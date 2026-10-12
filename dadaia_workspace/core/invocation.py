@@ -84,7 +84,7 @@ def sanitize_session_id(raw: str | None) -> str:
 def resolve_session_id(env: Mapping[str, str]) -> str:
     """The one session-id rule, sanitized: ``DADAIA_SESSION_ID``, then
     :data:`HARNESS_SESSION_ID_ENV_VARS`, else ``""``. Env only: ``context bind`` sees no
-    hook payload, so a payload id would be an id no bind can ever record (ADR 0116)."""
+    hook payload, so a payload id would be an id no bind can ever record."""
     candidate = env.get("DADAIA_SESSION_ID") or next(
         filter(None, map(env.get, HARNESS_SESSION_ID_ENV_VARS)), ""
     )
@@ -268,7 +268,7 @@ def resolve_context_specs_dir(workspace_root: Path, context: str) -> Path | None
 
 def alive_context_trees(workspace_root: Path) -> dict[str, Path]:
     """Every ALIVE context name -> its ``specs/`` tree, in registry order: one registry read
-    (a hook's cost never grows with the registry, ADR 0118). Names are unique: every store
+    (a hook's cost never grows with the registry). Names are unique: every store
     insert refuses a registered name (``SpecContextService._validate``)."""
     return {
         str(e["name"]): _specs_tree(workspace_root, slug)

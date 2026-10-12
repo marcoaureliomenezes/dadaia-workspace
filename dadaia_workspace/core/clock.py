@@ -1,4 +1,4 @@
-"""The package's door to the one UTC clock, ``dd-bug-resolution/scripts/_clock.py`` (AC11.4)."""
+"""The package's door to the one UTC clock, ``dd-bug-resolution/scripts/_clock.py``."""
 
 from __future__ import annotations
 

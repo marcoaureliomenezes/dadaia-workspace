@@ -1,7 +1,7 @@
-"""Pure data types for the push-range git object scan (SPEC v0.9.0 FR1).
+"""Pure data types for the push-range git object scan.
 
 Zero I/O (core ring rule): only the result shape, the typed failure, and the branch-
-deletion sentinel live here. The sole adapter (subprocess-backed, ADR-0001: one
+deletion sentinel live here. The sole adapter (subprocess-backed: one
 adapter, no port) lives in ``infrastructure/git_objects.py``. Kept in ``core/models/``
 rather than the adapter module itself so ``features/chokepoints/**`` — a
 security-sensitive push-gate surface that must NEVER gain subprocess reach, even
@@ -15,7 +15,7 @@ from dataclasses import dataclass
 
 from dadaia_workspace.core.skill_owner import load_owner
 
-#: A zero sha marks a branch deletion (SPEC FR1 row 3) — never scanned, always an empty
+#: A zero sha marks a branch deletion — never scanned, always an empty
 #: range. Shared here (rather than re-derived per module) so the adapter and its
 #: consumers agree on the sentinel without either importing the other's internals.
 ZERO_SHA = "0" * 40
@@ -25,45 +25,28 @@ SHA_SHAPE_RE = load_owner("dd-bug-resolution", "_grammar").OBJECT_ID_RE
 
 @dataclass(frozen=True)
 class ScannedObject:
-    """One blob newly reachable in a pushed range (SPEC v0.9.0 FR1).
+    """One blob or message body newly reachable in a pushed range.
 
-    ``decodable`` is False for a binary blob (FR6 row 3) or an oversized blob whose
-    scanned prefix failed to decode (SPEC v0.11.0 A4.6) — ``text`` is then the empty
-    string; undecodable bytes cannot be usefully matched by a text denylist, so the
-    matcher skips and counts it instead of raising.
+    ``decodable`` is False for a binary blob, or an oversized blob whose scanned prefix
+    failed to decode; ``text`` is then the empty string, and the matcher skips and counts
+    the object instead of raising.
 
-    ``oversized`` (SPEC v0.11.0 FR4, supersedes the v0.9.0 total-blind-spot R3 guard)
-    is True when the blob's GIT-REPORTED size exceeds the adapter's per-object cap. The
-    adapter never fetches the whole such blob: it reads at most the cap's worth of
-    bytes through a separate, bounded stream and closes it early, so the remainder is
-    genuinely never fetched. When that prefix IS valid UTF-8, ``decodable`` is True and
-    ``text`` carries the DECODED PREFIX (not the whole blob) — the matcher scans it like
-    any other object, so a match inside the first cap bytes still produces a hit
-    (partial coverage, not zero coverage). ``size_bytes`` (the blob's total size) and
-    ``scanned_bytes`` (how many bytes were actually read) are populated only when
-    ``oversized`` is True; both default to 0 for an ordinary, non-oversized object.
+    ``oversized`` is True when the git-reported size exceeds the adapter's per-object cap.
+    The adapter reads at most the cap's worth of bytes and closes the stream early. When
+    that prefix is valid UTF-8, ``decodable`` is True and ``text`` is the decoded prefix,
+    so a match inside the first cap bytes still produces a hit. ``size_bytes`` and
+    ``scanned_bytes`` are populated only when ``oversized`` is True; both default to 0.
 
-    ``prior_text`` (SPEC v0.11.0 FR2, ADR D7) is the published prior text of this SAME
-    path, at the resolvable base — ``None`` is an EXPLICIT absence, never an empty
-    string. Absence covers four situations the adapter never distinguishes further (the
-    FR1 amnesty predicate treats all four identically): the range has no single
-    published base (the ``--not --remotes`` fallback shape — no object anywhere carries
-    prior content in that shape); the path did not exist at the base (a genuinely new
-    file); the prior blob at the base exceeds the adapter's size cap; or the prior blob
-    at the base is not valid UTF-8. A non-``None`` value is always the FULL prior
-    content at that path (never truncated) — the resolvable-base lookup only ever
-    fetches prior blobs already known to be under the cap. Not populated for an
-    oversized CURRENT object (stays ``None``) — the prior-side lookup rides the FR9
-    batched chunk loop only, never the oversized per-object path.
+    ``prior_text`` is the full prior text of this same path at the resolvable base, never
+    truncated. ``None`` is an explicit absence: no single published base, the path did not
+    exist at the base, the prior blob exceeds the size cap, or it is not valid UTF-8. It
+    is always ``None`` for an oversized current object.
 
-    ``kind`` (v0.4.3 T-043-15/FR11) discriminates what this object actually is:
-    ``"blob"`` (the default — every pre-v0.4.3 object, unchanged) is a real blob at a
-    real repo-relative ``path``; ``"commit"`` is one commit's message BODY (never its
-    ``author``/``committer`` headers, A11.6) with a synthetic, non-path ``path`` label;
-    ``"tag"`` is an annotated tag's own body, same shape, yielded only for a tag-ref
-    push. A ``"commit"``/``"tag"`` object NEVER carries a real path — there is nothing
-    to key a prior-text amnesty lookup on, so ``prior_text`` is always ``None`` for it,
-    fail-closed by construction (A11.7).
+    ``kind`` is ``"blob"`` (the default: a real blob at a repo-relative ``path``),
+    ``"commit"`` (one commit's message body, never its author or committer headers, with a
+    synthetic non-path ``path`` label) or ``"tag"`` (an annotated tag's body, yielded only
+    for a tag-ref push). A ``"commit"`` or ``"tag"`` object never carries a real path, so
+    its ``prior_text`` is always ``None``.
     """
 
     path: str

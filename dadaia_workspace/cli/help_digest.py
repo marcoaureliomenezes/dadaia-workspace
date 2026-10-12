@@ -1,8 +1,7 @@
 """Derived CLI help digest — generated from the live command tree, never transcribed.
 
-Backlog `cli-help-architecture-and-session-injection` (operator request 2026-08-23,
-docker/cobra model): the hand-written CLI skill was structurally condemned to rot
-(ghost verbs, 53% coverage). The digest is introspected from the Typer/Click tree —
+A hand-written CLI skill rots (ghost verbs, stale coverage). The digest is introspected
+from the Typer/Click tree —
 ONE source — written under ``.dadaia/agentic/`` by ``public install``
 and ``reconcile`` (NEVER at hook fire: hooks read the file, they never build it), and
 attached to every ctx-inject emission bind-independent.
@@ -43,7 +42,7 @@ def _root_command() -> object:
 @functools.lru_cache(maxsize=1)
 def command_paths() -> frozenset[tuple[str, ...]]:
     """Every command path of the live tree, root ``()`` included — walked ONCE per
-    process (0.4.7 FR2: the digest, the citation contract tests and the doctor's
+    process (the digest, the citation contract tests and the doctor's
     ``MEM-DRIFT-2`` share this one walk).
 
     Walked by duck-typing (``hasattr(cmd, "commands")``), never ``isinstance(cmd,

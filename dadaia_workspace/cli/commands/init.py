@@ -50,7 +50,7 @@ class InitPlan:
 
 
 def _interactive() -> bool:
-    """Prompts are asked only when a human can answer them (D1)."""
+    """Prompts are asked only when a human can answer them."""
     return sys.stdin.isatty()
 
 
@@ -61,7 +61,7 @@ def _root(directory: str) -> Path:
 
 
 def _profile_harness(directory: str) -> str:
-    """An existing workspace answers ``--harness`` from its own profile (AC2.1)."""
+    """An existing workspace answers ``--harness`` from its own profile."""
     root = _root(directory)
     if not (root / ".dadaia").is_dir():
         return ""
@@ -179,7 +179,7 @@ def init(
 
 
 def _reconcile_upgrade(root: Path, before: str | None, after: str | None) -> None:
-    """D3: re-init IS the upgrade — the freshly installed venv is reconciled."""
+    """Re-init is the upgrade: the freshly installed venv is reconciled."""
     result = reconcile_workspace(
         root,
         expected_version=after or "",

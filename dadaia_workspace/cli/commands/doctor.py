@@ -1,13 +1,9 @@
-"""CLI command: ``dadaia doctor`` — the ONE compliance surface (0.4.7 FR5, T-047-02).
+"""CLI command: ``dadaia doctor``, the one compliance surface.
 
 Three sections in fixed order — ``workspace`` (zones, root, harness dirs), ``specs``
 (the SPEC-DOC rules), ``ledgers`` (BL-SCHEMA/CONFLICT/STALE) — collected
 from one rule registry (:mod:`dadaia_workspace.core.doctor_rules`), rendered by one
-grammar, exited by one rule. ``dadaia specs doctor`` and
-``dadaia backlog doctor`` are DELETED, not aliased: three commands with three finding
-types, three renderings and three exit rules were the structural cause of a doctor bug
-family in which each doctor could independently report health over a tree the other two
-never read.
+grammar, exited by one rule.
 
 This module is the ONE place the three sections meet — the features stay mutually
 independent (each contributes rules over its own context and its own issue type, with
@@ -143,7 +139,7 @@ def _build_specs_doctor(specs_dir: Path | None, public_dir: str | None) -> Specs
         templates_dir=_TEMPLATES_DIR,
         # repo_root: specs/ sits directly at the repo root; feeds MEM-DRIFT-2.
         repo_root=specs_dir.parent,
-        # The ONE Typer walk (0.4.7 FR2), done here and handed in as plain data;
+        # The Typer walk, done here and handed in as plain data;
         # `features` never imports `cli`.
         command_paths=command_paths(),
     )
@@ -187,7 +183,7 @@ def _resolve_run(
         raise typer.Exit(1) from None
     target = resolve_context_specs_dir_for_cli(workspace_root, name)
     # The ONE place a context's tree is resolved: a tree `specs init` has not stamped yet
-    # is onboarding level 2 — nothing for the specs/ledgers sections to judge (AC3.1).
+    # is onboarding level 2 — nothing for the specs/ledgers sections to judge.
     return (
         workspace_root,
         service,
@@ -206,7 +202,7 @@ def _bound_context() -> str | None:
 def _onboarding_section(
     workspace_root: Path | None, scope: str | None, *, expired_only: bool
 ) -> SectionReport:
-    """The derived next step (FR6 AC6.1) as one info finding — never an error."""
+    """The derived next step as one info finding, never an error."""
     if workspace_root is None or expired_only:
         return _empty_section("workspace")
     try:

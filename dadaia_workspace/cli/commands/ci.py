@@ -43,8 +43,8 @@ def _no_canon_violations(paths: Iterable[str]) -> list[str]:
 
 
 def _gate_inputs(repo_root: Path, head: str) -> tuple[Gitflow, GateFixes]:
-    """The gitflow through the ONE reader (ADR 0048: committed first, one warning on the
-    default; an associated repo reads its owner's main repo), the fix inputs (the repo,
+    """The gitflow through the one reader (committed first, one warning on the default; an
+    associated repo reads its owner's main repo), the fix inputs (the repo,
     the live work branch by the ONE rule, cut locally or not, and HEAD's branch)."""
     from dadaia_workspace.container import build_git_client
 

@@ -1,4 +1,4 @@
-"""The package's door to the one atomic writer, ``dd-bug-resolution/scripts/_atomic.py`` (ADR 0246)."""
+"""The package's door to the one atomic writer, ``dd-bug-resolution/scripts/_atomic.py``."""
 
 from __future__ import annotations
 

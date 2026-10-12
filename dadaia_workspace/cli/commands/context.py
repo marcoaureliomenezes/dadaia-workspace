@@ -44,7 +44,7 @@ from dadaia_workspace.features.spec_context.service import (
 from dadaia_workspace.features.workspace import onboarding
 
 app = typer.Typer(help="Manage Spec Context Projects.")
-# FR17 (v0.4.4, T-044-28): associated-repo registry verbs, nested under `context repo`
+# Associated-repo registry verbs, nested under `context repo`
 # — same `app.add_typer` pattern as `specs release`/`specs segment`.
 repo_app = typer.Typer(help="Manage a context's associated repos (main repo excluded).")
 app.add_typer(repo_app, name="repo")
@@ -62,8 +62,8 @@ def _ctx_service() -> SpecContextService:
 
 def _ctx_to_dict(svc: SpecContextService, ctx: SpecContextProject) -> dict[str, Any]:
     """The one record ``list`` and ``show`` render, JSON and table alike; every branch
-    resolved live through ``repos_live_status`` (FR18/A18.3), the stored snapshot kept
-    as ``stored_branch`` (A18.1); ``gitflow`` is the one reader's, off the main repo (ADR 0144)."""
+    resolved live through ``repos_live_status``, the stored snapshot kept as
+    ``stored_branch``; ``gitflow`` is the one reader's, off the main repo."""
     statuses = svc.repos_live_status(ctx)
     main_status, associated_statuses = statuses[0], statuses[1:]
     main_path = resolve_workspace_root() / "repos" / ctx.repo_slug
@@ -98,20 +98,20 @@ def _ctx_to_dict(svc: SpecContextService, ctx: SpecContextProject) -> dict[str, 
 
 
 def _sessions_dir(workspace_root: Path) -> Path:
-    # Session-store path via the single owner (T-011-05 / FR-W1-05, ADR-12) — the bind CLI
-    # no longer constructs the ``.dadaia/sessions`` path itself.
+    # Session-store path via the single owner — the bind CLI
+    # constructs no ``.dadaia/sessions`` path itself.
     return session_store.sessions_dir(workspace_root)
 
 
 def _live_session(workspace_root: Path, session_id: str) -> dict[str, Any] | None:
     """This caller's own session record, or ``None`` when absent/stale — the single
-    owner's predicate (:func:`core.session_store.live_session`, F002)."""
+    owner's predicate (:func:`core.session_store.live_session`)."""
     record = session_store.live_session(workspace_root, session_id)
     return None if record is None else dict(record)
 
 
 def print_next_step(workspace_root: Path, focus: str | None = None) -> None:
-    """The derived onboarding next step (FR6 AC6.2) — the text ``doctor`` also reports."""
+    """Print the derived onboarding next step, the text ``doctor`` also reports."""
     trees = alive_context_trees(workspace_root)
     bind, session = own_bind_for_cli()
     step = onboarding.next_step(
@@ -122,7 +122,7 @@ def print_next_step(workspace_root: Path, focus: str | None = None) -> None:
 
 
 def create_fix(root: Path, error: Exception, name: str | None, urls: list[str]) -> str:
-    """The invocation, every ``--associated-repo`` kept (AC3.5); what failed is the
+    """The invocation, every ``--associated-repo`` kept; what failed is the
     operator's choice, named in words — never the failing command repeated; an owned slug
     names its owner."""
     if isinstance(error, ContextAlreadyExistsError):
@@ -334,7 +334,7 @@ def bind(name: str = typer.Argument(..., help="Context name to bind to")) -> Non
             fail(f"Context '{name}' is DEAD — bring it back first.", fix)
     except ContextNotFoundError as e:
         fail(e)
-    # ADR 0116: the gate, the hooks and this record share one id; bind never mints one.
+    # The gate, the hooks and this record share one id; bind never mints one.
     session_id = resolve_session_id(os.environ)
     if not session_id:
         fail(
@@ -357,7 +357,7 @@ def bind(name: str = typer.Argument(..., help="Context name to bind to")) -> Non
     console.print(f"[green]✓[/green] Bound to '[bold]{name}[/bold]' (session id: {session_id})")
 
 
-# ------------------------------------------------------------------ context repo (FR17)
+# ------------------------------------------------------------------ context repo
 
 
 @repo_app.command(name="add")
@@ -445,6 +445,3 @@ def delete(name: str = typer.Argument(..., help="Context name to delete")) -> No
         console.print(f"[green]✓[/green] Context '[bold]{name}[/bold]' deleted")
     except (ContextNotFoundError, ContextStateError) as e:
         fail(e)
-
-
-# v2 removals: activate/deactivate/promote/use removed in v0.1.7

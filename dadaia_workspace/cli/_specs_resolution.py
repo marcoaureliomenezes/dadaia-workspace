@@ -1,11 +1,9 @@
-"""The single CLI bind-resolution seam (v0.1.50 FR4; generalized v0.1.77 FR1).
+"""The CLI bind-resolution seam: the one place a resolver-driven command resolves its context.
 
 Every resolver-driven ``dadaia`` command resolves through this module — its specs
-directory via :func:`resolve_specs_dir_for_cli`, or (v0.1.77) the bound CONTEXT NAME
-itself via :func:`resolve_context_for_cli`. A thin call onto the single resolution
-authority (release K1, the "One Invocation" deepening, 2026-08-28 audit):
-:mod:`dadaia_workspace.core.invocation`. This module's OWN job is the CLI-specific
-allowlist validation FR3 documents below — resolution itself has exactly one home now.
+directory via :func:`resolve_specs_dir_for_cli`, or the bound context name itself via
+:func:`resolve_context_for_cli`. A thin call onto :mod:`dadaia_workspace.core.invocation`,
+which owns resolution; this module adds only the CLI-specific allowlist validation.
 
 An *explicit* context name is gated by :data:`~dadaia_workspace.core.invocation.CONTEXT_NAME_RE`
 before any ``repos/<name>/specs`` join; an ambient ``DADAIA_CONTEXT`` is judged by the
@@ -32,10 +30,9 @@ from dadaia_workspace.core.invocation import (
 from dadaia_workspace.core.invocation import resolve_session_id as _resolve_session_id
 from dadaia_workspace.core.invocation import resolve_specs_dir as _core_resolve_specs_dir
 
-#: Re-exports so a verb never reaches ``core.invocation`` directly (FR3,
-#: ``bind-resolution-seam-is-a-single-home``). The contract takes ZERO ignore_imports,
-#: so every consumer of the harness-session-id env-var list, the session-id rule, or the
-#: name->repo-slug mapping routes through this seam.
+#: Re-exports so a verb never reaches ``core.invocation`` directly: every consumer of the
+#: harness-session-id env-var list, the session-id rule, or the name->repo-slug mapping
+#: routes through this seam.
 HARNESS_SESSION_ID_ENV_VARS = _HARNESS_SESSION_ID_ENV_VARS
 resolve_session_id = _resolve_session_id
 alive_context_trees = _alive_context_trees
@@ -74,9 +71,9 @@ def own_bind_for_cli() -> tuple[str | None, str | None]:
 
 
 def resolve_context_specs_dir_for_cli(workspace_root: Path, context: str) -> Path | None:
-    """Seam wrapper over the ONE context->specs resolver (T-053-01/F003): registry
-    ``repo_slug`` mapping, no fallback tree (0.4.8 R4). CLI verbs import THIS, never
-    ``core.invocation`` directly (bind-resolution-seam-is-a-single-home)."""
+    """Wrap the one context->specs resolver: the registry ``repo_slug`` mapping, no fallback
+    tree. Returns the specs directory, or None when the context is not registered.
+    CLI verbs import this, never ``core.invocation`` directly."""
     return _core_resolve_context_specs_dir(workspace_root, context)
 
 

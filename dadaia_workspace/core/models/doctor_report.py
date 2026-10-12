@@ -1,20 +1,17 @@
 """Typed doctor report — the single severity/verdict authority for diagnostic surfaces.
 
-Bug class (public-doctor-exits-zero-despite-error): diagnostic severity used to travel
-as a string prefix (``"[error] ..."``) in a ``list[str]``, and every consumer re-derived
-it by ``startswith`` against a CLOSED prefix list frozen at its own birth. A producer
-emitting a vocabulary the consumer never learned fell into a decorative ``else`` branch
-— printed, styled plain, and treated as harmless. The default was fail-open.
+Diagnostic severity is a typed :class:`DoctorStatus`, never a string prefix that each
+consumer re-derives.
 
-This module inverts that by construction:
+This module holds that by construction:
 
 - A producer cannot emit a line without choosing a :class:`DoctorStatus` member.
 - Every member's blocking-ness is decided HERE, at declaration, in ``_BLOCKING`` —
   adding a status without deciding whether it blocks is unrepresentable.
 - Consumers never parse: the verdict is :attr:`DoctorReport.blocking`, one authority.
 
-``DoctorLine.render()`` reproduces the legacy wire format byte-for-byte (``[status] text``)
-so golden byte-locks and human-facing output are unchanged by the migration.
+``DoctorLine.render()`` renders the ``[status] text`` wire format byte-for-byte, so golden
+byte-locks and human-facing output stay fixed.
 """
 
 from __future__ import annotations
@@ -26,7 +23,7 @@ __all__ = ["DoctorLine", "DoctorReport", "DoctorStatus", "attest"]
 
 
 class DoctorStatus(StrEnum):
-    """Every status a doctor/check surface may emit. Value == legacy prefix token."""
+    """Every status a doctor/check surface may emit. Value == its ``[status]`` prefix token."""
 
     OK = "ok"
     DRIFT = "drift"
@@ -66,7 +63,7 @@ _BLOCKING: frozenset[DoctorStatus] = frozenset(
 
 
 #: Escapes for every C0 control character (0x00-0x1F), the rendering authority's CWE-117
-#: fix (FR3 item 2): a producer's ``text`` can never forge a second physical line
+#: fix: a producer's ``text`` can never forge a second physical line
 #: through an embedded ``\n``/``\r``/ESC (or any other C0 byte). ``\n``/``\r``/ESC keep
 #: their familiar short form; every other C0 byte gets a ``\xHH`` escape. A NO-OP on
 #: clean text — no key in this table ever appears in a committed golden line, so
@@ -91,7 +88,7 @@ class DoctorLine:
     fix: str = ""  # the one remedy for this finding; never rendered, read by the verdict
 
     def render(self) -> str:
-        """Legacy wire format, byte-identical to the historical string lines.
+        """Render the ``[status] text`` wire format, byte for byte.
 
         ``text`` is escaped for C0 control characters (``\\n``, ``\\r``, ESC, and every
         other 0x00-0x1F byte) before rendering — CWE-117: no producer, present or
@@ -113,16 +110,16 @@ class DoctorReport:
         return any(line.status.blocking for line in self.lines)
 
     def rendered(self) -> list[str]:
-        """All lines in the legacy wire format (goldens, tests, display)."""
+        """All lines in the ``[status] text`` wire format (goldens, tests, display)."""
         return [line.render() for line in self.lines]
 
 
 def attest(check_id: str, lines: list[DoctorLine]) -> list[DoctorLine]:
     """An ATTESTING check always speaks — silence is unrepresentable.
 
-    Bug class (the vanished ``rule-corpus`` check): a check that emits ``[ok]`` only
-    when it finds applicable objects disappears from the report the day its universe
-    empties — indistinguishable from green. Wrap every attesting check's result: an
+    A check that emits ``[ok]`` only when it finds applicable objects disappears from the
+    report when its universe empties, indistinguishable from green. Wrap every attesting
+    check's result: an
     empty result becomes an explicit ``[not-applicable] check:<id>`` line, so a golden
     diff shows the check going quiet instead of the check going missing.
 

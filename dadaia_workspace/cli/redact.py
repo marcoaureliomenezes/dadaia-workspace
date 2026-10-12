@@ -2,7 +2,7 @@
 
 Services keep returning true names; :func:`build_context_redactor` is the one builder,
 :class:`ContextRedactor` masks each rendered string or JSON leaf as
-``[REDACTED-CONTEXT-<n>]``, ordinal by first appearance in one invocation (SPEC A8.3),
+``[REDACTED-CONTEXT-<n>]``, ordinal by first appearance in one invocation,
 on top of ``core/redaction.Redactor``.
 """
 
@@ -16,7 +16,7 @@ from dadaia_workspace.cli._specs_resolution import resolve_context_for_cli
 from dadaia_workspace.core.models.spec_context import SpecContextProject
 from dadaia_workspace.core.redaction import UNSAFE_FORMAT_CHARS_RE, Redactor, mask, privacy_matches
 
-#: SPEC FR8 placeholder shape.
+#: Placeholder shape of a masked context name.
 _PLACEHOLDER_FMT = "[REDACTED-CONTEXT-{n}]"
 
 
@@ -25,10 +25,9 @@ class ContextRedactor:
 
     Construct ONE instance per command invocation with the full candidate set (every
     known Spec Context name and repo slug), minus whatever must stay visible (the
-    caller's own resolved context name and repo slug — SPEC FR8: "other than the
-    caller's resolved context"). Reuse the same instance across every piece of output
+    caller's own resolved context name and repo slug). Reuse the same instance across every piece of output
     the command renders, in rendering order, so the underlying :class:`Redactor`
-    accumulates ordinals in the true first-appearance order of the invocation (A8.3).
+    accumulates ordinals in the true first-appearance order of the invocation.
     """
 
     def __init__(self, candidates: Iterable[str], *, exclude: Iterable[str | None] = ()) -> None:
@@ -57,7 +56,7 @@ class ContextRedactor:
         """Recursively redact string leaves of a JSON-shaped value.
 
         Keys and every non-string leaf (bool/int/float/None) pass through unchanged —
-        the redacted JSON always carries the SAME key set as the source (A8.4).
+        the redacted JSON always carries the SAME key set as the source.
         """
         if isinstance(value, str):
             return self.text(value)

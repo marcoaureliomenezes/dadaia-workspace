@@ -32,7 +32,7 @@ class InvalidContextNameError(DadaiaError, ValueError):
 
     Raised at ``SpecContextService.register``/``add_repo`` — the one place every registry
     insert passes — so ``context create``, ``context repo add`` and ``dadaia import`` refuse
-    the same names (bug import-registers-unvalidated-slugs-that-doctor-fix-inv5-rmtrees).
+    the same names.
     """
 
 
@@ -105,7 +105,7 @@ class WorkspaceVenvBootstrapError(DadaiaError, RuntimeError):
     """Workspace venv bootstrap could not create the venv or install the distribution.
 
     Inherits ``DadaiaError`` so the CLI entrypoint renders it as ONE operator-facing
-    line (bug r3b-portability-import-venv-permission, F-22 class): as a bare
+    line: as a bare
     ``RuntimeError`` it slipped past ``cli/main``'s ``except DadaiaError`` and every
     venv-bootstrap failure — ``init``, ``import``, ``certify``, ``reconcile`` alike —
     reached the operator as a raw traceback. ``RuntimeError`` is kept in the bases so
@@ -114,7 +114,7 @@ class WorkspaceVenvBootstrapError(DadaiaError, RuntimeError):
 
 
 class WorkspaceVenvNewerError(WorkspaceVenvBootstrapError):
-    """The workspace venv carries a NEWER dadaia-workspace than the running one (AC2.3).
+    """The workspace venv carries a NEWER dadaia-workspace than the running one.
 
     A downgrade is refused before any write; *installed* names the version to run
     ``init`` with instead.
@@ -134,7 +134,7 @@ class BootstrapPackageError(DadaiaError, ValueError):
     A dangling value is the normal state after a candidate wheel is replaced, so the
     message must name the offending value and what is required of it — a bare
     ``ValueError`` said neither and (before the CLI boundary landed) tracebacked
-    (bug f22-cli-boundary-is-a-whitelist-not-a-boundary). ``ValueError`` is kept in the
+    ``ValueError`` is kept in the
     bases so existing ``except ValueError`` call sites keep working.
     """
 

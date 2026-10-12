@@ -113,7 +113,7 @@ def validate(
             )
         target_paths = list(paths)
 
-    # Bug ancestor-walk-workspace-root-silent-mistarget (T-043-47/A30.5): name the
+    # Name the
     # resolved workspace root (stderr — never pollutes --json's stdout list shape) once
     # the invocation is accepted, so a refusal's first line stays `Error:`.
     print(f"Resolved workspace root: {workspace_root}", file=sys.stderr)
@@ -168,7 +168,7 @@ def validate(
             f"(of {len(results)} files)"
         )
 
-    # Exit-code truthfulness (validation-029 F-12): an INVALID file is a hard failure
+    # An INVALID file is a hard failure
     # — printing INVALID while exiting 0 masked tampered/malformed handoffs from every
     # consuming script.
     if n_invalid > 0:

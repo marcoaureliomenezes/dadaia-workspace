@@ -75,7 +75,7 @@ def build_git_client() -> GitSubprocessClient:
 
 
 def build_public_service() -> PublicAssetService:
-    # v0.1.65 FR7 (D-4): the agent-model-policy overlay loader is injected here so the
+    # The agent-model-policy overlay loader is injected here so the
     # features-layer service never imports the infrastructure store directly.
     from dadaia_workspace.infrastructure.json_agent_model_policy_store import (
         JsonAgentModelPolicyStore,
@@ -88,10 +88,10 @@ def build_public_service() -> PublicAssetService:
 
 
 def build_git_object_reader() -> GitSubprocessObjectReader:
-    """Composition-root seam for the push-range object reader (v0.9.0 FR1/FR7; ADR-0001:
-    the sole adapter ``ci.push_gate_check`` reads the pushed range through).
+    """Composition-root seam for the push-range object reader: the sole adapter
+    ``ci.push_gate_check`` reads the pushed range through.
 
-    As of v0.4.3 T-043-15/FR11, the adapter this seam returns yields commit-object
+    The adapter this seam returns yields commit-object
     message bodies and (for a tag-ref push) annotated tag bodies IN ADDITION to blob
     content — see ``GitSubprocessObjectReader.new_objects``'s own docstring for the full
     contract.
@@ -100,7 +100,7 @@ def build_git_object_reader() -> GitSubprocessObjectReader:
 
 
 def load_denylist_terms() -> tuple[tuple[str, str], ...]:
-    """Composition-root seam over the operator privacy denylist (v0.9.0 FR3, source 1).
+    """Composition-root seam over the operator privacy denylist.
 
     ``push-gate-check`` reads operator terms through here rather than importing
     ``infrastructure.privacy_check`` directly (``cli-no-infrastructure``).
@@ -111,15 +111,15 @@ def load_denylist_terms() -> tuple[tuple[str, str], ...]:
 
 
 def load_denylist_baseline_patterns() -> tuple[BaselinePatternLike, ...]:
-    """Composition-root seam over the packaged baseline privacy patterns (v0.9.0 FR3,
-    source 2) — same accessor :func:`load_denylist_terms` reuses the sibling of."""
+    """Composition-root seam over the packaged baseline privacy patterns, the sibling of
+    :func:`load_denylist_terms`."""
     from dadaia_workspace.infrastructure.privacy_check import load_baseline_patterns
 
     return load_baseline_patterns()
 
 
 def scan_publish_candidates(repo: Path, rels: list[str]) -> dict[str, str]:
-    """AC5.6: the pre-push matcher, in-process, over the files baseline is about
+    """The pre-push matcher, in-process, over the files baseline is about
     to commit, before any hook could see them.
     Read as the object reader reads a blob: undecodable bytes are scanned by path only."""
     from dadaia_workspace.core.models.git_scan import ScannedObject

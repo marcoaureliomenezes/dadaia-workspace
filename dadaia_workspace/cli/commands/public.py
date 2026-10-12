@@ -20,7 +20,7 @@ console = Console()
 def stage() -> None:
     """Stage packaged public assets into .dadaia/agentic/."""
     workspace_root = resolve_workspace_root()
-    # Defence-in-depth (rc-4 / T-017-36, bug agent-skill-surface-slop): fail staging on broken
+    # Defence-in-depth: fail staging on broken
     # agent→skill references so a stage with dangling skills never silently succeeds (doctor
     # also catches these post-hoc; this blocks them at the source).
     from dadaia_workspace.infrastructure.entity_doctor import check_agent_skill_refs

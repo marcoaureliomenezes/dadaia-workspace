@@ -5,10 +5,10 @@ was scaffolded for (``dadaia init --harness <set>``). It is the in-memory shape 
 ``infrastructure`` JSON adapter serialises to ``.dadaia/states/harness_profile.json`` and
 that ``public_assets`` install/doctor scope on.
 
-**No I/O here (A1 seam, v0.1.58).** This module mirrors the *discipline* of
+**No I/O here.** This module mirrors the *discipline* of
 ``core/models/spec_context.py`` — a frozen dataclass with zero filesystem or ``json``
 coupling. Serialisation lives in ``infrastructure/json_harness_profile_store.py`` — the
-one reader and writer, which ``dadaia init`` also goes through (T-046-32). The
+one reader and writer, which ``dadaia init`` also goes through. The
 ``core-no-os-primitives`` contract does not ban
 ``json``/``pathlib``, so keeping them out is a deliberate ports-and-adapters precedent,
 not a lint catch.

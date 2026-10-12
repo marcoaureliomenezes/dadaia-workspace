@@ -1,4 +1,4 @@
-"""The ONE spelling of the workspace CLI and its venv tools (ADR 0045): absolute paths,
+"""The ONE spelling of the workspace CLI and its venv tools: absolute paths,
 so every ``fix:`` runs from any cwd — ``shlex`` on POSIX; on Windows forward slashes, a
 part holding a blank quoted whole — the executable's quote opened after its drive letter
 (``C":/a b/x.exe"``), since a line opening with a quote is a PowerShell expression."""

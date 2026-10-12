@@ -1,5 +1,5 @@
 """The package's door to the one frontmatter grammar, ``dd-bug-resolution/scripts/_frontmatter.py``
-(ADR 0246): a stdlib strict subset of YAML that equals ``yaml.safe_load`` or refuses.
+A stdlib strict subset of YAML that equals ``yaml.safe_load`` or refuses.
 
 A memory atom is not read here: its one grammar is the stdlib reader ``memory.py`` ships
 (``features/specs/memory_canon.parse_atom``). A failure names its kind (no block, invalid

@@ -79,7 +79,7 @@ def live_release_id(specs_dir: Path) -> str | None:
 
 
 def resolve_live_candidate(specs_dir: Path) -> Path | None:
-    """The live release's highest-numbered ``rc-<N>/`` (ADR 0150) — `_release_store`'s
+    """The live release's highest-numbered ``rc-<N>/`` — `_release_store`'s
     `candidate_dir` rule; ``None`` with no live release or no candidate folder."""
     release_id = live_release_id(specs_dir)
     return candidate_dir(specs_dir / "releases" / release_id) if release_id else None

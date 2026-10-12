@@ -1,5 +1,5 @@
 """Which model an agent gets — the one module: the tier-to-Codex map, the built-in
-agent-model templates (ADR 0022, ADR 0240) and the operator overlay's resolution.
+agent-model templates and the operator overlay's resolution.
 
 Contract: templates name a tier by alias; a new model release needs no library change.
 Claude resolves the alias itself; :data:`TIER_CODEX` maps it to the Codex id. Pure data +
@@ -24,11 +24,11 @@ TIER_CODEX: dict[str, str] = {
 
 CodexEffort = Literal["high", "medium", "low"]
 
-#: Rendered Claude reasoning-effort vocabulary (D-3).
+#: Rendered Claude reasoning-effort vocabulary.
 ClaudeEffort = Literal["low", "medium", "high", "xhigh", "max"]
 CLAUDE_EFFORTS: tuple[ClaudeEffort, ...] = get_args(ClaudeEffort)
 
-#: D-3 fixed clamp map: resolved Claude effort -> codex ``model_reasoning_effort``.
+#: Fixed clamp map: resolved Claude effort -> codex ``model_reasoning_effort``.
 _CODEX_EFFORT_CLAMP: dict[ClaudeEffort, CodexEffort] = {
     "low": "low",
     "medium": "medium",
@@ -39,11 +39,11 @@ _CODEX_EFFORT_CLAMP: dict[ClaudeEffort, CodexEffort] = {
 
 
 def codex_effort_for_claude_effort(effort: ClaudeEffort) -> CodexEffort:
-    """Clamp a resolved Claude effort to the 3-valued codex effort axis (D-3)."""
+    """Clamp a resolved Claude effort to the 3-valued codex effort axis."""
     return _CODEX_EFFORT_CLAMP[effort]
 
 
-#: Schema identifier for the overlay document (FR3).
+#: Schema identifier for the overlay document.
 _SCHEMA_VERSION = "agent-model-policy-v1"
 
 #: Where a resolved (model, effort) came from.
@@ -60,12 +60,12 @@ class AgentModelAssignment:
 
 @dataclass(frozen=True)
 class AgentModelPolicyOverlay:
-    """Parsed, validated operator overlay (FR3 document shape)."""
+    """Parsed, validated operator overlay."""
 
     applied_template: str | None = None
 
     def to_dict(self) -> dict[str, object]:
-        """Serialize back to the FR3 document shape (omit an absent template)."""
+        """Serialize back to the document shape (omit an absent template)."""
         doc: dict[str, object] = {"schema_version": _SCHEMA_VERSION}
         if self.applied_template is not None:
             doc["applied_template"] = self.applied_template
@@ -82,7 +82,7 @@ class ResolvedAgentModel:
 
 
 class AgentModelPolicyStoreError(DadaiaError):
-    """Actionable agent-model-policy overlay failure (missing != invalid; FR3).
+    """Actionable agent-model-policy overlay failure (missing != invalid).
 
     *problem* is the finding; *fix* its one remedy (``""`` when none), joined into the
     message the CLI boundary prints, like ``SchemaVersionError``.
@@ -94,7 +94,7 @@ class AgentModelPolicyStoreError(DadaiaError):
 
 DEFAULT_TEMPLATE_ID = "balanced"
 
-#: ADR 0022's table: template id -> core agent -> (tier alias, effort); ``balanced`` is the default.
+#: The table: template id -> core agent -> (tier alias, effort); ``balanced`` is the default.
 TEMPLATES: dict[str, dict[str, AgentModelAssignment]] = {
     "balanced": {
         "dd-product-engineer": AgentModelAssignment("opus", "high"),

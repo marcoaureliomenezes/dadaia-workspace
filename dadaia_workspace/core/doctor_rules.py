@@ -1,13 +1,4 @@
-"""The ONE doctor rule record and section collector (release 0.4.7 FR5, T-047-02).
-
-Before this module the workspace had THREE doctors — ``dadaia doctor`` (zones),
-``dadaia specs doctor`` (the SPEC-DOC rules) and ``dadaia backlog doctor`` (BL-*) —
-each with its own command, option parsing, finding type, rendering grammar, exit rule
-and compliance notion (two had none). That is the structural cause of the doctor bug
-family: a record class nobody's doctor read (``archived-release-state-invalid-and-
-unparseable-doctor-silent``), a CLI surface the subject registry could not anchor
-(``backlog-subject-registry-lacks-top-level-doctor-cli-anchor``), and three renderings
-that could each claim health independently.
+"""The one doctor rule record and section collector.
 
 One record type (:class:`Rule`), one normalized finding (:class:`SectionFinding`), one
 collector (:func:`run_section`). A feature keeps its own module, emits
@@ -57,7 +48,7 @@ class SectionFinding:
     canonical: bool
     #: An error-class finding makes the run exit 1.
     error: bool
-    #: The ONE executable remediation (0.4.7 FR2). Mandatory on an error-class finding:
+    #: The one executable remediation. Mandatory on an error-class finding:
     #: an exit-1 finding with nothing to run is a Stall. Stamped from the emitting
     #: rule's ``fix_help`` by :func:`run_section` when the section left it empty.
     fix: str = ""
@@ -76,7 +67,7 @@ class Rule[C]:
     run: Callable[[C], list[SectionFinding]]
     fix: Callable[[C, SectionFinding], None] | None = None
     #: A shell line, or a workspace-CLI argv tuple that :func:`rule_fix` renders with
-    #: ``fix_line`` from the doctored workspace's root (ADR 0045).
+    #: ``fix_line`` from the doctored workspace's root.
     fix_help: str | tuple[str, ...] | None = None
 
 
@@ -141,11 +132,8 @@ def _with_fix[C](
 ) -> SectionFinding:
     """Stamp the emitting rule's ``fix_help`` onto *finding*.
 
-    0.4.7 FR2 — every BLOCK carries one executable fix. That every error-class rule
-    carries a ``fix_help`` is proven statically, before the operator ever runs the
-    doctor, by ``tests/core/test_cli_line__every_block_carries_a_fix.py``; raising here would
-    turn a rule-authoring defect into a traceback, which is a refusal with no message
-    at all.
+    Every BLOCK carries one executable fix. Raising here would turn a rule-authoring
+    defect into a traceback, which is a refusal with no message at all.
     """
     repair = finding.fixable or rule.fix_help != ("doctor", "--fix")
     return replace(finding, fix=finding.fix or (rule_fix(rule, root, specs) if repair else ""))
