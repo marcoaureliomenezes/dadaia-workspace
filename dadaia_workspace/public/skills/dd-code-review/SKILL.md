@@ -70,9 +70,11 @@ axes are reported side by side with equal weight, so no axis hides another's fin
 
 One reviewer, six checklists applied on every verdict; the engineer anticipates them.
 
-- **Architecture** — root cause named; the diff shrinks or keeps the feature; per PLAN §1.1 row, every `deleted` gone and every `consults` calls the authority (S4/S5/S10).
+- **Architecture** — root cause named; the diff shrinks or keeps the feature; per PLAN §1.1 row, every `deleted` gone and every `consults` calls the authority (S4/S5/S10); a duplicated decider is flagged on the first pass; no component imports another's internals or forms a cycle, it reaches the other by running its entry point.
 - **Security** — OWASP top 10, secrets, dependency CVEs (the ecosystem's dependency audit), CWE id per finding.
 - **QA** — every acceptance scenario has evidence; the pyramid holds; tests keep the root map §1 basics; pruning only by a curation verdict; a bug fix adds a case and rewrites no assert (`git diff -U0 <base>...HEAD -- <the repo's test globs> | grep -E '^-.*<assertion keywords>'` prints nothing) — a miss is HIGH, verdict REJECTED.
+- **QA, platform and claims** — the diff holds on Windows, platform facts read from one module; each negative claim in a verdict carries its grep and hit count; a new assert holds no platform literal and a child process copies the parent's env; the verdict names its platform proof.
+- **QA, visual and format** — a visual change is judged by a screenshot framed on the reported symptom, after listing each layer that renders there; a changed grammar, format, stamp, fix line or public name is grepped across every repo of the context, and each consumer it breaks is HIGH.
 - **Product** — the diff matches SPEC scope; memory atoms still tell the truth (`.agents/skills/dd-release-implementation/MEMORY-UPDATE.md`).
 - **Audit** — `dd-audit-project` pillars over the window, `SLOP.md` S1-S10 in pillar 2; findings, never fixes.
 - **AI surface** — every agent, skill, rule or hook change satisfies the fifteen rules of `.agents/skills/dd-ai-eng-knowhow/AUTHORING.md`.
