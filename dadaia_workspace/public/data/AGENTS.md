@@ -18,8 +18,8 @@
 - Arm B: `propose -> operator confirms -> register -> lowest-level RED test -> root-cause fix -> GREEN -> resolved`.
 - Test: does the tool break its own contract? Yes -> Arm B. No -> Arm A.
 - A feature enters only through the backlog or an operator demand recorded in the SPEC `Origin`; a confirmed bug is fixed per `specs/bugs/AGENTS.md` §2.
-- Every change minimizes code and tests: DELETE → REBUILD → UPDATE → KEEP → ADD last; verbosity is a defect; documented behavior still works; tests assert behavior not text, mock only boundaries, expect literals; fixes never rewrite old asserts.
-- The SDD documents (`specs/releases/AGENTS.md`) are the record of progress.
+- Every change minimizes code and tests: DELETE → REBUILD → UPDATE → KEEP → ADD last; verbosity is a defect; documented behavior still works; tests assert behavior not text, mock only boundaries, expect literals; fixes never rewrite old asserts. A failing old test is a question: outside a fix, an existing assert is never moved, narrowed, removed or skipped to pass, nor a guard's reach narrowed, without the main thread's ruling named in a `test(...)` commit, and a product-contract change also needs the operator. Inventory existing gates and tools first; a new gate, lock, repo, layer or review round states what it buys and names the heavier one it deletes; non-blocking findings go to the next bug window.
+- The SDD documents (`specs/releases/AGENTS.md`) are the record of progress; numbers, durations and dates are measured or read from a named source, and law text holds no dated snapshot value.
 
 ## 2. Who does what
 
@@ -50,8 +50,8 @@
 
 - Root holds only: `<!-- root -->`; any other entry, the operator's included, needs a pattern in `.dadaiaignore`, which only the operator edits.
 - Temp: `.dadaia/tmp/<agent>/<YYYYMMDD>/`; handoffs: `.dadaia/handoff/<context>/`; HTML reports: `.dadaia/reports/<context>/`; worktrees: `worktrees/<repo>/<name>/`; caches: `.dadaia/tmp/<tool>-cache/` (absolute, harness env); anything an MCP server needs: `.dadaia/mcps/<server>/`.
-- A repo tree carries source and its own artifacts only — never `.dadaia/`; caches redirect by configuration (`repos/<slug>/AGENTS.md`).
-- Credentials live outside the workspace, in the operator's own file: never create, copy, persist, commit, print or report a secret, anywhere.
+- A repo tree carries source and its own artifacts only — never `.dadaia/`; caches redirect by configuration (`repos/<slug>/AGENTS.md`); unexplained files are presumed yours, uncommitted work not yours is never discarded or restored, and no infrastructure is probed on a guess.
+- Credentials live outside the workspace, in the operator's own file: never create, copy, persist, commit, print or report a secret, anywhere; the operator sets a secret from a real terminal, a job that uses it verifies it (never its name), and text is scrubbed before commit, not only at push, with generic names in review and QA text.
 - Register every dev server through `dd-cli-library`.
 
 ## 5. Scoped law — open before acting there
