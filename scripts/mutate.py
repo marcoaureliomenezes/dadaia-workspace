@@ -1,14 +1,19 @@
 """Diff-scoped mutation: ``python scripts/mutate.py --base <ref>`` mutates the lines
 ``git diff -U0 <ref>`` adds to non-test ``.py`` files, at most ``CAP`` mutants per line, and
-prints ``SURVIVED|KILLED|TIMEOUT <file>:<line> <kind>: <old> -> <new> [killing tests]``, the
-mutation score and the diff's line and branch coverage from one baseline run. ``--module
-<path>...`` mutates every line of those files instead (no diff, no coverage lines). Tests per
-file come from running ``impact.py`` unless ``--tests <path>...`` names them. A mutant run
-longer than ``--timeout`` seconds counts as killed and names no killer. ``--home <id>`` (a
-file, a node id or a prefix) adds, after the score, ``DELETABLE`` for each other test whose
-every killed mutant the home also kills, ``KEPT`` for the rest and ``NO-KILL`` for a test
-that ran and killed none. Refuses a dirty tracked tree; every mutated file is restored byte
-for byte. Standard library plus ``pytest-cov``; exit 0."""
+prints ``SURVIVED|KILLED|TIMEOUT|UNCOVERED <file>:<line> <kind>: <old> -> <new> [killing
+tests]``, the mutation score and the diff's line and branch coverage from one baseline run.
+``--module <path>...`` mutates every line of those files instead (no diff, no coverage
+lines). Tests per file come from running ``impact.py`` unless ``--tests <path>...`` names
+them. A mutant run longer than ``--timeout`` seconds counts as killed and names no killer.
+Before mutating a file its tests run once under per-test coverage: a mutant runs only the
+tests that executed its line, every test when import time or a child process executed it,
+and none when nothing did (``UNCOVERED``, counted in the score's total, not killed). A
+baseline that fails prints ``BASELINE RED <file>: <failed ids>`` and exits 1 before any
+mutation. ``--home <id>`` (a file, a node id or a prefix) adds, after the score,
+``DELETABLE`` for each other test whose every killed mutant the home also kills, ``KEPT``
+for the rest and ``NO-KILL`` for a test that ran and killed none. Refuses a dirty tracked
+tree; every mutated file is restored byte for byte. Standard library plus ``pytest-cov``;
+exit 0 on success, 1 on a red baseline, 2 on a usage error."""
 
 from __future__ import annotations
 
@@ -23,6 +28,8 @@ import sys
 import tempfile
 import tokenize
 from pathlib import Path
+
+from coverage import CoverageData
 
 ROOT = Path(__file__).resolve().parents[1]
 CAP = 3
@@ -133,6 +140,25 @@ def _killers(tests: list[str], env: dict[str, str], timeout: float) -> list[str]
     return sorted(set(re.findall(r"^(?:FAILED|ERROR) (\S+)", done.stdout, re.M)))
 
 
+def _executed_by(name: str, tests: list[str], env: dict[str, str]) -> dict[int, list[str]]:
+    """Per line of ``name``, the node ids that executed it (``""`` for no test context)."""
+    with tempfile.TemporaryDirectory(prefix="dadaia-mutate-") as tmp:
+        data = str(Path(tmp, ".coverage"))
+        done = _run(
+            sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider", "-p", "scripts.covdata",
+            f"--cov={name.split('/')[0]}", "--cov-context=test", "--cov-report=", "--tb=no",
+            "-rfE", *tests, env={**env, "COVERAGE_FILE": data},
+        )  # fmt: skip
+        if done.returncode:
+            failed = sorted(set(re.findall(r"^(?:FAILED|ERROR) (\S+)", done.stdout, re.M)))
+            print(f"BASELINE RED {name}: {', '.join(failed)}")
+            sys.exit(1)
+        cov = CoverageData(basename=data)
+        cov.read()
+        by_line = cov.contexts_by_lineno(str(ROOT / name))
+    return {n: sorted({c.split("|")[0] for c in cs}) for n, cs in by_line.items()}
+
+
 def _coverage(changed: dict[str, set[int]], env: dict[str, str]) -> list[str]:
     with tempfile.TemporaryDirectory(prefix="dadaia-mutate-") as tmp:
         report = Path(tmp, "cov.json")
@@ -195,6 +221,7 @@ def main() -> None:
         tests = args.tests or _tests_for(name)
         if args.home_id and tests:
             ran |= _test_ids(tests, env)
+        executed = _executed_by(name, tests, env) if tests else {}
         try:
             for m in _mutants(original.decode("utf-8"), lines):
                 total += 1
@@ -205,9 +232,15 @@ def main() -> None:
                 except SyntaxError:
                     total -= 1
                     continue
+                who = executed.get(m[1], []) if tests else []
+                if tests and not who:
+                    print(f"UNCOVERED {label}")
+                    continue
                 target.write_bytes(mutated.encode("utf-8"))
                 try:
-                    ids = _killers(tests, env, args.timeout) if tests else None
+                    ids = (
+                        _killers(tests if "" in who else who, env, args.timeout) if tests else None
+                    )
                 except subprocess.TimeoutExpired:
                     killed += 1
                     print(f"TIMEOUT {label}")
