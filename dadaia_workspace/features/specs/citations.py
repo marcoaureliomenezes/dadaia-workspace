@@ -1,9 +1,7 @@
 """Citation finders — dead `specs/` paths, dead `dadaia <verb>`s, dead skill pointers.
 
-Relocated out of ``tests/infrastructure/test_entity_doctor.py`` (0.4.7 FR2): the same three
-finders that keep every ``public/**`` asset honest now measure ``specs/memory/**``
-through the doctor's ``MEM-DRIFT-2`` and the derived documents through FR3 — one
-implementation, three consumers, no test-local copy.
+Three finders keep every ``public/**`` asset honest; they measure ``specs/memory/**``
+through the doctor's ``MEM-DRIFT-2`` and the derived documents: one implementation, three consumers.
 
 Pure over text plus plain data: a command-path set (walked ONCE by
 ``cli.help_digest.command_paths``; ``features`` never imports ``cli``) and the file
@@ -51,8 +49,7 @@ _SCOPED_AGENTS_TOKEN_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]*-AGENTS\.md$")
 
 def posix_relpath(path: PurePath, root: PurePath) -> str:
     """Render *path* relative to *root* in POSIX form — separator-agnostic, so a
-    violation's ``file:line`` citation is byte-identical on Windows and POSIX (bug
-    ``citation-mutation-fixtures-never-turn-red-on-windows``). Pure path arithmetic
+    violation's ``file:line`` citation is byte-identical on Windows and POSIX. Pure path arithmetic
     (no I/O), so it takes any ``PurePath``."""
     return path.relative_to(root).as_posix()
 
@@ -100,8 +97,7 @@ def dead_path_citations(
     or ``(sibling)``-annotated bare-filename citation in *text* must resolve on disk.
 
     *exempt* holds tokens proven to be projected INSTANCE realities absent from any
-    checkout (bug ``citation-enforcer-resolves-projected-instance-paths-against-the-
-    checkout``) — plain data, decided by the caller, never a second allowlist here.
+    checkout — plain data, decided by the caller, never a second allowlist here.
     Sibling citations resolve next to the document (*sibling_dir*) or anywhere under
     *sibling_roots*; with neither supplied they are not checked.
     """
@@ -186,7 +182,7 @@ def _numbered_headings(skill_md: Path) -> set[str]:
 
 def dead_body_pointers(text: str, *, rel: str, public_dir: Path) -> list[str]:
     """Every backticked ``dd-<name>`` token names a skill directory or a persona file
-    under *public_dir* (since 0.4.7 the three personas are ``dd-`` named too);
+    under *public_dir*;
     every `` `dd-x` §N `` pair names a ``## N.`` section of that skill's ``SKILL.md``;
     every backticked ``*-AGENTS.md`` filename resolves to an asset under *public_dir*.
     Returns ``file:line: …`` strings naming what to re-read."""

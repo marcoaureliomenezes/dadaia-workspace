@@ -52,12 +52,12 @@ def _onboarded(rel: str) -> bool:
 
 
 WorktreeRows = Callable[[Path, Collection[str]], tuple[list[dict[str, Any]], str, str]]
-"""The owner's open-worktree rows: ``(rows, failure, fix)`` (AC1.10)."""
+"""The owner's open-worktree rows: ``(rows, failure, fix)``."""
 
 
 class InstallHooks(Protocol):
     """The one git-chokepoint installer ``alive()`` runs in every repo of the set —
-    injected by the composition root (P-07: features compose through the container,
+    injected by the composition root (features compose through the container,
     never a sibling import). Installs where absent, never over an existing hook; raises
     when *repo_root* is not a git repository.
     """
@@ -67,7 +67,7 @@ class InstallHooks(Protocol):
 
 class SecretScan(Protocol):
     """The pre-push matcher, run in-process by the composition root over the files a
-    publish is about to commit (AC5.6: one registry, one engine); returns one masked
+    publish is about to commit (one registry, one engine); returns one masked
     finding per offending repo-relative path — empty when clean."""
 
     def __call__(self, repo: Path, rels: list[str]) -> dict[str, str]: ...
@@ -75,7 +75,7 @@ class SecretScan(Protocol):
 
 class DeadReviewRequiredError(DadaiaError):
     """Raised when dead() finds a dirty checkout or unpushed commits off the work branch:
-    dead never commits (ADR 0172); it touches nothing and names one fix line per file."""
+    dead never commits; it touches nothing and names one fix line per file."""
 
 
 class DeadSecretFoundError(DadaiaError):
@@ -86,7 +86,7 @@ class DeadSecretFoundError(DadaiaError):
 
 class DeadUnpushedCommitsError(DadaiaError):
     """Raised when removing a repo would lose work no remote holds: local commits with
-    no remote, a linked worktree, or a non-HEAD branch origin lacks (FR16, A16.2).
+    no remote, a linked worktree, or a non-HEAD branch origin lacks.
     HEAD's own unpushed commits are not refused — Phase 2 pushes them."""
 
 
@@ -107,7 +107,7 @@ def _require_allowlisted(label: str, value: str) -> None:
 
 
 def slug_from_url(url: str) -> str:
-    """The ONE slug rule (0.4.8 AC3.2): a clone URL's last path segment minus a trailing
+    """The ONE slug rule: a clone URL's last path segment minus a trailing
     ``.git``, every char outside ``[A-Za-z0-9_-]`` replaced by ``-`` — so
     ``my.repo.git`` derives ``my-repo`` and any URL with a non-empty tail yields a slug
     the allowlist accepts. The context name defaults to the main repo's slug.
@@ -215,13 +215,13 @@ class SpecContextService:
         name: str | None = None,
         associated_urls: tuple[str, ...] = (),
     ) -> SpecContextProject:
-        """Make a context ALIVE from its clone URLs in ONE transactional step (0.4.8 FR3).
+        """Make a context ALIVE from its clone URLs in ONE transactional step.
 
         Every slug comes from :func:`slug_from_url`; *name* defaults to the main repo's.
         The record is validated first, then each repo is cloned — or adopted when
         ``repos/<slug>`` already holds a checkout whose ``origin`` is that URL — and
         hooked. Any failure removes every directory this call created and writes no
-        record, so the corrected command re-runs cleanly (R3). Writes nothing inside a
+        record, so the corrected command re-runs cleanly. Writes nothing inside a
         repo but the hook.
         """
         main_slug = slug_from_url(main_repo_url)
@@ -295,7 +295,7 @@ class SpecContextService:
             seen.add(repo.slug)
             self._refuse_slug(ctx.name, repo.slug, repo.url)
 
-    # ------------------------------------------------------------------ associated repos (FR17)
+    # ------------------------------------------------------------------ associated repos
 
     def _refuse_slug(self, name: str, slug: str, url: str, url_fix: str = "") -> None:
         """Refuse *slug* for *name* unless allowlisted, obtainable and unowned by any other
@@ -327,20 +327,19 @@ class SpecContextService:
                 )
 
     def add_repo(self, name: str, slug: str, repo_url: str = "") -> tuple[SpecContextProject, bool]:
-        """Register an associated repo on a context (A17.1/A17.3).
+        """Register an associated repo on a context.
 
         Returns ``(context, was_added)``. Idempotent: re-adding the exact same
         ``slug``/``repo_url`` pair is a no-op success (``was_added=False``, the
         stored context is returned unchanged) — never a duplicate entry. The same
         slug already registered with a *different* URL raises
         ``AssociatedRepoConflictError`` rather than silently overwriting it: this
-        method is the ONE way to register an associated repo's URL (FR15/A15.3's
-        one-accessor discipline extended to writes), so the recovery path is
+        method is the ONE way to register an associated repo's URL (one-accessor discipline extended to writes), so the recovery path is
         remove-then-add, never a second divergent "update" verb. The context's own
         main repo slug is a no-op (``was_added=False``) — it is already included via
         ``all_repos()``. Nor can a slug already owned by
         ANOTHER context — as that context's main repo or one of its associated
-        repos — be registered here (T-044-45 F-1): ``repos/<slug>`` is a namespace
+        repos — be registered here: ``repos/<slug>`` is a namespace
         every context shares, and ``dead()`` destroys every repo in
         ``all_repos()`` with no further ownership check, so a slug collision here
         is a live path to destroying a foreign working tree. ``create
@@ -380,14 +379,14 @@ class SpecContextService:
         return updated, True
 
     def remove_repo(self, name: str, slug: str) -> SpecContextProject:
-        """Remove an associated repo from a context's registry (A17.1/A17.2).
+        """Remove an associated repo from a context's registry.
 
         Registry-only: never touches disk or the git port — an on-disk checkout at
         ``repos/<slug>`` (if any) is left exactly as it was; the CLI layer states
-        what it leaves behind (A17.2). Raises ``ContextNotFoundError`` for an
+        what it leaves behind. Raises ``ContextNotFoundError`` for an
         unknown context and ``AssociatedRepoNotFoundError`` for a slug that is not
         currently registered — including a second ``remove`` of the same slug,
-        which is the loud-failure half of A17.1's idempotency, not a silent no-op.
+        which is the loud-failure half of idempotency, not a silent no-op.
         """
         ctx = self.show(name)
         if not any(r.slug == slug for r in ctx.associated_repos):
@@ -414,7 +413,7 @@ class SpecContextService:
     def _backfill_repo_url(self, repo_slug: str, current_url: str) -> str:
         """Return the on-disk ``origin`` URL when the record URL is empty.
 
-        FR-W2-03 (b) / T-011-08: ``alive``/``dead`` back-fill ``repo_url`` from
+        ``alive``/``dead`` back-fill ``repo_url`` from
         ``git remote get-url origin`` when the record's URL is empty and a repo is
         on disk (the repo knows its own remote). Goes exclusively through the
         per-context git-ops port — no raw subprocess in features. Returns the
@@ -434,9 +433,7 @@ class SpecContextService:
 
     def _backfilled(self, ctx: SpecContextProject) -> SpecContextProject:
         """*ctx* with EVERY repo's empty URL back-filled from its on-disk origin — the one
-        back-fill ``alive`` and ``dead`` share (bug
-        context-dead-destroys-associated-repo-without-url: a main-repo-only back-fill let
-        ``dead`` delete an associated checkout whose record kept url "")."""
+        back-fill ``alive`` and ``dead`` share."""
         return replace(
             ctx,
             repo_url=self._backfill_repo_url(ctx.repo_slug, ctx.repo_url),
@@ -460,19 +457,14 @@ class SpecContextService:
             )
         return ctx
 
-    # ------------------------------------------------------------------ branch resolution (FR18)
+    # ------------------------------------------------------------------ branch resolution
 
     def repo_live_status(self, repo: AssociatedRepo) -> RepoLiveStatus:
-        """THE single branch-resolution implementation (A18.3).
+        """THE single branch-resolution implementation.
 
         `context show`, `context list --json` and the export branch refresh all resolve a repo's on-disk presence and live checked-out
         branch through this ONE method — never a second ad hoc git-subprocess call
-        at a CLI or feature boundary. That duplication is exactly what produced bug
-        `context-list-current-branch-stale-for-alive-repo`: ``show`` queried git
-        live while ``list`` read only the stored snapshot, so the two verbs could
-        disagree on the same field name. Collapsing both onto this one seam makes
-        that disagreement structurally impossible rather than patched by adding a
-        refresh call to the divergent path.
+        at a CLI or feature boundary.
 
         A repo that is not cloned, or whose live git query fails, degrades to
         ``on_disk=False`` / ``current_branch=None`` rather than raising — every
@@ -489,10 +481,10 @@ class SpecContextService:
     def repos_live_status(self, ctx: SpecContextProject) -> list[RepoLiveStatus]:
         """Live status for every repo in ``ctx.all_repos()`` (main first, then every
         associated repo in registration order) — the ONE set ``show``/``list``/
-        export render for "this context's repos" (FR18)."""
+        export render for "this context's repos"."""
         return [self.repo_live_status(repo) for repo in ctx.all_repos()]
 
-    # ------------------------------------------------------------------ alive (T-10b / T-11)
+    # ------------------------------------------------------------------ alive
 
     def alive(self, name: str) -> SpecContextProject:
         """Transition a context from DEAD to ALIVE; clone every repo in the set if absent.
@@ -502,11 +494,10 @@ class SpecContextService:
         on disk). Sets alive_since=now and clears dead_since. Concurrent races are
         accepted and surface through git; this operation never acquires a lock.
 
-        FR16/A16.1/A16.3: every repo in the set — the main repo first, then each
-        associated repo in order (``SpecContextProject.all_repos()``, the one accessor,
-        A15.3) — is cloned if missing and gets the pre-push hook. Only the MAIN repo
+        Every repo in the set — the main repo first, then each
+        associated repo in order (``SpecContextProject.all_repos()``, the one accessor) — is cloned if missing and gets the pre-push hook. Only the MAIN repo
         receives checkout and branch tracking. alive() writes no specs and commits
-        nothing (0.4.8 AC3.7): the working tree is exactly what the remote holds.
+        nothing: the working tree is exactly what the remote holds.
         """
         ctx = self.show(name)
         filled = self._backfilled(ctx)
@@ -527,7 +518,7 @@ class SpecContextService:
                     ) from None
             self._install_hooks(repo_dest)
 
-        if ctx.state == ContextState.ALIVE:  # re-confirm, and keep a back-filled URL (CTX-URL-1)
+        if ctx.state == ContextState.ALIVE:  # re-confirm, and keep a back-filled URL
             self._store.update(filled)
             return filled
 
@@ -574,8 +565,7 @@ class SpecContextService:
     # ------------------------------------------------------------------ baseline
 
     def baseline(self, name: str, *, message: str = "chore: publish the dadaia specs") -> str:
-        """Publish the main repo of context *name*, append-only and anchor-first (ADRs 0035,
-        0042; R13; PLAN §1.5); return its work branch, ``""`` when nothing was pushed.
+        """Publish the main repo of context *name*, append-only and anchor-first; return its work branch, ``""`` when nothing was pushed.
         The onboarding paths are committed off every branch — HEAD detached (born), or
         on the unborn name renamed to ``<work>`` — so no existing branch ever holds that
         anchor; ``<work>`` is merged into it and advanced to it by compare-and-swap, then
@@ -595,9 +585,7 @@ class SpecContextService:
         if fix := self._git.identity_fix(repo):
             raise ContextStateError(f"Context '{name}': git identity unknown.", fix=fix)
         git = partial(self._git.git, repo)
-        rel = (
-            "specs/constitution.md"  # C1: on disk and committable ⇒ HEAD holds it after the anchor
-        )
+        rel = "specs/constitution.md"  # on disk and committable ⇒ HEAD holds it after the anchor
         if not (repo / rel).is_file() or not git("ls-files", "-co", "--exclude-standard", rel):
             raise ContextStateError(
                 f"Context '{name}': no committable {rel}.",
@@ -650,7 +638,7 @@ class SpecContextService:
     def _refuse_principal_absent(
         self, name: str, flow: Gitflow, heads: list[str], anchor: str, work: str
     ) -> None:
-        """S11, after the anchor (the gitflow exists only there): one ``specs init`` fix —
+        """After the anchor (the gitflow exists only there): one ``specs init`` fix —
         the one origin candidate, else an operator action naming the choice; never a guess."""
         found = [h for h in heads if h != flow.integration and flow.role_of(h) != "work"]
         argv = ("specs", "init", "--context", name, "--principal")
@@ -679,17 +667,17 @@ class SpecContextService:
                 fix=fix_line(self._workspace_root, "context", "baseline", name),
             )
 
-    # ------------------------------------------------------------------ dead (T-10b / T-11)
+    # ------------------------------------------------------------------ dead
 
     def _dead_preflight(self, name: str, ctx: SpecContextProject) -> None:
-        """Refuse, before any repo of the set is touched (A16.2), what dead() would lose:
-        no origin URL, a dirty checkout (dead never commits, ADR 0172), unpushed branches or
+        """Refuse, before any repo of the set is touched, what dead() would lose:
+        no origin URL, a dirty checkout (dead never commits), unpushed branches or
         a linked worktree, unpushed commits on a HEAD off the work branch. Every refusal
         names its repo."""
         main_repo = self._repo_path(ctx.repo_slug)
         trees, failed, refix = self._worktree_rows(
             self._workspace_root, {r.slug for r in ctx.all_repos()}
-        )  # AC1.10
+        )
         for repo in ctx.all_repos():
             slug, path = repo.slug, self._repo_path(repo.slug)
             lead = f"Context '{name}': repo '{slug}'"
@@ -737,10 +725,10 @@ class SpecContextService:
                 )
 
     def dead(self, name: str) -> SpecContextProject:
-        """ALIVE -> DEAD over the whole set (FR16/A16.2): back-fill every URL from origin
-        (FR-W2-03 b), preflight every repo mutating nothing, then a fast-forward push of
-        what is committed, through the pre-push hook, and hold each repo. It never commits
-        (ADR 0172). Races surface through git (NO-LOCKS)."""
+        """ALIVE -> DEAD over the whole set: back-fill every URL from origin,
+        preflight every repo mutating nothing, then a fast-forward push of
+        what is committed, through the pre-push hook, and hold each repo. It never commits.
+        Races surface through git."""
         ctx = self.show(name)
         if ctx.state != ContextState.ALIVE:
             raise ContextStateError(
@@ -800,7 +788,6 @@ class SpecContextService:
                 fix=fix_line(self._workspace_root, "context", "dead", name),
             )
         self._store.delete(name)
-        # Bug context-delete-leaves-stale-session-bind: a session record pointing at a
-        # DELETED context degrades to unbound via the resolver's own existence check
-        # (core.invocation._context_registered) — no marker artifact to clean up
-        # here since T-50-04 (SPEC v0.5.0 FR1) retires the bind-epoch marker subsystem.
+        # A session record pointing at a deleted context degrades to unbound via the
+        # resolver's own existence check (core.invocation._context_registered); there is
+        # no marker artifact to clean up.

@@ -1,12 +1,8 @@
-"""Context-injection decision policy — pure, I/O-free (F009, 20260830 audit).
+"""Context-injection decision policy — pure, I/O-free.
 
-``hooks/ctx_inject.py`` was a 469-line hook holding a four-branch injection state
-machine with three near-duplicate resolve-emit-stamp blocks; each historical fix
-(kimi-postcompact-omits-bound-context-bootstrap, claude-compact-reinjection-missing,
-the compact-marker trigger, the T-50-03 self-keyed rebind trigger) added a branch to
-transport code testable only by simulating stdin+env+files. The DECISION now lives
-here as one function over plain values; the hook computes the inputs and executes the
-returned :class:`InjectionDecision` — policy never touches a file, stdin or env.
+The decision is one function over plain values: ``hooks/ctx_inject.py`` computes the
+inputs and executes the returned :class:`InjectionDecision`; policy never touches a file,
+stdin or env.
 """
 
 from __future__ import annotations
@@ -60,8 +56,7 @@ def decide_injection(
         recorded_slug, sentinel_exists, compacted = "", False, False
     if event in ("postcompact", "session_restart"):
         # Recorded-slug fallback: a bind with no prior prompt leaves no sentinel, but
-        # a compact/clear re-entry still deserves the bound context's bootstrap (bug
-        # kimi-postcompact-omits-bound-context-bootstrap).
+        # a compact/clear re-entry still deserves the bound context's bootstrap.
         ctx = context or recorded_slug
         stamps = event == "session_restart"
         if ctx:

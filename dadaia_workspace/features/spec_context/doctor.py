@@ -1,4 +1,4 @@
-"""DoctorService — the one scan and reaper of the workspace instance (0.4.6 FR3/FR4).
+"""DoctorService — the one scan and reaper of the workspace instance.
 
 ``check()`` reports the context invariants (INV-4/5/6, CTX-URL-1, VENV-1).
 ``scan()`` is the ONE walk over the instance — one traversal primitive
@@ -9,10 +9,7 @@ the closed-canon zones, the TTL zones (only expired entries and holds) — each 
 step — seeds missing level-1 core and takes each TTL-expired entry by its zone class;
 ``fix()`` then holds the slop.
 
-Bug class (the six-bug ``.dadaia/`` ledger, workspace-doctor-root4-false-positive-dadaia-hooks
-.. dadaia-reconcile-quarantines-sanctioned-references-clone): the doctor kept its own name
-lists and disagreed with what init/install create. Nothing here spells a zone name — every
-allow set, TTL and canon is a view of the registry.
+Nothing here spells a zone name — every allow set, TTL and canon is a view of the registry.
 """
 
 import json
@@ -73,7 +70,7 @@ _DETAIL = {
 _CANONICAL = frozenset({FindingVerdict.CANON, FindingVerdict.OPERATOR, FindingVerdict.REAPED})
 
 #: What a TTL expiry does, by the zone's class: an OUTPUT entry may be unseen work (a
-#: no-operator bug proposal), so it is held; an EPHEMERAL one is deleted (AC2.10, AC2.12).
+#: no-operator bug proposal), so it is held; an EPHEMERAL one is deleted.
 _EXPIRY_ACT = {ZoneClass.OUTPUT: sweep.hold, ZoneClass.EPHEMERAL: sweep.remove}
 
 #: Directory names that end the repo-tree walk: a nested VCS/venv/dependency tree is
@@ -106,7 +103,7 @@ class Finding:
         """Whether this entry is one of the entries compliance is measured over.
 
         A held entry already LEFT the working tree, so it is not part of what the scan
-        scores — it is reported (FR6: the operator sees what was moved and how long is
+        scores — it is reported (the operator sees what was moved and how long is
         left to take it back) and counted nowhere. That is the whole rule: a hold is
         neither compliance nor failure, so it drops out of the fraction instead of
         needing a branch in the renderer, the exit rule or the score.
@@ -118,7 +115,7 @@ _BEHAVIOR_MAP = Path(__file__).with_name("behavior-map.json")
 
 
 def _worktree(verdict: str, message: str, fix: str = "") -> SectionFinding:
-    """A worktree finding: printed, never an error, never acted on by ``--fix`` (AC1.10)."""
+    """A worktree finding: printed, never an error, never acted on by ``--fix``."""
     return SectionFinding("WORKTREE", verdict, message, False, False, fix, fixable=False)
 
 
@@ -158,7 +155,7 @@ class DoctorService:
         return [SectionFinding("PROJECTION", "drift", message, False, True, fix)] if fix else []
 
     def check_skill_md_length(self) -> list[SectionFinding]:
-        """SKILL-MD-LENGTH (ADR 0170): a projected SKILL.md over the soft limit, a warning."""
+        """SKILL-MD-LENGTH: a projected SKILL.md over the soft limit, a warning."""
         soft = json.loads(_BEHAVIOR_MAP.read_bytes())["skill_md_line_soft"]
         return [
             SectionFinding(
@@ -176,7 +173,7 @@ class DoctorService:
     def check_installed_hooks(self, context: str | None = None) -> list[SectionFinding]:
         """HOOKS-DRIFT-1: an ALIVE repo's hook where git runs hooks is not byte-for-byte the
         shipped one — differs, absent or unreadable, each said as observed — the one backstop
-        outside every harness hook. A non-git repo is never a finding; *context* scopes the repos (0.4.8 R5)."""
+        outside every harness hook. A non-git repo is never a finding; *context* scopes the repos."""
         issues: list[SectionFinding] = []
         for top in self._alive_repo_tops(context):
             hooks_dir = git_hooks_dir(top)
@@ -207,7 +204,7 @@ class DoctorService:
     def _check_venv_health(self) -> list[SectionFinding]:
         """VENV-1 — the workspace venv exists with an executable ``dadaia`` entrypoint.
 
-        FR-W3-02 (ADR-G4). Windows-safe — the scripts dir / exe suffix come from ``PLATFORM``
+        Windows-safe — the scripts dir / exe suffix come from ``PLATFORM``
         and the exec check uses ``os.access``. Not fixable: rebuilding a venv is an operator
         action (``dadaia init`` / re-bootstrap), never an auto-repair.
         """
@@ -240,7 +237,7 @@ class DoctorService:
         return []
 
     def check_worktrees(self, context: str | None = None) -> list[SectionFinding]:
-        """AC1.10: the context's worktree rows, rendered — never judged or touched here."""
+        """The context's worktree rows, rendered — never judged or touched here."""
         if not (repos := {t.name for t in self._alive_repo_tops(context)}):
             return []
         found, failed, fix = self._worktree_rows(self._workspace_root, repos)
@@ -257,7 +254,7 @@ class DoctorService:
         except SchemaVersionError as refused:  # the registry's one grammar refused it
             return [_invariant("REG-SCHEMA", refused.message, refused.fix)]
 
-        # INV-4 (v2): ALIVE context must have repo on disk
+        # INV-4: ALIVE context must have repo on disk
         for ctx in contexts:
             for repo in ctx.all_repos() if ctx.state == ContextState.ALIVE else ():
                 if not (self._repos_dir() / repo.slug).exists():
@@ -269,7 +266,7 @@ class DoctorService:
                         )
                     )
 
-        # CTX-URL-1 (T-011-08 / FR-W2-03 d): an ALIVE context with an empty repo_url is
+        # CTX-URL-1: an ALIVE context with an empty repo_url is
         # un-portable — an export/import + ``context alive`` on another machine would
         # ``git clone ""`` and fail.
         for ctx in contexts:
@@ -282,7 +279,7 @@ class DoctorService:
                     )
                 )
 
-        # INV-5 (v2): DEAD context must not have repo on disk
+        # INV-5: DEAD context must not have repo on disk
         for ctx in contexts:
             for repo in ctx.all_repos() if ctx.state == ContextState.DEAD else ():
                 if (self._repos_dir() / repo.slug).exists():
@@ -294,8 +291,8 @@ class DoctorService:
                         )
                     )
 
-        # INV-6 (T-045-22): registry-wide slug-ownership uniqueness — report-only,
-        # heals nothing (S3-FR9-ruling.md); surfaces a pre-migration collision.
+        # INV-6: registry-wide slug-ownership uniqueness — report-only,
+        # heals nothing; surfaces a pre-migration collision.
         owners: dict[str, list[str]] = {}
         for ctx in contexts:
             owners.setdefault(ctx.repo_slug, []).append(ctx.name)
@@ -329,7 +326,7 @@ class DoctorService:
     # ------------------------------------------------------------------
 
     def scan(self, context: str | None = None) -> tuple[Finding, ...]:
-        """Every entry of the instance, classified, in the fixed FR3 order; *context* scopes the repo trees."""
+        """Every entry of the instance, classified, in a fixed order; *context* scopes the repo trees."""
         globs, _, invalid = workspace_layout.operator_globs(self._workspace_root)
         rules = (globs, *context_registry.registered_slugs(self._workspace_root))
         findings: list[Finding] = [*self._missing_core(), *self._scan_dadaiaignore(invalid)]
@@ -377,14 +374,14 @@ class DoctorService:
     def _scan_repo_trees(self, context: str | None) -> list[Finding]:
         """The repo-cleanliness walk (`repos/<slug>/AGENTS.md`), one finding per excluded entry.
 
-        Canonical at a repo top is EVERYTHING not on ``REPO_TREE_EXCLUDED`` (Q5): a repo
+        Canonical at a repo top is EVERYTHING not on ``REPO_TREE_EXCLUDED``: a repo
         working tree carries source and its own artifacts, and an untracked source entry
         is never the doctor's to judge — so only the excluded names are reported, at the
         top AND at any depth, plus a nested ``.dadaia/`` (which corrupts context
         resolution for every tree-walking tool).
 
         ``_REPO_WALK_PRUNED`` is consulted FIRST: ``.git``, ``.venv`` and
-        ``node_modules`` end the walk and are therefore never candidates (FR6). A
+        ``node_modules`` end the walk and are therefore never candidates. A
         virtualenv dies the moment it is moved — its interpreter paths are absolute —
         and this pass runs unattended.
         """
@@ -440,7 +437,7 @@ class DoctorService:
 
     def _missing_core(self) -> list[Finding]:
         """Level-1 core absent from disk — the root seeds, the provisioned zones, the harness
-        profile: one stat each, no walk, so the SessionStart lane can afford it (ADR 0096)."""
+        profile: one stat each, no walk, so the SessionStart lane can afford it."""
         root, dadaia = self._workspace_root, self._dadaia
         profile = JsonHarnessProfileStore.path(self._states)
         core = [
@@ -507,7 +504,7 @@ class DoctorService:
 
     def _ttl_findings(self, zone: Zone, now: float) -> list[Finding]:
         """Expired entries, whole, and each live hold in ``reaped/``; the zone's ``AGENTS.md``
-        is never a candidate (bug public-install-restores-expired-zone-agents-reblocks-preflight)."""
+        is never a candidate."""
         assert zone.ttl_seconds is not None
         ttl, zone_dir = zone.ttl_seconds, self._dadaia / zone.name
         out: list[Finding] = []
@@ -531,20 +528,20 @@ class DoctorService:
         return out
 
     # ------------------------------------------------------------------
-    # fix() — the one reaper, in the fixed FR4 order
+    # fix() — the one reaper, in a fixed order
     # ------------------------------------------------------------------
 
     def expire(self) -> list[str]:
-        """The SessionStart lane (``--expired-only``): missing level-1 core seeded (ADR 0096),
+        """The SessionStart lane (``--expired-only``): missing level-1 core seeded,
         stale session records deleted, then each TTL-expired zone entry taken by its zone
-        class — an OUTPUT entry held in ``reaped/``, an EPHEMERAL one deleted (AC2.10). It
+        class — an OUTPUT entry held in ``reaped/``, an EPHEMERAL one deleted. It
         costs one lstat per zone entry and walks no repo."""
         actions = [
             line
             for finding in self._missing_core()
             for line in sweep.guarded(finding.code, finding.path, partial(self._seed, finding))
         ]
-        # The record owner selects the expired records (F002); the one deleter removes them.
+        # The record owner selects the expired records; the one deleter removes them.
         for record in session_store.stale_records(self._workspace_root):
             step = partial(sweep.remove, self._workspace_root, record, record.name)
             actions.extend(sweep.guarded("GRAVEYARD-GC", record.name, step))
@@ -563,12 +560,11 @@ class DoctorService:
 
         Nothing here deletes a live entry. Slop is MOVED and holds its 7 days in
         ``.dadaia/reaped/<YYYYMMDD>/<workspace-relative-path>``, the clock starting at the
-        move; direct deletion is reserved to TTL expiry. That is the structural answer to
-        the CRITICAL ``doctor-ptr-gc-deletes-valid-lock-free-bind``: a misclassification
-        now costs a week of holding, not the operator's state. Every step on an entry runs
+        move; direct deletion is reserved to TTL expiry. A misclassification
+        costs a week of holding, not the operator's state. Every step on an entry runs
         through the ONE sweep guard: it reports what it did or that it skipped, never
         aborts, and never touches a location outside the workspace."""
-        try:  # an unreadable registry (REG-SCHEMA): every lane acts on nothing (AC3.9)
+        try:  # an unreadable registry: every lane acts on nothing
             context_registry.entries(self._workspace_root)
         except SchemaVersionError:
             return []
@@ -594,7 +590,7 @@ class DoctorService:
     def _reap_dead_repo(self, ctx: SpecContextProject, repo_path: Path) -> list[str]:
         """INV-5: reap ``repos/<slug>`` only when it resolves to a DIRECT child of
         ``repos/`` — a slug like ``..`` or a symlinked checkout resolves elsewhere and is
-        refused (bug import-registers-unvalidated-slugs-that-doctor-fix-inv5-rmtrees) —
+        refused —
         and the context is still DEAD at the moment of the reap. The two liveness
         questions are policy and live here; the filesystem act is the primitive's.
 
@@ -613,7 +609,7 @@ class DoctorService:
 
     def _seed(self, finding: Finding) -> str:
         """A missing zone is a directory; the missing profile is written by the one store
-        writer from the L1 harnesses whose projection dir exists at the root (FR8)."""
+        writer from the L1 harnesses whose projection dir exists at the root."""
         if finding.target == JsonHarnessProfileStore.path(self._states):
             present = tuple(
                 h
@@ -633,7 +629,7 @@ def _ttl_walk(directory: Path, expiry: float, *, depth: int) -> list[tuple[Path,
     into: a file, or a directory at *depth* (``tmp/<agent>/<YYYYMMDD>``, ``handoff/<ctx>/<file>``,
     ``reaped/<YYYYMMDD>/<top>``). A shallower directory whose entries all expired — none left
     means its own mtime expired — is itself one entry, reaped whole with its parents in one
-    run (bug reaper-judges-ttl-by-walking-every-file)."""
+    run."""
     out: list[tuple[Path, float]] = []
     for entry in sweep.walk(directory):
         if (st := sweep.lstat(entry)) is None:
@@ -647,11 +643,11 @@ def _ttl_walk(directory: Path, expiry: float, *, depth: int) -> list[tuple[Path,
     return out
 
 
-# ── the `workspace` section of the one doctor (0.4.7 FR5, T-047-02) ──────────────
+# ── the `workspace` section of the one doctor ──────────────
 
 SECTION = "workspace"
 
-#: The verdicts that make a run exit 1 — the pre-0.4.7 `dadaia doctor` rule, unchanged.
+#: The verdicts that make a run exit 1 — the `dadaia doctor` rule.
 ERROR_VERDICTS = frozenset({FindingVerdict.SLOP, FindingVerdict.EXPIRED, FindingVerdict.MISSING})
 
 

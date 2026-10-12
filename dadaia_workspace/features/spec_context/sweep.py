@@ -1,4 +1,4 @@
-"""The ONE traversal primitive of the workspace reaper (0.4.7 FR6a).
+"""The ONE traversal primitive of the workspace reaper.
 
 ``walk`` reads a directory, ``lstat`` reads one entry, ``move`` relocates an
 entry, ``remove`` deletes it — all four behind ONE guard:
@@ -17,12 +17,8 @@ entry, ``remove`` deletes it — all four behind ONE guard:
 * a read-only entry is made owner-writable and retried — the reaper owns what it
   reaps (a Go module cache is ``dr-xr-xr-x`` all the way down; loose VCS objects are 0444).
 
-Bug class this replaces: ``doctor.py`` carried five per-call-site guards
-(``_entries``/``_mtime``/``_remove``/``_guarded``/``_remove_dead_repo``), each
-re-deriving "may I touch this?" from its own premises. The CRITICAL
-``doctor-ptr-gc-deletes-valid-lock-free-bind`` is that shape's worst case: a call site
-deleted live state directly because its own local rule said the state looked dead.
-One guard, one home, and deletion reserved to TTL expiry (FR6b).
+All four actions run behind ONE guard, and deletion is reserved to TTL expiry: no scan
+verdict deletes anything directly.
 """
 
 from __future__ import annotations
@@ -198,8 +194,7 @@ def remove(workspace_root: Path, target: Path, label: str) -> str | Skipped | No
 
 
 #: The zone the reaper HOLDS what it takes off the working tree. Deletion is reserved to
-#: TTL expiry of this zone, so no scan verdict ever deletes anything directly — the shape
-#: behind the CRITICAL doctor-ptr-gc-deletes-valid-lock-free-bind.
+#: TTL expiry of this zone, so no scan verdict ever deletes anything directly.
 REAPED_ZONE = "reaped"
 
 
@@ -221,7 +216,7 @@ def move(
     """Relocate *target* to *destination*, creating its parents. Both ends must sit
     inside the workspace. *destination* itself is stamped: a hold counts from the move.
 
-    N moves make N holds (ADR 0074): an occupied destination yields the first free
+    N moves make N holds: an occupied destination yields the first free
     ``<name>-N`` beside it, so no hold dies before its own TTL.
 
     A cross-device ``os.replace`` (EXDEV) falls back to copy + remove here — the one
@@ -230,7 +225,7 @@ def move(
 
     ONE message shape for every mover: ``moved '<label>'<note> -> '<destination>'``.
     *note* is the one extra field a caller may add when the label alone does not say
-    whose entry it was (INV-5 names the context that owned the repo)."""
+    whose entry it was (for example, the context that owned the repo)."""
     if not occupied(target):
         return None
     if not _inside(workspace_root, target) or not _inside(workspace_root, destination):

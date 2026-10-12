@@ -3,20 +3,13 @@
 Races between sessions are never prevented; there is no session mode. Protected CLI session records remain fail-closed against
 file-tool writes.
 
-**The gate blocks three things (0.4.7 FR1).** A PROTECTED write (CLI-owned session
+**The gate blocks three things.** A PROTECTED write (CLI-owned session
 records and projected law files); a MUTATING write out of the bind's scope or under
-``repos/<r>/`` outside ``specs/audits/`` (ADRs 0103, 0105, 0124); and — in
+``repos/<r>/`` outside ``specs/audits/``; and — in
 ``hooks/root_whitelist`` — a new workspace-root entry. There is no
 fourth block and no path class beyond ``ADDITIVE``/``MUTATING``/``PROTECTED``.
 
-The MEMORY class and its phase rule are DELETED, with the gate's ``_RELEASE.json``
-read behind them: the gate reads no SDD artifact (the root `AGENTS.md` map §3), and every gate
-Stall in the bug ledger came from that read resolving an empty phase
-(``sdd-gate-memory-phase-resolves-empty…``, ``minted-feature-branch-without-live-
-release-blocks-every-memory-write``, ``context-bind-implementation-requires-release-id-
-stall-when-none-live``). Memory authorship is constitution discipline, audited by the
-drift pillar, never gated. The READ-mode self-block is deleted with it — its only
-documented way out was a bind flag that no longer exists.
+The gate reads no SDD artifact; memory authorship is never gated.
 """
 
 from __future__ import annotations
@@ -49,7 +42,7 @@ _SCOPE_MESSAGE = (
     "[GATE] '{rel_path}' writes into repo '{repo}', owned by context '{owner}' — this "
     "session is bound to {bound}, whose scope is: {scope}.\n"
 )
-#: ADR 0105: ``repos/<r>`` receives only merges; every agent write happens in a worktree.
+#: ``repos/<r>`` receives only merges; every agent write happens in a worktree.
 _MERGE_ONLY_MESSAGE = (
     "[GATE] '{rel_path}' is under repos/{repo}/, which receives only merges (ADR 0105): "
     "write it inside a worktree of {repo}.\n"
@@ -58,7 +51,7 @@ _WORKTREE_SCRIPT = ".agents/skills/dd-gitflow-default/scripts/worktree.py"
 
 
 class PathClass(Enum):
-    """Three classes, no fourth (0.4.7 FR1). A workspace-root path matching no
+    """Three classes, no fourth. A workspace-root path matching no
     ADDITIVE or PROTECTED prefix is MUTATING — there is no UNGATED fall-through."""
 
     ADDITIVE = "ADDITIVE"
@@ -108,7 +101,7 @@ def classify_path(
 ) -> tuple[PathClass, tuple[workspace_layout.FloorRefusal, str] | None]:
     """(class, ``_protection`` hit) of a workspace-relative path; first match wins: PROTECTED
     (*projected*, then the floor, then a *protected* glob — ``_protection``'s order), ADDITIVE (the zone-registry ``.dadaia/``
-    prefixes), else MUTATING — no ``repos/`` path is ever ADDITIVE (ADR 0124)."""
+    prefixes), else MUTATING — no ``repos/`` path is ever ADDITIVE."""
     p = rel_path.lstrip("/")
     if hit := _protection(p, projected, protected):
         return PathClass.PROTECTED, hit
@@ -137,8 +130,8 @@ def evaluate(
 
     PROTECTED blocks first (fail-closed). A MUTATING write into an owned repo outside the
     bind's *repos* is refused with ``context bind <owner>`` — an unbound session with an id
-    owns nothing (ADR 0072); an id-less one bound by env is told to relaunch; an id-less
-    unbound one is the declared gap (ADR 0116). Then every write in zone ``repo`` is
+    owns nothing; an id-less one bound by env is told to relaunch; an id-less
+    unbound one is the declared gap. Then every write in zone ``repo`` is
     refused with the ``worktree.py list`` fix. Everything else ALLOWS.
     """
     cls, hit = classify_path(rel_path, projected, protected)

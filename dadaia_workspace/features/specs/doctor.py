@@ -1,6 +1,6 @@
 """SpecsDoctor — thin coordinator for SDD release-lifecycle structural validation.
 
-v0.1.55 FR1 decomposed the former 2,830-line god module into a thin ``SpecsDoctor``
+A thin ``SpecsDoctor``
 coordinator (this file) that **owns check()/fix() ORDER** and delegates all LOGIC to five
 single-responsibility validator siblings plus two shared leaf modules:
 
@@ -13,14 +13,10 @@ single-responsibility validator siblings plus two shared leaf modules:
   * ``doctor_closure_audit``— audit naming, archive dirs; ``fix_archive_dir``
   * ``doctor_coherence``    — constitution and pattern-version coherence
 
-The coordinator owns ORDER: ``check()`` invokes the validators' public methods in the exact
-original interleaved sequence (families interleave — coherence→memory→release→…→
-closure→coherence), and ``fix()`` dispatches by issue code. It imports NO ``spec_context``
-(R-1 cap invariant): v0.1.76 T-4 retired the former ``pid_probe``/``workspace_state_dir`` seam
-along with SPEC-DOC-029 (see ``doctor_coherence.py``), so the coordinator holds no
-``spec_context`` cross-feature edge at all — not even via a typed leaf seam. Behavior is
-byte-identical to the pre-split module (golden lock
-``tests/unit/features/specs/test_doctor_golden.py``).
+The coordinator owns ORDER: ``check()`` invokes the validators' public methods in one fixed
+interleaved sequence (families interleave — coherence→memory→release→…→
+closure→coherence), and ``fix()`` dispatches by issue code. It imports NO ``spec_context``: the coordinator holds no ``spec_context`` cross-feature
+edge, not even via a typed leaf seam.
 
 Pure module — no I/O outside the supplied specs_dir / public_dir. No external dependencies.
 """
@@ -58,7 +54,7 @@ class SpecsDoctor:
         command_paths: Optional live command-path set
             (``cli.help_digest.command_paths()``), walked ONCE by the CLI composition
             root and passed in as plain data — feeds
-            MEM-DRIFT-2 (memory citations, 0.4.7 FR2). ``None`` (default) keeps that
+            MEM-DRIFT-2 (memory citations). ``None`` (default) keeps that
             check silent.
     """
 
@@ -74,7 +70,7 @@ class SpecsDoctor:
         self.public_dir: Path | None = Path(public_dir) if public_dir is not None else None
         # repo_root: MEM-DRIFT-2 resolves memory citations against it; None -> no-op.
         self.repo_root: Path | None = Path(repo_root) if repo_root is not None else None
-        # command_paths (0.4.7 FR2): MEM-DRIFT-2's plain-data input — the ONE Typer walk
+        # command_paths: MEM-DRIFT-2's plain-data input — the ONE Typer walk
         # (`cli.help_digest.command_paths`), done by the CLI. None -> that check is a
         # no-op; `features` never imports `cli`.
         self.command_paths: Collection[tuple[str, ...]] | None = command_paths
@@ -111,9 +107,8 @@ class SpecsDoctor:
         )
 
     def check(self) -> list[SectionFinding]:
-        """Run every rule in the ONE ordered registry (F012) over a FRESH SpecsTree
-        snapshot (F010) — shared facts are parsed once per run, the registry owns
-        order, and the golden lock pins the rendered output byte-identically."""
+        """Run every rule in the ONE ordered registry over a FRESH SpecsTree
+        snapshot — shared facts are parsed once per run, the registry owns order."""
         tree = SpecsTree(self.specs_dir)
         self._release.tree = tree
         issues: list[SectionFinding] = []
