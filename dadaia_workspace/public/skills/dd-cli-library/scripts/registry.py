@@ -15,12 +15,14 @@ import os
 import re
 import subprocess
 import sys
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
 sys.dont_write_bytecode = True  # the shared _ledger imports without a __pycache__
 sys.path.append(str(Path(__file__).resolve().parents[2] / "dd-bug-resolution" / "scripts"))
+import _clock
+import _platform
 from _ledger import replace, workspace_of
 
 DEFAULT_MIN_PORT = 3000
@@ -32,7 +34,12 @@ _USERS_PID_RE = re.compile(r'\("(?P<exe>[^"]+)",pid=(?P<pid>\d+)')
 
 
 def _now() -> datetime:
-    return datetime.now(tz=UTC)
+    return datetime.fromisoformat(_clock.now_iso())
+
+
+def _stamp(moment: datetime) -> str:
+    """*moment* in the kernel clock's `...Z` form; `is_stale` reads that and the old `+00:00`."""
+    return moment.isoformat().replace("+00:00", "Z")
 
 
 def find_registry(start: Path) -> Path:
@@ -52,7 +59,7 @@ def load(path: Path) -> dict[str, Any]:
 
 
 def pid_alive(pid: int) -> bool:
-    if os.name != "posix":
+    if _platform.detect().windows:
         return True  # no safe liveness probe without the POSIX signal-0 idiom
     try:
         os.kill(pid, 0)
@@ -151,8 +158,8 @@ def cmd_register(doc: dict[str, Any], args: argparse.Namespace, path: Path) -> i
         "url": args.url or f"http://localhost:{args.port}",
         "status": "active",
         "pid": args.pid,
-        "reserved_at": now.isoformat(),
-        "expires_at": (now + timedelta(hours=args.ttl)).isoformat(),
+        "reserved_at": _stamp(now),
+        "expires_at": _stamp(now + timedelta(hours=args.ttl)),
         "description": args.description,
     }
     doc["entries"].append(entry)
