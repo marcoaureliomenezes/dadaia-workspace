@@ -517,6 +517,17 @@
         "hypothesis-cache-stays-out-of-repo-trees",
         "multi-platform-by-construction-migration"
       ]
+    },
+    {
+      "id": "tests-one-contract-one-home",
+      "title": "One contract, one test home: each contract is asserted in exactly one test file; duplicate asserts are deleted",
+      "opened": "2026-10-12",
+      "status": "idea",
+      "description": "Measured 2026-10-12 (test audit): 1,393 test functions, 3,276 cases; test-to-production line ratio 1.86x; 8-week churn +3,406 / -3,345; the suite behaves as an append-only evidence ledger: a fix adds its test beside the ones already asserting the same contract and none leaves. Design: each contract has exactly one owner test file, its home; an assert of that contract in any other file is a duplicate and is deleted there, the home's assert kept. A behaviour change edits the home, never adds a second one. Relation: test-suite-diet (rc-14) deletes a closed list of duplicate and vacuous tests; this entry is the standing rule that stops the ledger growing back. Done when: the as-is review's duplicate-assert inventory is empty and each contract names one home. Placement: rc-15 (operator ruling 2026-10-12). Every design detail not quoted from the audit is agent default, unruled.",
+      "provenance": "operator ruling 2026-10-12, relayed by the main thread: the test-audit proposals go to rc-15 through the backlog; source: test audit report https://claude.ai/artifact/Rn1qCNi2qEcR1wXTNzEznf, proposal R1",
+      "relates": [
+        "test-suite-diet"
+      ]
     }
   ]
 }
