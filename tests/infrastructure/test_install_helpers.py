@@ -183,23 +183,22 @@ def test_resolve_codex_agent_model_fails_closed_for_any_agent_without_model(
     authored ``model:`` nor a resolved policy model raises — never a silent default.
     sa-persona-model-read-by-two-parsers: the one frontmatter reader is the only reader (a
     body ``model:`` line is no declaration) and an unregistered model is refused."""
+    from dadaia_workspace.core.frontmatter import Frontmatter, parse
     from dadaia_workspace.infrastructure.install_helpers import resolve_codex_agent_model
-    from dadaia_workspace.infrastructure.runtime_transforms.codex_assets import (
-        _parse_agent_frontmatter,
-    )
 
+    parsed = parse(persona)
+    assert isinstance(parsed, Frontmatter)
     with pytest.raises(PublicAssetError, match=agent):
-        resolve_codex_agent_model(agent, _parse_agent_frontmatter(persona).get("model"), None)
+        resolve_codex_agent_model(agent, parsed.data.get("model"), None)
 
 
 def test_an_inline_comment_is_not_part_of_the_declared_model() -> None:
     """sa-persona-model-read-by-two-parsers: YAML ``model: x # note`` declares ``x``."""
-    from dadaia_workspace.infrastructure.runtime_transforms.codex_assets import (
-        _parse_agent_frontmatter,
-    )
+    from dadaia_workspace.core.frontmatter import Frontmatter, parse
 
-    persona = "---\nname: a\nmodel: sonnet # tier\n---\n"
-    assert _parse_agent_frontmatter(persona)["model"] == "sonnet"
+    parsed = parse("---\nname: a\nmodel: sonnet # tier\n---\n")
+    assert isinstance(parsed, Frontmatter)
+    assert parsed.data["model"] == "sonnet"
 
 
 def test_resolve_codex_agent_model_falls_back_to_staged_when_no_resolved_policy() -> None:

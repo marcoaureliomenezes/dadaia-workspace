@@ -24,7 +24,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from dadaia_workspace.core.model_registry import ResolvedAgentModel
+from dadaia_workspace.infrastructure.agent_transcodes import codex_agent_toml_bytes
 from dadaia_workspace.infrastructure.codex_doctor import dcx7_codex_skill_refs
+from dadaia_workspace.infrastructure.runtime_config import codex_config
 from dadaia_workspace.infrastructure.runtime_transforms.codex_assets import (
     _CODEX_SKILL_REF_PREFIXES,
 )
@@ -113,3 +116,23 @@ def test_codex_skill_ref_prefixes_bind_to_the_real_inventory() -> None:
     assert not phantoms, (
         f"phantom _CODEX_SKILL_REF_PREFIXES entries (match no public/skills/ name): {phantoms}"
     )
+
+
+def test_a_bom_crlf_persona_projects_the_same_codex_bytes_as_its_lf_twin(tmp_path: Path) -> None:
+    """Bug codex-persona-frontmatter-drops-on-crlf: the Codex parser needed ``---\\n`` at byte 0,
+    so a BOM or CRLF persona lost its agent block."""
+    name = "dd-sw-engineer-sr"
+    lf = (_PUBLIC / "agents" / f"{name}.md").read_bytes()
+    crlf = b"\xef\xbb\xbf" + lf.replace(b"\n", b"\r\n")
+    for flavour, raw in (("lf", lf), ("crlf", crlf)):
+        agents = tmp_path / flavour / "agents"
+        agents.mkdir(parents=True)
+        (agents / f"{name}.md").write_bytes(raw)
+
+    blocks = {f: codex_config(tmp_path / f, tmp_path) for f in ("lf", "crlf")}
+    assert f'[agents."{name}"]\nconfig_file = "agents/{name}.toml"\n' in blocks["lf"]
+    assert blocks["crlf"] == blocks["lf"]
+    resolved = ResolvedAgentModel(model="sonnet", effort="high", source="default")
+    assert codex_agent_toml_bytes(
+        tmp_path / "crlf" / "agents" / f"{name}.md", name, resolved
+    ) == codex_agent_toml_bytes(tmp_path / "lf" / "agents" / f"{name}.md", name, resolved)
