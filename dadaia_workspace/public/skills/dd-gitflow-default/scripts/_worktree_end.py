@@ -69,12 +69,9 @@ def _refuse_dirty(tree: Path) -> None:
 
 def _kept(tree: Path, verb: str, keep: list[str], drop: bool) -> list[str]:
     """The ignored files to copy into the repo; refuses while one is neither kept nor dropped."""
+    listing = git(tree, "status", "--porcelain", "-z", "--ignored", "--untracked-files=all")
     ignored = [  # -z: a name with a blank arrives verbatim, never C-quoted; -uall: file level
-        line[3:].rstrip("/")
-        for line in git(
-            tree, "status", "--porcelain", "-z", "--ignored", "--untracked-files=all"
-        ).split("\0")
-        if line.startswith("!! ")
+        line[3:].rstrip("/") for line in listing.split("\0") if line.startswith("!! ")
     ]
     # disposable without asking: a tool cache directory or a *.pyc
     precious = [
