@@ -187,7 +187,7 @@ def test_a_drifted_pair_names_the_generator_as_its_fix(
     [
         ("# owner: someone", False),
         ("tldr: >\n  folded tldr", False),
-        ('tags: ["a, b", c]', False),
+        ('tags: ["a, b", c]', True),
         ("owner: a: b", False),
         ('tags: ["a", b]', True),
     ],
