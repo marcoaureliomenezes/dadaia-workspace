@@ -23,11 +23,13 @@ The branch contract by role; the names are `specs/constitution.md`'s `gitflow:` 
 5. Branch count, cut point and name follow §2a.
 6. Definition stage: where a candidate is defined is `specs/releases/AGENTS.md`'s.
 7. Implementation stage: one commit per task, shaped per §3a.
-8. Candidate closure: open one work → integration PR and merge it green.
+8. Candidate closure, on the operator's explicit order (publication): open one work → integration PR and merge it green; before that order, "finish" means merged into the work branch.
 9. After the merge, the main thread asks the operator: **promote or continue?** Continue = the next candidate's `python3 .agents/skills/dd-release-implementation/scripts/release.py new <id>`; promote = step 10.
 10. Promote: open the PR integration → principal (the reviewer's `APPROVED` on the integration tip, §3b); its merge is the deploy.
 11. The moment the promote PR merges, record it — `python3 .agents/skills/dd-release-implementation/scripts/release.py ship --sha <sha>` — then tag the work tip as `archive/<work-name>` before deleting that work branch, and cut the next one per §2a when another release opens.
 12. A WT-managed worktree and its branch complete under `worktrees/AGENTS.md` §2, which owns their merge and cleanup lifecycle.
+
+- Rewriting pushed history or force-pushing is refused unless the operator authorizes that act in its own turn.
 
 ## 2a. The branch contract
 

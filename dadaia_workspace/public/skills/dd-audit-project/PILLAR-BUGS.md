@@ -52,6 +52,8 @@ Metric 5's fixed path set is `.gitignore`, `privacy_baseline.json`,
 - Report any resolved record that fails the canonical resolution-fact check.
 - Check bug registration and fix commit shapes against `dd-gitflow-default` §3a.
 
+Rates are trends, never a gate.
+
 ## Pillar 1 output
 
 Pillar 1 appends findings with reproducible commands and results. Bug records remain

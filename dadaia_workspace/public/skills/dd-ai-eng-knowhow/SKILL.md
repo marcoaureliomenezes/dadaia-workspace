@@ -35,6 +35,8 @@ compatibility: Standalone Agent Skill. Inside a dadaia-workspace (pip install da
    writing-for-agents contract — and opens the relevant disclosed sibling instead of
    re-deriving harness behavior; then `.dadaia/.venv/bin/dadaia public doctor` must print `[ok] public-privacy` (its scan covers hostnames, IPs, home paths, emails and secrets).
 
+- A claim about a binary, a CLI flag, a model id or sandbox behaviour is checked against the live binary before it is written.
+
 ## 4. Done when
 
 - Your output names the primitive and its harness serialization.
