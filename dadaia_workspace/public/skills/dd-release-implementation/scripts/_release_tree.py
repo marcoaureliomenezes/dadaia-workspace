@@ -36,7 +36,7 @@ from _release_schema import (
     origin_line,
     writes,
 )
-from _release_store import SCRIPT, live_release
+from _release_store import SCRIPT, Live, live_release
 from _specs import quote, script, with_specs
 
 __all__ = ["check", "drift", "memory_errors", "ship_findings", "tree_findings"]
@@ -115,49 +115,41 @@ def _trace(
 BUG_WINDOW = "## Bug window review"
 
 
-def _origin_findings(specs: Path) -> list[dict[str, Any]]:
-    """The live candidate's SPEC head: its first `## ` heading is :data:`BUG_WINDOW` (AC5.6;
-    an error only in DEFINITION, where `new` writes it — info after), then its Origin line:
-    grammar and existence always, and each carried id listed with its standing — a missing
-    pointer is an error only once the live candidate (past DEFINITION, so a stacked
-    candidate's inherited log is not its own) logged its `dispositions` entry, or shipped."""
-    try:
-        live = live_release(specs)
-    except Refusal:
-        return []  # the tree walk reports a missing or doubled live release
-    spec = live.candidate / "SPEC.md" if live.candidate else None
-    if spec is None or not spec.is_file():
-        return []
-    rel, text, state = (
-        spec.relative_to(specs).as_posix(),
-        spec.read_text(encoding="utf-8"),
-        live.state,
-    )
+def _window_findings(
+    spec: Path, text: str, state: dict[str, Any], rel: str
+) -> list[dict[str, Any]]:
+    """AC5.6: the SPEC's first `## ` heading is :data:`BUG_WINDOW` — an error only in
+    DEFINITION, where `new` writes it, info after."""
     lines = text.splitlines()
     head = next((n for n, h in enumerate(lines, 1) if h.startswith("## ")), 1)
-    out = [] if lines[head - 1 : head] == [BUG_WINDOW] else [
+    if lines[head - 1 : head] == [BUG_WINDOW]:
+        return []
+    return [
         _findings.finding(CODE, rel, head, f"the live SPEC's first `## ` heading is not `{BUG_WINDOW}` (AC5.6)",
                 f"Operator action: open {spec} with `{BUG_WINDOW}` as its first `## ` heading, "
                 "reviewing the prior candidate's table and each resolved record's persisted "
                 "`fix_sha` with `git show` as `dd-bug-resolution/LINEAGE.md` defines")
         | ({} if state.get("phase") == "DEFINITION" else {"verdict": "info"})
     ]  # fmt: skip
-    line = origin_line(text)
-    try:
-        summary = next(
-            (
-                str(entry.get("text") or "")
-                for entry in reversed(state.get("log") or [])
-                if entry.get("kind") == "summary"
-            ),
-            "",
-        )
-        rows = _trace(specs, live.release_id, origin(text), summary)
-    except ValueError as error:
-        return out + [_findings.finding(CODE, rel, line, str(error), f"Operator action: rewrite the Origin "
-                              f"line {line} of {spec} to the Origin grammar ({error})")]  # fmt: skip
+
+
+def _last_summary(state: dict[str, Any]) -> str:
+    """The text of the log's last `kind: summary` entry, else empty."""
+    return next(
+        (
+            str(entry.get("text") or "")
+            for entry in reversed(state.get("log") or [])
+            if entry.get("kind") == "summary"
+        ),
+        "",
+    )
+
+
+def _swept(state: dict[str, Any]) -> bool:
+    """Whether a missing pointer is an error: the live candidate (past DEFINITION, so a stacked
+    candidate's inherited log is not its own) logged its `dispositions` entry, or shipped."""
     since = str((state.get("defined") or {}).get("ts") or "")
-    swept = (
+    return bool(
         state.get("shipped")
         or state.get("phase") != "DEFINITION"
         and any(
@@ -165,20 +157,47 @@ def _origin_findings(specs: Path) -> list[dict[str, Any]]:
             for e in state.get("log") or []
         )
     )
-    for kind, i, standing, writable in rows:
-        row = _findings.finding(CODE, rel, line, f"Origin {kind}:{i} {standing}", f"Operator action: name a "
+
+
+def _origin_row(
+    specs: Path, spec: Path, line: int, live: Live, swept: bool, row: tuple[str, str, str, bool]
+) -> dict[str, Any]:
+    """One carried id's finding: the pointer verb that writes it back, the operator act when
+    none can, else info for a standing id."""
+    kind, i, standing, writable = row
+    out = _findings.finding(CODE, spec.relative_to(specs).as_posix(), line, f"Origin {kind}:{i} {standing}", f"Operator action: name a "
                       f"live {kind} id for {kind}:{i}, or rule it out of the Origin line of {spec}.")  # fmt: skip
-        values = {"i": quote(i), "a": quote(i.rpartition("-F")[0]), "r": live.release_id}
-        if standing == "untraced" and swept and writable:
-            skill, verb = _POINTER[kind]
-            row["fix"] = with_specs(f"{script(_SKILLS / skill)} {verb.format(**values)}", specs)
-        elif standing == "untraced" and swept:
-            act = _ACT[kind].format(**values)
-            row["fix"] = f"Operator action: {act}, or rule it out of the Origin line of {spec}."
-        elif standing in ("traced", "untraced"):
-            row["verdict"] = "info"
-        out.append(row)
+    values = {"i": quote(i), "a": quote(i.rpartition("-F")[0]), "r": live.release_id}
+    if standing == "untraced" and swept and writable:
+        skill, verb = _POINTER[kind]
+        out["fix"] = with_specs(f"{script(_SKILLS / skill)} {verb.format(**values)}", specs)
+    elif standing == "untraced" and swept:
+        act = _ACT[kind].format(**values)
+        out["fix"] = f"Operator action: {act}, or rule it out of the Origin line of {spec}."
+    elif standing in ("traced", "untraced"):
+        out["verdict"] = "info"
     return out
+
+
+def _origin_findings(specs: Path) -> list[dict[str, Any]]:
+    """The live candidate's SPEC head: the bug-window heading (AC5.6), then its Origin line:
+    grammar and existence always, and each carried id listed with its standing."""
+    try:
+        live = live_release(specs)
+    except Refusal:
+        return []  # the tree walk reports a missing or doubled live release
+    spec = live.candidate / "SPEC.md" if live.candidate else None
+    if spec is None or not spec.is_file():
+        return []
+    text, rel = spec.read_text(encoding="utf-8"), spec.relative_to(specs).as_posix()
+    out, line = _window_findings(spec, text, live.state, rel), origin_line(text)
+    try:
+        rows = _trace(specs, live.release_id, origin(text), _last_summary(live.state))
+    except ValueError as error:
+        return out + [_findings.finding(CODE, rel, line, str(error), f"Operator action: rewrite the Origin "
+                              f"line {line} of {spec} to the Origin grammar ({error})")]  # fmt: skip
+    swept = _swept(live.state)
+    return out + [_origin_row(specs, spec, line, live, swept, row) for row in rows]
 
 
 def _definition_findings(
