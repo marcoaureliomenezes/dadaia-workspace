@@ -27,16 +27,17 @@ description: >
 9. Dispatch a review only for a tree whose `python3 .agents/skills/dd-gitflow-default/scripts/worktree.py preflight <tree>` prints `PREFLIGHT PASS`, and hand the reviewer that line; a red tree goes back unreviewed, since the preflight replaces the implementer's own verify run before hand-off.
 10. A ruling carries its reproduction and a consumer sweep across every repo of the context.
 11. A rework brief names the finding's contract class, requires its RED test first and a sweep of every other site of the class, and carries the bug history to read, the seams with evidence and the merge hazards with sibling jobs.
+12. One fresh agent per task, its full scope in its first prompt; a changed scope is a new dispatch, and an agent that stops early leaves the rest to a new dispatch against the same worktree.
+13. Check commits, files and test runs yourself; a handoff reported but not written does not count.
+14. A status answer counts each open class with its number.
 
 ## 2. Conflict resolution
 
 1. Resolve a decision by domain with the Decision Authority table (§3); evidence
    means `file:line`, spec citation, command output, or handoff field.
 2. On a two-agent deadlock: each agent states its position with evidence in the `findings` of its handoff or verdict; the main thread writes a synthesis naming the exact decision point.
-3. Still unresolved: call `dd-grill-me`, ask the operator one concrete question,
-   and reflect the answer in SPEC, PLAN, job files, ADR, or memory per the phase.
-4. Stop and surface to the operator on any Escalation trigger (§3); keep the §3
-   discipline table.
+3. Still unresolved: before launch, call `dd-grill-me` and reflect the operator's answer in SPEC, PLAN, job files, ADR, or memory per the phase; after launch, decide by law, ADRs and rulings (a failing old test: the root map §1 test line) and log it with the label `dd-grill-me` gives an unruled default.
+4. An Escalation trigger (§3) is a report line and independent tasks continue; only an operator-only act waits after launch: an ADR acceptance, a bug confirmation, a product-contract change, a secret. Keep the §3 discipline table.
 
 ## 3. Reference tables
 
@@ -44,11 +45,11 @@ description: >
 
 | Domain | Primary authority | May object with evidence | Tie-breaker |
 |---|---|---|---|
-| Scope, SPEC, memory, backlog | dd-product-engineer | any agent | operator |
-| PLAN, job files, implementation, tests | dd-sw-engineer-sr | dd-code-reviewer | operator |
-| Every review lens (architecture, security, QA, product, audit, AI surface) | dd-code-reviewer | dd-sw-engineer-sr | operator |
+| Scope, SPEC, memory, backlog | dd-product-engineer | any agent | main thread; operator for a product-contract change |
+| PLAN, job files, implementation, tests | dd-sw-engineer-sr | dd-code-reviewer | main thread |
+| Every review lens (architecture, security, QA, product, audit, AI surface) | dd-code-reviewer | dd-sw-engineer-sr | main thread |
 
-### Escalation triggers — stop and surface to the operator
+### Escalation triggers — a report line, not a wait
 
 1. Required SPEC/PLAN/job files or a resolvable `_RELEASE.json` `phase` missing or not
    approved (`python3 .agents/skills/dd-release-implementation/scripts/release.py check --specs <specs-dir>` exits non-zero; a hotfix job needs only its open bug).
@@ -71,4 +72,4 @@ description: >
 ## 4. Done when
 
 - Every job, plain, define or backlog merge names an APPROVED verdict file; every dispatch prompt carries that block.
-- Every conflict either resolved via evidence-based authority or escalated.
+- Every conflict either resolved via evidence-based authority or reported.

@@ -29,6 +29,9 @@ description: >
 8. A test enters the suite only under the root map §1 test basics.
 9. Before growing any module, run the deletion test (delete it: does complexity vanish or reappear across callers?) — a diff that only adds justifies itself against replace-don't-layer.
 10. Implement each task inside its own task worktree, cut from its job's worktree branch per `worktrees/AGENTS.md` §1.
+11. Before claiming a bug, unused code or done, cite file:line or a grep; reproduce from a clean state; done needs user-side evidence.
+12. After any tool error, re-read the real state; report a deferral to the operator as an intake proposal carrying its design, never written into the backlog.
+13. A red not caused by the change is proven at the merge-base before it is called pre-existing; an env-sensitive change is reproduced in a clean environment first.
 
 ## 2a. Push green
 
