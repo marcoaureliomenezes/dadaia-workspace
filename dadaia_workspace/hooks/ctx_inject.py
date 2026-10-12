@@ -202,9 +202,12 @@ def main() -> int:
         elif source != "resume":
             event = "session_start"
 
-    def newer(stamp: float | None) -> bool:
-        return sentinel_mtime is not None and stamp is not None and stamp > sentinel_mtime
+    def newer(stamp: float | None, whole_second: bool = False) -> bool:
+        # a whole-second stamp denotes a full second: a tie with the mtime counts (a repeat beats a miss)
+        grain = 1 if whole_second else 0
+        return sentinel_mtime is not None and stamp is not None and stamp + grain > sentinel_mtime
 
+    bound_at = _session_bound_at(workspace, session_id)
     try:
         decision = injection_policy.decide_injection(
             event=event,
@@ -212,7 +215,9 @@ def main() -> int:
             recorded_slug=recorded_slug,
             sentinel_exists=sentinel_mtime is not None,
             compacted=newer(_read_sentinel(compact_marker)[0]),
-            rebound=newer(_session_bound_at(workspace, session_id)),
+            rebound=newer(
+                bound_at, whole_second=bound_at is not None and bound_at == int(bound_at)
+            ),
         )
         if decision.emit == "bootstrap":
             _emit_bootstrap(workspace, decision.context)
