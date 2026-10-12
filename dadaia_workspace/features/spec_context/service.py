@@ -7,13 +7,12 @@ import shutil
 import sys
 from collections.abc import Callable
 from dataclasses import replace
-from datetime import UTC, datetime
 from enum import StrEnum
 from functools import partial
 from pathlib import Path
 from typing import Any, Protocol
 
-from dadaia_workspace.core import workspace_layout
+from dadaia_workspace.core import clock, workspace_layout
 from dadaia_workspace.core.cli_line import fix_line, git_line, shell_line
 from dadaia_workspace.core.exceptions import (
     AssociatedRepoConflictError,
@@ -89,10 +88,6 @@ class DeadUnpushedCommitsError(DadaiaError):
     """Raised when removing a repo would lose work no remote holds: local commits with
     no remote, a linked worktree, or a non-HEAD branch origin lacks (FR16, A16.2).
     HEAD's own unpushed commits are not refused — Phase 2 pushes them."""
-
-
-def _now() -> str:
-    return datetime.now(tz=UTC).isoformat()
 
 
 def _worktree_git_dir(tree: Path) -> Path:
@@ -235,8 +230,8 @@ class SpecContextService:
             state=ContextState.ALIVE,
             repo_slug=main_slug,
             repo_url=main_repo_url,
-            created_at=_now(),
-            alive_since=_now(),
+            created_at=clock.now_iso(),
+            alive_since=clock.now_iso(),
             dead_since=None,
             associated_repos=tuple(AssociatedRepo(slug_from_url(u), u) for u in associated_urls),
         )
@@ -561,7 +556,7 @@ class SpecContextService:
         alive_ctx = replace(
             self._backfilled(ctx_fresh),
             state=ContextState.ALIVE,
-            alive_since=_now(),
+            alive_since=clock.now_iso(),
             dead_since=None,
             current_branch=actual_branch,
         )
@@ -785,7 +780,7 @@ class SpecContextService:
             repo_url=ctx.repo_url,
             created_at=ctx.created_at,
             alive_since=None,
-            dead_since=_now(),
+            dead_since=clock.now_iso(),
             current_branch=branch_before_sync,
             associated_repos=ctx.associated_repos,
         )

@@ -2,10 +2,10 @@
 
 import json
 from dataclasses import dataclass
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Protocol
 
+from dadaia_workspace.core import clock
 from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.exceptions import (
     AssociatedRepoConflictError,
@@ -93,7 +93,7 @@ class ImportService:
         self._registry = registry
 
     def run(self, file: Path) -> ImportResult:
-        now = datetime.now(tz=UTC).isoformat()
+        now = clock.now_iso()
         registered: list[str] = []
         skipped: list[tuple[str, str]] = []
         for record in _read(file):

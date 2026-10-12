@@ -2,9 +2,9 @@
 
 import json
 from dataclasses import dataclass, replace
-from datetime import UTC, datetime
 from pathlib import Path
 
+from dadaia_workspace.core import clock
 from dadaia_workspace.core.atomic_write import atomic_write
 from dadaia_workspace.core.models.spec_context import (
     EXPORT_SCHEMA_VERSION,
@@ -63,7 +63,7 @@ class ExportService:
         return rows
 
     def run(self) -> ExportResult:
-        now = datetime.now(tz=UTC).isoformat()
+        now = clock.now_iso()
         rows = self._refresh_branches(now)
         payload = {
             "schema_version": EXPORT_SCHEMA_VERSION,

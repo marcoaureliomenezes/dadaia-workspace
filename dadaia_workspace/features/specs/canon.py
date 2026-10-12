@@ -59,11 +59,11 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterable
 from dataclasses import astuple, dataclass
-from datetime import UTC, datetime
 from functools import partial
 from pathlib import Path
 from typing import Literal
 
+from dadaia_workspace.core import clock
 from dadaia_workspace.core.atomic_write import SymlinkRefusedError, atomic_write
 from dadaia_workspace.core.gitflow import DEFAULT
 from dadaia_workspace.core.specs_version import CANONICAL_SPECS_VERSION
@@ -217,10 +217,6 @@ def default_public_dir() -> Path:
     return Path(__file__).resolve().parent.parent.parent / "public"
 
 
-def _today() -> str:
-    return datetime.now(tz=UTC).strftime("%Y-%m-%d")
-
-
 def _render(entry: CanonEntry, *, public_dir: Path, context: dict[str, str]) -> str:
     kind, template = TEMPLATES[entry.shape]
     if kind == "copy":
@@ -251,7 +247,7 @@ def scaffold(
     """
     resolved_public = public_dir if public_dir is not None else default_public_dir()
     context = {
-        "today": _today(),
+        "today": clock.today(),
         "project_name": project_name,
         "specs_pattern_version": str(CANONICAL_SPECS_VERSION),
         "gitflow": "{{principal: {}, integration: {}, work: {}}}".format(*astuple(DEFAULT)),
@@ -338,7 +334,7 @@ def scaffold_entry(specs_dir: Path, rel_path: str, /, **context: str) -> Path:
     rendered = _render(
         entry,
         public_dir=default_public_dir(),
-        context={"today": _today(), **context},
+        context={"today": clock.today(), **context},
     )
     atomic_write(target, rendered, ensure_parent=True)
     return target

@@ -3,7 +3,6 @@
 import json
 import os
 import sys
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -19,7 +18,7 @@ from dadaia_workspace.cli._specs_resolution import (
     resolve_session_id,
 )
 from dadaia_workspace.cli.redact import build_context_redactor
-from dadaia_workspace.core import session_store
+from dadaia_workspace.core import clock, session_store
 from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.exceptions import (
     AssociatedRepoConflictError,
@@ -96,10 +95,6 @@ def _ctx_to_dict(svc: SpecContextService, ctx: SpecContextProject) -> dict[str, 
             "work": flow.work_prefix,
         },
     }
-
-
-def _now_iso() -> str:
-    return datetime.now(tz=UTC).isoformat()
 
 
 def _sessions_dir(workspace_root: Path) -> Path:
@@ -356,7 +351,7 @@ def bind(name: str = typer.Argument(..., help="Context name to bind to")) -> Non
             context=name,
             runtime=os.environ.get("DADAIA_RUNTIME", "unknown"),
             pid=os.getpid(),
-            now=_now_iso(),
+            now=clock.now_iso(),
         ),
     )
     console.print(f"[green]✓[/green] Bound to '[bold]{name}[/bold]' (session id: {session_id})")
