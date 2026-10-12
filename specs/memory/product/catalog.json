@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-11T22:30:14Z",
+  "generated_at": "2026-10-12T12:09:20Z",
   "features": [
     {
       "rank": 1,
@@ -82,7 +82,7 @@
       ],
       "sources": [
         "dadaia_workspace/public/entities/**",
-        "dadaia_workspace/public/schemas/behavior-map-v1.schema.json",
+        "dadaia_workspace/features/spec_context/behavior-map*.json",
         "dadaia_workspace/public/data/CONTEXT-MAP.md",
         "dadaia_workspace/public/skills/**",
         "dadaia_workspace/infrastructure/entity_doctor.py"

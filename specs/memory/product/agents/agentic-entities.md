@@ -6,7 +6,7 @@ summary: The harness-neutral entity registry, its projected implementations, the
 tags: [agents, entities, derivation, governance]
 sources:
   - dadaia_workspace/public/entities/**
-  - dadaia_workspace/public/schemas/behavior-map-v1.schema.json
+  - dadaia_workspace/features/spec_context/behavior-map*.json
   - dadaia_workspace/public/data/CONTEXT-MAP.md
   - dadaia_workspace/public/skills/**
   - dadaia_workspace/infrastructure/entity_doctor.py
