@@ -1,9 +1,8 @@
 """Release validator: the active release, its artifacts, SemVer + ledger invariants.
 
-Single-responsibility sibling of the SpecsDoctor coordinator. Owns the active-release
-lifecycle check (SPEC-DOC-004), the release ledger invariant (unique ids SPEC-DOC-026), plus the family-local status extractor.
-A release dir's name and placement are TREE-8's alone.
-Leaf-only: imports the shared leaves + core, never a sibling validator.
+Owns the active-release lifecycle check, the release ledger invariant (unique release ids),
+and the family-local status extractor. A release dir's name and placement belong to the
+tree validator alone. Imports the shared leaves and core only, never a sibling validator.
 
 The active release and its phase are read by :func:`resolve_active_release`; whether the
 state document is valid is `release.py check`'s answer (LEDGER-RELEASE-SCHEMA).
@@ -47,7 +46,7 @@ class ReleaseValidator:
 
     def __init__(self, specs_dir: Path) -> None:
         self.specs_dir = specs_dir
-        #: Fresh per check() run (assigned by the coordinator, F010) — the parsed
+        #: Fresh per check() run (assigned by the coordinator) — the parsed
         #: snapshot every active-release read goes through; never survives a fix pass.
         self.tree: SpecsTree = SpecsTree(specs_dir)
 
@@ -89,10 +88,8 @@ class ReleaseValidator:
                     )
                 )
             elif status != APPROVED and active.phase in _PHASES[1:]:
-                # Bug fresh-release-scaffold-emits-spec-doctor-warnings-042: Draft/In
-                # review IS the legitimate state of a DEFINITION-phase release — the
-                # scaffolder emits exactly that. Only implementation-bound phases
-                # expect approved artifacts.
+                # Draft and in-review artifacts are the legitimate state of a
+                # DEFINITION-phase release. Only implementation-bound phases expect approved.
                 issues.append(
                     specs_finding(
                         code="SPEC-DOC-004",
@@ -108,7 +105,7 @@ class ReleaseValidator:
         return issues
 
     def check_unique_release_ids(self) -> list[SectionFinding]:
-        """SPEC-DOC-026: release ids (dir basenames) must be unique across
+        """Release ids (dir basenames) must be unique across
         ``releases/`` ∪ ``releases/_archive/`` (recursive). A collision is an ERROR.
         """
         issues: list[SectionFinding] = []
@@ -134,8 +131,8 @@ class ReleaseValidator:
         return issues
 
     def check_release_state_filename(self) -> list[SectionFinding]:
-        """SPEC-DOC-046 (ADR 0007, restored by ADR 0152 (4)): a release directory holds
-        the legacy ``RELEASE.json`` and no ``_RELEASE.json`` — `doctor --fix` renames it."""
+        """WARN on a release directory holding the legacy ``RELEASE.json`` and no
+        ``_RELEASE.json``; `doctor --fix` renames it."""
         return [
             specs_finding(
                 "SPEC-DOC-046",
@@ -151,7 +148,7 @@ class ReleaseValidator:
         ]
 
     def fix_release_state_filename(self, issue: SectionFinding) -> None:
-        """Rename the legacy state file (SPEC-DOC-046) — re-verified before the rename."""
+        """Rename the legacy state file, re-verified before the rename."""
         if (named := finding_path(issue)) and Path(named).name == LEGACY_RELEASE_STATE_FILENAME:
             legacy = Path(named)
             if legacy.is_file() and not legacy.with_name(RELEASE_STATE_FILENAME).exists():

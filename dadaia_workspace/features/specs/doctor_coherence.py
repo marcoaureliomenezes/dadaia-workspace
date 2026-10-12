@@ -33,8 +33,8 @@ class CoherenceValidator:
         return []
 
     def check_gitflow(self) -> list[SectionFinding]:
-        """GITFLOW-1, WARN-only (ADR 0037): the constitution's ``gitflow:`` block is absent
-        or malformed, so the pre-push gate falls back to the default."""
+        """WARN when the constitution's ``gitflow:`` block is absent or malformed: the
+        pre-push gate then falls back to the default."""
         from dadaia_workspace.core.gitflow import read_gitflow
 
         constitution = self.specs_dir / "constitution.md"

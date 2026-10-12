@@ -67,7 +67,7 @@ def _tech_stack_section(raw: str) -> str:
 
 def _build_memory(specs_dir: Path) -> str:
     """``constitution.md`` + the tech-stack section + the catalog digest (else ``index.md``)
-    — one hook for every harness, so every harness gets the constitution (ADR 0103)."""
+    — one hook for every harness, so every harness gets the constitution."""
     memory_dir = specs_dir / "memory"
     if not memory_dir.is_dir():
         return ""

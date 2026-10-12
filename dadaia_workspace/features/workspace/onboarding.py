@@ -1,7 +1,7 @@
-"""The onboarding step list (ADRs 0033, 0034, 0038, 0042-0044) — the ONE next-step derivation.
+"""The onboarding step list — the one next-step derivation.
 
 ``STEPS`` is ordered: ``context`` (no ALIVE context), ``bind`` (a resolvable session is
-unbound), ``constitution`` (frontmatter unparseable, ADR 0047), ``specs`` (3a),
+unbound), ``constitution`` (frontmatter unparseable), ``specs`` (3a),
 ``first-pass`` (3b), ``publish`` (3c). Every predicate reads real state — files, git,
 the session registry — never a stamp, and no network. One context is judged: the focus,
 else the only one in *trees* (every ALIVE name -> its ``specs/`` dir; the caller's read).

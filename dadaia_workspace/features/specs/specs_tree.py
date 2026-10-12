@@ -1,10 +1,8 @@
-"""SpecsTree — the parsed snapshot of shared specs facts (F010, 20260830 audit).
+"""SpecsTree — the parsed snapshot of shared specs facts.
 
-Before this module every validator owned raw filesystem access: RELEASE.json was
-re-read and re-parsed by four checks per doctor run, so rules could observe different
-states mid-run and re-derive shared facts independently. A ``SpecsTree`` is built
-FRESH at the start of every ``SpecsDoctor.check()`` run and handed to the validators;
-its sections are lazy and cached for the lifetime of that one run.
+A ``SpecsTree`` is built fresh at the start of every ``SpecsDoctor.check()`` run and handed
+to the validators, so every rule reads the same state. Its sections are lazy and cached for
+the lifetime of that one run.
 
 Contract (the fix/check freshness rule): checks read the tree; fixes take paths and
 mutate the filesystem; after fixing, the next ``check()`` builds a fresh tree — a
@@ -26,7 +24,7 @@ __all__ = ["ActiveRelease", "SpecsTree"]
 @dataclass(frozen=True)
 class ActiveRelease:
     """The one shared answer to "which release is live, in which phase, and which
-    ``rc-<N>/`` holds its live candidate" (ADR 0150)."""
+    ``rc-<N>/`` holds its live candidate."""
 
     release: str | None
     phase: str | None

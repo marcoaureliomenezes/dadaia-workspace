@@ -50,7 +50,7 @@ class WorkspaceService:
         self._python_env.ensure_workspace_venv(str(workspace_root))
         for zone in provisioned_zones():
             (workspace_root / ".dadaia" / zone.name).mkdir(parents=True, exist_ok=True)
-        for name, seed in LEVEL1_SEEDS.items():  # the operator's from then on (ADR 0095)
+        for name, seed in LEVEL1_SEEDS.items():  # written once; the operator owns it after
             if not occupied(target := workspace_root / name):
                 target.write_text(seed(workspace_root), encoding="utf-8")
         # Harness directories come from projections; only the shared skills root is eager.

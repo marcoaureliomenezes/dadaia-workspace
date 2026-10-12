@@ -22,7 +22,7 @@ from dadaia_workspace.infrastructure.ledger_scripts import load_owner
 #: The ADR ledger, relative to a specs tree.
 LEDGER = "ADRs/decisions.jsonl"
 
-#: An ADR id as memory atoms, skills and rules cite it: `ADR: 0007`, `ADR 0007`, `ADR-0007`.
+#: The citation shapes of an ADR id in memory atoms, skills and rules: "ADR", a colon, space or hyphen, four digits.
 _ADR_CITATION_RE = re.compile(r"\bADR[:\s-]+(\d{4})\b")
 
 
@@ -103,7 +103,7 @@ def adr_record_issues(specs_dir: Path) -> list[SectionFinding]:
             )
             break
     accepted = {str(r.get("id")) for _, r in records if r.get("status") == "accepted"}
-    for number, r in records:  # M2 (ADR 0151): only a ruled record changes a ruled one
+    for number, r in records:  # only a ruled record changes a ruled one
         named = f"{r.get('supersedes') or ''},{r.get('amends') or ''}".split(",")
         ruled = r.get("status") in ("accepted", "superseded") and "ruling" in r
         if r.get("status") != "rejected" and not ruled and (hit := sorted(accepted & set(named))):

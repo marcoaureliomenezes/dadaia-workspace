@@ -1,8 +1,8 @@
-"""The ONE loader for every packaged public JSON schema (0.4.7 FR6, T-047-03).
+"""The one loader for every packaged public JSON schema.
 
 A schema is addressed by its path under ``dadaia_workspace/public/schemas/`` without the
 ``.schema.json`` suffix (``"memory/memory-frontmatter-v1"``). A ledger schema is never
-validated here: ``_ledger.validate`` is the one ledger engine (ADR 0018).
+validated here: ``_ledger.validate`` is the one ledger engine.
 
 ``core.handoff_index``'s handoff-schema read is deliberately NOT folded in here: it
 reads the PROJECTED copy under a workspace's ``.dadaia/agentic/schemas/``, a
@@ -28,7 +28,7 @@ def load_schema(name: str) -> dict[str, Any]:
     """Load one packaged schema by its ``<dir>/<id>`` name.
 
     Raises ``FileNotFoundError`` naming the path when the installed package is
-    incomplete — the one diagnostic every consumer used to spell for itself.
+    incomplete.
     """
     path = SCHEMA_ROOT / f"{name}.schema.json"
     if not path.is_file():
