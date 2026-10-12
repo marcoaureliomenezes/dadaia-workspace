@@ -57,10 +57,11 @@ The branch contract by role; the names are `specs/constitution.md`'s `gitflow:` 
 | 3 | a job | Bug fix or REBUILD: `<code>`, red loop in the body, a hotfix's naming `block: <item>`; the regression test lands first as a `test(` commit (a task's shape 6, or the hotfix tree's) | `fix(bugs): <id> — <cause>`; a REBUILD `refactor(bugs): <id> — REBUILD <unit>: …`; a group names its N ids |
 | 4 | a job | Terminal transition without code (`resolve` after its named shape-3 fix commit, `supersede`, `reject`): `specs/bugs/BUGS.jsonl` | `chore(bugs): <verb> <id> — <reason, by task-id, or fix sha>`; per class `chore(bugs): <verb> class <class> — <reason>`, one id per body line |
 | 4 | a job | Archive terminal bugs: `specs/bugs/BUGS.jsonl`, `specs/bugs/_archive/bugs_histo.jsonl` | `chore(bugs): archive <ids>` |
-| 5 | `define` | Release definition: `specs/releases/<v>/rc-<N>/*` | `feat(specs): define candidate …` |
+| 5 | `define` | Release definition, and a candidate's birth (`release.py new` writes `_RELEASE.json` and the SPEC stub in one transaction): `specs/releases/<v>/rc-<N>/*`, `specs/releases/<v>/_RELEASE.json` | `feat(specs): define candidate …` |
 | 6 | a task tree | Task: its `W:` | `conventional-commit(<id>): description`, a REBUILD `refactor(<id>): REBUILD <unit> — …` |
+| 7 | `wt/hotfix/<bug-id>` | Specs revert, no code: the `specs/` paths of the culprit commit, put back | `Revert "<subject>"`; body `This reverts commit <sha>.` and `block: <item>` |
 | 8 | `define` | SPEC and PLAN approval: `specs/releases/<v>/rc-<N>/{SPEC,PLAN}.md` | `docs(specs): …` |
-| 9 | `reconcile` | Memory pass and derived docs: `specs/memory/*`, `README.md`, `llms.txt`, `docs/*.md` | `docs(memory): …` |
+| 9 | `reconcile` | Memory pass and derived docs: `specs/memory/*`, `README.md`, `docs/*.md` | `docs(memory): …` |
 | 10 | `define`, `reconcile` | Release state: `specs/releases/<v>/_RELEASE.json`, only when [`RELEASE-EVENTS.md`](../dd-release-implementation/RELEASE-EVENTS.md) requires a current entry | `chore(release): …` |
 
 ## 3b. The PR gate
