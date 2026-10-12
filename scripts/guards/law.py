@@ -1,6 +1,6 @@
 """Law checks: what the shipped law, scaffold and persona files say about the code and each other.
 
-Checks read tracked files as text, JSON or an AST. Where the package owns the answer (the
+Checks read tracked files as text, JSON, INI or an AST. Where the package owns the answer (the
 fixed-sections canon, the frontmatter grammar), the check imports that owner.
 """
 
@@ -108,10 +108,13 @@ def fragment_bullet_not_restated(tree: Tree) -> list[str]:
     ]
 
 
+_SHIPPED_NAMES = f"{_SKILLS}/dd-gitflow-default/scripts/_worktree_names.py"
+
+
 def gitflow_names(tree: Tree) -> list[str]:
     """Only ``core/gitflow`` spells the default branch names; the skill cuts work from integration."""
     out = [
-        f"{'shipped-literal' if 'public' in Path(p).parts else 'default-literal'}: {p} spells a default branch name"
+        f"default-literal: {p}: spells a default branch name"
         for p in tree.tracked(_PKG)
         if p.endswith(".py") and _DEFAULT_LITERAL.search(tree.read(p))
     ]
@@ -349,10 +352,7 @@ CHECKS: dict[str, Check] = {
         gitflow_names,
         {
             "default-literal": _plant(_MODULE, "x = 'principal: main'\n"),
-            "shipped-literal": _plant(
-                f"{_SKILLS}/dd-gitflow-default/scripts/_worktree_names.py",
-                "x = 'principal: main'\n",
-            ),
+            f"default-literal: {_SHIPPED_NAMES}": _plant(_SHIPPED_NAMES, "x = 'principal: main'\n"),
             "work-cut": _skill(
                 "dd-gitflow-default/SKILL.md", "| work `w` | Yes | develop | jobs |\n"
             ),

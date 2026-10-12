@@ -3,7 +3,9 @@ rules the package source must keep.
 
 Checks read tracked files as text, JSON, TOML or an AST. Where only the package's own decider
 can answer (the canonical sets, the template renderer, the shipped-history reader, the specs
-doctor, the harness registry), the check imports that decider and runs it over the tree.
+doctor, the harness registry), the check imports that decider and runs it over the tree. The
+Typer app is the exception: its verbs and defaults are the checkout's, not the judged tree's, so
+a planted tree supplies them through the session report.
 """
 
 from __future__ import annotations
@@ -42,7 +44,7 @@ from dadaia_workspace.features.specs.doctor import SpecsDoctor  # noqa: E402
 from dadaia_workspace.features.specs.doctor_common import RELEASE_ARTIFACTS  # noqa: E402
 
 if TYPE_CHECKING:
-    from run import Check, Plant, Tree
+    from run import Check, Plant, Session, Tree
 
 _PKG = "dadaia_workspace"
 _PUBLIC = f"{_PKG}/public"
@@ -412,45 +414,49 @@ def _reaches_seam(defs: dict[str, ast.FunctionDef], func: str, param: str) -> bo
     return explore(func, param)
 
 
-def _verbs() -> set[tuple[str, str]]:
-    """(module path, function name) of every leaf verb of the live Typer app, decorator or call form."""
-    out: set[tuple[str, str]] = set()
+def _live_verbs() -> list[dict[str, Any]]:
+    """Every leaf verb of the live Typer app, decorator or call form, that has a
+    ``context``/``specs_dir`` parameter: its module path, function name and each such
+    parameter's default value."""
+    out: list[dict[str, Any]] = []
 
     # Recurse on ``.commands``: Typer's vendored click shim fails isinstance(click.Group).
     def walk(cmd: Any) -> None:
-        if getattr(cmd, "commands", None) is None:
-            out.add((cmd.callback.__module__.replace(".", "/") + ".py", cmd.callback.__name__))
-        else:
+        if getattr(cmd, "commands", None) is not None:
             for sub in cmd.commands.values():
                 walk(sub)
+            return
+        params = {p.name: p.default for p in cmd.params if p.name in _RESOLVER_PARAMS}
+        if params:
+            module = cmd.callback.__module__.replace(".", "/") + ".py"
+            out.append({"module": module, "name": cmd.callback.__name__, "params": params})
 
     walk(typer.main.get_command(app))
     return out
 
 
 def bind_seam_reached(tree: Tree) -> list[str]:
-    """Each ``context``/``specs_dir`` parameter of a verb reaches the resolution seam, with no
-    ``dadaia-workspace`` literal default."""
-    out, seen = [], 0
+    """Each ``context``/``specs_dir`` parameter of a verb reaches the resolution seam and has no
+    ``dadaia-workspace`` default. The verbs and defaults are the checkout's live app, or the
+    session's ``verbs`` report when judging a planted tree; a verb whose definition is not a
+    module-level function under ``cli/commands`` is ``unreached``."""
+    verbs = _live_verbs() if tree.root == ROOT else tree.session["verbs"]
     tracked = set(tree.tracked(_COMMANDS))
-    for rel, name in sorted(v for v in _verbs() if v[0] in tracked):
-        defs = {n.name: n for n in _ast(tree, rel).body if isinstance(n, ast.FunctionDef)}
-        for fn in (defs[name],) if name in defs else ():
-            args = fn.args.args + fn.args.kwonlyargs
-            defaults = [None] * (len(fn.args.args) - len(fn.args.defaults)) + fn.args.defaults
-            for arg, default in zip(args, [*defaults, *fn.args.kw_defaults], strict=False):
-                if arg.arg not in _RESOLVER_PARAMS:
-                    continue
-                seen += 1
-                label = f"{rel}:{fn.name} --{arg.arg.replace('_', '-')}"
-                if default is not None and any(
-                    isinstance(n, ast.Constant) and n.value == "dadaia-workspace"
-                    for n in ast.walk(default)
-                ):
-                    out.append(f"hardcoded-default: {label}")
-                if not _reaches_seam(defs, fn.name, arg.arg):
-                    out.append(f"unreached: {label}")
-    return out or ([] if seen else ["unreached: no verb carries a context or specs_dir parameter"])
+    out = []
+    for v in sorted(verbs, key=lambda v: (v["module"], v["name"])):
+        rel, name = v["module"], v["name"]
+        defs = (
+            {n.name: n for n in _ast(tree, rel).body if isinstance(n, ast.FunctionDef)}
+            if rel in tracked
+            else {}
+        )
+        for param, default in v["params"].items():
+            label = f"{rel}:{name} --{param.replace('_', '-')}"
+            if default == "dadaia-workspace":
+                out.append(f"hardcoded-default: {label}")
+            if not _reaches_seam(defs, name, param):
+                out.append(f"unreached: {label}")
+    return out or ([] if verbs else ["empty: no verb carries a context or specs_dir parameter"])
 
 
 # --- plants: each writes one violation; ``run.py --planted`` requires red ----------------
@@ -470,8 +476,7 @@ def _shipped(text: str) -> str:
 _SPECS_TEMPLATE = "# AGENTS\n\n<!-- specs-canon -->\n"
 _SCAFFOLD_TEXT = "# area law\n"
 _VERB = (
-    "@app.command()\n"
-    "def certify(context: str = typer.Option(None)) -> None:\n"
+    "def certify(context: str | None = typer.Option(None)) -> None:\n"
     "    ctx = context\n"
     "    resolve_context_for_cli(ctx)\n"
 )
@@ -498,7 +503,13 @@ _PYTHON_FILES = {
 }
 
 
-def CONTROL(root: Path) -> None:
+def _report(rel: str, default: str | None) -> Session:
+    """The session report of one ``certify`` verb defined in *rel* with that ``--context`` default."""
+    verb = {"module": f"{_PKG}/{rel}", "name": "certify", "params": {"context": default}}
+    return {"verbs": [verb]}
+
+
+def CONTROL(root: Path) -> Session:
     """Every check green on a minimal healthy tree; violations only in an ignored file."""
     files = {
         ".gitignore": "scratch/\n",
@@ -530,6 +541,7 @@ def CONTROL(root: Path) -> None:
     }
     for rel, text in files.items():
         _write(root, rel, text)
+    return _report("cli/commands/certify.py", None)
 
 
 def _plant(rel: str, text: str) -> Plant:
@@ -544,6 +556,17 @@ def _plant(rel: str, text: str) -> Plant:
 
 def _py(rel: str, text: str) -> Plant:
     return _plant(f"{_PKG}/{rel}", text)
+
+
+def _verb(rel: str, text: str, default: str | None) -> Plant:
+    """CONTROL with the verb file *rel* replaced, reported with that ``--context`` default."""
+
+    def plant(root: Path) -> Session:
+        CONTROL(root)
+        _write(root, f"{_PKG}/{rel}", text)
+        return _report(rel, default)
+
+    return plant
 
 
 def _without(*rels: str) -> Plant:
@@ -648,10 +671,16 @@ CHECKS: dict[str, Check] = {
     "workspace-bind-seam-reached": (
         bind_seam_reached,
         {
-            "hardcoded-default": _py(
-                "cli/commands/certify.py", _VERB.replace("typer.Option(None)", '"dadaia-workspace"')
+            "hardcoded-default": _verb(
+                "cli/commands/certify.py",
+                '_DEFAULT_CTX = "dadaia-workspace"\n'
+                + _VERB.replace("typer.Option(None)", "_DEFAULT_CTX"),
+                "dadaia-workspace",
             ),
-            "unreached": _py("cli/commands/certify.py", _VERB.replace("ctx)", "None)")),
+            "unreached": _verb("cli/commands/certify.py", _VERB.replace("ctx)", "None)"), None),
+            f"unreached: {_PKG}/cli/main.py": _verb(
+                "cli/main.py", _VERB.replace("ctx)", "None)"), None
+            ),
         },
     ),
 }
