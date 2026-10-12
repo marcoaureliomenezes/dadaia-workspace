@@ -14,7 +14,7 @@ from dadaia_workspace.core import platform
 
 def cli_path[P: PurePath](root: P) -> P:
     """The workspace CLI's real executable (``Scripts\\dadaia.exe`` on Windows)."""
-    return _venv_tool(root / ".dadaia" / ".venv", "dadaia")
+    return platform.venv_tool(root / ".dadaia" / ".venv", "dadaia")
 
 
 def fix_line(root: PurePath | None, *argv: str) -> str:
@@ -37,12 +37,7 @@ def venv_line(root: PurePath | None, tool: str, *argv: str) -> str:
     """``<absolute venv tool> argv…`` for *tool* (``dadaia``, ``pip``, ``python``) of the
     workspace venv; no workspace (*root* ``None``: CI) names the venv running now."""
     venv = root / ".dadaia" / ".venv" if root is not None else Path(sys.prefix)
-    return shell_line(str(_venv_tool(venv, tool)), *argv)
-
-
-def _venv_tool[P: PurePath](venv: P, tool: str) -> P:
-    caps = platform.PLATFORM
-    return venv / caps.venv_scripts_dir / f"{tool}{caps.venv_exe_suffix}"
+    return shell_line(str(platform.venv_tool(venv, tool)), *argv)
 
 
 def git_line(repo: str | PurePath, *argv: str) -> str:
@@ -52,7 +47,7 @@ def git_line(repo: str | PurePath, *argv: str) -> str:
 
 def shell_line(*parts: str) -> str:
     """*parts* joined into one command line quoted for the host shell."""
-    if platform.PLATFORM.venv_exe_suffix:  # Windows
+    if platform.PLATFORM.windows:
         head, *argv = (_win_quote(part.replace("\\", "/")) for part in parts)
         if head.startswith('"'):  # a drive path: open the quote after its first char
             head = f'{head[1]}"{head[2:]}'

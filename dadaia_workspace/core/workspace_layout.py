@@ -11,7 +11,7 @@ from collections.abc import Callable, Collection, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 from functools import cached_property
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Literal
 
 from dadaia_workspace.core import platform
@@ -579,8 +579,7 @@ _SOURCE_CLI = ".venv/bin/dadaia"
 
 def render_workspace_cli(text: str) -> str:
     """Render the workspace CLI source for this host."""
-    caps = platform.PLATFORM
-    return text.replace(_SOURCE_CLI, f".venv/{caps.venv_scripts_dir}/dadaia{caps.venv_exe_suffix}")
+    return text.replace(_SOURCE_CLI, str(platform.venv_tool(PurePosixPath(".venv"), "dadaia")))
 
 
 def render_registry_tables(text: str) -> str:
