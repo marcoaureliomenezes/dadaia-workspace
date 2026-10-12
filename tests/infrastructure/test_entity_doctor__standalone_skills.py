@@ -20,7 +20,7 @@ import yaml
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _PUBLIC = _REPO_ROOT / "dadaia_workspace" / "public"
 _SKILLS_DIR = _PUBLIC / "skills"
-_MAP = _PUBLIC / "entities" / "behavior-map.json"
+_MAP = _REPO_ROOT / "dadaia_workspace" / "features" / "spec_context" / "behavior-map.json"
 
 _NAME_RE = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
 _FRONTMATTER_RE = re.compile(r"\A---\n(.*?)\n---\n", re.DOTALL)
@@ -38,7 +38,7 @@ def _standalone_skills() -> list[str]:
     names = data.get("standalone_skills")
     assert isinstance(names, list) and names, (
         "`standalone_skills` is missing or empty in "
-        "dadaia_workspace/public/entities/behavior-map.json — it is the one data "
+        "dadaia_workspace/features/spec_context/behavior-map.json — it is the one data "
         "source for the distributed skill set"
     )
     return [str(name) for name in names]

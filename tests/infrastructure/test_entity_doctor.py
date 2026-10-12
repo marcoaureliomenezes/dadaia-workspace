@@ -41,8 +41,8 @@ from tests.helpers.scan_population import assert_populated
 
 _PKG_ROOT = Path(__file__).resolve().parents[2] / "dadaia_workspace"
 _PUBLIC = _PKG_ROOT / "public"
-_MAP_PATH = _PUBLIC / "entities" / "behavior-map.json"
-_SCHEMA_PATH = _PUBLIC / "schemas" / "behavior-map-v1.schema.json"
+_MAP_PATH = _PKG_ROOT / "features" / "spec_context" / "behavior-map.json"
+_SCHEMA_PATH = _MAP_PATH.with_name("behavior-map-v1.schema.json")
 _LAW_PATH = _PUBLIC / "data" / "AGENTS.md"
 _SKILLS_DIR = _PUBLIC / "skills"
 _AGENTS_DIR = _PUBLIC / "agents"
