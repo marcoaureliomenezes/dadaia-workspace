@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any
 
 # The worklist has ONE decider, the spec navigator's drift function, projected beside
-# this skill: importing a pure function is not a script calling a script (SPEC D6).
+# this skill: importing a pure function is not a script calling a script.
 sys.path.insert(1, str(Path(__file__).resolve().parents[2] / "dd-spec-navigator" / "scripts"))
 
 import _findings
@@ -111,14 +111,14 @@ def _trace(
     ]
 
 
-#: AC5.6: the first `## ` heading of every live candidate's SPEC.
+#: The first `## ` heading of every live candidate's SPEC.
 BUG_WINDOW = "## Bug window review"
 
 
 def _window_findings(
     spec: Path, text: str, state: dict[str, Any], rel: str
 ) -> list[dict[str, Any]]:
-    """AC5.6: the SPEC's first `## ` heading is :data:`BUG_WINDOW` — an error only in
+    """The SPEC's first `## ` heading is :data:`BUG_WINDOW` — an error only in
     DEFINITION, where `new` writes it, info after."""
     lines = text.splitlines()
     head = next((n for n, h in enumerate(lines, 1) if h.startswith("## ")), 1)
@@ -180,7 +180,7 @@ def _origin_row(
 
 
 def _origin_findings(specs: Path) -> list[dict[str, Any]]:
-    """The live candidate's SPEC head: the bug-window heading (AC5.6), then its Origin line:
+    """The live candidate's SPEC head: the bug-window heading, then its Origin line:
     grammar and existence always, and each carried id listed with its standing."""
     try:
         live = live_release(specs)
@@ -323,8 +323,7 @@ def tree_findings(specs: Path) -> list[dict[str, Any]]:
             (specs / HISTO).read_text(encoding="utf-8"), specs.resolve()
         )
     for path in sorted(releases.glob(f"_archive/*/{STATE}")):
-        # An archived state names its ship (F059). Not the live schema: the
-        # 0.4.5-0.4.7 archives predate it (`ARCHIVED`, `rc`) and history is not rewritten.
+        # An archived state names its ship.
         rel, act = path.relative_to(specs).as_posix(), f"rewrite {path.resolve()} as one JSON "
         try:
             state = json.loads(path.read_text(encoding="utf-8"))
@@ -349,7 +348,7 @@ def check(specs: Path) -> list[dict[str, Any]]:
 
 def ship_findings(specs: Path) -> list[dict[str, Any]]:
     """What `ship` refuses on: `check`'s errors, a phase short of CLOSURE (fix: that
-    phase's NEXT verb), an archive already holding the id — one readiness authority (AC3.4)."""
+    phase's NEXT verb), an archive already holding the id — one readiness authority."""
     live = live_release(specs)
     found = [f for f in check(specs) if f["verdict"] == "error"]
     rel, phase = f"releases/{live.release_id}/{STATE}", str(live.state.get("phase"))

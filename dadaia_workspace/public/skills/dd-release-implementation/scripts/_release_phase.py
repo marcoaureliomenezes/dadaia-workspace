@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """`release.py phase` — the two in-candidate transitions a release walks.
 
-`phase` is the ONE writer of `phase`, `defined` and `implemented` (0.4.7 FR5): the phase
+`phase` is the one writer of `phase`, `defined` and `implemented`: the phase
 and its milestone move in one act, so they cannot disagree.
 """
 
@@ -37,7 +37,7 @@ PREDECESSOR = dict(zip(PHASES[1:], PHASES, strict=False))
 
 def _refuse_unapproved_docs(live: Live) -> Path:
     """A candidate enters IMPLEMENTATION only with SPEC and PLAN `Approved`; returns the
-    candidate folder that holds them (no folder yet: `rc-1/` is where they belong)."""
+    candidate folder that holds them (no folder yet: the first candidate's folder is where they belong)."""
     candidate = live.candidate or live.release_dir / "rc-1"
     for name in CANDIDATE_DOCS:
         document = candidate / name

@@ -1,6 +1,6 @@
 """Public asset manager — stages package assets and projects them to agent runtimes.
 
-K3 (v0.5.1): install/doctor are now two folds over one ``ProjectionRule`` table
+install/doctor are two folds over one ``ProjectionRule`` table
 (``infrastructure/projection_rules.py``) — ``install`` writes ``render``, ``doctor``
 compares against it. What remains here is genuinely bespoke: staging, plan
 resolution, install-ledger reconciliation, and the harness-independent
@@ -78,7 +78,7 @@ def _staged_bytes(src: Path) -> bytes:
 
 
 #: Non-silent doctor line for a runtime whose directory physically exists on disk but is
-#: NOT in the persisted harness profile (A3, v0.1.58 FR3). Emitted in place of the scoped
+#: NOT in the persisted harness profile. Emitted in place of the scoped
 #: drift block so a stale/hand-installed out-of-profile runtime never reads green-with-zero-
 #: lines. ``[warn]`` is non-blocking (CLI exit stays 0) but visible.
 
@@ -103,8 +103,7 @@ class FileSystemPublicAssetManager:
 
         A ledgered relpath whose parent became a SYMLINK is no longer the path the
         ledger recorded: following it would unlink a file inside the authored
-        ``.agents/`` tree the link points at (bug class
-        ``doctor-walks-symlinked-zone-root-into-a-repo-tree``). Such an entry is retired
+        ``.agents/`` tree the link points at. Such an entry is retired
         from the ledger untouched — the link rule that replaced it is already recorded.
         """
         for parent in path.parents:
@@ -198,7 +197,7 @@ class FileSystemPublicAssetManager:
         transcript = install_rules(rules, force=plan.force)
         installed.extend(transcript.render())
 
-        # LEDGER RECONCILIATION (bug retired-lib-asset-leaves-orphan-projection): the
+        # LEDGER RECONCILIATION: the
         # desired state is diffed against the RECORD of what a prior install wrote —
         # never against whatever the current source happens to carry, which is blind to
         # a retired family. Full reconciliation (prune) runs on every whole install;
@@ -237,18 +236,17 @@ class FileSystemPublicAssetManager:
         harness: str | None,
         force: bool,
     ) -> InstallPlan:
-        """Resolve ``install()``'s arguments ONCE (FR6): the single translation point.
+        """Resolve ``install()``'s arguments once: the single translation point.
 
-        v0.1.65 FR5: the agent-model policy is loaded ONCE per install run and the core
-        roster resolved through the single resolver (FR4). An invalid overlay raises the
-        typed store error HERE — loud, before any projection write (NFR-4). A missing
-        overlay resolves the `balanced` defaults.
+        The agent-model policy is loaded once per install run and the core roster resolved
+        through the single resolver. An invalid overlay raises the typed store error here,
+        before any projection write. A missing overlay resolves the `balanced` defaults.
         """
         overlay = self._load_agent_policy(workspace_root)
         resolved_models = self._resolved_core_models(overlay)
 
         # No harness named: project the roster of record — the shared authored set plus
-        # every harness registered in the profile (0.4.7 FR2 — `harness add` is the one
+        # every harness registered in the profile (`harness add` is the one
         # way in). A named harness is `harness add`'s own scoped projection, never a flag.
         if harness is None:
             profile_harnesses = self._profile_harnesses(workspace_root)
@@ -284,14 +282,14 @@ class FileSystemPublicAssetManager:
         return set(JsonHarnessProfileStore().resolve(states_dir, workspace_root).harnesses)
 
     # ------------------------------------------------------------------
-    # Agent-model policy (v0.1.65 FR4/FR5) — loaded ONCE per install/doctor run
+    # Agent-model policy — loaded once per install/doctor run
     # ------------------------------------------------------------------
 
     def _load_agent_policy(self, workspace_root: Path) -> AgentModelPolicyOverlay | None:
         """Load the operator overlay (``None`` when absent ⇒ ``balanced`` defaults).
 
         Raises the typed ``AgentModelPolicyStoreError`` on an invalid overlay — install
-        fails loud BEFORE any projection write (NFR-4); doctor converts it to an ERROR
+        fails loud before any projection write; doctor converts it to an ERROR
         line. Valid override targets are the ``CORE_AGENTS``.
         """
         return JsonAgentModelPolicyStore(workspace_root).load()
@@ -300,7 +298,7 @@ class FileSystemPublicAssetManager:
     def _resolved_core_models(
         overlay: AgentModelPolicyOverlay | None,
     ) -> dict[str, ResolvedAgentModel]:
-        """Resolve the full core roster through the single resolver (FR4)."""
+        """Resolve the full core roster through the single resolver."""
         return {agent: resolve_agent_model(agent, overlay) for agent in CORE_AGENTS}
 
     # ------------------------------------------------------------------
@@ -335,8 +333,7 @@ class FileSystemPublicAssetManager:
         def _record(candidate: Path, kind: str) -> None:
             try:
                 # The PARENT is resolved, never the entry itself: a projected symlink
-                # must be ledgered at the path it occupies, not at the path it points
-                # at (bug class doctor-walks-symlinked-zone-root-into-a-repo-tree).
+                # must be ledgered at the path it occupies, not at the path it points at.
                 rel = (candidate.parent.resolve() / candidate.name).relative_to(ws)
             except (ValueError, OSError):
                 return  # user-level files (e.g. $KIMI_CODE_HOME) are not workspace state
@@ -414,10 +411,10 @@ class FileSystemPublicAssetManager:
         # lines.
         active = self._profile_harnesses(workspace_root)
 
-        # v0.1.65 FR7: load the agent-model policy ONCE per doctor run. An INVALID
+        # Load the agent-model policy once per doctor run. An INVALID
         # overlay is a doctor ERROR line (and the render compare below degrades to the
         # `balanced` defaults); a MISSING overlay is silent and resolves the defaults
-        # (NFR-4 — missing != invalid).
+        # (a missing overlay is not an invalid one).
         overlay: AgentModelPolicyOverlay | None = None
         try:
             overlay = self._load_agent_policy(workspace_root)

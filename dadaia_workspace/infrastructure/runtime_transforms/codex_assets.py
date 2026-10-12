@@ -24,9 +24,8 @@ from dadaia_workspace.infrastructure.public_assets_common import _toml_escape
 # against the shared ``.agents/skills/`` tree Codex reads natively (codex_doctor.py).
 # Each entry must be an exact name or leading-hyphen prefix of a real
 # ``public/skills/<name>/SKILL.md`` SOURCE skill. A name that resolves to nothing is a phantom
-# prefix: it gates nothing real and would let D-CX-7 silently stop protecting the
-# family it was meant to cover (A22.6; a test derives this whole tuple from the
-# on-disk inventory — ``tests/infrastructure/runtime_transforms/test_codex_assets.py``).
+# prefix: it gates nothing real and would silently stop protecting the family it was
+# meant to cover (a test derives this whole tuple from the on-disk inventory — ``tests/infrastructure/runtime_transforms/test_codex_assets.py``).
 _CODEX_SKILL_REF_PREFIXES = ("dd-",)
 
 
@@ -38,18 +37,14 @@ def codex_model(alias: str) -> str:
 
 
 # ---------------------------------------------------------------------------
-# FR22 / A22.1 — Codex persona compaction (shared-law de-duplication)
+# Codex persona compaction (shared-law de-duplication)
 # ---------------------------------------------------------------------------
 #
 # The canonical law (the root AGENTS.md map) reaches every Codex agent context — the parent
 # session AND any delegated custom agent alike — through Codex's NATIVE
 # per-directory ``AGENTS.md`` discovery (`ai-harness-codex` skill §1), a
 # mechanism that is entirely independent of the SessionStart/UserPromptSubmit
-# hooks (live-verified, codex-cli 0.147.0, T-043-33: a parent `codex exec`
-# session AND a delegated `agent_type="dd-sw-engineer-sr"` subagent both
-# quoted the literal opening words of the projected root AGENTS.md from their
-# own context, unprompted by any tool call). Before this compaction, every
-# persona body ALSO restated fragments of that same law inline — the generic
+# hooks. Each persona body ALSO restated fragments of that same law inline — the generic
 # H1 report/protocol pointer blockquotes, the Step-0 memory-bootstrap
 # pointer, the `dd-handoff-emitter` artifact-emission paragraph, the
 # `dd-task-manager` review-gate paragraph, and the generic `dadaia CLI`
@@ -59,8 +54,8 @@ def codex_model(alias: str) -> str:
 # inline restatements — pure shared-law / cross-role repetition, already
 # covered by `AGENTS.md` (natively) or by the named skill (loaded on demand,
 # still listed in the agent's `skills:` frontmatter) — so the law loads
-# exactly once (A22.2). Role identity, role-specific decisions, authority and
-# write/refusal boundaries are never touched by these patterns.
+# exactly once. Role identity, role-specific decisions, authority and write/refusal
+# boundaries are never touched by these patterns.
 
 _CODEX_COMPACT_H1_PROTOCOL_POINTER_RE = re.compile(
     r"> This agent follows the shared workspace protocol: `AGENTS\.md` and the "
@@ -108,7 +103,7 @@ _CODEX_COMPACT_PATTERNS: tuple[re.Pattern[str], ...] = (
 
 
 def _compact_codex_developer_instructions(body: str) -> str:
-    """Strip shared-law / cross-role boilerplate from a Codex persona body (A22.1).
+    """Strip shared-law / cross-role boilerplate from a Codex persona body.
 
     *body* is the persona body, frontmatter already stripped. Every pattern in :data:`_CODEX_COMPACT_PATTERNS`
     targets content that restates law or protocol Codex already delivers
@@ -156,7 +151,7 @@ def _render_codex_agent_toml(
     embedded triple-double-quote sequences must be escaped character-by-character
     to prevent premature string termination.
 
-    *developer_instructions* is compacted (A22.1, FR22b) before serialization:
+    *developer_instructions* is compacted before serialization:
     :func:`_compact_codex_developer_instructions` strips inline shared-law /
     cross-role boilerplate that Codex already delivers via native ``AGENTS.md``
     discovery or a named skill — see that function's docstring for the full

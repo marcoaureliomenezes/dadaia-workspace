@@ -4,7 +4,7 @@ Extracted from ``public_assets.py`` to keep that module under 600 lines.
 All names remain importable from ``dadaia_workspace.infrastructure.public_assets``
 via its re-export block.
 
-Fail-closed posture (R7b / sec F-2): when the operator-private denylist is
+Fail-closed posture: when the operator-private denylist is
 absent (fresh clone, CI, pip install) the check is **never** a no-op. A
 versioned, in-package *baseline structural scan* runs instead, flagging IP
 literals, internal hostnames, ``/home/<user>`` paths, emails, and secret-looking
@@ -82,16 +82,16 @@ def _load_privacy_baseline() -> tuple[BaselinePattern, ...]:
 
 
 def load_privacy_terms() -> tuple[tuple[str, str], ...]:
-    """The operator denylist through its ONE loader and ONE root decision (ADR 0157):
-    ``_ledger.terms`` rooted at ``_ledger.workspace_of`` the cwd (the ledger seam passes its
-    ``--specs``), else the workspace owning this venv. ``$DADAIA_PRIVACY_DENYLIST`` loads
+    """The operator denylist, loaded through the ledger reader: ``_ledger.terms`` rooted at
+    ``_ledger.workspace_of`` the cwd (the ledger seam passes its ``--specs``), else the
+    workspace owning this venv. ``$DADAIA_PRIVACY_DENYLIST`` loads
     even outside any workspace."""
     ledger = load_owner("dd-bug-resolution", "_ledger")
     return tuple(ledger.terms(ledger.workspace_of(Path.cwd()) or own_workspace_root()))
 
 
 def load_baseline_patterns() -> tuple[_BaselinePattern, ...]:
-    """Public accessor over the packaged structural baseline (SPEC v0.9.0 FR3, source 2).
+    """Public accessor over the packaged structural baseline.
 
     Same compiled patterns :func:`check_public_privacy` scans public assets with —
     reused, not forked, so the push-range scan and the public-privacy doctor check stay
@@ -106,12 +106,11 @@ def load_baseline_patterns() -> tuple[_BaselinePattern, ...]:
 def _check_baseline_exclude_rationale(
     baseline: Iterable[_BaselinePattern],
 ) -> list[DoctorLine]:
-    """A12.1: every baseline pattern carrying an ``exclude_regex`` carve-out must
+    """Every baseline pattern carrying an ``exclude_regex`` carve-out must
     document WHY via ``exclude_rationale`` — flags, by pattern id, any that don't.
 
     A pattern with NO carve-out (``exclude is None``) needs no rationale and is never
-    flagged — this check is about carve-outs specifically, the exact thing the SPEC
-    calls out as having grown "literal by literal" with no attached justification.
+    flagged — this check is about carve-outs specifically.
     Wired into :func:`check_public_privacy` so it runs on every ``dadaia public
     doctor`` invocation, on the SAME ``public-privacy`` doctor line the operator
     already reads — never a second, easy-to-miss check surface.

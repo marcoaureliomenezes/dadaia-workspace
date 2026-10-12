@@ -1,9 +1,6 @@
 """The doctor's `ledgers` delegation seam.
 
-Each `specs/` ledger has exactly ONE validator since FR2: the skill script that also
-writes it.  Before this module the doctor carried a second implementation of every
-ledger schema (`features/specs/ledgers.py`, deleted here) — two readers of one
-contract, drifting apart by construction.
+Each `specs/` ledger has exactly one validator: the skill script that also writes it.
 
 This module runs each script's `check --specs <dir> --json` and re-emits its findings.
 It lives in `infrastructure/` because running a subprocess is an infrastructure act
@@ -76,13 +73,13 @@ class LedgerScript:
         return script_line(f".agents/skills/{self.skill}/scripts/{self.filename}")
 
 
-#: One row per ledger script (0.4.7 FR2's table). A new ledger is a row, never a branch.
+#: One row per ledger script. A new ledger is a row, never a branch.
 BUGS_SCRIPT = LedgerScript("BUGS", "dd-bug-resolution", "bugs.py")
 BACKLOG_SCRIPT = LedgerScript("BACKLOG", "dd-backlog-definition", "backlog.py")
 RELEASE_SCRIPT = LedgerScript("RELEASE", "dd-release-implementation", "release.py")
 AUDIT_SCRIPT = LedgerScript("FINDINGS", "dd-audit-project", "audit.py")
 MEMORY_SCRIPT = LedgerScript("MEMORY", "dd-spec-navigator", "memory.py", ("catalog", "generate"))
-#: Not a ledger: the worktrees' owner, read by `worktree_rows` alone (ADR 0135).
+#: Not a ledger: the worktrees' owner, read by `worktree_rows` alone.
 WORKTREE_SCRIPT = LedgerScript("WORKTREES", "dd-gitflow-default", "worktree.py")
 LEDGER_SCRIPTS = (BUGS_SCRIPT, BACKLOG_SCRIPT, RELEASE_SCRIPT, AUDIT_SCRIPT)
 

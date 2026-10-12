@@ -1,6 +1,6 @@
 """``projection_rules(plan)`` — the ONE table every projection family renders from.
 
-0.4.7 FR2: the harness seam is a *record*, not a class. Each
+The harness seam is a *record*, not a class. Each
 :class:`~dadaia_workspace.core.harness_registry.HarnessRecord` names how its harness
 consumes the authored persona set (``agent_transcode``) and which format its hook
 registration serializes into (``hooks``); this module holds one builder per enum value

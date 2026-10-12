@@ -85,7 +85,7 @@ def findings_for(
 ) -> list[dict[str, Any]]:
     """Every finding the ledger *text* carries — the ONE validation path, run both by
     ``check`` over the committed file and by every write over its own candidate bytes.
-    Lineage (AC3.8): a `caused_by` names a record of *text* or *archived*, or a task a
+    Lineage: a `caused_by` names a record of *text* or *archived*, or a task a
     `TASKS.md` under *root*`/releases/` carries, and never loops."""
     schema = load_schema()
     lines: dict[int, list[str]] = {}
@@ -138,7 +138,7 @@ def findings_for(
 
 
 def histo_findings(text: str, root: Path = _ledger.SPECS) -> list[dict[str, Any]]:
-    """The archive's bug records plus pre-v6 event lines, which remain readable history."""
+    """The archive's bug records plus the older event lines, which stay readable."""
     schema = load_schema()
 
     def problems(record: Any) -> list[str]:

@@ -16,7 +16,7 @@ from dataclasses import dataclass, replace
 from dadaia_workspace.core.harness_registry import HarnessRecord, HookFormat
 
 #: The SessionStart lane: the one reaper, run as a CLI process at every
-#: session start — never a hook module (P-12). ``--quiet`` prints only what it deleted, so
+#: session start — never a hook module. ``--quiet`` prints only what it deleted, so
 #: a compliant workspace adds nothing to the model context.
 REAPER_ARGS = "doctor --fix --expired-only --quiet"
 #: Every row's ``timeout``, in seconds — all six harnesses read that key (Copilot as the
@@ -111,7 +111,7 @@ _KIMI = ("DADAIA_RUNTIME", "kimi-code")
 _START = ("DADAIA_HOOK_EVENT", "SessionStart")
 _REAP = ("SessionStart", "doctor-expired", "startup|resume")
 
-#: One row per :class:`HookFormat`, total by construction (ADR 0054: every pre-tool event
+#: One row per :class:`HookFormat`, total by construction: every pre-tool event
 #: is gated; a format with no blocking contract declares ``ungated``).
 HOOK_DIALECTS: dict[HookFormat, HookDialect] = {
     HookFormat.NONE: HookDialect(),
@@ -255,7 +255,7 @@ def wrapper_name(record: HarnessRecord, lane: str) -> str:
     return HOOK_DIALECTS[record.hooks].wrapper.format(harness=record.name, lane=lane)
 
 
-#: The ONE missing-venv posture (DEC-10): warn on stderr naming the venv, ``{tell}`` the
+#: The one missing-venv posture: warn on stderr naming the venv, ``{tell}`` the
 #: agent (a ctx-inject lane), exit 0. ``$ROOT`` is the workspace (``$ESC`` JSON-escaped);
 #: POSIX ``bin/python`` or Windows ``Scripts/python.exe``.
 VENV_PYTHON = (
@@ -268,7 +268,7 @@ VENV_PYTHON = (
     "{tell}  exit 0\n"
     "fi\n"
 )
-#: What every ctx-inject firing tells the agent until the venv is fixed (AC2.7).
+#: What every ctx-inject firing tells the agent until the venv is fixed.
 VENV_MISSING = (
     "dadaia: no workspace venv at $ROOT/.dadaia/.venv — the gate is off.\n"
     "fix: uvx dadaia-workspace init $ROOT\n"
@@ -286,7 +286,7 @@ def _tell(lane: HookLane) -> str:
 def _translator(answer: HookAnswer) -> str:
     """Remap the gate's native envelope into *answer*'s shape, as parsed JSON (never a
     key-order text match). Only a deny is answered — no wrapper emits an explicit allow
-    (ADR 0054). No single quote: it is embedded in a single-quoted ``sh`` word."""
+    No single quote: it is embedded in a single-quoted ``sh`` word."""
     say = (
         f'sys.stderr.write(reason + "\\n")\n    raise SystemExit({answer.exit_code})\n'
         if answer.exit_code

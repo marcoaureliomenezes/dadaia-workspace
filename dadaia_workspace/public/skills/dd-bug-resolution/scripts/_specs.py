@@ -41,7 +41,7 @@ def _bound_fix(here: Path, rerun: str, ledger: str | None) -> tuple[str, str]:
             repo = str(json.loads(shown.stdout)["main_repo"])
         except (ValueError, LookupError, TypeError):
             return f"{head(str(cli))} context list", ""
-        if ledger is None or ledger.startswith("specs/audits/"):  # rc-5 AC1.1
+        if ledger is None or ledger.startswith("specs/audits/"):
             return with_specs(rerun, root / "repos" / repo / "specs"), ""
         return f"{script(_GITFLOW / 'worktree.py')} list", ""
     return "Operator action: re-run inside a repo that holds its specs/ tree", ""
