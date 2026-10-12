@@ -8,6 +8,7 @@ dies only after a day of silence, never a pause. The bind-CLI ``pid`` is never c
 from __future__ import annotations
 
 import json
+import secrets
 from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
@@ -86,6 +87,7 @@ def new_binding_record(
         "runtime": runtime,
         "pid": pid,
         "bound_at": now,
+        "bind_id": secrets.token_hex(8),
         SESSION_HEARTBEAT_FIELD: now,
     }
 

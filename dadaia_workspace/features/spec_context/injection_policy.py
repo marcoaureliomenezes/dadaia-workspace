@@ -52,8 +52,8 @@ def decide_injection(
 
     Inputs are plain values the transport resolves: *context* is the session's bind
     (``core.invocation.resolve_bind``); *recorded_slug* is the sentinel's last-injected
-    slug; *compacted* is "compact marker newer than sentinel"; *rebound* is "this
-    session's own bound_at newer than the sentinel" (covers a same-context re-bind). A
+    slug; *compacted* is "compact marker newer than sentinel"; *rebound* is "the
+    session's ``bind_id`` is not the one the sentinel recorded" (covers a same-context re-bind). A
     bound context without a specs tree still gets its header and next step.
     """
     if event == "session_start":

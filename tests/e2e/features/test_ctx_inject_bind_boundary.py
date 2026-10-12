@@ -90,7 +90,7 @@ def _inject(workspace: Path, session_id: str) -> str:
     T-50-03: ``CLAUDE_CODE_SESSION_ID`` carries *session_id* (not popped) — matching how a
     real harness delivers BOTH the env var and the stdin payload field for the SAME live
     session, which is what lets this hook's own self-keyed leg
-    (``_session_bound_context``) and its injection trigger (``_session_bound_at``) resolve
+    (``_session_bound_context``) and its injection trigger (the record's ``bind_id``) resolve
     the record a same-harness bind just wrote. ``DADAIA_CONTEXT`` stays popped so no
     developer-shell override leaks context resolution into this run.
     """

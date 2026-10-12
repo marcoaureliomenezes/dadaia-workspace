@@ -51,6 +51,7 @@ def test_new_binding_record_authors_the_schema_and_retired_keys_still_parse() ->
     record = si.new_binding_record(
         session_id="s1", context="alpha", runtime="claude-code", pid=1234, now=now
     )
+    assert len(bytes.fromhex(str(record.pop("bind_id")))) == 8
     assert record == {
         "session_id": "s1",
         "context": "alpha",

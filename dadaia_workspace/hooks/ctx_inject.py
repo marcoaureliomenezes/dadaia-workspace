@@ -1,5 +1,5 @@
 """Context-injection hook (SessionStart, UserPromptSubmit, PostCompact): transport for
-:func:`injection_policy.decide_injection`. Re-injects when the session's ``bound_at`` is not the
+:func:`injection_policy.decide_injection`. Re-injects when the session's ``bind_id`` is not the
 one its sentinel (``ctx-inject-fired-<sid>``) recorded, or the PostCompact marker is newer."""
 
 from __future__ import annotations
@@ -94,7 +94,7 @@ def _build_memory(specs_dir: Path) -> str:
 
 
 def _read_sentinel(sentinel: Path) -> tuple[float | None, str, str]:
-    """``(mtime, recorded slug, recorded bound_at)``; ``(None, "", "")`` when absent."""
+    """``(mtime, recorded slug, recorded bind_id)``; ``(None, "", "")`` when absent."""
     try:
         mtime = sentinel.stat().st_mtime
     except OSError:
@@ -103,13 +103,13 @@ def _read_sentinel(sentinel: Path) -> tuple[float | None, str, str]:
     with contextlib.suppress(OSError):
         text = sentinel.read_text(encoding="utf-8")
     fields = dict(line.split("=", 1) for line in text.splitlines() if "=" in line)
-    return mtime, fields.get("ctx", "").strip(), fields.get("bound", "").strip()
+    return mtime, fields.get("ctx", "").strip(), fields.get("bind", "").strip()
 
 
-def _stamp_sentinel(tmp_dir: Path, sentinel: Path, slug: str, bound: str) -> None:
+def _stamp_sentinel(tmp_dir: Path, sentinel: Path, slug: str, bind_id: str) -> None:
     with contextlib.suppress(OSError):
         tmp_dir.mkdir(parents=True, exist_ok=True)
-        sentinel.write_text(f"ctx={slug}\nbound={bound}\n" if slug else "", encoding="utf-8")
+        sentinel.write_text(f"ctx={slug}\nbind={bind_id}\n" if slug else "", encoding="utf-8")
 
 
 def _read_help_digest(workspace: Path) -> str:
@@ -188,7 +188,7 @@ def main() -> int:
     tmp_dir = workspace / workspace_layout.MARKER_DIR
     sentinel = tmp_dir / f"{_SENTINEL_PREFIX}{session_id}"
     compact_marker = tmp_dir / f"{_COMPACT_PREFIX}{session_id}"
-    sentinel_mtime, recorded_slug, recorded_bound = _read_sentinel(sentinel)
+    sentinel_mtime, recorded_slug, recorded_bind = _read_sentinel(sentinel)
     event: injection_policy.Event = "prompt"
     if os.environ.get("DADAIA_HOOK_EVENT") == "PostCompact":  # Kimi: stamp, then emit
         event = "postcompact"
@@ -204,7 +204,7 @@ def main() -> int:
             event = "session_start"
 
     record = session_store.read_session(workspace, session_id)
-    bound = str(record.get("bound_at") or "") if isinstance(record, dict) else ""
+    bind_id = str(record.get("bind_id") or "").strip() if isinstance(record, dict) else ""
     compact_mtime = _read_sentinel(compact_marker)[0]
     try:
         decision = injection_policy.decide_injection(
@@ -215,7 +215,7 @@ def main() -> int:
             compacted=sentinel_mtime is not None
             and compact_mtime is not None
             and compact_mtime > sentinel_mtime,
-            rebound=bool(bound) and bound != recorded_bound,
+            rebound=bool(bind_id) and bind_id != recorded_bind,
         )
         if decision.emit == "bootstrap":
             _emit_bootstrap(workspace, decision.context)
@@ -226,7 +226,7 @@ def main() -> int:
         _emit(render_finding(finding) + "\n")
         return 0
     if decision.stamp_slug is not None:
-        _stamp_sentinel(tmp_dir, sentinel, decision.stamp_slug, bound)
+        _stamp_sentinel(tmp_dir, sentinel, decision.stamp_slug, bind_id)
     return 0
 
 

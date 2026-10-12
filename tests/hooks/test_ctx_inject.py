@@ -13,13 +13,12 @@ import json
 import os
 import subprocess
 import sys
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 import pytest
 
-from dadaia_workspace.core import session_store
+from dadaia_workspace.core import clock, session_store
 from tests.fixtures.harness_env import claude_hook_env, kimi_hook_env, run_hook_subprocess
 
 
@@ -60,10 +59,17 @@ def _ws(root: Path, *contexts: dict[str, Any]) -> Path:
 
 
 def _bind(root: Path, sid: str, context: str) -> None:
-    """What ``dadaia context bind`` persists: the self-keyed record with a fresh ``bound_at``."""
-    now = datetime.now(tz=UTC).isoformat()
+    """What ``dadaia context bind`` persists: the record author's output stamped by the clock."""
     session_store.write_session(
-        root, sid, {"session_id": sid, "context": context, "bound_at": now, "last_seen_at": now}
+        root,
+        sid,
+        session_store.new_binding_record(
+            session_id=sid,
+            context=context,
+            runtime="claude-code",
+            pid=os.getpid(),
+            now=clock.now_iso(),
+        ),
     )
 
 
@@ -423,22 +429,21 @@ def test_hook_lane_cost_does_not_grow_with_the_registry(
     assert twenty == two
 
 
-def test_rebind_in_the_stamp_second_reinjects_once(tmp_path: Path) -> None:
-    """A new ``bound_at`` is re-injected whatever its instant against the stamp's mtime
-    (here the stamp's own whole second); a prompt with no new bind after it is silent."""
+def test_two_same_second_binds_each_reinject_once(tmp_path: Path) -> None:
+    """Two binds the real record author writes in one wall second carry the same ``bound_at``;
+    each still injects, and a prompt with no new bind after it is silent."""
     _ws(tmp_path, {"name": "alpha"})
-    _bind(tmp_path, "s", "alpha")
-    assert _A in _run(tmp_path, "s")
-    stamp = tmp_path / ".dadaia" / "tmp" / "hooks" / "ctx-inject-fired-s"
-    second = datetime.fromtimestamp(int(stamp.stat().st_mtime), tz=UTC).isoformat()
-    now = datetime.now(tz=UTC).isoformat()
-    session_store.write_session(
-        tmp_path,
-        "s",
-        {"session_id": "s", "context": "alpha", "bound_at": second, "last_seen_at": now},
-    )
-    assert _A in _run(tmp_path, "s")
-    assert _run(tmp_path, "s") == ""
+    now = clock.now_iso()
+    for _ in range(2):
+        session_store.write_session(
+            tmp_path,
+            "s",
+            session_store.new_binding_record(
+                session_id="s", context="alpha", runtime="r", pid=1, now=now
+            ),
+        )
+        assert _A in _run(tmp_path, "s")
+        assert _run(tmp_path, "s") == ""
 
 
 def test_naive_bound_at_reads_as_utc_in_any_zone(
