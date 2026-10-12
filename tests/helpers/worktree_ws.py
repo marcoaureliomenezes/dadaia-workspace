@@ -115,10 +115,7 @@ def make_workspace(root: Path) -> Path:
     (repo / ".gitignore").write_text("*.scratch\n__pycache__/\n")
     (repo / "scripts").mkdir()
     (repo / "scripts/ci.py").write_text(CI)
-    (repo / "AGENTS.md").write_text(
-        "verify: python scripts/ci.py job\n"
-        + "".join(f"verify-{lv}: python scripts/ci.py {lv}\n" for lv in ("task", "stage"))
-    )
+    (repo / "AGENTS.md").write_text("verify: python scripts/ci.py job\n")
     git(repo, "add", "-A")
     git(repo, "commit", "-qm", "init")
     git(repo, "branch", "feature/0.5.0")
@@ -176,7 +173,7 @@ def commit(tree: Path, rel: str, text: str = "x = 1\n") -> str:
     (tree / rel).parent.mkdir(parents=True, exist_ok=True)
     (tree / rel).write_text(text)
     git(tree, "add", rel)
-    git(tree, "commit", "-qm", rel)
+    git(tree, "commit", "-q", "--allow-empty", "-m", rel)
     return git(tree, "rev-parse", "HEAD").strip()
 
 
