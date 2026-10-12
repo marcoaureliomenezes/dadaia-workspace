@@ -23,7 +23,7 @@ sys.path[:0] = [
 from _clock import now_iso as utc_now
 from _grammar import SHA_RE, STATE
 from _refusal import Refusal
-from _release_check import histo_findings
+from _release_check import ship_histo_findings
 from _release_new import new_release
 from _release_phase import SHIP_PR, set_phase
 from _release_schema import (
@@ -218,7 +218,7 @@ def _ship(args: argparse.Namespace, specs: Path) -> int:
                        "release": live.release_id, "reason": None, "entry": None,
                        "summary": None}) + "\n"  # fmt: skip
     histo = specs / HISTO
-    if errors := histo_findings((histo.read_text("utf-8") if histo.is_file() else "") + line):
+    if errors := ship_histo_findings((histo.read_text("utf-8") if histo.is_file() else "") + line):
         raise Refusal(f"the ship ledger would not pass check: {errors[-1]['message']}",
                       f"{SCRIPT} check")  # fmt: skip
     commit(live.release_dir / STATE, f"releases/{live.release_id}/{STATE}",

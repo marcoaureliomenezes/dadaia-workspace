@@ -17,6 +17,8 @@ from graphlib import CycleError, TopologicalSorter
 from pathlib import Path
 from typing import Any
 
+import _findings
+import _jsonl
 import _ledger
 from _ledger import SPECS, load_schema, validate
 from _release_schema import (
@@ -39,58 +41,70 @@ _SUMMARY = re.compile(r"delivered: .+; carried: .+; backlog exits: .+")
 _BIRTH = re.compile(r"^(?:Candidate|Release \d+\.\d+\.\d+) born\b")
 
 
-def finding(path: str, line: int, message: str, fix: str) -> dict[str, Any]:
-    """One `check --json` record of this ledger."""
-    record: dict[str, Any] = _ledger.finding(CODE, path, line, message, fix)
-    return record
-
-
 def _unwritten(
     path: str, line: int, message: str, root: Path, at: int | str | None = None
 ) -> dict[str, Any]:
     """Content of this ledger no `release.py` verb wrote: a histo line, or *at* a state key."""
     fix = _ledger.unwritten(root / path, line if at is None else at, "`release.py`", _LAW)
-    return finding(path, line, message, fix)
+    return _findings.finding(CODE, path, line, message, fix)
+
+
+def _current_errors(
+    document: dict[str, Any], entries: list[dict[str, Any]], born: int
+) -> list[str]:
+    """The lean-log rules of the current candidate's *entries*, which start at log index *born*."""
+    return (
+        [
+            f"log[{born + index}] kind {entry.get('kind')!r} is legacy; current candidates "
+            f"write only {', '.join(sorted(_CURRENT_LOG_KINDS))}"
+            for index, entry in enumerate(entries)
+            if entry.get("kind") not in _CURRENT_LOG_KINDS
+        ]
+        + [
+            f"log[{born + index}] kind memory is closure-only"
+            for index, entry in enumerate(entries)
+            if entry.get("kind") == "memory" and document.get("phase") != "CLOSURE"
+        ]
+        + [
+            f"log[{born + index}] kind summary must contain delivered, carried and backlog exits"
+            for index, entry in enumerate(entries)
+            if entry.get("kind") == "summary" and not _SUMMARY.fullmatch(str(entry.get("text", "")))
+        ]
+    )
+
+
+def _merge_errors(entries: list[dict[str, Any]]) -> list[str]:
+    """Why a `kind: merge` job measurement is not the canonical line."""
+    return [
+        f"log[{index}] kind merge text {entry.get('text')!r} is not '{_JOB_MERGE.pattern}'"
+        for index, entry in enumerate(entries)
+        if entry.get("kind") == "merge"
+        and str(entry.get("text")).startswith("job:")
+        and not _JOB_MERGE.fullmatch(str(entry.get("text")))
+    ]
+
+
+def _order_errors(entries: list[dict[str, Any]]) -> list[str]:
+    """Why a log entry's `ts` precedes the one before it."""
+    stamps = [entry.get("ts") for entry in entries]
+    return [
+        f"log[{index + 1}].ts {later!r} precedes log[{index}].ts {earlier!r}"
+        for index, (earlier, later) in enumerate(zip(stamps, stamps[1:], strict=False))
+        if isinstance(earlier, str) and isinstance(later, str) and later < earlier
+    ]
 
 
 def _log_errors(document: dict[str, Any]) -> list[str]:
     """Validate ordering and the lean current-candidate log while retaining history."""
     entries = [entry for entry in document.get("log", []) if isinstance(entry, dict)]
-    stamps = [entry.get("ts") for entry in entries]
     born = max(
         (index for index, entry in enumerate(entries) if _BIRTH.match(str(entry.get("text", "")))),
         default=len(entries),
     )
-    current = entries[born:]
     return (
-        [
-            f"log[{born + index}] kind {entry.get('kind')!r} is legacy; current candidates "
-            f"write only {', '.join(sorted(_CURRENT_LOG_KINDS))}"
-            for index, entry in enumerate(current)
-            if entry.get("kind") not in _CURRENT_LOG_KINDS
-        ]
-        + [
-            f"log[{born + index}] kind memory is closure-only"
-            for index, entry in enumerate(current)
-            if entry.get("kind") == "memory" and document.get("phase") != "CLOSURE"
-        ]
-        + [
-            f"log[{born + index}] kind summary must contain delivered, carried and backlog exits"
-            for index, entry in enumerate(current)
-            if entry.get("kind") == "summary" and not _SUMMARY.fullmatch(str(entry.get("text", "")))
-        ]
-        + [
-            f"log[{index}] kind merge text {entry.get('text')!r} is not '{_JOB_MERGE.pattern}'"
-            for index, entry in enumerate(entries)
-            if entry.get("kind") == "merge"
-            and str(entry.get("text")).startswith("job:")
-            and not _JOB_MERGE.fullmatch(str(entry.get("text")))
-        ]
-        + [
-            f"log[{index + 1}].ts {later!r} precedes log[{index}].ts {earlier!r}"
-            for index, (earlier, later) in enumerate(zip(stamps, stamps[1:], strict=False))
-            if isinstance(earlier, str) and isinstance(later, str) and later < earlier
-        ]
+        _current_errors(document, entries[born:], born)
+        + _merge_errors(entries)
+        + _order_errors(entries)
     )
 
 
@@ -109,20 +123,15 @@ def state_findings(text: str, rel: str, root: Path = SPECS) -> list[dict[str, An
     return [_unwritten(rel, 1, "; ".join(messages), root, _ledger.NAMED)] if messages else []
 
 
-def histo_findings(text: str, root: Path = SPECS) -> list[dict[str, Any]]:
+def ship_histo_findings(text: str, root: Path = SPECS) -> list[dict[str, Any]]:
     """The append-only ship ledger: the histo-record-v1 shape, `delivered`, one line per
     release, ever."""
     schema = load_schema("histo-record-v1")
-    findings: list[dict[str, Any]] = []
     seen: dict[str, int] = {}
-    for number, raw in enumerate(text.split("\n"), start=1):
-        if not raw.strip():
-            continue
-        try:
-            record = json.loads(raw)
-        except json.JSONDecodeError as exc:
-            findings.append(_unwritten(HISTO, number, f"line is not valid JSON: {exc.msg}", root))
-            continue
+    numbers = (n for n, _, why in _jsonl.walk(text) if not why)  # the line `problems` is judging
+
+    def problems(record: Any) -> list[str]:
+        number = next(numbers)
         messages = list(validate(record, schema, schema, "record"))
         if not messages and record["disposition"] != DELIVERED:
             messages.append(
@@ -130,9 +139,15 @@ def histo_findings(text: str, root: Path = SPECS) -> list[dict[str, Any]]:
             )
         if not messages and (first := seen.setdefault(str(record["id"]), number)) != number:
             messages.append(f"{record['id']!r} ships twice (first at line {first})")
-        if messages:
-            findings.append(_unwritten(HISTO, number, "; ".join(messages), root))
-    return findings
+        return messages
+
+    return _findings.histo_findings(
+        text,
+        HISTO,
+        CODE,
+        problems,
+        lambda n: _ledger.unwritten(root / HISTO, n, "`release.py`", _LAW),
+    )
 
 
 def dag_errors(plan: str) -> list[str]:
