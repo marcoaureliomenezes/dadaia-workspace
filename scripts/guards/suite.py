@@ -210,7 +210,10 @@ def _session(**change: object) -> Callable[[Path], Session]:
 
 
 def CONTROL(root: Path) -> Session:
-    """Every check green: a healthy session and a clean tree."""
+    """Every check green: a healthy session, with violations only in an untracked,
+    gitignored file."""
+    _write(root, ".gitignore", "scratch/\n")
+    _write(root, "scratch/x.py", _IMPORT * 99 + "# sa-no-such-bug#S99\n")
     _write(root, "tests/fixtures/statement_ids.json", '{"sa-known-bug": ["S1"]}')
     _write(root, "specs/memory/QUALITY.md", "cites sa-quality-bug#Q1\n")
     _write(root, "tests/unit/test_c.py", "# sa-known-bug#S1 sa-quality-bug#Q1\n" + _ALLOWED * 99)
