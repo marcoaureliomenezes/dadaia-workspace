@@ -1,11 +1,10 @@
 """Repo law has one writer: ``specs init`` (canon.REPO_LAW), once; ``public install``
 never writes under ``repos/``.
 
-sa-public-install-writes-the-root-map-into-product-repos (WP-07);
 size: MEDIUM (real public tree, real install).
 
-Statements: sa-public-install-writes-the-root-map-into-product-repos#K1, #K2, #K6. The ledger-forget test is K6's upgrade
-safety: a single writer outside repos/ never prunes a repo file an older release wrote.
+The ledger-forget test is the upgrade safety: a single writer outside repos/ never prunes a
+repo file an older release wrote.
 """
 
 from __future__ import annotations
@@ -47,13 +46,13 @@ def _workspace(tmp_path: Path) -> tuple[Path, Path]:
 
 
 def test_install_first_then_specs_init_leaves_the_repo_template(tmp_path: Path) -> None:
-    """sa-public-install-writes-the-root-map-into-product-repos#K1: install writes the root map
+    """Install writes the root map
     from staged data/AGENTS.md and nothing under repos/; specs init then leaves the template."""
     ws, repo = _workspace(tmp_path)
     FileSystemPublicAssetManager().install(ws)
     assert not (repo / "AGENTS.md").exists()
     root_map = (ws / ".dadaia" / "agentic" / "data" / "AGENTS.md").read_bytes()
-    assert (ws / "AGENTS.md").read_bytes() == root_map  # K6: the root map's one source
+    assert (ws / "AGENTS.md").read_bytes() == root_map  # the root map's one source
 
     scaffold_repo_law(repo, project_name="zz-product")
 
@@ -63,7 +62,7 @@ def test_install_first_then_specs_init_leaves_the_repo_template(tmp_path: Path) 
 
 @pytest.mark.parametrize("banner", [False, True], ids=["plain", "bannered"])
 def test_an_operator_edit_to_repo_law_survives_install(tmp_path: Path, banner: bool) -> None:
-    """sa-public-install-writes-the-root-map-into-product-repos#K2: an operator-edited repo AGENTS.md (banner or not) stays byte-identical
+    """An operator-edited repo AGENTS.md (banner or not) stays byte-identical
     across install and install --force, and public doctor reports nothing for it."""
     ws, repo = _workspace(tmp_path)
     law = repo / "AGENTS.md"
@@ -80,7 +79,7 @@ def test_an_operator_edit_to_repo_law_survives_install(tmp_path: Path, banner: b
 
 
 def test_a_formerly_ledgered_repo_copy_is_forgotten_never_pruned(tmp_path: Path) -> None:
-    """sa-public-install-writes-the-root-map-into-product-repos#K6: a repos/ path a former release ledgered is forgotten, never pruned."""
+    """A repos/ path a former release ledgered is forgotten, never pruned."""
     ws, repo = _workspace(tmp_path)
     old = repo / "AGENTS.md"
     old.write_text("# former root-map copy\n", encoding="utf-8")

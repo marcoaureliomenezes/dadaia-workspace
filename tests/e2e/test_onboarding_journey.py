@@ -1,11 +1,10 @@
 """The onboarding journey in three levels, driven through ``uvx`` over file:// bare repos.
 
-0.4.8 FR8 / AC8.1, AC8.2 (T-048-01); 0.5.0 FR10 / AC10.1–AC10.3
-(T-050-21: the autopilot loop executes only printed fix lines).
+The autopilot loop executes only printed fix lines.
 
 Owner: dd-sw-engineer-sr (LARGE-tier e2e; tests/AGENTS.md "every file names an owner").
 
-Size: LARGE, justified — FR8 is a statement about the *published shape* of the tool: an
+Size: LARGE, justified — the journey is a statement about the *published shape* of the tool: an
 operator runs ``uvx --from <wheel> dadaia-workspace …`` and walks level 1 (workspace),
 level 2 (Spec Context Project) and level 3 (canonical specs). Every seam the journey
 crosses — uvx's own environment, the workspace venv provisioning, the clone, the hook,
@@ -15,13 +14,13 @@ reaches them. This is the durable form of the 0.4.8 onboarding audit script.
 Layout — ONE workspace carries the journey: born on the previous release (level 1),
 upgraded by re-init, then levels 2 and 3 — a real workspace venv is the journey's cost, so
 it is paid once. The current wheel's fresh level 1 is ``test_one_line_bootstrap``'s. After every
-level (AC8.2) doctor reports 0 errors and the user repo's HEAD equals its remote's.
+level doctor reports 0 errors and the user repo's HEAD equals its remote's.
 
 Real venvs are built here by CHILD processes (``uvx`` and ``init``);
 ``tests/conftest.py``'s ``_no_real_venv_in_tests`` backstop is an in-process monkeypatch
 and does not reach them — the same accommodation ``test_one_line_bootstrap`` documents.
 Needs network for dependency resolution. CI puts ``uv`` on PATH and sets
-``DADAIA_REQUIRE_UVX`` (T-048-11); without uvx the launcher is a child-built venv holding
+``DADAIA_REQUIRE_UVX``; without uvx the launcher is a child-built venv holding
 the same wheel, and only the verbatim-quickstart test (a literal ``uvx`` line) skips.
 """
 
@@ -157,7 +156,7 @@ class Env:
 
 
 class Workspace:
-    """One workspace under test and the AC8.2 assertions over it."""
+    """One workspace under test and the clean-level assertions over it."""
 
     def __init__(self, env: Env, name: str) -> None:
         self.env = env
@@ -181,7 +180,7 @@ class Workspace:
         return payload
 
     def assert_level_clean(self, context: str, repo_slug: str, url: str) -> None:
-        """AC8.2: doctor 0 errors and the user repo's HEAD equals its remote's."""
+        """Doctor 0 errors and the user repo's HEAD equals its remote's."""
         self.doctor_json(context)
         repo = self.path / "repos" / repo_slug
         head = self.env.git("rev-parse", "HEAD", cwd=repo)
@@ -242,9 +241,9 @@ def env(tmp_path: Path, wheel: Path) -> Env:
 
 def test_an_operator_journey_from_the_previous_release(env: Env) -> None:
     """Level 1 is ``init --repo`` on the previous PyPI release; re-``init`` with the ``+e2e``
-    wheel is the upgrade (AC2.1/AC2.2). On that workspace, level 2: a failed ``context
-    create`` leaves nothing (AC3.4/AC3.5), its retry and a second project with an associated
-    repo clone clean; the guidance names level 3 (AC6.1); level 3 ``specs init``. AC8.2 after
+    wheel is the upgrade On that workspace, level 2: a failed ``context
+    create`` leaves nothing, its retry and a second project with an associated
+    repo clone clean; the guidance names level 3; level 3 ``specs init``. Clean after
     every level. The current wheel's own level 1 is ``test_one_line_bootstrap``'s."""
     green = env.bare("green")
     ws = Workspace(env, "up")
@@ -258,7 +257,7 @@ def test_an_operator_journey_from_the_previous_release(env: Env) -> None:
     # birth (the behaviour D6 retires); the upgrade must not move HEAD further.
     repo = ws.path / "repos" / "green"
     head = env.git("rev-parse", "HEAD", cwd=repo)
-    done = env.uvx("init", "up")  # AC2.1: no --harness needed
+    done = env.uvx("init", "up")  # no --harness needed
     assert done.returncode == 0, f"{done.stdout}\n{done.stderr}"
     assert f"upgraded {previous} -> {_E2E_VERSION}" in done.stdout, done.stdout
     version = ws.dadaia("--version")
@@ -268,7 +267,7 @@ def test_an_operator_journey_from_the_previous_release(env: Env) -> None:
     assert refreshed.returncode == 0, f"{refreshed.stdout}\n{refreshed.stderr}"
     ws.doctor_json("green")
     assert env.git("rev-parse", "HEAD", cwd=repo) == head
-    again = env.uvx("init", "up")  # AC2.2
+    again = env.uvx("init", "up")
     assert again.returncode == 0 and f"already at {_E2E_VERSION}" in again.stdout
 
     bad = f"file://{env.fixtures / 'nothere.git'}"
@@ -285,31 +284,32 @@ def test_an_operator_journey_from_the_previous_release(env: Env) -> None:
             argv += ["--associated-repo", repos[name]]
         done = ws.dadaia(*argv)
         assert done.returncode == 0, f"{done.stdout}\n{done.stderr}"
-        assert "specs upgrade" not in done.stdout + done.stderr  # AC4.7
+        assert "specs upgrade" not in done.stdout + done.stderr
         for name, url in repos.items():
-            assert env.git("status", "--porcelain", cwd=ws.path / "repos" / name) == ""  # AC3.6
+            assert env.git("status", "--porcelain", cwd=ws.path / "repos" / name) == ""
             ws.assert_level_clean(slug, name, url)
 
     payload = ws.doctor_json("second")
     fixes = [f["fix"] for s in payload["sections"].values() for f in s["findings"]
              if f["verdict"] == "info"]  # fmt: skip
-    assert any("specs init --context second" in fix for fix in fixes), fixes  # AC6.1
+    assert any("specs init --context second" in fix for fix in fixes), fixes
     done = ws.dadaia("specs", "init", "--context", "second")
     assert done.returncode == 0, f"{done.stdout}\n{done.stderr}"
     ws.assert_level_clean("second", "second", repos["second"])
 
 
-# ── AC7.1: the quickstart block, verbatim ────────────────────────────────────────
+# ── the quickstart block, verbatim ────────────────────────────────────────
 
 
 @pytest.mark.skipif(_UVX is None, reason="the quickstart block is a `uvx` line, run as printed")
 class TestQuickstartVerbatim:
-    """AC7.1: docs/quickstart.md's two bash blocks run as printed with only ``REPO_URL``
+    """The quickstart fixture's two bash blocks run as printed with only ``REPO_URL``
     set — the one other substitution points ``uvx`` at the built wheel instead of PyPI;
-    the second files the first backlog entry in a ``backlog`` worktree (T-050-120)."""
+    the second files the first backlog entry in a ``backlog`` worktree. The fixture is
+    byte-equal to ``docs/quickstart.md`` (the ``workspace-quickstart-fixture`` guard)."""
 
     def test_the_quickstart_block_runs_as_printed(self, env: Env) -> None:
-        text = (_REPO_ROOT / "docs" / "quickstart.md").read_text("utf-8")
+        text = (_REPO_ROOT / "tests" / "fixtures" / "quickstart.md").read_text("utf-8")
         block, filing = re.findall(r"```bash\n(.*?)```", text, re.DOTALL)[:2]
         url = env.bare("quick")
         script, count = re.subn(r"^REPO_URL=.*$", f"REPO_URL={url}", block, flags=re.M)

@@ -277,6 +277,7 @@ def release_tree_checks_clean(tree: Tree) -> list[str]:
     done = subprocess.run(
         [sys.executable, str(_RELEASE_SCRIPT), "check", "--specs", str(tree.root / "specs")],
         capture_output=True,
+        encoding="utf-8",
         text=True,
         check=False,
     )

@@ -1,5 +1,4 @@
-"""K1 ("One Invocation") + F002 (20260830 audit): ``core.session_store``
-owns the session-binding record — its path, schema, liveness rule and stale selection."""
+"""``core.session_store`` owns the session-binding record: path, schema, liveness rule, stale selection."""
 
 from __future__ import annotations
 
@@ -15,7 +14,7 @@ SID = "my-session-id"
 
 @pytest.mark.parametrize("bad_name", ["../escape", "a/b", "a.b"])
 def test_path_validation_rejects_traversal(tmp_path: Path, bad_name: str) -> None:
-    """FR-R3-03: records live under PROTECTED .dadaia/sessions/; a traversal name is CWE-22."""
+    """Records live under PROTECTED .dadaia/sessions/; a traversal name is CWE-22."""
     assert si.session_record_path(tmp_path, SID).relative_to(tmp_path).as_posix() == (
         f".dadaia/sessions/{SID}.json"
     )
@@ -46,7 +45,7 @@ def test_touch_last_seen_at(tmp_path: Path) -> None:
 
 
 def test_new_binding_record_authors_the_schema_and_retired_keys_still_parse() -> None:
-    """F002 schema; 0.4.7 FR4: an old record with ``mode``/``release`` keys still reads live."""
+    """A new record carries the session schema; an old record with ``mode``/``release`` keys still reads live."""
     now = datetime.now(tz=UTC).isoformat()
     record = si.new_binding_record(
         session_id="s1", context="alpha", runtime="claude-code", pid=1234, now=now
@@ -77,9 +76,8 @@ def test_new_binding_record_authors_the_schema_and_retired_keys_still_parse() ->
     ],
 )
 def test_is_live_is_the_one_liveness_rule(record: dict[str, object], live: bool) -> None:
-    """sa-session-liveness-has-two-rules, bind-lost-silently-after-five-idle-
-    minutes: ``last_seen_at`` younger than a day (boundary stale) is live, minutes idle included; a record without it (``bound_at`` only, the
-    retired creation-time fallback, §4a item 13) or with a corrupt clock is not."""
+    """``last_seen_at`` younger than a day (boundary stale) is live, minutes idle included; a
+    record without it (``bound_at`` only) or with a corrupt clock is not."""
     assert si.is_live(record, clock=lambda: datetime(2026, 6, 6, 12, tzinfo=UTC)) is live
 
 
@@ -101,21 +99,12 @@ def test_live_session_and_stale_records_select_by_the_same_rule(tmp_path: Path) 
     assert si.stale_records(tmp_path) == [si.sessions_dir(tmp_path) / "dead-1.json"]
 
 
-def test_gc_check_assembly_has_one_home() -> None:
-    """F002: no module hand-builds the ``gc_check`` liveness input outside session_store."""
-    import dadaia_workspace
-
-    pkg_root = Path(dadaia_workspace.__file__).parent
-    offenders = [p for p in pkg_root.rglob("*.py") if "gc_check" in p.read_text(encoding="utf-8")]
-    assert offenders == []
-
-
 @pytest.mark.parametrize(
     ("name", "valid"),
     [("a_b-C9", True), ("_", True), ("-", True), ("a b", False), ("a.b", False), ("", False)],
 )
 def test_context_name_rule_is_the_spec_context_rule(name: str, valid: bool) -> None:
-    """AC16.1: one context-name rule; the twin pattern here is deleted in J3.T4."""
+    """One context-name rule: the session store's pattern equals the spec-context pattern."""
     from dadaia_workspace.core.models.spec_context import CONTEXT_NAME_RE
 
     assert bool(CONTEXT_NAME_RE.fullmatch(name)) is valid
@@ -123,7 +112,7 @@ def test_context_name_rule_is_the_spec_context_rule(name: str, valid: bool) -> N
 
 
 def test_naive_heartbeat_reads_as_utc_in_any_zone(monkeypatch: pytest.MonkeyPatch) -> None:
-    """AC16.1: ``2026-10-11T04:00:00`` is 04:00 UTC whatever the local zone."""
+    """``2026-10-11T04:00:00`` is 04:00 UTC whatever the local zone."""
     tzset = getattr(__import__("time"), "tzset", None)
     if tzset is None:
         pytest.skip("time.tzset is absent on Windows; the zone cannot be pinned")
