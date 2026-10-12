@@ -539,6 +539,18 @@
       "relates": [
         "tests-one-contract-one-home"
       ]
+    },
+    {
+      "id": "policy-tests-leave-pytest",
+      "title": "Policy and text tests leave pytest: the guard layer or one declarative policy table checks them, pytest asserts behaviour only",
+      "opened": "2026-10-12",
+      "status": "idea",
+      "description": "Measured 2026-10-12 (test audit): about 480 of the 1,393 test functions are policy and text tests: they assert wording, layout or conventions, not behaviour. Design: each moves to the guard layer (`scripts/guards/`) or to a declarative policy table checked once; a policy that duplicates an existing guard is deleted, not moved; pytest keeps behaviour asserts only. Relation: test-suite-diet (rc-14) absorbed meta-tests-leave-pytest, scoped to a closed list of tests that inspect the suite or the repo; this entry is the remaining policy class. Done when: no pytest test asserts the wording of a law, skill or spec file, and every moved policy is checked once by the guard runner. Placement: rc-15 (operator ruling 2026-10-12). Every design detail not quoted from the audit is agent default, unruled.",
+      "provenance": "operator ruling 2026-10-12, relayed by the main thread: the test-audit proposals go to rc-15 through the backlog; source: test audit report https://claude.ai/artifact/Rn1qCNi2qEcR1wXTNzEznf, proposal R3",
+      "relates": [
+        "test-suite-diet",
+        "tests-one-contract-one-home"
+      ]
     }
   ]
 }
