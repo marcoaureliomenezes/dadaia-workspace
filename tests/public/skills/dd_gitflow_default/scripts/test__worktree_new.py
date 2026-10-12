@@ -141,11 +141,11 @@ def test_a_task_needs_its_job_branch_and_a_sixth_task_refuses(root: Path) -> Non
     assert orphan.returncode == 1 and _fixes(orphan)[0].endswith(f"worktree.py new r {JOB}")
     assert _run(root, "new", "r", JOB).returncode == 0
     for task in range(1, 6):
-        assert _run(root, "new", "r", f"{JOB}--T-{task}").returncode == 0
-    sixth = _run(root, "new", "r", f"{JOB}--T-6")
+        assert _run(root, "new", "r", f"{JOB}--J1.T{task}").returncode == 0
+    sixth = _run(root, "new", "r", f"{JOB}--J1.T6")
     assert sixth.returncode == 1  # a commit-less task's exit is clean
     assert _fixes(sixth)[0].endswith(
-        f"worktree.py clean {_word(root / 'worktrees/r' / f'{JOB}--T-1')}"
+        f"worktree.py clean {_word(root / 'worktrees/r' / f'{JOB}--J1.T1')}"
     )
     assert _run(root, "new", "r", "0.5.0-rc1/j2").returncode == 0  # the cap counts tasks only
 
