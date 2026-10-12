@@ -218,9 +218,8 @@ def _unregistered(repo: Path, trees: list[dict[str, str]]) -> list[dict[str, obj
     return [
         _row(repo, t["worktree"], "unregistered", registered=False)
         | {
-            "fix": f"Operator action: register {repo.name} in a context, or land its work and drop "
-            f"the tree (`{git_line(repo, 'worktree', 'unlock', t['worktree'])}` then "
-            f"`{git_line(repo, 'worktree', 'remove', t['worktree'])}`)"
+            "fix": f"Operator action: land the work of {t['worktree']}, then run "
+            f"`{git_line(repo, 'worktree', 'remove', '--force', '--force', t['worktree'])}`"
         }  # fmt: skip
         for t in trees
     ]
