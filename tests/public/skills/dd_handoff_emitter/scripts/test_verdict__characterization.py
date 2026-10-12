@@ -43,13 +43,10 @@ def test_verdict_writes_the_exact_bound_handoff(tmp_path: Path) -> None:
     script = root / ".agents/skills/dd-handoff-emitter/scripts/verdict.py"
 
     bootstrap = (
-        "import sys\nfrom datetime import datetime\nfrom pathlib import Path\n"
+        "import sys\nfrom pathlib import Path\n"
         "sys.path.insert(0, str(Path(sys.argv.pop(1))))\n"
-        "import verdict\n"
-        "class Clock:\n"
-        " @staticmethod\n"
-        f" def now(tz): return datetime.fromisoformat({_NOW!r}.replace('Z', '+00:00'))\n"
-        "verdict.datetime = Clock\n"
+        "import verdict\nimport _clock\n"
+        f"_clock.now_iso = lambda: {_NOW!r}\n"
         "raise SystemExit(verdict.main(sys.argv[1:]))"
     )
     result = subprocess.run(
