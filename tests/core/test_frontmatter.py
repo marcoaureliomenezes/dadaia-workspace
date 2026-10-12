@@ -11,6 +11,8 @@ Size: SMALL — pure-function unit tests, no I/O.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from dadaia_workspace.core.frontmatter import Frontmatter, FrontmatterError, parse
@@ -82,3 +84,38 @@ def test_parse_error_kinds_table(text: str, expected_kind: str) -> None:
 
     assert isinstance(result, FrontmatterError)
     assert result.kind == expected_kind
+
+
+@pytest.mark.parametrize("prefix", ["", "﻿"], ids=["crlf", "bom-crlf"])
+def test_a_crlf_or_bom_document_parses_like_its_lf_twin(prefix: str) -> None:
+    """Bug frontmatter-parsers-disagree-on-crlf-and-bom: the block was lost on CRLF."""
+    text = f'{prefix}---\r\nslug: x\r\ngitflow: {{"work": "feature/"}}\r\n---\r\n\r\nBody.\r\n'
+
+    result = parse(text)
+
+    assert isinstance(result, Frontmatter)
+    assert result.data == {"slug": "x", "gitflow": {"work": "feature/"}}
+    assert result.body == "\nBody.\n"
+
+
+def test_a_block_outside_the_subset_names_its_line() -> None:
+    result = parse("---\nslug: x\nflag: yes\n---\n")
+
+    assert isinstance(result, FrontmatterError)
+    assert (result.kind, result.line) == ("invalid_yaml", 2)
+
+
+def test_merging_into_a_bom_constitution_edits_its_block_instead_of_prepending_a_second(
+    tmp_path: Path,
+) -> None:
+    from dadaia_workspace.core.gitflow import merge_frontmatter
+
+    (tmp_path / "constitution.md").write_text(
+        "﻿---\nspecs_pattern_version: 6\n---\n\n# Law\n", encoding="utf-8"
+    )
+
+    merge_frontmatter(tmp_path, specs_pattern_version=7)
+
+    assert (tmp_path / "constitution.md").read_text(encoding="utf-8") == (
+        "---\nspecs_pattern_version: 7\n---\n\n# Law\n"
+    )
