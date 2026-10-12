@@ -5,7 +5,7 @@ with the rest of `data/`, and no projection rule installs it into a runtime tree
 
 One row per surface: what it is for and what belongs in it. A surface's size is a soft
 review signal (one purpose, no restated rule), never a build failure; a SKILL.md's
-line limits are enforced by doctor (`SKILL-MD-LENGTH`).
+line limit is a doctor warning (`SKILL-MD-LENGTH`).
 
 The `Surface` column names the path or entity as it appears in an installed workspace.
 

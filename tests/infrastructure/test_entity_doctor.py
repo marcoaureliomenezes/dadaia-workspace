@@ -1,13 +1,12 @@
-"""One enforcer for the behavior map (T-050-19).
+"""One enforcer for the behavior map.
 
-- One map (`public/entities/behavior-map.json`), one schema, this one enforcer; every member (a
-  skill, or a scoped `AGENTS.md` SOURCE under `public/{data,scaffold,templates}/`) maps to exactly
-  one row and every root-map section has an owner (A10.1).
-- `scoped_agents_md` names SOURCE paths, never the projected instance path — bug
-  `citation-enforcer-resolves-projected-instance-paths-against-the-checkout`.
+- One map, one schema, this one enforcer; every member (a skill, or a scoped `AGENTS.md` SOURCE
+  under `public/{data,scaffold,templates}/`) maps to exactly one row and every root-map section
+  has an owner.
+- `scoped_agents_md` names SOURCE paths, never the projected instance path.
 - Every violation is built from POSIX-relative paths and every planted fixture is in-memory or
-  under `tmp_path` — bug `citation-mutation-fixtures-never-turn-red-on-windows`.
-- Each check has a planted violation that turns it red (A10.2).
+  under `tmp_path`.
+- Each check has a planted violation that turns it red.
 """
 
 from __future__ import annotations
