@@ -528,6 +528,17 @@
       "relates": [
         "test-suite-diet"
       ]
+    },
+    {
+      "id": "tests-tmp-expire-at-job-merge",
+      "title": "Job scaffolding tests live in a versioned tests/tmp/<job>/ and expire at the job's merge",
+      "opened": "2026-10-12",
+      "status": "idea",
+      "description": "Measured 2026-10-12 (test audit): 1,393 test functions, 3,276 cases; test-to-production line ratio 1.86x; 8-week churn +3,406 / -3,345; the suite behaves as an append-only evidence ledger: tests written to prove one job's change stay in the permanent suite after the job merges. Design: a job's scaffolding and evidence tests live under a versioned `tests/tmp/<job>/`; at the job's merge each one expires: it is deleted, or promoted into its contract's one home (tests-one-contract-one-home), never into a new file. Open for the grill: what checks the expiry without adding a gate (the merge, the job's last task or the reviewer). Done when: no `tests/tmp/<job>/` survives its job's merge on the work branch. Placement: rc-15 (operator ruling 2026-10-12). Every design detail not quoted from the audit is agent default, unruled.",
+      "provenance": "operator ruling 2026-10-12, relayed by the main thread: the test-audit proposals go to rc-15 through the backlog; source: test audit report https://claude.ai/artifact/Rn1qCNi2qEcR1wXTNzEznf, proposal R2",
+      "relates": [
+        "tests-one-contract-one-home"
+      ]
     }
   ]
 }
