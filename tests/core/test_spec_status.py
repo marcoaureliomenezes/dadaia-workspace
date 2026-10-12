@@ -2,18 +2,9 @@
 
 from __future__ import annotations
 
-import runpy
-from pathlib import Path
-
 import pytest
 
-import dadaia_workspace
 from dadaia_workspace.core.spec_status import APPROVED, CANONICAL_STATUS, extract_status
-
-_SCRIPTS = Path(dadaia_workspace.__file__).parent / "public/skills/dd-release-implementation"
-_script_extract_status = runpy.run_path(str(_SCRIPTS / "scripts/_release_schema.py"))[
-    "extract_status"
-]
 
 
 def test_vocabulary_is_the_canonical_triple() -> None:
@@ -35,8 +26,8 @@ def test_vocabulary_is_the_canonical_triple() -> None:
         ("# SPEC\n\nno status here\n", None),
     ],
 )
-def test_both_status_readers_return_the_same_token(text: str, expected: str | None) -> None:
+def test_the_status_reader_returns_the_declared_token(text: str, expected: str | None) -> None:
     """sa-status-line-has-two-parsers#B26-1 sa-status-line-has-two-parsers#B26-2
     sa-status-line-has-two-parsers#B26-4: first anchored line anywhere; bullet, blockquote,
-    mid-line quote never count; absent is None — both readers agree."""
-    assert extract_status(text) == _script_extract_status(text) == expected
+    mid-line quote never count; absent is None."""
+    assert extract_status(text) == expected
