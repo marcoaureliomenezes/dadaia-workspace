@@ -14,9 +14,15 @@ from __future__ import annotations
 
 import os
 import sys
+from collections.abc import Callable
 from pathlib import Path
 
 from dadaia_workspace.core.exceptions import WorkspaceNotInitializedError
+from dadaia_workspace.core.skill_owner import load_owner
+
+_root = load_owner("dd-bug-resolution", "_root")
+_workspace_of: Callable[..., Path | None] = _root.workspace_of
+_fenced: Callable[[], frozenset[Path]] = _root.fenced_roots
 
 #: The sentinel file whose presence marks a properly initialized workspace.
 _SENTINEL = Path(".dadaia") / "states" / "spec_contexts.json"
@@ -25,12 +31,6 @@ _SENTINEL = Path(".dadaia") / "states" / "spec_contexts.json"
 #: explicit ``--workspace`` — so no dadaia process nor child inheriting it acts on one
 #: (ADR 0088): the suite and every mutating probe set it.
 FENCE_ENV = "DADAIA_FENCED_ROOTS"
-
-
-def _fenced() -> frozenset[Path]:
-    return frozenset(
-        Path(p).resolve() for p in os.environ.get(FENCE_ENV, "").split(os.pathsep) if p
-    )
 
 
 def fenced_env(sandbox: Path) -> dict[str, str]:
@@ -49,34 +49,26 @@ def resolve_workspace_root(cwd: Path | None = None) -> Path:
     if own is not None:
         return own
     start = (cwd or Path.cwd()).resolve()
-    root, skipped = _walk(start, _fenced())
+    root = _workspace_of(start)
     if root is None:
-        raise not_initialized(start, skipped)
+        fenced = _fenced()
+        raise not_initialized(
+            start,
+            [d for d in (start, *start.parents) if (d / ".dadaia").exists() and d not in fenced],
+        )
     return root
 
 
 def acting_root(path: Path) -> Path | None:
     """The unfenced workspace holding *path* — where a process may act."""
-    return _walk(path.resolve(), _fenced())[0]
+    return _workspace_of(path)
 
 
 def owning_root(path: Path) -> Path | None:
     """The workspace holding *path*, fenced or not — the gate's question "which root
     protects this target" alone: the fence stops a process ACTING on a root, never the
     protection of that root (bug fenced-roots-env-disables-the-gate)."""
-    return _walk(path.resolve(), frozenset())[0]
-
-
-def _walk(start: Path, fenced: frozenset[Path]) -> tuple[Path | None, list[Path]]:
-    """The first unfenced sentinel-holding ancestor of *start*, and every skipped partial
-    ``.dadaia/`` (a sub-repo or partial init)."""
-    skipped: list[Path] = []
-    for candidate in (start, *start.parents):
-        if (candidate / ".dadaia").exists() and candidate not in fenced:
-            if (candidate / _SENTINEL).exists():
-                return candidate, skipped
-            skipped.append(candidate)
-    return None, skipped
+    return _workspace_of(path, fenced=frozenset())
 
 
 def own_workspace_root() -> Path | None:
