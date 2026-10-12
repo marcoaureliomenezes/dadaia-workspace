@@ -54,8 +54,8 @@ unique prefix (e.g. `[DEBUG-a4f2]`) so cleanup is a single grep. For performance
 regressions: measure a baseline, then bisect — logs mislead.
 *Done when one hypothesis survives by observation, not by reading code.*
 
-**Phase 5 — Seam test.** The regression test at the correct seam, BEFORE the fix, is
-a new case in the owner file with a literal expected value, covering every caller of the contract, at the lowest level that detects it (the root map §1: fixes never rewrite old asserts), committed first under a `test(` subject; watch it fail,
+**Phase 5 — Seam test.** The regression test at the correct seam, BEFORE the fix, has a literal
+expected value, covers every caller of the contract, sits at the lowest level that detects it, and is committed first under a `test(` subject; the test rule is the root map §1 line; watch it fail,
 fix the cause, watch it pass, re-run the Phase 1 loop on the original scenario. A
 correct seam exercises the real bug pattern at its call site; when none exists, that
 is itself the finding — return the seam gap to the main thread as a finding

@@ -19,7 +19,7 @@ description: >
 4. Each undispositioned `specs/audits/**` finding enters the SPEC's Origin as `findings:<id>`.
 5. Name the SPEC's `**Origin:**` per `specs/releases/AGENTS.md` §2.
 6. Write the SPEC's `## Bug window review`: list the fixes with `grep -o '"fix_sha": "[0-9a-f]*"' <specs-dir>/bugs/BUGS.jsonl`, then `git show <fix_sha>` each and compare that fix against the overfitting patterns — an assert or test the fix changed; a special case on a test value; a new branch, flag or second path; a reach into another feature; deleted functionality; ≥ 2 fixes on the unit.
-7. Give each fix KEEP or REBUILD; a REBUILD reworks the fix's code and what surrounds it, and keeps the fix's tests.
+7. Give each fix KEEP or REBUILD; a REBUILD reworks the fix's code and what surrounds it, and keeps the contract tests its fixes hardened.
 
 ## 2. As-is review
 
