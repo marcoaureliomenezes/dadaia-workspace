@@ -23,7 +23,7 @@ Every library skill must satisfy all fifteen; each rule's detail lives in the se
 | 12 | The set is curated and composed: overlap resolves by merge or by one skill calling the other | §7 |
 | 13 | Determinism goes to a script/template sibling; the skill authors only the stages | §3 |
 | 14 | Human gates are explicit: facts are the agent's job, decisions are the operator's | §8 |
-| 15 | The ecosystem stays equalized: behavior-map, grants, law citations and projections move with the skill | §9 |
+| 15 | The ecosystem stays equalized: grants, law citations and projections move with the skill | §9 |
 
 ---
 
@@ -64,7 +64,7 @@ Every library skill must satisfy all fifteen; each rule's detail lives in the se
 - A sibling is one ALL-CAPS.md per topic, pointed at with its reaching condition ("deepening a cluster → `DEEPENING.md`").
 - A deterministic procedure ships as a script/template sibling; the skill's job reduces to authoring its variable parts.
 - Co-location: keep a concept's definition, rule, and caveat under one heading, not scattered.
-- Sprawl is the failure disclosure cures; the SKILL.md size thresholds live in `behavior-map.json`.
+- Sprawl is the failure disclosure cures; doctor warns `SKILL-MD-LENGTH` past the SKILL.md size threshold.
 
 ---
 
@@ -135,11 +135,10 @@ decision-rich part.
 
 A skill moves with its ecosystem: any authoring act (create, merge, rename, delete, restructure) carries in the same change:
 
-1. `entities/behavior-map.json` — the row (exactly one per skill) and `declared_overlaps`.
-2. Persona `skills:` grants.
-3. Law citations — the root map and every scoped `AGENTS.md` SOURCE under `public/` that names the skill.
-4. Cross-citations in sibling skills (the citation contract test checks every path-shaped token in `public/**`).
-5. Reprojection — per `.dadaia/AGENTS.md` §4, `public doctor` `[ok]`; stale projected directories removed from every harness target.
+1. Persona `skills:` grants.
+2. Law citations — the root map and every scoped `AGENTS.md` SOURCE under `public/` that names the skill.
+3. Cross-citations in sibling skills (the citation contract test checks every path-shaped token in `public/**`).
+4. Reprojection — per `.dadaia/AGENTS.md` §4, `public doctor` `[ok]`; stale projected directories removed from every harness target.
 
 ---
 

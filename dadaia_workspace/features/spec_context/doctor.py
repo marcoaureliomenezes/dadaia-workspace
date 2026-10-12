@@ -114,7 +114,7 @@ class Finding:
         return self.verdict is not FindingVerdict.REAPED
 
 
-_BEHAVIOR_MAP = Path(__file__).resolve().parents[2] / "public" / "entities" / "behavior-map.json"
+_BEHAVIOR_MAP = Path(__file__).with_name("behavior-map.json")
 
 
 def _worktree(verdict: str, message: str, fix: str = "") -> SectionFinding:
