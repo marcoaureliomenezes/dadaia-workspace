@@ -1,12 +1,9 @@
 """The no-real-venv backstop must hold for EVERY fixture scope.
 
-Bug test-suite-real-venv-and-ci-longpole: ``_no_real_venv_in_tests`` was a
-function-scoped autouse fixture, but pytest instantiates higher-scoped fixtures FIRST —
-so a module- or session-scoped fixture calling ``WorkspaceService.init()`` (e.g. the
-``projected`` fixture in test_claude_scaffold_is_loadable.py) ran the REAL
-``ensure_workspace_venv`` before the guard existed, building a full venv + editable pip
-install per module (~17 s unloaded, 159 s on a loaded host) — the exact disk/time cost
-the backstop exists to prevent.
+A function-scoped autouse guard alone is not enough: pytest instantiates higher-scoped
+fixtures FIRST, so a module- or session-scoped fixture calling ``WorkspaceService.init()``
+would run the REAL ``ensure_workspace_venv``, a full venv and editable pip install per
+module — the disk and time cost the backstop exists to prevent.
 
 This module reproduces that escape with its own module-scoped fixture: if the backstop
 ever regresses to a scope below ``module``, the fixture builds a real venv and the test

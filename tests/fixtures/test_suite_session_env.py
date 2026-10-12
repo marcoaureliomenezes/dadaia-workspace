@@ -1,7 +1,6 @@
-"""rc-9 AC3.1: the root conftest applies the suite env once per process and its tripwire
-fails a session that writes outside tmp — each judged by a real inner session (pytester),
-never by re-executing the conftest. Bugs outside-tmp-home-pin-coupled-to-session-hooks,
-heartbeat-test-drives-hook-in-process, operator-env-scrub-row-leaves-stale-pinned-home."""
+"""The root conftest applies the suite env once per process and its tripwire fails a session
+that writes outside tmp — each judged by a real inner session (pytester), never by
+re-executing the conftest."""
 
 from __future__ import annotations
 
@@ -61,7 +60,7 @@ def test_inner_runs_see_the_temp_home_and_fail_on_a_pycache_or_a_created_root_ca
 ) -> None:
     """One test, inner runs in order: each one's watched write would fail any inner session
     running beside it (the tripwires watch the ``tests/`` tree and the checkout).
-    The last two pin T-010-25 / AC-R8-02 against the inner session's own rootdir (the
+    The last two pin the inner session's own rootdir (the
     pytester dir): a root cache dir the session creates fails it; one present before is
     ignored."""
     foreign = tmp_path / "foreign"

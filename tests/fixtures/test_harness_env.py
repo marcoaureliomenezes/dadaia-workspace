@@ -1,6 +1,5 @@
-"""rc-9 AC3.1: the suite's whole env is one pure function — the operator's session out, the
-temp home and the suite keys in (bugs outside-tmp-home-pin-coupled-to-session-hooks,
-operator-env-scrub-row-leaves-stale-pinned-home)."""
+"""The suite's whole env is one pure function — the operator's session out, the temp home
+and the suite keys in."""
 
 from __future__ import annotations
 

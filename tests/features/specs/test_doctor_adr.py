@@ -124,7 +124,7 @@ def test_each_record_shape_is_judged_by_the_doctor(
     change: dict[str, object], expected: list[str], tmp_path: Path
 ) -> None:
     """Each record shape is judged through the doctor's LEDGER-ADR-SCHEMA exactly as the row
-    states — `_ledger.validate` is the one engine (ADR 0018)."""
+    states — `_ledger.validate` is the one engine."""
     record = {k: v for k, v in {**_VALID_RECORD, **change}.items() if v is not _ABSENT}
     (tmp_path / "ADRs").mkdir()
     (tmp_path / "ADRs" / "decisions.jsonl").write_text(json.dumps(record) + "\n", "utf-8")
@@ -164,7 +164,7 @@ def test_an_unreadable_line_is_its_own_finding_and_the_next_record_is_still_read
 def test_the_doctor_rule_flags_the_first_id_breaking_0001_to_n(
     tmp_path: Path, ids: list[str], expected: list[str]
 ) -> None:
-    """sa-adr-measured-by-pattern-refuses-real-checks#B27-3: a gap or a start past 0001 is a LEDGER-ADR-SCHEMA finding."""
+    """A gap or a start past 0001 is a LEDGER-ADR-SCHEMA finding."""
     issues = adr_record_issues(_ledger(tmp_path, ids))
     assert [i.message for i in issues] == expected
 
@@ -183,7 +183,7 @@ def test_the_doctor_rule_flags_the_first_id_breaking_0001_to_n(
 def test_only_a_ruled_record_changes_an_accepted_one(
     tmp_path: Path, change: dict[str, object], expected: list[str]
 ) -> None:
-    """ADR 0151 M2: every non-rejected record (born-superseded too) amending an accepted one is itself accepted with a ruling."""
+    """Every non-rejected record (born-superseded too) amending an accepted one is itself accepted with a ruling."""
     specs = _ledger(tmp_path, ["0001"], **_RULED)
     ledger = specs / "ADRs" / "decisions.jsonl"
     successor = {**_VALID_RECORD, **change, "id": "0002", "amends": "0001"}
@@ -195,7 +195,7 @@ def test_only_a_ruled_record_changes_an_accepted_one(
 def test_doctor_admits_any_named_check_and_flags_a_duplicate_id(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """sa-adr-measured-by-pattern-refuses-real-checks#B27-1 and #B27-3: doctor accepts `npx vitest run`, flags a duplicate 0049."""
+    """Doctor accepts any named check (`npx vitest run`) and flags a duplicate record id."""
     monkeypatch.chdir(tmp_path)
     ids = [f"{n:04d}" for n in range(1, 50)] + ["0049"]
     specs = _ledger(tmp_path, ids, status="accepted", measured_by="npx vitest run")
@@ -223,7 +223,7 @@ _OPTIONS = [
 
 
 def test_a_record_above_0246_without_options_is_refused(tmp_path: Path) -> None:
-    """AC2.2: from 0247 on, `options` is required."""
+    """A record numbered above 0246 must carry `options`."""
     issues = adr_record_issues(_options_ledger(tmp_path, "0247"))
     assert [(i.code, i.message) for i in issues] == [
         (

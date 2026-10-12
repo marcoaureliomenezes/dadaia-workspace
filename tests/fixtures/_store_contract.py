@@ -1,4 +1,4 @@
-"""Shared JSON-store contract assertions (T-2, v0.1.75 FR1).
+"""Shared JSON-store contract assertions.
 
 Five workspace-state JSON stores repeat the same templated contract:
 missing→None/(), corrupt→typed error, unknown-top-level-field→typed error, wrong

@@ -1,6 +1,6 @@
-"""Unit tests for SpecsDoctor taxonomy + disposition invariants (T-46-13, AC-4).
+"""Unit tests for SpecsDoctor taxonomy and disposition invariants.
 
-SPEC-DOC-034 — the three ``_archive`` dirs exist (WARN + auto-fix).
+The three ``_archive`` dirs exist (WARN + auto-fix).
 """
 
 from __future__ import annotations

@@ -1,11 +1,8 @@
-"""The guard matrix over the ONE traversal primitive (0.4.7 FR6a, T-047-19).
+"""The guard matrix over the one traversal primitive of ``doctor.py``.
 
-Structural cause this suite pins: the five per-call-site guards in ``doctor.py``
-(``_entries``, ``_mtime``, ``_remove``, ``_guarded``, ``_remove_dead_repo``) each
-re-derived "may I touch this?" and disagreed — the bug family from
-``doctor-ptr-gc-deletes-valid-lock-free-bind`` (direct deletion on a per-site rule)
-through ``doctor-scan-raises-when-a-ttl-entry-vanishes-mid-walk`` and
-``doctor-fix-aborts-whole-pass-on-first-undeletable-entry``. One guard, one home.
+Every per-call-site guard (``_entries``, ``_mtime``, ``_remove``, ``_guarded``,
+``_remove_dead_repo``) answers "may I touch this?" through that primitive; each row
+pins one refusal or deletion outcome.
 """
 
 from __future__ import annotations
@@ -93,9 +90,8 @@ _SKIP = "skipped '{rel}' (outside the workspace)"
 def test_remove_deletes_a_read_only_tree(
     tmp_path: Path, setup: Callable[[Path], tuple[Path, Path]], rel: str, message: str | None, survivor: str | None
 ) -> None:
-    """sa-reaper-destroys-its-own-hold-before-ttl#B3: the reaper owns what it reaps — a read-only tree or
-    file (a Go module cache is dr-xr-xr-x all the way down; Windows refuses a read-only unlink) is made
-    writable on the way down, then removed; a symlink goes, its destination never; outside is never touched."""
+    """The reaper removes what it reaps: a read-only tree or file is made writable on the way
+    down, then removed; a symlink goes, its destination never; a path outside is never touched."""
     workspace, target = setup(tmp_path)
     done = sweep.remove(workspace, target, rel)
     expected = message and message.format(rel=rel)
@@ -125,8 +121,8 @@ def _exdev(a: object, b: object) -> None:
 def test_move_holds_the_content_inside_the_workspace_only(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, src: str, dest: str, message: str, exdev: bool
 ) -> None:
-    """sa-reaper-destroys-its-own-hold-before-ttl#B4 (the moved content is held; EXDEV handled in ONE place,
-    a failed move is never a partial delete) and #B8 (the mover never touches a path outside the workspace)."""
+    """The moved content is held inside the workspace; a cross-device move copies then removes
+    in one place, and a failed move is never a partial delete; a path outside is never touched."""
     workspace = (tmp_path / "ws")
     workspace.mkdir(exist_ok=True)
     source = _file(tmp_path / src)
@@ -140,8 +136,8 @@ def test_move_holds_the_content_inside_the_workspace_only(
 
 
 def test_move_resets_the_ttl_clock_and_never_follows_a_symlinked_source(tmp_path: Path) -> None:
-    """sa-reaper-destroys-its-own-hold-before-ttl#B3: the reaped clock starts at the move, never at the
-    origin's mtime (FR6b); #B4: a symlink is moved, its destination never."""
+    """The reaped clock starts at the move, never at the origin's mtime; a symlink is moved,
+    its destination never."""
     workspace = _outside_link(tmp_path)
     old = _file(workspace / "old")
     os.utime(old, (0, 0))
@@ -153,17 +149,15 @@ def test_move_resets_the_ttl_clock_and_never_follows_a_symlinked_source(tmp_path
 
 
 # ═════════════════════════════════════════════════════════════════════════════════
-# The CRITICAL bug's repro, over the primitive (doctor-ptr-gc-deletes-valid-lock-free-bind).
+# A live bind record over the primitive.
 # ═════════════════════════════════════════════════════════════════════════════════
 
 
 def test_a_live_bind_record_survives_a_full_doctor_fix_pass(tmp_path: Path) -> None:
-    """bug doctor-ptr-gc-deletes-valid-lock-free-bind. Size: SMALL.
+    """A live bind record survives a full doctor fix pass. Size: SMALL.
 
-    Bind, run ``fix()``, resolve the session again: the bind is intact. The original
-    CRITICAL deleted live bind state because a per-call-site rule inferred deadness from
-    the absence of a lock. There is no per-site deletion left: ``sessions/`` carries no
-    TTL, so no verdict ever names it, and every filesystem act goes through one guard.
+    Bind, run ``fix()``, resolve the session again: the bind is intact. ``sessions/`` carries
+    no TTL, so no verdict ever names it, and every filesystem act goes through one guard.
     """
     from datetime import UTC, datetime
 
@@ -196,7 +190,7 @@ def test_a_live_bind_record_survives_a_full_doctor_fix_pass(tmp_path: Path) -> N
 
 
 # ═════════════════════════════════════════════════════════════════════════════════
-# rc-9 AC3.3: the delete act is judged by its outcome; a refusal is falsy (rows 6, 21, 22).
+# The delete act is judged by its outcome; a refusal is falsy.
 # ═════════════════════════════════════════════════════════════════════════════════
 
 
@@ -274,7 +268,7 @@ def test_a_permission_failure_names_the_recorded_entry(tmp_path: Path, monkeypat
 
 @pytest.mark.skipif(os.utime not in os.supports_follow_symlinks, reason="a link's own mtime is POSIX-only")
 def test_a_root_level_held_symlink_keeps_its_hold_clock(tmp_path: Path) -> None:
-    """Row 26 (ADR 0074): a root-level hold is its own clock, a symlink's included."""
+    """A root-level hold is its own clock, a symlink's included."""
     (tmp_path / "link").symlink_to(tmp_path / "nowhere")
     os.utime(tmp_path / "link", (0, 0), follow_symlinks=False)
 
@@ -291,8 +285,8 @@ def test_a_root_level_held_symlink_keeps_its_hold_clock(tmp_path: Path) -> None:
 ])
 # fmt: on
 def test_only_a_gitdir_under_worktrees_marks_a_linked_worktree(tmp_path: Path, gitdir: str, message: str) -> None:
-    """rc-9 AC3.6 row 24: a submodule's ``.git`` file names a relative gitdir that moves
-    with its repo; only ``<common>/worktrees/<name>`` is a linked worktree."""
+    """A submodule's ``.git`` file names a relative gitdir that moves with its repo; only
+    ``<common>/worktrees/<name>`` is a linked worktree."""
     tree = tmp_path / "tree"
     _file(tree / "sub" / ".git").write_text(f"gitdir: {gitdir}\n")
 
@@ -302,7 +296,7 @@ def test_only_a_gitdir_under_worktrees_marks_a_linked_worktree(tmp_path: Path, g
 
 
 def test_n_moves_to_one_destination_make_n_holds(tmp_path: Path) -> None:
-    """ADR 0074: an occupied destination yields the first free ``<name>-N`` beside it."""
+    """An occupied destination yields the first free ``<name>-N`` beside it."""
     for _ in range(3):
         sweep.move(tmp_path, _file(tmp_path / "slop.txt"), tmp_path / "reaped" / "slop.txt", "slop")
 
@@ -311,8 +305,8 @@ def test_n_moves_to_one_destination_make_n_holds(tmp_path: Path) -> None:
 
 @pytest.mark.skipif(os.name == "nt" or os.geteuid() == 0, reason="POSIX dir permissions; root bypasses them")
 def test_an_unopenable_subdirectory_is_refused_never_raised(tmp_path: Path) -> None:
-    """Rows 21/22: a 0o000 subdirectory fails ``os.open`` inside the walk; that failure is
-    recorded and judged by the outcome, never re-called without its flags."""
+    """A 0o000 subdirectory fails ``os.open`` inside the walk; that failure is recorded and
+    judged by the outcome, never re-called without its flags."""
     entry = tmp_path / "tmp" / "a" / "20200101"
     (locked := entry / "x").mkdir(parents=True)
     _file(locked / "f.txt")
@@ -330,7 +324,7 @@ def test_an_unopenable_subdirectory_is_refused_never_raised(tmp_path: Path) -> N
 
 
 def test_a_nested_hold_stamps_its_top_entry(tmp_path: Path) -> None:
-    """ADR 0074: a hold of ``a/b/c`` restarts the clock of ``reaped/<day>/a``, not of ``a/b``."""
+    """A hold of ``a/b/c`` restarts the clock of ``reaped/<day>/a``, not of ``a/b``."""
     _file(tmp_path / "a" / "b" / "c")
     sweep.hold(tmp_path, tmp_path / "a" / "b" / "c", "a/b/c")
     [top] = (tmp_path / ".dadaia" / "reaped").glob("*/a")

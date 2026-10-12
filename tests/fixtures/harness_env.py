@@ -1,13 +1,8 @@
 """Harness-env fixture contract — the *only* sanctioned source of hook subprocess env.
 
-WS-R5 / FR-R5-01 / AC-R5-01 (release v0.1.10). The 2026-06-10 test-architecture audit
-(``specs/audits/2026-06-10T010550Z/qa-engineer.md`` §2, §6.1) named the single most
-expensive blind spot in this suite: **a simulated harness environment**. Hook and
-heartbeat tests ``setenv`` ``DADAIA_SESSION_ID`` / persona / mode variables that *no real
-harness ever delivers to a hook subprocess*, so the suite certified mechanisms that are
-physically dead in every runtime (bugs 2, 5, 17-D3, 28). This module is the corrective:
-it pins, in one place, exactly what each harness actually provides to a hook process, and
-exposes a subprocess runner so behavior tests invoke hooks the way the harness does.
+Hook tests never ``setenv`` a variable no real harness delivers to a hook subprocess. This
+module pins, in one place, exactly what each harness actually provides to a hook process,
+and exposes a subprocess runner so behavior tests invoke hooks the way the harness does.
 
 Why these env vars and *only* these
 -----------------------------------
@@ -113,7 +108,7 @@ def suite_env(
     and every ``DADAIA_*`` but the suite's), *home* and its cache roots in (pip's on every OS),
     no bytecode. *unset* removes inherited/default keys and *overrides* supplies the child's
     explicit values. tests/conftest.py applies it once per process; every child env is built
-    here (bug test-suite-writes-outside-tmp)."""
+    here."""
     kept = {
         k: v
         for k, v in parent.items()
@@ -154,12 +149,11 @@ ALLOWLISTED_DADAIA_ENV: Final[frozenset[str]] = frozenset(
     {
         "DADAIA_CONTEXT",
         # Read by cli/main._traceback_requested BY DESIGN: the operator's opt-in for a full
-        # traceback, since the CLI boundary otherwise renders every failure as one line
-        # (bug f22-cli-boundary-is-a-whitelist-not-a-boundary).
+        # traceback, since the CLI boundary otherwise renders every failure as one line.
         "DADAIA_TRACEBACK",
         # Read by infrastructure/python_env.VenvPythonEnvironmentManager.ensure_workspace_venv
         # BY DESIGN: points workspace-venv bootstraps at an unpublished candidate wheel
-        # (consumer-validation norm; bug init-bootstrap-pins-unpublished-version).
+        # (consumer-validation norm).
         "DADAIA_BOOTSTRAP_PACKAGE",
         "DADAIA_AGENTS_DIR",
         "DADAIA_SESSION_ID",
@@ -169,10 +163,10 @@ ALLOWLISTED_DADAIA_ENV: Final[frozenset[str]] = frozenset(
         # category as DADAIA_AGENTS_DIR above.
         "DADAIA_KIMI_SESSION_INDEX",
         # Read by core/workspace_resolver BY DESIGN: roots no process may resolve; the
-        # suite fences the enclosing instance (bug test-subprocesses-resolve-the-live-instance).
+        # suite fences the enclosing instance.
         "DADAIA_FENCED_ROOTS",
         # Read by infrastructure/privacy_check.load_privacy_terms BY DESIGN: the operator's
-        # denylist path override, source 1 of the one secret matcher (SPEC AC5.6).
+        # denylist path override, source 1 of the one secret matcher.
         "DADAIA_PRIVACY_DENYLIST",
     }
 )
@@ -186,7 +180,7 @@ ALLOWLISTED_DADAIA_ENV: Final[frozenset[str]] = frozenset(
 #: (:func:`run_hook_subprocess`), which is the harness-real channel. :func:`claude_hook_env`
 #: / :func:`codex_hook_env` accept them in ``extra`` for exactly that purpose.
 #:
-#: ``DADAIA_RUNTIME`` (v0.2.8): the kimi-code shims export it (``kimi-code``) before
+#: ``DADAIA_RUNTIME``: the kimi-code shims export it (``kimi-code``) before
 #: delegating to the Python hook modules, so presence records carry the right runtime —
 #: the same wiring-set category as the codex output-contract vars.
 HARNESS_CONTROL_DADAIA_ENV: Final[frozenset[str]] = frozenset(
@@ -202,7 +196,7 @@ HOOK_MODULES: Final[frozenset[str]] = frozenset(
     {"sdd_gate", "sdd_post_gate", "ctx_inject", "root_whitelist", "pre_gate"}
 )
 
-#: Policy modules whose standalone ``main()`` CLI entrypoint was removed in v0.1.53 (the
+#: Policy modules whose standalone ``main()`` CLI entrypoint was removed (the
 #: merged ``pre_gate`` is the sole harness entrypoint). They are still driven in ISOLATION
 #: for behavior tests via their pure ``evaluate_payload`` surface (see :func:`run_hook_subprocess`).
 _POLICY_ONLY_MODULES: Final[frozenset[str]] = frozenset({"sdd_gate", "root_whitelist"})
@@ -290,11 +284,11 @@ def kimi_hook_env(
     *,
     extra: dict[str, str] | None = None,
 ) -> dict[str, str]:
-    """Pinned-minimal env a real Kimi Code hook subprocess receives (v0.2.8).
+    """Pinned-minimal env a real Kimi Code hook subprocess receives.
 
     Kimi Code delivers **no native session-id env var** to a hook process — the session
     id travels exclusively in the stdin JSON payload (``session_id`` field), which
-    ``core/invocation.resolve_session_id`` never reads (env only, ADR 0116). The env is therefore the scrubbed
+    ``core/invocation.resolve_session_id`` never reads (env only). The env is therefore the scrubbed
     operator shell plus ``PWD`` only; ``extra`` may add the shim-exported
     wiring vars (``DADAIA_RUNTIME``/``DADAIA_HOOK_EVENT``) or operator-shell vars — a
     non-allowlisted ``DADAIA_*`` raises ``ValueError``.
@@ -370,8 +364,7 @@ def is_allow_envelope(line: str) -> bool:
     Keyed on "JSON envelope that is not a block" rather than a byte-exact literal so
     consumers (advisory-line filters) survive envelope evolution — the same non-block
     reading the codex hooks and the kimi shim apply. The allow envelope carries no
-    ``decision`` at all since bug pre-gate-allow-envelope-fails-claude-schema (Claude
-    Code's top-level enum is ``["approve", "block"]``).
+    ``decision`` at all (Claude Code's top-level enum is ``["approve", "block"]``).
     """
     try:
         data = json.loads(line)
@@ -396,7 +389,7 @@ def run_hook_subprocess(
     (use :func:`claude_hook_env` / :func:`codex_hook_env` to build it). Captures exit code,
     stdout, and stderr.
 
-    ``cwd`` (T-50-02, SPEC v0.5.0 FR1): the real harness spawns a hook with the operator's
+    ``cwd``: the real harness spawns a hook with the operator's
     session cwd, which — structurally, in every real workspace — sits somewhere UNDER the
     true workspace root. Every consumer now routed through
     ``core.specs_resolver.resolve_context`` may consult that cwd (rungs 0/3), so a test
@@ -419,8 +412,8 @@ def run_hook_subprocess(
             f"{sorted(HOOK_MODULES)}."
         )
     if hook_module in _POLICY_ONLY_MODULES:
-        # v0.1.53: the standalone ``sdd_gate`` / ``root_whitelist`` CLI ``main()`` entrypoints
-        # were removed — ``pre_gate`` is the single merged harness entrypoint. To keep
+        # The policy modules have no standalone ``main()``: ``pre_gate`` is the single merged
+        # harness entrypoint. To keep
         # exercising each policy IN ISOLATION (a merged ``pre_gate`` run would also apply the
         # other policies and change ALLOW outcomes), drive the policy's ``evaluate_payload``
         # in a real subprocess exactly as the removed ``main()`` did: read stdin JSON →

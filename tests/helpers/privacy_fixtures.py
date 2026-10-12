@@ -1,14 +1,9 @@
 """Pattern-shaped fixture values, composed at runtime from parts.
 
 This repository is PUBLIC: every pushed blob is published, so the push-range denylist
-scan stays FULL on every tracked path — ``tests/**`` included. Until v0.4.7 that scope
-was made liveable by a hand-kept list of 23 tolerated ``(path, baseline pattern)``
-pairs (``_TESTS_SCOPE_BASELINE``): a SECOND scope decision that had to be edited every
-time a fixture was added, moved or renamed — the structural cause of the measured
-26-bug privacy-scan loop, in which every fix was one more literal/baseline/regex edit.
-
-The structural fix is that no tracked fixture FILE carries a literal any pattern
-matches. A test that merely needs *a* home path, address or mailbox uses a value the
+scan stays FULL on every tracked path — ``tests/**`` included. No tracked fixture FILE
+carries a literal any pattern matches; a baseline of tolerated ``(path, pattern)`` pairs
+would be a second scope decision. A test that merely needs *a* home path, address or mailbox uses a value the
 baseline already excludes by design (``/home/user``, the RFC 5737 documentation
 ranges, ``@example.invalid``) written inline. A test that must prove the SCANNER FIRES
 on a realistic shape calls one of the builders below: the shape exists only in memory,

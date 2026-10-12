@@ -53,8 +53,8 @@ def test_alive_leaves_a_preexisting_specs_tree_untouched_and_hooks_the_repo(
     git: GitSubprocessClient,
     workspace_root: Path,
 ) -> None:
-    """0.4.8 AC3.7: alive() never merges, backs up or commits specs — an operator tree
-    stays byte-identical, nothing is committed, and the hook installer runs on the repo."""
+    """alive() never merges, backs up or commits specs: an operator tree stays
+    byte-identical, nothing is committed, and the hook installer runs on the repo."""
     hooked: list[Path] = []
     svc = SpecContextService(
         context_store=store,

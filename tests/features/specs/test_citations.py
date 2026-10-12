@@ -1,13 +1,12 @@
 """MEM-DRIFT-2 — memory atoms citing a dead `dadaia <verb>` or a dead repo path.
 
-The doctor's citation rule (0.4.7 FR2): the same finders that keep `public/**` honest
+The doctor's citation rule: the same finders that keep `public/**` honest
 (`features.specs.citations`) measure `specs/memory/**`, as a WARNING with no fix —
 memory drift is a closure finding (QUALITY.md), never a red build or a push gate.
 The command tree arrives as plain data, exactly as `live_shas` does; `features` never
 imports `cli`.
 
-0.4.7 T-047-35 (FR2, AC: a fixture atom citing `dadaia fixture-verb`
-yields one MEM-DRIFT-2 line and exit 0).
+A fixture atom citing `dadaia fixture-verb` yields one MEM-DRIFT-2 line and exit 0.
 """
 
 from __future__ import annotations
@@ -85,7 +84,7 @@ def test_no_command_tree_no_repo_root_or_no_specs_is_silent(tmp_path: Path) -> N
     "token", ["specs/../../outside/x.md", "specs/link.md"], ids=["traversal", "symlink"]
 )
 def test_a_citation_resolving_outside_the_repo_is_dead(tmp_path: Path, token: str) -> None:
-    """CWE-22 (0.4.7 T-047-35 security finding): a token is alive only when it resolves
+    """CWE-22: a token is alive only when it resolves
     INSIDE the repo; a symlink inside the repo is no containment proof."""
     repo_root = tmp_path / "repo"
     (tmp_path / "outside").mkdir()
@@ -99,7 +98,7 @@ def test_a_citation_resolving_outside_the_repo_is_dead(tmp_path: Path, token: st
 
 
 def test_the_markdown_walk_skips_symlinks(tmp_path: Path) -> None:
-    """0.4.7 T-047-35 security finding: the walk never reads a symlinked atom."""
+    """The walk never reads a symlinked atom."""
     repo_root = tmp_path / "repo"
     (tmp_path / "outside").mkdir()
     (tmp_path / "outside" / "planted.md").write_text(

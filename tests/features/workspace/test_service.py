@@ -27,10 +27,8 @@ def service() -> WorkspaceService:
 def test_init_creates_only_registry_init_zones_and_canon_seeds(
     service: WorkspaceService, workspace_root: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """0.4.6 AC10 (FR1/FR10).
-
-    ``init`` materialises exactly ``provisioned_zones()`` — the SAME view the doctor
-    reports ``missing`` for (bug WS-hooks-missing), never a second list — so a retired zone (``academy``, ``reports``,
+    """``init`` materialises exactly ``provisioned_zones()`` — the SAME view the doctor
+    reports ``missing`` for, never a second list — so a retired zone (``academy``, ``reports``,
     ``scripts``, an eager ``tmp``) cannot reappear, and no ``academy.json`` is seeded.
     """
     service.init(workspace_root, harnesses=("claude", "codex"), skip_assets=True)
@@ -84,11 +82,9 @@ def test_init_creates_only_registry_init_zones_and_canon_seeds(
 def test_init_skip_assets_writes_no_settings_and_says_ungated(
     service: WorkspaceService, workspace_root: Path
 ) -> None:
-    """Bug init-skip-assets-writes-gateless-claude-settings: init carried a SECOND
-    ``.claude/settings.json`` writer (``_configure_hook``) that emitted a gateless file
-    (UserPromptSubmit only — no gate, no venv guard, no root whitelist), silently. The
-    canonical writer is ``public install`` (runtime_config); init writes NO settings.
-    Under ``--skip-assets`` the ungated state is loud instead of silently half-wired."""
+    """init writes NO ``.claude/settings.json``: ``public install`` (runtime_config) is the
+    one writer. Under ``--skip-assets`` the ungated state is loud instead of silently
+    half-wired."""
     installed = service.init(workspace_root, harnesses=("claude", "codex"), skip_assets=True)
     assert not (workspace_root / ".claude" / "settings.json").exists()
     from dadaia_workspace.core.platform import PLATFORM
@@ -108,8 +104,7 @@ def test_init_with_assets_never_writes_settings_itself(
 
 
 def test_a_refused_hold_leaves_the_list_form_denylist_in_place(workspace_root: Path) -> None:
-    """rc-9 AC3.3 row 23 (workspace-denylist-migration-reads-a-refused-hold-as-success): a
-    hold the sweep refuses is falsy, so the converted file never replaces the operator's."""
+    """A hold the sweep refuses is falsy, so the converted file never replaces the operator's."""
     from dadaia_workspace.features.spec_context.sweep import Skipped
 
     refused = WorkspaceService(
@@ -127,7 +122,7 @@ def test_a_refused_hold_leaves_the_list_form_denylist_in_place(workspace_root: P
 
 
 def test_a_symlinked_list_form_denylist_is_refused_and_left_untouched(workspace_root: Path) -> None:
-    """AC11.3: the migration lands content on the denylist, so the one writer's symlink rule
+    """The migration lands content on the denylist, so the one writer's symlink rule
     applies: the operator's link is neither moved aside nor replaced by a regular file."""
     from dadaia_workspace.features.spec_context.sweep import hold
 

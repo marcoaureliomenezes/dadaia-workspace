@@ -1,4 +1,4 @@
-"""Real git in tmp_path — the one fixture every git question is asked against (AC9.4)."""
+"""Real git in tmp_path — the one fixture every git question is asked against."""
 
 import subprocess
 from pathlib import Path

@@ -1,12 +1,11 @@
-"""Unit tests for the memory validator's LINT-1 mapping (v0.4.3 T-043-20/FR16).
+"""Unit tests for the memory validator's LINT-1 mapping.
 
-LINT-1 imports ``features.specs.memory_lint`` directly (A16.1). These tests exercise ``check_lint1_memory_atoms`` against REAL
+LINT-1 imports ``features.specs.memory_lint`` directly. These tests exercise ``check_lint1_memory_atoms`` against REAL
 memory-atom fixtures written under ``tmp_path``, proving the severity mapping end to end
 through the real ``memory_lint`` implementation — never a faked subprocess result.
 
-v0.5.1 T-051-22 rework: MEM-DRIFT-1, the features package-map
-diagram in ARCHITECTURE.md vs the live ``dadaia_workspace/features`` packages (bug
-push-gate-test-pins-memory-package-count-that-only-closure-may-change).
+MEM-DRIFT-1 compares the features package-map diagram in ARCHITECTURE.md with the live
+``dadaia_workspace/features`` packages.
 
 The live-package introspection is monkeypatched in the table; one smoke test runs it for
 real.
@@ -68,10 +67,8 @@ def test_lint1_forbidden_heading_maps_to_error(tmp_path: Path) -> None:
 
 
 def test_lint1_unknown_heading_produces_no_issue(tmp_path: Path) -> None:
-    """The heading-vocabulary check (a curated allowlist of "known" headings) is
-    retired (v0.5.0): a heading vocabulary is prose policy, not a lint. A heading
-    nobody has ever seen before is neither an error nor a warning at the doctor
-    mapping layer either."""
+    """A heading nobody has ever seen before is neither an error nor a warning at the doctor
+    mapping layer."""
     specs = _make_specs_with_memory(tmp_path)
     (specs / "memory" / "product" / "a" / "architecture.md").write_text(
         _VALID_FRONTMATTER.format(slug="architecture")
@@ -122,9 +119,9 @@ def test_lint1_empty_memory_dir_is_a_noop(tmp_path: Path) -> None:
 
 
 def test_lint1_emits_one_single_line_issue_per_atom_error(tmp_path: Path) -> None:
-    """Bug lint1-prints-raw-multiline-findings: the doctor prints one
-    `<CODE> <verdict> <message>` line per finding, so every lint error is its own issue
-    naming its own atom — never a multi-line block of `  [path] ERROR:` lines."""
+    """The doctor prints one `<CODE> <verdict> <message>` line per finding, so every lint
+    error is its own issue naming its own atom — never a multi-line block of
+    `  [path] ERROR:` lines."""
     specs = _make_specs_with_memory(tmp_path)
     architecture = specs / "memory" / "product" / "a" / "architecture.md"
     architecture.write_text(

@@ -1,6 +1,6 @@
-"""The derived onboarding step list — one fixture per step, plus I1.
+"""The derived onboarding step list — one fixture per step, plus its invariant.
 
-AC1.1, AC1.2, AC3.1, AC4.1, AC7.2 (T-050-17). Size: SMALL (unit): the
+Size: SMALL (unit): the
 one git read is patched at the adapter; the real-git behaviour is the property test's.
 """
 
@@ -96,8 +96,8 @@ def test_next_step_is_derived_from_the_workspace_state(
     tmp_path: Path, _git: dict[str, bool], trees: Callable[[Path], dict[str, Path]], kwargs: dict[str, object],
     published: bool, expected: tuple[str, str] | None, command: tuple[str, ...] | None, in_command: list[str],
 ) -> None:  # fmt: skip
-    """sa-bind-has-two-stores#S1: the ``bind`` step judges the caller's Bind (no identity, no step).
-    sa-specs-tree-state-read-five-ways#B28-4: the specs fix is state()'s; ADR 0047: a typo is never a move."""
+    """The ``bind`` step judges the caller's Bind (no identity, no step). The specs fix is
+    state()'s; a typo is never a move."""
     _git["published"] = published
     step = next_step(tmp_path, trees(tmp_path), **kwargs)  # type: ignore[arg-type]
     assert (step and (step.id, step.kind)) == expected
@@ -110,7 +110,7 @@ def test_next_step_is_derived_from_the_workspace_state(
 
 
 def test_the_specs_step_reports_state_and_the_doctor_has_no_specs_version_code(tmp_path: Path) -> None:
-    """sa-specs-tree-state-read-five-ways#B28-6: ONBOARDING reports the state; the doctor has no SPECS-VERSION code."""
+    """ONBOARDING reports the state; the doctor has no SPECS-VERSION code."""
     specs = _foreign(tmp_path)["app"]
     step = next_step(tmp_path, {"app": specs})
     assert step is not None and step.command == state(specs, root=tmp_path, context="app")[1]

@@ -1,9 +1,8 @@
-"""Derived inventory of ``dadaia_workspace/public/**`` (v0.4.5 FR3,
-``byte-golden-test-inventory-roster-split``).
+"""Derived inventory of ``dadaia_workspace/public/**``.
 
 The single, DERIVED source of the public-asset inventory dimension: it scans
 ``dadaia_workspace/public/**`` at test time so no test hand-pins a per-file roster that
-drifts whenever a skill/agent/rule file is added or removed (v0.4.4 AR-1).
+drifts whenever a skill/agent/rule file is added or removed.
 
 It reuses ``iter_public_files`` (the real ignore rules) rather than reimplementing the
 include/exclude rules by hand — that walk is the EXACT enumeration ``install()``,
