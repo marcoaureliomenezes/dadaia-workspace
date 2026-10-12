@@ -54,14 +54,11 @@ _KERNEL_MODULES = {module.stem for module in _KERNEL.glob("*.py")}
 #: edge): backlog reads the release Origin parser (Job 11), release reads the worktree rows and
 #: the navigator's drift decider at the closure fence (Job 12).
 _CROSS_SKILL_EDGES = {
-    "dd-release-implementation": {"_memory_drift", "_worktree_git", "_worktree_names"},
-    "dd-backlog-definition": {"_release_schema"},
+    "dd-release-implementation": {"_memory_drift"},
 }
 
 #: The `sys.path` lines that serve a surviving edge, by module; each names the skill it reaches.
 _EDGE_PATH_LINES = {
-    "dd-backlog-definition/scripts/backlog.py": "dd-release-implementation",
-    "dd-release-implementation/scripts/_release_phase.py": "dd-gitflow-default",
     "dd-release-implementation/scripts/_release_tree.py": "dd-spec-navigator",
 }
 
