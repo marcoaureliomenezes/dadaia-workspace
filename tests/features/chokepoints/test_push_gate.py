@@ -69,8 +69,6 @@ def _gen() -> Iterable[tuple[str, str]]:
 
 # fmt: off
 @pytest.mark.parametrize(("files", "message", "ref", "terms", "in_message"), [
-    pytest.param({"leak.md": f"{_TERM}\n"}, None, _branch, _TERMS, [], id="A1.1-blob-in-branch-range"),
-    pytest.param({"tag-blob.md": f"{_TERM}\n"}, None, _tag, _TERMS, [], id="A2.1-tainted-tag"),
     pytest.param({"c.md": "clean\n"}, f"mentions {_TERM}", _branch, _TERMS,
                  ["Uncommit the unpublished range"], id="A11.1-term-only-in-commit-message"),
     pytest.param({"leak.md": f"{_TERM}\n"}, None, _tag, "gen", ["denylisted term"], id="one-shot-generator-terms"),

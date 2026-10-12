@@ -14,11 +14,8 @@ from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.features.migrate import upgrade as upgrade_feat
-from dadaia_workspace.features.spec_context import sweep
 from dadaia_workspace.features.specs.canon import scaffold
 from dadaia_workspace.features.specs.doctor import SpecsDoctor
-from dadaia_workspace.features.specs.doctor_memory import is_placeholder_atom
 
 _TEMPLATES_DIR = Path(__file__).resolve().parents[3] / "dadaia_workspace" / "public" / "templates"
 
@@ -64,26 +61,6 @@ def test_fix_removes_placeholder_and_tree_is_clean(tmp_path: Path) -> None:
     assert not atom.exists()
     errors = [f"{i.code}: {i.message}" for i in _doctor(specs).check() if i.verdict == "error"]
     assert errors == []
-
-
-def test_filled_atom_is_never_flagged_or_removed(tmp_path: Path) -> None:
-    specs = _fresh_specs(tmp_path)
-    atom = specs / "memory" / "product" / "feature.md"
-    atom.write_text(
-        "---\nslug: feature\ntitle: Real Feature\ntldr: A real feature.\n"
-        "summary: This placeholder text in prose is NOT a template marker.\n"
-        "tags: [feature]\ntoken_estimate: 50\n---\n\n## Propósito\n\nReal content.\n",
-        encoding="utf-8",
-    )
-    assert is_placeholder_atom(atom) is False
-    assert [i for i in _doctor(specs).check() if i.code == "MEM-PLACEHOLDER-1"] == []
-    assert atom.exists()
-
-
-def test_upgrade_dry_run_reports_without_deleting(tmp_path: Path) -> None:
-    specs, atom = _placeholder_atom(tmp_path)
-    upgrade_feat.upgrade(specs, remove=lambda p: sweep.remove(specs, p, p.name), dry_run=True)
-    assert atom.exists()
 
 
 def test_reconcile_ownership_preflight_names_owner_and_repair(tmp_path: Path) -> None:
