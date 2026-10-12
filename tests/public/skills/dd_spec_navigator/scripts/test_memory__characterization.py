@@ -122,13 +122,10 @@ def _run(
     command = [sys.executable, str(script), *args]
     if fixed_clock:
         bootstrap = (
-            "import sys\nfrom datetime import datetime\nfrom pathlib import Path\n"
+            "import sys\nfrom pathlib import Path\n"
             "sys.path.insert(0, str(Path(sys.argv.pop(1))))\n"
-            "import memory\n"
-            "class Clock:\n"
-            " @staticmethod\n"
-            f" def now(tz): return datetime.fromisoformat({_NOW!r}.replace('Z', '+00:00'))\n"
-            "memory.cat.datetime = Clock\n"
+            "import memory\nimport _clock\n"
+            f"_clock.now_iso = lambda: {_NOW!r}\n"
             "raise SystemExit(memory.main(sys.argv[1:]))"
         )
         command = [sys.executable, "-c", bootstrap, str(script.parent), *args]
