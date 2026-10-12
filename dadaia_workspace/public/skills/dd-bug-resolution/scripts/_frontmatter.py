@@ -6,10 +6,11 @@ that equals ``yaml.safe_load`` or refuses, never a silent difference.
 ``parse(block)`` returns the mapping or raises ``ValueError`` whose message starts
 ``line N``. Accepted: top-level ``key: value``; plain scalars typed null/bool/int/str;
 double-quoted (JSON rules) and single-quoted scalars; one-level flow maps and sequences
-of scalars; block lists of scalars or mappings; nested block maps; folded ``>`` and ``>-``.
-Everything else raises: tabs, duplicate keys, anchors, aliases, tags, ``|`` and ``>+``,
-multi-line plain or quoted scalars, ` #` comments after a value, nested flow collections,
-and every YAML 1.1 ambiguity (``yes``, ``0755``, ``1_000``, a date, ``~``, ``<<``).
+of scalars; block lists of scalars or mappings; nested block maps; folded ``>`` and
+``>-``; a ``#`` comment after a plain or quoted value. Everything else raises: tabs,
+duplicate keys, anchors, aliases, tags, ``|`` and ``>+``, multi-line plain or quoted
+scalars, nested flow collections, and every YAML 1.1 ambiguity (``yes``, ``0755``,
+``1_000``, a date, ``~``, ``<<``).
 """
 
 from __future__ import annotations
@@ -26,6 +27,8 @@ _BAD_CHAR = re.compile("[^\x20-\x7e\xa0-‧‪-﻾＀-�\U00010000-\U0010ffff]"
 _DQ = re.compile(r'"(?:[^"\\]|\\.)*"')
 _SQ = re.compile(r"'(?:[^']|'')*'")
 _FLOW_PLAIN = re.compile(r"[^\s,\[\]{}\"'#:?][^,\[\]{}\"'#:?]*")
+_TAIL = re.compile(r" *| +#.*")
+_COMMENT = re.compile(r" +#.*")
 _INT = re.compile(r"-?(?:0|[1-9][0-9]*)")
 _VERSION = re.compile(r"[0-9]+(?:\.[0-9]+){2,}")
 _TYPED: dict[str, Any] = {"null": None, "true": True, "false": False}
@@ -64,8 +67,8 @@ def _plain(s: str, number: int) -> Any:
         or s.lower() in _KEYWORDS | {"y", "n"}
     ):
         raise _fail(number, f"plain scalar {s!r} is ambiguous or outside the subset; quote it")
-    if ": " in s or s.endswith(":") or " #" in s:
-        raise _fail(number, f"plain scalar {s!r} holds ': ' or ' #'; quote it")
+    if ": " in s or s.endswith(":"):
+        raise _fail(number, f"plain scalar {s!r} holds ': '; quote it")
     return s
 
 
@@ -186,10 +189,12 @@ class _Reader:
     def scalar(self, s: str, number: int) -> Any:
         if s[0] in "\"'":
             value, end = _quoted(s, 0, number)
-            if s[end:].strip(" "):
+            if not _TAIL.fullmatch(s[end:]):
                 raise _fail(number, "text after a quoted scalar")
             return value
-        return _flow(s, number) if s[0] in "[{" else _plain(s, number)
+        if s[0] in "[{":
+            return _flow(s, number)
+        return _plain(_COMMENT.sub("", s), number)
 
     def value(self, rest: str, indent: int, number: int) -> Any:
         if rest.startswith(">"):
