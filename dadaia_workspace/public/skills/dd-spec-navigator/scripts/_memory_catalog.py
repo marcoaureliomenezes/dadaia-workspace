@@ -16,22 +16,15 @@ regenerating an unchanged catalog is idempotent to the byte and a clean tree sta
 from __future__ import annotations
 
 import json
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+import _clock
 from _memory_schema import CATALOG, INDEX, PRODUCT, WIKILINK_RE, parse
+from _refusal import Refusal
 from _specs import script
 
 Catalog = dict[str, Any]
-
-
-class Refusal(Exception):
-    """A write this script refuses, carrying the one `fix:` line that unblocks it."""
-
-    def __init__(self, message: str, fix: str = "") -> None:
-        super().__init__(message)
-        self.fix = fix
 
 
 def atoms(specs: Path) -> list[Path]:
@@ -86,10 +79,10 @@ def _stamp(specs: Path, features: list[dict[str, Any]]) -> str:
         previous = {}
     if previous.get("features") == features and isinstance(previous.get("generated_at"), str):
         return str(previous["generated_at"])
-    return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return _clock.now_iso()
 
 
-def serialize(catalog: Catalog) -> str:
+def catalog_text(catalog: Catalog) -> str:
     return json.dumps(catalog, ensure_ascii=False, indent=2) + "\n"
 
 

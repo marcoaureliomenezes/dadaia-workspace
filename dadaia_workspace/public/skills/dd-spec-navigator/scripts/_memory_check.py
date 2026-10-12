@@ -14,6 +14,7 @@ from typing import Any
 
 import _memory_catalog as cat
 from _memory_schema import CATALOG, CODE, INDEX
+from _refusal import Refusal
 from _specs import script, with_specs
 
 Finding = dict[str, Any]
@@ -23,7 +24,7 @@ def check(specs: Path) -> list[Finding]:
     """The catalog and index as they would be regenerated, against what is on disk."""
     try:
         catalog = cat.generate(specs)
-    except (cat.Refusal, json.JSONDecodeError) as exc:  # the missing tree's fix makes it
+    except (Refusal, json.JSONDecodeError) as exc:  # the missing tree's fix makes it
         fix = getattr(exc, "fix", "")
         if not fix.startswith("mkdir"):
             fix = (f"Operator action: correct the source atom — {exc} (specs/memory/AGENTS.md: "
@@ -31,7 +32,10 @@ def check(specs: Path) -> list[Finding]:
         return [{"code": CODE, "verdict": "error", "path": CATALOG, "line": 0,
                  "message": str(exc), "fix": fix}]  # fmt: skip
     out: list[Finding] = []
-    for name, rendered in ((CATALOG, cat.serialize(catalog)), (INDEX, cat.render(specs, catalog))):
+    for name, rendered in (
+        (CATALOG, cat.catalog_text(catalog)),
+        (INDEX, cat.render(specs, catalog)),
+    ):
         path = specs / name
         if not path.is_file():
             out.append({"path": name, "line": 0, "message": f"{path.name} does not exist"})

@@ -14,28 +14,20 @@ from __future__ import annotations
 
 import fnmatch
 import json
-import subprocess
 from pathlib import Path
 from typing import Any
 
+import _git
 from _memory_schema import CATALOG
+from _refusal import Refusal as Refusal
 from _specs import git_line
 
 NOT_CODE = frozenset({"specs", "tests", "test", "docs"})
 
 
-class Refusal(Exception):
-    """A refusal carrying the one `fix:` line that unblocks it."""
-
-    def __init__(self, message: str, fix: str = "") -> None:
-        super().__init__(message)
-        self.fix = fix
-
-
 def _cut(repo: Path, what: str) -> Refusal | None:
     """The one refusal naming a history cut: *repo* is a shallow clone, else None."""
-    shallow = subprocess.run(["git", "rev-parse", "--is-shallow-repository"], cwd=repo, capture_output=True, text=True, encoding="utf-8", errors="replace", check=False)  # fmt: skip
-    if shallow.stdout != "true\n":
+    if _git.git(repo, "rev-parse", "--is-shallow-repository", check=False).strip() != "true":
         return None
     return Refusal(
         f"{what}: a shallow clone lacks the window's history",
@@ -45,22 +37,30 @@ def _cut(repo: Path, what: str) -> Refusal | None:
 
 def git(repo: Path, *argv: str) -> list[str]:
     """`git *argv` from *repo*, as non-empty lines; a git that refuses is a Refusal."""
-    done = subprocess.run(["git", *argv], cwd=repo, capture_output=True, text=True, encoding="utf-8", errors="replace", check=False)  # fmt: skip
-    if done.returncode != 0:  # a bound-less caller's history precondition: a cut is named first
-        what = f"git {' '.join(argv)} failed in {repo}"
-        raise _cut(repo, what) or Refusal(f"{what}: {done.stderr.strip()}",
-                                          "Operator action: run this verb from a checkout whose history holds the --since commit")  # fmt: skip
-    return [line for line in done.stdout.split("\n") if line]
+    try:
+        out = _git.git(repo, *argv)
+    except RuntimeError as exc:  # a bound-less caller's history precondition: a cut is named first
+        raise _cut(repo, f"git {' '.join(argv)} failed in {repo}") or Refusal(
+            str(exc),
+            "Operator action: run this verb from a checkout whose history holds the --since commit",
+        ) from exc
+    return [line for line in out.split("\n") if line]
 
 
 def report(specs: Path, since: str, until: str = "HEAD") -> dict[str, Any]:
     """The worklist for the window *since*..*until* — the ONE decider every verb calls."""
     repo = specs.parent
-    for bound in (since, until):  # usable = an ancestor of HEAD; absent (128) is left to git()
-        reach = subprocess.run(["git", "merge-base", "--is-ancestor", bound, "HEAD"], cwd=repo, capture_output=True, check=False).returncode  # fmt: skip
-        if reach and (cut := _cut(repo, f"{bound} is out of reach")):  # a cut is checked first
+    for bound in (since, until):  # usable = an ancestor of HEAD; absent is left to git()
+        try:
+            _git.git(repo, "merge-base", "--is-ancestor", bound, "HEAD")
+            continue
+        except RuntimeError:
+            pass
+        if cut := _cut(repo, f"{bound} is out of reach"):  # a cut is checked first
             raise cut
-        if reach == 1:  # present, reached by no path from HEAD
+        if _git.git(
+            repo, "rev-parse", "--verify", "--quiet", f"{bound}^{{commit}}", check=False
+        ).strip():
             raise Refusal(f"{bound} is not an ancestor of HEAD — a clone of this branch lacks it (a rebase rewrote it)",
                           f"Operator action: replace {bound[:12]} with the commit HEAD reaches in its place")  # fmt: skip
     catalog = json.loads((specs / CATALOG).read_text(encoding="utf-8"))
