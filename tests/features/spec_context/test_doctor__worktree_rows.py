@@ -3,6 +3,8 @@ the owner's reader, so no process runs."""
 
 from __future__ import annotations
 
+import shlex
+import subprocess
 from collections.abc import Collection
 from pathlib import Path
 from typing import Any
@@ -97,3 +99,25 @@ def test_a_worktree_of_a_repo_in_no_context_is_a_finding_with_one_fix_and_a_bind
     assert found[str(tree)].message.startswith("unregistered")
     assert found[str(tree)].fix and "\n" not in found[str(tree)].fix
     assert f"unregistered {tree}" in block
+
+
+def test_the_fix_line_of_an_unregistered_tree_that_was_never_locked_removes_it(
+    tmp_path: Path,
+) -> None:
+    """AC15.2: the one fix act drops a tree made without `--lock`; `worktree unlock` exits 128 there."""
+    root = worktree_ws.make_workspace(tmp_path)
+    gone = root / "repos/gone"
+    gone.mkdir()
+    worktree_ws.git(gone, "init", "-q")
+    worktree_ws.git(gone, "commit", "-q", "--allow-empty", "-m", "init")
+    tree = root / "worktrees/gone/0.5.0-rc1/j1"
+    worktree_ws.git(gone, "worktree", "add", "-q", "-b", "wt/0.5.0-rc1/j1", str(tree))
+    doctor = worktree_ws.registered_doctor(root)
+    [finding] = [f for f in doctor.check_worktrees("c") if f.message.startswith("unregistered")]
+
+    command = finding.fix.split("`")[1]
+    assert command == f"git -C {gone} worktree remove --force --force {tree}"
+    subprocess.run(shlex.split(command), check=True, capture_output=True)
+
+    assert not [f for f in doctor.check_worktrees("c") if f.message.startswith("unregistered")]
+    assert not tree.exists()
