@@ -5,9 +5,11 @@ tests]``, the mutation score and the diff's line and branch coverage from one ba
 ``--module <path>...`` mutates every line of those files instead (no diff, no coverage
 lines). Tests per file come from running ``impact.py`` unless ``--tests <path>...`` names
 them. A mutant run longer than ``--timeout`` seconds counts as killed and names no killer.
-Before mutating a file its tests run once under per-test coverage: a mutant runs only the
-tests that executed its line, every test when import time or a child process executed it,
-and none when nothing did (``UNCOVERED``, counted in the score's total, not killed). A
+Before mutating a file its tests run once under per-test coverage: a mutant runs the tests
+that executed its line plus every test that started a child through ``subprocess`` (a child's
+lines may be unmeasured), every test when import time executed the line, and none when that
+set is empty (``UNCOVERED``, counted in the score's total, not killed). The mutant timeout
+is the larger of ``--timeout`` and three times that baseline run's wall time. A
 baseline that fails prints ``BASELINE RED <file>: <failed ids>`` and exits 1 before any
 mutation. ``--home <id>`` (a file, a node id or a prefix) adds, after the score,
 ``DELETABLE`` for each other test whose every killed mutant the home also kills, ``KEPT``
@@ -19,6 +21,7 @@ from __future__ import annotations
 
 import argparse
 import ast
+import inspect
 import io
 import json
 import os
@@ -26,6 +29,7 @@ import re
 import subprocess
 import sys
 import tempfile
+import time
 import tokenize
 from pathlib import Path
 
@@ -140,15 +144,21 @@ def _killers(tests: list[str], env: dict[str, str], timeout: float) -> list[str]
     return sorted(set(re.findall(r"^(?:FAILED|ERROR) (\S+)", done.stdout, re.M)))
 
 
-def _executed_by(name: str, tests: list[str], env: dict[str, str]) -> dict[int, list[str]]:
-    """Per line of ``name``, the node ids that executed it (``""`` for no test context)."""
+def _executed_by(
+    name: str, tests: list[str], env: dict[str, str]
+) -> tuple[dict[int, list[str]], set[str], float]:
+    """Per line of ``name`` the node ids that executed it (``""`` for no test context), the
+    ids that started a ``subprocess`` child, and the baseline's wall seconds. A red baseline
+    prints ``BASELINE RED`` and exits 1."""
     with tempfile.TemporaryDirectory(prefix="dadaia-mutate-") as tmp:
         data = str(Path(tmp, ".coverage"))
+        began = time.monotonic()
         done = _run(
             sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider", "-p", "scripts.covdata",
-            f"--cov={name.split('/')[0]}", "--cov-context=test", "--cov-report=", "--tb=no",
-            "-rfE", *tests, env={**env, "COVERAGE_FILE": data},
+            f"--cov={name.split('/')[0]}", "--cov=subprocess", "--cov-context=test",
+            "--cov-report=", "--tb=no", "-rfE", *tests, env={**env, "COVERAGE_FILE": data},
         )  # fmt: skip
+        wall = time.monotonic() - began
         if done.returncode:
             failed = sorted(set(re.findall(r"^(?:FAILED|ERROR) (\S+)", done.stdout, re.M)))
             print(f"BASELINE RED {name}: {', '.join(failed)}")
@@ -156,7 +166,12 @@ def _executed_by(name: str, tests: list[str], env: dict[str, str]) -> dict[int, 
         cov = CoverageData(basename=data)
         cov.read()
         by_line = cov.contexts_by_lineno(str(ROOT / name))
-    return {n: sorted({c.split("|")[0] for c in cs}) for n, cs in by_line.items()}
+        # ponytail: children started by os.system, os.exec*, a direct os.posix_spawn or
+        # multiprocessing are not detected; extend the spawner lines to cover them.
+        src, first = inspect.getsourcelines(subprocess.Popen._execute_child)  # type: ignore[attr-defined]
+        spawn = cov.contexts_by_lineno(str(Path(subprocess.__file__).resolve()))
+    spawners = {c.split("|")[0] for n in range(first, first + len(src)) for c in spawn.get(n, ())}
+    return {n: sorted({c.split("|")[0] for c in cs}) for n, cs in by_line.items()}, spawners, wall
 
 
 def _coverage(changed: dict[str, set[int]], env: dict[str, str]) -> list[str]:
@@ -221,7 +236,7 @@ def main() -> None:
         tests = args.tests or _tests_for(name)
         if args.home_id and tests:
             ran |= _test_ids(tests, env)
-        executed = _executed_by(name, tests, env) if tests else {}
+        executed, spawners, wall = _executed_by(name, tests, env) if tests else ({}, set(), 0.0)
         try:
             for m in _mutants(original.decode("utf-8"), lines):
                 total += 1
@@ -232,14 +247,18 @@ def main() -> None:
                 except SyntaxError:
                     total -= 1
                     continue
-                who = executed.get(m[1], []) if tests else []
+                who = executed.get(m[1], [])
+                if "" not in who:
+                    who = sorted({*who, *spawners})
                 if tests and not who:
                     print(f"UNCOVERED {label}")
                     continue
                 target.write_bytes(mutated.encode("utf-8"))
                 try:
                     ids = (
-                        _killers(tests if "" in who else who, env, args.timeout) if tests else None
+                        _killers(tests if "" in who else who, env, max(args.timeout, 3 * wall))
+                        if tests
+                        else None
                     )
                 except subprocess.TimeoutExpired:
                     killed += 1
