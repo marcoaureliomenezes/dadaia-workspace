@@ -75,17 +75,19 @@ def test_from_mapping_refuses_invalid(mapping: object) -> None:
         from_mapping(mapping)
 
 
-def test_the_history_rewrite_rule_scopes_to_the_branches_that_never_rebase() -> None:
-    """gitflow-pu3-refuses-the-job-branch-rebase-merge-prescribes: a wt/* branch is rebased by its owner."""
+def test_the_history_rewrite_rule_covers_only_the_branches_that_advance_by_merge_or_pr() -> None:
+    """A wt/* branch is rebased by its owner; the rule must not reach it,
+    and both of its verbs (rewrite, force-push) take the same scope."""
     skill = (
         Path(__file__).resolve().parents[2]
         / "dadaia_workspace/public/skills/dd-gitflow-default/SKILL.md"
     ).read_text("utf-8")
+    rows = [ln.split("|")[1:5] for ln in skill.splitlines() if re.match(r"\| [a-z]+( `|\s+\|)", ln)]
+    covered = {r[0].split()[0] for r in rows if "wt/" not in r[0]}
+    assert covered == {"work", "integration", "principal"}
     rule = next(ln for ln in skill.splitlines() if "pushed history" in ln)
-    rows = [
-        ln.split("|")[1].split()[0]
-        for ln in skill.splitlines()
-        if re.match(r"\| (work|integration|principal|job|backlog|task|plain) ", ln)
-    ]
-    assert [r for r in rows if re.search(rf"\b{r}\b", rule)] == ["work"]
-    assert "advances only by PR" in rule
+    verbs, scope = rule.split("force-pushing,", 1)
+    assert "pushed history of," in verbs
+    assert "work branch" in scope
+    assert "advances only by PR" in scope
+    assert not {"job", "backlog", "task", "plain"} & set(re.findall(r"\w+", scope))
