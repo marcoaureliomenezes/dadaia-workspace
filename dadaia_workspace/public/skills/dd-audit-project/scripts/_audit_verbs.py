@@ -10,20 +10,20 @@ gone without its record.
 from __future__ import annotations
 
 from collections import Counter
-from datetime import UTC, datetime
 from pathlib import Path
 from shutil import rmtree
 from typing import Any
 
+import _clock
 from _audit_check import AUDITS, DISPOSITIONS, FINDINGS, PILLARS, REQUIRED_EVIDENCE
 from _audit_store import (
     SCRIPT,
-    Refusal,
     append_histo,
     audit_dir,
     read_findings,
     write_findings,
 )
+from _refusal import Refusal
 from _specs import choice
 
 
@@ -95,7 +95,7 @@ def close(specs: Path, audit: str, sha: str) -> str:
     verdict = "resolved" if releases else "rejected"
     append_histo(specs, {
         "id": audit,
-        "ts": datetime.now(tz=UTC).strftime("%Y-%m-%d"),
+        "ts": _clock.today(),
         "disposition": verdict,
         "release": releases[0] if releases else None,
         "reason": None if releases else f"no finding resolved ({dict(verdicts) or 'none'})",

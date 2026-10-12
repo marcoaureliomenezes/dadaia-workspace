@@ -8,29 +8,16 @@ candidate bytes, run the SAME `check` they will be validated by, then `os.replac
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from typing import Any
 
-from _audit_check import (
-    AUDITS,
-    FINDINGS,
-    HISTO,
-    findings_findings,
-    histo_findings,
-)
-from _ledger import parse, replace
+import _jsonl
+from _audit_check import AUDITS, FINDINGS, HISTO, archive_findings, live_findings
+from _ledger import replace
+from _refusal import Refusal
 from _specs import script
 
 SCRIPT = script(Path(__file__).parent / "audit.py")
-
-
-class Refusal(Exception):
-    """A write this script refuses, carrying the one `fix:` line that unblocks it."""
-
-    def __init__(self, message: str, fix: str = "") -> None:
-        super().__init__(message)
-        self.fix = fix
 
 
 def audit_dir(specs: Path, audit: str, fix: str) -> Path:
@@ -61,24 +48,20 @@ def read_findings(directory: Path) -> list[dict[str, Any]]:
     """Every record of *directory*'s FINDINGS.jsonl, refused unless the document passes
     the same check every write runs — no verb writes the pair from an invalid document."""
     text = (directory / FINDINGS).read_text(encoding="utf-8")
-    problems = findings_findings(text, f"{AUDITS}/{directory.name}/{FINDINGS}")
+    problems = live_findings(text, f"{AUDITS}/{directory.name}/{FINDINGS}")
     if problems:
         raise Refusal(
             f"specs/{AUDITS}/{directory.name}/{FINDINGS} line {problems[0]['line']} does not "
             f"pass check ({problems[0]['message']}) — nothing was written",
             f"{SCRIPT} check",
         )
-    return parse(text)
-
-
-def serialize(records: list[dict[str, Any]]) -> str:
-    return "".join(json.dumps(r, sort_keys=True, ensure_ascii=False) + "\n" for r in records)
+    return _jsonl.load(text)
 
 
 def write_findings(directory: Path, records: list[dict[str, Any]]) -> None:
     """Replace *directory*'s FINDINGS.jsonl with *records*, validated first."""
-    text = serialize(records)
-    problems = findings_findings(text, f"{AUDITS}/{directory.name}/{FINDINGS}")
+    text = _jsonl.serialize(records)
+    problems = live_findings(text, f"{AUDITS}/{directory.name}/{FINDINGS}")
     if problems:
         raise Refusal(
             f"the resulting {FINDINGS} would not pass check — nothing was written "
@@ -92,8 +75,8 @@ def append_histo(specs: Path, record: dict[str, Any]) -> None:
     """Append one validated terminal record to the append-only archive. The record is
     validated ALONE — a pre-v6 line already in the file is history, not this write's
     business."""
-    line = json.dumps(record, sort_keys=True, ensure_ascii=False) + "\n"
-    problems = histo_findings(line)
+    line = _jsonl.serialize([record])
+    problems = archive_findings(line)
     if problems:
         raise Refusal(
             f"the {HISTO} record this close would write does not pass check — nothing "

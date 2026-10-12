@@ -27,7 +27,7 @@ sys.path[:0] = [
 
 import _audit_verbs as vb
 from _audit_check import DISPOSITIONS, check
-from _audit_store import Refusal
+from _refusal import Refusal
 from _specs import find_specs, refuse
 
 _HELP = {
