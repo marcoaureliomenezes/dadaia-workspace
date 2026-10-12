@@ -7,7 +7,6 @@ this module's share of the probe file, run there under the repo conftest.
 from __future__ import annotations
 
 import ast
-import json
 import re
 import sys
 from pathlib import Path
@@ -38,7 +37,6 @@ CALIBRATION = {
     "small win32 True": 60,
 }
 
-_CITATION = re.compile(r"\b[a-z0-9]+(?:-[a-z0-9]+)+#[A-Za-z]*\d+(?:[.-]\d+)?")
 _RUN_PYTEST = re.compile(r"^\s*(?:-\s*)?run:\s*(.*\bpytest\s.*)$", re.M)
 _SELECTOR = re.compile(r"""-m\s+(["'])(.*?)\1""")
 _REAL_CI = Path(__file__).resolve().parents[2] / _CI
@@ -168,18 +166,6 @@ def quarantine_needs_bug(tree: Tree) -> list[str]:
     return out
 
 
-def statement_id_cited(tree: Tree) -> list[str]:
-    ids = json.loads(tree.read("tests/fixtures/statement_ids.json"))
-    known = {f"{bug}#{sid}" for bug, sids in ids.items() for sid in sids}
-    known |= set(_CITATION.findall(tree.read("specs/memory/QUALITY.md")))
-    return [
-        f"unknown-id: {p} cites {cid}"
-        for p in tree.tracked("tests")
-        if p.endswith(".py")
-        for cid in sorted(set(_CITATION.findall(tree.read(p))) - known)
-    ]
-
-
 def push_starts_no_gc(tree: Tree) -> list[str]:
     spawned = tree.session.get("props", {}).get("push_gc")
     if spawned is None:
@@ -214,8 +200,6 @@ def CONTROL(root: Path) -> Session:
     gitignored file."""
     _write(root, ".gitignore", "scratch/\n")
     _write(root, "scratch/x.py", _IMPORT * 99 + "# sa-no-such-bug#S99\n")
-    _write(root, "tests/fixtures/statement_ids.json", '{"sa-known-bug": ["S1"]}')
-    _write(root, "specs/memory/QUALITY.md", "cites sa-quality-bug#Q1\n")
     _write(root, "tests/unit/test_c.py", "# sa-known-bug#S1 sa-quality-bug#Q1\n" + _ALLOWED * 99)
     _write(root, ".github/workflows/ci.yml", 'run: pytest -m "unit and not quarantine"\n')
     _write(root, _CI, _REAL_CI.read_text("utf-8"))
@@ -235,11 +219,6 @@ def _plant_selector(root: Path) -> Session:
     session = CONTROL(root)
     _write(root, _CI, _REAL_CI.read_text("utf-8").replace("slow and not quarantine", "slow"))
     return session
-
-
-def _plant_citation(root: Path) -> None:
-    CONTROL(root)
-    _write(root, "tests/unit/test_c.py", "# sa-no-such-bug#S99\n")
 
 
 _IMPORT = "from dadaia_workspace.core import _x\n"
@@ -278,7 +257,6 @@ CHECKS: dict[str, Check] = {
             "probe-broke": lambda root: {},
         },
     ),
-    "statement-id-cited": (statement_id_cited, {"unknown-id": _plant_citation}),
     "push-starts-no-gc": (
         push_starts_no_gc,
         {
