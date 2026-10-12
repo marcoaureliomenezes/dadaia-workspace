@@ -6,7 +6,7 @@
 **Opened:** 2026-10-11
 **Origin:** backlog:dd-ask-me-owned-questioning-skill,architecture-adr-section-generated,public-law-language-neutral,test-suite-diet,programmatic-dates-in-skills,impacted-test-selection,law-one-home-residual,bug-batch-cause-trigger-and-attempt-cap,define-backlog-merge-runs-verify,hotfix-specs-revert-commit-shape,harness-specific-surface-minimized,adr-0122-zero-backlog-destined-to-this-release,job-gate-runs-the-law-deletion-check,merge-entry-times-survive-rebase,hypothesis-cache-stays-out-of-repo-trees,task-gate-drops-deleted-paths-itself,architecture-principles-measured-by-re-pointed,fix-reader-rebuild-under-c,task-gate-declared-owner-tests,pr-merge-method-pinned,phase-implementation-has-a-place,stage-gate-keeps-only-the-red-check,verdict-author-unbound,judge-config-outside-the-script-dir,gate-reuses-a-green-result-for-the-same-tree,process-proportional-to-change-size,bug-status-deferred-banned,quality-scorecard-ruler,task-lines-carry-seam-and-adr-clause,skill-scripts-one-kernel; bugs:worktree-new-crashes-on-an-unreadable-release-state,release-check-admits-a-dag-that-phase-refuses,release-new-orphans-a-drafted-next-rc,verify-line-shlex-mangles-windows-paths,context-repo-refusals-carry-no-fix-line,codex-persona-frontmatter-drops-on-crlf,doctor-misses-worktrees-of-a-repo-that-left-its-context,job-gate-red-on-untracked-bytecode,cross-os-ci-masks-utf8,cli-refusals-print-no-fix-line,context-alive-crashes-on-a-non-git-repo-dir,skill-git-runners-read-the-callers-git-env,ledger-replace-destroys-a-symlinked-ledger,frontmatter-parsers-disagree-on-crlf-and-bom,slug-grammar-four-patterns-disagree
 
-Sources: the 0.5.0 scope grill of 2026-10-11 (report https://claude.ai/artifact/GGEzLQDmquUfrUhacFgmmK; "Confirmo, pode seguir (Recommended)"); each Origin entry's "Scope grill 2026-10-11" paragraph in `BACKLOG.json`; the duplicated-decider inventory at `dd10eb7de` (27 groups, about 110 copy sites, 12 diverged). Operator, 2026-10-11: "Eu so quero que vocÊ converja para 0 bugs ... qual é o problema core de tantos bugs ficarem aparecendo o tempo todo?"; "Isso é obvio né. Agora vc me fala desse problema arquitetural??? é esse o bug porra"; on the owner: "A: script da skill dona (Recommended)" (ADR 0246).
+Sources: the 0.5.0 scope grill of 2026-10-11 (report https://claude.ai/artifact/GGEzLQDmquUfrUhacFgmmK; "Confirmo, pode seguir (Recommended)"); each Origin entry's "Scope grill 2026-10-11" paragraph in `BACKLOG.json`; the duplicated-decider inventory at `dd10eb7de` (27 groups, about 110 copy sites, 12 diverged). Operator, 2026-10-11: "Eu so quero que vocÊ converja para 0 bugs ... qual é o problema core de tantos bugs ficarem aparecendo o tempo todo?"; "Isso é obvio né. Agora vc me fala desse problema arquitetural??? é esse o bug porra"; on the owner: "A: script da skill dona (Recommended)" (ADR 0246). FR18 is the operator demand `review-rework-prevention-2026-10-12`, ordered into rc-14 rather than the backlog; the Origin grammar has no clause for an operator demand beside backlog and bug ids, so it is recorded here. Operator, 2026-10-11/12: "Se está precisando de tanto retrabalho obviamente temos um problema serio que não será tolerado na proxima release."; "Não tolerarei nem mesmo 30% dessa quantidade de retrabalhos que tivemos."; "não porra, é materializado na lib ... algo que todo projeto usando dadaia-workspace siga ... e no eval, vai funcionar??? obviamente não"; "NÃO DEVE HAVER NADA NADA EM MEMORY QUE COMPETE COM NOSSAS FEATURES E CONTEXTO NATIVO DO DADAIA-WORKSPACE"; "EU FALEI HOTFIX OU AGORA ... NÃO É BACKLOG ... É AGORA."
 
 Placement (main-thread inference, review MEDIUM): `skill-scripts-one-kernel` was destined to Wave 2. Its move into rc-14 is the main thread's reading of "totalmente agora ... é para ser feito exatamente nessa release" and "é esse o bug porra". The operator's Option A ruling confirmed it afterwards.
 
@@ -35,6 +35,8 @@ The Wave 1 law has its own defects: an expiring grill record, ADRs without thres
 
 Fifteen confirmed bugs are open.
 
+Review rework (FR18): rc-14's reviewer verdicts count 14 trees, 29 verdicts and 13 REJECTED; 9 of 14 trees were rejected on the first pass. The causes: the hand-off already failed its declared checks (5); a PLAN row or ruling was neither reproduced nor swept for consumers (4); a rework fixed the cited site and broke its contract (2); an implementer claim was unproven (2). Every finding was real. What was missing was a review before the code review, of the definer's spec and of the implementer's hand-off.
+
 ## 2. Measurable Goals
 
 - G1. Zero copies: for each inventory group the PLAN names one `git grep`, and each returns only the owner's definition.
@@ -43,6 +45,7 @@ Fifteen confirmed bugs are open.
 - G4. radon reports no D–F function under `dadaia_workspace/public/skills/*/scripts` (constitution §5).
 - G5. Every ADR proposed after rc-14 carries `options` and a self-contained `ruling.words`; no `ADR:` label carries a status token after the Reconciliation.
 - G6. The FR4 grep over `public/` returns only the workspace's own operation; `git grep -n -- '--ts' dadaia_workspace/public/skills` returns nothing.
+- G7. At the next candidate's closure, AC18.5's count shows REJECTED ≤ 3 and first-pass rejected ≤ 20% of trees, against rc-14's 13 of 29 verdicts and 9 of 14 trees.
 
 ## 3. Requirements
 
@@ -158,6 +161,19 @@ Operator: "Registrar e corrigir no Job 5 (Recommended)", "Registrar, Job 5 (Reco
 - AC17.2 (integration, RED first): Adding the context's own main repo exits 0 as a no-op.
 - AC17.3 (integration, RED first): `context alive` on a non-git `repos/<slug>` refuses with one `fix:` line; the installer's off-repo condition is one domain refusal every caller consumes.
 
+### Review rework prevented (operator demand, 2026-10-12)
+
+#### FR18 — review rework prevented in the library's own flow
+
+Every project using the library follows it, and evals run without private memory, so each rule lives in the shipped law or skills.
+
+- AC18.1 (integration, RED first): `worktree.py ready <tree>` reports `READY <tree> <sha>` (exit 0) or `NOT READY <tree> <sha>` (exit 1); NOT READY names each failing condition with one fix line. It checks four conditions: the tree is clean; it is rebased on its base; the repo's declared `verify:` line exits 0, run through the merge gate's own declared-line runner (one owner); doctor passes. It reports and blocks nothing; the merge gate keeps its own check.
+- AC18.2 (no test — reviewer sweep): The orchestration skill dispatches a review only for a READY tree and hands the reviewer its READY line. A behaviour ruling by the main thread carries its reproduction and its consumer sweep, a search across every repo of the context. A rework brief names the finding's contract class, requires a RED test for the finding first, and requires a sweep of every other site of that class.
+- AC18.3 (no test — reviewer sweep): An implementer's hand-back carries evidence per item; a bare PASS goes back before review. The evidence: the consumer sweep for any changed grammar, format, public name or fix line; the search behind every negative claim; cross-platform evidence (no platform literal in a new assert, a child process env copied from the parent's); no existing assert removed or weakened without a recorded ruling. The code-review skill judges a re-review against the finding's class.
+- AC18.4 (no test — reviewer sweep): A PLAN row that REBUILDs or DELETEs a grammar, format, public name or fix line names its consumers. A read-only `dd-researcher` pre-mortem precedes the define review and lists the consumers touched, the existing tests and asserts that would go red, and the platform facts touched; the PLAN answers each.
+- AC18.5 (integration, RED first): `verdict.py stats <release-candidate>` prints trees, verdicts, REJECTED, first-pass rejected and extra rounds, all read from the verdict records; the closure summary carries its output.
+- AC18.6 (no test — reviewer sweep): Every development-flow rule the developer kept in private memory is either stated once in the library's law or skills, cited `path:line`, or recorded as specific to this repo's own pipeline. A parallel `dd-researcher` produces the inventory and it lands in the PLAN; no flow rule depends on private memory.
+
 ## 4. Exits at closure
 
 These entries need no rc-14 work; each exits once at closure with the reason from its paragraph.
@@ -200,6 +216,7 @@ The entries with work exit `delivered`, except `architecture-adr-section-generat
 - Projected copies of shared modules and schemas, their copy tables and allowance rows, become one owner per fact, loaded by core (FR11, ADR 0246).
 - Every second decider of a fact leaves (FR11 to FR16).
 - Per-site remedies become an error that carries its fix; the own-main refusal becomes a no-op (FR17).
+- A review dispatched on an unchecked hand-off, an uncited ruling, a site-only rework brief and a bare PASS hand-back become the READY line, a reproduced and swept ruling, a class-wide rework and per-item evidence (FR18).
 - The grill handoff as record, any decision as an ADR, id-only rulings, the `ADR:` status token, shipped library facts, `--ts`, v33, `ci.py` task and stage code, the working-tree bytecode check, the CI UTF-8 masks and hand-written registry `implementations` leave (FR1 to FR9).
 
 ### Governance sequencing
@@ -212,6 +229,7 @@ The entries with work exit `delivered`, except `architecture-adr-section-generat
 - Bugs law §2: Job 1 executes the REBUILD rows; the PLAN reconciles that with the owner DAG.
 - Tidy First: an owner moves before its behaviour changes; every bug fix lands its RED test first.
 - One canon bump across the law and kernel jobs; shipped law reaches this instance only by projection.
+- FR18 is public and language-neutral: it never requires CI, a remote, a PR host or a vendor CLI, adds no lock and no gate, and states each rule once.
 
 ### Risks
 
