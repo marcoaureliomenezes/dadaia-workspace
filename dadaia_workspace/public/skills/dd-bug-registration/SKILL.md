@@ -24,7 +24,7 @@ description: >
 5. Severity: CRITICAL a stall or data loss; HIGH a contract broken on the default
    path; MEDIUM off the default path or with a documented workaround; LOW a message
    or cosmetic defect.
-6. A subagent returns the proposal as a `bug-proposal:` finding (the reviewer: in its verdict's `findings`); the main thread puts it to the operator (after launch: the closure readout, `dd-manager-orchestration` §2 step 4).
+6. A subagent returns the proposal as a `bug-proposal:` finding (the reviewer: in its verdict's `findings`); the main thread puts it to the operator (after launch: the closure summary, `dd-manager-orchestration` §2 step 4).
 
 ## 3. Register — after the operator confirms
 

@@ -37,7 +37,7 @@ description: >
    means `file:line`, spec citation, command output, or handoff field.
 2. On a two-agent deadlock: each agent states its position with evidence in the `findings` of its handoff or verdict; the main thread writes a synthesis naming the exact decision point.
 3. Still unresolved: before launch, call `dd-grill-me` and reflect the operator's answer in SPEC, PLAN, job files, ADR, or memory per the phase; after launch, decide by law, ADRs and rulings (a failing old test: the root map §1 test line) and log it with the label `dd-grill-me` gives an unruled default.
-4. After launch the main thread asks the operator nothing; every question belongs to `dd-grill-me`. An Escalation trigger (§3) is a report line; an act a law reserves to the operator (ADR acceptance, `specs/ADRs/AGENTS.md`; bug confirmation, `dd-bug-registration`; SPEC/PLAN approval, `dd-release-definition`; publication, promote and protected-history rewrite, `dd-gitflow-default`; the PR merge, `dd-code-reviewer`; a product-contract change; a secret) or a bug proposal goes into the closure readout as one batch, and independent tasks continue.
+4. Between launch and the closure summary the main thread asks the operator nothing: every question belongs to `dd-grill-me` before launch. An act the law reserves to the operator, and a bug proposal, wait for the closure summary as one batch while independent tasks continue; the exception is a block-list bug (`specs/bugs/AGENTS.md` §2, a security finding included), put to the operator at once since it stops every merge.
 
 ## 3. Reference tables
 
