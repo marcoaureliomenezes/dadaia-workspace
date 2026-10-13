@@ -1,4 +1,4 @@
-"""AC16.2: ``core.platform`` decides through the kernel's ``_platform``, loaded by path."""
+"""``core.platform`` decides through the kernel's ``_platform``, loaded by path."""
 
 import os
 import subprocess

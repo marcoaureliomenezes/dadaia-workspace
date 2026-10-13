@@ -1,8 +1,7 @@
 """One bind: the gate, ctx_inject, onboarding and `context show` read the same Bind — the
 session's own record when it has an id, else a registered DADAIA_CONTEXT.
 
-sa-bind-has-two-stores (WP-16); size: MEDIUM (hook and CLI subprocess
-boundaries over a tmp workspace).
+Size: MEDIUM (hook and CLI subprocess boundaries over a tmp workspace).
 """
 
 from __future__ import annotations
@@ -63,7 +62,7 @@ def _record(root: Path, sid: str, context: str) -> None:
         pytest.param(_CLAUDE, "s1", "beta", None, None, id="native-id-no-record-unbound"),
         pytest.param(None, None, "beta", None, "beta", id="no-id-registered-env"),
         pytest.param(None, None, "ghost", None, None, id="no-id-ghost-env-unbound"),
-        # bug codex-thread-id-bind-resolution-breaks-cli: CODEX_THREAD_ID alone is the id.
+        # CODEX_THREAD_ID alone is the id.
         pytest.param("CODEX_THREAD_ID", "thread-abc123", "beta", "alpha", "alpha", id="codex-thread-id-only"),
     ],
 )  # fmt: skip
@@ -76,11 +75,10 @@ def test_the_readers_agree_on_the_bind(
     record: str | None,
     expected: str | None,
 ) -> None:
-    """sa-bind-has-two-stores#S1, #S2, #S3: gate, ctx_inject, onboarding, the CLI specs
+    """Gate, ctx_inject, onboarding, the CLI specs
     resolver and `context show` ask one question and get one answer. The record is
-    written by the real `context bind`; a workspace-root `specs/` is never a fallback
-    (v0.1.50 FR4); an unbound no-arg `context show` answers `{"context": null}`
-    (bug context-show-json-traceback-unbound)."""
+    written by the real `context bind`; a workspace-root `specs/` is never a fallback;
+    an unbound no-arg `context show` answers `{"context": null}`."""
     ws = _workspace(tmp_path, "alpha", "beta")
     for specs in ("repos/alpha/specs", "repos/beta/specs", "specs"):
         (ws / specs).mkdir()
@@ -118,8 +116,8 @@ def test_the_readers_agree_on_the_bind(
 
 
 def test_a_ghost_env_never_denies_and_is_surfaced(tmp_path: Path) -> None:
-    """sa-bind-has-two-stores#S3: a ghost DADAIA_CONTEXT is unbound and ctx_inject warns.
-    Review F1: Kimi's stdin-only session id is no id (bind cannot see it), so its write
+    """A ghost DADAIA_CONTEXT is unbound and ctx_inject warns.
+    Kimi's stdin-only session id is no id (bind cannot see it), so its write
     into a registered repo's worktree is the declared id-less gap, never a bind Stall."""
     ws = _workspace(tmp_path, "alpha")
     out = run_hook_subprocess(
@@ -137,7 +135,7 @@ def test_a_ghost_env_never_denies_and_is_surfaced(tmp_path: Path) -> None:
 def test_running_the_printed_scope_fix_clears_the_deny(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """sa-bind-has-two-stores#S4: a record-bound session denied a write runs the printed
+    """A record-bound session denied a write runs the printed
     `context bind` fix and the retried write is ALLOWED — even with a stale env export."""
     ws = _workspace(tmp_path, "alpha", "beta")
     _record(ws, "s1", "alpha")
@@ -154,7 +152,7 @@ def test_running_the_printed_scope_fix_clears_the_deny(
 
 
 def test_an_unbound_session_in_a_repo_injects_no_memory(tmp_path: Path) -> None:
-    """sa-bind-has-two-stores#S6: cwd inside repos/alpha is not a bind."""
+    """Cwd inside repos/alpha is not a bind."""
     ws = _workspace(tmp_path, "alpha")
     (ws / "repos" / "alpha" / "specs" / "memory").mkdir(parents=True)
     out = run_hook_subprocess(
@@ -164,8 +162,8 @@ def test_an_unbound_session_in_a_repo_injects_no_memory(tmp_path: Path) -> None:
 
 
 def test_a_bound_context_without_specs_gets_its_next_step(tmp_path: Path) -> None:
-    """sa-bind-has-two-stores#S7: header and next step, never "[no bound context]"; AC1.5:
-    exactly the step text ``doctor`` reports; AC1.10: then the doctor's worktree block, fix
+    """Header and next step, never "[no bound context]": exactly the step text ``doctor``
+    reports, then the doctor's worktree block, fix
     included, in the doctor's rendering (read through `worktree.py`, hence this tier)."""
     ws = _workspace(tmp_path, "alpha")
     _record(ws, "s1", "alpha")
@@ -192,19 +190,19 @@ def test_a_bound_context_without_specs_gets_its_next_step(tmp_path: Path) -> Non
 @pytest.mark.parametrize(
     ("sid", "name", "fix"),
     [
-        pytest.param("s1", "gamma", "context alive gamma", id="S9-dead-context"),
+        pytest.param("s1", "gamma", "context alive gamma", id="dead-context"),
         pytest.param(
             None,
             "alpha",
             "export DADAIA_SESSION_ID set to a stable id",
-            id="ADR0116-no-id-never-mints",
+            id="no-id-never-mints",
         ),
     ],
 )
 def test_bind_refuses_with_its_fix_and_writes_no_record(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, sid: str | None, name: str, fix: str
 ) -> None:
-    """sa-bind-has-two-stores#S9; AC1.2: with no native id and no DADAIA_SESSION_ID the
+    """With no native id and no DADAIA_SESSION_ID the
     bind exits non-zero with the export fix instead of minting an id no hook can see."""
     ws = _workspace(tmp_path, "gamma", "alpha", dead=("gamma",))
     monkeypatch.chdir(ws)

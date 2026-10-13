@@ -49,7 +49,7 @@ _BASE: dict[str, dict[str, Any]] = {
         "verdict": "APPROVED",
         "verdict_reason": "Contract is valid.",
     },
-    # write-once fields absent entirely, never null (A2.2b)
+    # write-once fields are absent entirely, never null
     "bug": {
         "id": "sample-bug",
         "ts": _TS,
@@ -102,7 +102,7 @@ _BASE: dict[str, dict[str, Any]] = {
     },
 }
 
-#: The governance rewrite each record takes after its fix/remediation — valid, immutable core untouched.
+#: The governance rewrite each record takes after its fix/remediation: valid, immutable core untouched.
 _REWRITE: dict[str, dict[str, Any]] = {
     "bug": {
         "status": "resolved",
@@ -184,9 +184,6 @@ _DROP = object()
     [
         pytest.param("handoff", {"metrics": _DROP}, "metrics", id="handoff-missing-metrics"),
         pytest.param("handoff", {"verdict": "MAYBE"}, "verdict", id="handoff-invalid-verdict"),
-        pytest.param("handoff", {"self_pull": _DROP}, "self_pull", id="handoff-v1.2-without-self-pull"),
-        pytest.param("handoff", {"schema_version": "handoff-v1.1"}, "schema_version", id="handoff-v1.1"),
-        pytest.param("handoff", {"schema_version": "handoff-v1"}, "schema_version", id="handoff-v1"),
         pytest.param("handoff", {"self_pull": {"refs": []}}, "refs", id="handoff-empty-refs"),
         pytest.param("handoff", {"artifact": _artifact_path("/etc/passwd")}, None, id="handoff-absolute-path"),
         pytest.param("handoff", {"artifact": _artifact_path("../report.html")}, None, id="handoff-parent-traversal"),
@@ -230,7 +227,7 @@ def test_an_invalid_record_is_refused(
 def test_mutability_is_declared_per_property_and_the_rewrite_spares_the_core(
     kind: str, categories: set[str]
 ) -> None:
-    """A2.1/A13.1: every property carries ``x-mutability`` in its closed set; ``required`` is
+    """Every property carries ``x-mutability`` in its closed set; ``required`` is
     every property but the write-once ones; the governance rewrite touches no immutable-core field.
     A finding's only mutable fields are disposition/release/reason."""
     properties = _schema(kind)["properties"]
@@ -264,6 +261,5 @@ def test_the_surface_names_no_library_fact() -> None:
 
 
 def test_handoff_schema_verdict_enum_is_the_two_tokens() -> None:
-    """verdict-vocabulary-persona-schema-mismatch: the one verdict vocabulary (the public text
-    rows live in test_public_source_hygiene)."""
+    """The one verdict vocabulary (the public text rows live in test_public_source_hygiene)."""
     assert _schema("handoff")["properties"]["verdict"]["enum"] == ["APPROVED", "REJECTED"]

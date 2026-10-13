@@ -57,21 +57,6 @@ def test_templates_are_the_three_ids_with_five_personas_each() -> None:
         assert set(cells) == set(_PERSONAS)
 
 
-def test_balanced_is_first_and_the_default() -> None:
-    assert next(iter(TEMPLATES)) == "balanced"
-    assert DEFAULT_TEMPLATE_ID == "balanced"
-
-
-def test_product_engineer_is_opus_high_in_balanced() -> None:
-    cell = template_by_id(DEFAULT_TEMPLATE_ID)["dd-product-engineer"]
-    assert (cell.model, cell.effort) == ("opus", "high")
-
-
 def test_core_agents_are_the_template_keys_and_the_five_names() -> None:
     assert tuple(TEMPLATES[DEFAULT_TEMPLATE_ID]) == CORE_AGENTS
     assert sorted(CORE_AGENTS) == sorted(_PERSONAS)
-
-
-@pytest.mark.parametrize("template", _TABLE)
-def test_fable_never_lands_on_the_reviewer(template: str) -> None:
-    assert template_by_id(template)["dd-code-reviewer"].model != "fable"

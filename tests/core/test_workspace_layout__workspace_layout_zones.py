@@ -1,5 +1,4 @@
-"""Expected values come from SPEC §3/§4 (FR1, FR5, FR8) and architect A, never from the
-module under test: the 12 rows in order (ADRs 0147 (1), 0148 (6)), the three TTL zones
+"""Expected values are literals, never read from the module under test: the 12 rows in order, the three TTL zones
 (handoff and tmp a day, reaped seven days), the three closed canons, the creators per zone, and the pure exception-glob parser.
 """
 
@@ -12,7 +11,7 @@ import pytest
 from dadaia_workspace.core import workspace_layout as wl
 
 C, K = wl.Creator, wl.ZoneClass
-#: SPEC FR1/FR5/FR8 + architect A: (name, class, creator, ttl seconds), in registry order.
+#: (name, class, creator, ttl seconds), in registry order.
 _SPEC_ZONES = [
     ("agentic", K.PROJECTION, C.INSTALL, None),
     ("hooks", K.PROJECTION, C.INSTALL, None),
@@ -40,8 +39,7 @@ _SPEC_STATES_CANON = {
 
 
 def test_registry_holds_the_twelve_spec_zones_in_order() -> None:
-    """sa-tool-caches-land-outside-the-cache-zone#B40-2: no .cache zone (ADR 0080); 0.4.7 FR6b:
-    ``reaped/`` is its own row held 7 days, never a TTL override inside ``tmp``."""
+    """There is no .cache zone; ``reaped/`` is its own row held 7 days, never a TTL override inside ``tmp``."""
     rows = [(z.name, z.cls, z.creator, z.ttl_seconds) for z in wl.DADAIA_ZONES]
     assert rows == _SPEC_ZONES
     assert wl.zone_names() == frozenset(name for name, *_ in _SPEC_ZONES)
@@ -69,7 +67,7 @@ def test_derived_views_follow_the_registry() -> None:
     assert rows["references"][2:] == ("operator", "never", "operator")
     assert frozenset({"AGENTS.md", ".gitignore"}) == wl.DADAIA_ROOT_FILES
     assert wl.DADAIAIGNORE in wl.ROOT_ALLOWED_FILES and "worktrees" in wl.ROOT_ALLOWED_DIRS
-    # ADR 0133 SPEC risk: the floor is what init/install create, plus the CLI's PROTECTED zone
+    # the floor is what init/install create, plus the CLI's PROTECTED zone
     zones = [z for z in wl.DADAIA_ZONES if z in wl.provisioned_zones() or z.cls is K.PROTECTED]
     made = {"AGENTS.md", *wl.LEVEL1_SEEDS, *(f".dadaia/{z.name}" for z in zones)}
     assert set(wl.CORE_FLOOR) <= made
@@ -99,7 +97,7 @@ def test_parse_dadaiaignore(text: str, expected: tuple[str, ...]) -> None:
 
 
 def test_dadaiaignore_invalid_lines_and_segment_scope() -> None:
-    """ADR 0093: ``!``, ``**``, an absolute path or ``..`` is invalid, never a pattern; ``*``
+    """``!``, ``**``, an absolute path or ``..`` is invalid, never a pattern; ``*``
     stays inside one segment, so a root pattern admits nothing below the root."""
     text = "!keep\nnotes/**\n/abs\na/../b\n*.png\n[protected]\nsecrets/\n**/k\n"
     invalid = ("!keep", "notes/**", "/abs", "a/../b", "**/k")

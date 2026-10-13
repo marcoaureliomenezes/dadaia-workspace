@@ -1,6 +1,5 @@
-"""ADR 0090: `_RELEASE.json` is the one state filename, decided by
-core.release_state; sa-release-json-validated-three-times#B4: a legacy RELEASE.json dir is
-live for neither the doctor nor release.py live_ids. Size: SMALL.
+"""`_RELEASE.json` is the one state filename, decided by core.release_state; a legacy
+RELEASE.json dir is live for neither the doctor nor release.py live_ids. Size: SMALL.
 """
 
 from __future__ import annotations

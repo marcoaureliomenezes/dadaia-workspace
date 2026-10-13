@@ -1,4 +1,4 @@
-"""AC17.1: a DadaiaError carries its fix; ``fail`` prints a caller fix only when the error has none."""
+"""A DadaiaError carries its fix; ``fail`` prints a caller fix only when the error has none."""
 
 from __future__ import annotations
 
