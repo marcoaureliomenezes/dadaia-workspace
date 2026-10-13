@@ -2,7 +2,7 @@
 
 **Status:** Draft
 
-Wave 5, with Jobs 18 and 20; waits on no FR19 job. The tool Jobs 21 to 24 prove every deletion with, and the readout every later review carries. This repository's own pipeline: it never ships and no gate, test or hook reads its output as pass or fail.
+Wave 5, with Jobs 18 and 20; waits on no FR19 job. The tool a review reads a diff's tests with, and the readout every later review carries. This repository's own pipeline: it never ships and no gate, test or hook reads its output as pass or fail.
 - **Why a new script (ladder).** The three existing Python mutation tools were inspected (PLAN §1.6): none scopes to a diff's lines with a per-line cap and a per-test kill list, so the first rung of the ruling fails and the stdlib mutator is the second. It adds no dependency; `pytest-cov` is already in the dev group.
 - **Branch coverage stays in the readout (ruling).** The baseline run carries `--cov-branch` on the command line only; `pyproject.toml` `[tool.coverage.run]` is untouched, so the CI `contract-coverage` job (`--cov-fail-under=80`, no branch data) and its number do not move.
 - **Selection by running the other script.** `mutate.py` runs `impact.py` (pre-review item 2: a component reaches another by running its entry point); `impact.py` stays the one decider of which tests a file reaches (`ci.py --changed` is its other caller, unchanged).
