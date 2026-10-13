@@ -1,4 +1,4 @@
-"""worktree-removal-leaves-empty-parent-and-remote-branch: a merged or cleaned worktree leaves
+"""a merged or cleaned worktree leaves
 nothing behind — its rc folder once empty, and its branch on the remote when it was pushed — and
 `list` shows a directory that holds no tree. Size: MEDIUM (real git and a bare remote, tmp workspace).
 """

@@ -1,4 +1,4 @@
-"""AC1.8 (T-050-96, T-050-108); rc-9 AC1.2–AC1.5 (ADRs 0190, 0191): `worktree.py merge` lands a
+"""`worktree.py merge` lands a
 job on the work branch after its APPROVED verdict naming its CI-matrix run and the job gate,
 a `define` tree after its verdict and the ledger checks alone — HEAD as it is, by
 fast-forward, then removes and `branch -d`s the tree, re-runnable; every refusal (dirty, a
@@ -116,7 +116,7 @@ def test_a_dirty_tree_refuses_with_one_fix_that_commits_or_removes(root: Path) -
 
 
 def test_a_define_tree_lands_specs_only_through_the_ledger_checks(root: Path) -> None:
-    """AC1.2 (ADR 0190): a `define` merge runs the ledger, trio and release checks alone — an
+    """a `define` merge runs the ledger, trio and release checks alone — an
     invalid ledger refuses, a valid one lands with no test run; code refuses with its undo."""
     repo, tree = root / "repos/r", root / "worktrees/r/0.5.0-rc1/define"
     assert run(root, "new", "r", "0.5.0-rc1/define").returncode == 0
@@ -184,7 +184,7 @@ def test_merge_needs_a_valid_approval_of_the_exact_head(
         text=True,
         check=True,
     ).stdout.strip()
-    if older:  # the newest produced_at decides (ADR 0110), never a name sorting last
+    if older:  # the newest produced_at decides, never a name sorting last
         approve(root, head, verdict=older, at="T09:00:00Z").rename(
             root / ".dadaia/handoff/c/v.handoff.json"
         )
@@ -246,16 +246,16 @@ def test_clean_removes_only_an_empty_worktree_of_ours(root: Path) -> None:
     assert _argv(run(root, "clean", TREE)) == [sys.executable, str(SCRIPT), "merge", str(tree)]
     git(tree, "reset", "-q", "--hard", "feature/0.5.0")
     assert run(root, "clean", TREE).returncode == 0 and not tree.exists()
-    # ours is the canonical wt/ branch, locked or not (T-050-99 N2); a tree on another is not
+    # ours is the canonical wt/ branch, locked or not; a tree on another is not
     git(repo, "worktree", "add", "-q", "-b", "side", str(root / "worktrees/r/0.5.0-rc1/j2"))
     foreign = run(root, "clean", "worktrees/r/0.5.0-rc1/j2")
     assert foreign.returncode == 1 and (root / "worktrees/r/0.5.0-rc1/j2").exists()
 
 
 def test_release_closure_waits_for_every_other_wt(tmp_path: Path) -> None:
-    """AC1.10 (F4); rc-9 AC1.5: closure runs in the Reconciliation job's tree, whose own wt/* is
+    """closure runs in the Reconciliation job's tree, whose own wt/* is
     spared; any other wt/* refuses it, naming repos/<r> and the owner's exit — `clean` for an
-    empty tree (N1), which clears it."""
+    empty tree, which clears it."""
     (root := tmp_path / "ws").mkdir()
     make_workspace(root)
     git(root / "repos/r", "checkout", "-q", "feature/0.5.0")
@@ -283,7 +283,7 @@ def test_release_closure_waits_for_every_other_wt(tmp_path: Path) -> None:
 
 
 def test_a_verdict_carries_over_only_an_identical_patch_and_message_series(root: Path) -> None:
-    """AC3.19 (ADR 0168): once the work branch moved, a reword, a dropped or added empty
+    """once the work branch moved, a reword, a dropped or added empty
     commit, a reorder, code amended under the same message (a colored config included), a gitlink
     amended under the same message (diff.ignoreSubmodules=all), or a hand-resolved conflict each change the approved series and refuse for review."""
     repo, tree = root / "repos/r", root / TREE
@@ -343,8 +343,8 @@ def test_a_verdict_carries_over_only_an_identical_patch_and_message_series(root:
 def test_a_moved_work_branch_refuses_and_its_fix_rebase_keeps_only_an_identical_patch(
     root: Path, change: str
 ) -> None:
-    """AC12.7 (ADR 0185): a moved work branch refuses with the rebase fix line, both branches
-    unchanged; after it, a patch-identical rebase lands under the old verdict (ADR 0168),
+    """a moved work branch refuses with the rebase fix line, both branches
+    unchanged; after it, a patch-identical rebase lands under the old verdict,
     a changed patch refuses for review."""
     repo, tree = root / "repos/r", root / TREE
     approve(root, mine := land(root, "src/a.py"))
@@ -372,7 +372,7 @@ def test_a_moved_work_branch_refuses_and_its_fix_rebase_keeps_only_an_identical_
 def test_the_job_gate_runs_scripts_ci_job_as_argv_on_the_head_it_lands(
     root: Path, red: bool
 ) -> None:
-    """AC1.2 (ADRs 0190, 0207): a job merge runs the work branch's `verify:` on HEAD, one argv list with
+    """a job merge runs the work branch's `verify:` on HEAD, one argv list with
     stdin closed, its output on stdout; a red gate lands nothing."""
     repo, tree = root / "repos/r", root / TREE
     head = land(root, "RED-job" if red else "src/a.py", "")
@@ -395,7 +395,7 @@ def test_the_job_gate_runs_scripts_ci_job_as_argv_on_the_head_it_lands(
 
 
 def test_a_job_merge_needs_a_verdict_naming_its_ci_matrix_run(root: Path) -> None:
-    """AC1.2, AC1.4: no verdict refuses; an APPROVED verdict lands the job with or without a
+    """no verdict refuses; an APPROVED verdict lands the job with or without a
     remote CI run named — the repo's `verify:` line is the job gate (no host is assumed)."""
     repo = root / "repos/r"
     head = land(root, "src/a.py")
@@ -418,7 +418,7 @@ def test_memory_is_not_a_doctor_ledger() -> None:
 
 
 def test_a_declared_verify_line_runs_as_argv_never_through_a_shell(root: Path) -> None:
-    """AC1.2: the `verify:` line is split by the one declared-line reader and run as argv: `;` and `$(...)` are words."""
+    """the `verify:` line is split by the one declared-line reader and run as argv: `;` and `$(...)` are words."""
     line = "verify: python scripts/ci.py job ; touch PWNED $(touch PWNED2)\n"
     commit(root / "repos/r", "AGENTS.md", line)
     git(root / TREE, "merge", "-q", "--ff-only", "feature/0.5.0")
@@ -431,7 +431,7 @@ def test_a_declared_verify_line_runs_as_argv_never_through_a_shell(root: Path) -
 
 
 def test_a_code_commit_made_on_the_job_branch_lands_once_reviewed(root: Path) -> None:
-    """ADR 0190 (amended): a job merge does not judge how code reached the branch; the one review
+    """a job merge does not judge how code reached the branch; the one review
     and the job gate judge the whole diff — a commit made directly on it lands like a task's."""
     approve(root, commit(root / TREE, "src/stray.py"))
     landed = run(root, "merge", TREE)
@@ -448,7 +448,7 @@ def test_a_code_commit_made_on_the_job_branch_lands_once_reviewed(root: Path) ->
 def test_a_job_gate_reads_the_work_branch_verify_line_not_its_own(
     root: Path, declared: str, act: str
 ) -> None:
-    """ADR 0207: a job whose task rewrote `verify:` is still judged by the work branch's
+    """a job whose task rewrote `verify:` is still judged by the work branch's
     line; its absent or unstartable refusal names the work branch, and doing that act lands."""
     repo, tree, agents = root / "repos/r", root / TREE, root / "repos/r/AGENTS.md"
     good = agents.read_text()
@@ -471,7 +471,7 @@ def test_a_job_gate_reads_the_work_branch_verify_line_not_its_own(
 
 
 def test_a_tests_line_after_a_utf8_bom_is_declared(tmp_path: Path) -> None:
-    """onboarding-writes-no-tests-line: a BOM before the first line does not hide `tests:`."""
+    """a BOM before the first line does not hide `tests:`."""
     sys.path.insert(0, str(_PACKAGE_SKILLS / "dd-gitflow-default" / "scripts"))
     end = load_owner("dd-gitflow-default", "_worktree_end")
     git(tmp_path, "init", "-q", "-b", "work")
@@ -518,14 +518,14 @@ def test_a_tests_line_after_a_bom_is_declared_whatever_codepage_text_decoding_de
 def test_git_output_decoded_with_replacement_keeps_a_latin1_laws_tests_line_declared(
     tmp_path: Path,
 ) -> None:
-    """git-errors-replace-has-no-row: a latin-1 byte on another line does not hide `tests:`."""
+    """a latin-1 byte on another line does not hide `tests:`."""
     end = _law_end(tmp_path, b"# caf\xe9\ntests: tests/**\n")
 
     assert end._declared(tmp_path, "work", "tests:") == "tests/**"
 
 
 def test_a_repo_declaring_only_verify_lines_lands_a_task_and_its_job(root: Path) -> None:
-    """freeze-deadlocks-a-repo-without-a-tests-line: the three verify lines are the whole law a
+    """the three verify lines are the whole law a
     task and a job merge read; a repo declaring nothing else lands both."""
     law = "".join(f"verify{k}: python scripts/ci.py {lv}\n"
                   for k, lv in (("", "job"), ("-stage", "stage"), ("-task", "task")))  # fmt: skip
@@ -602,7 +602,7 @@ def test_a_plain_merge_returns_to_its_recorded_base(tmp_path: Path, declared_ver
 
 
 def test_a_verdict_citing_a_file_only_the_reviewed_tree_holds_is_accepted(root: Path) -> None:
-    """Bug merge-gate-validates-the-verdict-without-the-reviewed-tree: the stub CLI resolves a
+    """The stub CLI resolves a
     `self_pull` ref as the real `reports validate` does, against `--reviewed-root` only (the repo
     checkout never holds the ref), so the gate must pass the tree it judged."""
     patch_cli(
@@ -634,7 +634,7 @@ def test_a_verdict_citing_a_file_only_the_reviewed_tree_holds_is_accepted(root: 
 def test_a_declared_line_splits_on_whitespace_alone(
     tmp_path: Path, law: bytes, key: str, argv: list[str]
 ) -> None:
-    """AC15.1 (ADR 0220 P3): one reader splits `verify:` and `tests:` lines, keeping backslashes."""
+    """one reader splits `verify:` and `tests:` lines, keeping backslashes."""
     end = _law_end(tmp_path, law)
 
     assert end._declared_argv(tmp_path, "work", key) == argv
@@ -658,7 +658,7 @@ def test_a_declared_line_splits_on_whitespace_alone(
 def test_a_quote_groups_one_word_of_a_declared_line(
     tmp_path: Path, law: bytes, argv: list[str]
 ) -> None:
-    """AC15.1: words split on whitespace, a quote groups a word, a backslash stays literal."""
+    """words split on whitespace, a quote groups a word, a backslash stays literal."""
     end = _law_end(tmp_path, law)
 
     assert end._declared_argv(tmp_path, "work", "verify:") == argv

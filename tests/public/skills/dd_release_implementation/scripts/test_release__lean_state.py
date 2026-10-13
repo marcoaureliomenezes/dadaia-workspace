@@ -47,7 +47,7 @@ def _entry(kind: str, text: str, **extra: object) -> dict[str, object]:
 
 
 def _milestones(phase: str) -> list[dict[str, object]]:
-    """The rc-1 stamps a state in *phase* has logged."""
+    """The first candidate's stamps a state in *phase* has logged."""
     stamps = [("defined", "1111111", "10")] + (
         [("implemented", "2222222", "11")] if phase == "CLOSURE" else []
     )
@@ -352,7 +352,7 @@ def test_ship_refuses_every_open_bug_then_carries_each_authorized_id(
     assert authorization in [entry["text"] for entry in archived["log"]]
 
 
-# --- J1.T21 (rc-14, AC14.1/AC14.3): one state reader, a drafted rc-2 adopted, `origin` ---
+# --- one state reader, a drafted second candidate adopted, `origin` ---
 
 
 def _jsonl_owner():  # noqa: ANN202

@@ -1,5 +1,5 @@
-"""AC1.3 (rc-9, ADR 0191): `worktree.py new` opens one tree per job or task — each name shape;
-an old-grammar name refused — and `list`; AC1.11 (T-050-101): the
+"""`worktree.py new` opens one tree per job or task — each name shape;
+an old-grammar name refused — and `list`; the
 one venv. Size: MEDIUM (real git in a tmp workspace, never the live instance).
 """
 
@@ -54,7 +54,7 @@ def root(definition_root: Path) -> Path:
 
 
 def test_a_release_job_needs_the_implementation_phase(definition_root: Path) -> None:
-    """AC2.1: an Approved SPEC does not start implementation while PLAN is still Draft."""
+    """an Approved SPEC does not start implementation while PLAN is still Draft."""
     _set_release(definition_root, "DEFINITION", plan="Draft")
     repo = definition_root / "repos/r"
 
@@ -67,7 +67,7 @@ def test_a_release_job_needs_the_implementation_phase(definition_root: Path) -> 
 
 
 def test_reconcile_also_opens_in_closure(definition_root: Path) -> None:
-    """AC2.2: reconciliation spans the IMPLEMENTATION-to-CLOSURE boundary."""
+    """reconciliation spans the IMPLEMENTATION-to-CLOSURE boundary."""
     _set_release(definition_root, "CLOSURE")
 
     opened = _run(definition_root, "new", "r", "0.5.0-rc1/reconcile")
@@ -136,7 +136,7 @@ def _word(path: Path) -> str:
 
 
 def test_a_task_needs_its_job_branch_and_a_sixth_task_refuses(root: Path) -> None:
-    """AC1.3: a task is cut from its job branch; 5 task worktrees open per rc at most."""
+    """a task is cut from its job branch; 5 task worktrees open per rc at most."""
     orphan = _run(root, "new", "r", TASK)
     assert orphan.returncode == 1 and _fixes(orphan)[0].endswith(f"worktree.py new r {JOB}")
     assert _run(root, "new", "r", JOB).returncode == 0
@@ -168,7 +168,7 @@ def test_no_work_branch_refuses_with_a_fix_that_creates_it(root: Path) -> None:
 def test_an_associated_job_reads_the_main_repos_spec(
     root: Path, spec: str, code: int, out: str
 ) -> None:
-    """AC11.0: `a` carries no specs; its job reads `r`'s release on `r`'s work branch."""
+    """`a` carries no specs; its job reads `r`'s release on `r`'s work branch."""
     associate(root, spec)
     if spec == "Draft":
         _set_release(root, "DEFINITION")
@@ -212,7 +212,7 @@ def test_list_reports_ours_with_ahead_and_dirty_and_a_native_one_as_foreign(root
 
 
 def test_the_one_venv_imports_the_checkout_it_runs_from() -> None:
-    """AC1.11 (ADR 0113): the shared venv's editable install points at repos/, yet a child
+    """the shared venv's editable install points at repos/, yet a child
     spawned from the suite's hermetic cwd imports THIS checkout (the conftest PYTHONPATH
     pin), and no checkout carries its own venv."""
     checkout = Path(__file__).resolve().parents[5]
@@ -235,7 +235,7 @@ def _bug_record(root: Path, status: str | None) -> None:
 
 
 def test_a_hotfix_job_opens_with_no_rc_and_lands_on_the_work_branch(root: Path) -> None:
-    """ADR 0206: a block-list bug is fixed as its own job — `new <repo> hotfix/<bug-id>` cuts it
+    """a block-list bug is fixed as its own job — `new <repo> hotfix/<bug-id>` cuts it
     from the work branch with no rc SPEC, and its merge runs the same review and job gate."""
     _bug_record(root, "open")
     repo, name = root / "repos/r", "hotfix/a-block-bug"
@@ -268,7 +268,7 @@ def test_a_hotfix_job_needs_its_open_bug_record_on_the_work_branch(
 def test_an_unreadable_release_state_refuses_a_job_and_creates_nothing(
     root: Path, state: str | None
 ) -> None:
-    """AC14.1: a missing, non-object or malformed `_RELEASE.json` on the work branch refuses
+    """a missing, non-object or malformed `_RELEASE.json` on the work branch refuses
     job admission: `[error]`, one `fix:` line, no branch, no worktree."""
     repo = root / "repos/r"
     path = repo / "specs/releases/0.5.0/_RELEASE.json"
@@ -313,7 +313,7 @@ def test_an_unreadable_release_state_refuses_a_job_and_creates_nothing(
 def test_a_name_is_accepted_as_the_backlog_slug_and_the_task_id_grammar_say(
     name: str, word: str, task: str | None
 ) -> None:
-    """AC13.1: the job, backlog, hotfix and plain words are the backlog `slug`; a task part is a
+    """the job, backlog, hotfix and plain words are the backlog `slug`; a task part is a
     release task id, so `--` only ever separates a job from `J<n>.T<k>`."""
     slug = load_owner("dd-bug-resolution", "_ledger").load_schema("backlog-v1")["$defs"]["slug"]
     task_id = load_owner("dd-bug-resolution", "_grammar").TASK_ID_RE

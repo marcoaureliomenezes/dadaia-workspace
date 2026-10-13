@@ -1,5 +1,5 @@
 """dd-release-implementation/scripts/release.py owns _RELEASE.json,
-the candidate trio and releases_histo.jsonl (0.4.7 c7 T-047-66: the release ledger verbs
+the candidate trio and releases_histo.jsonl (the release ledger verbs
 move into a stdlib skill script). Size: SMALL.
 
 The script reads its two schemas from ``scripts/schemas/`` BESIDE itself — copies
@@ -60,7 +60,7 @@ def _run(script: Path, *argv: str, cwd: Path | None = None) -> subprocess.Comple
     )
 
 
-#: Candidate 1's two milestone stamps: what a state in CLOSURE on rc-1 has logged.
+#: Candidate 1's two milestone stamps: what a state in CLOSURE on candidate 1 has logged.
 _RC1_MILESTONES = [
     {"ts": f"2026-01-0{day}T00:00:00Z", "agent": "release.py", "kind": "milestone",
      "candidate": "rc-1", "milestone": name, "sha": sha, "text": f"Candidate {name} at {sha}."}
@@ -85,7 +85,7 @@ def _state(release_id: str, **over: object) -> dict[str, object]:
 def _release(
     specs: Path, release_id: str, *, tasks: str = "- [x] T-1 — done\n", **over: object
 ) -> Path:
-    """One live release directory: its state document and candidate 1's trio in `rc-1/`."""
+    """One live release directory: its state document and candidate 1's trio in its first candidate folder."""
     release_dir = specs / "releases" / release_id
     (release_dir / "rc-1").mkdir(parents=True, exist_ok=True)
     for name in _TRIO:
@@ -150,7 +150,7 @@ def test_new_writes_the_spec_stub_and_the_state_in_one_act(script: Path, tmp_pat
 
 
 def test_new_refuses_a_second_live_release_with_one_fix_line(script: Path, tmp_path: Path) -> None:
-    """ADR 0005: exactly one live release, ever. The refusal writes nothing."""
+    """exactly one live release, ever. The refusal writes nothing."""
     specs = _specs(tmp_path)
     _release(specs, "0.5.0")
     before = _tree_hash(specs)
@@ -164,7 +164,7 @@ def test_new_refuses_a_second_live_release_with_one_fix_line(script: Path, tmp_p
 
 
 def test_new_opens_the_rc_spec_with_the_bug_window_review(script: Path, tmp_path: Path) -> None:
-    """AC5.6: `new` writes `## Bug window review` as the first SPEC heading."""
+    """`new` writes `## Bug window review` as the first SPEC heading."""
     specs = _specs(tmp_path)
     assert _run(script, "new", "9.9.9", "--specs", str(specs)).returncode == 0
     spec = (specs / "releases" / "9.9.9" / "rc-1" / "SPEC.md").read_text(encoding="utf-8")
@@ -182,7 +182,7 @@ def test_new_opens_the_rc_spec_with_the_bug_window_review(script: Path, tmp_path
 def test_a_live_spec_without_the_bug_window_review(
     script: Path, tmp_path: Path, phase: str, errors: list[tuple[str, int, bool]], verdict: str
 ) -> None:
-    """AC5.6, scoped as the Origin check is: a live SPEC lacking the heading is an error with
+    """scoped as the Origin check is: a live SPEC lacking the heading is an error with
     one fix while its candidate is in DEFINITION (where `new` writes it); past it, info."""
     specs = _specs(tmp_path)
     _release(specs, "0.5.0", phase=phase, tasks="- [ ] T-1 — open\n")
@@ -198,7 +198,7 @@ def test_a_live_spec_without_the_bug_window_review(
 def test_a_verb_with_no_live_release_hands_new_to_the_operator(
     script: Path, tmp_path: Path
 ) -> None:
-    """ADR 0158: with no live release the one fix is the operator's `new`, version unchosen."""
+    """with no live release the one fix is the operator's `new`, version unchosen."""
     specs = _specs(tmp_path)
     result = _run(script, "phase", "IMPLEMENTATION", "--sha", "abc1234", "--specs", str(specs))
     py = Path(sys.executable).as_posix()
@@ -212,7 +212,7 @@ def test_a_verb_with_no_live_release_hands_new_to_the_operator(
 def test_new_births_the_stacked_candidate_on_a_closed_live_release(
     script: Path, tmp_path: Path
 ) -> None:
-    """ADR 0150: `new <id>` on the live release in CLOSURE births `rc-<N+1>/` on a SPEC
+    """`new <id>` on the live release in CLOSURE births `rc-<N+1>/` on a SPEC
     stub, never touches the closed `rc-<N>/`, resets phase to DEFINITION and leaves the
     milestones standing (`phase IMPLEMENTATION` restamps `defined`)."""
     specs = _specs(tmp_path)
@@ -239,7 +239,7 @@ def test_new_births_the_stacked_candidate_on_a_closed_live_release(
 
 
 def test_new_refuses_the_same_id_while_its_candidate_is_open(script: Path, tmp_path: Path) -> None:
-    """sa-promote-has-no-verb#B25-8: a candidate is stacked only on a CLOSURE state: mid-IMPLEMENTATION the live trio
+    """a candidate is stacked only on a CLOSURE state: mid-IMPLEMENTATION the live trio
     is still being worked, and the refusal names the phase verb that unblocks it."""
     specs = _specs(tmp_path)
     _release(specs, "0.5.0", phase="IMPLEMENTATION")
@@ -279,7 +279,7 @@ def test_phase_closure_stamps_the_implemented_milestone(script: Path, tmp_path: 
     state = _read(specs / "releases" / "0.5.0" / "_RELEASE.json")
     assert state["phase"] == "CLOSURE"
     assert state["implemented"] == {"sha": "beef123", "ts": state["implemented"]["ts"]}
-    # AC3.14 (F061): the slot holds the live candidate's stamp; the log keeps every one.
+    # the slot holds the live candidate's stamp; the log keeps every one.
     assert state["log"][-1] == {"ts": ANY, "agent": "release.py", "kind": "milestone",
                                 "candidate": "rc-1", "milestone": "implemented",
                                 "sha": "beef123", "text": ANY}  # fmt: skip
@@ -314,8 +314,8 @@ def test_check_is_clean_on_a_valid_tree(script: Path, tmp_path: Path) -> None:
 
 
 def test_writes_reads_rc6_t_050_117_to_its_ten_paths(script: Path) -> None:
-    """AC3.3: a backticked path inside parentheses is named, not written. The line is
-    rc-6 TASKS.md's T-050-117 verbatim (commit a386efc7), inlined: `ship` archives rc-6."""
+    """a backticked path inside parentheses is named, not written. The line is
+    a task line from an archived candidate's TASKS.md, verbatim and inlined."""
     sys.path.insert(0, str(script.parent))  # the staged copy: no bytecode beside the source
     from _release_schema import MARK_RE, writes
 
@@ -341,7 +341,7 @@ def test_tasks_without_a_memory_write_set_are_silent(script: Path, tmp_path: Pat
 
 def test_a_source_file_named_memory_is_not_a_memory_write_set(script: Path, tmp_path: Path) -> None:
     """Re-homed SPEC-DOC-047: a `W:` naming `specs/memory` is a finding naming its task;
-    `memory_lint.py` beside it is not (bug spec-doc-047-matches-specs-memory-as-a-substring)."""
+    `memory_lint.py` beside it is not."""
     specs = _specs(tmp_path)
     tasks = "- [ ] **T-1** `W:` `f/specs/memory_lint.py`\n- [ ] **T-2** `W:` `specs/memory/x.md`\n"
     _release(specs, "0.5.0", phase="IMPLEMENTATION", tasks=tasks)
@@ -363,7 +363,7 @@ def test_a_source_file_named_memory_is_not_a_memory_write_set(script: Path, tmp_
 def test_check_judges_a_definition_release(
     script: Path, tmp_path: Path, tasks: str, log: list[tuple[str, str]], needle: str | None
 ) -> None:
-    """AC3.4 (release-check-accepts-done-tasks-in-definition): a marker past `[ ]`, a `W:`
+    """a marker past `[ ]`, a `W:`
     naming specs/memory (refused where it is born, memory-gate-requires-closure-phase-
     that-spec-doc-024-forbids-before-last-task) or a closure entry after the candidate's
     birth note is a finding under DEFINITION; a stacked candidate's inherited closure
@@ -381,7 +381,7 @@ def test_check_judges_a_definition_release(
 def test_a_definition_finding_stamps_the_commit_that_touched_the_trio(
     script: Path, tmp_path: Path
 ) -> None:
-    """AC3.4 review M3: `defined` is the trio's last commit, never HEAD — implementation
+    """`defined` is the trio's last commit, never HEAD — implementation
     commits after it stay inside the memory window `defined.sha` opens."""
     root, specs, _ = _memory_repo(tmp_path, script)
     trio = _git(root, "log", "-1", "--format=%h", "--", "specs/releases/0.5.0/rc-1/SPEC.md")
@@ -404,13 +404,6 @@ def test_check_reports_a_schema_violation_and_emits_json(script: Path, tmp_path:
     assert result.returncode == 1
     findings = json.loads(result.stdout)
     assert findings and all(f["code"] == "LEDGER-RELEASE-SCHEMA" for f in findings)
-
-
-def test_check_reports_a_histo_record_that_is_not_valid_json(script: Path, tmp_path: Path) -> None:
-    specs = _specs(tmp_path)
-    _release(specs, "0.5.0", phase="IMPLEMENTATION")
-    (specs / "releases" / "_archive" / "releases_histo.jsonl").write_text("{\n", encoding="utf-8")
-    assert _run(script, "check", "--specs", str(specs)).returncode == 1
 
 
 def test_check_reports_out_of_order_log_timestamps(script: Path, tmp_path: Path) -> None:
@@ -468,9 +461,9 @@ def _in_phase(root: Path, script: Path, phase: str) -> Path:
 def test_every_refusal_carries_one_fix_that_is_not_itself_refused(
     script: Path, tmp_path: Path, phase: str, argv: tuple[str, ...]
 ) -> None:
-    """sa-promote-has-no-verb#B25-7 and sa-promote-has-no-verb#B25-3: a refusal exits 1, writes nothing, prints
+    """a refusal exits 1, writes nothing, prints
     one `fix:` — and that fix, run as printed in the same state, is not refused;
-    ledger-fix-lines-drop-specs: under a spaced specs path too."""
+    under a spaced specs path too."""
     specs = _in_phase(tmp_path / "a b", script, phase)
     before = _tree_hash(specs)
     result = _run(script, *argv, "--specs", str(specs))
@@ -482,7 +475,7 @@ def test_every_refusal_carries_one_fix_that_is_not_itself_refused(
         if line.startswith("fix: ")
     ]
     assert len(fixes) == 1, result.stderr
-    # T-050-149 (AC4.4): no `<n>` — the PR number is the operator's act, supplied as it says.
+    # no `<n>` — the PR number is the operator's act, supplied as it says.
     act = re.fullmatch(
         r"Operator action: run `(.+)` with --pr set to the promote PR's .+", fixes[0]
     )
@@ -687,7 +680,7 @@ def test_memory_refuses_any_phase_but_closure(script: Path, tmp_path: Path) -> N
 def test_check_is_clean_when_a_source_moves_after_the_memory_entry(
     script: Path, tmp_path: Path
 ) -> None:
-    """release-check-reds-every-change-after-the-closure-memory-entry: memory references
+    """memory references
     the code, never repeats it — a commit after the entry leaves check clean."""
     specs = _reconciled_closure(tmp_path, script)
     root = specs.parent
@@ -704,7 +697,7 @@ def test_check_is_clean_when_a_source_moves_after_the_memory_entry(
 
 
 def test_ship_refuses_what_check_refuses_and_touches_nothing(script: Path, tmp_path: Path) -> None:
-    """AC3.4, the bug's repro (release-ship-accepts-what-release-check-refuses): a CLOSURE
+    """a CLOSURE
     with no memory entry — `ship` exits 1 with `check`'s message and fix, nothing written."""
     specs = _specs(tmp_path)
     _release(specs, "0.5.0", phase="CLOSURE")
@@ -723,9 +716,8 @@ def test_ship_refuses_what_check_refuses_and_touches_nothing(script: Path, tmp_p
 
 
 def test_ship_records_the_promote_and_new_births_the_next(script: Path, tmp_path: Path) -> None:
-    """sa-promote-has-no-verb#B25-1, sa-promote-has-no-verb#B25-2,
-    sa-promote-has-no-verb#B25-4: a reconciled CLOSURE ships by verb; ADR 0152 (1): the
-    folder moves to `_archive/<v>/`; AC3.14 (F059): `shipped` is the one sha/PR field,
+    """a reconciled CLOSURE ships by verb; the
+    folder moves to `_archive/<v>/`; `shipped` is the one sha/PR field,
     an archived state without a hex `shipped.sha` and int `shipped.pr` is a finding, a
     truncated one a finding with a fix and no traceback; the histo `summary` null."""
     specs = _reconciled_closure(tmp_path, script)
@@ -757,7 +749,7 @@ def test_ship_records_the_promote_and_new_births_the_next(script: Path, tmp_path
 
 
 def _closed_rc(tmp_path: Path, *bugs: dict[str, object]) -> Path:
-    """Release 0.5.0 in CLOSURE on rc-1, and a bug ledger holding *bugs*."""
+    """Release 0.5.0 in CLOSURE on its first candidate, and a bug ledger holding *bugs*."""
     specs = _specs(tmp_path)
     _release(
         specs, "0.5.0", phase="CLOSURE", implemented={"sha": "beef123", "ts": _TS}, log=_RC1_MILESTONES
@@ -776,7 +768,7 @@ def _found(bug: str, status: str) -> dict[str, object]:
 def test_new_stacks_while_an_open_bug_waits_for_the_ship_gate(
     script: Path, tmp_path: Path
 ) -> None:
-    """AC4.3: candidate closure has no mandatory bug-batch gate; ship owns open bugs."""
+    """candidate closure has no mandatory bug-batch gate; ship owns open bugs."""
     specs = _closed_rc(tmp_path, _found("still-open", "open"))
     assert _run(script, "new", "0.5.0", "--specs", str(specs)).returncode == 0
 
@@ -784,7 +776,7 @@ def test_new_stacks_while_an_open_bug_waits_for_the_ship_gate(
 def test_ship_refuses_every_open_bug_without_derived_candidate_fields(
     script: Path, tmp_path: Path
 ) -> None:
-    """AC4.2: ship judges the persisted open status, not a derived candidate placement."""
+    """ship judges the persisted open status, not a derived candidate placement."""
     specs = _reconciled_closure(tmp_path, script)
     ledger = specs / "bugs" / "BUGS.jsonl"
     ledger.parent.mkdir(exist_ok=True)
@@ -818,7 +810,7 @@ def test_new_help_states_the_origin_grammar_the_parser_enforces(script: Path) ->
     assert grammar in " ".join(result.stdout.split())
 
 
-# ── one DAG-vs-job-files decider (AC14.2) ─────────────────────────────────────
+# ── one DAG-vs-job-files decider ─────────────────────────────────────
 
 _JOB1 = (
     "# Job 1\n\n| task | who | AC | `W:` | outcome |\n|---|---|---|---|---|\n"

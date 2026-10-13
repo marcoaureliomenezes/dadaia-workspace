@@ -1,4 +1,4 @@
-"""AC12.2 (ADR 0218): `verdict.py` is the reviewer's one writer of a verdict handoff, bound to the
+"""`verdict.py` is the reviewer's one writer of a verdict handoff, bound to the
 sha and diff hash it judged; every refusal writes nothing. Size: MEDIUM (real git, tmp workspace)."""
 
 from __future__ import annotations
@@ -239,7 +239,7 @@ def test_the_file_name_stamp_and_produced_at_are_one_instant(tmp_path: Path) -> 
 def test_a_slug_is_accepted_exactly_as_the_backlog_slug_pattern_says(
     tmp_path: Path, slug: str
 ) -> None:
-    """AC13.1: the verdict slug and the backlog slug are one grammar, read from `backlog-v1`
+    """the verdict slug and the backlog slug are one grammar, read from `backlog-v1`
     (`$defs.slug`) — never restated here. `a--b` is the worktree job/task separator: refused;
     today the verdict's own looser pattern lets `a--b`, `1a` and `a-` through."""
     schema = load_owner("dd-bug-resolution", "_ledger").load_schema("backlog-v1")
