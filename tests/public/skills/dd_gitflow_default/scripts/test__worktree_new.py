@@ -135,19 +135,14 @@ def _word(path: Path) -> str:
     return shell_line("x", str(path)).split(" ", 1)[1]
 
 
-def test_a_task_needs_its_job_branch_and_a_sixth_task_refuses(root: Path) -> None:
-    """A task is cut from its job branch; 5 task worktrees open per rc at most."""
+def test_a_task_needs_its_job_branch_and_the_sixth_task_opens(root: Path) -> None:
+    """A task is cut from its job branch; the number of open tasks is not capped."""
     orphan = _run(root, "new", "r", TASK)
     assert orphan.returncode == 1 and _fixes(orphan)[0].endswith(f"worktree.py new r {JOB}")
     assert _run(root, "new", "r", JOB).returncode == 0
-    for task in range(1, 6):
+    for task in range(1, 7):
         assert _run(root, "new", "r", f"{JOB}--J1.T{task}").returncode == 0
-    sixth = _run(root, "new", "r", f"{JOB}--J1.T6")
-    assert sixth.returncode == 1  # a commit-less task's exit is clean
-    assert _fixes(sixth)[0].endswith(
-        f"worktree.py clean {_word(root / 'worktrees/r' / f'{JOB}--J1.T1')}"
-    )
-    assert _run(root, "new", "r", "0.5.0-rc1/j2").returncode == 0  # the cap counts tasks only
+    assert _run(root, "new", "r", "0.5.0-rc1/j2").returncode == 0
 
 
 def test_no_work_branch_refuses_with_a_fix_that_creates_it(root: Path) -> None:
