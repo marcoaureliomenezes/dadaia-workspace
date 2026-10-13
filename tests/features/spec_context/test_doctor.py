@@ -319,7 +319,8 @@ def test_fix_skips_and_reports_an_undeletable_entry_and_finishes_the_pass(
 def test_a_symlinked_zone_root_is_never_walked(
     tmp_path: Path, target_inside_workspace: bool
 ) -> None:
-    """A symlinked zone root (CWE-59) is never walked: no finding, nothing under the target touched."""
+    """A symlinked zone root (CWE-59) is never walked: no finding, nothing under the target
+    touched."""
     ws = tmp_path / "ws"
     ws.mkdir()
     _init_workspace(ws)

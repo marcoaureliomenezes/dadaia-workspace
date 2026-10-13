@@ -1,4 +1,5 @@
-"""The branch contract, read from the project gitflow: work branches ``<prefix><M.m.p>`` are pushable; the principal and integration
+"""The branch contract, read from the project gitflow: work branches ``<prefix><M.m.p>`` are
+pushable; the principal and integration
 branches are PR-only; every refusal and its fix line name the CONFIGURED branches.
 Every row runs under the default gitflow or a custom one (``trunk``/``next``/``work/``).
 """
@@ -179,7 +180,8 @@ def test_a_branch_outside_the_gitflow_is_refused_naming_the_work_branch(
 
 
 def test_an_outside_ref_is_carried_onto_the_live_work_branch() -> None:
-    """The live work branch may have diverged — switch to it and merge (append-only, never a rebase)."""
+    """The live work branch may have diverged — switch to it and merge (append-only, never a
+    rebase)."""
     refs = parse_push_stdin(_line("topic"))[0]
     decision = check_branch_policy(refs, _CUSTOM, replace(gate_fixes(), work="work/1.2.3", cut=True))
     assert decision is not None and "'work/1.2.3'" in decision.message

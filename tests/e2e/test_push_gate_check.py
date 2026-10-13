@@ -146,7 +146,8 @@ def test_an_associated_repo_inherits_its_context_gitflow(tmp_path: Path) -> None
     assert result.returncode == 0, result.stderr
     assert "WARNING" not in result.stderr
     assert _run_push_gate(infra, tmp_path, _push("feature/0.0.1", sha)).returncode != 0
-    # An absent main repo carries no committed text: the default plus one warning, never a traceback.
+    # An absent main repo carries no committed text: the default plus one warning, never a
+    # traceback.
     shutil.rmtree(main)
     result = _run_push_gate(infra, tmp_path, _push("feature/0.0.1", sha))
     assert result.returncode == 0 and result.stderr.count("WARNING") == 1, result.stderr

@@ -79,7 +79,8 @@ def _gen() -> Iterable[tuple[str, str]]:
 def test_branch_push_with_denylisted_blob_in_range_is_refused(
     repo: PushRepo, files: dict[str, str], message: str | None, ref: Any, terms: Any, in_message: list[str]
 ) -> None:
-    """A denylisted term anywhere in the pushed range (blob, tag, commit message) refuses; never unmasked."""
+    """A denylisted term anywhere in the pushed range (blob, tag, commit message) refuses; never
+    unmasked."""
     sha = repo.commit(files, message=message) if message else repo.commit(files)
     decision = _decide(repo, ref(sha), denylist_terms=_gen() if terms == "gen" else terms)
     assert not decision.allowed
@@ -188,7 +189,8 @@ def test_refusal_path_with_no_matching_segment_is_byte_identical(repo: PushRepo)
 
 @pytest.mark.parametrize("sep", ["\x9b", " "])
 def test_refusal_path_segment_uppercase_hyphenated_variant_of_term_is_masked(repo: PushRepo, sep: str) -> None:
-    """A segment split by U+009B or U+2028 is read whole (git output split on \\n only) and masked."""
+    """A segment split by U+009B or U+2028 is read whole (git output split on \\n only) and
+    masked."""
     sha = repo.commit({f"repos/Zz-A{sep}cme-Corp/notes.md": "contains zz-acme here\n"})
     decision = _decide(repo, _branch(sha), denylist_terms=(("zz-acme", "synthetic"),))
     assert not decision.allowed
