@@ -18,6 +18,7 @@ Operator rulings, verbatim:
 - Q6, ADR 0193's `amends`: "Novo registro (Recommended)" — a new record amends 0152; the ledger stays append-only; the ADR 0138 repair lane is not widened.
 - Q7, `measured_by` existence: "Construir e recusar (Recommended)" — built in the doctor's ADR code, refusing at regeneration, after the class triage.
 - DEFINITION done-marker check, 2026-10-13: "Apagar check e testes (Recommended)" — the check and its tests are deleted by this order (root map §1, ADR 0249), together with the last `TASKS.md` read in `_release_tree.py` (FR11).
+- Memory-in-`W:` rule, 2026-10-13: "Regra só antes do CLOSURE (Recommended)" — `release.py check`'s memory-in-`W:` refusal judges candidates in DEFINITION and IMPLEMENTATION only.
 - Carried, `architecture-adr-section-generated`: "Triagem + gerada (Recommended)" (2026-10-11); "Real no closure" (2026-10-03).
 - Carried, `task-worktree-cap-removed`: "Descartar (Recommended)" and "e vai fazer de novo quantas vezes???" (2026-10-13).
 - Carried, G7 (rc-14 SPEC G7, operator 2026-10-11/12): "Não tolerarei nem mesmo 30% dessa quantidade de retrabalhos que tivemos."
@@ -205,7 +206,7 @@ Each picked entry exits once at closure (`backlog.py exit`, from the reconcile t
 - Simplicity first: each FR deletes before it adds. FR8 and FR10 state their growth.
 - Tidy First: an owner moves before its behaviour changes (FR3 and FR5 before FR8); each bug fix lands its RED test first.
 - What ships stays language-neutral and requires no CI, remote, PR host or vendor CLI. `scripts/ci.py`, `mutate.py` and the guards are this repository's own.
-- Memory atoms change only at the Reconciliation.
+- Memory atoms change only at the Reconciliation. Rule for rc-15's PLAN: no task's `W:` names `specs/memory`; a memory change rides the define tree with its ADR acceptance, or the Reconciliation (§3a shapes 2 and 9).
 
 ### Risks
 
@@ -221,5 +222,6 @@ For the operator, through the main thread: accept or reject proposals 0250 and 0
 
 Notes (not blocking):
 
+- rc-14 tasks J16.T5 (`specs/memory/AGENTS.md`, the law mirror), J18.T5 (`specs/memory/ARCHITECTURE.md`, `QUALITY.md`) and J26.T7 (`specs/memory/QUALITY.md`), which re-rendered fixed blocks, wrote `specs/memory` against §3a shapes 2 and 9. The memory-in-`W:` check passed them because it read the retired `TASKS.md`. The job files stay as history. Under the 2026-10-13 ruling, the check judges candidates before CLOSURE only.
 - The gate's other fix line (`_check_approved`, `reports validate --all` when no verdict decides) names the validator where the remedy is to write a verdict (AS-IS §2.1). It is not in a bug record; it goes to the next bug window as a proposal.
 - `test_memory_lint.py:346-350,427-431` assert a label grammar FR10 deletes from the law. They still pass, and changing them needs the operator's order.
