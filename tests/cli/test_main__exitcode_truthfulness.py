@@ -1,4 +1,4 @@
-"""Exit codes must tell the truth (validation-029 F-04/F-12) + certify without a workspace (F-03).
+"""Exit codes must tell the truth, and certify runs without a workspace.
 
 A CLI that finds problems and exits 0 masks failures from every script/agent that
 consumes it — the exact 'cmd | tail masks exit' class the house gotchas document.
@@ -31,8 +31,8 @@ def test_doctor_exits_nonzero_when_issues_found(tmp_path: Path, monkeypatch) -> 
 
 
 def test_certify_runs_without_a_workspace_and_prints_pure_json(tmp_path: Path, monkeypatch) -> None:
-    """F-03: certify's contract is a DISPOSABLE workspace — a bare cwd runs it on a fallback root;
-    bug certify-json-stdout-polluted-info-line: diagnostics go to stderr, stdout is the JSON alone."""
+    """certify's contract is a DISPOSABLE workspace — a bare cwd runs it on a fallback root;
+    diagnostics go to stderr, stdout is the JSON alone."""
     monkeypatch.chdir(tmp_path)
     seen: list[Path] = []
 

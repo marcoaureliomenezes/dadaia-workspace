@@ -1,13 +1,8 @@
 """``dadaia init`` closes with the root-launch law exactly once and prints no harness
 settings advice.
 
-0.4.7 FR3c (T-047-57) + bug init-claude-note-cites-a-wrong-settings-key.
-Size: SMALL.
-
 Claude Code reads the root ``AGENTS.md`` natively, so init has no settings key to
-recommend; the note it once printed named a key that does not exist.
-
-QA-atom law (v0.1.57): ``CliRunner`` is built with NO ``mix_stderr`` kwarg.
+recommend.
 """
 
 from __future__ import annotations

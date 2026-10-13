@@ -1,18 +1,8 @@
-"""AC-3 (v0.1.58 FR2) — ``dadaia init --harness <set>`` scaffolds ONLY the chosen harnesses.
+"""``dadaia init --harness <set>`` scaffolds ONLY the chosen harnesses.
 
-RED-first: before FR2 ``dadaia init`` had no ``--harness`` flag and ALWAYS produced the
-full scaffold (``.claude`` + ``.codex``). This suite pins the harness-aware
-behaviour — each L1 harness that OWNS a workspace directory
+Each L1 harness that OWNS a workspace directory
 (``core.harness_registry.HARNESS_PROJECTION_DIRS``) gets its projection ONLY when it is
-THE named harness, and a bad value exits 2 with its message on stderr and empty stdout
-(0.4.7 T-047-73: one name, no default, no set). The AC-9(b) mutation-sanity
-sabotage (init ignores the harness set ⇒ always all-four) makes the claude-only case below
-FAIL — that is the discriminating proof the scaffold is genuinely harness-gated.
-
-QA-atom law (v0.1.57): ``CliRunner`` is built with NO ``mix_stderr`` kwarg (removed in
-Click 8.2; TypeErrors on the installed 8.4.1); ``result.stderr``/``result.stdout`` are read
-as separate channels; the error assert is width-independent (strip ANSI + Rich box glyphs,
-collapse whitespace).
+THE named harness.
 """
 
 from __future__ import annotations
@@ -25,7 +15,7 @@ from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app
 
-# NEVER pass mix_stderr (removed in Click 8.2; the installed 8.4.1 TypeErrors on it).
+# CliRunner takes no mix_stderr kwarg.
 _runner = CliRunner()
 
 
@@ -38,12 +28,11 @@ def _ctx_inject_commands(claude_dir: Path) -> list[str]:
 @pytest.mark.parametrize(
     ("name", "harness", "expect_present", "expect_absent"),
     [
-        # AC-9(b) sabotage detector: --harness claude → .claude/ + ctx-inject hook, and
-        # NO .codex/.
+        # --harness claude → .claude/ + ctx-inject hook, and NO .codex/.
         ("claude_only", "claude", ("claude",), ("codex",)),
         # --harness codex → .codex/ (+ .dadaia/hooks/codex-*), NO .claude/ agents.
         ("codex_only", "codex", ("codex",), ("claude", "kimi-code")),
-        # kimi-code owns no workspace directory (0.4.7 FR3) — it reads the shared
+        # kimi-code owns no workspace directory — it reads the shared
         # .agents/ tree natively and wires its hooks at the user level.
         # --harness kimi-code → nothing of its own; .claude/ and .codex/ stay absent.
         ("kimi_only", "kimi-code", (), ("claude", "codex", "kimi-code")),

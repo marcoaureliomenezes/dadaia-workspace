@@ -1,11 +1,10 @@
-"""init venv-bootstrap failure must be actionable, never a traceback (validation-028).
+"""init venv-bootstrap failure must be actionable, never a traceback
 
 An unpublished candidate wheel is THE consumer-validation scenario: the workspace venv
 bootstrap exploded with a raw CalledProcessError traceback, never naming the
 DADAIA_BOOTSTRAP_PACKAGE escape hatch that exists for exactly this case. (The index pin
-it used to explode on is gone — bug
-init-venv-installs-index-version-not-running-distribution — but the refusal it left
-behind is the same promise: actionable, never a traceback.)
+it used to explode on is gone, but the refusal it left behind is the same promise:
+actionable, never a traceback.)
 
 The conftest anti-disk-exhaustion backstop fakes ensure_workspace_venv globally, so the
 seam is exercised directly (subprocess.run mocked, pre-existing bare venv so
@@ -34,10 +33,8 @@ def test_ensure_workspace_venv_raises_actionable_error(tmp_path: Path, monkeypat
 
     (tmp_path / ".dadaia" / ".venv" / PLATFORM.venv_scripts_dir).mkdir(parents=True)
 
-    # The validation-028 shape, restated for the post-index bootstrap (bug
-    # init-venv-installs-index-version-not-running-distribution): a consumer running an
-    # installed distribution that cannot be re-packed. There is no index pin to fall
-    # back to any more, so the refusal itself must name the escape hatch.
+    # A consumer running an installed distribution that cannot be re-packed. There is no
+    # index pin to fall back to, so the refusal itself must name the escape hatch.
     site = tmp_path / "site-packages" / "dadaia_workspace"
     site.mkdir(parents=True)
     (site / "__init__.py").write_text("")
@@ -56,7 +53,7 @@ def test_ensure_workspace_venv_raises_actionable_error(tmp_path: Path, monkeypat
 
 
 def test_install_failure_names_pypi_and_shows_whole_lines(tmp_path: Path, monkeypatch) -> None:
-    """Bug init-offline-error-truncated-mid-string: the refusal says the venv resolves
+    """The refusal says the venv resolves
     from PyPI (network required) and quotes whole installer lines, never a cut one."""
     from dadaia_workspace.core.platform import PLATFORM
 

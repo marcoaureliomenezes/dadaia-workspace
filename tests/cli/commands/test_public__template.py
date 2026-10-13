@@ -1,4 +1,4 @@
-"""AC4.1/AC4.2: ``public install --template <id>`` saves the template; an unknown id is refused
+"""``public install --template <id>`` saves the template; an unknown id is refused
 naming the valid ids; no flag keeps the saved one; ``--help`` lists the ids. Ids come from
 ``TEMPLATES``/``DEFAULT_TEMPLATE_ID``, never literals.
 """

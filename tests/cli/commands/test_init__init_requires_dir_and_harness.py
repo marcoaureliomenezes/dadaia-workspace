@@ -1,10 +1,7 @@
 """The bootstrap seam is argv: the workspace directory is a PARAMETER, never resolved from
-cwd, and the harness is exactly ONE registered record. The three refusals asserted here
-are the whole interface contract — a missing `<dir>`, a missing `--harness`, and the
-retired meta-values (`all`, the comma subset) — each exiting 2 with exactly one
-executable `fix:` line, plus the idempotence clause that makes a re-run a no-op.
-
-size: SMALL.
+cwd, and the harness is exactly ONE registered record. The refusals asserted here
+are the whole interface contract — a missing `--harness` and the retired meta-values
+(`all`, the comma subset) — plus the idempotence clause that makes a re-run a no-op.
 """
 
 from __future__ import annotations
@@ -69,15 +66,14 @@ def _bootstrap_fails(tmp: Path, mp: pytest.MonkeyPatch) -> Path:
 
 # fmt: off
 @pytest.mark.parametrize(("argv", "setup", "code", "fix", "in_output"), [
-    pytest.param(["init", "demo"], None, 1, "uvx dadaia-workspace init demo --harness ", [], id="AC2.1-no-harness-default"),
-    pytest.param(["init", "--harness", "claude"], None, 1, None, [], id="no-dir-never-targets-cwd"),
+    pytest.param(["init", "demo"], None, 1, "uvx dadaia-workspace init demo --harness ", [], id="no-harness-default"),
     *[pytest.param(["init", "demo", "--harness", v], None, 2, None, ["claude", v], id=f"meta-or-unknown-{v}") for v in ("all", "claude,codex", "zzz")],
     pytest.param(["init", "demo", "--harness", "claude"], _foreign, 1, None, [], id="foreign-tree-never-scaffolded-over"),
     pytest.param(["init", ".", "--harness", "claude"], _foreign_cwd, 1, "uvx dadaia-workspace init {tmp}/proj-workspace --harness claude", [],
-                 id="init-foreign-tree-fix-line-unrunnable-sibling-from-the-resolved-path"),
+                 id="foreign-tree-fix-names-the-resolved-sibling"),
     pytest.param(["init", "/", "--harness", "claude"], None, 1, "uvx dadaia-workspace init {root}dadaia-workspace --harness claude", [],
-                 id="init-root-dir-crashes-deriving-sibling-fix"),
-    pytest.param(["init", "demo", "--harness", "claude"], _bootstrap_fails, 1, None, ["DADAIA_BOOTSTRAP_PACKAGE"], id="validation-028-bootstrap-error-clean-exit"),
+                 id="root-dir-derives-a-sibling-fix"),
+    pytest.param(["init", "demo", "--harness", "claude"], _bootstrap_fails, 1, None, ["DADAIA_BOOTSTRAP_PACKAGE"], id="bootstrap-error-clean-exit"),
 ])
 # fmt: on
 def test_init_refuses_meta_and_unknown_harness_values(
@@ -104,7 +100,7 @@ def test_init_refuses_meta_and_unknown_harness_values(
 
 
 def test_init_creates_the_named_dir_and_is_idempotent(tmp_path: Path, monkeypatch) -> None:
-    """The dir is created if absent; a second identical `init` changes nothing (AC2.1)."""
+    """The dir is created if absent; a second identical `init` changes nothing."""
     monkeypatch.chdir(tmp_path)
 
     first = _runner.invoke(app, ["init", "demo", "--harness", "claude", "--skip-assets"])

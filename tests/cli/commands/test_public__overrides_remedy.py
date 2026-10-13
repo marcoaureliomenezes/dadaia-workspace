@@ -1,4 +1,4 @@
-"""An overlay carrying ``overrides`` is refused with one runnable remedy that clears it (AC1.6, AC4.5)."""
+"""An overlay carrying ``overrides`` is refused with one runnable remedy that clears it."""
 
 from __future__ import annotations
 

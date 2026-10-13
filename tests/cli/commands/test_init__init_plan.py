@@ -1,8 +1,6 @@
 """Flags and TTY prompts fill the SAME plan object, so both produce the same tree; the
 output is at most 12 lines (asset count, absolute venv CLI path, next step); ``DIR`` and
 ``--harness`` are optional in ``--help``; a non-TTY missing either exits 2 with one fix.
-
-size: SMALL. QA-atom law (v0.1.57): ``CliRunner`` is built with NO ``mix_stderr`` kwarg.
 """
 
 from __future__ import annotations
@@ -29,7 +27,7 @@ def _contexts(root: Path) -> object:
 
 
 def test_prompts_and_flags_fill_the_same_plan(tmp_path: Path, monkeypatch) -> None:
-    """AC1.3: name -> ./<name>, harness, blank main URL; equal trees to the flag run."""
+    """Name -> ./<name>, harness, blank main URL; equal trees to the flag run."""
     flags_dir, prompt_dir = tmp_path / "flags", tmp_path / "prompt"
     flags_dir.mkdir()
     prompt_dir.mkdir()
@@ -47,7 +45,7 @@ def test_prompts_and_flags_fill_the_same_plan(tmp_path: Path, monkeypatch) -> No
 
 
 def test_output_is_at_most_twelve_lines_with_count_and_venv_path(tmp_path: Path) -> None:
-    """AC1.1: one count line, never the per-asset listing; the absolute CLI path."""
+    """One count line, never the per-asset listing; the absolute CLI path."""
     ws = tmp_path / "ws"
     result = _runner.invoke(app, ["init", str(ws), "--harness", "claude"])
 
@@ -59,7 +57,7 @@ def test_output_is_at_most_twelve_lines_with_count_and_venv_path(tmp_path: Path)
 
 
 def test_help_shows_dir_and_harness_optional() -> None:
-    """AC1.4: DIR is bracketed (optional) in usage."""
+    """DIR is bracketed (optional) in usage."""
     result = _runner.invoke(app, ["init", "--help"])
 
     assert result.exit_code == 0, result.output
@@ -70,7 +68,7 @@ def test_help_shows_dir_and_harness_optional() -> None:
 def test_non_tty_missing_field_exits_1_with_one_fix(
     argv: list[str], tmp_path: Path, monkeypatch
 ) -> None:
-    """AC1.2: no prompt off a TTY — exit 2 with the uvx fix; nothing scaffolded."""
+    """No prompt off a TTY — exit 1 with the uvx fix; nothing scaffolded."""
     monkeypatch.chdir(tmp_path)
 
     result = _runner.invoke(app, argv)
@@ -84,7 +82,7 @@ def test_non_tty_missing_field_exits_1_with_one_fix(
 
 
 def test_non_tty_fix_line_repeats_the_repo_flags(tmp_path: Path, monkeypatch) -> None:
-    """Bug init-missing-harness-fix-line-drops-repo-flags: running the fix as printed
+    """Running the fix as printed
     keeps level 2 — every --repo/--associated-repo the invocation carried."""
     monkeypatch.chdir(tmp_path)
     argv = ["init", "myws", "--repo", "https://h/m.git", "--associated-repo", "https://h/a.git"]

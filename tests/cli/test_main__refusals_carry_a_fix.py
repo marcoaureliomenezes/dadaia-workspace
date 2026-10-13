@@ -1,4 +1,4 @@
-"""v0.5.0 FR17 AC17.1/AC17.3: every CLI refusal prints `Error:` first and exactly one
+"""Every CLI refusal prints `Error:` first and exactly one
 `fix:` line, with no traceback; `create`'s conflict names its real recovery; an off-repo
 directory is one refusal for `context alive` and `ci install-hook`.
 

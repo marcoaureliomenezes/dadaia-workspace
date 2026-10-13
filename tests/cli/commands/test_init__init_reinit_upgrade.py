@@ -87,7 +87,7 @@ def test_newer_running_version_reconciles_and_reports_the_transition(
 def test_a_failed_reconcile_prints_the_windows_fix_line(
     workspace: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """AC2.6 (T-050-08): the refusal's fix is built by ``fix_line`` — on Windows the CLI is
+    """The refusal's fix is built by ``fix_line`` — on Windows the CLI is
     ``Scripts/dadaia.exe``, spelled with forward slashes."""
     _versions(monkeypatch, workspace, "0.4.7", "0.4.8")
 
@@ -123,7 +123,7 @@ def test_older_running_version_exits_1_with_the_pinned_fix(
 def test_reinit_sees_an_editable_source_bump(
     workspace: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """sa-editable-install-reports-a-frozen-version#B3: an editable venv whose dist-info
+    """An editable venv whose dist-info
     is frozen at 0.1.4 over a 0.4.7 source, against a workspace at 0.1.4, is an upgrade
     0.1.4 -> 0.4.7 — never 'already at'."""
     source = tmp_path / "src"

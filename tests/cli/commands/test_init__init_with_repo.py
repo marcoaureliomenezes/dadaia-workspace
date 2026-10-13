@@ -67,7 +67,7 @@ def test_init_with_repo_clones_creates_alives_binds_and_installs_the_hook(
         "demo-project",
         "alive",
     )
-    assert not list((workspace / ".dadaia" / "sessions").glob("*.json"))  # AC7.1
+    assert not list((workspace / ".dadaia" / "sessions").glob("*.json"))
     hook = repo / ".git" / "hooks" / "pre-push"
     assert hook.is_file() and os.access(hook, os.X_OK)
     assert "export DADAIA_" not in result.stdout and "bound" not in result.stdout
@@ -110,7 +110,7 @@ def test_init_without_repo_closes_with_the_law_and_the_next_step(tmp_path: Path)
     lines = [line for line in result.stdout.splitlines() if line.strip()]
     closing = lines[-3:]
     assert closing[0] == _LAW
-    assert closing[1].startswith("Next (")  # AC6.2
+    assert closing[1].startswith("Next (")
     assert closing[2].startswith(f"fix: Operator action: run {fix_line(ws, 'context', 'create')}")
     assert _LAW not in "\n".join(lines[:-3])
 

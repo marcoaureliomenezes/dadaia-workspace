@@ -1,4 +1,4 @@
-"""AC4.3: ``init DIR --template <id>`` saves the template on a new workspace and on a re-run
+"""``init DIR --template <id>`` saves the template on a new workspace and on a re-run
 (the upgrade) and re-projects; no flag keeps the saved one; ``reconcile`` keeps it and takes no
 flag. Ids come from ``TEMPLATES``, never literals.
 """
