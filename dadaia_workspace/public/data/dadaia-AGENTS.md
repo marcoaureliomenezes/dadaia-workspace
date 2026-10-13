@@ -27,7 +27,7 @@
 
 ## 4. Projections and law files
 
-- Re-project: `.dadaia/.venv/bin/dadaia public install`, then `public doctor` shows `[ok] public-privacy`.
+- Re-project: `.dadaia/.venv/bin/dadaia public stage`, then `public install`, then `public doctor` shows `[ok] public-privacy`.
 
 ## 5. Doctor — the one scan and reaper
 

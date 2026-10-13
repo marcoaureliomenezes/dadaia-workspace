@@ -37,6 +37,7 @@ line here and `--help` disagree, `--help` wins.
 - Open a port in this order: `list` → `next --project <name> --json` → start the server on
   loopback → `register --port N --project <name> [--pid <pid>] [--ttl <hours>]` — idempotent
   for the same project; a port held by another project exits 1 naming the owner.
+- Judging a served UI: restart its registered server and clear the browser cache first, so the page is the current code.
 - A visual unit ends with its server running and its URL reported; the port is released (`release --port N`, or `--project <name>` for all) once the operator confirms;
   on a conflict `list --status all`, `clean` (stale = TTL expired or pid gone), then `next`.
 - `scan [--json]` lists listeners no entry covers (Linux `ss`; empty elsewhere).

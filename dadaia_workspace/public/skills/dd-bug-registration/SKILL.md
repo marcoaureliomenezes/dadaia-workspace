@@ -7,7 +7,7 @@ description: >
 
 # dd-bug-registration
 
-> `dd-product-engineer` and `dd-sw-engineer-sr` register; every other agent, the reviewer included (in its verdict's `findings`), returns the proposal to the main thread; the propose/confirm rule lives in `specs/bugs/AGENTS.md` §1. Fixing a registered bug is dd-bug-resolution's.
+> `dd-code-reviewer`, `dd-product-engineer` and `dd-sw-engineer-sr` run this; any other agent returns the proposal to the main thread; the propose/confirm rule lives in `specs/bugs/AGENTS.md` §1. Fixing a registered bug is dd-bug-resolution's.
 
 ## 1. When
 
