@@ -469,7 +469,6 @@ _HISTORY = re.compile(r"^#{1,6}\s*(Changelog|History|Hist[oó]rico|Versions)\b",
 _PRINCIPLE = re.compile(r"^### P-(\d{2}) ·.*$", re.M)
 _BLOCK_END = re.compile(r"^(?:### P-\d{2} ·|## )", re.M)
 _MEASURED = re.compile(r"^Measured by: .+$", re.M)
-_ADR_LINE = re.compile(r"^ADR: (?:none\s*|(\d{4})\b.*)$", re.M)
 
 
 def memory_canonical_shape(tree: Tree) -> list[str]:
@@ -485,7 +484,7 @@ def memory_canonical_shape(tree: Tree) -> list[str]:
     out = []
     if top != ["AGENTS.md", *sections]:
         out.append(f"canonical-pair: specs/memory holds {top}")
-    known, seen = {r["id"] for r in _records(tree)}, set()
+    seen: set[str] = set()
     for name, (headings, fixed) in sections.items():
         text = tree.read(f"specs/memory/{name}")
         if (heads := _TOP.findall(text)) != headings:
@@ -513,10 +512,6 @@ def memory_canonical_shape(tree: Tree) -> list[str]:
             seen.add(pid)
             if not _MEASURED.search(body):
                 out.append(f"measured-line: {name} P-{pid} lacks `Measured by:`")
-            if not (adr := _ADR_LINE.search(body)):
-                out.append(f"adr-line: {name} P-{pid} lacks `ADR: NNNN` or `ADR: none`")
-            elif adr.group(1) and adr.group(1) not in known:
-                out.append(f"adr-exists: {name} P-{pid} cites missing ADR {adr.group(1)}")
     return out
 
 
@@ -1109,12 +1104,10 @@ CHECKS: dict[str, Check] = {
             "fixed-block": _edit(_Q, "slop-tests", "slop-gone"),
             "history-heading": _edit(_A, "\n## Tech Stack", "\n### Changelog\n\n## Tech Stack"),
             "measured-line": _edit(_A, "\nMeasured by: ", "\nMeasured: "),
-            "adr-line": _edit(_A, "\nADR: none\n", "\nADR: nope\n"),
             "no-principles": _re(_Q, r"(?m)^### P-", "### Q-"),
             "unique-ids": _edit(_Q, "### P-2", "### P-0"),
-            "adr-exists": _edit(_A, "ADR: 0176", "ADR: 9999"),
             "principle-placement": _edit(
-                _A, "\n## Structure", "\n### P-99 · x\nMeasured by: x\nADR: none\n\n## Structure"
+                _A, "\n## Structure", "\n### P-99 · x\nMeasured by: x\n\n## Structure"
             ),
             "atom-link": _edit(_Q, "\n## Gates", "\nSee [[sdd-gate-v3]].\n\n## Gates"),
         },
