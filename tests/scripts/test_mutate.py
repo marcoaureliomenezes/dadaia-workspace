@@ -105,7 +105,7 @@ _MATRIX = [
     " [tests/test_m.py::test_below_again, tests/test_m.py::test_below_the_limit]",
     'KILLED pkg/m.py:7 return: "no" -> None [tests/test_m.py::test_above_the_limit]',
     "mutation score 2/4",
-    "DELETABLE tests/test_m.py::test_below_again",
+    "NO-OWN-KILL tests/test_m.py::test_below_again",
     "KEPT tests/test_m.py::test_above_the_limit",
 ]
 
