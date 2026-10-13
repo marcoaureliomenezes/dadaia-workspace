@@ -178,7 +178,7 @@ def v32_hits(tree: Tree) -> list[tuple[str, str, str, str]]:
                 judge("comment", rel, t.start[0], t.string)
         for node in ast.walk(ast.parse(text)):
             if isinstance(node, _DOC_OWNERS) and (doc := ast.get_docstring(node, clean=False)):
-                first = node.body[0].lineno  # type: ignore[attr-defined]
+                first = node.body[0].lineno
                 for n, line in enumerate(doc.splitlines()):
                     judge("docstring", rel, first + n, line)
     return sorted(out, key=lambda h: h[2])
@@ -593,7 +593,12 @@ def _cfg(edit: Callable[[str, str], str]) -> Plant:
 
 def _ledger_plant(ledger: str, line: str, where: str, text: str) -> Plant:
     """One ledger *line* in *ledger* and *text* at *where*: the id must turn v32 red."""
-    return _plant(lambda root: (_write(root, ledger, line), _write(root, where, text)))
+
+    def write(root: Path) -> None:
+        _write(root, ledger, line)
+        _write(root, where, text)
+
+    return _plant(write)
 
 
 def _ids_plant(comments: int, docs: int) -> Plant:
