@@ -48,7 +48,7 @@ def find_registry(start: Path) -> Path:
         return root / ".dadaia" / "states" / "server_registry.json"
     report(
         "no workspace sentinel above the cwd",
-        "Operator action: rerun with --registry <path>, or from inside a workspace",
+        "Operator action: rerun with --registry and a registry file path, or from inside a workspace",
     )
     raise SystemExit(1)
 
