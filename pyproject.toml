@@ -112,7 +112,7 @@ pytest-timeout = "^2.3.1"
 optional = true
 
 [tool.poetry.group.mutation.dependencies]
-mutmut = "3.7.0"
+mutmut = "3.8.0"
 
 [build-system]
 requires = ["poetry-core"]
