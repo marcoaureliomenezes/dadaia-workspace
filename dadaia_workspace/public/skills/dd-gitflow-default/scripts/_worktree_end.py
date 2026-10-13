@@ -330,8 +330,8 @@ def _check_approved(root: Path, tree: Path, work: str, name: str) -> None:
         raise Refusal(
             f"the newest {REVIEWER} handoff naming HEAD {head} or a sha of its patch and message"
             " series is not a valid APPROVED (the file comes from the reviewer's verdict)",
-            cli_line(root, "reports", "validate", invalid or "--all"),
-        )
+            cli_line(root, "reports", "validate", *((invalid, "--reviewed-root", str(tree)) if invalid else ("--all",)))
+        )  # fmt: skip
     want = diff_sha256(tree, work, head)
     if any(row[3].get("diff_sha256") != want for row in decided):
         raise Refusal(f"no {REVIEWER} verdict binds the diff {head} lands",
@@ -353,10 +353,11 @@ def _into(repo: Path, onto: str) -> Path:
     return tree_path(repo.parents[1], repo.name, name) if onto.startswith("wt/") else repo
 
 
-def _kind_checks(root: Path, repo: Path, tree: Path, name: str, onto: str, into: Path) -> list[tuple[str, Callable[[], None]]]:  # fmt: skip
+def _kind_checks(root: Path, repo: Path, tree: Path, name: str, onto: str, into: Path, keep: list[str], drop: bool) -> list[tuple[str, Callable[[], object]]]:  # fmt: skip
     """The ordered (label, check) pairs a tree of this kind must pass to land; `merge` and
-    `preflight` both run this list, the verdict check labelled "verdict"."""
-    checks: list[tuple[str, Callable[[], None]]] = [("dirty", lambda: _refuse_dirty(tree))]
+    `preflight` both run this list, the verdict check labelled "verdict"; the ignored-file and
+    target-checkout checks end every kind."""
+    checks: list[tuple[str, Callable[[], object]]] = [("dirty", lambda: _refuse_dirty(tree))]
     ancestor = ("ancestor", lambda: _check_ancestor(tree, onto))
     verdict = ("verdict", lambda: _check_approved(root, tree, onto, name))
     if into != repo:  # a task: hygiene and implementation/test separation, no gate or verdict
@@ -367,16 +368,21 @@ def _kind_checks(root: Path, repo: Path, tree: Path, name: str, onto: str, into:
         checks += [ancestor, verdict, ("verify", lambda: _gate(tree, onto, required=False))]
     else:
         checks += [("open tasks", lambda: _open_tasks(repo, name)), ("scaffold", lambda: _scaffold(tree, name)), ancestor, verdict, ("verify", lambda: _gate(tree, onto))]  # fmt: skip
-    return checks
+    return checks + [("ignored", lambda: _kept(tree, "merge", keep, drop)), ("target", lambda: _on_target(into, onto))]  # fmt: skip
 
 
-def preflight(root: Path, path: str) -> int:
+def _on_target(into: Path, onto: str) -> None:
+    if git(into, "branch", "--show-current").strip() != onto:
+        raise Refusal(f"{into} is not on {onto}", git_line(into, "switch", onto))
+
+
+def preflight(root: Path, path: str, keep: list[str], drop: bool) -> int:
     """`merge` without the verdict: run every other check of the tree's kind, collect each refusal."""
     repo, tree, name, onto = _target(root, path)
     if not tree.exists():
         raise Refusal(f"{tree} does not exist", f"{script(SCRIPT)} list")
     failed = []
-    for label, check in _kind_checks(root, repo, tree, name, onto, _into(repo, onto)):
+    for label, check in _kind_checks(root, repo, tree, name, onto, _into(repo, onto), keep, drop):
         try:
             label == "verdict" or check()
         except Refusal as refusal:
@@ -405,11 +411,9 @@ def merge(root: Path, path: str, keep: list[str], drop: bool) -> str:
                 ) from error
         _rmdir(tree)
         return f"{ref} merged into {onto}"
-    for _, check in _kind_checks(root, repo, tree, name, onto, into):
+    for _, check in _kind_checks(root, repo, tree, name, onto, into, keep, drop):
         check()
     kept = _kept(tree, "merge", keep, drop)
-    if git(into, "branch", "--show-current").strip() != onto:
-        raise Refusal(f"{into} is not on {onto}", git_line(into, "switch", onto))
     try:
         git(into, "merge", "-q", "--ff-only", ref)
     except RuntimeError as error:

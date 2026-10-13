@@ -46,7 +46,7 @@ def main(argv: list[str] | None = None) -> int:
         end.add_argument("--drop", action="store_true", help="discard the other ignored files")
 
     end_args(verbs.add_parser("merge", help="land a worktree on its branch after its gate"))
-    verbs.add_parser("preflight", help="every check merge runs but the verdict, all failures printed").add_argument("path")  # fmt: skip
+    end_args(verbs.add_parser("preflight", help="every check merge runs but the verdict, all failures printed"))  # fmt: skip
     end_args(verbs.add_parser("clean", help="remove a merged or commit-less worktree"))
     seal = verbs.add_parser("hash", help="the diff_sha256 binding a verdict carries for a sha")
     seal.add_argument("path")
@@ -67,7 +67,7 @@ def main(argv: list[str] | None = None) -> int:
             print(digest(root, args.path, args.sha))
             return 0
         if args.verb == "preflight":
-            return preflight(root, args.path)
+            return preflight(root, args.path, args.keep, args.drop)
         if args.verb in ("merge", "clean"):
             end_verb = merge if args.verb == "merge" else clean
             print(f"[ok] {end_verb(root, args.path, args.keep, args.drop)}")
