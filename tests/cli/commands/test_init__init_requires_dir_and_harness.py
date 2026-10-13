@@ -66,9 +66,16 @@ def _bootstrap_fails(tmp: Path, mp: pytest.MonkeyPatch) -> Path:
 
 # fmt: off
 @pytest.mark.parametrize(("argv", "setup", "code", "fix", "in_output"), [
+    pytest.param(["init", "demo"], None, 1, "uvx dadaia-workspace init demo --harness ", [], id="AC2.1-no-harness-default"),
+    pytest.param(["init", "--harness", "claude"], None, 1, None, [], id="no-dir-never-targets-cwd"),
     pytest.param(["init", "demo"], None, 1, "uvx dadaia-workspace init demo --harness ", [], id="no-harness-default"),
     *[pytest.param(["init", "demo", "--harness", v], None, 2, None, ["claude", v], id=f"meta-or-unknown-{v}") for v in ("all", "claude,codex", "zzz")],
     pytest.param(["init", "demo", "--harness", "claude"], _foreign, 1, None, [], id="foreign-tree-never-scaffolded-over"),
+    pytest.param(["init", ".", "--harness", "claude"], _foreign_cwd, 1, "uvx dadaia-workspace init {tmp}/proj-workspace --harness claude", [],
+                 id="init-foreign-tree-fix-line-unrunnable-sibling-from-the-resolved-path"),
+    pytest.param(["init", "/", "--harness", "claude"], None, 1, "uvx dadaia-workspace init {root}dadaia-workspace --harness claude", [],
+                 id="init-root-dir-crashes-deriving-sibling-fix"),
+    pytest.param(["init", "demo", "--harness", "claude"], _bootstrap_fails, 1, None, ["DADAIA_BOOTSTRAP_PACKAGE"], id="validation-028-bootstrap-error-clean-exit"),
     pytest.param(["init", ".", "--harness", "claude"], _foreign_cwd, 1, "uvx dadaia-workspace init {tmp}/proj-workspace --harness claude", [],
                  id="foreign-tree-fix-names-the-resolved-sibling"),
     pytest.param(["init", "/", "--harness", "claude"], None, 1, "uvx dadaia-workspace init {root}dadaia-workspace --harness claude", [],

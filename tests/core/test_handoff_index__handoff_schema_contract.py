@@ -184,6 +184,9 @@ _DROP = object()
     [
         pytest.param("handoff", {"metrics": _DROP}, "metrics", id="handoff-missing-metrics"),
         pytest.param("handoff", {"verdict": "MAYBE"}, "verdict", id="handoff-invalid-verdict"),
+        pytest.param("handoff", {"self_pull": _DROP}, "self_pull", id="handoff-v1.2-without-self-pull"),
+        pytest.param("handoff", {"schema_version": "handoff-v1.1"}, "schema_version", id="handoff-v1.1"),
+        pytest.param("handoff", {"schema_version": "handoff-v1"}, "schema_version", id="handoff-v1"),
         pytest.param("handoff", {"self_pull": {"refs": []}}, "refs", id="handoff-empty-refs"),
         pytest.param("handoff", {"artifact": _artifact_path("/etc/passwd")}, None, id="handoff-absolute-path"),
         pytest.param("handoff", {"artifact": _artifact_path("../report.html")}, None, id="handoff-parent-traversal"),

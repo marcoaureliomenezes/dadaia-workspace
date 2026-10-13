@@ -100,6 +100,10 @@ def _post_gate_heartbeat(ws: Path, sess_id: str) -> None:
 @pytest.mark.parametrize(
     ("idle", "renew", "sessions_outside", "survives"),
     [
+        pytest.param(360, False, False, True, id="bind-lost-silently-after-five-idle-minutes-idle-bind-survives"),
+        pytest.param(None, True, False, True, id="FR-W1-04-heartbeat-renewed-bind-survives-and-resolves"),
+        pytest.param(None, False, False, False, id="FR-W1-04-unrenewed-stale-bind-collected"),
+        pytest.param(None, False, True, False, id="doctor-reports-a-refused-removal-as-deleted"),
         pytest.param(360, False, False, True, id="idle-bind-survives"),
         pytest.param(None, True, False, True, id="heartbeat-renewed-bind-survives-and-resolves"),
         pytest.param(None, False, False, False, id="unrenewed-stale-bind-collected"),
@@ -145,6 +149,7 @@ def test_no_stale_records(
     [
         pytest.param("tmp/claude/20260801", 60, "gone", id="ephemeral-tmp-deleted"),
         pytest.param("reaped/20260901/x", 60, "gone", id="ephemeral-hold-deleted-at-its-ttl"),
+        pytest.param("handoff/ctx/p.handoff.json", 60, "held", id="AC2.10-output-handoff-held"),
         pytest.param("handoff/ctx/p.handoff.json", 60, "held", id="output-handoff-held"),
         pytest.param("tmp/claude/today", -60, "kept", id="live-entry-no-finding"),
         pytest.param("handoff/AGENTS.md", 400 * 86_400, "kept", id="zone-law-never-a-candidate"),

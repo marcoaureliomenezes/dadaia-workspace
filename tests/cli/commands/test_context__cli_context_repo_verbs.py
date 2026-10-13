@@ -87,6 +87,13 @@ def test_a_refused_repo_verb_exits_1_and_changes_nothing(
     assert _record(foo, "foo")["associated_repos"] == _A
 
 
+def test_a17_2_adding_the_own_main_slug_is_a_no_op(foo: Path) -> None:
+    before = _record(foo, "foo")
+    result = _runner.invoke(app, ["context", "repo", "add", "foo", "foo-repo"])
+    assert result.exit_code == 0, result.output
+    assert _record(foo, "foo") == before
+
+
 def test_adding_the_own_main_slug_is_a_no_op(foo: Path) -> None:
     before = _record(foo, "foo")
     result = _runner.invoke(app, ["context", "repo", "add", "foo", "foo-repo"])

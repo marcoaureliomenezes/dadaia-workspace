@@ -190,6 +190,13 @@ def test_a_bound_context_without_specs_gets_its_next_step(tmp_path: Path) -> Non
 @pytest.mark.parametrize(
     ("sid", "name", "fix"),
     [
+        pytest.param("s1", "gamma", "context alive gamma", id="S9-dead-context"),
+        pytest.param(
+            None,
+            "alpha",
+            "export DADAIA_SESSION_ID set to a stable id",
+            id="ADR0116-no-id-never-mints",
+        ),
         pytest.param("s1", "gamma", "context alive gamma", id="dead-context"),
         pytest.param(
             None,
