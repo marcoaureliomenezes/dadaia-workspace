@@ -1,5 +1,4 @@
-"""0.4.6 AC8 (FR7, bug doctor-root1-flags-env-that-dadaia-md-9-declares-canonical)
-and AC7 (FR6, the ``.dadaiaignore`` reader); size: SMALL.
+"""The root gate's allow-list and the ``.dadaiaignore`` reader; size: SMALL.
 
 Harness-real behavior tests for dadaia_workspace.hooks.root_whitelist.
 
@@ -10,7 +9,7 @@ on the subprocess result, never by importing ``main()`` in-process.
 
 Rewritten from the old in-process ``root_whitelist.main()`` + ``sys.stdin`` simulation (the
 pattern the harness-env contract bans). The gate resolves the workspace root from the
-write target and the session cwd, as in production (sa-seven-workspace-root-rules#S3).
+write target and the session cwd, as in production.
 
 CRIT: root-whitelist is a deterministic enforcement policy — every current input survives
 below as a named parametrized row, including the W1-6 first-path-component block.
@@ -54,9 +53,8 @@ def _run(tmp_path: Path, payload: dict[str, Any]) -> tuple[str, dict[str, Any] |
 
 
 def test_block_message_lists_every_whitelisted_entry(tmp_path: Path) -> None:
-    """sa-gate-allows-root-entries-the-reaper-moves#E1, #E7: the block names every root
-    entry the law admits, and neither its text nor its fix points the agent at the
-    operator's exceptions file (DEC-1 (a))."""
+    """The block names every root entry the law admits, and neither its text nor its fix points
+    the agent at the operator's exceptions file."""
     _out, block = _run(
         _ws(tmp_path),
         {"tool_name": "Write", "tool_input": {"file_path": str(tmp_path / "junk.txt")}},
@@ -74,9 +72,8 @@ def test_block_message_lists_every_whitelisted_entry(tmp_path: Path) -> None:
 def test_law_declared_root_files_are_canon_for_the_hook_and_the_doctor(
     tmp_path: Path, name: str
 ) -> None:
-    """sa-gate-allows-root-entries-the-reaper-moves#E8, #E6: the hook and the doctor derive
-    from ``ROOT_ALLOWED_FILES``, so one row admits a file to both. ``.env`` left it (ADR 0146
-    (1): credentials live outside the workspace); the block message above no longer names it."""
+    """The hook and the doctor derive from ``ROOT_ALLOWED_FILES``, so one row admits a file to
+    both. ``.env`` is not admitted: credentials live outside the workspace."""
     from dadaia_workspace.features.spec_context.doctor import DoctorService, FindingVerdict
 
     ws = _ws(tmp_path)
@@ -121,12 +118,10 @@ def test_law_declared_root_files_are_canon_for_the_hook_and_the_doctor(
 def test_four_places_table(
     tmp_path: Path, target: str, ignore: str, registry: str, allowed: bool
 ) -> None:
-    """sa-gate-allows-root-entries-the-reaper-moves#E1 (stray blocked), #E2 (globbed allowed),
-    #E8 (law-admitted entries allowed) and T-050-116 (ADR 0132), which narrows #E8: a write
-    under an unregistered ``repos/<x>/`` — the retired ``subdir_write`` row — now blocks
-    (``repos-stray-context-name``). The root, ``.dadaia/``, ``repos/`` and ``worktrees/`` each block
-    a stray entry and admit a globbed one; ``repos/`` admits every repo slug of every context
-    (DEAD included), ``worktrees/`` those of ALIVE ones, and an unreadable registry admits all."""
+    """The root, ``.dadaia/``, ``repos/`` and ``worktrees/`` each block a stray entry and admit
+    a globbed one, and law-admitted entries are allowed. A write under an unregistered
+    ``repos/<x>/`` blocks. ``repos/`` admits every repo slug of every context (DEAD included),
+    ``worktrees/`` those of ALIVE ones, and an unreadable registry admits all."""
     ws = _ws(tmp_path, registry)
     (ws / DADAIAIGNORE).write_text(ignore, encoding="utf-8")
     out, block = _run(
@@ -139,8 +134,7 @@ def test_four_places_table(
 
 
 def test_a_fenced_root_stays_protected(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """AC1.3 (fenced-roots-env-disables-the-gate): the fence says "never act on", never
-    "nothing protects"."""
+    """The fence says "never act on", never "nothing protects"."""
     ws = _ws(tmp_path)
     monkeypatch.setenv(FENCE_ENV, os.pathsep.join((os.environ[FENCE_ENV], str(ws))))
     _out, block = _run(
@@ -174,9 +168,8 @@ def test_fail_open_table(tmp_path: Path, tool_name: str, tool_input: dict[str, A
 def test_the_fix_creates_the_agents_own_temp_dir(
     tmp_path: Path, extra: dict[str, object], segment: str
 ) -> None:
-    """AC4.4 (fix-lines-are-not-one-runnable-command): the fix makes the
-    agent's own `.dadaia/tmp/<agent>/<YYYYMMDD>/`, never the existing `tmp/` (a no-op); a
-    subagent payload's `agent_type` names it, only as a plain name (CWE-22)."""
+    """The fix makes the agent's own `.dadaia/tmp/<agent>/<YYYYMMDD>/`, never the existing
+    `tmp/` (a no-op); a subagent payload's `agent_type` names it, only as a plain name (CWE-22)."""
     payload = {"tool_name": "Write", "tool_input": {"file_path": str(tmp_path / "junk.txt")}}
     days = [datetime.now(UTC).strftime("%Y%m%d")]  # the call may cross UTC midnight
     _out, block = _run(_ws(tmp_path), {**payload, **extra})
@@ -198,9 +191,9 @@ def test_the_fix_creates_the_agents_own_temp_dir(
 def test_the_gate_judges_creation_only(
     tmp_path: Path, tool_name: str, entry: str, target: str
 ) -> None:
-    """Bug root-gate-blocks-editing-an-existing-entry: the law blocks a write "creating a new
-    entry"; an Edit or overwrite of a path that already exists creates nothing and is allowed — the
-    doctor still reports it. A new path under an existing slop directory stays blocked (#E1)."""
+    """The law blocks a write "creating a new entry"; an Edit or overwrite of a path that already
+    exists creates nothing and is allowed, and the doctor still reports it. A new path under an
+    existing slop directory stays blocked."""
     ws = _ws(tmp_path)
     payload = {"tool_name": tool_name, "tool_input": {"file_path": str(ws / target)}}
     _out, block = _run(tmp_path, payload)

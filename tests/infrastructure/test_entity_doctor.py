@@ -285,8 +285,7 @@ _REAL_CHECKS: dict[str, Callable[[], list[Any]]] = {
 
 @pytest.mark.parametrize("check", list(_REAL_CHECKS))
 def test_the_real_tree_passes_every_check(check: str) -> None:
-    """A10.1-A10.4, FR27/FR28 over the shipped tree; `every-cited-path-exists` is
-    sa-text-restates-rules-the-code-contradicts#49.6. Each check's planted red is below."""
+    """Every check passes over the shipped tree; each check's planted red is below."""
     violations = _REAL_CHECKS[check]()
     assert violations == [], f"{check}:\n" + "\n".join(map(str, violations))
 
@@ -424,8 +423,8 @@ def test_an_oversized_skill_md_and_an_undeclared_overlap_turn_red(tmp_path: Path
     ],
 )
 def test_skill_md_over_the_soft_limit_warns(tmp_path: Path, line: bytes) -> None:
-    """ADR 0170: a projected SKILL.md of soft + 1 lines is one workspace warning naming the
-    skill, its line count and its split; soft lines stay silent."""
+    """A projected SKILL.md of soft + 1 lines is one workspace warning naming the skill, its
+    line count and its split; soft lines stay silent."""
     soft = _real_map()["skill_md_line_soft"]
     skills = tmp_path / ".agents" / "skills"
     for name, n in (("fixture-long", soft), ("fixture-longer", soft + 1)):
@@ -451,8 +450,8 @@ def test_skill_md_over_the_soft_limit_warns(tmp_path: Path, line: bytes) -> None
 @functools.cache
 def _projected_specs_agents_relpath(repo_root: Path) -> str | None:
     """`specs/AGENTS.md` is a projected INSTANCE path, proven by running the real `scaffold()`
-    into a scratch dir and diffing it against its generating template — never by checkout
-    presence (bug citation-enforcer-resolves-projected-instance-paths-against-the-checkout)."""
+    into a scratch dir and diffing it against its generating template, never by checkout
+    presence."""
     templates_dir = repo_root / "dadaia_workspace" / "public" / "templates"
     source = templates_dir / "specs-AGENTS.md"
     if not source.exists():
@@ -483,8 +482,8 @@ def _real_dead_path_citations(repo_root: Path = _REPO_ROOT) -> list[str]:
 
 
 def test_projected_specs_agents_md_citation_survives_bare_checkout() -> None:
-    """Bug citation-enforcer-resolves-projected-instance-paths-against-the-checkout: with the
-    local `specs/AGENTS.md` leftover hidden (as in a bare CI clone), no citation of it is dead."""
+    """With the local `specs/AGENTS.md` leftover hidden (as in a bare clone), no citation of it
+    is dead."""
     real_path = _REPO_ROOT / "specs" / "AGENTS.md"
     hidden_path = real_path.with_name("AGENTS.md.hidden-for-bare-checkout-test")
     moved = real_path.exists()
@@ -526,8 +525,7 @@ def test_a_planted_dead_citation_turns_red(tmp_path: Path, body: str, token: str
 
 
 def test_posix_relpath_is_separator_agnostic_under_windows_path_semantics() -> None:
-    """Bug citation-mutation-fixtures-never-turn-red-on-windows: a `file:line` prefix built from
-    Windows path semantics renders POSIX."""
+    """A `file:line` prefix built from Windows path semantics renders POSIX."""
     root = PureWindowsPath(r"D:\pytest-fixture-repo")
     md = root / "dadaia_workspace" / "public" / "skills" / "fixture-skill" / "SKILL.md"
     assert posix_relpath(md, root) == "dadaia_workspace/public/skills/fixture-skill/SKILL.md"
@@ -559,8 +557,8 @@ _CITED_INVOCATION_RE = re.compile(
 
 
 def test_every_cited_dadaia_invocation_names_a_real_verb_and_option() -> None:
-    """repo-law-prescribes-a-removed-install-option: every `dadaia <verb…> --option` the law
-    cites resolves in the live Click tree, each `--option` among that command's parameters."""
+    """Every `dadaia <verb…> --option` the law cites resolves in the live Click tree, each
+    `--option` among that command's parameters."""
     from typer.main import get_command
 
     from dadaia_workspace.cli.main import app
@@ -629,8 +627,7 @@ def _self_invoked_verb_paths() -> list[tuple[str, tuple[str, ...]]]:
 
 
 def test_every_self_invoked_dadaia_verb_exists() -> None:
-    """0.4.7 FR5 (T-047-78), bug `certify-invokes-a-retired-verb`: the
-    longest literal prefix of every argv the package runs resolves to a LEAF verb."""
+    """The longest literal prefix of every argv the package runs resolves to a LEAF verb."""
     paths = set(command_paths())
     leaves = {p for p in paths if not any(q[: len(p)] == p and len(q) > len(p) for q in paths)}
     invocations = _self_invoked_verb_paths()
@@ -649,9 +646,9 @@ _ADD_PARSER_RE = re.compile(r"add_parser\(\s*\"([a-z][a-z-]*)\"")
 
 
 def test_every_cited_skill_script_verb_exists() -> None:
-    """bug `spec-navigator-cites-dead-memory-verb-and-false-binding-claim`:
-    a verb cited after `<script>.py` — inline (`memory.py drift`) or as the backticked list that
-    follows (`memory.py` — `catalog generate`, …) — is one of that script's `add_parser` names."""
+    """A verb cited after `<script>.py`, inline (`memory.py drift`) or as the backticked list
+    that follows (`memory.py` — `catalog generate`, …), is one of that script's `add_parser`
+    names."""
     verbs: dict[str, set[str]] = {}
     for script in sorted(_PUBLIC.glob("skills/*/scripts/[a-z]*.py")):
         found = verbs.setdefault(script.stem, set())

@@ -1,9 +1,9 @@
-"""Unit tests for the simple read/write JSON adapters — JsonHarnessProfileStore
-(v0.1.58 FR2, A1). Merged file (T-8, v0.1.75
-FR3 squeeze): both adapters share the identical stateless read/write-store contract
-(absent->None/roundtrip/canonical-shape/idempotent-mtime/overwrite), asserted once via
-the shared ``_store_contract.assert_read_write_store_contract`` helper through one
-parametrized sweep across both stores.
+"""Unit tests for the simple read/write JSON adapters, JsonHarnessProfileStore included.
+
+Both adapters share one stateless read/write-store contract (absent->None/roundtrip/
+canonical-shape/idempotent-mtime/overwrite), asserted once via the shared
+``_store_contract.assert_read_write_store_contract`` helper through one parametrized sweep
+across both stores.
 
 That is the discriminating proof the adapter genuinely persists the ledger shape.
 """

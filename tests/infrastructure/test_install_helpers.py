@@ -1,4 +1,4 @@
-"""The render-at-install seam (v0.1.65 FR5) at its K3 (v0.5.1) pure-render interface:
+"""The render-at-install seam at its pure-render interface:
 ``render_claude_agent``, ``resolve_codex_agent_model``, ``codex_agent_toml_bytes`` and the
 one ``ProjectionRule``/``install_rules`` seam.
 """
@@ -88,8 +88,8 @@ def test_render_claude_agent_seam(case: str, tmp_path: Path) -> None:
         assert "sonnet" not in rendered
 
     else:  # rejects-body-without-frontmatter
-        """sa-frontmatter-split-five-ways: one splitter, so the Claude render, the
-        Copilot view and the Codex TOML all refuse the same unclosed block."""
+        """One splitter, so the Claude render, the Copilot view and the Codex TOML all refuse the
+        same unclosed block."""
         resolved = ResolvedAgentModel(model="sonnet", effort="high", source="default")
         unclosed = "---\nname: x\nread_only: false\n\n# Body\n"
         md = _staged_agent_md(tmp_path, "x", unclosed)
@@ -111,9 +111,8 @@ def test_render_claude_agent_seam(case: str, tmp_path: Path) -> None:
 def test_privilege_derives_from_read_only_on_both_harnesses(
     tmp_path: Path, declared: str, claude: tuple[str, ...], sandbox: str
 ) -> None:
-    """sa-reviewer-persona-body-contradicts-its-tools#B2: read_only is the one privilege
-    field — Claude's permission mode derives from it, and so does the sandbox of a
-    writer (a read_only reviewer's Codex sandbox is pinned apart)."""
+    """read_only is the one privilege field: Claude's permission mode derives from it, and so
+    does the sandbox of a writer (a read_only reviewer's Codex sandbox is pinned apart)."""
     from dadaia_workspace.infrastructure.agent_transcodes import codex_agent_toml_bytes
     from dadaia_workspace.infrastructure.install_helpers import render_claude_agent
 
@@ -130,9 +129,8 @@ def test_privilege_derives_from_read_only_on_both_harnesses(
 
 
 def test_a_read_only_persona_gets_the_workspace_write_codex_sandbox(tmp_path: Path) -> None:
-    """merge-gate-accepts-verdict-written-by-the-merger: the reviewer (read_only: true) runs
-    ``verdict.py`` on Codex, so its sandbox is workspace-write (operator ruling 2026-10-07);
-    Claude still denies its edit tools."""
+    """The reviewer (read_only: true) runs ``verdict.py`` on Codex, so its sandbox is
+    workspace-write; Claude still denies its edit tools."""
     from dadaia_workspace.infrastructure.agent_transcodes import codex_agent_toml_bytes
     from dadaia_workspace.infrastructure.install_helpers import render_claude_agent
 
@@ -155,8 +153,7 @@ def test_a_read_only_persona_gets_the_workspace_write_codex_sandbox(tmp_path: Pa
     ],
 )
 def test_a_persona_without_read_only_never_renders(tmp_path: Path, body: str) -> None:
-    """sa-reviewer-persona-body-contradicts-its-tools#B3: privilege never falls back to
-    a silent default (review 0.4.7 c5 F2) — on either harness."""
+    """Privilege never falls back to a silent default, on either harness."""
     from dadaia_workspace.infrastructure.agent_transcodes import codex_agent_toml_bytes
     from dadaia_workspace.infrastructure.install_helpers import render_claude_agent
 
@@ -179,10 +176,9 @@ def test_a_persona_without_read_only_never_renders(tmp_path: Path, body: str) ->
 def test_resolve_codex_agent_model_fails_closed_for_any_agent_without_model(
     agent: str, persona: str
 ) -> None:
-    """sa-staged-assets-without-consumers#44.4: a persona, core or not, with neither an
-    authored ``model:`` nor a resolved policy model raises — never a silent default.
-    sa-persona-model-read-by-two-parsers: the one frontmatter reader is the only reader (a
-    body ``model:`` line is no declaration) and an unregistered model is refused."""
+    """A persona, core or not, with neither an authored ``model:`` nor a resolved policy model
+    raises, never a silent default. The one frontmatter reader is the only reader (a body
+    ``model:`` line is no declaration), and an unregistered model is refused."""
     from dadaia_workspace.core.frontmatter import Frontmatter, parse
     from dadaia_workspace.infrastructure.install_helpers import resolve_codex_agent_model
 
@@ -193,7 +189,7 @@ def test_resolve_codex_agent_model_fails_closed_for_any_agent_without_model(
 
 
 def test_an_inline_comment_is_not_part_of_the_declared_model() -> None:
-    """sa-persona-model-read-by-two-parsers: YAML ``model: x # note`` declares ``x``."""
+    """YAML ``model: x # note`` declares ``x``."""
     from dadaia_workspace.core.frontmatter import Frontmatter, parse
 
     parsed = parse("---\nname: a\nmodel: sonnet # tier\n---\n")
@@ -202,8 +198,7 @@ def test_an_inline_comment_is_not_part_of_the_declared_model() -> None:
 
 
 def test_resolve_codex_agent_model_falls_back_to_staged_when_no_resolved_policy() -> None:
-    """sa-staged-assets-without-consumers#44.4 + sa-codex-effort-set-by-policy-and-by-tier:
-    no policy -> the authored ``model:`` and the resolver's own ``medium`` effort."""
+    """No policy: the authored ``model:`` and the resolver's own ``medium`` effort."""
     from dadaia_workspace.infrastructure.install_helpers import resolve_codex_agent_model
 
     model, effort = resolve_codex_agent_model("frontend-engineer", "sonnet", None)
@@ -222,8 +217,8 @@ def test_resolve_codex_agent_model_falls_back_to_staged_when_no_resolved_policy(
 def test_resolve_codex_agent_model_with_a_resolved_policy(
     staged: str | None, effort: str, model: str, codex_model: str, codex_effort: str
 ) -> None:
-    """A resolved policy wins over an authored ``model:``; the alias becomes its Codex id
-    (AC1.4) and D-3 clamps its effort."""
+    """A resolved policy wins over an authored ``model:``; the alias becomes its Codex id and
+    the effort is clamped."""
     from dadaia_workspace.infrastructure.install_helpers import resolve_codex_agent_model
 
     resolved = ResolvedAgentModel(model=model, effort=effort, source="template")
@@ -308,7 +303,7 @@ def test_install_rules_rewrites_a_read_only_projection(tmp_path: Path) -> None:
 
 
 def test_persona_read_only_compares_the_typed_value_and_fails_closed() -> None:
-    """AC12.3: ``read_only`` is the bool the frontmatter reader types, never a string."""
+    """``read_only`` is the bool the frontmatter reader types, never a string."""
     from dadaia_workspace.infrastructure.install_helpers import persona_read_only
 
     assert persona_read_only({"read_only": True}) is True
@@ -321,7 +316,7 @@ def test_persona_read_only_compares_the_typed_value_and_fails_closed() -> None:
 
 
 def test_the_real_personas_parse_to_a_typed_band_and_read_only() -> None:
-    """AC12.3 (passes today: the shim already types through PyYAML; it must keep doing so)."""
+    """The shim already types through PyYAML; it must keep doing so."""
     from dadaia_workspace.core.frontmatter import Frontmatter, parse
 
     personas = sorted(

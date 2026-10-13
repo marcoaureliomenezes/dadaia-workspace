@@ -1,9 +1,7 @@
 """GitSubprocessClient against real git.
 
-Bug 4 (first push sets
-upstream, a mismatched upstream pushes by explicit refspec, v0.1.50 FR3); v0.4.3 A10.2
-(commit_paths ignores pre-staged content); SA-H3-2 (the operator's own identity, never a
-fallback); review 6 N2 (a failed step carries git's stdout).
+A mismatched upstream pushes by explicit refspec; commit_paths ignores pre-staged content;
+the identity is the operator's own, never a fallback; a failed step carries git's stdout.
 """
 
 import subprocess
@@ -85,8 +83,8 @@ def test_a_failed_git_step_carries_gits_full_output(tmp_path: Path) -> None:
 def test_push_first_push_sets_upstream_and_mismatched_branch_uses_explicit_refspec(
     tmp_path: Path,
 ) -> None:
-    """Bug 4 / v0.1.50 FR3: plain ``git push`` fails under push.default=simple when the
-    upstream name differs; the client pushes HEAD:<upstream branch> instead."""
+    """Plain ``git push`` fails under push.default=simple when the upstream name differs; the
+    client pushes HEAD:<upstream branch> instead."""
     bare = tmp_path / "bare.git"
     subprocess.run(["git", "init", "-q", "--bare", str(bare)], check=True)
     local = _repo(tmp_path / "local")
@@ -141,7 +139,7 @@ def _commit_file(repo: Path, name: str) -> str:
 def test_a_caller_git_env_never_redirects_the_client_to_another_repo(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """AC11.2: with GIT_DIR/GIT_WORK_TREE naming repo B, every answer is repo A's."""
+    """With GIT_DIR/GIT_WORK_TREE naming repo B, every answer is repo A's."""
     repo_a, repo_b = _repo(tmp_path / "a"), _repo(tmp_path / "b")
     head_a = _commit_file(repo_a, "only-a.txt")
     _commit_file(repo_b, "only-b.txt")
@@ -157,7 +155,7 @@ def test_a_caller_git_env_never_redirects_the_client_to_another_repo(
 
 
 def test_the_worktree_list_parse_is_the_kernels(tmp_path: Path) -> None:
-    """AC11.2: the linked trees `unrecoverable` removes are `_git.parse_worktrees` of the porcelain."""
+    """The linked trees `unrecoverable` removes are `_git.parse_worktrees` of the porcelain."""
     parse_worktrees = load_owner("dd-bug-resolution", "_git").parse_worktrees
     assert parse_worktrees("worktree /m\nHEAD a\n\nworktree /l\nHEAD b\nbranch refs/heads/x\n") == [
         {"worktree": "/l", "HEAD": "b", "branch": "refs/heads/x"}

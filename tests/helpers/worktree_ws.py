@@ -1,4 +1,4 @@
-"""A tmp workspace for `worktree.py` tests: one repo `r` on `main` with an Approved 0.5.0 rc-1
+"""A tmp workspace for `worktree.py` tests: one repo `r` on `main` with an Approved release
 trio, a valid `_RELEASE.json`, a `scripts/ci.py` whose level L fails iff the tree holds
 `RED-<L>`, and `feature/0.5.0`; its `verify:` lines declare it, and a stub CLI in the fake venv's
 scripts dir (`cli_path`) standing for the two reads the script makes — `context list --json` (gitflow `dev` as integration, so a
@@ -25,7 +25,7 @@ SCRIPT = (
     / "dadaia_workspace/public/skills/dd-gitflow-default/scripts/worktree.py"
 )
 FLOW = {"principal": "trunk", "integration": "dev", "work": "feature/"}
-#: The repo's gate (ADR 0190): prints its argv; level L fails iff the tree holds `RED-<L>`.
+#: The repo's gate: prints its argv; level L fails iff the tree holds `RED-<L>`.
 CI = 'import pathlib, sys\nprint("ci", *sys.argv[1:])\nsys.exit(pathlib.Path("RED-" + sys.argv[1]).exists())\n'
 JOB, TASK = "0.5.0-rc1/j1", "0.5.0-rc1/j1--J1.T1"
 _CLI = """#!python

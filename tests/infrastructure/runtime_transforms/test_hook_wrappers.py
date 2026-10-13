@@ -1,14 +1,14 @@
-"""sa-gate-blind-on-cursor-copilot-devin#B8: for every registry harness, a payload fixture in the harness's native shape
-(``tests/fixtures/hook_payloads/<harness>/``, shapes from the bug record's vendor-doc
-citations — authored, not recorded) through its rendered hook gets Claude's verdict for
-a new root entry / a PROTECTED file / a worktree write of an unregistered slug (scope: allowed).
-sa-gate-blind-on-cursor-copilot-devin#B2 Cursor's preToolUse
-deny reaches the model (agent_message) with a fix line; sa-gate-blind-on-cursor-copilot-devin#B3 Devin's hooks.v1.json has the
-documented event -> [{matcher, hooks}] shape; sa-gate-blind-on-cursor-copilot-devin#B4 an allowed call prints nothing on the
-translated harnesses; sa-gate-blind-on-cursor-copilot-devin#B5 Kimi's shim prints the reason with real newlines, `fix:` at a
-line start, exit 2. AC1.2 (ADR 0103, ctx-inject-on-cursor-copilot): every harness's
-rendered ctx-inject wrapper answers on stdout, Cursor and Copilot in their vendor key, at
-every sessionStart. AC3.9: a truncated registry under a live bind still BLOCKs in every dialect.
+"""Every registry harness, through its rendered hook, gets Claude's verdict for a payload in its
+native shape.
+
+The payloads (``tests/fixtures/hook_payloads/<harness>/``) cover a new root entry, a PROTECTED
+file and a worktree write of an unregistered slug (scope: allowed). Cursor's preToolUse deny
+reaches the model with a fix line; Devin's hooks.v1.json uses the documented event shape; an
+allowed call prints nothing on the translated harnesses; Kimi's shim prints the reason with real
+newlines, ``fix:`` at a line start, exit 2. Every harness's ctx-inject wrapper answers on stdout,
+Cursor and Copilot in their vendor key, at every sessionStart. A truncated registry under a live
+bind still blocks in every dialect.
+
 Size: MEDIUM — runs the real generated wrappers/shim over the real pre_gate.
 """
 
@@ -99,10 +99,9 @@ def test_b8_every_harness_gets_claudes_verdict(ws: Path, harness: str, case: str
 def test_ac3_9_a_bound_session_over_a_truncated_registry_still_blocks(
     ws: Path, harness: str, case: str, body: str
 ) -> None:
-    """AC3.9 (PLAN §2.6): a session bound by its live record, its registry truncated: an
-    unreadable registry is no bind, never a raise the pre-gate fails open on — a PROTECTED
-    write, a new root entry and a direct `repos/<r>/` write (ADR 0105) each BLOCK in every
-    dialect."""
+    """A session bound by its live record, its registry truncated: an unreadable registry is no
+    bind, never a raise the pre-gate fails open on. A PROTECTED write, a new root entry and a
+    direct `repos/<r>/` write each BLOCK in every dialect."""
     now = datetime.now(tz=UTC).isoformat()
     session_store.write_session(
         ws, "s", {"session_id": "s", "last_seen_at": now, "context": "demo"}
@@ -145,8 +144,8 @@ def test_b5_kimi_prints_the_reason_with_real_newlines_and_exits_2(ws: Path) -> N
 
 @pytest.mark.parametrize("harness", sorted(HARNESS_RECORDS))
 def test_ac1_2_every_ctx_inject_wrapper_answers_on_stdout(ws: Path, harness: str) -> None:
-    """AC1.2: a bound id-less session gets its context on the wrapper's STDOUT (never
-    ``>&2``); Cursor and Copilot twice, as two sessionStarts are two new sessions."""
+    """A bound id-less session gets its context on the wrapper's STDOUT (never ``>&2``); Cursor
+    and Copilot twice, as two sessionStarts are two new sessions."""
     (ws / ".dadaia/states/spec_contexts.json").write_text(
         json.dumps({"contexts": [{"name": "alpha", "state": "alive", "repo_slug": "alpha"}]})
     )

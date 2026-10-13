@@ -1,10 +1,8 @@
 """ctx_inject driven as a real harness does: a subprocess, the session id on stdin.
 
-bind-driven injection (FR-W2-01/02, T-50-03), compaction re-entry
-(claude-compact-reinjection-missing, kimi-postcompact-omits-bound-context-bootstrap),
-the catalog digest (AC-W4-03), A19.1 (associated repos inject nothing), A30.1,
-bind-lost-silently-after-five-idle-minutes (a lost bind is told once); AC1.2 Cursor/Copilot
-envelopes and new-session injection.
+Covers bind-driven injection, compaction re-entry, the catalog digest, associated repos
+injecting nothing, a lost bind told once, and the Cursor/Copilot envelopes and
+new-session injection.
 """
 
 from __future__ import annotations
@@ -302,8 +300,7 @@ def test_first_emission(
 
 
 def test_env_override_injects_context_memory(tmp_path: Path) -> None:
-    """sa-bind-has-two-stores#S2: a session with no id (a Kimi shell, no payload id) is
-    bound by DADAIA_CONTEXT."""
+    """A session with no id (a Kimi shell, no payload id) is bound by DADAIA_CONTEXT."""
     _ws(tmp_path, {"name": "ctx"})
     env = kimi_hook_env(tmp_path, extra={"DADAIA_CONTEXT": "ctx"})
     result = run_hook_subprocess("ctx_inject", {}, env)
@@ -335,7 +332,7 @@ def test_output_contract_envelopes(
 
 
 def test_emissions_attach_the_derived_help_digest(tmp_path: Path) -> None:
-    """T-053-24: the digest rides every emission, read from .dadaia/agentic/help-digest.md."""
+    """The digest rides every emission, read from .dadaia/agentic/help-digest.md."""
     _ws(tmp_path)
     (tmp_path / ".dadaia" / "agentic").mkdir()
     (tmp_path / ".dadaia" / "agentic" / "help-digest.md").write_text(
@@ -420,8 +417,7 @@ def _ops(root: Path, hook: str, bound: bool) -> int:
 def test_hook_lane_cost_does_not_grow_with_the_registry(
     tmp_path: Path, hook: str, bound: bool
 ) -> None:
-    """AC2.2 (0118): a hook lane's filesystem and subprocess operations are the same at 2 and
-    at 20 registered contexts."""
+    """A hook lane's filesystem and subprocess operations are the same at 2 and at 20 contexts."""
     two, twenty = (
         _ops(_ws(tmp_path / str(n), *({"name": f"c{i}"} for i in range(n))), hook, bound)
         for n in (2, 20)
@@ -449,7 +445,7 @@ def test_two_same_second_binds_each_reinject_once(tmp_path: Path) -> None:
 def test_naive_bound_at_reads_as_utc_in_any_zone(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """AC16.1: a ``bound_at`` without an offset is UTC, as ``session_store.is_live`` reads it."""
+    """A ``bound_at`` without an offset is UTC, as ``session_store.is_live`` reads it."""
     import time
 
     from dadaia_workspace.hooks import ctx_inject

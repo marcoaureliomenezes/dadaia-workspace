@@ -1,8 +1,7 @@
 """sdd_gate's ALLOW/BLOCK verdict, driven as a real PreToolUse subprocess.
 
-the install ledger decides PROTECTED (sa-gate-path-classes-diverge-from-the-law);
-scope is path-first and repos/<r>/ is merge-only (T-050-97, AC1.1); the gate never blocks on
-concurrency (NO-LOCKS doctrine, v0.1.76); a fenced root stays protected (AC1.3); a repo's own AGENTS.md is never law (v0.4.5 FR1).
+The install ledger decides PROTECTED; scope is path-first and repos/<r>/ is merge-only; the gate
+never blocks on concurrency; a fenced root stays protected; a repo's own AGENTS.md is never law.
 """
 
 from __future__ import annotations
@@ -83,7 +82,7 @@ def _row(id: str, target: Any, want: str | None = None, **opts: Any) -> Any:
           for r in (".agents/skills/dd-x/SKILL.md", ".dadaia/states/install_ledger.json")),
         *(_row(f"sa-gate-path-classes-diverge-from-the-law#B39-7-ledgered-law-{r}", r, _BLOCK,
                ledger=True) for r in ("AGENTS.md", ".dadaia/AGENTS.md", ".dadaia/tmp/AGENTS.md")),
-        *(_row(f"B39-7-unledgered-law-is-an-ordinary-write-{r}", r)  # root AGENTS.md: floor, gate-protects-nothing-without-install-ledger
+        *(_row(f"B39-7-unledgered-law-is-an-ordinary-write-{r}", r)  # unledgered law is a floor, not a PROTECTED path
           for r in (".dadaia/AGENTS.md", ".dadaia/tmp/AGENTS.md")),
         _row("sa-gate-path-classes-diverge-from-the-law#B39-3-a-tmp-probe-agents-md",
              ".dadaia/tmp/probe/20260927/AGENTS.md", ledger=True),
@@ -131,10 +130,9 @@ def test_gate_verdict(tmp_path: Path, target: Any, want: str | None, opts: dict[
 
 @pytest.mark.medium
 def test_a_truncated_registry_is_no_context_at_the_gate(tmp_path: Path) -> None:
-    """sa-context-repo-mapping-falls-back-to-the-name#B4 (the gate leg; `context show`
-    prints REG-SCHEMA since AC3.9, test_registry_version_grammar): with a truncated
-    spec_contexts.json and DADAIA_CONTEXT naming a context, the real hook neither crashes
-    nor scope-blocks an id-less worktree write (no context is registered, ADR 0116)."""
+    """A truncated registry is no context at the gate: with a truncated spec_contexts.json and
+    DADAIA_CONTEXT naming a context, the real hook neither crashes nor scope-blocks an id-less
+    worktree write (no context is registered)."""
     ws = _mk_workspace(tmp_path, "proj", "other")
     (ws / ".dadaia" / "states" / "spec_contexts.json").write_text('{"contexts": [{"na')
     env = claude_hook_env(ws, session_id="s")

@@ -1,15 +1,12 @@
-"""Public-source hygiene contract (FR-W5-01 / AC-W5-01, release v0.1.11).
+"""Public-source hygiene contract: no bytecode leaks into the canonical public asset tree.
 
-Residual R7: ``dadaia_workspace/public/scripts/__pycache__/`` had been committed —
-compiled bytecode leaking into the canonical public asset tree, which is source-of-truth
-for every consumer and is staged/projected verbatim. Two failure modes must stay closed:
+Two failure modes stay closed:
 
 1. **At rest.** No ``__pycache__``/``.pyc`` sits under ``dadaia_workspace/public/``.
 
-2. **Packaging.** The built wheel/sdist must contain no ``.pyc``. ``poetry-core`` honours
-   the ``[tool.poetry] exclude`` globs for both artifacts; this test asserts the exclusion
-   config is present (cheap — no full build invocation, which would be network/poetry
-   dependent and is the final-gate's job).
+2. **Packaging.** The built wheel/sdist contains no ``.pyc``. ``poetry-core`` honours the
+   ``[tool.poetry] exclude`` globs for both artifacts; this test asserts the exclusion config
+   is present (no full build invocation).
 """
 
 from __future__ import annotations
@@ -37,8 +34,8 @@ def tracked_bytecode(repo_root: Path) -> list[str]:
 
 
 def test_bytecode_contract_judges_tracked_files_not_the_working_tree(tmp_path: Path) -> None:
-    """job-gate-red-on-untracked-bytecode: an ignored ``__pycache__/x.pyc`` under public/
-    keeps the contract green; once tracked it fails it."""
+    """An ignored ``__pycache__/x.pyc`` under public/ keeps the contract green; once tracked it
+    fails it."""
     git(tmp_path, "init", "-q")
     cache = tmp_path / "dadaia_workspace" / "public" / "scripts" / "__pycache__"
     cache.mkdir(parents=True)
@@ -51,10 +48,9 @@ def test_bytecode_contract_judges_tracked_files_not_the_working_tree(tmp_path: P
 
 
 def test_pre_push_ci_gate_ships_pyproject_excludes_bytecode_and_scripts_leave_no_pycache() -> None:
-    """`pre-push-ci-gate.sh` is present in the public/scripts/ listing (the SINGLE
-    explicit ship assertion for the pre-push gate script, suite-wide, v0.1.51 FR3),
-    and the poetry-core build config excludes __pycache__/*.pyc from sdist and wheel;
-    the canonical public asset tree carries no bytecode at rest.
+    """`pre-push-ci-gate.sh` is in the public/scripts/ listing, the poetry-core build config
+    excludes __pycache__/*.pyc from sdist and wheel, and the canonical public asset tree
+    carries no bytecode at rest.
     """
     listing = {p.name for p in _SCRIPTS_DIR.iterdir()}
     assert_populated(listing, sentinel="pre-push-ci-gate.sh")
@@ -98,29 +94,29 @@ def _denied_lines(globs: tuple[str, ...], pattern: str, spare: str | None) -> li
 @pytest.mark.parametrize(
     ("globs", "pattern", "spare"),
     [
-        # 0.4.6 c4 AC13 (FR16, D2/D3/D9): retired surfaces staged verbatim must not be taught
+        # retired surfaces staged verbatim must not be taught
         pytest.param(_ALL, r"academy|dadaia clean|tmp gc|reports cleanup|ROOT-4|legacy-quarantine|repos catalog", None, id="retired-surface"),
-        # 0.4.7 FR4/AC4.1 (T-047-58): the published surface is 100% English
+        # the published surface is 100% English
         pytest.param(("public/**/*.md", "public/**/*.json", "public/**/*.py", "public/**/*.txt", "public/**/*.j2", "features/specs/canon.py"), rf"(?i){_PT_TERMS}", None, id="portuguese-control-vocabulary"),
-        # 0.4.7 FR1/FR7: a retired bug-record key named as a live field (its retirement line is spared)
+        # a retired bug-record key is not named as a live field (its retirement line is spared)
         pytest.param(_MD_JSON, r"lineage_source|registration_commit|registration_granularity|resolved_commit|resolution_granularity|root_cause|migration_note", "retired", id="retired-bug-record-key"),
-        # verdict-vocabulary-persona-schema-mismatch: the handoff schema admits APPROVED/REJECTED only
+        # the handoff schema admits APPROVED/REJECTED only
         pytest.param(_MD_JSON, r"REQUEST_CHANGES|\bAPPROVE\b", None, id="retired-verdict-token"),
-        # sa-specs-upgrade-stamps-any-target-and-memory-vocabulary-diverges#47.4
+        # shipped text teaches no Part 1 / Part 2 memory vocabulary
         pytest.param(tuple(f"public/**/*{s}" for s in (".md", ".json", ".py", ".toml", ".txt", ".sh")), r"Part 1|Part 2", None, id="memory-part-1-part-2"),
-        # AC3.2 / T-047-56: the pre-0.4.7 persona names, where not dd- prefixed
+        # retired persona names, where not dd- prefixed
         pytest.param(_ALL, rf"(?<![\w-])({_OLD_PERSONAS})\b", None, id="retired-persona-name"),
-        # roster-keeps-a-coordinator-persona-while-the-main-thread-coordinates (ADR 0022)
+        # the roster keeps no coordinator persona while the main thread coordinates
         pytest.param(("**/*",), r"project-manager", None, id="deleted-coordinator-persona"),
-        # sa-consumer-law-carries-library-facts#FR8.2: no skill prescribes the library's release tooling
+        # no skill prescribes the library's release tooling
         pytest.param(("public/skills/**/*.md",), r"(?i)release-please|gh pr create|last tag \+ 1", None, id="skill-release-tooling"),
-        # sa-consumer-law-carries-library-facts#FR8.3: scaffolded law cites no library ratchet, test or path
+        # scaffolded law cites no library ratchet, test or path
         pytest.param(("public/scaffold/**/*.md", "public/data/fixed/*.md"), r"ratchet V\d|test_\w+\.py|dadaia_workspace/|release-please", None, id="scaffold-law-library-fact"),
-        # sa-reviewer-persona-body-contradicts-its-tools#B4: ADDITIVE is the gate's path class only
+        # ADDITIVE is the gate's path class only
         pytest.param(("public/agents/*.md",), r"ADDITIVE", None, id="persona-additive"),
-        # help-texts-and-bug-schema-cite-behaviour-that-is-gone: the bug schema cites no retired verb
+        # the bug schema cites no retired verb
         pytest.param(("public/skills/dd-bug-resolution/scripts/schemas/bug-record-v1.schema.json",), r"dadaia bugs append|features/specs/schemas\.py", None, id="bug-schema-retired-verb"),
-        # sa-reaper-destroys-its-own-hold-before-ttl#B6
+        # the reaper's expired-only hold spares slop
         pytest.param(("public/skills/dd-cli-library/SKILL.md",), r"without touching slop", None, id="expired-only-spares-slop"),
     ],
 )  # fmt: skip
@@ -139,7 +135,7 @@ _PRIVATE_PIPELINE = (
 
 
 def test_public_law_names_no_private_pipeline() -> None:
-    """public-law-teaches-the-private-pipeline: shipped text names no remote CI or one-stack tool."""
+    """Shipped text names no remote CI or one-stack tool."""
     globs = tuple(f"public/**/*.{s}" for s in ("md", "json", "py", "sh")) + (
         "features/chokepoints/*.py",
     )
@@ -147,7 +143,7 @@ def test_public_law_names_no_private_pipeline() -> None:
 
 
 def test_public_law_names_no_adr_number_or_library_path() -> None:
-    """AC4.1: text agents read and scripts they run cite no ADR number and no library path."""
+    """Text agents read and scripts they run cite no ADR number and no library path."""
     globs = ("public/**/*",)
     assert _denied_lines(globs, r"ADR \d{4}|dadaia_workspace/", _BANNER_SPAN[0]) == []
 
@@ -192,9 +188,8 @@ def _shipped_text() -> list[Path]:
 
 
 def test_all_shipped_text_invokes_the_cli_by_its_venv_path() -> None:
-    """shipped-text-cites-bare-dadaia-the-gate-blocks,
-    shipped-text-bare-cli-guard-deleted-with-its-test. The venv-guard gate blocks a bare
-    `dadaia`, so no copyable span in shipped text may spell one. Zero tolerance."""
+    """The venv-guard gate blocks a bare `dadaia`, so no copyable span in shipped text may spell
+    one. Zero tolerance."""
     paths = _shipped_text()
     assert_populated([p.name for p in paths], "CONTEXT.md")
     violations = [
@@ -245,9 +240,8 @@ def _dead_flags(span: str, tree: dict[str, set[str]]) -> list[str]:
 
 
 def test_every_flag_cited_beside_a_venv_call_exists_in_that_verbs_help() -> None:
-    """dd-cli-library-cites-a-dead-flag-and-omits-level-3,
-    shipped-text-bare-cli-guard-deleted-with-its-test. A flag cited next to
-    `.dadaia/.venv/bin/dadaia <verb>` in shipped text is one that verb takes."""
+    """A flag cited next to `.dadaia/.venv/bin/dadaia <verb>` in shipped text is one that verb
+    takes."""
     tree = _cli_tree()
     violations = [
         f"{path.relative_to(_REPO_ROOT).as_posix()}:{n}: {dead}"
@@ -262,7 +256,7 @@ _RETIRED_PERSONA = "dd-" + "software-engineer"
 
 
 def test_the_retired_persona_name_stays_out_of_library_and_tests() -> None:
-    """AC2.5: no text file under dadaia_workspace/ or tests/ names the retired persona."""
+    """No text file under dadaia_workspace/ or tests/ names the retired persona."""
     paths = sorted(
         p
         for root in ("dadaia_workspace", "tests")

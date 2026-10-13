@@ -1,5 +1,4 @@
-"""A
-history read that a shallow clone cannot answer names the missing history, and its fix
+"""A history read that a shallow clone cannot answer names the missing history, and its fix
 line, run verbatim, clears the refusal.
 
 size: MEDIUM — real git clones over file:// and the real release script's `drift` verb.
@@ -104,7 +103,7 @@ class _Answer:
 def test_worktree_rows_keeps_the_contexts_repos_and_the_rows_no_context_owns(
     tmp_path: Path,
 ) -> None:
-    """The one filter — this context's repos plus `registered: false`, no other repo's."""
+    """The one filter: this context's repos plus `registered: false`, no other repo's."""
     rows: list[dict[str, object]] = [
         {"repo": "mine", "path": "/w/a", "registered": True},
         {"repo": "theirs", "path": "/w/b", "registered": True},

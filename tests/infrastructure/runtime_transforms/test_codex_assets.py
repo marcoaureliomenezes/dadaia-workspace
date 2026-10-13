@@ -1,22 +1,11 @@
-"""Contract — D-CX-7 stays live for the ``dd-`` skill family (SPEC v0.10.0 FR13(b)),
-and every ``_CODEX_SKILL_REF_PREFIXES`` entry binds to a real asset (v0.4.3 A22.6).
+"""Every ``_CODEX_SKILL_REF_PREFIXES`` entry binds to a real ``public/skills/`` name, and the
+D-CX-7 check stays live for the ``dd-`` family.
 
-``_CODEX_SKILL_REF_PREFIXES`` (``codex_assets.py``) gates which backtick-quoted
-skill references a projected Codex persona's ``developer_instructions`` are even
-checked for existence (``codex_doctor.py``, ``dcx7_codex_skill_refs``). The tuple
-used to carry the literal ``"drift-detection"`` — after the family rename to
-``dd-*`` (ADR #12/E-6), that literal no longer matches anything, and unless the
-tuple also gains a ``"dd-"`` prefix, D-CX-7 silently stops validating the entire
-new family: no error, no drift line, just quiet fail-open.
+``_CODEX_SKILL_REF_PREFIXES`` (``codex_assets.py``) gates which backtick-quoted skill references a
+projected Codex persona's ``developer_instructions`` are checked for existence
+(``codex_doctor.py``, ``dcx7_codex_skill_refs``). A phantom prefix would gate nothing, silently.
 
-The tuple also once carried ``"memory-ctx"``, backed by the Codex-only runtime
-adapter family. 0.4.7 FR3 retired that family with the ``.codex/skills`` copy — Codex
-reads the shared ``.agents/skills`` tree natively — so the only backing left is a real
-``public/skills/`` name. A22.6 binds the WHOLE tuple to that on-disk inventory, so a
-future phantom fails this test instead of gating nothing, forever, in silence.
-
-This file also proves the gate is alive for ``dd-`` names by construction: a
-projected Codex persona citing a non-existent ``dd-`` skill must produce the D-CX-7
+A projected Codex persona citing a non-existent ``dd-`` skill must produce the D-CX-7
 ``missing skill`` ERROR line, and one citing a real family skill must not.
 """
 
@@ -119,8 +108,7 @@ def test_codex_skill_ref_prefixes_bind_to_the_real_inventory() -> None:
 
 
 def test_a_bom_crlf_persona_projects_the_same_codex_bytes_as_its_lf_twin(tmp_path: Path) -> None:
-    """Bug codex-persona-frontmatter-drops-on-crlf: the Codex parser needed ``---\\n`` at byte 0,
-    so a BOM or CRLF persona lost its agent block."""
+    """A BOM or CRLF persona projects the same Codex bytes as its LF twin."""
     name = "dd-sw-engineer-sr"
     lf = (_PUBLIC / "agents" / f"{name}.md").read_bytes()
     crlf = b"\xef\xbb\xbf" + lf.replace(b"\n", b"\r\n")

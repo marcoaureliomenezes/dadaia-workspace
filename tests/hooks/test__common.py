@@ -39,10 +39,7 @@ def test_target_path_forms() -> None:
 
 
 def test_target_paths_multi_file_all_headers() -> None:
-    """T-014-02 (FR-W4-04) regression: target_paths() returns ALL apply_patch file headers
-    so the gate can classify every file and let the most restrictive verdict win — the
-    unique failure detector this file exists to keep.
-    """
+    """target_paths() returns ALL apply_patch file headers, so the gate classifies every file."""
     assert _common.target_paths({"tool_input": {"file_path": "/a/b.py"}}) == ["/a/b.py"]
     assert _common.target_paths({"path": "/c.py"}) == ["/c.py"]
     assert _common.target_paths({"tool_input": {"notebook_path": "/n.ipynb"}}) == ["/n.ipynb"]

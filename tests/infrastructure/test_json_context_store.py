@@ -1,12 +1,8 @@
 """Unit tests for JsonContextStore (v3 schema: ALIVE/DEAD + associated_repos).
 
-A15.2, A15.3 (registry-schema half; the model half lives in
-tests/core/models/test_spec_context.py). v2→v3 is purely additive
-(``associated_repos``), so — unlike the v1→v2 state-string rename — the store tolerates
-a v2 file on read rather than hard-refusing it: a hard version gate with no repair path
-reachable from every phase is exactly the bug class of
-``memory-agent-tier-migration-deadlock`` (CRITICAL, v0.1.72), and the CLI wiring that
-would supply that repair path is out of this task's write set.
+Associated repos round-trip through the registry schema. v2→v3 is purely additive
+(``associated_repos``), so the store tolerates a v2 file on read rather than hard-refusing it:
+a hard version gate with no repair path reachable from every phase deadlocks migration.
 """
 
 import json
@@ -88,7 +84,7 @@ def test_crud_round_trips(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# FR15/A15.3: associated_repos round-trips through the one registry schema.
+# associated_repos round-trips through the one registry schema.
 # ---------------------------------------------------------------------------
 
 
@@ -120,7 +116,7 @@ def test_associated_repos_round_trip_through_store(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# FR15/A15.2: a v2 registry (no associated_repos key) reads as behaviourally
+# A v2 registry (no associated_repos key) reads as behaviourally
 # identical to a v3 registry with zero associated repos — no migration required
 # to keep reading. See module docstring for why: the CLI repair path is out of
 # scope here, so hard-gating v2 on read would reproduce a known deadlock class.
@@ -140,7 +136,7 @@ def test_v2_registry_loads_with_empty_associated_repos(tmp_path: Path) -> None:
                 "alive_since": "2026-01-02T00:00:00Z",
                 "dead_since": None,
                 "current_branch": "main",
-                # no "associated_repos" key — the real shape of a pre-FR15 file.
+                # no "associated_repos" key: the real shape of an older file.
             }
         ],
     }

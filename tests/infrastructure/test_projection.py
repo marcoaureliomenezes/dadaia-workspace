@@ -216,7 +216,7 @@ def test_every_projected_skill_frontmatter_is_loadable(projected: Path) -> None:
 
 
 def test_claude_entries_are_symlinks_onto_the_authored_agents_set(projected: Path) -> None:
-    """One authored set, N harness views (FR3, AC3.2).
+    """One authored set, N harness views.
 
     A second COPY under ``.claude/`` loads exactly as well as a symlink — and drifts
     silently from the authored ``.agents/`` body the moment one of the two is rewritten.

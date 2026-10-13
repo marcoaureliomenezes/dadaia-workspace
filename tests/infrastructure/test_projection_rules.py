@@ -140,7 +140,7 @@ def test_every_scoped_law_source_has_an_installed_path() -> None:
 
 
 def test_every_scoped_law_is_cited_by_the_map_or_a_skill_step_one() -> None:
-    """FR2 — a scoped `AGENTS.md` nobody opens is law nobody reads."""
+    """A scoped `AGENTS.md` nobody opens is law nobody reads."""
     cited = set(_map_surface_rows()) | set(STEP_ONE_LAW.values())
     orphans = sorted(set(SCOPED_SOURCE_BY_INSTALLED_PATH) - cited)
     assert orphans == [], (
@@ -203,11 +203,10 @@ def _norm_statement(line: str) -> str:
 
 
 def test_no_statement_lives_in_two_shipped_homes() -> None:
-    """AC1.2 (0.4.7 c6): a rule lives in one home — no normalised bullet statement of
-    60+ chars appears in two shipped rule files or skills (the root map, every scoped
-    AGENTS.md source, every skill Markdown, the fixed sections). A statement is a bullet;
-    numbered procedure steps (two skills may open the same scoped law) and prose headers
-    are not statements."""
+    """A rule lives in one home: no normalised bullet statement of 60+ chars appears in two
+    shipped rule files or skills (the root map, every scoped AGENTS.md source, every skill
+    Markdown, the fixed sections). A statement is a bullet; numbered procedure steps (two
+    skills may open the same scoped law) and prose headers are not statements."""
     shipped = [
         *sorted(_PUBLIC.glob("skills/**/*.md")),
         *sorted(_PUBLIC.glob("scaffold/**/AGENTS.md")),

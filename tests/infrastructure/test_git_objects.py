@@ -1,9 +1,4 @@
-"""GitSubprocessObjectReader — the GitObjectReader adapter, driven over real git repos.
-
-v0.9.0 A1.1-A1.4, A6.1, A6.2; v0.11.0 A2.1-A2.4, A4.1, A4.2, A4.6, A7.4,
-A8.1, A8.2; v0.4.2 A7.1, A8.4, CR-1, CR-3; v0.4.3 A11.1-A11.4, A11.6, A11.7;
-bug new-branch-push-loses-prior-published-denylist-amnesty; 0.5.0 AC5.1/AC5.2.
-"""
+"""GitSubprocessObjectReader, the GitObjectReader adapter, driven over real git repos."""
 
 from __future__ import annotations
 
@@ -346,9 +341,8 @@ def test_mergetag_embedded_tag_body_reaches_the_matcher(tmp_path: Path) -> None:
 
 
 def test_a_new_branch_keeps_amnesty_for_what_origin_already_published(tmp_path: Path) -> None:
-    """bug new-branch-push-loses-prior-published-denylist-amnesty: a ZERO_SHA push of a
-    branch cut from published history still resolves prior text for published paths, and
-    only for them; the resolvable-remote form yields the identical result."""
+    """A ZERO_SHA push of a branch cut from published history still resolves prior text for
+    published paths, and only for them; the resolvable-remote form yields the identical result."""
     repo, (base,) = _repo(tmp_path, {"ledger.jsonl": "first\n"})
     _publish(repo, tmp_path, "develop")
     _git(["checkout", "-q", "-b", "feature/1.0.0"], repo)
