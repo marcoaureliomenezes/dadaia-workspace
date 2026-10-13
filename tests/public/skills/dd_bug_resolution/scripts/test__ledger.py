@@ -141,14 +141,7 @@ def test_every_check_finding_carries_its_fix(
     tmp_path: Path, script: str, files: dict[str, str]
 ) -> None:
     """Every record each ledger script's `check --json` emits carries a non-empty fix."""
-    skills, specs = _stage(tmp_path), tmp_path / "specs"
-    for rel, text in files.items():
-        (specs / rel).parent.mkdir(parents=True, exist_ok=True)
-        (specs / rel).write_text(text, encoding="utf-8")
-    done = subprocess.run(
-        [sys.executable, str(skills / script), "check", "--specs", str(specs), "--json"],
-        capture_output=True, text=True, check=False,
-    )  # fmt: skip
+    done, _, _ = _run(tmp_path, script, files, "check", "--json")
     records = json.loads(done.stdout)
     assert done.returncode == 1 and records, done.stderr
     assert [r for r in records if not str(r.get("fix", "")).strip()] == [], records
