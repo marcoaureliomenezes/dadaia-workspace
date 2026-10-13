@@ -19,8 +19,7 @@ def test_python_env_narrates_a_failed_repack_install_honestly() -> None:
         "an install failure must not be silently swallowed and re-narrated as another"
     )
     # The paired assertion on the fallback's own narration ("re-packed running
-    # distribution") died with the fallback itself (bug
-    # init-venv-installs-index-version-not-running-distribution): there is one install
+    # distribution") died with the fallback itself: there is one install
     # now, so there is no second failure to narrate as the first.
 
 

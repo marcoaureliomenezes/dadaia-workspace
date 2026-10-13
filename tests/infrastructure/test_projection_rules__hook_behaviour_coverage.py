@@ -123,7 +123,7 @@ def test_every_projected_wrapper_is_projected_executable(
         assert rule.mode == 0o755, f"{rule.label} is not projected executable"
 
 
-#: The expected hook table, literally.
+#: The table, literally.
 _BEHAVIOUR_TABLE = {
     "claude": {"ctx_inject", "pre_gate", "reaper", "sdd_post_gate"},
     "codex": {"ctx_inject", "pre_gate", "reaper", "sdd_post_gate"},

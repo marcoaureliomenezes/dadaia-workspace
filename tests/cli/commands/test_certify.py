@@ -1,4 +1,4 @@
-"""sa-reconcile-certify-skip-the-workspace-walk: the consumer recipe cites
+"""The consumer recipe cites
 only commands, flags and certify checks the wheel has (certify's own invocations run for
 real in tests/features/certification/test_service.py).
 
@@ -47,7 +47,7 @@ def _resolve(words: list[str]) -> tuple[str, Any]:
 
 @pytest.mark.parametrize("words", [w for w in _SPANS if w[0] == "$D"], ids=" ".join)
 def test_every_recipe_command_parses_against_the_wheel(words: list[str]) -> None:
-    """sa-reconcile-certify-skip-the-workspace-walk#B3: every '$D …' command the recipe
+    """Every '$D …' command the recipe
     prints names a real subcommand and only its real flags."""
     name, command = _resolve(words[1:])
     rest = words[len(name.split()) :]
@@ -61,7 +61,7 @@ def test_every_recipe_command_parses_against_the_wheel(words: list[str]) -> None
     "words", [w for w in _SPANS if w[0] == "python3" and "/scripts/" in w[1]], ids=" ".join
 )
 def test_every_recipe_script_flag_exists(words: list[str]) -> None:
-    """sa-reconcile-certify-skip-the-workspace-walk#B3: every 'python3 …scripts/*.py …'
+    """Every 'python3 …scripts/*.py …'
     line's subcommand and flags are in that script's own `--help`."""
     script = _PUBLIC / "skills" / words[1].removeprefix("$S/")
     verb = list(itertools.takewhile(lambda w: w[0] != "-", words[2:]))
@@ -73,7 +73,7 @@ def test_every_recipe_script_flag_exists(words: list[str]) -> None:
 
 
 def test_every_recipe_certify_check_is_one_certify_runs() -> None:
-    """sa-reconcile-certify-skip-the-workspace-walk#B4: every certify check the recipe
+    """Every certify check the recipe
     names (e.g. 'context-bind') is in certify's emitted check list."""
     checks = {
         node.args[0].value

@@ -10,8 +10,7 @@ Covers:
     6. Returns absolute path (not relative)
 
   resolve_cli_workspace_root —
-    9. explicit --workspace is authoritative and must hold .dadaia/ (bug
-       import-export-workspace-flag-re-resolves-through-ancestor-walk)
+    9. explicit --workspace is authoritative and must hold .dadaia/
 """
 
 from __future__ import annotations
@@ -114,15 +113,11 @@ def test_resolve_workspace_root_failure_table(tmp_path: Path) -> None:
 
 # ---------------------------------------------------------------------------
 # resolve_cli_workspace_root: an explicit --workspace is authoritative for EVERY verb
-# (bugs: init-ignores-workspace-flag, import-export-workspace-flag-re-resolves-through-ancestor-walk)
 # ---------------------------------------------------------------------------
 
 
 def test_explicit_workspace_is_authoritative_and_must_be_initialized(tmp_path: Path) -> None:
-    """bug import-export-workspace-flag-re-resolves-through-ancestor-walk;
-    sa-seven-workspace-root-rules#S7.
-
-    Size: SMALL — filesystem only."""
+    """Size: SMALL — filesystem only."""
     existing_ws = _make_full_workspace(tmp_path / "existing_ws")
 
     # An uninitialized directory nested inside a live workspace is REFUSED, never

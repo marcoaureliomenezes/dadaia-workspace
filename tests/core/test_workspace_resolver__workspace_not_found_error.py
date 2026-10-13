@@ -36,7 +36,8 @@ def _workspace(root: Path) -> Path:
 def test_the_cli_resolves_its_own_workspace_unless_fenced(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, fenced: bool
 ) -> None:
-    """The CLI's own workspace wins over the cwd; a fenced root is never the CLI's own workspace; an explicit start always walks."""
+    """The CLI's own workspace wins over the cwd;
+    a fenced root is never the CLI's own workspace; an explicit start always walks."""
     own, other = _workspace(tmp_path / "a"), _workspace(tmp_path / "b")
     monkeypatch.setattr(sys, "prefix", str(own / ".dadaia" / ".venv"))
     if fenced:

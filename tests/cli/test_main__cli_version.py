@@ -1,4 +1,6 @@
-"""`dadaia --version` / `-V` prints the version read from the fake dist-info, never from the code's own reader."""
+"""`dadaia --version` and `-V` report an expected
+value from an independent source: the fake dist-info, never the code's own reader
+(REWRITE; the -V twin is DELETE-DUP)."""
 
 from __future__ import annotations
 

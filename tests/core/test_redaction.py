@@ -31,7 +31,7 @@ def _lines(tmp_path: Path, text: str) -> list[str]:
 def test_an_operator_term_is_shown_first_last(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """sa-private-match-rendering-has-three-renderers#B1: an operator denylist term shows as z…x, never raw, in the public asset
+    """An operator denylist term shows as z…x, never raw, in the public asset
     and in the library's root AGENTS.md alike."""
     term = "zorb" + "lax"
     denylist = tmp_path / "denylist.json"
@@ -63,7 +63,7 @@ def test_an_operator_term_is_shown_first_last(
 def test_a_baseline_match_is_shown_first_last(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, value: str, shown: str
 ) -> None:
-    """sa-private-match-rendering-has-three-renderers#B2: a baseline match (IP, hostname, home path, email) shows as first…last."""
+    """A baseline match (IP, hostname, home path, email) shows as first…last."""
     monkeypatch.delenv("DADAIA_PRIVACY_DENYLIST", raising=False)
     monkeypatch.chdir(tmp_path)
 
@@ -74,7 +74,7 @@ def test_a_baseline_match_is_shown_first_last(
 
 
 def test_one_mask_and_one_redactor_builder() -> None:
-    """sa-private-match-rendering-has-three-renderers#B7: exactly one first…last mask definition (_privacy) and one
+    """Exactly one first…last mask definition (_privacy) and one
     ContextRedactor construction site (cli/redact)."""
     sources = {
         p.relative_to(_PKG).as_posix(): p.read_text(encoding="utf-8") for p in _PKG.rglob("*.py")

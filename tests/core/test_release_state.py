@@ -1,4 +1,4 @@
-"""sa-release-json-validated-three-times#B7: core/release_state exposes
+"""core/release_state exposes
 the state file's name and the id grammars only; no package module outside the release script validates a state
 document. Size: SMALL.
 """

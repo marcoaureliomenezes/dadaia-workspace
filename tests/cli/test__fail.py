@@ -38,13 +38,13 @@ def _printer_bypasses() -> list[str]:
 
 
 def test_s1_the_one_printer_is_cli_fail() -> None:
-    """sa-rich-printer-wraps-fix-lines#S1: no refusal is printed or exited outside
+    """No refusal is printed or exited outside
     cli/_fail (no secho, no stderr Console, no exit 2/3)."""
     assert _printer_bypasses() == []
 
 
 def test_s2_an_init_refusal_is_error_fix_exit_1(tmp_path: Path, monkeypatch) -> None:
-    """sa-rich-printer-wraps-fix-lines#S2: a refusal (not a usage error) exits 1 with
+    """A refusal (not a usage error) exits 1 with
     `Error:` and one whole `fix:` line."""
     monkeypatch.chdir(tmp_path)
     result = _runner.invoke(app, ["init", str(tmp_path / "ws")])
@@ -55,7 +55,7 @@ def test_s2_an_init_refusal_is_error_fix_exit_1(tmp_path: Path, monkeypatch) -> 
 
 
 def test_s4_an_unresolvable_specs_dir_is_error_exit_1(tmp_path: Path, monkeypatch) -> None:
-    """sa-rich-printer-wraps-fix-lines#S4: a resolution error goes through the printer,
+    """A resolution error goes through the printer,
     never Click's Rich panel."""
     monkeypatch.chdir(tmp_path)
     for var in ("DADAIA_CONTEXT", "DADAIA_SESSION_ID", "CLAUDE_CODE_SESSION_ID"):
@@ -68,7 +68,7 @@ def test_s4_an_unresolvable_specs_dir_is_error_exit_1(tmp_path: Path, monkeypatc
 
 
 def test_s5_specs_upgrade_below_the_floor_is_error_exit_1(tmp_path: Path) -> None:
-    """sa-rich-printer-wraps-fix-lines#S5: `specs upgrade` on a tree below the floor prints
+    """`specs upgrade` on a tree below the floor prints
     `Error:` and exits 1."""
     specs = tmp_path / "specs"
     specs.mkdir()
@@ -81,7 +81,7 @@ def test_s5_specs_upgrade_below_the_floor_is_error_exit_1(tmp_path: Path) -> Non
 
 
 def test_s6_reports_validate_refusals_exit_1(tmp_path: Path, monkeypatch) -> None:
-    """sa-rich-printer-wraps-fix-lines#S6: a missing path, no paths, or no workspace all
+    """A missing path, no paths, or no workspace all
     exit 1 through the printer."""
     monkeypatch.chdir(tmp_path)
     for argv in (["reports", "validate"], ["reports", "validate", str(tmp_path / "gone.json")]):

@@ -31,8 +31,8 @@ def test_doctor_exits_nonzero_when_issues_found(tmp_path: Path, monkeypatch) -> 
 
 
 def test_certify_runs_without_a_workspace_and_prints_pure_json(tmp_path: Path, monkeypatch) -> None:
-    """certify's contract is a DISPOSABLE workspace — a bare cwd runs it on a fallback root;
-    diagnostics go to stderr, stdout is the JSON alone."""
+    """Certify's contract is a DISPOSABLE workspace — a bare cwd runs it on a fallback root;
+    Diagnostics go to stderr, stdout is the JSON alone."""
     monkeypatch.chdir(tmp_path)
     seen: list[Path] = []
 

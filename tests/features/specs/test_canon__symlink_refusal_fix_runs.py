@@ -1,7 +1,7 @@
 """The symlink refusal's fix, run verbatim in the host shell, clears the refusal.
 
 The refusal's one fix is
-runnable on every supported OS: POSIX sh, Windows cmd. Size: SMALL (CliRunner + one shell
+runnable on every supported OS: POSIX sh, Windows cmd). Size: SMALL (CliRunner + one shell
 call).
 """
 
