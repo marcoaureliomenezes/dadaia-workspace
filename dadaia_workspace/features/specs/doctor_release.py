@@ -138,7 +138,7 @@ class ReleaseValidator:
                 "SPEC-DOC-046",
                 Severity.WARNING,
                 f"{legacy.relative_to(self.specs_dir).as_posix()} carries the legacy state-file name — "
-                f"canonical is {RELEASE_STATE_FILENAME} (ADR 0007)",
+                f"canonical is {RELEASE_STATE_FILENAME}",
                 str(legacy),
                 fixable=True,
             )

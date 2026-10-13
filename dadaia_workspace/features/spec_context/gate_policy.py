@@ -44,7 +44,7 @@ _SCOPE_MESSAGE = (
 )
 #: ``repos/<r>`` receives only merges; every agent write happens in a worktree.
 _MERGE_ONLY_MESSAGE = (
-    "[GATE] '{rel_path}' is under repos/{repo}/, which receives only merges (ADR 0105): "
+    "[GATE] '{rel_path}' is under repos/{repo}/, which receives only merges: "
     "write it inside a worktree of {repo}.\n"
 )
 _WORKTREE_SCRIPT = ".agents/skills/dd-gitflow-default/scripts/worktree.py"

@@ -121,7 +121,7 @@ HOOK_DIALECTS: dict[HookFormat, HookDialect] = {
             HookFileSpec(
                 "settings.json",
                 (
-                    ("PreToolUse", "pre-gate", "Edit|Write|MultiEdit|NotebookEdit|Bash"),
+                    ("PreToolUse", "pre-gate", "Edit|Write|MultiEdit|NotebookEdit"),
                     ("PostToolUse", "post-gate", "*"),
                     ("UserPromptSubmit", "ctx-inject", ""),
                     *(
@@ -148,7 +148,7 @@ HOOK_DIALECTS: dict[HookFormat, HookDialect] = {
             HookFileSpec(
                 "config.toml",
                 (
-                    ("PreToolUse", "pre-gate", "^(Edit|Write|Bash)$"),
+                    ("PreToolUse", "pre-gate", "^(Edit|Write)$"),
                     ("PostToolUse", "post-gate", None),
                     ("UserPromptSubmit", "ctx-inject", None),
                     ("PostCompact", "post-compact", "manual|auto"),
@@ -176,7 +176,7 @@ HOOK_DIALECTS: dict[HookFormat, HookDialect] = {
             HookFileSpec(
                 "hooks.json",
                 (
-                    ("PreToolUse", "pre-gate", "^(apply_patch|Edit|Write|Bash)$"),
+                    ("PreToolUse", "pre-gate", "^(apply_patch|Edit|Write)$"),
                     ("PostToolUse", "post-gate", None),
                     ("SessionStart", "ctx-inject-session-start", "startup|resume"),
                     _REAP,
