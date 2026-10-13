@@ -41,6 +41,7 @@ axes are reported side by side with equal weight, so no axis hides another's fin
 - Acceptance criteria without corresponding evidence (test/assertion) is a finding.
 - Read `rc-<N>/PLAN.md` §1 (As-is review) beside the SPEC and job files: a DELETE or REBUILD unit the range leaves unchanged is HIGH.
 - A KEEP unit the range grew is a finding.
+- A SPEC, PLAN or job file that adds a requirement applied to every task, job or deletion without its measured cost per run, or above one run of the job's `verify:` gate, is REJECTED (root map §1, "a new gate, lock, repo, layer or review round states what it buys").
 - A worktree's (`worktrees/AGENTS.md`) commits follow the `dd-gitflow-default` §3a rows of what they write.
 - The reviewer of a `define` tree judges each job-file `who` column against the shape rule in `dd-release-definition` §5.
 
