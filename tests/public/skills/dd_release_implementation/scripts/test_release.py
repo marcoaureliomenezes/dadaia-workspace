@@ -130,7 +130,8 @@ def _tree_hash(root: Path) -> list[tuple[str, str]]:
 
 
 def test_new_writes_the_spec_stub_and_the_state_in_one_act(script: Path, tmp_path: Path) -> None:
-    """A U+2028 inside a bug record is text, not a line break: the bugs: origin seeds the SPEC from it."""
+    """A U+2028 inside a bug record is text, not a line break: the bugs: origin seeds the SPEC from
+    it."""
     specs = _specs(tmp_path)
     bug = {"id": "ls-probe", "title": "t\u2028x", "repro": "r"}
     (specs / "bugs").mkdir()
@@ -313,7 +314,8 @@ def test_check_is_clean_on_a_valid_tree(script: Path, tmp_path: Path) -> None:
 
 
 def test_writes_reads_rc6_t_050_117_to_its_ten_paths(script: Path) -> None:
-    """A backticked path inside parentheses is named, not written; the task line is inlined verbatim."""
+    """A backticked path inside parentheses is named, not written; the task line is inlined
+    verbatim."""
     sys.path.insert(0, str(script.parent))  # the staged copy: no bytecode beside the source
     from _release_schema import MARK_RE, writes
 

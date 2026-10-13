@@ -418,7 +418,8 @@ def test_memory_is_not_a_doctor_ledger() -> None:
 
 
 def test_a_declared_verify_line_runs_as_argv_never_through_a_shell(root: Path) -> None:
-    """The `verify:` line is split by the one declared-line reader and run as argv: `;` and `$(...)` are words."""
+    """The `verify:` line is split by the one declared-line reader and run as argv: `;` and `$(...)`
+    are words."""
     line = "verify: python scripts/ci.py job ; touch PWNED $(touch PWNED2)\n"
     commit(root / "repos/r", "AGENTS.md", line)
     git(root / TREE, "merge", "-q", "--ff-only", "feature/0.5.0")
