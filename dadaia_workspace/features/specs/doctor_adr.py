@@ -22,7 +22,8 @@ from dadaia_workspace.infrastructure.ledger_scripts import load_owner
 #: The ADR ledger, relative to a specs tree.
 LEDGER = "ADRs/decisions.jsonl"
 
-#: The citation shapes of an ADR id in memory atoms, skills and rules: "ADR", a colon, space or hyphen, four digits.
+#: The citation shapes of an ADR id in memory atoms, skills and rules: "ADR", a colon, space or
+#: hyphen, four digits.
 _ADR_CITATION_RE = re.compile(r"\bADR[:\s-]+(\d{4})\b")
 
 
