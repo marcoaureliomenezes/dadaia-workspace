@@ -1,13 +1,12 @@
 """Spec Context Project domain models."""
 
-import re
 from dataclasses import dataclass
 from enum import StrEnum
 
-#: Path-traversal allowlist (CWE-22/CWE-59) for a context name or repo slug used as a
-#: filename or path component. ONE regex: every registry insert enforces it at
-#: ``SpecContextService.register``; every resolver reads it through ``core.invocation``.
-CONTEXT_NAME_RE = re.compile(r"[A-Za-z0-9_-]+")
+from dadaia_workspace.core.skill_owner import load_owner
+
+#: The kernel's context-name grammar, loaded from ``_grammar.py``.
+CONTEXT_NAME_RE = load_owner("dd-bug-resolution", "_grammar").CONTEXT_NAME_RE
 
 #: The `schema_version` `dadaia export` writes and `dadaia import` accepts.
 EXPORT_SCHEMA_VERSION = "spec-contexts-export-v1"

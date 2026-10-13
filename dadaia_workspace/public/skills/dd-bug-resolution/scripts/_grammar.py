@@ -11,6 +11,8 @@ STATE = "_RELEASE.json"
 SEMVER_RE = re.compile(r"^\d+\.\d+\.\d+$")
 #: A candidate folder; the live one is the highest N.
 CANDIDATE_RE = re.compile(r"^rc-([1-9][0-9]*)$")
+#: A context name or repo slug used as a path component: no ``.``, ``/`` or ``\`` (CWE-22).
+CONTEXT_NAME_RE = re.compile(r"[A-Za-z0-9_-]+")
 TAG_RE = re.compile(r"^v?(\d+)\.(\d+)\.(\d+)$")
 TASK_ID_RE = re.compile(r"^J[1-9][0-9]*(?:\.S[1-9][0-9]*)?\.T[1-9][0-9]*$")
 STATUS_RE = re.compile(r"^\*\*Status:\*\*\s*(.+?)\s*$", re.MULTILINE)

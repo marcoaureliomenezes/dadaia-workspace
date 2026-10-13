@@ -17,9 +17,9 @@ sys.path[:0] = [str(Path(__file__).resolve().parents[2] / "dd-bug-resolution" / 
 import _clock
 import _ledger
 import _root
+from _grammar import CONTEXT_NAME_RE
 from _handoffs import REVIEWER, reviewer_records
 
-_CONTEXT = r"^[a-z0-9][a-z0-9-]*$"
 _WORKTREE = Path(__file__).resolve().parents[2] / "dd-gitflow-default" / "scripts" / "worktree.py"
 _OWN = (
     "agent", "verdict", "verdict_reason", "reviewed_sha", "diff_sha256",
@@ -89,7 +89,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--reason", required=True)
     args = parser.parse_args(argv)
     slug = _ledger.load_schema("backlog-v1")["$defs"]["slug"]["pattern"]
-    for name, pattern in (("context", _CONTEXT), ("slug", slug)):
+    for name, pattern in (("context", CONTEXT_NAME_RE.pattern), ("slug", slug)):
         if not re.fullmatch(pattern, getattr(args, name)):
             return _refuse(f"--{name} must match {pattern}")
     body = _body(sys.stdin.read())
