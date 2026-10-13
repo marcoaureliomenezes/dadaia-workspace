@@ -197,13 +197,6 @@ def test_a_bound_context_without_specs_gets_its_next_step(tmp_path: Path) -> Non
             "export DADAIA_SESSION_ID set to a stable id",
             id="ADR0116-no-id-never-mints",
         ),
-        pytest.param("s1", "gamma", "context alive gamma", id="dead-context"),
-        pytest.param(
-            None,
-            "alpha",
-            "export DADAIA_SESSION_ID set to a stable id",
-            id="no-id-never-mints",
-        ),
     ],
 )
 def test_bind_refuses_with_its_fix_and_writes_no_record(

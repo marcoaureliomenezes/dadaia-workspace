@@ -92,10 +92,6 @@ def seeded(store: JsonContextStore) -> JsonContextStore:
     pytest.param(True, "proj", "assoc-repo", _URL, None, False, (_ASSOC,), id="A17.1-same-slug-same-url-idempotent-beside-a-foreign-context"),
     pytest.param(True, "proj", "assoc-repo", _URL + "-renamed", AssociatedRepoConflictError, None, (_ASSOC,), id="A17.1-same-slug-other-url-refused-untouched"),
     pytest.param(False, "nope", "assoc-repo", _URL, ContextNotFoundError, None, (), id="A17.1-unknown-context"),
-    pytest.param(False, "proj", "assoc-repo", _URL, None, True, (_ASSOC,), id="new-slug-registered-and-persisted"),
-    pytest.param(True, "proj", "assoc-repo", _URL, None, False, (_ASSOC,), id="same-slug-same-url-idempotent-beside-a-foreign-context"),
-    pytest.param(True, "proj", "assoc-repo", _URL + "-renamed", AssociatedRepoConflictError, None, (_ASSOC,), id="same-slug-other-url-refused-untouched"),
-    pytest.param(False, "nope", "assoc-repo", _URL, ContextNotFoundError, None, (), id="unknown-context"),
     pytest.param(False, "proj", "other-repo", _URL, AssociatedRepoConflictError, None, (), id="F-1-slug-owned-by-another-context-as-main"),
     pytest.param(False, "proj", "other-assoc", _URL, AssociatedRepoConflictError, None, (), id="F-1-slug-owned-by-another-context-as-associated"),
     pytest.param(False, "proj", "brand-new", "u", None, True, (AssociatedRepo(slug="brand-new", url="u"),), id="F-1-unowned-slug-still-accepted"),
@@ -145,8 +141,6 @@ _INFRA = (AssociatedRepo(slug="infra", url="https://github.com/org/infra"),)
     pytest.param("ok", "a/b", (), InvalidContextNameError, "letters, digits", id="allowlist-slug-with-slash"),
     pytest.param("new-proj", "main-repo", _OWN, AssociatedRepoConflictError, "own main repo", id="A17.3-associated-equals-main"),
     pytest.param("new-proj", "main-repo", _TWICE, AssociatedRepoConflictError, "more than once", id="A17.3-associated-given-twice"),
-    pytest.param("new-proj", "main-repo", _OWN, AssociatedRepoConflictError, "own main repo", id="associated-equals-main"),
-    pytest.param("new-proj", "main-repo", _TWICE, AssociatedRepoConflictError, "more than once", id="associated-given-twice"),
     pytest.param("new-proj", "brand-new-repo", (), None, None, id="unowned-slug-accepted"),
     pytest.param("new-proj", "main-2", _INFRA, None, None, id="associated-repos-in-the-same-guarded-write"),
 ])
@@ -172,7 +166,6 @@ def test_create_refuses_a_name_or_slug_outside_the_allowlist(
 @pytest.mark.parametrize(("context", "slug", "removes", "raises", "left"), [
     pytest.param("proj", "assoc-repo", 1, None, (), id="removes-the-registered-repo"),
     pytest.param("proj", "assoc-repo", 2, AssociatedRepoNotFoundError, (), id="A17.1-second-remove-fails-loudly"),
-    pytest.param("proj", "assoc-repo", 2, AssociatedRepoNotFoundError, (), id="second-remove-fails-loudly"),
     pytest.param("proj", "never-registered", 1, AssociatedRepoNotFoundError, (_ASSOC,), id="unknown-slug"),
     pytest.param("nope", "assoc-repo", 1, ContextNotFoundError, (_ASSOC,), id="unknown-context"),
 ])
