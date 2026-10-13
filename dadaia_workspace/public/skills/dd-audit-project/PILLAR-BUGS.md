@@ -40,9 +40,7 @@ value against the previous audit's `AUDIT.md`, from git history, where it was co
 | 8 | Sweep closures as `resolved` | resolved records whose `fix_sha` touches no production code |
 | 9 | REBUILD share | resolved records with `caused_by != none` whose named fix commit identifies a REBUILD |
 
-Metric 5's fixed path set is `.gitignore`, `privacy_baseline.json`,
-`shipped-hashes.json`, `*_golden/*.json`, skill-roster files and literal
-`frozenset({...})` inventories.
+Metric 5's path set is the hand-kept inventories the repo's own `ARCHITECTURE.md` names.
 
 ## Additional checks
 

@@ -35,7 +35,6 @@ description: >
 
 ## 2a. Push green
 
-- Every work-branch push (`<work>M.m.p`, the constitution's `gitflow:`) runs the repo's `verify:` line first, green.
 - Pre-push: `.dadaia/AGENTS.md` §3.
 - Commits flow freely; a full scan lives only in the audit lane.
 - Fix a red `verify:` line at its cause, since a rerun hides the defect it reports.

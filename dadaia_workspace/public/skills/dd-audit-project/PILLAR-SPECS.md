@@ -42,11 +42,10 @@ Also input: `.dadaia/.venv/bin/dadaia doctor` against every release the window t
 Input: every `rc-<N>/tasks/job<n>.md` the window touches and the job commits behind it (`dd-release-definition` §5 teaches the rules).
 
 1. Tasks with overlapping `W:` sets that ran in parallel (`worktrees/AGENTS.md` §3) are MEDIUM.
-2. Every task cites the AC it serves; one that names none is MEDIUM.
-3. A cancelled task keeps its row and states why; one deleted, or kept without a reason, is MEDIUM.
-4. Every path changed by a job is in its PLAN `W:` set; a breach is MEDIUM.
-5. Each AC names its test level (unit, integration, E2E, or no test with its reason); one that names none is LOW.
-6. Post-approval changes: an approved SPEC or PLAN is never amended (`specs/releases/AGENTS.md` §2); an edit after `**Status:** Approved` is MEDIUM.
+2. A cancelled task keeps its row and states why; one deleted, or kept without a reason, is MEDIUM.
+3. Every path changed by a job is in its PLAN `W:` set; a breach is MEDIUM.
+4. Each AC names its test level (unit, integration, E2E, or no test with its reason); one that names none is LOW.
+5. Post-approval changes: an approved SPEC or PLAN is never amended (`specs/releases/AGENTS.md` §2); an edit after `**Status:** Approved` is MEDIUM.
 
 ## Slop readout
 

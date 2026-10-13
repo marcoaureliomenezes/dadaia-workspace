@@ -70,7 +70,7 @@ Before the SPEC or any ADR, the main thread runs `dd-grill-me` on the picked set
 - One file per job, `rc-<N>/tasks/job<n>.md`, its PLAN DAG row `Job <n>`, which names the job's wave and complete `W:` set.
 - Every job file carries a task table. Each task has id `J<n>.T<k>`, `who`, its AC, exact `W:`, owner test file and RED tests; one owner, one session (~1 h), ~100 new code lines.
 - `who` names the dispatched role: `sr` or `jr`; `pe` or `cr` for a task another persona owns. `jr`: the outcome is fully stated by its AC and `W:`; `sr`: new behaviour, design choice, root cause, RED test of a new contract, PLAN, job files, as-is review.
-- Each behavior task runs as two dispatches (`worktrees/AGENTS.md` §2).
+- A behavior is two tasks, its RED test then its implementation, each its own dispatch and task worktree (`worktrees/AGENTS.md` §2).
 - A task is `running` while its task worktree exists. A cancelled task keeps its row and reason.
 - DELETE/REBUILD tasks precede ADD tasks; a task with no statable AC is folded, or goes back to the SPEC.
 

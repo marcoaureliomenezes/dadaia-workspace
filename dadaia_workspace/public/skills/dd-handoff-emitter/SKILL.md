@@ -3,8 +3,8 @@ name: dd-handoff-emitter
 description: >
   Emit the machine-readable handoff JSON at the end of any agent task (handoff-only by
   default; HTML report added only when the operator asks or the next hop is human), and
-  delete a consumed coordination handoff (ack-on-consume). Use at task completion and
-  after acting on a handoff addressed to you.
+  delete a consumed coordination handoff (ack-on-consume). Use at task completion, when
+  writing a reviewer verdict (verdict.py), and after acting on a handoff addressed to you.
 ---
 
 # dd-handoff-emitter
