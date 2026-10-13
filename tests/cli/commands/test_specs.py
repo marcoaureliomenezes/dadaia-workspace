@@ -1,6 +1,6 @@
-"""``specs init --context``
-on the three tree kinds — absent scaffolds, dadaia upgrades, foreign moves to ``specs-bkp/``
-only when confirmed — never committing. Size: MEDIUM (real git repo on disk)."""
+"""``specs init --context`` on the three tree kinds — absent scaffolds, dadaia upgrades, foreign
+moves to ``specs-bkp/`` only when confirmed — never committing. Size: MEDIUM (real git repo on
+disk)."""
 
 from __future__ import annotations
 
@@ -148,8 +148,8 @@ def test_replace_foreign_moves_to_specs_bkp_staged_then_scaffolds(repo: Path) ->
 def test_an_existing_specs_bkp_is_kept_and_the_tree_moves_to_a_stamped_child(
     repo: Path,
 ) -> None:
-    """A prior backup is never overwritten nor deleted; the
-    new one lands INSIDE specs-bkp/ — the one onboarding path baseline publishes."""
+    """A prior backup is never overwritten nor deleted; the new
+    one lands INSIDE specs-bkp/ — the one onboarding path baseline publishes."""
     _foreign(repo)
     (repo / "specs-bkp").mkdir()
     (repo / "specs-bkp" / "old.md").write_text("previous backup\n", encoding="utf-8")
@@ -203,8 +203,7 @@ def test_flags_merge_into_an_existing_tree_and_rerun_is_a_no_op(repo: Path) -> N
 
 
 def test_an_invalid_flag_refuses_with_a_fix_that_clears_it(repo: Path) -> None:
-    """The fix names
-    the detected values and clears the refusal."""
+    """The fix names the detected values and clears the refusal."""
     _git(repo, "update-ref", "refs/remotes/origin/master", "HEAD")
     result = _runner.invoke(app, ["specs", "init", "--context", "c", "--integration", "master"])
     assert result.exit_code == 1 and not (repo / "specs").exists()

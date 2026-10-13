@@ -190,11 +190,10 @@ def test_schema_staged_after_install_and_not_in_claude_schemas_dir(
 
 
 # ---------------------------------------------------------------------------
-# A bare
-# `dadaia reports validate <path>` run from a cwd outside the handoff's own workspace
+# A bare `dadaia reports validate <path>` run from a cwd outside the handoff's own workspace
 # silently resolves artifact.path against the WRONG ancestor root and reports a false
-# INVALID/missing_artifact. `--workspace` is the escape hatch, and the resolved root is
-# always named in the command's output so a false negative is never misread.
+# INVALID/missing_artifact. `--workspace` is the escape hatch, and the resolved root is always named
+# in the command's output so a false negative is never misread.
 # ---------------------------------------------------------------------------
 
 

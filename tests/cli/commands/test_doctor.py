@@ -447,8 +447,7 @@ def test_an_untraced_origin_id_is_cleared_by_its_printed_fix(repo: Path) -> None
 def test_a_judgment_only_rule_never_makes_the_run_exit_1(repo: Path) -> None:
     """The exit-code half of the contract: every judgment-only rule fires at once and
     contributes NO error-class finding and NO fix line, so it stalls nobody.
-    A history heading planted beside them is reported once, by LINT-1 — CAT-1 and SPEC-DOC-008 do
-    not exist."""
+    A history heading planted beside them is reported once, by LINT-1."""
     root = repo
     _plant_changelog_heading(root)
     for plant in REPORT_ONLY.values():

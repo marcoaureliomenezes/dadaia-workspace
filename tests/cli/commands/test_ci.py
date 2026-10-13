@@ -41,7 +41,7 @@ def _init_repo(path: Path) -> str:
 
 
 def test_push_gate_check_always_wires_a_real_object_source(monkeypatch, tmp_path: Path) -> None:
-    """A6.3: the scan runs over the real range — a tag push whose commit carries a
+    """The scan runs over the real range — a tag push whose commit carries a
     denylisted term is refused (a tag has no branch policy to short-circuit it)."""
     repo = tmp_path / "repo"
     _init_repo(repo)
@@ -100,7 +100,7 @@ def test_canon_scan_does_not_apply_to_a_tree_stamped_below_the_canon(
 def test_mode_line_distinguishes_operator_denylist_from_baseline_only(
     monkeypatch, tmp_path: Path
 ) -> None:
-    """A3.5: the stderr mode line names which term sources actually ran.
+    """The stderr mode line names which term sources actually ran.
 
     Patches the ``load_denylist_terms`` composition-root seam directly rather than
     relying on ``DADAIA_PRIVACY_DENYLIST``/filesystem discovery — this sandbox's own
@@ -109,7 +109,7 @@ def test_mode_line_distinguishes_operator_denylist_from_baseline_only(
     (the test's own tmp workspace is its cwd), so a
     file/env-based test would spuriously observe the ambient real denylist. The mode
     line's OWN branching logic — reacting to whatever term-loading returns — is what
-    A3.5 actually pins.
+    this test pins.
     """
     repo = tmp_path / "repo"
     tip_sha = _init_repo(repo)

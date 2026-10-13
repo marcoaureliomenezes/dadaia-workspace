@@ -210,7 +210,7 @@ def test_bind_records_dadaia_runtime_env(workspace: Path, monkeypatch: pytest.Mo
 
 
 def test_context_show_json_session_null_then_populated_when_bound(workspace: Path) -> None:
-    """AC-T10d-6: show --json has session=null when no session binding, and a
+    """show --json has session=null when no session binding, and a
     populated session sub-object when DADAIA_SESSION_ID is set and the session file
     is fresh."""
     _register_alive_ctx(workspace)
