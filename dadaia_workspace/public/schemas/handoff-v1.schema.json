@@ -148,7 +148,7 @@
     "verdict": {
       "type": "string",
       "enum": ["APPROVED", "REJECTED"],
-      "description": "Optional approval verdict emitted by dd-code-reviewer. When present, must be APPROVED or REJECTED. Enables machine-checkable dual-approval gate at release CLOSURE."
+      "description": "Optional approval verdict emitted by dd-code-reviewer. When present, must be APPROVED or REJECTED. Read by `worktree.py merge` (worktrees/AGENTS.md §2)."
     },
     "verdict_reason": {
       "type": "string",

@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
-"""The audit ledger's ONE writer and validator — `specs/audits/<dir>/FINDINGS.jsonl`
-and its append-only archive, stdlib only.
+"""The only verbs that change a committed finding or close the audit (`disposition`, `close`);
+`check` validates `specs/audits/<dir>/FINDINGS.jsonl` and its append-only archive, stdlib only.
 
-``audit.py <verb> --specs <path>``. A finding is APPENDED by an agent's file tools
-(immutable core, like an ADR); this script owns the two acts that CHANGE one: the
-governance triple, and the all-or-nothing close that archives the audit and deletes its
-directory. Every write builds the new bytes, runs `check` over them, and only then
+``audit.py <verb> --specs <path>``. A finding is APPENDED by hand (immutable core, like an
+ADR); this script owns the two acts that CHANGE one: the governance triple, and the
+all-or-nothing close that archives the audit and deletes its directory. Every write builds the new bytes, runs `check` over them, and only then
 replaces the file — so this script's writer and its validator cannot disagree.
 """
 
