@@ -80,7 +80,7 @@ clones every repo, installs the hook and makes the context ALIVE; `context bind`
 ```
 
 `bind` writes one record, `.dadaia/sessions/<session-id>.json` (context, runtime, pid,
-`bound_at`), and acquires nothing; the gate and the bind read the session id from the
+`bound_at`, `bind_id`), and acquires nothing; the gate and the bind read the session id from the
 environment only. The bind names the session's scope — the
 context's main repo plus its associated repos — and the bound context's memory is
 injected once into the session. The bind is read from the session's own record when it has an

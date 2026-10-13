@@ -62,7 +62,7 @@ die with it. Specs, bind, memory, releases and backlog resolve only from the mai
 `context create` clones (or adopts) every repo, installs the pre-push hook and makes
 the context ALIVE — it never binds; on failure nothing is left behind. The name
 defaults to the main repo's slug. `bind` writes exactly one record,
-`.dadaia/sessions/<session-id>.json` (context, runtime, pid, `bound_at`), and acquires
+`.dadaia/sessions/<session-id>.json` (context, runtime, pid, `bound_at`, `bind_id`), and acquires
 nothing; the session id comes from the environment only, and a session without a
 harness-native id exports `DADAIA_SESSION_ID` before it binds. The bind's scope
 is the context's main repo plus its associated repos; a MUTATING file-tool write into a
