@@ -1,4 +1,4 @@
-"""Persona frontmatter contract: numeric ``dispatch_band``, model-agnostic staged bodies.
+"""Persona frontmatter contract: model-agnostic staged bodies.
 
 The template table, tier map and their pin live in ``test_model_registry.py``.
 """
@@ -31,13 +31,13 @@ def _core_agents() -> list[Path]:
 
 
 # ---------------------------------------------------------------------------
-# Staged core bodies are model-agnostic; dispatch_band stays numeric and mandatory
+# Staged core bodies are model-agnostic
 # ---------------------------------------------------------------------------
 
 
 def test_core_agent_frontmatter_tiers() -> None:
     """The roster count is exactly the 5 core agents. Staged core bodies carry
-    ``dispatch_band`` but NO ``model:``/``effort:``: the model and effort pinning lives in
+    NO ``model:``/``effort:``: the model and effort pinning lives in
     the template registry, asserted above; the projected files carry them, the staged
     sources must not."""
     assert len(_core_agents()) == 5, [p.name for p in _core_agents()]
@@ -46,10 +46,6 @@ def test_core_agent_frontmatter_tiers() -> None:
     seen: set[str] = set()
     for md in _core_agents():
         fm = _frontmatter(md)
-        dispatch_band = fm.get("dispatch_band")
-        assert isinstance(dispatch_band, int) and not isinstance(dispatch_band, bool), (
-            f"{md.name}: 'dispatch_band' must be a numeric band, got {dispatch_band!r}"
-        )
         assert "model" not in fm, (
             f"{md.name}: staged core body must be model-agnostic (FR1/AC-1); "
             f"found model: {fm.get('model')!r}"

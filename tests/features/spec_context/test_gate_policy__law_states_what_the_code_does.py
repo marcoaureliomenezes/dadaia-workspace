@@ -40,11 +40,9 @@ def _fail_open_rows(
         raise RuntimeError
 
     monkeypatch.setattr(pre_gate, "_POLICIES", (raises,))
-    bash = {"tool_name": "Bash", "tool_input": {"command": "echo x > AGENTS.md"}}
     worktree = {"root": PurePath("/ws"), "zone": "worktree", "repo": "r", "owner": "r"}
     return {
         "TOOL_TIMEOUT_S": f"past {hook_wrappers.TOOL_TIMEOUT_S} s" in law["TOOL_TIMEOUT_S"],
-        "sdd_gate": sdd_gate.evaluate_payload(bash) is None,
         "gate_policy": gate_policy.evaluate("worktrees/r/w/x.py", has_id=False, **worktree)[0]
         == gate_policy.Decision.ALLOW
         != gate_policy.evaluate("worktrees/r/w/x.py", **worktree)[0],

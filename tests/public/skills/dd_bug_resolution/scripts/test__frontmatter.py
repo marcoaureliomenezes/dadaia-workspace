@@ -39,7 +39,6 @@ def test_a_crlf_persona_keeps_every_field_of_its_lf_twin() -> None:
     lf = _PERSONA.read_text(encoding="utf-8")
     parsed = _load(lf.replace("\n", "\r\n"))
     assert parsed == _load(lf)
-    assert parsed["dispatch_band"] == 3
     assert parsed["read_only"] is False
     assert parsed["name"] == "dd-sw-engineer-sr"
     assert parsed["tools"][:2] == ["Read", "Write"]

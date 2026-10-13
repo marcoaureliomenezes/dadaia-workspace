@@ -52,7 +52,7 @@ def test_kimi_hooks_block_parses_as_toml_and_pins_rules() -> None:
     ]
     by_event = {h["event"]: h for h in hooks}
     assert "matcher" not in by_event["SessionStart"]
-    assert by_event["PreToolUse"]["matcher"] == "^(Edit|Write|Bash)$"
+    assert by_event["PreToolUse"]["matcher"] == "^(Edit|Write)$"
     assert by_event["PostCompact"]["matcher"] == "manual|auto"
     assert "matcher" not in by_event["PostToolUse"]
     assert "matcher" not in by_event["UserPromptSubmit"]

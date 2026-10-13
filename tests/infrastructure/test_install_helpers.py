@@ -315,7 +315,7 @@ def test_persona_read_only_compares_the_typed_value_and_fails_closed() -> None:
         persona_read_only({})
 
 
-def test_the_real_personas_parse_to_a_typed_band_and_read_only() -> None:
+def test_the_real_personas_parse_to_a_typed_read_only() -> None:
     """The shim already types through PyYAML; it must keep doing so."""
     from dadaia_workspace.core.frontmatter import Frontmatter, parse
 
@@ -326,5 +326,4 @@ def test_the_real_personas_parse_to_a_typed_band_and_read_only() -> None:
     for persona in personas:
         parsed = parse(persona.read_text(encoding="utf-8"))
         assert isinstance(parsed, Frontmatter), persona.name
-        assert type(parsed.data["dispatch_band"]) is int, persona.name
         assert type(parsed.data["read_only"]) is bool, persona.name
