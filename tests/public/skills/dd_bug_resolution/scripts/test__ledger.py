@@ -212,7 +212,8 @@ def test_an_accepted_write_leaves_no_temp_sibling(tmp_path: Path, consumer: str)
 def test_the_one_ledger_writer_leaves_no_temp_and_writes_lf(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """A failing os.replace leaves no temp sibling and the original byte-unchanged; a write is LF."""
+    """A failing os.replace leaves no temp sibling and the original byte-unchanged; a write is
+    LF."""
     import importlib.util
 
     source = _PUBLIC / "skills" / "dd-bug-resolution" / "scripts" / "_ledger.py"

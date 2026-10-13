@@ -108,7 +108,7 @@ def test_stage_manifest_and_install_all(tmp_path: Path, monkeypatch: pytest.Monk
 def test_install_refuses_source_root_overwrite_skip_force_and_doctor_drift_tracking(
     tmp_path: Path,
 ) -> None:
-    """T-PROP-01: hash-compare governs overwrite-without-force / skip-when-canonical /
+    """Hash-compare governs overwrite-without-force / skip-when-canonical /
     force; doctor tracks the dadaia-scoped AGENTS.md files for drift. Plus: install()
     refuses to project onto the dadaia-workspace source root itself (own workspace)."""
     source_root = tmp_path / "dadaia-workspace"
