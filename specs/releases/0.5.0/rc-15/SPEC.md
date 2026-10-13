@@ -79,13 +79,14 @@ Wave ranking: Wave 1 is law, skills and the dev loop (FR1, FR2). Wave 2 is the s
 
 - AC2.1 (unit, RED first): The kernel's `_git.scrubbed_env()` carries `PYTHONDONTWRITEBYTECODE=1`. A child Python started with it from a temporary package writes no `__pycache__`.
 - AC2.2 (integration): Five env sites build their child env on the owner and drop their own literal. The sites are `scripts/ci.py`, `scripts/mutate.py`, `features/certification/service.py`, `tests/fixtures/harness_env.py` and `test__atomic.py:216` (AS-IS §2.2 lists their lines). Every existing test stays green unedited.
-- AC2.3 (no test — reviewer `git grep`): `git grep -nE 'PYTHONDONTWRITEBYTECODE|dont_write_bytecode|-B\b' -- dadaia_workspace scripts tests` hits only these, each named in PLAN §1 with its reason:
+- AC2.3 (no test — reviewer `git grep`): `git grep -nE 'PYTHONDONTWRITEBYTECODE|dont_write_bytecode|-B\b' -- dadaia_workspace scripts tests` hits only the set PLAN §1.2 measured, each hit with its reason there. That set is:
   - the owner and its test;
   - the 8 skill-script top lines;
   - the `core/skill_owner.py` toggle;
   - the `tests/conftest.py` and `test__ledger.py` in-process switches;
   - the `-B` argv literals where `-I` or a clean env hides the variable (`python_env.py`, `hook_wrappers.py` ×2, six test sites);
-  - the deliberate absence at `test__worktree_end__scaffold.py:92`.
+  - the deliberate absence at `test__worktree_end__scaffold.py:92`;
+  - seven more hits: `test_harness_env.py:22`, `test_ci.py:57`, `test_impact.py:95`, `test_mutate.py:74`, `hook_wrappers.py:39`, the `<sha-B>` text in the finding schema, and `privacy_baseline.json:22`.
 
   This replaces the entry's done-when ("names only the owner and its test"), which option B does not reach.
 - AC2.4 (unit — existing tripwire): The `tests/conftest.py` repo-tree write tripwire stays unedited and green on a clean checkout. It is the class's only catch for a new spawner.
@@ -94,7 +95,7 @@ Wave ranking: Wave 1 is law, skills and the dev loop (FR1, FR2). Wave 2 is the s
 
 #### FR3 — one context-name grammar (bug `verdict-context-pattern-disagrees-with-core`)
 
-- AC3.1 (unit, RED first): `verdict.py` accepts a context name that core registers (`My_Ctx`). It still refuses a name that leaves `.dadaia/handoff/` (`../x`, `a/b`), because the allowlist stays (CWE-22). The refused literal parametrised at `test_verdict.py:182` is still refused. The main thread checks that its parameters are kept or tightened, never narrowed.
+- AC3.1 (unit, RED first): `verdict.py` accepts a context name that core registers (`My_Ctx`). `--context` accepts exactly what the core grammar accepts. It still refuses a name that leaves `.dadaia/handoff/` (`../../evil`, `a/b`, `a\\b`) and the empty name, because the allowlist stays (CWE-22). By the operator's order of 2026-10-13, "Mover as linhas (Recommended)" (root map §1, ADR 0249), the `_x` and `A` rows of `test_verdict.py:182-194` move from the refused partition to the accepted partition for `--context`. They stay refused for `--slug`. Every other row stays refused.
 - AC3.2 (no test — reviewer `git grep`): The pattern has one definition, the kernel's `_grammar.CONTEXT_NAME_RE`. `core/models/spec_context.py` loads it through `load_owner`, and `verdict.py:22` `_CONTEXT` leaves.
 
 #### FR4 — the one-owner residue (`one-owner-residue-after-the-kernel`)
@@ -132,7 +133,7 @@ Wave ranking: Wave 1 is law, skills and the dev loop (FR1, FR2). Wave 2 is the s
 
 #### FR8 — the verdict writer validates its own output (bugs `verdict-validation-stated-three-ways-without-the-reviewed-tree`, `verdict-writer-emits-a-handoff-the-schema-rejects`)
 
-- AC8.1 (integration, RED first): A body whose finding lacks `fix_recommendation` makes `verdict.py` exit nonzero, with `Error:` and one `fix:` line naming the failing key. No file is left behind.
+- AC8.1 (integration, RED first): A body whose finding lacks `fix_recommendation` makes `verdict.py` exit nonzero. Its stderr follows the script's own grammar, `[error] …` plus one `fix:` line, and names the failing key. No file is left behind.
 - AC8.2 (integration, RED first): A verdict that cites a file only the reviewed tree holds is written, and it validates. The writer runs the workspace CLI's `reports validate <path> --reviewed-root <tree>` on its own output, and builds the CLI path with the kernel's `_platform`.
 - AC8.3 (integration): The merge gate's fix line for an invalid verdict carries `--reviewed-root <tree>`.
 - AC8.4 (no test — reviewer sweep): `dd-handoff-emitter` SKILL.md step 7 and its Done-when lose the manual `reports validate` run. The validation rule is stated once, by the writer. Growth reason: the bug's expected behaviour is validation before the file is accepted (about +8 production lines, AS-IS §2.1).
