@@ -35,7 +35,7 @@ __all__ = ["push_gate_decision"]
 
 _DENYLIST_LAW = "dd-release-implementation §2a — the push scan refuses a denylisted private name"
 _MAX_LISTED_HITS = 10
-#: R13, N3: every range is uncommitted to its oldest unpublished commit and amended.
+#: Every range is uncommitted to its oldest unpublished commit and amended.
 _REWRITE = (
     "Uncommit the unpublished range down to its oldest commit (origin's history is never "
     "rewritten), remove what is listed, `git commit --amend` and push:"
@@ -90,7 +90,7 @@ def _notes(
 
 
 def _rewrite_fix(ref: PushRef, object_source: ObjectSource, repo: Path, fixes: GateFixes) -> str:
-    """The uncommit-amend remedy for the first refused ref (R13: origin is never rewritten)."""
+    """The uncommit-amend remedy for the first refused ref (origin is never rewritten)."""
     branch = ref.local_ref.removeprefix(HEADS_PREFIX)
     if ref.local_ref.startswith("refs/tags/") or not fixes.head:
         fix = "Operator action: a tag or a detached HEAD has no branch to amend; push a branch."

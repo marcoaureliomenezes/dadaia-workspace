@@ -438,10 +438,8 @@ class VenvPythonEnvironmentManager:
                 if editable:
                     install_cmd.append("--editable")
                 install_cmd.append(spec)
-                # pip's stream is
-                # CAPTURED — a failure must not leak a raw "ERROR: Could not find a
-                # version..." into init's output, where it reads as a masked broken
-                # bootstrap.
+                # pip's stream is CAPTURED — a failure must not leak a raw "ERROR: Could not find a
+                # version..." into init's output, where it reads as a masked broken bootstrap.
                 try:
                     subprocess.run(
                         install_cmd,

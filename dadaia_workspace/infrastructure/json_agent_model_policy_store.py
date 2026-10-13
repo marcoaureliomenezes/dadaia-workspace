@@ -69,7 +69,7 @@ class JsonAgentModelPolicyStore:
         """Atomically persist the overlay, backing up the prior valid file first."""
         self._path.parent.mkdir(parents=True, exist_ok=True)
         if self._path.exists():
-            # Snapshot the PRIOR valid file verbatim before overwriting (NFR-1).
+            # Snapshot the PRIOR valid file verbatim before overwriting.
             atomic_write(self.last_good_path, self._path.read_bytes(), ensure_parent=True)
         atomic_write(
             self._path,

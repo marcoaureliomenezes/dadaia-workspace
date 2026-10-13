@@ -23,8 +23,7 @@ INTENTS_EXEMPT_STATUS = "idea"
 
 
 class SubjectKind(StrEnum):
-    """The registry source classes a subject ref may belong to, each derived from live
-    truth (SPEC §3.1/§3.2)."""
+    """The registry source classes a subject ref may belong to, each derived from live truth."""
 
     CODE = "code"
     DOC = "doc"
@@ -44,7 +43,7 @@ class Subject:
 
 @dataclass(frozen=True)
 class Intent:
-    """One ``(subject -> change)`` delta declared by a backlog item (SPEC §3.1)."""
+    """One ``(subject -> change)`` delta declared by a backlog item."""
 
     subject: Subject
     change: str

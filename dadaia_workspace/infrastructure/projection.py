@@ -5,7 +5,7 @@ library ships" was decided five separate ways across ``public_assets.py``,
 ``install_helpers.py`` and ``codex_doctor.py``: a raw sha compare, a rendered-content
 string compare, a policy-aware render compare reserved for Claude agents only, a
 merge-then-compare special case for ``settings.json``/the kimi hooks block, and nine
-narrow Codex-specific field/regex checks (D-CX-1/2/4/5/10) that re-derived a TOML's
+narrow Codex-specific field/regex checks that re-derived a TOML's
 correctness from its shape instead of its bytes.
 
 This module collapses all of it into one algorithm. A :class:`ProjectionRule`'s

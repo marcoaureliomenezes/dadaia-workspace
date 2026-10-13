@@ -44,7 +44,7 @@ def candidates(records: Records, surface: object) -> list[str]:
 
 def append(records: Records, values: dict[str, Any], dirs: set[str]) -> Records:
     """One brand-new record, `status: "open"`. Refuses a duplicate id, a surface that is
-    not one tracked directory name (F011), and a record naming no ledger ids or `none` as
+    not one tracked directory name, and a record naming no ledger ids or `none` as
     its correlation; the schema check does the rest."""
     bug_id = values["id"]
     if any(r.get("id") == bug_id for r in records):

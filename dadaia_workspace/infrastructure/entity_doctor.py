@@ -1,4 +1,4 @@
-"""Harness-independent public-asset coherence checks (F014, 20260830 audit).
+"""Harness-independent public-asset coherence checks.
 
 These checks read only ``public/`` source assets (agents, skills, behavior map,
 memory-phase law) — they are not Codex checks and never were; they lived in
@@ -159,7 +159,7 @@ def _lane_modules(record: HarnessRecord) -> set[str]:
 
 
 def _persona_content_drift(agent_id: str, agents_dir: Path) -> list[DoctorLine]:
-    """Behavioral-fidelity DRIFT lines for one correctly-bijected sub-agent (A22.5).
+    """Behavioral-fidelity DRIFT lines for one correctly-bijected sub-agent.
 
     Filename-stem bijection alone cannot see a stub file at the right path, or an
     internal identity swap (frontmatter ``name:`` diverging from its own filename)
@@ -235,7 +235,7 @@ def check_entities_derivation(public_dir: Path) -> list[DoctorLine]:
     2. Persona ↔ core sub-agent bijection: every ``public/agents/*.md`` derives from a
        Persona and every Persona has its derived sub-agent — BY NAME, plus, for every
        correctly-bijected pair, the sub-agent's own frontmatter is parseable and its
-       ``name:`` matches its filename (:func:`_persona_content_drift`, A22.5). A stub
+       ``name:`` matches its filename (:func:`_persona_content_drift`). A stub
        file or a copy-paste identity swap at the right filename is DRIFT even though
        filename-only bijection would pass it.
     3. Every Deterministic Behavior is covered by each harness record or listed in its
@@ -288,7 +288,7 @@ def check_entities_derivation(public_dir: Path) -> list[DoctorLine]:
                 f"sub-agent under public/agents/ (ENT-DERIVE-1)",
             )
         )
-    # Behavioral fidelity (A22.5): every correctly-bijected pair also gets its
+    # Behavioral fidelity: every correctly-bijected pair also gets its
     # content opened — a name-only pass cannot see a stub file or an identity swap.
     for matched_id in sorted(personas & scaffolded):
         out.extend(_persona_content_drift(matched_id, agents_dir))

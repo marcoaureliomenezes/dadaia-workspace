@@ -148,7 +148,7 @@ class FileSystemPublicAssetManager:
                 staged.append(f"[render] {dst}")
 
         # LF-exact, atomic writes: staged JSON is hash-compared by doctor, so it must
-        # not pick up Windows CRLF translation (FR-RC2-2).
+        # not pick up Windows CRLF translation.
         from dadaia_workspace.infrastructure.install_helpers import build_manifest
 
         manifest_path = agentic_dir / "manifest.json"
@@ -197,11 +197,10 @@ class FileSystemPublicAssetManager:
         transcript = install_rules(rules, force=plan.force)
         installed.extend(transcript.render())
 
-        # LEDGER RECONCILIATION: the
-        # desired state is diffed against the RECORD of what a prior install wrote —
-        # never against whatever the current source happens to carry, which is blind to
-        # a retired family. Full reconciliation (prune) runs on every whole install;
-        # `harness add`'s one-harness install merges its entries and never prunes.
+        # LEDGER RECONCILIATION: the desired state is diffed against the RECORD of what a prior
+        # install wrote — never against whatever the current source happens to carry, which is blind
+        # to a retired family. Full reconciliation (prune) runs on every whole install; `harness
+        # add`'s one-harness install merges its entries and never prunes.
         self._reconcile_install_ledger(
             workspace_root, transcript, installed, full=plan.harness is None
         )
@@ -406,7 +405,7 @@ class FileSystemPublicAssetManager:
 
         # Resolve the profile-scoped active harness set FIRST — absent profile ⇒
         # all-four (back-compat). An out-of-profile runtime whose directory physically
-        # EXISTS on disk is never silent (A3): a `[warn]` line replaces the scoped
+        # EXISTS on disk is never silent: a `[warn]` line replaces the scoped
         # drift block so a stale/hand-installed runtime cannot read green-with-zero-
         # lines.
         active = self._profile_harnesses(workspace_root)
@@ -444,7 +443,7 @@ class FileSystemPublicAssetManager:
             if name in active:
                 reports.extend(harness_checks(name, workspace_root))
         # An out-of-profile runtime directory that physically exists is surfaced by a
-        # `[warn]` line rather than staying silent (A3).
+        # `[warn]` line rather than staying silent.
         for name, rel_dirs in HARNESS_PROJECTION_DIRS.items():
             if name not in active and any((workspace_root / d).exists() for d in rel_dirs):
                 reports.append(_out_of_profile_warn(name))

@@ -2,7 +2,7 @@
 artifact resolution for ``*.handoff.json`` files.
 
 Placement: ``core``, beside ``specs_resolver``/``workspace_resolver`` — filesystem
-resolvers several layers need (P-11 authorized file I/O). No ``features/handoff.py``
+resolvers several layers need (authorized file I/O). No ``features/handoff.py``
 facade exists; every consumer imports this module directly.
 """
 
