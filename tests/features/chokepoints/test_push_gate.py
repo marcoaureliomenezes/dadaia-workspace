@@ -69,6 +69,8 @@ def _gen() -> Iterable[tuple[str, str]]:
 
 # fmt: off
 @pytest.mark.parametrize(("files", "message", "ref", "terms", "in_message"), [
+    pytest.param({"leak.md": f"{_TERM}\n"}, None, _branch, _TERMS, [], id="A1.1-blob-in-branch-range"),
+    pytest.param({"tag-blob.md": f"{_TERM}\n"}, None, _tag, _TERMS, [], id="A2.1-tainted-tag"),
     pytest.param({"c.md": "clean\n"}, f"mentions {_TERM}", _branch, _TERMS,
                  ["Uncommit the unpublished range"], id="A11.1-term-only-in-commit-message"),
     pytest.param({"leak.md": f"{_TERM}\n"}, None, _tag, "gen", ["denylisted term"], id="one-shot-generator-terms"),
@@ -274,11 +276,16 @@ def test_a_ledger_verb_outside_the_workspace_loads_the_pre_push_terms(
     assert ledger.private_refusal([{"title": f"a {_TERM} leak"}], specs) is not None
 
 
-def test_no_refusal_advertises_a_way_around_the_gate(repo: PushRepo) -> None:
-    """A refusal ends in its one fix line and names no bypass (ADR 0158)."""
+@pytest.mark.parametrize("scenario", ["denylisted-blob", "malformed-stdin", "unreadable-objects"])
+def test_no_refusal_advertises_a_way_around_the_gate(repo: PushRepo, scenario: str) -> None:
+    """Every refusal ends in its one fix line and names no bypass (ADR 0158)."""
     sha = repo.commit({"x.md": f"{_TERM}\n"})
-    source = _Raising(GitObjectReadError("stream desynchronised"))
-    decision = _decide(repo, _branch(sha), denylist_terms=_TERMS, source=source)
+    kw: dict[str, Any] = {"denylist_terms": _TERMS}
+    if scenario == "malformed-stdin":
+        kw["malformed_lines"] = 1
+    if scenario == "unreadable-objects":
+        kw["source"] = _Raising(GitObjectReadError("stream desynchronised"))
+    decision = _decide(repo, _branch(sha), **kw)
     assert not decision.allowed
     assert "--no-verify" not in decision.message
     assert decision.message.count("\nfix: ") == 1

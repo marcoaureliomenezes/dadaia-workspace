@@ -80,6 +80,7 @@ def _at(zone: str, repo: str, owner: str | None = None, **session: object) -> di
     pytest.param("AGENTS.md", {}, f"fix: {_DADAIA} public install", id="S6-floor-law-one-restore-command"),
     pytest.param(".dadaia/sessions/x.json", _A, f"fix: {_DADAIA} context bind ctx-a", id="AC4.4-session-floor-names-the-bound-context"),
     pytest.param(".dadaia/sessions/x.json", {}, f"fix: {_DADAIA} context list", id="AC4.4-session-floor-unbound-lists-contexts"),
+    pytest.param(".dadaia/states/install_ledger.json", {"projected": frozenset({".dadaia/states/install_ledger.json"})}, f"fix: {_DADAIA} public install", id="H1-ledgered-floor-path-is-projected-law-first"),
     pytest.param("repos/x/secrets/k", {"protected": ("secrets",)}, f"fix: {mkdir_line(_ROOT / '.dadaia' / 'tmp')}", id="AC2.5-protected-glob-operator-drafts-in-tmp"),
 ])
 # fmt: on

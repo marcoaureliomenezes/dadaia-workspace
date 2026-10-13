@@ -19,6 +19,7 @@ below as a named parametrized row, including the W1-6 first-path-component block
 from __future__ import annotations
 
 import json
+import os
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -26,6 +27,7 @@ from typing import Any
 import pytest
 
 from dadaia_workspace.core.workspace_layout import DADAIAIGNORE
+from dadaia_workspace.core.workspace_resolver import FENCE_ENV
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from tests.fixtures.harness_env import claude_hook_env, run_hook_subprocess
 from tests.fixtures.stores import context_store
@@ -49,6 +51,23 @@ def _run(tmp_path: Path, payload: dict[str, Any]) -> tuple[str, dict[str, Any] |
     result = run_hook_subprocess("root_whitelist", payload, env)
     assert result.returncode == 0, result.stderr
     return result.stdout, result.block_envelope()
+
+
+def test_block_message_lists_every_whitelisted_entry(tmp_path: Path) -> None:
+    """sa-gate-allows-root-entries-the-reaper-moves#E1, #E7: the block names every root
+    entry the law admits, and neither its text nor its fix points the agent at the
+    operator's exceptions file (DEC-1 (a))."""
+    _out, block = _run(
+        _ws(tmp_path),
+        {"tool_name": "Write", "tool_input": {"file_path": str(tmp_path / "junk.txt")}},
+    )
+    assert block is not None
+    reason = block["reason"]
+    assert (
+        ".agents/ .claude/ .codex/ .cursor/ .dadaia/ .devin/ .github/ repos/ worktrees/ "
+        ".dadaiaignore AGENTS.md prompt.md"
+    ) in reason
+    assert "instance_exceptions" not in reason
 
 
 @pytest.mark.parametrize("name", ["AGENTS.md", "prompt.md"])
@@ -76,12 +95,27 @@ def test_law_declared_root_files_are_canon_for_the_hook_and_the_doctor(
 @pytest.mark.parametrize(
     ("target", "ignore", "registry", "allowed"),
     [
+        pytest.param("junk.txt", "", REGISTRY, False, id="root-stray"),
         pytest.param("shot.png", "*.png\n", REGISTRY, True, id="root-globbed"),
+        pytest.param(".opencode/agents/foo.md", "", REGISTRY, False, id="root-stray-nested"),
+        pytest.param(".gitignore", "", REGISTRY, False, id="root-gitignore-is-no-canon"),
+        pytest.param(".git/info/exclude", "", REGISTRY, False, id="root-git-dir-is-no-canon"),
         pytest.param(".gitignore", ".gitignore\n", REGISTRY, True, id="root-gitignore-globbed"),
         pytest.param(".playwright-mcp/x.log", ".playwright-mcp/\n", REGISTRY, True, id="root-globbed-dir"),
+        pytest.param(".dadaia/junk.txt", "*.txt\n", REGISTRY, False, id="dadaia-stray"),
         pytest.param(".dadaia/junk.txt", ".dadaia/*.txt\n", REGISTRY, True, id="dadaia-globbed"),
+        pytest.param(".dadaia/tmp/agent/20260701/s.json", "", REGISTRY, True, id="dadaia-zone"),
+        pytest.param("repos/alpha/f.py", "", REGISTRY, False, id="repos-stray-context-name"),
         pytest.param("repos/alpha/f.py", "repos/alpha\n", REGISTRY, True, id="repos-globbed"),
+        pytest.param("repos/assoc-r/f.py", "", REGISTRY, True, id="repos-associated"),
+        pytest.param("repos/dead-r/f.py", "", REGISTRY, True, id="repos-dead-context"),
+        pytest.param("repos/any/f.py", "", "{", True, id="repos-unreadable-registry"),
+        pytest.param("worktrees/any/n/f.py", "", "[]", True, id="worktrees-wrong-shaped-registry"),
+        pytest.param("worktrees/dead-r/x/f.py", "", REGISTRY, False, id="worktrees-stray-dead"),
         pytest.param("worktrees/dead-r/x/f.py", "worktrees/dead-r\n", REGISTRY, True, id="worktrees-globbed"),
+        pytest.param("worktrees/assoc-r/0.5.0-rc1/j2/f.py", "", REGISTRY, True, id="worktrees-associated"),
+        pytest.param("worktrees/AGENTS.md", "", REGISTRY, True, id="worktrees-law"),
+        pytest.param(".claude/agents/unledgered.md", "", REGISTRY, True, id="harness-dir-unjudged"),
     ],
 )  # fmt: skip
 def test_four_places_table(
@@ -102,6 +136,31 @@ def test_four_places_table(
     if block is not None:
         assert "ROOT WHITELIST GATE" in block["reason"]
         assert target in block["reason"]
+
+
+def test_a_fenced_root_stays_protected(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """AC1.3 (fenced-roots-env-disables-the-gate): the fence says "never act on", never
+    "nothing protects"."""
+    ws = _ws(tmp_path)
+    monkeypatch.setenv(FENCE_ENV, os.pathsep.join((os.environ[FENCE_ENV], str(ws))))
+    _out, block = _run(
+        tmp_path, {"tool_name": "Write", "tool_input": {"file_path": str(ws / "junk.txt")}}
+    )
+    assert block is not None and "junk.txt" in block["reason"]
+
+
+@pytest.mark.parametrize(
+    ("tool_name", "tool_input"),
+    [
+        pytest.param("Read", {"path": "x"}, id="non_write_tool"),
+        pytest.param("Write", {}, id="unparseable_path_fails_open"),
+    ],
+)
+def test_fail_open_table(tmp_path: Path, tool_name: str, tool_input: dict[str, Any]) -> None:
+    """Nothing to judge is an allow, never a block."""
+    _ws(tmp_path)
+    out, block = _run(tmp_path, {"tool_name": tool_name, "tool_input": tool_input})
+    assert (out, block) == ("", None)
 
 
 @pytest.mark.parametrize(
@@ -126,3 +185,26 @@ def test_the_fix_creates_the_agents_own_temp_dir(
     fix = block["reason"].rsplit("fix: ", 1)[1]
     tmp = tmp_path.resolve() / ".dadaia" / "tmp" / segment  # the hook prints it resolved, POSIX
     assert any((tmp / day).as_posix() in fix for day in days)
+
+
+@pytest.mark.parametrize(
+    ("tool_name", "entry", "target"),
+    [
+        pytest.param("Edit", "z_feedback.md", "z_feedback.md", id="edit-existing-root-file"),
+        pytest.param("Write", "z_feedback.md", "z_feedback.md", id="overwrite-existing-root-file"),
+        pytest.param("Write", ".dadaia/junk.txt", ".dadaia/junk.txt", id="existing-dadaia-stray"),
+    ],
+)  # fmt: skip
+def test_the_gate_judges_creation_only(
+    tmp_path: Path, tool_name: str, entry: str, target: str
+) -> None:
+    """Bug root-gate-blocks-editing-an-existing-entry: the law blocks a write "creating a new
+    entry"; an Edit or overwrite of a path that already exists creates nothing and is allowed — the
+    doctor still reports it. A new path under an existing slop directory stays blocked (#E1)."""
+    ws = _ws(tmp_path)
+    payload = {"tool_name": tool_name, "tool_input": {"file_path": str(ws / target)}}
+    _out, block = _run(tmp_path, payload)
+    assert block is not None and target in block["reason"]
+
+    (ws / entry).mkdir() if entry.endswith("/") else (ws / entry).write_text("", encoding="utf-8")
+    assert _run(tmp_path, payload) == ("", None)

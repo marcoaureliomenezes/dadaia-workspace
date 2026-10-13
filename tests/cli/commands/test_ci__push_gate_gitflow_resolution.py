@@ -13,6 +13,7 @@ import pytest
 
 from dadaia_workspace.cli.commands import ci
 from dadaia_workspace.core.cli_line import fix_line
+from dadaia_workspace.core.gitflow import Gitflow
 
 _CUSTOM = "---\nspecs_pattern_version: 7\ngitflow: {principal: trunk, integration: next, work: work/}\n---\n"
 
@@ -44,6 +45,27 @@ def repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     _git(repo, "push", "-q", "--no-verify", "origin", "trunk")
     _git(repo, "checkout", "-q", "work/0.1.1")
     return repo
+
+
+def test_a_branch_without_specs_reads_the_newest_published_constitution(
+    repo: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert ci._gate_inputs(repo, "")[0] == Gitflow("trunk", "next", "work/")
+    assert "WARNING" not in capsys.readouterr().err
+
+
+def test_the_gate_names_the_live_release_work_branch(repo: Path) -> None:
+    """sa-live-work-branch-named-three-ways#B41-3: no live release -> work/0.1.0. sa-live-work-branch-named-three-ways#B41-2: live 0.5.0 -> work/0.5.0."""
+    assert ci._gate_inputs(repo, "")[1].work == "work/0.1.0"
+    (repo / "specs/releases/0.5.0").mkdir(parents=True)
+    (repo / "specs/releases/0.5.0/_RELEASE.json").write_text("{}", encoding="utf-8")
+    assert ci._gate_inputs(repo, "")[1].work == "work/0.5.0"
+
+
+def test_heads_constitution_wins_over_the_working_tree(repo: Path) -> None:
+    _git(repo, "checkout", "-q", "trunk")
+    (repo / "specs" / "constitution.md").write_text("# an uncommitted edit\n", encoding="utf-8")
+    assert ci._gate_inputs(repo, "")[0] == Gitflow("trunk", "next", "work/")
 
 
 def test_an_absent_specs_tree_is_reported_as_absent_with_the_specs_init_fix(

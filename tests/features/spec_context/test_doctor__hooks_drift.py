@@ -102,6 +102,28 @@ def test_no_module_computes_the_hooks_dir_itself() -> None:
     assert offenders == []
 
 
+# fmt: off
+@pytest.mark.parametrize(("layout", "observed", "other"), [
+    pytest.param({"drifted": True}, r"differs from the shipped \S+$", "absent", id="edited-hook-differs"),
+    pytest.param({"installed": False}, r"is absent$", "differs", id="deleted-hook-is-absent"),
+])
+# fmt: on
+def test_hooks_drift_1_names_the_observed_state_with_one_code_and_one_fix(
+    tmp_path: Path, layout: dict[str, bool], observed: str, other: str
+) -> None:
+    """AC5.1: the message states what was observed; one code and one fix line serve both."""
+    root = _workspace(tmp_path, **layout)
+    found = DoctorService(_Store([_ctx("demo")]), None, root).check_installed_hooks()  # type: ignore[arg-type]
+    assert {f.code for f in found} == {"HOOKS-DRIFT-1"}
+    for f in found:
+        head = f.message.split(" — ")[0]
+        assert head.startswith("repos/demo/.git/hooks/") and re.search(observed, head)
+        assert other not in f.message
+        # `fix_line` prints forward slashes on every host
+        assert f.fix.startswith(root.as_posix()) and " ci install-hook --force --repo " in f.fix
+        assert f.fix.endswith((root / "repos" / "demo").as_posix())
+
+
 def test_an_unreadable_hook_is_said_unreadable_never_differing(tmp_path: Path) -> None:
     """AC5.1: the `OSError` arm names the failed read, not a content difference."""
     root = _workspace(tmp_path)

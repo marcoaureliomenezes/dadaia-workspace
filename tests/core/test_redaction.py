@@ -1,4 +1,4 @@
-"""public doctor shows a private match only as first…last.
+"""public doctor shows a private match only as first…last; one mask, one redactor builder.
 
 Private-shaped values are composed at run time, never tracked literals.
 """
@@ -11,6 +11,8 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
+
+_PKG = Path(__file__).resolve().parents[2] / "dadaia_workspace"
 
 
 def _lines(tmp_path: Path, text: str) -> list[str]:
@@ -29,8 +31,8 @@ def _lines(tmp_path: Path, text: str) -> list[str]:
 def test_an_operator_term_is_shown_first_last(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """An operator denylist term shows as z…x, never raw, in the public asset and in the library's
-    root AGENTS.md alike."""
+    """sa-private-match-rendering-has-three-renderers#B1: an operator denylist term shows as z…x, never raw, in the public asset
+    and in the library's root AGENTS.md alike."""
     term = "zorb" + "lax"
     denylist = tmp_path / "denylist.json"
     denylist.write_text(json.dumps({term: "zz fixture term"}), encoding="utf-8")
@@ -61,7 +63,7 @@ def test_an_operator_term_is_shown_first_last(
 def test_a_baseline_match_is_shown_first_last(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, value: str, shown: str
 ) -> None:
-    """A baseline match (IP, hostname, home path, email) shows as first…last."""
+    """sa-private-match-rendering-has-three-renderers#B2: a baseline match (IP, hostname, home path, email) shows as first…last."""
     monkeypatch.delenv("DADAIA_PRIVACY_DENYLIST", raising=False)
     monkeypatch.chdir(tmp_path)
 
@@ -69,3 +71,15 @@ def test_a_baseline_match_is_shown_first_last(
 
     assert any(f"baseline match {shown}" in line for line in lines), lines
     assert not any(value in line for line in lines)
+
+
+def test_one_mask_and_one_redactor_builder() -> None:
+    """sa-private-match-rendering-has-three-renderers#B7: exactly one first…last mask definition (_privacy) and one
+    ContextRedactor construction site (cli/redact)."""
+    sources = {
+        p.relative_to(_PKG).as_posix(): p.read_text(encoding="utf-8") for p in _PKG.rglob("*.py")
+    }
+    masks = sorted(rel for rel, text in sources.items() if "[0]}…{" in text)
+    builders = sorted(rel for rel, text in sources.items() if "ContextRedactor(" in text)
+    assert masks == ["public/skills/dd-bug-resolution/scripts/_privacy.py"]
+    assert builders == ["cli/redact.py"]

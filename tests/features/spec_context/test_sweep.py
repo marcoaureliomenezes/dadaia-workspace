@@ -49,9 +49,17 @@ def _walk_symlinked(tmp: Path) -> Path:
     return tmp / "ws" / "link"
 
 
+def _walk_plain(tmp: Path) -> Path:
+    (tmp / "b").write_text("b")
+    (tmp / "a").mkdir()
+    return tmp
+
+
 # fmt: off
 @pytest.mark.parametrize(("setup", "names"), [
+    pytest.param(_walk_plain, ["a", "b"], id="sorted-entries"),
     pytest.param(_walk_symlinked, [], id="never-follows-a-symlinked-root"),
+    pytest.param(lambda tmp: tmp / "nope", [], id="missing-dir-is-empty"),
 ])
 # fmt: on
 def test_walk_lists_only_a_real_directorys_sorted_entries(tmp_path: Path, setup: Callable[[Path], Path], names: list[str]) -> None:

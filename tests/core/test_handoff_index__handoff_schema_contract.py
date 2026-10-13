@@ -1,5 +1,11 @@
-"""The shipped record schemas (handoff, bug, finding, decision, release state): closed
-envelopes, and what each accepts and refuses. Size: SMALL — schema documents only.
+"""The shipped record schemas: closed envelopes, and what each accepts and refuses.
+
+handoff-v1 (DADAIA §5.4; sa-handoff-self-pull-requirement-diverges#46.1,
+sa-handoff-self-pull-requirement-diverges#46.2, sa-handoff-self-pull-requirement-diverges#46.3:
+one ``jsonschema`` engine, one verdict per doc); bug-record-v1 (SPEC v0.5.0 A2.1); finding-record-v1
+(A13.1); decision-record-v1 (v0.5.0 specs-canon closure); release-state-v1 (no ``rc`` at any depth).
+Size: SMALL — schema documents only. The schema checks live here, not beside the stdlib-only core
+models (bug mutation-baseline-core-models-scope-now-imports-jsonschema-isolated-venv-cannot-collect).
 """
 
 from __future__ import annotations
@@ -61,6 +67,7 @@ _BASE: dict[str, dict[str, Any]] = {
         "caused_by": None,
         "closed_at": None,
     },
+    # the SPEC FR13 example, as appended
     "finding": {
         "id": "20261020-five-release-window-F003",
         "pillar": "bugs",
@@ -134,7 +141,7 @@ def test_schema_is_draft_2020_12_and_closes_the_envelope(
     if properties is not None:
         assert set(schema["properties"]) == properties
         if kind != "bug":
-            # `ruling` is required on `accepted` only, by the schema's allOf.
+            # ADR 0151 M1: `ruling` is required on `accepted` only, by the schema's allOf.
             assert (
                 set(schema["properties"])
                 == set(schema["required"]) | {"options", "ruling"} & properties
@@ -185,7 +192,7 @@ _DROP = object()
         pytest.param("handoff", {"artifact": _artifact_path("../report.html")}, None, id="handoff-parent-traversal"),
         pytest.param("handoff", {"artifact": _artifact_path(".dadaia/reports/../states/p.json")}, None, id="handoff-embedded-parent-traversal"),
         pytest.param("bug", {"unexpected": "nope"}, None, id="bug-unknown-property"),
-        # no `picked` status
+        # no `picked` status: the pick is the bundled definition commit (v0.5.0 FR2)
         pytest.param("bug", {"status": "picked"}, "status", id="bug-picked-status"),
         pytest.param("bug", {"status": "deferred"}, "status", id="bug-deferred-status"),
         pytest.param("finding", {"unexpected": "nope"}, None, id="finding-unknown-property"),
@@ -236,6 +243,24 @@ def test_mutability_is_declared_per_property_and_the_rewrite_spares_the_core(
         assert {n for n, c in mutability.items() if c == "mutable-governance"} == set(
             _REWRITE[kind]
         )
+
+
+def test_the_bug_law_points_at_x_mutability_and_lists_no_fields() -> None:
+    """sa-spec-doc-033-duplicates-bugs-check#B7: the scaffold bugs law names the schema's
+    x-mutability and restates no field list (no line naming three or more properties)."""
+    properties = set(_schema("bug")["properties"])
+    law = (_SCHEMAS.parent / "scaffold" / "bugs" / "AGENTS.md").read_text(encoding="utf-8")
+    assert "x-mutability" in law
+    assert not [ln for ln in law.splitlines() if len(properties & set(ln.split("`"))) >= 3]
+
+
+def test_the_surface_names_no_library_fact() -> None:
+    """sa-consumer-law-carries-library-facts#FR8.1: the bug schema projected beside every
+    consumer's bugs.py carries no library layer or package list for ``surface``."""
+    surface = _schema("bug")["properties"]["surface"]
+    assert "enum" not in surface and "x-enum-append" not in surface
+    assert surface["type"] == "string" and surface["minLength"] == 1
+    assert "dadaia_workspace" not in surface["description"]
 
 
 def test_handoff_schema_verdict_enum_is_the_two_tokens() -> None:

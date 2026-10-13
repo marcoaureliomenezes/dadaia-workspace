@@ -10,6 +10,7 @@ explicit tree) the run still refuses with the one initialization message.
 
 from __future__ import annotations
 
+import json
 import re
 from pathlib import Path
 
@@ -17,8 +18,12 @@ import pytest
 from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app
+from dadaia_workspace.features.specs.canon import scaffold
+from dadaia_workspace.infrastructure.ledger_scripts import script_repairs
 
 _runner = CliRunner()
+_REPO_ROOT = Path(__file__).resolve().parents[3]
+_TEMPLATES_DIR = _REPO_ROOT / "dadaia_workspace" / "public" / "templates"
 
 
 @pytest.fixture
@@ -26,6 +31,21 @@ def no_instance(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     monkeypatch.chdir(tmp_path)
     monkeypatch.delenv("DADAIA_CONTEXT", raising=False)
     return tmp_path
+
+
+@pytest.mark.medium
+def test_explicit_specs_dir_is_read_with_no_instance_around(no_instance: Path) -> None:
+    specs = no_instance / "specs"
+    scaffold(specs, project_name="bare", force=False, public_dir=_TEMPLATES_DIR.parent)
+    script_repairs(specs)  # the catalog pair's one writer, as `specs init` runs it
+
+    run = _runner.invoke(app, ["doctor", "--json", "--specs-dir", str(specs)])
+
+    payload = json.loads(run.output)
+    assert set(payload["sections"]) == {"workspace", "specs", "ledgers"}, run.output
+    assert payload["sections"]["workspace"]["findings"] == []
+    assert "specs" in payload["sections"] and "ledgers" in payload["sections"]
+    assert run.exit_code == 0, run.output
 
 
 def test_nothing_to_read_refuses_with_one_fix(no_instance: Path) -> None:

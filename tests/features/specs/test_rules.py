@@ -1,5 +1,11 @@
-"""The doctor parses shared facts once per check run, and derives check order, fix dispatch
-and the ``--fix`` help from one ordered rule table.
+"""F010/F012 (20260830-design-bug-surface-audit): the doctor has a parsed SpecsTree
+snapshot and ONE rule registry.
+
+- F010: shared facts are parsed ONCE per check() run — RELEASE.json was re-read and
+  re-parsed by four checks per run, so rules could observe different states mid-run.
+- F012: check order, fix dispatch and the --fix CLI help all derive from one ordered
+  RULES table — the hand-kept if/elif chain and the wrong hand-written help (TREE-3
+  claimed fixable, six real fixables omitted) cannot drift again.
 """
 
 from __future__ import annotations
@@ -48,9 +54,17 @@ def test_fix_dispatch_and_help_derive_from_the_registry() -> None:
         "MEM-PLACEHOLDER-1",
         "FIXED-1",
         "FIXED-2",
-        "SPEC-DOC-046",  # the legacy RELEASE.json rename
+        "SPEC-DOC-046",  # ADR 0007, restored by ADR 0152 (4): the legacy RELEASE.json rename
     }
     help_text = rules_mod.render_fix_help()
     for code in fixable:
         assert code in help_text, code
     assert "TREE-8" not in help_text, "TREE-8 is never auto-fixed (decision D8)"
+
+
+def test_cli_fix_help_is_the_derived_text() -> None:
+    src = (
+        Path(__file__).resolve().parents[3] / "dadaia_workspace/cli/commands/doctor.py"
+    ).read_text(encoding="utf-8")
+    assert "render_fix_help()" in src
+    assert "TREE-3: render missing memory HTML" not in src

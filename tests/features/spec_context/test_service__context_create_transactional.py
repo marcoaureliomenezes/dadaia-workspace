@@ -81,6 +81,7 @@ def _create(*args: str) -> tuple[int, str]:
     [
         ("https://h.test/org/my.repo.git", "my-repo"),
         ("git@h.test:org/app.git", "app"),
+        ("/srv/git/tools/", "tools"),
         ("https://h.test/a b+c", "a-b-c"),
     ],
 )

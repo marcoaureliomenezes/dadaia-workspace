@@ -1,4 +1,6 @@
-"""SpecsDoctor structural checks: one row per code (fires or silent)."""
+"""SpecsDoctor structural checks: one row per code (fires or silent).
+
+A release dir's name is TREE-8's (sa-release-dir-placement-judged-by-tree8-and-spec-doc-027)."""
 
 from __future__ import annotations
 
@@ -230,6 +232,12 @@ def test_code_matrix(
     assert (code in _codes(SpecsDoctor(specs).check())) is fires
 
 
+def test_the_source_scaffold_carries_the_area_law_files() -> None:
+    scaffold = _PUBLIC_DIR / "scaffold"
+    for rel in ("audits/AGENTS.md", "memory/AGENTS.md", "memory/QUALITY.md"):
+        assert (scaffold / rel).is_file(), rel
+
+
 def test_tree5_drift_is_reported_never_auto_repaired(tmp_path: Path) -> None:
     specs_drift = _make_clean_specs_tree(tmp_path / "drift")
     (specs_drift / "AGENTS.md").write_text("# AGENTS\n\nCustomised.\n", encoding="utf-8")
@@ -245,8 +253,8 @@ def test_tree5_drift_is_reported_never_auto_repaired(tmp_path: Path) -> None:
 
 
 def test_one_defect_one_code_missing_active_artifact(tmp_path: Path) -> None:
-    """Trio presence has ONE home, `release.py check`; the specs section reports nothing for a
-    missing PLAN.md and fix never creates it."""
+    """F005: trio presence has ONE home, `release.py check`; the specs section reports
+    nothing for a missing PLAN.md and fix never creates it."""
     specs = _make_clean_specs_tree(tmp_path)
     plan = specs / "releases" / "1.2.3" / "rc-1" / "PLAN.md"
     plan.unlink()
