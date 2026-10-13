@@ -485,7 +485,7 @@ def test_check_reports_a_duplicate_active_id(script: Path, tmp_path: Path) -> No
     done = _run(script, "check", "--specs", str(specs))
     assert done.returncode == 1
     lines = [ln for ln in done.stdout.splitlines() if ln.strip()]
-    assert len(lines) == 1
+    assert len(lines) == 2 and lines[1].startswith("fix: ")
     assert lines[0].startswith("LEDGER-BACKLOG-SCHEMA error ")
     assert "duplicate" in lines[0]
 

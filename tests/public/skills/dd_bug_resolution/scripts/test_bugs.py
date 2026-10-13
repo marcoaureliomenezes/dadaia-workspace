@@ -110,7 +110,7 @@ def test_record_missing_an_immutable_core_field_is_one_error_line(
     done = _run(script, "check", "--specs", str(specs))
     assert done.returncode == 1
     lines = [ln for ln in done.stdout.splitlines() if ln.strip()]
-    assert len(lines) == 1, lines
+    assert len(lines) == 2 and lines[1].startswith("fix: "), lines
     assert lines[0].startswith("LEDGER-BUGS-SCHEMA error ")
     assert "symptom" in lines[0] and "bugs/BUGS.jsonl:1" in lines[0]
 

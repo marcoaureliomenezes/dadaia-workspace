@@ -101,12 +101,22 @@ def test_a_define_tree_passes_without_a_verify_run_and_fails_a_red_ledger_check(
     assert done.returncode == 0 and "ci job" not in done.stdout + done.stderr, done.stderr
     assert _report(root, define) == [f"PREFLIGHT PASS {define} {_head(define)}"]
     commit(define, "specs/bugs/BUGS.jsonl", '{"id": "half"}\n')
-    _fail(
-        root,
-        define,
-        f"bugs.py check failed on {define / 'specs'}",
-        f"Operator action: fix the findings above in {define} and commit them",
+    ledger = define / "specs/bugs/BUGS.jsonl"
+    fix = (
+        f"Operator action: line 1 of {ledger} was not written by `bugs.py append` or "
+        "`bugs.py update` (specs/bugs/AGENTS.md: never hand-edit BUGS.jsonl) — if "
+        f"{ledger} has uncommitted changes, discard them (`git checkout -- {ledger}`); "
+        "otherwise revert the commit that introduced it "
+        f"(`git log -L 1,1:{ledger}` finds it), then redo the change through "
+        "`bugs.py append` or `bugs.py update`"
     )
+    # the check's own text output carries its fix line, which the refusal then relays
+    assert _report(root, define) == [
+        f"fix: {fix}",
+        f"PREFLIGHT FAIL {define} {_head(define)}",
+        f"[error] bugs.py check failed on {define / 'specs'}",
+        f"fix: {fix}",
+    ]
 
 
 def test_a_backlog_tree_fails_a_path_outside_specs(root: Path) -> None:
