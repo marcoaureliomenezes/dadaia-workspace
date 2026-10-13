@@ -41,7 +41,7 @@ def test_no_law_or_skill_names_the_picked_status_or_consumes() -> None:
 # `status` is a live-stage token with its own grammar, not a slug place.
 # This file pins only that every place agrees.
 
-_SLUGS = ("a--b", "a-", "9a")
+_SLUGS = ("a--b", "x", "a-", "9a")
 
 
 def _entry(**over: object) -> dict[str, object]:

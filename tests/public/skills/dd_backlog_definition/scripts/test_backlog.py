@@ -98,6 +98,20 @@ def test_absent_document_is_not_a_finding(script: Path, tmp_path: Path) -> None:
     assert _run(script, "check", "--specs", str(specs)).returncode == 0
 
 
+def test_new_appends_one_active_entry(script: Path, tmp_path: Path) -> None:
+    specs = _specs(tmp_path)
+    done = _run(
+        script, "new", "an-idea", "--specs", str(specs),
+        "--title", "An idea", "--description", "what it needs", "--provenance", "operator request",
+    )  # fmt: skip
+    assert done.returncode == 0, done.stdout + done.stderr
+    (entry,) = _active(specs)
+    assert entry["id"] == "an-idea"
+    assert entry["title"] == "An idea"
+    assert entry["status"] == "idea"
+    assert entry["provenance"] == "operator request"
+
+
 # --- new ----------------------------------------------------------------------------
 
 
@@ -422,6 +436,37 @@ def test_check_reports_a_duplicate_active_id(script: Path, tmp_path: Path) -> No
     assert len(lines) == 1
     assert lines[0].startswith("LEDGER-BACKLOG-SCHEMA error ")
     assert "duplicate" in lines[0]
+
+
+@pytest.mark.parametrize("status", ["delivered", "to-bug"])
+def test_check_reports_a_terminal_status_in_active(
+    script: Path, tmp_path: Path, status: str
+) -> None:
+    """Every disposition is terminal, `to-bug` included."""
+    specs = _specs(
+        tmp_path,
+        {
+            "id": "gone",
+            "title": "t",
+            "opened": "2026-09-20",
+            "status": status,
+            "description": "d",
+            "provenance": "operator request",
+        },  # fmt: skip
+    )
+    done = _run(script, "check", "--specs", str(specs))
+    assert done.returncode == 1
+    assert status in done.stdout
+
+
+def test_check_reports_a_missing_required_field(script: Path, tmp_path: Path) -> None:
+    specs = _specs(
+        tmp_path,
+        {"id": "thin", "title": "t", "opened": "2026-09-20", "status": "idea", "description": "d"},
+    )
+    done = _run(script, "check", "--specs", str(specs))
+    assert done.returncode == 1
+    assert "provenance" in done.stdout
 
 
 def test_check_reports_a_histo_record_off_the_backlog_vocabulary(

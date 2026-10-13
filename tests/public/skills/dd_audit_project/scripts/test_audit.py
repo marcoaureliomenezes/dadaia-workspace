@@ -134,6 +134,20 @@ def test_disposition_then_close_appends_the_histo_and_removes_the_directory(
     }
 
 
+def test_disposition_refuses_the_retired_deferred_verdict(script: Path, specs: Path) -> None:
+    result = _run(
+        script, "disposition", _AUDIT, f"{_AUDIT}-F001",
+        "--disposition", "deferred", "--specs", str(specs),
+    )  # fmt: skip
+
+    assert result.returncode == 2
+    assert "invalid choice: 'deferred'" in result.stderr
+    findings = load_owner("dd-bug-resolution", "_ledger").records(
+        specs / "audits" / _AUDIT / "FINDINGS.jsonl"
+    )
+    assert findings[0]["disposition"] == "open"
+
+
 def test_check_passes_on_a_valid_tree_and_fails_on_a_broken_record(
     script: Path, specs: Path
 ) -> None:

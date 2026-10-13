@@ -14,6 +14,8 @@ Contract:
   is ``key -> value``, a bare flag line (``locked``, ``detached``) is ``key -> ""``, and
   ``worktree`` is ``str(Path(value))``. ``_worktree_git._trees`` and
   ``git_subprocess.unrecoverable`` both read it.
+* ``_refusal.py`` holds ``Refusal(message, fix="")`` (``Exception``; ``.fix``) once; ``_bugs_store``
+  imports that class, so every skill raises and catches one object.
 """
 
 from __future__ import annotations
@@ -21,6 +23,7 @@ from __future__ import annotations
 import os
 import subprocess
 from pathlib import Path
+from types import ModuleType
 
 import pytest
 
@@ -104,3 +107,10 @@ def test_parse_worktrees_returns_the_linked_rows() -> None:
         {"worktree": "/w/worktrees/repo/b", "HEAD": "3" * 40, "detached": "", "locked": "reason text"},
     ]  # fmt: skip
     assert parse("worktree /w/repo\nHEAD " + "1" * 40 + "\n") == []
+
+
+def test_one_refusal_class_for_every_import_path() -> None:
+    refusal: ModuleType = load_owner("dd-bug-resolution", "_refusal")
+    assert refusal.Refusal is load_owner("dd-bug-resolution", "_bugs_store").Refusal
+    err = refusal.Refusal("m", "fix: x")
+    assert (str(err), err.fix) == ("m", "fix: x")

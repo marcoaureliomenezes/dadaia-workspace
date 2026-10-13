@@ -45,3 +45,8 @@ def test_a_malformed_baseline_refuses_naming_the_row_with_one_fix(
         module.load_baseline()
     assert named in str(caught.value)
     assert caught.value.fix.startswith("Operator action:")
+
+
+def test_a_wellformed_baseline_loads_every_row(tmp_path: Path) -> None:
+    module = _baseline_at(tmp_path, json.dumps({"patterns": [_GOOD]}))
+    assert [p.id for p in module.load_baseline()] == ["ok"]

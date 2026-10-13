@@ -102,9 +102,26 @@ def test_clean_ledger_exits_zero(script: Path, tmp_path: Path) -> None:
     assert done.stdout.strip() == "" or "error" not in done.stdout
 
 
+def test_record_missing_an_immutable_core_field_is_one_error_line(
+    script: Path, tmp_path: Path
+) -> None:
+    broken = {k: v for k, v in _OPEN_RECORD.items() if k != "symptom"}
+    specs = _ledger(tmp_path, broken)
+    done = _run(script, "check", "--specs", str(specs))
+    assert done.returncode == 1
+    lines = [ln for ln in done.stdout.splitlines() if ln.strip()]
+    assert len(lines) == 1, lines
+    assert lines[0].startswith("LEDGER-BUGS-SCHEMA error ")
+    assert "symptom" in lines[0] and "bugs/BUGS.jsonl:1" in lines[0]
+
+
 @pytest.mark.parametrize(
     ("mutation", "needle"),
     [
+        ({"status": "resolved"}, "closed_at"),
+        ({"closed_at": "2026-09-20"}, "closed_at"),
+        ({"severity": "URGENT"}, "severity"),
+        ({"ts": "yesterday"}, "ts"),
         ({"root_cause": "retired key"}, "root_cause"),
         ({"diff_direction": "net-negative"}, "diff_direction"),  # derived, never stored
     ],
@@ -116,6 +133,18 @@ def test_invariant_violations_are_reported(
     done = _run(script, "check", "--specs", str(specs))
     assert done.returncode == 1
     assert needle in done.stdout
+
+
+def test_closed_at_before_ts_is_refused(script: Path, tmp_path: Path) -> None:
+    record = {
+        **_OPEN_RECORD,
+        "status": "resolved",
+        "closed_at": "2020-01-01T00:00:00Z",
+        "solution": "s",
+    }
+    done = _run(script, "check", "--specs", str(_ledger(tmp_path, record)))
+    assert done.returncode == 1
+    assert "precedes" in done.stdout
 
 
 @pytest.mark.parametrize(
@@ -302,6 +331,13 @@ def test_a_bad_bug_line_is_one_finding_and_the_doctor_says_what_the_script_says(
 def test_script_is_executable_and_has_a_shebang() -> None:
     assert os.access(_SOURCE, os.X_OK)
     assert _SOURCE.read_text(encoding="utf-8").startswith("#!/usr/bin/env python3\n")
+
+
+@pytest.mark.parametrize("verb", ["fix", "window", "balance"])
+def test_retired_derived_verbs_are_not_cli_choices(script: Path, verb: str) -> None:
+    done = _run(script, verb, "--help")
+    assert done.returncode == 2
+    assert f"invalid choice: '{verb}'" in done.stderr
 
 
 # --- the write verbs: one ledger, one writer ------------------------------
@@ -643,6 +679,14 @@ def test_the_other_transitions_close_the_record(
     assert _run(script, "check", "--specs", str(specs)).returncode == 0
 
 
+def test_the_defer_transition_is_absent(script: Path, tmp_path: Path) -> None:
+    specs = _ledger(tmp_path, _OPEN_RECORD)
+    done = _run(script, "defer", "a-bug", "--reason", "later", "--specs", str(specs))
+    assert done.returncode == 2
+    assert "invalid choice: 'defer'" in done.stderr
+    assert _records(specs) == [_OPEN_RECORD]
+
+
 def test_update_writes_a_governance_field(script: Path, tmp_path: Path) -> None:
     specs = _ledger(tmp_path, _OPEN_RECORD)
     done = _run(script, "update", "a-bug", "--set", "caused_by=none", "--specs", str(specs))
@@ -712,6 +756,8 @@ def _closed(bug_id: str) -> dict[str, object]:
 @pytest.mark.parametrize(("argv", "code"), [
     (["old-a", "old-b"], 0),
     (["old-a", "a-bug"], 1),  # an open record never leaves
+    (["--threshold-days", "90"], 2),  # the age path is gone
+    ([], 2),  # no record named
 ])  # fmt: skip
 def test_archive_moves_named_terminal_records_without_an_adr_gate(
     script: Path, tmp_path: Path, argv: list[str], code: int
