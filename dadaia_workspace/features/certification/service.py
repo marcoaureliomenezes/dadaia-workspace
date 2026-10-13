@@ -16,6 +16,7 @@ from typing import Any
 
 from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES
 from dadaia_workspace.core.redaction import Redactor
+from dadaia_workspace.core.skill_owner import load_owner
 from dadaia_workspace.core.workspace_resolver import fenced_env
 from dadaia_workspace.infrastructure.certification_process import SubprocessCertificationProcess
 
@@ -253,10 +254,8 @@ def certify(
     pythonpath = os.pathsep.join(
         [*source_pythonpath, *([inherited_pythonpath] if inherited_pythonpath else [])]
     )
-    env = {  # every child acts on the sandbox only
-        **fenced_env(target),
-        "HOME": str(home),
-        "PYTHONDONTWRITEBYTECODE": "1",
+    env = load_owner("dd-bug-resolution", "_git").scrubbed_env(fenced_env(target)) | {
+        "HOME": str(home)  # every child acts on the sandbox only
     }
     if pythonpath:
         env["PYTHONPATH"] = pythonpath
