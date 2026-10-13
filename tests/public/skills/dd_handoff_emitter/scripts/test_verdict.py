@@ -6,6 +6,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 from datetime import UTC, datetime, timedelta
@@ -14,10 +15,11 @@ from pathlib import Path
 import jsonschema
 import pytest
 
+from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.skill_owner import load_owner
 from tests.fixtures.harness_env import suite_env
 from tests.helpers.skill_scripts import stage_skill_scripts
-from tests.helpers.worktree_ws import commit, git, make_workspace, run
+from tests.helpers.worktree_ws import commit, fixes, git, make_workspace, patch_cli, run
 
 PKG = Path(__file__).resolve().parents[5] / "dadaia_workspace"
 SKILL = "dd-handoff-emitter"
@@ -60,6 +62,7 @@ def _verdict(
     sha: str,
     stdin: str | None = None,
     slug: str = "s",
+    cwd: Path | None = None,
     **over: str,
 ) -> subprocess.CompletedProcess[str]:
     script = root / ".agents/skills" / SKILL / "scripts/verdict.py"
@@ -79,7 +82,7 @@ def _verdict(
     )
     return subprocess.run(
         cmd,
-        cwd=root,
+        cwd=cwd or root,
         env=env,
         capture_output=True,
         text=True,
@@ -325,3 +328,112 @@ def test_stats_counts_the_rc_verdict_sequences_in_produced_at_order(tmp_path: Pa
         0,
         "sequences 4\nverdicts 7\nrejected 4\nfirst_pass_rejected 3/4\n",
     ), done.stderr
+
+
+_STUB_VALIDATE = '    sys.exit(0 if "schema_version" in json.load(open(args[2])) else 1)'
+_REAL_VALIDATE = """    open({log!r}, "a").write(json.dumps(args) + chr(10))
+    import subprocess
+    sys.exit(subprocess.run([{py!r}, "-m", "dadaia_workspace", *args]).returncode)"""
+
+
+def _real_validator(root: Path, tmp_path: Path) -> Path:
+    """Route the stub's `reports validate` to the real validator; returns the argv log."""
+    log = tmp_path / "validate.argv"
+    schemas = root / ".dadaia/agentic/schemas"
+    schemas.mkdir(parents=True)
+    (root / ".dadaia/states/spec_contexts.json").write_text('{"contexts": []}')
+    shutil.copy(PKG / "public/schemas/handoff-v1.schema.json", schemas)
+    patch_cli(root, _STUB_VALIDATE, _REAL_VALIDATE.format(log=str(log), py=sys.executable))
+    return log
+
+
+_FINDING = {"severity": "LOW", "message": "m", "detail_md": "d", "fix_recommendation": "f"}
+_FIX = "fix: Operator action: correct {} in the stdin body ({}), then rerun verdict.py"
+_REFUSED = [
+    pytest.param(
+        {"findings": [{"severity": "LOW", "message": "m", "detail_md": "d"}]},
+        "$.findings[0]",
+        "'fix_recommendation' is a required property",
+        id="required-property",
+    ),
+    pytest.param(
+        {"findings": [{**_FINDING, "severity": "BAD"}]},
+        "$.findings[0].severity",
+        "'BAD' is not one of ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'INFO']",
+        id="enum-value",
+    ),
+    pytest.param(
+        {"self_pull": {"refs": ["specs/absent.md"]}},
+        "self_pull.refs[0]",
+        "ref does not exist: 'specs/absent.md' (checked reviewed_root, "
+        "repos/<context>/<ref> and <workspace>/<ref>)",
+        id="missing-ref",
+    ),
+]
+
+
+@pytest.mark.parametrize(("over", "where", "message"), _REFUSED)
+def test_a_body_the_schema_rejects_is_refused_by_field_and_leaves_no_handoff(
+    tmp_path: Path, over: dict[str, object], where: str, message: str
+) -> None:
+    root, tree, head = _workspace(tmp_path)
+    _real_validator(root, tmp_path)
+    refused = _verdict(root, tree, sha=head, stdin=json.dumps({**BODY, **over}))
+    assert refused.returncode == 1
+    assert refused.stderr == f"[error] {where}: {message}\n{_FIX.format(where, message)}\n"
+    assert _written(root) == []
+
+
+def test_an_unreadable_schema_passes_the_cli_fix_line_through(tmp_path: Path) -> None:
+    root, tree, head = _workspace(tmp_path)
+    log = _real_validator(root, tmp_path)
+    (root / ".dadaia/agentic/schemas/handoff-v1.schema.json").unlink()
+    refused = _verdict(root, tree, sha=head, stdin=json.dumps(BODY))
+    assert refused.returncode == 1
+    assert fixes(refused) == ["fix: " + fix_line(root, "public", "install")]
+    assert _written(root) == [] and log.exists()
+
+
+def test_a_verdict_citing_a_file_only_the_reviewed_tree_holds_is_written_and_validated_there(
+    tmp_path: Path,
+) -> None:
+    root, tree, _ = _workspace(tmp_path)
+    head = commit(tree, "specs/only-here.md", "x\n")
+    log = _real_validator(root, tmp_path)
+    body = {**BODY, "self_pull": {"refs": ["specs/only-here.md"]}}
+    done = _verdict(root, tree, sha=head, stdin=json.dumps(body))
+    assert done.returncode == 0, done.stderr
+    (path,) = _written(root)
+    assert done.stdout.strip() == str(path)
+    assert log.read_text() == (
+        json.dumps(["reports", "validate", str(path), "--reviewed-root", str(tree), "--json"])
+        + "\n"
+    )
+
+
+def test_a_relative_tree_path_is_validated_as_the_resolved_tree(tmp_path: Path) -> None:
+    root, tree, _ = _workspace(tmp_path)
+    head = commit(tree, "specs/only-here.md", "x\n")
+    log = _real_validator(root, tmp_path)
+    body = {**BODY, "self_pull": {"refs": ["specs/only-here.md"]}}
+    done = _verdict(root, ".", sha=head, stdin=json.dumps(body), cwd=tree)
+    assert done.returncode == 0, done.stderr
+    (path,) = _written(root)
+    assert log.read_text() == (
+        json.dumps(["reports", "validate", str(path), "--reviewed-root", str(tree), "--json"])
+        + "\n"
+    )
+
+
+def test_a_cli_crash_without_json_or_fix_line_is_refused_with_one_operator_action(
+    tmp_path: Path,
+) -> None:
+    root, tree, head = _workspace(tmp_path)
+    patch_cli(root, _STUB_VALIDATE, '    sys.stderr.write("boom")\n    sys.exit(1)')
+    refused = _verdict(root, tree, sha=head)
+    assert refused.returncode == 1
+    assert refused.stderr == (
+        "[error] boom\nfix: Operator action: resolve the workspace CLI error above,"
+        " then rerun verdict.py\n"
+    )
+    assert _written(root) == []
