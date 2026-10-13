@@ -87,7 +87,7 @@ def test_absence_is_still_a_finding(tmp_path: Path) -> None:
 
 def test_a_tree_checked_out_from_git_carries_the_canonical_specs_law(tmp_path: Path) -> None:
     """The specs tree git tracks (the index, what
-    every clone and worktree gets) holds a `specs/AGENTS.md` the doctor judges canonical."""
+    every clone and worktree gets) holds every scaffolded `specs/<area>/AGENTS.md` the doctor judges canonical."""
     tracked = subprocess.run(["git", "-C", str(_REPO_ROOT), "ls-files", "-z", "--", "specs"],
                              capture_output=True, check=True).stdout  # fmt: skip
     subprocess.run(["git", "-C", str(_REPO_ROOT), "checkout-index", "-z", "--stdin",
@@ -97,7 +97,7 @@ def test_a_tree_checked_out_from_git_carries_the_canonical_specs_law(tmp_path: P
     assert [
         i.message
         for i in issues
-        if i.code in ("TREE-5", "MEM-DRIFT-2") and "specs/AGENTS.md" in i.message
+        if i.code in ("TREE-5", "MEM-DRIFT-2") and "AGENTS.md" in i.message
     ] == []
 
 
