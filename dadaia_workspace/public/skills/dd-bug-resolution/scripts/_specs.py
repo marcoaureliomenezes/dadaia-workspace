@@ -40,16 +40,9 @@ def workspace_cli(root: Path) -> Path:
     raise Refusal("no workspace CLI", f"uvx dadaia-workspace init {quote(str(root))}")
 
 
-def _installed_cli(root: Path) -> Path | None:
-    try:
-        return workspace_cli(root)
-    except Refusal:
-        return None
-
-
 def _bound_fix(here: Path, rerun: str, ledger: str | None) -> tuple[str, str]:
     root = workspace_of(here)
-    if root and (cli := _installed_cli(root)):
+    if root and (cli := cli_path(root)).exists():
         shown = subprocess.run(
             [str(cli), "context", "show", "--json"], capture_output=True, text=True, encoding="utf-8", errors="replace"
         )  # fmt: skip

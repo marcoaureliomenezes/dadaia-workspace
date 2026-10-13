@@ -28,7 +28,7 @@ from dadaia_workspace.core.exceptions import (
     WorkspaceVenvBootstrapError,
     WorkspaceVenvNewerError,
 )
-from dadaia_workspace.core.platform import PLATFORM
+from dadaia_workspace.core.platform import PLATFORM, venv_dir, workspace_cli_path
 from dadaia_workspace.infrastructure.provider_version import provider_version
 
 __all__ = [
@@ -306,14 +306,10 @@ def _is_fully_qualified(candidate: str) -> bool:
 
 class VenvPythonEnvironmentManager:
     def _venv_path(self, workspace_root: str) -> Path:
-        return Path(workspace_root) / ".dadaia" / ".venv"
+        return venv_dir(Path(workspace_root))
 
     def _dadaia_entrypoint(self, workspace_root: str) -> Path:
-        return (
-            self._venv_path(workspace_root)
-            / PLATFORM.venv_scripts_dir
-            / f"dadaia{PLATFORM.venv_exe_suffix}"
-        )
+        return workspace_cli_path(Path(workspace_root))
 
     def _install_spec(self, scratch_dir: str) -> str:
         """Resolve what to ``pip install`` so the venv mirrors the RUNNING distribution.

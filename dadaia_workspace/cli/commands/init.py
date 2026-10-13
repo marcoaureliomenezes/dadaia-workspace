@@ -11,13 +11,14 @@ from dadaia_workspace import container
 from dadaia_workspace.cli._fail import fail
 from dadaia_workspace.cli.commands.context import create_fix, print_next_step
 from dadaia_workspace.core import harness_registry
-from dadaia_workspace.core.cli_line import cli_path, fix_line
+from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.exceptions import (
     ContextAlreadyExistsError,
     DadaiaError,
     WorkspaceVenvBootstrapError,
 )
 from dadaia_workspace.core.model_registry import TEMPLATES
+from dadaia_workspace.core.platform import workspace_cli_path
 from dadaia_workspace.features.spec_context.service import slug_from_url
 
 console = Console()
@@ -167,7 +168,7 @@ def init(
             console.print(item, markup=False)
     else:
         console.print(f"[green]✓[/green] {len(installed)} asset(s) installed", highlight=False)
-    console.print(f"CLI: {cli_path(root)}", markup=False, highlight=False, soft_wrap=True)
+    console.print(f"CLI: {workspace_cli_path(root)}", markup=False, highlight=False, soft_wrap=True)
     console.print(_LAW_NOTE, markup=False, soft_wrap=True)
 
     if action == "upgrade":

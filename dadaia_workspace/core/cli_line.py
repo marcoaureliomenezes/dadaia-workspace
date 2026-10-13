@@ -12,11 +12,6 @@ from pathlib import Path, PurePath
 from dadaia_workspace.core import platform
 
 
-def cli_path[P: PurePath](root: P) -> P:
-    """The workspace CLI's real executable (``Scripts\\dadaia.exe`` on Windows)."""
-    return platform.workspace_cli_path(root)
-
-
 def fix_line(root: PurePath | None, *argv: str) -> str:
     """``<absolute CLI> argv…`` quoted for the host shell (:func:`venv_line` for the CLI)."""
     return venv_line(root, "dadaia", *argv)
@@ -36,7 +31,7 @@ def script_line(script: str, *argv: str) -> str:
 def venv_line(root: PurePath | None, tool: str, *argv: str) -> str:
     """``<absolute venv tool> argv…`` for *tool* (``dadaia``, ``pip``, ``python``) of the
     workspace venv; no workspace (*root* ``None``: CI) names the venv running now."""
-    venv = root / ".dadaia" / ".venv" if root is not None else Path(sys.prefix)
+    venv = platform.venv_dir(root) if root is not None else Path(sys.prefix)
     return shell_line(str(platform.venv_tool(venv, tool)), *argv)
 
 
