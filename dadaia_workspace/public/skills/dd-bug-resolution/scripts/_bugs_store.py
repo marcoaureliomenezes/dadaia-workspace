@@ -34,11 +34,12 @@ def read_records(path: Path) -> Records:
 def _validator(path: Path, rel: str) -> Callable[[Records, Records, str, Records], str]:
     def validate(written: Records, records: Records, old: str, moved: Records) -> str:
         known = archived_ids(old) | {str(r.get("id")) for r in moved}
+        why = private_refusal((r for r in written if r not in records), path)
+        if why is not None:
+            raise Refusal(*why)
         return _commit.validated(
-            written,
-            records,
+            _jsonl.serialize(written),
             rel,
-            lambda new: private_refusal(new, path),
             lambda text: findings_for(text, rel, known, path.parents[1]),
             f"{script(Path(__file__).parent / 'bugs.py')} check",
         )

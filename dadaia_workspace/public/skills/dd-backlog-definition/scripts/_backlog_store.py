@@ -60,14 +60,12 @@ def commit(
         if why is not None:
             raise Refusal(*why)
         text = json.dumps({"schema": "backlog-v1", "active": written}, indent=2) + "\n"
-        if findings := pair_findings(text, old + appended):
-            detail = "; ".join(str(f["message"]) for f in findings[:5])
-            raise Refusal(
-                f"the resulting {LEDGER} + {HISTO} would not pass check — nothing was written "
-                f"({detail})",
-                f"{SCRIPT} check",
-            )
-        return text
+        return _commit.validated(
+            text,
+            f"{LEDGER} + {HISTO}",
+            lambda t: pair_findings(t, old + appended),
+            f"{SCRIPT} check",
+        )
 
     return _commit.commit(
         path, read_active, apply, validate, replace, specs / HISTO,

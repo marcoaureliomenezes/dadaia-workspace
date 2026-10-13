@@ -81,14 +81,7 @@ def open_bug_ids(specs: Path) -> list[str]:
 
 def validated(state: State, rel: str) -> str:
     text = json.dumps(state, indent=2, ensure_ascii=False) + "\n"  # the canonical bytes
-    findings = state_findings(text, rel)
-    if findings:
-        detail = "; ".join(str(f["message"]) for f in findings[:5])
-        raise Refusal(
-            f"the resulting {rel} would not pass check — nothing was written ({detail})",
-            f"{SCRIPT} check",
-        )
-    return text
+    return _commit.validated(text, rel, lambda t: state_findings(t, rel), f"{SCRIPT} check")
 
 
 def commit(path: Path, rel: str, apply: Callable[[State], State]) -> State:

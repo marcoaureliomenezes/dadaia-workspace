@@ -8,11 +8,10 @@ race surfaces and retries. The ledger decides what a record is: it hands in `loa
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from _jsonl import serialize
 from _refusal import Refusal
 
 Records = list[dict[str, Any]]
@@ -28,19 +27,10 @@ def stamp(path: Path) -> tuple[int, int] | None:
 
 
 def validated(
-    records: Records,
-    before: Records,
-    rel: str,
-    private: Callable[[Iterable[dict[str, Any]]], tuple[str, str] | None],
-    findings: Callable[[str], list[dict[str, Any]]],
-    fix: str,
+    text: str, rel: str, findings: Callable[[str], list[dict[str, Any]]], fix: str
 ) -> str:
-    """The bytes of *records*, or a refusal: the new ones carry no private term and the
-    bytes pass *findings*, the check the committed file is judged by."""
-    why = private(r for r in records if r not in before)
-    if why is not None:
-        raise Refusal(*why)
-    text = serialize(records)
+    """*text*, or a refusal naming *rel* when the bytes fail *findings*, the check the
+    committed file is judged by."""
     if found := findings(text):
         detail = "; ".join(f"line {f['line']}: {f['message']}" for f in found[:5])
         raise Refusal(

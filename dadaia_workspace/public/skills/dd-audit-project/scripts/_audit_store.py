@@ -11,6 +11,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+import _commit
 import _jsonl
 from _audit_check import AUDITS, FINDINGS, HISTO, archive_findings, live_findings
 from _ledger import replace
@@ -61,28 +62,18 @@ def read_findings(directory: Path) -> list[dict[str, Any]]:
 def write_findings(directory: Path, records: list[dict[str, Any]]) -> None:
     """Replace *directory*'s FINDINGS.jsonl with *records*, validated first."""
     text = _jsonl.serialize(records)
-    problems = live_findings(text, f"{AUDITS}/{directory.name}/{FINDINGS}")
-    if problems:
-        raise Refusal(
-            f"the resulting {FINDINGS} would not pass check — nothing was written "
-            f"({problems[0]['message']})",
-            f"{SCRIPT} check",
-        )
-    replace(directory / FINDINGS, text)
+    rel = f"{AUDITS}/{directory.name}/{FINDINGS}"
+    replace(
+        directory / FINDINGS,
+        _commit.validated(text, FINDINGS, lambda t: live_findings(t, rel), f"{SCRIPT} check"),
+    )
 
 
 def append_histo(specs: Path, record: dict[str, Any]) -> None:
     """Append one validated terminal record to the append-only archive. The record is
     validated ALONE — a pre-v6 line already in the file is history, not this write's
     business."""
-    line = _jsonl.serialize([record])
-    problems = archive_findings(line)
-    if problems:
-        raise Refusal(
-            f"the {HISTO} record this close would write does not pass check — nothing "
-            f"was written ({problems[0]['message']})",
-            f"{SCRIPT} check",
-        )
+    line = _commit.validated(_jsonl.serialize([record]), HISTO, archive_findings, f"{SCRIPT} check")
     path = specs / HISTO
     existing = path.read_text(encoding="utf-8") if path.is_file() else ""
     replace(path, existing + line)
