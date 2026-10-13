@@ -60,6 +60,7 @@ from pathlib import Path, PurePath
 from typing import Any, Final
 
 from dadaia_workspace.core import platform
+from dadaia_workspace.core.skill_owner import load_owner
 
 __all__ = [
     "ALLOWLISTED_DADAIA_ENV",
@@ -114,13 +115,12 @@ def suite_env(
         for k, v in parent.items()
         if k not in _OPERATOR_ENV and (not k.startswith("DADAIA_") or k in _SUITE_DADAIA_ENV)
     }
-    env = kept | {
+    env = load_owner("dd-bug-resolution", "_git").scrubbed_env(kept) | {
         "HOME": str(home),
         "USERPROFILE": str(home),
         "XDG_CACHE_HOME": str(home / ".cache"),
         "LOCALAPPDATA": str(home / "AppData" / "Local"),
         "KIMI_CODE_HOME": str(home / ".kimi-code"),
-        "PYTHONDONTWRITEBYTECODE": "1",
     }
     for key in unset:
         env.pop(key, None)

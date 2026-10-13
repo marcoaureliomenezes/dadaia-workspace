@@ -213,7 +213,7 @@ def test_bugs_append_into_a_symlinked_ledger_exits_1_with_one_fix_line(tmp_path:
 
 
 def _child(code: str, cwd: Path) -> subprocess.CompletedProcess[str]:
-    env = {**os.environ, "PYTHONPATH": str(_ROOT), "PYTHONDONTWRITEBYTECODE": "1"}
+    env = load_owner("dd-bug-resolution", "_git").scrubbed_env() | {"PYTHONPATH": str(_ROOT)}
     return subprocess.run(
         [sys.executable, "-B", "-c", code],
         capture_output=True,
