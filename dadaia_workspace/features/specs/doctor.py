@@ -15,7 +15,8 @@ single-responsibility validator siblings plus two shared leaf modules:
 
 The coordinator owns ORDER: ``check()`` invokes the validators' public methods in one fixed
 interleaved sequence (families interleave — coherence→memory→release→…→
-closure→coherence), and ``fix()`` dispatches by issue code. It imports NO ``spec_context``: the coordinator holds no ``spec_context`` cross-feature
+closure→coherence), and ``fix()`` dispatches by issue code. It imports NO ``spec_context``: the
+coordinator holds no ``spec_context`` cross-feature
 edge, not even via a typed leaf seam.
 
 Pure module — no I/O outside the supplied specs_dir / public_dir. No external dependencies.

@@ -173,7 +173,8 @@ class DoctorService:
     def check_installed_hooks(self, context: str | None = None) -> list[SectionFinding]:
         """HOOKS-DRIFT-1: an ALIVE repo's hook where git runs hooks is not byte-for-byte the
         shipped one — differs, absent or unreadable, each said as observed — the one backstop
-        outside every harness hook. A non-git repo is never a finding; *context* scopes the repos."""
+        outside every harness hook. A non-git repo is never a finding; *context* scopes the
+        repos."""
         issues: list[SectionFinding] = []
         for top in self._alive_repo_tops(context):
             hooks_dir = git_hooks_dir(top)
@@ -326,7 +327,8 @@ class DoctorService:
     # ------------------------------------------------------------------
 
     def scan(self, context: str | None = None) -> tuple[Finding, ...]:
-        """Every entry of the instance, classified, in a fixed order; *context* scopes the repo trees."""
+        """Every entry of the instance, classified, in a fixed order; *context* scopes the repo
+        trees."""
         globs, _, invalid = workspace_layout.operator_globs(self._workspace_root)
         rules = (globs, *context_registry.registered_slugs(self._workspace_root))
         findings: list[Finding] = [*self._missing_core(), *self._scan_dadaiaignore(invalid)]
