@@ -41,7 +41,7 @@ SCHEMA_VERSION = "agentic-entities-v1"
 
 def load_registry() -> dict[str, Any]:
     """The abstract-entity registry, shape-checked: the test reads the JSON itself now
-    that the panel's loader is gone (0.4.7 c5 FR1)."""
+    that the panel's loader is gone."""
     data = json.loads(_REGISTRY_PATH.read_text(encoding="utf-8"))
     assert isinstance(data, dict) and data.get("schema_version") == SCHEMA_VERSION
     for key in ("personas", "behaviors", "rules", "universal"):
@@ -199,7 +199,7 @@ def _write_registry(tmp_path: Path, payload: object) -> None:
     ],
 )
 def test_doctor_check_blocks_on_a_malformed_registry(tmp_path: Path, registry: object) -> None:
-    """FR3.3 (ENT-DERIVE-1): a registry off its schema yields exactly one typed ERROR line —
+    """ENT-DERIVE-1: a registry off its schema yields exactly one typed ERROR line —
     never a traceback, never a DRIFT line misread from the shape (``set("codex")`` as gap keys)."""
     from dadaia_workspace.infrastructure.entity_doctor import check_entities_derivation
 

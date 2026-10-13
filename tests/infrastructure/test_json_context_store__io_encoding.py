@@ -2,11 +2,8 @@
 
 Non-ASCII round-trip and cleanup-on-success coverage for the package's one atomic-write
 primitive itself (``core.atomic_write.atomic_write``) lives in
-``tests/core/test_atomic_write.py`` (v0.4.5 FR2/T-045-14: the eleven named/inline
-writers this file used to exercise via ``_atomic_write_text`` are gone — every call site
-now delegates directly to the primitive, so this file's remaining job is proving the
-higher-level JSON store abstraction round-trips non-ASCII data end to end, not the
-primitive's own byte-level contract).
+``tests/core/test_atomic_write.py``. This file proves only that the higher-level JSON
+store abstraction round-trips non-ASCII data end to end, not the primitive's byte-level contract.
 
 Ensures that the JSON context store round-trips
 non-ASCII data (paths, project names) correctly and the files on disk are valid UTF-8.

@@ -1,7 +1,7 @@
 """One interpreter rule for every hook: the workspace's own self-locating wrapper (Kimi's
 user-level shim: the nearest `.dadaia/states/spec_contexts.json` sentinel), and one
-missing-venv posture — a loud stderr warning and exit 0 (DEC-10 (a)), told to the agent by
-every ctx-inject firing (missing-venv-hook-disarms-the-gate-invisibly, AC2.7).
+missing-venv posture — a loud stderr warning and exit 0, told to the agent by
+every ctx-inject firing.
 Size: MEDIUM — executes the rendered hook commands as the harness would.
 """
 
@@ -73,8 +73,8 @@ def _run(command: str, cwd: Path, **env: str) -> subprocess.CompletedProcess[str
 def test_missing_venv_is_loud_and_fails_open_on_every_harness(
     tmp_path: Path, harness: str, output: str
 ) -> None:
-    """sa-hook-parity-claims-false-and-interpreter-rules-diverge#B3: no `.dadaia/.venv` —
-    every lane exits 0 (never 127) naming the missing venv on stderr; and (AC2.7) each
+    """No `.dadaia/.venv` —
+    every lane exits 0 (never 127) naming the missing venv on stderr; and each
     ctx-inject firing tells the agent, in that lane's envelope, with no file written."""
     ws = _workspace(tmp_path / 'w"s', venv=False)
     before = sorted((ws / ".dadaia").rglob("*"))
@@ -91,7 +91,7 @@ def test_missing_venv_is_loud_and_fails_open_on_every_harness(
 
 
 def test_kimi_shim_judges_the_nearest_sentinel_workspace(tmp_path: Path) -> None:
-    """sa-hook-parity-claims-false-and-interpreter-rules-diverge#B4: the shim run inside a
+    """The shim run inside a
     venv-less inner workspace nested in an outer one warns about INNER and exits 0 —
     it never runs the outer workspace's interpreter."""
     outer = _workspace(tmp_path / "ws-outer", venv=True)
@@ -104,7 +104,7 @@ def test_kimi_shim_judges_the_nearest_sentinel_workspace(tmp_path: Path) -> None
 
 
 def test_the_claude_hook_survives_a_moved_workspace(tmp_path: Path) -> None:
-    """sa-hook-parity-claims-false-and-interpreter-rules-diverge#B5: the registered command
+    """The registered command
     resolves through $CLAUDE_PROJECT_DIR, so a workspace moved after install still gates:
     a new root entry is refused."""
     _workspace(tmp_path / "before", venv=True)

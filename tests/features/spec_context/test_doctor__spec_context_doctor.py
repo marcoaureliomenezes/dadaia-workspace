@@ -28,7 +28,7 @@ from tests.fixtures.stores import context_store
 
 
 def _make_healthy_venv(root: Path) -> None:
-    """Create a SYNTHETIC healthy venv tree so the FR-W3-02 VENV-1 invariant is satisfied.
+    """Create a SYNTHETIC healthy venv tree so the VENV-1 invariant is satisfied.
 
     Synthetic only (mkdir/touch/chmod) — never a real venv build (QA memory law).
     """
@@ -72,7 +72,7 @@ def _make_doctor(
 def test_check_clean_state_no_issues(tmp_path: Path) -> None:
     ctx = _ctx("alpha", state=ContextState.ALIVE)
     (tmp_path / "repos" / "alpha").mkdir(parents=True)
-    _make_healthy_venv(tmp_path)  # FR-W3-02: a clean workspace has a healthy venv.
+    _make_healthy_venv(tmp_path)  # A clean workspace has a healthy venv.
     svc, _ = _make_doctor(tmp_path, [ctx])
     issues = svc.check()
     assert issues == []
@@ -204,7 +204,7 @@ def test_inv5_fix_refuses_a_dead_slug_that_resolves_outside_repos(tmp_path: Path
 
 
 def test_inv5_fix_never_follows_a_symlinked_repo_dir(tmp_path: Path) -> None:
-    """same bug, the CWE-59 shape: ``repos/<slug>`` is a symlink out of
+    """The CWE-59 shape: ``repos/<slug>`` is a symlink out of
     ``repos/``; the target is neither removed nor emptied."""
     outside = tmp_path / "outside"
     outside.mkdir()

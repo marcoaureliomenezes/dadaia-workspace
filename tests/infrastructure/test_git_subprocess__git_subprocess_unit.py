@@ -1,8 +1,7 @@
 """GitSubprocessClient decisions at the ``git_subprocess._run`` seam; real-git behavior
 lives in ``tests/infrastructure/test_git_subprocess.py``.
 
-F-05 (clone transport reject matrix); v0.4.3 A10.1, A10.3 and the
-T-043-23 ``_stage_files_safe`` hardening.
+Clone transport reject matrix and the ``_stage_files_safe`` hardening.
 """
 
 from __future__ import annotations
@@ -54,7 +53,7 @@ def _fake(monkeypatch: pytest.MonkeyPatch, reply: Reply) -> list[list[str]]:
 def test_clone_url_scheme_accept_reject_matrix(
     url: str, allowed: bool, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """F-05: a hostile transport is refused BEFORE git runs (never reduce this list)."""
+    """A hostile transport is refused BEFORE git runs (never reduce this list)."""
     calls = _fake(monkeypatch, lambda args: None)
     if allowed:
         GitSubprocessClient().clone(url, tmp_path / "dest")
@@ -129,7 +128,7 @@ def test_a_failed_git_step_raises_and_nothing_after_it_runs(
 def test_every_path_is_staged_and_committed_as_a_literal_pathspec(
     monkeypatch: pytest.MonkeyPatch, act: Callable[[Path], None], untracked: str, paths: list[str]
 ) -> None:
-    """A10.3: a name that looks like pathspec magic is never reinterpreted."""
+    """A name that looks like pathspec magic is never reinterpreted."""
     calls = _fake(
         monkeypatch,
         lambda args: (

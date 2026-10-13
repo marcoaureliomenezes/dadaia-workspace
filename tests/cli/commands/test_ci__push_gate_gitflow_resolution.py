@@ -55,7 +55,7 @@ def test_a_branch_without_specs_reads_the_newest_published_constitution(
 
 
 def test_the_gate_names_the_live_release_work_branch(repo: Path) -> None:
-    """sa-live-work-branch-named-three-ways#B41-3: no live release -> work/0.1.0. sa-live-work-branch-named-three-ways#B41-2: live 0.5.0 -> work/0.5.0."""
+    """With no live release the work branch is work/0.1.0; a live 0.5.0 names work/0.5.0."""
     assert ci._gate_inputs(repo, "")[1].work == "work/0.1.0"
     (repo / "specs/releases/0.5.0").mkdir(parents=True)
     (repo / "specs/releases/0.5.0/_RELEASE.json").write_text("{}", encoding="utf-8")

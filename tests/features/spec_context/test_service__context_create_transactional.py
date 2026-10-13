@@ -161,7 +161,7 @@ def test_only_a_checkout_of_the_url_is_adopted(ws: Path, tmp_path: Path) -> None
 
 
 def test_refusal_fix_lines_never_repeat_the_failing_command(ws: Path, tmp_path: Path) -> None:
-    """G3/G4/G6 — a bad URL fixes to an operator action naming it, an owned slug to
+    """A bad URL fixes to an operator action naming it, an owned slug to
     its owner."""
     bad = tmp_path / "nothere.git"
     code, out = _create("bad", "--main-repo", str(bad))
@@ -182,7 +182,7 @@ def test_refusal_fix_lines_never_repeat_the_failing_command(ws: Path, tmp_path: 
 def test_the_created_line_is_one_line_and_the_next_step_is_the_new_contexts(
     ws: Path, tmp_path: Path
 ) -> None:
-    """G1 + G5 — the success line is one line and names the new context's own next step."""
+    """The success line is one line and names the new context's own next step."""
     assert _create("--main-repo", str(_remote(tmp_path, "second.git")))[0] == 0
     code, out = _create("--main-repo", str(_remote(tmp_path, "a-rather-long-repo-name.git")))
     assert code == 0, out

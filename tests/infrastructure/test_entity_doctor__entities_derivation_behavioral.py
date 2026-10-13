@@ -1,8 +1,8 @@
 """ENT-DERIVE-1 behavioral fidelity: each drift class, mutated alone into a clean scratch
-tree, is reported as a BLOCKING line (v0.4.3 T-043-35), and harness coverage is derived
-(rc-14 AC5.1), never restated by the registry.
+tree, is reported as a BLOCKING line, and harness coverage is derived
+never restated by the registry.
 
-Seam (fixed for J7.T2): ``check_entities_derivation(public_dir)`` reads the harness
+Seam: ``check_entities_derivation(public_dir)`` reads the harness
 records from the module attribute ``entity_doctor.HARNESS_RECORDS`` and the hook table
 from ``entity_doctor.HOOK_DIALECTS``; these tests replace both at that boundary. A registry
 behavior is ``{id, mandate, modules: [dotted hook modules], gaps: {harness: reason}}``.

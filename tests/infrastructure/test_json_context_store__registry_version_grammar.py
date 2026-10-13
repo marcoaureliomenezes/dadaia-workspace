@@ -1,6 +1,6 @@
 """The store, ``migrate`` and the doctor ask ONE grammar (``parse_schema_version``), so a
 registry the context verbs read is exactly one ``migrate --yes`` leaves untouched.
-Supersedes test_cli_migrate_state.py and the store's legacy-refusal table. AC3.9: an
+Supersedes test_cli_migrate_state.py and the store's legacy-refusal table. An
 unreadable registry (truncated, `{}`) is REG-SCHEMA at every reader.
 
 size: MEDIUM (in-process CLI over a tmp workspace; one POSIX subprocess runs the fix).
@@ -55,8 +55,7 @@ def _registry(ws: Path, version: object, rows: list[dict[str, object]]) -> Path:
 def test_readable_iff_migrate_is_a_no_op(
     ws: Path, version: object, rows: list[dict[str, object]], readable: bool
 ) -> None:
-    """sa-registry-schema-version-has-three-grammars#B1, sa-registry-schema-version-has-three-grammars#B2,
-    sa-registry-schema-version-has-three-grammars#B3: int/str 2 and 3 read in
+    """int/str 2 and 3 read in
     `context list` and `context show`; a newer version says "newer than this dadaia",
     never advises migrate, and migrate changes nothing; the store reads it ⇔ migrate is
     a no-op, and once migrated the store reads it."""
@@ -82,7 +81,7 @@ def test_readable_iff_migrate_is_a_no_op(
 
 @pytest.mark.parametrize("version", ["1", "0"])
 def test_migrate_rewrites_only_v1_rows(ws: Path, version: str) -> None:
-    """sa-registry-schema-version-has-three-grammars#B4: schema "1"/"0" with v3 rows — only
+    """Schema "1"/"0" with v3 rows — only
     ativo/inativo rows are rewritten; alive/dead rows are preserved, associated_repos included."""
     path = _registry(ws, version, [_ALIVE, _DEAD, _ATIVO])
 
@@ -94,7 +93,7 @@ def test_migrate_rewrites_only_v1_rows(ws: Path, version: str) -> None:
 
 @pytest.mark.skipif(sys.platform == "win32", reason="the dadaia shim is a POSIX sh script")
 def test_the_refusal_fix_line_migrates_with_no_tty(tmp_path: Path) -> None:
-    """sa-registry-schema-version-has-three-grammars#B5: the refusal carries one fix line,
+    """The refusal carries one fix line,
     `dadaia migrate --yes`, and it works with no TTY (a workspace whose OWN venv runs it)."""
     bin_dir = tmp_path / "ws" / ".dadaia" / ".venv" / "bin"
     bin_dir.mkdir(parents=True)
@@ -136,7 +135,7 @@ _DEEP = '{"contexts": ' + "[" * 100_000  # past json's recursion limit (CWE-674)
 def test_doctor_on_a_bad_registry_gives_a_finding_with_a_fix(
     ws: Path, body: str, fix_head: str | None
 ) -> None:
-    """sa-registry-schema-version-has-three-grammars#B6, AC3.9: on a bad registry —
+    """On a bad registry —
     truncated and `{}` included — doctor gives one REG-SCHEMA finding with a fix and no
     traceback."""
     (ws / ".dadaia" / "states" / "spec_contexts.json").write_text(body, encoding="utf-8")
@@ -156,7 +155,7 @@ def test_doctor_on_a_bad_registry_gives_a_finding_with_a_fix(
     "body", [_TRUNCATED, "{}", _DEEP], ids=["truncated", "empty-object", "deep-nesting"]
 )
 def test_ac3_9_an_unreadable_registry_is_reg_schema_at_every_reader(ws: Path, body: str) -> None:
-    """AC3.9 (DEL corrupt-context-registry-crashes-doctor-and-next-step): `context
+    """`context
     list|show|create` refuse with the one fix line and no traceback; SessionStart prints
     REG-SCHEMA, never "create a context"; the layout check admits every slug (`*`)."""
     path = ws / ".dadaia" / "states" / "spec_contexts.json"
@@ -181,7 +180,7 @@ def test_ac3_9_an_unreadable_registry_is_reg_schema_at_every_reader(ws: Path, bo
 
 
 def test_ac3_9_doctor_fix_acts_on_nothing_over_an_unreadable_registry(ws: Path) -> None:
-    """AC3.9: an unreadable registry makes every `doctor --fix` lane act on nothing — a root
+    """An unreadable registry makes every `doctor --fix` lane act on nothing — a root
     slop file stays where it is."""
     (ws / ".dadaia" / "states" / "spec_contexts.json").write_text(_TRUNCATED, encoding="utf-8")
     (ws / "junk.txt").write_text("slop", encoding="utf-8")
@@ -192,7 +191,7 @@ def test_ac3_9_doctor_fix_acts_on_nothing_over_an_unreadable_registry(ws: Path) 
 
 
 def test_a_registry_row_missing_a_key_is_reg_schema(ws: Path) -> None:
-    """AC2.3 (0162): a row without ``created_at`` is unreadable, never a ``KeyError``:
+    """A row without ``created_at`` is unreadable, never a ``KeyError``:
     `context list` exits 1 with one ``Operator action:`` fix line, and doctor gives one
     REG-SCHEMA finding carrying it."""
     _registry(ws, "2", [{k: v for k, v in _ALIVE.items() if k != "created_at"}])

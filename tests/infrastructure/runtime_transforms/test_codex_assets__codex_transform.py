@@ -1,4 +1,4 @@
-"""The Codex model map (AC1.2): ``codex_model`` answers a tier alias from ``TIER_CODEX``,
+"""The Codex model map: ``codex_model`` answers a tier alias from ``TIER_CODEX``,
 an unknown alias raises.
 """
 

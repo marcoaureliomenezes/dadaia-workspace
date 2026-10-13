@@ -1,8 +1,8 @@
 """One owner per question: each rule scans the package and names every module that answers a
 question its owner alone answers.
 
-P-11 core file-I/O purity, P-12 hooks never import the container, F001 no
-orphaned factory, and the single-owner bug fixes cited on each row. Size: SMALL — AST/text
+P-11 core file-I/O purity, P-12 hooks never import the container, no orphaned
+factory, and the single-owner rule each row names. Size: SMALL — AST/text
 over the package source, plus one subprocess per hook import.
 """
 
@@ -273,21 +273,14 @@ _RULES: dict[str, Callable[[], list[str]]] = {
     "core-file-io-purity": _core_file_io,
     "session-store-owns-session-paths": _session_paths,
     "every-container-def-has-a-production-consumer": _orphan_factories,
-    # sa-context-dead-removes-repos-outside-the-reaper#C8
     "no-rmtree-outside-the-create-rollback": _rmtree_sites,
-    # sa-expiry-has-two-clocks#45.3
     "one-expiry-clock": _ttl_clocks,
-    # sa-gate-path-classes-diverge-from-the-law#B39-6 (tables and producer)
     "path-class-tables-have-one-reader": _path_class_tables_read_elsewhere,
     "path-class-has-one-producer": _path_class_produced_elsewhere,
     "release-state-module-never-writes": _release_state_writes,
-    # sa-context-repo-mapping-falls-back-to-the-name#B5
     "repos-path-comes-from-the-registry": _repos_path_from_a_context_name,
-    # sa-specs-upgrade-writes-through-symlinks#B4
     "specs-writes-go-through-atomic-write": _raw_specs_writes,
-    # sa-reaper-destroys-its-own-hold-before-ttl#B8
     "no-function-naming-the-reaped-zone-deletes": _reaped_zone_deleters,
-    # sa-gate-allows-root-entries-the-reaper-moves#E9 (gate and doctor ask the one verdict)
     "root-whitelist-asks-the-one-verdict": lambda: _layout_sets_read_by("hooks/root_whitelist.py"),
     "doctor-asks-the-one-verdict": lambda: _layout_sets_read_by("features/spec_context/doctor.py"),
 }
@@ -342,7 +335,7 @@ def test_gate_resolution_path_never_imports_the_container(tmp_path: Path) -> Non
 
 
 def test_harness_dirs_derive_from_the_one_harness_registry() -> None:
-    """0.4.7 FR3: HARNESS_DIRS is `.agents` plus HARNESS_PROJECTION_DIRS; kimi-code owns none."""
+    """HARNESS_DIRS is `.agents` plus HARNESS_PROJECTION_DIRS; kimi-code owns none."""
     from dadaia_workspace.core import harness_registry, workspace_layout
 
     assert harness_registry.HARNESS_PROJECTION_DIRS["kimi-code"] == ()
@@ -354,7 +347,7 @@ def test_harness_dirs_derive_from_the_one_harness_registry() -> None:
 
 
 def test_gate_additive_prefixes_are_the_registry_view() -> None:
-    """0.4.6 FR1: the gate's `.dadaia/` ADDITIVE class is the registry's OUTPUT + EPHEMERAL rows."""
+    """The gate's `.dadaia/` ADDITIVE class is the registry's OUTPUT + EPHEMERAL rows."""
     from dadaia_workspace.core import workspace_layout
     from dadaia_workspace.features.spec_context import gate_policy
 
@@ -368,7 +361,7 @@ def _gaps(behavior_id: str) -> dict[str, str]:
 
 
 def test_each_harness_carries_the_cache_env_or_declares_the_gap(tmp_path: Path) -> None:
-    """sa-tool-caches-land-outside-the-cache-zone#B40-2: Claude and Codex export the same
+    """Claude and Codex export the same
     absolute env; kimi-code, cursor, devin and copilot declare a gap — never silence."""
     tmp = Path("/ws/.dadaia/tmp")  # native separators (a backslash path on Windows)
     ruff, mypy = str(tmp / "ruff-cache"), str(tmp / "mypy-cache")

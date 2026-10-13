@@ -1,15 +1,13 @@
-"""Contract test: a rule's projected bytes are LF-exact and idempotent (FR-RC2-2).
+"""Contract test: a rule's projected bytes are LF-exact and idempotent.
 
-K3 (v0.5.1): the retired ``write_generated`` free function is superseded by the ONE
+The retired ``write_generated`` free function is superseded by the ONE
 ``ProjectionRule``/``install_rules`` seam (``infrastructure/projection.py``) — every
 generated projection (settings.json, config.toml, ...) now flows through it. The
 invariant this pins is now structurally guaranteed rather than merely tested:
 ``install_rules`` always calls ``atomic_write(rule.dst, desired)`` with *desired* typed
 ``bytes`` (never ``str``), so binary mode applies unconditionally and no newline
-translation can occur on any OS. Before 0.1.8 rc-2 the atomic writer wrote in text mode,
-so Windows newline translation (``\n`` -> ``\r\n``) made the hash-compare "skip when
-content matches" optimisation never match and every ``install`` rewrote every generated
-file — this test proves the fix holds at the current interface.
+translation can occur on any OS. A text-mode writer once made Windows newline translation (``\n`` -> ``\r\n``) defeat the
+hash-compare "skip when content matches" optimisation; this test pins that it cannot.
 """
 
 from __future__ import annotations
@@ -33,7 +31,7 @@ def test_rule_bytes_are_lf_exact_and_second_write_skips(tmp_path: Path) -> None:
     install_rules((rule,), force=False)
 
     # Binary read: no universal-newline translation. Must equal the LF content exactly,
-    # even on Windows. A "\r\n" anywhere here is the regression FR-RC2-2 guards against.
+    # even on Windows. A "\r\n" anywhere here is the regression this guards against.
     assert dst.read_bytes() == _CONTENT.encode("utf-8")
     assert b"\r\n" not in dst.read_bytes()
 

@@ -66,7 +66,7 @@ def test_gate_allows_iff_the_doctor_keeps_the_entry(
 
     block = gate.block_envelope()
     assert (block is None) is allows, gate.stdout
-    if block is not None:  # #E1, #E4: the one fix names the owning zone, never the globs
+    if block is not None:  # The one fix names the owning zone, never the globs
         (fix,) = [ln for ln in block["reason"].splitlines() if ln.startswith("fix: ")]
         tmp = tmp_path.resolve() / ".dadaia" / "tmp" / "main-thread"  # the agent's own day dir
         assert shlex.split(fix[len("fix: ") :]) in [
@@ -84,6 +84,6 @@ def test_gate_allows_iff_the_doctor_keeps_the_entry(
     ).scan()
     slop = [f.path for f in findings if f.verdict is FindingVerdict.SLOP]
     assert (slop == []) is allows, slop
-    if glob is not None:  # #E2
+    if glob is not None:
         verdicts = {f.path: f.verdict for f in findings}
         assert verdicts[glob] is FindingVerdict.OPERATOR
