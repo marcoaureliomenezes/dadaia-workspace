@@ -27,6 +27,8 @@ def check(specs: Path) -> list[Finding]:
     """The catalog and index as they would be regenerated, against what is on disk."""
     try:
         catalog = cat.generate(specs)
+    except _jsonl.Undecodable:
+        raise  # `decodable` names the file; it is no atom or catalog fault
     except (Refusal, json.JSONDecodeError) as exc:  # the missing tree's fix makes it
         fix = getattr(exc, "fix", "")
         if not fix.startswith("mkdir"):
