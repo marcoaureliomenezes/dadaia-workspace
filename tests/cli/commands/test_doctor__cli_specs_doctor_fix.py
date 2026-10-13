@@ -41,9 +41,8 @@ def _specs_errors(output: str) -> list[dict[str, str]]:
 def _make_minimal_specs(root: Path) -> Path:
     """Scaffold a minimal valid specs/ tree using the canonical scaffold().
 
-    v6 canon (T-050-05, FR1): scaffold() already writes bugs/AGENTS.md and
-    specs/AGENTS.md itself — no hand-rolled README.md/AGENTS.md injection
-    needed anymore.
+    scaffold() writes bugs/AGENTS.md and
+    specs/AGENTS.md itself; no hand-rolled README.md/AGENTS.md injection is needed.
     """
     specs = root / "specs"
     scaffold(
@@ -95,8 +94,7 @@ def test_doctor_clean_tree_then_remove_backlog_then_fix_recreates_then_no_fix_ne
 
 @pytest.mark.medium
 def test_tree8_stray_root_folder_errors_and_fix_keeps_it(tmp_path: Path) -> None:
-    """TREE-8 is ERROR and never auto-fixed (bug doctor-fix-tree8-deletes-operator-
-    content, decision D8): a non-canon top-level folder flips the exit code non-zero,
+    """TREE-8 is ERROR and never auto-fixed: a non-canon top-level folder flips the exit code non-zero,
     and ``--fix`` leaves it and its content on disk, still reported."""
     specs = _make_minimal_specs(tmp_path)
 

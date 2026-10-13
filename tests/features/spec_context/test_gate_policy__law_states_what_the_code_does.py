@@ -1,4 +1,4 @@
-"""sa-text-restates-rules-the-code-contradicts: a law or docstring
+"""A law or docstring
 sentence that restates a rule states what the code does, or cites the code instead.
 Size: SMALL — text reads, one AST walk, in-process gate calls; one pre-gate subprocess, as
 stdin is the only way an unreadable payload reaches the hook.
@@ -57,7 +57,7 @@ def _fail_open_rows(
 def test_the_map_lists_every_fail_open_path_the_code_has(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """AC4.9 (FR seventh-fail-open-path-law-line, F080): the map's fail-open list is
+    """The map's fail-open list is
     set-equal to the code's paths, each naming its evidence; no sentence pinned."""
     line = next(ln for ln in _MAP.read_text("utf-8").splitlines() if "fails open on:" in ln)
     items = line.split("fails open on:")[1].rstrip(".").split(";")
@@ -101,7 +101,7 @@ def _block_rows(tmp: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, bool]:
 def test_the_map_lists_every_block_the_code_has(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """AC12.5 (root-enforcement-section-states-false-blocks): §3's `blocks:` list is set-equal
+    """§3's `blocks:` list is set-equal
     to the code's blocks, each naming its evidence, merge-only included; the fail-open item
     `(registered_slugs)` names the merge-only block; no §3 line claims a PR check, the line naming
     APPROVED names `worktree.py merge`."""
@@ -118,7 +118,7 @@ def test_the_map_lists_every_block_the_code_has(
 
 
 def test_the_bind_resolution_contract_covers_every_verb_module() -> None:
-    """sa-text-restates-rules-the-code-contradicts#49.4: every cli/commands/* module is a
+    """Every cli/commands/* module is a
     source of the bind-resolution-seam contract, so a direct core.invocation import in any
     verb (harness, reconcile, capabilities, certify included) breaks lint-imports."""
     config = configparser.ConfigParser()
@@ -134,7 +134,7 @@ def test_the_bind_resolution_contract_covers_every_verb_module() -> None:
 
 
 def test_os_name_is_read_only_through_the_platform_seam() -> None:
-    """sa-text-restates-rules-the-code-contradicts#49.5: no `os.name` read in the package
+    """No `os.name` read in the package
     outside core/platform (python_env branches on PLATFORM). Stdlib skill scripts under
     public/ cannot import core and are out of this ratchet."""
     reads = [
@@ -171,7 +171,7 @@ def test_a_skill_prescribes_no_act_its_own_laws_forbid_or_its_writer_cannot_do(
 
 
 def test_the_orchestration_skill_dispatches_a_task_never_a_job() -> None:
-    """ADR 0190: the task is the dispatch unit, so step 6 of `dd-manager-orchestration` names no
+    """The task is the dispatch unit, so step 6 of `dd-manager-orchestration` names no
     job as a unit of dispatch."""
     skill = (_SKILLS / "dd-manager-orchestration/SKILL.md").read_text("utf-8")
     assert "unit of dispatch is a job" not in skill

@@ -1,5 +1,5 @@
-"""The release runner's checks: the Authorities table, the pinned pair resolving the live
-candidate, the one Origin parser and the trace.
+"""The release script's contracts: `measured_by`, the Authorities table, the pinned pair that
+resolves the live candidate, and the one Origin parser with its trace.
 
 `release.py phase IMPLEMENTATION` admits a candidate only when PLAN.md carries the As-is
 review table — structure only — and the skeleton `dd-release-definition` teaches passes
@@ -69,7 +69,7 @@ def _admits(script: Path, tmp_path: Path, plan: str) -> None:
 def test_an_approved_spec_and_plan_enter_implementation_with_no_tasks_file(
     script: Path, tmp_path: Path
 ) -> None:
-    """the job files carry the tasks; no `TASKS.md`, no PLAN table judge."""
+    """The job files carry the tasks; no `TASKS.md`, no PLAN table judge."""
     _admits(script, tmp_path, _dag(*_CHAIN[:2]))
 
 
@@ -79,7 +79,7 @@ def test_an_unapproved_plan_refuses(script: Path, tmp_path: Path) -> None:
 
 
 def test_the_pinned_pair_resolves_the_same_live_candidate(tmp_path: Path) -> None:
-    """one grammar (`rc-<N>`, N from 1, no leading zero); the package and the
+    """One grammar (`rc-<N>`, N from 1, no leading zero); the package and the
     scripts pick the same highest `rc-<N>/` directory; none without a candidate."""
     sys.path.insert(0, str(_SCRIPTS))
     sys.path.append(str(_SCRIPTS.parents[1] / "dd-bug-resolution" / "scripts"))
@@ -150,7 +150,7 @@ def _seed_ledgers(specs: Path, *, log: list[dict[str, object]] | None = None) ->
     ],
 )  # fmt: skip
 def test_spec_origin(script: Path, tmp_path: Path, origin: str, needles: list[str]) -> None:
-    """an Origin id resolves whatever its record's
+    """An Origin id resolves whatever its record's
     status or schema; a finding names only the unresolved ids."""
     specs = _specs(tmp_path, _GOOD)
     _seed_ledgers(specs)
@@ -166,7 +166,7 @@ def test_spec_origin(script: Path, tmp_path: Path, origin: str, needles: list[st
 def test_origin_trace_reads_the_closure_summary_instead_of_derived_ledger_fields(
     script: Path, tmp_path: Path
 ) -> None:
-    """the summary is the closure fact for delivered, carried and backlog exits;
+    """The summary is the closure fact for delivered, carried and backlog exits;
     Origin tracing does not reconstruct those facts from bug/backlog record fields."""
     specs = _specs(tmp_path, _GOOD)
     state = specs / "releases/0.5.0/_RELEASE.json"
@@ -228,7 +228,7 @@ def test_a_stacked_candidate_in_definition_lists_its_carried_ids(
 
 
 def test_only_the_live_candidate_is_ranked(script: Path, tmp_path: Path) -> None:
-    """the highest candidate folder is ranked; a closed one is history."""
+    """The highest `rc-<N>/` is ranked; a closed lower-numbered candidate is history."""
     specs = _specs(tmp_path, _GOOD)
     (specs / "releases/0.5.0/rc-2").mkdir()
     (specs / "releases/0.5.0/rc-2/SPEC.md").write_text("**Status:** Draft\n", "utf-8")
@@ -251,7 +251,7 @@ _JOB = (
     "- J2.S2.T1 — AC2.1 · `W:` `src/x.py` · owner `tests/unit/test_x.py`\n"
 )
 
-_JOB1 = (  # a job file's shape: titled stages, prose contracts, AC ranges
+_JOB1 = (  # a job1 file's shape: titled stages, prose contracts, AC ranges
     "# TASKS — 0.5.0 rc-9, Job 1 — the demolition\n\n## Stage J1.S1 — RED (tests only)\n\n"
     "- Contract: exit tests are each AC's acceptance test as a strict xfail; envelope `tests/**`.\n\n"
     "- J1.S1.T1 — AC1.1 · `W:` `tests/integration/test_ci_script.py` · owner same\n"
@@ -262,7 +262,7 @@ _JOB1 = (  # a job file's shape: titled stages, prose contracts, AC ranges
     "- J1.S2.T1 — AC1.1 · `W:` `scripts/ci.py` · owner `test_ci_script.py`\n"
 )
 
-_JOB_TABLE = (  # the job files' task tables: the `W:` column holds each row's writes
+_JOB_TABLE = (  # job files' task tables: the `W:` column holds each row's writes
     "## Stage J1.S1 — RED\n\n- Contract: x\n\n| id | AC | `W:` | owner |\n|---|---|---|---|\n"
     "| T1 | AC1 | `tests/unit/test_t.py` | same |\n"
 )
@@ -279,7 +279,7 @@ _JOB_TABLE = (  # the job files' task tables: the `W:` column holds each row's w
 def test_check_judges_each_job_file(
     script: Path, tmp_path: Path, job: str, needle: str | None
 ) -> None:
-    """a job file parses into stages; stage 1 writes tests only."""
+    """A job file parses into stages; stage 1 writes tests only."""
     specs = _specs(tmp_path, _dag(*_CHAIN[:2]))
     (tasks := specs / "releases/0.5.0/rc-1/tasks").mkdir()
     (tasks / "j2.md").write_text(job, "utf-8")
@@ -307,7 +307,7 @@ def test_check_judges_each_job_file(
 def test_check_validates_a_jobs_merge_entry(
     script: Path, tmp_path: Path, text: str, bad: bool
 ) -> None:
-    """a job's `kind: merge` entry carries its six measurements (start..job_gate_runs)."""
+    """A job's `kind: merge` entry carries its six measurements (start..job_gate_runs)."""
     specs = _specs(tmp_path, _GOOD)
     state = specs / "releases/0.5.0/_RELEASE.json"
     entry = {"ts": "2026-10-05T18:00:00Z", "agent": "j", "kind": "merge", "text": text}
@@ -319,7 +319,7 @@ def test_check_validates_a_jobs_merge_entry(
 
 
 def _dag(*rows: tuple[str, str]) -> str:
-    """A PLAN in the DAG shape: `## DAG` table (job | waits on | why), then `### Hot files`."""
+    """A PLAN: `## DAG` table (job | waits on | why), then `### Hot files`."""
     table = "".join(f"| {job} | {waits} | x |\n" for job, waits in rows)
     return (f"{_GOOD}\n## DAG\n\n| job | waits on | why |\n|---|---|---|\n{table}"
             "\n### Hot files\n\n- `scripts/ci.py`: Job 1, then Job 2.\n")  # fmt: skip
@@ -352,7 +352,7 @@ _RECON = ("Reconciliation", "Jobs 1–8")
 def test_check_refuses_each_trio_row(
     script: Path, tmp_path: Path, plan: str, job: str, needle: str | None
 ) -> None:
-    """one trio per refusal, one fix line each; the valid trio exits 0."""
+    """One trio per refusal, one fix line each; the valid trio exits 0."""
     specs = _specs(tmp_path, plan)
     (tasks := specs / "releases/0.5.0/rc-1/tasks").mkdir()
     (tasks / "j2.md").write_text(job, "utf-8")

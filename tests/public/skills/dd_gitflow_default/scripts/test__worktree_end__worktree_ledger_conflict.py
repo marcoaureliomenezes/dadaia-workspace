@@ -1,7 +1,6 @@
-"""worktree-merge-union-duplicates-ledger-records-on-in-place-mutation:
-a ledger record changed in place in a worktree, while the work branch appended another: merge
+"""A ledger record changed in place in a worktree, while the work branch appended another: merge
 refuses with the rebase fix line, and that rebase stops on the ledger conflicted like any file
-(no union merge, ADR 0180) — the record never lands twice.
+(no union merge) — the record never lands twice.
 Size: MEDIUM (real git, tmp workspace).
 """
 

@@ -1,4 +1,4 @@
-"""AC4.2-AC4.6 (T-050-15, T-050-40 R13 append-only model): `context
+"""`context
 baseline` adopts what origin holds, publishes the local principal as it is on an empty
 origin, never rewrites or deletes a branch, and every refusal leaves the repo and the
 remote unchanged with the fix for its own cause.
@@ -232,7 +232,7 @@ def test_baseline_adopts_origin_and_publishes_the_draft(
     work: str,
     then: Callable[[Path, Path, dict[str, str]], bool],
 ) -> None:
-    """AC4.2-AC4.4: baseline returns the work branch it published and the Then holds —
+    """Baseline returns the work branch it published and the Then holds —
     origin's branches adopted, never rewritten; the draft published on top."""
     svc, repo, bare = env
     if seeded:
@@ -279,7 +279,7 @@ def test_second_run_is_a_no_op(env, tmp_path: Path, seeded) -> None:
 
 
 def test_an_origin_without_the_principal_refuses_and_publishes_nothing(env, tmp_path: Path) -> None:
-    """Review CRITICAL (round 4, N5) / design review C3, Q2: origin holds only another
+    """Origin holds only another
     branch and the clone is unborn — nothing is guessed or pushed, no untracked operator
     file is overwritten, HEAD is on the work branch holding the anchor and the unborn
     name leaves no stray branch."""
@@ -301,7 +301,7 @@ def test_an_origin_without_the_principal_refuses_and_publishes_nothing(env, tmp_
 
 
 def test_several_principal_candidates_are_listed_never_guessed(env, tmp_path: Path) -> None:
-    """Design review C6: two candidate heads — both listed, the choice the operator's."""
+    """Two candidate heads — both listed, the choice the operator's."""
     svc, repo, bare = env
     _seed(bare, tmp_path / "seed", "trunk", "master")
     _git(bare, "symbolic-ref", "HEAD", "refs/heads/trunk")
@@ -313,7 +313,7 @@ def test_several_principal_candidates_are_listed_never_guessed(env, tmp_path: Pa
 
 
 def test_a_never_onboarded_repo_is_refused_with_the_specs_init_fix(env, tmp_path: Path) -> None:
-    """sa-public-install-writes-the-root-map-into-product-repos#K3: Design review C1 / AC4.5: a constitution git would not commit (here: ignored) is
+    """A constitution git would not commit (here: ignored) is
     refused before any write, so HEAD holds one after every anchor — never 'published'
     without specs (the old S20 false success)."""
     svc, repo, bare = env
@@ -334,7 +334,7 @@ def test_a_never_onboarded_repo_is_refused_with_the_specs_init_fix(env, tmp_path
 def test_a_work_branch_checked_out_in_another_worktree_is_refused_and_left_untouched(
     env, tmp_path: Path
 ) -> None:
-    """Review 7 R8-1: <work> is checked out in a second worktree holding staged work — git
+    """<work> is checked out in a second worktree holding staged work — git
     refuses to move it (its text), the worktree's branch, index and files stay as they
     were, and nothing reaches origin."""
     svc, repo, bare = env
@@ -358,7 +358,7 @@ def test_a_work_branch_checked_out_in_another_worktree_is_refused_and_left_untou
 def test_a_stale_work_draft_conflict_names_the_anchor_and_never_publishes_the_old_draft(
     env, tmp_path: Path
 ) -> None:
-    """Design review C2 (D-S13b): the stale <work> holds an older AGENTS.md — git's add/add
+    """The stale <work> holds an older AGENTS.md — git's add/add
     conflict text names the anchor; nothing reaches origin; HEAD holds the new draft."""
     svc, repo, bare = env
     _seed(bare, tmp_path / "seed", "main", "develop")
@@ -396,7 +396,7 @@ def test_unrelated_operator_history_keeps_gits_refusal(env, tmp_path: Path) -> N
 
 
 def test_a_draft_origin_tracks_is_never_stashed_away(env, tmp_path: Path) -> None:
-    """Review 5 H5 (P9): origin's integration already tracks AGENTS.md — git's own text
+    """Origin's integration already tracks AGENTS.md — git's own text
     stands alone; the drafts are never stashed into a false 'already published'."""
     svc, repo, bare = env
     seed = tmp_path / "seed"
@@ -415,7 +415,7 @@ def test_a_draft_origin_tracks_is_never_stashed_away(env, tmp_path: Path) -> Non
 
 
 def test_a_tool_commit_never_falls_back_to_a_tool_identity(tmp_path: Path, monkeypatch) -> None:
-    """SA-H3-2: one identity rule (git's own) — no hard-coded fallback author."""
+    """One identity rule (git's own) — no hard-coded fallback author."""
     (tmp_path / "gitconfig").write_text(
         f"{GIT_QUIET_INCLUDE}[user]\n\tuseConfigOnly = true\n", encoding="utf-8"
     )
@@ -434,7 +434,7 @@ def test_a_tool_commit_never_falls_back_to_a_tool_identity(tmp_path: Path, monke
 
 
 def test_an_env_identity_publishes_without_git_config(env, monkeypatch) -> None:
-    """Bug baseline-identity-precheck-ignores-git-env-identity: git's identity is
+    """Git's identity is
     whatever git resolves — GIT_AUTHOR_*/GIT_COMMITTER_* included — never config alone."""
     svc, repo, bare = env
     for role in ("AUTHOR", "COMMITTER"):
@@ -448,7 +448,7 @@ def test_an_env_identity_publishes_without_git_config(env, monkeypatch) -> None:
 def test_a_secret_under_a_non_ascii_name_refuses_before_any_write(
     env, tmp_path: Path, seeded
 ) -> None:
-    """Review C1/M5: the secret scan reads the same real paths git commits, and refuses
+    """The secret scan reads the same real paths git commits, and refuses
     before any write, with a fix line."""
     svc, repo, bare = env
     if seeded:
@@ -463,7 +463,7 @@ def test_a_secret_under_a_non_ascii_name_refuses_before_any_write(
 
 
 def test_a_second_foreign_backup_is_published_inside_specs_bkp(env, tmp_path: Path) -> None:
-    """Review H1: `specs init --replace-foreign` over an existing specs-bkp/ moves the tree to
+    """`specs init --replace-foreign` over an existing specs-bkp/ moves the tree to
     specs-bkp/<UTC>/ — inside the paths baseline publishes, so the pushed tree carries it."""
     svc, repo, bare = env
     seed = tmp_path / "seed"

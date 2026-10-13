@@ -4,9 +4,9 @@ Covers:
 - ``create`` persists an explicit repo_url and refuses an empty one with no checkout.
 - ``alive``/``dead`` back-fill repo_url from ``git remote get-url origin`` when the record
   URL is empty and the repo is on disk — exercised against a REAL ``GitSubprocessClient``
-  with a local ``file://`` fixture remote as origin (per AC-W2-03).
+  with a local ``file://`` fixture remote as origin.
 
-CRITICAL last-chance capture: alive()/dead() back-filling repo_url — dead() specifically
+Last-chance capture: alive()/dead() back-filling repo_url — dead() specifically
 BEFORE rmtree — are the data-loss guards this file exists to keep.
 """
 

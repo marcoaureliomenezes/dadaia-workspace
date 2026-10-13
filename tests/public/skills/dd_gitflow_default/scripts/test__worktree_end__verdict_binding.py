@@ -1,6 +1,5 @@
-"""merge-gate-accepts-verdict-written-by-the-merger (rc-10 AC12.2, ADR 0218): a job merge lands
-only a verdict that names a candidate sha in `reviewed_sha` and carries the `diff_sha256` of the
-diff the merge lands; a hand form, a missing or other hash, a sha outside the candidates and a
+"""A job merge lands only a verdict that names a sha of the job's range in `reviewed_sha` and
+carries the `diff_sha256` of the diff the merge lands; a hand form, a missing or other hash, a sha outside the job's range and a
 same-patch rebase over other blobs each refuse. `worktree.py hash` prints the binding.
 Size: MEDIUM (real git, tmp workspace, a stub CLI).
 """
@@ -92,7 +91,7 @@ def test_a_verdict_that_does_not_bind_the_diff_it_lands_refuses(
         "hand": {},
         "no-hash": {"reviewed_sha": head},
         "other-range": {"reviewed_sha": head, "diff_sha256": diff_hash(root, first)},
-        "outside": {  # scope names HEAD; the bound sha is the work branch tip, no candidate
+        "outside": {  # scope names HEAD; the bound sha is the work branch tip, outside the job's range
             "reviewed_sha": git(root / "repos/r", "rev-parse", "feature/0.5.0").strip(),
             "diff_sha256": diff_hash(root, head),
         },

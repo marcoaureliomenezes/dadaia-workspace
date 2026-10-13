@@ -197,7 +197,7 @@ SITES: list[tuple[str, Callable[[Path, pytest.MonkeyPatch], Case]]] = [
 ]  # fmt: skip
 
 
-# Operator ruling 2026-10-11 "Só fix que resolve": git's own text stands alone when no remedy clears it.
+# When no remedy clears it, git's own text stands alone.
 _GIT_TEXT_ONLY = {"baseline-git-failure", "dead-git-failure"}
 
 

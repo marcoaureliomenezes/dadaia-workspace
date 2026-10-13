@@ -65,7 +65,7 @@ def test_an_absent_profile_reads_none(tmp_path: Path) -> None:
 
 
 def test_init_writes_the_profile_through_the_store_and_never_spells_the_file() -> None:
-    """AC9 (FR8): one writer. The service holds no copy of the profile's file name or
+    """One writer. The service holds no copy of the profile's file name or
     payload shape — both live only in ``infrastructure/json_harness_profile_store``."""
     source = inspect.getsource(service_module)
 

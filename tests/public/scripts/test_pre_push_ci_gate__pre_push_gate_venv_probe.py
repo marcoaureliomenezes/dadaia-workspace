@@ -1,6 +1,6 @@
 """Unit tests for the pre-push CI gate runner-resolution probe.
 
-T-010-26 / bug pre-push-gate-cannot-locate-workspace-venv. The gate
+The gate
 (`public/scripts/pre-push-ci-gate.sh`) must resolve the dadaia runner in this
 priority order:
 
@@ -15,7 +15,7 @@ Linux-only by the same convention as the other shell-hook subprocess suites
 (`tests/integration/test_hooks.py`): bash is required and the probe is a POSIX
 shell contract.
 
-CRIT-adjacent (never-push-red): the fail-closed row (none-found) is the load-bearing one.
+The fail-closed row (none-found) is the load-bearing one.
 """
 
 from __future__ import annotations

@@ -1,7 +1,7 @@
-"""skill-script-root-walks-ignore-the-fence: every skill script that looks for the workspace
-above its cwd or itself skips a root `DADAIA_FENCED_ROOTS` fences (ADR 0088) — the worktree
-script's root, the dev-server registry, the release closure's worktree wait, and the fix line a
-missing specs tree prints. Size: MEDIUM (real git and scripts in a tmp workspace)."""
+"""Every skill script that looks for the workspace above its cwd or itself skips a root
+`DADAIA_FENCED_ROOTS` fences — the worktree script's root, the dev-server registry, the release
+closure's worktree wait, and the fix line a missing specs tree prints. Size: MEDIUM (real git and
+scripts in a tmp workspace)."""
 
 from __future__ import annotations
 
@@ -87,9 +87,8 @@ def test_the_closure_waits_for_no_worktree_of_a_fenced_workspace(
 def test_the_closure_spares_only_the_next_candidates_define_tree(
     ws: Path, other: str, spared: bool, legacy: bool
 ) -> None:
-    """release-closure-refuses-the-next-candidates-define-tree: rc 2 is drafted in its define
-    tree while rc 1 implements (releases law), so rc 1's closure waits for every other open tree
-    but that one. A legacy release folder with no `rc-<N>/` counts as rc 1."""
+    """The closure of the live candidate waits for every open tree but the next candidate's
+    define tree. A legacy release folder with no `rc-<N>/` counts as the first candidate."""
     git(ws / "repos/r", "checkout", "-q", "feature/0.5.0")
     for name in ("0.5.0-rc1/reconcile", other):
         assert run(ws, "new", "r", name).returncode == 0

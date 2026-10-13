@@ -1,8 +1,8 @@
-"""One `dadaia doctor`: three sections over one rule registry (0.4.7 FR5 / T-047-02).
+"""One `dadaia doctor`: three sections over one rule registry.
 
-T-047-02: `dadaia doctor` renders `workspace`, `specs` and
+`dadaia doctor` renders `workspace`, `specs` and
 `ledgers` in that order, one line `<CODE> <verdict> <message>` per finding; a release
-state defect is release.py check's one finding (ADR 0077); and the two commands this one
+state defect is release.py check's one finding; and the two commands this one
 replaces (`specs doctor`, `backlog doctor`) no longer exist.
 Size: SMALL — Typer CliRunner over tmp_path trees plus one in-process run over this
 repo's own specs/; no subprocess, no network.
@@ -73,9 +73,9 @@ def _release_findings(specs: Path) -> tuple[list[dict[str, Any]], list[str]]:
 
 
 def test_a_mis_cased_phase_is_one_finding_whose_fix_clears_it(tmp_path: Path) -> None:
-    """sa-release-json-validated-three-times#B1: phase 'closure' yields exactly one
-    finding, whose fix is ADR 0158's `Operator action:` naming the file, the keys its message names and the law
-    (AC4.5); the repair clears it."""
+    """Phase 'closure' yields exactly one
+    finding, whose fix is `Operator action:` naming the file, the keys its message names and the law;
+    the repair clears it."""
     state = _live_release(tmp_path / "specs", phase="closure")
     named, _ = _release_findings(tmp_path / "specs")
     assert len(named) == 1 and named[0]["code"] == "LEDGER-RELEASE-SCHEMA", named
@@ -103,7 +103,7 @@ def test_a_mis_cased_phase_is_one_finding_whose_fix_clears_it(tmp_path: Path) ->
     ],  # fmt: skip
 )
 def test_doctor_release_findings_are_the_scripts(tmp_path: Path, over: dict[str, Any]) -> None:
-    """sa-release-json-validated-three-times#B2: the doctor's release findings are
+    """The doctor's release findings are
     release.py check's (LEDGER-RELEASE-SCHEMA); no RELEASE-TREE-* or SPEC-DOC-003/009."""
     _live_release(tmp_path / "specs", **over)
     named, specs_codes = _release_findings(tmp_path / "specs")

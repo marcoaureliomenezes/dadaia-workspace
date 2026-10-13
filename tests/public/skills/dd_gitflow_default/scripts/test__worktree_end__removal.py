@@ -1,5 +1,5 @@
-"""a merged or cleaned worktree leaves
-nothing behind — its rc folder once empty, and its branch on the remote when it was pushed — and
+"""A merged or cleaned worktree leaves
+nothing behind — its parent folder once empty, and its branch on the remote when it was pushed — and
 `list` shows a directory that holds no tree. Size: MEDIUM (real git and a bare remote, tmp workspace).
 """
 
@@ -54,7 +54,7 @@ def test_clean_removes_the_emptied_rc_folder_and_the_pushed_branch(root: Path) -
 
 
 def test_a_merge_with_no_remote_still_lands_and_keeps_a_sibling_tree(root: Path) -> None:
-    """No remote is assumed: nothing to delete there, and a rc folder still holding a tree stays."""
+    """No remote is assumed: nothing to delete there, and a parent folder still holding a tree stays."""
     assert run(root, "new", "r", "0.5.0-rc1/j2").returncode == 0
     approve(root, land(root, "src/a.py"))
     assert run(root, "merge", f"worktrees/r/{JOB}").returncode == 0

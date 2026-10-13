@@ -1,4 +1,4 @@
-"""a `define` merge runs the workspace
+"""A `define` merge runs the workspace
 doctor on its own `specs/` — the check the work branch's CI runs — fenced to the tree, so a tree
 the doctor refuses never lands. Size: MEDIUM (real git, tmp workspace, a stub CLI).
 """

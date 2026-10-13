@@ -1,4 +1,4 @@
-"""AC18.1 (rc-14 FR18): `worktree.py preflight <tree>` is `merge` without the verdict — it runs
+"""`worktree.py preflight <tree>` is `merge` without the verdict — it runs
 every check `merge` runs for the tree's kind, collects each refusal and prints
 `PREFLIGHT PASS|FAIL <tree> <sha>`, each failing check with its message and its one `fix:` line.
 Size: MEDIUM (real git, tmp workspace, a stub CLI).

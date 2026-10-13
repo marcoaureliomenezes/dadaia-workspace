@@ -1,4 +1,4 @@
-"""verdict-ttl-shorter-than-merge-window (rc-10 AC12.3): a bound APPROVED older than the handoff
+"""A bound APPROVED older than the handoff
 zone's TTL is held by the real expiry lane, and the merge of its sha still lands.
 Size: MEDIUM (real git, tmp workspace, a stub CLI, the real doctor).
 """
