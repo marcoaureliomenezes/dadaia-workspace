@@ -206,7 +206,7 @@ def test_public_privacy_gate_flags_identifiers(
 
     rendered = [line.render() for line in report]
     assert any(line.startswith("[error] public-privacy:") for line in rendered)
-    shown = f"'{_PRIVACY_TEST_TERM[0]}…{_PRIVACY_TEST_TERM[-1]}'"  # WP-11: first…last
+    shown = f"'{_PRIVACY_TEST_TERM[0]}…{_PRIVACY_TEST_TERM[-1]}'"  # first…last
     assert any(shown in line.lower() for line in rendered)
 
 
@@ -334,7 +334,7 @@ def test_model_policy_overlay_lockstep_rendering_invalid_fails_loud_and_doctor_r
     not_skipped = [line for line in agent_lines if not line.startswith("[skip]")]
     assert not_skipped == [], f"repeated install must be byte-stable: {not_skipped}"
 
-    # NFR-4: invalid overlay -> loud typed error, never a silent fallback; the
+    # Invalid overlay -> loud typed error, never a silent fallback; the
     # projection tree is not touched.
     from dadaia_workspace.core.model_registry import (
         AgentModelPolicyStoreError,

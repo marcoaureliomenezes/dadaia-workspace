@@ -79,10 +79,7 @@ def _init_context_repo(workspace: Path, slug: str) -> Path:
 
 
 def _plant_backlog_doctor_violation(repo: Path) -> None:
-    """A BL-SCHEMA violation (an unresolved subject symbol) — the exact shape the
-    deleted integration test used to prove the (now-removed) blocking gate against.
-    ``BACKLOG.json`` (operator ruling 2026-08-28) replaces the retired ``BACKLOG.md``
-    Markdown grammar — the content shape changes, the violation itself does not."""
+    """A BL-SCHEMA violation (an unresolved subject symbol) in ``BACKLOG.json``."""
     (repo / "specs" / "backlog" / "BACKLOG.json").write_text(
         json.dumps(
             {

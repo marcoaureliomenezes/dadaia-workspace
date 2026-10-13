@@ -543,9 +543,8 @@ def _exited(script: Path, tmp_path: Path) -> Path:
 
 
 def test_a_refused_exit_leaves_both_backlog_files_byte_intact(script: Path, tmp_path: Path) -> None:
-    """Given BACKLOG.json holding an invalid entry (an Idea without intents), when
-    `backlog.py exit <other-slug>` runs, then it exits 1 and BACKLOG.json and
-    backlog_histo.jsonl are both
+    """Given BACKLOG.json holding an invalid entry (an Idea without intents), when `backlog.py exit
+    <other-slug>` runs, then it exits 1 and BACKLOG.json and backlog_histo.jsonl are both
     byte-identical." Run twice: a retry appends nothing either."""
     specs = _exited(script, tmp_path)
     document = json.loads((specs / "backlog" / "BACKLOG.json").read_text(encoding="utf-8"))
