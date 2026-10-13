@@ -5,6 +5,7 @@
 
 # dadaia-workspace — the map
 
+- Simplicity and lightness are the first law, and every other rule yields to them. The lightest solution that works wins: every gate, step, file and line must earn its place, and a heavier option is chosen only when a lighter one was tried and failed.
 - One workspace folder; the agent session launches at its root, always.
 - Projects live in `repos/<slug>/`; governance (`AGENTS.md`, `.agents/`, `.dadaia/`) lives outside every repo.
 - A project is a **context**: one **main repo** (where `specs/` lives) plus **associated repos**; never a monorepo.
