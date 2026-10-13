@@ -1,5 +1,5 @@
-"""0.4.6 AC2, AC4 (`dadaia doctor` workspace section: finding lines, exit code,
-`--json`, `--fix --expired-only --quiet`, holds in reaped/, expiry); size: SMALL.
+"""`dadaia doctor` workspace section: finding lines, exit code, `--json`,
+`--fix --expired-only --quiet`, holds in reaped/, expiry. Size: SMALL.
 """
 
 from __future__ import annotations
@@ -55,7 +55,7 @@ def workspace(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     )
     (tmp_path / "repos").mkdir()
     (tmp_path / "AGENTS.md").write_text("# agents", encoding="utf-8")
-    for name in LEVEL1_SEEDS:  # init writes them (ADR 0095)
+    for name in LEVEL1_SEEDS:  # init writes them
         (tmp_path / name).write_text("", encoding="utf-8")
     venv_bin = dadaia / ".venv" / PLATFORM.venv_scripts_dir
     venv_bin.mkdir(parents=True)
@@ -336,7 +336,7 @@ def test_no_harness_dir_entry_is_ever_slop_or_moved(workspace: Path, harness_dir
 def test_fix_changes_nothing_in_a_harness_dir_without_a_readable_ledger(
     workspace: Path, ledger_state: str
 ) -> None:
-    """sa-doctor-reaps-harness-owned-entries#H5: with no readable ledger ``--fix`` touches no harness file."""
+    """With no readable ledger ``--fix`` touches no harness file."""
     ledger = workspace / ".dadaia" / "states" / "install_ledger.json"
     if ledger_state == "corrupt":
         ledger.write_text("{not json", encoding="utf-8")
@@ -438,7 +438,7 @@ def test_a_retired_cache_zone_is_held_by_the_reaper_never_orphaned(workspace: Pa
 
 
 def test_a_context_run_neither_reports_nor_reaps_another_contexts_repo(workspace: Path) -> None:
-    """AC10.4: slop only in repos/beta; `--context alpha` judges and repairs alpha alone."""
+    """Slop only in repos/beta; `--context alpha` judges and repairs alpha alone."""
     store = context_store(workspace / ".dadaia" / "states")
     for name in ("alpha", "beta"):
         store.save(

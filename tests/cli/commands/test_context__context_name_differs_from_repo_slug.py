@@ -1,23 +1,10 @@
-"""A context whose NAME differs from its repo SLUG must work end to end.
-
-Bugs a1-context-specs-resolution-ignores-repo-slug and a1-audit-completes-without-audit-report,
-both reported by the consumer-side validator against the re-architected workflows.
-
-``dadaia context create meu-projeto --main-repo <url of repo-diferente>`` is ordinary usage: a context has
-two identities — the NAME every session record and handoff uses, and the SLUG that is the
-directory under ``repos/``. 28 call sites across 9 modules derived the directory by
-interpolating the NAME, so any context where they differed resolved to a path that does not
-exist. The workflows then reported success while writing nothing: the deliverable zone
-pointed at the wrong directory, so the worker's write fell out of scope.
-
-Every one of those sites now derives the directory from ONE resolution
-(``repo_slug_for_context``, or the already-resolved ``specs_dir``), which is why this test
-exercises the whole chain rather than a single function.
+"""``dadaia context create <name> --main-repo <url>`` where the NAME differs from the repo SLUG
+(the directory under ``repos/``) succeeds, and ``create`` refuses a name the rest of the CLI
+cannot use.
 """
 
 from __future__ import annotations
 
-import json
 import subprocess
 import sys
 from pathlib import Path
@@ -32,7 +19,6 @@ from tests.fixtures.harness_env import claude_hook_env
 
 _NAME = "meu-projeto"
 _SLUG = "repo-diferente"
-_RELEASE = "v0.1.0"
 _TIMEOUT = 180
 
 
@@ -62,25 +48,12 @@ def workspace(tmp_path: Path) -> Path:
     return root
 
 
-def _run(workspace: Path, *args: str) -> dict:
-    proc = _dadaia(workspace, *args, "--json")
-    assert proc.returncode == 0, f"{' '.join(args)} failed:\n{proc.stdout}{proc.stderr}"
-    return json.loads(proc.stdout)
-
-
 def test_create_refuses_a_name_no_other_verb_can_use(workspace: Path) -> None:
     """`create` must refuse exactly what the rest of the CLI refuses.
 
-    Explicit timeout: this test builds several real
-    workspaces through the CliRunner and measured ~20 s solo / >60 s under full-suite
-    xdist load — above the 60 s integration ceiling. The justified bound stays; the
-    structural fix (splitting the workspace builds) was queued and curated under the
-    v0.4.3 stewardship pass (FR18).
-
-    Bug a3-context-create-accepts-unusable-name: `create` accepted names with spaces or
-    non-ASCII characters, and then `bind`, `bugs append` and every workflow rejected that
-    same context against the `[A-Za-z0-9_-]+` allowlist. The operator was left holding a
-    context they could create and never use — a trap whose only exit is deleting it.
+    A name with spaces or non-ASCII characters would otherwise be created and then rejected by
+    `bind` and every workflow against the `[A-Za-z0-9_-]+` allowlist, leaving the operator a
+    context they can create and never use.
 
     The check reuses the resolver's own allowlist rather than inventing a second, stricter
     opinion, so "created" and "usable" cannot drift apart.

@@ -1,13 +1,8 @@
-"""CLI integration tests for the context repo_url lifecycle (T-011-08 / FR-W2-03, ADR-7).
+"""CLI integration tests for the context repo_url lifecycle.
 
-Closes bug ``context-repo-url-not-settable-or-repairable``. Covers:
-- (a) a record with neither a URL nor a ``repos/<slug>`` checkout is refused (bug
-      ``context-create-admits-uncloneable-empty-url``); ``create`` itself always takes
-      a URL since 0.4.8 (``test_context_create_transactional.py``).
-- (b) ``context alive``/``dead`` back-fill repo_url from the on-disk origin remote when
-      the record URL is empty (real git + local ``file://`` fixture remote).
-- (d) ``dadaia doctor`` flags an ALIVE context with empty repo_url (CTX-URL-1).
-- the named regression test reproducing the export/import clone scenario from the bug.
+- A record with neither a URL nor a ``repos/<slug>`` checkout is refused.
+- ``context alive`` back-fills repo_url from the on-disk origin remote when the record
+  URL is empty (real git + local ``file://`` fixture remote), so the record stays cloneable.
 """
 
 from __future__ import annotations
@@ -83,17 +78,13 @@ def _record(workspace: Path, name: str) -> dict:  # type: ignore[type-arg]
 def test_empty_url_refusal_ctx_url_1_doctor_flag_and_export_import_clone(
     workspace: Path, tmp_path: Path
 ) -> None:
-    """(a) an unobtainable record is refused; (d) doctor flags CTX-URL-1 for an
-    ALIVE context with an empty repo_url.
-
-    Plus the named regression for bug ``context-repo-url-not-settable-or-repairable``:
-    reproduces the VPS export/import clone scenario — a context created without a URL
-    whose on-disk repo HAS a valid origin remote. ``context alive`` must back-fill the
-    record's repo_url from ``git remote get-url origin`` so that a later export/import +
-    ``alive`` on a second machine can clone instead of failing on ``git clone ""``.
+    """An unobtainable record is refused; an ALIVE context over a checkout with no origin keeps
+    an empty repo_url; one whose checkout has an origin remote gets it back-filled by
+    ``context alive``, so a later export/import + ``alive`` on a second machine can clone
+    instead of failing on ``git clone ""``.
     """
     # No URL and no repos/bar checkout: nothing could ever clone it — refused, nothing
-    # registered (bug context-create-admits-uncloneable-empty-url).
+    # registered.
     with pytest.raises(RepoUrlMissingError):
         seed_dead_context(workspace, "bar", "bar", "")
     assert "bar" not in [c["name"] for c in _contexts(workspace)]
@@ -101,7 +92,7 @@ def test_empty_url_refusal_ctx_url_1_doctor_flag_and_export_import_clone(
     if not _HAS_GIT:
         return
 
-    # (d) CTX-URL-1: repo on disk with no origin, ALIVE with an empty url.
+    # Repo on disk with no origin: ALIVE keeps the empty url.
     repo_path = workspace / "repos" / "baz"
     repo_path.mkdir(parents=True)
     _git(["init"], cwd=repo_path)
@@ -111,11 +102,7 @@ def test_empty_url_refusal_ctx_url_1_doctor_flag_and_export_import_clone(
     assert alive.exit_code == 0, alive.output
     assert _record(workspace, "baz")["repo_url"] == ""
 
-    # (d) CTX-URL-1 itself: tests/features/spec_context/test_doctor__unfixable_findings_carry_their_own_fix.py
-    # (sa-unfixable-doctor-findings-say-doctor-fix#S3; the substring check was hollow).
-
-    # Named regression: export/import clone scenario (own slug "qux" to avoid collision
-    # with "foo"/"bar"/"baz" above).
+    # Export/import clone scenario (own slug "qux" to avoid collision with "bar"/"baz" above).
     # 1. Build the upstream the on-disk repo points at (file:// fixture remote).
     upstream = tmp_path / "upstream.git"
     _git(["init", "--bare", str(upstream)], cwd=tmp_path)
@@ -154,9 +141,8 @@ def test_empty_url_refusal_ctx_url_1_doctor_flag_and_export_import_clone(
 
 
 def test_a_bare_associated_slug_with_no_checkout_is_refused(workspace: Path) -> None:
-    """Bug context-create-admits-uncloneable-empty-url, associated arm: a bare slug with no
-    URL and no ``repos/a`` is the dead end ``alive`` hits cloning ``''`` — ``repo add``
-    refuses it with one operator action naming the URL to supply."""
+    """A bare associated slug with no URL and no ``repos/a`` is the dead end ``alive`` hits
+    cloning ``''`` — ``repo add`` refuses it with one operator action naming the URL to supply."""
     seed_dead_context(workspace, "m", "m", "https://x.test/m.git")
     add = _runner.invoke(app, ["context", "repo", "add", "m", "a"])
     assert add.exit_code == 1, add.output

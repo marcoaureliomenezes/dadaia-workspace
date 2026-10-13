@@ -1,10 +1,4 @@
-"""Public CLI contracts for `dadaia ci` (pre-push gate, T-GATE-01).
-
-Pre-commit allow/block and push-gate block/pass are covered at the STRONGER
-real-boundary e2e (``tests/e2e/test_pre_commit_lease_gate.py`` / real git hook,
-``tests/e2e/test_push_gate_check.py`` / real subprocess stdin) — this CliRunner-level
-duplicate was removed; the ``metrics.commit_sha`` keying coverage lives wholly there.
-"""
+"""``dadaia ci install-hook``: where the pre-push gate lands and when it refuses to overwrite."""
 
 from __future__ import annotations
 
@@ -22,7 +16,7 @@ _runner = CliRunner()
 def test_install_hook_writes_and_refuses_overwrite_without_force(
     monkeypatch, tmp_path: Path
 ) -> None:
-    """pre-push-gate-never-runs-under-core-hookspath#B1: under core.hooksPath the gate lands
+    """Under core.hooksPath the gate lands
     where git runs hooks; a hook already there is refused non-zero with a fix: line."""
     subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
     subprocess.run(["git", "-C", str(tmp_path), "config", "core.hooksPath", ".husky"], check=True)

@@ -1,7 +1,6 @@
 """`dadaia doctor` reports the derived onboarding step and refuses a ghost context.
 
-0.4.8 FR6 AC6.1, AC6.3, AC3.1 doctor half (T-048-07); 0.5.0 AC4.4. Size: MEDIUM
-(integration: a real initialized workspace, a real git checkout as the level-2 repo).
+Size: MEDIUM (integration: a real initialized workspace, a real git checkout as the level-2 repo).
 """
 
 from __future__ import annotations
@@ -81,7 +80,7 @@ def _register_specless_context(root: Path, *names: str) -> None:
 def test_doctor_names_the_onboarding_step_of_the_context_it_judges(
     workspace: Path, contexts: tuple[str, ...], argv: list[str], text: str, code: int | None
 ) -> None:
-    """The next step is one finding whose fix names the workspace CLI (ADR 0047); a
+    """The next step is one finding whose fix names the workspace CLI; a
     ghost context never falls back to a specs tree."""
     if contexts:
         _register_specless_context(workspace, *contexts)

@@ -1,10 +1,5 @@
-"""RED tests — the doctor exit verdict comes from the typed report, fail-closed.
-
-Bug ``public-doctor-exits-zero-despite-error``: the CLI re-derived severity by
-``startswith`` against a closed prefix list; ``[error]`` lines (public-privacy,
-codex checks) fell into a decorative ``else`` and the command exited 0. These tests
-pin the new contract: the exit code is :attr:`DoctorReport.blocking` — ANY blocking
-status fails the run, including statuses the old chain never knew.
+"""The doctor exit verdict comes from the typed report, fail-closed: the exit code is
+:attr:`DoctorReport.blocking`, so ANY blocking status fails the run, ``[error]`` lines included.
 """
 
 from __future__ import annotations
@@ -49,7 +44,7 @@ def _run_doctor_with(monkeypatch, tmp_path: Path, lines: tuple[DoctorLine, ...])
         (DoctorStatus.LEAK, 1),
         (DoctorStatus.WARN, 0),
         (DoctorStatus.INFO, 0),
-        (DoctorStatus.FOREIGN, 0),  # Ruling 16
+        (DoctorStatus.FOREIGN, 0),
         (DoctorStatus.NOT_APPLICABLE, 0),
     ],
     ids=lambda v: getattr(v, "name", str(v)),

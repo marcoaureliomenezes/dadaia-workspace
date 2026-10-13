@@ -1,7 +1,7 @@
-"""AC6.4 amended, ADR 0048 (reviewer H3 repro ws13): the pre-push gate
-reads the gitflow from committed data — HEAD's constitution, else the newest one on a
-remote-tracking ref — never the working tree. Neither -> default + one warning:
-e2e/test_push_gate_check.py::test_an_absent_gitflow_block_warns_and_falls_back_to_the_default.
+"""The pre-push gate's gitflow input over a committed constitution.
+
+With no committed constitution it reports the absent specs tree with the ``specs init`` fix;
+with a committed constitution that has no gitflow block it warns and offers no ``specs init`` fix.
 Size: MEDIUM (real git repos on disk)."""
 
 from __future__ import annotations
@@ -14,8 +14,6 @@ import pytest
 from dadaia_workspace.cli.commands import ci
 from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.gitflow import Gitflow
-
-_CUSTOM = "---\nspecs_pattern_version: 7\ngitflow: {principal: trunk, integration: next, work: work/}\n---\n"
 
 
 def _git(repo: Path, *args: str) -> None:

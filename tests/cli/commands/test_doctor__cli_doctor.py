@@ -37,7 +37,7 @@ def workspace(tmp_path: Path, monkeypatch) -> Path:
 
 
 def test_doctor_detects_and_holds_a_dead_contexts_stale_repo(workspace: Path) -> None:
-    """INV-5 (sa-context-dead-removes-repos-outside-the-reaper#C5): a DEAD context's stale repo dir is reported, then --fix HOLDS
+    """A DEAD context's stale repo dir is reported, then --fix HOLDS
     it under .dadaia/reaped/ — never deletes it."""
     states = workspace / ".dadaia" / "states"
     ctx_data = {
@@ -61,7 +61,7 @@ def test_doctor_detects_and_holds_a_dead_contexts_stale_repo(workspace: Path) ->
     (stale_repo / "work.txt").write_text("keep\n")
 
     detect_result = _runner.invoke(app, ["doctor"])
-    # Exit-code truthfulness (validation-029 F-04): issues found => non-zero.
+    # Issues found => non-zero.
     assert detect_result.exit_code == 1, detect_result.output
     assert "Context 'stale-ctx' is dead but repo 'stale-ctx' is on disk" in " ".join(
         detect_result.output.split()
@@ -77,7 +77,7 @@ def test_doctor_detects_and_holds_a_dead_contexts_stale_repo(workspace: Path) ->
 
 @pytest.mark.parametrize("disarmed", [".claude/settings.json", ".dadaia/hooks/claude-pre-gate"])
 def test_both_doctors_give_one_answer_on_a_disarmed_gate(workspace: Path, disarmed: str) -> None:
-    """sa-instance-health-judged-by-two-doctors: a deleted gate wire fails `doctor` AND
+    """A deleted gate wire fails `doctor` AND
     `public doctor`, each with the one fix `<ws venv>/dadaia public install`."""
     (workspace / disarmed).unlink()
     for argv in (["doctor"], ["public", "doctor"]):
