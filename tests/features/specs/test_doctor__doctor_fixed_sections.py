@@ -221,19 +221,21 @@ def test_markers_without_a_ledger_render_an_empty_list(tmp_path: Path) -> None:
     assert _fixed_issues(doctor) == []
 
 
-def test_a_ledger_that_is_not_utf8_is_restored_not_misread_as_a_refused_render(
+def test_a_ledger_that_is_not_utf8_is_one_restore_finding_and_never_a_crash(
     tmp_path: Path,
 ) -> None:
     public, specs, _ = _adr_specs(tmp_path, markers=True, measured_by="tests/test_x.py::test_one")
     ledger = specs / "ADRs" / "decisions.jsonl"
     ledger.write_bytes(b"\xff\xfe\n")
-
-    (refused,) = MemoryValidator(specs).check_fixed_sections(public)
-
-    assert refused.fix == (
+    restore = (
         f"Operator action: restore {ledger} with "
         f"`{git_line(ledger.parent, 'checkout', '--', ledger.name)}`"
     )
+
+    found = SpecsDoctor(specs, public_dir=public).check()
+
+    assert [i.fix for i in found if i.code == "LEDGER-ADR-SCHEMA"] == [restore]
+    assert [i.fix for i in found if i.code == "FIXED-2"] == [restore]
 
 
 def test_a_fragment_that_is_not_utf8_is_reinstalled_not_misread_as_a_refused_render(
