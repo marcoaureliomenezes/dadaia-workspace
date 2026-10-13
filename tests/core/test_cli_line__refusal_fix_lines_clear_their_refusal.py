@@ -3,7 +3,8 @@ gate (`ci push-gate-check`), `context baseline` and `context dead` prints ONE fi
 that, executed verbatim, clears the refusal.
 
 The doctor has this harness (``test_doctor_fix_lines_clear_their_finding.py``); these
-three verbs did not, and their fix lines failed one site at a time. Each case below builds the triggering state over ``file://`` remotes and hits the
+three verbs did not, and their fix lines failed one site at a time. Each case below builds the
+triggering state over ``file://`` remotes and hits the
 refusal: a push-gate case feeds the ref lines git hands its hook to an in-process
 ``ci push-gate-check`` (80 columns, no TTY); a baseline/alive/dead case runs the real
 command as a child process. It takes the single ``fix:`` line and runs it with ``sh -c`` —

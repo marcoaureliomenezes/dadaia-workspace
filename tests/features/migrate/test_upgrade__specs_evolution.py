@@ -1,4 +1,4 @@
-"""Unit tests for the specs stamp writer and ``upgrade`` orchestration (FR-S02, FR-S05)."""
+"""Unit tests for the specs stamp writer and ``upgrade`` orchestration."""
 
 from __future__ import annotations
 
@@ -36,7 +36,7 @@ def test_write_version_creates_and_updates_stamp(tmp_path: Path) -> None:
     assert "other: keep" in text
 
 
-# ───────────────────────────── upgrade (FR-S05) ────────────────────────────────
+# ───────────────────────────── upgrade ────────────────────────────────
 
 
 def test_upgrade_refuses_below_floor_without_any_write(tmp_path: Path) -> None:

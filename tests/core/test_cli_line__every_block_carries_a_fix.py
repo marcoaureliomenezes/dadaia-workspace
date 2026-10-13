@@ -126,7 +126,8 @@ _KNOWN_DIRS = _tracked_dirs() | _canon_dirs()
 
 
 def _unresolved_paths(command: str) -> list[str]:
-    """Every unquoted path token (a slash, no root list to go stale; a ``--flag=value`` carries it in the value) whose directory is neither
+    """Every unquoted path token (a slash, no root list to go stale; a ``--flag=value`` carries it
+    in the value) whose directory is neither
     tracked here nor guaranteed by the specs canon: a fix creates, edits or deletes its
     leaf, so only the directory holding it must exist."""
     lexer = shlex.shlex(command, posix=False)

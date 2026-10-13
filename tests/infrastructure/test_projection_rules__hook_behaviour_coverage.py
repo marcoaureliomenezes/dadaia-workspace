@@ -34,7 +34,7 @@ _PUBLIC = _REPO_ROOT / "dadaia_workspace" / "public"
 _REGISTRY = _PUBLIC / "entities" / "registry.json"
 
 #: The SDD gate's single merged PreToolUse entrypoint — root whitelist, venv guard and
-#: the gate itself are three behaviours behind ONE module (FR-W4-01).
+#: the gate itself are three behaviours behind ONE module.
 _PRE_GATE = "dadaia_workspace.hooks.pre_gate"
 #: The session-start reaper lane: a CLI process, never a ``hooks.*`` module (P-12).
 _REAPER = "-m dadaia_workspace doctor --fix --expired-only"

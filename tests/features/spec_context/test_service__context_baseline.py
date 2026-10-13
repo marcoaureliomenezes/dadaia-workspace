@@ -380,7 +380,7 @@ def test_a_stale_work_draft_conflict_names_the_anchor_and_never_publishes_the_ol
 
 
 def test_unrelated_operator_history_keeps_gits_refusal(env, tmp_path: Path) -> None:
-    """Q1 ruling: HEAD's root carries operator content — git's own refusal stands."""
+    """HEAD's root carries operator content — git's own refusal stands."""
     svc, repo, bare = env
     _seed(bare, tmp_path / "seed", "main", "develop")
     _git(repo.parent, "init", "-q", "-b", "main", str(repo))
