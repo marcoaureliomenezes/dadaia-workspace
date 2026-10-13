@@ -263,7 +263,8 @@ def _ledgers(root: Path, tree: Path) -> None:
     """A `define` or `backlog` merge's whole gate: the ledger checks and the doctor on the tree, a red one relaying its own first `fix:` line."""
     for name, done in _checks(root, tree):
         if done.returncode:
-            print(out := done.stdout + done.stderr, end="")
+            out = done.stdout + done.stderr
+            print("".join(ln for ln in out.splitlines(True) if not ln.startswith("fix: ")), end="")
             raise Refusal(f"{name} check failed on {tree / 'specs'}", next((ln[5:] for ln in out.splitlines() if ln.startswith("fix: ")), f"Operator action: fix the findings above in {tree} and commit them"))  # fmt: skip
 
 
