@@ -449,6 +449,11 @@ def CONTROL(root: Path) -> Session:
     _write(root, f"{PKG}/{SWEEP}", "def sweep(p):\n    p.unlink()\n")
     _write(root, f"{PKG}/ids.py", _ids(V32_COMMENTS, V32_DOCSTRINGS) + 'x = "FR1 ADR 1"\n')
     _write(root, f"{PKG}/zz/near.py", _NEAR)
+    _write(root, "tests/unit/test_ok.py", '"""Loads x."""\n# a why\nS = "AC1.2 zz-open-bug"\n')
+    _write(root, "scripts/guards/ok.py", '"""Judges x."""\n')
+    _write(root, "specs/backlog/_archive/backlog_histo.jsonl", '{"id": "dd-code-review"}\n')
+    _write(root, f"{PKG}/public/skills/dd-code-review/SKILL.md", "x\n")
+    _write(root, "tests/unit/test_skill.py", '"""Names dd-code-review."""\n')
     _write(
         root,
         f"{PKG}/zz/near2.py",
@@ -542,6 +547,11 @@ def _cfg(edit: Callable[[str, str], str]) -> Plant:
     return _plant(rewrite)
 
 
+def _ledger_plant(ledger: str, line: str, where: str, text: str) -> Plant:
+    """One ledger *line* in *ledger* and *text* at *where*: the id must turn v32 red."""
+    return _plant(lambda root: (_write(root, ledger, line), _write(root, where, text)))
+
+
 def _ids_plant(comments: int, docs: int) -> Plant:
     return _plant(lambda root: (root / PKG / "ids.py").write_text(_ids(comments, docs), "utf-8"))
 
@@ -573,6 +583,33 @@ _PLANTS: dict[str, dict[str, Plant]] = {
     "v32": {
         "comment-ids": _ids_plant(V32_COMMENTS + 1, V32_DOCSTRINGS),
         "docstring-ids": _ids_plant(V32_COMMENTS, V32_DOCSTRINGS + 1),
+        "tests-docstring-ids": _add("tests/unit/test_p.py", '"""AC19.3 hardens x."""\n'),
+        "scripts-comment-ids": _add("scripts/guards/x.py", "# ADR 12\n"),
+        "package-docstring-ids": _add(f"{PKG}/zz/ac.py", '"""AC1.2 states x."""\n'),
+        "exact-bug-id": _ledger_plant(
+            "specs/bugs/BUGS.jsonl",
+            '{"id": "zz-planted-bug"}\n',
+            "scripts/guards/x.py",
+            "# see zz-planted-bug\n",
+        ),
+        "archived-bug-id": _ledger_plant(
+            "specs/bugs/_archive/bugs_histo.jsonl",
+            '{"event": "archived", "data": {"id": "zz-archived-bug"}}\n',
+            "tests/unit/test_p.py",
+            '"""zz-archived-bug."""\n',
+        ),
+        "exact-backlog-id": _ledger_plant(
+            "specs/backlog/BACKLOG.json",
+            '{"active": [{"id": "zz-planted-entry"}]}\n',
+            f"{PKG}/zz/b.py",
+            '"""Fixes zz-planted-entry."""\n',
+        ),
+        "archived-backlog-id": _ledger_plant(
+            "specs/backlog/_archive/backlog_histo.jsonl",
+            '{"id": "zz-archived-entry"}\n',
+            "tests/unit/test_p.py",
+            '"""zz-archived-entry."""\n',
+        ),
     },
     "v37": {
         "function-twin": _twins("def twin(p):\n    return p\n"),
