@@ -1,4 +1,4 @@
-"""agentic-projections-agent-writable: the schema and the harness wiring that judge a verdict are PROTECTED.
+"""The schema and the harness wiring that judge a verdict are PROTECTED.
 
 In-process `sdd_gate.evaluate_payload` on absolute paths, in a workspace with no install ledger.
 """
