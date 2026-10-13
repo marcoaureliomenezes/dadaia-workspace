@@ -81,7 +81,7 @@ JOBS: dict[str, list[Step]] = {
 }
 
 
-STAGE = ("lint", "typecheck", "guards", "unit-fast")
+STAGE = ("lint", "typecheck", "guards", "unit-fast", "doctor")
 
 
 def plan(argv: list[str]) -> list[tuple[str, Step]]:
