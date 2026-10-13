@@ -39,22 +39,25 @@ def _origin_ids(spec: Path) -> list[str]:
     return [ln[len("backlog ") :] for ln in done.stdout.splitlines() if ln.startswith("backlog ")]
 
 
-def _picks(specs: Path, slug: str) -> list[str]:
-    """Each release whose candidate SPEC (``rc-<N>/``) carries *slug* in its Origin's `backlog:` clause."""
-    picks = {s.parents[1].name for s in (specs / "releases").glob("*/rc-*/SPEC.md") if slug in _origin_ids(s)}  # fmt: skip
-    return sorted(picks, key=lambda v: [int(p) if p.isdigit() else -1 for p in v.split(".")])
-
-
 def _release(specs: Path, slug: str, disposition: str, release: str | None) -> None:
-    """A release whose candidate SPEC picked *slug*; the fix keeps the disposition."""
-    picks = _picks(specs, slug)
-    if release not in picks:
+    """*release* must name a folder directly under `releases/`, and that folder's candidate SPECs
+    must name *slug* in an Origin's `backlog:` clause."""
+    releases = specs / "releases"
+    if release not in (
+        {p.name for p in releases.iterdir() if p.is_dir()} if releases.is_dir() else set()
+    ):
         raise Refusal(
-            f"--release {release or '(none)'}: no releases/<v>/rc-<N>/SPEC.md first `**Origin:**` line "
+            f"--release {release or '(none)'} names no folder directly under {releases}",
+            f"Operator action: pass --release with the release folder under {releases} whose SPEC "
+            f"names {slug}, then rerun this exit with --disposition {disposition}.",
+        )  # fmt: skip
+    folder = releases / release
+    if not any(slug in _origin_ids(s) for s in folder.glob("rc-*/SPEC.md")):
+        raise Refusal(
+            f"--release {release}: no {folder}/rc-<N>/SPEC.md first `**Origin:**` line "
             f"picks {slug!r} — only a release that picked an item can exit it as {disposition!r}",
-            f"{SCRIPT} exit {slug} --disposition {disposition} --release {picks[-1]}" if picks
-            else f"Operator action: name {slug} in the `backlog:` clause of a candidate SPEC's "
-                 f"first `**Origin:**` line under {specs / 'releases'}, then rerun this exit.",
+            f"Operator action: name {slug} in the backlog: clause of the first **Origin:** line "
+            f"of a SPEC under {folder}, then rerun this exit with --disposition {disposition}.",
         )  # fmt: skip
 
 
