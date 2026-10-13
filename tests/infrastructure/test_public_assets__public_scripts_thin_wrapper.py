@@ -1,9 +1,8 @@
-"""0.4.7 FR1 (ADR 0018 measured_by): skill owner scripts; AC3.1 (ADR 0135):
-one loader, one owner per grammar. Size: SMALL.
+"""Skill owner scripts: one loader, one owner per grammar. Size: SMALL.
 
 A ``public/skills/*/scripts/`` script OWNS its logic, so it must be self-contained:
 stdlib imports only, exec bit set, and ``--help`` exits 0. Size is never capped: class and
-method size and responsibility are review signals (ADR 0143).
+method size and responsibility are review signals.
 """
 
 from __future__ import annotations
@@ -22,14 +21,14 @@ from tests.helpers.scan_population import assert_populated
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _SKILLS_DIR = _REPO_ROOT / "dadaia_workspace" / "public" / "skills"
 
-#: Owner scripts whose verb set includes `check` (the ledger scripts of FR2). A
+#: Owner scripts whose verb set includes `check` (the ledger scripts). A
 #: script listed here must expose `check`; `registry.py` owns ports, not a ledger.
 _LEDGER_OWNER_SCRIPTS: frozenset[str] = frozenset(
     {"bugs.py", "backlog.py", "release.py", "audit.py", "memory.py"}
 )
 
 
-# --- Owner scripts: public/skills/*/scripts/*.py (0.4.7 FR1) ------------------------
+# --- Owner scripts: public/skills/*/scripts/*.py ------------------------
 
 
 def _owner_scripts() -> list[Path]:
@@ -50,9 +49,8 @@ def _imported_roots(path: Path) -> set[str]:
 _KERNEL = _SKILLS_DIR / "dd-bug-resolution" / "scripts"
 _KERNEL_MODULES = {module.stem for module in _KERNEL.glob("*.py")}
 
-#: The cross-skill import edges PLAN 1.5 lists as surviving (ADR 0246 allows only the kernel
-#: edge): backlog reads the release Origin parser (Job 11), release reads the worktree rows and
-#: the navigator's drift decider at the closure fence (Job 12).
+#: The cross-skill import edges that survive: backlog reads the release Origin parser, and
+#: release reads the worktree rows and the navigator's drift decider at the closure fence.
 _CROSS_SKILL_EDGES = {
     "dd-release-implementation": {"_memory_drift"},
 }
@@ -76,7 +74,7 @@ def _path_statements(script: Path) -> list[str]:
 
 @pytest.mark.parametrize("script", _owner_scripts(), ids=lambda p: f"{p.parents[1].name}/{p.name}")
 def test_skill_owner_script_meets_the_contract(script: Path) -> None:
-    """FR1: every skill script is a self-contained stdlib owner — no import into
+    """Every skill script is a self-contained stdlib owner — no import into
     the library, executable, and (for an entry point) `--help` exits 0.
 
     A script may split its verbs into `_`-prefixed sibling modules in the same folder, imported through the script's own directory on
@@ -141,14 +139,14 @@ def test_ledger_owner_scripts_expose_check() -> None:
         assert done.returncode == 0, f"{script.name} has no `check` subcommand: {done.stderr}"
 
 
-# --- The 0135 contract: one loader, one owner per grammar (AC3.1, PLAN §1.1) --------
+# --- One loader, one owner per grammar --------
 
 _PACKAGE = _REPO_ROOT / "dadaia_workspace"
 _LOADER = "core/skill_owner.py"
 _RE_CALLS = {"compile", "search", "match", "fullmatch", "finditer", "findall", "sub", "split"}
 #: A grammar's head, as a package regex would spell it; only its owner and pinned twin hold it.
 _GRAMMAR_HEADS = {r"\*\*Origin:\*\*": set(), r"\*\*Status:\*\*": {"core/spec_status.py"}}
-#: Each §1.1 owner's pinned file and top-level names (the Status pair: `test_spec_status.py`).
+#: Each owner's pinned file and top-level names (the Status pair: `test_spec_status.py`).
 _SCHEMA = "public/skills/dd-release-implementation/scripts/_release_schema.py"
 _OWNERS = {
     _SCHEMA: {"origin", "MARK_RE", "MARKS", "writes"},
@@ -190,7 +188,7 @@ def _package_modules() -> list[Path]:
 
 
 def test_no_package_module_loads_a_script_or_parses_a_grammar_but_its_owner() -> None:
-    """AC3.1: only the loader execs a `public/skills` script; no second grammar parser."""
+    """Only the loader execs a `public/skills` script; no second grammar parser."""
     modules = _package_modules()
     assert_populated({p.name for p in modules}, sentinel="ledger_scripts.py")
     found = [

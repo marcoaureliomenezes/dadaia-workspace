@@ -1,5 +1,5 @@
-"""0.4.6 AC12 (FR14/D14: the zone and canon tables are rendered from the
-registry at ``public stage``); size: SMALL.
+"""The zone and canon tables are rendered from the
+registry at ``public stage``; size: SMALL.
 
 The two ``.dadaia/**`` law fragments carry placeholders; ``stage`` fills them from
 ``core.workspace_layout`` before the manifest hashes the staged bytes. The pure renderer is
@@ -45,7 +45,7 @@ def test_text_without_placeholders_is_returned_unchanged() -> None:
 def test_stage_renders_every_data_fragment_before_the_manifest_hashes_it(
     tmp_path: Path,
 ) -> None:
-    """sa-specs-init-writes-unrendered-law#B38-2: stage's writer leaves no registry
+    """Stage's writer leaves no registry
     placeholder in any staged Markdown (the one renderer, core.workspace_layout)."""
     FileSystemPublicAssetManager().stage(tmp_path)
     agentic = tmp_path / ".dadaia" / "agentic"

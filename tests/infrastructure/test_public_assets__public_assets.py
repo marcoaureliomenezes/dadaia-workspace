@@ -1,7 +1,7 @@
 """CRIT public-privacy gate (the repo went public and was reverted for an infra leak once —
 never weaken). Operator terms are private, so every test runs with no operator denylist.
 Hostname, home-path and trailer literals are composed at runtime, never contiguous in this
-tracked blob (push-gate-refuses-its-own-privacy-baseline-fixtures; T-043-23 HIGH CWE-532).
+tracked blob.
 """
 
 from __future__ import annotations
@@ -80,7 +80,7 @@ def test_baseline_pattern_matches_and_carve_out(
 
 @pytest.mark.parametrize("letter", ["n", "t", "r"])
 def test_email_pattern_never_reads_an_escape_letter_as_local_part(letter: str) -> None:
-    """privacy-email-pattern-reads-escape-as-local-part: a source escape then a decorator is no address."""
+    """A source escape then a decorator is no email address."""
     pattern = {p.id: p for p in _load_privacy_baseline()}["email-address"]
     assert (
         pattern.regex.search("'" + chr(92) + letter + "@" + _host("pytest", "mark", "unit") + "'")
@@ -113,8 +113,7 @@ def test_public_privacy_doctor_verdict(
 ) -> None:
     """The baseline alone (no operator denylist) flags leaks and never a false block.
 
-    Portuguese control vocabulary is shown raw: sa-private-match-rendering-has-three-renderers
-    (KEEP, out of #B1/#B2; 0.4.7 FR4/AC4.1).
+    Portuguese control vocabulary is shown raw.
     """
     (tmp_path / "public" / "data").mkdir(parents=True)
     (tmp_path / "public" / "data" / name).write_text(text, encoding="utf-8")
@@ -128,7 +127,7 @@ def test_public_privacy_doctor_verdict(
 
 
 def test_stage_copies_no_bytecode_cache(tmp_path: Path) -> None:
-    """sa-scoped-public-install-prunes-the-gate-wiring#L3: stage copies no __pycache__."""
+    """Stage copies no __pycache__."""
     scripts = tmp_path / "public" / "skills" / "sample" / "scripts"
     (scripts / "__pycache__").mkdir(parents=True)
     (scripts / "run.py").write_text("print(1)\n", encoding="utf-8")
@@ -141,7 +140,7 @@ def test_stage_copies_no_bytecode_cache(tmp_path: Path) -> None:
 
 
 def test_shipped_baseline_header_and_single_line_documented_carve_outs() -> None:
-    """A10.2/A10.4, A12.1/A12.5: version 15, single-line regexes, every carve-out has a rationale."""
+    """The shipped baseline header is versioned; its regexes are single-line; every carve-out has a rationale."""
     raw = json.loads(
         (
             Path(__file__).parents[2]
@@ -168,7 +167,7 @@ def test_shipped_baseline_header_and_single_line_documented_carve_outs() -> None
 
 
 def test_carve_out_without_rationale_is_flagged_by_name() -> None:
-    """A12.1: a carve-out with a missing or blank rationale is flagged; documented or no carve-out is not."""
+    """A carve-out with a missing or blank rationale is flagged; documented or no carve-out is not."""
 
     def pattern(pid: str, exclude: str | None, rationale: str | None) -> _BaselinePattern:
         compiled = re.compile(exclude) if exclude else None
@@ -195,7 +194,7 @@ def test_carve_out_without_rationale_is_flagged_by_name() -> None:
 def test_load_denylist_source_formats(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, name: str, payload: object
 ) -> None:
-    """sa-denylist-file-has-three-shapes, ADR 0157: the dict is the one grammar; any other
+    """The dict is the one grammar; any other
     shape or an unreadable file is refused naming the file. Missing or absent loads as empty."""
     source = tmp_path / "d.json"
     source.write_text(json.dumps(payload), encoding="utf-8")

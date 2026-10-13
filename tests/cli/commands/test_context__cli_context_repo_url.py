@@ -123,14 +123,14 @@ def test_empty_url_refusal_ctx_url_1_doctor_flag_and_export_import_clone(
     seed_dead_context(workspace, "qux", "qux", "")
     assert _record(workspace, "qux")["repo_url"] == ""
 
-    # 4. context alive → back-fills repo_url from origin (the fix).
+    # 4. context alive back-fills repo_url from origin.
     qux_alive = _runner.invoke(app, ["context", "alive", "qux"])
     assert qux_alive.exit_code == 0, qux_alive.output
     assert _record(workspace, "qux")["repo_url"] == file_url
 
     # 5. The record is now portable: on a second machine (after export/import) the empty
-    #    on-disk repo path means ``alive`` clones from the record's repo_url. With the bug,
-    #    that URL was "" → ``git clone ""`` fails. Prove the persisted URL is cloneable by
+    #    on-disk repo path means ``alive`` clones from the record's repo_url. An empty URL
+    #    would make ``git clone ""`` fail. Prove the persisted URL is cloneable by
     #    cloning it from a fresh location (the second-machine scenario, isolated from the
     #    orthogonal dead() 0444 rmtree guard).
     persisted = _record(workspace, "qux")["repo_url"]

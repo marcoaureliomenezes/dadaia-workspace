@@ -111,7 +111,7 @@ def test_no_module_computes_the_hooks_dir_itself() -> None:
 def test_hooks_drift_1_names_the_observed_state_with_one_code_and_one_fix(
     tmp_path: Path, layout: dict[str, bool], observed: str, other: str
 ) -> None:
-    """AC5.1: the message states what was observed; one code and one fix line serve both."""
+    """The message states what was observed; one code and one fix line serve both."""
     root = _workspace(tmp_path, **layout)
     found = DoctorService(_Store([_ctx("demo")]), None, root).check_installed_hooks()  # type: ignore[arg-type]
     assert {f.code for f in found} == {"HOOKS-DRIFT-1"}

@@ -1,4 +1,4 @@
-"""AC11.1: a staged skill holds no copy of another skill's kernel, schema or privacy file.
+"""A staged skill holds no copy of another skill's kernel, schema or privacy file.
 
 Size: MEDIUM (a real `public stage` into a temp dir; each entry point run as a subprocess).
 """

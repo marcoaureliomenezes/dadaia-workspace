@@ -1,4 +1,4 @@
-"""AC11.5 (rc-14 J16): every `*.schema.json` path a shipped text names resolves to a shipped file.
+"""Every `*.schema.json` path a shipped text names resolves to a shipped file.
 
 Size: SMALL (reads the shipped tree, no install).
 

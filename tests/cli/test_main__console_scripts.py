@@ -1,6 +1,6 @@
 """Two console-script names, one callable.
 
-T-047-85 (SPEC 0.4.7 FR3, AC3.1): `[tool.poetry.scripts]` declares
+`[tool.poetry.scripts]` declares
 both `dadaia` and `dadaia-workspace`, and both targets import to the SAME callable
 object — so `uvx dadaia-workspace init <dir> --harness <name> --repo <url>` resolves
 against the distribution name a reader already knows, without a second CLI existing.
@@ -10,7 +10,7 @@ no build, no subprocess, no network.
 The seam is the entry-point table: poetry-core compiles it into the wheel's
 `entry_points.txt` verbatim, so the table IS the shipped contract and reading it here
 needs no build. Identity, not string equality: two names that happened to spell
-different callables would be the second CLI ADR 0018 forbids.
+different callables would be a second CLI, which the law forbids.
 """
 
 from __future__ import annotations
@@ -46,7 +46,7 @@ def test_both_console_script_names_are_declared() -> None:
 
 
 def test_every_declared_name_resolves_to_the_one_callable() -> None:
-    """One CLI, two names (ADR 0018): the resolved objects are identical, so there is no
+    """One CLI, two names: the resolved objects are identical, so there is no
     second entry module to drift — a new name is a table line, never a new module."""
     resolved = {name: _resolve(target) for name, target in _scripts().items()}
     expected = _resolve(_TARGET)

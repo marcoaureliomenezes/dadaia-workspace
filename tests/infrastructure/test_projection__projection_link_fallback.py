@@ -103,7 +103,7 @@ def test_a_pre_kind_ledger_entry_migrates_as_file() -> None:
 
 
 def test_prune_never_follows_a_link_into_the_authored_tree(tmp_path: Path) -> None:
-    """T-047-56: the ledger's prune stops at a symlinked parent.
+    """The ledger's prune stops at a symlinked parent.
 
     An instance upgrading to the link projection carries ledger entries like
     ``.claude/skills/dd-x/SKILL.md`` whose parent is now a symlink onto

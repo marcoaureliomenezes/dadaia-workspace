@@ -1,4 +1,4 @@
-"""AC4.1/AC4.2: ``install(template=X)`` is the only writer of ``applied_template`` and
+"""``install(template=X)`` is the only writer of ``applied_template`` and
 projects X's cells in the same pass; an unknown id changes nothing; no ``template`` keeps
 the saved one. Templates and cells come from ``TEMPLATES``/``CORE_AGENTS``, never literals.
 """

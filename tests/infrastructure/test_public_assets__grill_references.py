@@ -1,4 +1,4 @@
-"""AC1.4 (rc-14 J8): `public install` projects the stage references and the report CSS of
+"""`public install` projects the stage references and the report CSS of
 `dd-grill-me`. Size: MEDIUM (a real install into tmp_path).
 
 Owner: dd-sw-engineer-sr

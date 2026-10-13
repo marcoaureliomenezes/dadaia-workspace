@@ -1,6 +1,6 @@
 """Persona frontmatter contract: numeric ``dispatch_band``, model-agnostic staged bodies.
 
-The template table, tier map and G-1 pin live in ``test_model_registry.py``.
+The template table, tier map and their pin live in ``test_model_registry.py``.
 """
 
 from __future__ import annotations
@@ -31,15 +31,15 @@ def _core_agents() -> list[Path]:
 
 
 # ---------------------------------------------------------------------------
-# (e) staged core bodies are model-agnostic; dispatch_band stays numeric+mandatory
+# Staged core bodies are model-agnostic; dispatch_band stays numeric and mandatory
 # ---------------------------------------------------------------------------
 
 
 def test_core_agent_frontmatter_tiers() -> None:
-    """(f): roster count is exactly the 5 core agents. (e): staged core bodies carry
-    ``dispatch_band`` but NO ``model:``/``effort:`` (v0.1.65 FR1: the model/effort
-    pinning moved from per-file frontmatter to the template registry, asserted above;
-    the projected files carry them, the staged sources must not)."""
+    """The roster count is exactly the 5 core agents. Staged core bodies carry
+    ``dispatch_band`` but NO ``model:``/``effort:``: the model and effort pinning lives in
+    the template registry, asserted above; the projected files carry them, the staged
+    sources must not."""
     assert len(_core_agents()) == 5, [p.name for p in _core_agents()]
     assert {p.stem for p in _core_agents()} == set(CORE_AGENTS)
 

@@ -1,6 +1,6 @@
 """Tool caches land in the workspace's tmp zone from any cwd — never in the tree.
 
-sa-tool-caches-land-outside-the-cache-zone#B40-1, #B40-2, #B40-3; AC2.14 (T-050-119). Size: MEDIUM
+Size: MEDIUM
 (real ruff/mypy subprocesses and a real git worktree in tmp_path).
 """
 
@@ -37,7 +37,7 @@ def _git(cwd: Path, *args: str) -> None:
 def test_the_bare_command_writes_no_cache_into_the_tree(
     tmp_path: Path, tool: str, argv: tuple[str, ...]
 ) -> None:
-    """sa-tool-caches-land-outside-the-cache-zone#B40-1, #B40-3: the bare command, run with
+    """The bare command, run with
     the projected harness env from the repo top, a subdirectory and a harness worktree,
     leaves no cache and no nested .dadaia/ in the tree; the doctor stays clean."""
     from dadaia_workspace.features.spec_context.doctor import DoctorService, FindingVerdict
@@ -65,7 +65,7 @@ def test_the_bare_command_writes_no_cache_into_the_tree(
     worktree = repo / ".claude" / "worktrees" / "wt1"
     _git(repo, "worktree", "add", "-q", "-b", "wt/1", str(worktree))
     projected = merge_claude_settings({"env": {"OPERATOR": "kept"}}, workspace)["env"]
-    assert projected["OPERATOR"] == "kept"  # type: ignore[index]  # AC2.14: operator keys kept
+    assert projected["OPERATOR"] == "kept"  # type: ignore[index]  # operator keys kept
     assert projected["PLAYWRIGHT_MCP_OUTPUT_DIR"] == f"{workspace}/.dadaia/mcps/playwright"  # type: ignore[index]
     env = suite_env(os.environ, Path.home()) | projected  # type: ignore[operator]
 

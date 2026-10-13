@@ -36,12 +36,12 @@ def test_invalid_target_raises(tmp_path: Path) -> None:
 
 
 def test_install_leaves_only_ledger_owned_entries_under_claude(tmp_path: Path) -> None:
-    """sa-doctor-reaps-harness-owned-entries#H4: the install ledger is
+    """The install ledger is
     the one owner of what the library writes under ``.claude/`` — every entry a real
     ``install`` leaves there is a ledger target or a directory holding one; size: MEDIUM
     (drives the real ``public/`` tree, no fake agentic dir).
 
-    A category with no staged source (``commands`` retired at v0.1.1) must not
+    A category with no staged source (``commands``, retired) must not
     materialise as an empty directory the ledger does not own.
     """
     workspace_root = tmp_path / "workspace"
@@ -65,7 +65,7 @@ def test_install_leaves_only_ledger_owned_entries_under_claude(tmp_path: Path) -
 
 
 def test_install_restages_a_staging_older_than_the_package(tmp_path: Path) -> None:
-    """Bug public-install-never-restages-after-an-upgrade: a staging left by an older
+    """A staging left by an older
     package reads as `stage:` drift, and `install` is the remedy doctor names."""
     workspace_root = tmp_path / "workspace"
     (workspace_root / ".dadaia" / "states").mkdir(parents=True)

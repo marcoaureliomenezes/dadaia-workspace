@@ -4,16 +4,15 @@ A local branch carrying a commit origin lacks,
   in ANY repo of the set, refuses dead; a linked
   worktree registered by the repo or nested inside it refuses dead; any `wt/*`
   refuses dead with the owner's `worktree.py merge` fix, checked out or orphan, and
-  rows the owner cannot read refuse with its fix; AC2.11: a refused hold refuses dead;
-  sa-context-dead-removes-repos-outside-the-reaper#C7: a refusal touches nothing, the record stays ALIVE;
-  sa-context-dead-removes-repos-outside-the-reaper#C1: otherwise each repo is HELD under `.dadaia/reaped/`.
-- A16.1 (FR16 v0.4.4): alive clones the whole set, idempotently. A16.2: an untracked file
+  rows the owner cannot read refuse with its fix; a refused hold refuses dead;
+  a refusal touches nothing, the record stays ALIVE; otherwise each repo is HELD under `.dadaia/reaped/`.
+- alive clones the whole set, idempotently. An untracked file
   or a remote-less repo anywhere in the set refuses dead before any repo acts.
-- context-dead-destroys-associated-repo-without-url: dead back-fills each repo's URL from
+- dead back-fills each repo's URL from
   origin, refuses a repo it could never clone back; alive refuses a URL-less missing repo
   with a runnable fix line.
-- context-dead-pushes-an-unborn-clone: an empty unborn clone is held, never pushed.
-- ADR 0172 (rc-9 AC3.2): dead never commits; a dirty checkout refuses, one fix line per
+- An empty unborn clone is held, never pushed.
+- dead never commits; a dirty checkout refuses, one fix line per
   file; a gitignored file is not dirty.
 The refusal fix lines on the main repo are the refusal harness's Cases
 (`test_refusal_fix_lines_clear_their_refusal.py`: untracked, no_origin,
@@ -118,7 +117,7 @@ def _worktree(repo: Path) -> None:
 
 
 def _wt(repo: Path, *, checked_out: bool) -> None:
-    """An UNPUSHED `wt/0.5.0-rc1/j1` carrying a commit — `dadaia:`-locked in its canonical
+    """An UNPUSHED `wt/` job worktree carrying a commit — `dadaia:`-locked in its canonical
     tree, or an orphan with none."""
     tree = repo.parents[1] / "worktrees" / repo.name / "0.5.0-rc1/j1"
     _git("branch", "feature/0.5.0", cwd=repo)  # the work branch it is ahead of
@@ -276,7 +275,7 @@ def test_alive_refuses_a_legacy_url_less_missing_repo_with_a_fix_line(tmp_path: 
 
 
 def test_dead_refuses_a_dirty_checkout_with_one_fix_line_naming_every_file(tmp_path: Path) -> None:
-    """rc-9 AC3.2 (ADR 0172 as amended by ADR 0247): dead never commits — a dirty checkout
+    """Dead never commits — a dirty checkout
     refuses with exactly one fix line naming every dirty path and leaves tree and origin untouched."""
     service, store, repo = _alive(tmp_path)
     lib = repo.parent / "lib"
@@ -309,7 +308,7 @@ def test_dead_refuses_a_dirty_checkout_with_one_fix_line_naming_every_file(tmp_p
 def test_an_oserror_in_the_hold_loop_refuses_with_a_fix_line(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """rc-9 AC3.3 row 27 (context-dead-hold-oserror-escapes-mid-loop): a hold that fails is
+    """A hold that fails is
     dead's refusal with a fix line, never an escaping OSError; the record stays ALIVE."""
     from dadaia_workspace.core.cli_line import fix_line
     from dadaia_workspace.features.spec_context import sweep

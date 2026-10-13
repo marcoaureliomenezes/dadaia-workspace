@@ -138,7 +138,7 @@ def test_json_carries_findings_and_fixed(workspace: Path) -> None:
 def test_fix_reports_an_undeletable_entry_exits_1_and_never_raises(
     workspace: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """doctor-fix-aborts-whole-pass-on-first-undeletable-entry: the pass finishes, reports the skip, exits 1."""
+    """The pass finishes, reports the skip, exits 1."""
     stale = _plant_expired(workspace)
     locked = workspace / ".dadaia" / _TTL_ZONE.name / "locked"
     locked.mkdir()
@@ -167,7 +167,7 @@ def test_fix_reports_an_undeletable_entry_exits_1_and_never_raises(
 def test_the_session_lane_costs_one_lstat_per_zone_entry_whatever_it_holds(
     workspace: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """reaper-judges-ttl-by-walking-every-file: `--fix --expired-only --quiet` deletes the expired
+    """`--fix --expired-only --quiet` deletes the expired
     entry, leaves slop to the full `--fix`, prints nothing on a second run, and its filesystem
     calls and `doctor`'s lines do not grow with the files inside one live tmp entry or one hold."""
     (workspace / "junk.txt").write_text("", encoding="utf-8")
@@ -197,7 +197,7 @@ def test_the_session_lane_costs_one_lstat_per_zone_entry_whatever_it_holds(
 
 
 def test_a_held_entry_is_always_listed_and_never_fails(workspace: Path) -> None:
-    """sa-reaper-destroys-its-own-hold-before-ttl#B7: a hold is listed with its days left (text and
+    """A hold is listed with its days left (text and
     `--json`) and exits 0."""
     held = workspace / ".dadaia" / "reaped" / "20260913" / "x"
     held.parent.mkdir(parents=True)
@@ -227,7 +227,7 @@ class _FrozenClock(datetime):
 def test_two_same_second_reaps_of_one_origin_leave_two_intact_holds(
     workspace: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """sa-reaper-destroys-its-own-hold-before-ttl#B1, sa-reaper-destroys-its-own-hold-before-ttl#B2: two reaps in
+    """Two reaps in
     one frozen second leave the first hold byte-intact and a second distinct hold."""
     monkeypatch.setattr(sweep, "datetime", _FrozenClock)
     skill = workspace / "stray"
@@ -247,7 +247,7 @@ def test_two_same_second_reaps_of_one_origin_leave_two_intact_holds(
 
 
 def test_fix_deletes_a_hold_past_seven_days_and_keeps_a_younger_one(workspace: Path) -> None:
-    """sa-reaper-destroys-its-own-hold-before-ttl#B3: an 8-day hold is deleted (WS-reaped-expired); a 6-day one survives."""
+    """An 8-day hold is deleted (WS-reaped-expired); a 6-day one survives."""
     old = workspace / ".dadaia" / "reaped" / "20260901" / "old"
     young = workspace / ".dadaia" / "reaped" / "20260921" / "young"
     for path, days in ((old, 8), (young, 6)):
@@ -264,7 +264,7 @@ def test_fix_deletes_a_hold_past_seven_days_and_keeps_a_younger_one(workspace: P
 
 
 def test_a_hold_of_old_files_counts_from_the_move(workspace: Path) -> None:
-    """sa-reaper-destroys-its-own-hold-before-ttl#B3: a hold of 30-day-old files ages from the move, dying at 8 days."""
+    """A hold of 30-day-old files ages from the move, dying at 8 days."""
     stray = workspace / "stray"
     (stray / "deep").mkdir(parents=True)
     (stray / "a.md").write_text("a", encoding="utf-8")
@@ -294,7 +294,7 @@ _OPERATOR_HARNESS_FILES = {
 
 
 def test_fix_leaves_operator_files_in_a_harness_dir_byte_identical(workspace: Path) -> None:
-    """sa-doctor-reaps-harness-owned-entries#H1: operator files in .claude/ stay byte-identical; no WS-claude-slop."""
+    """Operator files in .claude/ stay byte-identical; no WS-claude-slop."""
     for rel, body in _OPERATOR_HARNESS_FILES.items():
         (workspace / rel).parent.mkdir(parents=True, exist_ok=True)
         (workspace / rel).write_bytes(body)
@@ -311,7 +311,7 @@ def test_fix_leaves_operator_files_in_a_harness_dir_byte_identical(workspace: Pa
     "harness_dir", sorted({d for dirs in HARNESS_PROJECTION_DIRS.values() for d in dirs})
 )
 def test_no_harness_dir_entry_is_ever_slop_or_moved(workspace: Path, harness_dir: str) -> None:
-    """sa-doctor-reaps-harness-owned-entries#H2, sa-doctor-reaps-harness-owned-entries#H3: an unledgered tree in any
+    """An unledgered tree in any
     harness dir is no finding and ``--fix`` moves nothing."""
     planted = {
         f"{harness_dir}/hooks/stray.json": b"{}\n",
@@ -366,7 +366,7 @@ def _expired(workspace: Path) -> list[str]:
 
 
 def test_a_nested_expired_tree_is_gone_after_one_expired_only_run(workspace: Path) -> None:
-    """reaper-needs-many-runs-for-a-nested-expired-tree: an entry ages by its newest file, so one run reaps it whole."""
+    """An entry ages by its newest file, so one run reaps it whole."""
     day = workspace / ".dadaia" / "tmp" / "a" / "20260920"
     for n in range(4):
         deep = day / "tree" / f"d{n}" / "e" / "f"
@@ -404,7 +404,7 @@ def test_a_nested_expired_tree_is_gone_after_one_expired_only_run(workspace: Pat
 def test_an_expired_marker_is_reaped_by_the_zone_walk(
     workspace: Path, rel: str, body: str, reported: str
 ) -> None:
-    """sa-expiry-has-two-clocks#45.1, #45.2: an entry one second past its zone TTL by mtime is reaped by the one
+    """An entry one second past its zone TTL by mtime is reaped by the one
     zone walk whatever its content says; a fresh handoff with an old produced_at is kept."""
     old = workspace / ".dadaia" / rel
     fresh = workspace / ".dadaia" / "handoff" / "ctx" / "fresh.handoff.json"
@@ -422,7 +422,7 @@ def test_an_expired_marker_is_reaped_by_the_zone_walk(
 
 
 def test_a_retired_cache_zone_is_held_by_the_reaper_never_orphaned(workspace: Path) -> None:
-    """sa-tool-caches-land-outside-the-cache-zone#B40-3: a retired .dadaia/.cache/ is reported slop and held in reaped/."""
+    """A retired .dadaia/.cache/ is reported slop and held in reaped/."""
     cache = workspace / ".dadaia" / ".cache" / "ruff" / "x"
     cache.parent.mkdir(parents=True)
     cache.write_text("x", encoding="utf-8")
