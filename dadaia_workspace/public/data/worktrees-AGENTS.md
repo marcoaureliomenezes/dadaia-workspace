@@ -13,13 +13,13 @@ Scope: this file governs only `worktrees/**`.
 - Two more trees inside an rc folder: `define/` (the candidate's definition) and `reconcile/` (the Reconciliation job: memory, derived docs, `measured_by` repairs, the rc's measurement, closure).
 - Besides plain changes, outside an rc only `worktrees/<repo>/backlog/<slug>/`, on `wt/backlog/<slug>`, and `worktrees/<repo>/hotfix/<bug-id>/`, on `wt/hotfix/<bug-id>` (§3); a bug is a job.
 - One worktree per task, `<M.m.p>-rc<N>/<job>--<task-id>/` on `wt/<M.m.p>-rc<N>/<job>--<task-id>`, cut from its job branch. One change — code, tests, specs, memory or derived docs — lands in one job.
-- `WT new <repo> <name>` opens any tree named above and records the exact base its merge returns to.
+- `WT new <repo> <name>` opens any tree named above and fixes the base its merge returns to: a plain tree records it, every other tree derives it from its name.
 
 ## 2. Two gates, one review
 
 1. Task: its commit takes shape 6 of `dd-gitflow-default` §3a; a RED-test subject starts `test(`. `WT merge <task path>` checks git hygiene and refuses an implementation dispatch that touches the repo's `tests:` globs (the built-in fallback when none is declared); it then fast-forwards the job branch. The RED-test dispatch and fresh implementation dispatch use separate task worktrees. A task behind its job branch rebases first and the gate reruns.
 2. Job or plain change: `dd-code-reviewer` reviews `git diff <base>...HEAD` once and writes its own verdict with `verdict.py` (`dd-handoff-emitter`), its only write. A job branch may be pushed before review because push is not merge.
-3. `WT merge <path>` lands HEAD as it is only when the tree is clean, HEAD contains its recorded base, no task worktree of the job is open, no path tracked under `tests/tmp/<job>/` at HEAD, a valid APPROVED verdict names HEAD or the equivalent reviewed patch series, `diff_sha256` matches the range, and the recorded base's tracked `verify:` runs once and passes (a job refuses without one; a plain change may omit it). It returns to that base, fast-forwards it, removes the tree and deletes its branch.
+3. `WT merge <path>` lands HEAD as it is only when the tree is clean, HEAD contains its base, no task worktree of the job is open, no path tracked under `tests/tmp/<job>/` at HEAD, a valid APPROVED verdict names HEAD or the equivalent reviewed patch series, `diff_sha256` matches the range, and the recorded base's tracked `verify:` runs once and passes (a job refuses without one; a plain change may omit it). It returns to that base, fast-forwards it, removes the tree and deletes its branch.
 4. A `define` or `backlog` tree lands `specs/` only: its merge needs one review plus `bugs.py check`, `backlog.py check`, `release.py check` and `.dadaia/.venv/bin/dadaia doctor --specs-dir <tree>/specs` on the tree, and runs no test.
 
 - A moved work branch refuses with `fix: git -C <tree> rebase <work>`; the rebase runs inside the worktree. A ledger conflict is redone by the ledger's own writer on the rebased tree, never hand-merged. `WT merge` re-runs cleanly after any stop.

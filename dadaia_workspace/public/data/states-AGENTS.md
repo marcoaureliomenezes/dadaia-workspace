@@ -2,7 +2,7 @@
 
 Scope: this file governs `.dadaia/states/**`.
 
-Each state file is written only by its owning verb or skill script.
+Each state file is written only by its owning verb or skill script; `privacy_denylist.json` is the operator's own file.
 
 ## 1. Canon
 

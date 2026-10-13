@@ -52,7 +52,7 @@ description: >
 ### Escalation triggers — a report line, not a wait
 
 1. Required SPEC/PLAN/job files or a resolvable `_RELEASE.json` `phase` missing or not
-   approved (`python3 .agents/skills/dd-release-implementation/scripts/release.py check --specs <specs-dir>` exits non-zero; a hotfix job needs only its open bug).
+   approved (the `specs/AGENTS.md` §3 precondition fails: `phase` is not `IMPLEMENTATION`, or `python3 .agents/skills/dd-release-implementation/scripts/release.py check --specs <specs-dir>` exits non-zero on the job files; a hotfix job needs only its open bug).
 2. A CRITICAL security issue.
 3. A dispatched agent returns `[SCOPE ERROR]`.
 4. Three or more unresolved conflicts open.

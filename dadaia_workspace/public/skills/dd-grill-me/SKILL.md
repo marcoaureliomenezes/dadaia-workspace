@@ -29,7 +29,7 @@ Each stage reads its reference before the first question:
 4. Ask one question per `AskUserQuestion` call: 3 closed options, each with its trade-off, one marked recommended; free text is the tool's open answer. Without that tool, ask in numbered text, still one at a time.
 5. Skip aesthetic preference, an already-working implementation choice, and anything answerable "whatever is reasonable." A contract break, a de-dup, dead code or lying text is decided in scope and stated in one line, never asked.
 6. Sharpen terminology as decisions land: resolve a fuzzy or colliding term to the one name the repo's specs already use.
-7. Land every answer in its durable record in the same turn: the backlog entry description, the ADR `options` and `ruling.words`, or the SPEC. The handoff is ephemeral, never the record. A default you choose is labelled "agent default, unruled"; Recommended never marks an option that reverses a ruling, and a permission denial is not a ruling.
+7. Land every answer in the handoff with the operator's words; the main thread writes the ADR `ruling.words`, and `dd-product-engineer` lands the rest in the backlog entry or the SPEC (`dd-backlog-definition`, `dd-release-definition`). A default you choose is labelled "agent default, unruled"; Recommended never marks an option that reverses a ruling, and a permission denial is not a ruling.
 8. Stop when nothing is left to ask — every branch visited, nothing silently assumed — and state the shared understanding back in one summary.
 9. Present the result as the harness artifact when it has one; otherwise as an HTML report styled by `scripts/report.css`.
 10. Emit the session through `dd-handoff-emitter`, with `answered via inspection: <value>` and `<decision> — reason: <justification>` findings.

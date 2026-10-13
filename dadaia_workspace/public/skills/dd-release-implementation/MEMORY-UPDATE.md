@@ -11,7 +11,7 @@ Disclosed reference reached at `SKILL.md` step 7 — `dd-product-engineer` runs 
    - UPDATE every claim whose behavior changed; the tldr and summary are claims too.
    - ADD what is new, only after the two passes above.
 4. For each uncovered package, write one atom (`product/<area>/<slug>.md`, frontmatter with `sources`); for a feature that died, delete its atom and its wikilinks.
-5. A line naming a date, a release, a candidate, a task or an FR is history: `LINT-1` rejects it (history lines, `MEM-NARRATIVE-1:` prefix) — say what the product does, never when it started.
+5. History lines are `LINT-1` errors (`specs/memory/AGENTS.md` §4) — say what the product does, never when it started.
 6. `python3 .agents/skills/dd-spec-navigator/scripts/memory.py catalog generate`, then `memory.py check`.
 7. In the same Reconciliation tree, before its merge: reconcile the repo's derived docs from every changed atom.
 8. Commit the atoms, then `python3 .agents/skills/dd-release-implementation/scripts/release.py memory --reviewed <slugs> --changed <slugs>` — it derives the same window, computes the worklist itself and records `since`/`until`; `reviewed` names the entries read and left as they were, `changed` those rewritten or created; it refuses a worklist entry in neither list, a name outside the worklist, a `changed` atom that did not move over the window, and any phase but `CLOSURE`.
