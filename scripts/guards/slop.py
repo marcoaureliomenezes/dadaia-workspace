@@ -1,5 +1,5 @@
 """Slop checks: the package's slop ratchets (V32, V37-V41), the doctor section subset,
-the suppressed layering-edge cap (ARCHITECTURE P-10) and no file-size pin (ADR 0143).
+the suppressed layering-edge cap (ARCHITECTURE P-10) and no file-size pin.
 
 ``ALLOWANCES`` (V38-V39) is data each check reads from the tree's own copy of this file, so
 a plant edits it like any tracked file. A row is ``<check>[*] <key> <value>``: ``*`` marks a
@@ -12,6 +12,7 @@ from __future__ import annotations
 import ast
 import configparser
 import io
+import json
 import re
 import shutil
 import sys
@@ -35,7 +36,7 @@ _LEDGER = load_owner("dd-bug-resolution", "_ledger")
 
 # Ceilings measured on this tree; ratchet DOWN ONLY, target 0: lower one in the commit that
 # removes a hit, never raise one.
-V32_COMMENTS, V32_DOCSTRINGS, IGNORE_EDGES = 92, 178, 0
+V32_COMMENTS, V32_DOCSTRINGS, IGNORE_EDGES = 58, 453, 0
 
 # v38: each deleter outside sweep,
 # keyed to the test pinning its delete (a stdlib skill script cannot import the sweep, so its
@@ -131,24 +132,67 @@ def _allowance(tree: Tree, hits: dict[str, str], check: str, also: str = "") -> 
     return out + [f"absent-at-birth: {k} (only shrinks)" for k in sorted(allow.keys() - born)]
 
 
-_GOV_ID = re.compile(r"\b(FR[0-9]+|T-[0-9]{2,3}(-[0-9]+)?|ADR[ -]?[0-9]+|v0\.[0-9]+(\.[0-9]+)?)\b")
+_GRAMMAR = re.compile(
+    r"\b(FR[0-9]+|AC[0-9]+(\.[0-9]+)*|ADR[ -]?[0-9]+|T-[0-9]{2,3}(-[0-9]+)?|J[0-9]+\.T[0-9]+"
+    r"|rc-?[0-9]+|v0\.[0-9]+(\.[0-9]+)?|[0-9]{8}-[a-z0-9-]+-F[0-9]{3}|[Rr]ound [0-9]+|re-review)\b"
+)
+_TOKEN = re.compile(r"\w(?:[\w.-]*\w)?")
 _DOC_OWNERS = (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)
+_LEDGERS = (
+    ("exact-bug-id", "specs/bugs/BUGS.jsonl"),
+    ("archived-bug-id", "specs/bugs/_archive/bugs_histo.jsonl"),
+    ("archived-backlog-id", "specs/backlog/_archive/backlog_histo.jsonl"),
+)
+
+
+def _exact_ids(tree: Tree) -> dict[str, str]:
+    """Every bug and backlog id of the tree, archives included, -> its sub-rule; the skill
+    folder and persona names an id can equal are dropped."""
+    ids = {}
+    for rule, rel in _LEDGERS:
+        for r in _LEDGER.records(tree.root / rel):
+            ids[r.get("id") or r.get("data", {}).get("id")] = rule
+    if tree.tracked("specs/backlog/BACKLOG.json"):
+        active = json.loads(tree.read("specs/backlog/BACKLOG.json")).get("active", [])
+        ids |= {e["id"]: "exact-backlog-id" for e in active}
+    shipped = {p.split("/")[3] for p in tree.tracked(f"{PKG}/public/skills") if p.count("/") > 3}
+    shipped |= {Path(p).stem for p in tree.tracked(f"{PKG}/public/agents")}
+    return {i: rule for i, rule in ids.items() if i and i not in shipped}
+
+
+def v32_hits(tree: Tree) -> list[tuple[str, str, str, str]]:
+    """``(kind, sub-rule, path:line, match)`` per comment token and docstring line of the
+    package, tests and scripts citing a grammar id or an exact ledger id."""
+    exact, out = _exact_ids(tree), []
+
+    def judge(kind: str, rel: str, line: int, text: str) -> None:
+        scope = "package" if rel.startswith(PKG) else rel.split("/")[0]
+        if m := _GRAMMAR.search(text):
+            out.append((kind, f"{scope}-{kind}-ids", f"{rel}:{line}", m.group()))
+        elif found := next((t for t in _TOKEN.findall(text) if t in exact), ""):
+            out.append((kind, exact[found], f"{rel}:{line}", found))
+
+    for rel, text in _files(tree, PKG, "tests", "scripts", py=True).items():
+        for t in tokenize.generate_tokens(io.StringIO(text).readline):
+            if t.type == tokenize.COMMENT:
+                judge("comment", rel, t.start[0], t.string)
+        for node in ast.walk(ast.parse(text)):
+            if isinstance(node, _DOC_OWNERS) and (doc := ast.get_docstring(node, clean=False)):
+                first = node.body[0].lineno  # type: ignore[attr-defined]
+                for n, line in enumerate(doc.splitlines()):
+                    judge("docstring", rel, first + n, line)
+    return sorted(out, key=lambda h: h[2])
 
 
 def v32(tree: Tree) -> list[str]:
-    """Governance ids in package comment tokens and docstring lines (tests excluded)."""
-    comments = docs = 0
-    for text in _files(tree, PKG, py=True).values():
-        for t in tokenize.generate_tokens(io.StringIO(text).readline):
-            comments += t.type == tokenize.COMMENT and bool(_GOV_ID.search(t.string))
-        for node in ast.walk(ast.parse(text)):
-            if isinstance(node, _DOC_OWNERS):
-                doc = ast.get_docstring(node, clean=False) or ""
-                docs += sum(bool(_GOV_ID.search(line)) for line in doc.splitlines())
-    out = [f"comment-ids: {comments} comments > {V32_COMMENTS}"] if comments > V32_COMMENTS else []
-    return out + (
-        [f"docstring-ids: {docs} lines > {V32_DOCSTRINGS}"] if docs > V32_DOCSTRINGS else []
-    )
+    """Governance and ledger ids in comment tokens and docstring lines of the package, tests
+    and scripts: every hit of a kind is listed once its count passes the kind's ceiling."""
+    hits, out = v32_hits(tree), []
+    for kind, ceiling in (("comment", V32_COMMENTS), ("docstring", V32_DOCSTRINGS)):
+        mine = [h for h in hits if h[0] == kind]
+        if len(mine) > ceiling:
+            out += [f"{rule}: {where} cites {match}" for _, rule, where, match in mine]
+    return out
 
 
 def _definition(node: ast.stmt) -> tuple[str, str, str] | None:
@@ -313,7 +357,7 @@ def ignore_cap(tree: Tree) -> list[str]:
 
 
 _READS = {"read_text", "read_bytes", "read", "readlines"}
-_EXEMPT = {"skill_md_line_soft", "skill_md_line_ceiling"}  # ADR 0170's two keys
+_EXEMPT = {"skill_md_line_soft", "skill_md_line_ceiling"}
 
 
 def _callee(n: ast.AST | None) -> str:
@@ -361,7 +405,7 @@ def _bound(e: ast.expr, names: dict[str, ast.expr]) -> str | None:
 
 
 def no_size_pin(tree: Tree) -> list[str]:
-    """ADR 0143: no test or script compares a file's line or byte count against a constant."""
+    """No test or script compares a file's line or byte count against a constant."""
     out = []
     for rel, text in _files(tree, py=True).items():
         module, names = ast.parse(text), {}
@@ -581,8 +625,7 @@ no-size-pin read tests/unit/test_pin.py ok = len(f.read()) >= 9\n
 _EDGE = f"{PKG}.features.zz -> {PKG}.features.yy"
 _PLANTS: dict[str, dict[str, Plant]] = {
     "v32": {
-        "comment-ids": _ids_plant(V32_COMMENTS + 1, V32_DOCSTRINGS),
-        "docstring-ids": _ids_plant(V32_COMMENTS, V32_DOCSTRINGS + 1),
+        "package-comment-ids": _ids_plant(V32_COMMENTS + 1, V32_DOCSTRINGS),
         "tests-docstring-ids": _add("tests/unit/test_p.py", '"""AC19.3 hardens x."""\n'),
         "scripts-comment-ids": _add("scripts/guards/x.py", "# ADR 12\n"),
         "package-docstring-ids": _add(f"{PKG}/zz/ac.py", '"""AC1.2 states x."""\n'),
