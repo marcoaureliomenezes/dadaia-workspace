@@ -18,7 +18,7 @@ Scope: this file governs only `specs/backlog/`.
 
 - `<slug>` matches `$defs.slug` of backlog-v1.
 - `BACKLOG_PY new` writes `status: idea`; a later lowercase live token (`candidate`, …) is a hand edit, which `BACKLOG_PY check` validates (§4).
-- Optional: `intents` (§4) and `relates` (`BACKLOG_PY new --help`).
+- `relates` is required while `active[]` holds an entry (`--relates <slugs>|none`); `intents` is optional (§4).
 - An entry leaves only by `BACKLOG_PY exit <slug> --disposition …`, which removes the `active[]` object and appends its one histo record.
 
 ## 3. Terminal disposition tokens
