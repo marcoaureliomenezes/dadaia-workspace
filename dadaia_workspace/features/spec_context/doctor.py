@@ -459,7 +459,7 @@ class DoctorService:
         return [
             self._finding(
                 "root", self._workspace_root, target, FindingVerdict.SLOP,
-                f"(invalid line {line!r}: no !, **, / or .. — ADR 0093; the operator edits it)",
+                f"(invalid line {line!r}: no !, **, / or ..; the operator edits it)",
                 fixable=False,
             )
             for line in invalid
