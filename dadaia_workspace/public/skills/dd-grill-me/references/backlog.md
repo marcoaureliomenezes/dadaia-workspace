@@ -8,4 +8,4 @@ Before a demand becomes a backlog entry. Inspect first; ask only what inspection
 4. What is the scope? One outcome, what is out, and the demand's smallest form that still serves it.
 5. Does an entry, a bug or a shipped feature already cover it? Merge into it, never duplicate.
 
-Record: the answers go into the entry's description in the same turn, the operator's words kept.
+Record: the answers go into the handoff, the operator's words kept; `dd-product-engineer` writes them into the entry's description.

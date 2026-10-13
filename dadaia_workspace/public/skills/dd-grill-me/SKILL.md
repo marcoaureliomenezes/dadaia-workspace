@@ -37,7 +37,7 @@ Each stage reads its reference before the first question:
 ## 3. Done when
 
 - Every gap findable by inspection is resolved or promoted, not asked of the operator.
-- Every operator answer sits in its durable record and the operator confirmed the summary.
+- Every operator answer is in the handoff with the operator's words, and the operator confirmed the summary.
 - The handoff is emitted; inside a dadaia workspace it passes `.dadaia/.venv/bin/dadaia reports validate`.
 
 ## 4. References

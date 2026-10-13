@@ -65,7 +65,7 @@ The branch contract by role; the names are `specs/constitution.md`'s `gitflow:` 
 | 7 | `wt/hotfix/<bug-id>` | Specs revert, no code: the `specs/` paths of the culprit commit, put back | `Revert "<subject>"`; body `This reverts commit <sha>.` and `block: <item>` |
 | 8 | `define` | SPEC and PLAN approval: `specs/releases/<v>/rc-<N>/{SPEC,PLAN}.md` | `docs(specs): …` |
 | 9 | `reconcile`, the first-pass plain tree | Memory pass and derived docs: `specs/memory/*`, `README.md`, `docs/*.md` | `docs(memory): …` |
-| 10 | `define`, `reconcile`, the promote's plain tree (`ship`) | Release state: `specs/releases/<v>/_RELEASE.json`, `specs/releases/_archive/**` and the ship histo line, only when [`RELEASE-EVENTS.md`](../dd-release-implementation/RELEASE-EVENTS.md) requires a current entry | `chore(release): …` |
+| 10 | `define`, `reconcile`, a plain tree on the work branch after the promote merges (§2 step 11, `ship`) | Release state: `specs/releases/<v>/_RELEASE.json` and `specs/releases/_archive/**`, only when [`RELEASE-EVENTS.md`](../dd-release-implementation/RELEASE-EVENTS.md) requires a current entry | `chore(release): …` |
 
 ## 3b. The PR gate
 
