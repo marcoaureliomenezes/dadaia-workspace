@@ -1729,6 +1729,23 @@ def test_every_site_carries_one_runnable_fix(workspace: Path, site: str) -> None
     the_fix(SITES[site](workspace))
 
 
+_BLOCKS = {
+    "gate-protected-glob-dec-11" if s == "gate-protected-glob" else s: SITES[s]
+    for s in (
+        "gate-root-whitelist", "gate-protected-sessions", "gate-protected-projected",
+        "gate-protected-glob", "gate-scope-names-the-bind", "gate-id-less-session-relaunch",
+        "hook-missing-venv", "push-malformed-stdin", "push-main", "push-develop",
+        "push-birth-with-content", "push-invalid-name", "push-not-a-branch-head", "push-refspec",
+        "push-specs-canon", "push-denylist", "push-git-read-failure",
+    )
+}  # fmt: skip
+
+
+@pytest.mark.parametrize("block", list(_BLOCKS))
+def test_every_block_carries_a_runnable_fix(workspace: Path, block: str) -> None:
+    the_fix(_BLOCKS[block](workspace))
+
+
 def test_every_fix_site_has_a_case() -> None:
     assert Counter(_fix_sites()) == {site: len(refusals) for site, refusals in _REFUSALS.items()}
 
