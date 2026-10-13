@@ -330,24 +330,73 @@ def test_writes_reads_rc6_t_050_117_to_its_ten_paths(script: Path) -> None:
     ]  # fmt: skip
 
 
+def _job_release(specs: Path, job: str, dag_writes: str, **over: object) -> None:
+    """A release whose candidate carries `tasks/job1.md` (*job*) and a PLAN DAG row
+    holding *dag_writes*."""
+    release_dir = _release(specs, "0.5.0", tasks="- [ ] T-1 — open\n", **over)
+    plan = _DAG_HEAD.replace("`src/x.py`", dag_writes)
+    (release_dir / "rc-1" / "PLAN.md").write_text(
+        f"# PLAN.md\n\n**Status:** Approved\n\n{plan}", encoding="utf-8"
+    )
+    (release_dir / "rc-1" / "tasks").mkdir()
+    (release_dir / "rc-1" / "tasks" / "job1.md").write_text(job, encoding="utf-8")
+
+
+def _task_job(*cells: tuple[str, str]) -> str:
+    """A job file whose task table holds one task per (`W:` cell, outcome cell) pair."""
+    rows = "".join(f"| J1.T{n} | sr | AC1.1 | {w} | {o} |\n" for n, (w, o) in enumerate(cells, 1))
+    return f"# Job 1\n\n| task | who | AC | `W:` | outcome |\n|---|---|---|---|---|\n{rows}"
+
+
 def test_tasks_without_a_memory_write_set_are_silent(script: Path, tmp_path: Path) -> None:
     """Memory is closure procedure, never a task:
     `specs/memory` in prose or in a source file name is not a `W:` naming the memory tree."""
     specs = _specs(tmp_path)
-    tasks = "- [ ] **T-1** specs/memory in prose `W:` `f/specs/memory_lint.py`\n"
-    _release(specs, "0.5.0", phase="IMPLEMENTATION", tasks=tasks)
+    job = _task_job(("`f/specs/memory_lint.py`", "specs/memory in prose"))
+    _job_release(specs, job, "`f/specs/memory_lint.py`", phase="IMPLEMENTATION")
     assert _run(script, "check", "--specs", str(specs)).returncode == 0
 
 
 def test_a_source_file_named_memory_is_not_a_memory_write_set(script: Path, tmp_path: Path) -> None:
-    """A `W:` naming `specs/memory` is a finding naming its task;
+    """A `W:` naming `specs/memory` is one finding naming its task, with one fix line;
     `memory_lint.py` beside it is not."""
     specs = _specs(tmp_path)
-    tasks = "- [ ] **T-1** `W:` `f/specs/memory_lint.py`\n- [ ] **T-2** `W:` `specs/memory/x.md`\n"
-    _release(specs, "0.5.0", phase="IMPLEMENTATION", tasks=tasks)
+    job = _task_job(("`f/specs/memory_lint.py`", "x"), ("`specs/memory/x.md`", "x"))
+    _job_release(specs, job, "`f/specs/memory_lint.py`, `specs/memory/x.md`", phase="IMPLEMENTATION")
     result = _run(script, "check", "--specs", str(specs))
     assert result.returncode == 1
-    assert "T-2" in result.stdout and "T-1" not in result.stdout, result.stdout
+    assert "J1.T2" in result.stdout and "J1.T1" not in result.stdout, result.stdout
+    [finding] = json.loads(_run(script, "check", "--json", "--specs", str(specs)).stdout)
+    assert finding["fix"].startswith("Operator action:"), finding
+
+
+def test_check_refuses_a_memory_task_under_definition(script: Path, tmp_path: Path) -> None:
+    """A `W:` naming specs/memory in a DEFINITION candidate's job file is refused."""
+    specs = _specs(tmp_path)
+    _job_release(specs, _task_job(("`specs/memory/x.md`", "x")), "`specs/memory/x.md`")
+    result = _run(script, "check", "--specs", str(specs))
+    assert result.returncode == 1 and "specs/memory" in result.stdout, result.stdout
+
+
+@pytest.mark.parametrize(
+    ("job", "needle"),
+    [
+        ("# Job 1\n\nno table\n", "no canonical task table"),
+        ("# Job 1\n\n| task | AC |\n|---|---|\n| J1.T1 | AC1.1 |\n", "`W:` columns"),
+        (_task_job(("`src/x.py`", "x")) + "| J1.T2 | sr |\n", "malformed task row"),
+        (_task_job(("`src/x.py`", "x")) + "\n| a | b |\n|---|---|\n| c | d |\n", "malformed task row"),
+    ],
+    ids=["no-table", "no-w-column", "short-row", "second-table"],
+)
+def test_check_reports_a_malformed_job_file_as_a_finding(
+    script: Path, tmp_path: Path, job: str, needle: str
+) -> None:
+    """A rejected task table is a finding with its needle, never a crash."""
+    specs = _specs(tmp_path)
+    _job_release(specs, job, "`src/x.py`", phase="IMPLEMENTATION")
+    result = _run(script, "check", "--specs", str(specs))
+    assert result.returncode == 1 and needle in result.stdout, result.stdout
+    assert "Traceback" not in result.stderr, result.stderr
 
 
 @pytest.mark.parametrize(
@@ -355,7 +404,6 @@ def test_a_source_file_named_memory_is_not_a_memory_write_set(script: Path, tmp_
     [
         ("- [x] **T-1** done\n", [], "T-1"),
         ("- [-] **T-1** reserved\n", [], "T-1"),
-        ("- [ ] **T-1** `W:` `specs/memory/x.md`\n", [], "specs/memory"),
         ("- [ ] **T-1** open\n", [("new", "note"), ("x", "dispositions")], "dispositions"),
         ("- [ ] **T-1** open\n", [("x", "dispositions"), ("new", "note")], None),
     ],
@@ -363,7 +411,7 @@ def test_a_source_file_named_memory_is_not_a_memory_write_set(script: Path, tmp_
 def test_check_judges_a_definition_release(
     script: Path, tmp_path: Path, tasks: str, log: list[tuple[str, str]], needle: str | None
 ) -> None:
-    """A marker past `[ ]`, a `W:` naming specs/memory or a closure entry after the candidate's
+    """A marker past `[ ]` or a closure entry after the candidate's
     birth note is a finding under DEFINITION; a stacked candidate's inherited closure
     entries, logged before its birth, are not."""
     specs = _specs(tmp_path)
