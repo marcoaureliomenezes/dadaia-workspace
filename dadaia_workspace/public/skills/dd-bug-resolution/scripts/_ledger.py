@@ -48,7 +48,7 @@ def load_schema(name: str) -> dict[str, Any]:
         path = _HERE.parents[1] / _SCHEMA_OWNERS[name] / "scripts" / "schemas" / file
     else:
         path = next((_HERE.parents[2] / "schemas").rglob(file), _HERE / "schemas" / file)
-    return dict(json.loads(path.read_text("utf-8")))
+    return dict(json.loads(_jsonl.read_text(path)))
 
 
 def _combinators(value: object, spec: dict[str, Any], root: dict[str, Any], where: str) -> Any:
@@ -164,8 +164,8 @@ def terms(root: Path | None) -> list[tuple[str, str]]:
         if not path.exists():
             continue
         try:
-            raw = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, ValueError):
+            raw = json.loads(_jsonl.read_text(path))
+        except (OSError, ValueError, _jsonl.Undecodable):
             raw = None
         if not isinstance(raw, dict):
             report(

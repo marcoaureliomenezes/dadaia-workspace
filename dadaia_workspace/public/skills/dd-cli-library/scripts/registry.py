@@ -22,6 +22,7 @@ from typing import Any
 sys.dont_write_bytecode = True  # the shared _ledger imports without a __pycache__
 sys.path.append(str(Path(__file__).resolve().parents[2] / "dd-bug-resolution" / "scripts"))
 import _clock
+import _jsonl
 import _platform
 from _ledger import replace, workspace_of
 from _refusal import report
@@ -60,7 +61,7 @@ def load(path: Path) -> dict[str, Any]:
             "range": {"min_port": DEFAULT_MIN_PORT, "max_port": DEFAULT_MAX_PORT},
             "entries": [],
         }
-    return dict(json.loads(path.read_text(encoding="utf-8")))
+    return dict(json.loads(_jsonl.read_text(path)))
 
 
 def pid_alive(pid: int) -> bool:

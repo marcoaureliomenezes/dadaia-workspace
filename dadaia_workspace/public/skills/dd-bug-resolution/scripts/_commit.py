@@ -12,6 +12,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+from _jsonl import read_text
 from _refusal import Refusal
 
 Records = list[dict[str, Any]]
@@ -60,7 +61,7 @@ def commit(
 
     def attempt() -> tuple[tuple[int, int] | None, str, Records, Records, str]:
         before = stamp(path)
-        old = histo.read_text(encoding="utf-8") if histo is not None and histo.is_file() else ""
+        old = read_text(histo) if histo is not None and histo.is_file() else ""
         records = load(path)
         written = apply(records)
         moved = [r for r in records if r not in written] if archive else []

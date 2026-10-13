@@ -27,8 +27,7 @@ def decodable(code: str) -> Callable[[Check], Check]:
             except _jsonl.Undecodable as bad:
                 root, path = specs.resolve(), bad.path.resolve()
                 rel = path.relative_to(root).as_posix() if path.is_relative_to(root) else str(path)
-                fix = f"Operator action: restore {rel} with `git checkout -- {path}`"
-                return [finding(code, rel, 1, "the file is not valid UTF-8", fix)]
+                return [finding(code, rel, 1, "the file is not valid UTF-8", bad.fix)]
 
         return run
 

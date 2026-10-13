@@ -20,11 +20,14 @@ class LineError(ValueError):
         self.number = number
 
 
-class Undecodable(Exception):
-    """The file *path* is not UTF-8; the check verbs report it as a finding."""
+class Undecodable(Refusal):
+    """The file *path* is not UTF-8: a verb refuses with the restore act, a check reports a finding."""
 
     def __init__(self, path: Path) -> None:
-        super().__init__(f"{path} is not valid UTF-8")
+        super().__init__(
+            f"{path} is not valid UTF-8",
+            f"Operator action: restore {path.resolve()} with `git checkout -- {path.resolve()}`",
+        )
         self.path = path
 
 

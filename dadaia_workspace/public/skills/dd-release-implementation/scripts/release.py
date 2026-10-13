@@ -23,6 +23,7 @@ sys.path[:0] = [
 ]
 
 import _findings
+import _jsonl
 from _clock import now_iso as utc_now
 from _grammar import SHA_RE, STATE
 from _refusal import Refusal, report
@@ -103,12 +104,13 @@ def _new(args: argparse.Namespace, specs: Path) -> int:
 
 def _origin(spec: Path) -> int:
     try:
-        carried = origin(spec.read_text("utf-8"))
-    except (OSError, ValueError) as error:
+        carried = origin(_jsonl.read_text(spec))
+    except (OSError, ValueError, _jsonl.Undecodable) as error:
         act = (
             "pass the path of an existing SPEC.md"
             if isinstance(error, OSError)
-            else "edit its `**Origin:**` line"
+            else getattr(error, "fix", "").removeprefix("Operator action: ")
+            or "edit its `**Origin:**` line"
         )
         report(f"{spec} {error}", f"Operator action: {act}")
         return 1
@@ -217,7 +219,7 @@ def _record_ship(args: argparse.Namespace, specs: Path, live: Live, ts: str) -> 
                        "release": live.release_id, "reason": None, "entry": None,
                        "summary": None}) + "\n"  # fmt: skip
     histo = specs / HISTO
-    if errors := ship_histo_findings((histo.read_text("utf-8") if histo.is_file() else "") + line):
+    if errors := ship_histo_findings((_jsonl.read_text(histo) if histo.is_file() else "") + line):
         raise Refusal(f"the ship ledger would not pass check: {errors[-1]['message']}",
                       f"{SCRIPT} check")  # fmt: skip
     commit(live.release_dir / STATE, f"releases/{live.release_id}/{STATE}",

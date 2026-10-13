@@ -33,7 +33,7 @@ def read_active(path: Path) -> Items:
     read in full refuses the read rather than being silently rewritten without it."""
     if not path.is_file():
         return []
-    document = _jsonl.parse_object(path.read_text(encoding="utf-8"), f"{SCRIPT} check")
+    document = _jsonl.parse_object(_jsonl.read_text(path), f"{SCRIPT} check")
     active = document.get("active")
     if not isinstance(active, list):
         raise Refusal(

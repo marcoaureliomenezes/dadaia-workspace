@@ -48,7 +48,7 @@ def audit_dir(specs: Path, audit: str, fix: str) -> Path:
 def read_findings(directory: Path) -> list[dict[str, Any]]:
     """Every record of *directory*'s FINDINGS.jsonl, refused unless the document passes
     the same check every write runs — no verb writes the pair from an invalid document."""
-    text = (directory / FINDINGS).read_text(encoding="utf-8")
+    text = _jsonl.read_text(directory / FINDINGS)
     problems = live_findings(text, f"{AUDITS}/{directory.name}/{FINDINGS}")
     if problems:
         raise Refusal(
@@ -75,5 +75,5 @@ def append_histo(specs: Path, record: dict[str, Any]) -> None:
     business."""
     line = _commit.validated(_jsonl.serialize([record]), HISTO, archive_findings, f"{SCRIPT} check")
     path = specs / HISTO
-    existing = path.read_text(encoding="utf-8") if path.is_file() else ""
+    existing = _jsonl.read_text(path) if path.is_file() else ""
     replace(path, existing + line)

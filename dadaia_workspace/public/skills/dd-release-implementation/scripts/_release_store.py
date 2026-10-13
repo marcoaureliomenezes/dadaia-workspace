@@ -16,7 +16,7 @@ from typing import Any
 
 import _commit
 from _grammar import STATE
-from _jsonl import parse_object
+from _jsonl import parse_object, read_text
 from _ledger import records, replace
 from _refusal import Refusal
 from _release_check import state_findings
@@ -41,7 +41,7 @@ def read_state(path: Path) -> State:
     """One state document, refusing anything this script cannot read in full."""
     fix = f"Operator action: repair {path} until `{SCRIPT} check` passes"
     try:
-        text = path.read_text(encoding="utf-8")
+        text = read_text(path)
     except OSError as exc:
         raise Refusal(f"{path.name} cannot be read ({exc})", fix) from exc
     return parse_object(text, fix)

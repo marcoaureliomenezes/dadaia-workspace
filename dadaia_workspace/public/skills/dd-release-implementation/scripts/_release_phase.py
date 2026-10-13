@@ -15,6 +15,7 @@ from typing import Any
 
 import _clock
 import _git
+import _jsonl
 from _grammar import SHA_RE, STATE
 from _refusal import Refusal
 from _release_check import candidate_errors
@@ -47,7 +48,7 @@ def _refuse_unapproved_docs(live: Live) -> Path:
                 f"release {live.release_id} has no {document.relative_to(live.release_dir).as_posix()}",
                 f"Operator action: write {document.resolve()} carrying '**Status:** {APPROVED}'",
             )
-        status = extract_status(document.read_text(encoding="utf-8"))
+        status = extract_status(_jsonl.read_text(document))
         if status != APPROVED:
             raise Refusal(
                 f"{document.relative_to(live.release_dir).as_posix()} of release {live.release_id} "

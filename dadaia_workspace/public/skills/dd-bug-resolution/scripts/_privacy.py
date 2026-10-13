@@ -16,6 +16,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any, NamedTuple
 
+import _jsonl
 from _refusal import Refusal
 
 __all__ = [
@@ -178,7 +179,7 @@ def load_baseline() -> tuple[BaselinePattern, ...]:
     naming the row."""
     path = Path(__file__).with_name("privacy_baseline.json")
     try:
-        rows = json.loads(path.read_text("utf-8"))["patterns"]
+        rows = json.loads(_jsonl.read_text(path))["patterns"]
         return tuple(_pattern(row, number) for number, row in enumerate(rows, start=1))
     except (OSError, ValueError, LookupError, TypeError) as exc:
         raise Refusal(
