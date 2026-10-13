@@ -13,7 +13,7 @@ to import credits every collected test of that file. The mutant timeout
 is the larger of ``--timeout`` and three times that baseline run's wall time. A
 baseline that fails prints ``BASELINE RED <file>: <failed ids>`` and exits 1 before any
 mutation. ``--home <id>`` (a file, a node id or a prefix) adds, after the score,
-``DELETABLE`` for each other test whose every killed mutant the home also kills, ``KEPT``
+``NO-OWN-KILL`` for each other test whose every killed mutant the home also kills, ``KEPT``
 for the rest and ``NO-KILL`` for a test that ran and killed none. Refuses a dirty tracked
 tree; every mutated file is restored byte for byte. Standard library plus ``pytest-cov``;
 exit 0 on success, 1 on a red baseline, 2 on a usage error."""
@@ -201,10 +201,10 @@ def _coverage(changed: dict[str, set[int]], env: dict[str, str]) -> list[str]:
 def _matrix(home: str, ran: set[str], kills: dict[str, set[int]]) -> list[str]:
     covered = {m for t in ran if t.startswith(home) for m in kills.get(t, ())}
     others = sorted(t for t in ran if not t.startswith(home))
-    deletable = [t for t in others if kills.get(t) and kills[t] <= covered]
+    no_own_kill = [t for t in others if kills.get(t) and kills[t] <= covered]
     return [
-        *(f"DELETABLE {t}" for t in deletable),
-        *(f"KEPT {t}" for t in others if kills.get(t) and t not in deletable),
+        *(f"NO-OWN-KILL {t}" for t in no_own_kill),
+        *(f"KEPT {t}" for t in others if kills.get(t) and t not in no_own_kill),
         *(f"NO-KILL {t}" for t in others if not kills.get(t)),
     ]
 
