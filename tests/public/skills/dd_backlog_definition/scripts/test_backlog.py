@@ -281,6 +281,26 @@ def test_delivered_outside_the_release_origin_is_refused(
     assert _histo(specs) == []
 
 
+@pytest.mark.parametrize("release", ["0.4.7/.", "{specs}/releases/0.4.7", "AGENTS.md"])
+def test_a_release_that_is_not_one_folder_name_is_refused(
+    script: Path, tmp_path: Path, release: str
+) -> None:
+    """`--release` names one folder directly under `releases/`; a path to it is no release."""
+    specs = _specs(tmp_path)
+    _run(script, "new", "an-idea", "--specs", str(specs))
+    _pick(specs)
+    (specs / "releases/AGENTS.md").write_text("# law\n")
+    done = _run(
+        script, "exit", "an-idea", "--specs", str(specs),
+        "--disposition", "delivered", "--release", release.format(specs=specs),
+    )  # fmt: skip
+    assert done.returncode == 1
+    [fix] = _fix_lines(done)
+    assert fix.startswith("fix: Operator action: pass --release with the release folder")
+    assert len(_active(specs)) == 1
+    assert _histo(specs) == []
+
+
 def test_delivered_ignores_another_release_with_an_origin_less_spec(
     script: Path, tmp_path: Path
 ) -> None:
@@ -298,21 +318,29 @@ def test_delivered_ignores_another_release_with_an_origin_less_spec(
     assert _active(specs) == []
 
 
-def test_the_refusal_fix_names_the_latest_picking_release_by_version(
+def test_the_refusal_fix_names_the_flag_release_not_another_picking_one(
     script: Path, tmp_path: Path
 ) -> None:
-    """0.10.0 is later than 0.9.0, though it sorts before it as text."""
+    """The fix asks for the Origin edit under the `--release` given, whatever other releases picked."""
     specs = _specs(tmp_path)
     _run(script, "new", "an-idea", "--specs", str(specs))
-    for release in ("0.9.0", "0.10.0"):
+    for release, origin in (
+        ("0.9.0", "backlog:an-idea"),
+        ("0.10.0", "backlog:an-idea"),
+        ("9.9.9", "operator-demand"),
+    ):
         (specs / f"releases/{release}/rc-1").mkdir(parents=True)
-        (specs / f"releases/{release}/rc-1/SPEC.md").write_text("**Origin:** backlog:an-idea\n")
+        (specs / f"releases/{release}/rc-1/SPEC.md").write_text(f"**Origin:** {origin}\n")
     done = _run(
         script, "exit", "an-idea", "--specs", str(specs),
         "--disposition", "delivered", "--release", "9.9.9",
     )  # fmt: skip
     [fix] = _fix_lines(done)
-    assert fix.split(" --specs ")[0].endswith("--disposition delivered --release 0.10.0")
+    assert fix == (
+        "fix: Operator action: name an-idea in the backlog: clause of the first **Origin:** line "
+        f"of a SPEC under {specs / 'releases/9.9.9'}, then rerun this exit with --disposition delivered."
+    )
+    assert "0.9.0" not in fix and "0.10.0" not in fix
 
 
 @pytest.mark.parametrize(
@@ -358,7 +386,12 @@ def test_rejected_requires_a_reason(script: Path, tmp_path: Path) -> None:
 
 @pytest.mark.parametrize(
     ("disposition", "evidence"),
-    [("superseded", ["--release", "9.9.9"]), ("rejected", []), ("to-bug", [])],
+    [
+        ("superseded", ["--release", "9.9.9"]),
+        ("superseded", []),
+        ("rejected", []),
+        ("to-bug", []),
+    ],
 )
 def test_each_refusal_fix_keeps_the_chosen_disposition(
     script: Path, tmp_path: Path, disposition: str, evidence: list[str]
