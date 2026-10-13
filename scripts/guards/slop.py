@@ -1,4 +1,4 @@
-"""Slop checks: the package's slop ratchets (V32, V37-V41), the doctor section subset,
+"""Slop checks: the package's slop checks (V32, V37-V41), the doctor section subset,
 the suppressed layering-edge cap (ARCHITECTURE P-10) and no file-size pin.
 
 ``ALLOWANCES`` (V38-V39) is data each check reads from the tree's own copy of this file, so
@@ -33,10 +33,9 @@ if TYPE_CHECKING:
 
 SELF, PKG, SWEEP = "scripts/guards/slop.py", "dadaia_workspace", "features/spec_context/sweep.py"
 _LEDGER = load_owner("dd-bug-resolution", "_ledger")
+_BACKLOG = load_owner("dd-backlog-definition", "_backlog_store")
 
-# Ceilings measured on this tree; ratchet DOWN ONLY, target 0: lower one in the commit that
-# removes a hit, never raise one.
-V32_COMMENTS, V32_DOCSTRINGS, IGNORE_EDGES = 0, 0, 0
+IGNORE_EDGES = 0
 
 # v38: each deleter outside sweep,
 # keyed to the test pinning its delete (a stdlib skill script cannot import the sweep, so its
@@ -136,6 +135,15 @@ _GRAMMAR = re.compile(
     r"\b(FR[0-9]+|AC[0-9]+(\.[0-9]+)*|ADR[ -]?[0-9]+|T-[0-9]{2,3}(-[0-9]+)?|J[0-9]+\.T[0-9]+"
     r"|rc-?[0-9]+|v0\.[0-9]+(\.[0-9]+)?|[0-9]{8}-[a-z0-9-]+-F[0-9]{3}|[Rr]ound [0-9]+|re-review)\b"
 )
+#: sub-rule -> a further id form, named by the sub-rule that reports it
+_FORMS = {
+    "staged-task-id": re.compile(r"\bJ[0-9]+\.S[0-9]+\.T[0-9]+\b"),
+    "review-finding-id": re.compile(r"\breview F[0-9]+\b"),
+    "wave-ac-id": re.compile(r"\bAC-[A-Z0-9]+(-[0-9]+)*\b"),
+    "finding-number-id": re.compile(r"\bF-[0-9]+\b"),
+    "bug-number-id": re.compile(r"\bbugs? [0-9]{3}\b"),
+    "release-label-id": re.compile(r"\bK[0-9]+ \(release\b"),
+}
 _TOKEN = re.compile(r"\w(?:[\w.-]*\w)?")
 _DOC_OWNERS = (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)
 _LEDGERS = (
@@ -153,8 +161,8 @@ def _exact_ids(tree: Tree) -> dict[str, str]:
         for r in _LEDGER.records(tree.root / rel):
             ids[r.get("id") or r.get("data", {}).get("id")] = rule
     if tree.tracked("specs/backlog/BACKLOG.json"):
-        active = json.loads(tree.read("specs/backlog/BACKLOG.json")).get("active", [])
-        ids |= {e["id"]: "exact-backlog-id" for e in active}
+        active = _BACKLOG.read_active(tree.root / "specs/backlog/BACKLOG.json")
+        ids |= {e.get("id"): "exact-backlog-id" for e in active}
     shipped = {p.split("/")[3] for p in tree.tracked(f"{PKG}/public/skills") if p.count("/") > 3}
     shipped |= {Path(p).stem for p in tree.tracked(f"{PKG}/public/agents")}
     return {i: rule for i, rule in ids.items() if i and i not in shipped}
@@ -169,6 +177,8 @@ def v32_hits(tree: Tree) -> list[tuple[str, str, str, str]]:
         scope = "package" if rel.startswith(PKG) else rel.split("/")[0]
         if m := _GRAMMAR.search(text):
             out.append((kind, f"{scope}-{kind}-ids", f"{rel}:{line}", m.group()))
+        elif form := next(((r, m) for r, f in _FORMS.items() if (m := f.search(text))), None):
+            out.append((kind, form[0], f"{rel}:{line}", form[1].group()))
         elif found := next((t for t in _TOKEN.findall(text) if t in exact), ""):
             out.append((kind, exact[found], f"{rel}:{line}", found))
 
@@ -186,13 +196,8 @@ def v32_hits(tree: Tree) -> list[tuple[str, str, str, str]]:
 
 def v32(tree: Tree) -> list[str]:
     """Governance and ledger ids in comment tokens and docstring lines of the package, tests
-    and scripts: every hit of a kind is listed once its count passes the kind's ceiling."""
-    hits, out = v32_hits(tree), []
-    for kind, ceiling in (("comment", V32_COMMENTS), ("docstring", V32_DOCSTRINGS)):
-        mine = [h for h in hits if h[0] == kind]
-        if len(mine) > ceiling:
-            out += [f"{rule}: {where} cites {match}" for _, rule, where, match in mine]
-    return out
+    and scripts: one line per hit."""
+    return [f"{rule}: {where} cites {match}" for _, rule, where, match in v32_hits(tree)]
 
 
 def _definition(node: ast.stmt) -> tuple[str, str, str] | None:
@@ -434,16 +439,6 @@ def _write(root: Path, rel: str, text: str) -> None:
         f.write(text)
 
 
-def _ids(comments: int, docs: int) -> str:
-    """A module with *comments* id comments and *docs* id docstring lines over all four owners."""
-    q, r = divmod(docs, 4)
-    doc = ['"""' + "\n".join(["FR1"] * n) + '"""' for n in (q + r, q)]
-    body = "".join(
-        f"x = 1  {('# FR1', '# T-050', '# ADR 1', '# v0.5.1')[i % 4]}\n" for i in range(comments)
-    )
-    return f"{doc[0]}\n{body}class C:\n    {doc[1]}\ndef f():\n    {doc[1]}\nasync def g():\n    {doc[1]}\n"
-
-
 _NEAR = '''"""A near miss for every matcher; no governance id here."""
 import json, os
 SECTION = "workspace"
@@ -471,8 +466,7 @@ _DELETERS = [
 
 
 def CONTROL(root: Path) -> Session:
-    """Every check green: synthetic twins and deleters for each allowance key, the ceilings
-    met exactly, a near miss per matcher; violations only in an untracked, gitignored dir."""
+    """Every check green: synthetic twins and deleters for each allowance key, a near miss per matcher; violations only in an untracked, gitignored dir."""
     (root / SELF).parent.mkdir(parents=True)
     shutil.copyfile(ROOT / SELF, root / SELF)
     shutil.copyfile(ROOT / "setup.cfg", root / "setup.cfg")
@@ -491,9 +485,10 @@ def CONTROL(root: Path) -> Session:
         '{"id": "zz-open-bug", "status": "open"}\n{"id": "zz-shut", "status": "resolved"}\n',
     )
     _write(root, f"{PKG}/{SWEEP}", "def sweep(p):\n    p.unlink()\n")
-    _write(root, f"{PKG}/ids.py", _ids(V32_COMMENTS, V32_DOCSTRINGS) + 'x = "FR1 ADR 1"\n')
+    _write(root, f"{PKG}/ids.py", 'x = "FR1 ADR 1"\n')
     _write(root, f"{PKG}/zz/near.py", _NEAR)
     _write(root, "tests/unit/test_ok.py", '"""Loads x."""\n# a why\nS = "AC1.2 zz-open-bug"\n')
+    _write(root, "tests/unit/test_doctor.py", '"""Fixes TREE-5 and WS-1 in a tree."""\n')
     _write(root, "scripts/guards/ok.py", '"""Judges x."""\n')
     _write(root, "specs/backlog/_archive/backlog_histo.jsonl", '{"id": "dd-code-review"}\n')
     _write(root, f"{PKG}/public/skills/dd-code-review/SKILL.md", "x\n")
@@ -601,10 +596,6 @@ def _ledger_plant(ledger: str, line: str, where: str, text: str) -> Plant:
     return _plant(write)
 
 
-def _ids_plant(comments: int, docs: int) -> Plant:
-    return _plant(lambda root: (root / PKG / "ids.py").write_text(_ids(comments, docs), "utf-8"))
-
-
 # Plants appending one text under CONTROL: `<check> <row> <path> <text>`, the text's `\n` escaped.
 _APPENDS = r"""
 v38 path-delete dadaia_workspace/zz/tidy.py def tidy(p):\n    p.unlink()\n
@@ -630,10 +621,17 @@ no-size-pin read tests/unit/test_pin.py ok = len(f.read()) >= 9\n
 _EDGE = f"{PKG}.features.zz -> {PKG}.features.yy"
 _PLANTS: dict[str, dict[str, Plant]] = {
     "v32": {
-        "package-comment-ids": _ids_plant(V32_COMMENTS + 1, V32_DOCSTRINGS),
+        "package-comment-ids": _add(f"{PKG}/zz/ac.py", "x = 1  # FR1\n"),
+        "tests-comment-ids": _add("tests/unit/test_p.py", "# ADR 12\n"),
         "tests-docstring-ids": _add("tests/unit/test_p.py", '"""AC19.3 hardens x."""\n'),
         "scripts-comment-ids": _add("scripts/guards/x.py", "# ADR 12\n"),
         "package-docstring-ids": _add(f"{PKG}/zz/ac.py", '"""AC1.2 states x."""\n'),
+        "staged-task-id": _add("tests/unit/test_p.py", "# J2.S6.T5 pins x\n"),
+        "review-finding-id": _add("tests/unit/test_p.py", "# review F7 pins x\n"),
+        "wave-ac-id": _add("tests/unit/test_p.py", '"""AC-W4-03 pins x."""\n'),
+        "finding-number-id": _add("tests/unit/test_p.py", "# recipe F-22 pins x\n"),
+        "bug-number-id": _add("tests/unit/test_p.py", "# bugs 465, 467 pin x\n"),
+        "release-label-id": _add("tests/unit/test_p.py", "# K3 (release 0.5.1) pins x\n"),
         "exact-bug-id": _ledger_plant(
             "specs/bugs/BUGS.jsonl",
             '{"id": "zz-planted-bug"}\n',
