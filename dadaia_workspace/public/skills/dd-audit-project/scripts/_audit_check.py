@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any
 
 import _findings
+import _jsonl
 import _ledger
 from _ledger import SPECS, load_schema, validate
 
@@ -80,6 +81,7 @@ def archive_findings(text: str, root: Path = SPECS) -> list[Finding]:
     return _findings.histo_findings(text, HISTO, CODE, problems, _fix(HISTO, root))
 
 
+@_findings.decodable(CODE)
 def check(specs: Path) -> list[Finding]:
     """Every live audit's findings plus the archive, in path order."""
     audits = specs / AUDITS
@@ -96,12 +98,12 @@ def check(specs: Path) -> list[Finding]:
             continue
         out.extend(
             live_findings(
-                path.read_text(encoding="utf-8"),
+                _jsonl.read_text(path),
                 f"{AUDITS}/{directory.name}/{FINDINGS}",
                 specs.resolve(),
             )
         )
     archive = specs / HISTO
     if archive.is_file():
-        out.extend(archive_findings(archive.read_text(encoding="utf-8"), specs.resolve()))
+        out.extend(archive_findings(_jsonl.read_text(archive), specs.resolve()))
     return out

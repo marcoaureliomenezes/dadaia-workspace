@@ -4,13 +4,35 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any
 
 import _jsonl
 
+Check = Callable[[Path], list[dict[str, Any]]]
+
+
 def finding(code: str, path: str, line: int, message: str, fix: str) -> dict[str, Any]:
     return {"code": code, "verdict": "error", "path": path, "line": line, "message": message,
             "fix": fix}  # fmt: skip
+
+
+def decodable(code: str) -> Callable[[Check], Check]:
+    """Make a ``check(specs)`` report a file that is not UTF-8 as one finding of *code*."""
+
+    def wrap(check: Check) -> Check:
+        def run(specs: Path) -> list[dict[str, Any]]:
+            try:
+                return check(specs)
+            except _jsonl.Undecodable as bad:
+                root, path = specs.resolve(), bad.path.resolve()
+                rel = path.relative_to(root).as_posix() if path.is_relative_to(root) else str(path)
+                fix = f"Operator action: restore {rel} with `git checkout -- {path}`"
+                return [finding(code, rel, 1, "the file is not valid UTF-8", fix)]
+
+        return run
+
+    return wrap
 
 
 def print_text(findings: list[dict[str, Any]]) -> None:

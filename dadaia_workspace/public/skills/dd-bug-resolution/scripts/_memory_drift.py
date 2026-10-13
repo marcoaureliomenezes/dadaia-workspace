@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Any
 
 import _git
+import _jsonl
 from _refusal import Refusal as Refusal
 from _specs import CATALOG, git_line
 
@@ -62,7 +63,7 @@ def report(specs: Path, since: str, until: str = "HEAD") -> dict[str, Any]:
         ).strip():
             raise Refusal(f"{bound} is not an ancestor of HEAD — a clone of this branch lacks it (a rebase rewrote it)",
                           f"Operator action: replace {bound[:12]} with the commit HEAD reaches in its place")  # fmt: skip
-    catalog = json.loads((specs / CATALOG).read_text(encoding="utf-8"))
+    catalog = json.loads(_jsonl.read_text(specs / CATALOG))
     changed = git(repo, "diff", "--name-only", f"{since}..{until}")
     return {"since": since, **worklist(catalog, changed, git(repo, "ls-files"))}
 

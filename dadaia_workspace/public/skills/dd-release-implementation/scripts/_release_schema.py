@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 import _git
+import _jsonl
 from _grammar import STATE, STATUS_RE, TASK_ID_RE, candidate_dir, candidate_number, live_ids
 from _ledger import load_schema
 
@@ -75,7 +76,7 @@ def releases(specs: Path) -> dict[str, tuple[_dt.datetime, _dt.datetime | None]]
     spans: dict[str, tuple[_dt.datetime, _dt.datetime | None]] = {}
     for path in [*(specs / "releases").glob(f"*/{STATE}"), *(specs / "releases/_archive").glob(f"*/{STATE}")]:  # fmt: skip
         try:
-            state = json.loads(path.read_text(encoding="utf-8"))
+            state = json.loads(_jsonl.read_text(path))
             shipped = (state.get("shipped") or {}).get("ts")
             spans[path.parent.name] = (
                 utc(state["log"][0]["ts"]),

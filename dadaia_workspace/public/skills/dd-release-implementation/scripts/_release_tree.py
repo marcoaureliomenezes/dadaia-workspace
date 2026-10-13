@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any
 
 import _findings
+import _jsonl
 import _memory_drift as drift
 from _grammar import SEMVER_RE, SHA_RE, STATE, live_ids
 from _ledger import records
@@ -63,7 +64,7 @@ def _trace(
     its closed audit's record), ``untraced`` while it does not yet, else why it is wrong;
     ``live`` when a verb can still write its pointer (an active entry, an open audit's finding)."""
     document = specs / "backlog" / "BACKLOG.json"
-    active = json.loads(document.read_text(encoding="utf-8")) if document.is_file() else {}
+    active = json.loads(_jsonl.read_text(document)) if document.is_file() else {}
     exits = records(specs / "backlog/_archive/backlog_histo.jsonl")
     bugs = {r.get("id"): r for p in ("BUGS.jsonl", "_archive/bugs_histo.jsonl")
             for r in records(specs / "bugs" / p)}  # fmt: skip
@@ -184,7 +185,7 @@ def _origin_findings(specs: Path) -> list[dict[str, Any]]:
     spec = live.candidate / "SPEC.md" if live.candidate else None
     if spec is None or not spec.is_file():
         return []
-    text, rel = spec.read_text(encoding="utf-8"), spec.relative_to(specs).as_posix()
+    text, rel = _jsonl.read_text(spec), spec.relative_to(specs).as_posix()
     out, line = _window_findings(spec, text, live.state, rel), origin_line(text)
     try:
         rows = _trace(specs, live.release_id, origin(text), _last_summary(live.state))
@@ -222,7 +223,7 @@ def _directory_findings(release_dir: Path, specs: Path) -> list[dict[str, Any]]:
     if not path.is_file():
         return [_findings.finding(CODE, dir_rel, 1, f"release directory carries no {STATE}", f"Operator action: "
                         f"restore {path} from git history, or move {release_dir} out of specs/")]  # fmt: skip
-    text = path.read_text(encoding="utf-8")
+    text = _jsonl.read_text(path)
     if findings := state_findings(text, f"{dir_rel}/{STATE}", specs.resolve()):
         return findings
     state = json.loads(text)
@@ -301,14 +302,12 @@ def tree_findings(specs: Path) -> list[dict[str, Any]]:
                                 f"Operator action: keep one of {', '.join(ids)} live under "
                                 f"{releases}; ship or move out the others"))  # fmt: skip
     if (specs / HISTO).is_file():
-        findings += ship_histo_findings(
-            (specs / HISTO).read_text(encoding="utf-8"), specs.resolve()
-        )
+        findings += ship_histo_findings(_jsonl.read_text(specs / HISTO), specs.resolve())
     for path in sorted(releases.glob(f"_archive/*/{STATE}")):
         # An archived state names its ship.
         rel, act = path.relative_to(specs).as_posix(), f"rewrite {path.resolve()} as one JSON "
         try:
-            state = json.loads(path.read_text(encoding="utf-8"))
+            state = json.loads(_jsonl.read_text(path))
         except json.JSONDecodeError as error:
             findings.append(_findings.finding(CODE, rel, 1, f"archived state is not valid JSON: {error}",
                                     f"Operator action: {act}object, from git history"))  # fmt: skip
@@ -322,6 +321,7 @@ def tree_findings(specs: Path) -> list[dict[str, Any]]:
     return findings
 
 
+@_findings.decodable(CODE)
 def check(specs: Path) -> list[dict[str, Any]]:
     """The ONE release validator (the doctor delegates here): the tree, the live
     candidate's Origin, then the live CLOSURE's memory record."""

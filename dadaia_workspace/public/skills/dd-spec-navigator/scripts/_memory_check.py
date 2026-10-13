@@ -12,6 +12,8 @@ import json
 from pathlib import Path
 from typing import Any
 
+import _findings
+import _jsonl
 import _memory_catalog as cat
 from _memory_schema import CODE, INDEX
 from _refusal import Refusal
@@ -20,6 +22,7 @@ from _specs import CATALOG, script, with_specs
 Finding = dict[str, Any]
 
 
+@_findings.decodable(CODE)
 def check(specs: Path) -> list[Finding]:
     """The catalog and index as they would be regenerated, against what is on disk."""
     try:
@@ -39,7 +42,7 @@ def check(specs: Path) -> list[Finding]:
         path = specs / name
         if not path.is_file():
             out.append({"path": name, "line": 0, "message": f"{path.name} does not exist"})
-        elif path.read_text(encoding="utf-8") != rendered:
+        elif _jsonl.read_text(path) != rendered:
             out.append({
                 "path": name, "line": 0,
                 "message": f"{path.name} does not match the atoms it is generated from",

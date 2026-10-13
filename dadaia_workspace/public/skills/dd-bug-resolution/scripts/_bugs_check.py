@@ -74,7 +74,7 @@ def tasks(root: Path) -> set[str]:
     return {
         cell
         for file in files
-        for line in file.read_text(encoding="utf-8").splitlines()
+        for line in _jsonl.read_text(file).splitlines()
         for cell in (part.strip() for part in line.split("|"))
         if TASK_ID_RE.fullmatch(cell)
     }
@@ -161,12 +161,13 @@ def archived_ids(text: str) -> frozenset[str]:
     )
 
 
+@_findings.decodable(CODE)
 def check(specs: Path) -> list[dict[str, Any]]:
     """Validate the committed ledger and its archive; a young specs tree with neither is
     not a finding. A merge can join two valid writes into a cycle: check re-judges."""
     ledger, histo = specs / LEDGER, specs / HISTO
-    text = ledger.read_text(encoding="utf-8") if ledger.is_file() else ""
-    archived = histo.read_text(encoding="utf-8") if histo.is_file() else ""
+    text = _jsonl.read_text(ledger) if ledger.is_file() else ""
+    archived = _jsonl.read_text(histo) if histo.is_file() else ""
     root = specs.resolve()
     return findings_for(text, archived=archived_ids(archived), root=root) + histo_findings(
         archived, root

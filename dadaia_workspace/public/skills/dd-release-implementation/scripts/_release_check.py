@@ -173,14 +173,14 @@ def candidate_errors(candidate: Path) -> list[tuple[Path, str, str]]:
     plan, found = candidate / "PLAN.md", []
     planned = None
     if plan.is_file():
-        text = plan.read_text(encoding="utf-8")
+        text = _jsonl.read_text(plan)
         planned = current_plan_jobs(text)[0]
         redo = f"Operator action: correct the as-is review and DAG in {plan.resolve()}"
         found += [(plan, e, redo) for e in plan_errors(text) + (dag_errors(text) if planned is None else [])]  # fmt: skip
     authorities: dict[str, set[str]] = {}
     for job in sorted(candidate.glob("tasks/*.md")):
         rel, fix = f"tasks/{job.name}", f"Operator action: correct {job.resolve()} (dd-release-definition §5)"  # fmt: skip
-        body = job.read_text(encoding="utf-8")
+        body = _jsonl.read_text(job)
         found += [(job, e, fix) for e in job_errors(body, rel)]
         if (writes := current_job_writes(body, rel)[0]) is None:
             continue

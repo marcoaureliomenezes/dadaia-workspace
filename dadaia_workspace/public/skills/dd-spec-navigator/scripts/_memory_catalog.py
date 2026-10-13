@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Any
 
 import _clock
+import _jsonl
 from _memory_schema import INDEX, PRODUCT, WIKILINK_RE, parse
 from _refusal import Refusal
 from _specs import CATALOG, script
@@ -45,7 +46,7 @@ def _depends_on(body: str) -> list[str]:
 
 def feature(path: Path, specs: Path, rank: int) -> dict[str, Any]:
     """One catalog entry built from *path*'s frontmatter and body."""
-    data, body, error = parse(path.read_text(encoding="utf-8"))
+    data, body, error = parse(_jsonl.read_text(path))
     if error is not None or data is None:
         fix = f"{script(Path(__file__).with_name('memory.py'))} check"
         raise Refusal(f"{path}: {error}", fix)
@@ -74,7 +75,7 @@ def generate(specs: Path) -> Catalog:
 
 def _stamp(specs: Path, features: list[dict[str, Any]]) -> str:
     try:
-        previous = json.loads((specs / CATALOG).read_text(encoding="utf-8"))
+        previous = json.loads(_jsonl.read_text(specs / CATALOG))
     except (OSError, json.JSONDecodeError):
         previous = {}
     if previous.get("features") == features and isinstance(previous.get("generated_at"), str):
@@ -124,7 +125,7 @@ def render(specs: Path, catalog: Catalog) -> str:
     either branch: they once differed by a blank line at EOF, and `generate` over a file it
     had just written disagreed with `check` forever."""
     path = specs / INDEX
-    existing = path.read_text(encoding="utf-8") if path.is_file() else None
+    existing = _jsonl.read_text(path) if path.is_file() else None
     rendered = _tables(catalog)
     if existing and HEADING in existing:
         lines = existing.splitlines(keepends=True)

@@ -20,8 +20,24 @@ class LineError(ValueError):
         self.number = number
 
 
+class Undecodable(Exception):
+    """The file *path* is not UTF-8; the check verbs report it as a finding."""
+
+    def __init__(self, path: Path) -> None:
+        super().__init__(f"{path} is not valid UTF-8")
+        self.path = path
+
+
 class Unreadable(Refusal):
     """A document that is not one JSON object; ``.fix`` is the act its caller names."""
+
+
+def read_text(path: Path) -> str:
+    """The text of *path*; bytes that are not UTF-8 raise :class:`Undecodable` naming it."""
+    try:
+        return path.read_text(encoding="utf-8")
+    except UnicodeDecodeError as exc:
+        raise Undecodable(path) from exc
 
 
 def walk(text: str) -> Iterator[tuple[int, Any, str]]:
@@ -50,7 +66,7 @@ def load(text: str) -> list[dict[str, Any]]:
 
 def read(path: Path) -> list[dict[str, Any]]:
     """Every JSON object of the JSONL file *path*, in file order; absent reads empty."""
-    return load(path.read_text(encoding="utf-8")) if path.is_file() else []
+    return load(read_text(path)) if path.is_file() else []
 
 
 def serialize(records: Iterable[dict[str, Any]]) -> str:

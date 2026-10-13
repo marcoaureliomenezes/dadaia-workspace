@@ -100,9 +100,10 @@ def histo_findings(text: str, root: Path = SPECS) -> list[dict[str, Any]]:
     return _findings.histo_findings(text, HISTO, CODE, problems, lambda n: _fix(HISTO, n, root))
 
 
+@_findings.decodable(CODE)
 def check(specs: Path) -> list[dict[str, Any]]:
     """Validate both committed files; a young specs tree with neither is not a finding."""
-    document, histo = (p.read_text(encoding="utf-8") if p.is_file() else "" for p in (specs / LEDGER, specs / HISTO))  # fmt: skip
+    document, histo = (_jsonl.read_text(p) if p.is_file() else "" for p in (specs / LEDGER, specs / HISTO))  # fmt: skip
     return pair_findings(document or None, histo, specs.resolve())
 
 
