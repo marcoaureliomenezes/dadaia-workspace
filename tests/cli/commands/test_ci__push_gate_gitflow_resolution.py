@@ -15,6 +15,8 @@ from dadaia_workspace.cli.commands import ci
 from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.gitflow import Gitflow
 
+_CUSTOM = "---\nspecs_pattern_version: 7\ngitflow: {principal: trunk, integration: next, work: work/}\n---\n"
+
 
 def _git(repo: Path, *args: str) -> None:
     subprocess.run(
