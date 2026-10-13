@@ -51,5 +51,5 @@ def check(specs: Path) -> list[Finding]:
         f"{script(Path(__file__).with_name('memory.py'))} catalog generate", specs.resolve()
     )
     for finding in out:  # the pair is regenerated, never hand-fixed: the fix line clears it
-        finding |= {"code": CODE, "fix": fix}
+        finding |= {"code": CODE, "verdict": "error", "fix": fix}
     return out
