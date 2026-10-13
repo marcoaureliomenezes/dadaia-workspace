@@ -18,6 +18,7 @@ import _jsonl
 import _privacy
 from _commit import stamp as stamp
 from _findings import finding as finding
+from _refusal import report
 from _root import STATES as _STATES
 from _root import workspace_of as workspace_of
 
@@ -167,11 +168,11 @@ def terms(root: Path | None) -> list[tuple[str, str]]:
         except (OSError, ValueError):
             raw = None
         if not isinstance(raw, dict):
-            raise SystemExit(
-                f"error: privacy denylist {path} is not one JSON object\n"
-                f"fix: Operator action: rewrite {path} as one JSON object mapping each term to "
-                "its reason"
+            report(
+                f"privacy denylist {path} is not one JSON object",
+                f"Operator action: rewrite {path} as one JSON object mapping each term to its reason",
             )
+            raise SystemExit(1)
         if raw:
             return [(str(term), str(reason)) for term, reason in raw.items()]
     return []

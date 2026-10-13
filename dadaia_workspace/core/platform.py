@@ -37,3 +37,10 @@ def venv_tool[P: PurePath](venv: P, tool: str) -> P:
     caps = _owner.Caps(PLATFORM.venv_scripts_dir, PLATFORM.venv_exe_suffix, PLATFORM.windows)
     path: P = _owner.venv_tool(venv, tool, caps)
     return path
+
+
+def workspace_cli_path[P: PurePath](root: P) -> P:
+    """Where the workspace CLI lives under *root*, by the kernel's rule fed the current ``PLATFORM``."""
+    caps = _owner.Caps(PLATFORM.venv_scripts_dir, PLATFORM.venv_exe_suffix, PLATFORM.windows)
+    path: P = _owner.cli_path(root, caps)
+    return path

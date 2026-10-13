@@ -11,8 +11,8 @@ import sys
 from pathlib import Path
 
 from _ledger import parse as parse
-from _platform import detect, workspace_cli
-from _refusal import report
+from _platform import cli_path, detect
+from _refusal import Refusal, report
 from _root import workspace_of as workspace_of
 
 CATALOG = "memory/product/catalog.json"
@@ -29,14 +29,27 @@ def find_specs(given: Path | None, *, ledger: str | None = None) -> Path:
     if tree := next((t for t in trees if t.is_dir()), None):
         return tree.resolve()
     fix, note = _bound_fix(here, _rerun(), ledger)
-    print(f"error: no specs tree at {given or f'or above {here}'} — nothing was written{note}",
-          f"fix: {fix}", sep="\n", file=sys.stderr)  # fmt: skip
+    report(f"no specs tree at {given or f'or above {here}'} — nothing was written{note}", fix)
     raise SystemExit(1)
+
+
+def workspace_cli(root: Path) -> Path:
+    """The installed workspace CLI under *root*. Raises `Refusal` carrying the install fix."""
+    if (cli := cli_path(root)).exists():
+        return cli
+    raise Refusal("no workspace CLI", f"uvx dadaia-workspace init {quote(str(root))}")
+
+
+def _installed_cli(root: Path) -> Path | None:
+    try:
+        return workspace_cli(root)
+    except Refusal:
+        return None
 
 
 def _bound_fix(here: Path, rerun: str, ledger: str | None) -> tuple[str, str]:
     root = workspace_of(here)
-    if root and (cli := workspace_cli(root)):
+    if root and (cli := _installed_cli(root)):
         shown = subprocess.run(
             [str(cli), "context", "show", "--json"], capture_output=True, text=True, encoding="utf-8", errors="replace"
         )  # fmt: skip

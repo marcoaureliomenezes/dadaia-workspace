@@ -19,6 +19,7 @@ from _atomic import SymlinkRefusedError
 from _bugs_check import CODE, LEDGER, OPEN, STATUS_BY_VERB, check
 from _bugs_store import Refusal, commit, read_records
 from _git import GitError, git
+from _refusal import report
 from _specs import find_specs, refuse
 
 _OPTIONS: dict[str, tuple[str, ...]] = {
@@ -153,9 +154,10 @@ def main(argv: list[str] | None = None) -> int:
     except Refusal as refusal:
         return refuse(refusal, specs)
     except SymlinkRefusedError as exc:
-        print(f"Error: {exc} — nothing was written",
-              f"fix: Operator action: replace {exc.path} with a regular file holding its content",
-              sep="\n", file=sys.stderr)  # fmt: skip
+        report(
+            f"{exc} — nothing was written",
+            f"Operator action: replace {exc.path} with a regular file holding its content",
+        )
         return 1
 
 

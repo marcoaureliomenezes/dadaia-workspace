@@ -24,7 +24,7 @@ sys.path[:0] = [
 
 from _clock import now_iso as utc_now
 from _grammar import SHA_RE, STATE
-from _refusal import Refusal
+from _refusal import Refusal, report
 from _release_check import ship_histo_findings
 from _release_new import new_release
 from _release_phase import SHIP_PR, set_phase
@@ -110,12 +110,7 @@ def _origin(spec: Path) -> int:
             if isinstance(error, OSError)
             else "edit its `**Origin:**` line"
         )
-        print(
-            f"Error: {spec} {error}",
-            f"fix: Operator action: {act}",
-            sep="\n",
-            file=sys.stderr,
-        )
+        report(f"{spec} {error}", f"Operator action: {act}")
         return 1
     print(
         *(f"{kind} {i}" for kind in ORIGIN_KINDS for i in carried.get(kind, [])),

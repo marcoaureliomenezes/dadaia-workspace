@@ -14,9 +14,8 @@ from pathlib import Path
 
 from _git import git as git, parse_worktrees, scrubbed_env as scrubbed_env  # isort: skip
 from _grammar import SEMVER_RE, TAG_RE
-from _platform import workspace_cli
 from _specs import git_line as git_line
-from _specs import head
+from _specs import head, workspace_cli
 from _specs import quote as quote  # (`as`: re-exported to the worktree verbs)
 from _specs import script as script
 from _specs import workspace_of as workspace_of
@@ -34,14 +33,6 @@ def dirty(tree: Path) -> bool:
     return bool(git(tree, "status", "--porcelain").strip())
 
 
-def _exe(root: Path) -> Path:
-    if exe := workspace_cli(root):
-        return exe
-    raise Refusal(
-        "no workspace CLI", " ".join(map(quote, ("uvx", "dadaia-workspace", "init", str(root))))
-    )
-
-
 def cli(root: Path, *args: str, tree: Path | None = None) -> subprocess.CompletedProcess[str]:
     """One read-only run of the workspace CLI — the owner of every package grammar. With *tree*
     the run acts on that tree alone: its cwd, every root above it fenced."""
@@ -50,7 +41,7 @@ def cli(root: Path, *args: str, tree: Path | None = None) -> subprocess.Complete
         {"DADAIA_FENCED_ROOTS": os.pathsep.join(map(str, tree.resolve().parents))} if tree else {}
     )
     return run(
-        [str(_exe(root)), *args],
+        [str(workspace_cli(root)), *args],
         cwd=tree or root,
         env=scrubbed_env() | fence,
         stdin=subprocess.DEVNULL,
@@ -61,7 +52,7 @@ def cli(root: Path, *args: str, tree: Path | None = None) -> subprocess.Complete
 
 def cli_line(root: Path, *args: str) -> str:
     """The fix line running :func:`cli` with *args*, quoted for the host shell."""
-    return " ".join((head(str(_exe(root))), *map(quote, args)))
+    return " ".join((head(str(workspace_cli(root))), *map(quote, args)))
 
 
 def gitflows(root: Path) -> dict[str, dict[str, str]]:

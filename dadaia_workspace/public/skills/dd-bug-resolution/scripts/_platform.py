@@ -20,10 +20,14 @@ def detect(platform: str | None = None) -> Caps:
     return Caps("Scripts" if windows else "bin", ".exe" if windows else "", windows)
 
 
-def workspace_cli(root: Path) -> Path | None:
-    """The workspace CLI under *root*, or None when no install put it there."""
-    cli = venv_tool(root / ".dadaia/.venv", "dadaia")
-    return cli if cli.exists() else None
+def venv_dir(root: Path) -> Path:
+    """The workspace venv under *root*."""
+    return root / ".dadaia" / ".venv"
+
+
+def cli_path(root: Path, caps: Caps | None = None) -> Path:
+    """Where the workspace CLI lives under *root*; whether it exists is not asked."""
+    return venv_tool(venv_dir(root), "dadaia", caps)
 
 
 def venv_tool(venv: Path, tool: str, caps: Caps | None = None) -> Path:

@@ -21,9 +21,8 @@ import _root
 from _git import scrubbed_env
 from _grammar import CONTEXT_NAME_RE
 from _handoffs import REVIEWER, reviewer_records
-from _platform import workspace_cli
 from _refusal import Refusal, report
-from _specs import quote
+from _specs import workspace_cli
 
 _WORKTREE = Path(__file__).resolve().parents[2] / "dd-gitflow-default" / "scripts" / "worktree.py"
 _OWN = (
@@ -150,8 +149,7 @@ def _run(argv: list[str]) -> int:
         **body,
     }
     root = Path(bound["root"])
-    if not (cli := workspace_cli(root)):
-        raise Refusal("no workspace CLI", f"uvx dadaia-workspace init {quote(str(root))}")
+    cli = workspace_cli(root)
     out = root / ".dadaia/handoff" / args.context
     out.mkdir(parents=True, exist_ok=True)
     target = out / f"{now.replace(':', '')}-{REVIEWER}-{args.slug}.handoff.json"

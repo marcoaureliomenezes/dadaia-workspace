@@ -14,7 +14,7 @@ from dadaia_workspace.core import platform
 
 def cli_path[P: PurePath](root: P) -> P:
     """The workspace CLI's real executable (``Scripts\\dadaia.exe`` on Windows)."""
-    return platform.venv_tool(root / ".dadaia" / ".venv", "dadaia")
+    return platform.workspace_cli_path(root)
 
 
 def fix_line(root: PurePath | None, *argv: str) -> str:

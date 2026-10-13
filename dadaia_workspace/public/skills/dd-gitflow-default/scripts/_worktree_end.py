@@ -20,7 +20,7 @@ from datetime import datetime
 from pathlib import Path
 
 from _handoffs import REVIEWER, reviewer_records
-from _platform import venv_tool
+from _platform import venv_dir, venv_tool
 from _refusal import report
 from _worktree_git import (
     cli,
@@ -184,7 +184,7 @@ def _gate(tree: Path, work: str, *, required: bool = True) -> None:
         raise Refusal(f"this repo declares no {key} command",
                       f"Operator action: add this repo's job gate as a {key} line to {agents} and commit it on {work}")  # fmt: skip
     env = scrubbed_env()
-    env["PATH"] = os.pathsep.join([str(venv_tool(root / ".dadaia/.venv", "python").parent), env.get("PATH", "")])  # fmt: skip
+    env["PATH"] = os.pathsep.join([str(venv_tool(venv_dir(root), "python").parent), env.get("PATH", "")])  # fmt: skip
     try:
         done = subprocess.run(command, cwd=tree, env=env, stdin=subprocess.DEVNULL,
                               stderr=subprocess.STDOUT)  # fmt: skip

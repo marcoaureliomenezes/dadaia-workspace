@@ -24,6 +24,7 @@ sys.path.append(str(Path(__file__).resolve().parents[2] / "dd-bug-resolution" / 
 import _clock
 import _platform
 from _ledger import replace, workspace_of
+from _refusal import report
 
 DEFAULT_MIN_PORT = 3000
 DEFAULT_MAX_PORT = 3999
@@ -45,7 +46,11 @@ def _stamp(moment: datetime) -> str:
 def find_registry(start: Path) -> Path:
     if root := workspace_of(start):
         return root / ".dadaia" / "states" / "server_registry.json"
-    raise SystemExit("error: no workspace sentinel above the cwd; pass --registry <path>")
+    report(
+        "no workspace sentinel above the cwd",
+        "Operator action: rerun with --registry <path>, or from inside a workspace",
+    )
+    raise SystemExit(1)
 
 
 def load(path: Path) -> dict[str, Any]:
@@ -124,9 +129,9 @@ def cmd_next(doc: dict[str, Any], args: argparse.Namespace, path: Path) -> int:
         else:
             free = [p for p in range(args.min_port, args.max_port + 1) if p not in occupied]
             if not free:
-                print(
-                    f"error: no free ports in [{args.min_port}, {args.max_port}]; run clean",
-                    file=sys.stderr,
+                report(
+                    f"no free ports in [{args.min_port}, {args.max_port}]",
+                    "Operator action: run registry.py clean, then rerun",
                 )
                 return 1
             port, is_base = free[0], False
@@ -146,9 +151,9 @@ def cmd_register(doc: dict[str, Any], args: argparse.Namespace, path: Path) -> i
                 print(f"port {args.port} already registered for '{args.project}' -> {e['url']}")
                 save(path, doc)
                 return 0
-            print(
-                f"error: port {args.port} is registered by project '{e['project']}' ({e['url']})",
-                file=sys.stderr,
+            report(
+                f"port {args.port} is registered by project '{e['project']}' ({e['url']})",
+                "Operator action: pick another port with registry.py next, then rerun",
             )
             return 1
     now = _now()
@@ -170,7 +175,10 @@ def cmd_register(doc: dict[str, Any], args: argparse.Namespace, path: Path) -> i
 
 def cmd_release(doc: dict[str, Any], args: argparse.Namespace, path: Path) -> int:
     if args.port is None and args.project is None:
-        print("error: provide --port and/or --project", file=sys.stderr)
+        report(
+            "provide --port and/or --project",
+            "Operator action: pass --port and/or --project, then rerun",
+        )
         return 1
     keep: list[dict[str, Any]] = []
     released: list[dict[str, Any]] = []
@@ -186,7 +194,10 @@ def cmd_release(doc: dict[str, Any], args: argparse.Namespace, path: Path) -> in
             if owner is None
             else f"belongs to project '{owner}', not '{args.project}'"
         )
-        print(f"error: port {args.port} {why}", file=sys.stderr)
+        report(
+            f"port {args.port} {why}",
+            "Operator action: run registry.py list to see the registered ports, then rerun",
+        )
         return 1
     doc["entries"] = keep
     save(path, doc)
