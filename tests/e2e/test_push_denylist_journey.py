@@ -86,9 +86,9 @@ def _remote_branch_sha(bare: Path) -> str | None:
 
 
 def test_the_gate_runs_where_core_hookspath_points(tmp_path: Path) -> None:
-    """With ``core.hooksPath``
-    set, ``ci install-hook`` puts the gate where git runs hooks, and a push carrying an
-    AKIA-shaped key is refused. Composed at runtime — never a tracked secret literal."""
+    """With ``core.hooksPath`` set, ``ci install-hook`` puts the gate where git runs hooks, and a
+    push carrying an AKIA-shaped key is refused. Composed at runtime — never a tracked secret
+    literal."""
     repo, bare = _init_repo_and_remote(tmp_path, _SLUG)
     _git(["config", "core.hooksPath", ".husky"], repo)
     (repo / "creds.txt").write_text("key " + "AKIA" + "Q" * 16 + "\n", encoding="utf-8")
@@ -117,8 +117,8 @@ def test_the_gate_runs_where_core_hookspath_points(tmp_path: Path) -> None:
 def test_a_record_whose_context_carries_a_published_term_registers_and_pushes(
     tmp_path: Path,
 ) -> None:
-    """A context value
-    origin already holds is accepted by the ledger seam AND by the installed pre-push."""
+    """A context value origin already holds is accepted by the ledger seam AND by the installed
+    pre-push."""
     from tests.helpers.skill_scripts import stage_skill_scripts
 
     bugs = stage_skill_scripts("dd-bug-resolution", tmp_path / "staged" / "scripts") / "bugs.py"

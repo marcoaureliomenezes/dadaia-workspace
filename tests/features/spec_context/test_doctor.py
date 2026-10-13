@@ -115,10 +115,9 @@ _PLACES = {
 def test_four_places_classify_every_entry(
     tmp_path: Path, registry: str, expected: dict[str, str]
 ) -> None:
-    """One walk
-    over the root, ``.dadaia/``, ``repos/`` and ``worktrees/`` — unlisted = slop, globbed =
-    operator; repo slugs, never context names, DEAD ones under ``repos/`` only; an unreadable
-    registry keeps every ``repos/<r>`` and ``worktrees/<r>``."""
+    """One walk over the root, ``.dadaia/``, ``repos/`` and ``worktrees/`` — unlisted = slop,
+    globbed = operator; repo slugs, never context names, DEAD ones under ``repos/`` only; an
+    unreadable registry keeps every ``repos/<r>`` and ``worktrees/<r>``."""
     _init_workspace(tmp_path)
     dadaia = tmp_path / ".dadaia"
     (dadaia / _STATE_ZONE.name / "spec_contexts.json").write_text(registry, encoding="utf-8")

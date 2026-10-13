@@ -85,7 +85,7 @@ def test_a_code_ref_is_any_tracked_path_its_word_optional(
 
 
 def test_a_code_word_is_read_from_the_live_file(repo: Path) -> None:
-    """SPEC §3.7.5: no stored registry — editing the file changes the verdict."""
+    """No stored registry — editing the file changes the verdict."""
     (repo / "pkg" / "widget.go").write_text("package widget\n", encoding="utf-8")
     assert _build(repo).bind("pkg/widget.go#MakeWidget", SubjectKind.CODE).status is (
         BindStatus.UNRESOLVED

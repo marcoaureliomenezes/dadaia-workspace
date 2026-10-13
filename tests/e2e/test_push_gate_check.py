@@ -1,9 +1,8 @@
-"""`ci push-gate-check`
-driven as the pre-push hook drives it (git's ref lines on stdin, harness-free env, no
-handoff on disk). A work-branch push, a branch deletion and a tag push pass; the branch
-names come from the committed constitution's gitflow (custom, absent -> default + one
-warning, inherited by an associated repo; its main repo absent -> default + one warning).
-The integration-branch refusal and its fix are the refusal harness Case `birth_published`.
+"""`ci push-gate-check` driven as the pre-push hook drives it (git's ref lines on stdin,
+harness-free env, no handoff on disk). A work-branch push, a branch deletion and a tag push pass;
+the branch names come from the committed constitution's gitflow (custom, absent -> default + one
+warning, inherited by an associated repo; its main repo absent -> default + one warning). The
+integration-branch refusal and its fix are the refusal harness Case `birth_published`.
 
 Owner: dd-sw-engineer-sr
 """

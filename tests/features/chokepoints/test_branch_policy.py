@@ -1,6 +1,6 @@
 """The branch contract, read from the project gitflow: work branches ``<prefix><M.m.p>`` are
-pushable; the principal and integration
-branches are PR-only; every refusal and its fix line name the CONFIGURED branches.
+pushable; the principal and integration branches are PR-only; every refusal and its fix line
+name the CONFIGURED branches.
 Every row runs under the default gitflow or a custom one (``trunk``/``next``/``work/``).
 """
 

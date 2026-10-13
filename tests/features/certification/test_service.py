@@ -83,11 +83,10 @@ class _Children(SubprocessCertificationProcess):
 @pytest.mark.medium
 @pytest.mark.slow(reason="a real certify journey: about a dozen dadaia children")
 def test_certify_fails_naming_the_sandbox_slop(tmp_path: Path) -> None:
-    """A certify sandbox seeded with
-    `.dadaia/nonsense/` and a root `notes.txt` — the workspace section is judged and the
-    result fails naming WS-dadaia-slop and WS-root-slop. Run from a "live" workspace owning the
-    children's venv, every child
-    acts on the sandbox only — the live registry is byte-identical, no session is left."""
+    """A certify sandbox seeded with `.dadaia/nonsense/` and a root `notes.txt` — the workspace
+    section is judged and the result fails naming WS-dadaia-slop and WS-root-slop. Run from a
+    "live" workspace owning the children's venv, every child acts on the sandbox only — the
+    live registry is byte-identical, no session is left."""
     live = own_venv_workspace(tmp_path / "live")
     result = certify(live, _Children(own_venv_python(live))).to_dict()
 

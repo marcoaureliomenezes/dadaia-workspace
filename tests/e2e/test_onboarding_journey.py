@@ -9,7 +9,7 @@ operator runs ``uvx --from <wheel> dadaia-workspace …`` and walks level 1 (wor
 level 2 (Spec Context Project) and level 3 (canonical specs). Every seam the journey
 crosses — uvx's own environment, the workspace venv provisioning, the clone, the hook,
 the specs scaffold, doctor — is crossed by REAL child processes; no in-process runner
-reaches them. This is the durable form of the 0.4.8 onboarding audit script.
+reaches them.
 
 Layout — ONE workspace carries the journey: born on the previous release (level 1),
 upgraded by re-init, then levels 2 and 3 — a real workspace venv is the journey's cost, so
@@ -62,7 +62,7 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 _SOURCE_VERSION: str = tomllib.loads((_REPO_ROOT / "pyproject.toml").read_text("utf-8"))["tool"][
     "poetry"
 ]["version"]
-# Local version segment: the built wheel differs from the last PyPI release (risk §8).
+# Local version segment: the built wheel differs from the last PyPI release.
 _E2E_VERSION = f"{_SOURCE_VERSION}+e2e"
 
 
