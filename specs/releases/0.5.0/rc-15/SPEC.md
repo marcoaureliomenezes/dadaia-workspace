@@ -17,11 +17,12 @@ Operator rulings, verbatim:
 - Q5, ADR triage: "Por classe (Recommended)" — class-level superseding proposals, each naming many ids, each accepted by the operator.
 - Q6, ADR 0193's `amends`: "Novo registro (Recommended)" — a new record amends 0152; the ledger stays append-only; the ADR 0138 repair lane is not widened.
 - Q7, `measured_by` existence: "Construir e recusar (Recommended)" — built in the doctor's ADR code, refusing at regeneration, after the class triage.
+- DEFINITION done-marker check, 2026-10-13: "Apagar check e testes (Recommended)" — the check and its tests are deleted by this order (root map §1, ADR 0249), together with the last `TASKS.md` read in `_release_tree.py` (FR11).
 - Carried, `architecture-adr-section-generated`: "Triagem + gerada (Recommended)" (2026-10-11); "Real no closure" (2026-10-03).
 - Carried, `task-worktree-cap-removed`: "Descartar (Recommended)" and "e vai fazer de novo quantas vezes???" (2026-10-13).
 - Carried, G7 (rc-14 SPEC G7, operator 2026-10-11/12): "Não tolerarei nem mesmo 30% dessa quantidade de retrabalhos que tivemos."
 
-Agent defaults, unruled (main thread, 2026-10-13): Q2 bytecode = AS-IS option B; Q3 release drift = option B; Q4 reconcile shape = option B; Q8 G7 = as the rc-14 SPEC wrote it. The sr's own defaults (AS-IS §5) are labelled where they appear.
+Agent defaults, unruled (main thread, 2026-10-13): Q2 bytecode = AS-IS option B; Q3 release drift = option B; Q4 reconcile shape = option B; Q8 G7 = as the rc-14 SPEC wrote it, a readout (operator, 2026-10-12: "quero que na proxima release candidate eu possa medir o quanto melhorou"). Main-thread rulings, 2026-10-13: the job-gate `doctor` (AC5.3) is kept under the gate-cost line; FR10's triage proposals land in a `backlog/<slug>` tree. The sr's own defaults (AS-IS §5) are labelled where they appear.
 
 `law-one-home-residual` exited `delivered` at rc-14; its parts (b), the ADR-ledger triage, and (c), 0193's `amends`, are carried by `architecture-adr-section-generated` (FR10). Its histo reason "(b) ADR 0243 accepted" stands uncorrected: `backlog.py` has no verb to amend an exit.
 
@@ -59,11 +60,11 @@ The rc-14 G1 readout also left residue: an unscrubbed git call, a refusal templa
 - G1. `bugs.py status --specs specs` lists none of the five Origin bugs as open at closure.
 - G2. No skill script imports another skill except the kernel: `_CROSS_SKILL_EDGES` and `_EDGE_PATH_LINES` are gone and the thin-wrapper test is green.
 - G3. Production code shrinks or holds: the closure summary records the net production lines of rc-15 (`git diff --shortstat <rc-15 cut>..<reconcile head> -- dadaia_workspace scripts`). Each growth names its reason (FR8, FR10).
-- G7. Measured at rc-15 closure by `verdict.py stats 0.5.0-rc15`, recorded in the closure summary: REJECTED at most 30% of rc-14's, so ≤ 10 (35 × 0.3), and first-pass rejected at most 20% of rc-15's sequences. The rc-14 baseline is pinned here because verdict records age out of the hold: `verdict.py stats 0.5.0-rc14` read 2026-10-13T13:39Z gave 47 sequences, 81 verdicts, 35 rejected, 23/47 first-pass rejected; the closure summary had recorded 46 / 79 / 34 / 22. Agent default, unruled: G7 is a readout. A miss joins the closure-summary batch for the operator and adds no gate.
+- G7. Measured at rc-15 closure by `verdict.py stats 0.5.0-rc15`, recorded in the closure summary: REJECTED at most 30% of rc-14's, so ≤ 10 (35 × 0.3), and first-pass rejected at most 20% of rc-15's sequences. The rc-14 baseline is pinned here because verdict records age out of the hold: `verdict.py stats 0.5.0-rc14` read 2026-10-13T13:39Z gave 47 sequences, 81 verdicts, 35 rejected, 23/47 first-pass rejected; the closure summary had recorded 46 / 79 / 34 / 22. G7 is a readout, per the operator's words of 2026-10-12: "quero que na proxima release candidate eu possa medir o quanto melhorou". A miss joins the closure-summary batch for the operator and adds no gate.
 
 ## 3. Requirements
 
-Wave ranking: Wave 1 is law, skills and the dev loop (FR1, FR2). Wave 2 is the shared foundation (FR3 to FR5). Wave 3 is features and bugs (FR6 to FR9). Wave 4 is promote-facing (FR10, then the Reconciliation). FR7 is the G7 lever and every later review leans on `preflight`, so the PLAN may lift it into Wave 1 (AS-IS §3).
+Wave ranking: Wave 1 is law, skills and the dev loop (FR1, FR2). Wave 2 is the shared foundation (FR3 to FR5). Wave 3 is features and bugs (FR6 to FR9, FR11). Wave 4 is promote-facing (FR10, then the Reconciliation). FR7 is the G7 lever and every later review leans on `preflight`, so the PLAN may lift it into Wave 1 (AS-IS §3).
 
 ### Wave 1 — law, skills and dev loop
 
@@ -113,7 +114,7 @@ Wave ranking: Wave 1 is law, skills and the dev loop (FR1, FR2). Wave 2 is the s
 
 - AC5.1 (integration): `report`, `render`, `worklist` and `git` of `_memory_drift.py` move to the kernel with their decisions unchanged, and `CATALOG` moves to the kernel's `_specs.py`. The release and navigator skills both import them, typed `Refusal` included. `release.py drift`, `memory` and `check` and `memory.py drift` keep their existing tests green. The only edit is the `sys.path` setup at `test__memory_drift.py:196,236`, which names the kernel only.
 - AC5.2 (unit, RED first): The thin-wrapper test loses `_CROSS_SKILL_EDGES` and `_EDGE_PATH_LINES`. Any import outside the stdlib, the skill's folder and the kernel fails it, and a planted cross-skill import turns it red. This tightens the invariant. The `sys.path.insert` at `_release_tree.py:19` leaves.
-- AC5.3 (integration; the sr's default, AS-IS §5, unruled): `scripts/ci.py` `STAGE` runs the existing `doctor` job, so memory drift turns the job gate red instead of only CI. Measured cost at `33cab8274`: 0.91 s wall, inside the gate-cost rule (root map §1). The task re-measures it and states the number in its commit body. The change adds no new check and no second decider beside LINT-1.
+- AC5.3 (integration; the sr's default, AS-IS §5, kept by the main thread's ruling of 2026-10-13): `scripts/ci.py` `STAGE` runs the existing `doctor` job, so memory drift turns the job gate red instead of only CI. Measured cost at `33cab8274`: `python -m dadaia_workspace doctor --specs-dir specs` 0.91 s wall, exit 0, far below one run of the job's `verify:` gate, so the gate-cost line (root map §1) holds without the operator. The task re-measures it and states the number in its commit body. The change adds no new check and no second decider beside LINT-1.
 
 ### Wave 3 — features and bugs
 
@@ -140,6 +141,14 @@ Wave ranking: Wave 1 is law, skills and the dev loop (FR1, FR2). Wave 2 is the s
 - AC9.1 (integration): A sixth task tree of one rc opens. At `test__worktree_new.py:138-152` the sixth-refusal and "cap counts tasks only" asserts become "the sixth opens", in a `test(...)` commit that names the operator's order of 2026-10-13: "Trocar o assert (Recommended)". The orphan and job-branch asserts stay unedited.
 - AC9.2 (no test — reviewer sweep): Three things leave: `TASK_CAP`, its refusal in `_worktree_new.py`, and the law clause "at most 5 task worktrees are open per rc" (`public/data/worktrees-AGENTS.md`). The `worktrees` memory atom line changes at the Reconciliation. Concurrency stays the approved PLAN's schedule.
 
+#### FR11 — the DEFINITION done-marker check leaves (operator, 2026-10-13: "Apagar check e testes (Recommended)")
+
+Job files carry no `[x]`/`[-]` markers, so the check reads markers only from the retired `rc-<N>/TASKS.md` and never fires on a current candidate. The hotfix `release-check-memory-task-check-reads-retired-tasks-md` keeps that read only for this check, until FR11 deletes it.
+
+- AC11.1 (no test — reviewer sweep; tests deleted by the operator's order): The marker half of `_definition_findings` (`_release_tree.py`, "task … is marked past '[ ]' in phase DEFINITION") and the last `TASKS.md` read in `_release_tree.py` leave. `git grep -n 'TASKS.md' -- dadaia_workspace/public/skills/dd-release-implementation/scripts/_release_tree.py` returns nothing. The tests leave in one `test(...)` commit that names the order "Apagar check e testes (Recommended)": the two marker rows of `test_check_judges_a_definition_release` (`test_release.py`, `("- [x] **T-1** done\n", [], "T-1")` and `("- [-] **T-1** reserved\n", [], "T-1")`), plus any test the hotfix adds for that read alone (the PLAN names it at the hotfix's merged sha).
+- AC11.2 (integration — existing tests): The closure-entry-after-birth finding of `_definition_findings` reads `_RELEASE.json`, not `TASKS.md`, and stays. Its parametrised rows stay unedited. `test_a_definition_finding_stamps_the_commit_that_touched_the_trio` keeps its assert. It is triggered today by the default ticked `TASKS.md` task, so it moves to the closure-entry trigger; that setup change takes the main thread's ruling, named in its `test(...)` commit (root map §1).
+- AC11.3 (no test — reviewer `git grep`): `MARK_RE` and `MARKS` (`_release_schema.py`) leave only if no reader remains. If they leave, the `MARK_RE` assert at `test_release.py:324` and the thin-wrapper `_SCHEMA` allowlist entry go back to the main thread for the operator's order first.
+
 ### Wave 4 — promote-facing
 
 #### FR10 — ARCHITECTURE.md's ADR section is generated from the ledger (`architecture-adr-section-generated`, with `law-one-home-residual` (b) and (c))
@@ -164,7 +173,7 @@ Each picked entry exits once at closure (`backlog.py exit`, from the reconcile t
 ## 5. Not in rc-15
 
 - **Non-goals** (operator, 2026-10-13: "Fora: rc-15 só limpa (Recommended)"): `promote-gate-050`, `release-approve-requires-evals-gate`, `windows-smoke-t1-at-release`, `eval-codex-lane-in-library-ci`. They stay active and untouched. `evals-benchmark-lanes` is not destined to 0.5.0.
-- **Hotfix:** `release-check-memory-task-check-reads-retired-tasks-md` is open and fixed now as a hotfix outside the rc's DAG.
+- **Hotfix:** `release-check-memory-task-check-reads-retired-tasks-md` is open and fixed now as a hotfix outside the rc's DAG; FR11 deletes the one `TASKS.md` read it leaves.
 - **Every other `active[]` entry** stays active and untouched.
 
 ## 6. Constraints and risks
@@ -181,16 +190,17 @@ Each picked entry exits once at closure (`backlog.py exit`, from the reconcile t
 - `TASK_CAP`, its refusal and its law clause leave (FR9).
 - The `ADR:` label grammar, its guard rows and plants, the pairing law and row 2's hunk clause become one generated block and a `measured_by` check (FR10).
 - Closure readouts in a closed PLAN or SPEC become the closure summary only (FR1).
+- The DEFINITION done-marker check, its last `TASKS.md` read and its two marker test rows leave by the operator's order (FR11).
 
 ### Governance sequencing
 
-1. ADR proposals land in a `define` or `backlog/<slug>` tree (§3a row 2), carrying `options` and self-contained `ruling.words` (ids above 0246). Only the operator accepts.
-2. Two accepted records state what this SPEC deletes. ADR 0191 states "At most 5 task worktrees per rc", and 0125 (3) caps impl worktrees (FR9). ADR 0245 (4) states "A principle's ADR: label stays with the id only" (FR10). Each needs an amending proposal that the operator accepts before its job merges (`dd-release-definition` §4.6, `references/plan.md`).
+1. ADR proposals land in a `define` or `backlog/<slug>` tree (§3a row 2), carrying `options` and self-contained `ruling.words` (ids above 0246). Only the operator accepts. FR10's class-triage proposals (AC10.1) land in a `backlog/<slug>` tree during rc-15 (main thread, 2026-10-13); the PLAN schedules that tree.
+2. Two accepted records state what this SPEC deletes. ADR 0191 states "At most 5 task worktrees per rc", carrying 0125 (3) (FR9). ADR 0245 (4) keeps the id-only `ADR:` label and the pairing rule (FR10). This define tree proposes ADR 0250 (amends 0191) and ADR 0251 (amends 0245). Each must be accepted by the operator before its job merges.
 3. FR10's order: the triage (AC10.1) proposes after the bug jobs merge, when the ledger is final. AC10.3's refusal runs only after the operator has accepted those proposals. The Reconciliation regenerates the block.
 
 ### Delivery constraints
 
-- No test and no existing assert is removed or skipped without the operator's order (root map §1, ADR 0249). This SPEC changes only two asserts, both ordered: AC6.2 and AC9.1. Every other RED is a new partition, or a tightening checked by the reviewer's revert check.
+- No test and no existing assert is removed or skipped without the operator's order (root map §1, ADR 0249). This SPEC changes two asserts and deletes two test rows, each by an operator order: AC6.2, AC9.1 and AC11.1. AC11.2 and AC11.3 name the test edits that still need a ruling. Every other RED is a new partition, or a tightening checked by the reviewer's revert check.
 - A docstring or comment states only its unit's contract.
 - Simplicity first: each FR deletes before it adds. FR8 and FR10 state their growth.
 - Tidy First: an owner moves before its behaviour changes (FR3 and FR5 before FR8); each bug fix lands its RED test first.
@@ -207,14 +217,9 @@ Each picked entry exits once at closure (`backlog.py exit`, from the reconcile t
 
 ## 7. Open questions
 
-For the operator, through the main thread:
-
-1. ADR 0191 / 0125 (3), the task cap, and ADR 0245 (4), the `ADR:` label: approve amending proposals so that FR9 and FR10 do not contradict accepted records (§6 Governance 2)?
-2. AC5.3, adding `doctor` to the job gate's `STAGE`, is the sr's default and adds about 0.91 s to every job gate: confirm or cut.
-3. G7 as a readout with no gate is an agent default: confirm.
+For the operator, through the main thread: accept or reject proposals 0250 and 0251 (§6 Governance 2).
 
 Notes (not blocking):
 
-- The DEFINITION done-marker check (`_release_tree.py:203-222`) reads markers from the same retired `TASKS.md` as the hotfix bug, whose symptom names `_release_tree.py:213-214`. AS-IS.md does not list it, so it is not in this SPEC. The hotfix or the next bug window takes it.
 - The gate's other fix line (`_check_approved`, `reports validate --all` when no verdict decides) names the validator where the remedy is to write a verdict (AS-IS §2.1). It is not in a bug record; it goes to the next bug window as a proposal.
 - `test_memory_lint.py:346-350,427-431` assert a label grammar FR10 deletes from the law. They still pass, and changing them needs the operator's order.
