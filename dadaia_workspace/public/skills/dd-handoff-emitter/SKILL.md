@@ -29,11 +29,11 @@ completed agent task; the HTML report is the exception, not the rule.
    fix any non-zero exit before moving on.
 7. A reviewer verdict is written only by `python3 .agents/skills/dd-handoff-emitter/scripts/verdict.py <worktree> --sha <sha> --context <ctx>
    --slug <slug> --verdict APPROVED|REJECTED --reason "<line>"`, the rest of the body as one JSON
-   object on stdin; it binds the verdict to the diff it judged. Then run `reports validate` on the
-   path it prints.
+   object on stdin; it binds the verdict to the diff it judged and validates the file against the
+   reviewed tree before accepting it. A validation refusal leaves no file and prints one `fix:` line; the path it prints is the verdict.
 
 **Done when** the handoff file exists at that exact path shape, `.dadaia/.venv/bin/dadaia reports
-validate` exits 0, and (report mode) `artifact.content_hash` matches the file on disk, and for a verdict, `reports validate` exits 0 on the path `verdict.py` printed.
+validate` exits 0 on a non-verdict handoff, and (report mode) `artifact.content_hash` matches the file on disk; a verdict is done when `verdict.py` prints its path, having validated it against the reviewed tree.
 
 ## Consuming (ack-on-consume)
 
