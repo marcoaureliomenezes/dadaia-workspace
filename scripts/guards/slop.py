@@ -133,7 +133,7 @@ def _allowance(tree: Tree, hits: dict[str, str], check: str, also: str = "") -> 
 #: One pattern, one named group per id kind; the group that matched names the sub-rule.
 _GRAMMAR = re.compile(
     r"\b(?:(?P<core>(?:N?FR|AC|WP)(?:[0-9]+|-[A-Z]{0,3}[0-9]+)[a-z]?(?:[.-][A-Z]?[0-9]+[a-z]?)*"
-    r"|ADRs?[ -]?[0-9]+|TR?-[A-Z]+-[A-Z]?[0-9]+(?:-[0-9]+)?"
+    r"|ADRs?[ -]?[0-9]+|T-[0-9]{2,3}(?:-[0-9]+)?|TR?-[A-Z]+-[A-Z]?[0-9]+(?:-[0-9]+)?"
     r"|J[0-9]+\.T[0-9]+|rc-?[0-9]+|v0\.[0-9]+(?:\.[0-9]+)?|[Rr]ound [0-9]+|re-review"
     r"|P-[0-9]{2})"
     r"|(?P<staged_task_id>J[0-9]+\.S[0-9]+\.T[0-9]+)"
@@ -143,6 +143,7 @@ _GRAMMAR = re.compile(
     r"|(?P<review_label_id>[Rr]eview (?:finding [0-9]+|(?:[0-9]+ )?[FMN][0-9]+))"
     r"|(?P<plan_label_id>PLAN [A-Z]?[0-9]+(?:\.[0-9]+)*)"
     r"|(?P<grill_label_id>Grill Q[0-9]+|Q[0-9]+ ruling|[Rr]uling [A-Z][0-9]+)"
+    r"|(?P<ruling_label_id>Ruling [0-9]+)"
     r"|(?P<bug_number_id>[Bb]ugs? [0-9]{3}))\b"
 )
 _TOKEN = re.compile(r"\w(?:[\w.-]*\w)?")
