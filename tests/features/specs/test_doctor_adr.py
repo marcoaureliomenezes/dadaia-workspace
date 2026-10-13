@@ -183,7 +183,8 @@ def test_the_doctor_rule_flags_the_first_id_breaking_0001_to_n(
 def test_only_a_ruled_record_changes_an_accepted_one(
     tmp_path: Path, change: dict[str, object], expected: list[str]
 ) -> None:
-    """Every non-rejected record (born-superseded too) amending an accepted one is itself accepted with a ruling."""
+    """Every non-rejected record (born-superseded too) amending an accepted one is itself accepted
+    with a ruling."""
     specs = _ledger(tmp_path, ["0001"], **_RULED)
     ledger = specs / "ADRs" / "decisions.jsonl"
     successor = {**_VALID_RECORD, **change, "id": "0002", "amends": "0001"}

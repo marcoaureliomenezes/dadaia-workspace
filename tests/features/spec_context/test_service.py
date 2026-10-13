@@ -1,10 +1,10 @@
-"""Unit tests for SpecContextService — Bug 3 (T-BCR-04), updated for T-10b.
+"""Unit tests for SpecContextService.
 
-Bug 3: shutil.rmtree fails with PermissionError on root-owned files.
+shutil.rmtree fails with PermissionError on root-owned files.
 Fix: detect non-writable files before rmtree and raise GitSyncError with
      a descriptive message suggesting 'sudo chown'.
 
-T-10b: activate()/deactivate() removed; alive()/dead() replace them.
+activate()/deactivate() are removed; alive()/dead() replace them.
 
 CRITICAL ALIVE/DEAD state machine — alive() leaving operator specs untouched is the
 data-loss guard this file exists to keep, alongside the non-writable-files dead() fix.

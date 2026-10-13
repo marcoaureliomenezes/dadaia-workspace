@@ -1,6 +1,7 @@
 """Unit tests for the memory validator's LINT-1 mapping.
 
-LINT-1 imports ``features.specs.memory_lint`` directly. These tests exercise ``check_lint1_memory_atoms`` against REAL
+LINT-1 imports ``features.specs.memory_lint`` directly. These tests exercise
+``check_lint1_memory_atoms`` against REAL
 memory-atom fixtures written under ``tmp_path``, proving the severity mapping end to end
 through the real ``memory_lint`` implementation — never a faked subprocess result.
 
