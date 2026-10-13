@@ -356,7 +356,7 @@ def workflow_never_rules(tree: Tree) -> list[str]:
         "pypi-publisher-outside-release-yml": [
             p for p in wfs if "pypa/gh-action-pypi-publish" in text[p] and p != _RELEASE
         ],
-        # same-workflow chaining only: a second trigger would need a PAT (PLAN D8)
+        # same-workflow chaining only: a second trigger would need a PAT
         "release-event-trigger": [p for p, doc in wfs.items() if "release" in _on(doc)],
         "tag-push-trigger": [
             p

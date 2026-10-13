@@ -1,4 +1,4 @@
-"""Suite checks: what the test suite and its conftest must hold (QUALITY P-21, P-22, P-23).
+"""Suite checks: what the test suite and its conftest must hold.
 
 The session checks read the runner's one probe session, never this process; ``PROBE`` is
 this module's share of the probe file, run there under the repo conftest.
@@ -19,13 +19,13 @@ if TYPE_CHECKING:
 
     from run import Check, Session, Tree
 
-# P-23 ceilings, measured on this tree; ratchet DOWN ONLY, target 0. Lower them in the
+# Ceilings, measured on this tree; ratchet DOWN ONLY, target 0. Lower them in the
 # commit that removes an import; raising one is never a ratchet move.
 PRIVATE_IMPORT_STATEMENTS = 17
 PRIVATE_IMPORT_FILES = 16
 _ALLOW = "# allow-private-import:"
 
-# P-21: the tier table on Linux and macOS; the conftest calibrates once for Windows.
+# The tier table on Linux and macOS; the conftest calibrates once for Windows.
 TIER_SECONDS = {"small": 10, "medium": 60, "e2e": 120}
 CALIBRATION = {
     "small linux False": 10,
