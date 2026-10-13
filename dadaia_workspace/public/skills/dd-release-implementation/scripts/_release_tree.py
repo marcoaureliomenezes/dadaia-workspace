@@ -27,9 +27,11 @@ from _release_check import candidate_errors, ship_histo_findings, state_findings
 from _release_phase import NEXT
 from _release_schema import (
     CANDIDATE_DOCS,
+    CLOSURE,
     CODE,
     HISTO,
     MARK_RE,
+    MEMORY_WRITE,
     TRIO_PHASES,
     current_candidate,
     origin,
@@ -234,7 +236,8 @@ def _directory_findings(release_dir: Path, specs: Path) -> list[dict[str, Any]]:
     state = json.loads(text)
     phase, candidate = state["phase"], current_candidate(release_dir, state)
     jobs = [_findings.finding(CODE, f"{dir_rel}/{path.relative_to(release_dir).as_posix()}", 1, message, fix)
-            for path, message, fix in (candidate_errors(candidate) if candidate else [])]  # fmt: skip
+            for path, message, fix in (candidate_errors(candidate) if candidate else [])
+            if not (phase == CLOSURE and MEMORY_WRITE in message)]  # fmt: skip
     tasks = candidate / "TASKS.md" if candidate else None
     marks = list(MARK_RE.finditer(tasks.read_text("utf-8"))) if tasks and tasks.is_file() else []
     if phase not in TRIO_PHASES:

@@ -24,6 +24,8 @@ PHASES = tuple(load_schema("release-state-v1")["properties"]["phase"]["enum"])
 #: The phases in which the live candidate's SPEC, PLAN and job files are REQUIRED; the first, DEFINITION, is authoring it.
 DEFINITION, IMPLEMENTATION, CLOSURE = PHASES
 TRIO_PHASES = frozenset(PHASES[1:])
+#: What a task's error says when its `W:` names the memory tree: a CLOSURE candidate's is history.
+MEMORY_WRITE = "writes specs/memory"
 #: A release ships `delivered` — the one histo disposition this ledger writes.
 DELIVERED = "delivered"
 APPROVED = "Approved"
@@ -272,7 +274,7 @@ def current_job_writes(text: str, rel: str) -> tuple[set[str] | None, list[str]]
             errors.append(f"{rel} task {task_id} has no exact `W:` set")
         if any(p.split("/")[:2] == ["specs", "memory"] for p in paths):
             errors.append(
-                f"{rel} task {task_id} writes specs/memory — memory is closure procedure (RC-FLOW step 4)"
+                f"{rel} task {task_id} {MEMORY_WRITE} — memory is closure procedure (RC-FLOW step 4)"
             )
         authority.update(paths)
     return authority, errors
