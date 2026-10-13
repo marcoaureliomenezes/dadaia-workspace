@@ -1,4 +1,4 @@
-"""The five check verbs share one finding renderer.
+"""The five check verbs share one finding renderer and one decode-aware reader.
 Size: SMALL.
 """
 
@@ -54,3 +54,15 @@ def test_text_mode_prints_each_findings_fix_after_it(tmp_path: Path, verb: str) 
         at = next(i for i, line in enumerate(lines) if finding["message"] in line)
         assert lines[at + 1] == f"fix: {finding['fix']}"
 
+
+@pytest.mark.parametrize("verb", _VERBS)
+def test_a_file_that_is_not_utf8_is_a_finding_of_the_verbs_own_code(
+    tmp_path: Path, verb: str
+) -> None:
+    code, relative = _VERBS[verb][2], _VERBS[verb][4]
+    done = _check(tmp_path, verb, (relative, b"\xff\xfe\n"))("--json")
+
+    assert done.returncode == 1 and "Traceback" not in done.stderr
+    (finding,) = json.loads(done.stdout)
+    assert (finding["code"], finding["verdict"], finding["path"]) == (code, "error", relative)
+    assert "git" in finding["fix"] and relative in finding["fix"]
