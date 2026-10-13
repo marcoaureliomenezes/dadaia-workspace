@@ -30,7 +30,9 @@ sources:
 - Hooks are the Python package `dadaia_workspace/hooks/`, rendered into each harness's own hook format; a harness action with no pre-event would be declared `ungated` in its dialect row (one `public doctor` WARN); every harness gates its pre-tool event, so none is declared.
 - Install compares content, not existence: a differing staged hash overwrites without `--force`, which is reserved for a hand-edited projection; an operator's own keys in a shared settings file are left alone.
 - A skill is a folder projected whole to `.agents/skills/<name>/`; `.claude/skills/<name>` is a relative symlink to it, or a hash-verified copy where links are unavailable, and the install ledger records which.
+- Staging copies each skill folder as authored and nothing into it: no shared module, privacy baseline or schema is duplicated across skills. Each ledger schema lives in its writer skill's `scripts/schemas/`, and a skill script reaches a shared fact by importing the sibling `dd-bug-resolution/scripts` module that owns it, the kernel the package also loads ([[bug-ledger]]).
 - The five `agents/dd-*.md` personas stage generic and render into `.agents/agents/` with the tier alias and effort of the template `.dadaia/states/agent_model_policy.json` applies, `balanced` when absent ([[agent-orchestration]]); `public install --template <id>` saves that template before staging, an unknown id refused with exit 1; the Codex transcode fails closed on an alias `TIER_CODEX` does not map.
+- Every persona transcode reads its frontmatter through the one kernel parser, a stdlib strict subset of YAML that equals `yaml.safe_load` or refuses; a persona without a closed frontmatter block is refused, and `read_only` must be a YAML boolean.
 - `public install` refuses the dadaia-workspace source repository root unless `DADAIA_ALLOW_SOURCE_ROOT_PUBLIC_INSTALL=1`.
 
 ## Doctor
@@ -45,7 +47,7 @@ sources:
 
 - The scaffolded `specs/` tree is the canon — `AGENTS.md`, constitution, canonical and product memory, releases, backlog, bugs, audits and ADRs — stamped at `specs_pattern_version: 12`; QUALITY carries principles, test architecture and gates, with no generated bug-balance section ([[specs-migration]]).
 - The scaffold writes only absent files, each through one `O_CREAT|O_NOFOLLOW` open: an existing file or a symlinked destination is skipped, and a path escaping the tree through a symlinked parent is never written.
-- Every scoped scaffold `AGENTS.md` is the system of record of its area; no test or script pins a file's byte or line count, the one exception `behavior-map.json`'s `SKILL.md` line limits (`skill_md_line_soft`, a doctor warning, and `skill_md_line_ceiling`); `TREE-5` heals each by shipped hash, and operator-owned files are never overwritten ([[workspace-doctor]]).
+- Every scoped scaffold `AGENTS.md` is the system of record of its area; no test or script pins a file's byte or line count, the one exception the library's own `behavior-map.json` `SKILL.md` line limits (`skill_md_line_soft`, a doctor warning, and `skill_md_line_ceiling`), a map that lives beside the doctor and is never staged or projected; `TREE-5` heals each by shipped hash, and operator-owned files are never overwritten ([[workspace-doctor]]).
 - The repo template lands with `dadaia specs init`: `repo-AGENTS.md` becomes the main repo's `AGENTS.md`, names its tracked `verify:` as the sole repository verification authority, and carries no test-path, stage or task-gate declaration. Once written it is operator-owned and never overwritten.
 - A memory atom still carrying the scaffold's placeholders is `MEM-PLACEHOLDER-1` in `dadaia doctor`'s `specs` section, removed by `--fix`.
 - Consumer-repo `AGENTS.md` fan-out is gated by the canonical banner: absent creates, a stale banner is restored as `[updated]`, a bannerless file is `[foreign]` and never overwritten; a symlinked destination file is `[foreign]`.
@@ -56,4 +58,4 @@ sources:
 
 ## Dependencies
 
-[[agentic-entities]], [[pypi-distribution]], [[workspace-init]], [[workspace-doctor]], [[context-management]], [[specs-migration]], [[sdd-gate-v3]], [[consumer-agent-support]], [[harness-kimi-code]], [[agent-orchestration]].
+[[agentic-entities]], [[pypi-distribution]], [[workspace-init]], [[workspace-doctor]], [[context-management]], [[specs-migration]], [[sdd-gate-v3]], [[consumer-agent-support]], [[harness-kimi-code]], [[agent-orchestration]], [[bug-ledger]].

@@ -17,6 +17,7 @@ sources:
 - `dadaia_workspace/public/entities/registry.json` is the harness-neutral inventory of five personas, five deterministic behaviors, two abstract rules and the universal surface.
 - Persona source files and registry personas form a bijection. Wired hook entrypoints map to registered behaviors, and projected core rules map to registered rules.
 - The five behaviors are root-whitelist, SDD gate, context-memory injection, git chokepoints and workspace-level tool-cache placement. Root-whitelist and SDD gate share the pre-tool entrypoint; context injection covers session start and prompt submission; git chokepoints are repository hooks; harnesses with an environment surface point supported tool caches at `.dadaia/tmp/` ([[sdd-gate-v3]]).
+- A behavior names only its exceptions: the `dadaia_workspace.*` `modules` a hook lane runs, and `gaps`, the harnesses that cannot implement it with the reason. Coverage derives from the harness records: each harness must run one of a behavior's modules in a hook lane or be listed in its `gaps`, every `gaps` key is a harness record, every lane module is named by some behavior, and every named module resolves to a source file; any break is an `ENT-DERIVE-1` drift line.
 - Every BLOCK emits one fix line. Hook wrappers fail open when the workspace venv is absent and tell the operator how to initialize the workspace.
 - Operator-created entities are outside derivation; the registry governs what the library ships.
 
@@ -28,7 +29,7 @@ sources:
 
 ## Structural behavior map
 
-- `behavior-map.json` rows contain `section`, optional `anchor`, `skill` and `scoped_agents_md`. It carries no content hashes, recorder or date fields.
+- `behavior-map.json` and its schema `behavior-map-v1.schema.json` live in `dadaia_workspace/features/spec_context/`, the library's own data, never staged or projected. Rows contain `section`, optional `anchor`, `skill` and `scoped_agents_md`; the map carries no content hashes, recorder or date fields.
 - Every shipped skill and scoped law source appears in exactly one row; every mapped law section has an owner. Declared overlaps are explicit, standalone skills are enumerated, and skills disabled for model invocation appear in no persona grant.
 - `tests/infrastructure/test_entity_doctor.py` validates the map schema, member coverage, unique mapping, section ownership, overlap declarations, skill ceiling, persona grants, path and CLI citations, body pointers and projected-law references.
 - `dadaia public doctor` separately checks installed entity derivation and reports projection drift ([[public-asset-distribution]]).

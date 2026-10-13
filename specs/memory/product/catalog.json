@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-12T12:09:20Z",
+  "generated_at": "2026-10-13T07:31:09Z",
   "features": [
     {
       "rank": 1,
@@ -14,9 +14,10 @@
         "handoff",
         "schema"
       ],
-      "token_estimate": 536,
+      "token_estimate": 571,
       "depends_on": [
         "worktrees",
+        "release-lifecycle",
         "workspace-doctor",
         "public-asset-distribution"
       ],
@@ -41,10 +42,11 @@
         "dispatch",
         "sdd"
       ],
-      "token_estimate": 630,
+      "token_estimate": 822,
       "depends_on": [
         "worktrees",
         "release-lifecycle",
+        "bug-ledger",
         "public-asset-distribution",
         "workspace-init",
         "agentic-entities",
@@ -71,7 +73,7 @@
         "derivation",
         "governance"
       ],
-      "token_estimate": 417,
+      "token_estimate": 548,
       "depends_on": [
         "sdd-gate-v3",
         "public-asset-distribution",
@@ -128,9 +130,10 @@
         "projection",
         "privacy"
       ],
-      "token_estimate": 1141,
+      "token_estimate": 1292,
       "depends_on": [
         "agentic-entities",
+        "bug-ledger",
         "agent-orchestration",
         "workspace-init",
         "workspace-doctor",
@@ -173,7 +176,7 @@
         "release",
         "packaging"
       ],
-      "token_estimate": 1075,
+      "token_estimate": 1262,
       "depends_on": [
         "release-lifecycle",
         "QUALITY",
@@ -374,7 +377,7 @@
         "paradigm",
         "pillars"
       ],
-      "token_estimate": 487,
+      "token_estimate": 585,
       "depends_on": [
         "context-management",
         "worktrees",
@@ -406,7 +409,7 @@
         "lifecycle",
         "concurrency"
       ],
-      "token_estimate": 580,
+      "token_estimate": 585,
       "depends_on": [
         "context-management",
         "specs-migration",
@@ -491,7 +494,7 @@
         "session",
         "privacy"
       ],
-      "token_estimate": 2882,
+      "token_estimate": 3023,
       "depends_on": [
         "specs-migration",
         "workspace-doctor",
@@ -547,7 +550,7 @@
       "title": "cross-platform-portability",
       "area": "platform",
       "tldr": "Linux, macOS and Windows through one platform capability seam carrying the venv layout, Python hooks and cross-OS CI legs.",
-      "summary": "dadaia_workspace/core/platform.py is the single capability source — two flags, the venv scripts directory and the executable suffix — read by the modules that build venv paths; no port, adapter pair or file lock exists for portability.",
+      "summary": "dadaia_workspace/core/platform.py is the package's one platform seam over the kernel's one host reader — the venv scripts directory, the executable suffix and the Windows path flavor, plus the one venv-executable rule; no port, adapter pair or file lock exists for portability.",
       "path": "specs/memory/product/platform/cross-platform-portability.md",
       "tags": [
         "platform",
@@ -557,8 +560,9 @@
         "macos",
         "linux"
       ],
-      "token_estimate": 339,
+      "token_estimate": 393,
       "depends_on": [
+        "bug-ledger",
         "workspace-init",
         "sdd-gate-v3",
         "ARCHITECTURE",
@@ -642,7 +646,7 @@
         "compliance",
         "privacy"
       ],
-      "token_estimate": 2951,
+      "token_estimate": 3001,
       "depends_on": [
         "public-asset-distribution",
         "sdd-gate-v3",
@@ -749,7 +753,7 @@
         "ledger",
         "governance"
       ],
-      "token_estimate": 857,
+      "token_estimate": 903,
       "depends_on": [
         "agent-orchestration",
         "worktrees",
@@ -777,8 +781,9 @@
         "lineage",
         "resolution"
       ],
-      "token_estimate": 447,
+      "token_estimate": 644,
       "depends_on": [
+        "public-asset-distribution",
         "release-lifecycle",
         "worktrees",
         "audits-canon",
@@ -805,10 +810,11 @@
         "state",
         "closure"
       ],
-      "token_estimate": 526,
+      "token_estimate": 683,
       "depends_on": [
         "agent-orchestration",
         "worktrees",
+        "agent-comms",
         "bug-ledger",
         "backlog-ledger",
         "audits-canon",
@@ -860,7 +866,7 @@
       "title": "worktrees",
       "area": "sdd",
       "tldr": "Repository changes are isolated in canonical plain, release, task, backlog or hotfix worktrees and land by worktree.py merge after the gate for that tree shape.",
-      "summary": "The worktree grammar, recorded bases, RED/implementation separation, one reviewed job or plain-change gate, merge cleanup and closure holds.",
+      "summary": "The worktree grammar, recorded bases, RED/implementation separation, one reviewed job or plain-change gate, the preflight that runs that gate without the verdict, merge cleanup and closure holds.",
       "path": "specs/memory/product/sdd/worktrees.md",
       "tags": [
         "worktrees",
@@ -869,14 +875,14 @@
         "merge",
         "review"
       ],
-      "token_estimate": 518,
+      "token_estimate": 751,
       "depends_on": [
+        "agent-orchestration",
         "sdd-gate-v3",
         "release-lifecycle",
         "bug-ledger",
         "workspace-doctor",
-        "context-management",
-        "agent-orchestration"
+        "context-management"
       ],
       "sources": [
         "dadaia_workspace/public/skills/dd-gitflow-default/scripts/worktree.py",

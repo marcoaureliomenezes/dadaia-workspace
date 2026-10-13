@@ -19,6 +19,7 @@ sources:
 
 ## Product principles
 
+- Simplicity and lightness are the first law: the lightest solution that works wins, and a heavier one is chosen only when a lighter one was tried and failed. A requirement applied to every task or job is a gate and states its measured cost.
 - Context is explicit: a bind scopes the session to one context's repository set and injects its constitution and memory.
 - Documents are the lifecycle: backlog, approved definition, job files, release state and record stores carry progress; no workflow engine advances them.
 - Mechanical boundaries cover path class, bind scope, root hygiene and push publication. Each refusal carries one executable fix or one operator action ([[sdd-gate-v3]]).
@@ -26,6 +27,7 @@ sources:
 - Evidence is produced by the mechanism that judged the artifact and binds to the judged sha.
 - Features and fixes spend future options when they add coupling. Delivery alternates with deletion, simplification or decoupling that restores options.
 - Mechanisms without a current demand are removed, and runtime state, reports, handoffs, caches and projections stay in their canonical homes.
+- A test, or an existing assert, leaves a suite only on the operator's order; a bug fix hardens the contract test in that contract's one home.
 
 ## Two entry paths
 

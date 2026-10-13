@@ -19,12 +19,13 @@ sources:
 
 ## Lifecycle
 
-- `release.py new` creates a release or stacks the next candidate and writes the definition stub atomically.
-- `phase IMPLEMENTATION` requires approved SPEC and PLAN plus structurally valid PLAN and job files, then stamps the defined milestone.
+- `release.py new` creates a release or stacks the next candidate and writes the definition stub atomically. One rule names the next candidate, shared by `new`, the closure fence and the upgrade fold: the last `milestone` entry's candidate plus one, else the highest `rc-<N>` folder plus one, so a drafted `rc-<N>/SPEC.md` with no milestone is adopted, never skipped.
+- `release.py origin <spec>` prints the ids a SPEC's first `**Origin:**` line carries, one `<kind> <id>` per line; the backlog exit reads a pick through it.
+- `phase IMPLEMENTATION` requires approved SPEC and PLAN plus structurally valid PLAN and job files, then stamps the defined milestone; `check` and `phase` judge the PLAN DAG and the job files through one decider, so a DAG `check` admits is one `phase` admits.
 - Each behavior begins with a RED-test task and continues in a fresh source-only implementation task. Jobs merge after their one independent review and tracked repository verification ([[worktrees]]).
 - `phase CLOSURE` refuses while any canonical worktree of the repo is open except its own tree and the next candidate's `define` tree, which stays open across the closure, and stamps the implemented milestone.
 - In closure, `release.py drift` derives the memory window from the latest memory entry's `until`, otherwise the defined sha. The product pass reads every matched source diff, reconciles atoms and derived documents, generates the catalog, and records exactly one `memory` entry.
-- The closure summary carries delivered, carried and backlog-exit scope. Ledgers and git retain their own detailed evidence; closure does not reconstruct it into extra log kinds.
+- The closure summary carries delivered, carried and backlog-exit scope, plus the review-rework count `verdict.py stats <M.m.p>-rc<N>` prints (verdict sequences, verdicts, rejections, first-pass rejections) and the batch of operator-reserved acts and bug proposals ([[agent-comms]], [[agent-orchestration]]). Ledgers and git retain their own detailed evidence; closure does not reconstruct it into extra log kinds.
 
 ## Checks and shipping
 
@@ -35,4 +36,4 @@ sources:
 
 ## Dependencies
 
-[[worktrees]], [[bug-ledger]], [[backlog-ledger]], [[audits-canon]], [[workspace-doctor]], [[agent-orchestration]].
+[[worktrees]], [[bug-ledger]], [[backlog-ledger]], [[audits-canon]], [[workspace-doctor]], [[agent-orchestration]], [[agent-comms]].

@@ -22,7 +22,7 @@ sources:
 - `dadaia context bind <ctx>` selects a context and nothing else, changing only the record of the caller's environment session id; a session without a harness-native id exports `DADAIA_SESSION_ID` before it binds, or carries the binding in `DADAIA_CONTEXT`.
 - A bind carries a scope — the context's main repo plus its associated repos — and a MUTATING file-tool write into a repo outside it is refused with the bind that would allow it, an unbound session with an id owning no repo ([[sdd-gate-v3]]).
 - A repo checkout receives only merges: agents write a repo inside its worktrees and land them by `worktree.py merge`, audits aside ([[worktrees]]).
-- Context injection fires when the session record's `bound_at` is newer than that session's injection sentinel ([[context-management]]).
+- Context injection fires again when the session record's `bind_id` is not the one that session's injection sentinel recorded ([[context-management]]).
 - No phase and no mode is enforced; concurrent sessions never block each other, and overlap surfaces through git.
 
 ## Runtime state

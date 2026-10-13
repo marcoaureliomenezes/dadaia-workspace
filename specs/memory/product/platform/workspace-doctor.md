@@ -62,10 +62,10 @@ sources:
 
 ## The `ledgers` section
 
-- `BL-SCHEMA`, `BL-CONFLICT` over `BACKLOG.json` (`dadaia_workspace/features/backlog/doctor.py`); `LEDGER-ADR-SCHEMA` over `decisions.jsonl`, its fix an `Operator action:` to discard or revert the change that wrote the line, then redo it as an ADR commit.
+- `BL-SCHEMA`, `BL-CONFLICT` over `BACKLOG.json` (`dadaia_workspace/features/backlog/doctor.py`); `LEDGER-ADR-SCHEMA` over `decisions.jsonl` against `decision-record-v1` (an `accepted` record carries the operator's `ruling` words; every record from id 0247 on carries two or more `options`, each a name, trade-off and rejection reason), its fix an `Operator action:` to discard or revert the change that wrote the line, then redo it as an ADR commit.
 - Each record ledger script (`bugs.py`, `backlog.py`, `release.py`, `audit.py`) runs its own `check --specs <dir> --json`; error and warning records re-emit as `LEDGER-<NAME>-SCHEMA`, while informational trace rows remain on the owner script's direct JSON surface. A record without a fix means an older install (`<cli> public install`); a script that cannot run is a finding whose fix is `<cli> public install`.
 - Product-memory atoms are linted in the `specs` section through the shared `memory.py` grammar. The generated catalog pair is checked and rewritten by `memory.py` during the closure pass and `specs init` or `specs upgrade`; it is not a record ledger in the doctor's `ledgers` section.
-- The doctor builds no validator for a ledger schema: where it reads a ledger itself (the backlog anchors, the ADR ledger) it goes through the scripts' own reader and schema engine, `_ledger.py`, loaded from the package's copy by `infrastructure/ledger_scripts.load_owner`; it repairs no ledger.
+- The doctor builds no validator for a ledger schema: where it reads a ledger itself (the backlog anchors, the ADR ledger) it goes through the scripts' own reader and schema engine, `_ledger.py`, loaded from the packaged `dd-bug-resolution` skill script itself by `core/skill_owner.load_owner`, one module object and no copy; it repairs no ledger.
 
 ## The reaper
 

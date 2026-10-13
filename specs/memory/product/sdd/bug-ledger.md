@@ -23,11 +23,14 @@ sources:
 - `resolve` requires cause, lineage, solution and fix sha. `supersede` names the replacement; `reject` records the reason. The schema's mutability classes prevent generic update from changing transition-owned state.
 - `archive` moves named terminal records into the bug history. Open records cannot be archived.
 - Every candidate ledger is validated before atomic replacement, so a refusal leaves both live and archived bytes unchanged.
+- Every timestamp comes from the one clock; no verb takes a timestamp argument.
+- `dd-bug-resolution/scripts` also holds the kernel the other skill scripts and the package load for every shared fact: the refusal, the git runner with its scrubbed environment, the JSONL reader, the atomic writer, the frontmatter parser, the clock, the platform facts, the workspace-root walk and the privacy matcher with its baseline ([[public-asset-distribution]]).
 
 ## Resolution discipline
 
 - Read matching records and their named fixes before changing code. At most the twenty most recent surface/component matches and their fix commits belong to one fix investigation.
-- Establish the lowest-level RED behavior first, fix the owning seam, keep existing assertions, then persist the implementation sha.
+- Confirmed bugs are fixed in a batch at the candidate's bug window or at twenty registrations, whichever comes first; bugs sharing a cause are fixed together. Two failed fix attempts on one bug hand it to a fresh session with a written diagnosis.
+- Establish the lowest-level RED behavior first, then fix the owning seam. The fix hardens the contract test in that contract's one home: it tightens an assert or adds the missing partition, never loosens or removes one, and the reviewer confirms the hardened test goes red with the fix reverted; then persist the implementation sha.
 - Two prior fixes on the touched module require a REBUILD that keeps regression coverage.
 - Block-list bugs use hotfix jobs. Other confirmed bugs become explicit candidate scope; ship may carry an open id only through the exact operator authorization enforced by [[release-lifecycle]].
 - The next candidate's bug-window review owns KEEP or REBUILD maturity. No runtime balance, source-quality reconstruction or cached candidate placement lives in the ledger.
