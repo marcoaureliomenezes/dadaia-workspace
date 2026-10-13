@@ -14,7 +14,7 @@ from dadaia_workspace.core.models.doctor_report import (
     attest,
 )
 
-#: The frozen verdict table. FOREIGN is non-blocking by Ruling 16 (hand-authored
+#: The frozen verdict table. FOREIGN is non-blocking (hand-authored
 #: consumer guardrail pairs are legitimate); EXTRA blocks (residue on a managed
 #: surface is drift). Changing ANY entry is a policy decision — update this test
 #: deliberately, in its own reviewed diff.

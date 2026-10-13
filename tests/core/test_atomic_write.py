@@ -110,7 +110,7 @@ def test_no_temp_sibling_survives_any_injected_failure(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """A2.3: every combination raises, leaves no ``.tmp`` sibling, and leaves the target
+    """Every combination raises, leaves no ``.tmp`` sibling, and leaves the target
     byte-identical (or still absent)."""
     target = tmp_path / "atom.md"
     if existing:

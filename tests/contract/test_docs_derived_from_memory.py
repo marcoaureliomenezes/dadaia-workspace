@@ -70,8 +70,8 @@ def test_the_readme_sends_a_reader_to_the_docs_folder() -> None:
 
 
 def test_every_readme_link_is_absolute() -> None:
-    """PyPI renders the
-    README outside the checkout, where a relative link or image target is a dead end."""
+    """PyPI renders the README outside the checkout, where a relative link or image target is a dead
+    end."""
     readme = (_REPO_ROOT / "README.md").read_text("utf-8")
     targets = re.findall(r"\]\(([^)\s]+)", readme) + re.findall(r'(?:src|href)="([^"]+)"', readme)
     relative = [t for t in targets if not re.match(r"(?:https?:|mailto:|#)", t)]
@@ -162,8 +162,7 @@ def _onboarding_texts() -> list[Path]:
 
 
 def test_no_onboarding_text_claims_offline_operation() -> None:
-    """`init`
-    resolves its dependencies from PyPI, so no surface may call it offline."""
+    """`init` resolves its dependencies from PyPI, so no surface may call it offline."""
     violations = [
         f"{path.relative_to(_REPO_ROOT).as_posix()}:{number}: claims offline operation"
         for path in _onboarding_texts()
@@ -174,8 +173,7 @@ def test_no_onboarding_text_claims_offline_operation() -> None:
 
 
 def test_no_onboarding_text_cites_a_retired_create_flag() -> None:
-    """`context
-    create` takes `--main-repo <url>` and repeatable `--associated-repo <url>`; a cited
+    """`context create` takes `--main-repo <url>` and repeatable `--associated-repo <url>`; a cited
     `--url` or `--associated-repos` exits 2."""
     violations = [
         f"{path.relative_to(_REPO_ROOT).as_posix()}:{number}: `{match.group(0).strip()}`"

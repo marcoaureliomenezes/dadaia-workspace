@@ -46,8 +46,7 @@ def test_missing_delimiter_is_named_as_missing_delimiter_not_invalid_yaml() -> N
 
 
 def test_invalid_yaml_in_a_present_block_names_the_line_never_the_delimiter() -> None:
-    """An unquoted
-    scalar containing ': ' breaks the YAML on line 2 of the block; the block itself
+    """An unquoted scalar containing ': ' breaks the YAML on line 2 of the block; the block itself
     IS present, so the diagnostic must never claim it is missing."""
     text = "---\nslug: x\ntldr: Two-tier memory: 17 principles\n---\n\nBody.\n"
 

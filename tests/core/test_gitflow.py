@@ -65,7 +65,7 @@ def test_from_mapping_reads_the_block_keys_and_maps_their_roles() -> None:
         {"principal": "a.lock", "integration": "develop", "work": "feature/"},
         {"principal": 7, "integration": "develop", "work": "feature/"},
         {"principal": "release", "integration": "develop", "work": "release/"},  # nests
-        {"principal": "main", "integration": "rel", "work": "rel/v"},  # nests (C9)
+        {"principal": "main", "integration": "rel", "work": "rel/v"},  # nests
         "main",
     ],
 )

@@ -44,7 +44,7 @@ def test_associated_repos_defaults_empty_and_is_ordered() -> None:
 
 
 def test_all_repos_zero_associated_yields_only_main() -> None:
-    """A15.2 (model half): zero associated repos == behaviourally just the main repo."""
+    """Zero associated repos == behaviourally just the main repo."""
     ctx = _ctx()
     assert ctx.all_repos() == (AssociatedRepo(slug="alpha", url="https://github.com/org/alpha"),)
 

@@ -1,5 +1,5 @@
-"""K1 ("One Invocation") + F002 (20260830 audit): ``core.session_store``
-owns the session-binding record — its path, schema, liveness rule and stale selection."""
+"""``core.session_store`` owns the session-binding record — its path, schema, liveness rule and
+stale selection."""
 
 from __future__ import annotations
 
@@ -102,7 +102,7 @@ def test_live_session_and_stale_records_select_by_the_same_rule(tmp_path: Path) 
 
 
 def test_gc_check_assembly_has_one_home() -> None:
-    """F002: no module hand-builds the ``gc_check`` liveness input outside session_store."""
+    """No module hand-builds the ``gc_check`` liveness input outside session_store."""
     import dadaia_workspace
 
     pkg_root = Path(dadaia_workspace.__file__).parent

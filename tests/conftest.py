@@ -1,6 +1,6 @@
 """Root conftest.py — workspace-level pytest fixtures.
 
-TR-3 (T-GOS-A4): repo-root write-backstop guard.
+Repo-root write-backstop guard.
 
 This fixture captures the set of entries present in specific protected directories
 at the lib repo root BEFORE each test and asserts that no NEW entries have appeared

@@ -1,6 +1,5 @@
-"""core/release_state exposes
-the state file's name and the id grammars only; no package module outside the release script validates a state
-document. Size: SMALL.
+"""core/release_state exposes the state file's name and the id grammars only; no package module
+outside the release script validates a state document. Size: SMALL.
 """
 
 from __future__ import annotations

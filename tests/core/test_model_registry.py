@@ -1,6 +1,6 @@
 """Unit tests for ``core.model_registry`` — the one module answering which model an
 agent gets: templates name a tier by alias, ``TIER_CODEX`` maps alias to Codex id, the
-D-3 effort clamp, and ``resolve_agent_model`` (applied template > ``balanced`` default).
+effort clamp, and ``resolve_agent_model`` (applied template > ``balanced`` default).
 Agents and cells come from ``TEMPLATES`` and ``CORE_AGENTS``, never roster literals.
 """
 

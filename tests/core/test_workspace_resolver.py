@@ -133,7 +133,7 @@ def test_explicit_workspace_is_authoritative_and_must_be_initialized(tmp_path: P
     other = _make_full_workspace(tmp_path / "other_ws")
     assert resolve_cli_workspace_root(other) == other.resolve()
 
-    # A partial .dadaia/ (sub-repo shape, no sentinel) is refused naming the dir (#S7).
+    # A partial .dadaia/ (sub-repo shape, no sentinel) is refused naming the dir.
     sub_repo = _make_partial_dadaia(existing_ws / "repos", "my-service")
     with pytest.raises(WorkspaceNotInitializedError) as partial:
         resolve_cli_workspace_root(sub_repo)

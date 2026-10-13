@@ -114,7 +114,7 @@ def test_resolve_session_id_precedence(env: dict[str, str], expected: str) -> No
 def test_context_name_for_repo_slug_maps_main_associated_and_legacy_repo_field(
     tmp_path: Path,
 ) -> None:
-    """A16.4: a main slug maps to its context name, an associated slug to its OWNING context;
+    """A main slug maps to its context name, an associated slug to its OWNING context;
     a legacy ``repo`` field still maps."""
     ws = _mk_ws(tmp_path, _ctx("beta-repo", "alpha-context"), _ctx("other", None, "assoc-repo"))
     assert invocation.context_name_for_repo_slug(ws, "beta-repo") == "alpha-context"
@@ -177,7 +177,7 @@ def test_resolve_specs_dir_refuses_a_symlinked_explicit_root(tmp_path: Path) -> 
 
 
 class TestAliveContextNames:
-    """F008 (20260830 audit): the registry read family has ONE home — invocation."""
+    """The registry read family has ONE home — invocation."""
 
     def test_alive_filter_yields_context_names(self, tmp_path: Path) -> None:
         """Only ALIVE entries (case-insensitive) yield their name."""
