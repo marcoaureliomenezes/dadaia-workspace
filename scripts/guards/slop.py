@@ -1,10 +1,10 @@
-"""Slop checks: the package's slop checks (V32, V37-V41), the doctor section subset,
-the suppressed layering-edge cap (ARCHITECTURE P-10) and no file-size pin.
+"""Slop checks: the package's slop checks (``v32``, ``v37`` to ``v41``), the doctor section
+subset, the suppressed layering-edge cap and no file-size pin.
 
-``ALLOWANCES`` (V38-V39) is data each check reads from the tree's own copy of this file, so
-a plant edits it like any tracked file. A row is ``<check>[*] <key> <value>``: ``*`` marks a
-key there at birth (the allowance only shrinks); a value is ``parity:<test file>``, an open
-bug id, ``report-only`` (v39) or ``-`` (a birth key no longer allowed).
+``ALLOWANCES`` (``v38``, ``v39``) is data each check reads from the tree's own copy of this
+file, so a plant edits it like any tracked file. A row is ``<check>[*] <key> <value>``: ``*``
+marks a key there at birth (the allowance only shrinks); a value is ``parity:<test file>``, an
+open bug id, ``report-only`` (v39) or ``-`` (a birth key no longer allowed).
 """
 
 from __future__ import annotations
@@ -132,18 +132,19 @@ def _allowance(tree: Tree, hits: dict[str, str], check: str, also: str = "") -> 
 
 #: One pattern, one named group per id kind; the group that matched names the sub-rule.
 _GRAMMAR = re.compile(
-    r"\b(?:(?P<core>FR-?[A-Z]?[0-9]+(?:-[0-9]+)*|AC[0-9]+(?:\.[0-9]+)*|ADR[ -]?[0-9]+"
-    r"|T-(?:[0-9]{2,3}[a-z]?|[A-Z]+-[0-9]+)(?:-[0-9]+)?|J[0-9]+\.T[0-9]+|rc-?[0-9]+"
-    r"|v0\.[0-9]+(?:\.[0-9]+)?|[0-9]{8}-[a-z0-9-]+-F[0-9]{3}|[Rr]ound [0-9]+|re-review)"
+    r"\b(?:(?P<core>(?:N?FR|AC|WP)(?:[0-9]+|-[A-Z]{0,3}[0-9]+)[a-z]?(?:[.-][A-Z]?[0-9]+[a-z]?)*"
+    r"|ADRs?[ -]?[0-9]+|TR?-(?:[0-9]{1,3}[a-z]?|[A-Z]+-[A-Z]?[0-9]+)(?:-[0-9]+)?"
+    r"|J[0-9]+\.T[0-9]+|rc-?[0-9]+|v0\.[0-9]+(?:\.[0-9]+)?|[Rr]ound [0-9]+|re-review"
+    r"|P-[0-9]{2}|CP[0-9])"
     r"|(?P<staged_task_id>J[0-9]+\.S[0-9]+\.T[0-9]+)"
-    r"|(?P<review_finding_id>(?i:review (?:finding [0-9]+|[FH][0-9]+)))"
-    r"|(?P<wave_ac_id>AC-[A-Z0-9]+(?:-[0-9]+)*)"
-    r"|(?P<finding_number_id>F-[0-9]+)"
-    r"|(?P<bug_number_id>[Bb]ugs? [0-9]+)"
-    r"|(?P<bug_slug_id>[Bb]ug:? [a-z0-9]+(?:-[a-z0-9]+){2,})"
-    r"|(?P<wave_label_id>W[0-9]+-[0-9]+)"
-    r"|(?P<grill_label_id>Grill Q[0-9]+|Q[0-9]+ ruling)"
-    r"|(?P<release_label_id>K[0-9]+ \(release))\b"
+    r"|(?P<ac_number_id>A[0-9]+\.[0-9]+)"
+    r"|(?P<audit_finding_id>F-[0-9]+|F0[0-9]{2}|[0-9]{8}(?:-[a-z][a-z0-9-]*| audit))"
+    r"|(?P<review_label_id>[Rr]eview (?:finding [0-9]+|(?:[0-9]+ )?[FHMN][0-9]+))"
+    r"|(?P<plan_label_id>PLAN [A-Z]?[0-9]+(?:\.[0-9]+)*)"
+    r"|(?P<grill_label_id>Grill Q[0-9]+|Q[0-9]+ ruling|[Rr]uling [A-Z]?[0-9]+)"
+    r"|(?P<bug_number_id>[Bb]ugs? [0-9]{3}))\b"
+    r"|^\W*(?P<leading_label_id>[A-GI-Z]-?[0-9]{1,2}(?:\.[0-9]+)*(?:[:,\u2014]| \())"
+    r"|(?P<marked_label_id>[(#][A-GI-KM-SU-Z][0-9]{1,2}\b)"
 )
 _TOKEN = re.compile(r"\w(?:[\w.-]*\w)?")
 _DOC_OWNERS = (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)
@@ -349,7 +350,7 @@ def _edges(text: str) -> list[tuple[str, str]]:
 
 
 def ignore_cap(tree: Tree) -> list[str]:
-    """P-10: the suppressed edges equal the cap, under the cross-feature contract, from features."""
+    """The suppressed edges equal the cap, under the cross-feature contract, from features."""
     edges = _edges(tree.read("setup.cfg"))
     out = (
         [f"edge-cap: {len(edges)} ignored edges != {IGNORE_EDGES}"]
