@@ -25,6 +25,7 @@ import ast
 import inspect
 import io
 import json
+import os
 import re
 import subprocess
 import sys
@@ -36,9 +37,6 @@ from pathlib import Path
 from coverage import CoverageData
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT))
-from dadaia_workspace.core.skill_owner import load_owner  # noqa: E402
-
 CAP = 3
 _COMPARE = {"<": "<=", "<=": "<", ">": ">=", ">=": ">", "==": "!=", "!=": "=="}
 _ARITH = {"+": "-", "-": "+", "*": "+"}
@@ -228,7 +226,7 @@ def main() -> None:
         if args.module
         else changed_lines(_run("git", "diff", "-U0", "--no-color", args.base).stdout)
     )
-    env = load_owner("dd-bug-resolution", "_git").scrubbed_env()
+    env = {**os.environ, "PYTHONDONTWRITEBYTECODE": "1"}
     killed = total = 0
     ran: set[str] = set()
     kills: dict[str, set[int]] = {}
