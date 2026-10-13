@@ -182,8 +182,8 @@ def test_entry_with_a_dead_pid_is_stale_before_its_ttl(tmp_path: Path) -> None:
 
 
 def test_a_concurrent_load_never_reads_a_half_written_registry(tmp_path: Path) -> None:
-    """Interleaved save
-    and load never raise JSONDecodeError (a load raising it fails the reader thread)."""
+    """Interleaved save and load never raise JSONDecodeError (a load raising it fails the reader
+    thread)."""
     import threading
 
     module = _load_module()

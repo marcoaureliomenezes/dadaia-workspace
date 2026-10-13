@@ -383,7 +383,7 @@ def test_a_definition_finding_stamps_the_commit_that_touched_the_trio(
     commits after it stay inside the memory window `defined.sha` opens."""
     root, specs, _ = _memory_repo(tmp_path, script)
     trio = _git(root, "log", "-1", "--format=%h", "--", "specs/releases/0.5.0/rc-1/SPEC.md")
-    _release(specs, "0.5.0")  # DEFINITION, `[x]` T-1; the trio's bytes unchanged
+    _release(specs, "0.5.0")  # DEFINITION with its task ticked; the trio's bytes unchanged
     (root / "dadaia_workspace/features/alpha/core.py").write_text("x = 3\n", encoding="utf-8")
     _git(root, "commit", "-qam", "implementation after the trio")
     fixes = [
@@ -677,8 +677,8 @@ def test_memory_refuses_any_phase_but_closure(script: Path, tmp_path: Path) -> N
 def test_check_is_clean_when_a_source_moves_after_the_memory_entry(
     script: Path, tmp_path: Path
 ) -> None:
-    """Memory references
-    the code, never repeats it — a commit after the entry leaves check clean."""
+    """Memory references the code, never repeats it — a commit after the entry leaves check
+    clean."""
     specs = _reconciled_closure(tmp_path, script)
     root = specs.parent
     _git(root, "commit", "-qam", "memory entry")
@@ -694,8 +694,8 @@ def test_check_is_clean_when_a_source_moves_after_the_memory_entry(
 
 
 def test_ship_refuses_what_check_refuses_and_touches_nothing(script: Path, tmp_path: Path) -> None:
-    """A CLOSURE
-    with no memory entry — `ship` exits 1 with `check`'s message and fix, nothing written."""
+    """A CLOSURE with no memory entry — `ship` exits 1 with `check`'s message and fix, nothing
+    written."""
     specs = _specs(tmp_path)
     _release(specs, "0.5.0", phase="CLOSURE")
     before = _tree_hash(specs)
