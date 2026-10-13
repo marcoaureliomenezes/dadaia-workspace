@@ -199,7 +199,8 @@ def test_merge_needs_a_valid_approval_of_the_exact_head(
     head = git(root / TREE, "rev-parse", "HEAD").strip()
     assert result.returncode == 1 and head in result.stderr
     cli = str(cli_path(root))
-    assert _argv(result) == [cli, "reports", "validate", str(target)]
+    expected = [cli, "reports", "validate", str(target)]
+    assert _argv(result) == expected + (["--reviewed-root", str(root / TREE)] if named else [])
     assert git(root / "repos/r", "rev-parse", "feature/0.5.0").strip() != head
 
 
