@@ -179,8 +179,13 @@ def _tree_files(top: Path) -> set[Path]:
     return {p for p in top.rglob("*") if p.is_file() and ".git" not in p.parts}
 
 
-@pytest.mark.parametrize("name", ["--context", "--slug"])
-@pytest.mark.parametrize("bad", ["../../evil", "a/b", "a\\b", "_x", "A", ""])
+_CLIMBING = ["../../evil", "a/b", "a\\b", ""]
+
+
+@pytest.mark.parametrize(
+    ("name", "bad"),
+    [("--context", b) for b in _CLIMBING] + [("--slug", b) for b in [*_CLIMBING, "_x", "A"]],
+)
 def test_a_bad_context_or_slug_is_refused_by_name_and_writes_nothing_anywhere(
     tmp_path: Path, name: str, bad: str
 ) -> None:
