@@ -55,7 +55,7 @@ def _run(script: Path, *argv: str) -> subprocess.CompletedProcess[str]:
 def test_catalog_generate_byte_reproduces_the_committed_catalog_and_index(
     script: Path, specs: Path
 ) -> None:
-    """regenerating this repo's committed pair in a
+    """Regenerating this repo's committed pair in a
     checkout folder named otherwise changes not one byte — the property `git status`
     measures after the verb runs."""
     product = specs / "memory" / "product"
@@ -109,7 +109,7 @@ def test_catalog_generate_preserves_non_catalog_sections_verbatim(
 def test_check_passes_in_a_checkout_folder_not_named_after_the_repo(
     script: Path, specs: Path
 ) -> None:
-    """the committed pair checked from
+    """The committed pair checked from
     a folder named anything but the repo is in sync (exit 0), and carries no folder name."""
     result = _run(script, "check", "--specs", str(specs))
 
@@ -120,7 +120,7 @@ def test_check_passes_in_a_checkout_folder_not_named_after_the_repo(
 
 
 def test_check_ignores_frontmatter_the_library_lint_owns(script: Path, specs: Path) -> None:
-    """a tldr over the schema ceiling is LINT-1's
+    """A tldr over the schema ceiling is LINT-1's
     finding over the one grammar's dict; `check` reports only the generated pair."""
     assert _run(script, "check", "--specs", str(specs)).returncode == 0
 
@@ -169,7 +169,7 @@ def test_check_flags_an_index_that_drifted_from_the_atoms(script: Path, specs: P
 def test_a_drifted_pair_names_the_generator_as_its_fix(
     script: Path, specs: Path, tmp_path: Path
 ) -> None:
-    """a catalog written by an older generator (it carried `context`) is
+    """A catalog written by an older generator (it carried `context`) is
     drift whose fix regenerates the pair by its absolute specs path, from any directory."""
     catalog = specs / "memory" / "product" / "catalog.json"
     document = {"context": "old-folder", **json.loads(catalog.read_text(encoding="utf-8"))}
@@ -215,7 +215,7 @@ def test_generate_check_and_lint1_reach_one_verdict_per_atom(
 
 
 def test_every_committed_atom_parses_to_the_dict_safe_load_reads() -> None:
-    """the atoms' grammar is the kernel owner; the committed tree parses to what
+    """The atoms' grammar is the kernel owner; the committed tree parses to what
     `yaml.safe_load` reads from each block."""
     import yaml
 

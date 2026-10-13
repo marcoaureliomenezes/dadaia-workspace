@@ -30,7 +30,7 @@ _PUBLIC_SKILLS = _PKG / "public" / "skills"
 def test_cli_line_and_the_scripts_render_one_argv_as_one_line(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """ADR 0159's pinned pair: one argv through ``core/cli_line`` and the scripts' ``_specs``
+    """One argv through ``core/cli_line`` and the scripts' ``_specs``
     renders one line — a blank, a quote and a ``$`` included, the head's too."""
     monkeypatch.setattr("sys.executable", str(tmp_path / "Program Files (x86)" / "python"))
     loader = importlib.util.spec_from_file_location(
@@ -103,7 +103,7 @@ def _cli_command(tokens: list[str]) -> Any:
 
 def _tracked_dirs() -> frozenset[str]:
     """Every tracked directory — git's answer, never the working tree's, which differs
-    between a local checkout and CI's (0.4.7 c8 review MEDIUM-3)."""
+    between a local checkout and CI's."""
     listed = subprocess.run(["git", "-C", str(_REPO_ROOT), "ls-files", "-z"],
                             capture_output=True, text=True, check=True, timeout=60).stdout  # fmt: skip
     return frozenset(
@@ -126,8 +126,7 @@ _KNOWN_DIRS = _tracked_dirs() | _canon_dirs()
 
 
 def _unresolved_paths(command: str) -> list[str]:
-    """Every unquoted path token (a slash, no root list to go stale — 0.4.7 c8 review
-    MEDIUM-3; a ``--flag=value`` carries it in the value) whose directory is neither
+    """Every unquoted path token (a slash, no root list to go stale; a ``--flag=value`` carries it in the value) whose directory is neither
     tracked here nor guaranteed by the specs canon: a fix creates, edits or deletes its
     leaf, so only the directory holding it must exist."""
     lexer = shlex.shlex(command, posix=False)
@@ -148,10 +147,9 @@ def _unresolved_paths(command: str) -> list[str]:
 
 @pytest.mark.parametrize(("codes", "command"), _FIX_LINES, ids=[c for c, _ in _FIX_LINES])
 def test_every_doctor_fix_target_resolves_on_disk(codes: str, command: str) -> None:
-    """0.4.7 c8 review F7, bug backlog-doctor-fix-names-missing-update-verb, AC4.4: no
-    ``<…>``; every path token resolves to a directory this repo tracks or the specs canon
+    """No ``<…>``; every path token resolves to a directory this repo tracks or the specs canon
     guarantees; a ``dadaia`` fix walks the live command tree to a leaf; a skill-script fix
-    (sa-fix-lines-not-built-by-cli-line#S8) runs the venv interpreter and a shipped script
+    runs the venv interpreter and a shipped script
     by absolute path, whose subcommand takes ``--help``."""
     assert not _defect(command) and "<specs>" not in command, command
     assert _unresolved_paths(command) == [], f"{codes}: {command!r}"
@@ -191,7 +189,7 @@ _SCRIPT_MODULES = sorted(_PUBLIC_SKILLS.glob("*/scripts/*.py"))
     "module", _SCRIPT_MODULES, ids=[f"{m.parts[-3]}/{m.name}" for m in _SCRIPT_MODULES]
 )
 def test_every_script_fix_line_names_its_folders_entry_script(module: Path) -> None:
-    """0.4.7 review fold (F3): every `fix:` literal naming a `.py` file, and every `SCRIPT`
+    """Every `fix:` literal naming a `.py` file, and every `SCRIPT`
     constant a `Refusal` fix is built from, names its folder's entry script — never a sibling
     module with no ``__main__`` (an un-runnable fix is a Stall)."""
     entry = _ENTRY_SCRIPTS[module.parts[-3]]
@@ -207,15 +205,15 @@ def test_every_script_fix_line_names_its_folders_entry_script(module: Path) -> N
 
 #: A fix callee: a `cli_line` builder's or a fix producer's arguments are fix text.
 _FIX_CALL_RE = re.compile(r"(_line|_fix|^script)$")
-#: A hand-built CLI spelling in a fix (sa-fix-lines-not-built-by-cli-line, ADR 0045).
+#: A hand-built CLI spelling in a fix.
 _SPELLING = re.compile(r"\.dadaia[/\\]\.venv|(?<![\w./-])dadaia\s|shlex\.")
 _HAND_BUILT = {"DADAIA_BIN", "cli_path"}
 #: A fix's positional index in a constructor no `def` declares (onboarding `Step`, `Refusal`,
 #: and `_ledger.finding`, which re-exports the kernel's `_findings.finding`).
 _FIX_CTORS = {"Step": 3, "Refusal": 1, "_ledger.finding": 4}
-#: B1's other fix positions: a value bound to, or returned by, a `fix`-named name.
+#: The other fix positions: a value bound to, or returned by, a `fix`-named name.
 _FIX_NAME = re.compile(r"(?i)(?:^|_)fix(?:es)?(?:$|_)")
-#: A builder spelling a command inside error prose with no `fix:` line (PLAN §2.8 not-sites).
+#: A builder spelling a command inside error prose with no `fix:` line.
 #: Keyed on the stripped source line, never its number: a refactor above it moves the line.
 _PROSE = {
     ("dadaia_workspace/cli/_specs_resolution.py",
@@ -382,7 +380,7 @@ def _code_sites(trees: dict[str, ast.Module]) -> list[str]:
     return sorted(filter(_not_prose, sites))
 
 
-#: AC4.8: a command line spelling the CLI — a code span or a fenced line naming it.
+#: A command line spelling the CLI — a code span or a fenced line naming it.
 _CODE_SPAN = re.compile(r"`([^`\n]+)`")
 _CLI_WORDS = re.compile(r"(?:^|(?<=[\s(]))(\S*(?<![\w-])dadaia)(?![\w.-])((?: [^\s|;&`]+)*)")
 
@@ -404,18 +402,17 @@ def _bad_command(text: str) -> bool:
     return False
 
 
-#: Dead law words: retired release verbs, rc-N, bug-resolve-law-names-flags-the-script-does-not-have
+#: Dead law words: retired release verbs and retired release-candidate shapes.
 _DEAD_RELEASE_VOCABULARY = re.compile(r"rc-archive|release\.py (fold|archive)|rc-N|resolve` carrying")  # fmt: skip
-#: `memory.py check` decides only the generated catalog pair; LINT-1 owns the atoms (bug
-#: memory-done-criterion-names-a-script-that-never-validates-atoms).
+#: `memory.py check` decides only the generated catalog pair; LINT-1 owns the atoms.
 _NON_AUTHORITY_DONE = re.compile(r"memory\.py check`? exit 0")
 
 
 def _text_rows(rel: str) -> list[Callable[[str], object]]:
     """The scans a tracked text file's lines take, by where it ships: the law (the shipped
     surface, product memory, the glossary) names no retired verb; what ships names no
-    `memory.py check` done criterion; consumer guidance no library toolchain (AC4.7);
-    `public/**/*.md` command lines spell the live CLI (AC4.8); a script's git fix goes through
+    `memory.py check` done criterion; consumer guidance no library toolchain;
+    `public/**/*.md` command lines spell the live CLI; a script's git fix goes through
     `_specs.git_line`, never a hand-spelled unquoted `git -C {…}`."""
     rows: list[Callable[[str], object]] = []
     if rel.startswith(("dadaia_workspace/public/", "specs/memory/")) or rel == "CONTEXT.md":
@@ -446,10 +443,9 @@ def _text_sites(texts: dict[str, str]) -> list[str]:
 
 
 def test_no_fix_or_shipped_line_bypasses_the_one_renderer() -> None:
-    """AC4.1, AC4.4 (DEL fix-lines-are-not-one-runnable-command, ADR
-    0158), AC4.7, AC4.8, sa-fix-lines-not-built-by-cli-line#S1: one walk over every package
+    """One walk over every package
     module and `public/skills` script, every doctor rule's `rule_fix`, and every tracked
-    law, docs and shipped text file (bug law-file-scan-reads-untracked-bytecode)."""
+    law, docs and shipped text file."""
     listed = subprocess.run(["git", "ls-files", "-z", "--", "dadaia_workspace", "specs/memory",
                              "CONTEXT.md", "docs"], cwd=_REPO_ROOT, capture_output=True,
                             text=True, check=True).stdout.split("\0")  # fmt: skip

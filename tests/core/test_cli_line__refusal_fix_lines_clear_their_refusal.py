@@ -1,14 +1,13 @@
-"""0.5.0 c3 re-review (C1, H1-H4, M1): every refusal of the pre-push
+"""Every refusal of the pre-push
 gate (`ci push-gate-check`), `context baseline` and `context dead` prints ONE fix line
 that, executed verbatim, clears the refusal.
 
 The doctor has this harness (``test_doctor_fix_lines_clear_their_finding.py``); these
-three verbs did not, and their fix lines failed review round after round, one site at a
-time. Each case below builds the triggering state over ``file://`` remotes and hits the
+three verbs did not, and their fix lines failed one site at a time. Each case below builds the triggering state over ``file://`` remotes and hits the
 refusal: a push-gate case feeds the ref lines git hands its hook to an in-process
 ``ci push-gate-check`` (80 columns, no TTY); a baseline/alive/dead case runs the real
 command as a child process. It takes the single ``fix:`` line and runs it with ``sh -c`` —
-an ``Operator action:`` line is played by the case's *operator* instead (ADR 0158) — and
+an ``Operator action:`` line is played by the case's *operator* instead — and
 runs the real command (the real push through the shipped hook) again. One line without a TTY — every family prints through
 ``cli/_fail.fail`` — is proven on a real child by
 :func:`test_every_fix_line_prints_on_one_line_without_a_tty`. Progress rule:
@@ -355,7 +354,7 @@ def _seeded(world: World) -> None:
 
 
 def _outside(world: World, published: bool = True) -> str:
-    """Review H-C (P4): the refused ref is not the checked-out one."""
+    """The refused ref is not the checked-out one."""
     if published:
         _published(world)
     world.commit("notes.md", "n\n", branch="topic")
@@ -364,7 +363,7 @@ def _outside(world: World, published: bool = True) -> str:
 
 
 def _outside_with_work(world: World) -> str:
-    """Review 5 M2: the live work branch exists and has DIVERGED from the refused ref — a
+    """The live work branch exists and has DIVERGED from the refused ref — a
     fast-forward cannot carry it; the switch + merge does."""
     _published(world)
     world.commit("w.md", "w\n", branch="feature/0.1.0")
@@ -423,7 +422,7 @@ def _malformed(world: World) -> str:
 
 
 def _work(world: World) -> str:
-    """The live work branch by the ONE rule (sa-live-work-branch-named-three-ways)."""
+    """The live work branch by the ONE rule."""
     return work_branch(world.repo / "specs", DEFAULT)
 
 
@@ -458,18 +457,18 @@ def _clean_publish(world: World) -> None:
 
 
 def _denylisted_not_checked_out(world: World) -> str:
-    """Review 5 H1 (P2): HEAD is `main`; the refused branch must be switched to first."""
+    """HEAD is `main`; the refused branch must be switched to first."""
     command = _denylisted(world)
     world.git(world.repo, "checkout", "-q", "main")
     return command
 
 
-#: H1: the operator's edit happens on the refused branch, after the switch.
+#: The operator's edit happens on the refused branch, after the switch.
 _CLEAN_COMMIT_PUSH = f"printf 'a b\\n' > notes.md && {_COMMIT_PUSH}"
 
 
 def _denylisted_advanced_integration(world: World) -> str:
-    """Review 5 H2 (P3): origin's integration moved on after this work was cut."""
+    """Origin's integration moved on after this work was cut."""
     _published(world)
     world.deny()
     world.commit("mine.md", "m\n", branch="feature/1.0.0")
@@ -511,7 +510,7 @@ def _no_junk(world: World) -> None:
 
 
 def _denylisted_in_a_worktree(world: World) -> str:
-    """Review H-B (P10): the pushing repo is a worktree under repos/<slug>/."""
+    """The pushing repo is a worktree under repos/<slug>/."""
     _published(world)
     world.deny()
     wt = world.repo / ".claude" / "worktrees" / "agent-x"
@@ -533,7 +532,7 @@ def _worktree_clean(world: World) -> None:
 
 
 def _denylisted_no_context(world: World) -> str:
-    """Review deferred LOW (P6): no context owns the pushing repo — the fix adopts it,
+    """No context owns the pushing repo — the fix adopts it,
     never a `<context>` placeholder."""
     command = _denylisted(world)
     JsonContextStore(world.ws / ".dadaia" / "states").delete("proj")
@@ -573,7 +572,7 @@ def _baseline_denylisted(world: World) -> list[str]:
     world.deny()
     (world.repo / "AGENTS.md").write_text(f"a {_TERM}\n", encoding="utf-8")
     # Committed before the publish, so only the gate sees it: the in-process preflight
-    # (AC5.6) refuses an untracked onboarding file first (_require_publishable#0).
+    # refuses an untracked onboarding file first.
     world.git(world.repo, "add", "AGENTS.md")
     world.git(world.repo, "commit", "-qm", "draft")
     return ["context", "baseline", "proj"]
@@ -631,13 +630,12 @@ def _advance_origin_work(world: World) -> None:
 
 
 def _no_checkout(world: World) -> list[str]:
-    """Review M-A (P7a)."""
     _seeded(world)
     return ["context", "baseline", "proj"]
 
 
 def _draft_principal_absent(world: World) -> list[str]:
-    """S11 (SA-H3-3, design review C3/C6): origin publishes `main` under a malformed block;
+    """Origin publishes `main` under a malformed block;
     the draft names `trunk` — the one origin candidate is the fix's principal."""
     world.seed("---\nspecs_pattern_version: 7\ngitflow: {principal: main\n---\n# c\n", "main")
     world.clone()
@@ -646,14 +644,13 @@ def _draft_principal_absent(world: World) -> list[str]:
 
 
 def _never_onboarded(world: World) -> list[str]:
-    """Design review C1 / AC4.5: no constitution on disk — the fix is onboarding's specs step."""
+    """No constitution on disk — the fix is onboarding's specs step."""
     world.seed(None)
     world.clone()
     return ["context", "baseline", "proj"]
 
 
 def _unknown_context(world: World) -> list[str]:
-    """Review M-A (P7c)."""
     _seeded(world)
     JsonContextStore(world.ws / ".dadaia" / "states").delete("proj")
     return ["context", "baseline", "proj"]
@@ -747,7 +744,7 @@ def _dead_via_work(world: World) -> None:
 
 
 def _associated_on_integration(world: World) -> list[str]:
-    """Review M4: an associated repo has no specs/ — its work branch is the main repo's."""
+    """An associated repo has no specs/ — its work branch is the main repo's."""
     _released(world)
     world.git(world.repo, "checkout", "-q", "-b", "feature/1.0.0", "origin/develop")
     world.git(world.repo, "push", "-q", "-u", "origin", "feature/1.0.0")
@@ -770,7 +767,7 @@ def _associated_on_integration(world: World) -> list[str]:
 
 
 def _associated_dead(world: World) -> None:
-    """dead-holds-main-repo-before-associated-push: every repo pushed before any is held."""
+    """Every repo is pushed before any is held."""
     assert "feature/1.0.0" in world.git(world.tmp / "lib.git", "branch")
     assert not world.repo.exists() and not (world.ws / "repos" / "lib").exists()
 
@@ -783,10 +780,10 @@ def _dead_denylisted(world: World) -> list[str]:
 
 
 def _unpushed_side_branch(world: World) -> list[str]:
-    """sa-context-dead-removes-repos-outside-the-reaper#C3: a local branch other than HEAD's
-    carries a commit origin lacks; unrecoverable-fix-line-pushes-a-wt-branch-the-pre-push-refuses:
+    """A local branch other than HEAD's
+    carries a commit origin lacks:
     a non-work branch the gate refuses to push — already archived once, then advanced
-    (ADR 0120: one archive tag per tip, never a collision)."""
+    (one archive tag per tip, never a collision)."""
     _published(world)
     world.git(world.repo, "checkout", "-q", "-b", "wt/0.5.0a", "origin/develop")
     world.commit("notes.md", "n\n")
@@ -798,7 +795,7 @@ def _unpushed_side_branch(world: World) -> list[str]:
 
 
 def _stashed(world: World) -> list[str]:
-    """context-dead-secret-fix-line-stashes-what-dead-then-destroys: a stash entry dies with
+    """A stash entry dies with
     the clone."""
     _on_work(world)
     (world.repo / "README.md").write_text("edited\n", encoding="utf-8")
@@ -813,7 +810,7 @@ def _play_stash_act(world: World) -> None:
 
 
 def _dead_twice(world: World) -> list[str]:
-    """Review M-A: dead on a DEAD context."""
+    """Dead on a DEAD context."""
     _seeded(world)
     store = JsonContextStore(world.ws / ".dadaia" / "states")
     store.update(
@@ -825,7 +822,7 @@ def _dead_twice(world: World) -> list[str]:
 
 
 def _dead_clean_detached(world: World) -> list[str]:
-    """Review LOW (P8): a clean published detached HEAD has nothing to push."""
+    """A clean published detached HEAD has nothing to push."""
     _published(world)
     world.git(world.repo, "checkout", "-q", "--detach", "origin/main")
     return ["context", "dead", "proj"]
@@ -1022,7 +1019,7 @@ def test_dead_leaves_a_clean_published_detached_head(world: World) -> None:
 
 
 def test_dead_pushes_an_associated_repo_while_its_main_repo_is_absent(world: World) -> None:
-    """pre-push-gate-crashes-when-owner-main-repo-absent: dead's preflight reads the gitflow
+    """Dead's preflight reads the gitflow
     through the same reader — an absent main repo is the default, never a traceback."""
     _associated_on_integration(world)
     world.git(world.ws / "repos" / "lib", "checkout", "-q", "-b", "feature/1.0.0")
@@ -1038,7 +1035,7 @@ def test_the_fix_line_clears_the_refusal(case: Case, world: World) -> None:
 
 
 def test_a_repaired_custom_gitflow_publishes_end_to_end(world: World) -> None:
-    """C1 (r3-typo): on an empty origin the draft constitution names non-default branches —
+    """On an empty origin the draft constitution names non-default branches —
     baseline publishes under those names, the shipped gate admitting every push."""
     world.clone()
     world.onboard(_constitution("trunk", "stage", "rel/"))
@@ -1070,7 +1067,7 @@ def test_every_fix_line_prints_on_one_line_without_a_tty(tmp_path: Path) -> None
 def test_the_gate_is_read_only_and_its_rewrite_fix_uncommits_only_unpublished_work(
     world: World,
 ) -> None:
-    """R13 rule 3 / review 5 H2: the denylist refusal's fix uncommits the refused ref's own
+    """The denylist refusal's fix uncommits the refused ref's own
     unpublished range, down to its oldest unpublished commit (N3) — never a squash of
     published history, never a publish verb that rewrites."""
     command = _denylisted(world)
@@ -1083,7 +1080,7 @@ def test_the_gate_is_read_only_and_its_rewrite_fix_uncommits_only_unpublished_wo
 def test_a_denylisted_tag_from_a_detached_head_on_an_empty_origin_prints_no_command(
     world: World,
 ) -> None:
-    """Review 5 C1 (P1): the range reaches a root commit and the ref is a tag — the refusal
+    """The range reaches a root commit and the ref is a tag — the refusal
     names the operator action, prints no command, and the repo stays a repo."""
     world.clone()
     world.deny()
@@ -1103,7 +1100,7 @@ def test_a_denylisted_tag_from_a_detached_head_on_an_empty_origin_prints_no_comm
 def test_dead_on_a_non_fast_forward_carries_gits_own_text_and_removes_nothing(
     world: World,
 ) -> None:
-    """Review 5 H6: no pull fix row leads dead into a conflicted merge it would commit and
+    """No pull fix row leads dead into a conflicted merge it would commit and
     push — git's own text stands alone; the checkout stays."""
     _on_work(world)
     _advance_origin_work(world)
@@ -1119,7 +1116,7 @@ def test_dead_on_a_non_fast_forward_carries_gits_own_text_and_removes_nothing(
 def test_a_refused_baseline_push_names_the_anchor_and_the_publish_as_the_next_step(
     world: World,
 ) -> None:
-    """Design review C7 / C2: the gate refuses baseline's push — the refusal keeps the gate's
+    """The gate refuses baseline's push — the refusal keeps the gate's
     one fix (reset to the oldest unpublished commit) and names the anchor and the publish
     as the step after the amend (a hand push would drop origin's merge parent)."""
     done = _hit(world, _baseline_denylisted(world))
@@ -1132,7 +1129,7 @@ def test_a_refused_baseline_push_names_the_anchor_and_the_publish_as_the_next_st
 def test_dead_after_the_operator_pulls_into_a_conflict_publishes_no_markers(
     world: World,
 ) -> None:
-    """Review 6 H6 (R7): the operator follows git's own `git pull` hint into a conflict;
+    """The operator follows git's own `git pull` hint into a conflict;
     the unmerged file is a dirty checkout dead refuses — nothing published, the checkout kept."""
     _on_work(world)
     _advance_origin_work(world)

@@ -1235,7 +1235,7 @@ def _plant_stray_dotfile(root: Path) -> None:
 
 
 def _plant_orphan_wt(root: Path) -> None:
-    """An unmerged orphan: `wt/0.5.0-rc1/j1` carries a task merge and has no tree."""
+    """An unmerged orphan: a job branch carries a task merge and has no tree."""
     repo, tree = root / "repos/r", root / "worktrees/r/0.5.0-rc1/j1"
     task = root / "worktrees/r/0.5.0-rc1/j1--t1"
     worktree_ws.git(repo, "checkout", "-q", "feature/0.5.0")

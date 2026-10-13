@@ -182,7 +182,7 @@ def test_drift_requires_since_and_resolves_no_window_itself(script: Path, repo: 
 def test_a_bound_head_does_not_reach_refuses_as_a_clean_clone_would(
     script: Path, repo: Path, orphaned: str
 ) -> None:
-    """a rebased-away sha still in the object
+    """A rebased-away sha still in the object
     store is refused by the one decider every verb calls, as a single-branch clone (which
     lacks it) refuses it."""
     base = _git(repo, "rev-parse", "HEAD")
@@ -210,7 +210,7 @@ def test_a_bound_head_does_not_reach_refuses_as_a_clean_clone_would(
 def test_a_bound_a_shallow_clone_holds_beyond_its_cut_names_the_cut_not_a_rebase(
     script: Path, repo: Path, tmp_path: Path
 ) -> None:
-    """a shallow clone that fetched an
+    """A shallow clone that fetched an
     older bound by sha holds it, yet HEAD does not reach it through the cut history; the
     refusal names the cut and its fix line, never a rebase."""
     older = _git(repo, "rev-parse", "HEAD")
@@ -292,7 +292,7 @@ def _release_drift(script: Path, repo: Path, state: dict[str, object]) -> dict[s
 
 
 def test_the_closure_window_opens_at_the_live_release_defined_sha(script: Path, repo: Path) -> None:
-    """the closure
+    """The closure
     worklist is asked with no sha; with no memory entry the window opens at defined.sha."""
     base = _git(repo, "rev-parse", "HEAD")
     (repo / "dadaia_workspace" / "features" / "alpha" / "core.py").write_text("x = 2\n", "utf-8")
@@ -305,7 +305,7 @@ def test_the_closure_window_opens_at_the_live_release_defined_sha(script: Path, 
 
 
 def test_the_closure_window_opens_at_the_last_memory_entry_until(script: Path, repo: Path) -> None:
-    """a recorded
+    """A recorded
     `kind: memory` entry moves the window start to its `until`."""
     base = _git(repo, "rev-parse", "HEAD")
     (repo / "README.md").write_text("later\n", "utf-8")
@@ -329,7 +329,7 @@ def test_the_closure_window_opens_at_the_last_memory_entry_until(script: Path, r
 def test_any_tracked_file_makes_its_directory_a_unit(
     script: Path, repo: Path, path: str, unit: str | None
 ) -> None:
-    """no language list — a `.c` dir is a unit; a unit is a directory, so a
+    """No language list — a `.c` dir is a unit; a unit is a directory, so a
     root-level file or one under a dot-dir is never listed."""
     (repo / path).parent.mkdir(parents=True, exist_ok=True)
     (repo / path).write_text("z = 1\n", "utf-8")
@@ -348,7 +348,7 @@ def test_any_tracked_file_makes_its_directory_a_unit(
 def test_drift_in_repo_a_answers_for_a_under_a_foreign_git_dir(
     script: Path, repo: Path, tmp_path: Path
 ) -> None:
-    """GIT_DIR and GIT_WORK_TREE both on repo B (GIT_DIR alone
+    """The navigator runner: GIT_DIR and GIT_WORK_TREE both on repo B (GIT_DIR alone
     lets git take the cwd as the work tree and pass by accident); the window of A still reads A."""
     base = _git(repo, "rev-parse", "HEAD")
     (repo / "dadaia_workspace" / "features" / "alpha" / "core.py").write_text("x = 2\n", "utf-8")

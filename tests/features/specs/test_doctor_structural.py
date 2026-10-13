@@ -1,4 +1,4 @@
-"""upgrade-never-refreshes-uncustomised-scoped-law-projection: TREE-5 tells a stale SHIPPED projection (bytes equal a version we published: refresh is
+"""TREE-5 tells a stale SHIPPED projection (bytes equal a version we published: refresh is
 lossless) from operator customisation (bytes we never shipped: never overwritten).
 """
 
@@ -55,8 +55,7 @@ _CUSTOMISED = "# AGENTS\n\nOur own workflow contract, hand-written.\n"
 def test_tree5_refreshes_only_bytes_we_shipped(
     tmp_path: Path, agents_md: str, history: bool, fixable: bool
 ) -> None:
-    """sa-specs-init-writes-unrendered-law#B38-3 sa-specs-init-writes-unrendered-law#B38-5:
-    TREE-5 is fixable only when the on-disk bytes are a recorded shipped version; ``fix()``
+    """TREE-5 is fixable only when the on-disk bytes are a recorded shipped version; ``fix()``
     then writes the RENDERED law, otherwise it leaves the file byte-identical."""
     templates = tmp_path / "templates"
     templates.mkdir()
@@ -79,7 +78,7 @@ def test_tree5_refreshes_only_bytes_we_shipped(
 
 
 def test_shipped_history_records_the_current_canonical_template(tmp_path: Path) -> None:
-    """sa-specs-init-writes-unrendered-law#B38-4: the history records the digest of what `specs init` writes (the
+    """The history records the digest of what `specs init` writes (the
     rendered law) and keeps the raw template an older init wrote as ours."""
     specs = tmp_path / "specs"
     canon.scaffold(specs, project_name="p")
@@ -88,8 +87,7 @@ def test_shipped_history_records_the_current_canonical_template(tmp_path: Path) 
     assert was_shipped(_CANONICAL_TEXT, "specs-AGENTS.md", _REAL_TEMPLATES_DIR)
 
 
-# T-053-15 (bug releases-agents-projection-stale-vs-scaffold-source): the same history
-# covers every scoped scaffold law file (memory/ since 0.4.7 FR6).
+# The same history covers every scoped scaffold law file.
 
 _SCOPED_STALE = "# specs/releases/ — old era\n\nRELEASE.jsonl append-only event log.\n"
 _SCOPED_CANONICAL = "# specs/releases/ — Release Rules\n\nRELEASE.json is one mutable doc.\n"

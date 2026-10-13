@@ -1,6 +1,4 @@
-"""``scripts/ci.py --changed`` over a temporary git repo (never the checkout): AC10.1.
-
-Owner: dd-sw-engineer-sr (J6.T1; J6.T3 implements ``scripts/ci.py`` and ``scripts/impact.py``).
+"""``scripts/ci.py --changed`` over a temporary git repo (never the checkout).
 
 Design choices the implementation must satisfy:
 

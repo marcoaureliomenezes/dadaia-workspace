@@ -1,5 +1,5 @@
-"""sa-release-json-validated-three-times: `release.py check` is the ONE
-release validator (ADR 0077); the doctor delegates to it. Size: SMALL (script subprocess
+"""`release.py check` is the ONE
+release validator; the doctor delegates to it. Size: SMALL (script subprocess
 over tmp trees; the repo's own tree once).
 """
 
@@ -74,7 +74,7 @@ def test_closure_memory_record_is_judged_by_the_script(
     tmp_path: Path, phase: str, log: list[Any], expected: str | None
 ) -> None:
     """A memory entry stamped at or after implemented.ts exists; its fix names the real
-    script and --specs, and no placeholder (ADR 0158)."""
+    script and --specs, and no placeholder."""
     specs = _specs(tmp_path, phase, log)
     record = [f for f in _check(specs) if "`kind: memory`" in f["message"]]
     fix = f"Operator action: run `{sys.executable} {_SCRIPT} memory --specs {specs.resolve()}` "
@@ -114,8 +114,8 @@ def test_the_repos_own_release_tree_checks_clean() -> None:
 
 
 def test_a_legacy_next_dir_is_not_live_and_new_refuses(tmp_path: Path) -> None:
-    """sa-release-json-validated-three-times#B3: `next/` is not live; `new` refuses while
-    `check` is red (ADR 0077), and doctor and script name the same non-canon `next`."""
+    """`next/` is not live; `new` refuses while
+    `check` is red, and doctor and script name the same non-canon `next`."""
     specs = _specs(tmp_path, "DEFINITION", [], rid="next")
     result = _run("new", "0.6.0", "--specs", str(specs))
     assert result.returncode == 1 and "next" in result.stderr

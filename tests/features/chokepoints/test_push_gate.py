@@ -275,7 +275,7 @@ def test_a_ledger_verb_outside_the_workspace_loads_the_pre_push_terms(
 
 @pytest.mark.parametrize("scenario", ["denylisted-blob", "malformed-stdin", "unreadable-objects"])
 def test_no_refusal_advertises_a_way_around_the_gate(repo: PushRepo, scenario: str) -> None:
-    """Every refusal ends in its one fix line and names no bypass (ADR 0158)."""
+    """Every refusal ends in its one fix line and names no bypass."""
     sha = repo.commit({"x.md": f"{_TERM}\n"})
     kw: dict[str, Any] = {"denylist_terms": _TERMS}
     if scenario == "malformed-stdin":
@@ -289,7 +289,7 @@ def test_no_refusal_advertises_a_way_around_the_gate(repo: PushRepo, scenario: s
 
 
 def test_no_refusal_advertises_a_way_around_the_gate_single_case(repo: PushRepo) -> None:
-    """A refusal ends in its one fix line and names no bypass (ADR 0158)."""
+    """A refusal ends in its one fix line and names no bypass."""
     sha = repo.commit({"x.md": f"{_TERM}\n"})
     source = _Raising(GitObjectReadError("stream desynchronised"))
     decision = _decide(repo, _branch(sha), denylist_terms=_TERMS, source=source)

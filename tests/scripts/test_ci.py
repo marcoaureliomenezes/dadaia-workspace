@@ -192,7 +192,7 @@ def test_pushes_use_linux_and_pull_requests_use_the_full_matrix() -> None:
 def test_documented_coverage_line_leaves_no_coverage_file_in_the_checkout(
     tmp_path: Path, doc: str
 ) -> None:
-    """AC2.1: on CI, the doc's own ``pytest --cov`` line, run in a git checkout, leaves no
+    """On CI, the doc's own ``pytest --cov`` line, run in a git checkout, leaves no
     coverage file there (tracked, untracked or ignored)."""
     line = next(
         ln for ln in (_REPO / doc).read_text(encoding="utf-8").splitlines()

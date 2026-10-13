@@ -1,6 +1,6 @@
 """SpecsDoctor structural checks: one row per code (fires or silent).
 
-A release dir's name is TREE-8's (sa-release-dir-placement-judged-by-tree8-and-spec-doc-027)."""
+A release dir's name is TREE-8's."""
 
 from __future__ import annotations
 
@@ -253,7 +253,7 @@ def test_tree5_drift_is_reported_never_auto_repaired(tmp_path: Path) -> None:
 
 
 def test_one_defect_one_code_missing_active_artifact(tmp_path: Path) -> None:
-    """F005: trio presence has ONE home, `release.py check`; the specs section reports
+    """Trio presence has ONE home, `release.py check`; the specs section reports
     nothing for a missing PLAN.md and fix never creates it."""
     specs = _make_clean_specs_tree(tmp_path)
     plan = specs / "releases" / "1.2.3" / "rc-1" / "PLAN.md"

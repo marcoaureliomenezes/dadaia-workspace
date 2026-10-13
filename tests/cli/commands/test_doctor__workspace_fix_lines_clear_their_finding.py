@@ -56,7 +56,7 @@ def _parse(stdout: str, scope: tuple[str, ...]) -> list[dict[str, str]]:
 
 
 def _run_from_elsewhere(root: Path, fix: str) -> None:
-    elsewhere = root / "repos" / "alpha"  # WP-17 #S2: a fix runs from any cwd
+    elsewhere = root / "repos" / "alpha"  # a fix runs from any cwd
     elsewhere.mkdir(parents=True, exist_ok=True)
     ran = run_bash(fix, cwd=elsewhere, env=_env())
     assert ran.returncode == 0, ran.stdout + ran.stderr
@@ -84,8 +84,7 @@ _LEDGER_ROWS = [
 def test_an_invalid_ledger_line_is_one_operator_action(
     tmp_path: Path, code: str, rel: str, committed: str, bad: str, where: int | str
 ) -> None:
-    """AC4.5, sa-unfixable-doctor-findings-say-doctor-fix#S1: an
-    invalid line is ONE finding whose fix is ADR 0158's `Operator action:` naming the
+    """An invalid line is ONE finding whose fix is an `Operator action:` naming the
     file, where in it, and the ledger's law; uncommitted content is discarded, else the
     commit that introduced it is reverted — never a hand edit."""
     subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)  # noqa: S603, S607
@@ -126,7 +125,7 @@ def _bugs(tmp_path: Path, *records: dict[str, object]) -> str:
 
 
 def test_a_dangling_caused_by_is_cleared_by_bugs_update(tmp_path: Path) -> None:
-    """AC4.5: a line a governance verb clears takes that verb with real
+    """A line a governance verb clears takes that verb with real
     values; run from elsewhere, `bugs.py update <id> --set caused_by=none` clears it."""
     fix = _bugs(tmp_path, {**_RECORD, "caused_by": "a-ghost"})
     assert " update a-bug --set caused_by=none --specs " in fix, fix
@@ -137,7 +136,7 @@ def test_a_dangling_caused_by_is_cleared_by_bugs_update(tmp_path: Path) -> None:
 
 
 def test_a_caused_by_cycle_is_an_operator_decision(tmp_path: Path) -> None:
-    """AC4.5 (operator ruling 2026-10-02): which link of a cycle is wrong
+    """Which link of a cycle is wrong
     is a judgement; the fix names the cycle's records and the law, and sets no value."""
     fix = _bugs(
         tmp_path,
@@ -203,10 +202,10 @@ def _plant_long_skill(ws: Path) -> str:
     return "SKILL-MD-LENGTH"
 
 
-#: Every code this module proves: cleared by its printed fix, or an operator action (V39).
+#: Every code this module proves: cleared by its printed fix, or an operator action .
 WORKSPACE_PLANTS = {
     **dict.fromkeys(code for code, *_ in _LEDGER_ROWS),
-    "WS-ENTRY": _plant_root_slop,  # the fixable sub-rule (S5)
+    "WS-ENTRY": _plant_root_slop,  # the fixable sub-rule
     "HOOKS-DRIFT-1": _plant_drifted_hook,
     "PROJECTION": _plant_disarmed_gate,
     "SKILL-MD-LENGTH": _plant_long_skill,
@@ -216,7 +215,7 @@ WORKSPACE_PLANTS = {
 @pytest.mark.skipif(sys.platform == "win32", reason="the stub CLI is a POSIX shell script")
 @pytest.mark.parametrize("plant", [_plant_root_slop, _plant_drifted_hook, _plant_disarmed_gate])
 def test_a_workspace_finding_is_cleared_by_its_printed_fix(tmp_path: Path, plant: object) -> None:
-    """sa-unfixable-doctor-findings-say-doctor-fix#S2 — in an initialized tmp
+    """In an initialized tmp
     workspace the printed fix, run from repos/alpha, clears the workspace finding."""
     ws = _workspace(tmp_path)
     code = plant(ws)  # type: ignore[operator]
@@ -227,7 +226,7 @@ def test_a_workspace_finding_is_cleared_by_its_printed_fix(tmp_path: Path, plant
 
 @pytest.mark.skipif(sys.platform == "win32", reason="the stub CLI is a POSIX shell script")
 def test_a_long_skill_md_is_a_warning_naming_its_file(tmp_path: Path) -> None:
-    """ADR 0170: the real doctor run prints one non-error SKILL-MD-LENGTH whose
+    """The real doctor run prints one non-error SKILL-MD-LENGTH whose
     `Operator action:` names the projected SKILL.md."""
     ws = _workspace(tmp_path)
     code = _plant_long_skill(ws)
@@ -238,7 +237,7 @@ def test_a_long_skill_md_is_a_warning_naming_its_file(tmp_path: Path) -> None:
 
 @pytest.mark.skipif(sys.platform == "win32", reason="the stub CLI is a POSIX shell script")
 def test_a_deleted_hook_is_reported_absent_and_its_fix_restores_it(tmp_path: Path) -> None:
-    """AC5.1: delete a projected hook; the finding says absent, and its printed fix, run,
+    """Delete a projected hook; the finding says absent, and its printed fix, run,
     restores the hook byte for byte and clears the finding."""
     from dadaia_workspace.core import workspace_layout
 
