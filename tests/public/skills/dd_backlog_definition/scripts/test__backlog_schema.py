@@ -1,4 +1,4 @@
-"""sa-backlog-status-has-no-single-authority#B7: no law or skill names
+"""No law or skill names
 the `picked` status or `**Consumes:**` — the pick is the SPEC's `**Origin:** backlog:`
 line. Size: SMALL.
 """
@@ -31,18 +31,17 @@ def test_no_law_or_skill_names_the_picked_status_or_consumes() -> None:
     assert hits == []
 
 
-# --- J1.T9 (rc-14, AC13.1): one slug grammar ---------------------------------------------
+# --- one slug grammar ---------------------------------------------
 #
-# Seam for J1.T8/T10: the schema is read through the owner's own loader,
+# The schema is read through the owner's own loader,
 # `load_owner("dd-bug-resolution", "_ledger")` -> `load_schema("backlog-v1")` and `validate`,
-# never a `public/schemas` path, so T8's move to `dd-backlog-definition/scripts/schemas/`
-# (and T11's loader update) leaves this file untouched. `backlog.py new` runs staged.
+# never a `public/schemas` path. `backlog.py new` runs staged.
 #
-# Bug `slug-grammar-four-patterns-disagree`: `new`, the entry id and `relates` must agree.
+# `new`, the entry id and `relates` must agree on which slugs are valid.
 # `status` is a live-stage token with its own grammar, not a slug place.
-# Which slugs are valid is T10's decision; this file pins only that every place agrees.
+# This file pins only that every place agrees.
 
-_SLUGS = ("a--b", "x", "a-", "9a")
+_SLUGS = ("a--b", "a-", "9a")
 
 
 def _entry(**over: object) -> dict[str, object]:

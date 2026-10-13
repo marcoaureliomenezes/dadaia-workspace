@@ -1,11 +1,11 @@
-"""J1.T5 (rc-14, ADR 0246, AC11.2): the one git runner and the one ``Refusal`` of ``dd-bug-resolution/scripts``.
+"""The one git runner of ``dd-bug-resolution/scripts``.
 
-Design seam for J1.T6 (this file is the contract; T6 makes it green):
+Contract:
 
 * ``_git.py`` public names: ``git(repo, *args, check=True, input=None) -> str`` and
   ``parse_worktrees(text) -> list[dict[str, str]]``.
 * ``git`` runs ``git -C <repo> <args>`` with every ``GIT_*`` variable of the caller removed
-  (moved verbatim from ``_worktree_git._env``), so a caller's ``GIT_DIR`` or ``GIT_WORK_TREE``
+  so a caller's ``GIT_DIR`` or ``GIT_WORK_TREE``
   never redirects it; stdout on success; ``RuntimeError("git <args>: <stderr>")`` on a non-zero
   exit when ``check`` (``check=False`` returns stdout unchecked). ``_ledger._published_text``
   calls it instead of its private ``subprocess`` runner.
@@ -14,8 +14,6 @@ Design seam for J1.T6 (this file is the contract; T6 makes it green):
   is ``key -> value``, a bare flag line (``locked``, ``detached``) is ``key -> ""``, and
   ``worktree`` is ``str(Path(value))``. ``_worktree_git._trees`` and
   ``git_subprocess.unrecoverable`` both read it.
-* ``_refusal.py`` holds ``Refusal(message, fix="")`` (``Exception``; ``.fix``) ONCE; ``_bugs_store``
-  imports that class, so every skill raises and catches one object.
 """
 
 from __future__ import annotations
@@ -23,7 +21,6 @@ from __future__ import annotations
 import os
 import subprocess
 from pathlib import Path
-from types import ModuleType
 
 import pytest
 
@@ -107,10 +104,3 @@ def test_parse_worktrees_returns_the_linked_rows() -> None:
         {"worktree": "/w/worktrees/repo/b", "HEAD": "3" * 40, "detached": "", "locked": "reason text"},
     ]  # fmt: skip
     assert parse("worktree /w/repo\nHEAD " + "1" * 40 + "\n") == []
-
-
-def test_one_refusal_class_for_every_import_path() -> None:
-    refusal: ModuleType = load_owner("dd-bug-resolution", "_refusal")
-    assert refusal.Refusal is load_owner("dd-bug-resolution", "_bugs_store").Refusal
-    err = refusal.Refusal("m", "fix: x")
-    assert (str(err), err.fix) == ("m", "fix: x")

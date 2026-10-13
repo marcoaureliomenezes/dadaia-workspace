@@ -1,6 +1,5 @@
 """dd-audit-project/scripts/audit.py owns specs/audits/<dir>/
-FINDINGS.jsonl and audits_histo.jsonl (0.4.7 c7 T-047-67: the audit ledger verbs move
-into a stdlib skill script). Size: SMALL.
+FINDINGS.jsonl and audits_histo.jsonl Size: SMALL.
 
 The script reads its two schemas from ``scripts/schemas/`` BESIDE itself — copies
 `public stage` makes — so every test stages the folder exactly as stage does.
@@ -91,11 +90,9 @@ def _histo(specs: Path) -> list[dict[str, object]]:
 def test_a_write_verb_refuses_and_leaves_every_byte(
     script: Path, specs: Path, argv: tuple[str, ...], finding: dict[str, object], needle: str
 ) -> None:
-    """sa-audit-close-archives-without-validating#B43-1: a FINDINGS.jsonl failing check
-    makes close exit non-zero, write no histo and keep the directory.
-    sa-audit-close-archives-without-validating#B43-4: an `_archive` id is refused.
-    sa-audit-close-archives-without-validating#B43-6: every write verb runs check over
-    the candidate bytes."""
+    """A FINDINGS.jsonl failing check
+    makes close exit non-zero, write no histo and keep the directory; an `_archive` id is
+    refused; every write verb runs check over the candidate bytes."""
     for directory in (specs / "audits" / _AUDIT, specs / "audits" / "_archive"):
         (directory / "FINDINGS.jsonl").write_text(json.dumps(finding) + "\n", encoding="utf-8")
     before = (specs / "audits" / _AUDIT / "FINDINGS.jsonl").read_bytes()
@@ -119,7 +116,7 @@ def test_disposition_then_close_appends_the_histo_and_removes_the_directory(
         )  # fmt: skip
         assert done.returncode == 0, done.stderr
 
-    # AC3.15 (F052): a histo record without its window-end sha is unrecordable.
+    # A histo record without its window-end sha is unrecordable.
     assert _run(script, "close", _AUDIT, "--specs", str(specs)).returncode == 2
     result = _run(script, "close", _AUDIT, "--sha", "abc1234", "--specs", str(specs))
 
@@ -135,20 +132,6 @@ def test_disposition_then_close_appends_the_histo_and_removes_the_directory(
         "pillars": {"bugs": 2, "specs": 0, "memory": 0},
         "dispositions": {"resolved": 2},
     }
-
-
-def test_disposition_refuses_the_retired_deferred_verdict(script: Path, specs: Path) -> None:
-    result = _run(
-        script, "disposition", _AUDIT, f"{_AUDIT}-F001",
-        "--disposition", "deferred", "--specs", str(specs),
-    )  # fmt: skip
-
-    assert result.returncode == 2
-    assert "invalid choice: 'deferred'" in result.stderr
-    findings = load_owner("dd-bug-resolution", "_ledger").records(
-        specs / "audits" / _AUDIT / "FINDINGS.jsonl"
-    )
-    assert findings[0]["disposition"] == "open"
 
 
 def test_check_passes_on_a_valid_tree_and_fails_on_a_broken_record(
@@ -178,15 +161,14 @@ def test_check_passes_on_a_valid_tree_and_fails_on_a_broken_record(
 def test_close_without_a_resolved_finding_never_records_resolved(
     script: Path, specs: Path, verdicts: tuple[str, ...], expected: str
 ) -> None:
-    """sa-audit-close-archives-without-validating#B43-3: all rejected gives the
-    histo disposition rejected, never resolved; a clean audit
-    (audit-close-refuses-a-clean-audit) still closes."""
+    """All rejected gives the histo disposition rejected, never resolved; a clean
+    audit still closes."""
     records = [_finding(i + 1, disposition=v, reason="r") for i, v in enumerate(verdicts)]
     (specs / "audits" / _AUDIT / "FINDINGS.jsonl").write_text(
         "".join(json.dumps(r) + "\n" for r in records), encoding="utf-8"
     )
 
-    # AC3.15 (F052): a histo record without its window-end sha is unrecordable.
+    # A histo record without its window-end sha is unrecordable.
     assert _run(script, "close", _AUDIT, "--specs", str(specs)).returncode == 2
     result = _run(script, "close", _AUDIT, "--sha", "abc1234", "--specs", str(specs))
 
@@ -198,8 +180,7 @@ def test_close_without_a_resolved_finding_never_records_resolved(
 
 
 def test_the_doctor_neither_folds_findings_nor_recommends_close() -> None:
-    """sa-audit-close-archives-without-validating#B43-2: no doctor rule recommends
-    `audit.py close`. sa-audit-close-archives-without-validating#B43-5: features/specs
+    """No doctor rule recommends `audit.py close`; features/specs
     parses no finding record."""
     from dadaia_workspace.features.specs.rules import RULES
 

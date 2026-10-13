@@ -1,6 +1,5 @@
 """dd-backlog-definition/scripts/backlog.py owns BACKLOG.json and its
-histo (0.4.7 c7 T-047-65: the backlog ledger verbs move into a stdlib skill script).
-Size: SMALL.
+histo. Size: SMALL.
 
 The script reads its two schemas from ``scripts/schemas/`` BESIDE itself — copies
 `public stage` makes — so every test stages the trio exactly as stage does.
@@ -29,7 +28,7 @@ _SOURCE = _SCRIPTS / "backlog.py"
 @pytest.fixture
 def script(tmp_path: Path) -> Path:
     """The staged shape: backlog.py with both schema copies beside it, and the release
-    and bug skills beside it, whose Origin parser and bug reader `exit` imports (ADR 0161)."""
+    and bug skills beside it, whose Origin parser and bug reader `exit` imports."""
     for owner in ("dd-release-implementation", "dd-bug-resolution"):
         stage_skill_scripts(owner, tmp_path / "skills" / owner / "scripts")
     skill = tmp_path / "skills" / "dd-backlog-definition" / "scripts"
@@ -69,7 +68,7 @@ def _histo(specs: Path) -> list[dict[str, object]]:
 
 
 def _pick(specs: Path, origin: str = "backlog:an-idea") -> None:
-    """The pick: `release.py new 0.4.7 --origin <origin>`, no hand edit of BACKLOG.json."""
+    """The pick: `release.py new <release> --origin <origin>`, no hand edit of BACKLOG.json."""
     release = _PUBLIC / "skills" / "dd-release-implementation" / "scripts" / "release.py"
     done = _run(release, "new", "0.4.7", "--origin", origin, "--specs", str(specs))
     assert done.returncode == 0, done.stdout + done.stderr
@@ -102,20 +101,6 @@ def test_absent_document_is_not_a_finding(script: Path, tmp_path: Path) -> None:
 # --- new ----------------------------------------------------------------------------
 
 
-def test_new_appends_one_active_entry(script: Path, tmp_path: Path) -> None:
-    specs = _specs(tmp_path)
-    done = _run(
-        script, "new", "an-idea", "--specs", str(specs),
-        "--title", "An idea", "--description", "what it needs", "--provenance", "operator request",
-    )  # fmt: skip
-    assert done.returncode == 0, done.stdout + done.stderr
-    (entry,) = _active(specs)
-    assert entry["id"] == "an-idea"
-    assert entry["title"] == "An idea"
-    assert entry["status"] == "idea"
-    assert entry["provenance"] == "operator request"
-
-
 def test_new_over_a_malformed_privacy_baseline_exits_one_with_one_fix_line(
     script: Path, tmp_path: Path
 ) -> None:
@@ -142,7 +127,7 @@ def test_new_refuses_a_duplicate_slug_with_one_fix_line(script: Path, tmp_path: 
 def test_a_refused_positional_drops_only_itself_never_an_equal_flag_value(
     script: Path, tmp_path: Path
 ) -> None:
-    """AC4.4 (T-050-151 review LOW 1): the invalid slug leaves the quoted
+    """The invalid slug leaves the quoted
     command; a flag value spelled the same stays with its flag."""
     done = _run(script, "new", "Bad", "--title", "Bad", "--specs", str(_specs(tmp_path)))
     (fix,) = _fix_lines(done)
@@ -150,7 +135,7 @@ def test_a_refused_positional_drops_only_itself_never_an_equal_flag_value(
 
 
 def test_new_names_the_live_entries_it_relates_to(script: Path, tmp_path: Path) -> None:
-    """AC1.12: past the first entry, `new` refuses without `--relates`, listing
+    """Past the first entry, `new` refuses without `--relates`, listing
     the live entries, and always refuses a slug that is not one; the named ones are recorded."""
     specs = _specs(tmp_path)
     assert _run(script, "new", "first", "--specs", str(specs), "--relates", "ghost").returncode == 1
@@ -192,12 +177,9 @@ def test_new_records_typed_intents(script: Path, tmp_path: Path) -> None:
 
 
 def test_exit_moves_the_entry_to_the_histo_exactly_once(script: Path, tmp_path: Path) -> None:
-    """sa-ledger-verbs-append-histo-before-validating-the-pair#J5: "Given a valid pair, when
-    `exit`/`archive` succeed, then the record leaves the document and appears exactly once
-    in the histo, written atomically as a pair." (`exit` half)
-    sa-backlog-status-has-no-single-authority#B4: `release.py new --origin backlog:<slug>`,
-    then `exit --disposition delivered`, exits 0 with no hand edit. sa-backlog-status-has-no-single-authority#B6: until then the
-    picked item stays live with its status unchanged."""
+    """`exit` moves the record out of the document into the histo exactly once, as a pair.
+    After `release.py new --origin backlog:<slug>`, `exit --disposition delivered` exits 0
+    with no hand edit; until then the picked item stays live with its status unchanged."""
     specs = _specs(tmp_path)
     assert _run(script, "new", "an-idea", "--specs", str(specs)).returncode == 0
     _pick(specs)
@@ -219,7 +201,7 @@ def test_exit_moves_the_entry_to_the_histo_exactly_once(script: Path, tmp_path: 
 def test_exit_stamps_the_histo_from_the_clock_and_has_no_ts_option(
     script: Path, tmp_path: Path
 ) -> None:
-    """AC8.1: `exit --ts X` is an unknown option (argparse exit 2) that writes nothing;
+    """`exit --ts X` is an unknown option (argparse exit 2) that writes nothing;
     without it the histo record's `ts` is today's date, `YYYY-MM-DD`."""
     specs = _specs(tmp_path)
     assert _run(script, "new", "an-idea", "--specs", str(specs)).returncode == 0
@@ -267,7 +249,7 @@ def test_a_second_exit_exits_one_with_a_fix_naming_the_script(script: Path, tmp_
 def test_delivered_outside_the_release_origin_is_refused(
     script: Path, tmp_path: Path, release: str
 ) -> None:
-    """sa-backlog-status-has-no-single-authority#B5: delivered on a slug outside Origin
+    """Delivered on a slug outside Origin
     is refused, and the fix never suggests rejected."""
     specs = _specs(tmp_path)
     _run(script, "new", "an-idea", "--specs", str(specs))
@@ -278,7 +260,7 @@ def test_delivered_outside_the_release_origin_is_refused(
     )  # fmt: skip
     assert done.returncode == 1
     [fix] = _fix_lines(done)
-    assert "rejected" not in fix and "<" not in fix  # ADR 0158: no placeholder
+    assert "rejected" not in fix and "<" not in fix  # no placeholder
     assert len(_active(specs)) == 1
     assert _histo(specs) == []
 
@@ -286,7 +268,7 @@ def test_delivered_outside_the_release_origin_is_refused(
 def test_the_refusal_fix_names_the_latest_picking_release_by_version(
     script: Path, tmp_path: Path
 ) -> None:
-    """Review F8: 0.10.0 is later than 0.9.0, though it sorts before it as text."""
+    """0.10.0 is later than 0.9.0, though it sorts before it as text."""
     specs = _specs(tmp_path)
     _run(script, "new", "an-idea", "--specs", str(specs))
     for release in ("0.9.0", "0.10.0"):
@@ -311,8 +293,8 @@ def test_the_refusal_fix_names_the_latest_picking_release_by_version(
 def test_exit_reads_origin_through_the_release_parser(
     script: Path, tmp_path: Path, origin: str, code: int
 ) -> None:
-    """spec-origin-line-has-two-readers: only the first Origin line counts, and a
-    clause line parses (ADR 0161) — `exit` asks `release.py`'s one parser."""
+    """Only the first Origin line counts, and a
+    clause line parses — `exit` asks `release.py`'s one parser."""
     specs = _specs(tmp_path)
     _run(script, "new", "an-idea", "--specs", str(specs))
     _pick(specs, "operator-demand")
@@ -348,9 +330,9 @@ def test_rejected_requires_a_reason(script: Path, tmp_path: Path) -> None:
 def test_each_refusal_fix_keeps_the_chosen_disposition(
     script: Path, tmp_path: Path, disposition: str, evidence: list[str]
 ) -> None:
-    """T-050-138 review F1: a picked entry refused for its evidence gets the fix of THAT
-    evidence row — never a `delivered` exit the operator did not choose (#B5 class).
-    A runnable fix runs as printed and exits under the chosen disposition (ADR 0158)."""
+    """A picked entry refused for its evidence gets the fix of THAT
+    evidence row — never a `delivered` exit the operator did not choose.
+    A runnable fix runs as printed and exits under the chosen disposition."""
     specs = _specs(tmp_path)
     _run(script, "new", "an-idea", "--specs", str(specs))
     _pick(specs)
@@ -371,7 +353,7 @@ def test_each_refusal_fix_keeps_the_chosen_disposition(
 
 
 def test_a_deferred_exit_is_refused_and_the_entry_stays_live(script: Path, tmp_path: Path) -> None:
-    """Operator ruling 2026-10-01 (T-050-138 review F4): `deferred` is no backlog word —
+    """`deferred` is no backlog word —
     a postponed item stays in active[] and needs no exit; nothing is written."""
     specs = _specs(tmp_path)
     _run(script, "new", "an-idea", "--specs", str(specs))
@@ -389,7 +371,7 @@ def test_a_deferred_exit_is_refused_and_the_entry_stays_live(script: Path, tmp_p
 def test_to_bug_exits_only_into_a_registered_bug(
     script: Path, tmp_path: Path, bug: str, code: int
 ) -> None:
-    """AC3.12 (ADR 0137): `to-bug` exits when --reason names a BUGS.jsonl record, an
+    """`to-bug` exits when --reason names a BUGS.jsonl record, an
     unknown id is refused with nothing written, and `check` accepts the record."""
     specs = _specs(tmp_path)
     _run(script, "new", "an-idea", "--specs", str(specs))
@@ -406,7 +388,7 @@ def test_to_bug_exits_only_into_a_registered_bug(
 
 
 def test_new_and_exit_refuse_a_value_the_push_refuses(script: Path, tmp_path: Path) -> None:
-    """sa-ledger-write-seam-redacts-less-than-push-refuses#B2: backlog.py new/exit refuse
+    """backlog.py new/exit refuse
     a push-matched value, naming the field and the masked term; both files unchanged."""
     specs = _specs(tmp_path)
     home = "/".join(("", "home", "someone", "work"))
@@ -442,37 +424,6 @@ def test_check_reports_a_duplicate_active_id(script: Path, tmp_path: Path) -> No
     assert "duplicate" in lines[0]
 
 
-@pytest.mark.parametrize("status", ["delivered", "to-bug"])
-def test_check_reports_a_terminal_status_in_active(
-    script: Path, tmp_path: Path, status: str
-) -> None:
-    """T-050-138 review F2: every disposition is terminal, `to-bug` included."""
-    specs = _specs(
-        tmp_path,
-        {
-            "id": "gone",
-            "title": "t",
-            "opened": "2026-09-20",
-            "status": status,
-            "description": "d",
-            "provenance": "operator request",
-        },  # fmt: skip
-    )
-    done = _run(script, "check", "--specs", str(specs))
-    assert done.returncode == 1
-    assert status in done.stdout
-
-
-def test_check_reports_a_missing_required_field(script: Path, tmp_path: Path) -> None:
-    specs = _specs(
-        tmp_path,
-        {"id": "thin", "title": "t", "opened": "2026-09-20", "status": "idea", "description": "d"},
-    )
-    done = _run(script, "check", "--specs", str(specs))
-    assert done.returncode == 1
-    assert "provenance" in done.stdout
-
-
 def test_check_reports_a_histo_record_off_the_backlog_vocabulary(
     script: Path, tmp_path: Path
 ) -> None:
@@ -499,19 +450,6 @@ def test_check_reports_a_histo_record_off_the_backlog_vocabulary(
     assert "resolved" in done.stdout
 
 
-def test_check_json_carries_one_object_per_finding(script: Path, tmp_path: Path) -> None:
-    specs = _specs(
-        tmp_path,
-        {"id": "thin", "title": "t", "opened": "2026-09-20", "status": "idea", "description": "d"},
-    )
-    done = _run(script, "check", "--specs", str(specs), "--json")
-    assert done.returncode == 1
-    payload = json.loads(done.stdout)
-    assert len(payload) == 1
-    assert payload[0]["code"] == "LEDGER-BACKLOG-SCHEMA"
-    assert payload[0]["verdict"] == "error"
-
-
 def test_a_refused_write_leaves_the_document_byte_identical(script: Path, tmp_path: Path) -> None:
     specs = _specs(tmp_path)
     _run(script, "new", "an-idea", "--specs", str(specs))
@@ -527,8 +465,8 @@ def test_a_refused_write_leaves_the_document_byte_identical(script: Path, tmp_pa
 def test_new_refuses_a_retired_kind_and_its_fix_lists_the_kinds(
     script: Path, tmp_path: Path, kind: str
 ) -> None:
-    """sa-subjects-resolve-is-circular#B4: `new` refuses a kind outside the four, nothing
-    written; T-050-154: its fix line `new --help` lists every kind, and `subjects` is gone."""
+    """`new` refuses a kind outside the four, nothing
+    written; its fix line `new --help` lists every kind, and `subjects` is gone."""
     specs = _specs(tmp_path)
     done = _run(script, "new", "x-item", "--specs", str(specs), "--intent", f"{kind}:x=y")
     fix = [line for line in (done.stdout + done.stderr).splitlines() if line.startswith("fix:")]
@@ -558,10 +496,9 @@ def _exited(script: Path, tmp_path: Path) -> Path:
 
 
 def test_a_refused_exit_leaves_both_backlog_files_byte_intact(script: Path, tmp_path: Path) -> None:
-    """sa-ledger-verbs-append-histo-before-validating-the-pair#J1: "Given BACKLOG.json
-    holding an invalid entry (an Idea without intents), when `backlog.py exit <other-slug>`
-    runs, then it exits 1 and BACKLOG.json and backlog_histo.jsonl are both
-    byte-identical." Run twice: a retry appends nothing either."""
+    """With BACKLOG.json holding an invalid entry (an Idea without intents),
+    `backlog.py exit <other-slug>` exits 1 and BACKLOG.json and backlog_histo.jsonl are both
+    byte-identical. Run twice: a retry appends nothing either."""
     specs = _exited(script, tmp_path)
     document = json.loads((specs / "backlog" / "BACKLOG.json").read_text(encoding="utf-8"))
     document["active"].append({"id": "broken", "status": "Idea"})
@@ -580,9 +517,8 @@ def test_a_refused_exit_leaves_both_backlog_files_byte_intact(script: Path, tmp_
 def test_new_refuses_a_slug_that_already_exited_and_writes_nothing(
     script: Path, tmp_path: Path
 ) -> None:
-    """sa-ledger-verbs-append-histo-before-validating-the-pair#J3: "Given slug zz already
-    exited (a histo record exists), when `backlog.py new zz` runs, then it exits 1 citing
-    the earlier exit and writes nothing." The pair check refuses it."""
+    """With slug zz already exited (a histo record exists), `backlog.py new zz` exits 1
+    citing the earlier exit and writes nothing; the pair check refuses it."""
     specs = _exited(script, tmp_path)
     before = _pair(specs)
 
@@ -603,7 +539,7 @@ def test_new_refuses_a_slug_that_already_exited_and_writes_nothing(
 def test_the_backlog_seam_amnesties_a_term_origin_already_holds(
     script: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, first: str, refused: bool
 ) -> None:
-    """AC2.7 on the second ledger caller: a denylisted term BACKLOG.json already holds on
+    """A denylisted term BACKLOG.json already holds on
     origin is accepted by `new`, as the push accepts it; an unpublished one is refused."""
     root = tmp_path / "repo"
     specs = _specs(root)

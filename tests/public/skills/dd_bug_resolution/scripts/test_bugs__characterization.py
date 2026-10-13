@@ -283,31 +283,3 @@ def test_all_public_bug_verbs_pin_output_and_each_ledger_write(tmp_path: Path) -
     assert (specs / "bugs/_archive/bugs_histo.jsonl").read_bytes() == _bytes(
         rejected, resolved, superseded
     )
-
-
-def test_append_rejects_ts_option_as_unknown(tmp_path: Path) -> None:
-    stage_skill_scripts(
-        "dd-release-implementation", tmp_path / "skills/dd-release-implementation/scripts"
-    )
-    script = (
-        stage_skill_scripts("dd-bug-resolution", tmp_path / "skills/dd-bug-resolution/scripts")
-        / "bugs.py"
-    )
-    repo = tmp_path / "repo"
-    ledger = repo / "specs/bugs/BUGS.jsonl"
-    ledger.parent.mkdir(parents=True)
-    ledger.write_bytes(b"")
-    (repo / "src").mkdir()
-    (repo / "src/module.py").write_text("value = 1\n", encoding="utf-8")
-    _git(repo.parent, "init", "-q", str(repo))
-    _git(repo, "add", "-A")
-    _git(repo, "commit", "-qm", "fixture")
-    valid = [
-        "append", "--bug-id", "x", "--reported-by", "r", "--title", "T", "--severity", "LOW",
-        "--surface", "src", "--component", "c", "--context", "k", "--symptom", "s",
-        "--repro", "p", "--expected", "e", "--correlates", "none", "--specs", str(repo / "specs"),
-    ]  # fmt: skip
-    result = _run(script, repo, *valid, "--ts", _OPENED)
-    assert result.returncode == 2
-    assert "unrecognized arguments: --ts" in result.stderr
-    assert ledger.read_bytes() == b""

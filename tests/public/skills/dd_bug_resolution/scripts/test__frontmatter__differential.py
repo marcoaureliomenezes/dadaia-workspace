@@ -1,4 +1,4 @@
-"""AC12.2: the kernel's frontmatter owner equals ``yaml.safe_load`` or refuses (ADR 0246).
+"""The kernel's frontmatter owner equals ``yaml.safe_load`` or refuses.
 
 ``yaml`` is the dev-only oracle and is imported by this test only. Every case is a block:
 the owner must raise ``ValueError`` or return what ``yaml.safe_load`` returns (compared by

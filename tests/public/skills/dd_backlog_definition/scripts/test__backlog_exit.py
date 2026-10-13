@@ -1,13 +1,6 @@
-"""0.4.7 FR7 contract (T-047-05), bug
-``provisional-consumed-histo-records-never-finalized-no-writer-no-check``.
-
-A picked backlog item stays ``picked`` in
-``active[]`` and exits ONCE, at closure. The provisional ``CONSUMED`` token invented a
-second, pick-time exit whose finalizer was never written: 27 records stalled in
-``consumed_backlog_histo.jsonl`` forever, and two independent staleness checks
-(BL-STALE condition (a), SPEC-DOC-031) were built to police the stall instead of
-removing it. This test pins the deletion: no source or test file names the token, the
-ledger module, the record class or the consumed histo file ever again.
+"""A picked backlog item stays ``picked`` in ``active[]`` and exits ONCE, at closure.
+No source or test file names the retired pick-time ``CONSUMED`` token, its ledger module,
+its record class or its histo file.
 
 Size: SMALL (reads the shipped source tree; no subprocess, no fixture, no network).
 """
@@ -32,8 +25,7 @@ _DEAD_NAMES = (
 )
 _DEAD_RE = re.compile("|".join(re.escape(name) for name in _DEAD_NAMES))
 
-#: Law/skill text under ``public/`` is T-047-12's write set — this contract covers the
-#: code and its tests, which T-047-05 owns.
+#: Law/skill text under ``public/`` is out of scope — this contract covers the code and its tests.
 _SCOPES = (_PKG / "core", _PKG / "features", _PKG / "cli", _PKG / "hooks", _TESTS)
 
 
