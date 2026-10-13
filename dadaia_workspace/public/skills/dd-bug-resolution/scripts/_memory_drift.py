@@ -18,9 +18,8 @@ from pathlib import Path
 from typing import Any
 
 import _git
-from _memory_schema import CATALOG
 from _refusal import Refusal as Refusal
-from _specs import git_line
+from _specs import CATALOG, git_line
 
 NOT_CODE = frozenset({"specs", "tests", "test", "docs"})
 

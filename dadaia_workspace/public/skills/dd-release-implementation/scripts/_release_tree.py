@@ -10,13 +10,8 @@ from __future__ import annotations
 
 import json
 import re
-import sys
 from pathlib import Path
 from typing import Any
-
-# The worklist has ONE decider, the spec navigator's drift function, projected beside
-# this skill: importing a pure function is not a script calling a script.
-sys.path.insert(1, str(Path(__file__).resolve().parents[2] / "dd-spec-navigator" / "scripts"))
 
 import _findings
 import _memory_drift as drift

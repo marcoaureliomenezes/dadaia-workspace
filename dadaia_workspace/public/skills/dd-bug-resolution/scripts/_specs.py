@@ -14,6 +14,8 @@ from _ledger import parse as parse
 from _platform import detect, venv_tool
 from _root import workspace_of as workspace_of
 
+CATALOG = "memory/product/catalog.json"
+
 
 def find_specs(given: Path | None, *, ledger: str | None = None) -> Path:
     """*given*, else the nearest git-rooted ``specs/`` at or above the cwd — never created:

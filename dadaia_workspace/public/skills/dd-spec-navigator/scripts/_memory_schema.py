@@ -16,7 +16,6 @@ from _frontmatter import split
 
 CODE = "LEDGER-MEMORY-SCHEMA"
 PRODUCT = "memory/product"
-CATALOG = "memory/product/catalog.json"
 INDEX = "memory/product/index.md"
 WIKILINK_RE = re.compile(r"\[\[([^\]]+)\]\]")
 

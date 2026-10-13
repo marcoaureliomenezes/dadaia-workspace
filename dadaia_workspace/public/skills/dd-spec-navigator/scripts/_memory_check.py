@@ -13,9 +13,9 @@ from pathlib import Path
 from typing import Any
 
 import _memory_catalog as cat
-from _memory_schema import CATALOG, CODE, INDEX
+from _memory_schema import CODE, INDEX
 from _refusal import Refusal
-from _specs import script, with_specs
+from _specs import CATALOG, script, with_specs
 
 Finding = dict[str, Any]
 

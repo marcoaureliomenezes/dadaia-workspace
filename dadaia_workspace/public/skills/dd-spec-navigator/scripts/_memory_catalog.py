@@ -20,9 +20,9 @@ from pathlib import Path
 from typing import Any
 
 import _clock
-from _memory_schema import CATALOG, INDEX, PRODUCT, WIKILINK_RE, parse
+from _memory_schema import INDEX, PRODUCT, WIKILINK_RE, parse
 from _refusal import Refusal
-from _specs import script
+from _specs import CATALOG, script
 
 Catalog = dict[str, Any]
 

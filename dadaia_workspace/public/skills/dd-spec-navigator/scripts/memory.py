@@ -26,9 +26,9 @@ sys.path[:0] = [
 import _memory_catalog as cat
 import _memory_drift as dft
 from _memory_check import check
-from _memory_schema import CATALOG, INDEX
+from _memory_schema import INDEX
 from _refusal import Refusal
-from _specs import find_specs, refuse
+from _specs import CATALOG, find_specs, refuse
 
 
 def _parser() -> argparse.ArgumentParser:
