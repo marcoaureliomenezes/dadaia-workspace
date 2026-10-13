@@ -394,6 +394,25 @@ def test_check_leaves_a_closed_candidates_memory_task_as_history(script: Path, t
     assert "writes specs/memory" not in result.stdout, result.stdout  # no memory log entry: exit 1 stays
 
 
+def test_a_closed_candidate_still_reports_its_other_job_file_findings(
+    script: Path, tmp_path: Path
+) -> None:
+    """The CLOSURE exemption drops only the memory finding: a malformed row is still reported."""
+    specs = _specs(tmp_path)
+    _job_release(
+        specs,
+        _task_job(("`specs/memory/x.md`", "x")) + "| J1.T2 | sr |\n",
+        "`specs/memory/x.md`",
+        phase="CLOSURE",
+        defined={"sha": "aaaaaaa", "ts": _TS},
+        implemented={"sha": "beef123", "ts": _TS},
+        log=_RC1_MILESTONES,
+    )
+    result = _run(script, "check", "--specs", str(specs))
+    assert "malformed task row" in result.stdout, result.stdout
+    assert "writes specs/memory" not in result.stdout, result.stdout
+
+
 @pytest.mark.parametrize(
     ("job", "needle"),
     [
