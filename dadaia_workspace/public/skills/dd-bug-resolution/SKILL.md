@@ -5,7 +5,7 @@ description: >
   red loop, minimise, hypotheses, instrument, seam test, cleanup) plus the resolve
   record and commit. Use when a bug carries an open record in BUGS.jsonl; registering
   one is dd-bug-registration's job.
-compatibility: Standalone Agent Skill. Inside a dadaia-workspace (pip install dadaia-workspace) it also drives the SDD lifecycle — specs, backlog, bugs, releases.
+compatibility: Standalone Agent Skill; the full lifecycle lives in a dadaia-workspace.
 ---
 
 # dd-bug-resolution — Arm B

@@ -5,7 +5,7 @@ description: >
   resolving by inspection everything the repo/CLI/a subagent can answer first. Use
   for ambiguous intake, the mandatory pre-SPEC session of a release candidate, an
   ADR decision, a focused spec question, or when the operator says "grill". It asks and records; the backlog document is dd-backlog-definition's and the SPEC dd-release-definition's.
-compatibility: Standalone Agent Skill. Inside a dadaia-workspace (pip install dadaia-workspace) it also drives the SDD lifecycle — specs, backlog, bugs, releases.
+compatibility: Standalone Agent Skill; the full lifecycle lives in a dadaia-workspace.
 ---
 
 # dd-grill-me — SDD Spec Refinement

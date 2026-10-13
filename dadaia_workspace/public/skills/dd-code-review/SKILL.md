@@ -7,7 +7,7 @@ description: >
   what the approved SPEC and job files say, nothing more), Bug-surface (ledger evidence
   that the touched feature's bug surface shrank, held or grew) — plus six lenses, ending
   in an APPROVED/REJECTED verdict. Returns findings; the implementer writes the fix.
-compatibility: Standalone Agent Skill. Inside a dadaia-workspace (pip install dadaia-workspace) it also drives the SDD lifecycle — specs, backlog, bugs, releases.
+compatibility: Standalone Agent Skill; the full lifecycle lives in a dadaia-workspace.
 ---
 
 # dd-code-review
