@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""The only verbs that change a committed finding or close the audit (`disposition`, `close`);
+"""Change a committed finding or close the audit (`disposition`, `close`), and validate the audit.
+
 `check` validates `specs/audits/<dir>/FINDINGS.jsonl` and its append-only archive, stdlib only.
 
 ``audit.py <verb> --specs <path>``. A finding is APPENDED by hand (immutable core, like an

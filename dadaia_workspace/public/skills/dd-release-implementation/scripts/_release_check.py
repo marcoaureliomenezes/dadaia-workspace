@@ -31,7 +31,7 @@ from _release_schema import (
     plan_errors,
 )
 
-_LAW = "specs/releases/AGENTS.md: release.py writes every _RELEASE.json field"
+_LAW = "specs/releases/AGENTS.md: release.py writes every _RELEASE.json field and ledger line"
 #: A merged job's measurement, one `kind: merge` entry per job (RELEASE-EVENTS.md §log).
 _JOB_MERGE = re.compile(
     r"job: [a-z0-9-]+; start: \S+; end: \S+; wall: \d+; ritual_wait: \d+; dispatches: \d+; job_gate_runs: \d+"

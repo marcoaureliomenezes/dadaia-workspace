@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""The validator of `_RELEASE.json`, the candidate's SPEC/PLAN/job files and the ship ledger, and the writer
-of `_RELEASE.json` and the SPEC stub, stdlib only. Every write is validated by `check` before an atomic
-replace; `ship` records the merged promote PR and moves the release to `_archive/<v>/`.
+"""Validate and write a release's `_RELEASE.json` and SPEC stub, stdlib only.
+
+Also validates the candidate's SPEC/PLAN/job files and the ship ledger. Every write is validated by `check`
+before an atomic replace; `ship` records the merged promote PR and moves the release to `_archive/<v>/`.
 """
 
 from __future__ import annotations
