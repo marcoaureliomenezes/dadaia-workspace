@@ -1,5 +1,4 @@
-"""bug scoped-memory-agents-md-prose-rewrite-undetected-by-doctor: the ONE TREE-5
-comparator checks every scaffolded `specs/<area>/AGENTS.md` against its source and shipped history;
+"""The one tree comparator checks every scaffolded `specs/<area>/AGENTS.md` against its source and shipped history;
 matching neither is a `copy-drift` WARNING, absence a finding, scaffold bytes silent."""
 
 from __future__ import annotations
@@ -61,7 +60,7 @@ def _memory_issues(tmp_path: Path, content: str | None) -> list[str]:
 
 
 def test_a_prose_rewrite_of_the_memory_scaffold_is_a_copy_drift_finding(tmp_path: Path) -> None:
-    """Its fix, run as printed, shows the rewrite (tree5-copy-drift-fix-not-built-by-cli-line)."""
+    """Its fix, run as printed, shows the rewrite."""
     issues = _memory_issues(tmp_path, _PROSE_REWRITE)
     assert len(issues) == 1, issues
     assert issues[0].startswith("TREE-5 warning copy-drift:"), issues[0]
@@ -86,7 +85,7 @@ def test_absence_is_still_a_finding(tmp_path: Path) -> None:
 
 
 def test_a_tree_checked_out_from_git_carries_the_canonical_specs_law(tmp_path: Path) -> None:
-    """specs-law-file-untracked-by-gitignore: the specs tree git tracks (the index, what
+    """The specs tree git tracks (the index, what
     every clone and worktree gets) holds a `specs/AGENTS.md` the doctor judges canonical."""
     tracked = subprocess.run(["git", "-C", str(_REPO_ROOT), "ls-files", "-z", "--", "specs"],
                              capture_output=True, check=True).stdout  # fmt: skip
@@ -104,7 +103,7 @@ def test_a_tree_checked_out_from_git_carries_the_canonical_specs_law(tmp_path: P
 def test_a_law_in_either_cli_form_is_silent_under_win32(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """shipped-law-hardcodes-the-posix-venv-path: the tracked source form and the rendered
+    """The tracked source form and the rendered
     `Scripts\\dadaia.exe` form of a canonical law are the same law, never drift."""
     monkeypatch.setattr("dadaia_workspace.core.platform.PLATFORM", Capabilities.detect("win32"))
     rendered = render_registry_tables(_MEMORY_SCAFFOLD)
