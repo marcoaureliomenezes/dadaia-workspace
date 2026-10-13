@@ -22,6 +22,7 @@ from typer.testing import CliRunner
 
 from dadaia_workspace.cli.help_digest import command_paths
 from dadaia_workspace.cli.main import app
+from dadaia_workspace.core.cli_line import git_line
 
 _runner = CliRunner()
 _REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -82,7 +83,8 @@ def test_a_mis_cased_phase_is_one_finding_whose_fix_clears_it(tmp_path: Path) ->
     assert named[0]["fix"].startswith(
         f"Operator action: {state.resolve()} fails at the keys this finding names "
     ), named
-    assert f"`git log -p -- {state.resolve()}`" in named[0]["fix"], named
+    log = git_line(state.resolve().parent, "log", "-p", "--", state.name)
+    assert f"`{log}`" in named[0]["fix"], named
     state.write_text(state.read_text("utf-8").replace('"closure"', '"CLOSURE"'), "utf-8")
     assert not [f for f in _release_findings(tmp_path / "specs")[0] if "'closure'" in f["message"]]
 

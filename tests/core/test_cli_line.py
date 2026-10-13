@@ -8,13 +8,13 @@ from pathlib import Path, PurePosixPath, PureWindowsPath
 import pytest
 
 from dadaia_workspace.core import cli_line
-from dadaia_workspace.core.platform import Capabilities
+from dadaia_workspace.core.platform import Capabilities, workspace_cli_path
 
 
 def test_posix_cli_path_and_fix_line(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("dadaia_workspace.core.platform.PLATFORM", Capabilities.detect("linux"))
     root = PurePosixPath("/ws/my ws")
-    assert cli_line.cli_path(root) == PurePosixPath("/ws/my ws/.dadaia/.venv/bin/dadaia")
+    assert workspace_cli_path(root) == PurePosixPath("/ws/my ws/.dadaia/.venv/bin/dadaia")
     assert (
         cli_line.fix_line(root, "context", "bind", "a b")
         == "'/ws/my ws/.dadaia/.venv/bin/dadaia' context bind 'a b'"
@@ -27,7 +27,7 @@ def test_windows_cli_path_and_fix_line(monkeypatch: pytest.MonkeyPatch) -> None:
     its drive letter, as a line opening with a quote is a PowerShell expression."""
     monkeypatch.setattr("dadaia_workspace.core.platform.PLATFORM", Capabilities.detect("win32"))
     root = PureWindowsPath(r"C:\ws\my ws")
-    assert cli_line.cli_path(root) == PureWindowsPath(
+    assert workspace_cli_path(root) == PureWindowsPath(
         r"C:\ws\my ws\.dadaia\.venv\Scripts\dadaia.exe"
     )
     assert (
