@@ -13,8 +13,6 @@ from _refusal import Refusal as Refusal
 
 SCRIPT = Path(__file__).parent / "worktree.py"
 LOCK = "dadaia:"
-#: Task worktrees open at once per rc.
-TASK_CAP = 5
 
 
 def _unanchored(pattern: str) -> str:

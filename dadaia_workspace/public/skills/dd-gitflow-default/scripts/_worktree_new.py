@@ -13,10 +13,8 @@ from _specs import parse
 from _worktree_git import (
     flow_for,
     git,
-    ours,
     quote,
     record_base,
-    rows,
     script,
     work_version,
 )
@@ -24,7 +22,6 @@ from _worktree_names import (
     LOCK,
     NAME_RE,
     SCRIPT,
-    TASK_CAP,
     Refusal,
     base,
     branch,
@@ -37,11 +34,6 @@ def _refuse_symlink(root: Path, repo_name: str) -> None:
     for part in (tree_path(root, ""), tree_path(root, repo_name)):
         if part.is_symlink():
             raise Refusal(f"{part} is a symlink", f"rm {part}")
-
-
-def _exit(root: Path, path: str) -> str:
-    """The worktree's one exit, `clean` or `merge`, as `rows()` rules it."""
-    return next(str(row["exit"]) for row in rows(root) if row["path"] == path)
 
 
 def _refuse_unopened_bug(main: Path, work: str, bug: str) -> None:
@@ -96,13 +88,8 @@ def _refuse_unready(root: Path, flow: dict[str, str], work: str, version: str, r
                       f"{script(SCRIPT)} new {quote(flow['main'])} {rc}/define")  # fmt: skip
 
 
-def _refuse_task(root: Path, repo: Path, match: re.Match[str], start: str) -> None:
-    """A task is cut from its job branch; at most TASK_CAP are open per rc."""
-    tasks = [r for r in ours(repo) if (m := NAME_RE.match(r["name"])) and m["task"]
-             and m["rc"] == match["rc"]]  # fmt: skip
-    if len(tasks) >= TASK_CAP:
-        raise Refusal(f"{TASK_CAP} task worktrees are open in {match['rc']}",
-                      _exit(root, tasks[0]["path"]))  # fmt: skip
+def _refuse_task(repo: Path, match: re.Match[str], start: str) -> None:
+    """A task is cut from its job branch."""
     if not git(repo, "branch", "--list", start).strip():
         job = f"{match['rc']}/{match['job']}"
         raise Refusal(f"no job branch {start}", f"{script(SCRIPT)} new {quote(repo.name)} {job}")
@@ -120,7 +107,7 @@ def new(root: Path, repo_name: str, name: str) -> Path:
         _refuse_unopened_bug(root / "repos" / flow["main"], work, match["bug"])
     start = base(name, work)
     if match["task"]:
-        _refuse_task(root, repo, match, start)
+        _refuse_task(repo, match, start)
     tree = tree_path(root, repo_name, name)
     if git(repo, "branch", "--list", branch(name)).strip():
         raise Refusal(f"{branch(name)} exists", f"{script(SCRIPT)} list")
