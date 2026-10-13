@@ -119,7 +119,7 @@ def test_refusal_message_shape_and_ten_item_cap(repo: PushRepo) -> None:
     """12 hits, 10 shown, 2 remainder; masked; one switch fix line."""
     sha = repo.commit({f"file{i}.md": f"{_TERM} number {i}\n" for i in range(12)})
     message = _decide(repo, _branch(sha), fixes=replace(gate_fixes(), head="main"), denylist_terms=_TERMS).message
-    for part in ("refs/heads/feature/0.0.1", "file0.md:1", "z…m", "operator denylist", "dd-release-implementation §2a",
+    for part in ("refs/heads/feature/0.0.1", "file0.md:1", "z…m", "operator denylist", ".dadaia/AGENTS.md §3",
                  "already-published history never needs a rewrite"):  # fmt: skip
         assert part in message
     assert "2 more" in message or "and 2" in message
