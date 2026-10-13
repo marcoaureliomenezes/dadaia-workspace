@@ -187,6 +187,40 @@ _ADOPTIONS = [
 ]  # fmt: skip
 
 
+_CASE_IDS = dict(
+    zip(
+        [
+            "R13-2-empty-origin-gets-the-onboarding-commit-as-the-principal",
+            "C2-operator-code-on-local-main-published-as-it-is",
+            "R13-1-origin-work-branch-adopted-never-deleted",
+            "sa-live-work-branch-named-three-ways#B41-1-live-release-never-a-tag",
+            "D-E3-stale-local-work-takes-the-anchor-main-never-holds-it",
+            "R10b-unborn-clone-of-non-empty-origin-merges-onto-the-tool-root",
+            "sa-principal-branch-defaults-to-main-and-cut-point-diverges#B42-4-master-principal",
+            "H4-release-prefix-from-the-committed-draft",
+            "P7c-specs-committed-on-the-principal-are-published",
+            "P8-local-principal-commits-carried-onto-work",
+            "h-dirty-work-outside-the-paths-rides-along-uncommitted",
+        ],
+        [
+            "empty-origin-gets-the-onboarding-commit-as-the-principal",
+            "operator-code-on-local-main-published-as-it-is",
+            "origin-work-branch-adopted-never-deleted",
+            "live-release-never-a-tag",
+            "stale-local-work-takes-the-anchor-main-never-holds-it",
+            "unborn-clone-of-non-empty-origin-merges-onto-the-tool-root",
+            "master-principal",
+            "release-prefix-from-the-committed-draft",
+            "specs-committed-on-the-principal-are-published",
+            "local-principal-commits-carried-onto-work",
+            "dirty-work-outside-the-paths-rides-along-uncommitted",
+        ],
+        strict=True,
+    )
+)
+_ADOPTIONS += [pytest.param(*c.values, id=_CASE_IDS[c.id]) for c in _ADOPTIONS if c.id in _CASE_IDS]
+
+
 @pytest.mark.parametrize(("seeded", "head", "tag", "prepare", "work", "then"), _ADOPTIONS)
 def test_baseline_adopts_origin_and_publishes_the_draft(
     env: tuple[SpecContextService, Path, Path],

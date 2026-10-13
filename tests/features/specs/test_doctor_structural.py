@@ -47,6 +47,8 @@ _CUSTOMISED = "# AGENTS\n\nOur own workflow contract, hand-written.\n"
     [
         pytest.param(_STALE_SHIPPED, True, True, id="B38-3-stale-shipped-is-refreshed-rendered"),
         pytest.param(_CUSTOMISED, True, False, id="B38-5-operator-customisation-never-overwritten"),
+        pytest.param(_STALE_SHIPPED, True, True, id="stale-shipped-is-refreshed-rendered"),
+        pytest.param(_CUSTOMISED, True, False, id="operator-customisation-never-overwritten"),
         pytest.param(_STALE_SHIPPED, False, False, id="no-history-file-stays-warn-only"),
     ],
 )

@@ -289,3 +289,13 @@ def test_no_refusal_advertises_a_way_around_the_gate(repo: PushRepo, scenario: s
     assert not decision.allowed
     assert "--no-verify" not in decision.message
     assert decision.message.count("\nfix: ") == 1
+
+
+def test_no_refusal_advertises_a_way_around_the_gate_single_case(repo: PushRepo) -> None:
+    """A refusal ends in its one fix line and names no bypass (ADR 0158)."""
+    sha = repo.commit({"x.md": f"{_TERM}\n"})
+    source = _Raising(GitObjectReadError("stream desynchronised"))
+    decision = _decide(repo, _branch(sha), denylist_terms=_TERMS, source=source)
+    assert not decision.allowed
+    assert "--no-verify" not in decision.message
+    assert decision.message.count("\nfix: ") == 1
