@@ -2,7 +2,7 @@
 name: dd-code-review
 description: >
   Use when reviewing a job, plain change, PR, branch or commit range, or when an audit
-  or curation verdict needs the Bug-surface axis. Three axes reported side by side —
+  verdict needs the Bug-surface axis. Three axes reported side by side —
   Standards (repo conventions, twelve Fowler smells, SLOP.md S1-S10), Spec (the diff does
   what the approved SPEC and job files say, nothing more), Bug-surface (ledger evidence
   that the touched feature's bug surface shrank, held or grew) — plus six lenses, ending
@@ -20,7 +20,7 @@ axes are reported side by side with equal weight, so no axis hides another's fin
 1. Inside a dadaia workspace, open `specs/memory/AGENTS.md` (the area's scoped law) and follow it — the diff is
    judged against current product truth.
 2. Reviewing a PR, branch or commit range before the candidate's PR.
-3. A curation, architecture or audit verdict needs the Bug-surface axis (§4).
+3. An architecture or audit verdict needs the Bug-surface axis (§4).
 
 ## 2. Axis 1 — Standards
 

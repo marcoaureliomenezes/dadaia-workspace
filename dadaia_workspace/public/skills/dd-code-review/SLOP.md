@@ -23,7 +23,7 @@ labelled judgement call with the command that makes it verifiable in the diff.
 
 - S3b — tautology: expected computed by the code's own expression, `assert f(x) == f(x)`, a constant vs itself; HIGH; an independent literal.
 - S3c — own-module mock: a patch target inside the repo's own package or a bare `MagicMock()`, `assert_called` on own code; MEDIUM; mock at the frontier.
-- S3d — tombstone/change-detector: a `removed|retired|no_longer|legacy` name, an absence assertion, a grep over source; MEDIUM.
+- S3d — tombstone/change-detector: a `removed|retired|no_longer|legacy` name, an absence assertion, a grep over source; MEDIUM; root map §1.
 - S3e — conditional logic in a test: `if`, `for` or `try` steering which assert runs; MEDIUM; one case per branch.
 - S3f — assertion roulette: several unrelated asserts in one test, no message to tell which failed; MEDIUM; one behavior per test.
 - S3g — mystery guest: the test reads a file the test does not show; MEDIUM; a live repo file is policy, a guard case.
