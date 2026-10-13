@@ -81,8 +81,8 @@ def _publish(repo: Path, tmp_path: Path, branch: str) -> None:
 def test_the_range_form_decides_which_blobs_are_new(
     tmp_path: Path, remote: str, expected: set[str]
 ) -> None:
-    """A1.1-A1.3, A7.4: a resolvable remote scopes the range; anything else falls back to
-    ``--not --remotes`` (no remote here: everything). A2.2: no object ever carries prior
+    """A resolvable remote scopes the range; anything else falls back to
+    ``--not --remotes`` (no remote here: everything). No object ever carries prior
     text for a path that did not exist at a resolvable base."""
     repo, (base, tip) = _repo(tmp_path, {"a.txt": "one\n"}, {"b.txt": "two\n"})
     objects = _scan(repo, tip, base if remote == "base" else remote)
@@ -94,7 +94,7 @@ def test_the_range_form_decides_which_blobs_are_new(
 def test_rev_list_argv_carries_trailing_end_of_options_marker(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, remote: str
 ) -> None:
-    """A7.4: both range forms end the rev-list argv with ``--``."""
+    """Both range forms end the rev-list argv with ``--``."""
     repo, (base, tip) = _repo(tmp_path, {"a.txt": "one\n"}, {"b.txt": "two\n"})
     real_run = git_objects._run
     argvs: list[list[str]] = []
@@ -123,7 +123,7 @@ def test_a_deletion_sha_scans_nothing(tmp_path: Path) -> None:
 
 
 def test_a_blob_shared_by_two_paths_is_yielded_once(tmp_path: Path) -> None:
-    """A1.4: one object per distinct blob sha."""
+    """One object per distinct blob sha."""
     repo, (tip,) = _repo(tmp_path, {"a.txt": "same\n", "b.txt": "same\n"})
     assert [o.path for o in _scan(repo, tip, ZERO_SHA) if o.kind == "blob"] in (
         ["a.txt"],
@@ -142,7 +142,7 @@ def test_a_blob_shared_by_two_paths_is_yielded_once(tmp_path: Path) -> None:
 def test_blob_decoding_and_the_size_cap(
     tmp_path: Path, content: str | bytes, decodable: bool, oversized: bool, text_len: int
 ) -> None:
-    """A6.2, A4.1, A4.2, A4.6: undecodable -> empty text; oversized -> at most the cap is read."""
+    """Undecodable -> empty text; oversized -> at most the cap is read."""
     repo, (tip,) = _repo(tmp_path, {"x": content, "small.txt": "tiny\n"})
     objects = {obj.path: obj for obj in _scan(repo, tip, ZERO_SHA)}
     blob = objects["x"]
@@ -195,7 +195,7 @@ def test_blob_decoding_and_the_size_cap(
 def test_prior_text_is_the_base_text_of_the_same_single_path(
     tmp_path: Path, commits: list[Tree], prior: str | None
 ) -> None:
-    """A2.1, A2.4, A7.1, CR-3: prior text only for a single-path, under-cap, decodable
+    """Prior text only for a single-path, under-cap, decodable
     blob whose path held a blob at the base; every other case is an explicit ``None``.
     Each row's range holds only the blobs under test (a shared blob dedupes to one)."""
     repo, shas = _repo(tmp_path, *commits)
@@ -244,7 +244,7 @@ def test_a_corrupt_or_failing_git_answer_raises_the_typed_error(
     reply: str | Callable[[list[str]], subprocess.CompletedProcess[bytes]],
     match: str | None,
 ) -> None:
-    """A6.1, A8.1, A8.2, A8.4, A2.3, A11.4: never a raw exception, never a
+    """Never a raw exception, never a
     fabricated undecodable object."""
     repo, (base, tip) = _repo(tmp_path, {"a.txt": "hello\n"}, {"a.txt": "edited\n"})
     blob = _git(["rev-parse", "HEAD:a.txt"], repo)
@@ -282,7 +282,7 @@ def test_a_directory_that_is_not_a_repo_raises_the_typed_error(tmp_path: Path) -
 
 
 def test_each_range_commit_body_is_scanned_without_its_header(tmp_path: Path) -> None:
-    """A11.1, A11.2, A11.6, A11.7: empty commits still yield their bodies; the identity
+    """Empty commits still yield their bodies; the identity
     header never reaches the text; a repeated published message is never amnestied."""
     repo, (base,) = _repo(tmp_path, {"a.txt": "x\n"})
     _git(["config", "user.name", "HeaderOnlyName"], repo)
@@ -302,7 +302,7 @@ def test_each_range_commit_body_is_scanned_without_its_header(tmp_path: Path) ->
 def test_only_an_annotated_tag_yields_its_own_body(
     tmp_path: Path, annotated: bool, tags: int
 ) -> None:
-    """A11.3: a lightweight tag is no object of its own; the commit body is yielded either way."""
+    """A lightweight tag is no object of its own; the commit body is yielded either way."""
     repo, _ = _repo(tmp_path, {"a.txt": "x\n"})
     _git(["tag", *(["-a", "-m", "tag notes SECRET"] if annotated else []), "v9"], repo)
     tag_sha = _git(["rev-parse", "v9"], repo)
@@ -377,7 +377,7 @@ def test_a_commit_already_on_origin_publishes_nothing(tmp_path: Path) -> None:
 def test_the_unpublished_range_is_newest_first_and_ignores_an_advanced_origin(
     tmp_path: Path,
 ) -> None:
-    """H2/N3: the oldest entry is where the rewrite fix resets — never origin's tip."""
+    """The oldest entry is where the rewrite fix resets — never origin's tip."""
     repo, _ = _published_repo(tmp_path)
     _git(["checkout", "-q", "-b", "topic"], repo)
     _git(["commit", "-q", "--allow-empty", "-m", "mine"], repo)
@@ -391,13 +391,13 @@ def test_the_unpublished_range_is_newest_first_and_ignores_an_advanced_origin(
 
 
 def test_a_range_reaching_a_root_commit_ends_at_the_root(tmp_path: Path) -> None:
-    """N3: an empty origin is the same formula — the oldest commit is the root."""
+    """An empty origin is the same formula — the oldest commit is the root."""
     repo, (root, sha) = _repo(tmp_path, {}, {})
     assert GitSubprocessObjectReader().unpublished(repo, sha) == [sha, root]
 
 
 def test_a_commit_only_another_remote_holds_is_still_unpublished(tmp_path: Path) -> None:
-    """SA-H3-1: "published" means on origin — one rule for the gate and ``unpushed``."""
+    """A commit is published when it is on origin — one rule for the gate and ``unpushed``."""
     repo, (sha,) = _repo(tmp_path, {})
     _git(["update-ref", "refs/remotes/fork/main", sha], repo)
     assert unpublished(repo, sha) == [sha]

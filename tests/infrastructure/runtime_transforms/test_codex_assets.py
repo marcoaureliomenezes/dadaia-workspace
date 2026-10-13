@@ -78,7 +78,7 @@ def test_dcx7_does_not_report_a_real_dd_family_skill_reference(tmp_path: Path) -
 
 
 # ---------------------------------------------------------------------------
-# A22.6 — the whole tuple binds to the real inventory, not to memory
+# The whole tuple binds to the real inventory, not to memory
 # ---------------------------------------------------------------------------
 
 
@@ -93,7 +93,7 @@ def _is_phantom_prefix(prefix: str, skill_names: set[str]) -> bool:
 
 
 def test_codex_skill_ref_prefixes_bind_to_the_real_inventory() -> None:
-    """A22.6: every ``_CODEX_SKILL_REF_PREFIXES`` entry is backed by a real
+    """Every ``_CODEX_SKILL_REF_PREFIXES`` entry is backed by a real
     ``public/skills/`` source skill — derived from the inventory, so a future phantom
     fails loud."""
     skill_names = _skill_names(_PUBLIC)

@@ -141,7 +141,7 @@ def _find_dangling_member_references(
 
 
 def _find_members_mapped_to_two_sections(map_data: dict[str, Any]) -> list[str]:
-    """A10.1: the row is the ownership unit — a member in two rows is ambiguous, same section or not."""
+    """The row is the ownership unit — a member in two rows is ambiguous, same section or not."""
     skills, scoped = _members(map_data)
     return [f"skill:{k}" for k, v in sorted(Counter(skills).items()) if v > 1] + [
         f"scoped_agents_md:{k}" for k, v in sorted(Counter(scoped).items()) if v > 1
@@ -218,7 +218,7 @@ def _find_undeclared_activation_overlaps(
 
 
 def _granted_to_any_model(agents_dir: Path, skills_dir: Path) -> set[str]:
-    """A28.1: every persona's `skills:` allowlist plus the universal-grant skills — derived."""
+    """Every persona's `skills:` allowlist plus the universal-grant skills — derived."""
     granted = {
         line.strip()[2:].strip()
         for agent_md in sorted(agents_dir.glob("*.md"))
@@ -387,7 +387,7 @@ _PLANTED: dict[str, tuple[Callable[[], list[Any]], Callable[[list[Any]], bool]]]
 
 @pytest.mark.parametrize("case", list(_PLANTED))
 def test_a_planted_map_violation_turns_red(case: str) -> None:
-    """A10.2: each in-memory planted violation is flagged with its exact message."""
+    """Each in-memory planted violation is flagged with its exact message."""
     run, expected = _PLANTED[case]
     violations = run()
     assert expected(violations), violations
@@ -399,7 +399,7 @@ def _write_skill(skills_dir: Path, name: str, text: str) -> None:
 
 
 def test_an_oversized_skill_md_and_an_undeclared_overlap_turn_red(tmp_path: Path) -> None:
-    """A10.2 mutation fixtures 5 and 6, planted under tmp_path."""
+    """An oversized SKILL.md and an undeclared overlap, planted under tmp_path."""
     ceiling = _real_map()["skill_md_line_ceiling"]
     _write_skill(tmp_path / "big", "fixture-oversized-skill", "\n".join(["l"] * (ceiling + 20)))
     for name in ("fixture-skill-one", "fixture-skill-two"):
@@ -469,7 +469,7 @@ def _projected_specs_agents_relpath(repo_root: Path) -> str | None:
             public_dir=templates_dir.parent,
         )
         target = specs_dir / "AGENTS.md"
-        rendered = render_registry_tables(source.read_text(encoding="utf-8"))  # WP-38
+        rendered = render_registry_tables(source.read_text(encoding="utf-8"))
         if target not in created or target.read_text(encoding="utf-8") != rendered:
             return None
     return "AGENTS.md"
@@ -514,7 +514,7 @@ def _fixture_skill(tmp_path: Path, body: str) -> Path:
     ],
 )  # fmt: skip
 def test_a_planted_dead_citation_turns_red(tmp_path: Path, body: str, token: str) -> None:
-    """A27.20 mutation fixtures 9-11: one located violation per planted dead citation."""
+    """One located violation per planted dead citation."""
     repo = _fixture_skill(tmp_path, body)
     public = repo / "dadaia_workspace" / "public"
     violations = dead_path_citations_in_tree(public, repo) + dead_verb_citations_in_tree(

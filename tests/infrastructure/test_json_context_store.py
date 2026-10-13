@@ -155,7 +155,7 @@ def test_v2_registry_loads_with_empty_associated_repos(tmp_path: Path) -> None:
 
 
 def test_a_fresh_store_writes_v3_rows_without_legacy_fields(tmp_path: Path) -> None:
-    """AC-T10a-7: spec_contexts.json written by the store has no legacy fields —
+    """spec_contexts.json written by the store has no legacy fields —
     is_primary / activated_at never round-trip."""
     fresh_ws = tmp_path
     fresh_store = context_store(fresh_ws)

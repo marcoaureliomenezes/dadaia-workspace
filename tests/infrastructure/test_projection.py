@@ -69,7 +69,7 @@ _CLAUDE_TOOL_NAMES = frozenset(
 )
 
 #: Model ids a sub-agent may declare — full ids and the bare aliases Claude Code accepts.
-#: ``claude-opus-5`` is the operator's Layer-1 remap and is a real id (it is the model this
+#: ``claude-opus-5`` is a remap and is a real id (it is the model this
 #: workspace's own sessions run on); it is listed deliberately, not by accident.
 _CLAUDE_MODEL_IDS = frozenset(
     {

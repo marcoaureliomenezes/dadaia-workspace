@@ -71,7 +71,7 @@ def _first_numbered_step(skill: str) -> str:
 
 @pytest.mark.parametrize("skill", sorted(STEP_ONE_LAW))
 def test_skill_step_one_opens_its_scoped_law(skill: str) -> None:
-    """FR2a — the first numbered step names the area's scoped law, root-relative."""
+    """The first numbered step names the area's scoped law, root-relative."""
     expected = STEP_ONE_LAW[skill]
     step = _first_numbered_step(skill)
     assert expected in step, (
@@ -81,7 +81,7 @@ def test_skill_step_one_opens_its_scoped_law(skill: str) -> None:
 
 
 def test_every_step_one_path_is_an_installed_scoped_law() -> None:
-    """FR2c — a step-1 path names a scoped law the library actually ships."""
+    """A step-1 path names a scoped law the library actually ships."""
     assert_populated(set(STEP_ONE_LAW), sentinel="dd-cli-library")
     missing = sorted(
         f"{skill} -> {path}"

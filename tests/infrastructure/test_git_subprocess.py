@@ -67,7 +67,7 @@ def test_repo_lifecycle_clone_dirty_commit_remote_branch_checkout_and_error_path
 
 
 def test_a_failed_git_step_carries_gits_full_output(tmp_path: Path) -> None:
-    """Review 6 N2: git writes CONFLICT to stdout — the error carries it."""
+    """Git writes CONFLICT to stdout — the error carries it."""
     repo = _repo(tmp_path / "r")
     client = GitSubprocessClient()
     client.git(repo, "checkout", "-q", "-b", "b")
@@ -105,7 +105,7 @@ def test_push_first_push_sets_upstream_and_mismatched_branch_uses_explicit_refsp
 
 
 def test_commit_paths_ignores_operator_pre_staged_unrelated_content(tmp_path: Path) -> None:
-    """A10.2: the commit is path-scoped; the operator's staged file stays staged."""
+    """The commit is path-scoped; the operator's staged file stays staged."""
     repo = _repo(tmp_path / "repo")
     (repo / "operator-staged.txt").write_text("operator content")
     _git(repo, "add", "operator-staged.txt")
