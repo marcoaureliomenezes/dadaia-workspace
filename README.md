@@ -74,7 +74,7 @@ prints `upgraded A -> B`, or `already at A`; then
 `.dadaia/.venv/bin/dadaia harness add <name>` adds a harness later.
 
 `.dadaia/.venv/bin/dadaia context bind <ctx>` writes one session record (context,
-runtime, pid, `bound_at`, `bind_id`) under the session id the environment carries and acquires
+runtime, pid, `bound_at`, `bind_id`, `last_seen_at`) under the session id the environment carries and acquires
 nothing. The bind's scope is the context's main repo plus its associated repos, and it
 drives the injection of `constitution.md`, the tech stack and the memory catalog digest
 into the session.
