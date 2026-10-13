@@ -96,7 +96,7 @@ class FloorRefusal(StrEnum):
 
 
 _OPERATOR = (  # the operator's file, or a path under an operator glob
-    "[GATE] '{path}' is the operator's ({why}; ADRs 0092, 0133): only the operator edits it "
+    "[GATE] '{path}' is the operator's ({why}): only the operator edits it "
     "by hand. Draft your change under .dadaia/tmp/<agent>/<YYYYMMDD>/ and hand it over.\n"
 )
 #: Each refusal's message, formatted with ``path`` and ``match``; the gate appends its ``fix:``.
