@@ -49,8 +49,8 @@ def _lines(root: Path, verb: str, tree: Path) -> tuple[int, list[str]]:
 
 def _refused(root: Path, tree: Path, job: str) -> None:
     folder = tree / "tests" / "tmp" / job
-    error = f"[error] {folder} exists: promote each test in it into its contract's home or delete it before the job lands"  # fmt: skip
-    fix = f"fix: Operator action: promote each test in {folder} into its contract's home or delete it, then commit the removal"  # fmt: skip
+    error = f"[error] {folder} exists: promote each test in it into its contract's home, or the operator orders its delete, before the job lands"  # fmt: skip
+    fix = f"fix: Operator action: promote each test in {folder} into its contract's home, or order its delete, then commit the removal"  # fmt: skip
     head = git(tree, "rev-parse", "HEAD").strip()
     assert _lines(root, "preflight", tree) == (1, [f"PREFLIGHT FAIL {tree} {head}", error, fix])
     assert _lines(root, "merge", tree) == (1, [error, fix])
