@@ -17,8 +17,7 @@ def _install_all(ws: Path) -> FileSystemPublicAssetManager:
 
 
 def test_retired_family_is_pruned_on_next_install(tmp_path: Path) -> None:
-    """A retired family's pristine projection is pruned; an operator-modified one is retained.
-    """
+    """A retired family's pristine projection is pruned; an operator-modified one is retained."""
     ws = tmp_path / "ws"
     ws.mkdir()
     mgr = FileSystemPublicAssetManager()

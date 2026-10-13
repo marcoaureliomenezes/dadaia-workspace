@@ -1,5 +1,4 @@
-"""``public install`` deletes only what its install ledger recorded.
-"""
+"""``public install`` deletes only what its install ledger recorded."""
 
 from __future__ import annotations
 
