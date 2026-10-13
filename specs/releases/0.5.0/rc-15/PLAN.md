@@ -1,6 +1,6 @@
 # PLAN — Release: 0.5.0, candidate 15
 
-**Status:** Draft
+**Status:** Approved
 **Release ID:** 0.5.0
 **Owner:** dd-sw-engineer-sr
 

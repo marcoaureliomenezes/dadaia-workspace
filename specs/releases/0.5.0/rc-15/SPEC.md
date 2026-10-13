@@ -1,6 +1,6 @@
 # SPEC — Release: 0.5.0, candidate 15 — clean-up: the five open bugs and the rc-14 carry
 
-**Status:** Draft
+**Status:** Approved
 **Release ID:** 0.5.0
 **Owner:** dd-product-engineer
 **Opened:** 2026-10-13
