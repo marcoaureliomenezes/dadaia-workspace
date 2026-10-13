@@ -1,4 +1,4 @@
-"""T-048-05 (SPEC 0.4.8 FR4 AC4.1, AC4.3–AC4.5): ``specs init --context``
+"""``specs init --context``
 on the three tree kinds — absent scaffolds, dadaia upgrades, foreign moves to ``specs-bkp/``
 only when confirmed — never committing. Size: MEDIUM (real git repo on disk)."""
 
@@ -83,7 +83,7 @@ def test_absent_specs_scaffolds_lists_paths_and_commits_nothing(repo: Path) -> N
         PurePath(ln.removeprefix("[created] ")).parts[-2:] for ln in result.output.splitlines()
     }
     assert {("specs", "constitution.md"), ("memory", "ARCHITECTURE.md")} <= created
-    # sa-placement-rules-contradict-tree8#B5: a fresh scaffold is doctor-clean — no issue at all.
+    # A fresh scaffold is doctor-clean — no issue at all.
     assert [i.to_dict() for i in SpecsDoctor(repo / "specs").check()] == []
     assert _git(repo, "rev-parse", "HEAD") == head
     assert repo.name in (repo / "AGENTS.md").read_text(encoding="utf-8")
@@ -91,7 +91,7 @@ def test_absent_specs_scaffolds_lists_paths_and_commits_nothing(repo: Path) -> N
 
 
 def test_the_catalog_pair_is_written_by_its_one_generator(repo: Path) -> None:
-    """sa-package-defines-a-fact-twice: the scaffold writes no catalog; `specs init` runs
+    """The scaffold writes no catalog; `specs init` runs
     `memory.py catalog generate`, so the pair it leaves passes `memory.py check`."""
     assert "memory/product/catalog.json" not in canon.TEMPLATES
 
@@ -162,15 +162,15 @@ def test_an_existing_specs_bkp_is_kept_and_the_tree_moves_to_a_stamped_child(
     assert list(repo.glob("specs-bkp-*")) == []
 
 
-# ── T-050-13 (AC6.3): the gitflow flags ──────────────────────────────────────────────
+# ── the gitflow flags ──────────────────────────────────────────────
 
 
 @pytest.mark.parametrize(("head", "principal"), [("trunk", "trunk"), ("develop", "master")])
 def test_fresh_tree_writes_the_detected_gitflow_and_names_it(
     repo: Path, head: str, principal: str
 ) -> None:
-    """sa-principal-branch-defaults-to-main-and-cut-point-diverges#B42-2 origin/HEAD=trunk: trunk.
-    sa-principal-branch-defaults-to-main-and-cut-point-diverges#B42-1 HEAD=develop, master present: master."""
+    """origin/HEAD=trunk: trunk.
+    HEAD=develop, master present: master."""
     for ref in {head, "master"}:
         _git(repo, "update-ref", f"refs/remotes/origin/{ref}", "HEAD")
     _git(repo, "symbolic-ref", "refs/remotes/origin/HEAD", f"refs/remotes/origin/{head}")
@@ -203,7 +203,7 @@ def test_flags_merge_into_an_existing_tree_and_rerun_is_a_no_op(repo: Path) -> N
 
 
 def test_an_invalid_flag_refuses_with_a_fix_that_clears_it(repo: Path) -> None:
-    """sa-principal-branch-defaults-to-main-and-cut-point-diverges#B42-3: the fix names
+    """The fix names
     the detected values and clears the refusal."""
     _git(repo, "update-ref", "refs/remotes/origin/master", "HEAD")
     result = _runner.invoke(app, ["specs", "init", "--context", "c", "--integration", "master"])
@@ -234,11 +234,10 @@ _SPECS = "repos/c/specs"
 _REFUSALS = [
     pytest.param(_foreign, ["specs", "init", "--context", "c"], "--replace-foreign", id="AC4.4-foreign-tree-non-tty"),
     pytest.param(_symlinked, ["specs", "init", "--context", "c"], "symlink", id="finding-7-symlinked-context-root"),
-    # bug symlinked-specs-root-is-followed-by-migration-and-repair (T-044-40, CWE-59),
-    # sa-specs-upgrade-writes-through-symlinks#B5: every verb refuses at the one seam.
+    # Every verb refuses a symlinked specs root at the one seam.
     pytest.param(_symlinked, ["specs", "upgrade", "--specs-dir", _SPECS], "symlink", id="B5-upgrade-symlinked-root"),
     pytest.param(_symlinked, ["doctor", "--specs-dir", _SPECS, "--fix"], "symlink", id="B5-doctor-fix-symlinked-root"),
-    # sa-context-repo-mapping-falls-back-to-the-name#B2: a typo never becomes repos/alpah/.
+    # A typo never becomes repos/alpah/.
     pytest.param(lambda r: None, ["specs", "init", "--context", "alpah"], "context list", id="B2-unregistered-context"),
     pytest.param(lambda r: None, ["specs", "init"], "specs init --context` with it", id="ADR-0045-no-context-resolved"),
 ]  # fmt: skip
@@ -264,8 +263,8 @@ def test_a_refusal_names_its_fix_and_writes_nothing(
 
 
 def test_specs_init_writes_every_law_rendered(repo: Path) -> None:
-    """sa-specs-init-writes-unrendered-law#B38-1: specs/AGENTS.md carries the canon
-    table; sa-specs-init-writes-unrendered-law#B38-2: no law file `specs init` writes
+    """specs/AGENTS.md carries the canon
+    table; no law file `specs init` writes
     (specs tree and repo law) keeps a registry placeholder."""
     assert _runner.invoke(app, ["specs", "init", "--context", "c"]).exit_code == 0
 

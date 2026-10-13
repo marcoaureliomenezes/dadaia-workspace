@@ -101,13 +101,12 @@ def _real_checkout(repo: Path, branch: str) -> None:
 
 
 def test_export_refreshes_an_alive_context_branch_from_its_real_checkout(tmp_path: Path) -> None:
-    """AC11 (FR13): an ALIVE context's `branch` is re-read from the repo's
+    """An ALIVE context's `branch` is re-read from the repo's
     real checked-out HEAD at export time, superseding the stale store value, in both the
     store and the exported record.
 
     Size: MEDIUM — a real `git init`/`checkout` under `repos/<slug>` drives the real
-    `GitSubprocessClient` through the CLI; ported from the retired tar-era e2e
-    (tests/e2e/features/test_branch_tracking.py) when T-046-31 removed the archive."""
+    `GitSubprocessClient` through the CLI."""
     source = _workspace(tmp_path / "source")
     source.save(_ctx("alpha", ContextState.ALIVE))  # the store still says "develop"
     repo = tmp_path / "source" / "repos" / "alpha"
@@ -128,8 +127,7 @@ def test_export_refreshes_an_alive_context_branch_from_its_real_checkout(tmp_pat
 def test_explicit_workspace_pointing_at_an_uninitialized_dir_is_refused(
     tmp_path: Path, verb: str
 ) -> None:
-    """bug import-export-workspace-flag-re-resolves-through-ancestor-walk:
-    an explicit --workspace is authoritative; a path without its own `.dadaia/` is refused
+    """An explicit --workspace is authoritative; a path without its own `.dadaia/` is refused
     instead of silently resolving to the enclosing live workspace.
 
     Size: MEDIUM — a real filesystem workspace sentinel driven through the CLI."""

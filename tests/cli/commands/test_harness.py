@@ -39,7 +39,7 @@ def _claude_only_workspace(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> P
     assert result.exit_code == 0, result.output
     assert not (ws / ".codex").exists(), "fixture must start Claude-only"
     monkeypatch.chdir(ws)
-    # harness-add-crashes-staging-shared-skill-scripts: the package lives under a `.venv`.
+    # The package lives under a `.venv`.
     site = ws / ".dadaia" / ".venv" / "site" / "dadaia_workspace"
     site.parent.mkdir(parents=True)
     site.symlink_to(Path(dadaia_workspace.__file__).parent, target_is_directory=True)
@@ -50,7 +50,7 @@ def _claude_only_workspace(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> P
 def test_harness_add_projects_the_set_registers_it_and_is_idempotent(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """AC2.1 third clause: `harness add codex` on a Claude-only workspace yields the
+    """`harness add codex` on a Claude-only workspace yields the
     `.codex/` set, `harness list` shows both, `public doctor` exits 0, and a second
     `add` changes nothing."""
     ws = _claude_only_workspace(tmp_path, monkeypatch)
@@ -91,7 +91,7 @@ def test_harness_add_projects_the_set_registers_it_and_is_idempotent(
 def test_harness_add_registers_each_newly_recorded_harness(
     harness: str, projected: str | None, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """AC3.1: `harness add cursor|devin|copilot` exits 0 and leaves `public doctor` at 0.
+    """`harness add cursor|devin|copilot` exits 0 and leaves `public doctor` at 0.
 
     `devin` projects no persona view of its own — it reads the shared authored tree —
     so the assertion for it is that the shared set is there and its own directory is

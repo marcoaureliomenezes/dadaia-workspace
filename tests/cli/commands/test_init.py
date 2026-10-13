@@ -21,7 +21,7 @@ _runner = CliRunner()
 def test_init_creates_states_and_the_three_root_files_and_is_idempotent(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, links: tuple[str, ...]
 ) -> None:
-    """AC2.2 (ADR 0095): init and its re-run create `prompt.md`,
+    """Init and its re-run create `prompt.md`,
     `AGENTS.md` and `.dadaiaignore` when absent and never overwrite the operator's; a dangling
     link (CWE-59) is present, never written through."""
     ws, outside = tmp_path / "ws", tmp_path / "outside"
@@ -48,8 +48,7 @@ def test_init_creates_states_and_the_three_root_files_and_is_idempotent(
 def test_init_converts_a_list_form_denylist_once_and_holds_the_original(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """AC3.10 / list-form-privacy-denylist-errors-without-migration
-    (ADR 0157): the upgrade rewrites a 0.4.7 list form as the object form once, the original
+    """The upgrade rewrites a 0.4.7 list form as the object form once, the original
     held under `.dadaia/reaped/`; the pre-push loader then reads it."""
     from dadaia_workspace.container import load_denylist_terms
 
@@ -74,7 +73,7 @@ def test_init_converts_a_list_form_denylist_once_and_holds_the_original(
 def test_a_failed_denylist_conversion_leaves_the_operator_terms_in_place(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """AC3.10, review L1 (CWE-636): when the converted file cannot be
+    """When the converted file cannot be
     written, the original stays where the loader reads it and nothing is held; a list holding
     anything but strings or string pairs is never converted."""
     ws = tmp_path / "ws"

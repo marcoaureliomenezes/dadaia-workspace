@@ -1,9 +1,4 @@
 """The CLI surface: its verb tree, its rendered help and what `capabilities --json` advertises.
-
-backlog cli-help-architecture (T-053-24) one-line-help ratchet; 0.4.7 FR5
-(T-047-78) verb ceiling and citation; cli-help-leaks-internal-spec-ids;
-help-texts-and-bug-schema-cite-behaviour-that-is-gone;
-capabilities-advertises-verbs-and-surfaces-that-do-not-exist; dadaia-capabilities-v3 schema.
 Size: SMALL (in-process Click tree and CliRunner).
 """
 
@@ -55,15 +50,15 @@ def _help(*argv: str) -> str:
 
 
 def test_deleted_groups_are_gone_and_reports_keeps_validate() -> None:
-    """0.4.6 AC4 (FR4): `doctor --fix` is the one reaper — no `clean`/`tmp`/`academy` group;
-    0.4.7 FR2 (T-047-64): bugs.py is the ledger's one writer — no `bugs` group."""
+    """`doctor --fix` is the one reaper — no `clean`/`tmp`/`academy` group;
+    bugs.py is the ledger's one writer — no `bugs` group."""
     groups = dict(get_command(app).commands)  # type: ignore[attr-defined]
     assert not {"clean", "tmp", "academy", "bugs"} & set(groups)
     assert set(groups["reports"].commands) == {"validate"}
 
 
 def test_the_verb_surface_is_bounded_documented_and_cited() -> None:
-    """At most 30 leaf verbs, a new one only when an old one leaves (ADR 0018); at most 30 with a
+    """At most 30 leaf verbs, a new one only when an old one leaves; at most 30 with a
     one-line help (both ratchet down); every leaf is invoked (`dadaia`, `$D`, `$DADAIA`) by some
     public asset — an uncited verb is a verb nobody runs."""
     leaves = _leaves()
@@ -96,7 +91,7 @@ _LEAK = re.compile(
 
 
 def test_no_command_help_leaks_an_internal_id() -> None:
-    """cli-help-leaks-internal-spec-ids: every rendered --help states behaviour in the reader's
+    """Every rendered --help states behaviour in the reader's
     words — no requirement, task or audit id, no code seam name."""
     leaks = [
         f"{' '.join(p) or '<root>'}: {m.group(0)!r}"
@@ -120,7 +115,6 @@ def test_help_states_current_behaviour(
     absent: tuple[str, ...],
     at_most_once: tuple[str, ...],
 ) -> None:
-    """help-texts-and-bug-schema-cite-behaviour-that-is-gone."""
     text = _help(*argv)
     assert [w for w in present if w not in text] == []
     assert [w for w in absent if w in text] == []
@@ -135,8 +129,7 @@ def test_reports_validate_help_shows_each_example_once() -> None:
 
 def test_capabilities_json_matches_service_and_public_schema() -> None:
     """`capabilities --json` is the service payload and validates against the v3 schema; it pins
-    context safety and names verbs, never a hand-spelled `dadaia ` command
-    (sa-fix-lines-not-built-by-cli-line#S7)."""
+    context safety and names verbs, never a hand-spelled `dadaia ` command."""
     result = CliRunner().invoke(app, ["capabilities", "--json"])
     assert result.exit_code == 0, result.output
     payload = json.loads(result.stdout)
@@ -153,7 +146,7 @@ def test_capabilities_json_matches_service_and_public_schema() -> None:
 
 
 def test_every_advertised_verb_and_harness_exists() -> None:
-    """capabilities-advertises-verbs-and-surfaces-that-do-not-exist: each advertised verb is a
+    """Each advertised verb is a
     path of the live tree, and the harness list is the harness registry."""
     payload = build_capabilities(command_paths())
     live = command_paths()
@@ -166,7 +159,7 @@ def test_every_advertised_verb_and_harness_exists() -> None:
 
 
 def test_every_help_example_renders_the_venv_cli() -> None:
-    """help-examples-spell-the-blocked-bare-cli: the gate blocks a bare `dadaia` first token,
+    """The gate blocks a bare `dadaia` first token,
     so a command path in any --help follows only the `fix_line` rendering of the CLI."""
     leaf = "|".join(r"\s+".join(p) for p in sorted(command_paths(), key=len, reverse=True) if p)
     bare = re.compile(rf"(?<!Usage: )\bdadaia\s+(?:{leaf})(?=[\s'\"`]|$)")

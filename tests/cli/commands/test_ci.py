@@ -1,10 +1,10 @@
-"""`ci push-gate-check` CLI wiring for the v0.9.0 range-scoped denylist scan.
+"""`ci push-gate-check` CLI wiring.
 
 Pins two composition-root guarantees:
 
-* A6.3 — ``push-gate-check`` ALWAYS builds and passes a real ``GitObjectReader`` into
-  ``push_gate_decision`` — never omitted, never ``None`` (FR6 row 4/FR7 row A7.2).
-* A3.5 — the stderr mode line distinguishes "operator denylist + baseline" (a
+* ``push-gate-check`` always builds and passes a real ``GitObjectReader`` into
+  ``push_gate_decision`` — never omitted, never ``None``.
+* The stderr mode line distinguishes "operator denylist + baseline" (a
   ``DADAIA_PRIVACY_DENYLIST`` file present) from "baseline only" (absent).
 """
 
@@ -74,8 +74,8 @@ def _stamped_specs(repo: Path, version: int) -> str:
 def test_canon_scan_does_not_apply_to_a_tree_stamped_below_the_canon(
     monkeypatch, tmp_path: Path
 ) -> None:
-    """Bug pre-push-canon-scan-not-range-scoped: a pushed tree stamped 5 is foreign — the
-    push proceeds printing state()'s fix; stamped canonical, the same path is refused."""
+    """A pushed tree stamped 5 is foreign: the push proceeds, printing state()'s fix;
+    stamped canonical, the same path is refused."""
     repo = tmp_path / "repo"
     _init_repo(repo)
     (repo / "specs" / "backlog").mkdir(parents=True)
@@ -84,7 +84,7 @@ def test_canon_scan_does_not_apply_to_a_tree_stamped_below_the_canon(
 
     result = _runner.invoke(app, ["ci", "push-gate-check"], input=_stamped_specs(repo, 5))
     assert result.exit_code == 0, result.output
-    # sa-fix-lines-not-built-by-cli-line#S1: the fix is named through the builder.
+    # The fix is named through the builder.
     assert (
         fix_line(None, "specs", "init", "--specs-dir", str(repo / "specs"), "--replace-foreign")
         in result.output
@@ -137,11 +137,9 @@ def test_mode_line_distinguishes_operator_denylist_from_baseline_only(
 def test_a_sibling_repo_name_that_is_an_english_word_does_not_block_the_push(
     monkeypatch, tmp_path: Path
 ) -> None:
-    """bug ``push-gate-foreign-slug-layer-blocks-onboarded-specs-push``.
-
-    A context ``shop`` whose associated repo is ``docs``: the pushed blob uses the
+    """A context ``shop`` whose associated repo is ``docs``: the pushed blob uses the
     English word "docs". Names are private only through the operator denylist and the
-    structural baseline (ADR 0032) — a sibling repo name is never a term source."""
+    structural baseline — a sibling repo name is never a term source."""
     (tmp_path / ".dadaia").mkdir()
     (tmp_path / "repos" / "docs").mkdir(parents=True)
     repo = tmp_path / "repos" / "shop"
@@ -166,7 +164,7 @@ def test_a_sibling_repo_name_that_is_an_english_word_does_not_block_the_push(
     assert result.exit_code == 0, result.output
 
 
-# ── 0.5.0 AC5.1/AC5.4 (T-050-14): the bootstrap birth through the REAL reader ──────────
+# ── the bootstrap birth through the REAL reader ──────────
 
 
 def _git(repo: Path, *args: str) -> str:

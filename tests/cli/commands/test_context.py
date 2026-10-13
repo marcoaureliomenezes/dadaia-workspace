@@ -92,9 +92,8 @@ def test_context_create_show_list_happy_lifecycle(workspace: Path) -> None:
 
     list_json = _runner.invoke(app, ["context", "list", "--json"])
     assert list_json.exit_code == 0, list_json.output
-    # FR18 (T-044-29): `list --json` also carries `stored_branch` (the stored
-    # snapshot, distinct from the live-resolved `current_branch`, A18.1) and
-    # `associated_repos` (full list, A18.4/A18.5).
+    # `list --json` also carries `stored_branch` (the stored snapshot, distinct from
+    # the live-resolved `current_branch`) and `associated_repos` (full list).
     assert json.loads(list_json.stdout) == [
         {
             "alive_since": None,
@@ -136,9 +135,9 @@ def test_context_error_matrix(workspace: Path, invoke_args: list[str]) -> None:
 def test_context_bind_is_one_verb_with_one_argument(
     workspace: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """0.4.7 FR4: `bind <ctx>` exits 0, persists the record, prints a human
+    """`bind <ctx>` exits 0, persists the record, prints a human
     confirmation — never a shell export line. No --mode, no --release, no --force,
-    no --reason, no --print-env (0148 (4)); the record carries neither `mode` nor `release`."""
+    no --reason, no --print-env; the record carries neither `mode` nor `release`."""
     monkeypatch.setenv("DADAIA_SESSION_ID", "sess_t1")
     _register_alive_ctx(workspace)
     result = _runner.invoke(app, ["context", "bind", "myctx"])
@@ -158,7 +157,7 @@ def test_context_bind_is_one_verb_with_one_argument(
 @pytest.mark.parametrize(
     ("env", "session_id"),
     [
-        # bug bind-session-id-divergence: one stable harness-native id, never a minted sess_*
+        # One stable harness-native id, never a minted sess_*
         pytest.param({"CLAUDE_CODE_SESSION_ID": "claude-stable-abc123"}, "claude-stable-abc123", id="claude-native-id"),
         pytest.param({"CODEX_THREAD_ID": "harness-session"}, "harness-session", id="codex-native-id"),
         # the eval-flow contract: an explicit DADAIA_SESSION_ID is reused, never re-minted
@@ -229,7 +228,7 @@ def test_context_show_json_session_null_then_populated_when_bound(workspace: Pat
     show_result = _runner.invoke(app, ["context", "show", "--json"], env=env)
     assert show_result.exit_code == 0, show_result.output
     data = json.loads(show_result.stdout)
-    # sa-bind-has-two-stores#S8: name and session come from the one Bind.
+    # Name and session come from the one bind.
     assert data["name"] == "myctx" == data["session"]["context"]
     assert data["session"]["session_id"] == session_id
 
@@ -305,7 +304,7 @@ def _remote_heads(bare: Path) -> dict[str, str]:
 
 
 def test_context_baseline_is_consent_by_invocation(workspace: Path, tmp_path: Path) -> None:
-    """AC4.2/AC4.7: no --yes/--push; one invocation publishes, a re-run is a no-op."""
+    """No --yes/--push; one invocation publishes, a re-run is a no-op."""
     bare = tmp_path / "baseline.git"
     subprocess.run(["git", "init", "--bare", str(bare)], capture_output=True, check=True)
     repo = workspace / "repos" / "baseline"
@@ -330,7 +329,7 @@ def test_context_baseline_is_consent_by_invocation(workspace: Path, tmp_path: Pa
 def test_context_dead_surfaces_the_refused_push_with_its_fix_line(
     workspace: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """T-048-11: a push the pre-push hook refuses reaches the operator verbatim — its
+    """A push the pre-push hook refuses reaches the operator verbatim — its
     one ``fix:`` line included — instead of a bare "resolve the issue and retry"."""
     bare = tmp_path / "refused.git"
     subprocess.run(["git", "init", "--bare", str(bare)], capture_output=True, check=True)
@@ -357,7 +356,7 @@ def test_context_dead_surfaces_the_refused_push_with_its_fix_line(
 
 
 def test_show_unbound_is_calm_in_both_modes(workspace: Path) -> None:
-    """Bug context-show-json-traceback-unbound: with no bind, `show --json` answers
+    """With no bind, `show --json` answers
     {"context": null} and human `show` prints a calm line — both exit 0, no traceback."""
     as_json = _runner.invoke(app, ["context", "show", "--json"])
     human = _runner.invoke(app, ["context", "show"])
@@ -369,9 +368,7 @@ def test_show_unbound_is_calm_in_both_modes(workspace: Path) -> None:
 def test_bind_with_no_live_release_exits_zero_and_the_next_write_is_allowed(
     workspace: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Bug ``context-bind-implementation-requires-release-id-stall-when-none-live``.
-
-    The repro: a workspace with no ``specs/releases/<id>/`` on disk. Bind used to refuse
+    """A workspace with no ``specs/releases/<id>/`` on disk. Bind used to refuse
     (``--release <id> is required``) and the only way to create the release was a
     MUTATING write the refused bind would not grant — a closed loop. `bind` no longer
     knows what a release is, so it exits 0 and the next in-scope MUTATING write ALLOWs.
@@ -385,7 +382,7 @@ def test_bind_with_no_live_release_exits_zero_and_the_next_write_is_allowed(
     result = _runner.invoke(app, ["context", "bind", "myctx"])
     assert result.exit_code == 0, result.output
 
-    # sa-bind-has-two-stores#S4: the record the bind wrote is the bind — no env by hand.
+    # The record the bind wrote is the bind — no env by hand.
     target = workspace / "worktrees/myctx/0.0.1a-release/specs/releases/0.0.1/SPEC.md"
     block = pre_gate.evaluate_payload(
         {"tool_name": "Write", "tool_input": {"file_path": str(target)}}
@@ -394,7 +391,7 @@ def test_bind_with_no_live_release_exits_zero_and_the_next_write_is_allowed(
 
 
 def test_context_show_and_list_json_emit_main_repo_key(workspace: Path) -> None:
-    """AC5.1. `show --json` / `list --json` carry `main_repo`;
+    """`show --json` / `list --json` carry `main_repo`;
     the retired output key `repo_slug` is absent (the state-file schema keeps it)."""
     from dadaia_workspace.core.models.spec_context import AssociatedRepo
 

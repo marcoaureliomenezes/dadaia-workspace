@@ -109,7 +109,7 @@ def test_valid_handoff_exits_0_with_valid_count_and_json_shape(tmp_path: Path, m
     json_result = _runner.invoke(app, ["reports", "validate", str(handoff_path), "--json"])
     assert json_result.exit_code == 0, json_result.output
     # `.stdout` (pure stdout), not `.output` (stdout+stderr mixed, per Click 8.2's own
-    # docstring): the resolved-workspace-root diagnostic (T-043-47/A30.5) writes to
+    # docstring): the resolved-workspace-root diagnostic writes to
     # stderr precisely so it never pollutes the --json stdout payload's list shape.
     data = json.loads(json_result.stdout)
     assert isinstance(data, list)
@@ -121,9 +121,8 @@ def test_valid_handoff_exits_0_with_valid_count_and_json_shape(tmp_path: Path, m
 
 
 def test_schema_violation_always_exits_nonzero(tmp_path: Path, monkeypatch) -> None:
-    """sa-rich-printer-wraps-fix-lines#S6: an INVALID file exits 1 (exit-code truthfulness,
-    validation-029 F-12): the old non-strict 'print INVALID, exit 0' contract masked
-    tampered/malformed handoffs from every consuming script."""
+    """An INVALID file exits 1: a zero exit on INVALID would mask tampered or
+    malformed handoffs from every consuming script."""
     _init_workspace(tmp_path)
     monkeypatch.chdir(tmp_path)
 
@@ -169,7 +168,7 @@ def test_schema_staged_after_install_and_not_in_claude_schemas_dir(
     tmp_path: Path, monkeypatch
 ) -> None:
     """After workspace init + stage, handoff-v1.schema.json exists in
-    agentic/schemas/ and is consumable by the CLI, while FR1/A1 enforces that the
+    agentic/schemas/ and is consumable by the CLI, while the
     schema is NOT projected to .claude/schemas/."""
     _init_workspace(tmp_path)
     monkeypatch.chdir(tmp_path)
@@ -191,7 +190,7 @@ def test_schema_staged_after_install_and_not_in_claude_schemas_dir(
 
 
 # ---------------------------------------------------------------------------
-# Bug ancestor-walk-workspace-root-silent-mistarget (T-043-47/A30.5) — a bare
+# A bare
 # `dadaia reports validate <path>` run from a cwd outside the handoff's own workspace
 # silently resolves artifact.path against the WRONG ancestor root and reports a false
 # INVALID/missing_artifact. `--workspace` is the escape hatch, and the resolved root is
@@ -250,7 +249,7 @@ def test_reports_validate_always_emits_resolved_workspace_root_json_mode(
 def test_a_retired_version_without_self_pull_is_invalid(
     tmp_path: Path, monkeypatch, version: str
 ) -> None:
-    """sa-handoff-self-pull-requirement-diverges#46.1: v1/v1.1 without self_pull exit 1
+    """v1/v1.1 without self_pull exit 1
     naming schema_version."""
     _init_workspace(tmp_path)
     monkeypatch.chdir(tmp_path)
