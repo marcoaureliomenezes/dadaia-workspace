@@ -14,7 +14,7 @@ Four anchor kinds, each backed by a real registry of truth in the live tree:
 **Binding contract:** the model *proposes* a subject string; Python *normalizes + binds* it to
 a single registry anchor, and **HALTs (rejects, not silent NEW)** any subject that resolves to
 no known anchor or to an ambiguous set. The HALT message names the unresolved ref so it is
-actionable (acceptance §3.7.1).
+actionable.
 """
 
 from __future__ import annotations

@@ -497,7 +497,7 @@ SCOPED_LAW_AREAS: tuple[str, ...] = tuple(
 
 
 def root_entries_display() -> str:
-    """§5.1's one line: every root directory (trailing ``/``) then every root file."""
+    """The root listing: every root directory (trailing ``/``) then every root file."""
     return " ".join(
         [*(f"{name}/" for name in sorted(ROOT_ALLOWED_DIRS)), *sorted(ROOT_ALLOWED_FILES)]
     )

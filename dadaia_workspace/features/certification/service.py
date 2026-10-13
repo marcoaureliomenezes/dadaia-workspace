@@ -65,8 +65,8 @@ _LiveProbe = Callable[[SubprocessCertificationProcess, Path, str, str], str]
 
 
 # Live probe of the installed Codex CLI: a real `codex exec`, bounded and read-only. Static Codex
-# projection tests (TOML shape, frontmatter
-# parsing) never attest this — they cannot prove a live session actually answers.
+# projection tests (TOML shape, frontmatter parsing) never attest this — they cannot prove a
+# live session actually answers.
 _CODEX_LIVE_PROBE_PROMPT = (
     "Reply with exactly the single line: DADAIA-LIVE-PROBE-OK. No tool calls, no other text."
 )
