@@ -2,7 +2,7 @@
 workspace defines. This contract pins both halves of that sentence against the live
 projection table, not against a hand-listed set of harnesses. Coverage (the gate judges
 every harness's native payload) is proven by payload parity, not string search:
-``tests/infrastructure/runtime_transforms/test_hook_wrappers.py`` (sa-gate-blind-on-cursor-copilot-devin#B8).
+``tests/infrastructure/runtime_transforms/test_hook_wrappers.py``.
 
 - **No invention** — every ``dadaia_workspace`` entrypoint any projected hook artifact
   references must be named by some Deterministic Behavior in
@@ -123,7 +123,7 @@ def test_every_projected_wrapper_is_projected_executable(
         assert rule.mode == 0o755, f"{rule.label} is not projected executable"
 
 
-#: sa-hook-parity-claims-false-and-interpreter-rules-diverge#B1 — the table, literally.
+#: The expected hook table, literally.
 _BEHAVIOUR_TABLE = {
     "claude": {"ctx_inject", "pre_gate", "reaper", "sdd_post_gate"},
     "codex": {"ctx_inject", "pre_gate", "reaper", "sdd_post_gate"},
@@ -140,7 +140,7 @@ def _behaviours(text: str) -> set[str]:
 
 
 def test_the_behaviour_table_is_derived_and_the_registry_declares_it(workspace: Path) -> None:
-    """sa-hook-parity-claims-false-and-interpreter-rules-diverge#B1: rendering every
+    """Rendering every
     harness's hooks yields the declared table; the registry names ctx_inject/the post gate
     exactly where they are wired."""
     derived = {
@@ -155,7 +155,7 @@ def test_the_behaviour_table_is_derived_and_the_registry_declares_it(workspace: 
 
 
 def test_no_text_claims_behaviour_parity() -> None:
-    """sa-hook-parity-claims-false-and-interpreter-rules-diverge#B2: the hook derivation
+    """The hook derivation
     never claims "only serialization" differs nor that "no harness adds a behaviour".
     (The memory atom's copy is reconciled at the closure memory pass — dd-product-engineer.)"""
     hooks_py = _REPO_ROOT / "dadaia_workspace/infrastructure/runtime_transforms/hook_wrappers.py"
@@ -166,7 +166,7 @@ def test_no_text_claims_behaviour_parity() -> None:
 
 
 def test_runtime_config_bakes_no_interpreter() -> None:
-    """sa-hook-parity-claims-false-and-interpreter-rules-diverge#B6: no render-time
+    """No render-time
     interpreter: runtime_config never reads sys.executable or builds a venv path."""
     source = (_REPO_ROOT / "dadaia_workspace/infrastructure/runtime_config.py").read_text("utf-8")
     assert "sys.executable" not in source

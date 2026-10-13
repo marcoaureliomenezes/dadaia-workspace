@@ -1,4 +1,4 @@
-"""retired-lib-asset-leaves-orphan-projection: projection reconciliation diffs against the install ledger: prune only a pristine orphan."""
+"""Projection reconciliation diffs against the install ledger: prune only a pristine orphan."""
 
 from __future__ import annotations
 
@@ -18,10 +18,6 @@ def _install_all(ws: Path) -> FileSystemPublicAssetManager:
 
 def test_retired_family_is_pruned_on_next_install(tmp_path: Path) -> None:
     """A retired family's pristine projection is pruned; an operator-modified one is retained.
-
-    sa-public-install-unlinks-operator-files-outside-its-ledger#D3;
-    sa-public-install-unlinks-operator-files-outside-its-ledger#D4;
-    sa-doctor-reaps-harness-owned-entries#H4.
     """
     ws = tmp_path / "ws"
     ws.mkdir()
@@ -46,7 +42,7 @@ def test_retired_family_is_pruned_on_next_install(tmp_path: Path) -> None:
 
 
 def test_no_ledger_bootstrap_prunes_nothing(tmp_path: Path) -> None:
-    """sa-public-install-unlinks-operator-files-outside-its-ledger#D5 — no ledger: prune nothing."""
+    """No ledger: prune nothing."""
     ws = tmp_path / "ws"
     ws.mkdir()
     mgr = _install_all(ws)
@@ -65,8 +61,7 @@ def test_no_ledger_bootstrap_prunes_nothing(tmp_path: Path) -> None:
 
 
 def test_every_install_keeps_every_ledgered_path_the_library_still_ships(tmp_path: Path) -> None:
-    """sa-scoped-public-install-prunes-the-gate-wiring#L2,
-    sa-public-install-unlinks-operator-files-outside-its-ledger#D3 — a whole, forced or
+    """A whole, forced or
     claude-scoped install keeps every previously ledgered path on disk."""
     from dadaia_workspace.infrastructure.json_install_ledger_store import JsonInstallLedgerStore
 

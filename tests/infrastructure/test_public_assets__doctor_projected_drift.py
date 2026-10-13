@@ -96,7 +96,7 @@ def test_clean_ok_paths_incl_scripts(tmp_path: Path) -> None:
 
 @pytest.mark.skipif(os.name == "nt", reason="Windows has no POSIX exec bit")
 def test_an_executable_rule_that_lost_its_exec_bit_is_drift(tmp_path: Path) -> None:
-    """sa-projected-file-judged-by-four-verifiers: doctor_rules is the one verifier, with an
+    """doctor_rules is the one verifier, with an
     exec-bit mode check — equal bytes with a cleared exec bit are [drift]; chmod clears it."""
     src, dst = tmp_path / "src" / "hook.sh", tmp_path / "dst" / "hook.sh"
     _write(src, b"#!/bin/sh\n")
