@@ -21,8 +21,8 @@ import _root
 from _git import scrubbed_env
 from _grammar import CONTEXT_NAME_RE
 from _handoffs import REVIEWER, reviewer_records
-from _platform import venv_tool
-from _refusal import Refusal
+from _platform import workspace_cli
+from _refusal import Refusal, report
 from _specs import quote
 
 _WORKTREE = Path(__file__).resolve().parents[2] / "dd-gitflow-default" / "scripts" / "worktree.py"
@@ -103,7 +103,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         return _run(sys.argv[1:] if argv is None else argv)
     except Refusal as refusal:
-        print(f"[error] {refusal}", f"fix: {refusal.fix}", sep="\n", file=sys.stderr)
+        report(refusal, refusal.fix)
         return 1
 
 
@@ -150,8 +150,7 @@ def _run(argv: list[str]) -> int:
         **body,
     }
     root = Path(bound["root"])
-    cli = venv_tool(root / ".dadaia/.venv", "dadaia")
-    if not cli.exists():
+    if not (cli := workspace_cli(root)):
         raise Refusal("no workspace CLI", f"uvx dadaia-workspace init {quote(str(root))}")
     out = root / ".dadaia/handoff" / args.context
     out.mkdir(parents=True, exist_ok=True)

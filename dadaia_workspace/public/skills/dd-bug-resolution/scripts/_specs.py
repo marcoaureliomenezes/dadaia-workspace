@@ -11,7 +11,8 @@ import sys
 from pathlib import Path
 
 from _ledger import parse as parse
-from _platform import detect, venv_tool
+from _platform import detect, workspace_cli
+from _refusal import report
 from _root import workspace_of as workspace_of
 
 CATALOG = "memory/product/catalog.json"
@@ -35,7 +36,7 @@ def find_specs(given: Path | None, *, ledger: str | None = None) -> Path:
 
 def _bound_fix(here: Path, rerun: str, ledger: str | None) -> tuple[str, str]:
     root = workspace_of(here)
-    if root and (cli := venv_tool(root / ".dadaia" / ".venv", "dadaia")).exists():
+    if root and (cli := workspace_cli(root)):
         shown = subprocess.run(
             [str(cli), "context", "show", "--json"], capture_output=True, text=True, encoding="utf-8", errors="replace"
         )  # fmt: skip
@@ -110,5 +111,5 @@ def refuse(refusal: Exception, specs: Path) -> int:
     ):  # a command of this entry point, which takes --specs
         fix = with_specs(fix, specs)
     fix = f"Operator action: run `{fix}` {words}" if words else fix
-    print(f"[error] {refusal}", f"fix: {fix}", sep="\n", file=sys.stderr)
+    report(refusal, fix)
     return 1

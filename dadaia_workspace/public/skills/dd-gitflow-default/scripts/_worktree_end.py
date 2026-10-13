@@ -21,6 +21,7 @@ from pathlib import Path
 
 from _handoffs import REVIEWER, reviewer_records
 from _platform import venv_tool
+from _refusal import report
 from _worktree_git import (
     cli,
     cli_line,
@@ -391,7 +392,7 @@ def preflight(root: Path, path: str, keep: list[str], drop: bool) -> int:
         f"PREFLIGHT {'FAIL' if failed else 'PASS'} {tree} {git(tree, 'rev-parse', 'HEAD').strip()}"
     )
     for red in failed:
-        print(f"[error] {red}", f"fix: {red.fix}", sep="\n")
+        report(red, red.fix, sys.stdout)
     return 1 if failed else 0
 
 

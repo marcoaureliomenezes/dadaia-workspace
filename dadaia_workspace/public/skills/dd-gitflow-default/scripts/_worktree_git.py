@@ -14,7 +14,7 @@ from pathlib import Path
 
 from _git import git as git, parse_worktrees, scrubbed_env as scrubbed_env  # isort: skip
 from _grammar import SEMVER_RE, TAG_RE
-from _platform import venv_tool
+from _platform import workspace_cli
 from _specs import git_line as git_line
 from _specs import head
 from _specs import quote as quote  # (`as`: re-exported to the worktree verbs)
@@ -35,7 +35,7 @@ def dirty(tree: Path) -> bool:
 
 
 def _exe(root: Path) -> Path:
-    if (exe := venv_tool(root / ".dadaia/.venv", "dadaia")).exists():
+    if exe := workspace_cli(root):
         return exe
     raise Refusal(
         "no workspace CLI", " ".join(map(quote, ("uvx", "dadaia-workspace", "init", str(root))))

@@ -18,6 +18,7 @@ sys.path[:0] = [
     str(Path(__file__).resolve().parents[2] / "dd-bug-resolution" / "scripts"),
 ]
 
+from _refusal import report
 from _worktree_end import clean, digest, merge, preflight
 from _worktree_git import rows, workspace_of
 from _worktree_names import Refusal
@@ -74,7 +75,7 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         found = rows(root)
     except Refusal as refusal:
-        print(f"[error] {refusal}", f"fix: {refusal.fix}", sep="\n", file=sys.stderr)
+        report(refusal, refusal.fix)
         return 1
     if args.json:
         print(json.dumps(found, indent=2))
