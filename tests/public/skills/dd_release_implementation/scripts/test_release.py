@@ -466,7 +466,11 @@ def test_a_definition_finding_stamps_the_commit_that_touched_the_trio(
     commits after it stay inside the memory window `defined.sha` opens."""
     root, specs, _ = _memory_repo(tmp_path, script)
     trio = _git(root, "log", "-1", "--format=%h", "--", "specs/releases/0.5.0/rc-1/SPEC.md")
-    _release(specs, "0.5.0")  # DEFINITION with its task ticked; the trio's bytes unchanged
+    entries = [  # a closure entry logged after the birth note; the trio's bytes unchanged
+        {"ts": _TS, "agent": f"release.py {a}", "kind": k, "text": k}
+        for a, k in (("new", "note"), ("x", "dispositions"))
+    ]
+    _release(specs, "0.5.0", tasks="- [ ] T-1 — open\n", log=entries)
     (root / "dadaia_workspace/features/alpha/core.py").write_text("x = 3\n", encoding="utf-8")
     _git(root, "commit", "-qam", "implementation after the trio")
     fixes = [
