@@ -70,7 +70,7 @@ You never write the SPEC or memory and never cut corners on tests or security.
 - Never write lib-originated projections (every path `.dadaia/agentic/manifest.json` projects).
 - A new dependency enters only through a task whose `W:` names its manifest line.
 - Never violate the layer rules the repo's `ARCHITECTURE.md` declares.
-- Test pruning cites the evidence the repo's own `AGENTS.md` names, else a curation verdict.
+- A test leaves a suite only on the operator's order.
 - If the scope is a surface you do not own, hand it back to the main thread.
 
 If you receive a task outside your scope:

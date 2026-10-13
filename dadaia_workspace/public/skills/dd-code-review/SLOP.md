@@ -10,7 +10,7 @@ labelled judgement call with the command that makes it verifiable in the diff.
 |---|---|---|---|---|
 | S1 | Comment or skill text narrating the what, the change or an id (the root map §1 docstring sentence) | `git diff -U0 \| grep -E '^\+\s*#.*(FR[0-9]\|T-[0-9]{3}\|ADR\|v[0-9]\.[0-9]\|added\|fixed\|changed)'`; a comment paraphrasing the next line; "renamed from", "formerly", `v0.` in a `SKILL.md` | LOW; MEDIUM above 5 hits | Delete; the why moves to the commit body or the ledger |
 | S2 | A docstring past the root map §1 docstring sentence | `git diff \| grep -c '"""'`, then read; the words bug, release, resolved, previously | LOW | Reduce to the contract |
-| S3 | Test slop: tautology, own-module mock, tombstone, test smells | §Tests below, one check each | HIGH (b); MEDIUM (c, d, e-h) | Literal from an independent source; mock at the frontier; delete at closure |
+| S3 | Test slop: tautology, own-module mock, tombstone, test smells | §Tests below, one check each | HIGH (b); MEDIUM (c, d, e-h) | Literal from an independent source; mock at the frontier; a test leaves only on the operator's order |
 | S4 | Stub, unread parameter, port with one adapter | `grep -nE 'NotImplementedError\|^\s+pass$'`; the linter's unused-argument rule; a Protocol with one implementer | HIGH | Delete until the second caller appears |
 | S5 | Layer over the old path; a second path | `--stat` adds only; `_v2\|_legacy\|_old`; `if legacy`; a swallowing `try/except`; a wrapper that delegates | HIGH (bug-surface) | Replace, don't layer; delete the old path in the same diff |
 | S6 | Codes outside FR/AC/T- | numbered families outside FR/AC/T- in the diff; SPEC/job-file size is a recommendation, never a finding (`specs/releases/AGENTS.md`) | MEDIUM | Rename to glossary terms |
@@ -23,7 +23,7 @@ labelled judgement call with the command that makes it verifiable in the diff.
 
 - S3b — tautology: expected computed by the code's own expression, `assert f(x) == f(x)`, a constant vs itself; HIGH; an independent literal.
 - S3c — own-module mock: a patch target inside the repo's own package or a bare `MagicMock()`, `assert_called` on own code; MEDIUM; mock at the frontier.
-- S3d — tombstone/change-detector: a `removed|retired|no_longer|legacy` name, an absence assertion, a grep over source; MEDIUM; dies at closure.
+- S3d — tombstone/change-detector: a `removed|retired|no_longer|legacy` name, an absence assertion, a grep over source; MEDIUM; leaves only on the operator's order.
 - S3e — conditional logic in a test: `if`, `for` or `try` steering which assert runs; MEDIUM; one case per branch.
 - S3f — assertion roulette: several unrelated asserts in one test, no message to tell which failed; MEDIUM; one behavior per test.
 - S3g — mystery guest: the test reads a file the test does not show; MEDIUM; a live repo file is policy, a guard case.
@@ -31,7 +31,7 @@ labelled judgement call with the command that makes it verifiable in the diff.
 
 ## Lifecycle
 
-- The deletion test applies to a file, line, comment, test, spec sentence, acronym, branch, release, rule or handoff alike.
+- The deletion test applies to a file, line, comment, spec sentence, acronym, branch, release, rule or handoff alike; a test leaves only on the operator's order.
 - Slop dies in the change that finds it — never commented out, marked, archived or deferred.
 - The writer proves the artifact fails the test, the reviewer applies it, the auditor measures the balance.
 
