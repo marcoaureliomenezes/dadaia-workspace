@@ -643,6 +643,7 @@ _PLANTS: dict[str, dict[str, Plant]] = {
         "scripts-comment-ids": _add("scripts/guards/x.py", "# FR-W4-01\n"),
         "package-docstring-ids": _add(f"{PKG}/zz/ac.py", '"""AC1.2 states x."""\n'),
         "staged-task-id": _add("tests/unit/test_p.py", "# J2.S6.T5 pins x\n"),
+        "audit-finding-id": _add("tests/unit/test_p.py", "# 20260830-canon-v6-first-F014 pins x\n"),
         "review-label-id": _add("tests/unit/test_p.py", '"""Review finding 8 pins x."""\n'),
         "plan-label-id": _add("tests/unit/test_p.py", "# PLAN D8 pins x\n"),
         "grill-label-id": _add("tests/unit/test_p.py", "# Grill Q14 ordered x\n"),
