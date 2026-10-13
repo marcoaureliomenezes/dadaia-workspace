@@ -6,6 +6,7 @@ Size: MEDIUM (real git, tmp workspace, a stub CLI).
 
 from __future__ import annotations
 
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -36,14 +37,17 @@ def _head(tree: Path) -> str:
     return git(tree, "rev-parse", "HEAD").strip()
 
 
-def _report(root: Path, tree: Path, verb: str = "preflight") -> list[str]:
+def _lines(done: subprocess.CompletedProcess[str]) -> list[str]:
     """The verdict line, each failing check's `[error]` line and each `fix:` line, in print order."""
-    done = run(root, verb, str(tree))
     return [
         ln
         for ln in (done.stdout + done.stderr).splitlines()
         if ln.startswith(("PREFLIGHT ", "[error] ", "fix: "))
     ]
+
+
+def _report(root: Path, tree: Path) -> list[str]:
+    return _lines(run(root, "preflight", str(tree)))
 
 
 def _fail(root: Path, tree: Path, error: str, fix: str) -> None:
@@ -161,3 +165,59 @@ def test_merge_on_a_passing_tree_without_a_verdict_refuses_only_with_the_verdict
     assert len(fixes(refused)) == 1
     approve(root, head)
     assert run(root, "merge", str(job)).returncode == 0
+
+
+def _kind(root: Path, kind: str) -> tuple[Path, Path]:
+    """A committed, approved tree of *kind* and the checkout its merge lands in."""
+    repo = root / "repos/r"
+    if kind == "task":
+        job = _tree(root, JOB)
+        tree = _tree(root, TASK)
+        commit(tree, "src/a.py")
+        return tree, job
+    if kind == "hotfix":
+        commit(repo, "specs/bugs/BUGS.jsonl", '{"id": "a-block-bug", "status": "open"}\n')
+    name = {
+        "job": JOB,
+        "plain": "fix-a",
+        "define": DEFINE,
+        "backlog": "backlog/x",
+        "reconcile": "0.5.0-rc1/reconcile",
+        "hotfix": "hotfix/a-block-bug",
+    }[kind]
+    tree = _tree(root, name)
+    approve(root, commit(tree, "specs/notes" if kind in ("define", "backlog") else "src/a.py"))
+    return tree, repo
+
+
+def _same_refusal(root: Path, tree: Path, error: str) -> None:
+    """`preflight` and `merge` print the same one `[error]` line and `fix:` line, both exit 1."""
+    merged = run(root, "merge", str(tree))
+    assert merged.returncode == 1, merged.stderr
+    lines = _lines(merged)
+    assert len(lines) == 2 and lines[0].startswith(f"[error] {error}"), lines
+    checked = run(root, "preflight", str(tree))
+    assert checked.returncode == 1
+    assert _lines(checked)[1:] == lines
+
+
+@pytest.mark.parametrize(
+    "kind", ["task", "job", "plain", "define", "backlog", "reconcile", "hotfix"]
+)
+def test_preflight_refuses_an_ignored_file_neither_kept_nor_dropped_as_merge_does(
+    root: Path, kind: str
+) -> None:
+    tree, _ = _kind(root, kind)
+    (tree / "keep.scratch").write_text("x")
+    _same_refusal(root, tree, "ignored files would be lost: keep.scratch")
+
+
+@pytest.mark.parametrize(
+    "kind", ["task", "job", "plain", "define", "backlog", "reconcile", "hotfix"]
+)
+def test_preflight_refuses_a_target_checkout_off_the_target_branch_as_merge_does(
+    root: Path, kind: str
+) -> None:
+    tree, into = _kind(root, kind)
+    git(into, "switch", "-q", "-c", "elsewhere")
+    _same_refusal(root, tree, f"{into} is not on ")
