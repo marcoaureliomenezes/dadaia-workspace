@@ -203,8 +203,8 @@ prefix_rule(
 - Consult the live probe (`.dadaia/.venv/bin/dadaia certify --json`'s `codex-live-probe` check) instead of assuming.
 - Rerun the live contract after any Codex CLI upgrade.
 - The git chokepoints remain independent regardless of hook enforcement (pre-push).
-- Inject full context once per session on `SessionStart` (matcher `startup|resume`), keyed on `session_id`.
-- The bootstrap must stay a silent no-op after the first injection (session-keyed sentinel).
+- Inject full context on `SessionStart` (matcher `startup|resume`), keyed on `session_id`.
+- The bootstrap must stay a silent no-op after the first injection (session-keyed sentinel), until the session's bind changes or it compacts.
 - Re-injecting the whole bootstrap per prompt is token waste and drift.
 
 | Property | Consequence for authoring |

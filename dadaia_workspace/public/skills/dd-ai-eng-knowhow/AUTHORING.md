@@ -17,7 +17,7 @@ Every library skill must satisfy all fifteen; each rule's detail lives in the se
 | 6 | Every step ends on a checkable, demanding completion criterion | §4 |
 | 7 | Leading words over prose; a vocabulary skill says "use these terms exactly" with an Avoid list | §5 |
 | 8 | Positive by default; a prohibition stays only with a demonstrated failure, paired with the positive | §5 |
-| 9 | Prune no-ops, sediment, duplication; git keeps history; a prohibition carries its short reason or a bug/ADR id | §6 |
+| 9 | Prune no-ops, sediment, duplication; git keeps history; a prohibition carries its short reason | §6 |
 | 10 | Right altitude: intent over mechanics that go stale (paths, snippets), with the prototype exception | §6 |
 | 11 | Steps are actions in execution order, one idea each; the branch decision comes first; templates are fenced blocks | §8 |
 | 12 | The set is curated and composed: overlap resolves by merge or by one skill calling the other | §7 |
@@ -87,7 +87,7 @@ Every library skill must satisfy all fifteen; each rule's detail lives in the se
 - A vocabulary skill states "use these terms exactly", pairs each term with its _Avoid_ list, and every sibling skill speaks it.
 - Negation is the failure mode beside this lever: a prohibition drags the banned behavior into context.
 - Prompt the positive: state the target ("link to the canonical source") instead of the banned behavior.
-- A prohibition stays only with a demonstrated failure: its short reason or a bug/ADR id beside it, paired with the positive target.
+- A prohibition stays only with a demonstrated failure: its short reason beside it, paired with the positive target.
 - A negation of something retired ("no such flag exists") is sediment — delete it with the shape it mourns.
 - Audit test: each prohibition without a reason is a rewrite to the positive.
 

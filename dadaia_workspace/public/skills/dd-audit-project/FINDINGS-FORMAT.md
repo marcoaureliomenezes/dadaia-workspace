@@ -32,4 +32,4 @@ An append authors the immutable core. Every later change uses the disposition ve
    disposition replaces only the finding's governance triple; its immutable fields
    remain unchanged.
 4. `audit.py close <audit> --sha <window-end>` refuses while any finding is `open`, then
-   appends one audit-history record and deletes the live directory atomically.
+   appends one audit-history record and deletes the live directory.

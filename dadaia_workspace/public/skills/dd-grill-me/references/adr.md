@@ -23,6 +23,4 @@ Ask only what inspection leaves open, one question at a time.
 
 ## Record
 
-- `options`: at least two, in the decision record's schema shape.
-- `ruling.words`: self-contained, the question asked plus the chosen option, verbatim; never only an answer id.
-- Written in the turn of the answer, as the record's text; only the operator rules.
+- The record's shape and the ruling rule: `specs/ADRs/AGENTS.md` §1-§2.

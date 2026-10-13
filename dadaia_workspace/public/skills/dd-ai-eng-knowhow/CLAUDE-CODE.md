@@ -114,8 +114,8 @@ A decision surface, not a doc mirror — official docs are an on-demand index at
 
 - Gotcha: an empty matcher fires on every tool (`Read`, `Grep`, `Glob`, `WebFetch`, `TaskCreate` too).
 - Scope write-gates to `Edit|Write|MultiEdit|NotebookEdit`.
-- Inject full static context once per logical session (session-keyed sentinel), never every prompt.
-- `UserPromptSubmit` may fire every prompt but must stay a silent no-op after the first injection.
+- Inject full static context once (session-keyed sentinel), never every prompt.
+- `UserPromptSubmit` may fire every prompt but must stay a silent no-op after the first injection, until the session's bind changes or it compacts.
 - PreToolUse is a guardrail, not a hard boundary — a script that writes files itself can slip past it.
 - Keep a server-side backstop (a `doctor` check) for true enforcement.
 - Hooks run unsandboxed on the operator's machine, only after project-trust is accepted.
