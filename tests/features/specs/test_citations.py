@@ -67,8 +67,7 @@ def test_mem_drift2_citation(tmp_path: Path, rel: str, body: str, needles: tuple
 
 
 def test_no_command_tree_no_repo_root_or_no_specs_is_silent(tmp_path: Path) -> None:
-    """An unresolved CLI tree keeps the rule silent, as ``live_shas=None`` keeps
-    SPEC-DOC-044 silent — never a false drift report."""
+    """An unresolved CLI tree keeps the rule silent: never a false drift report."""
     specs = tmp_path / "specs"
     (specs / "memory").mkdir(parents=True)
     (specs / "memory" / "thing.md").write_text("Run `dadaia fixture-verb`.\n", encoding="utf-8")
