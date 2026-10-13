@@ -134,6 +134,22 @@ class MemoryValidator:
                     )
                 )
                 continue
+            except UnicodeDecodeError:
+                ledger = self.specs_dir / doctor_adr.LEDGER
+                restore = f"Operator action: restore {ledger} with `git checkout -- {ledger}`"
+                issues.append(
+                    specs_finding(
+                        "FIXED-2",
+                        Severity.ERROR,
+                        f"{rel}: fixed law section `{section_id}` source is not valid UTF-8",
+                        str(path),
+                        fixable=False,
+                        fix=restore
+                        if optional
+                        else shell_line(sys.executable, "-m", "pip", "install", "-U", _PKG),
+                    )
+                )
+                continue
             except ValueError as refusal:
                 message = f"{rel}: fixed law section `{section_id}` refused: {refusal}"
                 issues.append(
