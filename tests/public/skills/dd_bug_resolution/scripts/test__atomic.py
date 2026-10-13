@@ -206,7 +206,7 @@ def test_bugs_append_into_a_symlinked_ledger_exits_1_with_one_fix_line(tmp_path:
         cwd=tmp_path,
     )
     assert done.returncode == 1, done.stdout + done.stderr
-    assert "Error:" in done.stderr
+    assert "[error]" in done.stderr
     assert sum(line.lstrip().startswith("fix:") for line in done.stderr.splitlines()) == 1
     assert real.read_text(encoding="utf-8") == ""
     assert (repo / "specs" / "bugs" / "BUGS.jsonl").is_symlink()
