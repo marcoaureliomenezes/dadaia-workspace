@@ -177,7 +177,8 @@ def v32_hits(tree: Tree) -> list[tuple[str, str, str, str]]:
     def judge(kind: str, rel: str, line: int, text: str) -> None:
         scope = "package" if rel.startswith(PKG) else rel.split("/")[0]
         if m := _GRAMMAR.search(text):
-            rule = f"{scope}-{kind}-ids" if m.lastgroup == "core" else m.lastgroup.replace("_", "-")
+            form = str(m.lastgroup)
+            rule = f"{scope}-{kind}-ids" if form == "core" else form.replace("_", "-")
             out.append((kind, rule, f"{rel}:{line}", m.group()))
         elif found := next((t for t in _TOKEN.findall(text) if t in exact), ""):
             out.append((kind, exact[found], f"{rel}:{line}", found))
