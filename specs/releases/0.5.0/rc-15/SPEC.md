@@ -78,7 +78,7 @@ Wave ranking: Wave 1 is law, skills and the dev loop (FR1, FR2). Wave 2 is the s
 #### FR2 — bytecode-off has one env owner (`one-bytecode-off-owner`; Q2 option B, agent default, unruled)
 
 - AC2.1 (unit, RED first): The kernel's `_git.scrubbed_env()` carries `PYTHONDONTWRITEBYTECODE=1`. A child Python started with it from a temporary package writes no `__pycache__`.
-- AC2.2 (integration): Five env sites build their child env on the owner and drop their own literal. The sites are `scripts/ci.py`, `scripts/mutate.py`, `features/certification/service.py`, `tests/fixtures/harness_env.py` and `test__atomic.py:216` (PLAN §1.2 lists their lines). Every existing test stays green unedited.
+- AC2.2 (integration): Four env sites build their child env on the owner and drop their own literal (`scripts/ci.py` keeps its own; PLAN §1.2 states why). The sites are `scripts/mutate.py`, `features/certification/service.py`, `tests/fixtures/harness_env.py` and `test__atomic.py:216` (PLAN §1.2 lists their lines). Every existing test stays green unedited.
 - AC2.3 (no test — reviewer `git grep`): `git grep -nE 'PYTHONDONTWRITEBYTECODE|dont_write_bytecode|-B\b' -- dadaia_workspace scripts tests` hits only the set PLAN §1.2 measured, each hit with its reason there. That set is:
   - the owner and its test;
   - the 8 skill-script top lines;
