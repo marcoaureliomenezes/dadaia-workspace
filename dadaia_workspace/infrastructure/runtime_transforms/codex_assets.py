@@ -25,7 +25,8 @@ from dadaia_workspace.infrastructure.public_assets_common import _toml_escape
 # Each entry must be an exact name or leading-hyphen prefix of a real
 # ``public/skills/<name>/SKILL.md`` SOURCE skill. A name that resolves to nothing is a phantom
 # prefix: it gates nothing real and would silently stop protecting the family it was
-# meant to cover (a test derives this whole tuple from the on-disk inventory — ``tests/infrastructure/runtime_transforms/test_codex_assets.py``).
+# meant to cover (a test derives this whole tuple from the on-disk inventory —
+# ``tests/infrastructure/runtime_transforms/test_codex_assets.py``).
 _CODEX_SKILL_REF_PREFIXES = ("dd-",)
 
 

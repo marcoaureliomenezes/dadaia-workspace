@@ -37,7 +37,8 @@ PREDECESSOR = dict(zip(PHASES[1:], PHASES, strict=False))
 
 def _refuse_unapproved_docs(live: Live) -> Path:
     """A candidate enters IMPLEMENTATION only with SPEC and PLAN `Approved`; returns the
-    candidate folder that holds them (no folder yet: the first candidate's folder is where they belong)."""
+    candidate folder that holds them (no folder yet: the first candidate's folder is where they
+    belong)."""
     candidate = live.candidate or live.release_dir / "rc-1"
     for name in CANDIDATE_DOCS:
         document = candidate / name
