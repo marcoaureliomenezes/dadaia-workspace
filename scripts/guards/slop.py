@@ -139,7 +139,8 @@ _GRAMMAR = re.compile(
     r"|(?P<staged_task_id>J[0-9]+\.S[0-9]+\.T[0-9]+)"
     r"|(?P<ac_number_id>A[0-9]+\.[0-9]+)"
     r"|(?P<audit_finding_id>F-[0-9]+|F0[0-9]{2}|[0-9]{8}(?:-[a-z][a-z0-9-]*| audit))"
-    r"|(?P<review_label_id>[Rr]eview (?:finding [0-9]+|(?:[0-9]+ )?[FHMN][0-9]+))"
+    r"|(?P<review_label_id>[Rr]eview (?:finding [0-9]+"
+    r"|(?:[0-9]+ )?(?:[FMN][0-9]+|H[0-9]+\b(?! heading))))"
     r"|(?P<plan_label_id>PLAN [A-Z]?[0-9]+(?:\.[0-9]+)*)"
     r"|(?P<grill_label_id>Grill Q[0-9]+|Q[0-9]+ ruling|[Rr]uling [A-Z]?[0-9]+)"
     r"|(?P<bug_number_id>[Bb]ugs? [0-9]{3}))\b"
@@ -498,10 +499,10 @@ def CONTROL(root: Path) -> Session:
         "Reads ISO-8601 at section 4, a bug in the parser, a review of the diff, a wave of\n"
         "work, a grill of the plan, a ruling on Q and python 3.12 on v1.2. A bug end-to-end\n"
         "test, Bug: off-by-one in a cursor, ISO week 2026-W41-1, the W1-4 range, fixed 2 bugs\n"
-        "3 times, python bug 12345, review h2 heading, SHA256, UTF8, SHA-256, UTF-8, an H1\n"
-        "heading, IPv4, E402 and S603 lint codes, C0 control bytes, T1 evals, L1 harness,\n"
-        "A4 paper, NIST P-256, FRAME 3, ACK 2, a WPA2 key, (L1 harness), (T1 evals), a (H1)\n"
-        "heading, the #C0FFEE color and the 20261013T040740Z stamp.\n"
+        "3 times, python bug 12345, review h2 heading, Review H1 heading, SHA256, UTF8, SHA-256,\n"
+        "UTF-8, an H1 heading, IPv4, E402 and S603 lint codes, C0 control bytes, T1 evals,\n"
+        "L1 harness, A4 paper, NIST P-256, FRAME 3, ACK 2, a WPA2 key, (L1 harness), (T1 evals),\n"
+        "a (H1) heading, the #C0FFEE color and the 20261013T040740Z stamp.\n"
         '"""\n',
     )
     _write(root, "scripts/guards/ok.py", '"""Judges x."""\n')
