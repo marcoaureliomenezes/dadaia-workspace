@@ -11,7 +11,7 @@ Agents creating or editing tests must follow them.
   `tests/<p>/test_<m>.py` mirrors `dadaia_workspace/<p>/<m>.py` for that module's tests only; the folder never says the size. A second file for the same module is `test_<m>__<topic>.py`.
 - `tests/fixtures/**`: the suite's own support and the tests of it.
 - `tests/e2e/**`: named end-to-end journeys only. Every file names an owner.
-- `tests/tmp/<job>/`: seam REDs, refactor pins and bug reproductions live in it, versioned, collected during the job, refused at the job merge while git tracks a file there. Each `tests/tmp/<job>/` carries an `__init__.py`. Each test is promoted into its contract's home or deleted.
+- `tests/tmp/<job>/`: seam REDs, refactor pins and bug reproductions live in it, versioned, collected during the job, refused at the job merge while git tracks a file there. Each `tests/tmp/<job>/` carries an `__init__.py`. Each test is promoted into its contract's home.
 
 ## Sizes and cost
 
