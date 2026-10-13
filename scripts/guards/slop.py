@@ -500,12 +500,9 @@ def CONTROL(root: Path) -> Session:
         "3 times, python bug 12345, review h2 heading, review H2 sections, ruling 3 times,\n"
         "SHA256, UTF8, SHA-256, UTF-8, an H1 heading, IPv4, E402 and S603 lint codes, T-1,\n"
         "TR-808, CP1252, NIST P-256, FRAME 3, ACK 2, a WPA2 key, 12345678-abcd-1234, 20261013-x,\n"
-        "the #C0FFEE color and the 20261013T040740Z stamp.\n"
-        "T1: cold onboarding\n"
-        "#: C0, C1\n"
-        "L1, L2 caches\n"
-        "S3: the bucket\n"
-        "object storage (S3) and (C1 range), a (Q3) quarter, priority (P0), a (H1) heading\n"
+        "the #C0FFEE color, the 20261013T040740Z stamp, T1: cold onboarding, #: C0, C1, L1, L2\n"
+        "caches, S3: the bucket, object storage (S3), a (C1 range), a (Q3) quarter, (P0) and a\n"
+        "(H1) heading.\n"
         '"""\n',
     )
     _write(root, "scripts/guards/ok.py", '"""Judges x."""\n')
