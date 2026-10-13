@@ -22,6 +22,7 @@ from _git import scrubbed_env
 from _grammar import CONTEXT_NAME_RE
 from _handoffs import REVIEWER, reviewer_records
 from _platform import venv_tool
+from _refusal import Refusal
 from _specs import quote
 
 _WORKTREE = Path(__file__).resolve().parents[2] / "dd-gitflow-default" / "scripts" / "worktree.py"
@@ -31,38 +32,37 @@ _OWN = (
 )  # fmt: skip
 
 
-def _refuse(message: str) -> int:
-    print(f"[error] {message}", file=sys.stderr)
-    return 1
-
-
-def _body(text: str) -> dict[str, object] | str:
-    """The stdin object, or the reason it is refused."""
+def _body(text: str) -> dict[str, object]:
+    """The stdin object. Raises `Refusal` when it is not one verdict.py may extend."""
+    fix = "Operator action: pipe one JSON object without the keys verdict.py owns, then rerun verdict.py"
     try:
         body = json.loads(text)
     except ValueError:
-        return "stdin is not JSON"
+        raise Refusal("stdin is not JSON", fix) from None
     if not isinstance(body, dict):
-        return "stdin is not a JSON object"
+        raise Refusal("stdin is not a JSON object", fix)
     if taken := [k for k in _OWN if k in body]:
-        return f"stdin sets keys verdict.py owns: {', '.join(taken)}"
+        raise Refusal(f"stdin sets keys verdict.py owns: {', '.join(taken)}", fix)
     return body
 
 
-def _reason(stdout: str, stderr: str) -> str:
-    """The refusal text for a failed `reports validate --json`: its first error, or its own text."""
+def _reason(stdout: str, stderr: str) -> Refusal:
+    """The refusal for a failed `reports validate --json`: its first error, or its own text."""
     try:
         err = json.loads(stdout)[0]["errors"][0]
     except (ValueError, LookupError, TypeError):  # no JSON: the CLI refused before validating
         said = stderr.splitlines()
         fix = next(
-            (x for x in said if x.startswith("fix: ")),
-            "fix: Operator action: resolve the workspace CLI error above, then rerun verdict.py",
+            (x[5:] for x in said if x.startswith("fix: ")),
+            "Operator action: resolve the workspace CLI error above, then rerun verdict.py",
         )
         why = next((x[7:] for x in said if x.startswith("Error: ")), stderr.strip() or "no output")
-        return f"{why}\n{fix}"
+        return Refusal(why, fix)
     where, why = err["field_path"], err["message"]
-    return f"{where}: {why}\nfix: Operator action: correct {where} in the stdin body ({why}), then rerun verdict.py"
+    return Refusal(
+        f"{where}: {why}",
+        f"Operator action: correct {where} in the stdin body ({why}), then rerun verdict.py",
+    )
 
 
 def _stats(argv: list[str]) -> int:
@@ -72,7 +72,10 @@ def _stats(argv: list[str]) -> int:
     rc = parser.parse_args(argv).rc
     root = _root.workspace_of(Path.cwd())
     if root is None:
-        return _refuse("no workspace above the current directory")
+        raise Refusal(
+            "no workspace above the current directory",
+            "Operator action: run verdict.py stats from inside the workspace, then rerun it",
+        )
     by_tree: dict[str, list[tuple[str, str]]] = {}
     for _path, data in reviewer_records(root):
         branch = str(data.get("scope", "")).partition("@")[0]
@@ -97,7 +100,14 @@ def _stats(argv: list[str]) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
-    argv = sys.argv[1:] if argv is None else argv
+    try:
+        return _run(sys.argv[1:] if argv is None else argv)
+    except Refusal as refusal:
+        print(f"[error] {refusal}", f"fix: {refusal.fix}", sep="\n", file=sys.stderr)
+        return 1
+
+
+def _run(argv: list[str]) -> int:
     if argv[:1] == ["stats"]:
         return _stats(argv[1:])
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
@@ -111,11 +121,12 @@ def main(argv: list[str] | None = None) -> int:
     slug = _ledger.load_schema("backlog-v1")["$defs"]["slug"]["pattern"]
     for name, pattern in (("context", CONTEXT_NAME_RE.pattern), ("slug", slug)):
         if not re.fullmatch(pattern, getattr(args, name)):
-            return _refuse(f"--{name} must match {pattern}")
+            raise Refusal(
+                f"--{name} must match {pattern}",
+                f"Operator action: pass a {name} matching that pattern, then rerun verdict.py",
+            )
     tree = Path(args.path).resolve()
     body = _body(sys.stdin.read())
-    if isinstance(body, str):
-        return _refuse(body)
     done = subprocess.run(
         [sys.executable, str(_WORKTREE), "hash", str(tree), "--sha", args.sha],
         capture_output=True,
@@ -141,7 +152,7 @@ def main(argv: list[str] | None = None) -> int:
     root = Path(bound["root"])
     cli = venv_tool(root / ".dadaia/.venv", "dadaia")
     if not cli.exists():
-        return _refuse(f"no workspace CLI\nfix: uvx dadaia-workspace init {quote(str(root))}")
+        raise Refusal("no workspace CLI", f"uvx dadaia-workspace init {quote(str(root))}")
     out = root / ".dadaia/handoff" / args.context
     out.mkdir(parents=True, exist_ok=True)
     target = out / f"{now.replace(':', '')}-{REVIEWER}-{args.slug}.handoff.json"
@@ -149,7 +160,10 @@ def main(argv: list[str] | None = None) -> int:
         with target.open("x", encoding="utf-8") as fh:
             fh.write(json.dumps(handoff, indent=2) + "\n")
     except FileExistsError:
-        return _refuse(f"{target.name} exists; rerun in a second")
+        raise Refusal(
+            f"{target.name} exists; rerun in a second",
+            "Operator action: rerun verdict.py in a second",
+        ) from None
     checked = subprocess.run(
         [str(cli), "reports", "validate", str(target), "--reviewed-root", str(tree), "--json"],
         cwd=root,
@@ -159,7 +173,7 @@ def main(argv: list[str] | None = None) -> int:
     )  # fmt: skip
     if checked.returncode:
         _atomic.atomic_write(target, None)
-        return _refuse(_reason(checked.stdout, checked.stderr))
+        raise _reason(checked.stdout, checked.stderr)
     print(target)
     return 0
 
