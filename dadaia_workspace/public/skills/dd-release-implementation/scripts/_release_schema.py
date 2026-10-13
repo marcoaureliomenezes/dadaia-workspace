@@ -103,7 +103,7 @@ def candidate_adds(specs: Path) -> list[tuple[_dt.datetime, str, str]]:
         log = _git.git(specs, "log", "--diff-filter=A", "--name-only", "--format=%x00%H %cI", "--",
                        ":(glob)releases/**/rc-*/SPEC.md")  # fmt: skip
     except RuntimeError as exc:
-        from _specs import git_line  # the entry point's bootstrap resolves it
+        from _platform import git_line  # the entry point's bootstrap resolves it
 
         raise Unreadable(
             f"cannot read the history of {specs}: {exc}", git_line(specs, "fsck")

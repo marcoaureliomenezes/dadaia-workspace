@@ -17,7 +17,7 @@ import _clock
 import _git
 import _jsonl
 from _grammar import SHA_RE, STATE
-from _refusal import Refusal
+from _refusal import Refusal, fix_of
 from _release_check import candidate_errors
 from _release_schema import (
     APPROVED,
@@ -66,9 +66,7 @@ def _worktree_rows(root: Path) -> list[dict[str, Any]]:
                           capture_output=True, text=True, encoding="utf-8", errors="replace", check=False)  # fmt: skip
     if done.returncode:
         lines = done.stderr.splitlines()
-        fix = next(
-            (ln[5:] for ln in lines if ln.startswith("fix: ")), f"{sys.executable} {owner} list"
-        )
+        fix = fix_of(done.stderr, f"{sys.executable} {owner} list")
         raise Refusal(f"worktree rows unreadable: {lines[0] if lines else done.returncode}", fix)
     rows: list[dict[str, Any]] = json.loads(done.stdout)
     return rows

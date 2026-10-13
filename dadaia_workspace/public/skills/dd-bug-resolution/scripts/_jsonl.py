@@ -9,6 +9,7 @@ from collections.abc import Iterable, Iterator
 from pathlib import Path
 from typing import Any
 
+from _platform import git_line
 from _refusal import Refusal
 
 
@@ -24,9 +25,10 @@ class Undecodable(Refusal):
     """The file *path* is not UTF-8: a verb refuses with the restore act, a check reports a finding."""
 
     def __init__(self, path: Path) -> None:
+        target = path.resolve()
+        restore = git_line(target.parent, "checkout", "--", target.name)
         super().__init__(
-            f"{path} is not valid UTF-8",
-            f"Operator action: restore {path.resolve()} with `git checkout -- {path.resolve()}`",
+            f"{path} is not valid UTF-8", f"Operator action: restore {target} with `{restore}`"
         )
         self.path = path
 

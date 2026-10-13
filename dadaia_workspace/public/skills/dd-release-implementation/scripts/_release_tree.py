@@ -18,6 +18,7 @@ import _jsonl
 import _memory_drift as drift
 from _grammar import SEMVER_RE, SHA_RE, STATE, live_ids
 from _ledger import records
+from _platform import quote
 from _refusal import Refusal
 from _release_check import candidate_errors, ship_histo_findings, state_findings
 from _release_phase import NEXT
@@ -33,7 +34,7 @@ from _release_schema import (
     origin_line,
 )
 from _release_store import SCRIPT, Live, live_release
-from _specs import quote, script, with_specs
+from _specs import script, with_specs
 
 __all__ = ["check", "drift", "memory_errors", "ship_findings", "tree_findings"]
 

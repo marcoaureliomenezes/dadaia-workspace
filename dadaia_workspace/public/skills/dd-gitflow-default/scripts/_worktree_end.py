@@ -21,7 +21,7 @@ from pathlib import Path
 
 from _handoffs import REVIEWER, reviewer_records
 from _platform import venv_dir, venv_tool
-from _refusal import report
+from _refusal import fix_of, report, without_fix
 from _worktree_git import (
     cli,
     cli_line,
@@ -264,8 +264,8 @@ def _ledgers(root: Path, tree: Path) -> None:
     for name, done in _checks(root, tree):
         if done.returncode:
             out = done.stdout + done.stderr
-            print("".join(ln for ln in out.splitlines(True) if not ln.startswith("fix: ")), end="")
-            raise Refusal(f"{name} check failed on {tree / 'specs'}", next((ln[5:] for ln in out.splitlines() if ln.startswith("fix: ")), f"Operator action: fix the findings above in {tree} and commit them"))  # fmt: skip
+            print(without_fix(out), end="")
+            raise Refusal(f"{name} check failed on {tree / 'specs'}", fix_of(out, f"Operator action: fix the findings above in {tree} and commit them"))  # fmt: skip
 
 
 def _series(tree: Path, work: str, tip: str) -> list[tuple[str, str]]:

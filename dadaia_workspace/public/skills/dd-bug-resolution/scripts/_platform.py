@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
-"""The one reader of `sys.platform` for the skill scripts: does this host spell paths and venvs the Windows way?"""
+"""The one reader of `sys.platform` for the skill scripts — does this host spell paths and venvs the Windows way —
+and the shell words and git lines spelled by it."""
 
 from __future__ import annotations
 
+import shlex
 import sys
 from pathlib import Path
 from typing import NamedTuple
@@ -34,3 +36,25 @@ def venv_tool(venv: Path, tool: str, caps: Caps | None = None) -> Path:
     """Where *venv* keeps the executable *tool* on this host."""
     caps = caps or detect()
     return venv / caps.scripts_dir / f"{tool}{caps.exe_suffix}"
+
+
+def quote(word: str) -> str:
+    """One shell word as `core/cli_line.shell_line` spells it: ``shlex`` on POSIX; on
+    Windows forward slashes, double quotes only around a blank."""
+    if not detect().windows:
+        return shlex.quote(word)
+    word = word.replace("\\", "/")
+    return word if word and not any(c in word for c in ' \t"') else f'"{word}"'
+
+
+def head(word: str) -> str:
+    """A command's first word as `core/cli_line.shell_line` spells it: on Windows a quote
+    opens after the drive letter, so the line never opens with one PowerShell reads as an
+    expression."""
+    word = quote(word)
+    return f'{word[1]}"{word[2:]}' if detect().windows and word.startswith('"') else word
+
+
+def git_line(repo: Path | str, *argv: str) -> str:
+    """``git -C <repo> argv…`` quoted, as `core/cli_line.git_line` spells it."""
+    return " ".join(map(quote, ("git", "-C", str(repo), *argv)))

@@ -16,7 +16,8 @@ import _findings
 import _jsonl
 import _ledger
 from _grammar import TASK_ID_RE
-from _specs import quote, script, with_specs
+from _platform import quote
+from _specs import script, with_specs
 
 CODE = "LEDGER-BUGS-SCHEMA"
 LEDGER = "bugs/BUGS.jsonl"

@@ -5,13 +5,12 @@ script prints through."""
 from __future__ import annotations
 
 import json
-import shlex
 import subprocess
 import sys
 from pathlib import Path
 
 from _ledger import parse as parse
-from _platform import cli_path, detect
+from _platform import cli_path, head, quote
 from _refusal import Refusal, report
 from _root import workspace_of as workspace_of
 
@@ -57,28 +56,6 @@ def _bound_fix(here: Path, rerun: str, ledger: str | None) -> tuple[str, str]:
 
 
 _GITFLOW = Path(__file__).resolve().parents[2] / "dd-gitflow-default" / "scripts"
-
-
-def quote(word: str) -> str:
-    """One shell word as `core/cli_line.shell_line` spells it: ``shlex`` on POSIX; on
-    Windows forward slashes, double quotes only around a blank."""
-    if not detect().windows:
-        return shlex.quote(word)
-    word = word.replace("\\", "/")
-    return word if word and not any(c in word for c in ' \t"') else f'"{word}"'
-
-
-def head(word: str) -> str:
-    """A command's first word as `core/cli_line.shell_line` spells it: on Windows a quote
-    opens after the drive letter, so the line never opens with one PowerShell reads as an
-    expression."""
-    word = quote(word)
-    return f'{word[1]}"{word[2:]}' if detect().windows and word.startswith('"') else word
-
-
-def git_line(repo: Path | str, *argv: str) -> str:
-    """``git -C <repo> argv…`` quoted, as `core/cli_line.git_line` spells it."""
-    return " ".join(map(quote, ("git", "-C", str(repo), *argv)))
 
 
 def script(path: Path) -> str:

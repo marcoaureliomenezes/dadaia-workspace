@@ -30,6 +30,15 @@ LEDGER = "ADRs/decisions.jsonl"
 _ADR_CITATION_RE = re.compile(r"\bADR[:\s-]+(\d{4})\b")
 
 
+def _ledger_text(ledger: Path) -> str:
+    """The ledger's text; raises ValueError, whose text is the one fix line, when it is not UTF-8."""
+    owner = load_owner("dd-bug-resolution", "_jsonl")
+    try:
+        return str(owner.read_text(ledger))
+    except owner.Undecodable as bad:
+        raise ValueError(bad.fix) from bad
+
+
 def _records(text: str, status: str) -> list[dict[str, object]]:
     """An unreadable line names nothing here; it is `adr_record_issues`' finding."""
     owner = load_owner("dd-bug-resolution", "_ledger")
@@ -46,7 +55,11 @@ def superseded_adr_citations(specs_dir: Path, public_dir: Path | None) -> list[S
     ledger = specs_dir / "ADRs" / "decisions.jsonl"
     if not ledger.is_file():
         return []
-    superseded = {str(r.get("id")) for r in _records(ledger.read_text("utf-8"), "superseded")}
+    try:
+        text = _ledger_text(ledger)
+    except ValueError:  # `adr_record_issues` names the file
+        return []
+    superseded = {str(r.get("id")) for r in _records(text, "superseded")}
     if not superseded:
         return []
     roots = [specs_dir / "memory"]
@@ -90,7 +103,7 @@ def _doctor_codes() -> frozenset[str]:
 
 def _accepted(specs_dir: Path) -> list[dict[str, object]]:
     ledger = specs_dir / LEDGER
-    return _records(ledger.read_text(encoding="utf-8"), "accepted") if ledger.is_file() else []
+    return _records(_ledger_text(ledger), "accepted") if ledger.is_file() else []
 
 
 def unresolved_measured_by(specs_dir: Path) -> list[tuple[str, str]]:
@@ -152,7 +165,19 @@ def adr_record_issues(specs_dir: Path) -> list[SectionFinding]:
     records: list[tuple[int, dict[str, object]]] = []
     owner = load_owner("dd-bug-resolution", "_ledger")
     schema = owner.load_schema("decision-record-v1")
-    for number, raw in enumerate(ledger.read_text(encoding="utf-8").split("\n"), start=1):
+    try:
+        lines = _ledger_text(ledger).split("\n")
+    except ValueError as bad:
+        return [
+            specs_finding(
+                code="LEDGER-ADR-SCHEMA",
+                severity=Severity.ERROR,
+                description=f"{LEDGER} is not valid UTF-8",
+                path=LEDGER,
+                fix=str(bad),
+            )
+        ]
+    for number, raw in enumerate(lines, start=1):
         try:
             parsed = owner.parse(raw)
         except owner.LineError as exc:

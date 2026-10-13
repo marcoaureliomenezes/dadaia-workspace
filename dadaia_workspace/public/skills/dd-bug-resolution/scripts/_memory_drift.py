@@ -19,8 +19,9 @@ from typing import Any
 
 import _git
 import _jsonl
+from _platform import git_line
 from _refusal import Refusal as Refusal
-from _specs import CATALOG, git_line
+from _specs import CATALOG
 
 NOT_CODE = frozenset({"specs", "tests", "test", "docs"})
 

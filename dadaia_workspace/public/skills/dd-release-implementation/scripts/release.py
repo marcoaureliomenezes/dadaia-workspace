@@ -105,12 +105,14 @@ def _new(args: argparse.Namespace, specs: Path) -> int:
 def _origin(spec: Path) -> int:
     try:
         carried = origin(_jsonl.read_text(spec))
-    except (OSError, ValueError, _jsonl.Undecodable) as error:
+    except _jsonl.Undecodable as bad:
+        report(bad, bad.fix)
+        return 1
+    except (OSError, ValueError) as error:
         act = (
             "pass the path of an existing SPEC.md"
             if isinstance(error, OSError)
-            else getattr(error, "fix", "").removeprefix("Operator action: ")
-            or "edit its `**Origin:**` line"
+            else "edit its `**Origin:**` line"
         )
         report(f"{spec} {error}", f"Operator action: {act}")
         return 1

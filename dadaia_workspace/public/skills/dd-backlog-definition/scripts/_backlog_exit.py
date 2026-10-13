@@ -19,8 +19,8 @@ import _git
 from _backlog_schema import DISPOSITIONS
 from _backlog_store import SCRIPT, Items
 from _bugs_store import read_records
-from _refusal import Refusal
-from _specs import quote
+from _platform import quote
+from _refusal import Refusal, fix_of
 
 #: `release.py`'s Origin parser, run as its own script: the one reader of the line.
 _RELEASE = (
@@ -34,7 +34,7 @@ def _origin_ids(spec: Path) -> list[str]:
                           capture_output=True, text=True, encoding="utf-8", errors="replace", check=False)  # fmt: skip
     if done.returncode:
         lines = done.stderr.splitlines()
-        fix = next((ln[5:] for ln in lines if ln.startswith("fix: ")), f"{sys.executable} {_RELEASE} origin {spec}")  # fmt: skip
+        fix = fix_of(done.stderr, f"{sys.executable} {_RELEASE} origin {spec}")
         raise Refusal(f"Origin unreadable: {lines[0] if lines else done.returncode}", fix)
     return [ln[len("backlog ") :] for ln in done.stdout.splitlines() if ln.startswith("backlog ")]
 

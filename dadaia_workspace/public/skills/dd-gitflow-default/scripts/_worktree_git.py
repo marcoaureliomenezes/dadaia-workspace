@@ -14,10 +14,11 @@ from pathlib import Path
 
 from _git import git as git, parse_worktrees, scrubbed_env as scrubbed_env  # isort: skip
 from _grammar import SEMVER_RE, TAG_RE
-from _specs import git_line as git_line
-from _specs import head, workspace_cli
-from _specs import quote as quote  # (`as`: re-exported to the worktree verbs)
+from _platform import git_line as git_line
+from _platform import head
+from _platform import quote as quote  # (`as`: re-exported to the worktree verbs)
 from _specs import script as script
+from _specs import workspace_cli
 from _specs import workspace_of as workspace_of
 from _worktree_names import NAME_RE, SCRIPT, Refusal, base, branch, name_of, plain, tree_path
 

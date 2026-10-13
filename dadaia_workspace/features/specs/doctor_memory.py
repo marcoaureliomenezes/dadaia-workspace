@@ -5,14 +5,13 @@ Leaf-only: imports the shared leaves + core, never a sibling validator."""
 from __future__ import annotations
 
 import re
-import sys
 from collections.abc import Callable, Collection
 from contextlib import suppress
 from functools import partial
 from pathlib import Path
 
 from dadaia_workspace.core.atomic_write import atomic_write
-from dadaia_workspace.core.cli_line import materialize_line, shell_line
+from dadaia_workspace.core.cli_line import materialize_line
 from dadaia_workspace.core.doctor_rules import SectionFinding
 from dadaia_workspace.features.specs import citations, doctor_adr, memory_canon, memory_lint
 from dadaia_workspace.features.specs.canon import default_public_dir, is_canon_path
@@ -21,7 +20,6 @@ from dadaia_workspace.features.specs.doctor_types import Severity, finding_path,
 TOPLEVEL_MEMORY_FILES = memory_canon.MEMORY_TOPLEVEL_FILES
 PRODUCT_INDEX_REL = "product/index.md"
 _ADR_LIST = "adr-list"  # the ledger-rendered block of memory/ARCHITECTURE.md
-_PKG = "dadaia-workspace"  # a missing library fragment is repaired by reinstalling it
 _PLACEHOLDER_TOKENS = ("SLUG_PLACEHOLDER", "TITLE_PLACEHOLDER", "RELEASE_PLACEHOLDER")
 # An unfilled token is a tight code span around the token alone; a longer span only illustrates.
 _MD_HEADING_RE = re.compile(r"^#{1,6}\s+\S", re.MULTILINE)
@@ -130,23 +128,7 @@ class MemoryValidator:
                         Severity.ERROR,
                         f"{rel}: library fragment `{section_id}` is missing: {gone.filename}",
                         str(path),
-                        fix=shell_line(sys.executable, "-m", "pip", "install", "-U", _PKG),
-                    )
-                )
-                continue
-            except UnicodeDecodeError:
-                ledger = self.specs_dir / doctor_adr.LEDGER
-                restore = f"Operator action: restore {ledger} with `git checkout -- {ledger}`"
-                issues.append(
-                    specs_finding(
-                        "FIXED-2",
-                        Severity.ERROR,
-                        f"{rel}: fixed law section `{section_id}` source is not valid UTF-8",
-                        str(path),
-                        fixable=False,
-                        fix=restore
-                        if optional
-                        else shell_line(sys.executable, "-m", "pip", "install", "-U", _PKG),
+                        fix=memory_canon.reinstall_line(),
                     )
                 )
                 continue

@@ -25,7 +25,7 @@ import _clock
 import _jsonl
 import _platform
 from _ledger import replace, workspace_of
-from _refusal import report
+from _refusal import Refusal, report
 
 DEFAULT_MIN_PORT = 3000
 DEFAULT_MAX_PORT = 3999
@@ -331,7 +331,11 @@ def main(argv: list[str] | None = None) -> int:
     path = args.registry or find_registry(Path.cwd())
     verbs = {"list": cmd_list, "next": cmd_next, "register": cmd_register}
     verbs |= {"release": cmd_release, "clean": cmd_clean, "scan": cmd_scan}
-    return verbs[args.verb](load(path), args, path)
+    try:
+        return verbs[args.verb](load(path), args, path)
+    except Refusal as refusal:
+        report(refusal, refusal.fix)
+        return 1
 
 
 if __name__ == "__main__":

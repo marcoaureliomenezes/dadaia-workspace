@@ -21,7 +21,7 @@ import _root
 from _git import scrubbed_env
 from _grammar import CONTEXT_NAME_RE
 from _handoffs import REVIEWER, reviewer_records
-from _refusal import Refusal, report
+from _refusal import Refusal, fix_of, report
 from _specs import workspace_cli
 
 _WORKTREE = Path(__file__).resolve().parents[2] / "dd-gitflow-default" / "scripts" / "worktree.py"
@@ -51,9 +51,8 @@ def _reason(stdout: str, stderr: str) -> Refusal:
         err = json.loads(stdout)[0]["errors"][0]
     except (ValueError, LookupError, TypeError):  # no JSON: the CLI refused before validating
         said = stderr.splitlines()
-        fix = next(
-            (x[5:] for x in said if x.startswith("fix: ")),
-            "Operator action: resolve the workspace CLI error above, then rerun verdict.py",
+        fix = fix_of(
+            stderr, "Operator action: resolve the workspace CLI error above, then rerun verdict.py"
         )
         why = next((x[7:] for x in said if x.startswith("Error: ")), stderr.strip() or "no output")
         return Refusal(why, fix)

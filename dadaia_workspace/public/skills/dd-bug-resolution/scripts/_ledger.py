@@ -18,6 +18,7 @@ import _jsonl
 import _privacy
 from _commit import stamp as stamp
 from _findings import finding as finding
+from _platform import git_line
 from _refusal import report
 from _root import STATES as _STATES
 from _root import workspace_of as workspace_of
@@ -139,11 +140,13 @@ def unwritten(file: Path, at: int | str, verbs: str, law: str) -> str:
     line one commit owns, so its commits are listed whole."""
     if isinstance(at, int):
         what = f"line {at} of {file} was not written by {verbs} ({law})"
-        finder = f"`git log -L {at},{at}:{file}` finds it"
+        log = git_line(file.parent, "log", "-L", f"{at},{at}:{file.name}")
+        finder = f"`{log}` finds it"
     else:
-        what, finder = f"{file} fails at {at} ({law})", f"`git log -p -- {file}` lists them"
+        what = f"{file} fails at {at} ({law})"
+        finder = f"`{git_line(file.parent, 'log', '-p', '--', file.name)}` lists them"
     return (f"Operator action: {what} — if {file} has uncommitted changes, discard them "
-            f"(`git checkout -- {file}`); otherwise revert the commit that introduced it "
+            f"(`{git_line(file.parent, 'checkout', '--', file.name)}`); otherwise revert the commit that introduced it "
             f"({finder}), then redo the change through {verbs}")  # fmt: skip
 
 
