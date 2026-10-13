@@ -79,7 +79,7 @@ def _run(
     source: str | None = None,
     extra: dict[str, str] | None = None,
 ) -> str:
-    env = claude_hook_env(  # the env id is the one id channel: bind sees no stdin (review F1)
+    env = claude_hook_env(  # the env id is the one id channel: bind sees no stdin
         root,
         session_id=sid,
         extra={**(extra or {}), **({"DADAIA_HOOK_EVENT": event} if event else {})},
@@ -342,7 +342,7 @@ def test_emissions_attach_the_derived_help_digest(tmp_path: Path) -> None:
 
 
 def test_injected_catalog_is_tldr_digest_and_measurably_smaller(tmp_path: Path) -> None:
-    """AC-W4-03 / F-77: the injected catalog keeps slug/title/tldr/path only (never the heavy
+    """The injected catalog keeps slug/title/tldr/path only (never the heavy
     ``summary`` nor ``rank``), is under half the raw bytes, and the file on disk is untouched."""
     feature = {
         "rank": 1,

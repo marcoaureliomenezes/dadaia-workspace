@@ -267,7 +267,7 @@ def test_model_policy_overlay_lockstep_rendering_invalid_fails_loud_and_doctor_r
     register_all(ws)
     manager.install(ws)
 
-    # AC-2: with no overlay, BOTH projections render the exact `balanced` roster from
+    # With no overlay, BOTH projections render the exact `balanced` roster from
     # the SAME resolved config — this lockstep IS the codex-correctness assurance (no
     # codex doctor byte-compare exists).
     pm = _claude_frontmatter(ws, "dd-product-engineer")
@@ -290,7 +290,7 @@ def test_model_policy_overlay_lockstep_rendering_invalid_fails_loud_and_doctor_r
         sc.effort,
     )
 
-    # AC-3: an overlay change moves the .claude md AND .codex toml together at install.
+    # An overlay change moves the .claude md AND .codex toml together at install.
     states = ws / ".dadaia" / "states"
     states.mkdir(parents=True, exist_ok=True)
     (states / "agent_model_policy.json").write_text(

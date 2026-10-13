@@ -52,7 +52,7 @@ pytest_plugins = ("pytester",)
 # the working tree. Import-time compilation happens BEFORE any in-script
 # ``sys.dont_write_bytecode`` guard can run (e.g. tests importing the
 # ``public/scripts/*.py`` sources), so the suite-wide switch is the only reliable
-# enforcement point (AC-W5-01).
+# enforcement point.
 sys.dont_write_bytecode = True
 
 from dadaia_workspace.infrastructure.subprocess_runner import ProcessResult  # noqa: E402

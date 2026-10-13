@@ -193,7 +193,7 @@ def test_a_fresh_store_writes_v3_rows_without_legacy_fields(tmp_path: Path) -> N
 def test_a_row_missing_name_is_unreadable_at_every_method(
     tmp_path: Path, call: Callable[[JsonContextStore], object]
 ) -> None:
-    """J2.S6.T2 (review F3): a row without ``name`` is a SchemaVersionError at every store
+    """A row without ``name`` is a SchemaVersionError at every store
     method, never a KeyError; the registry file is left as it was."""
     path = tmp_path / "spec_contexts.json"
     body = json.dumps({"schema_version": 3, "contexts": [{"state": "alive"}]})
@@ -208,7 +208,7 @@ def test_a_row_missing_name_is_unreadable_at_every_method(
 
 
 def test_a_refused_row_is_named_by_its_name(tmp_path: Path) -> None:
-    """J2.S6.T6: the refusal names the row to repair; a row keeping its name is named."""
+    """The refusal names the row to repair; a row keeping its name is named."""
     path = tmp_path / "spec_contexts.json"
     row = {"name": "beta", "state": "alive", "repo_slug": "beta", "repo_url": "u"}
     path.write_text(json.dumps({"schema_version": 3, "contexts": [row]}), encoding="utf-8")

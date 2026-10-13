@@ -107,7 +107,7 @@ def test_resolve_scenarios(tmp_path: Path, given: dict[str, Any], then: dict[str
     ],
 )  # fmt: skip
 def test_resolve_session_id_precedence(env: dict[str, str], expected: str) -> None:
-    """DADAIA_SESSION_ID > harness env > ""; env only — bind sees no payload (review F1)."""
+    """DADAIA_SESSION_ID > harness env > ""; env only — bind sees no payload."""
     assert invocation.resolve_session_id(env) == expected
 
 
@@ -193,7 +193,7 @@ class TestAliveContextNames:
 
 
 def test_a_row_without_a_main_slug_has_no_specs_tree(tmp_path: Path) -> None:
-    """J2.S6.T5 (review F7): a hand-edited ALIVE row whose main slug is empty or absent maps
+    """A hand-edited ALIVE row whose main slug is empty or absent maps
     to no ``repos/<slug>/specs`` tree; the other ALIVE contexts still do."""
     ws = _mk_ws(tmp_path)
     path = ws / ".dadaia" / "states" / "spec_contexts.json"

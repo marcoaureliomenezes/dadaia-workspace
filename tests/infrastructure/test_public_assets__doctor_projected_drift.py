@@ -1,4 +1,4 @@
-"""Unit tests for T-PROP-02: doctor staging-vs-projected drift detection.
+"""Doctor staging-vs-projected drift detection.
 
 Verifies that `dadaia public doctor` (via FileSystemPublicAssetManager.doctor):
 1. Exits 0 and emits [ok] for every staged asset on a clean workspace.
@@ -54,7 +54,7 @@ def _make_manager(public_dir: Path) -> FileSystemPublicAssetManager:
 
 
 def test_drift_and_missing_exit_nonzero(tmp_path: Path) -> None:
-    """T-PROP-02 AC-1/AC-3: staged SHA differs from projected → [drift]; staged asset
+    """Staged SHA differs from projected → [drift]; staged asset
     with no projection at all → [missing]. Both are the doctor's non-zero-exit codes."""
     public_dir = tmp_path / "public"
     public_dir.mkdir()
@@ -78,7 +78,7 @@ def test_drift_and_missing_exit_nonzero(tmp_path: Path) -> None:
 
 
 def test_clean_ok_paths_incl_scripts(tmp_path: Path) -> None:
-    """T-PROP-02 AC-2: identical staged/projected content is [ok]."""
+    """Identical staged/projected content is [ok]."""
     public_dir = tmp_path / "public"
     public_dir.mkdir()
     mgr = _make_manager(public_dir)
