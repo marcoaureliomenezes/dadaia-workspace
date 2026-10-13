@@ -157,7 +157,7 @@ def _plan(*argv: str) -> list[str]:
 def test_job_verify_is_the_fast_check() -> None:
     assert _plan("job") == _plan() == [
         "lint: ruff format", "lint: ruff check", "lint: lint-imports", "typecheck: mypy",
-        "guards: guards", "guards: guards --planted", "unit-fast: unit-fast",
+        "guards: guards", "guards: guards --planted", "unit-fast: unit-fast", "doctor: doctor",
     ]  # fmt: skip
 
 
