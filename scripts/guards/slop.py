@@ -130,19 +130,21 @@ def _allowance(tree: Tree, hits: dict[str, str], check: str, also: str = "") -> 
     return out + [f"absent-at-birth: {k} (only shrinks)" for k in sorted(allow.keys() - born)]
 
 
+#: One pattern, one named group per id kind; the group that matched names the sub-rule.
 _GRAMMAR = re.compile(
-    r"\b(FR[0-9]+|AC[0-9]+(\.[0-9]+)*|ADR[ -]?[0-9]+|T-[0-9]{2,3}(-[0-9]+)?|J[0-9]+\.T[0-9]+"
-    r"|rc-?[0-9]+|v0\.[0-9]+(\.[0-9]+)?|[0-9]{8}-[a-z0-9-]+-F[0-9]{3}|[Rr]ound [0-9]+|re-review)\b"
+    r"\b(?:(?P<core>FR-?[A-Z]?[0-9]+(?:-[0-9]+)*|AC[0-9]+(?:\.[0-9]+)*|ADR[ -]?[0-9]+"
+    r"|T-(?:[0-9]{2,3}[a-z]?|[A-Z]+-[0-9]+)(?:-[0-9]+)?|J[0-9]+\.T[0-9]+|rc-?[0-9]+"
+    r"|v0\.[0-9]+(?:\.[0-9]+)?|[0-9]{8}-[a-z0-9-]+-F[0-9]{3}|[Rr]ound [0-9]+|re-review)"
+    r"|(?P<staged_task_id>J[0-9]+\.S[0-9]+\.T[0-9]+)"
+    r"|(?P<review_finding_id>(?i:review (?:finding [0-9]+|[FH][0-9]+)))"
+    r"|(?P<wave_ac_id>AC-[A-Z0-9]+(?:-[0-9]+)*)"
+    r"|(?P<finding_number_id>F-[0-9]+)"
+    r"|(?P<bug_number_id>[Bb]ugs? [0-9]+)"
+    r"|(?P<bug_slug_id>[Bb]ug:? [a-z0-9]+(?:-[a-z0-9]+){2,})"
+    r"|(?P<wave_label_id>W[0-9]+-[0-9]+)"
+    r"|(?P<grill_label_id>Grill Q[0-9]+|Q[0-9]+ ruling)"
+    r"|(?P<release_label_id>K[0-9]+ \(release))\b"
 )
-#: sub-rule -> a further id form, named by the sub-rule that reports it
-_FORMS = {
-    "staged-task-id": re.compile(r"\bJ[0-9]+\.S[0-9]+\.T[0-9]+\b"),
-    "review-finding-id": re.compile(r"\breview F[0-9]+\b"),
-    "wave-ac-id": re.compile(r"\bAC-[A-Z0-9]+(-[0-9]+)*\b"),
-    "finding-number-id": re.compile(r"\bF-[0-9]+\b"),
-    "bug-number-id": re.compile(r"\bbugs? [0-9]{3}\b"),
-    "release-label-id": re.compile(r"\bK[0-9]+ \(release\b"),
-}
 _TOKEN = re.compile(r"\w(?:[\w.-]*\w)?")
 _DOC_OWNERS = (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)
 _LEDGERS = (
@@ -175,9 +177,8 @@ def v32_hits(tree: Tree) -> list[tuple[str, str, str, str]]:
     def judge(kind: str, rel: str, line: int, text: str) -> None:
         scope = "package" if rel.startswith(PKG) else rel.split("/")[0]
         if m := _GRAMMAR.search(text):
-            out.append((kind, f"{scope}-{kind}-ids", f"{rel}:{line}", m.group()))
-        elif form := next(((r, m) for r, f in _FORMS.items() if (m := f.search(text))), None):
-            out.append((kind, form[0], f"{rel}:{line}", form[1].group()))
+            rule = f"{scope}-{kind}-ids" if m.lastgroup == "core" else m.lastgroup.replace("_", "-")
+            out.append((kind, rule, f"{rel}:{line}", m.group()))
         elif found := next((t for t in _TOKEN.findall(text) if t in exact), ""):
             out.append((kind, exact[found], f"{rel}:{line}", found))
 
@@ -465,7 +466,8 @@ _DELETERS = [
 
 
 def CONTROL(root: Path) -> Session:
-    """Every check green: synthetic twins and deleters for each allowance key, a near miss per matcher; violations only in an untracked, gitignored dir."""
+    """Every check green: synthetic twins and deleters for each allowance key, a near miss per
+    matcher; violations only in an untracked, gitignored dir."""
     (root / SELF).parent.mkdir(parents=True)
     shutil.copyfile(ROOT / SELF, root / SELF)
     shutil.copyfile(ROOT / "setup.cfg", root / "setup.cfg")
@@ -487,7 +489,13 @@ def CONTROL(root: Path) -> Session:
     _write(root, f"{PKG}/ids.py", 'x = "FR1 ADR 1"\n')
     _write(root, f"{PKG}/zz/near.py", _NEAR)
     _write(root, "tests/unit/test_ok.py", '"""Loads x."""\n# a why\nS = "AC1.2 zz-open-bug"\n')
-    _write(root, "tests/unit/test_doctor.py", '"""Fixes TREE-5 and WS-1 in a tree."""\n')
+    _write(
+        root,
+        "tests/unit/test_doctor.py",
+        '"""Fixes TREE-5, WS-1, LINT-1, DRIFT-2, CWE-22, DOC-034, CX-7, INV-5, URL-1 and RFC-2606.\n'
+        "Reads ISO-8601 at section 4, a bug in the parser, a review of the diff, a wave of\n"
+        'work, a grill of the plan, a ruling on Q and python 3.12 on v1.2.\n"""\n',
+    )
     _write(root, "scripts/guards/ok.py", '"""Judges x."""\n')
     _write(root, "specs/backlog/_archive/backlog_histo.jsonl", '{"id": "dd-code-review"}\n')
     _write(root, f"{PKG}/public/skills/dd-code-review/SKILL.md", "x\n")
@@ -621,12 +629,15 @@ _EDGE = f"{PKG}.features.zz -> {PKG}.features.yy"
 _PLANTS: dict[str, dict[str, Plant]] = {
     "v32": {
         "package-comment-ids": _add(f"{PKG}/zz/ac.py", "x = 1  # FR1\n"),
-        "tests-comment-ids": _add("tests/unit/test_p.py", "# ADR 12\n"),
+        "tests-comment-ids": _add("tests/unit/test_p.py", "# T-PROP-01\n"),
         "tests-docstring-ids": _add("tests/unit/test_p.py", '"""AC19.3 hardens x."""\n'),
-        "scripts-comment-ids": _add("scripts/guards/x.py", "# ADR 12\n"),
+        "scripts-comment-ids": _add("scripts/guards/x.py", "# FR-W4-01\n"),
         "package-docstring-ids": _add(f"{PKG}/zz/ac.py", '"""AC1.2 states x."""\n'),
         "staged-task-id": _add("tests/unit/test_p.py", "# J2.S6.T5 pins x\n"),
-        "review-finding-id": _add("tests/unit/test_p.py", "# review F7 pins x\n"),
+        "review-finding-id": _add("tests/unit/test_p.py", '"""Review finding 8 pins x."""\n'),
+        "bug-slug-id": _add("tests/unit/test_p.py", "# bug validation-027-f-07 pins x\n"),
+        "wave-label-id": _add("tests/unit/test_p.py", "# the W1-6 block\n"),
+        "grill-label-id": _add("tests/unit/test_p.py", "# Grill Q14 ordered x\n"),
         "wave-ac-id": _add("tests/unit/test_p.py", '"""AC-W4-03 pins x."""\n'),
         "finding-number-id": _add("tests/unit/test_p.py", "# recipe F-22 pins x\n"),
         "bug-number-id": _add("tests/unit/test_p.py", "# bugs 465, 467 pin x\n"),
