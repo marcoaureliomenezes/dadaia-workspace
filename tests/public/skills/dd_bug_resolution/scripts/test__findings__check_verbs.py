@@ -66,3 +66,38 @@ def test_a_file_that_is_not_utf8_is_a_finding_of_the_verbs_own_code(
     (finding,) = json.loads(done.stdout)
     assert (finding["code"], finding["verdict"], finding["path"]) == (code, "error", relative)
     assert "git" in finding["fix"] and relative in finding["fix"]
+
+
+# verb: (skill, script, argv after the script, the file whose bytes are not UTF-8)
+_WRITERS = {
+    "bugs": ("dd-bug-resolution", "bugs.py", ["status"], "bugs/BUGS.jsonl"),
+    "backlog": ("dd-backlog-definition", "backlog.py",
+                ["exit", "x", "--disposition", "delivered"], "backlog/BACKLOG.json"),
+    "audit": ("dd-audit-project", "audit.py",
+              ["disposition", "20260101-w", "20260101-w-F001", "--disposition", "resolved", "--release", "0.5.0"],
+              "audits/20260101-w/FINDINGS.jsonl"),
+    "memory": ("dd-spec-navigator", "memory.py", ["catalog", "generate"],
+               "memory/product/area/x.md"),
+}  # fmt: skip
+
+
+@pytest.mark.parametrize("verb", _WRITERS)
+def test_a_verb_that_reads_a_file_that_is_not_utf8_refuses_with_one_fix(
+    tmp_path: Path, verb: str
+) -> None:
+    skill, name, argv, relative = _WRITERS[verb]
+    script = stage_skill_scripts(skill, tmp_path / "staged" / "scripts") / name
+    specs = tmp_path / "repo" / "specs"
+    (specs / relative).parent.mkdir(parents=True)
+    (specs / relative).write_bytes(b"\xff\xfe\n")
+    done = subprocess.run(
+        [sys.executable, str(script), *argv, "--specs", str(specs)],
+        capture_output=True, check=False, text=True,
+    )  # fmt: skip
+
+    assert done.returncode == 1 and "Traceback" not in done.stderr
+    assert relative in done.stderr
+    assert [ln for ln in done.stderr.splitlines() if ln.startswith("fix: ")] == [
+        f"fix: Operator action: restore {(specs / relative).resolve()} with "
+        f"`git checkout -- {(specs / relative).resolve()}`"
+    ]
