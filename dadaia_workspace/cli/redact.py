@@ -26,8 +26,7 @@ class ContextRedactor:
     Construct ONE instance per command invocation with the full candidate set (every
     known Spec Context name and repo slug), minus whatever must stay visible (the
     caller's own resolved context name and repo slug). Reuse the same instance across every piece of
-    output
-    the command renders, in rendering order, so the underlying :class:`Redactor`
+    output the command renders, in rendering order, so the underlying :class:`Redactor`
     accumulates ordinals in the true first-appearance order of the invocation.
     """
 

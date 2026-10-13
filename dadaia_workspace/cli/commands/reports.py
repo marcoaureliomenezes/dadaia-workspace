@@ -113,9 +113,8 @@ def validate(
             )
         target_paths = list(paths)
 
-    # Name the
-    # resolved workspace root (stderr — never pollutes --json's stdout list shape) once
-    # the invocation is accepted, so a refusal's first line stays `Error:`.
+    # Name the resolved workspace root (stderr — never pollutes --json's stdout list shape) once the
+    # invocation is accepted, so a refusal's first line stays `Error:`.
     print(f"Resolved workspace root: {workspace_root}", file=sys.stderr)
 
     # Version routing (v1/v1.1/v1.2, and refusal of any future/unknown token) lives in

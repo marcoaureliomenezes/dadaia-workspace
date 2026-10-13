@@ -47,8 +47,8 @@ class DoctorStatus(StrEnum):
 
 
 #: The complete blocking policy, decided at declaration time — the ONE place severity
-#: maps to a verdict. ``FOREIGN`` is deliberately non-blocking (Ruling 16: a
-#: hand-authored consumer AGENTS.md/CLAUDE.md pair is legitimate operator authorship).
+#: maps to a verdict. ``FOREIGN`` is deliberately non-blocking (a hand-authored
+#: consumer AGENTS.md/CLAUDE.md pair is legitimate operator authorship).
 #: ``EXTRA`` blocks: unowned residue on a managed surface is drift, not decoration.
 #: A contract test pins this exact set — changing it is a reviewed diff, never an accident.
 _BLOCKING: frozenset[DoctorStatus] = frozenset(
@@ -117,11 +117,10 @@ class DoctorReport:
 def attest(check_id: str, lines: list[DoctorLine]) -> list[DoctorLine]:
     """An ATTESTING check always speaks — silence is unrepresentable.
 
-    A check that emits ``[ok]`` only when it finds applicable objects disappears from the
-    report when its universe empties, indistinguishable from green. Wrap every attesting
-    check's result: an
-    empty result becomes an explicit ``[not-applicable] check:<id>`` line, so a golden
-    diff shows the check going quiet instead of the check going missing.
+    A check that emits ``[ok]`` only when it finds applicable objects disappears from the report
+    when its universe empties, indistinguishable from green. Wrap every attesting check's result: an
+    empty result becomes an explicit ``[not-applicable] check:<id>`` line, so a golden diff shows
+    the check going quiet instead of the check going missing.
 
     Issues-only checks (silence == healthy BY CONTRACT, e.g. drift scanners) are not
     wrapped — their healthy state is the absence of findings, not a positive claim.

@@ -32,10 +32,9 @@ app = typer.Typer(
     name="dadaia",
     help="AI-native workspace management with Spec Context Projects.",
     no_args_is_help=True,
-    # A DadaiaError (e.g. WorkspaceNotInitializedError from a verb run outside an
-    # initialized workspace) is an EXPECTED operator-facing condition, not a crash. Let it
-    # propagate out of app() so _safe_app renders a concise message instead of a Rich
-    # traceback. Genuinely unexpected
+    # A DadaiaError (e.g. WorkspaceNotInitializedError from a verb run outside an initialized
+    # workspace) is an EXPECTED operator-facing condition, not a crash. Let it propagate out of
+    # app() so _safe_app renders a concise message instead of a Rich traceback. Genuinely unexpected
     # exceptions still surface their traceback for debugging.
     pretty_exceptions_enable=False,
 )
