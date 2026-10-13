@@ -39,13 +39,14 @@ import pytest
 from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app
-from dadaia_workspace.core.cli_line import cli_path, fix_line, shell_line
+from dadaia_workspace.core.cli_line import fix_line, shell_line
 from dadaia_workspace.core.gitflow import DEFAULT, work_branch
 from dadaia_workspace.core.models.spec_context import (
     AssociatedRepo,
     ContextState,
     SpecContextProject,
 )
+from dadaia_workspace.core.platform import workspace_cli_path
 from dadaia_workspace.core.specs_version import CANONICAL_SPECS_VERSION
 from dadaia_workspace.features.spec_context.service import git_hooks_dir, install_git_hooks
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
@@ -148,7 +149,7 @@ class World:
         # The workspace CLI, as `fix_line` spells it: a venv layout (pyvenv.cfg + the base
         # interpreter, no pip, nothing installed) so the CLI owns THIS workspace from any
         # cwd, importing this checkout and the running venv's dependencies.
-        cli = cli_path(self.ws)
+        cli = workspace_cli_path(self.ws)
         venv = cli.parent.parent
         cli.parent.mkdir(parents=True)
         base = Path(sys._base_executable)
@@ -196,7 +197,7 @@ class World:
         return done.stdout.strip()
 
     def cli(self, *argv: str) -> subprocess.CompletedProcess[str]:
-        return self.run([str(cli_path(self.ws)), *argv], self.elsewhere)
+        return self.run([str(workspace_cli_path(self.ws)), *argv], self.elsewhere)
 
     def seed(self, constitution: str | None = None, *branches: str, live: str = "") -> None:
         """The bare remote carries *branches* (default ``main`` then ``develop``), each at

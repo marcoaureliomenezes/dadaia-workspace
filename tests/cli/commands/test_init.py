@@ -98,8 +98,7 @@ def test_an_upgrade_leaves_no_reconcile_scratch_and_rewrites_only_a_differing_ho
     import subprocess
 
     from dadaia_workspace.core import workspace_layout
-    from dadaia_workspace.core.cli_line import cli_path
-    from dadaia_workspace.core.platform import PLATFORM
+    from dadaia_workspace.core.platform import PLATFORM, workspace_cli_path
     from dadaia_workspace.infrastructure.python_env import (
         VenvPythonEnvironmentManager,
         build_digest,
@@ -108,9 +107,9 @@ def test_an_upgrade_leaves_no_reconcile_scratch_and_rewrites_only_a_differing_ho
 
     def upgrade(venv: str, running: str) -> None:
         venv_bin = ws / ".dadaia" / ".venv" / PLATFORM.venv_scripts_dir
-        cli_path(ws).parent.mkdir(parents=True, exist_ok=True)
-        cli_path(ws).write_text(f"#!{venv_bin / ('python' + PLATFORM.venv_exe_suffix)}")
-        cli_path(ws).chmod(0o755)
+        workspace_cli_path(ws).parent.mkdir(parents=True, exist_ok=True)
+        workspace_cli_path(ws).write_text(f"#!{venv_bin / ('python' + PLATFORM.venv_exe_suffix)}")
+        workspace_cli_path(ws).chmod(0o755)
         built = f"{venv} {build_digest(None)}"
         monkeypatch.setattr(VenvPythonEnvironmentManager, "installed_build", lambda s, w: built)
         install_fake_dist(monkeypatch, running)

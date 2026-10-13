@@ -14,8 +14,8 @@ from typer.testing import CliRunner
 
 from dadaia_workspace.cli.commands import init as init_module
 from dadaia_workspace.cli.main import app
-from dadaia_workspace.core.cli_line import cli_path, fix_line
-from dadaia_workspace.core.platform import PLATFORM, Capabilities
+from dadaia_workspace.core.cli_line import fix_line
+from dadaia_workspace.core.platform import PLATFORM, Capabilities, workspace_cli_path
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager, build_digest
 from tests.fixtures.provider_dist import install_fake_dist
 
@@ -36,9 +36,9 @@ def _bytes(tree: Path) -> dict[Path, bytes]:
 
 
 def _versions(monkeypatch: pytest.MonkeyPatch, ws: Path, venv: str, running: str) -> None:
-    cli_path(ws).parent.mkdir(parents=True, exist_ok=True)
+    workspace_cli_path(ws).parent.mkdir(parents=True, exist_ok=True)
     venv_bin = ws / ".dadaia" / ".venv" / PLATFORM.venv_scripts_dir
-    cli_path(ws).write_text(f"#!{venv_bin / ('python' + PLATFORM.venv_exe_suffix)}")
+    workspace_cli_path(ws).write_text(f"#!{venv_bin / ('python' + PLATFORM.venv_exe_suffix)}")
     built = f"{venv} {build_digest(None)}"
     monkeypatch.setattr(VenvPythonEnvironmentManager, "installed_build", lambda self, ws: built)
     install_fake_dist(monkeypatch, running)  # the running version, at its one boundary

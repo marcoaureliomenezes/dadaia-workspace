@@ -34,7 +34,7 @@ from typer.testing import CliRunner
 from dadaia_workspace.cli.help_digest import command_paths
 from dadaia_workspace.cli.main import app
 from dadaia_workspace.core import workspace_layout
-from dadaia_workspace.core.cli_line import cli_path, fix_line, git_line, shell_line
+from dadaia_workspace.core.cli_line import fix_line, git_line, shell_line
 from dadaia_workspace.core.doctor_rules import rule_fix
 from dadaia_workspace.core.gitflow import DEFAULT, work_branch
 from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES
@@ -43,7 +43,7 @@ from dadaia_workspace.core.models.spec_context import (
     ContextState,
     SpecContextProject,
 )
-from dadaia_workspace.core.platform import PLATFORM
+from dadaia_workspace.core.platform import PLATFORM, workspace_cli_path
 from dadaia_workspace.core.specs_version import CANONICAL_SPECS_VERSION
 from dadaia_workspace.features.chokepoints import push_gate_decision
 from dadaia_workspace.features.chokepoints.branch_policy import parse_push_stdin
@@ -119,8 +119,8 @@ def _workspace(root: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     (root / ".dadaiaignore").write_text("[protected]\nsecrets\n", encoding="utf-8")
     stand_in = shutil.which("whoami" if sys.platform == "win32" else "true")  # a real exe, exit 0
     assert stand_in, "the host has no stand-in executable"
-    cli_path(root).parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy(stand_in, cli_path(root))
+    workspace_cli_path(root).parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy(stand_in, workspace_cli_path(root))
     monkeypatch.chdir(root)
     return root
 
@@ -291,7 +291,7 @@ class World:
         # The workspace CLI, as `fix_line` spells it: a venv layout (pyvenv.cfg + the base
         # interpreter, no pip, nothing installed) so the CLI owns THIS workspace from any
         # cwd, importing this checkout and the running venv's dependencies.
-        cli = cli_path(self.ws)
+        cli = workspace_cli_path(self.ws)
         venv = cli.parent.parent
         cli.parent.mkdir(parents=True)
         base = Path(sys._base_executable)
@@ -339,7 +339,7 @@ class World:
         return done.stdout.strip()
 
     def cli(self, *argv: str) -> subprocess.CompletedProcess[str]:
-        return self.run([str(cli_path(self.ws)), *argv], self.elsewhere)
+        return self.run([str(workspace_cli_path(self.ws)), *argv], self.elsewhere)
 
     def seed(self, constitution: str | None = None, *branches: str, live: str = "") -> None:
         """The bare remote carries *branches* (default ``main`` then ``develop``), each at
@@ -1791,7 +1791,9 @@ def test_a_fix_runs_verbatim_in_every_host_shell(blank_workspace: Path, shell: l
     ]
     assert [r.returncode for r in runs] == [0, 0, 0], [r.stderr for r in runs]
     # The CLI ran, not a shell echo of its quoted path (PowerShell exits 0 on an expression).
-    direct = subprocess.run([cli_path(workspace)], capture_output=True, text=True, check=True)
+    direct = subprocess.run(
+        [workspace_cli_path(workspace)], capture_output=True, text=True, check=True
+    )
     assert runs[2].stdout.strip() == direct.stdout.strip()
     assert (workspace / ".dadaia" / "tmp").is_dir()
     assert not (workspace / ".dadaiaignore").exists()  # the fix never writes the operator's file
