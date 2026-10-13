@@ -378,6 +378,22 @@ def test_check_refuses_a_memory_task_under_definition(script: Path, tmp_path: Pa
     assert result.returncode == 1 and "specs/memory" in result.stdout, result.stdout
 
 
+def test_check_leaves_a_closed_candidates_memory_task_as_history(script: Path, tmp_path: Path) -> None:
+    """The memory rule judges a candidate before CLOSURE; a CLOSURE candidate's job files are history."""
+    specs = _specs(tmp_path)
+    _job_release(
+        specs,
+        _task_job(("`specs/memory/x.md`", "x")),
+        "`specs/memory/x.md`",
+        phase="CLOSURE",
+        defined={"sha": "aaaaaaa", "ts": _TS},
+        implemented={"sha": "beef123", "ts": _TS},
+        log=_RC1_MILESTONES,
+    )
+    result = _run(script, "check", "--specs", str(specs))
+    assert result.returncode == 0, result.stdout
+
+
 @pytest.mark.parametrize(
     ("job", "needle"),
     [
