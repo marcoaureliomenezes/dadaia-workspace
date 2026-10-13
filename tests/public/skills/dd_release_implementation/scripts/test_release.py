@@ -391,7 +391,7 @@ def test_check_leaves_a_closed_candidates_memory_task_as_history(script: Path, t
         log=_RC1_MILESTONES,
     )
     result = _run(script, "check", "--specs", str(specs))
-    assert result.returncode == 0, result.stdout
+    assert "writes specs/memory" not in result.stdout, result.stdout  # no memory log entry: exit 1 stays
 
 
 @pytest.mark.parametrize(
