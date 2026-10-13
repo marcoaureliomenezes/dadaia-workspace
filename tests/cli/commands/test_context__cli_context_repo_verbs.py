@@ -94,7 +94,6 @@ def test_a17_2_adding_the_own_main_slug_is_a_no_op(foo: Path) -> None:
     assert _record(foo, "foo") == before
 
 
-
 @pytest.mark.parametrize(
     ("checkout", "text"), [(True, "untouched"), (False, "no on-disk checkout")]
 )
