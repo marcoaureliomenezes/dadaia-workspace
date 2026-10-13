@@ -21,7 +21,7 @@ description: >
 - **Pillar 1 — bugs** ([`PILLAR-BUGS.md`](PILLAR-BUGS.md)): compute all nine
   forensic metrics it lists on each `BUGS.jsonl` record in the window; the audit record and git history establish coverage.
 - **Pillar 2 — specs** ([`PILLAR-SPECS.md`](PILLAR-SPECS.md)): commit shapes, canon compliance, `_RELEASE.json` milestones over the window.
-- **Pillar 3 — memory** ([`PILLAR-MEMORY.md`](PILLAR-MEMORY.md)): principles through their `Measured by:` checks, canonical hunks against ADRs, product atoms against code.
+- **Pillar 3 — memory** ([`PILLAR-MEMORY.md`](PILLAR-MEMORY.md)): principles through their `Measured by:` checks, product atoms against code.
 
 The main thread refuses to write `AUDIT.md` until all three pillar sections are present. Append one `FINDINGS.jsonl` record per claim
 ([`FINDINGS-FORMAT.md`](FINDINGS-FORMAT.md)).

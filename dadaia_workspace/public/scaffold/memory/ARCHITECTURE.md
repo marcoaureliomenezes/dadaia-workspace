@@ -2,7 +2,7 @@
 slug: ARCHITECTURE
 title: Architecture
 tldr: The system's principles, technology stack and structure.
-summary: The Principles section holds the architecture principles, changed only by an accepted ADR; the Tech Stack and Structure sections describe what the code is today.
+summary: The Principles section holds the architecture principles; the Tech Stack and Structure sections describe what the code is today.
 tags:
   - architecture
   - layers
@@ -12,7 +12,7 @@ tags:
 ## Principles
 
 Greenfield: no principle is accepted yet. The founding release's SPEC proposes the initial
-layout; an accepted ADR records each principle here.
+layout.
 
 ## Tech Stack
 
