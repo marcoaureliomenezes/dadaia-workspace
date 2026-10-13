@@ -78,7 +78,7 @@ def test_the_scaffold_bytes_are_silent(tmp_path: Path) -> None:
 
 
 def test_absence_is_still_a_finding(tmp_path: Path) -> None:
-    """The presence check TREE-5M owned survives the fold into the one comparator."""
+    """A missing scaffolded memory AGENTS.md is a finding of the one comparator."""
     issues = _memory_issues(tmp_path, None)
     assert len(issues) == 1, issues
     assert issues[0].startswith("TREE-5 warning"), issues[0]

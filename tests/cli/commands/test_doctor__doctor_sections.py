@@ -103,8 +103,7 @@ def test_a_mis_cased_phase_is_one_finding_whose_fix_clears_it(tmp_path: Path) ->
     ],  # fmt: skip
 )
 def test_doctor_release_findings_are_the_scripts(tmp_path: Path, over: dict[str, Any]) -> None:
-    """The doctor's release findings are
-    release.py check's (LEDGER-RELEASE-SCHEMA); no RELEASE-TREE-* or SPEC-DOC-003/009."""
+    """The doctor's release findings are release.py check's (LEDGER-RELEASE-SCHEMA) alone."""
     _live_release(tmp_path / "specs", **over)
     named, specs_codes = _release_findings(tmp_path / "specs")
     script = subprocess.run(
