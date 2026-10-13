@@ -20,6 +20,7 @@ import pytest
 from dadaia_workspace.core import doctor_rules
 from dadaia_workspace.core.cli_line import fix_line, git_line, shell_line
 from dadaia_workspace.core.gitflow import DEFAULT
+from dadaia_workspace.core.skill_owner import load_owner
 from tests.core.test_cli_line__fix_line_contract import fix_defect as _defect
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -30,7 +31,7 @@ _PUBLIC_SKILLS = _PKG / "public" / "skills"
 def test_cli_line_and_the_scripts_render_one_argv_as_one_line(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """One argv through ``core/cli_line`` and the scripts' ``_specs``
+    """One argv through ``core/cli_line`` and the scripts' ``_platform`` and ``_specs``
     renders one line — a blank, a quote and a ``$`` included, the head's too."""
     monkeypatch.setattr("sys.executable", str(tmp_path / "Program Files (x86)" / "python"))
     loader = importlib.util.spec_from_file_location(
@@ -40,7 +41,8 @@ def test_cli_line_and_the_scripts_render_one_argv_as_one_line(
     specs = importlib.util.module_from_spec(loader)
     loader.loader.exec_module(specs)
     rest = ["commit", "-m", "it's $HOME"]
-    assert specs.git_line(tmp_path / "a b", *rest) == git_line(tmp_path / "a b", *rest)
+    kernel_git_line = load_owner("dd-bug-resolution", "_platform").git_line
+    assert kernel_git_line(tmp_path / "a b", *rest) == git_line(tmp_path / "a b", *rest)
     script = tmp_path / "s p" / "x.py"
     assert specs.script(script) == shell_line(sys.executable, str(script.resolve()))
 
@@ -413,7 +415,7 @@ def _text_rows(rel: str) -> list[Callable[[str], object]]:
     surface, product memory, the glossary) names no retired verb; what ships names no
     `memory.py check` done criterion; consumer guidance no library toolchain;
     `public/**/*.md` command lines spell the live CLI; a script's git fix goes through
-    `_specs.git_line`, never a hand-spelled unquoted `git -C {…}`."""
+    `_platform.git_line`, never a hand-spelled unquoted `git -C {…}`."""
     rows: list[Callable[[str], object]] = []
     if rel.startswith(("dadaia_workspace/public/", "specs/memory/")) or rel == "CONTEXT.md":
         rows.append(_DEAD_RELEASE_VOCABULARY.search)

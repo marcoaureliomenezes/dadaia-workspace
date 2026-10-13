@@ -134,3 +134,16 @@ def test_a_release_check_names_the_undecodable_file_and_not_the_spec_it_was_reac
 
     assert done.returncode == 1 and "Traceback" not in done.stderr
     assert [f["path"] for f in json.loads(done.stdout)] == [relative]
+
+
+def test_the_origin_verb_names_a_spec_that_is_not_utf8_once(tmp_path: Path) -> None:
+    script = stage_skill_scripts("dd-release-implementation", tmp_path / "staged" / "scripts")
+    spec = tmp_path / "SPEC.md"
+    spec.write_bytes(b"\xff\xfe\n")
+    done = subprocess.run(
+        [sys.executable, str(script / "release.py"), "origin", str(spec)],
+        capture_output=True, check=False, text=True,
+    )  # fmt: skip
+
+    assert done.returncode == 1
+    assert done.stderr == f"[error] {spec} is not valid UTF-8\nfix: {_restore(spec.resolve())}\n"
