@@ -503,6 +503,7 @@ def CONTROL(root: Path) -> Session:
         "the #C0FFEE color, the 20261013T040740Z stamp, T1: cold onboarding, #: C0, C1, L1, L2\n"
         "caches, S3: the bucket, object storage (S3), a (C1 range), a (Q3) quarter, (P0) and a\n"
         "(H1) heading.\n"
+        "F-16 jet, F-35, F012 field, P-51 Mustang, section A4.1 and UK-A1-2.\n"
         '"""\n',
     )
     _write(root, "scripts/guards/ok.py", '"""Judges x."""\n')
@@ -650,6 +651,8 @@ _PLANTS: dict[str, dict[str, Plant]] = {
         "grill-label-id": _add("tests/unit/test_p.py", "# Grill Q14 ordered x\n"),
         "bug-number-id": _add("tests/unit/test_p.py", "# bugs 465, 467 pin x\n"),
         "section-label-id": _add("tests/unit/test_p.py", "# SA-H3-1 pins x\n"),
+        "scripts-docstring-ids": _add("scripts/guards/x.py", '"""T-050-190 pins x."""\n'),
+        "ruling-label-id": _add("tests/unit/test_p.py", "# Ruling 16 holds\n"),
         "exact-bug-id": _ledger_plant(
             "specs/bugs/BUGS.jsonl",
             '{"id": "zz-planted-bug"}\n',
