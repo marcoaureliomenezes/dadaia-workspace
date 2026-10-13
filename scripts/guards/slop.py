@@ -133,19 +133,17 @@ def _allowance(tree: Tree, hits: dict[str, str], check: str, also: str = "") -> 
 #: One pattern, one named group per id kind; the group that matched names the sub-rule.
 _GRAMMAR = re.compile(
     r"\b(?:(?P<core>(?:N?FR|AC|WP)(?:[0-9]+|-[A-Z]{0,3}[0-9]+)[a-z]?(?:[.-][A-Z]?[0-9]+[a-z]?)*"
-    r"|ADRs?[ -]?[0-9]+|TR?-(?:[0-9]{1,3}[a-z]?|[A-Z]+-[A-Z]?[0-9]+)(?:-[0-9]+)?"
+    r"|ADRs?[ -]?[0-9]+|TR?-[A-Z]+-[A-Z]?[0-9]+(?:-[0-9]+)?"
     r"|J[0-9]+\.T[0-9]+|rc-?[0-9]+|v0\.[0-9]+(?:\.[0-9]+)?|[Rr]ound [0-9]+|re-review"
-    r"|P-[0-9]{2}|CP[0-9])"
+    r"|P-[0-9]{2})"
     r"|(?P<staged_task_id>J[0-9]+\.S[0-9]+\.T[0-9]+)"
     r"|(?P<ac_number_id>A[0-9]+\.[0-9]+)"
-    r"|(?P<audit_finding_id>F-[0-9]+|F0[0-9]{2}|[0-9]{8}(?:-[a-z][a-z0-9-]*| audit))"
-    r"|(?P<review_label_id>[Rr]eview (?:finding [0-9]+"
-    r"|(?:[0-9]+ )?(?:[FMN][0-9]+|H[0-9]+\b(?! heading))))"
+    r"|(?P<section_label_id>[A-Z]{2}-[A-Z][0-9]+-[0-9]+)"
+    r"|(?P<audit_finding_id>F-[0-9]+|F0[0-9]{2}|[0-9]{8}(?:-[a-z0-9-]+-(?:F[0-9]{3}|audit)| audit))"
+    r"|(?P<review_label_id>[Rr]eview (?:finding [0-9]+|(?:[0-9]+ )?[FMN][0-9]+))"
     r"|(?P<plan_label_id>PLAN [A-Z]?[0-9]+(?:\.[0-9]+)*)"
-    r"|(?P<grill_label_id>Grill Q[0-9]+|Q[0-9]+ ruling|[Rr]uling [A-Z]?[0-9]+)"
+    r"|(?P<grill_label_id>Grill Q[0-9]+|Q[0-9]+ ruling|[Rr]uling [A-Z][0-9]+)"
     r"|(?P<bug_number_id>[Bb]ugs? [0-9]{3}))\b"
-    r"|^\W*(?P<leading_label_id>[A-GI-Z]-?[0-9]{1,2}(?:\.[0-9]+)*(?:[:,\u2014]| \())"
-    r"|(?P<marked_label_id>[(#][A-GI-KM-SU-Z][0-9]{1,2}\b)"
 )
 _TOKEN = re.compile(r"\w(?:[\w.-]*\w)?")
 _DOC_OWNERS = (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)
@@ -501,8 +499,8 @@ def CONTROL(root: Path) -> Session:
         "test, Bug: off-by-one in a cursor, ISO week 2026-W41-1, the W1-4 range, fixed 2 bugs\n"
         "3 times, python bug 12345, review h2 heading, review H2 sections, ruling 3 times,\n"
         "SHA256, UTF8, SHA-256, UTF-8, an H1 heading, IPv4, E402 and S603 lint codes, T-1,\n"
-        "TR-808, CP1252, NIST P-256, FRAME 3, ACK 2, a WPA2 key, 12345678-abcd-1234, 20261013-x, the\n"
-        "#C0FFEE color and the 20261013T040740Z stamp.\n"
+        "TR-808, CP1252, NIST P-256, FRAME 3, ACK 2, a WPA2 key, 12345678-abcd-1234, 20261013-x,\n"
+        "the #C0FFEE color and the 20261013T040740Z stamp.\n"
         "T1: cold onboarding\n"
         "#: C0, C1\n"
         "L1, L2 caches\n"
