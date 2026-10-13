@@ -15,7 +15,7 @@ Disclosed sibling of `SKILL.md`, pillar 3. Input: canonical memory (`ARCHITECTUR
 git log -p <from-sha>..HEAD -- specs/memory/ARCHITECTURE.md specs/memory/QUALITY.md
 ```
 
-1. Every `### P-NN` hunk pairs with a `docs(adr): accept NNNN-<slug>` commit — the same commit — whose record names the statement; other sections follow `specs/memory/AGENTS.md` §1.
+1. Every `### P-NN` hunk pairs with the `docs(adr): accept <slug>` commit (`dd-gitflow-default` §3a) — the same commit — whose record names the statement; other sections follow `specs/memory/AGENTS.md` §1.
 2. A `### P-NN` hunk without that pairing is HIGH.
 3. Exception: the first-inventory case — read `specs/ADRs/AGENTS.md` §5.1 before scoring a CREATING commit.
 

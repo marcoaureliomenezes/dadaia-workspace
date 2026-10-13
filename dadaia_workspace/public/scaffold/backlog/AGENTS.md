@@ -17,7 +17,6 @@ Scope: this file governs only `specs/backlog/`.
 ## 2. Authoring rules
 
 - `<slug>` matches `$defs.slug` of backlog-v1.
-- Every `active[]` entry carries five required fields: `title`, `opened` (`YYYY-MM-DD`), `status`, `description`, `provenance`.
 - `BACKLOG_PY new` writes `status: idea`; a later lowercase live token (`candidate`, …) is a hand edit, which `BACKLOG_PY check` validates (§4).
 - Optional: `intents` (§4) and `relates` (`BACKLOG_PY new --help`).
 - An entry leaves only by `BACKLOG_PY exit <slug> --disposition …`, which removes the `active[]` object and appends its one histo record.

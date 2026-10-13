@@ -25,7 +25,7 @@
 - A failing old test is a question: outside a fix, an assert is moved or narrowed, or a guard's reach narrowed, only with the main thread's ruling named in a `test(...)` commit, and a product-contract change also needs the operator.
 - Inventory existing gates and tools first; a new gate, lock, repo, layer or review round states what it buys and names the heavier one it deletes.
 - A requirement applied to every task, job or deletion is a gate, states its measured cost per run, and that cost never exceeds one run of the job's `verify:` gate without the operator's ruling.
-- Non-blocking findings go to the next bug window.
+- Non-blocking findings go to the main thread's intake report (`dd-backlog-definition`).
 - The SDD documents (`specs/releases/AGENTS.md`) are the record of progress; numbers, durations and dates are measured or read from a named source, and law text holds no dated snapshot value.
 
 ## 2. Who does what
@@ -49,7 +49,7 @@
 - The Bash hook wrapper accepts the workspace venv's POSIX or Windows Python; when neither is executable, it warns and exits 0, and each context-injection lane prints the `uvx dadaia-workspace init <workspace>` fix.
 - Path classes: ADDITIVE (`.dadaia/AGENTS.md`'s output and ephemeral zones) writable; PROTECTED (projected law files and hook wiring, `.dadaia/states`, `hooks`, `agentic`, `sessions`, `.dadaiaignore` and its `[protected]` globs) blocked; the rest MUTATING.
 - Every BLOCK carries exactly one fix line, `fix: <command>` or `Operator action: <one act>`; a BLOCK whose fix is itself blocked is a Stall, CRITICAL.
-- Git chokepoints (branch contract and scope: `dd-gitflow-default` §2a): pre-push admits its pushable branch shapes. It also admits the initial ref for either PR-only branch when origin has no Gitflow branch, or when the ref publishes no new objects; it refuses a non-canon `specs/` path or a denylisted secret; `worktree.py merge` refuses a job, plain, `define` or `backlog` tree without a valid APPROVED verdict bound to its diff, and a job whose `verify:` does not exit 0; the PR gate is discipline (`dd-gitflow-default` §3b).
+- Git chokepoints (branch contract and scope: `dd-gitflow-default` §2a): pre-push: `.dadaia/AGENTS.md` §3; `worktree.py merge` refuses a job, plain, `define` or `backlog` tree without a valid APPROVED verdict bound to its diff, and a job whose `verify:` does not exit 0; the PR gate is discipline (`dd-gitflow-default` §3b).
 - The binding: `.dadaia/.venv/bin/dadaia context show --json`. The gate reads no SDD artifact; procedure is skill-taught and audit-measured, never gated.
 - Common behaviour lives in skills and `AGENTS.md`; a persona or hook carries only the surface its harness cannot do without; a harness fact lives in one registry row.
 
@@ -65,14 +65,14 @@
 
 | Area | File | Governs |
 |---|---|---|
-| specs tree | `specs/AGENTS.md` | canon, status tokens, doctor codes |
+| specs tree | `specs/AGENTS.md` | canon, status tokens, load order, artifact authority |
 | releases | `specs/releases/AGENTS.md` | candidates, phases, tasks, promote |
 | backlog | `specs/backlog/AGENTS.md` | demand queue, `exit`, dispositions |
 | bugs | `specs/bugs/AGENTS.md` | what a bug is, propose/confirm, records, resolution |
 | memory | `specs/memory/AGENTS.md` | product truth, atoms, ownership |
 | ADRs | `specs/ADRs/AGENTS.md` | decisions.jsonl, acceptance |
 | audits | `specs/audits/AGENTS.md` | three pillars, remediation release |
-| runtime | `.dadaia/AGENTS.md` | zones, doctor, reprojection, chokepoints, context freeze |
+| runtime | `.dadaia/AGENTS.md` | zones, doctor, reprojection, chokepoints |
 | handoff | `.dadaia/handoff/AGENTS.md` | emission, schema, ack |
 | tmp / states | `.dadaia/tmp/AGENTS.md`, `.dadaia/states/AGENTS.md` | TTL, state files |
 | a repo | `repos/<slug>/AGENTS.md` | clean tree, caches, tests |

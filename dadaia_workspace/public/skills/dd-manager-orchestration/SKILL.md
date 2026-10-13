@@ -64,7 +64,7 @@ description: >
 |---|---|
 | Chain agents only through the main thread | Every hand-off stays traceable |
 | Merge a task only with its validation evidence | Acceptance is checked |
-| Merge, deploy or close only after the reviewer's `APPROVED` | `worktrees/AGENTS.md` §2 |
+| Merge a job, plain, `define` or `backlog` tree, deploy or close only after the reviewer's `APPROVED` | `worktrees/AGENTS.md` §2 |
 | Edit production files only inside a job's or task's worktree | Each edit traces to its task |
 | Land an edit inside an open job as one of its tasks | Micro-dispatch: the ritual wait it adds outweighs the edit |
 | Keep private/project-specific details out of public assets | Security and portability |

@@ -35,7 +35,7 @@ The main thread refuses to write `AUDIT.md` until all three pillar sections are 
 
 ## 4. Done when
 
-- Window recorded; nine bug metrics with baseline + target; every PILLAR-MEMORY §1 check ran; `AUDIT.md` has all three pillars, each claim a `FINDINGS.jsonl` record; `python3 .agents/skills/dd-audit-project/scripts/audit.py check --specs <specs-dir>` exits 0; that check fails closed on an unreadable input, printing one `fix:` line (the hooks' fail-open stands).
+- Window recorded; nine bug metrics with baseline + target; every PILLAR-MEMORY §1 check ran; `AUDIT.md` has all three pillars, each claim a `FINDINGS.jsonl` record; `python3 .agents/skills/dd-audit-project/scripts/audit.py check --specs <specs-dir>` exits 0.
 
 ## 5. References
 

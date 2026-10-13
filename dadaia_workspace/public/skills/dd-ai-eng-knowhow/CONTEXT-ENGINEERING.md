@@ -79,7 +79,7 @@ Audit protocol — detecting order drift:
 
 ## 3. Persona-Consistency Invariants
 
-Four invariants MUST hold across the full personas (reviewer, product engineer, sr); the lighter `dd-researcher` and `dd-sw-engineer-jr` are exempt from I2 and I3, and I4 binds every agent but `dd-researcher`. Inconsistencies are bugs — file them in a refactor report.
+Four invariants MUST hold across the full personas (reviewer, product engineer, sr); the lighter `dd-researcher` and `dd-sw-engineer-jr` are exempt from I2 and I3, and I4 binds every agent but `dd-researcher`. An inconsistency is an AI-surface lens finding (`dd-code-review` §6).
 
 | # | Invariant | What must match |
 |---|---|---|

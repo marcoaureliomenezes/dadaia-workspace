@@ -22,7 +22,7 @@
 
 ## 3. Git chokepoints
 
-- The pre-push hook scans the pushed range only (published history is the baseline); the specs canon applies only to a tree at the canonical stamp, a tree whose `constitution.md` `specs_pattern_version` is lower passes the push, and `.dadaia/.venv/bin/dadaia doctor` prints its `specs init --context <ctx>` fix line.
+- The pre-push hook admits its pushable branch shapes (`dd-gitflow-default` §2a). It also admits the initial ref for either PR-only branch when origin has no Gitflow branch, or when the ref publishes no new objects; it refuses a non-canon `specs/` path or a denylisted secret. It scans the pushed range only (published history is the baseline); the specs canon applies only to a tree at the canonical stamp, a tree whose `constitution.md` `specs_pattern_version` is lower passes the push, and `.dadaia/.venv/bin/dadaia doctor` prints its `specs init --context <ctx>` fix line.
 - `HOOKS-DRIFT-1`: an ALIVE repo's `.git/hooks/pre-push` differing from the shipped script; run doctor's per-repo `fix:` line.
 
 ## 4. Projections and law files

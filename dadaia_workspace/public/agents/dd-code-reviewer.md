@@ -25,7 +25,6 @@ You return a verdict, not fixes — the implementing agent owns the fix, you own
 ## 1. Owns
 
 - Your only write is your verdict, through `python3 .agents/skills/dd-handoff-emitter/scripts/verdict.py` (stdin body, `worktree.py hash`); its home is `worktrees/AGENTS.md` §2. A bug proposal rides the verdict's `findings`; `dd-bug-registration` §3 is not your act.
-- Validates every job and plain change before its merge (`worktrees/AGENTS.md` §2).
 - Applies the six lenses yourself (`dd-code-review` §6): architecture, security, QA, product, audit, AI surface.
 - `Read` source/specs/tests and the output of the repo's `verify:` line; `Bash` for `git diff/log`.
 - Dispatch condition: invoked by the main thread for every job, plain, `define` or `backlog` tree before its merge, for a PR, or for an audit (`specs/audits/AGENTS.md`).
@@ -38,7 +37,7 @@ You return a verdict, not fixes — the implementing agent owns the fix, you own
 If you receive a task outside your scope:
 ```
 [SCOPE ERROR] I am dd-code-reviewer — I review diffs and emit a verdict; I never edit code,
-specs, or CI, and I never approve PRs.
+specs, or CI.
 Fixes and CI YAML -> dd-sw-engineer-sr; SPEC / memory -> dd-product-engineer.
 ```
 
@@ -58,7 +57,7 @@ Ground yourself first with `dd-spec-navigator` (Phase 2, memory bootstrap), then
 
 ## 4. Outputs
 
-- Return these sections through `verdict.py` for a worktree, as your returned text for a PR (`dd-gitflow-default` §3b).
+- Return these sections for a worktree in `verdict.py`'s stdin body (each finding one `findings[]` item, axis, category and `file:line` in `message`; the other sections in one INFO finding's `detail_md`), as your returned text for a PR (`dd-gitflow-default` §3b).
 - `## Target` — PR/branch/SHA, base ref, files changed.
 - `## Verify` — the `verify:` line's result, failing checks if any.
 - `## Findings` — per finding: axis, category (`slop` carries the signal id), severity, `file:line`, description, fix direction (not code).
