@@ -11,6 +11,7 @@ from pathlib import Path
 
 from dadaia_workspace.core.cli_line import git_line, shell_line
 from dadaia_workspace.features.specs.doctor import SpecsDoctor
+from dadaia_workspace.features.specs.doctor_adr import adr_record_issues
 from dadaia_workspace.features.specs.doctor_memory import MemoryValidator
 from dadaia_workspace.features.specs.doctor_types import finding_path
 
@@ -234,7 +235,7 @@ def test_a_ledger_that_is_not_utf8_is_one_restore_finding_and_never_a_crash(
 
     found = SpecsDoctor(specs, public_dir=public).check()
 
-    assert [i.fix for i in found if i.code == "LEDGER-ADR-SCHEMA"] == [restore]
+    assert [i.fix for i in adr_record_issues(specs)] == [restore]
     assert [i.fix for i in found if i.code == "FIXED-2"] == [restore]
 
 
