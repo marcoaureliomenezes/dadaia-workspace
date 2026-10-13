@@ -1,6 +1,4 @@
-"""bug cli-missing-version-flag (dadaia --version / -V), expected
-value from an independent source: the fake dist-info, never the code's own reader
-(REWRITE; the -V twin is DELETE-DUP)."""
+"""`dadaia --version` / `-V` prints the version read from the fake dist-info, never from the code's own reader."""
 
 from __future__ import annotations
 
