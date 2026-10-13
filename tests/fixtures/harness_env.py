@@ -18,8 +18,8 @@ documented operator-shell convenience var). In particular the harness never sets
   *operator override only*, never a harness-supplied value.
 - ``DADAIA_PERSONA`` / ``*_AGENT_PERSONA`` — no harness exposes the dispatched persona to
   a hook subprocess. Tests must never plant it.
-- ``DADAIA_MODE`` — bind mode is read from the on-disk session record, not a hook env var
-  (WS-R4). A hook env never carries it from the harness.
+- ``DADAIA_MODE`` — bind mode is read from the on-disk session record, not a hook env var.
+  A hook env never carries it from the harness.
 
 Verification source: ``dadaia_workspace/hooks/{sdd_gate,sdd_post_gate,ctx_inject}.py`` +
 ``core/invocation.resolve_session_id`` (which env vars the hooks actually read), and the
@@ -159,7 +159,7 @@ ALLOWLISTED_DADAIA_ENV: Final[frozenset[str]] = frozenset(
         "DADAIA_SESSION_ID",
         "DADAIA_MODE",
         # Operator/test path-override knob read by production in
-        # features/telemetry/service.py (PI session-store ingest, WS-PI-6) — same
+        # features/telemetry/service.py (session-store ingest) — same
         # category as DADAIA_AGENTS_DIR above.
         "DADAIA_KIMI_SESSION_INDEX",
         # Read by core/workspace_resolver BY DESIGN: roots no process may resolve; the

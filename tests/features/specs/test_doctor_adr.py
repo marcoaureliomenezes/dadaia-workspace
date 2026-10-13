@@ -104,7 +104,7 @@ _RECORD_ROWS = [
         ["record.ruling.date value '30/09/2026' does not match ^\\d{4}-\\d{2}-\\d{2}$"],
         id="0151-M1-date-shape",
     ),
-    # The six records the 2026-09-12 audit found carried `"supersedes": []`.
+    # An empty `supersedes` list is refused.
     pytest.param(
         {"supersedes": []},
         ["record.supersedes must be of type ['string', 'null']"],

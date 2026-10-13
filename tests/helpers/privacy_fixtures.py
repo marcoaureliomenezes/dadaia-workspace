@@ -3,10 +3,9 @@
 This repository is PUBLIC: every pushed blob is published, so the push-range denylist
 scan stays FULL on every tracked path — ``tests/**`` included. No tracked fixture FILE
 carries a literal any pattern matches; a baseline of tolerated ``(path, pattern)`` pairs
-would be a second scope decision. A test that merely needs *a* home path, address or mailbox uses a
-value the
-baseline already excludes by design (``/home/user``, the RFC 5737 documentation
-ranges, ``@example.invalid``) written inline. A test that must prove the SCANNER FIRES
+would be a second scope decision. A test that merely needs *a* home path, address or mailbox
+uses a value the baseline already excludes by design (``/home/user``, the RFC 5737
+documentation ranges, ``@example.invalid``) written inline. A test that must prove the SCANNER FIRES
 on a realistic shape calls one of the builders below: the shape exists only in memory,
 at run time, and the assertion it feeds is unchanged.
 

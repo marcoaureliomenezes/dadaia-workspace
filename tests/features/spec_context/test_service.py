@@ -1,13 +1,10 @@
 """Unit tests for SpecContextService.
 
-shutil.rmtree fails with PermissionError on root-owned files.
-Fix: detect non-writable files before rmtree and raise GitSyncError with
-     a descriptive message suggesting 'sudo chown'.
+dead() detects non-writable files before rmtree and raises GitSyncError with a
+descriptive message suggesting 'sudo chown'.
 
-activate()/deactivate() are removed; alive()/dead() replace them.
-
-CRITICAL ALIVE/DEAD state machine — alive() leaving operator specs untouched is the
-data-loss guard this file exists to keep, alongside the non-writable-files dead() fix.
+The ALIVE/DEAD state machine: alive() leaves operator specs untouched, the data-loss
+guard this file keeps, alongside the non-writable-files dead() contract.
 """
 
 from __future__ import annotations

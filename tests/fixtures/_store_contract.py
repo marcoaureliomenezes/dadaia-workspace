@@ -6,7 +6,7 @@ schema_version→typed error, atomic write (no .tmp leftover), and a last-good
 snapshot of the PRIOR valid file on the second save. This module holds the ONE
 shared assertion body for that template; each per-store test file calls the
 matching helper with its own store factory / valid document / exception type so
-per-store files keep only their own store-specific logic (D-7, L8 secrets,
+per-store files keep only their own store-specific logic (secrets,
 extends graph, resilience, etc.) — never a re-implementation of the template.
 
 Not a test module itself (no ``test_*`` functions) — it is a helper imported by

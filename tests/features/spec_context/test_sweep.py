@@ -195,8 +195,8 @@ def test_a_live_bind_record_survives_a_full_doctor_fix_pass(tmp_path: Path) -> N
 
 
 def _rmtree_leaving(error: OSError | None) -> Callable[..., None]:
-    """``shutil.rmtree`` that deletes nothing: silent, as 3.14's swallowed retry (row 6), or
-    reporting *error* to its ``onexc`` as a failed scan (row 22): recorded as injected, never
+    """``shutil.rmtree`` that deletes nothing: silent, as 3.14's swallowed retry, or
+    reporting *error* to its ``onexc`` as a failed scan: recorded as injected, never
     replaced by a real retry's platform errno."""
 
     def rmtree(path: str, *, onexc: Callable[..., object]) -> None:
@@ -225,7 +225,7 @@ def test_a_surviving_target_is_refused_by_its_outcome(
 
 
 def test_a_refusal_is_falsy_and_no_str(tmp_path: Path) -> None:
-    """U2: no caller can read a refusal as an act — not by truth value, not as a ``str``."""
+    """No caller can read a refusal as an act — not by truth value, not as a ``str``."""
     workspace = _outside_link(tmp_path)
 
     done = sweep.remove(workspace, tmp_path / "outside" / "treasure.txt", "treasure")
@@ -235,7 +235,7 @@ def test_a_refusal_is_falsy_and_no_str(tmp_path: Path) -> None:
 
 
 def test_move_returns_its_failure_as_a_refusal(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """U2 / row 27: a failed ``os.replace`` (not EXDEV) is the act's refusal, never raised."""
+    """A failed ``os.replace`` (not EXDEV) is the act's refusal, never raised."""
     source = _file(tmp_path / "slop.txt")
     monkeypatch.setattr(sweep.os, "replace", _not_the_owner)
 
