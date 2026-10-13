@@ -148,7 +148,7 @@ def test_replace_foreign_moves_to_specs_bkp_staged_then_scaffolds(repo: Path) ->
 def test_an_existing_specs_bkp_is_kept_and_the_tree_moves_to_a_stamped_child(
     repo: Path,
 ) -> None:
-    """Review finding 8: a prior backup is never overwritten nor deleted. Review H1: the
+    """A prior backup is never overwritten nor deleted; the
     new one lands INSIDE specs-bkp/ — the one onboarding path baseline publishes."""
     _foreign(repo)
     (repo / "specs-bkp").mkdir()

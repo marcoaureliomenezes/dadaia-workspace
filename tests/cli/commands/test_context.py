@@ -162,7 +162,7 @@ def test_context_bind_is_one_verb_with_one_argument(
         pytest.param({"CODEX_THREAD_ID": "harness-session"}, "harness-session", id="codex-native-id"),
         # the eval-flow contract: an explicit DADAIA_SESSION_ID is reused, never re-minted
         pytest.param({"DADAIA_SESSION_ID": "sess_stable01"}, "sess_stable01", id="dadaia-session-id"),
-        # bug validation-027-f-07: env id AND harness id -> the env id owns the ONE record
+        # env id AND harness id -> the env id owns the ONE record
         pytest.param({"DADAIA_SESSION_ID": "sess_envfixed", "CLAUDE_CODE_SESSION_ID": "claude-native-xyz"}, "sess_envfixed", id="env-id-wins-one-record"),
     ],
 )  # fmt: skip
