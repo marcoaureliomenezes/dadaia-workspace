@@ -95,7 +95,7 @@ Wave ranking: Wave 1 is law, skills and the dev loop (FR1, FR2). Wave 2 is the s
 
 #### FR3 — one context-name grammar (bug `verdict-context-pattern-disagrees-with-core`)
 
-- AC3.1 (unit, RED first): `verdict.py` accepts a context name that core registers (`My_Ctx`). `--context` accepts exactly what the core grammar accepts. It still refuses a name that leaves `.dadaia/handoff/` (`../../evil`, `a/b`, `a\\b`) and the empty name, because the allowlist stays (CWE-22). By the operator's order of 2026-10-13, "Mover as linhas (Recommended)" (root map §1, ADR 0249), the `_x` and `A` rows of `test_verdict.py:182-194` move from the refused partition to the accepted partition for `--context`. They stay refused for `--slug`. Every other row stays refused.
+- AC3.1 (unit, RED first): `verdict.py` accepts a context name that core registers (`My_Ctx`). `--context` accepts exactly what the core grammar accepts. It still refuses a name that leaves `.dadaia/handoff/` (`../../evil`, `a/b`, `a\b`) and the empty name, because the allowlist stays (CWE-22). By the operator's order of 2026-10-13, "Mover as linhas (Recommended)" (root map §1, ADR 0249), the `_x` and `A` rows of `test_verdict.py:182-194` move from the refused partition to the accepted partition for `--context`. They stay refused for `--slug`. Every other row stays refused.
 - AC3.2 (no test — reviewer `git grep`): The pattern has one definition, the kernel's `_grammar.CONTEXT_NAME_RE`. `core/models/spec_context.py` loads it through `load_owner`, and `verdict.py:22` `_CONTEXT` leaves.
 
 #### FR4 — the one-owner residue (`one-owner-residue-after-the-kernel`)
