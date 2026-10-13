@@ -54,7 +54,7 @@ rc-14 left five open bugs. Each one is a fact still stated in two or three place
 - the verdict rule is stated three ways, and none of them is the writer;
 - the context name has two grammars.
 
-The rc-14 G1 readout also left residue: an unscrubbed git call, a refusal template copied three times, the last cross-skill import (`_memory_drift`), and bytecode-off decided at about 14 sites by 8+ ledger bugs. Two rules have no measured reason: a fixed five-task cap, and an `ADR:` label plus a pairing law that duplicate ledger status in prose. The reconcile tree writes with no commit shape. Of rc-14's 47 review sequences, 23 were rejected on the first pass.
+The rc-14 G1 readout also left residue: an unscrubbed git call, a refusal template built four times, the last cross-skill import (`_memory_drift`), and bytecode-off decided at about 14 sites by 8+ ledger bugs. Two rules have no measured reason: a fixed five-task cap, and an `ADR:` label plus a pairing law that duplicate ledger status in prose. The reconcile tree writes with no commit shape. Of rc-14's 47 review sequences, 23 were rejected on the first pass.
 
 ## 2. Measurable Goals
 
@@ -189,7 +189,7 @@ Each picked entry exits once at closure (`backlog.py exit`, from the reconcile t
 - `verdict.py`'s `_CONTEXT` and core's literal pattern become the kernel grammar (FR3).
 - The release skill's import of the navigator's `_memory_drift`, `_CROSS_SKILL_EDGES`, `_EDGE_PATH_LINES` and the `sys.path` insert become the kernel decider (FR5).
 - Five per-site `PYTHONDONTWRITEBYTECODE` env literals become the kernel env (FR2).
-- `bugs.py`'s unscrubbed `git` call and two inline copies of the "would not pass check" refusal become their owners (FR4).
+- `bugs.py`'s unscrubbed `git` call and the three inline copies of the "would not pass check — nothing was written" refusal (in `_backlog_store.py`, `_release_store.py` and `_audit_store.py`) become their owners (FR4).
 - `TASK_CAP`, its refusal and its law clause leave (FR9).
 - The `ADR:` label grammar, its guard rows and plants, the pairing law and row 2's hunk clause become one generated block and a `measured_by` check (FR10).
 - Closure readouts in a closed PLAN or SPEC become the closure summary only (FR1).
