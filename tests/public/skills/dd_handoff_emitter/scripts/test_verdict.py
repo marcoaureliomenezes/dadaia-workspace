@@ -239,7 +239,7 @@ def test_the_file_name_stamp_and_produced_at_are_one_instant(tmp_path: Path) -> 
 def test_a_slug_is_accepted_exactly_as_the_backlog_slug_pattern_says(
     tmp_path: Path, slug: str
 ) -> None:
-    """the verdict slug and the backlog slug are one grammar, read from `backlog-v1`
+    """The verdict slug and the backlog slug are one grammar, read from `backlog-v1`
     (`$defs.slug`) — never restated here. `a--b` is the worktree job/task separator: refused;
     today the verdict's own looser pattern lets `a--b`, `1a` and `a-` through."""
     schema = load_owner("dd-bug-resolution", "_ledger").load_schema("backlog-v1")

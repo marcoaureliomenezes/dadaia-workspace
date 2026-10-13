@@ -60,7 +60,7 @@ def _run(script: Path, *argv: str, cwd: Path | None = None) -> subprocess.Comple
     )
 
 
-#: Candidate 1's two milestone stamps: what a state in CLOSURE on candidate 1 has logged.
+#: The live candidate's two milestone stamps: what a state in CLOSURE has logged.
 _RC1_MILESTONES = [
     {"ts": f"2026-01-0{day}T00:00:00Z", "agent": "release.py", "kind": "milestone",
      "candidate": "rc-1", "milestone": name, "sha": sha, "text": f"Candidate {name} at {sha}."}
@@ -85,7 +85,7 @@ def _state(release_id: str, **over: object) -> dict[str, object]:
 def _release(
     specs: Path, release_id: str, *, tasks: str = "- [x] T-1 — done\n", **over: object
 ) -> Path:
-    """One live release directory: its state document and candidate 1's trio in its first candidate folder."""
+    """One live release directory: its state document and the candidate's trio."""
     release_dir = specs / "releases" / release_id
     (release_dir / "rc-1").mkdir(parents=True, exist_ok=True)
     for name in _TRIO:
@@ -130,8 +130,7 @@ def _tree_hash(root: Path) -> list[tuple[str, str]]:
 
 
 def test_new_writes_the_spec_stub_and_the_state_in_one_act(script: Path, tmp_path: Path) -> None:
-    """A U+2028 inside a bug record is text, not a line break (release-new-crashes-on-a-
-    unicode-line-separator-in-the-bug-ledger): the bugs: origin seeds the SPEC from it."""
+    """A U+2028 inside a bug record is text, not a line break: the bugs: origin seeds the SPEC from it."""
     specs = _specs(tmp_path)
     bug = {"id": "ls-probe", "title": "t\u2028x", "repro": "r"}
     (specs / "bugs").mkdir()
@@ -150,7 +149,7 @@ def test_new_writes_the_spec_stub_and_the_state_in_one_act(script: Path, tmp_pat
 
 
 def test_new_refuses_a_second_live_release_with_one_fix_line(script: Path, tmp_path: Path) -> None:
-    """exactly one live release, ever. The refusal writes nothing."""
+    """Exactly one live release, ever. The refusal writes nothing."""
     specs = _specs(tmp_path)
     _release(specs, "0.5.0")
     before = _tree_hash(specs)
@@ -182,7 +181,7 @@ def test_new_opens_the_rc_spec_with_the_bug_window_review(script: Path, tmp_path
 def test_a_live_spec_without_the_bug_window_review(
     script: Path, tmp_path: Path, phase: str, errors: list[tuple[str, int, bool]], verdict: str
 ) -> None:
-    """scoped as the Origin check is: a live SPEC lacking the heading is an error with
+    """A live SPEC lacking the heading is an error with
     one fix while its candidate is in DEFINITION (where `new` writes it); past it, info."""
     specs = _specs(tmp_path)
     _release(specs, "0.5.0", phase=phase, tasks="- [ ] T-1 — open\n")
@@ -198,7 +197,7 @@ def test_a_live_spec_without_the_bug_window_review(
 def test_a_verb_with_no_live_release_hands_new_to_the_operator(
     script: Path, tmp_path: Path
 ) -> None:
-    """with no live release the one fix is the operator's `new`, version unchosen."""
+    """With no live release the one fix is the operator's `new`, version unchosen."""
     specs = _specs(tmp_path)
     result = _run(script, "phase", "IMPLEMENTATION", "--sha", "abc1234", "--specs", str(specs))
     py = Path(sys.executable).as_posix()
@@ -212,8 +211,8 @@ def test_a_verb_with_no_live_release_hands_new_to_the_operator(
 def test_new_births_the_stacked_candidate_on_a_closed_live_release(
     script: Path, tmp_path: Path
 ) -> None:
-    """`new <id>` on the live release in CLOSURE births `rc-<N+1>/` on a SPEC
-    stub, never touches the closed `rc-<N>/`, resets phase to DEFINITION and leaves the
+    """`new <id>` on the live release in CLOSURE births the next candidate's folder on a SPEC
+    stub, never touches the closed candidate, resets phase to DEFINITION and leaves the
     milestones standing (`phase IMPLEMENTATION` restamps `defined`)."""
     specs = _specs(tmp_path)
     release_dir = _release(
@@ -239,7 +238,7 @@ def test_new_births_the_stacked_candidate_on_a_closed_live_release(
 
 
 def test_new_refuses_the_same_id_while_its_candidate_is_open(script: Path, tmp_path: Path) -> None:
-    """a candidate is stacked only on a CLOSURE state: mid-IMPLEMENTATION the live trio
+    """A candidate is stacked only on a CLOSURE state: mid-IMPLEMENTATION the live trio
     is still being worked, and the refusal names the phase verb that unblocks it."""
     specs = _specs(tmp_path)
     _release(specs, "0.5.0", phase="IMPLEMENTATION")
@@ -314,8 +313,7 @@ def test_check_is_clean_on_a_valid_tree(script: Path, tmp_path: Path) -> None:
 
 
 def test_writes_reads_rc6_t_050_117_to_its_ten_paths(script: Path) -> None:
-    """a backticked path inside parentheses is named, not written. The line is
-    a task line from an archived candidate's TASKS.md, verbatim and inlined."""
+    """A backticked path inside parentheses is named, not written; the task line is inlined verbatim."""
     sys.path.insert(0, str(script.parent))  # the staged copy: no bytecode beside the source
     from _release_schema import MARK_RE, writes
 
@@ -331,7 +329,7 @@ def test_writes_reads_rc6_t_050_117_to_its_ten_paths(script: Path) -> None:
 
 
 def test_tasks_without_a_memory_write_set_are_silent(script: Path, tmp_path: Path) -> None:
-    """Re-homed from the doctor's SPEC-DOC-047 (memory is closure procedure, never a task):
+    """Memory is closure procedure, never a task:
     `specs/memory` in prose or in a source file name is not a `W:` naming the memory tree."""
     specs = _specs(tmp_path)
     tasks = "- [ ] **T-1** specs/memory in prose `W:` `f/specs/memory_lint.py`\n"
@@ -340,7 +338,7 @@ def test_tasks_without_a_memory_write_set_are_silent(script: Path, tmp_path: Pat
 
 
 def test_a_source_file_named_memory_is_not_a_memory_write_set(script: Path, tmp_path: Path) -> None:
-    """Re-homed SPEC-DOC-047: a `W:` naming `specs/memory` is a finding naming its task;
+    """A `W:` naming `specs/memory` is a finding naming its task;
     `memory_lint.py` beside it is not."""
     specs = _specs(tmp_path)
     tasks = "- [ ] **T-1** `W:` `f/specs/memory_lint.py`\n- [ ] **T-2** `W:` `specs/memory/x.md`\n"
@@ -363,9 +361,7 @@ def test_a_source_file_named_memory_is_not_a_memory_write_set(script: Path, tmp_
 def test_check_judges_a_definition_release(
     script: Path, tmp_path: Path, tasks: str, log: list[tuple[str, str]], needle: str | None
 ) -> None:
-    """a marker past `[ ]`, a `W:`
-    naming specs/memory (refused where it is born, memory-gate-requires-closure-phase-
-    that-spec-doc-024-forbids-before-last-task) or a closure entry after the candidate's
+    """A marker past `[ ]`, a `W:` naming specs/memory or a closure entry after the candidate's
     birth note is a finding under DEFINITION; a stacked candidate's inherited closure
     entries, logged before its birth, are not."""
     specs = _specs(tmp_path)
@@ -461,9 +457,8 @@ def _in_phase(root: Path, script: Path, phase: str) -> Path:
 def test_every_refusal_carries_one_fix_that_is_not_itself_refused(
     script: Path, tmp_path: Path, phase: str, argv: tuple[str, ...]
 ) -> None:
-    """a refusal exits 1, writes nothing, prints
-    one `fix:` — and that fix, run as printed in the same state, is not refused;
-    under a spaced specs path too."""
+    """A refusal exits 1, writes nothing, prints one `fix:` — and that fix, run as printed in the
+    same state, is not refused; under a spaced specs path too."""
     specs = _in_phase(tmp_path / "a b", script, phase)
     before = _tree_hash(specs)
     result = _run(script, *argv, "--specs", str(specs))
@@ -579,7 +574,7 @@ def test_a_memory_rerun_over_the_same_window_appends_nothing(script: Path, tmp_p
 def test_the_first_memory_run_at_the_definition_sha_records_its_entry(
     script: Path, tmp_path: Path
 ) -> None:
-    """J2.S6.T5 (review F9): with HEAD at defined.sha and no memory entry yet, the run is
+    """With HEAD at defined.sha and no memory entry yet, the run is
     the first reconciliation, never "already reconciled": it records since == until."""
     root, specs, _ = _memory_repo(tmp_path, script)
     head = _git(root, "rev-parse", "HEAD")
@@ -594,7 +589,7 @@ def test_the_first_memory_run_at_the_definition_sha_records_its_entry(
 
 
 def test_memory_takes_no_caller_chosen_window_or_worklist(script: Path, tmp_path: Path) -> None:
-    """H1: `--since`/`--worklist` were the caller choosing an empty window; they are gone."""
+    """The caller no longer picks the window: `--since` and `--worklist` are gone."""
     root, specs, base = _memory_repo(tmp_path, script)
     for flag in (["--since", base], ["--worklist", str(tmp_path / "empty.json")]):
         result = _run(script, "memory", *flag, "--reviewed=alpha", "--specs", str(specs), cwd=root)
@@ -603,7 +598,7 @@ def test_memory_takes_no_caller_chosen_window_or_worklist(script: Path, tmp_path
 
 
 def test_memory_refuses_an_empty_closure_over_a_moved_window(script: Path, tmp_path: Path) -> None:
-    """H1: the code moved since defined.sha, so the derived worklist names `alpha` — a
+    """The code moved since defined.sha, so the derived worklist names `alpha` — a
     closure dispositioning nothing is refused."""
     root, specs, _ = _memory_repo(tmp_path, script)
 
@@ -652,7 +647,7 @@ def test_memory_opens_the_next_window_at_the_previous_until(script: Path, tmp_pa
 def test_a_rerun_after_the_second_reconciliation_appends_nothing(
     script: Path, tmp_path: Path
 ) -> None:
-    """J2.S6.T5: the no-op reads the LAST memory record's until, not the first one's."""
+    """The no-op reads the LAST memory record's until, not the first one's."""
     root, specs, _ = _memory_repo(tmp_path, script)
     assert _memory(script, root, specs, reviewed="alpha", changed="").returncode == 0
     _git(root, "commit", "-qam", "memory entry")
@@ -680,7 +675,7 @@ def test_memory_refuses_any_phase_but_closure(script: Path, tmp_path: Path) -> N
 def test_check_is_clean_when_a_source_moves_after_the_memory_entry(
     script: Path, tmp_path: Path
 ) -> None:
-    """memory references
+    """Memory references
     the code, never repeats it — a commit after the entry leaves check clean."""
     specs = _reconciled_closure(tmp_path, script)
     root = specs.parent
@@ -697,7 +692,7 @@ def test_check_is_clean_when_a_source_moves_after_the_memory_entry(
 
 
 def test_ship_refuses_what_check_refuses_and_touches_nothing(script: Path, tmp_path: Path) -> None:
-    """a CLOSURE
+    """A CLOSURE
     with no memory entry — `ship` exits 1 with `check`'s message and fix, nothing written."""
     specs = _specs(tmp_path)
     _release(specs, "0.5.0", phase="CLOSURE")
@@ -710,14 +705,14 @@ def test_ship_refuses_what_check_refuses_and_touches_nothing(script: Path, tmp_p
         f"fix: {checked['fix']}"
     ]
     assert _tree_hash(specs) == before
-    _release(specs, "0.5.0", phase="BOGUS")  # review L1: an invalid phase refuses, no KeyError
+    _release(specs, "0.5.0", phase="BOGUS")  # an invalid phase refuses, no KeyError
     bogus = _run(script, "ship", "--sha", "beef123", "--pr", "261", "--specs", str(specs))
     assert bogus.returncode == 1 and "Traceback" not in bogus.stderr, bogus.stderr
 
 
 def test_ship_records_the_promote_and_new_births_the_next(script: Path, tmp_path: Path) -> None:
-    """a reconciled CLOSURE ships by verb; the
-    folder moves to `_archive/<v>/`; `shipped` is the one sha/PR field,
+    """A reconciled CLOSURE ships by verb; the folder moves to `_archive/<v>/`;
+    `shipped` is the one sha/PR field,
     an archived state without a hex `shipped.sha` and int `shipped.pr` is a finding, a
     truncated one a finding with a fix and no traceback; the histo `summary` null."""
     specs = _reconciled_closure(tmp_path, script)
@@ -749,7 +744,7 @@ def test_ship_records_the_promote_and_new_births_the_next(script: Path, tmp_path
 
 
 def _closed_rc(tmp_path: Path, *bugs: dict[str, object]) -> Path:
-    """Release 0.5.0 in CLOSURE on its first candidate, and a bug ledger holding *bugs*."""
+    """Release 0.5.0 in CLOSURE, and a bug ledger holding *bugs*."""
     specs = _specs(tmp_path)
     _release(
         specs, "0.5.0", phase="CLOSURE", implemented={"sha": "beef123", "ts": _TS}, log=_RC1_MILESTONES
@@ -768,7 +763,7 @@ def _found(bug: str, status: str) -> dict[str, object]:
 def test_new_stacks_while_an_open_bug_waits_for_the_ship_gate(
     script: Path, tmp_path: Path
 ) -> None:
-    """candidate closure has no mandatory bug-batch gate; ship owns open bugs."""
+    """Candidate closure has no mandatory bug-batch gate; ship owns open bugs."""
     specs = _closed_rc(tmp_path, _found("still-open", "open"))
     assert _run(script, "new", "0.5.0", "--specs", str(specs)).returncode == 0
 
@@ -776,7 +771,7 @@ def test_new_stacks_while_an_open_bug_waits_for_the_ship_gate(
 def test_ship_refuses_every_open_bug_without_derived_candidate_fields(
     script: Path, tmp_path: Path
 ) -> None:
-    """ship judges the persisted open status, not a derived candidate placement."""
+    """Ship judges the persisted open status, not a derived candidate placement."""
     specs = _reconciled_closure(tmp_path, script)
     ledger = specs / "bugs" / "BUGS.jsonl"
     ledger.parent.mkdir(exist_ok=True)

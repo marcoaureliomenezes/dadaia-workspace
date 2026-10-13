@@ -228,9 +228,8 @@ _APPEND = ["append", "--bug-id", "x", "--title", "t", "--severity", "LOW", "--su
 def test_a_missing_specs_tree_is_refused_never_created(
     script: Path, tmp_path: Path, argv: list[str], trees: tuple[str, ...], fix: str, note: str
 ) -> None:
-    """A read verb reruns on the bound repo tree (and runs as printed); a write verb's fix names the
-    command listing the open worktrees — never
-    `repos/<r>/specs`, which only `specs/audits/` may write."""
+    """A missing specs tree is refused, never created: a read verb's fix reruns on the bound repo
+    tree as printed; a write verb's fix names the command listing the open worktrees."""
     (cli := tmp_path / ".dadaia/.venv/bin/dadaia").parent.mkdir(parents=True)
     cli.write_text(f'#!{sys.executable}\nprint(\'{{"main_repo": "demo"}}\')\n', "utf-8")
     cli.chmod(0o755)
@@ -309,9 +308,8 @@ def test_absent_ledger_is_not_a_finding(script: Path, tmp_path: Path) -> None:
 def test_a_bad_bug_line_is_one_finding_and_the_doctor_says_what_the_script_says(
     script: Path, tmp_path: Path, bad: str
 ) -> None:
-    """Bug-record validity is reported only as
-    LEDGER-BUGS-SCHEMA, and doctor = `bugs.py check` on every row;
-    severity BLOCKER gives exactly one finding."""
+    """Bug-record validity is reported only as LEDGER-BUGS-SCHEMA, and doctor = `bugs.py check`
+    on every row; severity BLOCKER gives exactly one finding."""
     from dadaia_workspace.features.specs import SpecsDoctor
     from dadaia_workspace.infrastructure.ledger_scripts import script_findings
 
@@ -415,9 +413,9 @@ def test_append_names_its_correlations_from_the_ledger(script: Path, tmp_path: P
 def test_append_takes_a_tracked_directory_surface_and_non_blank_fields(
     script: Path, tmp_path: Path, field: str, value: str, needle: str | None
 ) -> None:
-    """The tracked-directory set is the one decider — `.github` admitted,
-    an untracked `unknown` refused naming close matches, a blank context
-    or component refused. Every refusal leaves the ledger untouched."""
+    """The tracked-directory set is the one decider: `.github` admitted, an untracked
+    `unknown` refused naming close matches. A blank context or component is refused.
+    Every refusal leaves the ledger untouched."""
     specs = _ledger(tmp_path)
     values = {"surface": "cli", "context": "ctx", "component": "c", field: value}
     done = _run(script, "append", "--specs", str(specs), "--bug-id", "b", "--title", "t",
@@ -483,10 +481,9 @@ _SHA = "0123456789abcdef" * 2 + "01234567"
 def test_the_seam_refuses_exactly_what_the_push_refuses(
     script: Path, tmp_path: Path, value: str, pushed: bool
 ) -> None:
-    """Append refuses a
-    push-matched value, naming the field and the masked term, ledger unchanged; resolve
-    refuses it too and the record stays open. On the same
-    matrix the seam refuses iff the push matcher does; a bare sha is not refused."""
+    """Append refuses a push-matched value, naming the field and the masked term, ledger
+    unchanged. Resolve refuses it too and the record stays open. On the same matrix the seam
+    refuses iff the push matcher does. A bare sha is not refused."""
     from dadaia_workspace.core.models.git_scan import ScannedObject
     from dadaia_workspace.features.chokepoints.denylist_scan import scan_objects
     from dadaia_workspace.infrastructure.privacy_check import load_baseline_patterns
@@ -709,9 +706,8 @@ def test_update_writes_a_governance_field(script: Path, tmp_path: Path) -> None:
 def test_update_refuses_a_field_it_does_not_own(
     script: Path, tmp_path: Path, change: str, owner: str
 ) -> None:
-    """Update refuses x-mutability
-    immutable-core (reported_by and context included) and refuses superseded_by; the
-    refusal names the owner and the ledger is untouched."""
+    """Update refuses x-mutability immutable-core (reported_by and context included) and
+    superseded_by; the refusal names the owner and the ledger is untouched."""
     specs = _ledger(tmp_path, _OPEN_RECORD)
     before = (specs / "bugs" / "BUGS.jsonl").read_bytes()
     done = _run(script, "update", "a-bug", "--set", change, "--specs", str(specs))
@@ -850,7 +846,7 @@ def test_the_projection_rule_carries_the_exec_bit_for_an_executable_source(
 def test_a_refused_archive_leaves_both_ledger_files_byte_intact(
     script: Path, tmp_path: Path
 ) -> None:
-    """With BUGS.jsonl holding an invalid record, `bugs.py archive` exits non-zero and
+    """Given BUGS.jsonl holding an invalid record, `bugs.py archive` exits non-zero and
     BUGS.jsonl and bugs_histo.jsonl are byte-identical. Run twice: a retry included."""
     old = {
         **_OPEN_RECORD, "id": "old-bug", "ts": "2025-12-01T00:00:00Z",

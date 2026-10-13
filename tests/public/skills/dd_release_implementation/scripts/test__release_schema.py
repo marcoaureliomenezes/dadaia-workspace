@@ -1,4 +1,4 @@
-"""a release id has ONE grammar, the
+"""A release id has ONE grammar, the
 script's bare M.m.p (`_release_schema.SEMVER_RE`); core consults it; archived dirs are
 exempt by location. Size: SMALL.
 """
@@ -36,7 +36,7 @@ import _release_schema  # noqa: E402
     ],  # fmt: skip
 )
 def test_one_release_id_grammar_everywhere(tmp_path: Path, release_id: str, legal: bool) -> None:
-    """core,
+    """Core,
     the canon and `release.py new` agree on every id — a suffix and a `v` are refused."""
     assert bool(RELEASE_ID_RE.match(release_id)) is legal
     assert is_canon_path(f"releases/{release_id}/rc-1/SPEC.md") is legal
@@ -273,7 +273,7 @@ def _git(*args: str, cwd: Path) -> None:
 
 
 def _repo(path: Path, *, spec: bool) -> Path:
-    """A repo of two commits; with *spec*, the first adds a Draft `releases/0.5.0/<candidate>/SPEC.md`."""
+    """A repo of two commits; with *spec*, the first adds a Draft SPEC for the live candidate."""
     path.mkdir()
     _git("init", "-q", cwd=path)
     if spec:
@@ -301,7 +301,7 @@ def _adds_under_foreign_git_env(specs: Path, other: Path) -> subprocess.Complete
 
 
 def test_the_birth_log_answers_for_the_repo_given_not_for_git_dir(tmp_path: Path) -> None:
-    """with GIT_DIR and GIT_WORK_TREE on another repo, the log read
+    """The release runner: with GIT_DIR and GIT_WORK_TREE on another repo, the log read
     still lists the Draft SPEC that repo A holds — today it reads B and finds none."""
     a, b = _repo(tmp_path / "a", spec=True), _repo(tmp_path / "b", spec=False)
     out = _adds_under_foreign_git_env(a, b)
@@ -310,7 +310,7 @@ def test_the_birth_log_answers_for_the_repo_given_not_for_git_dir(tmp_path: Path
 
 
 def test_the_shallow_check_answers_for_the_repo_given_not_for_git_dir(tmp_path: Path) -> None:
-    """a shallow GIT_DIR repo B must not make the full repo A read as shallow."""
+    """A shallow GIT_DIR repo B must not make the full repo A read as shallow."""
     a, b = _repo(tmp_path / "a", spec=True), _repo(tmp_path / "src", spec=False)
     shallow = tmp_path / "shallow"
     subprocess.run(["git", "clone", "-q", "--depth", "1", f"file://{b}", str(shallow)], check=True,

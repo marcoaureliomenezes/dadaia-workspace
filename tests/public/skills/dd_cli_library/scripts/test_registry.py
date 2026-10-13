@@ -1,5 +1,5 @@
-"""dd-cli-library/scripts/registry.py owns the port registry JSON (0.4.7
-c5 T-047-45: the `dadaia server` group retired into one stdlib script). Size: SMALL."""
+"""dd-cli-library/scripts/registry.py owns the port registry JSON (one stdlib script).
+Size: SMALL."""
 
 from __future__ import annotations
 
@@ -139,7 +139,7 @@ def _run_in(cwd: Path, *argv: str) -> subprocess.CompletedProcess[str]:
 
 
 def test_registry_resolves_the_workspace_sentinel_never_a_partial_dadaia(tmp_path: Path) -> None:
-    """sa-seven-workspace-root-rules#S6: from repos/<slug> holding a partial .dadaia/ (no
+    """From repos/<slug> holding a partial .dadaia/ (no
     sentinel), the registry lands in the workspace owning the sentinel."""
     workspace = tmp_path / "ws"
     repo = workspace / "repos" / "yb"
@@ -153,7 +153,7 @@ def test_registry_resolves_the_workspace_sentinel_never_a_partial_dadaia(tmp_pat
 
 
 def test_registry_refuses_when_no_dadaia_dir_is_above_the_cwd(tmp_path: Path) -> None:
-    """sa-seven-workspace-root-rules#S6: no workspace sentinel above (a bare .dadaia/ is
+    """No workspace sentinel above (a bare .dadaia/ is
     not one) → exit non-zero, no registry written."""
     lonely = tmp_path / "lonely"
     (lonely / ".dadaia").mkdir(parents=True)
@@ -182,7 +182,7 @@ def test_entry_with_a_dead_pid_is_stale_before_its_ttl(tmp_path: Path) -> None:
 
 
 def test_a_concurrent_load_never_reads_a_half_written_registry(tmp_path: Path) -> None:
-    """sa-ledger-vocabulary-and-atomic-write-duplicated-in-scripts#48.4: interleaved save
+    """Interleaved save
     and load never raise JSONDecodeError (a load raising it fails the reader thread)."""
     import threading
 
@@ -206,7 +206,7 @@ def _dead_pid() -> int:
 def test_the_liveness_branch_comes_from_the_platform_decision(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """AC11.4: `_platform.detect()` (which reads `sys.platform`) is the one platform fact. On a
+    """`_platform.detect()` (which reads `sys.platform`) is the one platform fact. On a
     faked Windows host there is no signal-0 probe, so a dead pid reads alive and its entry is
     not stale; on a POSIX host (control, passes today) the same pid is dead. Today the registry
     reads `os.name` itself, so faking `sys.platform` changes nothing and the Windows case fails."""
@@ -224,7 +224,7 @@ def test_the_liveness_branch_comes_from_the_platform_decision(
 def test_register_stamps_through_the_kernel_clock(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """AC11.4: `register` takes its instant from `_clock.now_iso()` (called through the module,
+    """`register` takes its instant from `_clock.now_iso()` (called through the module,
     so a test freezes it) and writes both stamps in that clock's `YYYY-MM-DDTHH:MM:SSZ` form;
     `expires_at` is the default 8-hour TTL later."""
     module = _load_module()
