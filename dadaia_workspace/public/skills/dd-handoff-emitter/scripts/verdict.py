@@ -14,11 +14,15 @@ sys.dont_write_bytecode = True
 #: One bootstrap statement: the kernel, at the front.
 sys.path[:0] = [str(Path(__file__).resolve().parents[2] / "dd-bug-resolution" / "scripts")]
 
+import _atomic
 import _clock
 import _ledger
 import _root
+from _git import scrubbed_env
 from _grammar import CONTEXT_NAME_RE
 from _handoffs import REVIEWER, reviewer_records
+from _platform import venv_tool
+from _specs import quote
 
 _WORKTREE = Path(__file__).resolve().parents[2] / "dd-gitflow-default" / "scripts" / "worktree.py"
 _OWN = (
@@ -43,6 +47,22 @@ def _body(text: str) -> dict[str, object] | str:
     if taken := [k for k in _OWN if k in body]:
         return f"stdin sets keys verdict.py owns: {', '.join(taken)}"
     return body
+
+
+def _reason(stdout: str, stderr: str) -> str:
+    """The refusal text for a failed `reports validate --json`: its first error, or its own text."""
+    try:
+        err = json.loads(stdout)[0]["errors"][0]
+    except (ValueError, LookupError, TypeError):  # no JSON: the CLI refused before validating
+        said = stderr.splitlines()
+        fix = next(
+            (x for x in said if x.startswith("fix: ")),
+            "fix: Operator action: resolve the workspace CLI error above, then rerun verdict.py",
+        )
+        why = next((x[7:] for x in said if x.startswith("Error: ")), stderr.strip() or "no output")
+        return f"{why}\n{fix}"
+    where, why = err["field_path"], err["message"]
+    return f"{where}: {why}\nfix: Operator action: correct {where} in the stdin body ({why}), then rerun verdict.py"
 
 
 def _stats(argv: list[str]) -> int:
@@ -92,11 +112,12 @@ def main(argv: list[str] | None = None) -> int:
     for name, pattern in (("context", CONTEXT_NAME_RE.pattern), ("slug", slug)):
         if not re.fullmatch(pattern, getattr(args, name)):
             return _refuse(f"--{name} must match {pattern}")
+    tree = Path(args.path).resolve()
     body = _body(sys.stdin.read())
     if isinstance(body, str):
         return _refuse(body)
     done = subprocess.run(
-        [sys.executable, str(_WORKTREE), "hash", args.path, "--sha", args.sha],
+        [sys.executable, str(_WORKTREE), "hash", str(tree), "--sha", args.sha],
         capture_output=True,
         text=True, encoding="utf-8", errors="replace",
     )  # fmt: skip
@@ -117,7 +138,11 @@ def main(argv: list[str] | None = None) -> int:
         "diff_sha256": bound["diff_sha256"],
         **body,
     }
-    out = Path(bound["root"]) / ".dadaia/handoff" / args.context
+    root = Path(bound["root"])
+    cli = venv_tool(root / ".dadaia/.venv", "dadaia")
+    if not cli.exists():
+        return _refuse(f"no workspace CLI\nfix: uvx dadaia-workspace init {quote(str(root))}")
+    out = root / ".dadaia/handoff" / args.context
     out.mkdir(parents=True, exist_ok=True)
     target = out / f"{now.replace(':', '')}-{REVIEWER}-{args.slug}.handoff.json"
     try:
@@ -125,6 +150,16 @@ def main(argv: list[str] | None = None) -> int:
             fh.write(json.dumps(handoff, indent=2) + "\n")
     except FileExistsError:
         return _refuse(f"{target.name} exists; rerun in a second")
+    checked = subprocess.run(
+        [str(cli), "reports", "validate", str(target), "--reviewed-root", str(tree), "--json"],
+        cwd=root,
+        env=scrubbed_env(),
+        capture_output=True,
+        text=True, encoding="utf-8", errors="replace",
+    )  # fmt: skip
+    if checked.returncode:
+        _atomic.atomic_write(target, None)
+        return _refuse(_reason(checked.stdout, checked.stderr))
     print(target)
     return 0
 
