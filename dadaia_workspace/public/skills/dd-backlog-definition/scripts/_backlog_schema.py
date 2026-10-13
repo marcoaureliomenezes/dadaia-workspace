@@ -15,5 +15,5 @@ HISTO = "backlog/_archive/backlog_histo.jsonl"
 DISPOSITIONS = ("delivered", "superseded", "rejected", "to-bug")
 #: The terminal words no LIVE active[] entry carries; a postponed item keeps any other status.
 TERMINAL = (*DISPOSITIONS, "resolved")
-#: The one status exempt from the typed-intents requirement (dd-backlog-definition §2).
+#: The one status exempt from the typed-intents requirement (`specs/backlog/AGENTS.md` §4).
 IDEA = "idea"
