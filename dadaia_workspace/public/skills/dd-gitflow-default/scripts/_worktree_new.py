@@ -86,7 +86,7 @@ def _plain_base(root: Path, repo: Path, flow: dict[str, str]) -> str:
 def _refuse_unready(root: Path, flow: dict[str, str], work: str, version: str, rc: str) -> None:
     """A job opens only while its release is in IMPLEMENTATION on *work*."""
     fix = f"Operator action: repair {STATE} on {work} until release.py check passes"
-    main = root / "repos" / flow["main"]  # the context's trio lives in its main repo
+    main = root / "repos" / flow["main"]  # the context's specs live in its main repo
     try:
         state = parse_object(git(main, "show", f"{work}:specs/releases/{version}/{STATE}", check=False), fix)  # fmt: skip
     except Unreadable as bad:

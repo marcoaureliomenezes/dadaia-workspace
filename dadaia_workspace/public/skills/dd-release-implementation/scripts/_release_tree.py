@@ -213,7 +213,7 @@ def _definition_findings(
               for m in marks if m[2] != " "]  # fmt: skip
     if not found:
         return []
-    try:  # `defined` is the commit that approved the trio, never HEAD: impl commits follow it
+    try:  # `defined` is the commit that approved the SPEC and PLAN, never HEAD: impl commits follow it
         docs = [str(candidate / n) for n in ("SPEC.md", "PLAN.md")]
         sha = drift.git(specs.parent, "log", "-1", "--format=%h", "--", *docs)[0]
         fix = with_specs(f"{SCRIPT} {NEXT['DEFINITION']} --sha {sha}", specs)
@@ -224,7 +224,7 @@ def _definition_findings(
 
 def _directory_findings(release_dir: Path, specs: Path) -> list[dict[str, Any]]:
     """One live directory: its state document, its live candidate's `W:` sets, then the
-    trio in IMPLEMENTATION/CLOSURE or the untouched markers in DEFINITION."""
+    SPEC, PLAN and job files in IMPLEMENTATION/CLOSURE or the untouched markers in DEFINITION."""
     dir_rel, path = release_dir.relative_to(specs).as_posix(), release_dir / STATE
     if not path.is_file():
         return [_findings.finding(CODE, dir_rel, 1, f"release directory carries no {STATE}", f"Operator action: "

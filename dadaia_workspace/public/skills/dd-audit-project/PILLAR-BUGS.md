@@ -26,7 +26,7 @@ record whose `ts` or `closed_at` falls inside that window.
 ## The nine forensic metrics
 
 A pillar-1 run reporting fewer than nine is incomplete. Each metric reports the window's
-value against the previous audit from `audits_histo.jsonl`. Metrics 7 and 8 have target 0.
+value against the previous audit's `AUDIT.md`, read at its close sha with `git show`. Metrics 7 and 8 have target 0.
 
 | # | Metric | Definition / evidence |
 |---|---|---|

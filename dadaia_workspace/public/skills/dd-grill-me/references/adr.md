@@ -2,7 +2,7 @@
 
 ## Threshold
 
-A decision is an ADR only when all three legs hold: it is a one-way door, it is architecturally significant, and at least two genuine options exist.
+The ADR threshold: `specs/ADRs/AGENTS.md` §1.
 
 ## Question bank
 

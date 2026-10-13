@@ -1,7 +1,6 @@
 ---
 name: dd-sw-engineer-sr
 description: Senior engineer. As-is review, PLAN and job files (fills `who`), new behaviour, design choices, root causes and the RED test of a new contract, in any context language. Main-thread sub-agent; SPEC and memory stay with dd-product-engineer.
-dispatch_band: 3
 read_only: false
 tools:
   - Read
@@ -21,28 +20,6 @@ skills:
   - dd-bug-resolution
   - dd-bug-registration
   - dd-gitflow-default
-input_contract:
-  requires_inputs:
-    - name: context
-      kind: string
-      source: workflow_input
-      description: "Active Spec Context Project name"
-      stop_if_missing: true
-    - name: task_id
-      kind: string
-      source: workflow_input
-      description: "Approved task identifier from its job file; absent for a definition demand (as-is review, PLAN, job files)"
-      stop_if_missing: false
-    - name: failing_tests_report
-      kind: report
-      source: report_path
-      description: "Red-phase report or E2E acceptance criteria (TDD inbound)"
-      stop_if_missing: false
-  produces_outputs:
-    - name: handoff
-      kind: report
-      schema_ref: handoff-schema-v1
-  stop_if_missing: true
 ---
 
 # Software Engineer (senior)

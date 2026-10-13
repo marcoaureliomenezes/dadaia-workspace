@@ -21,7 +21,7 @@ HISTO = "releases/_archive/releases_histo.jsonl"
 CANDIDATE_DOCS = ("SPEC.md", "PLAN.md")
 #: The lifecycle phases, read from the `release-state-v1` enum; a shipped release moves whole to `_archive/<v>/`.
 PHASES = tuple(load_schema("release-state-v1")["properties"]["phase"]["enum"])
-#: The phases in which the live candidate's trio is REQUIRED; the first, DEFINITION, is authoring it.
+#: The phases in which the live candidate's SPEC, PLAN and job files are REQUIRED; the first, DEFINITION, is authoring it.
 DEFINITION, IMPLEMENTATION, CLOSURE = PHASES
 TRIO_PHASES = frozenset(PHASES[1:])
 #: A release ships `delivered` — the one histo disposition this ledger writes.
@@ -38,7 +38,7 @@ _ORIGIN_GRAMMAR = "operator-demand | backlog:<ids>; bugs:<ids>; findings:<ids>, 
 
 
 def extract_status(text: str) -> str | None:
-    """The ``**Status:**`` token a trio document carries, or ``None``."""
+    """The ``**Status:**`` token a SPEC, PLAN or job document carries, or ``None``."""
     match = STATUS_RE.search(text)
     return match.group(1) if match else None
 

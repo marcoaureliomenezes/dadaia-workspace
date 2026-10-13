@@ -26,8 +26,6 @@ description: >
 The main thread refuses to write `AUDIT.md` until all three pillar sections are present. Append one `FINDINGS.jsonl` record per claim
 ([`FINDINGS-FORMAT.md`](FINDINGS-FORMAT.md)).
 
-The audit pass doubles as the version scorecard: the independent reviewer runs it before evals or promote, with metrics computed by script.
-
 ## 3. First pass — a freshly onboarded context
 
 - Applies while `.dadaia/.venv/bin/dadaia doctor`'s ONBOARDING next step is `first-pass`; its fix line lists the pending memory files.

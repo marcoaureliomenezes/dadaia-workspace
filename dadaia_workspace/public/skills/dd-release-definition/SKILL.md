@@ -92,7 +92,7 @@ Before the SPEC or any ADR, the main thread runs `dd-grill-me` on the picked set
 - Picked set recorded; the `dd-grill-me` session completed and emitted.
 - PLAN §1 gives every touched unit one verdict and every touched question one §1.1 authority; SPEC authored from the refined set, `Replaces` present, `**Origin:**` declared.
 - Every approved requirement maps into the PLAN's DAG and >=1 job-file task.
-- `python3 .agents/skills/dd-release-implementation/scripts/release.py check --specs <specs-dir>` exits 0 (Origin line, DAG, `W:` overlaps).
+- `python3 .agents/skills/dd-release-implementation/scripts/release.py check --specs <specs-dir>` exits 0 (Origin line, DAG, wave `W:` overlaps, each DAG `W:` equal to its job-file union).
 - Every unresolved gap rides the handoff to the main thread's operator-gated intake, the backlog's one entry path.
 
 ## 8. References

@@ -1,7 +1,6 @@
 ---
 name: dd-sw-engineer-jr
 description: Junior engineer. Implements tasks whose outcome the AC and `W:` fully state, in any context language. Main-thread sub-agent.
-dispatch_band: 2
 read_only: false
 tools:
   - Read
@@ -16,23 +15,6 @@ skills:
   - dd-spec-navigator
   - dd-ai-eng-knowhow
   - dd-gitflow-default
-input_contract:
-  requires_inputs:
-    - name: context
-      kind: string
-      source: workflow_input
-      description: "Active Spec Context Project name"
-      stop_if_missing: true
-    - name: task_id
-      kind: string
-      source: workflow_input
-      description: "Approved task identifier from its job file"
-      stop_if_missing: true
-  produces_outputs:
-    - name: handoff
-      kind: report
-      schema_ref: handoff-schema-v1
-  stop_if_missing: true
 ---
 
 # Software Engineer (junior)

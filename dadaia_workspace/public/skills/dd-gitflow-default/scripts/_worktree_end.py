@@ -39,7 +39,7 @@ from _worktree_git import (
 )
 from _worktree_names import NAME_RE, SCRIPT, Refusal, branch, locate, non_code, plain, tree_path
 
-#: The ledger, trio and release checks a `define` or `backlog` merge runs, in this order.
+#: The ledger and release checks a `define` or `backlog` merge runs, in this order.
 _LEDGERS = (("dd-bug-resolution", "bugs.py"), ("dd-backlog-definition", "backlog.py"),
             ("dd-release-implementation", "release.py"))  # fmt: skip
 

@@ -79,7 +79,7 @@ Audit protocol — detecting order drift:
 
 ## 3. Persona-Consistency Invariants
 
-Four invariants MUST hold across all personas. Inconsistencies are bugs — file them in a refactor report.
+Four invariants MUST hold across the full personas (reviewer, product engineer, sr); the lighter `dd-researcher` and `dd-sw-engineer-jr` are exempt from I2 and I3, and I4 binds every agent but `dd-researcher`. Inconsistencies are bugs — file them in a refactor report.
 
 | # | Invariant | What must match |
 |---|---|---|
@@ -88,7 +88,7 @@ Four invariants MUST hold across all personas. Inconsistencies are bugs — file
 | I3 | `[SCOPE ERROR]` block format | Opener, one-line identity, explicit redirect per foreign domain |
 | I4 | Handoff JSON contract | All agents emit via `dd-handoff-emitter` against the same schema version |
 
-- I1 reference: the shared core is `name`, `description`, `dispatch_band`, `read_only`, `tools`, `skills`, in that order; a role-specific extension such as `input_contract` follows it.
+- I1 reference: the shared core is `name`, `description`, `read_only`, `tools`, `skills`, in that order; a role-specific extension follows it.
 - No persona sets `maxTurns`: a capped subagent stops mid-work and returns no report; the main thread stops a runaway one.
 - Model resolution is a separate policy-overlay mechanism, never asserted in persona frontmatter.
 

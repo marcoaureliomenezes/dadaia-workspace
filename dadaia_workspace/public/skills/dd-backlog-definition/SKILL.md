@@ -11,7 +11,7 @@ description: >
 ## The document
 
 1. Open `specs/backlog/AGENTS.md` (the area's scoped law) and follow it.
-2. Before `backlog.py new`, run `dd-grill-me` with its `references/backlog.md`.
+2. Before `backlog.py new`, read the main thread's `dd-grill-me` backlog-stage handoff (`references/backlog.md`).
 3. Write in a `backlog` worktree (`worktrees/AGENTS.md`). Append via `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py new <slug> --title "…" --description "…" --provenance "<operator words or intake item + date>" --relates <slugs>|none`; validate via `.dadaia/.venv/bin/dadaia doctor` (`ledgers`
    section).
 
@@ -36,8 +36,7 @@ description: >
 
 ## Pick and dispositions
 
-- The pick is the SPEC's `**Origin:** backlog:<ids>` line; the entry keeps its status.
-- It exits exactly once, at closure, by `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py exit <slug> --disposition
+- Pick and exit: `specs/backlog/AGENTS.md` §5. The exit command: `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py exit <slug> --disposition
   <disposition> [--release <id>] [--reason <text>]` — one histo
   record, refused on a second exit (`dd-release-implementation` RC-FLOW step 4).
 

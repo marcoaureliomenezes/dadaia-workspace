@@ -70,7 +70,7 @@ A decision surface, not a doc mirror — official docs are an on-demand index at
 
 ## 4. Skills mechanics — and the listing-budget tax
 
-- A skill's body loads only on invoke — long reference material is nearly free until used.
+- A skill's body loads only on invoke — long reference material is nearly free until used; a subagent's `skills:` grants preload the full body at every dispatch.
 - The description is not free: it loads every session.
 
 | Field | Effect | Authoring lever |
@@ -114,7 +114,6 @@ A decision surface, not a doc mirror — official docs are an on-demand index at
 
 - Gotcha: an empty matcher fires on every tool (`Read`, `Grep`, `Glob`, `WebFetch`, `TaskCreate` too).
 - Scope write-gates to `Edit|Write|MultiEdit|NotebookEdit`.
-- Add `Bash` to that matcher only when the gate inspects shell-side writes.
 - Inject full static context once per logical session (session-keyed sentinel), never every prompt.
 - `UserPromptSubmit` may fire every prompt but must stay a silent no-op after the first injection.
 - PreToolUse is a guardrail, not a hard boundary — a script that writes files itself can slip past it.
@@ -161,7 +160,6 @@ A decision surface, not a doc mirror — official docs are an on-demand index at
 - Prune dead/stale permission entries.
 - Gotcha: nothing enforces the per-persona write-allowlist.
 - Native frontmatter (`name`, `description`, `model`, `tools`, `skills`, `maxTurns`) is honored.
-- dadaia extras (`dispatch_band`, `input_contract`) are ignored by the runtime.
 - dadaia's PreToolUse gate is persona-blind: path-class x scope only.
 
 ---

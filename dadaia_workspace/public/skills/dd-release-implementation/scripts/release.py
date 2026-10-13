@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""The release ledger's ONE writer and validator — `_RELEASE.json`, the candidate trio and
+"""The release ledger's ONE writer and validator — `_RELEASE.json`, the candidate's SPEC, PLAN and job files and
 the ship ledger, stdlib only. Every write is validated by `check` before an atomic
 replace; `ship` records the merged promote PR and moves the release to `_archive/<v>/`.
 """

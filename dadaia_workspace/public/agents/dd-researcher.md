@@ -1,7 +1,6 @@
 ---
 name: dd-researcher
 description: Read-only research on codebase and web questions. Returns findings as `path:line` or a URL. Never writes.
-dispatch_band: 1
 read_only: true
 tools:
   - Read
