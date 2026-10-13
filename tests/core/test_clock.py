@@ -1,4 +1,4 @@
-"""core.clock is the package's view of the kernel's one UTC clock (AC11.4)."""
+"""core.clock is the package's view of the kernel's one UTC clock."""
 
 import datetime as dt
 import importlib
@@ -11,7 +11,7 @@ from dadaia_workspace.core.skill_owner import load_owner
 
 
 def _clock() -> ModuleType:
-    # by name: the shim is created by J9.T5, so this file collects (and fails) before it exists
+    # by name: this file collects (and fails) until the shim exists
     return importlib.import_module("dadaia_workspace.core.clock")
 
 

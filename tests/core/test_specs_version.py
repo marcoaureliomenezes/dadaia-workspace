@@ -1,6 +1,5 @@
-"""AC6.2 (T-050-11): the constitution gitflow reads back; one merge-writer
-keeps every other key and the body byte-identical. Bug
-upgrade-leaves-project-specs-unmigrated-and-silent: the canon a tree must meet is pinned
+"""The constitution gitflow reads back; one merge-writer
+keeps every other key and the body byte-identical. The canon a tree must meet is pinned
 to ``CANONICAL_SPECS_VERSION``."""
 
 from __future__ import annotations

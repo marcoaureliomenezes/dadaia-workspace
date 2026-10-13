@@ -1,4 +1,4 @@
-"""AC3.2, AC3.3 (T-050-10): a memory stub is recognised as shipped by
+"""A memory stub is recognised as shipped by
 its stripped digest (fixed sections removed), so a ``doctor --fix`` FIXED-2 rewrite of an
 untouched stub still reads as ours and an edited body does not."""
 
@@ -40,7 +40,7 @@ def test_a_stub_from_before_fixed_sections_strips_to_the_same_text() -> None:
 
 
 def test_a_law_rendered_for_win32_reads_shipped(monkeypatch: pytest.MonkeyPatch) -> None:
-    """shipped-law-hardcodes-the-posix-venv-path: history holds recorded Windows digests;
+    """History holds recorded Windows digests;
     forward-rendering an authored law to `Scripts/dadaia.exe` still identifies it as ours."""
     monkeypatch.setattr("dadaia_workspace.core.platform.PLATFORM", Capabilities.detect("win32"))
     source = (_PUBLIC / "scaffold" / "memory" / "AGENTS.md").read_text(encoding="utf-8")

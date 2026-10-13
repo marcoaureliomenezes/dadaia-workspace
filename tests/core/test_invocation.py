@@ -1,8 +1,7 @@
 """``core.invocation`` — the single session/context/root/Bind resolution authority.
 
-0.5.1 K1 ("One Invocation"): the rung table asserts observable outcomes
-through :func:`invocation.resolve`, never internal ladder state. Also covers
-``sdd-gate-memory-phase-resolves-empty-when-cwd-is-a-linked-worktree-outside-repos``: a nested
+The rung table ("One Invocation") asserts observable outcomes
+through :func:`invocation.resolve`, never internal ladder state. Also covers a nested
 sentinel-bearing sandbox under cwd never shadows the workspace that owns the write target.
 """
 
@@ -126,9 +125,8 @@ def test_context_name_for_repo_slug_maps_main_associated_and_legacy_repo_field(
 
 
 def test_an_unowned_repo_resolves_no_context(tmp_path: Path) -> None:
-    """sa-context-repo-mapping-falls-back-to-the-name#B1: repos/foo on disk, owned by no
-    registered context: the mapping answers None and resolve() from repos/foo binds no
-    context named after the directory (DELETE-LOSER: the three name-fallback tests)."""
+    """repos/foo on disk, owned by no registered context: the mapping answers None and
+    resolve() from repos/foo binds no context named after the directory."""
     ws = _mk_ws(tmp_path)
     (ws / "repos" / "foo").mkdir()
     assert invocation.context_name_for_repo_slug(ws, "foo") is None
@@ -143,8 +141,7 @@ def test_an_unowned_repo_resolves_no_context(tmp_path: Path) -> None:
     ids=["truncated", "empty-object", "deep-nesting"],
 )
 def test_an_unreadable_registry_refuses_never_answers_no_context(tmp_path: Path, body: str) -> None:
-    """AC3.9 (rewrites sa-context-repo-mapping-falls-back-to-the-name#B4's fail-soft leg):
-    the name list, the slug mapping and the bind each raise REG-SCHEMA's refusal; the gate
+    """The name list, the slug mapping and the bind each raise REG-SCHEMA's refusal; the gate
     maps it to no bind (test_sdd_gate)."""
     ws = _mk_ws(tmp_path)
     (ws / ".dadaia" / "states" / "spec_contexts.json").write_text(body, "utf-8")

@@ -1,4 +1,4 @@
-"""sa-status-line-has-two-parsers; 0.4.7 FR4 (T-047-58)."""
+"""The status-line readers return the same declared token."""
 
 from __future__ import annotations
 
@@ -31,9 +31,8 @@ def test_vocabulary_is_the_canonical_triple() -> None:
     ],
 )
 def test_the_status_reader_returns_the_declared_token(text: str, expected: str | None) -> None:
-    """sa-status-line-has-two-parsers#B26-1 sa-status-line-has-two-parsers#B26-2
-    sa-status-line-has-two-parsers#B26-4: first anchored line anywhere; bullet, blockquote,
-    mid-line quote never count; absent is None."""
+    """The first anchored line counts anywhere; bullet, blockquote, mid-line quote never count;
+    absent is None."""
     assert extract_status(text) == expected
 
 
@@ -60,7 +59,6 @@ _script_extract_status = runpy.run_path(str(_SCRIPTS / "scripts/_release_schema.
     ],
 )
 def test_both_status_readers_return_the_same_token(text: str, expected: str | None) -> None:
-    """sa-status-line-has-two-parsers#B26-1 sa-status-line-has-two-parsers#B26-2
-    sa-status-line-has-two-parsers#B26-4: first anchored line anywhere; bullet, blockquote,
-    mid-line quote never count; absent is None — both readers agree."""
+    """The first anchored line counts anywhere; bullet, blockquote, mid-line quote never count;
+    absent is None; both readers agree."""
     assert extract_status(text) == _script_extract_status(text) == expected

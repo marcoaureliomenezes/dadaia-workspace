@@ -1,4 +1,4 @@
-"""AC6.1 (T-050-11): the project gitflow value — roles fixed, names free."""
+"""The project gitflow value — roles fixed, names free."""
 
 from __future__ import annotations
 
@@ -11,8 +11,7 @@ from dadaia_workspace.core.gitflow import DEFAULT, from_mapping
 
 
 def test_the_default_names_live_only_in_default_and_work_is_cut_from_integration() -> None:
-    """sa-principal-branch-defaults-to-main-and-cut-point-diverges#B42-6: only DEFAULT spells it.
-    sa-principal-branch-defaults-to-main-and-cut-point-diverges#B42-5: the skill cuts work from integration."""
+    """Only DEFAULT spells the principal name; the skill cuts work from integration."""
     pkg = Path(__file__).resolve().parents[2] / "dadaia_workspace"
     literal = re.compile(r'principal: main|"--principal", "main"|else "main"')
     assert [p.name for p in pkg.rglob("*.py") if literal.search(p.read_text("utf-8"))] == []
@@ -22,8 +21,8 @@ def test_the_default_names_live_only_in_default_and_work_is_cut_from_integration
 
 
 def test_one_live_release_reader_and_no_verb_mints_a_version() -> None:
-    """sa-live-work-branch-named-three-ways#B41-5: one reader of the live id, no tag+1.
-    sa-live-work-branch-named-three-ways#B41-4: release-please owns the version; no module lists or bumps tags."""
+    """One reader of the live id, no tag+1; release-please owns the version.
+    No module lists or bumps tags."""
     pkg = Path(__file__).resolve().parents[2] / "dadaia_workspace"
     src = {p.name: p.read_text("utf-8") for p in pkg.rglob("*.py") if "public" not in p.parts}
     assert [n for n, t in src.items() if "def live_ids" in t] == []
@@ -94,7 +93,7 @@ def test_the_history_rewrite_rule_covers_only_the_branches_that_advance_by_merge
 
 
 def test_the_history_rewrite_rule_scopes_to_the_branches_that_never_rebase() -> None:
-    """gitflow-pu3-refuses-the-job-branch-rebase-merge-prescribes: a wt/* branch is rebased by its owner."""
+    """A wt/* branch is rebased by its owner."""
     skill = (
         Path(__file__).resolve().parents[2]
         / "dadaia_workspace/public/skills/dd-gitflow-default/SKILL.md"

@@ -1,11 +1,8 @@
-"""``--redact`` output mode (SPEC v0.9.0 FR8a, T-090-07).
-
-v0.9.0 A8.1, A8.3, A8.4; v0.11.0 A6.4, A6.5;
-sa-private-match-rendering-has-three-renderers#B4, #B5, #B6.
+"""``--redact`` output mode: foreign context names and candidate strings are masked.
 
 Three layers: ``core.redaction`` (the primitive the push gate's render boundary also consumes),
 :class:`ContextRedactor` in isolation, and the ``doctor``/``context list``/``context show`` verbs
-over a real workspace. ``tests/cli/commands/test_context__cli_output_stability.py`` pins A8.2 (no flag, no change).
+over a real workspace. Without the flag the output is unchanged; ``tests/cli/commands/test_context__cli_output_stability.py`` pins it.
 """
 
 from __future__ import annotations
@@ -35,28 +32,25 @@ _runner = CliRunner()
 ])
 # fmt: on
 def test_core_redactor_masks_by_word_with_stable_ordinals(candidates: list[str], fmt: str, text: str, expected: str) -> None:
-    """sa-private-match-rendering-has-three-renderers#B6."""
     redactor = Redactor(candidates, placeholder_fmt=fmt)
     assert redactor.mask(text) == expected
     assert redactor.active is bool(candidates)
 
 
 def test_compile_candidates_orders_longest_first_and_drops_empties() -> None:
-    """sa-private-match-rendering-has-three-renderers#B6."""
     assert compile_candidates(["", ""]) is None
     pattern = compile_candidates(["ab", "abcdef", "abc"])
     assert pattern is not None and pattern.match("abcdef").group(0) == "abcdef"  # type: ignore[union-attr]
 
 
 def test_redactor_ordinal_by_first_appearance_and_caller_exclusion() -> None:
-    """sa-private-match-rendering-has-three-renderers#B5: A8.3 first-appearance ordinals; the caller stays visible."""
     redactor = ContextRedactor(["foo-ctx", "bar-ctx", "own-ctx"], exclude=("own-ctx",))
     rendered = redactor.text("own-ctx bar-ctx foo-ctx bar-ctx")
     assert rendered == "own-ctx [REDACTED-CONTEXT-1] [REDACTED-CONTEXT-2] [REDACTED-CONTEXT-1]"
 
 
 def test_redactor_json_value_preserves_key_set_and_non_string_leaves() -> None:
-    """sa-private-match-rendering-has-three-renderers#B4: A8.4 only string leaves change; keys and the rest pass through."""
+    """Only string leaves change; keys and the rest pass through."""
     redactor = ContextRedactor(["foreign-ctx"])
     payload = {
         "name": "foreign-ctx",
@@ -142,8 +136,8 @@ def _ctx_row(
 def test_context_verbs_redact_every_foreign_name_and_keep_the_callers(
     workspace: Path, monkeypatch: pytest.MonkeyPatch, args: list[str], hidden: list[str], shown: list[str]
 ) -> None:
-    """sa-private-match-rendering-has-three-renderers#B4 #B5: A8.1 a context other than the caller's is masked
-    however it is reached; A8.4 `--json` keeps each row's key set and stays valid JSON."""
+    """A context other than the caller's is masked however it is reached;
+    ``--json`` keeps each row's key set and stays valid JSON."""
     _write_contexts(workspace, [_ctx_row("caller-ctx"), _ctx_row("foreign-one"), _ctx_row("foreign-two")])
     monkeypatch.setenv("DADAIA_CONTEXT", "caller-ctx")
 
@@ -159,7 +153,6 @@ def test_context_verbs_redact_every_foreign_name_and_keep_the_callers(
 
 
 def test_doctor_redact_masks_an_associated_slug_like_context_list(workspace: Path) -> None:
-    """sa-private-match-rendering-has-three-renderers#B4: doctor --redact masks an associated slug as context list --redact does."""
     from dadaia_workspace.cli.commands.doctor import _render_for
 
     row = _ctx_row("zz-foreign") | {"associated_repos": [{"slug": "zz-assoc", "url": "u"}]}
@@ -170,9 +163,9 @@ def test_doctor_redact_masks_an_associated_slug_like_context_list(workspace: Pat
 
 
 def test_doctor_redact_json_prints_no_absolute_workspace_path(workspace: Path) -> None:
-    """doctor-redact-json-prints-absolute-home-paths: every leaf of `doctor --redact
-    --json` (findings' extras and specs_dir included) goes through the one render
-    boundary; the workspace root never survives — paths print workspace-relative."""
+    """Every leaf of `doctor --redact --json` (findings' extras and specs_dir included) goes
+    through the one render boundary; the workspace root never survives, paths print
+    workspace-relative."""
     _write_contexts(workspace, [_ctx_row("zz-dead", state="dead")])
     (workspace / "repos" / "zz-dead").mkdir(parents=True)
 
@@ -196,7 +189,7 @@ def test_doctor_redact_json_prints_no_absolute_workspace_path(workspace: Path) -
 ])
 # fmt: on
 def test_the_redact_render_masks_exactly_what_the_push_refuses(workspace: Path, text: str, expected: str) -> None:
-    """sa-redact-text-keeps-a-second-privacy-grammar: --redact masks what privacy_matches finds, with mask()."""
+    """--redact masks what privacy_matches finds, with mask()."""
     from dadaia_workspace.cli.commands.doctor import _render_for
 
     rendered = text.format(ws=(ws := workspace.as_posix()), wsb=ws.replace("/", "\\"))

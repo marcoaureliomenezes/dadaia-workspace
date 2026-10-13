@@ -1,4 +1,4 @@
-"""AC2.1 (T-050-07): one CLI spelling, both platform forms pinned."""
+"""One CLI spelling; both platform forms are pinned."""
 
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ def test_posix_cli_path_and_fix_line(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_windows_cli_path_and_fix_line(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Review H5, windows-quoted-executable-fix-not-runnable-in-powershell: forward slashes;
+    """Forward slashes;
     a part with a blank quoted whole, `-c` code one word; the executable's quote opens after
     its drive letter, as a line opening with a quote is a PowerShell expression."""
     monkeypatch.setattr("dadaia_workspace.core.platform.PLATFORM", Capabilities.detect("win32"))

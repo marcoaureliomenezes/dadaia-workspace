@@ -70,7 +70,7 @@ def test_report_verdict_is_any_blocking_line() -> None:
 
 
 class TestControlCharacterEscaping:
-    """FR3 item 2 (CWE-117): a producer's ``text`` must never be able to forge a second
+    """CWE-117: a producer's ``text`` must never be able to forge a second
     physical line through an embedded control character. Fixed at the ONE rendering
     authority, ``DoctorLine.render()`` — through which ``DoctorReport.rendered()`` and
     every golden already pass.

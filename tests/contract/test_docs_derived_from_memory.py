@@ -60,8 +60,8 @@ def test_the_agent_index_lists_every_page_of_the_site() -> None:
 
 
 def test_the_readme_sends_a_reader_to_the_docs_folder() -> None:
-    """docs-url-dead-and-readme-links-break-on-pypi. No Pages site
-    exists: the Documentation URL and the README both name the repository's docs folder."""
+    """The Documentation URL and the README both name the repository's docs folder; no Pages
+    site exists."""
     readme = (_REPO_ROOT / "README.md").read_text("utf-8")
 
     assert _DOCS_URL in readme
@@ -70,7 +70,7 @@ def test_the_readme_sends_a_reader_to_the_docs_folder() -> None:
 
 
 def test_every_readme_link_is_absolute() -> None:
-    """docs-url-dead-and-readme-links-break-on-pypi. PyPI renders the
+    """PyPI renders the
     README outside the checkout, where a relative link or image target is a dead end."""
     readme = (_REPO_ROOT / "README.md").read_text("utf-8")
     targets = re.findall(r"\]\(([^)\s]+)", readme) + re.findall(r'(?:src|href)="([^"]+)"', readme)
@@ -133,7 +133,7 @@ def _pyproject_poetry() -> dict[str, object]:
 
 def test_one_tagline_across_the_readme_pyproject_and_the_agent_index() -> None:
     """The three discovery surfaces say one thing: PyPI's `description`, the README's
-    first paragraph and `llms.txt`'s `> ` line are the same sentence (SPEC 0.4.7 FR4)."""
+    first paragraph and `llms.txt`'s `> ` line are the same sentence."""
     readme = _readme_tagline()
 
     assert _pyproject_poetry()["description"] == readme
@@ -162,7 +162,7 @@ def _onboarding_texts() -> list[Path]:
 
 
 def test_no_onboarding_text_claims_offline_operation() -> None:
-    """bug `onboarding-docs-contradict-the-cli`, AC2.4. `init`
+    """`init`
     resolves its dependencies from PyPI, so no surface may call it offline."""
     violations = [
         f"{path.relative_to(_REPO_ROOT).as_posix()}:{number}: claims offline operation"
@@ -174,7 +174,7 @@ def test_no_onboarding_text_claims_offline_operation() -> None:
 
 
 def test_no_onboarding_text_cites_a_retired_create_flag() -> None:
-    """AC3.8, bug `onboarding-docs-contradict-the-cli`. `context
+    """`context
     create` takes `--main-repo <url>` and repeatable `--associated-repo <url>`; a cited
     `--url` or `--associated-repos` exits 2."""
     violations = [

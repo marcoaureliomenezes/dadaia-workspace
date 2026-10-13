@@ -1,9 +1,9 @@
-"""v0.1.14 FR-W2 (T-50-03): the ONE real-process SENTINEL of bind ->
+"""The ONE real-process SENTINEL of bind ->
 ctx_inject. `context bind` runs as its own process and the hook as another, both carrying
 the same CLAUDE_CODE_SESSION_ID: unbound -> no memory; bind X -> X injected; re-bind Y ->
 Y; a repeat prompt is silent; a same-context re-bind re-injects; the injection carries
-constitution.md (AC1.2, ADR 0103). A bind under a distinct
-session id never bridges (T-50-04): test_one_bind.py row native-id-no-record-unbound.
+constitution.md. A bind under a distinct
+session id never bridges (test_one_bind.py row native-id-no-record-unbound).
 Hand-built workspace, never a real venv.
 
 Owner: dd-sw-engineer-sr
@@ -56,7 +56,7 @@ def _real_bind(
 ) -> subprocess.CompletedProcess[str]:
     """Run ``dadaia context bind <ctx>`` as a genuine separate process.
 
-    T-50-03: *session_id*, when given, exports ``CLAUDE_CODE_SESSION_ID`` in the bind
+    *session_id*, when given, exports ``CLAUDE_CODE_SESSION_ID`` in the bind
     process's own env — modeling a REAL harness, where the bind CLI (run through the
     harness's own shell tool) and the hook are both children of the SAME harness process
     and inherit the SAME native session-id env var. This is what lets the bind's session
@@ -87,7 +87,7 @@ def _real_bind(
 def _inject(workspace: Path, session_id: str) -> str:
     """Run ctx_inject as a real subprocess; return stdout.
 
-    T-50-03: ``CLAUDE_CODE_SESSION_ID`` carries *session_id* (not popped) — matching how a
+    ``CLAUDE_CODE_SESSION_ID`` carries *session_id* (not popped) — matching how a
     real harness delivers BOTH the env var and the stdin payload field for the SAME live
     session, which is what lets this hook's own self-keyed leg
     (``_session_bound_context``) and its injection trigger (the record's ``bind_id``) resolve
@@ -102,8 +102,8 @@ def _inject(workspace: Path, session_id: str) -> str:
 
 
 def test_seed3_bind_drives_injection_across_real_process_boundary(tmp_path: Path) -> None:
-    """Seed-3 acceptance: unbound → no memory; bind alpha → alpha; re-bind beta → beta;
-    repeat → silent; SAME-CONTEXT re-bind (new pin, T-50-03) → re-injects; repeat → silent
+    """Unbound → no memory; bind alpha → alpha; re-bind beta → beta;
+    repeat → silent; SAME-CONTEXT re-bind (new pin) → re-injects; repeat → silent
     again.
 
     A SINGLE hook session id (``s-e2e``) is used across the whole scenario, exported as
@@ -117,7 +117,7 @@ def test_seed3_bind_drives_injection_across_real_process_boundary(tmp_path: Path
     sid = "s-e2e"
 
     # 1) Fresh unbound session → generic preflight: ALIVE list only, NO dispatcher
-    #    preflight restatement (FR30/T-044-60 deleted it from every emission path) and NO
+    #    preflight restatement (deleted from every emission path) and NO
     #    context memory.
     first = _inject(tmp_path, sid)
     assert "[no bound context]" in first
@@ -130,15 +130,15 @@ def test_seed3_bind_drives_injection_across_real_process_boundary(tmp_path: Path
     assert "- beta" in first
 
     # 2) Real `dadaia context bind alpha`, SAME session id → next prompt for the live hook
-    #    session injects ALPHA's memory (self-keyed session record, T-50-03) — the memory
-    #    prefix ONLY: no dispatcher preflight, no ALIVE-context list (FR30/T-044-60 — the
+    #    session injects ALPHA's memory (self-keyed session record) — the memory
+    #    prefix ONLY: no dispatcher preflight, no ALIVE-context list (the
     #    list is useful only in the unbound case).
     bind_alpha = _real_bind(tmp_path, "alpha", session_id=sid)
     assert bind_alpha.returncode == 0, bind_alpha.stderr or bind_alpha.stdout
 
     after_alpha = _inject(tmp_path, sid)
     assert "[alpha]" in after_alpha
-    assert "alpha CONSTITUTION-MARKER" in after_alpha  # AC1.2 (0103): every harness, one hook
+    assert "alpha CONSTITUTION-MARKER" in after_alpha  # every harness, one hook
     assert "end memory bootstrap" in after_alpha
     assert "ALPHA-MARKER" in after_alpha
     assert "BETA-MARKER" not in after_alpha
@@ -162,7 +162,7 @@ def test_seed3_bind_drives_injection_across_real_process_boundary(tmp_path: Path
     repeat = _inject(tmp_path, sid)
     assert repeat.strip() == ""
 
-    # 5) SAME-CONTEXT re-bind (new pin, T-50-03, SPEC v0.5.0 FR1 coupling 1): re-binding
+    # 5) SAME-CONTEXT re-bind (new pin): re-binding
     #    beta AGAIN refreshes bound_at and MUST re-inject even though the resolved name is
     #    unchanged — a re-bind is how a mode/release change reaches a live session.
     rebind_beta = _real_bind(tmp_path, "beta", session_id=sid)

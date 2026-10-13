@@ -46,7 +46,7 @@ def test_touch_last_seen_at(tmp_path: Path) -> None:
 
 
 def test_new_binding_record_authors_the_schema_and_retired_keys_still_parse() -> None:
-    """F002 schema; 0.4.7 FR4: an old record with ``mode``/``release`` keys still reads live."""
+    """An old record with ``mode``/``release`` keys still reads live."""
     now = datetime.now(tz=UTC).isoformat()
     record = si.new_binding_record(
         session_id="s1", context="alpha", runtime="claude-code", pid=1234, now=now
@@ -77,9 +77,9 @@ def test_new_binding_record_authors_the_schema_and_retired_keys_still_parse() ->
     ],
 )
 def test_is_live_is_the_one_liveness_rule(record: dict[str, object], live: bool) -> None:
-    """sa-session-liveness-has-two-rules, bind-lost-silently-after-five-idle-
-    minutes: ``last_seen_at`` younger than a day (boundary stale) is live, minutes idle included; a record without it (``bound_at`` only, the
-    retired creation-time fallback, §4a item 13) or with a corrupt clock is not."""
+    """``last_seen_at`` younger than a day (boundary stale) is live, minutes idle included; a
+    record without it (``bound_at`` only, the retired creation-time fallback) or with a corrupt
+    clock is not."""
     assert si.is_live(record, clock=lambda: datetime(2026, 6, 6, 12, tzinfo=UTC)) is live
 
 
@@ -115,7 +115,7 @@ def test_gc_check_assembly_has_one_home() -> None:
     [("a_b-C9", True), ("_", True), ("-", True), ("a b", False), ("a.b", False), ("", False)],
 )
 def test_context_name_rule_is_the_spec_context_rule(name: str, valid: bool) -> None:
-    """AC16.1: one context-name rule; the twin pattern here is deleted in J3.T4."""
+    """One context-name rule: the spec-context rule."""
     from dadaia_workspace.core.models.spec_context import CONTEXT_NAME_RE
 
     assert bool(CONTEXT_NAME_RE.fullmatch(name)) is valid
@@ -123,7 +123,7 @@ def test_context_name_rule_is_the_spec_context_rule(name: str, valid: bool) -> N
 
 
 def test_naive_heartbeat_reads_as_utc_in_any_zone(monkeypatch: pytest.MonkeyPatch) -> None:
-    """AC16.1: ``2026-10-11T04:00:00`` is 04:00 UTC whatever the local zone."""
+    """``2026-10-11T04:00:00`` is 04:00 UTC whatever the local zone."""
     tzset = getattr(__import__("time"), "tzset", None)
     if tzset is None:
         pytest.skip("time.tzset is absent on Windows; the zone cannot be pinned")

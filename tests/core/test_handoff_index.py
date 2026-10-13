@@ -1,12 +1,9 @@
 """Table-driven tests for ``core.handoff_index``.
 
-release 0.5.1 K6 (one module owns version routing, the self_pull
-rule and artifact resolution); sa-json-schema-validated-by-two-engines (jsonschema is the
-one engine).
+One module owns version routing, the self_pull rule and artifact resolution;
+jsonschema is the one engine.
 
-sa-handoff-self-pull-requirement-diverges (0.5.0 WP-46): the schema admits only
-handoff-v1.2 (sa-handoff-self-pull-requirement-diverges#46.1) and self_pull is always required
-(sa-handoff-self-pull-requirement-diverges#46.2).
+The schema admits only handoff-v1.2, and self_pull is always required.
 """
 
 from __future__ import annotations
@@ -93,8 +90,7 @@ def test_malformed_handoff_classification(tmp_path: Path, name: str, content: st
 # ---------------------------------------------------------------------------
 # 3. Version routing — the schema's own ``schema_version`` enum is the router;
 #    a future/unknown token is refused explicitly, never silently downgraded
-#    (bug reports-sidecar-version-detection-misroutes-future-tokens, fixed at the root:
-#    there is no second ad-hoc detector left to misroute it).
+#    (there is no second ad-hoc detector left to misroute it).
 # ---------------------------------------------------------------------------
 
 
@@ -113,7 +109,7 @@ def test_malformed_handoff_classification(tmp_path: Path, name: str, content: st
 def test_schema_version_routing_matrix(
     tmp_path: Path, schema_version: str, expect_valid: bool
 ) -> None:
-    """sa-handoff-self-pull-requirement-diverges#46.1: only handoff-v1.2 is valid."""
+    """Only handoff-v1.2 is valid."""
     doc = _base_doc(schema_version=schema_version)
     path = _write(tmp_path / "h.handoff.json", doc)
     handoff = Handoff.load(path)
@@ -126,9 +122,8 @@ def test_schema_version_routing_matrix(
 
 
 def test_v12_requires_self_pull(tmp_path: Path) -> None:
-    """sa-handoff-self-pull-requirement-diverges#46.2: a v1.2 without self_pull is
-    INVALID, naming the field; sa-json-schema-validated-by-two-engines: the error is
-    jsonschema's own."""
+    """A v1.2 without self_pull is
+    INVALID, naming the field; the error is jsonschema's own."""
     doc = _base_doc()
     del doc["self_pull"]
     result = Handoff.load(_write(tmp_path / "v12.handoff.json", doc)).validate(
@@ -169,8 +164,7 @@ def test_artifact_path_none_when_undeclared(tmp_path: Path) -> None:
 
 
 def test_artifact_path_resolves_repos_specs_audits_workspace_rooted(tmp_path: Path) -> None:
-    """Bug handoff-artifact-path-cannot-reference-specs-audits: a
-    repos/<slug>/specs/audits/<UTC>/audit.md path resolves — it is NOT
+    """A repos/<slug>/specs/audits/<UTC>/audit.md path resolves — it is NOT
     .dadaia/reports/-prefixed, and the one rule has no such special case."""
     audit = tmp_path / "repos" / "dadaia-workspace" / "specs" / "audits" / "2026-06-10" / "audit.md"
     audit.parent.mkdir(parents=True)
@@ -311,7 +305,7 @@ def _v12_doc_with_refs(refs: list[str]) -> dict[str, object]:
 
 
 def test_self_pull_ref_existence_and_missing_ref_named(tmp_path: Path) -> None:
-    """sa-context-repo-mapping-falls-back-to-the-name#B3: refs resolve in the context's
+    """Refs resolve in the context's
     registered repo — the context NAME (dadaia-workspace) differs from its repo slug."""
     states = tmp_path / ".dadaia" / "states"
     states.mkdir(parents=True)

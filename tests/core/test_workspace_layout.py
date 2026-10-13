@@ -1,12 +1,10 @@
-"""0.4.6 AC1 (FR2: the three ratchets born with the zone registry); 0.5.0 AC6.1
-(the canonical sets widened to ledger vocabularies, phases, trio names, gitflow roles; every
-``public/**/*.md`` law file scanned); size: SMALL.
+"""Three ratchets over the zone registry, the canonical sets (ledger vocabularies, phases,
+trio names, gitflow roles) and every ``public/**/*.md`` law file; size: SMALL.
 
 ``core.workspace_layout.DADAIA_ZONES`` is the one record of what may live in ``.dadaia/``.
-Six ledger bugs (architect G, 2026-07-01..08-26) edited the membership of bare name lists
-in ``doctor.py``, ``legacy_dadaia_dirs.py``, ``hygiene.py`` and ``workspace/service.py``
-without ever changing their shape; each list disagreed with the next. These ratchets make
-the recurrence unrepresentable:
+Bare name lists in ``doctor.py``, ``legacy_dadaia_dirs.py``, ``hygiene.py`` and
+``workspace/service.py`` were edited in membership without their shape changing, so each list
+disagreed with the next. These ratchets make the recurrence unrepresentable:
 
 1. the rendered ``.dadaia/AGENTS.md`` table IS the registry (documented == allowed);
 2. no other literal in the package holds three or more names of ANY canonical set (zones,
@@ -15,8 +13,8 @@ the recurrence unrepresentable:
 3. every ``Creator`` maps to a live module — retiring a feature without deleting its row
    fails the build (the ``test_core_file_io_purity`` "every authorized stem exists" shape).
 
-Ratchet 2 carries a pending-demolition allowance: files outside T-046-24's write set that
-still hold a second list, each keyed to the task that deletes it. The allowance moves
+Ratchet 2 carries a pending-demolition allowance: files outside the retiring task's write set
+that still hold a second list, each keyed to the task that deletes it. The allowance moves
 down only — an entry whose file no longer violates is stale and fails the test.
 """
 
@@ -58,7 +56,7 @@ _SCHEMAS = _REPO_ROOT / "dadaia_workspace" / "public" / "schemas"
 _SKILLS = _REPO_ROOT / "dadaia_workspace" / "public" / "skills"
 _PACKAGE = _REPO_ROOT / "dadaia_workspace"
 
-#: Zone names retired by 0.4.6 candidate 4 (SPEC FR1/FR9, architect C). A string literal
+#: Zone names retired from the registry. A string literal
 #: ``.dadaia/<retired>`` anywhere in the package is a path into a directory no record
 #: sanctions.
 _RETIRED_ZONES: frozenset[str] = frozenset(
@@ -86,8 +84,8 @@ def _package_sources() -> list[Path]:
 _PARITY = "parity:tests/public/skills/dd_bug_resolution/scripts/test__ledger.py"
 _TEXT = "sa-text-restates-rules-the-code-contradicts"
 
-#: Every closed set of canonical names the registry owns (0.4.7 FR5 widened ratchet 2
-#: from the zone names to all four): a literal holding three or more names of ONE set,
+#: Every closed set of canonical names the registry owns: a literal holding three or more
+#: names of ONE set,
 #: outside ``core/workspace_layout.py``, is a second list of that set.
 _CANONICAL_SETS: dict[str, frozenset[str]] = {
     "zone": zone_names(),
@@ -119,9 +117,9 @@ _SET_HOME: dict[str, str] = {
     "gitflow-role": "dadaia_workspace/core/gitflow.py",
 }
 
-#: AC6.5 allowance for the widened sets (birth keys pinned at T-050-135): each second list,
+#: Allowance for the second lists: each second list,
 #: keyed ``file`` -> ``parity:<test file>``, the test proving its set.
-_SECOND_LIST_BIRTH = frozenset(  # its keys at T-050-135; the allowance only shrinks
+_SECOND_LIST_BIRTH = frozenset(  # the allowance only shrinks
     {
         "dadaia_workspace/public/skills/dd-audit-project/scripts/_audit_check.py",
         "dadaia_workspace/public/skills/dd-backlog-definition/scripts/_backlog_schema.py",
@@ -297,7 +295,7 @@ def test_zone_registry_is_the_only_dadaia_name_list() -> None:
 
 
 def test_a_planted_second_list_of_a_widened_set_trips() -> None:
-    """RED fixture (AC6.1): a literal restating the gitflow roles or the trio is a second
+    """A literal restating the gitflow roles or the trio is a second
     list outside its home module, and not inside it."""
     tree = ast.parse(
         "ROLES = ('principal', 'integration', 'work')\nT = ['SPEC.md', 'PLAN.md', 'TASKS.md']\n"
@@ -323,12 +321,12 @@ def _restating_law_files() -> set[str]:
 def test_the_law_source_never_restates_a_canonical_set() -> None:
     """No law line spells out a canonical set: §5.1 (root), §5.3 (repo exclusions) and
     §6.2 (specs canon) carry placeholders ``public stage`` fills from the registry, and
-    every other ``public/**/*.md`` restatement is gone (AC6.1's allowance drained)."""
+    every other ``public/**/*.md`` restatement is gone."""
     assert _restating_law_files() == set()
 
 
 def test_a_planted_law_line_restating_a_small_set_trips() -> None:
-    """RED fixture (AC6.1): the whole trio on one line is a restatement; two of it is not."""
+    """The whole trio on one line is a restatement; two of it is not."""
     assert _restated_law_lines("- SPEC.md, PLAN.md and TASKS.md are the trio.\n")
     assert not _restated_law_lines("- SPEC.md and PLAN.md only.\n")
 
@@ -338,8 +336,8 @@ def test_staged_law_canon_tables_equal_the_registry(staged_data: Path) -> None:
     row; the staged law's root line and ``repo-AGENTS.md``'s exclusion line ARE the rendered
     registry lists — documented == allowed, wherever the rule now lives."""
     text = (staged_data / "AGENTS.md").read_text("utf-8")
-    # The scoped templates are not staged (sa-staged-assets-without-consumers#44.2: no
-    # reader of .dadaia/agentic/templates); they are rendered by the same one renderer.
+    # The scoped templates are not staged (no reader of .dadaia/agentic/templates); they are
+    # rendered by the same one renderer.
     scoped = Path(__file__).resolve().parents[2] / "dadaia_workspace" / "public" / "templates"
     specs_law = render_registry_tables((scoped / "specs-AGENTS.md").read_text("utf-8"))
     repo_law = render_registry_tables((scoped / "repo-AGENTS.md").read_text("utf-8"))

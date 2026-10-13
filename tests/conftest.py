@@ -9,8 +9,7 @@ in those directories AFTER the test completes.
 The guard is intentionally scope=``function`` and autouse=True so it fires around
 every test in the suite.  Every test also STARTS in an empty temporary directory
 (``_hermetic_cwd``): the checkout usually sits inside a live operator instance, and a
-cwd walk from it would resolve and scan that instance (bug
-``doctor-tests-walk-the-real-workspace-tmp-zone``).
+cwd walk from it would resolve and scan that instance.
 
 Protected paths (relative to the repo root, checked recursively):
   .claude/
@@ -60,9 +59,7 @@ from dadaia_workspace.infrastructure.subprocess_runner import ProcessResult  # n
 from tests.fixtures.harness_env import suite_env  # noqa: E402
 
 # Every subprocess a test spawns (`python -m dadaia_workspace...`: CLI verbs, hooks) must
-# import THIS checkout, whatever the venv's install mode or the worktree it runs in — bugs
-# hook-subprocess-tests-import-the-installed-package-not-the-checkout and
-# worktree-subprocess-cli-tests-import-the-shared-venvs-editable-install-not-the-worktree.
+# import THIS checkout, whatever the venv's install mode or the worktree it runs in.
 # One rule, in the suite env (pytest_configure); never a per-helper copy.
 _CHECKOUT_ROOT = Path(__file__).resolve().parent.parent
 # A child CPython normalizes its own `sys.executable`; a `../` launch keeps the dots here, so
@@ -70,8 +67,9 @@ _CHECKOUT_ROOT = Path(__file__).resolve().parent.parent
 sys.executable = os.path.normpath(sys.executable)
 
 # No process the suite runs or spawns may resolve the operator instance this checkout sits
-# in, nor the one owning the running venv (bug test-subprocesses-resolve-the-live-instance):
-# the fence is in the suite env every child inherits, and the one resolver honours it. The instance's registry and repos/ are fingerprinted around the session.
+# in, nor the one owning the running venv: the fence is in the suite env every child
+# inherits, and the one resolver honours it. The instance's registry and repos/ are
+# fingerprinted around the session.
 _INSTANCE_SENTINEL = Path(".dadaia") / "states" / "spec_contexts.json"
 _FENCED_ROOTS: tuple[Path, ...] = tuple(
     p
@@ -219,7 +217,7 @@ _SEAM_MODULES = _PROCESS_MODULES | {
     "dadaia_workspace.infrastructure.git_subprocess",
 }
 
-# Bug ``windows-xdist-workers-crash-on-unit-fast-tier``: the table above is calibrated on
+# The table above is calibrated on
 # the Linux runners. Windows CI runs the tree-copying install/doctor tests 2-3x slower
 # (measured: <5s Linux vs 9.7-16s Windows for one unit test) and pytest-timeout's only
 # Windows method (``thread``) ends the xdist worker with ``os._exit`` — reported as an
@@ -227,8 +225,7 @@ _SEAM_MODULES = _PROCESS_MODULES | {
 # never a per-test marker.
 _TIER_TIMEOUT_PLATFORM_FACTOR: dict[str, int] = {"win32": 3}
 # Coverage tracing (pytest --cov) roughly halves execution speed on the same runner
-# (bug tier-ceiling-trips-under-coverage-instrumentation-on-windows-contract-coverage-job:
-# a 30s-ceiling unit test measured 32.3s under --cov on Windows).
+# (a 30s-ceiling unit test measured 32.3s under --cov on Windows).
 _TIER_TIMEOUT_COVERAGE_FACTOR = 2
 
 
@@ -246,7 +243,7 @@ def tier_timeout_seconds(
 
 
 def _validate_quarantine_markers(items: list[pytest.Item]) -> None:
-    """S-20/S-21: a quarantined test without a registered bug id refuses collection.
+    """A quarantined test without a registered bug id refuses collection.
 
     Quarantine is a lane out of the gating selectors — usable ONLY with a live bug
     (`@pytest.mark.quarantine(bug="<bug-slug>")`). An unregistered quarantine would be
@@ -264,7 +261,7 @@ def _validate_quarantine_markers(items: list[pytest.Item]) -> None:
                 "`dadaia bugs append` first."
             )
             # Under xdist the UsageError kills the worker and surfaces as an opaque
-            # INTERNALERROR on the controller (T-070-09 finding 2) — print the
+            # INTERNALERROR on the controller: print the
             # actionable line to stderr FIRST so it reaches the operator either way.
             print(f"\n[quarantine-discipline] {message}", file=sys.stderr, flush=True)
             raise pytest.UsageError(message)
@@ -364,7 +361,7 @@ def _no_real_venv_in_tests() -> Iterator[None]:
     the venv python, so we replace the builder with a no-op that just materialises the
     directory and returns its path (matching FakePythonEnvironmentManager's behaviour).
 
-    Bug test-suite-real-venv-and-ci-longpole — two escapes closed, both guarded by
+    Two escapes are closed, both guarded by
     tests/unit/test_no_real_venv_backstop.py and the import round-trip assertion:
 
     1. SCOPE: this fixture is session-scoped (was function-scoped). pytest instantiates

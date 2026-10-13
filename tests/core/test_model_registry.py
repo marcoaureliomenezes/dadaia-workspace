@@ -26,12 +26,11 @@ CELLS = [(t, a) for t, cells in TEMPLATES.items() for a in cells]
 
 @pytest.mark.parametrize(("template", "agent"), CELLS)
 def test_every_template_cell_names_a_tier_alias(template: str, agent: str) -> None:
-    """AC1.1: no cell names an exact Claude model id."""
+    """No cell names an exact Claude model id."""
     assert TEMPLATES[template][agent].model in ALIASES
 
 
 def test_tier_codex_has_exactly_the_four_spec_entries() -> None:
-    """AC1.2."""
     assert mr.TIER_CODEX == {
         "opus": "gpt-5.6-sol",
         "fable": "gpt-5.6-sol",
@@ -42,13 +41,13 @@ def test_tier_codex_has_exactly_the_four_spec_entries() -> None:
 
 @pytest.mark.parametrize("template", list(TEMPLATES))
 def test_code_reviewer_never_resolves_to_fable(template: str) -> None:
-    """AC1.3 (G-1): kept by the template table alone."""
+    """Kept by the template table alone."""
     overlay = AgentModelPolicyOverlay(applied_template=template)
     assert resolve_agent_model("dd-code-reviewer", overlay).model != "fable"
 
 
 def test_resolver_has_no_override_source_and_overlay_only_applied_template() -> None:
-    """AC1.6: overrides are gone from the resolver and the overlay."""
+    """Overrides are gone from the resolver and the overlay."""
     assert get_args(mr.ResolvedSource) == ("template", "default")
     assert [f.name for f in dataclasses.fields(AgentModelPolicyOverlay)] == ["applied_template"]
 

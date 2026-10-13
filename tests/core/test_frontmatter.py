@@ -1,11 +1,8 @@
-"""``core.frontmatter`` — the ONE frontmatter parser (v0.5.1 T-051-16, K10).
+"""``core.frontmatter`` — the ONE frontmatter parser.
 
 Table-driven over :func:`parse`'s outcome shapes: valid, missing delimiter, invalid YAML
-(with the line number), and a present-but-non-dict block. Regression coverage for bug
-``memory-lint-blames-missing-delimiter-for-a-yaml-parse-error`` (kind distinguishes
-"no block" from "block present, invalid YAML").
-
-v0.5.1 A10.2/A10.3.
+(with the line number), and a present-but-non-dict block. The kind distinguishes "no block"
+from "block present, invalid YAML".
 Size: SMALL — pure-function unit tests, no I/O.
 """
 
@@ -49,7 +46,7 @@ def test_missing_delimiter_is_named_as_missing_delimiter_not_invalid_yaml() -> N
 
 
 def test_invalid_yaml_in_a_present_block_names_the_line_never_the_delimiter() -> None:
-    """Bug memory-lint-blames-missing-delimiter-for-a-yaml-parse-error: an unquoted
+    """An unquoted
     scalar containing ': ' breaks the YAML on line 2 of the block; the block itself
     IS present, so the diagnostic must never claim it is missing."""
     text = "---\nslug: x\ntldr: Two-tier memory: 17 principles\n---\n\nBody.\n"
@@ -88,7 +85,6 @@ def test_parse_error_kinds_table(text: str, expected_kind: str) -> None:
 
 @pytest.mark.parametrize("prefix", ["", "﻿"], ids=["crlf", "bom-crlf"])
 def test_a_crlf_or_bom_document_parses_like_its_lf_twin(prefix: str) -> None:
-    """Bug frontmatter-parsers-disagree-on-crlf-and-bom: the block was lost on CRLF."""
     text = f'{prefix}---\r\nslug: x\r\ngitflow: {{"work": "feature/"}}\r\n---\r\n\r\nBody.\r\n'
 
     result = parse(text)
