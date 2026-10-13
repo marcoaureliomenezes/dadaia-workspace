@@ -1,4 +1,4 @@
-"""Characterization net for the public ``worktree.py hash`` seam owned by CP1."""
+"""Characterization net for the public ``worktree.py hash`` seam."""
 
 from __future__ import annotations
 

@@ -1,8 +1,7 @@
-"""F015/F016 (20260830-design-bug-surface-audit): honesty residue.
+"""Single-owner facts of the git and mode seams.
 
-- The first-parent-of-a-sha git fact has ONE implementation (git_objects); ci.py
-  delegates instead of hand-rolling a second subprocess with different error modes.
-- gate_policy reads no mode token that no writer mints (BOUND_READ retired).
+- The first-parent-of-a-sha git fact has ONE implementation (git_objects); ci.py delegates.
+- gate_policy reads no mode token that no writer mints.
 - python_env never re-narrates a failed repack-INSTALL as a failed repack.
 """
 

@@ -1,10 +1,8 @@
 """A CLI verb run outside an initialized workspace must fail CLEANLY.
 
-A consumer found that `dadaia doctor`, `dadaia public doctor`, and `dadaia reports
-doctor` raised WorkspaceNotInitializedError (a DadaiaError), which Typer rendered as a
-full Python/Rich TRACEBACK — and two of them even exited 0 despite it. A CLI must
-surface a concise, actionable error and a NON-ZERO exit, never a traceback. server/plugin
-already did this per-command; this pins the whole class via the global entrypoint handler.
+A verb run outside an initialized workspace (`dadaia doctor`, `dadaia public doctor`,
+`dadaia reports doctor`) prints one concise, actionable error and exits NON-ZERO, never a
+traceback; the global entrypoint handler is the one home of that contract.
 
 Owner: dd-sw-engineer-sr
 """

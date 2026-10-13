@@ -1,6 +1,6 @@
-"""The rendered Codex ``.rules`` auto-allows only argv-closed readers (``ls cat``); interpreter-capable
-sed/rg (``1e``, ``w``, ``-i``, ``--pre``) prompt (#B1-#B3); registry.json says so (#B4).
-Size: SMALL; #B1 also asks the real ``codex execpolicy`` when the binary is on PATH.
+"""The rendered Codex ``.rules`` auto-allows only argv-closed readers (``ls cat``);
+interpreter-capable sed/rg (``1e``, ``w``, ``-i``, ``--pre``) prompt; registry.json says so.
+Size: SMALL; the real ``codex execpolicy`` is also asked when the binary is on PATH.
 """
 
 from __future__ import annotations
@@ -37,7 +37,7 @@ def _allowed_prefixes() -> set[tuple[str, ...]]:
 
 
 def test_b3_read_only_inspection_stays_allowed() -> None:
-    """#B2 and #B3: the allow set is exactly the read-only one, so no allowed prefix is
+    """The allow set is exactly the read-only one, so no allowed prefix is
     write- or exec-capable."""
     assert _allowed_prefixes() == {("ls",), ("cat",)}
 

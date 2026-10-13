@@ -173,7 +173,7 @@ def test_dead_refuses_an_unrecoverable_repo_anywhere_in_the_set_and_touches_noth
     error: type[Exception],
     match: str,
 ) -> None:
-    """#C7: the refusal names the repo's fix; every repo stays, nothing is held, ALIVE."""
+    """The refusal names the repo's fix; every repo stays, nothing is held, ALIVE."""
     service, store, repo = _alive(tmp_path, lib_url="" if plant is _url_less else None)
     plant(repo.parent / offender)
 
@@ -204,7 +204,7 @@ _HOLDS = [
 def test_dead_holds_every_repo_of_the_set_under_reaped(
     tmp_path: Path, plant: Callable[[Path], object], held: str, content: str | None
 ) -> None:
-    """#C1: each repo leaves `repos/` and is held byte-intact; the record turns DEAD."""
+    """Each repo leaves `repos/` and is held byte-intact; the record turns DEAD."""
     service, store, repo = _alive(tmp_path)
     plant(repo.parent / "lib")
 

@@ -108,7 +108,7 @@ def test_skill_owner_script_meets_the_contract(script: Path) -> None:
 @pytest.mark.parametrize("script", _owner_scripts(), ids=lambda p: f"{p.parents[1].name}/{p.name}")
 def test_one_bootstrap_line_names_only_the_own_folder_and_the_kernel(script: Path) -> None:
     """Rule 2: an entry point edits `sys.path` once, naming its folder and the kernel's; a
-    module edits it only for a surviving edge (PLAN 1.5)."""
+    module edits it only for a surviving edge."""
     rel = f"{script.parents[1].name}/scripts/{script.name}"
     lines = _path_statements(script)
     if rel in _EDGE_PATH_LINES:

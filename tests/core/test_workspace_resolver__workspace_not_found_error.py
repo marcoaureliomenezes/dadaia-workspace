@@ -1,5 +1,5 @@
-"""A verb run outside any workspace runs in the CLI's own workspace (review M1: fix lines
-run from any cwd); with none, it names the searched directory and prints ONE runnable
+"""A verb run outside any workspace runs in the CLI's own workspace (fix lines run
+from any cwd); with none, it names the searched directory and prints ONE runnable
 ``fix:`` line — the uvx bootstrap.
 
 The CLI's own workspace is derived from ``sys.prefix`` (the venv lives at

@@ -1,4 +1,4 @@
-"""Characterization net for the public ``dadaia reconcile`` seam owned by CP4."""
+"""Characterization net for the public ``dadaia reconcile`` seam."""
 
 from __future__ import annotations
 

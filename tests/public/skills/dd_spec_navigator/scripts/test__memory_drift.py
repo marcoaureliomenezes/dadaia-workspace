@@ -292,8 +292,8 @@ def _release_drift(script: Path, repo: Path, state: dict[str, object]) -> dict[s
 
 
 def test_the_closure_window_opens_at_the_live_release_defined_sha(script: Path, repo: Path) -> None:
-    """The closure
-    worklist is asked with no sha; with no memory entry the window opens at defined.sha."""
+    """The closure worklist is asked with no sha; with no memory entry the window opens at
+    defined.sha."""
     base = _git(repo, "rev-parse", "HEAD")
     (repo / "dadaia_workspace" / "features" / "alpha" / "core.py").write_text("x = 2\n", "utf-8")
     _git(repo, "commit", "-aqm", "touch alpha")
@@ -305,8 +305,7 @@ def test_the_closure_window_opens_at_the_live_release_defined_sha(script: Path, 
 
 
 def test_the_closure_window_opens_at_the_last_memory_entry_until(script: Path, repo: Path) -> None:
-    """A recorded
-    `kind: memory` entry moves the window start to its `until`."""
+    """A recorded `kind: memory` entry moves the window start to its `until`."""
     base = _git(repo, "rev-parse", "HEAD")
     (repo / "README.md").write_text("later\n", "utf-8")
     _git(repo, "add", "README.md")

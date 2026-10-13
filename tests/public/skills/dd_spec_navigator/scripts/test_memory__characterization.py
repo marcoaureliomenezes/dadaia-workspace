@@ -1,4 +1,4 @@
-"""Characterization net for the three public memory seams owned by CP1."""
+"""Characterization net for the three public memory seams."""
 
 from __future__ import annotations
 

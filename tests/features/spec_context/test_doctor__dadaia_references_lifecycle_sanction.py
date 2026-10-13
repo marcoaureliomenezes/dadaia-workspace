@@ -54,13 +54,13 @@ def _make_doctor(root: Path, store: JsonContextStore | None = None) -> DoctorSer
 
 
 # ---------------------------------------------------------------------------
-# A10.1 — doctor-clean
+# doctor-clean
 # ---------------------------------------------------------------------------
 
 
 def test_reference_clone_reports_doctor_clean(tmp_path: Path) -> None:
     """``references`` reads canon at the ``.dadaia/`` top level and nothing beneath it is
-    ever an entry of the walk (operator ruling O4; OPERATOR zones are never walked)."""
+    ever an entry of the walk (OPERATOR zones are never walked)."""
     _init_workspace(tmp_path)
     _plant_reference_clone(tmp_path)
 
@@ -71,7 +71,7 @@ def test_reference_clone_reports_doctor_clean(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# A10.2 — outside the context lifecycle, proven at the shared seam AND on real verb paths
+# Outside the context lifecycle, proven at the shared seam AND on real verb paths
 # ---------------------------------------------------------------------------
 
 

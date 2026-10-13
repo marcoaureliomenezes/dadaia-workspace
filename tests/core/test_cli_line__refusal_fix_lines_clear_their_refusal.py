@@ -1,16 +1,13 @@
-"""Every refusal of the pre-push
-gate (`ci push-gate-check`), `context baseline` and `context dead` prints ONE fix line
-that, executed verbatim, clears the refusal.
+"""Every refusal of the pre-push gate (`ci push-gate-check`), `context baseline` and
+`context dead` prints ONE fix line that, executed verbatim, clears the refusal.
 
-The doctor has this harness (``test_doctor_fix_lines_clear_their_finding.py``); these
-three verbs did not, and their fix lines failed one site at a time. Each case below builds the
-triggering state over ``file://`` remotes and hits the
-refusal: a push-gate case feeds the ref lines git hands its hook to an in-process
+Each case below builds the triggering state over ``file://`` remotes and hits the refusal:
+a push-gate case feeds the ref lines git hands its hook to an in-process
 ``ci push-gate-check`` (80 columns, no TTY); a baseline/alive/dead case runs the real
 command as a child process. It takes the single ``fix:`` line and runs it with ``sh -c`` —
-an ``Operator action:`` line is played by the case's *operator* instead — and
-runs the real command (the real push through the shipped hook) again. One line without a TTY — every family prints through
-``cli/_fail.fail`` — is proven on a real child by
+an ``Operator action:`` line is played by the case's *operator* instead — and runs the real
+command (the real push through the shipped hook) again. One line without a TTY — every
+family prints through ``cli/_fail.fail`` — is proven on a real child by
 :func:`test_every_fix_line_prints_on_one_line_without_a_tty`. Progress rule:
 the command then succeeds, or refuses with a DIFFERENT fix line (the next step), which is
 followed the same way — at most four steps, never a repeated line. A fix that is itself
@@ -448,7 +445,7 @@ _COMMIT_PUSH = "git commit -qa --amend --no-edit && git push -q origin feature/1
 
 
 def _clean_publish(world: World) -> None:
-    """L3: the operator's work is PUBLISHED (not merely left on disk), without the term."""
+    """The operator's work is PUBLISHED (not merely left on disk), without the term."""
     tip = world.remote_heads()["feature/1.0.0"]
     assert _TERM not in world.git(world.repo, "log", "-p", tip, "--not", "origin/develop")
     assert {"notes.md", "more.md"} <= set(
@@ -583,7 +580,7 @@ def _drop_draft_term(world: World) -> None:
     (world.repo / "AGENTS.md").write_text("a\n", encoding="utf-8")
 
 
-#: N3: the refusal's documented step after its reset — amend — then the publish again.
+#: The refusal's documented step after its reset — amend — then the publish again.
 _AMEND_BASELINE = (
     "git commit -qa --amend --no-edit && ../../.dadaia/.venv/bin/dadaia context baseline proj"
 )
@@ -1069,7 +1066,7 @@ def test_the_gate_is_read_only_and_its_rewrite_fix_uncommits_only_unpublished_wo
     world: World,
 ) -> None:
     """The denylist refusal's fix uncommits the refused ref's own
-    unpublished range, down to its oldest unpublished commit (N3) — never a squash of
+    unpublished range, down to its oldest unpublished commit — never a squash of
     published history, never a publish verb that rewrites."""
     command = _denylisted(world)
     oldest = world.git(world.repo, "rev-parse", "HEAD~1")

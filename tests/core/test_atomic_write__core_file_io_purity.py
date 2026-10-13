@@ -1,7 +1,7 @@
 """One owner per question: each rule scans the package and names every module that answers a
 question its owner alone answers.
 
-P-11 core file-I/O purity, P-12 hooks never import the container, no orphaned
+Core file-I/O purity, hooks never import the container, no orphaned
 factory, and the single-owner rule each row names. Size: SMALL — AST/text
 over the package source, plus one subprocess per hook import.
 """
@@ -48,7 +48,7 @@ def _functions(tree: ast.AST) -> Iterator[ast.FunctionDef | ast.AsyncFunctionDef
     yield from (n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef | ast.AsyncFunctionDef))
 
 
-#: core/ modules whose file I/O is architecture-authorized (ARCHITECTURE.md P-11); new I/O
+#: core/ modules whose file I/O is architecture-authorized; new I/O
 #: enters core/ only by joining this set on purpose.
 _CORE_IO_STEMS = frozenset(
     {"workspace_resolver", "context_registry", "session_store", "handoff_index",
@@ -297,7 +297,7 @@ def test_each_question_has_one_owner(rule: str) -> None:
     ["pre_gate", "sdd_gate", "sdd_post_gate", "ctx_inject", "root_whitelist"],
 )
 def test_importing_a_hook_never_imports_the_container(module: str) -> None:
-    """P-12: a hook is a one-shot process per write; the container costs ~2s to import."""
+    """A hook is a one-shot process per write; the container costs ~2s to import."""
     code = f"import dadaia_workspace.hooks.{module}, sys; assert 'dadaia_workspace.container' not in sys.modules"
     result = subprocess.run(
         [sys.executable, "-c", code], capture_output=True, text=True, timeout=120
@@ -306,7 +306,7 @@ def test_importing_a_hook_never_imports_the_container(module: str) -> None:
 
 
 def test_gate_resolution_path_never_imports_the_container(tmp_path: Path) -> None:
-    """P-12, the executed path: the gate's real entry judges a repo write (its BLOCK path:
+    """The executed path: the gate's real entry judges a repo write (its BLOCK path:
     the worktree fix, `_worktree_names.locate`, `script_line`) with the container still unimported;
     the child carries the conftest pin, so it judges THIS checkout."""
     ws = tmp_path / "ws"

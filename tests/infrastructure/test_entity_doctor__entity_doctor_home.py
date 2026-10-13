@@ -1,10 +1,6 @@
-"""F014 (20260830-design-bug-surface-audit): modules split by seam, not line-count.
-
-The harness-independent public-asset coherence checks live in an honestly named home
-(``infrastructure.entity_doctor``), not a codex-named one; ``public_assets`` no longer
-re-exports ~25 underscore names as a test-only interface; ``_compare_content`` (zero
-callers) is deleted.
-"""
+"""The harness-independent public-asset coherence checks live in
+``infrastructure.entity_doctor``, not a codex-named home; ``public_assets`` re-exports no
+underscore name as a test-only interface."""
 
 from __future__ import annotations
 

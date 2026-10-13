@@ -1,4 +1,4 @@
-"""Characterization net for the four context registry write seams owned by CP4."""
+"""Characterization net for the four context registry write seams."""
 
 from __future__ import annotations
 

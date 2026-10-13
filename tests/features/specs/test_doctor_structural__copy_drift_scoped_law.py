@@ -1,6 +1,6 @@
-"""The ONE TREE-5
-comparator checks every scaffolded `specs/<area>/AGENTS.md` against its source and shipped history;
-matching neither is a `copy-drift` WARNING, absence a finding, scaffold bytes silent."""
+"""The ONE TREE-5 comparator checks every scaffolded `specs/<area>/AGENTS.md` against its source and
+shipped history; matching neither is a `copy-drift` WARNING, absence a finding, scaffold bytes
+silent."""
 
 from __future__ import annotations
 

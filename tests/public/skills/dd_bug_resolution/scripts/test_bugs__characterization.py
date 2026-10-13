@@ -1,4 +1,4 @@
-"""Characterization net for the six public ``bugs.py`` seams owned by CP3."""
+"""Characterization net for the six public ``bugs.py`` seams."""
 
 from __future__ import annotations
 

@@ -315,7 +315,7 @@ def test_several_principal_candidates_are_listed_never_guessed(env, tmp_path: Pa
 def test_a_never_onboarded_repo_is_refused_with_the_specs_init_fix(env, tmp_path: Path) -> None:
     """A constitution git would not commit (here: ignored) is
     refused before any write, so HEAD holds one after every anchor — never 'published'
-    without specs (the old S20 false success)."""
+    without specs."""
     svc, repo, bare = env
     _seed(bare, tmp_path / "seed", "main", "develop")
     _git(repo.parent, "clone", "-q", bare.as_uri(), str(repo))
@@ -488,7 +488,7 @@ def test_a_second_foreign_backup_is_published_inside_specs_bkp(env, tmp_path: Pa
 
 
 def test_the_publish_code_never_rewrites_forces_or_deletes() -> None:
-    """R13 rule 3: no forced checkout, reset, rebase, force-push, remote delete or squash
+    """No forced checkout, reset, rebase, force-push, remote delete or squash
     in the publish, the gate or the sync-failure fixes."""
     pkg = Path(__file__).resolve().parents[3] / "dadaia_workspace"
     for rel in (

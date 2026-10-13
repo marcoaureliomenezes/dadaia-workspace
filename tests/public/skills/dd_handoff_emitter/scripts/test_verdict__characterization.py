@@ -1,4 +1,4 @@
-"""Characterization net for the public ``verdict.py`` seam owned by CP1."""
+"""Characterization net for the public ``verdict.py`` seam."""
 
 from __future__ import annotations
 

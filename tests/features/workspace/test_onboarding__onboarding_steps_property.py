@@ -1,8 +1,8 @@
 """Over random real-state starts (remote unborn / principal only / both, a tag or not, a
 session identity or not), the loop takes the printed step, executes its fix line (the
 ``context`` step's operator action is played with a name and the bare remote's URL; the
-``agent`` step runs a scripted stand-in that fills memory) and asserts I3 — the step is no longer
-pending — and I4 — the printed step's index strictly increases, so the loop ends within
+``agent`` step runs a scripted stand-in that fills memory) and asserts the step is no longer
+pending and the printed step's index strictly increases, so the loop ends within
 ``len(STEP_IDS)`` iterations.
 
 MEDIUM: real git over ``file://`` bare remotes; the workspace pre-push hook is pointed

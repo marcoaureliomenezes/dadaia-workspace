@@ -1,12 +1,6 @@
-"""F011 (20260830-design-bug-surface-audit): memory-canon facts have ONE home —
-``features.specs.memory_canon`` — and every consumer imports it.
-
-Multiplied before the fold: the required-memory-file list (canon.CANON rows,
-doctor_structural._TREE3_MEMORY_FILES, doctor_memory.TOPLEVEL_MEMORY_FILES), the
-forbidden-heading vocabulary (doctor_memory prefix regex vs memory_lint exact
-frozenset — already divergent: singular 'Version' and unaccented 'Historico'
-passed lint), and the wikilink regex compiled three times.
-"""
+"""Memory-canon facts have ONE home — ``features.specs.memory_canon`` — and every consumer
+imports it: the required-memory-file list, the forbidden-heading vocabulary and the
+wikilink regex."""
 
 from __future__ import annotations
 

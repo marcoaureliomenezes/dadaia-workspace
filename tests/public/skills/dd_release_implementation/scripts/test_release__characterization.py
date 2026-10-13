@@ -1,4 +1,4 @@
-"""Characterization net for the three public ``release.py`` seams owned by CP3."""
+"""Characterization net for the three public ``release.py`` seams."""
 
 from __future__ import annotations
 

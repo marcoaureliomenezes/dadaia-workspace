@@ -40,7 +40,7 @@ def test_write_version_creates_and_updates_stamp(tmp_path: Path) -> None:
 
 
 def test_upgrade_refuses_below_floor_without_any_write(tmp_path: Path) -> None:
-    """A-10.1: refusing a below-floor tree never touches the filesystem — no
+    """Refusing a below-floor tree never touches the filesystem — no
     backup, no re-stamp, no migrated content."""
     specs = tmp_path / "specs"
     _write_constitution(specs, "# C\n")  # version 0, below the canonical floor

@@ -82,11 +82,10 @@ def _temp_then_replace_writer_defs(package_root: Path) -> list[str]:
 
 
 def test_only_core_atomic_write_defines_the_temp_then_replace_idiom() -> None:
-    """A2.2: the census is DERIVED by scan. The next accidental reintroduction of a raw
-    tmp-write-then-swap idiom anywhere under ``dadaia_workspace/`` — named anything —
-    fails this test loudly instead of silently escaping a hand-kept list.
-    The ledger scripts
-    carry no `_replace` copy of their own; one staged source is the scripts' writer."""
+    """The census is DERIVED by scan. The next accidental reintroduction of a raw
+    tmp-write-then-swap idiom anywhere under ``dadaia_workspace/`` — named anything — fails this
+    test loudly instead of silently escaping a hand-kept list. The ledger scripts carry no
+    `_replace` copy of their own; one staged source is the scripts' writer."""
     hits = _temp_then_replace_writer_defs(_PACKAGE_ROOT)
 
     assert hits == _EXPECTED_DEFINITIONS, (

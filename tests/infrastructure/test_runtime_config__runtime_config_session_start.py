@@ -2,7 +2,7 @@
 harness's hook wiring; size: SMALL.
 
 Every harness renders, from its ``HOOK_DIALECTS`` row, exactly one session-start command
-that deletes — ``dadaia doctor --fix --expired-only --quiet`` as a CLI process (P-12), never
+that deletes — ``dadaia doctor --fix --expired-only --quiet`` as a CLI process, never
 a ``dadaia_workspace.hooks.*`` module; the settings merge replaces it instead of stacking.
 Every rendered row is bounded: 10 s on the tool-call events, 30 s on the others.
 """

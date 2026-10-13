@@ -36,7 +36,7 @@ _REGISTRY = _PUBLIC / "entities" / "registry.json"
 #: The SDD gate's single merged PreToolUse entrypoint — root whitelist, venv guard and
 #: the gate itself are three behaviours behind ONE module.
 _PRE_GATE = "dadaia_workspace.hooks.pre_gate"
-#: The session-start reaper lane: a CLI process, never a ``hooks.*`` module (P-12).
+#: The session-start reaper lane: a CLI process, never a ``hooks.*`` module.
 _REAPER = "-m dadaia_workspace doctor --fix --expired-only"
 
 #: Every ``dadaia_workspace`` reference a hook artifact may carry, as a dotted module
