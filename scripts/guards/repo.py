@@ -322,7 +322,7 @@ def workflow_never_rules(tree: Tree) -> list[str]:
         for line in (s.get("run") or "").splitlines()
     ]
     never = {
-        # Grill Q14: no standalone skills repository was ordered.
+        # No standalone skills repository was ordered.
         "skills-repository-published": [
             f"{p}:{n}"
             for p in surfaces
