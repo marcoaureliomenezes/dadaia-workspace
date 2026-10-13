@@ -110,13 +110,7 @@ def test_a_define_tree_passes_without_a_verify_run_and_fails_a_red_ledger_check(
         f"(`git log -L 1,1:{ledger}` finds it), then redo the change through "
         "`bugs.py append` or `bugs.py update`"
     )
-    # the check's own text output carries its fix line, which the refusal then relays
-    assert _report(root, define) == [
-        f"fix: {fix}",
-        f"PREFLIGHT FAIL {define} {_head(define)}",
-        f"[error] bugs.py check failed on {define / 'specs'}",
-        f"fix: {fix}",
-    ]
+    _fail(root, define, f"bugs.py check failed on {define / 'specs'}", fix)
 
 
 def test_a_backlog_tree_fails_a_path_outside_specs(root: Path) -> None:
