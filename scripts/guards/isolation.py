@@ -399,7 +399,7 @@ os.environ["DADAIA_PERSONA"] = time.time()
 
 def CONTROL(root: Path) -> Session:
     """Every check green: a healthy session, near-miss shapes tracked, and every violation
-    only in an untracked, gitignored ``tests/tmp/x.py`` (bugs 465, 467) or in the fixture
+    only in an untracked, gitignored ``tests/tmp/x.py`` or in the fixture
     itself, the one module that may write any ``DADAIA_*``."""
     _write(root, ".gitignore", "tests/tmp/*\n")
     _write(root, "tests/tmp/x.py", _VIOLATOR)

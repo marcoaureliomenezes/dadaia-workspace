@@ -744,7 +744,7 @@ _ROGUE = (
 
 def CONTROL(root: Path) -> None:
     """Every check green on a copy of the tracked library files; an untracked, excluded
-    workflow breaking the CI rules stays out (bugs 465, 467: untracked is never read)."""
+    workflow breaking the CI rules stays out (untracked is never read)."""
     for rel in tracked(ROOT, *_COPIED):
         (root / rel).parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(ROOT / rel, root / rel)
