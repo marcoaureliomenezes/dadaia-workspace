@@ -36,11 +36,24 @@ The SPEC (Draft, FR1 to FR19) says what; this PLAN records the as-is review, the
 - Restored by plain change `restore-tests` (merges into `feature/0.5.0`): job27 (J27.T1–T5), 32 ids. Proof: `pytest --collect-only` ids at base `90fafb7cf` minus the ids at HEAD is empty.
 - Operator ruling, 2026-10-12, "Restaura os que têm código": the rc-14 deletions made before FR19, from `c5dfdc07f` (rc-14's birth) to `90fafb7cf`, are restored by plain change `restore-tests` when their unit still exists. Deleting commits named by the define review: `e103231a4` (J6.T5), `be5f8dacd` (J7.T3), `bc5f6f6e6` (J6.T4), `39ec61afb` (J9.T8), `a0b2d201d` (J9.T7), `55d67c988` (J1.T26), `b56281d61` (J1.T17), `b2f74f7d2` (J4.T5), `71abb6a6a` (J1.T6); the plain change takes the ids from `pytest --collect-only` at `c5dfdc07f` minus the ids at HEAD, parametrized cases included. The restore merges into `feature/0.5.0` before Jobs 22, 23, 25 and 27 merge, so those trees rebase onto the restored ids.
 
-**Left-out table (tests of removed units).** Filled when plain change `restore-tests` hands back.
+**Left-out table (tests of removed units).** Operator ruling, 2026-10-12, on the 15 pre-FR19 tests that assert behaviour rc-14 changed by an earlier ruling: "Ficam fora, listados".
 
-| test | removed unit | deleting commit | ruling |
-|---|---|---|---|
-| (pending the restore's hand-back) | — | — | "Restaura os que têm código": a test whose unit rc-14 removed stays out and is listed here, never dropped silently |
+| test | reason | commit |
+|---|---|---|
+| `tests/scripts/guards/test_slop.py::test_v33_dotted_task_id_is_one_witness` (4 cases) | unit removed: `slop.v33` | `12c2660b0` |
+| `test_entity_doctor__agentic_entities_derivation.py::test_behaviors_cover_every_harness_whose_hooks_are_derived` | unit removed: `projection_rules.harnesses_with_a_hook_derivation` | `a815d9896` |
+| `test_context__cli_context_repo_verbs.py::test_a_refused_repo_verb_exits_1_and_changes_nothing[A17.3-main-repo-slug]` and `test_service__repo_verbs.py::…[A17.3-own-main-slug-refused]` | behaviour changed by ruling (own-main add is a no-op, A17.2) | `d2d806027` |
+| `test_service__context_dead_holds.py::test_dead_refuses_a_dirty_checkout_one_fix_line_per_file` | dead's one fix names every dirty path | `f39fad045` |
+| `tests/core/test_release_state.py::test_core_reads_the_phase_and_judges_nothing` | `read_phase` removed in the kernel REBUILD | `508b6d12f` |
+| 3 ids asserting registry `implementations` (purity `test_b7…`, `agentic_entities_derivation` `test_rule_implementations…`, `entities_derivation_behavioral` `test_each_drift_class_blocks[missing-key]`) | the registry now holds modules and gaps | `c52a305a3` |
+| `test_public_assets__public_scripts_thin_wrapper.py::test_each_owner_sits_at_its_pinned_location[infrastructure/ledger_scripts.py]` | `load_owner` moved into core | `f55fd7260` |
+| `test_bugs.py::test_every_ledger_skill_stages_a_byte_identical_privacy_pair` | the projected kernel copy tables were deleted | `badf1d9a6` |
+| `test_bugs.py::test_a_missing_specs_tree_is_refused_never_created[argv1..3]` | the worktree scan was deleted; the fix names `worktree.py list` | `513a2a850` |
+| `test_bugs.py::…[argv4]`, `[argv5]` | position ids only; the same cases run at HEAD as argv1 and argv2 | — |
+| `test_memory.py::test_generate_check_and_lint1_reach_one_verdict_per_atom[tags: ["a, b", c]-False]` | the atom grammar now accepts it | `0d6128122` |
+
+- **Restore commits** on `wt/restore-tests`: `bd792d956`, `47c881e38`, `f5733dc91`.
+- **Guard drops** ("Remove os guards duplicados": an FR19 guard check whose rule a restored pytest test judges leaves; a check with its own rule stays): `74f7583fb` (feature: `law.py` gone, `workspace.py` keeps `quickstart-fixture`, `fixline.py`'s 4 checks stay), `9e94988a1` (Job 22 `owners.py`), `0e1965eb7` (Job 23: `entities`, `projection`, `public_text`, `surface`; the J23.T5 `_MIRROR_ALLOW` change reverted).
 
 ## 1. As-is review
 
