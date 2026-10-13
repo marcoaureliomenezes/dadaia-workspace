@@ -4,6 +4,8 @@ through its registry (check + fix) and the validator's own interface.
 
 from __future__ import annotations
 
+import json
+import subprocess
 from pathlib import Path
 
 from dadaia_workspace.features.specs.doctor import SpecsDoctor
@@ -115,4 +117,103 @@ def test_fix_inserts_a_missing_block_and_refreshes_a_drifted_one(tmp_path: Path)
     assert (specs / "memory" / "QUALITY.md").read_text(encoding="utf-8") == (
         "# Q\n\n" + _block("slop-tests", _FRAGMENTS["slop-tests"])
     )
+    assert _fixed_issues(doctor) == []
+
+
+_STALE = "- 0099 — Stale\n"
+_ADR_LIST = "- 0001 — A kept decision\n"
+
+
+def _adr_specs(tmp_path: Path, *, markers: bool, measured_by: str) -> tuple[Path, Path, Path]:
+    """Specs whose fixed blocks are exact; ARCHITECTURE.md carries a stale `adr-list` block."""
+    public = _public_dir(tmp_path)
+    architecture = "# A\n\n" + _block("slop-code", _FRAGMENTS["slop-code"])
+    if markers:
+        architecture += "\n" + _block("adr-list", _STALE)
+    specs = _specs(
+        tmp_path,
+        constitution="# C\n\n" + _block("slop-law", _FRAGMENTS["slop-law"]),
+        architecture=architecture,
+        quality="# Q\n\n" + _block("slop-tests", _FRAGMENTS["slop-tests"]),
+    )
+    record = {
+        "id": "0001",
+        "title": "A kept decision",
+        "status": "accepted",
+        "measured_by": measured_by,
+    }
+    (specs / "ADRs").mkdir()
+    (specs / "ADRs" / "decisions.jsonl").write_text(json.dumps(record) + "\n", encoding="utf-8")
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "tests" / "test_x.py").write_text("def test_one():\n    pass\n", encoding="utf-8")
+    subprocess.run(["git", "-C", str(tmp_path), "add", "-A"], check=True)
+    return public, specs, specs / "memory" / "ARCHITECTURE.md"
+
+
+def test_a_stale_adr_list_block_is_fixed_2_and_fix_regenerates_it(tmp_path: Path) -> None:
+    public, specs, architecture = _adr_specs(
+        tmp_path, markers=True, measured_by="tests/test_x.py::test_one"
+    )
+    doctor = SpecsDoctor(specs, public_dir=public)
+    assert _fixed_issues(doctor) == [("FIXED-2", "ARCHITECTURE.md")]
+
+    doctor.fix()
+
+    assert architecture.read_text(encoding="utf-8") == (
+        "# A\n\n"
+        + _block("slop-code", _FRAGMENTS["slop-code"])
+        + "\n"
+        + _block("adr-list", _ADR_LIST)
+    )
+    assert _fixed_issues(doctor) == []
+
+
+def test_a_file_without_the_adr_list_markers_yields_nothing(tmp_path: Path) -> None:
+    public, specs, _ = _adr_specs(tmp_path, markers=False, measured_by="tests/test_x.py::test_one")
+    assert _fixed_issues(SpecsDoctor(specs, public_dir=public)) == []
+
+
+def test_an_unresolved_measured_by_refuses_the_regeneration_and_writes_nothing(
+    tmp_path: Path,
+) -> None:
+    public, specs, architecture = _adr_specs(tmp_path, markers=True, measured_by="tests/missing.py")
+    before = architecture.read_text(encoding="utf-8")
+    doctor = SpecsDoctor(specs, public_dir=public)
+
+    refused = [i for i in doctor.check() if i.code == "FIXED-2"]
+
+    assert len(refused) == 1 and "0001" in refused[0].message
+    assert refused[0].fix == (
+        "Operator action: set the measured_by of ADR 0001 to a tracked path, a path::name test or"
+        " workflow-job id, or a rule code (an in-place `chore(adrs): repair` commit)."
+    )
+    doctor.fix()
+    assert architecture.read_text(encoding="utf-8") == before
+
+
+def test_a_refused_adr_list_does_not_withhold_the_other_blocks_of_the_file(tmp_path: Path) -> None:
+    public, specs, architecture = _adr_specs(tmp_path, markers=True, measured_by="tests/missing.py")
+    drifted = architecture.read_text(encoding="utf-8").replace(_FRAGMENTS["slop-code"], "drifted\n")
+    architecture.write_text(drifted, encoding="utf-8")
+    doctor = SpecsDoctor(specs, public_dir=public)
+
+    doctor.fix()
+
+    assert architecture.read_text(encoding="utf-8") == drifted.replace(
+        "drifted\n", _FRAGMENTS["slop-code"]
+    )
+
+
+def test_markers_without_a_ledger_render_an_empty_list(tmp_path: Path) -> None:
+    public, specs, architecture = _adr_specs(
+        tmp_path, markers=True, measured_by="tests/test_x.py::test_one"
+    )
+    (specs / "ADRs" / "decisions.jsonl").unlink()
+    doctor = SpecsDoctor(specs, public_dir=public)
+    assert _fixed_issues(doctor) == [("FIXED-2", "ARCHITECTURE.md")]
+
+    doctor.fix()
+
+    assert architecture.read_text(encoding="utf-8").endswith(_block("adr-list", ""))
     assert _fixed_issues(doctor) == []
