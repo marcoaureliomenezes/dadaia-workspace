@@ -172,8 +172,8 @@ def _last_rc(release_dir: Path, state: dict[str, Any] | None) -> int:
 
 
 def current_candidate(release_dir: Path, state: dict[str, Any]) -> Path | None:
-    """The ``rc-<N>/`` the release is working: the last candidate in the trio phases, the one
-    past a milestone's in DEFINITION; ``None`` for a flat trio, which has no folder."""
+    """The ``rc-<N>/`` the release is working: the last candidate in IMPLEMENTATION or CLOSURE,
+    the one past a milestone's in DEFINITION; ``None`` for a legacy flat release, which has no folder."""
     if last := _milestone_rc(state):
         return release_dir / f"rc-{last + (state.get('phase') == DEFINITION)}"
     return candidate_dir(release_dir)
