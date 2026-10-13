@@ -281,6 +281,23 @@ def test_delivered_outside_the_release_origin_is_refused(
     assert _histo(specs) == []
 
 
+def test_delivered_ignores_another_release_with_an_origin_less_spec(
+    script: Path, tmp_path: Path
+) -> None:
+    """The exit asks only the `--release` SPEC; a draft elsewhere does not refuse it."""
+    specs = _specs(tmp_path)
+    _run(script, "new", "an-idea", "--specs", str(specs))
+    _pick(specs)
+    (specs / "releases/0.4.8/rc-1").mkdir(parents=True)
+    (specs / "releases/0.4.8/rc-1/SPEC.md").write_text("# a draft with no origin\n")
+    done = _run(
+        script, "exit", "an-idea", "--specs", str(specs),
+        "--disposition", "delivered", "--release", "0.4.7",
+    )  # fmt: skip
+    assert done.returncode == 0, done.stdout + done.stderr
+    assert _active(specs) == []
+
+
 def test_the_refusal_fix_names_the_latest_picking_release_by_version(
     script: Path, tmp_path: Path
 ) -> None:
