@@ -437,3 +437,9 @@ def test_narrative_history_phrase_in_a_product_atom(tmp_path: Path, phrase: str)
 def test_narrative_history_phrase_outside_product_is_not_flagged(tmp_path: Path) -> None:
     """T-047-98. The phrase table applies to product atoms only."""
     assert _canonical(tmp_path, "## Principles\n\nA retired path is no longer read.\n") == []
+
+
+def test_narrative_exempts_the_principle_adr_line(tmp_path: Path) -> None:
+    """T-047-98. `ADR: NNNN (accepted)` names the decision that
+    governs a principle — it is current truth, not history."""
+    assert _canonical(tmp_path, "## Principles\n\nADR: 0023 (accepted)\n") == []

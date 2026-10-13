@@ -20,6 +20,7 @@ structurally out of this contract's reach (by design).
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -207,3 +208,19 @@ def test_doctor_check_blocks_on_a_malformed_registry(tmp_path: Path, registry: o
     assert len(lines) == 1 and lines[0].status is DoctorStatus.ERROR, lines
     assert lines[0].text.startswith("entities-derivation:"), lines
     assert lines[0].text.endswith("(ENT-DERIVE-1)"), lines
+
+
+def test_every_wired_core_hook_derives_from_a_deterministic_behavior() -> None:
+    """Every ``dadaia_workspace.hooks.*`` entrypoint the installer wires must be
+    named by some Deterministic Behavior's implementations."""
+    dialects = (_PKG_ROOT / "infrastructure/runtime_transforms/hook_wrappers.py").read_text()
+    wired = set(re.findall(r"dadaia_workspace\.hooks\.([a-z_]+)", dialects))
+    assert wired, "no wired hook entrypoints found — the extraction regex broke"
+    behaviors_blob = json.dumps(load_registry()["behaviors"])
+    underived = {
+        module for module in wired if f"dadaia_workspace.hooks.{module}" not in behaviors_blob
+    }
+    assert not underived, (
+        f"core hook entrypoints wired without an abstract Deterministic Behavior: "
+        f"{sorted(underived)}"
+    )
