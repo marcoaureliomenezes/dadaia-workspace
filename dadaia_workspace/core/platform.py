@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import PurePath
+from typing import Any
 
 from dadaia_workspace.core.skill_owner import load_owner
 
@@ -32,7 +33,7 @@ class Capabilities:
 PLATFORM: Capabilities = Capabilities.detect()
 
 
-def _caps() -> _owner.Caps:
+def _caps() -> Any:
     return _owner.Caps(PLATFORM.venv_scripts_dir, PLATFORM.venv_exe_suffix, PLATFORM.windows)
 
 
