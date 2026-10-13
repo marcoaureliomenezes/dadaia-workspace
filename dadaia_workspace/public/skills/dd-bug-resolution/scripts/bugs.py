@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import subprocess
 import sys
 from collections import Counter
 from pathlib import Path
@@ -19,6 +18,7 @@ import _jsonl
 from _atomic import SymlinkRefusedError
 from _bugs_check import CODE, LEDGER, OPEN, STATUS_BY_VERB, check
 from _bugs_store import Refusal, commit, read_records
+from _git import GitError, git
 from _specs import find_specs, refuse
 
 _OPTIONS: dict[str, tuple[str, ...]] = {
@@ -111,18 +111,10 @@ def _write(args: argparse.Namespace, specs: Path) -> int:
         values["ts"] = wr.now_iso()
         values["reported_by"] = values["reported_by"] or "dd-sw-engineer-sr"
         try:
-            listed = subprocess.run(
-                ["git", "-C", str(specs), "ls-files", "--full-name", ":/"],
-                capture_output=True,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
-                check=True,
-            ).stdout
-        except (OSError, subprocess.CalledProcessError) as exc:
-            cause = getattr(exc, "stderr", "") or str(exc)
+            listed = git(specs, "ls-files", "--full-name", ":/")
+        except (OSError, GitError) as exc:
             raise Refusal(
-                f"cannot list the repo's tracked directories: {cause.strip()}",
+                f"cannot list the repo's tracked directories: {getattr(exc, 'stderr', exc)}",
                 "Operator action: point --specs at a specs tree inside a git repo",
             ) from None
         dirs = {part for path in listed.splitlines() for part in path.split("/")[:-1]}

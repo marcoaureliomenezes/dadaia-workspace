@@ -23,12 +23,20 @@ def scrubbed_env(parent: Mapping[str, str] | None = None) -> dict[str, str]:
     } | {"PYTHONDONTWRITEBYTECODE": "1"}
 
 
+class GitError(RuntimeError):
+    """A git command that exited non-zero; *stderr* is git's own text."""
+
+    def __init__(self, args: tuple[str, ...], stderr: str) -> None:
+        super().__init__(f"git {' '.join(args)}: {stderr}")
+        self.stderr = stderr
+
+
 def git(repo: Path, *args: str, check: bool = True, input: str | None = None) -> str:
     done = subprocess.run(
         ["git", "-C", str(repo), *args], env=scrubbed_env(), capture_output=True, text=True, encoding="utf-8", errors="replace", input=input
     )  # fmt: skip
     if check and done.returncode:
-        raise RuntimeError(f"git {' '.join(args)}: {done.stderr.strip()}")
+        raise GitError(args, done.stderr.strip())
     return done.stdout
 
 
