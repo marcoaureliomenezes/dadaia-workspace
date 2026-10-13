@@ -45,7 +45,7 @@ Rationale: a model call on a PR path fails closed without the paid key and expos
 - `flaky` marks a pass-and-fail on identical code; `quarantine` leaves every gating selector, is bug-gated by P-22, and the lane is empty.
 - Growth past the per-job wall-clock budget frozen by ADR 0119 is a budget breach, judged by `dd-code-reviewer` reading the CI job durations (`gh run view`, per job; ADR 0166).
 - A test, or an existing assert, leaves the suite or is removed or skipped only on the operator's order (root map §1, ADR 0249); a bug fix hardens the contract test in that contract's one home and never loosens it, and a cross-cutting contract may gain one parametrized home beside its per-site tests.
-- Scaffolding (a seam RED, a refactor pin, a bug reproduction) lives in a versioned `tests/tmp/<job>/`, collected during the job; the job merge refuses while git tracks a file there, so each test is promoted into its contract's home ([[worktrees]]).
+- Scaffolding (a seam RED, a refactor pin, a bug reproduction) lives in a versioned `tests/tmp/<job>/`, collected during the job; the job merge refuses while git tracks a file there, so each test is promoted into its contract's home (`worktree.py merge`).
 - Mutation runs from this repository's dev group: `scripts/mutate.py` mutates only a diff's lines and prints the score, the survivors, the kill matrix and the diff's branch coverage. Its readout is optional review evidence, never required; no gate and no test reads it as pass or fail, and it never authorizes a deletion (ADR 0248 as amended by 0249).
 
 ## Gates
