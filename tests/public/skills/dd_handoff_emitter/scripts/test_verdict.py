@@ -193,6 +193,15 @@ def test_a_bad_context_or_slug_is_refused_by_name_and_writes_nothing_anywhere(
     assert _tree_files(tmp_path) == before
 
 
+@pytest.mark.parametrize("ctx", ["My_Ctx", "A", "_x"])
+def test_a_context_the_core_grammar_accepts_receives_its_verdict(tmp_path: Path, ctx: str) -> None:
+    root, tree, head = _workspace(tmp_path)
+    done = _verdict(root, tree, sha=head, **{"--context": ctx})
+    assert done.returncode == 0, done.stderr
+    (path,) = _written(root)
+    assert path.parent == root / ".dadaia/handoff" / ctx
+
+
 @pytest.mark.parametrize("stdin", ["[1]", "3", "null", '"s"'])
 def test_a_non_object_json_is_refused_with_text_and_no_traceback(
     tmp_path: Path, stdin: str
