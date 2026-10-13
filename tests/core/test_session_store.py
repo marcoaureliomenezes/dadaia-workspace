@@ -15,7 +15,7 @@ SID = "my-session-id"
 
 @pytest.mark.parametrize("bad_name", ["../escape", "a/b", "a.b"])
 def test_path_validation_rejects_traversal(tmp_path: Path, bad_name: str) -> None:
-    """FR-R3-03: records live under PROTECTED .dadaia/sessions/; a traversal name is CWE-22."""
+    """Records live under PROTECTED .dadaia/sessions/; a traversal name is CWE-22."""
     assert si.session_record_path(tmp_path, SID).relative_to(tmp_path).as_posix() == (
         f".dadaia/sessions/{SID}.json"
     )

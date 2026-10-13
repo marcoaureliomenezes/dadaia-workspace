@@ -2,7 +2,8 @@
 
 Three layers: ``core.redaction`` (the primitive the push gate's render boundary also consumes),
 :class:`ContextRedactor` in isolation, and the ``doctor``/``context list``/``context show`` verbs
-over a real workspace. Without the flag the output is unchanged; ``tests/cli/commands/test_context__cli_output_stability.py`` pins it.
+over a real workspace. Without the flag the output is unchanged;
+``tests/cli/commands/test_context__cli_output_stability.py`` pins it.
 """
 
 from __future__ import annotations
