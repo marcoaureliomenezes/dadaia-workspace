@@ -196,7 +196,7 @@ Each picked entry exits once at closure (`backlog.py exit`, from the reconcile t
 ### Governance sequencing
 
 1. ADR proposals land in a `define` or `backlog/<slug>` tree (§3a row 2), carrying `options` and self-contained `ruling.words` (ids above 0246). Only the operator accepts. FR10's class-triage proposals (AC10.1) land in a `backlog/<slug>` tree during rc-15 (main thread, 2026-10-13); the PLAN schedules that tree.
-2. Two accepted records state what this SPEC deletes. ADR 0191 states "At most 5 task worktrees per rc", carrying 0125 (3) (FR9). ADR 0245 (4) keeps the id-only `ADR:` label and the pairing rule (FR10). This define tree proposes ADR 0250 (amends 0191) and ADR 0251 (amends 0245). Each must be accepted by the operator before its job merges.
+2. Two accepted records state what this SPEC deletes. ADR 0191 states "At most 5 task worktrees per rc", carrying 0125 (3) (FR9). ADR 0245 (4) keeps the id-only `ADR:` label and the pairing rule (FR10). ADR 0250 (amends 0191) and ADR 0251 (amends 0245) were accepted by the operator on 2026-10-13, "Aceitar (Recommended)" (`cb7cf3f70`).
 3. FR10's order: the triage (AC10.1) proposes after the bug jobs merge, when the ledger is final. AC10.3's refusal runs only after the operator has accepted those proposals. The Reconciliation regenerates the block.
 
 ### Delivery constraints
@@ -218,7 +218,7 @@ Each picked entry exits once at closure (`backlog.py exit`, from the reconcile t
 
 ## 7. Open questions
 
-For the operator, through the main thread: accept or reject proposals 0250 and 0251 (§6 Governance 2).
+None.
 
 Notes (not blocking):
 
