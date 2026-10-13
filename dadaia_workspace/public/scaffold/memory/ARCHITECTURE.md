@@ -11,7 +11,7 @@ tags:
 
 ## Principles
 
-Greenfield: no principle is accepted yet. The founding release's SPEC proposes the initial
+Greenfield: no principle is recorded yet. The founding release's SPEC proposes the initial
 layout.
 
 ## Tech Stack

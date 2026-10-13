@@ -18,7 +18,6 @@ Scope: this file governs only `specs/ADRs/`.
 - Any agent may append a record with `status: "proposed"`.
 - One decision per change set; never one per statement that merely exists.
 - Only the operator accepts: the main thread writes `accepted` with `ruling: {date, words}` (his verbatim words, in the turn he rules; the question plus the chosen option, never only an answer id) and `measured_by` naming a check of a kind `specs/memory/AGENTS.md` §2 lists; never delegated, and no role agent writes `accepted` or `ruling`.
-- A canonical-memory commit that only states what the code is, needs no ADR and names its code evidence.
 - `accepted` is then immutable: `context`/`decision`/`consequences` never rewritten again.
 - A reversal is a new record naming the earlier `id` in `supersedes`/`amends`.
 - Rejecting is a `status: "rejected"` edit by the operator.

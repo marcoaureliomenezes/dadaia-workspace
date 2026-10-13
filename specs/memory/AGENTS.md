@@ -11,7 +11,7 @@ Memory is current product truth: what the product is now, never how it got there
 
 | Tier | Files | Changes how |
 |---|---|---|
-| Canonical memory | `ARCHITECTURE.md`, `QUALITY.md` | any section, a `### P-NN` principle included, may be rewritten to state what the code is, naming its code evidence, with no ADR; a principle keeps its `Measured by:` check |
+| Canonical memory | `ARCHITECTURE.md`, `QUALITY.md` | any section may be rewritten to state what the code is, naming its code evidence, with no ADR; a `### P-NN` principle keeps its `Measured by:` check |
 | Product memory | `product/<area>/<slug>.md` | at every closure, by `dd-product-engineer`, reconciled from the window's code diff |
 
 
@@ -30,11 +30,10 @@ Memory is current product truth: what the product is now, never how it got there
 
 ## 4. Tree, format, validation
 
-- `MEMORY_PY` = `python3 .agents/skills/dd-spec-navigator/scripts/memory.py`; `RELEASE_PY` = `python3 .agents/skills/dd-release-implementation/scripts/release.py`.
+- `MEMORY_PY` = `python3 .agents/skills/dd-spec-navigator/scripts/memory.py`.
 - `product/index.md` and `product/catalog.json` are generated together by `MEMORY_PY catalog generate`; `MEMORY_PY check` (`LEDGER-MEMORY-SCHEMA`) fails when either differs from the atoms.
 - Frontmatter `memory-frontmatter-v1`, applied by `LINT-1`: `slug`, `title`, `tldr`, `summary`, `tags` on every atom, `sources` on every product atom; a stray field is a hard error.
 - Body: curated headings only; `[[slug]]` wikilinks resolve by slug, never a path; no history heading, and no history line — a date or a release, candidate or task id anywhere, or a history phrase in a product atom, is a `LINT-1` history-line error.
-- The bootstrap hook injects `constitution.md`, `ARCHITECTURE.md`'s `## Tech Stack` section and the catalog digest.
 - Fix findings at the source atom; regenerate `catalog.json` with `MEMORY_PY catalog generate`.
 
 Generated from this release's scaffold image. Project teams may customize this file; `.dadaia/.venv/bin/dadaia doctor` reports drift instead of overwriting it.

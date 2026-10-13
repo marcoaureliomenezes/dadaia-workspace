@@ -26,7 +26,7 @@ Scope: this file governs only `specs/bugs/`.
 - Any fix whose `caused_by` is not `none`, a bug's fix or a feature task, is a REBUILD of the unit, keeping its tests.
 - The next rc's `## Bug window review` judges those fixes (KEEP or REBUILD); its Job 1 executes the verdicts.
 - Close with the fix: `bugs.py resolve`, with the flags `dd-bug-resolution` Phase 6 names.
-- Check prior resolutions on the same component first using `dd-bug-resolution/LINEAGE.md`; inspect each persisted `fix_sha` with `git show`. `caused_by: X` means bug or task X wrote the lines this fix corrects; use `none` only when blame offers no candidate.
+- Lineage before any fix: `dd-bug-resolution/LINEAGE.md`.
 - Commit exactly what the fix touched, never a blanket `-A`; a net-positive diff is judged by `dd-code-review` §6's Architecture lens at review.
 
 ## 3. Field classes
