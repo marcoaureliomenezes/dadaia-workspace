@@ -49,17 +49,6 @@ def _imported_roots(path: Path) -> set[str]:
 _KERNEL = _SKILLS_DIR / "dd-bug-resolution" / "scripts"
 _KERNEL_MODULES = {module.stem for module in _KERNEL.glob("*.py")}
 
-#: The cross-skill import edges that survive: backlog reads the release Origin parser, and
-#: release reads the worktree rows and the navigator's drift decider at the closure fence.
-_CROSS_SKILL_EDGES = {
-    "dd-release-implementation": {"_memory_drift"},
-}
-
-#: The `sys.path` lines that serve a surviving edge, by module; each names the skill it reaches.
-_EDGE_PATH_LINES = {
-    "dd-release-implementation/scripts/_release_tree.py": "dd-spec-navigator",
-}
-
 
 def _path_statements(script: Path) -> list[str]:
     """The source of every statement that edits `sys.path`."""
@@ -72,6 +61,26 @@ def _path_statements(script: Path) -> list[str]:
     ]
 
 
+def _foreign_imports(script: Path) -> set[str]:
+    """The imports of *script* outside the stdlib, its own folder and the kernel; a kernel
+    module may import only the stdlib and its own folder."""
+    allowed = {module.stem for module in script.parent.glob("*.py")}
+    if script.parent.parent.name != _KERNEL.parent.name:
+        allowed |= _KERNEL_MODULES
+    return _imported_roots(script) - set(sys.stdlib_module_names) - allowed
+
+
+def _path_violations(script: Path) -> list[str]:
+    """The `sys.path` statements *script* may not hold: any in a module; in an entry point
+    more than one, or one naming a skill other than the kernel's."""
+    lines = _path_statements(script)
+    if script.name.startswith("_"):
+        return lines
+    return lines[1:] + [
+        ln for ln in lines if set(re.findall(r"\"(dd-[a-z-]+)\"", ln)) - {_KERNEL.parent.name}
+    ]
+
+
 @pytest.mark.parametrize("script", _owner_scripts(), ids=lambda p: f"{p.parents[1].name}/{p.name}")
 def test_skill_owner_script_meets_the_contract(script: Path) -> None:
     """Every skill script is a self-contained stdlib owner — no import into
@@ -81,13 +90,7 @@ def test_skill_owner_script_meets_the_contract(script: Path) -> None:
     `sys.path`. A sibling is a module, not an entry point, so only the non-`_` scripts
     answer `--help`; everything else applies to every file under `scripts/`.
     """
-    skill = script.parent.parent.name
-    siblings = {module.stem for module in script.parent.glob("*.py")} | _KERNEL_MODULES
-    siblings |= _CROSS_SKILL_EDGES.get(skill, set())
-    if skill == _KERNEL.parent.name:
-        # rule 1: a kernel module imports only the stdlib and kernel siblings
-        siblings = {module.stem for module in script.parent.glob("*.py")}
-    foreign = _imported_roots(script) - set(sys.stdlib_module_names) - siblings
+    foreign = _foreign_imports(script)
     assert foreign == set(), (
         f"{script.name} imports non-stdlib module(s) {sorted(foreign)} — a skill script "
         "runs from a projected skill folder with no library on sys.path (FR1)."
@@ -108,17 +111,20 @@ def test_skill_owner_script_meets_the_contract(script: Path) -> None:
 @pytest.mark.parametrize("script", _owner_scripts(), ids=lambda p: f"{p.parents[1].name}/{p.name}")
 def test_one_bootstrap_line_names_only_the_own_folder_and_the_kernel(script: Path) -> None:
     """Rule 2: an entry point edits `sys.path` once, naming its folder and the kernel's; a
-    module edits it only for a surviving edge."""
-    rel = f"{script.parents[1].name}/scripts/{script.name}"
-    lines = _path_statements(script)
-    if rel in _EDGE_PATH_LINES:
-        lines = [ln for ln in lines if _EDGE_PATH_LINES[rel] not in ln]
-    if script.name.startswith("_"):
-        assert lines == []
-        return
-    assert len(lines) <= 1
-    skills = {m for ln in lines for m in re.findall(r"\"(dd-[a-z-]+)\"", ln)}
-    assert skills <= {_KERNEL.parent.name}
+    module never edits it."""
+    assert _path_violations(script) == []
+
+
+def test_a_planted_cross_skill_import_or_path_line_bites(tmp_path: Path) -> None:
+    folder = tmp_path / "dd-release-implementation" / "scripts"
+    folder.mkdir(parents=True)
+    plant = folder / "_plant.py"
+    plant.write_text("import _memory_catalog\n", "utf-8")
+    assert _foreign_imports(plant) == {"_memory_catalog"}
+    plant.write_text(
+        'import sys\nsys.path.insert(0, str(HERE.parent.parent / "dd-spec-navigator"))\n', "utf-8"
+    )
+    assert len(_path_violations(plant)) == 1
 
 
 def test_ledger_owner_scripts_expose_check() -> None:
