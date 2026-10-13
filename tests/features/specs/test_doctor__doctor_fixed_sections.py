@@ -6,8 +6,10 @@ from __future__ import annotations
 
 import json
 import subprocess
+import sys
 from pathlib import Path
 
+from dadaia_workspace.core.cli_line import git_line, shell_line
 from dadaia_workspace.features.specs.doctor import SpecsDoctor
 from dadaia_workspace.features.specs.doctor_memory import MemoryValidator
 from dadaia_workspace.features.specs.doctor_types import finding_path
@@ -228,7 +230,10 @@ def test_a_ledger_that_is_not_utf8_is_restored_not_misread_as_a_refused_render(
 
     (refused,) = MemoryValidator(specs).check_fixed_sections(public)
 
-    assert refused.fix == f"Operator action: restore {ledger} with `git checkout -- {ledger}`"
+    assert refused.fix == (
+        f"Operator action: restore {ledger} with "
+        f"`{git_line(ledger.parent, 'checkout', '--', ledger.name)}`"
+    )
 
 
 def test_a_fragment_that_is_not_utf8_is_reinstalled_not_misread_as_a_refused_render(
@@ -245,4 +250,6 @@ def test_a_fragment_that_is_not_utf8_is_reinstalled_not_misread_as_a_refused_ren
 
     (refused,) = [i for i in SpecsDoctor(specs, public_dir=public).check() if i.code == "FIXED-2"]
 
-    assert "pip install -U" in refused.fix
+    assert refused.fix == shell_line(
+        sys.executable, "-m", "pip", "install", "-U", "dadaia-workspace"
+    )

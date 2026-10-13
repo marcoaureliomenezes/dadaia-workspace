@@ -1,5 +1,5 @@
 """The five check verbs share one finding renderer and one decode-aware reader.
-Size: SMALL.
+Size: MEDIUM.
 """
 
 from __future__ import annotations
@@ -11,6 +11,7 @@ from pathlib import Path
 
 import pytest
 
+from dadaia_workspace.core.cli_line import git_line
 from tests.helpers.skill_scripts import stage_skill_scripts
 
 # verb: (skill, script, code, a tree the verb flags, a file whose bytes are not UTF-8)
@@ -26,6 +27,10 @@ _VERBS = {
     "release": ("dd-release-implementation", "release.py", "LEDGER-RELEASE-SCHEMA",
                 ("releases/0.5.0/.keep", b""), "releases/0.5.0/_RELEASE.json"),
 }  # fmt: skip
+
+
+def _restore(path: Path) -> str:
+    return f"Operator action: restore {path} with `{git_line(path.parent, 'checkout', '--', path.name)}`"
 
 
 def _check(tmp_path: Path, verb: str, planted: tuple[str, bytes]):
@@ -65,7 +70,8 @@ def test_a_file_that_is_not_utf8_is_a_finding_of_the_verbs_own_code(
     assert done.returncode == 1 and "Traceback" not in done.stderr
     (finding,) = json.loads(done.stdout)
     assert (finding["code"], finding["verdict"], finding["path"]) == (code, "error", relative)
-    assert "git" in finding["fix"] and relative in finding["fix"]
+    target = (tmp_path / "repo" / "specs" / relative).resolve()
+    assert finding["fix"] == _restore(target)
 
 
 # verb: (skill, script, argv after the script, the file whose bytes are not UTF-8)
@@ -98,6 +104,5 @@ def test_a_verb_that_reads_a_file_that_is_not_utf8_refuses_with_one_fix(
     assert done.returncode == 1 and "Traceback" not in done.stderr
     assert relative in done.stderr
     assert [ln for ln in done.stderr.splitlines() if ln.startswith("fix: ")] == [
-        f"fix: Operator action: restore {(specs / relative).resolve()} with "
-        f"`git checkout -- {(specs / relative).resolve()}`"
+        f"fix: {_restore((specs / relative).resolve())}"
     ]

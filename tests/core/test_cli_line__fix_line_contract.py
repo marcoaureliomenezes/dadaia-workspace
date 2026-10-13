@@ -34,7 +34,7 @@ from typer.testing import CliRunner
 from dadaia_workspace.cli.help_digest import command_paths
 from dadaia_workspace.cli.main import app
 from dadaia_workspace.core import workspace_layout
-from dadaia_workspace.core.cli_line import cli_path, fix_line, shell_line
+from dadaia_workspace.core.cli_line import cli_path, fix_line, git_line, shell_line
 from dadaia_workspace.core.doctor_rules import rule_fix
 from dadaia_workspace.core.gitflow import DEFAULT, work_branch
 from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES
@@ -1529,8 +1529,13 @@ def _ledger(ws: Path, code: str) -> str:
         if "audits" in rel:  # a bound session writes findings directly: the governed act
             assert f"line 1 of {path} " in fix, fix
         else:
-            finder = f"git log -L 1,1:{path}" if where == 1 else f"git log -p -- {path}"
-            assert f"`git checkout -- {path}`" in fix and finder in fix, fix
+            finder = (
+                git_line(path.parent, "log", "-L", f"1,1:{path.name}")
+                if where == 1
+                else git_line(path.parent, "log", "-p", "--", path.name)
+            )
+            assert f"`{git_line(path.parent, 'checkout', '--', path.name)}`" in fix, fix
+            assert finder in fix, fix
             assert (f"line 1 of {path} " if where == 1 else f"{path} fails at {where} ") in fix, fix
         first = first or fix
     return f"fix: {first}"

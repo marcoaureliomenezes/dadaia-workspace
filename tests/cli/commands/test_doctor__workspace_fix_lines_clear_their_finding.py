@@ -19,6 +19,7 @@ import pytest
 from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app
+from dadaia_workspace.core.cli_line import git_line
 from tests.fixtures.harness_env import run_bash, suite_env
 
 _REPO = Path(__file__).resolve().parents[3]
@@ -103,8 +104,13 @@ def test_an_invalid_ledger_line_is_one_operator_action(
     if "audits" in rel:  # a bound session writes findings directly: the governed act
         assert f"line 1 of {path} " in fix, fix
         return
-    finder = f"git log -L 1,1:{path}" if where == 1 else f"git log -p -- {path}"
-    assert f"`git checkout -- {path}`" in fix and finder in fix, fix
+    finder = (
+        git_line(path.parent, "log", "-L", f"1,1:{path.name}")
+        if where == 1
+        else git_line(path.parent, "log", "-p", "--", path.name)
+    )
+    assert f"`{git_line(path.parent, 'checkout', '--', path.name)}`" in fix, fix
+    assert finder in fix, fix
     assert (f"line 1 of {path} " if where == 1 else f"{path} fails at {where} ") in fix, fix
 
 

@@ -105,9 +105,9 @@ def test_a_define_tree_passes_without_a_verify_run_and_fails_a_red_ledger_check(
     fix = (
         f"Operator action: line 1 of {ledger} was not written by `bugs.py append` or "
         "`bugs.py update` (specs/bugs/AGENTS.md: never hand-edit BUGS.jsonl) — if "
-        f"{ledger} has uncommitted changes, discard them (`git checkout -- {ledger}`); "
+        f"{ledger} has uncommitted changes, discard them (`{git_line(ledger.parent, 'checkout', '--', ledger.name)}`); "
         "otherwise revert the commit that introduced it "
-        f"(`git log -L 1,1:{ledger}` finds it), then redo the change through "
+        f"(`{git_line(ledger.parent, 'log', '-L', f'1,1:{ledger.name}')}` finds it), then redo the change through "
         "`bugs.py append` or `bugs.py update`"
     )
     _fail(root, define, f"bugs.py check failed on {define / 'specs'}", fix)
