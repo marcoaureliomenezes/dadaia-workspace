@@ -125,21 +125,20 @@ def test_a_verdict_for_a_sha_a_later_commit_left_behind_is_refused_by_the_merge(
     assert refused.returncode != 0 and "reports validate" in refused.stderr
 
 
-_CASES = [(f'{{"{k}": "x"}}', k) for k in RESERVED] + [
-    ("", "empty"), ("not json", "non-json"), ("[1]", "array"),
+_OWNED = "stdin sets keys verdict.py owns: "
+_CASES = [(f'{{"{k}": "x"}}', k, f"{_OWNED}{k}") for k in RESERVED] + [
+    ("", "empty", "stdin is not JSON"),
+    ("not json", "non-json", "stdin is not JSON"),
+    ("[1]", "array", "stdin is not a JSON object"),
 ]  # fmt: skip
 
 
-@pytest.mark.parametrize(("stdin", "why"), _CASES, ids=[w for _, w in _CASES])
-def test_a_bad_stdin_is_refused_and_writes_nothing(tmp_path: Path, stdin: str, why: str) -> None:
+@pytest.mark.parametrize(("stdin", "why", "message"), _CASES, ids=[w for _, w, _ in _CASES])
+def test_a_bad_stdin_is_refused_and_writes_nothing(
+    tmp_path: Path, stdin: str, why: str, message: str
+) -> None:
     root, tree, head = _workspace(tmp_path)
     refused = _verdict(root, tree, sha=head, stdin=stdin)
-    message = {"empty": "stdin is not JSON", "non-json": "stdin is not JSON"}.get(
-        why,
-        "stdin is not a JSON object"
-        if why == "array"
-        else f"stdin sets keys verdict.py owns: {why}",
-    )
     assert refused.returncode == 1, why
     assert refused.stderr == (
         f"[error] {message}\nfix: Operator action: pipe one JSON object without the keys"

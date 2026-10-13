@@ -14,6 +14,8 @@ from typing import Any
 
 import pytest
 
+from dadaia_workspace.core.cli_line import git_line
+
 _SCRIPT = (
     Path(__file__).resolve().parents[5]
     / "dadaia_workspace"
@@ -242,18 +244,43 @@ def test_register_stamps_through_the_kernel_clock(
     )
 
 
-def _one_fix(refused: subprocess.CompletedProcess[str]) -> None:
-    lines = refused.stderr.splitlines()
-    assert refused.returncode == 1 and lines[0].startswith("[error] ")
-    assert len(lines) == 2 and lines[1].startswith("fix: Operator action: ")
+def _refused(refused: subprocess.CompletedProcess[str], error: str, fix: str) -> None:
+    assert refused.returncode == 1
+    assert refused.stderr == f"[error] {error}\nfix: {fix}\n"
 
 
 def test_every_registry_refusal_prints_one_error_line_and_one_fix_line(tmp_path: Path) -> None:
     reg = tmp_path / "r.json"
     _run(reg, "register", "--port", "3100", "--project", "demo")
-    _one_fix(_run(reg, "register", "--port", "3100", "--project", "other"))
-    _one_fix(_run(reg, "release"))
-    _one_fix(_run(reg, "release", "--port", "3999"))
-    _one_fix(_run(reg, "next", "--project", "z", "--min-port", "3100", "--max-port", "3100"))
+    _refused(
+        _run(reg, "register", "--port", "3100", "--project", "other"),
+        "port 3100 is registered by project 'demo' (http://localhost:3100)",
+        "Operator action: pick another port with registry.py next, then rerun",
+    )
+    _refused(
+        _run(reg, "release"),
+        "provide --port and/or --project",
+        "Operator action: pass --port and/or --project, then rerun",
+    )
+    _refused(
+        _run(reg, "release", "--port", "3999"),
+        "port 3999 is not registered",
+        "Operator action: run registry.py list to see the registered ports, then rerun",
+    )
+    _refused(
+        _run(reg, "next", "--project", "z", "--min-port", "3100", "--max-port", "3100"),
+        "no free ports in [3100, 3100]",
+        "Operator action: run registry.py clean, then rerun",
+    )
     (lonely := tmp_path / "lonely").mkdir()
-    _one_fix(_run_in(lonely, "list"))
+    _refused(
+        _run_in(lonely, "list"),
+        "no workspace sentinel above the cwd",
+        "Operator action: rerun with --registry and a registry file path, or from inside a workspace",
+    )
+    reg.write_bytes(b"\xff")
+    _refused(
+        _run(reg, "list"),
+        f"{reg} is not valid UTF-8",
+        f"Operator action: restore {reg} with `{git_line(reg.parent, 'checkout', '--', reg.name)}`",
+    )
