@@ -39,5 +39,5 @@ The main thread refuses to write `AUDIT.md` until all three pillar sections are 
 
 ## 5. References
 
-- Script: `python3 .agents/skills/dd-audit-project/scripts/audit.py` — `disposition`, `close`, `check`: this ledger's ONE writer and validator.
+- Script: `python3 .agents/skills/dd-audit-project/scripts/audit.py` — the only verbs that change a committed finding or close the audit (`disposition`, `close`); `check` validates; a finding is appended by hand (`FINDINGS-FORMAT.md`).
 - Lifecycle, pillars and verbs: `specs/audits/AGENTS.md`.

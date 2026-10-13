@@ -31,7 +31,6 @@ You never write the SPEC or memory and never cut corners on tests or security.
 ## 1. Owns
 
 - Implementer (the root `AGENTS.md` map §2): the new behaviour, design choices, root causes and the RED test of a new contract. Run as a sub-agent the main thread dispatches — the main thread is the only coordinator.
-- Never call `.dadaia/.venv/bin/dadaia context bind` independently.
 - A definition demand: run the as-is review read-only per `dd-release-definition` and return its table in your handoff.
 - Write: any context-language source the active release's job files declare in scope, inside its task worktree or its hotfix tree (`worktrees/AGENTS.md` §1).
 - Write: the tests the job file's `W:` names, unit to E2E.
@@ -72,7 +71,7 @@ Ground yourself first with `dd-spec-navigator` (Phase 2, memory bootstrap), then
 
 ## 4. Outputs
 
-- Write an HTML report to `.dadaia/reports/<context>/<UTC>-dd-sw-engineer-sr-<task-slug>.html` only on operator request or human next hop.
+- An HTML report, when `.dadaia/handoff/AGENTS.md` calls for one: `.dadaia/reports/<context>/<UTC>-dd-sw-engineer-sr-<task-slug>.html`.
 - Required sections: Summary, Tests written (`file:line`), Security checklist (OWASP items touched), Commit/branch, Review status.
 - Emit via `dd-handoff-emitter`.
 - Treat a completed implementation as a handoff, not task completion — the main thread merges, opens PRs and closes.

@@ -14,7 +14,7 @@
 
 - Resolution order: the bind (a session with an id: its own record; none: a registered `DADAIA_CONTEXT`) -> the cwd repo (`.dadaia/.venv/bin/dadaia context show --json`); none -> bind, never borrow one.
 - Automatic workspace and root resolution skips every root in `DADAIA_FENCED_ROOTS`; an explicitly named target such as a ledger script's `--specs` path is resolved independently.
-- `.dadaia/.venv/bin/dadaia context bind <ctx>` is one verb, no mode or release; the memory-injection trigger (re-fired after compaction); the session id comes from the environment only; a subagent inherits its parent's session id and binding and never binds.
+- `.dadaia/.venv/bin/dadaia context bind <ctx>` is one verb, no mode or release; memory injection: `dd-spec-navigator` Phase 2; the session id comes from the environment only; a subagent inherits its parent's session id and binding and never binds.
 - Scope = the bound context's main and associated repos, judged under `repos/<slug>/` and `worktrees/<slug>/`; binding is optional, an ADDITIVE write needs none.
 - An id-bearing session with no bind owns no repo; an unregistered slug and a root path are not scope-judged.
 - Races are surfaced, not prevented; zero ALIVE -> alert the operator.

@@ -25,7 +25,7 @@ A decision surface, not a doc mirror — official docs are an on-demand index at
 | Most-recent skill invocation (partially re-attached, capped) | Earlier skill invocations beyond the re-attach budget |
 
 - A behavior that must hold across a long session belongs in CLAUDE.md/a rule (survives) or a hook (deterministic).
-- A skill whose guidance is lost at compaction is placed at the wrong layer — promote it to a rule, or re-invoke it.
+- A skill whose guidance is lost at compaction is placed at the wrong layer — promote it to an `AGENTS.md` line, or re-invoke it.
 - Subagents isolate a big exploration in its own context window and return only a summary.
 
 ---
@@ -185,8 +185,8 @@ Must it hold EVERY time, regardless of what the model decides?
    |- yes -> MCP server (capability) + a skill (know-how). Lean on tool-search.
    `- no -> Is it standing law that should color reasoning?
       |- yes -> Does it govern only one subtree?
-      |         |- yes -> RULE with paths: (never always-on for subtree law).
-      |         `- no  -> always-on RULE, or a line in CLAUDE.md if core+global.
+      |         |- yes -> a scoped `AGENTS.md` (never always-on for subtree law).
+      |         `- no  -> the root `AGENTS.md` map.
       |                   (A "see X" prose pointer loads nothing — @import it).
       `- no -> Is it a procedure / reference needed only sometimes?
          |- yes -> SKILL. Path-scope with paths:, not applyTo:.

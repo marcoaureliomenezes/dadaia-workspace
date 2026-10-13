@@ -7,7 +7,7 @@ The craft: maximize behavior-change-per-token under a hard context budget, keepi
 
 - Five disciplines, ordered by how often you reach for them: token economy, instruction hierarchy.
 - Disciplines (continued): consistency invariants, tier selection, scope-drift detection.
-- Apply them in that order when authoring; apply them in reverse when reviewing someone else's change (safety first).
+- Apply them in that order when authoring; review someone else's change safety first, in the order set under "Applying this file".
 
 ---
 
@@ -123,12 +123,12 @@ Fix protocol:
 - The dominant task drives the tier — not the easiest or the rarest.
 - Tier aliases are the keys of `TIER_CODEX` in `core/model_registry.py` — never hand-maintain a copy that can drift.
 
-| Tier alias | Workload character |
+| Workload character | Each `TIER_CODEX` key, by cost |
 |---|---|
-| `fable` | Heavy synthesis, recursive analysis, persona/skill authoring, fleet audit, security reasoning |
-| `opus` | Orchestration, dispatch authority, review verdicts, broad-context implementation |
-| `sonnet` | Mid-cost general implementation |
-| `haiku` | High-volume mechanical reformatting, bulk renames, deterministic transforms |
+| Heavy synthesis, recursive analysis, persona/skill authoring, fleet audit, security reasoning | the heaviest keys |
+| Orchestration, dispatch authority, review verdicts, broad-context implementation | the orchestration key |
+| Mid-cost general implementation | the mid key |
+| High-volume mechanical reformatting, bulk renames, deterministic transforms | the lightest key |
 
 - Current model ids come from `core/model_registry.py`, never hand-copied: Codex ids from `TIER_CODEX`; Claude resolves the alias itself. Reasoning effort is the template cell's effort.
 - The tiering axis is (model x effort): on Claude the alias and `effort:`; on Codex the `TIER_CODEX` id and `model_reasoning_effort`.

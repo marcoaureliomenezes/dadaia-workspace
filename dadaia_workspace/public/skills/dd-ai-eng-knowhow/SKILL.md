@@ -2,7 +2,7 @@
 name: dd-ai-eng-knowhow
 description: >
   Use before reading or changing any persona, skill, rule, hook, AGENTS.md or MCP config: harness literacy, Claude Code/Codex deltas, the AUTHORING contract.
-compatibility: Standalone Agent Skill. Inside a dadaia-workspace (pip install dadaia-workspace) it also drives the SDD lifecycle — specs, backlog, bugs, releases.
+compatibility: Standalone Agent Skill.
 ---
 
 # dd-ai-eng-knowhow — Harness Literacy for Everyone, Depth on Demand

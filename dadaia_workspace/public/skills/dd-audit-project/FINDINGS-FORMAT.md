@@ -7,18 +7,6 @@ field semantics.
 
 ## Fields
 
-| Field | Mutability | Set by |
-|---|---|---|
-| `id` | immutable-core | `<audit-slug>-F<nnn>`, appended once |
-| `pillar` | immutable-core | `bugs` \| `specs` \| `memory` |
-| `severity` | immutable-core | `LOW` \| `MEDIUM` \| `HIGH` \| `CRITICAL` |
-| `refs` | immutable-core | file:line, bug ids, commit shas and/or release ids |
-| `claim` | immutable-core | one sentence stating the finding |
-| `evidence` | immutable-core | reproducible command plus a redacted one-line result |
-| `disposition` | mutable-governance | `open` at append; later moved by `audit.py disposition` |
-| `release` | mutable-governance | remediation release for `resolved` or `superseded` |
-| `reason` | mutable-governance | rationale for `rejected` |
-
 An append authors the immutable core. Every later change uses the disposition verb.
 
 ## Evidence
