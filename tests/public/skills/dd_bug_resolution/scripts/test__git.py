@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import os
 import subprocess
+import sys
 from pathlib import Path
 from types import ModuleType
 
@@ -74,6 +75,28 @@ def test_the_scrub_drops_repo_selectors_and_keeps_the_callers_identity_and_confi
     kept = load_owner("dd-bug-resolution", "_git").scrubbed_env()
     assert {"GIT_INDEX_FILE", "GIT_COMMON_DIR"}.isdisjoint(kept)
     assert {"GIT_AUTHOR_NAME", "GIT_CONFIG_GLOBAL"} <= set(kept)
+
+
+def test_the_scrubbed_env_forbids_bytecode_even_when_the_parent_allows_it(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("PYTHONDONTWRITEBYTECODE", "0")
+    assert load_owner("dd-bug-resolution", "_git").scrubbed_env()["PYTHONDONTWRITEBYTECODE"] == "1"
+
+
+def test_a_child_python_on_the_scrubbed_env_writes_no_bytecode(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("PYTHONDONTWRITEBYTECODE", "0")
+    pkg = tmp_path / "pkg"
+    pkg.mkdir()
+    (pkg / "__init__.py").write_text("X = 1\n", encoding="utf-8")
+    env = load_owner("dd-bug-resolution", "_git").scrubbed_env() | {"PYTHONPATH": str(tmp_path)}
+    done = subprocess.run(
+        [sys.executable, "-c", "import pkg"], env=env, cwd=tmp_path, capture_output=True, text=True, check=False
+    )  # fmt: skip
+    assert done.returncode == 0, done.stderr
+    assert list(tmp_path.rglob("__pycache__")) == []
 
 
 def test_ledger_published_text_reads_its_repo_not_the_callers_git_env(
