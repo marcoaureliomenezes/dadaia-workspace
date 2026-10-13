@@ -425,6 +425,28 @@ def test_append_takes_a_tracked_directory_surface_and_non_blank_fields(
     assert len(_records(specs)) == int(needle is None), done.stderr
 
 
+def test_append_judges_the_surface_against_its_own_repo_under_a_foreign_git_env(
+    script: Path, tmp_path: Path
+) -> None:
+    """With GIT_DIR and GIT_WORK_TREE on another repo, a directory tracked only there is refused."""
+    specs = _ledger(tmp_path / "own")
+    other = tmp_path / "other"
+    (other / "foreign").mkdir(parents=True)
+    (other / "foreign" / "x.py").write_text("y = 1\n", encoding="utf-8")
+    subprocess.run(["git", "init", "-q", str(other)], check=True)
+    subprocess.run(["git", "-C", str(other), "add", "foreign"], check=True)
+    env = {**os.environ, "GIT_DIR": str(other / ".git"), "GIT_WORK_TREE": str(other)}
+    done = subprocess.run(
+        [sys.executable, str(script), "append", "--specs", str(specs), "--bug-id", "b",
+         "--title", "t", "--severity", "LOW", "--surface", "foreign", "--component", "c",
+         "--context", "ctx", "--symptom", "s", "--repro", "r", "--expected", "e",
+         "--correlates", "none"],
+        capture_output=True, text=True, check=False, env=env,
+    )  # fmt: skip
+    assert done.returncode == 1 and "foreign" in done.stderr, done.stderr
+    assert len(_records(specs)) == 0
+
+
 def test_an_operator_action_run_outside_the_tree_keeps_its_specs_and_known_argv(
     script: Path, tmp_path: Path
 ) -> None:
