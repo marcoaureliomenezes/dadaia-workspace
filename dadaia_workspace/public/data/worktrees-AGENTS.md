@@ -12,7 +12,7 @@ Scope: this file governs only `worktrees/**`.
 - One worktree per release job lives at `worktrees/<repo>/<M.m.p>-rc<N>/<job>/`, on `wt/<M.m.p>-rc<N>/<job>`, cut from the repo's work branch; its admission precondition is `specs/AGENTS.md` §3.
 - Two more trees inside an rc folder: `define/` (the candidate's definition) and `reconcile/` (the Reconciliation job: memory, derived docs, `measured_by` repairs, the rc's measurement, closure).
 - Besides plain changes, outside an rc only `worktrees/<repo>/backlog/<slug>/`, on `wt/backlog/<slug>`, and `worktrees/<repo>/hotfix/<bug-id>/`, on `wt/hotfix/<bug-id>` (§3); a bug is a job.
-- One worktree per task, `<M.m.p>-rc<N>/<job>--<task-id>/` on `wt/<M.m.p>-rc<N>/<job>--<task-id>`, cut from its job branch; at most 5 task worktrees are open per rc. One change — code, tests, specs, memory or derived docs — lands in one job.
+- One worktree per task, `<M.m.p>-rc<N>/<job>--<task-id>/` on `wt/<M.m.p>-rc<N>/<job>--<task-id>`, cut from its job branch. One change — code, tests, specs, memory or derived docs — lands in one job.
 - `WT new <repo> <name>` opens any tree named above and records the exact base its merge returns to.
 
 ## 2. Two gates, one review
