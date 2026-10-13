@@ -193,7 +193,7 @@ def test_a_bound_head_does_not_reach_refuses_as_a_clean_clone_would(
     _git(repo, "reset", "-q", "--hard", base)
     bounds = {"since": base, "until": base, orphaned: orphan}
     call = (
-        f"import sys; sys.path[:0] = [{str(script.parent)!r}, {str(script.parents[2] / 'dd-bug-resolution' / 'scripts')!r}]; import _memory_drift as d\n"
+        f"import sys; sys.path[:0] = [{str(script.parents[2] / 'dd-bug-resolution' / 'scripts')!r}]; import _memory_drift as d\n"
         f"try: d.report(__import__('pathlib').Path({str(repo / 'specs')!r}), "
         f"{bounds['since']!r}, {bounds['until']!r})\n"
         "except d.Refusal as r: print(r); print(r.fix)"
@@ -233,7 +233,7 @@ def test_a_bound_a_shallow_clone_holds_beyond_its_cut_names_the_cut_not_a_rebase
 def _refusal(script: Path, call: str) -> list[str]:
     """The message and fix line of the `Refusal` the python *call* raises, in the staged skill."""
     code = (
-        f"import sys; sys.path[:0] = [{str(script.parent)!r}, {str(script.parents[2] / 'dd-bug-resolution' / 'scripts')!r}]; import _memory_drift as d\n"
+        f"import sys; sys.path[:0] = [{str(script.parents[2] / 'dd-bug-resolution' / 'scripts')!r}]; import _memory_drift as d\n"
         f"try: {call}\nexcept d.Refusal as r: print(r); print(r.fix)"
     )
     done = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, check=True)
