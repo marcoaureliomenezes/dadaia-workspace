@@ -10,7 +10,7 @@ Wave 2, after Job 3 (both edit `scripts/ci.py`). The release skill's only non-ke
   - `release.py` is unchanged: it reaches `drift` through `_release_tree`'s `__all__`.
   - The thin-wrapper test's body becomes one helper that returns a script's foreign imports; the contract test and a planted-import test both call it. The plants: a release script importing `_memory_catalog` (a sibling of another skill) and a module with a `sys.path` line naming another skill.
   - AC5.3 re-measure: `python -m dadaia_workspace doctor --specs-dir specs` wall time against one `python scripts/ci.py job` run, both in the commit body (0.91 s measured in the as-is review; the gate-cost line holds while it stays below one gate run).
-  - **Main-thread ruling (2026-10-13) named in `test(J6.T3)`:** `test_job_verify_is_the_fast_check` gains `"doctor: doctor"` at the end of its expected list; nothing is removed or loosened.
+  - **Main-thread ruling of 2026-10-13 (the AC5.3 ruling) named in `test(J6.T3)`:** `test_job_verify_is_the_fast_check` gains `"doctor: doctor"` at the end of its expected list; nothing is removed or loosened.
 - Test-side first: T1, T2, T3 (disjoint `W:`). Then T4, T5.
 - Commit bodies carry `git grep -nE '_CROSS_SKILL_EDGES|_EDGE_PATH_LINES|_memory_drift' -- dadaia_workspace scripts tests` and `git grep -n 'sys.path.insert' -- dadaia_workspace/public/skills/dd-release-implementation`.
 - Pre-review checklist: one decider for the worklist; the only skill-to-skill edge is the kernel; sweep lines; no platform fact; net lines about 0 (121 move; six allowlist lines and the insert leave).
