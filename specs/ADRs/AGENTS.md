@@ -16,9 +16,9 @@ Scope: this file governs only `specs/ADRs/`.
 ## 2. Acceptance law (operator-only)
 
 - Any agent may append a record with `status: "proposed"`.
-- One decision per change set, naming every canonical memory statement it creates or changes — never one per statement that merely exists.
+- One decision per change set; never one per statement that merely exists.
 - Only the operator accepts: the main thread writes `accepted` with `ruling: {date, words}` (his verbatim words, in the turn he rules; the question plus the chosen option, never only an answer id) and `measured_by` naming a check of a kind `specs/memory/AGENTS.md` §2 lists; never delegated, and no role agent writes `accepted` or `ruling`.
-- A canonical-memory commit that only states what the code is, outside a `### P-NN` principle, needs no ADR and names its code evidence.
+- A canonical-memory commit that only states what the code is, needs no ADR and names its code evidence.
 - `accepted` is then immutable: `context`/`decision`/`consequences` never rewritten again.
 - A reversal is a new record naming the earlier `id` in `supersedes`/`amends`.
 - Rejecting is a `status: "rejected"` edit by the operator.
@@ -28,12 +28,3 @@ Scope: this file governs only `specs/ADRs/`.
 ## 3. Commit shapes
 
 - The ADR commit shapes (propose, accept, repair): `dd-gitflow-default` §3a.
-
-## 5. Relationship to memory and audits
-
-- `dd-audit-project`'s pillar 3 (`PILLAR-MEMORY.md`) is the audit check that a canonical hunk and an accept commit pair.
-
-### 5.1 The first-inventory case (bootstrap)
-
-- The pairing law presupposes a `## Principles` section that already exists — it does not apply to the CREATING commit.
-- From the first `docs(adr): accept <slug>` commit onward, the pairing law applies unconditionally.

@@ -4,14 +4,14 @@ Scope: `specs/memory/**`; broader SDD rules are in the sibling `specs/AGENTS.md`
 
 Memory is current product truth: what the product is now, never how it got there.
 
-- Product memory is `dd-product-engineer`'s; a canonical principle lands with its ADR acceptance (`dd-gitflow-default` §3a).
+- Product memory is `dd-product-engineer`'s.
 - Stale memory found mid-implementation becomes a bug or a closure note.
 
 ## 1. The two tiers
 
 | Tier | Files | Changes how |
 |---|---|---|
-| Canonical memory | `ARCHITECTURE.md`, `QUALITY.md` | a `### P-NN` principle only in the commit carrying its accepted ADR; any other section may be rewritten to state what the code is, naming its code evidence, with no ADR |
+| Canonical memory | `ARCHITECTURE.md`, `QUALITY.md` | any section, a `### P-NN` principle included, may be rewritten to state what the code is, naming its code evidence, with no ADR; a principle keeps its `Measured by:` check |
 | Product memory | `product/<area>/<slug>.md` | at every closure, by `dd-product-engineer`, reconciled from the window's code diff |
 
 
@@ -19,7 +19,7 @@ Memory is current product truth: what the product is now, never how it got there
 
 - `ARCHITECTURE.md`: `## Principles`, `## Tech Stack`, `## Structure`. `QUALITY.md`: `## Principles`, `## Test architecture`, `## Gates`. Fixed `<!-- dadaia:fixed … -->` blocks keep their place.
 - `## Tech Stack` is one line per technology, 8 to 15 lines — a soft ceiling a large stack may exceed, never with prose.
-- A principle needs an existing mechanical check that fails when violated: `### P-NN · We …` / `Measured by:` (a doctor code, contract test, lint contract or CI job) / `Rationale:` one line / optional `ADR: NNNN` or `ADR: none`, the id only. An unmeasurable rule is a proposed ADR, not a principle.
+- A principle needs an existing mechanical check that fails when violated: `### P-NN · We …` / `Measured by:` (a doctor code, contract test, lint contract or CI job) / `Rationale:` one line. An unmeasurable rule is a proposed ADR, not a principle.
 - Moving or deleting a statement is recorded row by row in the commit body's coverage table: old section -> new home, or `deleted: <reason>`.
 
 ## 3. Product memory — reconciled, never appended

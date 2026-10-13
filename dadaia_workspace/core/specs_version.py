@@ -29,7 +29,7 @@ OLDEST_UPGRADABLE_VERSION = 6
 
 #: The canon fingerprint each stamp was cut at — re-pinned only together with a stamp bump,
 #: or while the stamp is unpublished (``test_a_canon_change_bumps_the_stamp`` computes it).
-CANON_AT = {12: "b0b166167e4c55ae"}
+CANON_AT = {12: "d0ed9125d24cba09"}
 State = Literal["absent", "malformed", "foreign", "upgradable", "canonical"]
 
 
