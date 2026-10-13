@@ -55,7 +55,7 @@ def write(request: pytest.FixtureRequest, full: _Write) -> _Write:
         ('{"name": "caf\u00e9"}', {}, '{"name": "caf\u00e9"}'.encode()),
         (b"\x00\x01hello\xff", {}, b"\x00\x01hello\xff"),
         ("hello\n", {"ensure_parent": True}, b"hello\n"),
-        ("line\n", {"newline": None}, b"line\n"),
+        ("line\n", {"newline": None}, b"line" + os.linesep.encode()),
     ],
     ids=["lf", "utf8-no-bom", "binary", "ensure-parent", "newline-none"],
 )
