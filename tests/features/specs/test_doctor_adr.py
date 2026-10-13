@@ -5,6 +5,7 @@ doctor's LEDGER-ADR-SCHEMA rule (``features/specs/doctor_adr``), the one ADR aut
 from __future__ import annotations
 
 import json
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -256,3 +257,80 @@ def test_options_below_two_or_missing_a_field_are_refused(
 ) -> None:
     issues = adr_record_issues(_options_ledger(tmp_path, "0247", options=options))
     assert [i.code for i in issues] == ["LEDGER-ADR-SCHEMA"]
+
+
+def _tracked_repo(tmp_path: Path, records: list[dict[str, object]]) -> Path:
+    """A real git repo tracking one test file, its specs ledger holding *records*."""
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "tests" / "test_x.py").write_text("def test_one():\n    pass\n", encoding="utf-8")
+    specs = tmp_path / "specs"
+    (specs / "ADRs").mkdir(parents=True)
+    (specs / "ADRs" / "decisions.jsonl").write_text(
+        "".join(json.dumps({**_VALID_RECORD, **r}) + "\n" for r in records), encoding="utf-8"
+    )
+    subprocess.run(["git", "-C", str(tmp_path), "add", "-A"], check=True)
+    return specs
+
+
+def test_an_accepted_measured_by_must_resolve_and_only_accepted_records_are_judged(
+    tmp_path: Path,
+) -> None:
+    from dadaia_workspace.features.specs.doctor_adr import unresolved_measured_by
+
+    missing = "tests/missing.py"
+    specs = _tracked_repo(
+        tmp_path,
+        [
+            {"id": "0001", "status": "accepted", "measured_by": missing},
+            {"id": "0002", "status": "accepted", "measured_by": "tests/test_x.py::test_one"},
+            {"id": "0003", "status": "accepted", "measured_by": "tests/test_x.py::test_gone"},
+            {"id": "0004", "status": "superseded", "measured_by": missing},
+            {"id": "0005", "status": "proposed", "measured_by": missing},
+            {"id": "0006", "status": "rejected", "measured_by": missing},
+        ],
+    )
+    assert unresolved_measured_by(specs) == [
+        ("0001", missing),
+        ("0003", "tests/test_x.py::test_gone"),
+    ]
+
+
+def test_a_job_resolves_only_as_a_workflow_node_id_and_a_code_only_if_the_doctor_owns_it(
+    tmp_path: Path,
+) -> None:
+    from dadaia_workspace.features.specs.doctor_adr import unresolved_measured_by
+
+    specs = _tracked_repo(
+        tmp_path,
+        [
+            {"id": "0001", "status": "accepted", "measured_by": "the doctor flags it"},
+            {"id": "0002", "status": "accepted", "measured_by": ".github/workflows/ci.yml::doctor"},
+            {"id": "0003", "status": "accepted", "measured_by": "MEM-NARRATIVE-1"},
+            {"id": "0004", "status": "accepted", "measured_by": "ZZ-GHOST"},
+            {
+                "id": "0005",
+                "status": "accepted",
+                "measured_by": "tests/test_y.py::TestFoo::test_bar",
+            },
+            {
+                "id": "0006",
+                "status": "accepted",
+                "measured_by": "tests/test_y.py::TestFoo::test_no",
+            },
+        ],
+    )
+    (tmp_path / ".github" / "workflows").mkdir(parents=True)
+    (tmp_path / ".github" / "workflows" / "ci.yml").write_text(
+        "jobs:\n  doctor:\n    runs-on: x\n", encoding="utf-8"
+    )
+    (tmp_path / "tests" / "test_y.py").write_text(
+        'CODE = "ZZ-GHOST"\n\n\nclass TestFoo:\n    def test_bar(self):\n        pass\n',
+        encoding="utf-8",
+    )
+    subprocess.run(["git", "-C", str(tmp_path), "add", "-A"], check=True)
+    assert unresolved_measured_by(specs) == [
+        ("0001", "the doctor flags it"),
+        ("0004", "ZZ-GHOST"),
+        ("0006", "tests/test_y.py::TestFoo::test_no"),
+    ]
