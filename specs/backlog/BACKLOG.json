@@ -82,17 +82,6 @@
       ]
     },
     {
-      "id": "dd-ask-me-owned-questioning-skill",
-      "title": "dd-ask-me: an owned questioning skill - one question, three options, stage references, durable records",
-      "opened": "2026-10-03",
-      "status": "idea",
-      "description": "Measured (HEAD c9100eaee): `public/skills/dd-grill-me/SKILL.md:29` asks the whole frontier in one round with one recommended answer, no options, no open answer; it and `data/handoff-AGENTS.md:8` (ADR 0146) mandate a questionnaire `.md`; its step 14 (SKILL.md:43) records every decision as an ADR line; the skill has no `references/` or `scripts/`; `EMISSION-FORMAT.md:3` (Step 5, now step 16) and `:10` (Step 4, now step 10) cite stale steps (`:12` Step 1 is still true); no `.css` exists under `public/`; 28 ADR rulings cite grill answer ids (0016-0021, 0023, 0032-0039, 0042-0046, 0052, 0054-0056, 0092-0094, 0097) whose handoffs are reaped (handoff TTL 1 day, `core/workspace_layout.py:181,190`; reaped hold 7 days, :182,193). Change: rename to `dd-ask-me` (same semantic base; no \"grill\" name inside the skill). Common core: one question at a time, 3 closed options each with its trade-off, one recommended; the harness question tool (AskUserQuestion in Claude Code, numbered text elsewhere), free text via the tool's own \"Other\". Stage references: `references/backlog.md` (is it a decision at all: problem measured, feature vs bug, scope), `references/release.md`, `references/adr.md` (threshold + question bank: reversibility, decision drivers, quality-attribute scenario whose response measure becomes measured_by, bug history of the surface, ownership/coupling, reuse, failure/rollback, cost, security, what it lets us delete, accepted drawback, open issues), `references/plan.md` (PLAN contradicts an accepted ADR? a threshold-passing technical decision?). Presentation: the harness artifact first, fallback an HTML report styled by `scripts/report.css`. Every answer lands in a durable record in the same turn (backlog description at `backlog.py new`; ADR `options` + self-contained `ruling.words`); no questionnaire `.md`; handoffs stay ephemeral. Triggers: `dd-backlog-definition` (new), `dd-release-definition` \u00a73 (pre-SPEC/ADR), post-PLAN (threshold-passing technical decisions only). The skill's size is a live readout, never asserted (delete-text-count-inventory-asserts). Rename blast radius (live law only; ledgers, releases, history untouched): the skill dir; `data/AGENTS.md:76`; `data/CONTEXT-MAP.md:76`; `data/handoff-AGENTS.md:8`; `entities/behavior-map.json:5,240` (hash re-record); `scaffold/bugs/AGENTS.md:15` + `specs/bugs/AGENTS.md:15`; `dd-architecture-survey/SKILL.md:5,72,95` + `HTML-REPORT.md:92`; `dd-codebase-design/SKILL.md:58`; `dd-manager-orchestration/SKILL.md:34`; `dd-release-definition/SKILL.md:50,91`; `tests/contract/test_behavior_map.py:70` `_UNIVERSAL_NAMES`; fixture `tests/fixtures/handoffs/v1.2-deepening-audit-self-pull.handoff.json:32`. Generic \"grill\" in live law -> \"ask-me session\": `agents/dd-product-engineer.md` (x8), `entities/registry.json:7`, `schemas/ADRs/decision-record-v1.schema.json:91`, `scaffold/ADRs/AGENTS.md:18`, `scaffold/releases/AGENTS.md:20-21`, `dd-domain-modeling/SKILL.md:32`. Done when: no live-law reference to dd-grill-me; the 3 stage skills invoke dd-ask-me with their reference; no `.md` questionnaire path in law. Relates: absorbs grill-one-question-with-options; adr-born-at-release-with-options. ADR 0165 (accepted) and 0146 (questionnaire clause) are amended at the release that picks this.\n\nScope grill 2026-10-11 (operator, verbatim): 'Tudo, sem rename (Recommended)'. Earlier rulings kept: 2026-10-03 'grill-me obrigatorio, mais especializado ... criando references ... grill-me especializados para cada necessidade, backlog definition, ADRs e outros'; 'artifact ... fallback um report HTML ... reference scripts/ com CSS'; 'Se \u00e9 mais simples mais eficiente e menos sucetivel a bugs, \u00e9 sempre nossa orienta\u00e7\u00e3o'; '3 gatilhos (Recommended)'; 'S\u00f3 `options` (Recommended)'. The name 'ask-me' was never the operator's choice. Destination: 0.5.0. Wave: 1 (agent behavior: every backlog, SPEC and ADR decision rides this skill). Scope now: the whole design above except the rename: references/ per stage, the harness artifact first with an HTML report styled by a CSS file under scripts/ as fallback, the 3 triggers, every answer in a durable record in the same turn and a self-contained ADR ruling (`options` field). The skill keeps its name dd-grill-me, so the rename and its blast radius above leave scope.",
-      "provenance": "operator demand 2026-10-03: ADR/RFC/SAST grill Q1-Q7 + R2-1..R2-4 (audit 2026-10-02)",
-      "relates": [
-        "grill-one-question-with-options"
-      ]
-    },
-    {
       "id": "architecture-adr-section-generated",
       "title": "ARCHITECTURE.md's ADR section is generated from the ledger; the P-NN ADR label and the pairing law leave",
       "opened": "2026-10-03",
@@ -101,180 +90,6 @@
       "provenance": "operator demand 2026-10-03: ADR/RFC/SAST grill Q1-Q7 + R2-1..R2-4 (audit 2026-10-02)",
       "relates": [
         "adr-born-at-release-with-options"
-      ]
-    },
-    {
-      "id": "public-law-language-neutral",
-      "title": "The shipped public surface is language-neutral: no library internals, Python-project assumptions or ADR numbers",
-      "opened": "2026-10-03",
-      "status": "idea",
-      "description": "Measured (read-only sweep of the 117 files under `dadaia_workspace/public/`, 2026-10-03; re-checked at HEAD c9100eaee): 74 findings - 5 own-pipeline, 29 Python-project assumptions, 40 self-hosting/library internals - plus this repo's ADR numbers cited in 33 shipped files (13 Markdown law files, 20 scripts/schemas), worst inside user-owned `scaffold/ADRs/AGENTS.md:19,29` and `scaffold/releases/AGENTS.md:20,24`, read as the user's own ADRs. Worst offenders: `data/CONSUMER_VALIDATION_RECIPE.md` (wheel release QA shipped to every instance); `agents/dd-software-engineer.md:54-60,80-86,97-102,125-137` (dadaia_workspace layer rules, poetry/ruff/mypy mandate); `templates/repo-AGENTS.md:56-57`; `scaffold/memory/QUALITY.md:20-21`; `dd-ai-eng-knowhow` SKILL :22,37-47, AUTHORING, CODEX (self-hosting authoring; `CODEX.md:37` contradicts `templates/repo-AGENTS.md:6`); the closure derived-docs pipeline (`dd-release-implementation/MEMORY-UPDATE.md:8,16`, `RC-FLOW.md:45-46`, `data/worktrees-AGENTS.md:12,24`); `dd-code-review/SKILL.md:29,60-61,74` + `SLOP.md:11-16,26`; `dd-audit-project` PILLAR-SPECS:44-47, PILLAR-MEMORY:29,37-41, PILLAR-BUGS:34-35; `data/AGENTS.md:2,39-40,70`; `data/dadaia-AGENTS.md:6,14,30`; `data/states-AGENTS.md:10`; `data/CONTEXT-MAP.md:3-13`; `dd-domain-modeling/SKILL.md:29-30,61`; `dd-test-stewardship/PARAMETERS.md:5-7`; `dd-release-definition/SKILL.md:37,43`; schema descriptions citing library modules/tests; `entities/registry.json:81-83`; `scripts/pre-push-ci-gate.sh:3,16-21,66-76`. Change: criterion - the shipped surface serves humans and autonomous agents building projects in any language; Python only operates the workspace. Each finding is deleted, rewritten language-neutral, or moved to this repo's own `repos/dadaia-workspace/AGENTS.md`; ADR-number citations are deleted from shipped files; nothing moves to private. lib-test-guidance-dehydrated owns, and this entry does not touch: dd-test-stewardship (incl. PARAMETERS.md), `templates/tests-AGENTS.md`, `PILLAR-SPECS.md:44-47`, `MEMORY-UPDATE.md:16`, `data/CONTEXT-MAP.md:3-13`, `scaffold/memory/QUALITY.md:20-21` and `SLOP.md` S6 - listed above as evidence only. Done when: a grep for this repo's package paths, ADR numbers and Python-only tooling in `public/` returns only the workspace's own operation (`.dadaia/.venv`, `uvx dadaia-workspace`). Relates: lib-test-guidance-dehydrated, cli-ships-no-library-pipeline.\n\nScope grill 2026-10-11 (operator, verbatim): 'Confirmo, pode seguir (Recommended)' (the operator's confirmation of the whole 0.5.0 scope; this entry had no question of its own: it was decided by inspection and announced in the grill, the operator could object). Earlier rulings kept: 2026-10-03 'usu\u00e1rios ... qualquer linguagem ... pip audit no doctor ... deve ser privado'; 2026-10-06 'CI em repo remoto n\u00e3o deve ser de forma alguma obrigatorio'. Destination: 0.5.0. Wave: 1 (law: the shipped surface every user and agent reads). Scope now: the whole entry as written above; it enters whole.",
-      "provenance": "operator demand 2026-10-03: ADR/RFC/SAST grill Q1-Q7 + R2-1..R2-4 (audit 2026-10-02)",
-      "relates": [
-        "lib-test-guidance-dehydrated",
-        "cli-ships-no-library-pipeline"
-      ]
-    },
-    {
-      "id": "job-gate-runs-the-law-deletion-check",
-      "title": "scripts/ci.py job runs the push gate's ADR 0151 M3 law-deletion check over the job range",
-      "opened": "2026-10-06",
-      "status": "idea",
-      "description": "Found in rc-9: Job 1's commits deleting AGENTS.md/SKILL.md law lines without citing an accepted ADR were refused only by pre-push (ADR 0151 M3), after the job gate and the review had passed; the messages were then reworded to cite their ADRs (Job 1 merge 29ee92d3a). Design: the job level of scripts/ci.py runs the same policy the pre-push chokepoint runs \u2014 the law-deletion rule of features/chokepoints over <work branch>..HEAD, one function, called by both, never a copy \u2014 so a job whose commit deletes a law line without its ADR citation fails at the job gate with the same fix line (reword the first listed commit). Owner: the chokepoint's law-deletion policy (one entry point), scripts/ci.py job, tests/integration/test_ci_script.py. Done when: a job range holding an uncited law-line deletion fails scripts/ci.py job naming that commit.\n\nScope grill 2026-10-11: decided exit superseded --release 0.5.0 (obsolete by ADR 0230). Not destined to 0.5.0 work. backlog.py exit refused 'superseded' on 2026-10-11 because no 0.5.0 SPEC Origin picks this slug; the exit waits for the main thread: name the slug in the next candidate SPEC's Origin and exit it at that closure, or exit it rejected with this reason.",
-      "provenance": "rc-9 Reconciliation deferral (JR.S2.T5), dispatched by the main thread 2026-10-06 under the operator's rc-9 scope; target rc-10 or later",
-      "relates": []
-    },
-    {
-      "id": "merge-entry-times-survive-rebase",
-      "title": "AC1.7's kind: merge entry measures a job, not its last rebase: start, ritual_wait and dispatches anchored to facts a rebase keeps",
-      "opened": "2026-10-06",
-      "status": "idea",
-      "description": "Found at rc-9 Reconciliation (AC6.2): AC1.7 defines start as the committer time of the job branch's first commit and ritual_wait from the last task commit, but every rebase rewrites committer time to the rebase instant (job3 19:36:26Z, job4 19:36:48Z, job2 22:39:31Z, against author times 15:50:39Z, 18:41:23Z, 20:51:00Z), so the literal reading gave rc-wide parallelism 0.90 against 1.58 on author time; dispatches has no record at all (the log used distinct task ids as a proxy) and job_gate_runs only a lower bound. Design: (a) start = the author time of the job's first own commit, ritual_wait from the author time of its last task commit \u2014 author time survives rebase and cherry-pick; or (b) start = createdAt of the job branch's first push CI run (gh), which the origin remote-tracking reflog also keeps. dispatches and job_gate_runs need a writer: worktree.py merge appends one line per job-gate run and task landing to the job's own record (or the driver counts each dispatch in the job file), so Reconciliation reads facts instead of reconstructing them. Owner: RELEASE-EVENTS.md \u00a7log, SPEC template wording, worktree.py merge. Done when: the merge entry of a rebased job reports the same start before and after the rebase.\n\nScope grill 2026-10-11: decided exit superseded --release 0.5.0 (obsolete by e8c2683ca). Not destined to 0.5.0 work. backlog.py exit refused 'superseded' on 2026-10-11 because no 0.5.0 SPEC Origin picks this slug; the exit waits for the main thread: name the slug in the next candidate SPEC's Origin and exit it at that closure, or exit it rejected with this reason.",
-      "provenance": "rc-9 Reconciliation deferral (JR.S2.T5), dispatched by the main thread 2026-10-06 under the operator's rc-9 scope; target rc-10 or later",
-      "relates": []
-    },
-    {
-      "id": "hypothesis-cache-stays-out-of-repo-trees",
-      "title": "No .hypothesis/ directory lands in a repo or worktree tree",
-      "opened": "2026-10-06",
-      "status": "idea",
-      "description": "Found in rc-9: a .hypothesis/ cache appeared in repo trees during gate runs although tests/conftest.py redirects hypothesis storage with set_hypothesis_home_dir at import; a likely cause to confirm at the as-is review is that the hypothesis pytest plugin initialises its storage before the conftest runs, or a run outside the suite's conftest (a task gate over owner files from another cwd). Design: one decider, as for coverage (scripts/covdata.py): the suite env sets the hypothesis storage directory before any plugin loads (an environment value in suite_env, or a -p plugin like covdata), pointing under the harness cache zone; the conftest redirect leaves if it becomes redundant. RED first: the AC3.1 tripwire (tests/conftest.py) also exits 1 on a gained .hypothesis/ under the repo root. Done when: scripts/ci.py stage and task leave no .hypothesis/ in the tree.\n\nScope grill 2026-10-11: decided exit superseded --release 0.5.0 (obsolete by ADR 0231; the redirect lives in tests/conftest.py:153-169, the tripwire at :513-549). Not destined to 0.5.0 work. backlog.py exit refused 'superseded' on 2026-10-11 because no 0.5.0 SPEC Origin picks this slug; the exit waits for the main thread: name the slug in the next candidate SPEC's Origin and exit it at that closure, or exit it rejected with this reason.",
-      "provenance": "rc-9 Reconciliation deferral (JR.S2.T5), dispatched by the main thread 2026-10-06 under the operator's rc-9 scope; target rc-10 or later",
-      "relates": []
-    },
-    {
-      "id": "task-gate-drops-deleted-paths-itself",
-      "title": "scripts/ci.py task drops paths that no longer exist, so a hand-run task gate over a deletion is green",
-      "opened": "2026-10-06",
-      "status": "idea",
-      "description": "Found in rc-9: worktree.py merge filters deleted paths (git diff --diff-filter=d) before calling the verify-task line, but scripts/ci.py task FILE... passes every argument to ruff and mypy, so the same gate run by hand with a deleted path fails on a missing file. Two deciders of 'which touched paths a task gate judges'. Design: scripts/ci.py _task keeps only existing files, one filter; worktree.py's --diff-filter=d then leaves (the gate decides, the caller passes what the task touched). Owner: scripts/ci.py _task, dd-gitflow-default/scripts/_worktree_end.py merge, tests/integration/test_ci_script.py. Done when: scripts/ci.py task <a deleted path> <an existing test> runs the existing file's steps and exits 0.\n\nScope grill 2026-10-11: decided exit superseded --release 0.5.0 (obsolete by ADRs 0231/0232/0236; the dead task/stage code of scripts/ci.py is deleted under test-suite-diet). Not destined to 0.5.0 work. backlog.py exit refused 'superseded' on 2026-10-11 because no 0.5.0 SPEC Origin picks this slug; the exit waits for the main thread: name the slug in the next candidate SPEC's Origin and exit it at that closure, or exit it rejected with this reason.",
-      "provenance": "rc-9 Reconciliation deferral (JR.S2.T5), dispatched by the main thread 2026-10-06 under the operator's rc-9 scope; target rc-10 or later",
-      "relates": []
-    },
-    {
-      "id": "architecture-principles-measured-by-re-pointed",
-      "title": "ARCHITECTURE P-12, P-14 and P-15 re-point their Measured-by lines to the checks that hold them since T-050-86",
-      "opened": "2026-10-06",
-      "status": "idea",
-      "description": "Found at rc-9 Reconciliation (review M-2 at 8693810de): ARCHITECTURE.md P-12 (:57), P-14 (:67) and P-15 (:72) name tests/contract/test_hook_import_surface.py, test_release_state_read_only.py (deleted at e68dcb0e3) and test_release_state_schema.py (deleted at be15615b0), both T-050-86 on 2026-09-28. A ### P-NN principle changes only in the commit carrying its accepted ADR (specs/memory/AGENTS.md \u00a71, ADR 0138), so an agent cannot repair the lines in place. Design: one ADR, accepted by the operator, re-pointing the three lines to the checks that hold them today: P-12 -> pytest tests/contract/test_core_file_io_purity.py::test_importing_a_hook_never_imports_the_container (the six hook modules) and ::test_gate_resolution_path_never_imports_the_container (the executed gate path); P-14 -> pytest tests/contract/test_core_file_io_purity.py::test_each_question_has_one_owner[release-state-module-never-writes]; P-15 -> pytest tests/contract/test_handoff_schema_contract.py, release rows, which cover only part of the principle: the top level and the three milestones closed, rc refused at top level and in a milestone, a log entry without kind/text refused; no row refuses an unknown log-entry key or a session_id, though the schema closes the log entry. So P-15 either gains those two refusal rows in the same release or narrows its wording to what the rows check. Owner: specs/memory/ARCHITECTURE.md, specs/ADRs/decisions.jsonl, tests/contract/test_handoff_schema_contract.py. Conflicts with rc-10 AC10.1 (every tests/\u2026py path named in QUALITY.md and ARCHITECTURE.md exists) until it lands. Done when: every Measured-by path of P-12, P-14 and P-15 exists and its check fails when the principle is violated.\n\nScope grill 2026-10-11: decided exit superseded --release 0.5.0 (delivered by an earlier rc whose SPEC Origin did not name it ('delivered' was tried and refused). Evidence: 75150722f, 6c9ea5f6d; residue goes to the ratification of the four principles by new ADRs (operator 2026-10-11 'Ratificar os 4 (Recommended)')). Not destined to 0.5.0 work. backlog.py exit refused 'superseded' on 2026-10-11 because no 0.5.0 SPEC Origin picks this slug; the exit waits for the main thread: name the slug in the next candidate SPEC's Origin and exit it at that closure, or exit it rejected with this reason.",
-      "provenance": "rc-9 Reconciliation deferral (review M-2 at 8693810de), dispatched by the main thread 2026-10-06; target rc-10 or later",
-      "relates": [
-        "architecture-adr-section-generated"
-      ]
-    },
-    {
-      "id": "fix-reader-rebuild-under-c",
-      "title": "Job 1's fix reader is REBUILT to one Subject parser with every function at radon C or better",
-      "opened": "2026-10-06",
-      "status": "idea",
-      "description": "Measured: rc-10 Job 1's REBUILD grew the dd-bug-resolution scripts 1217->1383 lines (+166; its files 344->493); _bugs_fix.fixes is radon F-49, the worst function in the library; the new _bugs_transition.transition is D-24; fmt:skip 24->31; indexed regex groups remain; two task-subject regexes remain (bugs.py:107, :155); the bug-link grammar is spelled 3x. The audit's readability goal was not delivered. _fixes saw 6 commits and missed 579a6c70a. Design: REBUILD (keeps the fix's tests) to one Subject parser (one-task-id-subject-grammar), named groups, one link grammar, every function in dd-bug-resolution/scripts at radon C or better; the diff deletes more than it adds. Done when: radon cc reports nothing above C under dd-bug-resolution/scripts and Job 1's tests stay green unedited. Placement: rc-11. Placement and every design detail not quoted from a ruling are agent default, unruled.\n\nScope grill 2026-10-11: decided exit superseded --release 0.5.0 (obsolete by 392769e97). Not destined to 0.5.0 work. backlog.py exit refused 'superseded' on 2026-10-11 because no 0.5.0 SPEC Origin picks this slug; the exit waits for the main thread: name the slug in the next candidate SPEC's Origin and exit it at that closure, or exit it rejected with this reason.",
-      "provenance": "audit verification 2026-10-06 over feature/0.5.0 8e6448f13 (four read-only verifiers); main-thread registration after the operator grill of 2026-10-06",
-      "relates": [
-        "bugs-fix-reads-the-per-class-shape"
-      ]
-    },
-    {
-      "id": "skill-scripts-one-kernel",
-      "title": "The skill scripts share one kernel: _ledger/_specs updated in place, gitflow included",
-      "opened": "2026-10-06",
-      "status": "idea",
-      "description": "Measured: Refusal defined 7x (_release_store:31, _worktree_names:23, _audit_store:31, _memory_catalog:33, _bugs_store:27, _backlog_store:31, _memory_drift:27); the store commit loop copied 3x (_bugs_store.commit 69-109, _backlog_store.commit 85-114, _release_store.commit 102-121); 9 git wrappers with >=5 error contracts and 2 shallow-clone probes; 6 root finders; a 4-skill import cycle (gitflow, bug-resolution, spec-navigator, release-implementation) with 3 two-way pairs; 35 sys.path lines, 102 noqa E402. _SKILL_SCRIPT_SHARED already copies 4 sources (_privacy, privacy_baseline.json, _ledger, _specs) into 6 skills but excludes gitflow, and the tests resolve via sys.path while the projection resolves the copies. Design: UPDATE the already-copied _ledger.py/_specs.py, never ADD a _kernel; add gitflow to _SKILL_SCRIPT_SHARED; one Refusal, one commit loop, one git(), one fenced root walk (honouring DADAIA_FENCED_ROOTS; the symptom is the bug skill-script-root-walks-ignore-the-fence, fixed in rc-10's bug batch); drop the cross-skill sys.path edges. Tidy First: one skill per job. Absorbed (each exits rejected 'absorbed by skill-scripts-one-kernel'; their full text stays in the histo): (a) privacy-baseline-one-parser - infrastructure/privacy_check.py _load_privacy_baseline and _ledger._baseline both parse privacy_baseline.json and disagree on a malformed entry and exclude_rationale; one owner parses, the other consults (ADR 0135, 0157). (b) ledger-refusals-guess-specs-from-command-shape - _specs.with_specs/refuse guess --specs from the interpreter prefix with a worktree.py denylist exemption; the producer declares it, the exemption is deleted. (c) ledger-reader-one-numbered-tolerant-iterator - one numbered tolerant iterator in _ledger, the ten hand JSONL loops collapse into it (seven-bug family of hand readers). Supersedes: clone-detection (the sanctioned copies become one kernel, removing the divergent-copy class it was meant to find) and task-gate-mypy-follows-cross-skill-imports (with the sys.path edges gone mypy follows real imports; delete the casts in release.py (a9108723f) and _backlog_check.py). Placement: rc-12 (operator, 2026-10-06: 'rc-12, antes dos evals'). Placement and every design detail not quoted from a ruling are agent default, unruled.\n\nScope grill 2026-10-11 (operator, verbatim): 'totalmente agora .porra. isso \u00e9 arquitetural. \u00e9 critico ... Onde ja se viu ficar distribuindo copias. horrivel. \u00e9 para ser feito exatamente nessa release1. 100%. isso \u00e9 causa de problemas, problema para matner.'; on constitution \u00a75: 'Literal: zerar as 20 (Recommended)'. Earlier rulings kept: none in the extracted operator words. Destination: 0.5.0. Wave: 2 (code foundation: every later code change lands on the one kernel). Scope now: complete: one Refusal, one commit loop, one JSONL reader, one git(), zero sys.path edges and no distributed copies (the _SKILL_SCRIPT_SHARED copy mechanism included, resolved without reverting ADR 0135/0157/0161 or by an explicit new ADR; this replaces the earlier 'add gitflow to _SKILL_SCRIPT_SHARED' design), plus the 2 open bugs (release-check-admits-a-dag-that-phase-refuses, worktree-new-crashes-on-an-unreadable-release-state), one `_RELEASE.json` reader (today three: core/release_state.py, _release_store.read_state and a raw read in _worktree_new) and the D-F functions of the skill scripts. \u00a75 read literally: all 20 D-F functions are taken apart by their cause and `surface` refuses the package root; the skill-script share is Wave 2, the cli/features share Wave 3.\n\nOperator, 2026-10-11, after the duplicated-decider inventory (verbatim): 'Isso \u00e9 obvio n\u00e9. Agora vc me fala desse problema arquitetural??? \u00e9 esse o bug porra'; before it: 'Eu so quero que voc\u00ca converja para 0 bugs ... a cada teste, passo um novo problema. assim vai ficar impossivel passar no eval'. Destination now: rc-14 (Wave 2 folds into rc-14; the earlier ruling 'totalmente agora ... \u00e9 para ser feito exatamente nessa release' was read too late). Evidence (read-only inventory at dd10eb7de): 27 fact groups decided in 2+ places, about 110 copy sites, 12 groups already diverged; four replayed by the main thread and registered as bugs: skill-git-runners-read-the-callers-git-env, ledger-replace-destroys-a-symlinked-ledger, frontmatter-parsers-disagree-on-crlf-and-bom, slug-grammar-four-patterns-disagree. Root premise to delete: the structural-audit bugs of 2026-09-27/28 (sa-package-defines-a-fact-twice, sa-seven-workspace-root-rules, sa-live-release-resolved-by-two-readers, sa-ledger-vocabulary-and-atomic-write-duplicated-in-scripts, sa-frontmatter-split-five-ways and others) closed resolved while copies stayed, on the premise 'the stdlib-only skill scripts and the package cannot share code' (sa-live-release-resolved-by-two-readers); ADR 0157 already has the package import the skill's _ledger.py, so the premise is false. The slop.py twin/allowance rows that sanction copies (v37, v38) leave with the copies. Scope adds (main thread, from the inventory): one owner, every copy deleted, for the git runner, the atomic writer, frontmatter, the slug grammar, platform facts (os.name sites outside core/platform.py), the commit loop, _validated, finding(), the task-id and sha grammars, the workspace-root walk, histo_findings, the JSONL reader, the clock and timestamp reading, the context-name regex, the status vocabularies, the worktree path derivation.",
-      "provenance": "audit verification 2026-10-06 over feature/0.5.0 8e6448f13 (four read-only verifiers); main-thread registration after the operator grill of 2026-10-06",
-      "relates": [
-        "privacy-baseline-one-parser",
-        "ledger-refusals-guess-specs-from-command-shape",
-        "ledger-reader-one-numbered-tolerant-iterator",
-        "clone-detection",
-        "task-gate-mypy-follows-cross-skill-imports"
-      ]
-    },
-    {
-      "id": "task-gate-declared-owner-tests",
-      "title": "The task gate runs the task's declared owner tests and never prints ALL PASS for zero steps",
-      "opened": "2026-10-06",
-      "status": "idea",
-      "description": "Measured: scripts/ci.py task with zero steps reports ALL PASS (:87-100, :129); any test_ name counts as an owner (:293-297); Owner-tests is checked only with is_file (:288). rc-10 SPEC Carried names this ('the task gate's test_ name check becomes a declared owner mapping - design and intake at rc-10 Reconciliation'); this entry is that intake. Design: the task gate reads the owner test file the job file declares for the task and runs it; a run with no steps prints NO STEPS instead of ALL PASS. Whether NO STEPS exits non-zero is unruled. Placement and every design detail not quoted from a ruling are agent default, unruled.\n\nScope grill 2026-10-11: decided exit superseded --release 0.5.0 (obsolete by ADRs 0231/0232/0236). Not destined to 0.5.0 work. backlog.py exit refused 'superseded' on 2026-10-11 because no 0.5.0 SPEC Origin picks this slug; the exit waits for the main thread: name the slug in the next candidate SPEC's Origin and exit it at that closure, or exit it rejected with this reason.",
-      "provenance": "audit verification 2026-10-06 over feature/0.5.0 8e6448f13 (four read-only verifiers); main-thread registration after the operator grill of 2026-10-06",
-      "relates": [
-        "stage-gate-runs-the-contract-tier"
-      ]
-    },
-    {
-      "id": "pr-merge-method-pinned",
-      "title": "PR merge method pinned: develop by merge commit, main by squash, no rebase",
-      "opened": "2026-10-06",
-      "status": "idea",
-      "description": "Operator, 2026-10-06, verbatim: 'develop=merge, main=squash, sem rebase'. Measured: the repo allows merge, squash and rebase; main has required_linear_history (so squash); develop takes merge commits. Design: allow_rebase_merge off (a repo setting: an operator act); dd-gitflow-default states develop=merge commit, main=squash, in one place. Placement and every design detail not quoted from a ruling are agent default, unruled.\n\nScope grill 2026-10-11: decided exit superseded --release 0.5.0 (delivered by an earlier rc whose SPEC Origin did not name it ('delivered' was tried and refused). Evidence: allow_rebase_merge false; main keeps linear history). Not destined to 0.5.0 work. backlog.py exit refused 'superseded' on 2026-10-11 because no 0.5.0 SPEC Origin picks this slug; the exit waits for the main thread: name the slug in the next candidate SPEC's Origin and exit it at that closure, or exit it rejected with this reason.",
-      "provenance": "audit verification 2026-10-06 over feature/0.5.0 8e6448f13 (four read-only verifiers); main-thread registration after the operator grill of 2026-10-06",
-      "relates": []
-    },
-    {
-      "id": "phase-implementation-has-a-place",
-      "title": "The move to phase IMPLEMENTATION has a named step in the flow",
-      "opened": "2026-10-06",
-      "status": "idea",
-      "description": "Measured: rc-10 implemented while _RELEASE.json said DEFINITION (fixed on job 4 by 54832fb32), the second rc in a row. Design: RC-FLOW names the one step and its owner that run release.py phase IMPLEMENTATION, right after the trio is Approved and before the first job worktree opens. Whether a job worktree open refuses while the phase is DEFINITION is unruled. Placement and every design detail not quoted from a ruling are agent default, unruled.\n\nScope grill 2026-10-11: decided exit superseded --release 0.5.0 (delivered by an earlier rc whose SPEC Origin did not name it ('delivered' was tried and refused). Evidence: 2a8b5637f, dd-release-definition SKILL.md:61). Not destined to 0.5.0 work. backlog.py exit refused 'superseded' on 2026-10-11 because no 0.5.0 SPEC Origin picks this slug; the exit waits for the main thread: name the slug in the next candidate SPEC's Origin and exit it at that closure, or exit it rejected with this reason.",
-      "provenance": "audit verification 2026-10-06 over feature/0.5.0 8e6448f13 (four read-only verifiers); main-thread registration after the operator grill of 2026-10-06",
-      "relates": []
-    },
-    {
-      "id": "test-suite-diet",
-      "title": "The test suite diet: a REBUILD that deletes duplicate and vacuous tests",
-      "opened": "2026-10-06",
-      "status": "idea",
-      "description": "Measured: 1,180 tests, 41,939 lines, test/code ratio 1.68; text asserts 10.8% (strict regex) to 17% (broad); test_honesty_residue.py is vacuous -> DELETE; test_atomic_write_census.py is a ratchet -> KEEP; mutation skipped 147/223 (66%). behavior-map.json took 121 fix commits; its consumers: spec_context/doctor.py:112,155 (skill_md_line_soft), test_standalone_skills, skill_inventory_oracle, .gitattributes, law and memory atoms - a DELETE candidate whose consumers move first (unruled). Absorbs meta-tests-leave-pytest (exits rejected 'absorbed by test-suite-diet'): delete the duplicates (suite_cannot_reach_* x2 vs the conftest sessionfinish; stewardship_mechanics vs conftest; repo_self_scan vs gitleaks + pre-push; source_repo_hygiene vs the CI repo-hygiene job; mutation wiring x3); the unique guards become scripts of one CI job, each proven to catch what it caught; mutation removal (run_mutation_baseline.sh, its 2 wiring tests, test_mutation_baseline_scope_stdlib_only.py, [tool.mutmut], the optional group mutation; QUALITY.md says mutation evidence is operator tooling, outside the repo); ADRs 0163, 0166, 0167. Done when no pytest test inspects the suite or the repo. The text-assert ratio is read with scorecard-one-ruler's pinned regex. Placement: rc-12, as a REBUILD (operator, 2026-10-06: 'rc-12, antes dos evals'). Placement and every design detail not quoted from a ruling are agent default, unruled.\n\nScope grill 2026-10-11 (operator, verbatim): 'Confirmo, pode seguir (Recommended)' (the operator's confirmation of the whole 0.5.0 scope; this entry had no question of its own: it was decided by inspection and announced in the grill, the operator could object); for the v33 root fix carried here from define-backlog-merge-runs-verify: 'Consertar a raiz (Recommended)'. Earlier rulings kept: none in the extracted operator words. Destination: 0.5.0. Wave: 1 (dev loop: every later job pays the suite's cost). Scope now: the closed DELETE list above, plus the dead task and stage code of scripts/ci.py. Carried from define-backlog-merge-runs-verify (exits superseded): the v33 guard stops reading specs/ prose, or is deleted if it never caught real slop; no new gate.",
-      "provenance": "audit verification 2026-10-06 over feature/0.5.0 8e6448f13 (four read-only verifiers); main-thread registration after the operator grill of 2026-10-06",
-      "relates": [
-        "meta-tests-leave-pytest",
-        "stage-gate-runs-the-contract-tier"
-      ]
-    },
-    {
-      "id": "stage-gate-keeps-only-the-red-check",
-      "title": "The stage gate keeps only the RED-stage check; the generic verify-stage rerun is deleted",
-      "opened": "2026-10-06",
-      "status": "idea",
-      "description": "Operator, 2026-10-06, verbatim: 'S\u00f3 a checagem RED fica'. Measured: WT stage records nothing (:324-332) and enforces no order; RC-FLOW.md:30 says stage 1 writes strict xfails, yet pyproject.toml:119 sets no xfail_strict; the green-stage rerun repeats what the job gate runs on the same sha (the suite runs 3x per job). Design: WT stage checks only that a RED stage's tests are strict xfails that fail; the generic verify-stage rerun for green stages is deleted. stage-gate-runs-the-contract-tier would ADD the contract tier to the stage level this entry deletes; it exits in this same range under the operator's 2026-10-06 ruling 'S\u00f3 a checagem RED fica'. Placement: rc-11 (gate sizing). Placement and every design detail not quoted from a ruling are agent default, unruled.\n\nScope grill 2026-10-11: decided exit superseded --release 0.5.0 (obsolete by ADRs 0231/0232/0236). Not destined to 0.5.0 work. backlog.py exit refused 'superseded' on 2026-10-11 because no 0.5.0 SPEC Origin picks this slug; the exit waits for the main thread: name the slug in the next candidate SPEC's Origin and exit it at that closure, or exit it rejected with this reason.",
-      "provenance": "audit verification 2026-10-06 over feature/0.5.0 8e6448f13 (four read-only verifiers); main-thread registration after the operator grill of 2026-10-06",
-      "relates": [
-        "stage-gate-runs-the-contract-tier"
-      ]
-    },
-    {
-      "id": "programmatic-dates-in-skills",
-      "title": "Every date a skill writes comes from the clock or git, never from the model",
-      "opened": "2026-10-06",
-      "status": "idea",
-      "description": "Operator demand 2026-10-06 (relayed by the main thread): 'datas s\u00e3o uma delas. n\u00e3o pode alucinar aqui'. Measured: dd-handoff-emitter has no script (SKILL.md only), so the handoff's file-name stamp and produced_at are typed by the model; no library code validates produced_at (grep: only _worktree_end.py and certification/service.py read it). Design: an emit.py in dd-handoff-emitter stamps the file name and produced_at from one clock read; dadaia reports validate refuses a produced_at in the future and a file-name stamp that differs from produced_at; every other skill-written date comes from date -u, git or gh. Placement: rc-11. Placement and every design detail not quoted from a ruling are agent default, unruled.\n\nScope grill 2026-10-11 (operator, verbatim): 'Confirmo, pode seguir (Recommended)' (the operator's confirmation of the whole 0.5.0 scope; this entry had no question of its own: it was decided by inspection and announced in the grill, the operator could object). Earlier rulings kept: none in the extracted operator words beyond the 2026-10-06 quote above. Destination: 0.5.0. Wave: 1 (agent behavior: dates the model types are hallucination surface). Scope now: every date a skill writes comes from the clock or git, never from the model; the skill scripts' `--ts` override flags are deleted.",
-      "provenance": "audit verification 2026-10-06 over feature/0.5.0 8e6448f13 (four read-only verifiers); main-thread registration after the operator grill of 2026-10-06",
-      "relates": []
-    },
-    {
-      "id": "adr-0122-zero-backlog-destined-to-this-release",
-      "title": "ADR 0122 amended: a promote needs zero active backlog destined to this release",
-      "opened": "2026-10-06",
-      "status": "idea",
-      "description": "Operator, 2026-10-06, verbatim: 'Emendar: zero backlog destinado a esta release'. Measured: ADR 0122 demands zero active backlog and zero open audit findings at the promote, which the four post-0.5.0 evals entries contradict (rc-10 SPEC Carried: 'the operator's ruling before the promote'). Design: amend 0122 so the promote requires zero active entries destined to the release being promoted; entries destined to a later release stay active; the two 09-30 audits close through audit-scorecard-cycle. The amendment is proposed at rc-11 definition and accepted by the operator there. How an entry declares its destination is unruled. Placement and every design detail not quoted from a ruling are agent default, unruled.\n\nScope grill 2026-10-11 (operator, verbatim): 'o que \u00e9 cada backlog que ainda faz sentido implementar, analise um por 1 ... vamos ver caso a caso' (the amendment returns to the 2026-10-06 ruling below); on the D1-D10 rubric: 'Uma vez no promote (Recommended)'. Earlier rulings kept: 2026-10-06 'Emendar: zero backlog destinado a esta release (Recommended)'. Destination: 0.5.0. Wave: 4 (promote-facing: the promote's own precondition). Scope now: the main thread writes the ADR: the 2026-10-06 ruling, clone detection out of ADR 0122 (the kernel is the cure), the D1-D10 readout only at the promote head, launch D3a/D4 out. This grill's paragraphs record each entry's destination.",
-      "provenance": "audit verification 2026-10-06 over feature/0.5.0 8e6448f13 (four read-only verifiers); main-thread registration after the operator grill of 2026-10-06",
-      "relates": [
-        "evals-release-gate-status",
-        "evals-harness-lanes-and-benchmark",
-        "evals-windows-smoke",
-        "devin-subagent-projection",
-        "audit-scorecard-cycle"
-      ]
-    },
-    {
-      "id": "impacted-test-selection",
-      "title": "The local stage and merge gates run only the tests a change can reach; CI keeps the full suite",
-      "opened": "2026-10-07",
-      "status": "idea",
-      "description": "Operator, 2026-10-06, verbatim (ADR 0211's ruling): 'N\u00e3o \u00e9 possivel mapear e rodar somente os necess\u00e1rios??'. ADR 0211 answered with a tier cut (the stage level runs lint, typecheck, guards and the whole small tier); the rc-10 Reconciliation review (M3) found that cut is an agent reading of the demand, not the mapping the operator asked for, and deferred it here. Design: the local stage gate and worktree.py merge derive the selection from the change itself - the static import graph of the changed modules (a test is selected when it imports, transitively, a changed module) united with the owner tests the job file declares per task (task-gate-declared-owner-tests is that mapping's one decider; no second owner list); a change the graph cannot resolve (law, data, schema, a non-Python file) selects the whole small tier; CI on push keeps the full suite of every tier unchanged, so a selection miss surfaces there, never as a skip. One decider for the selection, in scripts/ci.py; no new marker. Placement and every design detail not quoted from a ruling are agent default, unruled.\n\nScope grill 2026-10-11 (operator, verbatim): 'Mapa de impacto como leitura (Recommended)'. Earlier rulings kept: 2026-10-06 'N\u00e3o \u00e9 possivel mapear e rodar somente os necess\u00e1rios?? ... existe codigo macarronico ...?'. Destination: 0.5.0. Wave: 1 (dev loop: the developer runs only what a change reaches). Scope now: `ci.py --changed` lists and runs the tests the diff's import graph reaches, a developer read outside the gate; the gate-side selection designed above leaves scope.",
-      "provenance": "rc-10 Reconciliation review finding M3 (2026-10-07), deferred by the main thread; operator demand in ADR 0211's ruling, 2026-10-06",
-      "relates": [
-        "task-gate-declared-owner-tests",
-        "stage-gate-keeps-only-the-red-check",
-        "test-suite-diet"
       ]
     },
     {
@@ -288,92 +103,6 @@
         "evals-windows-smoke",
         "public-law-language-neutral",
         "complexity-and-private-import-ratchet"
-      ]
-    },
-    {
-      "id": "verdict-author-unbound",
-      "title": "The merge gate knows who wrote a verdict, and a PR-edge verdict binds a hash",
-      "opened": "2026-10-07",
-      "status": "idea",
-      "description": "rc-10 Reconciliation review, deferred: 'the merge gate cannot tell who ran verdict.py; a PR-edge verdict reads no hash'. What Job 10 covers (SPEC AC12.2, ADR 0218): the verdict carries reviewed_sha and diff_sha256 and worktree.py merge refuses a missing field or a mismatch - a verdict binds the diff. What it leaves (SPEC 2026-10-07 amendment: 'authorship stays discipline plus audit, backlog verdict-author-unbound'): (1) authorship - any session, the merging main thread included, can run verdict.py over the right range and produce a hash-valid verdict, so the 'main thread never writes a verdict' rule of ADR 0218 is unenforced; (2) the PR edge - the work->integration and integration->principal verdicts are the reviewer's text pasted by the main thread into the PR, bound to no sha and no hash. Design: (1) the PreToolUse gate refuses a Bash run of verdict.py whose hook payload does not come from a dd-code-reviewer subagent (the payload's agent type is the one decider), with an adversary test where the main thread runs verdict.py itself; where a harness carries no agent type, the gate fails open and the audit counts verdicts with no reviewer session; (2) verdict.py gains a PR mode that hashes the PR's base..head diff, and the PR quote carries reviewed_sha and diff_sha256 so the promote reads the same binding the merge gate reads - one verdict shape, one decider. Placement and every design detail not quoted from a ruling are agent default, unruled.\n\nScope grill 2026-10-11: decided exit superseded --release 0.5.0 (delivered by an earlier rc whose SPEC Origin did not name it ('delivered' was tried and refused). Evidence: operator 2026-10-11 'Disciplina + auditoria (Recommended)'; ADR 0218 delivered in rc-10; authorship stays discipline plus audit, no new hook). Not destined to 0.5.0 work. backlog.py exit refused 'superseded' on 2026-10-11 because no 0.5.0 SPEC Origin picks this slug; the exit waits for the main thread: name the slug in the next candidate SPEC's Origin and exit it at that closure, or exit it rejected with this reason.",
-      "provenance": "rc-10 Reconciliation review (2026-10-07), named by the rc-10 SPEC AC12.2 amendment as this backlog entry; ADR 0218 ruling 'Revisor emite o pr\u00f3prio (Recommended)'",
-      "relates": []
-    },
-    {
-      "id": "judge-config-outside-the-script-dir",
-      "title": "The judged range may not change what the verify line's judgement reads",
-      "opened": "2026-10-08",
-      "status": "idea",
-      "description": "Evidence: _worktree_end.py:172-177 refuses a range only for edits in the directory of the file the verify line names (scripts/). scripts/ci.py imports only the stdlib, but its judgement also reads pyproject.toml ([tool.ruff] select :84, [tool.pytest] addopts/markers :119-122), tests/conftest.py and the doctor it runs (ci.py:74-77): a job can weaken lint or pytest config and still pass its own gate. Design: the refusal covers every file the judgement reads; trade-off is legitimate config or dependency edits; adversary test required (judged party edits its own judge). Scope of ADR 0207 (proposed, ADR 0226, awaiting operator). Distinct from verdict-author-unbound. Placement: rc-11 wave A (closes bypasses); no ruling, agent default. Placement and every design detail not quoted from a ruling are agent default, unruled.\n\nScope grill 2026-10-11: decided exit superseded --release 0.5.0 (operator 2026-10-08 question 16 'Apagar; o revisor cobre (Recommended)' reversed it). Not destined to 0.5.0 work. backlog.py exit refused 'superseded' on 2026-10-11 because no 0.5.0 SPEC Origin picks this slug; the exit waits for the main thread: name the slug in the next candidate SPEC's Origin and exit it at that closure, or exit it rejected with this reason.",
-      "provenance": "operator confirmation 2026-10-07 of intake report review-of-reports-20261007 (.dadaia/reports/dadaia-workspace/review-of-reports-20261007/intake-report-review-of-reports.md), grill rulings 2026-10-07",
-      "relates": [
-        "verdict-author-unbound"
-      ]
-    },
-    {
-      "id": "gate-reuses-a-green-result-for-the-same-tree",
-      "title": "A job merge reuses the green gate result recorded for the same tree",
-      "opened": "2026-10-08",
-      "status": "idea",
-      "description": "Evidence: `worktree.py merge` reruns `verify:` on HEAD after the job gate already ran on that HEAD (worktrees law 2.4); stage-gate-keeps-only-the-red-check records the suite runs 3x per job. Design: a local green record keyed by tree hash + verify line. Reusing a remote CI result needs a remote, so it is developer-only (private-public boundary). Risk: a new state file is new bug surface; the deletion test applies at the as-is review. Neighbours: impacted-test-selection (what runs), stage-gate-keeps-only-the-red-check (which level). Placement: rc-12, after stage-gate-keeps-only-the-red-check measures what is left. Placement and every design detail not quoted from a ruling are agent default, unruled.\n\nScope grill 2026-10-11: decided exit superseded --release 0.5.0 (operator 2026-10-08 'somente job e tasks s\u00e3o suficientes'; verify runs once per job (ADR 0231)). Not destined to 0.5.0 work. backlog.py exit refused 'superseded' on 2026-10-11 because no 0.5.0 SPEC Origin picks this slug; the exit waits for the main thread: name the slug in the next candidate SPEC's Origin and exit it at that closure, or exit it rejected with this reason.",
-      "provenance": "operator confirmation 2026-10-07 of intake report review-of-reports-20261007 (.dadaia/reports/dadaia-workspace/review-of-reports-20261007/intake-report-review-of-reports.md), grill rulings 2026-10-07",
-      "relates": [
-        "stage-gate-keeps-only-the-red-check",
-        "impacted-test-selection"
-      ]
-    },
-    {
-      "id": "process-proportional-to-change-size",
-      "title": "Gate and review cost scale with change size",
-      "opened": "2026-10-08",
-      "status": "idea",
-      "description": "Evidence: 47 of 451 commits are feat/fix and 234 are chore/docs; the per-task fixed cost (brief, tree, gate, merge, map rebase) dominates small changes; today's only size rule is one review per stage past 400 added lines (worktrees law 2). Design: size classes for the gate and the review; the exact classes are for the as-is review. Neighbour of stage-gate-keeps-only-the-red-check. Placement: rc-11 (gate sizing). Placement and every design detail not quoted from a ruling are agent default, unruled.\n\nScope grill 2026-10-11: decided exit superseded --release 0.5.0 (delivered by an earlier rc whose SPEC Origin did not name it ('delivered' was tried and refused). Evidence: operator 2026-10-08 'devemos ser por default leves' and question 18 'Worktree livre'). Not destined to 0.5.0 work. backlog.py exit refused 'superseded' on 2026-10-11 because no 0.5.0 SPEC Origin picks this slug; the exit waits for the main thread: name the slug in the next candidate SPEC's Origin and exit it at that closure, or exit it rejected with this reason.",
-      "provenance": "operator confirmation 2026-10-07 of intake report review-of-reports-20261007 (.dadaia/reports/dadaia-workspace/review-of-reports-20261007/intake-report-review-of-reports.md), grill rulings 2026-10-07",
-      "relates": [
-        "stage-gate-keeps-only-the-red-check"
-      ]
-    },
-    {
-      "id": "bug-status-deferred-banned",
-      "title": "`deferred` is no terminal status for bugs nor audit findings: it is open",
-      "opened": "2026-10-08",
-      "status": "idea",
-      "description": "Ruling 2026-10-07: 'Deferred = open (Recommended)'; scope: 'Yes, one rule (Recommended)' - the ban covers BUGS and audit FINDINGS dispositions. Evidence: `deferred` lives in bug-record-v1.schema.json:122, _bugs_check.py:28 TERMINAL, bugs.py:60 `defer` verb, specs/bugs/AGENTS.md:46, dd-gitflow-default 3a row 4 (19 lib hits); audit FINDINGS carry 13 deferred dispositions; `bugs.py status --found-in` and `release.py new|ship` already count deferred as open (bugs.py:236-241), so the status buys nothing. Design: delete the verb, the enum value and the law rows (net-negative); one-shot migration of existing deferred records (the 4 rc-10 ones are fixed in the rc-10 batch; `panel-telemetry-sqlite-corrupts-under-concurrent-access` closes resolved citing 545ce34ef, ADR 0123); audit findings take open|resolved|rejected only. Needs ADR amending 0206 (proposed, ADR 0223). Placement: rc-11 Job 1. Placement and every design detail not quoted from a ruling are agent default, unruled.\n\nScope grill 2026-10-11: decided exit superseded --release 0.5.0 (delivered by an earlier rc whose SPEC Origin did not name it ('delivered' was tried and refused). Evidence: ADRs 0223/0227, 392769e97; residue: the histo schema's 'deferred' and the _audit_check docstring). Not destined to 0.5.0 work. backlog.py exit refused 'superseded' on 2026-10-11 because no 0.5.0 SPEC Origin picks this slug; the exit waits for the main thread: name the slug in the next candidate SPEC's Origin and exit it at that closure, or exit it rejected with this reason.",
-      "provenance": "operator confirmation 2026-10-07 of intake report review-of-reports-20261007 (.dadaia/reports/dadaia-workspace/review-of-reports-20261007/intake-report-review-of-reports.md), grill rulings 2026-10-07",
-      "relates": []
-    },
-    {
-      "id": "law-one-home-residual",
-      "title": "Residual of law-one-home-per-rule: ADR ledger keeps only architectural decisions (a)-(c)",
-      "opened": "2026-10-08",
-      "status": "idea",
-      "description": "Operator, 2026-10-06: 'Se tudo \u00e9 ADR nada \u00e9 ADR'. Ruling 2026-10-07: 'Exit delivered + re-intake rest (Recommended)'. law-one-home-per-rule exited delivered at 0.5.0 for its AC12.6 half (one home per rule across the laws). This entry carries the residual, unchanged in design: (a) adr-born-at-release-with-options - an ADR is born only in dd-release-definition through dd-ask-me references/adr.md, past a three-leg threshold (one-way door; architecturally significant criterion; >=2 genuine options), options[{name, tradeoff, rejected_because}] (min 2), ruling.words carrying question and chosen option; decisions.jsonl leaves the backlog kind's allowed set and its gitflow row. (b) adr-ledger-triage-process-rules - one pass: 36 process rules and 14 spent rulings move to their scoped AGENTS.md and one consolidated ADR supersedes them; the 5 principles on rejected ADRs are re-judged; each remaining measured_by resolves to an executable check. (c) adr-0193-records-its-amends - 0193 carries amends: null though it amends 0152 (2); the operator rules a new amending record or a wider 0138 repair lane. Also: the ADR 0151 law-deletion check stops demanding an ADR per changed law line (if it lands first, job-gate-runs-the-law-deletion-check shrinks). Input to triage: rerun corpus-audit and prompt-audit on the rc-10 tip (the 20261004/20261007 runs scanned 76d7af604, before Job 10's law rework). Placement: rc-11. Placement and design details not quoted from a ruling are agent default, unruled.\n\nScope grill 2026-10-11 (operator, verbatim): 'Triagem + gerada (Recommended)'. Earlier rulings kept: 2026-10-06 'Se tudo \u00e9 ADR nada \u00e9 ADR'; 2026-10-07 'Exit delivered + re-intake rest (Recommended)'. Destination: 0.5.0. Wave: 1 (law: what deserves an ADR governs every later decision). Scope now: (a) the threshold line in the ADR law (what deserves an ADR), the `options` field and a self-contained `ruling.words`. The one-time triage (b) is carried by architecture-adr-section-generated's Wave 4 part; (c) and the rest of the text above were not re-ruled in this grill.\n\nScope grill 2026-10-11, three more decisions this Wave 1 entry owns (each quoted option is the operator's verbatim choice; the text after it is the decision as the main thread recorded it). (1) 'ADR que supersede (Recommended)': a new ADR supersedes ADR 0187 (1)(3) and ADR 0205 (no found_in; archiving is a \u00a73a act without an ADR); the found_in backfill 0d9fba147 is discarded. (2) 'Ratificar os 4 (Recommended)': P-01, P-09, P-14 and P-15 are ratified by new ADR(s) with their current text and checks; the same ruling also sits in architecture-principles-measured-by-re-pointed, which is not destined to 0.5.0, so this entry carries the work. (3) ADR 0242 (proposed in the scope-050 backlog tree; it amends 0122 at acceptance) is accepted in the next candidate's define tree with the operator's rulings: 2026-10-06 'Emendar: zero backlog destinado a esta release (Recommended)'; 2026-10-11 'Confirmo, pode seguir (Recommended)'.\n\nrc-14 define, 2026-10-11 (main thread decision, unruled by the operator): the clause 'an ADR is born only in dd-release-definition ... decisions.jsonl leaves the backlog kind's allowed set and its gitflow row' is dropped \u2014 it was an agent default; the three-leg threshold serves 'Se tudo \u00e9 ADR nada \u00e9 ADR'. (c) moved to architecture-adr-section-generated (Wave 4 triage).",
-      "provenance": "operator ruling 2026-10-07 K1: 'Exit delivered + re-intake rest (Recommended)'; intake report review-of-reports-20261007",
-      "relates": [
-        "job-gate-runs-the-law-deletion-check"
-      ]
-    },
-    {
-      "id": "quality-scorecard-ruler",
-      "title": "QUALITY.md carries one scorecard ruler: rates as trend, one pinned text-assert regex, targets for criteria 1 and 3",
-      "opened": "2026-10-08",
-      "status": "idea",
-      "description": "Operator, 2026-10-06, verbatim: 'Taxas viram tend\u00eancia; regex fixa; metas 1 e 3'; and 'Sim, na Reconcilia\u00e7\u00e3o da rc-10' - the baseline scorecard was missed at the Reconciliation and now runs as an rc-10 tail act (2026-10-08), so rc-11 (>=8 on every criterion, ruling Quality-uplift 2026-10-07) is measured against it. Measured: rates (parallelism, test/code ratio) were read as gates; the text-assert share is 10.8% or 17% depending on the regex; criteria 1 (Core) and 3 (push_gate refactor) had no target. Design: one ruler in QUALITY.md - rates are reported as a trend, never a gate; one pinned regex counts text asserts; criteria 1 and 3 get targets from complexity-and-private-import-ratchet and push-gate-decision-split; dd-code-review gains a scorecard lens reading that ruler. rc-11 note carried from bug-ledger-balance-and-convergence (picked by rc-10, whose SPEC is Approved and frozen): add a fix-induced Laplace line (u=+2.9..+4.6, accelerating; the all-bugs Laplace was NOT reproduced - its sign flips with the end date, +0.95/-0.89/-1.57) and a count of closures under 10 minutes (116/789 resolved <10 min, 52 <1 min; 22/70 <10 min since 20260930-structural-convergence-F008 was marked resolved), both as readouts, never gates; the Laplace counts audit batches unless found_by is derived from the registration commit (a typed found_by is rejected as a puxadinho). Placement: rc-11. Placement and every design detail not quoted from a ruling are agent default, unruled. Corrected 2026-10-07 on operator confirmation of intake report review-of-reports-20261007 (successor of scorecard-one-ruler; its baseline moved from the Reconciliation to an rc-10 tail act, K5).\nReplaces scorecard-one-ruler; still linked by test-suite-diet, re-pointed when picked.\n\nScope grill 2026-10-11: decided exit superseded --release 0.5.0 (superseded by the operator's 2026-10-09 score-9 ruling, ADR 0239). Not destined to 0.5.0 work. backlog.py exit refused 'superseded' on 2026-10-11 because no 0.5.0 SPEC Origin picks this slug; the exit waits for the main thread: name the slug in the next candidate SPEC's Origin and exit it at that closure, or exit it rejected with this reason.",
-      "provenance": "audit verification 2026-10-06 over feature/0.5.0 8e6448f13 (four read-only verifiers); main-thread registration after the operator grill of 2026-10-06; corrected on operator confirmation 2026-10-07 (intake report review-of-reports-20261007)",
-      "relates": [
-        "complexity-and-private-import-ratchet",
-        "test-suite-diet"
-      ]
-    },
-    {
-      "id": "bug-batch-cause-trigger-and-attempt-cap",
-      "title": "The bug batch is triggered by cause, and a fix gets two attempts before a fresh session",
-      "opened": "2026-10-08",
-      "status": "idea",
-      "description": "Ruling 2026-10-07: 'Adopt b+c, derive a (Recommended)'. Evidence: dd-architecture-survey SKILL.md triggers only 'at the close of each candidate'; ADR 0123's group-by-cause has no skill trigger; dd-bug-resolution has no attempt cap (grep attempt -> 0). Design: trigger = the rc bug window or 20 registrations, whichever comes first; a 2-attempt cap on one bug, then a fresh session with a written diagnosis. Distinct from quality-scorecard-ruler (readouts only). Placement: rc-11. Placement and every design detail not quoted from a ruling are agent default, unruled.\n\nScope grill 2026-10-11 (operator, verbatim): 'a+b+c+hotspots (Recommended)'. Earlier rulings kept: 2026-10-07 'Adopt b+c, derive a (Recommended)'; 2026-10-06 'maior busca ... overfitting e aumento de superficie de bugs'; 2026-10-08 question 8 'Apagar bloco, manter revis\u00e3o' and question 17 '4 campos' (neither revoked the trigger nor the cap). Destination: 0.5.0. Wave: 1 (dev loop: two law lines in dd-bug-resolution; the stats share is bug-stats-hotspots-and-age, Wave 3). Scope now: the causal batch trigger (the rc bug window or 20 registrations, whichever first) and the 2-attempt cap, one line each in dd-bug-resolution; ADR 0123's group-by-cause is housed by the trigger line.",
-      "provenance": "operator confirmation 2026-10-07 of intake report review-of-reports-20261007 (.dadaia/reports/dadaia-workspace/review-of-reports-20261007/intake-report-review-of-reports.md), grill rulings 2026-10-07",
-      "relates": [
-        "quality-scorecard-ruler"
       ]
     },
     {
@@ -407,17 +136,6 @@
       "description": "This repo's own pipeline, never library content. Measured (HEAD c9100eaee): `.github/workflows/ci.yml` lint runs ruff with `select = [E, F, I, UP, B, SIM]` (`pyproject.toml:118`), no `S`, yet 39 `noqa: S...` comments in 20 files (3 library, 17 tests) suppress a rule that never runs; CodeQL default setup `not-configured` (repo is public, free); no pip-audit job; `secret-scan.yml` runs on push only to main (PRs to main/develop), not on work-branch pushes; 13 open Dependabot alerts, all PyJWT on main's `poetry.lock` (1 critical, 5 high, 7 medium), already absent from the feature/develop locks (de4e3179a). Change: ruff `S` on, with one triage (justified noqa or fix); a `pip-audit` job on `poetry.lock` failing on any finding; CodeQL default setup (operator act, or `gh api` on operator order); `.github/required-checks.json` updated; no job reads Dependabot alerts (GITHUB_TOKEN cannot; no new secret) - that check is the operator's private post-push rule. Delivered already: the poetry floor (`ci.yml:71` `poetry==2.5.1`). Still absent (grep codeql|pip-audit .github/workflows -> 0; pyproject.toml:84 select has no S). Done when: the 3 jobs are required checks and green. Relates: none. Corrected 2026-10-07 on operator confirmation of intake report review-of-reports-20261007 (successor of repo-ci-sast; the poetry floor is delivered at ci.yml:71 and the measurements are rerun at HEAD).\nReplaces repo-ci-sast; no live entry still links it.\n\nScope grill 2026-10-11 (operator, verbatim): 'Tudo; pip-audit agendado (Recommended)'. Earlier rulings kept: 2026-10-03 'Op\u00e7\u00e3o 1, CI do repo + privado'; 'Local + pip-audit CI (Recommended)'; 'Tudo, PyJWT = 1 bug'. Destination: 0.5.0. Wave: 3 (developer pipeline hardening, independent of the law work). Scope now: ruff S in the required lint with named ignores; CodeQL on (an operator act in the repo Settings); pip-audit on push and on a daily schedule, not a required check, a red run being a CRITICAL bug; the private rule ~/.claude/rules/sast-dependabot.md corrected to the truth with the operator's permission. Developer-only, never library content.",
       "provenance": "operator demand 2026-10-03: ADR/RFC/SAST grill Q1-Q7 + R2-1..R2-4 (audit 2026-10-02); corrected on operator confirmation 2026-10-07 (intake report review-of-reports-20261007)",
       "relates": []
-    },
-    {
-      "id": "task-lines-carry-seam-and-adr-clause",
-      "title": "Job-file task lines carry the seam and the ADR clause they serve",
-      "opened": "2026-10-08",
-      "status": "idea",
-      "description": "Evidence: postmortem gaps that no law line states: C9 stages ordered by real dependency, the operator's priority first; C13 one task row per ADR clause, each with its measured_by case; C15 a gate-contract task cites the governing ADR clause; C16 a fix task's `W:` names the causing seam. grep seam in dd-release-definition and dd-bug-resolution finds only Phase 5's seam test. Design: law lines in dd-release-definition 4-5 (one home per rule). Placement: rc-11, may ride the law-one-home-residual entry. Placement and every design detail not quoted from a ruling are agent default, unruled.\nReplaces task-lines-carry-seam-and-adr-clause (renamed, never landed); still linked by law-one-home-residual, re-pointed when picked.\n\nScope grill 2026-10-11: decided exit superseded --release 0.5.0 (the job file was slimmed by the operator's 2026-10-08 questions 12 and 15; ADRs 0231/0232). Not destined to 0.5.0 work. backlog.py exit refused 'superseded' on 2026-10-11 because no 0.5.0 SPEC Origin picks this slug; the exit waits for the main thread: name the slug in the next candidate SPEC's Origin and exit it at that closure, or exit it rejected with this reason.",
-      "provenance": "operator confirmation 2026-10-07 of intake report review-of-reports-20261007 (.dadaia/reports/dadaia-workspace/review-of-reports-20261007/intake-report-review-of-reports.md), grill rulings 2026-10-07",
-      "relates": [
-        "law-one-home-residual"
-      ]
     },
     {
       "id": "eval-codex-lane-in-library-ci",
@@ -460,36 +178,6 @@
       "relates": []
     },
     {
-      "id": "define-backlog-merge-runs-verify",
-      "title": "A define or backlog tree merge runs the recorded base's verify: line when the repo declares one",
-      "opened": "2026-10-10",
-      "status": "idea",
-      "description": "Measured: worktrees/AGENTS.md \u00a72 item 4 lands a define or backlog tree after one review plus bugs.py check, backlog.py check, release.py check and doctor, and runs no test, so specs text that turns a repo guard red is caught only by CI after the push. Evidence: bug rc13-define-cites-an-unread-prefix-family (specs/bugs/_archive/bugs_histo.jsonl): the OWASP prompt-injection id in the rc-13 SPEC and PLAN made guard v33 (scripts/guards/slop.py:194) count 32 orphan families against a limit of 31; CI run 38079070924 failed, the fix took a revert hotfix plus a redo, and every commit was blocked meanwhile. Design: the define/backlog merge runs the recorded base's tracked verify: line once, as a job merge does (\u00a72 item 3), when the repo declares one; with none declared it keeps today's checks. Public shape asks nothing of users: it runs only the repo's own declared line (private-public boundary). Cost: that line's runtime on every define and backlog merge.\n\nScope grill 2026-10-11: decided exit superseded --release 0.5.0 (operator 2026-10-11 'Consertar a raiz (Recommended)': the v33 guard stops reading specs/ prose (or is deleted if it never caught real slop), no new gate; Wave 1 dev-loop work, carried in test-suite-diet's 2026-10-11 paragraph). Not destined to 0.5.0 work. backlog.py exit refused 'superseded' on 2026-10-11 because no 0.5.0 SPEC Origin picks this slug; the exit waits for the main thread: name the slug in the next candidate SPEC's Origin and exit it at that closure, or exit it rejected with this reason.",
-      "provenance": "Operator, 2026-10-10: 'define/backlog merge runs verify:' - selected for the backlog as an Arm A demand.",
-      "relates": [
-        "gate-reuses-a-green-result-for-the-same-tree",
-        "impacted-test-selection"
-      ]
-    },
-    {
-      "id": "hotfix-specs-revert-commit-shape",
-      "title": "dd-gitflow-default \u00a73a has a commit-shape row for a hotfix that reverts specs text",
-      "opened": "2026-10-10",
-      "status": "idea",
-      "description": "Measured: dd-gitflow-default \u00a73a row 3 covers a bug fix on <code> only (paths outside specs/), and row 5 is define-only, so the rc13-define-cites-an-unread-prefix-family hotfix - two git revert commits of rc-13 specs with a 'block: (1)' body - matched no row. The reviewer flagged it MEDIUM (verdict .dadaia/handoff/dadaia-workspace/2026-10-10T201433Z-dd-code-reviewer-rc13-define-cites-an-unread-prefix-family-hotfix.handoff.json, finding 1). Design: one \u00a73a row (or a widened row 3) naming the hotfix tree, the reverted specs/ paths and the message shape of a revert that carries its block: item.\n\nScope grill 2026-10-11 (operator, verbatim): 'Confirmo, pode seguir (Recommended)' (the operator's confirmation of the whole 0.5.0 scope; this entry had no question of its own: it was decided by inspection and announced in the grill, the operator could object). Earlier rulings kept: 2026-10-10 'define/backlog merge runs verify:, \u00a73a row for a hotfix revert'. Destination: 0.5.0. Wave: 1 (law: the commit shapes every agent follows). Scope now: the whole entry as written above: one \u00a73a row for a hotfix that reverts specs text; it enters whole.",
-      "provenance": "Operator, 2026-10-10: '\u00a73a row for a hotfix revert' - selected for the backlog as an Arm A demand.",
-      "relates": []
-    },
-    {
-      "id": "harness-specific-surface-minimized",
-      "title": "Minimize what is specific to each harness (sub-agents, hooks); skills and AGENTS.md carry the common behavior",
-      "opened": "2026-10-11",
-      "status": "idea",
-      "description": "Operator, 2026-10-11, verbatim: 'foco na parte em que desidratamos o que \u00e9 comum em cada harness priorizando nossas skills e AGENTS.md e minimizamos a superficie do que \u00e9 especifico de cada harness (sub-agents e hooks principalmente) como Devin CLI, e outros ... Nossa estrategia clara e core de minimizar contextos especificos de cada harness nos garantir\u00e1 que ao mudar de um harness para outro pouca coisa muda.' Destination: 0.5.0. Wave: 1 (a law statement; the as-is measures what is harness-specific today).",
-      "provenance": "operator, scope grill 2026-10-11",
-      "relates": []
-    },
-    {
       "id": "promote-gate-050",
       "title": "The 0.5.0 promote gate: pruned 050 checks, readouts, terminal findings, audit close",
       "opened": "2026-10-11",
@@ -519,63 +207,6 @@
       ]
     },
     {
-      "id": "tests-one-contract-one-home",
-      "title": "One contract, one test home: each contract is asserted in exactly one test file; duplicate asserts are deleted",
-      "opened": "2026-10-12",
-      "status": "idea",
-      "description": "Measured 2026-10-12 (test audit): 1,393 test functions, 3,276 cases; test-to-production line ratio 1.86x; 8-week churn +3,406 / -3,345; the suite behaves as an append-only evidence ledger: a fix adds its test beside the ones already asserting the same contract and none leaves. Design: each contract has exactly one owner test file, its home; an assert of that contract in any other file is a duplicate and is deleted there, the home's assert kept. A behaviour change edits the home, never adds a second one. Relation: test-suite-diet (rc-14) deletes a closed list of duplicate and vacuous tests; this entry is the standing rule that stops the ledger growing back. Done when: the as-is review's duplicate-assert inventory is empty and each contract names one home. Placement: rc-15 (operator ruling 2026-10-12). Every design detail not quoted from the audit is agent default, unruled.",
-      "provenance": "operator ruling 2026-10-12, relayed by the main thread: the test-audit proposals go to rc-15 through the backlog; source: test audit report https://claude.ai/artifact/Rn1qCNi2qEcR1wXTNzEznf, proposal R1",
-      "relates": [
-        "test-suite-diet"
-      ]
-    },
-    {
-      "id": "tests-tmp-expire-at-job-merge",
-      "title": "Job scaffolding tests live in a versioned tests/tmp/<job>/ and expire at the job's merge",
-      "opened": "2026-10-12",
-      "status": "idea",
-      "description": "Measured 2026-10-12 (test audit): 1,393 test functions, 3,276 cases; test-to-production line ratio 1.86x; 8-week churn +3,406 / -3,345; the suite behaves as an append-only evidence ledger: tests written to prove one job's change stay in the permanent suite after the job merges. Design: a job's scaffolding and evidence tests live under a versioned `tests/tmp/<job>/`; at the job's merge each one expires: it is deleted, or promoted into its contract's one home (tests-one-contract-one-home), never into a new file. Open for the grill: what checks the expiry without adding a gate (the merge, the job's last task or the reviewer). Done when: no `tests/tmp/<job>/` survives its job's merge on the work branch. Placement: rc-15 (operator ruling 2026-10-12). Every design detail not quoted from the audit is agent default, unruled.",
-      "provenance": "operator ruling 2026-10-12, relayed by the main thread: the test-audit proposals go to rc-15 through the backlog; source: test audit report https://claude.ai/artifact/Rn1qCNi2qEcR1wXTNzEznf, proposal R2",
-      "relates": [
-        "tests-one-contract-one-home"
-      ]
-    },
-    {
-      "id": "policy-tests-leave-pytest",
-      "title": "Policy and text tests leave pytest: the guard layer or one declarative policy table checks them, pytest asserts behaviour only",
-      "opened": "2026-10-12",
-      "status": "idea",
-      "description": "Measured 2026-10-12 (test audit): about 480 of the 1,393 test functions are policy and text tests: they assert wording, layout or conventions, not behaviour. Design: each moves to the guard layer (`scripts/guards/`) or to a declarative policy table checked once; a policy that duplicates an existing guard is deleted, not moved; pytest keeps behaviour asserts only. Relation: test-suite-diet (rc-14) absorbed meta-tests-leave-pytest, scoped to a closed list of tests that inspect the suite or the repo; this entry is the remaining policy class. Done when: no pytest test asserts the wording of a law, skill or spec file, and every moved policy is checked once by the guard runner. Placement: rc-15 (operator ruling 2026-10-12). Every design detail not quoted from the audit is agent default, unruled.",
-      "provenance": "operator ruling 2026-10-12, relayed by the main thread: the test-audit proposals go to rc-15 through the backlog; source: test audit report https://claude.ai/artifact/Rn1qCNi2qEcR1wXTNzEznf, proposal R3",
-      "relates": [
-        "test-suite-diet",
-        "tests-one-contract-one-home"
-      ]
-    },
-    {
-      "id": "review-mutation-on-the-diff",
-      "title": "The review readout runs mutation testing and branch coverage on the diff, not suite-wide counts",
-      "opened": "2026-10-12",
-      "status": "idea",
-      "description": "Measured 2026-10-12 (test audit): mutation on `_jsonl.py` kills 62-85%, so a green suite says little about a changed line, and suite-wide counts (1,393 functions, 3,276 cases) say nothing about a diff. Design: a review readout runs mutation testing on the changed lines plus branch coverage of the diff and hands both to the reviewer; a readout, never a gate. It is this repo's own review tooling: the shipped surface requires no mutation tool or language toolchain of a user. Open for the grill: test-suite-diet (rc-14) removes the repo's mutation wiring and calls mutation evidence operator tooling outside the repo; this entry decides where the diff readout lives. Done when: a review of a diff carries its mutation score and its branch coverage, and nothing in the suite or a gate reads them as pass or fail. Placement: rc-15 (operator ruling 2026-10-12). Every design detail not quoted from the audit is agent default, unruled.",
-      "provenance": "operator ruling 2026-10-12, relayed by the main thread: the test-audit proposals go to rc-15 through the backlog; source: test audit report https://claude.ai/artifact/Rn1qCNi2qEcR1wXTNzEznf, proposal R4",
-      "relates": [
-        "test-suite-diet"
-      ]
-    },
-    {
-      "id": "closure-test-suite-readouts",
-      "title": "Each candidate closure records suite size, test ratio, churn and mutation score as trends, never gates",
-      "opened": "2026-10-12",
-      "status": "idea",
-      "description": "Baseline measured 2026-10-12 (test audit): 1,393 test functions, 3,276 cases; test-to-production line ratio 1.86x; 8-week churn +3,406 / -3,345; mutation on `_jsonl.py` kills 62-85%. Design: each candidate closure records those readouts in its closure summary beside the prior candidate's, as a trend; none is a gate and none blocks a closure or a promote. The mutation figure comes from review-mutation-on-the-diff. Relation: quality-scorecard-ruler (rates as trend, never a gate) awaits its superseded exit; this entry keeps only the test-suite readouts. Done when: the closure summary of the candidate that picks this entry carries the four readouts with the 2026-10-12 baseline beside them. Placement: rc-15 (operator ruling 2026-10-12). Every design detail not quoted from the audit is agent default, unruled.",
-      "provenance": "operator ruling 2026-10-12, relayed by the main thread: the test-audit proposals go to rc-15 through the backlog; source: test audit report https://claude.ai/artifact/Rn1qCNi2qEcR1wXTNzEznf, proposal R5",
-      "relates": [
-        "quality-scorecard-ruler",
-        "review-mutation-on-the-diff"
-      ]
-    },
-    {
       "id": "release-drift-edge-runs-memory-drift",
       "title": "The release skill stops importing the navigator's drift module, and the cross-skill edge table is deleted",
       "opened": "2026-10-12",
@@ -585,6 +216,15 @@
       "relates": [
         "skill-scripts-one-kernel"
       ]
+    },
+    {
+      "id": "task-worktree-cap-removed",
+      "title": "worktree.py new stops capping open task worktrees at five per candidate",
+      "opened": "2026-10-13",
+      "status": "idea",
+      "description": "Today worktree.py new refuses a sixth open task tree of one rc (TASK_CAP = 5 in dadaia_workspace/public/skills/dd-gitflow-default/scripts/_worktree_names.py, checked in _worktree_new.py; stated in dadaia_workspace/public/data/worktrees-AGENTS.md: 'at most 5 task worktrees are open per rc'). The cap is a fixed number the approved PLAN's schedule (waves, agent cap) already governs, so it is a gate with no measured cost reason. Design: DELETE TASK_CAP, its check and refusal in _worktree_new.py, the law clause in worktrees-AGENTS.md and the worktrees memory atom line. The owner test tests/public/skills/dd_gitflow_default/scripts/test__worktree_new.py::test_a_task_needs_its_job_branch_and_a_sixth_task_refuses asserts the sixth refusal: changing or removing that assert needs the operator's own order (root map \u00a71; ADR 0249), named in the task's test( commit. Next candidate. Agent default, unruled: slug, title and the deletion set beyond TASK_CAP.",
+      "provenance": "Operator, 2026-10-13, gate audit (relayed by the main thread): the gate-cuts plain tree is discarded, 'Descartar (Recommended)' (tip 1612d93c4), and its removal of the fixed 5-task-tree cap per rc becomes a backlog entry for the next rc; root map \u00a71 gate-cost line (operator, 2026-10-13: 'e vai fazer de novo quantas vezes???').",
+      "relates": []
     }
   ]
 }
