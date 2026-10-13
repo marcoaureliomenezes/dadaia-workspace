@@ -106,3 +106,31 @@ def test_a_verb_that_reads_a_file_that_is_not_utf8_refuses_with_one_fix(
     assert [ln for ln in done.stderr.splitlines() if ln.startswith("fix: ")] == [
         f"fix: {_restore((specs / relative).resolve())}"
     ]
+
+
+@pytest.mark.parametrize(
+    "relative",
+    ["bugs/BUGS.jsonl", "releases/0.5.0/rc-1/PLAN.md", "releases/0.5.0/rc-1/tasks/job1.md"],
+)
+def test_a_release_check_names_the_undecodable_file_and_not_the_spec_it_was_reached_from(
+    tmp_path: Path, relative: str
+) -> None:
+    specs = tmp_path / "repo" / "specs"
+    rc = specs / "releases" / "0.5.0" / "rc-1"
+    (rc / "tasks").mkdir(parents=True)
+    (rc / "SPEC.md").write_text("# S\n\n**Status:** Approved\n**Origin:** bugs:x\n\n", "utf-8")
+    (rc / "PLAN.md").write_text("# P\n\n**Status:** Approved\n\n", "utf-8")
+    state = {"schema": "release-state-v1", "release": "0.5.0", "phase": "DEFINITION",
+             "defined": None, "implemented": None, "shipped": None, "log": []}  # fmt: skip
+    (specs / "releases" / "0.5.0" / "_RELEASE.json").write_text(json.dumps(state), "utf-8")
+    (specs / "bugs").mkdir()
+    (specs / "bugs" / "BUGS.jsonl").write_text("", "utf-8")
+    (specs / relative).write_bytes(b"\xff\xfe\n")
+    script = stage_skill_scripts("dd-release-implementation", tmp_path / "staged" / "scripts")
+    done = subprocess.run(
+        [sys.executable, str(script / "release.py"), "check", "--specs", str(specs), "--json"],
+        capture_output=True, check=False, text=True,
+    )  # fmt: skip
+
+    assert done.returncode == 1 and "Traceback" not in done.stderr
+    assert [f["path"] for f in json.loads(done.stdout)] == [relative]
