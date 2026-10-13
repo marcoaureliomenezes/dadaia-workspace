@@ -429,3 +429,30 @@ def test_narrative_exempts_the_principle_adr_line(tmp_path: Path) -> None:
     """`ADR: NNNN (accepted)` names the decision that
     governs a principle — it is current truth, not history."""
     assert _canonical(tmp_path, "## Principles\n\nADR: 0023 (accepted)\n") == []
+
+
+def test_narrative_exempts_a_fixed_section_block_and_not_the_same_line_outside(
+    tmp_path: Path,
+) -> None:
+    """A rendered block carries ledger text, whatever tokens it holds."""
+    line = "- 0042 — Delivered by J3.T2"
+    inside = (
+        f"## Purpose\n\n<!-- dadaia:fixed adr-list -->\n{line}\n<!-- /dadaia:fixed adr-list -->\n"
+    )
+    assert _canonical(tmp_path, inside) == []
+    errors = _canonical(tmp_path, f"## Purpose\n\n{line}\n")
+    assert len(errors) == 1 and "task id 'J3.T2'" in errors[0], errors
+
+
+def test_narrative_exempts_only_a_closed_fixed_section_pair(tmp_path: Path) -> None:
+    """A lone opening marker exempts nothing, and later line numbers do not move."""
+    line = "- 0042 — Delivered by J3.T2"
+    lone = f"## Purpose\n\n<!-- dadaia:fixed adr-list -->\n{line}\n"
+    errors = _canonical(tmp_path, lone)
+    assert len(errors) == 1 and errors[0].startswith("MEM-NARRATIVE-1 line "), errors
+    paired = (
+        "## Purpose\n\n<!-- dadaia:fixed adr-list -->\nA\nB\n<!-- /dadaia:fixed adr-list -->\n"
+        f"{line}\n"
+    )
+    after = _canonical(tmp_path, paired)
+    assert len(after) == 1 and "line 16:" in after[0], after
