@@ -270,6 +270,10 @@ def current_job_writes(text: str, rel: str) -> tuple[set[str] | None, list[str]]
         paths = writes(f"`W:` {cells[writes_at]}")
         if not paths:
             errors.append(f"{rel} task {task_id} has no exact `W:` set")
+        if any(p.split("/")[:2] == ["specs", "memory"] for p in paths):
+            errors.append(
+                f"{rel} task {task_id} writes specs/memory — memory is closure procedure (RC-FLOW step 4)"
+            )
         authority.update(paths)
     return authority, errors
 

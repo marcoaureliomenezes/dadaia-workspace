@@ -34,7 +34,6 @@ from _release_schema import (
     current_candidate,
     origin,
     origin_line,
-    writes,
 )
 from _release_store import SCRIPT, Live, live_release
 from _specs import quote, script, with_specs
@@ -238,26 +237,16 @@ def _directory_findings(release_dir: Path, specs: Path) -> list[dict[str, Any]]:
             for path, message, fix in (candidate_errors(candidate) if candidate else [])]  # fmt: skip
     tasks = candidate / "TASKS.md" if candidate else None
     marks = list(MARK_RE.finditer(tasks.read_text("utf-8"))) if tasks and tasks.is_file() else []
-    memory = _memory_tasks(marks, tasks, dir_rel) if tasks else []
     if phase not in TRIO_PHASES:
         return (_definition_findings(state, marks, f"{dir_rel}/{STATE}", candidate, specs)
-                if candidate else []) + memory + jobs  # fmt: skip
+                if candidate else []) + jobs  # fmt: skip
     missing = [n for n in CANDIDATE_DOCS if not (candidate and (candidate / n).is_file())]
     if candidate is None or missing:
         where = candidate.name if candidate else "rc-<N>"
         return [_findings.finding(CODE, dir_rel, 1, f"phase {phase} is missing {where}/{', '.join(missing)}",
                         f"Operator action: define {', '.join(missing)} in {candidate or release_dir}"
                         " (dd-release-definition)")]  # fmt: skip
-    return memory + jobs
-
-
-def _memory_tasks(marks: list[re.Match[str]], tasks: Path, dir_rel: str) -> list[dict[str, Any]]:
-    """A task whose `W:` writes `specs/memory`: memory is closure procedure, never a task."""
-    fix = f"Operator action: drop the specs/memory path from that task's `W:` in {tasks}"
-    return [_findings.finding(CODE, f"{dir_rel}/{tasks.parent.name}/TASKS.md", 1, f"task {line[:80]!r} writes "
-                    "specs/memory — memory is closure procedure (RC-FLOW step 4)", fix)
-            for line in (m[0].strip() for m in marks)
-            if any(p.split("/")[:2] == ["specs", "memory"] for p in writes(line))]  # fmt: skip
+    return jobs
 
 
 def memory_errors(specs: Path, phase: str, entry: dict[str, Any]) -> list[str]:
