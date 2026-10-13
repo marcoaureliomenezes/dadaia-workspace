@@ -6,7 +6,7 @@
 **Opened:** 2026-10-13
 **Origin:** backlog:one-bytecode-off-owner,release-drift-edge-runs-memory-drift,architecture-adr-section-generated,one-owner-residue-after-the-kernel,reconcile-tree-writes-have-a-commit-shape,task-worktree-cap-removed; bugs:backlog-exit-refuses-on-an-unrelated-spec-origin,preflight-skips-checks-merge-runs,verdict-context-pattern-disagrees-with-core,verdict-validation-stated-three-ways-without-the-reviewed-tree,verdict-writer-emits-a-handoff-the-schema-rejects
 
-Sources: the as-is review `rc-15/AS-IS.md` (`7e88a1663`, read at `33cab8274`); the main thread's grill of 2026-10-13 (AskUserQuestion; each chosen option quoted verbatim where it rules); each Origin entry's `BACKLOG.json` description. Paths are relative to `repos/dadaia-workspace/`.
+Sources: the as-is review, read at `33cab8274`, whose table and sections now live in PLAN §1 to §1.6; the main thread's grill of 2026-10-13 (AskUserQuestion; each chosen option quoted verbatim where it rules); each Origin entry's `BACKLOG.json` description. Paths are relative to `repos/dadaia-workspace/`.
 
 Operator rulings, verbatim:
 
@@ -23,7 +23,7 @@ Operator rulings, verbatim:
 - Carried, `task-worktree-cap-removed`: "Descartar (Recommended)" and "e vai fazer de novo quantas vezes???" (2026-10-13).
 - Carried, G7 (rc-14 SPEC G7, operator 2026-10-11/12): "Não tolerarei nem mesmo 30% dessa quantidade de retrabalhos que tivemos."
 
-Agent defaults, unruled (main thread, 2026-10-13): Q2 bytecode = AS-IS option B; Q3 release drift = option B; Q4 reconcile shape = option B; Q8 G7 = as the rc-14 SPEC wrote it, a readout (operator, 2026-10-12: "quero que na proxima release candidate eu possa medir o quanto melhorou"). Main-thread rulings, 2026-10-13: the job-gate `doctor` (AC5.3) is kept under the gate-cost line; FR10's triage proposals land in a `backlog/<slug>` tree. The sr's own defaults (AS-IS §5) are labelled where they appear.
+Agent defaults, unruled (main thread, 2026-10-13): Q2 bytecode = option B (the child env comes from `_git.scrubbed_env`; the `-B` argv literals stay, each with a reason); Q3 release drift = option B (the decider and `CATALOG` move into the kernel); Q4 reconcile shape = option B (readouts only in the closure summary; `reconcile` added to the exit and repair rows; no §4 exception); Q8 G7 = as the rc-14 SPEC wrote it, a readout (operator, 2026-10-12: "quero que na proxima release candidate eu possa medir o quanto melhorou"). Main-thread rulings, 2026-10-13: the job-gate `doctor` (AC5.3) is kept under the gate-cost line; FR10's triage proposals land in a `backlog/<slug>` tree; the instance is reprojected after each wave's merges, so FR7's `preflight` and FR8's writer act on rc-15's own later reviews (G7). The sr's own defaults are labelled where they appear.
 
 `law-one-home-residual` exited `delivered` at rc-14; its parts (b), the ADR-ledger triage, and (c), 0193's `amends`, are carried by `architecture-adr-section-generated` (FR10). Its histo reason "(b) ADR 0243 accepted" stands uncorrected: `backlog.py` has no verb to amend an exit.
 
@@ -35,7 +35,7 @@ rc-14 ran from its birth at `c5dfdc07f` (2026-10-11) to its closure (2026-10-13)
 
 | verdict | disposition | fixes |
 |---|---|---|
-| REBUILD — FR8 | `fcbbe0850` (+1/−1): `--reviewed-root` added to the gate's call only; the fix line (`_worktree_end.py:311`) and `dd-handoff-emitter` SKILL.md step 7 still state the old command. Same unit, second bug: `verdict-validation-stated-three-ways-without-the-reviewed-tree`. | `merge-gate-validates-the-verdict-without-the-reviewed-tree` |
+| REBUILD — FR8 | `fcbbe0850` (+1/−1): `--reviewed-root` added to the gate's call only; the fix line in `_check_approved` and `dd-handoff-emitter` SKILL.md step 7 still state the old command. Same unit, second bug: `verdict-validation-stated-three-ways-without-the-reviewed-tree`. | `merge-gate-validates-the-verdict-without-the-reviewed-tree` |
 | REBUILD — FR2 | `5bb7044cc` (+9/−4): one more per-site bytecode switch in a test helper, the class's ninth site. | `skill-owner-tests-write-bytecode-into-the-source-tree` |
 | REBUILD — FR4 | `9c5911a51` moved the navigator's runner onto `_git`; `bugs.py:114` still runs an unscrubbed `git ls-files`. | `skill-git-runners-read-the-callers-git-env` |
 | REBUILD — FR6 | Not a fix: `e3e5b747d` (J11.T2, +29/−25) made the Origin scan strict across every release, and its body states the open bug's behaviour. | (cause of `backlog-exit-refuses-on-an-unrelated-spec-origin`) |
@@ -65,20 +65,20 @@ The rc-14 G1 readout also left residue: an unscrubbed git call, a refusal templa
 
 ## 3. Requirements
 
-Wave ranking: Wave 1 is law, skills and the dev loop (FR1, FR2). Wave 2 is the shared foundation (FR3 to FR5). Wave 3 is features and bugs (FR6 to FR9, FR11). Wave 4 is promote-facing (FR10, then the Reconciliation). FR7 is the G7 lever and every later review leans on `preflight`, so the PLAN may lift it into Wave 1 (AS-IS §3).
+Wave ranking: Wave 1 is law, skills and the dev loop (FR1, FR2). Wave 2 is the shared foundation (FR3 to FR5). Wave 3 is features and bugs (FR6 to FR9, FR11). Wave 4 is promote-facing (FR10, then the Reconciliation). FR7 is the G7 lever and every later review leans on `preflight`, so the PLAN may lift it into Wave 1 (PLAN §1.6). After each wave's merges the instance is reprojected (main thread, 2026-10-13), so the fixed `preflight` and verdict writer judge rc-15's own later reviews.
 
 ### Wave 1 — law, skills and dev loop
 
 #### FR1 — the reconcile tree's writes have their shape (`reconcile-tree-writes-have-a-commit-shape`; Q4 option B, agent default, unruled)
 
 - AC1.1 (no test — reviewer sweep): `dd-gitflow-default` §3a names `reconcile` in two rows: row 2's backlog entry or exit, and row 2's in-place `measured_by` repair. Rows 4 and 8 are unchanged. `specs/AGENTS.md` §4 keeps "read-only after its closure" and gains no exception.
-- AC1.2 (no test — reviewer sweep): The rc's closure readouts (its independent measurement, `verdict.py stats`, the goal readouts) live only in the `_RELEASE.json` closure summary. Every shipped text that places a closure readout in a PLAN or SPEC is changed to say so: `RC-FLOW.md` step 4, `RELEASE-EVENTS.md` and the PLAN skeleton.
+- AC1.2 (no test — reviewer sweep; an addition): No shipped text places a readout in a PLAN or SPEC; rc-13 and rc-14 did it by themselves. `RC-FLOW.md:39` already routes the closure narrative to the summary. RC-FLOW step 4 gains one clause: the rc's closure readouts (its independent measurement, `verdict.py stats`, the goal readouts) go in the `_RELEASE.json` closure summary, never in the closed PLAN or SPEC.
 - AC1.3 (no test — closure check): rc-15's own reconcile commits touch neither `rc-15/SPEC.md` nor `rc-15/PLAN.md`. Proof: `git diff --stat <phase CLOSURE sha>..<reconcile head> -- specs/releases/0.5.0/rc-15/SPEC.md specs/releases/0.5.0/rc-15/PLAN.md` prints nothing.
 
 #### FR2 — bytecode-off has one env owner (`one-bytecode-off-owner`; Q2 option B, agent default, unruled)
 
 - AC2.1 (unit, RED first): The kernel's `_git.scrubbed_env()` carries `PYTHONDONTWRITEBYTECODE=1`. A child Python started with it from a temporary package writes no `__pycache__`.
-- AC2.2 (integration): Five env sites build their child env on the owner and drop their own literal. The sites are `scripts/ci.py`, `scripts/mutate.py`, `features/certification/service.py`, `tests/fixtures/harness_env.py` and `test__atomic.py:216` (AS-IS §2.2 lists their lines). Every existing test stays green unedited.
+- AC2.2 (integration): Five env sites build their child env on the owner and drop their own literal. The sites are `scripts/ci.py`, `scripts/mutate.py`, `features/certification/service.py`, `tests/fixtures/harness_env.py` and `test__atomic.py:216` (PLAN §1.2 lists their lines). Every existing test stays green unedited.
 - AC2.3 (no test — reviewer `git grep`): `git grep -nE 'PYTHONDONTWRITEBYTECODE|dont_write_bytecode|-B\b' -- dadaia_workspace scripts tests` hits only the set PLAN §1.2 measured, each hit with its reason there. That set is:
   - the owner and its test;
   - the 8 skill-script top lines;
@@ -86,6 +86,7 @@ Wave ranking: Wave 1 is law, skills and the dev loop (FR1, FR2). Wave 2 is the s
   - the `tests/conftest.py` and `test__ledger.py` in-process switches;
   - the `-B` argv literals where `-I` or a clean env hides the variable (`python_env.py`, `hook_wrappers.py` ×2, six test sites);
   - the deliberate absence at `test__worktree_end__scaffold.py:92`;
+  - two text hits: `tests/conftest.py:53` (a comment) and `tests/core/test_skill_owner.py:25` (a docstring);
   - seven more hits: `test_harness_env.py:22`, `test_ci.py:57`, `test_impact.py:95`, `test_mutate.py:74`, `hook_wrappers.py:39`, the `<sha-B>` text in the finding schema, and `privacy_baseline.json:22`.
 
   This replaces the entry's done-when ("names only the owner and its test"), which option B does not reach.
@@ -101,8 +102,8 @@ Wave ranking: Wave 1 is law, skills and the dev loop (FR1, FR2). Wave 2 is the s
 #### FR4 — the one-owner residue (`one-owner-residue-after-the-kernel`)
 
 - AC4.1 (unit, RED first): `bugs.py`'s `git ls-files` call goes through `_git.git`. With `GIT_DIR` pointing at another repo, `bugs.py` still answers for its own (the rc-14 AC11.2 partition, extended to this site).
-- AC4.2 (unit): The refusal "would not pass check — nothing was written" is assembled once, in `_commit.validated`. `_backlog_store.py` and `_release_store.py` call it, and their existing tests stay green unedited.
-- AC4.3 (no test — reviewer sweep): PLAN §1 keeps each of these with its reason (AS-IS §1):
+- AC4.2 (unit): The refusal "would not pass check — nothing was written" is built four times today: `_commit.py` (`validated`), `_backlog_store.py`, `_release_store.py` and `dd-audit-project/scripts/_audit_store.py`. After the change it is built once, in `_commit.validated`, which the three stores call; their existing tests stay green unedited. Done when `git grep -n 'would not pass check — nothing was written' -- dadaia_workspace/public/skills` returns one line, in `_commit.py`. `release.py`'s "the ship ledger would not pass check:" is a different refusal, outside this grep and this AC.
+- AC4.3 (no test — reviewer sweep): PLAN §1.3 keeps each of these with its reason:
   - `infrastructure/git_subprocess.py` `_run`;
   - the 8 non-git `subprocess.run` calls;
   - the two `os.replace` path moves (D2);
@@ -116,7 +117,7 @@ Wave ranking: Wave 1 is law, skills and the dev loop (FR1, FR2). Wave 2 is the s
 
 - AC5.1 (integration): `report`, `render`, `worklist` and `git` of `_memory_drift.py` move to the kernel with their decisions unchanged, and `CATALOG` moves to the kernel's `_specs.py`. The release and navigator skills both import them, typed `Refusal` included. `release.py drift`, `memory` and `check` and `memory.py drift` keep their existing tests green. The only edit is the `sys.path` setup at `test__memory_drift.py:196,236`, which names the kernel only.
 - AC5.2 (unit, RED first): The thin-wrapper test loses `_CROSS_SKILL_EDGES` and `_EDGE_PATH_LINES`. Any import outside the stdlib, the skill's folder and the kernel fails it, and a planted cross-skill import turns it red. This tightens the invariant. The `sys.path.insert` at `_release_tree.py:19` leaves.
-- AC5.3 (integration; the sr's default, AS-IS §5, kept by the main thread's ruling of 2026-10-13): `scripts/ci.py` `STAGE` runs the existing `doctor` job, so memory drift turns the job gate red instead of only CI. Measured cost at `33cab8274`: `python -m dadaia_workspace doctor --specs-dir specs` 0.91 s wall, exit 0, far below one run of the job's `verify:` gate, so the gate-cost line (root map §1) holds without the operator. The task re-measures it and states the number in its commit body. The change adds no new check and no second decider beside LINT-1.
+- AC5.3 (integration; the sr's default, PLAN §1, kept by the main thread's ruling of 2026-10-13): `scripts/ci.py` `STAGE` runs the existing `doctor` job, so memory drift turns the job gate red instead of only CI. Measured cost at `33cab8274`: `python -m dadaia_workspace doctor --specs-dir specs` 0.91 s wall, exit 0, far below one run of the job's `verify:` gate, so the gate-cost line (root map §1) holds without the operator. The task re-measures it and states the number in its commit body. The change adds no new check and no second decider beside LINT-1.
 
 ### Wave 3 — features and bugs
 
@@ -136,7 +137,7 @@ Wave ranking: Wave 1 is law, skills and the dev loop (FR1, FR2). Wave 2 is the s
 - AC8.1 (integration, RED first): A body whose finding lacks `fix_recommendation` makes `verdict.py` exit nonzero. Its stderr follows the script's own grammar, `[error] …` plus one `fix:` line, and names the failing key. No file is left behind.
 - AC8.2 (integration, RED first): A verdict that cites a file only the reviewed tree holds is written, and it validates. The writer runs the workspace CLI's `reports validate <path> --reviewed-root <tree>` on its own output, and builds the CLI path with the kernel's `_platform`.
 - AC8.3 (integration): The merge gate's fix line for an invalid verdict carries `--reviewed-root <tree>`.
-- AC8.4 (no test — reviewer sweep): `dd-handoff-emitter` SKILL.md step 7 and its Done-when lose the manual `reports validate` run. The validation rule is stated once, by the writer. Growth reason: the bug's expected behaviour is validation before the file is accepted (about +8 production lines, AS-IS §2.1).
+- AC8.4 (no test — reviewer sweep): `dd-handoff-emitter` SKILL.md step 7 and its Done-when lose the manual `reports validate` run. The validation rule is stated once, by the writer. Growth reason: the bug's expected behaviour is validation before the file is accepted (about +8 production lines, as estimated by the as-is review).
 
 #### FR9 — no task-tree cap (`task-worktree-cap-removed`; Q-cap "Trocar o assert (Recommended)")
 
@@ -197,7 +198,7 @@ Each picked entry exits once at closure (`backlog.py exit`, from the reconcile t
 ### Governance sequencing
 
 1. ADR proposals land in a `define` or `backlog/<slug>` tree (§3a row 2), carrying `options` and self-contained `ruling.words` (ids above 0246). Only the operator accepts. FR10's class-triage proposals (AC10.1) land in a `backlog/<slug>` tree during rc-15 (main thread, 2026-10-13); the PLAN schedules that tree.
-2. Two accepted records state what this SPEC deletes. ADR 0191 states "At most 5 task worktrees per rc", carrying 0125 (3) (FR9). ADR 0245 (4) keeps the id-only `ADR:` label and the pairing rule (FR10). ADR 0250 (amends 0191) and ADR 0251 (amends 0245) were accepted by the operator on 2026-10-13, "Aceitar (Recommended)" (`cb7cf3f70`).
+2. Two accepted records state what this SPEC deletes. ADR 0191 states "At most 5 task worktrees per rc", carrying 0125 (3) (FR9). ADR 0245 (4) keeps the id-only `ADR:` label and the pairing rule (FR10). ADR 0250 (amends 0191) and ADR 0251 (amends 0245) were accepted by the operator on 2026-10-13, "Aceitar (Recommended)"; each record's `ruling` holds the question and the chosen option.
 3. FR10's order: the triage (AC10.1) proposes after the bug jobs merge, when the ledger is final. AC10.3's refusal runs only after the operator has accepted those proposals. The Reconciliation regenerates the block.
 
 ### Delivery constraints
@@ -213,7 +214,7 @@ Each picked entry exits once at closure (`backlog.py exit`, from the reconcile t
 
 | risk | control |
 |---|---|
-| AC10.3 refuses most of the ledger before the triage (AS-IS §2.4 heuristic: 98 of 209 unresolved) | order forced: triage acceptance, then the refusal |
+| AC10.3 refuses most of the ledger before the triage (the as-is review's heuristic: 98 of 209 accepted records unresolved) | order forced: triage acceptance, then the refusal |
 | `scrubbed_env` now carries a non-git key | one owner of a child env; the PLAN names it so a reader does not split it again |
 | The kernel grows by one module with two consumers (FR5) | ADR 0246 admits it; net lines about 0 |
 
@@ -223,6 +224,7 @@ None.
 
 Notes (not blocking):
 
+- The harness atoms `harness-claude-code`, `harness-codex` and `harness-kimi-code` still list `Bash` in the pre-gate matcher. That drift came from `b3374373b` (scorecard-fix). The fix is a Reconciliation memory-pass item that the PLAN's Reconciliation lists: a define tree writes memory only with an ADR acceptance (§3a rows 2 and 9).
 - rc-14 tasks J16.T5 (`specs/memory/AGENTS.md`, the law mirror), J18.T5 (`specs/memory/ARCHITECTURE.md`, `QUALITY.md`) and J26.T7 (`specs/memory/QUALITY.md`), which re-rendered fixed blocks, wrote `specs/memory` against §3a shapes 2 and 9. The memory-in-`W:` check passed them because it read the retired `TASKS.md`. The job files stay as history. Under the 2026-10-13 ruling, the check judges candidates before CLOSURE only.
-- The gate's other fix line (`_check_approved`, `reports validate --all` when no verdict decides) names the validator where the remedy is to write a verdict (AS-IS §2.1). It is not in a bug record; it goes to the next bug window as a proposal.
+- The gate's other fix line (`_check_approved`, `reports validate --all` when no verdict decides) names the validator where the remedy is to write a verdict (PLAN §1, the `_check_approved` row). It is not in a bug record; it goes to the next bug window as a proposal.
 - `test_memory_lint.py:346-350,427-431` assert a label grammar FR10 deletes from the law. They still pass, and changing them needs the operator's order.
