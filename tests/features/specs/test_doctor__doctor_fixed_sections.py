@@ -49,7 +49,7 @@ def _fixed_issues(doctor: SpecsDoctor) -> list[tuple[str, str]]:
 def test_check_reports_missing_and_drifted_blocks_and_stays_silent_on_exact_ones(
     tmp_path: Path,
 ) -> None:
-    """sa-doctor-finding-has-four-shapes: a specs rule emits a SectionFinding directly."""
+    """A specs rule emits a SectionFinding directly."""
     public = _public_dir(tmp_path)
     specs = _specs(
         tmp_path,

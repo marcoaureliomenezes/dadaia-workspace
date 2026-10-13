@@ -1,7 +1,7 @@
 """``WorkspaceService.init`` persists the harness profile through the ONE writer,
 ``JsonHarnessProfileStore.write`` — the service never spells the file (the inline
 ``_write_harness_profile`` copy is gone). Re-running ``init`` with the same set is a no-op
-(no spurious rewrite, no second hook entry). An absent profile file (a pre-v0.1.58 workspace)
+(no spurious rewrite, no second hook entry). An absent profile file (a workspace with no profile file)
 reads as ``None`` — the "treated as all-four" back-compat convention every consumer honours.
 
 These are unit-level assertions over the real service with fake asset/venv managers; the
@@ -60,7 +60,7 @@ def test_init_persists_the_harness_profile_through_the_one_store(
 
 
 def test_an_absent_profile_reads_none(tmp_path: Path) -> None:
-    """A pre-v0.1.58 workspace (no profile file) reads as None: the all-four convention."""
+    """A workspace with no profile file reads as None: the all-four convention."""
     assert JsonHarnessProfileStore().read(tmp_path) is None
 
 

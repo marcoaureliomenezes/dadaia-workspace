@@ -1,10 +1,9 @@
-"""v0.9.0 A4.2, A6.1; v0.11.0 A1.6, A2.3, A10.2: the push-range denylist
+"""The push-range denylist
 scan over a REAL throwaway repo, through the real ``GitSubprocessObjectReader`` wired into
 ``push_gate_decision`` (no CLI layer). Amnesty is bound to the PATH that already published
-a value at the range base (v0.11.0 FR1) — for a tag pushed over a published sha and for
-the first push of a new branch whose past is on origin (bug
-new-branch-push-loses-prior-published-denylist-amnesty); a git failure refuses naming
-its failure (FR6 row 2). Synthetic terms only.
+a value at the range base — for a tag pushed over a published sha and for
+the first push of a new branch whose past is on origin ); a git failure refuses naming
+its failure. Synthetic terms only.
 """
 
 from __future__ import annotations
@@ -102,8 +101,7 @@ def test_the_amnesty_is_bound_to_the_path_that_already_published_the_value(
 def test_prior_side_lookup_failure_refuses_naming_the_failure_and_no_verify(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """SPEC v0.11.0 A2.3 (integration tier — unit tier already pinned in
-    ``tests/infrastructure/test_git_objects.py``): a forced git failure on
+    """Integration tier: a forced git failure on
     the prior-side lookup refuses, naming the failure, over the
     REAL adapter wired into ``push_gate_decision``."""
     repo = tmp_path / "repo"
@@ -136,7 +134,7 @@ def test_prior_side_lookup_failure_refuses_naming_the_failure_and_no_verify(
 
 
 def test_real_git_failure_refuses_naming_the_failure(tmp_path: Path) -> None:
-    """FR6 row 2, integration-tier: a genuinely non-git directory wired through the
+    """Integration tier: a genuinely non-git directory wired through the
     REAL adapter refuses, never silently allows an unscannable push."""
     not_a_repo = tmp_path / "not-a-repo"
     not_a_repo.mkdir()

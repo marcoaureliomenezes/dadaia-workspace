@@ -6,7 +6,7 @@ pending — and I4 — the printed step's index strictly increases, so the loop 
 ``len(STEP_IDS)`` iterations.
 
 MEDIUM: real git over ``file://`` bare remotes; the workspace pre-push hook is pointed
-at an empty hooks dir (the chokepoint is T-050-14's contract, not this one's).
+at an empty hooks dir (the chokepoint is another contract's, not this one's).
 """
 
 from __future__ import annotations
@@ -106,7 +106,7 @@ def _git_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
 
 
 def _bound(root: Path, session: str | None) -> bool | None:
-    """The caller's Bind as the CLI reads it (sa-bind-has-two-stores#S1)."""
+    """The caller's Bind as the CLI reads it."""
     return (
         None
         if session is None
@@ -153,7 +153,7 @@ def test_every_command_fix_clears_its_step_and_the_loop_advances(
                 assert after is None or after.id != step.id, f"I3: {step.id} still pending"
             else:
                 pytest.fail(f"I4: the loop did not end within {len(STEP_IDS)} steps")
-            assert ("bind" in [STEP_IDS[i] for i in seen]) == (session is not None)  # AC7.3
+            assert ("bind" in [STEP_IDS[i] for i in seen]) == (session is not None)
             assert STEP_IDS[seen[-1]] == "publish"
         finally:
             os.chdir(cwd)

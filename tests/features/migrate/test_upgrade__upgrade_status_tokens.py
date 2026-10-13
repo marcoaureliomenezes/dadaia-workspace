@@ -1,6 +1,6 @@
 """`specs upgrade` rewrites the retired Portuguese status tokens in the
-live candidate's trio (0.4.7 FR4 / T-047-58), never in a closed rc-<N>/ or published
-history (ADR 0150 (1)); only the owner's anchored line is a declaration (T-050-143). Size: SMALL."""
+live candidate's trio never in a closed candidate directory or published
+history; only the owner's anchored line is a declaration. Size: SMALL."""
 
 from __future__ import annotations
 
@@ -52,9 +52,9 @@ def test_upgrade_rewrites_retired_status_tokens_only_in_the_live_trio(tmp_path: 
 
 @pytest.mark.medium
 def test_one_upgrade_run_folds_a_legacy_flat_tree_clean(tmp_path: Path) -> None:
-    """ADR 0150, 0151 M5, 0152 (4): a stamp-6 tree whose release carries the legacy
-    `RELEASE.json`, a closed `rc-1/` and a flat trio is clean after ONE `specs upgrade`:
-    the trio lands in `rc-2/`, the dry run plans the same destinations, `rc-1/` is kept."""
+    """A stamp-6 tree whose release carries the legacy
+    `RELEASE.json`, a closed first candidate and a flat trio is clean after ONE `specs upgrade`:
+    the trio lands in the second candidate, the dry run plans the same destinations, the first is kept."""
     specs = tmp_path / "specs"
     canon.scaffold(specs, project_name="p")
     merge_frontmatter(specs, specs_pattern_version=6)
@@ -81,7 +81,7 @@ def test_one_upgrade_run_folds_a_legacy_flat_tree_clean(tmp_path: Path) -> None:
 
 @pytest.mark.medium
 def test_one_upgrade_run_folds_a_flat_only_tree_into_rc_1(tmp_path: Path) -> None:
-    """A stamp-6 release holding only a flat trio, with no `rc-<N>/`, lands in `rc-1/`:
+    """A stamp-6 release holding only a flat trio, with no candidate directory, lands in the first:
     the trio is the candidate being folded, never one already counted."""
     specs = tmp_path / "specs"
     canon.scaffold(specs, project_name="p")

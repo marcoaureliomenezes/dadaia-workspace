@@ -1,7 +1,6 @@
-"""Wiring the specs/ canon scan into ``push_gate_decision`` (v0.5.0 specs-canon
-closure, operator ruling 2026-08-28).
+"""Wiring the specs/ canon scan into ``push_gate_decision`` .
 
-Every range is a real git range read by the real ``GitSubprocessObjectReader`` (AC9.4).
+Every range is a real git range read by the real ``GitSubprocessObjectReader``.
 Covers: canon paths pass; a stray/non-canon path in the range refuses (naming the fix
 hint); a non-canon path already published never blocks; the scan reaches every
 non-deletion ref (tags included), never a deletion.
@@ -71,8 +70,7 @@ def test_the_canon_scan_refuses_a_non_canon_path_in_the_pushed_range(
     side: dict[str, str] | None,
     files: dict[str, str | None], line: str, refused: str | None
 ) -> None:
-    """Bugs ``pre-push-canon-scan-not-range-scoped``, ``pre-push-canon-scan-judges-paths-the-range-deletes``:
-    only the net tree the range publishes is judged — a None path is added then deleted inside the range;
+    """Only the net tree the range publishes is judged — a None path is added then deleted inside the range;
     *side* is published as develop from the published tip, then merged."""
     remote = ZERO
     if published:

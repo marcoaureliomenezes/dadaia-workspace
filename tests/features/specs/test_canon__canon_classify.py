@@ -1,4 +1,4 @@
-"""sa-specs-tree-state-read-five-ways, T-048-05 (ADR 0047): the tree state
+"""The tree state
 and its fix; the scaffolded stubs speak English with the fixed memory sections. SMALL."""
 
 from __future__ import annotations
@@ -43,9 +43,9 @@ _MALFORMED = "---\nspecs_pattern_version: 7\ngitflow: {principal: main\n---\n# C
 def test_state_is_the_one_reader_with_one_fix(
     tmp_path: Path, text: str | None, kind: str, fix_tail: str | None
 ) -> None:
-    """sa-specs-tree-state-read-five-ways#B28-1: exactly one state plus one fix; a malformed
+    """Exactly one state plus one fix; a malformed
     constitution is malformed, never pattern 0. ``""`` = no constitution file in the tree.
-    sa-specs-tree-state-read-five-ways#B28-7: state() is the module's only tree reader."""
+    state() is the module's only tree reader."""
     specs = tmp_path / "specs"
     if text is not None:
         specs.mkdir()

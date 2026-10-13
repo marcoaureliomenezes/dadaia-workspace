@@ -1,4 +1,4 @@
-"""ADR-SUPERSEDED-CITATION (0.4.7 c5 FR4): a memory atom, skill or rule
+"""ADR-SUPERSEDED-CITATION: a memory atom, skill or rule
 citing a superseded decision is an error; accepted and proposed citations are silent.
 Size: SMALL."""
 
@@ -47,7 +47,7 @@ def test_no_superseded_record_means_silence(tmp_path: Path) -> None:
 
 
 def test_a_record_holding_u2028_is_read_whole(tmp_path: Path) -> None:
-    """release-new-crashes-on-a-unicode-line-separator-in-the-bug-ledger (AC3.5): a U+2028
+    """A U+2028
     inside a superseded record's text keeps that record one line."""
     specs = tmp_path / "specs"
     (specs / "ADRs").mkdir(parents=True)

@@ -1,5 +1,5 @@
 """`specs upgrade` removes a live `releases/_ideas/` that holds nothing
-but the scaffolded AGENTS.md (0.4.7 c5 T-047-49: `_ideas/` left the canon). Size: SMALL."""
+but the scaffolded AGENTS.md (`_ideas/` is not canon). Size: SMALL."""
 
 from __future__ import annotations
 

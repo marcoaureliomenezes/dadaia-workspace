@@ -1,4 +1,4 @@
-"""memory-catalog-context-is-the-checkout-folder-name#upgrade: the
+"""The
 upgrade repair regenerates a drifted catalog pair through its ONE generator
 (`memory.py catalog generate`), so the doctor's memory ledger ends clean.
 

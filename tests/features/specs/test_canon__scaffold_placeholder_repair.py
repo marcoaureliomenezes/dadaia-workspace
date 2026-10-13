@@ -1,5 +1,4 @@
-"""v0.2.9 T2 — placeholder-atom repair (bug scaffold-repair-cannot-remediate-invalid-
-placeholder-atom).
+"""Placeholder-atom repair.
 
 Old scaffolds shipped a raw ``memory/product/feature.md`` template
 (``SLUG_PLACEHOLDER`` & friends) that NO verb could remediate. Now: the doctor flags it as fixable
@@ -87,7 +86,7 @@ def test_upgrade_dry_run_reports_without_deleting(tmp_path: Path) -> None:
 
 
 def test_reconcile_ownership_preflight_names_owner_and_repair(tmp_path: Path) -> None:
-    """Bug reconcile-root-owned-agentic: a mixed-ownership workspace gets an actionable
+    """A mixed-ownership workspace gets an actionable
     ownership error (path + owner + chown command), never a bare Permission denied."""
     import os
 
