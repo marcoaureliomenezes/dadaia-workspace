@@ -499,10 +499,15 @@ def CONTROL(root: Path) -> Session:
         "Reads ISO-8601 at section 4, a bug in the parser, a review of the diff, a wave of\n"
         "work, a grill of the plan, a ruling on Q and python 3.12 on v1.2. A bug end-to-end\n"
         "test, Bug: off-by-one in a cursor, ISO week 2026-W41-1, the W1-4 range, fixed 2 bugs\n"
-        "3 times, python bug 12345, review h2 heading, Review H1 heading, SHA256, UTF8, SHA-256,\n"
-        "UTF-8, an H1 heading, IPv4, E402 and S603 lint codes, C0 control bytes, T1 evals,\n"
-        "L1 harness, A4 paper, NIST P-256, FRAME 3, ACK 2, a WPA2 key, (L1 harness), (T1 evals),\n"
-        "a (H1) heading, the #C0FFEE color and the 20261013T040740Z stamp.\n"
+        "3 times, python bug 12345, review h2 heading, review H2 sections, ruling 3 times,\n"
+        "SHA256, UTF8, SHA-256, UTF-8, an H1 heading, IPv4, E402 and S603 lint codes, T-1,\n"
+        "TR-808, CP1252, NIST P-256, FRAME 3, ACK 2, a WPA2 key, 12345678-abcd-1234, 20261013-x, the\n"
+        "#C0FFEE color and the 20261013T040740Z stamp.\n"
+        "T1: cold onboarding\n"
+        "#: C0, C1\n"
+        "L1, L2 caches\n"
+        "S3: the bucket\n"
+        "object storage (S3) and (C1 range), a (Q3) quarter, priority (P0), a (H1) heading\n"
         '"""\n',
     )
     _write(root, "scripts/guards/ok.py", '"""Judges x."""\n')
@@ -649,8 +654,7 @@ _PLANTS: dict[str, dict[str, Plant]] = {
         "plan-label-id": _add("tests/unit/test_p.py", "# PLAN D8 pins x\n"),
         "grill-label-id": _add("tests/unit/test_p.py", "# Grill Q14 ordered x\n"),
         "bug-number-id": _add("tests/unit/test_p.py", "# bugs 465, 467 pin x\n"),
-        "leading-label-id": _add("tests/unit/test_p.py", "# R13, N3: pins x\n"),
-        "marked-label-id": _add("tests/unit/test_p.py", "# pins x (N3)\n"),
+        "section-label-id": _add("tests/unit/test_p.py", "# SA-H3-1 pins x\n"),
         "exact-bug-id": _ledger_plant(
             "specs/bugs/BUGS.jsonl",
             '{"id": "zz-planted-bug"}\n',
