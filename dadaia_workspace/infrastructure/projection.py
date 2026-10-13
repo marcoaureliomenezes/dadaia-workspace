@@ -1,7 +1,6 @@
 """``ProjectionRule``: the one seam every install/doctor comparison flows through.
 
-K3 (release 0.5.1, candidate "one ProjectionRule table; harness as a real seam with
-three adapters"). Before this module, "does this projected file match what the
+Before this module, "does this projected file match what the
 library ships" was decided five separate ways across ``public_assets.py``,
 ``install_helpers.py`` and ``codex_doctor.py``: a raw sha compare, a rendered-content
 string compare, a policy-aware render compare reserved for Claude agents only, a

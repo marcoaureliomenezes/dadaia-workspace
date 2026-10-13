@@ -334,7 +334,8 @@ class SpecContextService:
         stored context is returned unchanged) — never a duplicate entry. The same
         slug already registered with a *different* URL raises
         ``AssociatedRepoConflictError`` rather than silently overwriting it: this
-        method is the ONE way to register an associated repo's URL (one-accessor discipline extended to writes), so the recovery path is
+        method is the ONE way to register an associated repo's URL (one-accessor discipline
+        extended to writes), so the recovery path is
         remove-then-add, never a second divergent "update" verb. The context's own
         main repo slug is a no-op (``was_added=False``) — it is already included via
         ``all_repos()``. Nor can a slug already owned by
@@ -495,7 +496,8 @@ class SpecContextService:
         accepted and surface through git; this operation never acquires a lock.
 
         Every repo in the set — the main repo first, then each
-        associated repo in order (``SpecContextProject.all_repos()``, the one accessor) — is cloned if missing and gets the pre-push hook. Only the MAIN repo
+        associated repo in order (``SpecContextProject.all_repos()``, the one accessor) — is
+        cloned if missing and gets the pre-push hook. Only the MAIN repo
         receives checkout and branch tracking. alive() writes no specs and commits
         nothing: the working tree is exactly what the remote holds.
         """
@@ -565,7 +567,8 @@ class SpecContextService:
     # ------------------------------------------------------------------ baseline
 
     def baseline(self, name: str, *, message: str = "chore: publish the dadaia specs") -> str:
-        """Publish the main repo of context *name*, append-only and anchor-first; return its work branch, ``""`` when nothing was pushed.
+        """Publish the main repo of context *name*, append-only and anchor-first; return its
+        work branch, ``""`` when nothing was pushed.
         The onboarding paths are committed off every branch — HEAD detached (born), or
         on the unborn name renamed to ``<work>`` — so no existing branch ever holds that
         anchor; ``<work>`` is merged into it and advanced to it by compare-and-swap, then
