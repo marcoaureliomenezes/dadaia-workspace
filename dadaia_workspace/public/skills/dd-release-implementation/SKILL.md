@@ -27,7 +27,7 @@ description: >
 6. Change `_RELEASE.json` through `release.py` verbs (`phase`, `memory`, `ship`); only `summary` and the authorization `note` are hand-written (`RELEASE-EVENTS.md`).
 7. At `RC-FLOW.md` step 4, run `MEMORY-UPDATE.md`'s full protocol before touching any memory atom.
 8. A test enters the suite only under the root map §1 test basics.
-9. Before growing any module, run the deletion test (delete it: does complexity vanish or reappear across callers?) — a diff that only adds justifies itself against replace-don't-layer.
+9. Before growing any module, run the deletion test (`dd-code-review` SLOP.md) — a diff that only adds justifies itself against replace-don't-layer.
 10. Implement each task inside its own task worktree, cut from its job's worktree branch per `worktrees/AGENTS.md` §1.
 11. Before claiming a bug, unused code or done, cite file:line or a grep; reproduce from a clean state; done needs user-side evidence.
 12. After any tool error, re-read the real state; report a deferral to the operator as an intake proposal carrying its design, never written into the backlog.

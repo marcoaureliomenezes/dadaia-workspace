@@ -33,7 +33,7 @@ Scope: this file governs only `specs/bugs/`.
 
 - Each field's class is its `x-mutability` in `bug-record-v1`; this law lists no fields.
 - `immutable-core`: never rewritten once appended.
-- `write-once`: absent at registration; settable once, then immutable.
+- `write-once`: settable once (`correlates` at registration, the rest at closure), then immutable.
 - `mutable-governance`: rewritten in place, atomic refuse-stale.
 
 ## 4. Authoring rules

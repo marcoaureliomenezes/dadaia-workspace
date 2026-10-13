@@ -22,7 +22,6 @@ Also input: `.dadaia/.venv/bin/dadaia doctor` against every release the window t
 2. Each finding reads `<CODE> <verdict> <message>`; the message carries its own remediation.
 3. Every non-zero-severity issue inside the window becomes a `FINDINGS-FORMAT.md` record with `pillar: "specs"`.
 4. Record a WARN that `--fix` can repair mechanically as a finding too — this pillar measures, it never fixes.
-5. Treat an archived release carrying no directory (only its `releases_histo.jsonl` summary) as the canon shape, not drift.
 
 ## `_RELEASE.json` milestone completeness
 
@@ -30,7 +29,7 @@ Also input: `.dadaia/.venv/bin/dadaia doctor` against every release the window t
 2. Milestones: `defined` (SPEC `Approved`), `implemented` (`release.py phase CLOSURE`), `shipped` (merge to the principal branch of the constitution's `gitflow:`).
 3. Confirm each carries a `sha` (and, where applicable, a `pr`).
 4. Flag a release with a `shipped` milestone but no `defined`/`implemented` milestone — the chain has a gap.
-5. For an archived release, check the same via its `releases_histo.jsonl` summary.
+5. For an archived release, check the same from `releases/_archive/<v>/_RELEASE.json`.
 
 ## SPEC provenance and the one exit
 

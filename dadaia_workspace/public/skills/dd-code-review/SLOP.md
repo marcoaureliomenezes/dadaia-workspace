@@ -31,7 +31,7 @@ labelled judgement call with the command that makes it verifiable in the diff.
 
 ## Lifecycle
 
-- The deletion test applies to a file, line, comment, spec sentence, acronym, branch, release, rule or handoff alike.
+- The deletion test: delete the unit; does complexity vanish or reappear across callers? It applies to a file, line, comment, spec sentence, acronym, branch, release, rule or handoff alike.
 - Slop dies in the change that finds it — never commented out, marked, archived or deferred.
 - The writer proves the artifact fails the test, the reviewer applies it, the auditor measures the balance.
 

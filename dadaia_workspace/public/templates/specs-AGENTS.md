@@ -31,7 +31,7 @@ Scope: this file governs only the `specs/` tree of one Spec Context Project.
 | `releases/<id>/rc-<N>/{SPEC,PLAN}.md`, `rc-<N>/tasks/job<n>.md` (read-only after its closure; archived whole at promote) | `dd-product-engineer` (SPEC), `dd-sw-engineer-sr` (PLAN, job files) |
 | `memory/**` | `dd-product-engineer`; phases and tiers: `memory/AGENTS.md` §1 |
 | `backlog/**` | `dd-product-engineer`; entries exit by `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py exit` |
-| `bugs/**` | any agent, by verbs only; propose and confirm: `bugs/AGENTS.md` |
+| `bugs/**` | `dd-product-engineer`, `dd-sw-engineer-sr`, by verbs only, after the operator confirms; propose and confirm: `bugs/AGENTS.md` |
 | `audits/**` | the main thread, from the reviewer's audit-lens report; how a finding moves: `audits/AGENTS.md` |
 
 ## 7. Escalation

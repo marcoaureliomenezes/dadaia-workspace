@@ -3,11 +3,10 @@
 Scope: this file governs only `specs/backlog/`.
 
 - `BACKLOG_PY` is `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py`: `new` creates an entry, `exit` removes it and appends its history, and `check` validates both files; live-entry curation is §2.
-- Create and append entries with `BACKLOG_PY new <slug>`.
 - The backlog is the operator's demand queue: only the operator creates demand, `dd-product-engineer` curates `active[]`.
 - An entry materializes only through the main thread's operator-facing intake report; an operator-ratified in-release deferral already counts as intake.
 - The backlog is a single JSON document: `specs/backlog/BACKLOG.json`, `{schema: "backlog-v1", active: [...]}`.
-- Full schema: `dd-backlog-definition` (The document), `.agents/skills/dd-backlog-definition/scripts/schemas/backlog-v1.schema.json`.
+- Full schema: `.agents/skills/dd-backlog-definition/scripts/schemas/backlog-v1.schema.json`.
 - A closed item's history lives beside the document, in `specs/backlog/_archive/backlog_histo.jsonl`.
 
 ## 1. The document, plus its histo
@@ -18,8 +17,7 @@ Scope: this file governs only `specs/backlog/`.
 ## 2. Authoring rules
 
 - `<slug>` matches `$defs.slug` of backlog-v1.
-- Every `active[]` entry carries five required fields: `title`, `opened` (`YYYY-MM-DD`), `status`, `description`, `provenance`.
-- `BACKLOG_PY new` writes `status: idea`; a later lowercase live token (`candidate`, …) is a hand edit, which `BACKLOG_PY check` validates: no terminal status on a live entry, and a status past `idea` binds `intents[]`.
+- `BACKLOG_PY new` writes `status: idea`; a later lowercase live token (`candidate`, …) is a hand edit, which `BACKLOG_PY check` validates (§4).
 - Optional: `intents` (§4) and `relates` (`BACKLOG_PY new --help`).
 - An entry leaves only by `BACKLOG_PY exit <slug> --disposition …`, which removes the `active[]` object and appends its one histo record.
 
