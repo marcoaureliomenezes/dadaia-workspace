@@ -107,7 +107,7 @@ def test_none_removes_a_file_and_leaves_a_missing_parent_missing(
 
 @pytest.mark.skipif(sys.platform == "win32", reason="symlink creation needs a privilege")
 @pytest.mark.parametrize("content", ["new\n", None], ids=["text", "none"])
-def test_symlinked_path_is_refused_and_untouched(
+def test_symlinked_path_is_refused_and_untouched_through_every_door(
     write: _Write, tmp_path: Path, content: str | None
 ) -> None:
     target = tmp_path / "target.txt"
@@ -150,7 +150,7 @@ def test_no_temp_sibling_survives_any_injected_failure(
     assert not existing or target.read_text(encoding="utf-8") == "original\n"
 
 
-def test_permission_error_retries_the_swap_on_a_fake_clock(
+def test_permission_error_retries_the_swap_on_a_fake_clock_through_every_door(
     write: _Write, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     dest, real = tmp_path / "a.txt", os.replace
@@ -244,3 +244,78 @@ def test_a_call_through_load_owner_leaves_no_pycache(tmp_path: Path) -> None:
     assert done.returncode == 0, done.stderr
     assert done.stdout.strip() == "[]"
     assert (tmp_path / "o.txt").read_text(encoding="utf-8") == "ok"
+
+
+def _linked(tmp_path: Path) -> tuple[Path, Path]:
+    target = tmp_path / "target.txt"
+    target.write_text("keep\n", encoding="utf-8")
+    link = tmp_path / "link.txt"
+    link.symlink_to(target)
+    return link, target
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="symlink creation needs a privilege")
+def test_symlinked_path_is_refused_and_untouched(atomic: ModuleType, tmp_path: Path) -> None:
+    link, target = _linked(tmp_path)
+    with pytest.raises(SymlinkRefusedError):
+        atomic.atomic_write(link, "new\n")
+    assert link.is_symlink() and link.resolve() == target
+    assert target.read_text(encoding="utf-8") == "keep\n"
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["link.txt", "target.txt"]
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="symlink creation needs a privilege")
+def test_ledger_replace_raises_the_core_class(tmp_path: Path) -> None:
+    link, target = _linked(tmp_path)
+    with pytest.raises(SymlinkRefusedError):
+        load_owner("dd-bug-resolution", "_ledger").replace(link, "new\n")
+    assert target.read_text(encoding="utf-8") == "keep\n" and link.is_symlink()
+
+
+def test_no_temp_sibling_survives_a_failed_swap(
+    atomic: ModuleType, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    dest = tmp_path / "a.txt"
+    dest.write_text("old", encoding="utf-8")
+
+    def boom(src: object, dst: object) -> None:
+        raise OSError("injected")
+
+    monkeypatch.setattr(os, "replace", boom)
+    with pytest.raises(OSError, match="injected"):
+        atomic.atomic_write(dest, "new")
+    assert [p.name for p in tmp_path.iterdir()] == ["a.txt"]
+    assert dest.read_text(encoding="utf-8") == "old"
+
+
+def test_permission_error_retries_the_swap_on_a_fake_clock(
+    atomic: ModuleType, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    dest, real, naps, calls = tmp_path / "a.txt", os.replace, [], []
+
+    def flaky(src: object, dst: object) -> None:
+        calls.append(1)
+        if len(calls) <= 2:
+            raise PermissionError("held open")
+        real(src, dst)
+
+    monkeypatch.setattr(os, "replace", flaky)
+    monkeypatch.setattr(time, "sleep", naps.append)
+    atomic.atomic_write(dest, "new\n")
+    assert (len(calls), naps) == (3, [0.01, 0.01])
+    assert dest.read_text(encoding="utf-8") == "new\n"
+    assert [p.name for p in tmp_path.iterdir()] == ["a.txt"]
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX modes")
+def test_preserve_mode_and_ensure_parent(atomic: ModuleType, tmp_path: Path) -> None:
+    dest = tmp_path / "a.txt"
+    dest.write_text("old", encoding="utf-8")
+    dest.chmod(0o640)
+    atomic.atomic_write(dest, "new", preserve_mode=True)
+    assert (dest.stat().st_mode & 0o777, dest.read_text(encoding="utf-8")) == (0o640, "new")
+    deep = tmp_path / "x" / "y" / "b.txt"
+    with pytest.raises(FileNotFoundError):
+        atomic.atomic_write(deep, "b")
+    atomic.atomic_write(deep, "b", ensure_parent=True)
+    assert deep.read_text(encoding="utf-8") == "b"

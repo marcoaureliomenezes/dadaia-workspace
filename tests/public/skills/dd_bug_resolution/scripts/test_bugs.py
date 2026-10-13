@@ -866,3 +866,20 @@ def test_a_refused_archive_leaves_both_ledger_files_byte_intact(
         done = _run(script, "archive", "old-bug", "--specs", str(specs))
         assert done.returncode == 1, done.stdout
         assert [(specs / "bugs" / "BUGS.jsonl").read_bytes(), histo.read_bytes()] == before
+
+
+def test_duplicate_ids_are_refused(script: Path, tmp_path: Path) -> None:
+    done = _run(script, "check", "--specs", str(_ledger(tmp_path, _OPEN_RECORD, _OPEN_RECORD)))
+    assert done.returncode == 1
+    assert "duplicate" in done.stdout
+
+
+def test_json_output_carries_one_object_per_finding(script: Path, tmp_path: Path) -> None:
+    broken = {k: v for k, v in _OPEN_RECORD.items() if k != "symptom"}
+    done = _run(script, "check", "--specs", str(_ledger(tmp_path, broken)), "--json")
+    assert done.returncode == 1
+    payload = json.loads(done.stdout)
+    assert len(payload) == 1
+    assert payload[0]["code"] == "LEDGER-BUGS-SCHEMA"
+    assert payload[0]["verdict"] == "error"
+    assert payload[0]["line"] == 1

@@ -870,3 +870,10 @@ def test_origin_names_the_right_fix_for_each_cause(script: Path, tmp_path: Path)
         "fix: Operator action: pass the path of an existing SPEC.md"
     )
     assert malformed.stderr.splitlines()[-1] == "fix: Operator action: edit its `**Origin:**` line"
+
+
+def test_check_reports_a_histo_record_that_is_not_valid_json(script: Path, tmp_path: Path) -> None:
+    specs = _specs(tmp_path)
+    _release(specs, "0.5.0", phase="IMPLEMENTATION")
+    (specs / "releases" / "_archive" / "releases_histo.jsonl").write_text("{\n", encoding="utf-8")
+    assert _run(script, "check", "--specs", str(specs)).returncode == 1

@@ -606,3 +606,16 @@ def test_the_backlog_seam_amnesties_a_term_origin_already_holds(
 
     assert (done.returncode == 1) is refused, done.stderr
     assert ("field 'description' carries" in done.stderr) is refused
+
+
+def test_check_json_carries_one_object_per_finding(script: Path, tmp_path: Path) -> None:
+    specs = _specs(
+        tmp_path,
+        {"id": "thin", "title": "t", "opened": "2026-09-20", "status": "idea", "description": "d"},
+    )
+    done = _run(script, "check", "--specs", str(specs), "--json")
+    assert done.returncode == 1
+    payload = json.loads(done.stdout)
+    assert len(payload) == 1
+    assert payload[0]["code"] == "LEDGER-BACKLOG-SCHEMA"
+    assert payload[0]["verdict"] == "error"
