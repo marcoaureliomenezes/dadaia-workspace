@@ -197,6 +197,9 @@ def test_a_bad_context_or_slug_is_refused_by_name_and_writes_nothing_anywhere(
     refused = _verdict(root, tree, sha=head, **{name: bad})
     assert refused.returncode == 1
     assert refused.stderr.startswith(f"[error] {name} must match ")
+    assert refused.stderr.endswith(
+        f"\nfix: Operator action: pass a {name[2:]} matching that pattern, then rerun verdict.py\n"
+    )
     assert "Traceback" not in refused.stderr
     assert _tree_files(tmp_path) == before
 
@@ -217,7 +220,10 @@ def test_a_non_object_json_is_refused_with_text_and_no_traceback(
     root, tree, head = _workspace(tmp_path)
     refused = _verdict(root, tree, sha=head, stdin=stdin)
     assert refused.returncode == 1
-    assert refused.stderr == "[error] stdin is not a JSON object\n"
+    assert refused.stderr == (
+        "[error] stdin is not a JSON object\nfix: Operator action: pipe one JSON object"
+        " without the keys verdict.py owns, then rerun verdict.py\n"
+    )
     assert _written(root) == []
 
 
@@ -235,7 +241,7 @@ def test_a_verdict_in_a_second_already_taken_never_overwrites_the_first(tmp_path
     refused = _verdict(root, tree, sha=head)
     assert refused.returncode == 1
     assert refused.stderr.startswith("[error] ") and refused.stderr.endswith(
-        "exists; rerun in a second\n"
+        "exists; rerun in a second\nfix: Operator action: rerun verdict.py in a second\n"
     )
     assert [p.read_text() for p in taken] == ["first"] * len(taken)
     assert set(_written(root)) == set(taken)
@@ -437,3 +443,29 @@ def test_a_cli_crash_without_json_or_fix_line_is_refused_with_one_operator_actio
         " then rerun verdict.py\n"
     )
     assert _written(root) == []
+
+
+def test_stats_outside_a_workspace_is_refused_with_one_fix_line(tmp_path: Path) -> None:
+    root, _tree, _head = _workspace(tmp_path)
+    (away := tmp_path / "away").mkdir()
+    script = root / ".agents/skills" / SKILL / "scripts/verdict.py"
+    refused = subprocess.run(
+        [sys.executable, str(script), "stats", "0.5.0-rc1"],
+        cwd=away,
+        capture_output=True,
+        text=True,
+    )
+    assert refused.returncode == 1
+    assert refused.stderr == (
+        "[error] no workspace above the current directory\nfix: Operator action: run"
+        " verdict.py stats from inside the workspace, then rerun it\n"
+    )
+
+
+def test_a_workspace_without_its_cli_is_refused_with_the_install_fix_line(tmp_path: Path) -> None:
+    root, tree, head = _workspace(tmp_path)
+    shutil.rmtree(root / ".dadaia/.venv")
+    refused = _verdict(root, tree, sha=head)
+    assert refused.returncode == 1
+    assert refused.stderr.startswith("[error] no workspace CLI\nfix: uvx dadaia-workspace init ")
+    assert refused.stderr.count("fix:") == 1 and _written(root) == []
