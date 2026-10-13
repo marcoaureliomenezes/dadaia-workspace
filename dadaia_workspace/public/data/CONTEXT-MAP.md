@@ -38,7 +38,7 @@ The `Surface` column names the path or entity as it appears in an installed work
 |---|---|---|
 | `AGENTS.md` | the root map: the flow, the roles, the gate invariants, the root, credentials, and one line per scoped file | statements; the index of every other surface |
 | `specs/AGENTS.md` | the canon of a specs tree and its status tokens | canon table, status tokens, doctor codes |
-| `specs/releases/AGENTS.md` | candidates, phases, task markers, promote | release procedure and commit shapes |
+| `specs/releases/AGENTS.md` | candidates, phases, promote | release procedure and commit shapes |
 | `specs/backlog/AGENTS.md` | the operator's demand queue and its exits | `BACKLOG.json` shape, intake gate, dispositions |
 | `specs/bugs/AGENTS.md` | what a bug is and how it is proposed, recorded, resolved | bug procedure and the redaction rule |
 | `specs/memory/AGENTS.md` | current product truth and who writes it | atoms, ownership |

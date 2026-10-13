@@ -29,10 +29,6 @@ MEMORY_WRITE = "writes specs/memory"
 #: A release ships `delivered` — the one histo disposition this ledger writes.
 DELIVERED = "delivered"
 APPROVED = "Approved"
-#: The task markers in order — open < reserved < done; the ONE task-line grammar.
-MARKS = (" ", "-", "x")
-#: A task line: indent and any Markdown bullet (``-``, ``*``, ``+``) or none, the marker, the rest.
-MARK_RE = re.compile(r"^([ \t]*(?:[-*+][ \t]*)?\[)([ x-])(\].*)$", re.MULTILINE)
 #: The Origin clause kinds, each at most once on the line.
 ORIGIN_KINDS = ("backlog", "bugs", "findings")
 _ORIGIN_RE = re.compile(r"^\*\*Origin:\*\*[ \t]*(.*?)[ \t]*$", re.MULTILINE)

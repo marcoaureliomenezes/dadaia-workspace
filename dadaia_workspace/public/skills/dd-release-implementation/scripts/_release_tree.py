@@ -25,7 +25,6 @@ from _release_schema import (
     CLOSURE,
     CODE,
     HISTO,
-    MARK_RE,
     MEMORY_WRITE,
     TRIO_PHASES,
     current_candidate,
@@ -197,16 +196,14 @@ def _origin_findings(specs: Path) -> list[dict[str, Any]]:
 
 
 def _definition_findings(
-    state: dict[str, Any], marks: list[re.Match[str]], rel: str, candidate: Path, specs: Path
+    state: dict[str, Any], rel: str, candidate: Path, specs: Path
 ) -> list[dict[str, Any]]:
-    """DEFINITION implements nothing: a `[-]`/`[x]` marker, or a closure entry logged
-    after the live candidate's birth note, means the phase verb was never run."""
+    """DEFINITION implements nothing: a closure entry logged after the live candidate's
+    birth note means the phase verb was never run."""
     log = state["log"]
     born = max((n for n, e in enumerate(log) if e["agent"] == "release.py new"), default=-1)
     found = [f"closure entry kind {e['kind']!r} logged after the candidate's birth"
              for e in log[born + 1:] if e["kind"] not in ("note", "milestone", "merge")]  # fmt: skip
-    found += [f"task {m[0].strip()[:80]!r} is marked past '[ ]' in phase DEFINITION"
-              for m in marks if m[2] != " "]  # fmt: skip
     if not found:
         return []
     try:  # `defined` is the commit that approved the SPEC and PLAN, never HEAD: impl commits follow it
@@ -220,7 +217,7 @@ def _definition_findings(
 
 def _directory_findings(release_dir: Path, specs: Path) -> list[dict[str, Any]]:
     """One live directory: its state document, its live candidate's `W:` sets, then the
-    SPEC, PLAN and job files in IMPLEMENTATION/CLOSURE or the untouched markers in DEFINITION."""
+    SPEC, PLAN and job files in IMPLEMENTATION/CLOSURE, or its closure-entry check in DEFINITION."""
     dir_rel, path = release_dir.relative_to(specs).as_posix(), release_dir / STATE
     if not path.is_file():
         return [_findings.finding(CODE, dir_rel, 1, f"release directory carries no {STATE}", f"Operator action: "
@@ -233,10 +230,8 @@ def _directory_findings(release_dir: Path, specs: Path) -> list[dict[str, Any]]:
     jobs = [_findings.finding(CODE, f"{dir_rel}/{path.relative_to(release_dir).as_posix()}", 1, message, fix)
             for path, message, fix in (candidate_errors(candidate) if candidate else [])
             if not (phase == CLOSURE and MEMORY_WRITE in message)]  # fmt: skip
-    tasks = candidate / "TASKS.md" if candidate else None
-    marks = list(MARK_RE.finditer(tasks.read_text("utf-8"))) if tasks and tasks.is_file() else []
     if phase not in TRIO_PHASES:
-        return (_definition_findings(state, marks, f"{dir_rel}/{STATE}", candidate, specs)
+        return (_definition_findings(state, f"{dir_rel}/{STATE}", candidate, specs)
                 if candidate else []) + jobs  # fmt: skip
     missing = [n for n in CANDIDATE_DOCS if not (candidate and (candidate / n).is_file())]
     if candidate is None or missing:
