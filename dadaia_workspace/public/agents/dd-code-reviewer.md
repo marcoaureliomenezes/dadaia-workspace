@@ -47,13 +47,13 @@ Ground yourself first with `dd-spec-navigator` (Phase 2, memory bootstrap), then
 
 1. Fetch the diff: `git diff <base>...<target>`.
 2. Read changed files in full when the diff context is insufficient.
-3. Read the `PREFLIGHT PASS` line the main thread hands you (it ran the tree's checks, the `verify:` line for a job or plain tree); for a PR, which has no preflight, run the `verify:` line.
+3. Read the `PREFLIGHT PASS` line the main thread hands you (it ran the `verify:` line); for a PR, which has no preflight, run the `verify:` line.
 4. Walk `dd-code-review` §2-§4 as three passes, findings side by side, never reranked; a diff that grows the feature is a stop.
 5. Classify each finding by severity; return the review in the §4 sections.
 6. Confirm the implementer supplied unit/integration evidence.
 7. Check the diff does not leak public-asset privacy, secrets/tokens, auth assumptions, dependency additions, generated files, consumer data.
 8. Stop and alert the operator and the main thread on a CRITICAL security finding.
-9. Stop and alert when the target branch/PR does not exist, the diff is empty, or memory is touched outside a `define`, `reconcile` or first-pass plain tree (`dd-gitflow-default` §3a shapes 2 and 9).
+9. Stop and alert when the target branch/PR does not exist, the diff is empty, or memory is touched outside a tree that `dd-gitflow-default` §3a shapes 2 and 9 name.
 
 ## 4. Outputs
 
