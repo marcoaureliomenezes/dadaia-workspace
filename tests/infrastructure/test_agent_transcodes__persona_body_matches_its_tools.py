@@ -26,7 +26,7 @@ _RESOLVED = ResolvedAgentModel(model="sonnet", effort="high", source="default")
 
 @pytest.mark.parametrize("persona", _PERSONAS, ids=lambda p: p.stem)
 def test_a_persona_body_never_requires_a_missing_tool(persona: Path) -> None:
-    """sa-reviewer-persona-body-contradicts-its-tools#B1: the rendered Claude agent and
+    """The rendered Claude agent and
     Codex TOML of a persona without Write never instruct a write."""
     claude = render_claude_agent(persona.read_text(encoding="utf-8"), _RESOLVED)
     if "disallowedTools: [Edit, Write, NotebookEdit]" not in claude:
