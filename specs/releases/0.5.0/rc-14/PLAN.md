@@ -55,7 +55,7 @@ The SPEC (Draft, FR1 to FR19) says what; this PLAN records the as-is review, the
 | `test_a_mutant_runs_only_the_tests_that_execute_its_line_and_an_unexecuted_line_is_uncovered` | removed unit: per-test mutant selection (J21.T9, removed by J21.T12) | `3b6849188` |
 | `test_a_rebind_in_the_second_of_the_last_stamp_reinjects` | removed unit: whole-second rebind precision layer | `d97d70123`, `babc1a587` |
 | `test_rebind_in_the_stamp_second_reinjects_once` | behaviour changed: same-second rebind identity is bind_id | `babc1a587` |
-| `test_the_orchestration_skill_cites_every_law_home_that_reserves_an_act_to_the_operator` | behaviour changed: §2 step 4 holds the rule once, no act list | `3a3bd1262` |
+| `test_the_orchestration_skill_cites_every_law_home_that_reserves_an_act_to_the_operator` | behaviour changed: §2 step 4 holds the rule once, no act list | `cf4bbe281 (behaviour: 3a3bd1262)` |
 | `test_the_three_slug_patterns_are_one_defs_slug` | behaviour changed: status is a stage token, not a slug place | `9fb6a8ca1` |
 
 - **Restore-tests-2** (plain change `restore-tests-2`): `b56c9be8c` (J21.T5's every-block file, 5 tests, and `test_every_block_carries_a_runnable_fix` in the fix-line home), `13eb8cea5` (`fixline.py` gone; its 4 checks judged by those tests), `ce967fd0e` and `15c1cfc88` (`mutate.py` `DELETABLE` label becomes `NO-OWN-KILL`).
