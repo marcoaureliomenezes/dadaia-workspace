@@ -244,6 +244,7 @@ def test_a_missing_specs_tree_is_refused_never_created(
     rerun = f"{sys.executable} {script} {' '.join(argv)}"
     want = fix.format(rerun=rerun, ws=tmp_path, py=sys.executable)
     assert [ln for ln in done.stderr.splitlines() if ln.startswith("fix:")] == [f"fix: {want}"]
+    assert done.stderr.splitlines()[0].startswith("[error] no specs tree at ")
     assert done.stderr.splitlines()[0].endswith(f"nothing was written{note}")
     if argv == ["stats"]:  # the read runs as printed
         _ledger(tmp_path / "repos" / "demo")

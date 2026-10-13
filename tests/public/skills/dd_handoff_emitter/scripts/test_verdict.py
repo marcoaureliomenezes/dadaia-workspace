@@ -134,7 +134,17 @@ _CASES = [(f'{{"{k}": "x"}}', k) for k in RESERVED] + [
 def test_a_bad_stdin_is_refused_and_writes_nothing(tmp_path: Path, stdin: str, why: str) -> None:
     root, tree, head = _workspace(tmp_path)
     refused = _verdict(root, tree, sha=head, stdin=stdin)
-    assert refused.returncode != 0 and refused.stderr, why
+    message = {"empty": "stdin is not JSON", "non-json": "stdin is not JSON"}.get(
+        why,
+        "stdin is not a JSON object"
+        if why == "array"
+        else f"stdin sets keys verdict.py owns: {why}",
+    )
+    assert refused.returncode == 1, why
+    assert refused.stderr == (
+        f"[error] {message}\nfix: Operator action: pipe one JSON object without the keys"
+        " verdict.py owns, then rerun verdict.py\n"
+    ), why
     assert _written(root) == []
 
 

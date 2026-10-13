@@ -192,7 +192,11 @@ def test_carve_out_without_rationale_is_flagged_by_name() -> None:
     [("dict_format", {"foo": "reason-a", "bar": "reason-b"}), ("list_of_strings", ["alpha"])],
 )
 def test_load_denylist_source_formats(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, name: str, payload: object
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    name: str,
+    payload: object,
 ) -> None:
     """The dict is the one grammar; any other
     shape or an unreadable file is refused naming the file. Missing or absent loads as empty."""
@@ -202,10 +206,12 @@ def test_load_denylist_source_formats(
     if name == "list_of_strings":
         with pytest.raises(SystemExit) as refused:
             load_privacy_terms()
-        assert str(refused.value).splitlines()[-1] == (
+        assert refused.value.code == 1
+        assert capsys.readouterr().err.splitlines() == [
+            f"[error] privacy denylist {source} is not one JSON object",
             f"fix: Operator action: rewrite {source} as one JSON object mapping each term to "
-            "its reason"
-        )
+            "its reason",
+        ]
         return
     assert load_privacy_terms() == (("foo", "reason-a"), ("bar", "reason-b"))
     (tmp_path / "no_workspace").mkdir()

@@ -422,7 +422,7 @@ def test_origin_refuses_a_malformed_line_with_one_fix_line(script: Path, tmp_pat
     refused = _run(script, "origin", str(spec))
     assert refused.returncode == 1
     assert refused.stdout == ""
-    assert refused.stderr.startswith("Error: ")
+    assert refused.stderr.startswith("[error] ")
     assert len([row for row in refused.stderr.splitlines() if row.startswith("fix:")]) == 1
 
 

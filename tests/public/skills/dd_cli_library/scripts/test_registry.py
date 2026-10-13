@@ -240,3 +240,20 @@ def test_register_stamps_through_the_kernel_clock(
         "2026-01-02T03:04:05Z",
         "2026-01-02T11:04:05Z",
     )
+
+
+def _one_fix(refused: subprocess.CompletedProcess[str]) -> None:
+    lines = refused.stderr.splitlines()
+    assert refused.returncode == 1 and lines[0].startswith("[error] ")
+    assert len(lines) == 2 and lines[1].startswith("fix: Operator action: ")
+
+
+def test_every_registry_refusal_prints_one_error_line_and_one_fix_line(tmp_path: Path) -> None:
+    reg = tmp_path / "r.json"
+    _run(reg, "register", "--port", "3100", "--project", "demo")
+    _one_fix(_run(reg, "register", "--port", "3100", "--project", "other"))
+    _one_fix(_run(reg, "release"))
+    _one_fix(_run(reg, "release", "--port", "3999"))
+    _one_fix(_run(reg, "next", "--project", "z", "--min-port", "3100", "--max-port", "3100"))
+    (lonely := tmp_path / "lonely").mkdir()
+    _one_fix(_run_in(lonely, "list"))
