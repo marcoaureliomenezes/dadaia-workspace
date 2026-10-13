@@ -5,7 +5,7 @@ Disclosed sibling of `SKILL.md`. Every claim becomes one line in
 `.agents/skills/dd-audit-project/scripts/schemas/finding-record-v1.schema.json`. The schema owns
 field semantics.
 
-## Fields
+## Writes
 
 An append authors the immutable core. Every later change uses the disposition verb.
 

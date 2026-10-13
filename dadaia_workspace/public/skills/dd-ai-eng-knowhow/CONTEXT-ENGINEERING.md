@@ -121,15 +121,7 @@ Fix protocol:
 | Volume | Occasional -> high-frequency / bulk |
 
 - The dominant task drives the tier — not the easiest or the rarest.
-- Tier aliases are the keys of `TIER_CODEX` in `core/model_registry.py` — never hand-maintain a copy that can drift.
-
-| Workload character | Each `TIER_CODEX` key, by cost |
-|---|---|
-| Heavy synthesis, recursive analysis, persona/skill authoring, fleet audit, security reasoning | the heaviest keys |
-| Orchestration, dispatch authority, review verdicts, broad-context implementation | the orchestration key |
-| Mid-cost general implementation | the mid key |
-| High-volume mechanical reformatting, bulk renames, deterministic transforms | the lightest key |
-
+- Tier aliases are each `TIER_CODEX` key in `core/model_registry.py` — never hand-maintain a copy that can drift.
 - Current model ids come from `core/model_registry.py`, never hand-copied: Codex ids from `TIER_CODEX`; Claude resolves the alias itself. Reasoning effort is the template cell's effort.
 - The tiering axis is (model x effort): on Claude the alias and `effort:`; on Codex the `TIER_CODEX` id and `model_reasoning_effort`.
 - Quote the template cell (alias + effort), and on Codex its `TIER_CODEX` id, when recommending a move; take the price from the provider's published table, never from memory.
@@ -188,6 +180,6 @@ Re-verify topology invariants also when a `[SCOPE ERROR]` redirect set changes.
 ## Applying this file
 
 - Authoring a new persona/skill/rule: walk §1 (cheapest layer) -> §2 (spine) -> §3 (invariants) -> §4 (tier) -> §5 (drift).
-- Reviewing someone else's AI-entity change: walk in reverse — §5 first, then §3, §2, §1, §4.
+- Reviewing someone else's AI-entity change: walk §5 first, then §3, §2, §1, §4.
 - Auditing the fleet (efficiency report): §1 ranks files by lifetime cost, §2/§3 find structural drift.
 - Auditing (continued): §4 recommends tier moves, §5 recommends deduplication.

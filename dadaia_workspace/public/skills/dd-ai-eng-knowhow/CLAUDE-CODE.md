@@ -24,7 +24,7 @@ A decision surface, not a doc mirror — official docs are an on-demand index at
 | Path-scoped rules (re-loaded on matching file access) | Conversation detail (summarized lossily) |
 | Most-recent skill invocation (partially re-attached, capped) | Earlier skill invocations beyond the re-attach budget |
 
-- A behavior that must hold across a long session belongs in CLAUDE.md/a rule (survives) or a hook (deterministic).
+- A behavior that must hold across a long session belongs in an `AGENTS.md` line (law) or a hook (deterministic).
 - A skill whose guidance is lost at compaction is placed at the wrong layer — promote it to an `AGENTS.md` line, or re-invoke it.
 - Subagents isolate a big exploration in its own context window and return only a summary.
 
@@ -37,12 +37,12 @@ A decision surface, not a doc mirror — official docs are an on-demand index at
 
 | Need | Layer | Loads | Pick when |
 |---|---|---|---|
-| Core convention every session needs | Project `CLAUDE.md` | Full every session; survives compaction | "Always do X" law, build commands |
+| Core convention every session needs | Project `CLAUDE.md` | Full every session; survives compaction | Build commands, the harness bootstrap; law lives in `AGENTS.md` |
 | Personal cross-project preference | User memory (`~/.claude/CLAUDE.md`) | Full every session, all projects, local only | Machine-local prefs |
-| Topic law, maybe directory-specific | Rule (`.claude/rules/*.md`) | Every session (unscoped) or on match (`paths:`) | Modular standing law |
+| Topic instructions, maybe directory-specific | Rule (`.claude/rules/*.md`) | Every session (unscoped) or on match (`paths:`) | Harness-only modular instructions; law lives in `AGENTS.md` |
 | Sometimes-needed reference | Skill (`SKILL.md`) | Description every session; body on invoke | Multi-step protocol, deep reference |
 
-- CLAUDE.md past ~200 lines: move reference material to skills, split topics into rules.
+- CLAUDE.md past ~200 lines: move reference material to skills, split law into scoped `AGENTS.md` files.
 - A long CLAUDE.md lowers adherence.
 - A "see X" prose pointer loads nothing in Claude Code — only an `@import` or a symlink pulls a file in.
 - Personal machine-local content goes to `~/.claude/` and `CLAUDE.local.md` (gitignored).
@@ -55,16 +55,16 @@ A decision surface, not a doc mirror — official docs are an on-demand index at
 
 | Frontmatter | Activation | Use for |
 |---|---|---|
-| No `paths:` | Always-on; loads every session for every task | Truly global law |
-| `paths: [glob, ...]` | Loads only on a matching-file access | Directory- or language-specific law |
+| No `paths:` | Always-on; loads every session for every task | Instructions for every task |
+| `paths: [glob, ...]` | Loads only on a matching-file access | Directory- or language-specific instructions |
 
 - A rule fires by presence in context — advisory, the model is expected to comply.
 - A skill is invoked — its body enters context on demand and the model acts on it.
-- Rule of separation: standing law coloring all reasoning -> rule.
+- Rule of separation: standing law coloring all reasoning -> the root map or a scoped `AGENTS.md`.
 - A procedure run on a specific task -> skill.
 - A guarantee that must hold regardless of model choice -> hook.
 - Gotcha: an unscoped rule loads every session even when irrelevant.
-- Add `paths:` for subtree-only law; reserve always-on for genuinely global law.
+- Add `paths:` for subtree-only instructions; reserve always-on for genuinely global instructions.
 
 ---
 
@@ -124,7 +124,7 @@ A decision surface, not a doc mirror — official docs are an on-demand index at
 | If the constraint must... | Use |
 |---|---|
 | hold every time, regardless of model choice | a **hook** (deterministic) |
-| color all reasoning but tolerate interpretation | a **rule** (advisory) |
+| color all reasoning but tolerate interpretation | standing law: the root map or a scoped `AGENTS.md`; harness-only advisory instructions: a **rule** |
 | apply only while a specific procedure runs | a **guard in the skill body** (interpreted) |
 
 ---
@@ -196,7 +196,7 @@ Must it hold EVERY time, regardless of what the model decides?
             |- yes -> SUBAGENT (isolated window, returns a summary).
             |         Never grant the Agent tool to a Tier-3 worker.
             `- no -> It is probably a one-off; just say it in the turn (but know it
-                    will not survive compaction — promote to CLAUDE.md/rule if it
+                    will not survive compaction — promote to an `AGENTS.md` line if it
                     must).
 ```
 
