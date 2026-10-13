@@ -454,8 +454,7 @@ class DoctorService:
         ]
 
     def _scan_dadaiaignore(self, invalid: tuple[str, ...]) -> list[Finding]:
-        """An invalid line is reported, never fixed — the file is the operator's (ADRs 0092,
-        0093, 0145)."""
+        """An invalid line is reported, never fixed — the file is the operator's."""
         target = self._workspace_root / workspace_layout.DADAIAIGNORE
         return [
             self._finding(
@@ -590,11 +589,10 @@ class DoctorService:
         return actions
 
     def _reap_dead_repo(self, ctx: SpecContextProject, repo_path: Path) -> list[str]:
-        """INV-5: reap ``repos/<slug>`` only when it resolves to a DIRECT child of
-        ``repos/`` — a slug like ``..`` or a symlinked checkout resolves elsewhere and is
-        refused —
-        and the context is still DEAD at the moment of the reap. The two liveness
-        questions are policy and live here; the filesystem act is the primitive's.
+        """INV-5: reap ``repos/<slug>`` only when it resolves to a DIRECT child of ``repos/`` — a
+        slug like ``..`` or a symlinked checkout resolves elsewhere and is refused — and the context
+        is still DEAD at the moment of the reap. The two liveness questions are policy and live
+        here; the filesystem act is the primitive's.
 
         The leftover is MOVED, like every other reaped entry: a DEAD context whose repo is
         still on disk is exactly the case where an rmtree used to be irreversible."""

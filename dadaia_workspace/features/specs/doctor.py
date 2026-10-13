@@ -1,8 +1,7 @@
 """SpecsDoctor — thin coordinator for SDD release-lifecycle structural validation.
 
-A thin ``SpecsDoctor``
-coordinator (this file) that **owns check()/fix() ORDER** and delegates all LOGIC to five
-single-responsibility validator siblings plus two shared leaf modules:
+A thin ``SpecsDoctor`` coordinator (this file) that **owns check()/fix() ORDER** and delegates all
+LOGIC to five single-responsibility validator siblings plus two shared leaf modules:
 
   * ``doctor_types``     — ``Severity`` / ``SectionFinding``
   * ``doctor_common``    — cross-validator pure helpers (``resolve_active_release`` + release-dir discovery)
@@ -16,8 +15,7 @@ single-responsibility validator siblings plus two shared leaf modules:
 The coordinator owns ORDER: ``check()`` invokes the validators' public methods in one fixed
 interleaved sequence (families interleave — coherence→memory→release→…→
 closure→coherence), and ``fix()`` dispatches by issue code. It imports NO ``spec_context``: the
-coordinator holds no ``spec_context`` cross-feature
-edge, not even via a typed leaf seam.
+coordinator holds no ``spec_context`` cross-feature edge, not even via a typed leaf seam.
 
 Pure module — no I/O outside the supplied specs_dir / public_dir. No external dependencies.
 """
@@ -55,8 +53,7 @@ class SpecsDoctor:
         command_paths: Optional live command-path set
             (``cli.help_digest.command_paths()``), walked ONCE by the CLI composition
             root and passed in as plain data — feeds
-            MEM-DRIFT-2 (memory citations). ``None`` (default) keeps that
-            check silent.
+            MEM-DRIFT-2 (memory citations). ``None`` (default) keeps that check silent.
     """
 
     def __init__(

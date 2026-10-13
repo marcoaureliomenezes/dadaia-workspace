@@ -21,7 +21,7 @@ copy (the drift class this module closes):
   against the SAME predicate, through the injected git object reader
   (``list_tree_paths``) — never a second, hand-kept member list.
 
-The canon (operator, 2026-08-28) — the ONLY members permitted under ``specs/``:
+The canon — the ONLY members permitted under ``specs/``:
 
     AGENTS.md constitution.md memory/ releases/ backlog/ bugs/ audits/ ADRs/
 
