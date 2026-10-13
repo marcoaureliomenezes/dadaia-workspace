@@ -1,35 +1,16 @@
-"""FR9 — hooks de-slopped to the publication boundary (v0.5.0 D9).
+"""Hooks gate only at the publication boundary: pre-commit is advisory, the pre-push gate
+fails closed.
 
-Two EXECUTED-PATH fixtures, at CONTRACT tier, that replace the two files this FR
-deletes: ``tests/integration/test_precommit_backlog_scoping.py`` (imported
-``_run_backlog_doctor_gate`` directly — the symbol this FR deletes, so the import
-would fail) and its LARGE-tier e2e companion
-``tests/e2e/features/test_backlog_precommit.py`` (its entire premise — pre-commit
-*blocking* a bad stage — is deleted by this FR; rewriting either would be a
-change-detector test of the new advisory behaviour, the class
-the root map test basics prohibit). Verdict: `qa-engineer`, SPEC FR9 "Tests:"
-line / A9.3 — both files DELETE, replaced here.
+Each test drives the REAL shipped shell script through ``bash``, never its text:
 
-Each test below drives the REAL shipped shell script through ``bash`` (never asserts
-on the script's *text* — SPEC A9.1/A9.2 both say "the executed path, not the script's
-text"):
+* :func:`test_pre_commit_exits_0_on_a_staged_set_backlog_doctor_would_reject` —
+  ``pre-commit-presence-gate.sh`` exits 0 on a staged set the backlog doctor would reject.
+* :func:`test_unresolvable_runner_still_refuses_the_push` — with no resolvable dadaia
+  runner anywhere, ``pre-push-ci-gate.sh`` refuses the push (exit 1), never skips it.
 
-* :func:`test_pre_commit_exits_0_on_a_staged_set_backlog_doctor_would_reject` — A9.1:
-  ``pre-commit-presence-gate.sh`` exits 0 on a staged set the (now-deleted) backlog
-  doctor block would have rejected.
-* :func:`test_unresolvable_runner_still_refuses_the_push` — A9.2: with no resolvable
-  dadaia runner anywhere, ``pre-push-ci-gate.sh`` REFUSES the push (exit 1), never
-  silently skips it — the fail-closed publication boundary the pre-commit hook does
-  NOT share (pre-commit is advisory-only, D9).
+The invalid-branch and denylist refusals are proven at the real CLI boundary by the e2e
+journeys in ``tests/e2e/``; this module adds no duplicate coverage of them.
 
-The other two refusals A9.2 names — an invalid branch name and a denylist hit — are
-already proven at the real CLI boundary by
-``tests/e2e/test_push_gate_check.py::test_develop_push_is_blocked_naming_the_pr_path``
-and ``tests/e2e/test_push_denylist_journey.py::
-test_planted_term_refused_then_clean_push_after_amend`` respectively; this module adds
-no duplicate coverage of those two.
-
-v0.5.0 A9.1, A9.2, A9.3
 Owner: dd-sw-engineer-sr
 """
 
@@ -58,12 +39,8 @@ _BASH = shutil.which("bash") or "/usr/bin/bash"
 _DEADLINE = 30.0
 _ZERO = "0" * 40
 
-#: bug self-scan-baseline-drift-t05018-hooks-publication-boundary-fixture: the
-#: prior email-shaped placeholder used a real ccTLD, never one of
-#: privacy_baseline.json's RFC-2606-reserved-domain exclusions
-#: (.invalid/.test/.example/.localhost) -- one placeholder, reused at both synthetic
-#: git-identity call sites in this module, rather than two independently-typed
-#: literals drifting apart again.
+#: Synthetic git identity on an RFC-2606 reserved domain, which privacy_baseline.json
+#: excludes; one placeholder is reused at both git-identity call sites in this module.
 _SYNTHETIC_GIT_EMAIL = "test@example.invalid"
 
 
@@ -133,10 +110,9 @@ def _plant_backlog_doctor_violation(repo: Path) -> None:
 
 
 def test_unresolvable_runner_still_refuses_the_push(tmp_path: Path) -> None:
-    """A9.2: with no workspace venv, no poetry, and no repo-local
-    venv, ``pre-push-ci-gate.sh`` REFUSES the push (exit 1) — never silently skipped.
-    Pre-push keeps its fail-closed runner resolution; only pre-commit became
-    unconditionally exit 0 (D9)."""
+    """With no workspace venv, no poetry, and no repo-local venv, ``pre-push-ci-gate.sh``
+    refuses the push (exit 1), never skips it. Pre-push keeps fail-closed runner resolution;
+    pre-commit always exits 0."""
     workspace = tmp_path
     repo = workspace / "isolated-repo"
     repo.mkdir(parents=True)

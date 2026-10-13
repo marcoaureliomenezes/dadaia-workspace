@@ -1,21 +1,17 @@
-"""The one git runner of ``dd-bug-resolution/scripts``.
-
-Contract:
+"""The one git runner and the one ``Refusal`` of ``dd-bug-resolution/scripts``.
 
 * ``_git.py`` public names: ``git(repo, *args, check=True, input=None) -> str`` and
   ``parse_worktrees(text) -> list[dict[str, str]]``.
 * ``git`` runs ``git -C <repo> <args>`` with every ``GIT_*`` variable of the caller removed
-  so a caller's ``GIT_DIR`` or ``GIT_WORK_TREE``
-  never redirects it; stdout on success; ``RuntimeError("git <args>: <stderr>")`` on a non-zero
-  exit when ``check`` (``check=False`` returns stdout unchecked). ``_ledger._published_text``
-  calls it instead of its private ``subprocess`` runner.
+  so a caller's ``GIT_DIR`` or ``GIT_WORK_TREE`` never redirects it; stdout on success;
+  ``RuntimeError("git <args>: <stderr>")`` on a non-zero exit when ``check`` (``check=False``
+  returns stdout unchecked).
 * ``parse_worktrees(text)`` takes ``git worktree list --porcelain`` text and returns the LINKED
   worktrees, main checkout excluded, one dict per block in git's order: each ``key value`` line
   is ``key -> value``, a bare flag line (``locked``, ``detached``) is ``key -> ""``, and
-  ``worktree`` is ``str(Path(value))``. ``_worktree_git._trees`` and
-  ``git_subprocess.unrecoverable`` both read it.
-* ``_refusal.py`` holds ``Refusal(message, fix="")`` (``Exception``; ``.fix``) once; ``_bugs_store``
-  imports that class, so every skill raises and catches one object.
+  ``worktree`` is ``str(Path(value))``.
+* ``_refusal.py`` holds ``Refusal(message, fix="")`` (``Exception``; ``.fix``) once; every
+  skill raises and catches that one class.
 """
 
 from __future__ import annotations

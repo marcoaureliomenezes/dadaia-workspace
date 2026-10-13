@@ -1,4 +1,4 @@
-"""The kernel's one frontmatter grammar a stdlib strict subset of YAML that
+"""The one frontmatter grammar: a stdlib strict subset of YAML that
 equals ``yaml.safe_load`` or refuses. ``split(text)`` returns ``(block, body)`` or ``None``;
 ``parse(block)`` returns the mapping or raises ``ValueError`` naming ``line N``."""
 

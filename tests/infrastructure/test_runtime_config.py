@@ -1,6 +1,6 @@
-"""v0.2.8 T2 — Kimi Code's managed ``[[hooks]]`` block (shape, replace-or-append upsert)
-and its five user-level shims (sh syntax, fail-open outside a workspace); the block/allow
-replay runs in tests/infrastructure/runtime_transforms/test_hook_wrappers.py (#B5, #B8).
+"""Kimi Code's managed ``[[hooks]]`` block (shape, replace-or-append upsert) and its five
+user-level shims (sh syntax, fail-open outside a workspace). The block/allow replay runs in
+tests/infrastructure/runtime_transforms/test_hook_wrappers.py.
 """
 
 from __future__ import annotations

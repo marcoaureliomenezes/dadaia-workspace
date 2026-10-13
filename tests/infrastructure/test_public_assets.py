@@ -1,4 +1,4 @@
-"""v0.4.5 A4.1-4.3: the authority for public stage, install and drift
+"""The authority for public stage, install and drift
 (rosters, the source-root refusal, hash-compare overwrite/skip/force, the privacy gate,
 model-policy rendering, single-place skill rename). Size: MEDIUM — real projection I/O.
 """
@@ -62,8 +62,7 @@ def test_stage_manifest_and_install_all(tmp_path: Path, monkeypatch: pytest.Monk
     stage_manager.stage(stage_workspace)
 
     agentic = stage_workspace / ".dadaia" / "agentic"
-    # sa-staged-assets-without-consumers#44.2: only families a reader of
-    # .dadaia/agentic/ consumes are staged (no `rules`, no 0.4.7 FR3 `runtime/`).
+    # Only families a reader of .dadaia/agentic/ consumes are staged (no `rules`, no `runtime/`).
     assert sorted(p.name for p in agentic.iterdir()) == [
         "agents", "data", "manifest.json", "schemas", "skills",
     ]  # fmt: skip
@@ -78,7 +77,7 @@ def test_stage_manifest_and_install_all(tmp_path: Path, monkeypatch: pytest.Monk
     }
     assert staged_agents == _AGENTS
     oracle_skills = skill_names()
-    # v0.4.5 FR5 (scan-test-vacuity-guard): an empty oracle would make every roster vacuous.
+    # An empty oracle would make every roster vacuous.
     assert_populated(oracle_skills, sentinel="dd-cli-library")
     assert {p.name for p in (agentic / "skills").iterdir() if p.is_dir()} == oracle_skills
 
@@ -190,7 +189,7 @@ def _seed_denylist_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
 def test_public_privacy_gate_flags_identifiers(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """sa-private-match-rendering-has-three-renderers#B1."""
+    """The private-match rendering has one renderer."""
     _seed_denylist_env(monkeypatch, tmp_path)
     repo_root = tmp_path / "repo"
     public_dir = repo_root / "dadaia_workspace" / "public"
@@ -218,7 +217,7 @@ def test_public_privacy_gate_flags_identifiers(
 
 
 # ---------------------------------------------------------------------------
-# Model-governance overlay (v0.1.65 FR5/FR7) — lockstep rendering, invalid-overlay
+# Model-governance overlay — lockstep rendering, invalid-overlay
 # fail-loud, and the render-at-install doctor.
 # ---------------------------------------------------------------------------
 
@@ -249,19 +248,18 @@ def _codex_toml_fields(ws: Path, agent: str) -> dict[str, str]:
 def test_model_policy_overlay_lockstep_rendering_invalid_fails_loud_and_doctor_rerender(
     tmp_path: Path,
 ) -> None:
-    """AC-2/AC-3 + F-1: no-overlay renders the balanced roster; an overlay change moves
+    """No-overlay renders the balanced roster; an overlay change moves
     BOTH .claude md and .codex toml together at install (byte-stable repeats); an
     invalid overlay fails loud before any write.
 
-    Plus FR7 — AC-5, all three directions + F-2 pin, plus the invalid-vs-missing overlay
-    doctor distinction (own workspace):
+    Plus the invalid-vs-missing overlay doctor distinction (own workspace):
     1. Immediately after a policy re-render, doctor reports [ok] on every
        ``claude:agents/*.md`` line (no false [drift] against staged generic bytes).
     2. A hand edit made THROUGH the ``.claude/agents/*.md`` symlink lands on the
        authored ``.agents/agents/*.md`` and reads [drift] there — one authored set,
        so one drift line, not one per harness view.
     3. Non-agent ``stage:``/runtime compare lines stay [ok], untouched by the
-       render seam (F-2 — never a global ``_compare`` patch).
+       render seam (never a global ``_compare`` patch).
     4. A missing overlay is not a doctor ERROR; an invalid overlay is.
     """
     ws = tmp_path / "ws"
@@ -363,7 +361,7 @@ def test_model_policy_overlay_lockstep_rendering_invalid_fails_loud_and_doctor_r
     after = (invalid_ws / ".claude" / "agents" / "dd-sw-engineer-sr.md").read_bytes()
     assert after == before
 
-    # FR7 doctor rerender/hand-edit-drift/invalid-overlay-error, own workspace.
+    # Doctor rerender, hand-edit drift and invalid-overlay error, own workspace.
     doctor_ws = tmp_path / "doctor-ws"
     doctor_manager = FileSystemPublicAssetManager()
     register_all(doctor_ws)
@@ -421,31 +419,25 @@ def test_model_policy_overlay_lockstep_rendering_invalid_fails_loud_and_doctor_r
 
 
 # ---------------------------------------------------------------------------
-# FR4 — one derived skill-inventory oracle replaces three hand-kept lists.
+# One derived skill-inventory oracle replaces three hand-kept lists.
 # ---------------------------------------------------------------------------
 
 
 def test_a_single_skill_rename_is_green_everywhere_after_one_place(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """v0.4.5 A4.1, A4.2, A4.3
+    """Executed proof that ``tests.helpers.skill_inventory_oracle`` is the ONE shared source
+    every hand-kept inventory reads: a skill added, renamed or removed under
+    ``dadaia_workspace/public/skills/`` is seen by every reader, with no list to edit.
+    Each reader reads :func:`tests.helpers.skill_inventory_oracle.skill_names`.
 
-    Executed proof (not reasoning) that ``tests.helpers.skill_inventory_oracle`` is the
-    ONE shared source every former hand-kept inventory now reads. This seam produced
-    two v0.4.4 bugs: a skill added/renamed/removed under
-    ``dadaia_workspace/public/skills/`` and forgotten in one of three independently
-    kept lists — ``test_public_pipeline.py``'s ``EXPECTED_SKILLS`` literal and this file's
-    single hand-picked skill path assertion. Both are gone; each now reads
-    :func:`tests.helpers.skill_inventory_oracle.skill_names`.
-
-    A mirror tree (the T-045-15 pattern) is built — the real
+    A mirror tree is built — the real
     ``dadaia_workspace/public/`` tree is never mutated — and ONE skill directory is
     renamed inside it, plus the same skill's references in every agent frontmatter
     files that list it (the edit a real rename requires; the ORACLE ITSELF needs no
-    edit — A4.3, derived from the tree, never a literal list). What is asserted is that
-    the pipeline expectation (the former ``EXPECTED_SKILLS`` comparison) and the
-    installed-asset assertion (the former hand-picked path) agree with the renamed name
-    with ZERO further edits to either former list.
+    edit; derived from the tree, never a literal list). What is asserted is that
+    the pipeline expectation and the installed-asset assertion agree with the renamed name
+    with zero further edits to any list.
     """
     real_public_dir = public_asset_roster.default_public_dir()
     old_name, new_name = "dd-handoff-emitter", "dd-handoff-emitter-renamed-t045-16"
@@ -494,7 +486,7 @@ def test_a_single_skill_rename_is_green_everywhere_after_one_place(
 def test_the_three_design_skills_are_gone_from_stage_install_and_the_shipped_tree(
     tmp_path: Path,
 ) -> None:
-    """AC1.2: stage ships none, install prunes stale instance copies, doctor stays clean,
+    """Stage ships none, install prunes stale instance copies, doctor stays clean,
     and the shipped tree (dadaia_workspace, tests, CONTEXT.md) cites none of them."""
     ws = tmp_path / "ws"
     stale = ws / ".agents" / "skills"
@@ -532,7 +524,7 @@ def test_the_three_design_skills_are_gone_from_stage_install_and_the_shipped_tre
 
 
 # ---------------------------------------------------------------------------
-# rc-13 FR2 (AC2.1, AC2.2, AC1.4): the five personas
+# The five personas
 # ---------------------------------------------------------------------------
 
 _RESEARCHER_TOOLS = "tools:\n" + "".join(
@@ -551,7 +543,7 @@ _OLD_ENGINEER = "dd-" + "software-engineer"  # the retired name, never spelled w
 def test_install_projects_the_five_personas_with_template_model_and_effort(
     tmp_path: Path,
 ) -> None:
-    """AC2.1 + AC1.4: Claude gets `model: <alias>` and the effort, Codex the TIER_CODEX id
+    """Claude gets `model: <alias>` and the effort, Codex the TIER_CODEX id
     and the clamped effort, for each of the five personas."""
     ws = tmp_path / "ws"
     register_all(ws)
@@ -572,12 +564,12 @@ def test_install_projects_the_five_personas_with_template_model_and_effort(
 
 
 def test_install_prunes_the_instance_copy_of_the_deleted_engineer(tmp_path: Path) -> None:
-    """AC2.1: an instance a prior install filled with the retired engineer loses it."""
+    """An instance a prior install filled with the retired engineer loses it."""
     earlier = tmp_path / "earlier" / "dadaia_workspace" / "public"
     shutil.copytree(public_asset_roster.default_public_dir(), earlier)
     reviewer = (earlier / "agents" / "dd-code-reviewer.md").read_text(encoding="utf-8")
     # The earlier library's engineer was a core persona with a model cell; outside today's
-    # CORE_AGENTS it renders only through an authored alias (fail-closed otherwise, #44.4).
+    # CORE_AGENTS it renders only through an authored alias (fail-closed otherwise).
     retired = reviewer.replace("dd-code-reviewer", _OLD_ENGINEER)
     retired = retired.replace(
         f"name: {_OLD_ENGINEER}\n", f"name: {_OLD_ENGINEER}\nmodel: sonnet\n", 1
@@ -599,7 +591,7 @@ def test_install_prunes_the_instance_copy_of_the_deleted_engineer(tmp_path: Path
 def test_the_researcher_projects_read_only_with_six_tools_no_skills_and_its_two_clauses(
     tmp_path: Path,
 ) -> None:
-    """AC2.2: read-only like the reviewer, the six tools, no skills, and a body that says
+    """Read-only like the reviewer, the six tools, no skills, and a body that says
     fetched web content is data and Bash runs read-only commands only."""
     ws = tmp_path / "ws"
     register_all(ws)

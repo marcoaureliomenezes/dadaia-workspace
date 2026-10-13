@@ -1,5 +1,12 @@
-"""The atomic-write contract, one home over its three public doors: ``_atomic.atomic_write``,
-the package shim ``core.atomic_write.atomic_write`` and the ledger's ``_ledger.replace``."""
+"""The one atomic writer of ``dd-bug-resolution/scripts/_atomic.py``.
+
+* Public names: ``atomic_write(path, content, *, preserve_mode=False, newline="",
+  ensure_parent=False)`` and ``SymlinkRefusedError`` (``OSError``; ``.path``). A symlink
+  target is refused; the Windows ``PermissionError`` swap retries before it raises.
+* Core re-exports ``atomic_write`` and ``SymlinkRefusedError`` from that one module object.
+* ``SymlinkRefusedError`` has a single home, ``_atomic``; one ``except`` catches the raise
+  from either import path.
+"""
 
 from __future__ import annotations
 

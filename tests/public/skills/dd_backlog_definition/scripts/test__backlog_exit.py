@@ -1,6 +1,7 @@
-"""A picked backlog item stays ``picked`` in ``active[]`` and exits ONCE, at closure.
-No source or test file names the retired pick-time ``CONSUMED`` token, its ledger module,
-its record class or its histo file.
+"""A picked backlog item stays ``picked`` in ``active[]`` and exits once, at closure.
+
+No source or test file names the ``CONSUMED`` token, its ledger module, its record class
+or its consumed histo file.
 
 Size: SMALL (reads the shipped source tree; no subprocess, no fixture, no network).
 """
@@ -25,7 +26,7 @@ _DEAD_NAMES = (
 )
 _DEAD_RE = re.compile("|".join(re.escape(name) for name in _DEAD_NAMES))
 
-#: Law/skill text under ``public/`` is out of scope — this contract covers the code and its tests.
+#: Law and skill text under ``public/`` is outside this contract; it covers code and tests.
 _SCOPES = (_PKG / "core", _PKG / "features", _PKG / "cli", _PKG / "hooks", _TESTS)
 
 

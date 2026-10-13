@@ -1,10 +1,5 @@
 """VenvPythonEnvironmentManager — the workspace venv bootstrap, over a faked subprocess.
 
-bug init-venv-never-installs-dadaia-workspace (VENV-1 coherence);
-bug init-venv-installs-index-version-not-running-distribution; bug
-certify-cannot-install-installed-provider; bug init-succeeds-after-provider-bootstrap-failure;
-bug init-venv-bootstrap-inherits-degraded-base-python; 0.4.8 AC1.6, AC2.1-AC2.3; v0.4.3 A9.1-A9.3.
-
 The conftest backstop no-ops ``ensure_workspace_venv``; the real method is captured at
 import time and restored by the ``recorder`` fixture.
 """
@@ -138,9 +133,8 @@ def test_reinit_reinstalls_only_an_older_venv(
     running: str,
     installs: bool,
 ) -> None:
-    """0.4.8 AC2.1/AC2.2, bugs upgrade-refuses-a-prerelease-label-as-a-downgrade and
-    reinit-with-unchanged-version-label-mixes-venv-and-projection: PEP 440 order; any other
-    build takes the one install path, only the running build itself is untouched."""
+    """PEP 440 order decides the install: any other build takes the one install path, only the
+    running build itself is untouched."""
     install_fake_dist(monkeypatch, running)
     _healthy(tmp_path)
     recorder.installed = installed if " " in installed else f"{installed} {build_digest(None)}"
@@ -174,9 +168,9 @@ def test_reinit_reinstalls_a_venv_whose_entrypoint_names_another_root(
     form: str,
     installs: bool,
 ) -> None:
-    """Bug init-on-a-copied-workspace-leaves-a-cli-bound-to-the-original: ``cp -a orig ws``
-    keeps the build but the entry scripts name the original's python, so the copy is
-    reinstalled by its OWN python — also when the original's path ends with the copy's."""
+    """``cp -a orig ws`` keeps the build but the entry scripts name the original's python, so
+    the copy is reinstalled by its OWN python — also when the original's path ends with the
+    copy's."""
     install_fake_dist(monkeypatch, "1.0.0")
     ws = tmp_path / ws_name
     names = {
@@ -199,7 +193,7 @@ def test_reinit_refuses_a_newer_venv_before_any_write(
     installed: str,
     running: str,
 ) -> None:
-    """0.4.8 AC2.3: never downgrade; name the version."""
+    """Never downgrade; name the version."""
     install_fake_dist(monkeypatch, running)
     _healthy(tmp_path)
     recorder.installed = f"{installed} {build_digest(None)}"
@@ -247,7 +241,7 @@ def test_bootstrap_installs_the_repacked_running_distribution(
     tmp_path: Path, recorder: _Recorder, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """One pip install of the re-packed wheel, no ``==`` pin ever attempted, and the
-    wheel is scratch (0.4.8 AC1.6): gone after the install."""
+    wheel is scratch: gone after the install."""
     _wheel_install(tmp_path, monkeypatch)
     written: list[Path] = []
 
@@ -312,9 +306,8 @@ def test_repack_returns_none_for_editable_install(tmp_path: Path) -> None:
 def test_a_failed_reinstall_is_narrated_and_keeps_the_old_build(
     tmp_path: Path, recorder: _Recorder, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Bugs init-succeeds-after-provider-bootstrap-failure and
-    reinit-with-unchanged-version-label-mixes-venv-and-projection: pip's raw stream never
-    reaches the operator, and a failed reinstall of a same-label build is ONE pip
+    """pip's raw stream never reaches the operator, and a failed reinstall of a same-label
+    build is ONE pip
     transaction (``--force-reinstall``), so pip's rollback leaves the old ``dadaia`` in
     place — never a venv without it. The fake models pip: ``uninstall`` removes the build."""
     _healthy(tmp_path)
@@ -398,7 +391,7 @@ def test_venv_creation_failure_is_one_clean_actionable_error(
     named: str,
     not_named: str | None,
 ) -> None:
-    """Bug r3b-portability-import-venv-permission; 0.4.8 AC1.6: a DadaiaError naming the
+    """A DadaiaError naming the
     venv path and the likely cause, never a raw traceback nor a wrong cause."""
 
     def failing(cmd: list[str], check: bool = False, **_kwargs: object) -> None:
@@ -426,7 +419,7 @@ def test_venv_creation_failure_is_one_clean_actionable_error(
 def test_version_satisfies_requires_python(
     version: tuple[int, int, int], spec: str | None, ok: bool
 ) -> None:
-    """Bug init-venv-bootstrap-inherits-degraded-base-python: an empty spec fails open."""
+    """An empty spec fails open."""
     assert python_env_module._version_satisfies(version, spec) is ok
 
 
@@ -442,8 +435,7 @@ def test_version_satisfies_requires_python(
 def test_is_fully_qualified_per_host_flavor(
     monkeypatch: pytest.MonkeyPatch, host: str, path: str, ok: bool
 ) -> None:
-    """CWE-426 (v0.4.3 T-043-23): a Windows drive-relative path passes ``isabs`` yet is
-    not fully qualified."""
+    """CWE-426: a Windows drive-relative path passes ``isabs`` yet is not fully qualified."""
     monkeypatch.setattr(python_env_module, "PLATFORM", Capabilities.detect(host))
     assert python_env_module._is_fully_qualified(path) is ok
 
@@ -455,7 +447,7 @@ def test_is_fully_qualified_per_host_flavor(
 def test_path_candidates_keep_only_absolute_which_results(
     monkeypatch: pytest.MonkeyPatch, which: str, expected: list[str]
 ) -> None:
-    """v0.4.3 A9.1."""
+    """Candidate lookup order."""
     monkeypatch.setattr(
         python_env_module.shutil, "which", lambda name: which if which.endswith(name) else None
     )
@@ -468,7 +460,7 @@ def test_path_candidates_keep_only_absolute_which_results(
 def test_pyvenv_executable_keeps_only_an_absolute_value(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, value: str, expected: str | None
 ) -> None:
-    """v0.4.3 A9.1: a hand-edited relative ``pyvenv.cfg`` value is never returned."""
+    """A hand-edited relative ``pyvenv.cfg`` value is never returned."""
     (tmp_path / "pyvenv.cfg").write_text(f"executable = {value}\n", encoding="utf-8")
     monkeypatch.setattr(python_env_module.sys, "prefix", str(tmp_path))
     assert python_env_module._current_venv_pyvenv_executable() == expected
@@ -516,8 +508,7 @@ def test_child_venv_interpreter_is_the_first_candidate_satisfying_requires_pytho
     versions: dict[str, tuple[int, int, int]],
     expected: str | None,
 ) -> None:
-    """Bug init-venv-bootstrap-inherits-degraded-base-python; v0.4.3 A9.1 (CWE-426):
-    base executable, then pyvenv.cfg, then PATH; a relative candidate is never spawned;
+    """Base executable, then pyvenv.cfg, then PATH (CWE-426); a relative candidate is never spawned;
     nothing satisfying raises naming the requirement and what was tried."""
     mgr = VenvPythonEnvironmentManager()
     monkeypatch.setattr(python_env_module, "PLATFORM", Capabilities.detect(host))
@@ -566,7 +557,7 @@ def test_child_venv_version_postcondition(
 def test_interpreter_version_probe_passes_a_bounded_timeout_and_devnull_stdin(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """A9.2: the probe subprocess must be bounded (``timeout=``) and never inherit the
+    """The probe subprocess must be bounded (``timeout=``) and never inherit the
     caller's stdin (``stdin=subprocess.DEVNULL``) — an interactive or hanging candidate
     must not wedge the bootstrap."""
     seen: dict[str, object] = {}
@@ -588,7 +579,7 @@ def test_interpreter_version_probe_passes_a_bounded_timeout_and_devnull_stdin(
 def test_interpreter_version_probe_degrades_to_none_on_timeout(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """A9.2: a candidate that would otherwise hang (``subprocess.run`` raising
+    """A candidate that would otherwise hang (``subprocess.run`` raising
     ``TimeoutExpired`` once the bound is enforced) degrades to ``None`` and is skipped —
     never propagates and never hangs the caller."""
 

@@ -1,6 +1,5 @@
-"""No law or skill names
-the `picked` status or `**Consumes:**` — the pick is the SPEC's `**Origin:** backlog:`
-line. Size: SMALL.
+"""No law or skill names the `picked` status or `**Consumes:**`; the pick is the SPEC's
+`**Origin:** backlog:` line. Size: SMALL.
 """
 
 from __future__ import annotations
@@ -31,13 +30,13 @@ def test_no_law_or_skill_names_the_picked_status_or_consumes() -> None:
     assert hits == []
 
 
-# --- one slug grammar ---------------------------------------------
+# --- One slug grammar ---------------------------------------------------------------------
 #
 # The schema is read through the owner's own loader,
 # `load_owner("dd-bug-resolution", "_ledger")` -> `load_schema("backlog-v1")` and `validate`,
 # never a `public/schemas` path. `backlog.py new` runs staged.
 #
-# `new`, the entry id and `relates` must agree on which slugs are valid.
+# `new`, the entry id and `relates` must agree on one slug grammar.
 # `status` is a live-stage token with its own grammar, not a slug place.
 # This file pins only that every place agrees.
 

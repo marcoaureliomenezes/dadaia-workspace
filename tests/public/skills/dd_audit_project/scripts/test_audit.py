@@ -1,5 +1,6 @@
 """dd-audit-project/scripts/audit.py owns specs/audits/<dir>/
-FINDINGS.jsonl and audits_histo.jsonl Size: SMALL.
+FINDINGS.jsonl and audits_histo.jsonl; the audit ledger verbs live in a stdlib skill script.
+Size: SMALL.
 
 The script reads its two schemas from ``scripts/schemas/`` BESIDE itself — copies
 `public stage` makes — so every test stages the folder exactly as stage does.
@@ -90,9 +91,9 @@ def _histo(specs: Path) -> list[dict[str, object]]:
 def test_a_write_verb_refuses_and_leaves_every_byte(
     script: Path, specs: Path, argv: tuple[str, ...], finding: dict[str, object], needle: str
 ) -> None:
-    """A FINDINGS.jsonl failing check
-    makes close exit non-zero, write no histo and keep the directory; an `_archive` id is
-    refused; every write verb runs check over the candidate bytes."""
+    """A FINDINGS.jsonl failing check makes close exit non-zero, write no histo and keep the
+    directory; an `_archive` id is refused; every write verb runs check over the candidate
+    bytes."""
     for directory in (specs / "audits" / _AUDIT, specs / "audits" / "_archive"):
         (directory / "FINDINGS.jsonl").write_text(json.dumps(finding) + "\n", encoding="utf-8")
     before = (specs / "audits" / _AUDIT / "FINDINGS.jsonl").read_bytes()
@@ -175,8 +176,8 @@ def test_check_passes_on_a_valid_tree_and_fails_on_a_broken_record(
 def test_close_without_a_resolved_finding_never_records_resolved(
     script: Path, specs: Path, verdicts: tuple[str, ...], expected: str
 ) -> None:
-    """All rejected gives the histo disposition rejected, never resolved; a clean
-    audit still closes."""
+    """All rejected gives the histo disposition rejected, never resolved; a clean audit
+    still closes."""
     records = [_finding(i + 1, disposition=v, reason="r") for i, v in enumerate(verdicts)]
     (specs / "audits" / _AUDIT / "FINDINGS.jsonl").write_text(
         "".join(json.dumps(r) + "\n" for r in records), encoding="utf-8"
@@ -194,8 +195,7 @@ def test_close_without_a_resolved_finding_never_records_resolved(
 
 
 def test_the_doctor_neither_folds_findings_nor_recommends_close() -> None:
-    """No doctor rule recommends `audit.py close`; features/specs
-    parses no finding record."""
+    """No doctor rule recommends `audit.py close`; features/specs parses no finding record."""
     from dadaia_workspace.features.specs.rules import RULES
 
     assert not [r.codes for r in RULES if "close" in str(r.fix_help)]

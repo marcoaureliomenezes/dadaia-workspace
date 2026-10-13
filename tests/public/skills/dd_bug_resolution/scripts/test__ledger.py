@@ -1,7 +1,6 @@
-"""sa-ledger-verbs-append-histo-before-validating-the-pair#J4: "Given
-any write verb of bugs.py, backlog.py, audit and release scripts and an injected invalid
-document, when the verb exits non-zero, then no file of its pair changed (hash before =
-after)." Size: SMALL — each ledger script as a child process over a tmp specs tree.
+"""A ledger write verb that exits non-zero on an injected invalid document changes no file
+of its pair (hash before = after). Size: SMALL — each ledger script as a child process
+over a tmp specs tree.
 
 Every case injects a schema-invalid (still JSON) document, so the refusal can only come
 from the pair check the verb runs over its candidate bytes before writing.
@@ -141,9 +140,15 @@ _BROKEN = [
 def test_every_check_finding_carries_its_fix(
     tmp_path: Path, script: str, files: dict[str, str]
 ) -> None:
-    """AC4.5: every record each ledger script's `check --json` emits
-    carries a non-empty fix (ADR 0158), so the doctor never invents one."""
-    done, _, _ = _run(tmp_path, script, files, "check", "--json")
+    """Every record each ledger script's `check --json` emits carries a non-empty fix."""
+    skills, specs = _stage(tmp_path), tmp_path / "specs"
+    for rel, text in files.items():
+        (specs / rel).parent.mkdir(parents=True, exist_ok=True)
+        (specs / rel).write_text(text, encoding="utf-8")
+    done = subprocess.run(
+        [sys.executable, str(skills / script), "check", "--specs", str(specs), "--json"],
+        capture_output=True, text=True, check=False,
+    )  # fmt: skip
     records = json.loads(done.stdout)
     assert done.returncode == 1 and records, done.stderr
     assert [r for r in records if not str(r.get("fix", "")).strip()] == [], records
@@ -214,9 +219,7 @@ def test_an_accepted_write_leaves_no_temp_sibling(tmp_path: Path, consumer: str)
 def test_the_one_ledger_writer_leaves_no_temp_and_writes_lf(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """sa-ledger-vocabulary-and-atomic-write-duplicated-in-scripts#48.2: a failing
-    os.replace leaves no temp sibling and the original byte-unchanged.
-    sa-ledger-vocabulary-and-atomic-write-duplicated-in-scripts#48.3: a write is LF."""
+    """A failing os.replace leaves no temp sibling and the original byte-unchanged; a write is LF."""
     import importlib.util
 
     source = _PUBLIC / "skills" / "dd-bug-resolution" / "scripts" / "_ledger.py"
@@ -276,9 +279,8 @@ def test_every_script_subset_is_drawn_from_the_one_vocabulary(
 def test_a_shared_disposition_requires_the_same_evidence_in_both_ledgers(
     script_table: Any,
 ) -> None:
-    """sa-ledger-vocabulary-and-atomic-write-duplicated-in-scripts#48.1: the scripts' own
-    tables are the only definition, core carries none, and a word both ledgers use
-    requires the same evidence in each."""
+    """The scripts' own tables are the only definition, core carries none, and a word both
+    ledgers use requires the same evidence in each."""
     rows = script_table("dd-backlog-definition/scripts/_backlog_exit.py", "EVIDENCE")
     dispositions = script_table("dd-backlog-definition/scripts/_backlog_schema.py", "DISPOSITIONS")
     assert set(rows) == set(dispositions)
@@ -289,7 +291,7 @@ def test_a_shared_disposition_requires_the_same_evidence_in_both_ledgers(
 
 
 def test_the_ledger_walk_skips_a_fenced_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:  # fmt: skip
-    """ADR 0088: no dadaia process acts on a fenced root, the privacy lookup included."""
+    """No dadaia process acts on a fenced root, the privacy lookup included."""
     import importlib.util
 
     source = _PUBLIC / "skills" / "dd-bug-resolution" / "scripts" / "_ledger.py"

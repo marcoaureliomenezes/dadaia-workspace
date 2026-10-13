@@ -1,5 +1,6 @@
 """dd-backlog-definition/scripts/backlog.py owns BACKLOG.json and its
-histo. Size: SMALL.
+histo; the backlog ledger verbs live in a stdlib skill script.
+Size: SMALL.
 
 The script reads its two schemas from ``scripts/schemas/`` BESIDE itself — copies
 `public stage` makes — so every test stages the trio exactly as stage does.
@@ -191,9 +192,10 @@ def test_new_records_typed_intents(script: Path, tmp_path: Path) -> None:
 
 
 def test_exit_moves_the_entry_to_the_histo_exactly_once(script: Path, tmp_path: Path) -> None:
-    """`exit` moves the record out of the document into the histo exactly once, as a pair.
-    After `release.py new --origin backlog:<slug>`, `exit --disposition delivered` exits 0
-    with no hand edit; until then the picked item stays live with its status unchanged."""
+    """When `exit` succeeds, the record leaves the document and appears exactly once in the
+    histo, written atomically as a pair. `release.py new --origin backlog:<slug>`, then
+    `exit --disposition delivered`, exits 0 with no hand edit; until then the picked item
+    stays live with its status unchanged."""
     specs = _specs(tmp_path)
     assert _run(script, "new", "an-idea", "--specs", str(specs)).returncode == 0
     _pick(specs)
@@ -307,8 +309,8 @@ def test_the_refusal_fix_names_the_latest_picking_release_by_version(
 def test_exit_reads_origin_through_the_release_parser(
     script: Path, tmp_path: Path, origin: str, code: int
 ) -> None:
-    """Only the first Origin line counts, and a
-    clause line parses — `exit` asks `release.py`'s one parser."""
+    """Only the first Origin line counts, and a clause line parses — `exit` asks
+    `release.py`'s one parser."""
     specs = _specs(tmp_path)
     _run(script, "new", "an-idea", "--specs", str(specs))
     _pick(specs, "operator-demand")
@@ -344,9 +346,9 @@ def test_rejected_requires_a_reason(script: Path, tmp_path: Path) -> None:
 def test_each_refusal_fix_keeps_the_chosen_disposition(
     script: Path, tmp_path: Path, disposition: str, evidence: list[str]
 ) -> None:
-    """A picked entry refused for its evidence gets the fix of THAT
-    evidence row — never a `delivered` exit the operator did not choose.
-    A runnable fix runs as printed and exits under the chosen disposition."""
+    """A picked entry refused for its evidence gets the fix of THAT evidence row — never a
+    `delivered` exit the operator did not choose. A runnable fix runs as printed and exits
+    under the chosen disposition."""
     specs = _specs(tmp_path)
     _run(script, "new", "an-idea", "--specs", str(specs))
     _pick(specs)
@@ -510,8 +512,8 @@ def test_a_refused_write_leaves_the_document_byte_identical(script: Path, tmp_pa
 def test_new_refuses_a_retired_kind_and_its_fix_lists_the_kinds(
     script: Path, tmp_path: Path, kind: str
 ) -> None:
-    """`new` refuses a kind outside the four, nothing
-    written; its fix line `new --help` lists every kind, and `subjects` is gone."""
+    """`new` refuses a kind outside the four, nothing written; its fix line `new --help`
+    lists every kind."""
     specs = _specs(tmp_path)
     done = _run(script, "new", "x-item", "--specs", str(specs), "--intent", f"{kind}:x=y")
     fix = [line for line in (done.stdout + done.stderr).splitlines() if line.startswith("fix:")]
@@ -541,9 +543,10 @@ def _exited(script: Path, tmp_path: Path) -> Path:
 
 
 def test_a_refused_exit_leaves_both_backlog_files_byte_intact(script: Path, tmp_path: Path) -> None:
-    """With BACKLOG.json holding an invalid entry (an Idea without intents),
-    `backlog.py exit <other-slug>` exits 1 and BACKLOG.json and backlog_histo.jsonl are both
-    byte-identical. Run twice: a retry appends nothing either."""
+    """Given BACKLOG.json holding an invalid entry (an Idea without intents), when
+    `backlog.py exit <other-slug>` runs, then it exits 1 and BACKLOG.json and
+    backlog_histo.jsonl are both
+    byte-identical." Run twice: a retry appends nothing either."""
     specs = _exited(script, tmp_path)
     document = json.loads((specs / "backlog" / "BACKLOG.json").read_text(encoding="utf-8"))
     document["active"].append({"id": "broken", "status": "Idea"})
@@ -562,8 +565,8 @@ def test_a_refused_exit_leaves_both_backlog_files_byte_intact(script: Path, tmp_
 def test_new_refuses_a_slug_that_already_exited_and_writes_nothing(
     script: Path, tmp_path: Path
 ) -> None:
-    """With slug zz already exited (a histo record exists), `backlog.py new zz` exits 1
-    citing the earlier exit and writes nothing; the pair check refuses it."""
+    """Given slug zz already exited (a histo record exists), when `backlog.py new zz` runs,
+    then it exits 1 citing the earlier exit and writes nothing. The pair check refuses it."""
     specs = _exited(script, tmp_path)
     before = _pair(specs)
 
@@ -584,7 +587,7 @@ def test_new_refuses_a_slug_that_already_exited_and_writes_nothing(
 def test_the_backlog_seam_amnesties_a_term_origin_already_holds(
     script: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, first: str, refused: bool
 ) -> None:
-    """A denylisted term BACKLOG.json already holds on
+    """On the second ledger caller: a denylisted term BACKLOG.json already holds on
     origin is accepted by `new`, as the push accepts it; an unpublished one is refused."""
     root = tmp_path / "repo"
     specs = _specs(root)
