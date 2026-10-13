@@ -82,14 +82,12 @@ def _state(release_id: str, **over: object) -> dict[str, object]:
     return document
 
 
-def _release(
-    specs: Path, release_id: str, *, tasks: str = "- [x] T-1 — done\n", **over: object
-) -> Path:
+def _release(specs: Path, release_id: str, **over: object) -> Path:
     """One live release directory: its state document and the candidate's trio."""
     release_dir = specs / "releases" / release_id
     (release_dir / "rc-1").mkdir(parents=True, exist_ok=True)
     for name in _TRIO:
-        body = {"TASKS.md": tasks, "PLAN.md": PLAN}.get(
+        body = {"TASKS.md": "- [x] T-1 — done\n", "PLAN.md": PLAN}.get(
             name, "**Origin:** operator-demand\n\n## Bug window review\n"
         )
         release_dir.joinpath("rc-1", name).write_text(
@@ -185,7 +183,7 @@ def test_a_live_spec_without_the_bug_window_review(
     """A live SPEC lacking the heading is an error with
     one fix while its candidate is in DEFINITION (where `new` writes it); past it, info."""
     specs = _specs(tmp_path)
-    _release(specs, "0.5.0", phase=phase, tasks="- [ ] T-1 — open\n")
+    _release(specs, "0.5.0", phase=phase)
     spec_md = specs / "releases" / "0.5.0" / "rc-1" / "SPEC.md"
     spec_md.write_text(spec_md.read_text(encoding="utf-8").replace("## Bug window review\n", ""))
     found = _run(script, "check", "--json", "--specs", str(specs))
@@ -317,11 +315,10 @@ def test_writes_reads_rc6_t_050_117_to_its_ten_paths(script: Path) -> None:
     """A backticked path inside parentheses is named, not written; the task line is inlined
     verbatim."""
     sys.path.insert(0, str(script.parent))  # the staged copy: no bytecode beside the source
-    from _release_schema import MARK_RE, writes
+    from _release_schema import writes
 
     line = '- [x] **T-050-117 — PROTECTED floor in code; the protected section.** `W:` `core/workspace_layout.py`, `f/spec_context/gate_policy.py`, `hooks/sdd_gate.py`, `f/spec_context/doctor.py`, `CONTEXT.md`, `tests/unit/features/spec_context/test_gate_policy.py`, `tests/unit/hooks/test_pre_gate.py`, `tests/unit/core/test_workspace_layout_zones.py`, `tests/unit/hooks/test_sdd_gate.py`, `tests/integration/scripts/test_run_mutation_baseline_wiring.py` (:65 reads `classify_path(...)[0]`), (:83 B39-7 unledgered row drops root `AGENTS.md`, now floor) (the grammar owner, :97,104 rewritten to the triple; `doctor.py:299` follows the triple)'  # fmt: skip
     assert writes("`W:` `a.py` ) `b.py`") == ["a.py", "b.py"]  # a stray `)` drops nothing
-    assert [m[0] for m in MARK_RE.finditer("-\n\n- [ ]**T-1**")] == ["- [ ]**T-1**"]
     assert writes(line) == [
         "core/workspace_layout.py", "f/spec_context/gate_policy.py", "hooks/sdd_gate.py",
         "f/spec_context/doctor.py", "CONTEXT.md", "tests/unit/features/spec_context/test_gate_policy.py",
@@ -333,7 +330,7 @@ def test_writes_reads_rc6_t_050_117_to_its_ten_paths(script: Path) -> None:
 def _job_release(specs: Path, job: str, dag_writes: str, **over: object) -> None:
     """A release whose candidate carries `tasks/job1.md` (*job*) and a PLAN DAG row
     holding *dag_writes*."""
-    release_dir = _release(specs, "0.5.0", tasks="- [ ] T-1 — open\n", **over)
+    release_dir = _release(specs, "0.5.0", **over)
     plan = _DAG_HEAD.replace("`src/x.py`", dag_writes)
     (release_dir / "rc-1" / "PLAN.md").write_text(
         f"# PLAN.md\n\n**Status:** Approved\n\n{plan}", encoding="utf-8"
@@ -435,23 +432,20 @@ def test_check_reports_a_malformed_job_file_as_a_finding(
 
 
 @pytest.mark.parametrize(
-    ("tasks", "log", "needle"),
+    ("log", "needle"),
     [
-        ("- [x] **T-1** done\n", [], "T-1"),
-        ("- [-] **T-1** reserved\n", [], "T-1"),
-        ("- [ ] **T-1** open\n", [("new", "note"), ("x", "dispositions")], "dispositions"),
-        ("- [ ] **T-1** open\n", [("x", "dispositions"), ("new", "note")], None),
+        ([("new", "note"), ("x", "dispositions")], "dispositions"),
+        ([("x", "dispositions"), ("new", "note")], None),
     ],
 )
 def test_check_judges_a_definition_release(
-    script: Path, tmp_path: Path, tasks: str, log: list[tuple[str, str]], needle: str | None
+    script: Path, tmp_path: Path, log: list[tuple[str, str]], needle: str | None
 ) -> None:
-    """A marker past `[ ]` or a closure entry after the candidate's
-    birth note is a finding under DEFINITION; a stacked candidate's inherited closure
-    entries, logged before its birth, are not."""
+    """A closure entry after the candidate's birth note is a finding under DEFINITION;
+    a stacked candidate's inherited closure entries, logged before its birth, are not."""
     specs = _specs(tmp_path)
     entries = [{"ts": _TS, "agent": f"release.py {a}", "kind": k, "text": k} for a, k in log]
-    _release(specs, "0.5.0", tasks=tasks, log=entries)
+    _release(specs, "0.5.0", log=entries)
     result = _run(script, "check", "--specs", str(specs))
     if needle:
         assert result.returncode == 1 and needle in result.stdout, result.stdout
@@ -470,7 +464,7 @@ def test_a_definition_finding_stamps_the_commit_that_touched_the_trio(
         {"ts": _TS, "agent": f"release.py {a}", "kind": k, "text": k}
         for a, k in (("new", "note"), ("x", "dispositions"))
     ]
-    _release(specs, "0.5.0", tasks="- [ ] T-1 — open\n", log=entries)
+    _release(specs, "0.5.0", log=entries)
     (root / "dadaia_workspace/features/alpha/core.py").write_text("x = 3\n", encoding="utf-8")
     _git(root, "commit", "-qam", "implementation after the trio")
     fixes = [
@@ -524,9 +518,7 @@ def _in_phase(root: Path, script: Path, phase: str) -> Path:
     if phase == "CLOSURE":
         return _reconciled_closure(root, script)
     specs = _specs(root)
-    _release(
-        specs, "0.5.0", phase=phase, tasks=f"- [{' ' if phase == 'DEFINITION' else 'x'}] T-1\n"
-    )
+    _release(specs, "0.5.0", phase=phase)
     return specs
 
 
@@ -910,7 +902,7 @@ def _dag_tree(tmp_path: Path, *, extra_dag_job: bool) -> Path:
     """A DEFINITION release whose DAG names Job 1 (and, mismatched, Job 2) and whose
     tasks/ holds job1.md only."""
     specs = _specs(tmp_path)
-    release_dir = _release(specs, "0.5.0", tasks="- [ ] T-1 — open\n")
+    release_dir = _release(specs, "0.5.0")
     plan = _DAG_HEAD + ("| Job 2 | 1 | 2 | `src/y.py` |\n" if extra_dag_job else "")
     (release_dir / "rc-1" / "PLAN.md").write_text(
         f"# PLAN.md\n\n**Status:** Approved\n\n{plan}", encoding="utf-8"

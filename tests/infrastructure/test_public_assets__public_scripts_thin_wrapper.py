@@ -155,7 +155,7 @@ _GRAMMAR_HEADS = {r"\*\*Origin:\*\*": set(), r"\*\*Status:\*\*": {"core/spec_sta
 #: Each owner's pinned file and top-level names (the Status pair: `test_spec_status.py`).
 _SCHEMA = "public/skills/dd-release-implementation/scripts/_release_schema.py"
 _OWNERS = {
-    _SCHEMA: {"origin", "MARK_RE", "MARKS", "writes"},
+    _SCHEMA: {"origin", "writes"},
     "public/skills/dd-bug-resolution/scripts/_ledger.py": {"records", "validate", "terms"},
     _LOADER: {"load_owner"},
     "core/context_registry.py": {"entries"},
