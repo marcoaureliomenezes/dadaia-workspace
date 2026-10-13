@@ -20,7 +20,7 @@ with the workspace venv first on `PATH`:
 verify: python scripts/ci.py job
 
 - The developer's pipeline — `.github/`, `scripts/ci.py`, `scripts/guards/`, `tests/`, Dependabot/SAST, mutation and test-audit — is private to this repository and never ships. What ships (`dadaia_workspace/public/**`, the projected law, the skill scripts) requires of a user's repo only its own `verify:` lines and local git: never a remote, CI, `gh`, a PR host or a language toolchain. `test_public_source_hygiene.py`'s `public-law-names-no-private-pipeline` row is the mechanical half.
-- A review of a diff here carries `python scripts/mutate.py --base <work branch>` (score, survivors, kill matrix) and the diff's branch coverage from that run as evidence. Neither is a gate: no test reads either as pass or fail; the script and its `pytest-cov` use stay out of the built wheel.
+- A review of a diff here may carry `python scripts/mutate.py --base <work branch>` (score, survivors, kill matrix) and the diff's branch coverage from that run as optional evidence, never required. Neither is a gate: no test reads either as pass or fail; the script and its `pytest-cov` use stay out of the built wheel.
 
 - Versioning here: release-please owns the version, tag and CHANGELOG; the work branch
   is named for the live release (`_RELEASE.json`).

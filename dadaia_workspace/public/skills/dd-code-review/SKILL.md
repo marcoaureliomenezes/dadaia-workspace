@@ -41,7 +41,7 @@ axes are reported side by side with equal weight, so no axis hides another's fin
 - Acceptance criteria without corresponding evidence (test/assertion) is a finding.
 - Read `rc-<N>/PLAN.md` §1 (As-is review) beside the SPEC and job files: a DELETE or REBUILD unit the range leaves unchanged is HIGH.
 - A KEEP unit the range grew is a finding.
-- A SPEC, PLAN or job file that adds a requirement applied to every task, job or deletion without its measured cost per run, or above one run of the job's `verify:` gate, is REJECTED (root map §1, "a new gate, lock, repo, layer or review round states what it buys").
+- A SPEC, PLAN or job file that adds a requirement applied to every task, job or deletion without its measured cost per run, or above one run of the job's `verify:` gate, is REJECTED (root map §1, the gate-cost clause).
 - A worktree's (`worktrees/AGENTS.md`) commits follow the `dd-gitflow-default` §3a rows of what they write.
 - The reviewer of a `define` tree judges each job-file `who` column against the shape rule in `dd-release-definition` §5.
 
@@ -73,7 +73,7 @@ One reviewer, six checklists applied on every verdict; the engineer anticipates 
 
 - **Architecture** — root cause named; the diff shrinks or keeps the feature; per PLAN §1.1 row, every `deleted` gone and every `consults` calls the authority (S4/S5/S10); a duplicated decider is flagged on the first pass; no component imports another's internals or forms a cycle, it reaches the other by running its entry point.
 - **Security** — OWASP top 10, secrets, dependency CVEs (the ecosystem's dependency audit), CWE id per finding.
-- **QA** — every acceptance scenario has evidence; the pyramid holds; tests keep the root map §1 basics; a deleted test is HIGH, REJECTED, unless the operator ordered it; a loosened assert, or a fix without its revert-check evidence, is HIGH, verdict REJECTED; the `SLOP.md` S3 signals are QA-lens items.
+- **QA** — every acceptance scenario has evidence; the pyramid holds; tests keep the root map §1 basics; a deleted test, or a removed or skipped assert, is HIGH, REJECTED, unless the operator ordered it (root map §1); a loosened assert, or a fix without its revert-check evidence, is HIGH, verdict REJECTED; the `SLOP.md` S3 signals are QA-lens items.
 - **QA, platform and claims** — the diff holds on Windows, platform facts read from one module; each negative claim in a verdict carries its grep and hit count; a new assert holds no platform literal and a child process copies the parent's env; the verdict names its platform proof.
 - **QA, visual and format** — a visual change is judged by a screenshot framed on the reported symptom, after listing each layer that renders there; a changed grammar, format, stamp, fix line or public name is grepped across every repo of the context, and each consumer it breaks is HIGH.
 - **Product** — the diff matches SPEC scope; memory atoms still tell the truth (`.agents/skills/dd-release-implementation/MEMORY-UPDATE.md`).
