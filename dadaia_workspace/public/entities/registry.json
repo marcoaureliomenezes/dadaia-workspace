@@ -41,7 +41,7 @@
     },
     {
       "id": "git-chokepoints",
-      "mandate": "Harness-independent: pre-push allows only work-branch pushes (the constitution's gitflow) and refuses integration/principal direct pushes (branch contract: `dd-gitflow-default`)."
+      "mandate": "Harness-independent: the shipped pre-push hook enforces .dadaia/AGENTS.md §3 (branch contract: dd-gitflow-default §2a)."
     },
     {
       "id": "tool-cache-env",
