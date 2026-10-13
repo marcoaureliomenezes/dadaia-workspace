@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import os
 import subprocess
+from collections.abc import Mapping
 from pathlib import Path
 
 #: `git rev-parse --local-env-vars` less the config injectors: what makes git answer for another repo. Identity, config and ssh are the caller's.
@@ -15,8 +16,11 @@ _LOCAL = frozenset({
 })  # fmt: skip
 
 
-def scrubbed_env() -> dict[str, str]:
-    return {k: v for k, v in os.environ.items() if k not in _LOCAL}
+def scrubbed_env(parent: Mapping[str, str] | None = None) -> dict[str, str]:
+    """A child env from *parent* (default `os.environ`): repo-selecting `GIT_*` out, bytecode off."""
+    return {
+        k: v for k, v in (os.environ if parent is None else parent).items() if k not in _LOCAL
+    } | {"PYTHONDONTWRITEBYTECODE": "1"}
 
 
 def git(repo: Path, *args: str, check: bool = True, input: str | None = None) -> str:
