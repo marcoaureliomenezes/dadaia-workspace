@@ -1,11 +1,10 @@
 """One table of ROOT ENTRIES through the gate and the doctor: the gate ALLOWs a write that
-creates an entry at a judged level (the root, ``.dadaia/``, ``repos/<r>``, ``worktrees/<r>``,
-ADR 0132) iff the doctor does not judge that entry SLOP. Scope inside a registered repo is
+creates an entry at a judged level (the root, ``.dadaia/``, ``repos/<r>``, ``worktrees/<r>``)
+iff the doctor does not judge that entry SLOP. Scope inside a registered repo is
 test_sdd_gate's, not this table's.
 
-sa-gate-allows-root-entries-the-reaper-moves#E6 (every row), #E1
-(notes/ without a glob), #E2 (with one), sa-gate-allows-root-entries-the-reaper-moves#E3 (wrong type), #E4 (.dadaia non-zone and
-non-canon states), #E5 (root specs/), #E8 (law files) — ADR 0058.
+Rows cover notes/ without a glob and with one, a wrong type, a .dadaia non-zone and
+non-canon states, a root specs/ and the law files.
 Size: MEDIUM (integration: the real ``pre_gate`` subprocess, then ``DoctorService.scan``).
 
 Structural cause pinned: the gate (``root_whitelist``: type-blind names, "an existing
@@ -40,7 +39,7 @@ _TABLE = [
     ("prompt.md", None, None, True),
     ("specs/bugs/x.md", None, None, False),
     (".dadaia/newzone/x.txt", None, None, False),
-    ("worktrees/x/0.5.0-rc1/j1/f.py", None, None, False),  # x: no registered slug (ADR 0132)
+    ("worktrees/x/0.5.0-rc1/j1/f.py", None, None, False),  # x: no registered slug
     (".dadaia/tmp/agent/20260927/x.txt", None, None, True),
 ]
 

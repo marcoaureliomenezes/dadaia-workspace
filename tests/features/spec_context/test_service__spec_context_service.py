@@ -1,4 +1,4 @@
-"""SpecContextService ALIVE/DEAD transitions (lock-free): dead never commits (ADR 0172),
+"""SpecContextService ALIVE/DEAD transitions (lock-free): dead never commits,
 so a dirty checkout refuses before any repo is touched."""
 
 from __future__ import annotations
@@ -59,11 +59,11 @@ def service(
 def test_alive_clone_behavior_state_and_not_found(
     service: SpecContextService, remote: str, workspace_root: Path
 ) -> None:
-    """AC-T10b-1/3: alive() clones an absent repo, is idempotent, never clones over a present dir."""
+    """alive() clones an absent repo, is idempotent, never clones over a present dir."""
     register_dead(service, "proj", "my-repo", remote)
     repo = workspace_root / "repos" / "my-repo"
 
-    # AC-T10b-1: alive() sets state=ALIVE, alive_since=<now>, dead_since=null; it
+    # alive() sets state=ALIVE, alive_since=<now>, dead_since=null; it
     # clones since the repo dir is absent.
     ctx = service.alive("proj")
     assert ctx.state == ContextState.ALIVE
@@ -71,7 +71,7 @@ def test_alive_clone_behavior_state_and_not_found(
     assert ctx.dead_since is None
     assert git(repo, "remote", "get-url", "origin") == remote
 
-    # AC-T10b-3: alive() on an already-ALIVE context is idempotent (no error, no
+    # alive() on an already-ALIVE context is idempotent (no error, no
     # re-clone since the repo now exists).
     (repo / "local.txt").write_text("kept\n", encoding="utf-8")
     ctx2 = service.alive("proj")

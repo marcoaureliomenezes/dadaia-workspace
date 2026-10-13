@@ -1,4 +1,4 @@
-"""AC8.2: SpecContextService's dead() preflight reads the worktree rows it is handed — a
+"""SpecContextService's dead() preflight reads the worktree rows it is handed — a
 stub callable stands for the owner's reader."""
 
 from __future__ import annotations

@@ -1,4 +1,4 @@
-"""Unit tests for the DoctorService venv-health invariant (FR-W3-02, T-014-13).
+"""Unit tests for the DoctorService venv-health invariant.
 
 The doctor reports a VENV-* finding when the workspace venv is missing or its ``dadaia``
 entrypoint is absent / non-executable. A healthy synthetic tree reports nothing, and every

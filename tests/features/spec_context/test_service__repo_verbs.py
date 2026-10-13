@@ -1,15 +1,12 @@
-"""FR17 (v0.4.4, T-044-28) — the `SpecContextService` create/add/remove-repo methods.
+"""The `SpecContextService` create/add/remove-repo methods.
 
-A17.1 (idempotent, fails loudly on unknown context/slug), A17.3
-(refuses the main repo's own slug as associated), context-repo-add-accepts-foreign-
-context-slug (T-044-45 F-1: refuses a slug already owned by ANOTHER context, as its
-main repo or an associated repo) and its `create`-seam mirror
-context-create-accepts-slug-owned-by-another-context (S5-FR23 Firing 5 finding: the
-same `_foreign_slug_owner` predicate applied at `create`'s own `--repo` slug, the
-second registry seam that writes into the shared `repos/<slug>` namespace).
+Idempotent, fails loudly on unknown context/slug; refuses the main repo's own slug as
+associated; refuses a slug already owned by ANOTHER context, as its main repo or an
+associated repo, and the same `_foreign_slug_owner` predicate applies at `create`'s own
+`--repo` slug, the second registry seam that writes into the shared `repos/<slug>` namespace.
 JsonContextStore-driven (SMALL/unit tier): a pure registry-mutation concern, no real
 git/disk behavior under test — the CLI-level surface (argument parsing,
-on-disk-left-untouched messaging for A17.2) is proven in
+on-disk-left-untouched messaging) is proven in
 ``tests/cli/commands/test_context__cli_context_repo_verbs.py``.
 """
 
@@ -91,10 +88,10 @@ def seeded(store: JsonContextStore) -> JsonContextStore:
 
 # fmt: off
 @pytest.mark.parametrize(("preadd", "context", "slug", "url", "raises", "added", "final"), [
-    pytest.param(False, "proj", "assoc-repo", _URL, None, True, (_ASSOC,), id="A17.1-new-slug-registered-and-persisted"),
-    pytest.param(True, "proj", "assoc-repo", _URL, None, False, (_ASSOC,), id="A17.1-same-slug-same-url-idempotent-beside-a-foreign-context"),
-    pytest.param(True, "proj", "assoc-repo", _URL + "-renamed", AssociatedRepoConflictError, None, (_ASSOC,), id="A17.1-same-slug-other-url-refused-untouched"),
-    pytest.param(False, "nope", "assoc-repo", _URL, ContextNotFoundError, None, (), id="A17.1-unknown-context"),
+    pytest.param(False, "proj", "assoc-repo", _URL, None, True, (_ASSOC,), id="new-slug-registered-and-persisted"),
+    pytest.param(True, "proj", "assoc-repo", _URL, None, False, (_ASSOC,), id="same-slug-same-url-idempotent-beside-a-foreign-context"),
+    pytest.param(True, "proj", "assoc-repo", _URL + "-renamed", AssociatedRepoConflictError, None, (_ASSOC,), id="same-slug-other-url-refused-untouched"),
+    pytest.param(False, "nope", "assoc-repo", _URL, ContextNotFoundError, None, (), id="unknown-context"),
     pytest.param(False, "proj", "other-repo", _URL, AssociatedRepoConflictError, None, (), id="F-1-slug-owned-by-another-context-as-main"),
     pytest.param(False, "proj", "other-assoc", _URL, AssociatedRepoConflictError, None, (), id="F-1-slug-owned-by-another-context-as-associated"),
     pytest.param(False, "proj", "brand-new", "u", None, True, (AssociatedRepo(slug="brand-new", url="u"),), id="F-1-unowned-slug-still-accepted"),
@@ -105,7 +102,7 @@ def test_add_repo_refuses_slug_owned_by_another_context_as_main_repo(
     service: SpecContextService, seeded: JsonContextStore, preadd: bool, context: str, slug: str, url: str,
     raises: type[Exception] | None, added: bool | None, final: tuple[AssociatedRepo, ...],
 ) -> None:  # fmt: skip
-    """A17.1/A17.3; context-repo-add-accepts-foreign-context-slug (T-044-45 F-1): one predicate over
+    """One predicate over
     every context's main AND associated slugs refuses a slug another context owns — a foreign slug
     would arm that context's `dead()` to rmtree this one's tree; its own slug stays an idempotent no-op."""
     if preadd:
@@ -120,7 +117,7 @@ def test_add_repo_refuses_slug_owned_by_another_context_as_main_repo(
 
 
 def test_add_repo_own_main_slug_is_a_no_op(service: SpecContextService, seeded: JsonContextStore) -> None:
-    """A17.2 ruling (operator, 2026-10-11): adding a context's own main slug as an associated repo is an
+    """Adding a context's own main slug as an associated repo is an
     idempotent no-op — the context is returned unchanged, was_added False, the stored record equal before/after."""
     before = seeded.get("proj")
     ctx, was_added = service.add_repo("proj", "main-repo", _URL)
@@ -142,8 +139,8 @@ _INFRA = (AssociatedRepo(slug="infra", url="https://github.com/org/infra"),)
     pytest.param("projeto-café", "ok", (), InvalidContextNameError, "letters, digits", id="allowlist-name-non-ascii"),
     pytest.param("ok", "../escape", (), InvalidContextNameError, "letters, digits", id="allowlist-slug-escape"),
     pytest.param("ok", "a/b", (), InvalidContextNameError, "letters, digits", id="allowlist-slug-with-slash"),
-    pytest.param("new-proj", "main-repo", _OWN, AssociatedRepoConflictError, "own main repo", id="A17.3-associated-equals-main"),
-    pytest.param("new-proj", "main-repo", _TWICE, AssociatedRepoConflictError, "more than once", id="A17.3-associated-given-twice"),
+    pytest.param("new-proj", "main-repo", _OWN, AssociatedRepoConflictError, "own main repo", id="associated-equals-main"),
+    pytest.param("new-proj", "main-repo", _TWICE, AssociatedRepoConflictError, "more than once", id="associated-given-twice"),
     pytest.param("new-proj", "brand-new-repo", (), None, None, id="unowned-slug-accepted"),
     pytest.param("new-proj", "main-2", _INFRA, None, None, id="associated-repos-in-the-same-guarded-write"),
 ])
@@ -152,9 +149,8 @@ def test_create_refuses_a_name_or_slug_outside_the_allowlist(
     service: SpecContextService, store: JsonContextStore, name: str, slug: str,
     assoc: tuple[AssociatedRepo, ...], raises: type[Exception] | None, match: str | None,
 ) -> None:  # fmt: skip
-    """import-registers-unvalidated-slugs-that-doctor-fix-inv5-rmtrees and
-    context-create-accepts-slug-owned-by-another-context: `SpecContextService.register`, the ONE seam
-    every registry insert goes through, owns the allowlist, A17.3 and the foreign-slug predicate."""
+    """`SpecContextService.register`, the ONE seam
+    every registry insert goes through, owns the allowlist, the own-slug rule and the foreign-slug predicate."""
     _save(store, "other-proj", "other-repo", (_OTHER_ASSOC,))
     if raises:
         with pytest.raises(raises, match=match):
@@ -169,7 +165,7 @@ def test_create_refuses_a_name_or_slug_outside_the_allowlist(
 # fmt: off
 @pytest.mark.parametrize(("context", "slug", "removes", "raises", "left"), [
     pytest.param("proj", "assoc-repo", 1, None, (), id="removes-the-registered-repo"),
-    pytest.param("proj", "assoc-repo", 2, AssociatedRepoNotFoundError, (), id="A17.1-second-remove-fails-loudly"),
+    pytest.param("proj", "assoc-repo", 2, AssociatedRepoNotFoundError, (), id="second-remove-fails-loudly"),
     pytest.param("proj", "never-registered", 1, AssociatedRepoNotFoundError, (_ASSOC,), id="unknown-slug"),
     pytest.param("nope", "assoc-repo", 1, ContextNotFoundError, (_ASSOC,), id="unknown-context"),
 ])
@@ -193,7 +189,7 @@ def test_remove_repo_converges_to_not_registered(
 def test_remove_repo_never_touches_git(
     service: SpecContextService, seeded: JsonContextStore, workspace_root: Path
 ) -> None:
-    """A17.2 (service layer half): removing a registry entry leaves the checkout and history as they were."""
+    """Removing a registry entry leaves the checkout and history as they were."""
     remote = seeded_remote(workspace_root.parent, "assoc-repo")
     repo = clone(remote, workspace_root / "repos" / "assoc-repo")
     head = git(repo, "rev-parse", "HEAD")

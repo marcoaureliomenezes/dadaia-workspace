@@ -86,12 +86,12 @@ def _create(*args: str) -> tuple[int, str]:
     ],
 )
 def test_one_slug_rule(url: str, slug: str) -> None:
-    """AC3.2 — every char outside [A-Za-z0-9_-] becomes '-'."""
+    """Every char outside [A-Za-z0-9_-] becomes '-'."""
     assert slug_from_url(url) == slug
 
 
 def test_create_clones_hooks_alives_and_leaves_the_repo_untouched(ws: Path, tmp_path: Path) -> None:
-    """AC3.1 + AC3.6 — the name defaults to the slug; porcelain clean; HEAD equals the remote's."""
+    """The name defaults to the slug; porcelain clean; HEAD equals the remote's."""
     main = _remote(tmp_path, "my.app.git")
     assoc = _remote(tmp_path, "lib.git")
 
@@ -102,7 +102,7 @@ def test_create_clones_hooks_alives_and_leaves_the_repo_untouched(ws: Path, tmp_
     record = json.loads(_runner.invoke(app, ["context", "show", "my-app", "--json"]).stdout)
     assert record["state"] == "alive"
     assert [r["slug"] for r in record["associated_repos"]] == ["lib"]
-    assert session_store.read_session(ws, _SID) is None  # sa-bind-has-two-stores#S10, AC7.1
+    assert session_store.read_session(ws, _SID) is None
     assert "bound" not in out and "export DADAIA_" not in out
     for checkout in (repo, ws / "repos" / "lib"):
         assert (checkout / ".git" / "hooks" / "pre-push").is_file()
@@ -113,7 +113,7 @@ def test_create_clones_hooks_alives_and_leaves_the_repo_untouched(ws: Path, tmp_
 def test_a_failed_clone_leaves_nothing_and_the_same_command_then_succeeds(
     ws: Path, tmp_path: Path
 ) -> None:
-    """AC3.4 + AC3.5 — rollback leaves no dir or record; the fix line keeps every repo; the retry succeeds."""
+    """Rollback leaves no dir or record; the fix line keeps every repo; the retry succeeds."""
     main = _remote(tmp_path, "core.git")
     ok_assoc = _remote(tmp_path, "one.git")
     missing = tmp_path / "two.git"
@@ -137,7 +137,7 @@ def test_a_failed_clone_leaves_nothing_and_the_same_command_then_succeeds(
 
 
 def test_only_a_checkout_of_the_url_is_adopted(ws: Path, tmp_path: Path) -> None:
-    """AC3.3 — a checkout of the URL is adopted; a plain dir or another origin is refused untouched."""
+    """A checkout of the URL is adopted; a plain dir or another origin is refused untouched."""
     main = _remote(tmp_path, "adopt.git")
     _git("clone", "-q", str(main), str(ws / "repos" / "adopt"))
     (ws / "repos" / "squat").mkdir()
@@ -187,5 +187,5 @@ def test_the_created_line_is_one_line_and_the_next_step_is_the_new_contexts(
     code, out = _create("--main-repo", str(_remote(tmp_path, "a-rather-long-repo-name.git")))
     assert code == 0, out
     assert any(ln.endswith("(main repo: repos/a-rather-long-repo-name)") for ln in out.splitlines())
-    assert "context bind a-rather-long-repo-name" in out  # AC7.2: a session, unbound
+    assert "context bind a-rather-long-repo-name" in out  # a session, unbound
     assert "'second'" not in out

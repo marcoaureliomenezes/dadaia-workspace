@@ -1,7 +1,7 @@
 """``.venv``, ``.git`` and ``node_modules`` end the repo-tree walk. They are pruned
 BEFORE anything is classified, so the unattended reaper can never move a virtualenv
 (absolute interpreter paths die with the move). A nested ``.dadaia`` beside it is still
-reported and still moved; a tool cache is the repo's own (T-050-154).
+reported and still moved; a tool cache is the repo's own.
 
 size: SMALL.
 """

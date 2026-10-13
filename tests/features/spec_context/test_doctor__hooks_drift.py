@@ -1,4 +1,4 @@
-"""HOOKS-DRIFT-1 — the installed git hooks match the shipped ones (0.4.7 FR6c, T-047-21).
+"""HOOKS-DRIFT-1 — the installed git hooks match the shipped ones.
 
 A git chokepoint is the ONE mechanical backstop that runs outside every harness hook
 (`.dadaia/AGENTS.md`). An installed copy that has drifted from what the library ships is a
@@ -73,7 +73,7 @@ def test_hooks_drift_1_flags_an_installed_hook_that_is_not_the_shipped_one(
 
 
 def test_a_named_context_checks_only_its_own_repos(tmp_path: Path) -> None:
-    """0.4.8 R5 / AC3.7: `doctor --context X` judges X's hooks, never another context's."""
+    """`doctor --context X` judges X's hooks, never another context's."""
     root = _workspace(tmp_path, drifted=True)
     service = DoctorService(_Store([_ctx("demo"), _ctx("other")]), None, root)  # type: ignore[arg-type]
     assert service.check_installed_hooks("other") == []
@@ -81,7 +81,7 @@ def test_a_named_context_checks_only_its_own_repos(tmp_path: Path) -> None:
 
 
 def test_a_gate_git_never_runs_is_a_finding(tmp_path: Path) -> None:
-    """pre-push-gate-never-runs-under-core-hookspath#B2: the gate sits in .git/hooks but
+    """The gate sits in .git/hooks but
     core.hooksPath sends git elsewhere — an error finding with a runnable fix, never healthy."""
     root = _workspace(tmp_path)
     subprocess.run(
@@ -94,7 +94,7 @@ def test_a_gate_git_never_runs_is_a_finding(tmp_path: Path) -> None:
 
 
 def test_no_module_computes_the_hooks_dir_itself() -> None:
-    """pre-push-gate-never-runs-under-core-hookspath#B4: installer and doctor share ONE
+    """Installer and doctor share ONE
     resolver (`git rev-parse --git-path hooks`); no code builds `.git/hooks` by hand."""
     package = Path(workspace_layout.__file__).parents[1]
     hand_built = re.compile(r"""["']\.git["']\s*/\s*["']hooks["']|["']\.git/hooks""")
@@ -125,7 +125,7 @@ def test_hooks_drift_1_names_the_observed_state_with_one_code_and_one_fix(
 
 
 def test_an_unreadable_hook_is_said_unreadable_never_differing(tmp_path: Path) -> None:
-    """AC5.1: the `OSError` arm names the failed read, not a content difference."""
+    """The `OSError` arm names the failed read, not a content difference."""
     root = _workspace(tmp_path)
     for target, _ in workspace_layout.INSTALLED_GIT_HOOKS:
         hook = root / "repos" / "demo" / ".git" / "hooks" / target

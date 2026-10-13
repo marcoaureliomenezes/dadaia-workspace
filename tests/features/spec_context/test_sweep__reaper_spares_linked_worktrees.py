@@ -1,7 +1,7 @@
-"""reaper-deletes-linked-git-worktrees: `sweep.remove`/`sweep.move`,
+"""`sweep.remove`/`sweep.move`,
 the one chokepoint of every reaper deletion and slop move, never touches a registered
 linked worktree — an expired one under `.dadaia/tmp/` or one at an unlisted root entry.
-AC1.10: the doctor lists the context's worktrees from git and touches none — a canonical one
+The doctor lists the context's worktrees from git and touches none — a canonical one
 with kind/age/ahead/state and, ready, its `worktree.py merge` fix; a foreign one (never a TTL
 `expired` entry), an orphan `wt/*` and an unregistered `worktrees/` dir as findings.
 Size: MEDIUM — git's own `.git`-file shape and `prunable` verdict are the contract.
@@ -96,7 +96,7 @@ def test_doctor_lists_the_contexts_worktrees_from_git_and_touches_none(tmp_path:
         assert worktree_ws.run(root, "new", "r", f"0.5.0-rc1/{job}").returncode == 0
     ready, empty = root / "worktrees/r/0.5.0-rc1/j1", root / "worktrees/r/0.5.0-rc1/j2"
     worktree_ws.commit(ready, "src/a.py")
-    log = repo / ".git/logs/refs/heads/wt/0.5.0-rc1/j1"  # age is the branch's birth (ADR 0108)
+    log = repo / ".git/logs/refs/heads/wt/0.5.0-rc1/j1"  # age is the branch's birth
     log.write_text(re.sub(r"> \d+ ", f"> {int(_TWO_DAYS_AGO)} ", log.read_text(), count=1))
     foreign = root / ".dadaia/tmp/claude/20200101/wt-a"
     # a canonical wt/ branch outside worktrees/r/ is still foreign — its merge would refuse

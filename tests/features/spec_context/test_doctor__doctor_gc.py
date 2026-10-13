@@ -1,6 +1,6 @@
 """Doctor cleanup: retired concurrency state, caller-owned sessions and the one expiry table.
 
-Re-classification note (T-011-04 / FR-W1-04, ADR-8 amended): SESSION-record (bind) GC TTL
+SESSION-record (bind) GC TTL
 semantics measure against the heartbeat-renewed ``last_seen_at`` (``session_store.is_live``);
 the bind-CLI pid is never consulted (dead by construction).
 
@@ -100,16 +100,16 @@ def _post_gate_heartbeat(ws: Path, sess_id: str) -> None:
 @pytest.mark.parametrize(
     ("idle", "renew", "sessions_outside", "survives"),
     [
-        pytest.param(360, False, False, True, id="bind-lost-silently-after-five-idle-minutes-idle-bind-survives"),
-        pytest.param(None, True, False, True, id="FR-W1-04-heartbeat-renewed-bind-survives-and-resolves"),
-        pytest.param(None, False, False, False, id="FR-W1-04-unrenewed-stale-bind-collected"),
-        pytest.param(None, False, True, False, id="doctor-reports-a-refused-removal-as-deleted"),
+        pytest.param(360, False, False, True, id="idle-bind-survives"),
+        pytest.param(None, True, False, True, id="heartbeat-renewed-bind-survives-and-resolves"),
+        pytest.param(None, False, False, False, id="unrenewed-stale-bind-collected"),
+        pytest.param(None, False, True, False, id="a-refused-removal-is-not-reported-deleted"),
     ],
 )  # fmt: skip
 def test_no_stale_records(
     tmp_path: Path, idle: int | None, renew: bool, sessions_outside: bool, survives: bool
 ) -> None:
-    """T-011-04, bind-lost-silently-after-five-idle-minutes: another session's
+    """Another session's
     SessionStart lane collects a bind only past a dead session's TTL (a day), measured against
     ``last_seen_at`` renewed through the REAL PostToolUse path; idle minutes never unbind. A
     sessions dir resolving outside the workspace is refused, never reported deleted."""
@@ -122,7 +122,7 @@ def test_no_stale_records(
         (ws / ".dadaia" / "sessions").symlink_to(tmp_path / "elsewhere")
     record = _bind(ws, sid, _stale() if idle is None else _ago(idle))
     if renew:
-        # post-gate-runs-the-reaper-on-the-tool-hot-path: the heartbeat never reaps.
+        # the heartbeat never reaps.
         expired = ws / ".dadaia" / "tmp" / "expired.txt"
         expired.parent.mkdir(parents=True, exist_ok=True)
         expired.touch()
@@ -145,7 +145,7 @@ def test_no_stale_records(
     [
         pytest.param("tmp/claude/20260801", 60, "gone", id="ephemeral-tmp-deleted"),
         pytest.param("reaped/20260901/x", 60, "gone", id="ephemeral-hold-deleted-at-its-ttl"),
-        pytest.param("handoff/ctx/p.handoff.json", 60, "held", id="AC2.10-output-handoff-held"),
+        pytest.param("handoff/ctx/p.handoff.json", 60, "held", id="output-handoff-held"),
         pytest.param("tmp/claude/today", -60, "kept", id="live-entry-no-finding"),
         pytest.param("handoff/AGENTS.md", 400 * 86_400, "kept", id="zone-law-never-a-candidate"),
         pytest.param("tmp/link", 60, "gone", id="a-link-is-acted-on-never-followed"),
@@ -154,9 +154,7 @@ def test_no_stale_records(
 def test_a_ttl_expiry_is_its_zone_class_act(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, lane: str, rel: str, past_ttl: int, after: str
 ) -> None:
-    """AC2.10, AC2.12 (the one expiry table; bugs
-    bug-proposal-handoff-reaped-without-a-hold, reaper-judges-ttl-by-walking-every-file,
-    doctor-scan-raises-when-a-ttl-entry-vanishes-mid-walk finding 2): an expired entry is one
+    """The one expiry table: an expired entry is one
     finding; both lanes take it by its zone class — EPHEMERAL deleted, OUTPUT held in reaped/
     and named by one REAPED finding; a live entry or a zone law yields none; a link is acted on,
     its target never; a failing seed never stops the pass."""
@@ -199,8 +197,7 @@ def _denied(*_: object, **__: object) -> None:
 def test_the_expire_lane_walks_each_expired_entry_once(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """rc-9 AC3.6 row 25 (ttl-expire-lane-walks-each-expired-entry-content-twice): the
-    linked-worktree question is asked once per expired entry, at the filesystem seam."""
+    """The linked-worktree question is asked once per expired entry, at the filesystem seam."""
     from dadaia_workspace.features.spec_context import sweep
 
     ws = _make_workspace(tmp_path)
@@ -225,7 +222,7 @@ def test_the_expire_lane_walks_each_expired_entry_once(
 
 
 def test_scan_leaves_an_expired_worktree_holder_to_its_worktree_row(tmp_path: Path) -> None:
-    """rc-9 AC3.6 (doctor `_scan_ttl_zone`): an expired tmp entry holding a linked worktree
+    """An expired tmp entry holding a linked worktree
     yields no TTL finding (its WORKTREE `foreign` row reports it); a plain expired sibling
     is one EXPIRED finding whose detail states its age against the one-day TTL."""
     ws = _make_workspace(tmp_path)

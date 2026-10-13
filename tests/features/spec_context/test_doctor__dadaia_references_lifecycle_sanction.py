@@ -1,7 +1,7 @@
-"""``.dadaia/references/<clone>/`` holds operator-placed reference clones. A10.1: the doctor's
-zone walk never flags one (``references`` is an OPERATOR zone, never walked). A10.2: no
+"""``.dadaia/references/<clone>/`` holds operator-placed reference clones. The doctor's
+zone walk never flags one (``references`` is an OPERATOR zone, never walked). No
 lifecycle verb resolves, binds or GCs one — proven at the shared resolution seam, on the real
-bind/show resolution path, and on the whole ``DoctorService.fix()`` sweep. A10.4: nothing here
+bind/show resolution path, and on the whole ``DoctorService.fix()`` sweep. Nothing here
 writes under ``specs/``.
 """
 

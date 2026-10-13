@@ -1,5 +1,4 @@
-"""rc-9 AC3.6 row 24 (context-dead-submodule-refusal-prints-a-worktree-move-that-cannot-run):
-a submodule is no linked worktree — dead holds the repo holding it, and the submodule's
+"""A submodule is no linked worktree — dead holds the repo holding it, and the submodule's
 relative gitdir still resolves after the move. Size: MEDIUM — real git in tmp_path."""
 
 from __future__ import annotations

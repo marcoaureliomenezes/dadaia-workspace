@@ -1,6 +1,5 @@
 """A finding the doctor cannot repair carries its own fix — never `doctor --fix`.
 
-sa-unfixable-doctor-findings-say-doctor-fix#S1..#S6 (listed per test).
 Size: MEDIUM (real git repo, the doctor's own section assembly, the CLI in-process).
 """
 
@@ -65,9 +64,7 @@ def _findings(ws: Path) -> dict[str, list[tuple[str, str]]]:
 
 
 def test_no_unfixable_finding_says_doctor_fix(tmp_path: Path) -> None:
-    """sa-unfixable-doctor-findings-say-doctor-fix#S1, sa-unfixable-doctor-findings-say-doctor-fix#S5,
-    sa-unfixable-doctor-findings-say-doctor-fix#S6, sa-unfixable-doctor-findings-say-doctor-fix#S4:
-    CTX-URL-1, INV-6 and VENV-1 are unfixable; each carries its own command, none the
+    """CTX-URL-1, INV-6 and VENV-1 are unfixable; each carries its own command, none the
     doctor's own repair, none restated in the prose; a missing install ledger is no finding."""
     found = _findings(_workspace(tmp_path))
     for code in ("CTX-URL-1", "INV-6", "VENV-1"):
@@ -79,7 +76,7 @@ def test_no_unfixable_finding_says_doctor_fix(tmp_path: Path) -> None:
 def test_the_printed_ctx_url_fix_clears_ctx_url_1(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """sa-unfixable-doctor-findings-say-doctor-fix#S2, sa-unfixable-doctor-findings-say-doctor-fix#S3: run the printed fix (its argv
+    """Run the printed fix (its argv
     after the workspace CLI path), re-run the doctor: CTX-URL-1 is gone and nothing new
     appears for that context."""
     ws = _workspace(tmp_path)

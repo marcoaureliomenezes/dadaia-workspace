@@ -86,7 +86,7 @@ def test_alive_on_dead_context_writes_no_specs_commits_nothing_and_hooks_every_r
 
 
 def test_an_adopted_checkouts_own_pre_push_survives_create_and_alive(tmp_path: Path) -> None:
-    """Review finding 5 (T-048-02): the composition root never overwrites an operator's
+    """The composition root never overwrites an operator's
     hook in an adopted checkout; a repo this call cloned is still hooked."""
     from dadaia_workspace import container
 

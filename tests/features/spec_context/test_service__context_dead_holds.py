@@ -1,9 +1,8 @@
 """`context alive`/`context dead` over the whole repo set (main + associated).
 
-sa-context-dead-removes-repos-outside-the-reaper#C3 /
-  sa-context-dead-removes-repos-outside-the-reaper#C4: a local branch carrying a commit origin lacks,
-  in ANY repo of the set, refuses dead; sa-context-dead-removes-repos-outside-the-reaper#C2: a linked
-  worktree registered by the repo or nested inside it refuses dead; AC1.10: any `wt/*`
+A local branch carrying a commit origin lacks,
+  in ANY repo of the set, refuses dead; a linked
+  worktree registered by the repo or nested inside it refuses dead; any `wt/*`
   refuses dead with the owner's `worktree.py merge` fix, checked out or orphan, and
   rows the owner cannot read refuse with its fix; AC2.11: a refused hold refuses dead;
   sa-context-dead-removes-repos-outside-the-reaper#C7: a refusal touches nothing, the record stays ALIVE;
@@ -239,7 +238,7 @@ def test_c2_a_nested_foreign_worktree_is_refused_and_its_fix_clears_it(tmp_path:
     fix = str(refused.value).rsplit("fix: ", 1)[1]
     move = f"{fix.split('`')[1]} {tmp_path / 'kept'}"
     # Git runs from the common git dir, never inside the tree it moves: Windows refuses
-    # to rename a process's cwd (sa-context-dead-removes-repos-outside-the-reaper).
+    # to rename a process's cwd.
     assert Path(move.split()[2]).samefile(other / ".git"), fix
     subprocess.run(move, shell=True, check=True, capture_output=True)  # noqa: S602
     service.dead("proj")
@@ -248,7 +247,7 @@ def test_c2_a_nested_foreign_worktree_is_refused_and_its_fix_clears_it(tmp_path:
 
 
 def test_alive_dead_alive_keeps_every_repo_obtainable(tmp_path: Path) -> None:
-    """A16.1 + context-dead-destroys-associated-repo-without-url: a lib registered with no
+    """A lib registered with no
     URL gets origin's URL back-filled by dead; alive then re-clones the whole set, and a
     second alive (clone into a populated dir would fail) is a no-op."""
     service, store, repo = _alive(tmp_path, lib_url="")

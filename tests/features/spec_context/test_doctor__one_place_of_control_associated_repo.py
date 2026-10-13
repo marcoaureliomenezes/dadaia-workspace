@@ -1,7 +1,7 @@
-"""FR19 (v0.4.4, T-044-30) A19.2 — one place of control: ``dadaia doctor``'s specs and ledgers sections, ``backlog
+"""One place of control: ``dadaia doctor``'s specs and ledgers sections, ``backlog
 doctor`` and the SDD gate see exactly ONE ``specs/`` tree per context — the main repo's.
 
-G13 (v0.4.4 grill ADR, ratified): a Spec Context's associated repos are cloned clean and
+A Spec Context's associated repos are cloned clean and
 their OWN ``specs/`` (if any) are **ignored** by the spec context. This suite builds the
 adversarial fixture the acceptance criterion calls for: the associated repo carries its
 OWN, git-committed ``specs/`` tree, DELIBERATELY diverging from the main repo's (a
@@ -9,7 +9,7 @@ different release name, a different phase, and a backlog schema violation under 
 distinctive slug) — so a leak is unambiguous the moment any of the three consumers
 below reads so much as one byte of it.
 
-Extends T-044-27's A16.4 resolution-walk coverage
+Extends the resolution-walk coverage
 (``tests/unit/core/test_specs_resolver_associated_repo_walk.py`` — which already proves
 ``core.specs_resolver.resolve_specs_dir`` lands on the main repo's ``specs/`` from a cwd
 inside the associated repo) up to the three real consumers that sit on top of that
@@ -18,7 +18,7 @@ the same convention as
 ``tests/core/test_invocation__one_bind.py``) and the
 ``sdd_gate`` PreToolUse hook (via ``run_hook_subprocess``, the same convention as
 ``tests/hooks/test_sdd_gate.py``). Fixture SHAPE (git-committed repos, same
-slug/name identifiers) is reused from T-044-27's suite locally, not shared as a fixture
+slug/name identifiers) is reused locally, not shared as a fixture
 module — the established convention for this feature.
 """
 
@@ -80,13 +80,13 @@ def _seed_main_repo(repo: Path) -> None:
     release_dir.mkdir(parents=True)
     for name in ("SPEC.md", "PLAN.md", "TASKS.md"):
         (release_dir / name).write_text(f"# {name}\n\n**Status:** Approved\n", encoding="utf-8")
-    # ACTIVE.md retired (v0.5.0 FR4/T-050-21A) -- the live phase is read directly off
+    # The live phase is read directly off
     # RELEASE.json (core.release_state.parse_release_state).
     write_release_phase(repo / "specs", _MAIN_RELEASE, _MAIN_PHASE)
     mem = repo / "specs" / "memory" / "product"
     mem.mkdir(parents=True)
     (repo / "specs" / "memory" / "TECHSTACK.md").write_text("# tech\nmain\n", encoding="utf-8")
-    # The catalog pair is written by its ONE writer (0.4.7 FR2/FR3: the doctor's
+    # The catalog pair is written by its ONE writer (the doctor's
     # `ledgers` section validates it by running that same script), never hand-shaped here.
     subprocess.run(
         [
@@ -101,7 +101,7 @@ def _seed_main_repo(repo: Path) -> None:
         capture_output=True,
         timeout=60,
     )
-    # A2.8 (backlog doctor): an empty backlog/ dir with NO BACKLOG.json is a clean no-op.
+    # (backlog doctor) an empty backlog/ dir with NO BACKLOG.json is a clean no-op.
     (repo / "specs" / "backlog").mkdir(parents=True)
     _git(repo, "-c", "init.defaultBranch=main", "init")
     _git(repo, "add", "-A")
@@ -110,8 +110,8 @@ def _seed_main_repo(repo: Path) -> None:
 
 def _seed_associated_repo(repo: Path) -> None:
     """The associated repo's OWN, DELIBERATELY DIVERGENT specs/ tree — committed to its
-    own git history, exactly as A16.3 proves a real ``alive()`` clone would leave it."""
-    # ACTIVE.md retired (v0.5.0 FR4/T-050-21A) -- the decoy phase now lives in this
+    own git history, exactly as a real ``alive()`` clone would leave it."""
+    # The decoy phase lives in this
     # repo's OWN RELEASE.json, which must never be read while resolving inside it.
     write_release_phase(repo / "specs", _ASSOC_RELEASE, _ASSOC_PHASE)
     (repo / "specs" / "memory").mkdir(parents=True)
