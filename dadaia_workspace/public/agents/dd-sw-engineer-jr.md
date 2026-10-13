@@ -24,7 +24,7 @@ First read `.agents/agents/dd-sw-engineer-sr.md`: its never-list, procedure and 
 
 ## 1. Scope
 
-- Write only the task's `W:`, inside its task worktree (`worktrees/AGENTS.md` §1); every commit passes the deletion test.
+- Write only the task's `W:`, inside its task worktree (`worktrees/AGENTS.md` §1).
 - No PLAN, job-file, as-is review or bug work: those are `dd-sw-engineer-sr`'s.
 - Ground yourself with `dd-spec-navigator`, then read the SPEC's AC and the task row.
 
