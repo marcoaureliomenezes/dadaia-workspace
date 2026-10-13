@@ -8,10 +8,19 @@ from typing import Any
 
 import _jsonl
 
-
 def finding(code: str, path: str, line: int, message: str, fix: str) -> dict[str, Any]:
     return {"code": code, "verdict": "error", "path": path, "line": line, "message": message,
             "fix": fix}  # fmt: skip
+
+
+def print_text(findings: list[dict[str, Any]]) -> None:
+    """Each finding of the check verbs' text mode, its fix on the line after it."""
+    for found in findings:
+        print(
+            f"{found['code']} {found['verdict']} {found['path']}:{found['line']} {found['message']}"
+        )
+        if found.get("fix"):
+            print(f"fix: {found['fix']}")
 
 
 def histo_findings(

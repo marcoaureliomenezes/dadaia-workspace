@@ -26,6 +26,7 @@ sys.path[:0] = [
 ]
 
 import _audit_verbs as vb
+import _findings
 from _audit_check import DISPOSITIONS, check
 from _refusal import Refusal
 from _specs import find_specs, refuse
@@ -66,9 +67,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.json:
             print(json.dumps(findings, indent=2))
         else:
-            for finding in findings:
-                print(f"{finding['code']} error {finding['path']}:{finding['line']} "
-                      f"{finding['message']}")  # fmt: skip
+            _findings.print_text(findings)
         return 1 if findings else 0
     try:
         if args.verb == "disposition":

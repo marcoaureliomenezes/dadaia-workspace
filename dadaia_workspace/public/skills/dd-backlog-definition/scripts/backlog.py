@@ -27,9 +27,10 @@ sys.path[:0] = [
 
 import _backlog_exit as ex
 import _backlog_write as wr
+import _findings
 import _jsonl
 from _backlog_check import check
-from _backlog_schema import CODE, DISPOSITIONS, HISTO, LEDGER
+from _backlog_schema import DISPOSITIONS, HISTO, LEDGER
 from _backlog_store import commit, read_active
 from _refusal import Refusal
 from _specs import find_specs, refuse
@@ -86,9 +87,7 @@ def main(argv: list[str] | None = None) -> int:
     specs = find_specs(args.specs, ledger=None if args.verb == "check" else f"specs/{LEDGER}")
     if args.verb == "check":
         findings = check(specs)
-        print(json.dumps(findings, indent=2)) if args.json else [
-            print(f"{CODE} error {f['path']}:{f['line']} {f['message']}") for f in findings
-        ]
+        print(json.dumps(findings, indent=2)) if args.json else _findings.print_text(findings)
         return 1 if findings else 0
     try:
         return _new(args, specs) if args.verb == "new" else _exit(args, specs)

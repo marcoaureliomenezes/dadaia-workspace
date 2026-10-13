@@ -22,6 +22,7 @@ sys.path[:0] = [
     str(Path(__file__).resolve().parents[2] / "dd-bug-resolution" / "scripts"),
 ]
 
+import _findings
 from _clock import now_iso as utc_now
 from _grammar import SHA_RE, STATE
 from _refusal import Refusal, report
@@ -30,7 +31,6 @@ from _release_new import new_release
 from _release_phase import SHIP_PR, set_phase
 from _release_schema import (
     _ORIGIN_GRAMMAR,
-    CODE,
     HISTO,
     ORIGIN_KINDS,
     origin,
@@ -268,9 +268,7 @@ def main(argv: list[str] | None = None) -> int:
             if f["verdict"] == "error" or (publish_origin and f["message"].startswith("Origin "))
         ]
         # JSON adds Origin trace information; only errors control the exit status.
-        print(json.dumps(json_findings, indent=2)) if args.json else [
-            print(f"{CODE} {f['verdict']} {f['path']}:{f['line']} {f['message']}") for f in findings
-        ]
+        print(json.dumps(json_findings, indent=2)) if args.json else _findings.print_text(findings)
         return 1 if errors else 0
     try:
         return _VERBS[args.verb](args, specs)

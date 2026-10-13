@@ -14,9 +14,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import _bugs_transition as tr
 import _bugs_write as wr
+import _findings
 import _jsonl
 from _atomic import SymlinkRefusedError
-from _bugs_check import CODE, LEDGER, OPEN, STATUS_BY_VERB, check
+from _bugs_check import LEDGER, OPEN, STATUS_BY_VERB, check
 from _bugs_store import Refusal, commit, read_records
 from _git import GitError, git
 from _refusal import report
@@ -144,8 +145,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.json:
             print(json.dumps(findings, indent=2))
         else:
-            for finding in findings:
-                print(f"{CODE} error {finding['path']}:{finding['line']} {finding['message']}")
+            _findings.print_text(findings)
         return 1 if findings else 0
     try:
         if args.verb in ("status", "stats"):

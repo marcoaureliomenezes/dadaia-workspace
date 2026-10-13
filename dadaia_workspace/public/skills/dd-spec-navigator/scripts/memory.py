@@ -23,6 +23,7 @@ sys.path[:0] = [
     str(Path(__file__).resolve().parents[2] / "dd-bug-resolution" / "scripts"),
 ]
 
+import _findings
 import _memory_catalog as cat
 import _memory_drift as dft
 from _memory_check import check
@@ -73,9 +74,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.json:
             print(json.dumps(findings, indent=2))
         else:
-            for finding in findings:
-                print(f"{finding['code']} error {finding['path']}:{finding['line']} "
-                      f"{finding['message']}")  # fmt: skip
+            _findings.print_text(findings)
         return 1 if findings else 0
     try:
         if args.verb == "drift":
