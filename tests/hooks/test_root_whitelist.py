@@ -12,7 +12,7 @@ pattern the harness-env contract bans). The gate resolves the workspace root fro
 write target and the session cwd, as in production.
 
 CRIT: root-whitelist is a deterministic enforcement policy — every current input survives
-below as a named parametrized row, including the W1-6 first-path-component block.
+below as a named parametrized row, including the first-path-component block.
 """
 
 from __future__ import annotations
