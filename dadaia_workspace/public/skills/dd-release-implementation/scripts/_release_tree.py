@@ -16,7 +16,7 @@ from typing import Any
 import _findings
 import _jsonl
 import _memory_drift as drift
-from _grammar import SEMVER_RE, SHA_RE, STATE, live_ids
+from _grammar import SEMVER_RE, SHA_RE, STATE, SeveralLive, sole_live
 from _ledger import records
 from _platform import quote
 from _refusal import Refusal
@@ -297,10 +297,13 @@ def tree_findings(specs: Path) -> list[dict[str, Any]]:
             findings.append(_findings.finding(CODE, f"releases/{d.name}", 1, f"{d.name!r} is not a bare M.m.p "
                                     "release id, so it is not a live release",
                                     f"Operator action: move {move}"))  # fmt: skip
-    if len(ids := live_ids(specs)) > 1:
+    try:
+        sole_live(specs)
+    except SeveralLive as several:
+        ids = ", ".join(several.args[0])
         findings.append(_findings.finding(CODE, "releases", 1, f"multiple live release directories carry "
-                                f"{STATE}: {', '.join(ids)} — exactly one is allowed",
-                                f"Operator action: keep one of {', '.join(ids)} live under "
+                                f"{STATE}: {ids} — exactly one is allowed",
+                                f"Operator action: keep one of {ids} live under "
                                 f"{releases}; ship or move out the others"))  # fmt: skip
     if (specs / HISTO).is_file():
         findings += ship_histo_findings(_jsonl.read_text(specs / HISTO), specs.resolve())

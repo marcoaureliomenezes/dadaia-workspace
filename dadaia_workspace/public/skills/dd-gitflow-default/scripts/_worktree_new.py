@@ -13,7 +13,7 @@ from _specs import parse
 from _worktree_git import (
     flow_for,
     git,
-    live_release,
+    live_work_version,
     quote,
     record_base,
     script,
@@ -64,7 +64,7 @@ def _shape(repo: Path, flow: dict[str, str], name: str) -> tuple[re.Match[str], 
 
 def _plain_base(root: Path, repo: Path, flow: dict[str, str]) -> str:
     """The branch a plain tree returns to: the live work branch, else the checked-out one."""
-    if release := live_release(root / "repos" / flow["main"] / "specs"):
+    if release := live_work_version(root / "repos" / flow["main"] / "specs"):
         return f"{flow['work']}{release}"
     if start := git(repo, "branch", "--show-current").strip():
         return start

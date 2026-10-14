@@ -33,6 +33,18 @@ def candidate_dir(release_dir: Path) -> Path | None:
     return release_dir / f"rc-{n}" if n else None
 
 
+class SeveralLive(ValueError):
+    """More than one release is live; ``args[0]`` is their sorted ids."""
+
+
+def sole_live(specs: Path) -> str | None:
+    """The one live release id, ``None`` when none is live; raises :class:`SeveralLive` when several are."""
+    ids = live_ids(specs)
+    if len(ids) > 1:
+        raise SeveralLive(ids)
+    return ids[0] if ids else None
+
+
 def live_ids(specs: Path) -> list[str]:
     """Every SemVer-named release directory directly under ``releases/`` carrying a state
     document — `_archive` is not live."""

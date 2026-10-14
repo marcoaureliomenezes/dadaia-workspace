@@ -13,7 +13,7 @@ import time
 from pathlib import Path
 
 from _git import git as git, parse_worktrees, scrubbed_env as scrubbed_env  # isort: skip
-from _grammar import SEMVER_RE, TAG_RE, live_ids
+from _grammar import SEMVER_RE, TAG_RE, SeveralLive, sole_live
 from _platform import git_line as git_line
 from _platform import head
 from _platform import quote as quote  # (`as`: re-exported to the worktree verbs)
@@ -85,13 +85,13 @@ def flow_for(root: Path, repo: Path) -> dict[str, str]:
     return flow
 
 
-def live_release(main_specs: Path) -> str | None:
-    """The one live release id under *main_specs*, else None; raises Refusal when several are live."""
-    live = live_ids(main_specs)
-    if len(live) > 1:
+def live_work_version(main_specs: Path) -> str | None:
+    """The live release id under *main_specs* that names the work branch, else None; Refusal when several are live."""
+    try:
+        return sole_live(main_specs)
+    except SeveralLive as several:
         raise Refusal("multiple live releases make the work branch ambiguous",
-                      f"Operator action: make exactly one release live in repos/{main_specs.parent.name}/specs")  # fmt: skip
-    return live[0] if live else None
+                      f"Operator action: make exactly one release live in repos/{main_specs.parent.name}/specs") from several  # fmt: skip
 
 
 def work_version(repo: Path, flow: dict[str, str]) -> str:
@@ -107,7 +107,7 @@ def work_version(repo: Path, flow: dict[str, str]) -> str:
         )
     tags = [tuple(map(int, m.groups())) for t in git(repo, "tag").split() if (m := TAG_RE.match(t))]
     major, minor, patch = max(tags, default=(0, 0, 0))
-    nxt = live_release(repo.parent / flow["main"] / "specs") or (f"{major}.{minor}.{patch + 1}" if tags else "0.1.0")  # fmt: skip
+    nxt = live_work_version(repo.parent / flow["main"] / "specs") or (f"{major}.{minor}.{patch + 1}" if tags else "0.1.0")  # fmt: skip
     raise Refusal(
         f"no work branch {prefix}<M.m.p>",
         git_line(repo, "branch", f"{prefix}{nxt}", flow["integration"]),
@@ -192,7 +192,9 @@ def _absent(root: Path, repo: Path, held: set[str], found: list[dict[str, object
         if f"refs/heads/{ref}" not in held and (name := name_of(ref)):
             row = _row(repo, str(home / name), "orphan")
             if (home / name).exists():  # merge cannot clear a directory git does not know
-                row["fix"] = f"Operator action: remove the directory {row['path']}, then run `{row['fix']}`"
+                row["fix"] = (
+                    f"Operator action: remove the directory {row['path']}, then run `{row['fix']}`"
+                )
             out.append(row)
     listed = {Path(str(r["path"])).resolve() for r in (*found, *out)}  # one row per path
     for stray in sorted(home.glob("*/*")):  # a name is two levels
