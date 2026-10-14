@@ -19,6 +19,7 @@ import pytest
 
 from dadaia_workspace.core import doctor_rules
 from dadaia_workspace.core.cli_line import fix_line, git_line, shell_line
+from dadaia_workspace.core.fixed_sections import authored_text
 from dadaia_workspace.core.gitflow import DEFAULT
 from dadaia_workspace.core.skill_owner import load_owner
 from tests.core.test_cli_line__fix_line_contract import fix_defect as _defect
@@ -434,10 +435,13 @@ def _text_rows(rel: str) -> list[Callable[[str], object]]:
 
 def _text_sites(texts: dict[str, str]) -> list[str]:
     """`file:line` of each line a row of :func:`_text_rows` bites; a fenced line is a
-    command line whole."""
+    command line whole; product memory is read as its operator wrote it (a generated
+    section is the doctor's to judge)."""
     sites: list[str] = []
     for rel, text in texts.items():
         rows, fenced = _text_rows(rel), False
+        if rel.startswith("specs/memory/"):
+            text = authored_text(text)
         for number, line in enumerate(text.splitlines(), start=1):
             fenced ^= line.startswith("```")
             whole = fenced and rel.startswith("dadaia_workspace/public/") and _bad_command(line)
