@@ -435,7 +435,12 @@ def test_an_untraced_origin_id_is_cleared_by_its_printed_fix(repo: Path) -> None
 
     assert origin_errors() == []  # before the sweep the carried id is only listed
     state = specs / "releases" / _RELEASE / "_RELEASE.json"
-    sweep = {"ts": "2026-01-01T00:00:00Z", "agent": "a", "kind": "dispositions", "text": "t"}
+    sweep = {
+        "ts": "2026-01-01T00:00:00Z",
+        "agent": "a",
+        "kind": "summary",
+        "text": "delivered: none; carried: none; backlog exits: none",
+    }
     state.write_text(json.dumps({**json.loads(state.read_text("utf-8")), "log": [sweep]}))
 
     [before] = origin_errors()

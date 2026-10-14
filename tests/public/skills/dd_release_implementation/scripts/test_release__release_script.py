@@ -105,6 +105,11 @@ def _origin_rows(script: Path, specs: Path) -> list[dict[str, str]]:
     return [f for f in json.loads(done.stdout) if "Origin" in f["message"]]
 
 
+def _run_text(script: Path, specs: Path) -> str:
+    return subprocess.run([sys.executable, str(script), "check", "--specs", str(specs)],
+                          capture_output=True, text=True).stdout  # fmt: skip
+
+
 def _check(script: Path, specs: Path) -> list[str]:
     return [f["message"] for f in _origin_rows(script, specs) if f["verdict"] == "error"]
 
@@ -189,6 +194,32 @@ def test_origin_trace_reads_the_closure_summary_instead_of_derived_ledger_fields
         ("Origin bugs:already-fixed traced", "info"),
     ]
     assert all("fix" not in row for row in rows)
+
+
+def test_an_untraced_origin_id_is_an_error_only_once_the_closure_summary_is_logged(
+    script: Path, tmp_path: Path
+) -> None:
+    """The Reconciliation's sweep ends in the `summary` entry: before it an untraced
+    id is an info row with no fix, after it an error with its fix."""
+    specs = _specs(tmp_path, _GOOD)
+    state = specs / "releases/0.5.0/_RELEASE.json"
+    (specs / "releases/0.5.0/rc-1/SPEC.md").write_text(
+        "# S\n\n**Status:** Approved\n**Origin:** bugs:half-written\n\n## Bug window review\n",
+        "utf-8",
+    )
+    summary = {"ts": "2026-01-02T00:00:00Z", "agent": "closer", "kind": "summary",
+               "text": "delivered: none; carried: none; backlog exits: none"}  # fmt: skip
+
+    def origin_row(log: list[dict[str, object]]) -> tuple[str, str]:
+        _seed_ledgers(specs, log=log)
+        state.write_text(json.dumps({**json.loads(state.read_text("utf-8")), "phase": "CLOSURE",
+                                     "defined": {"sha": "abc1234", "ts": "2026-01-01T00:00:00Z"}}))  # fmt: skip
+        lines = _run_text(script, specs).splitlines()
+        at = next(n for n, ln in enumerate(lines) if "Origin bugs:half-written" in ln)
+        return lines[at].split(" ", 2)[1], lines[at + 1][:5]
+
+    assert origin_row([]) == ("info", "LEDGE")
+    assert origin_row([summary]) == ("error", "fix: ")
 
 
 def test_a_backlog_exit_rejected_by_disposition_traces(script: Path, tmp_path: Path) -> None:
