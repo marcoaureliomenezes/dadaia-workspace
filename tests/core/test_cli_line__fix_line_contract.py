@@ -183,6 +183,7 @@ _FEATURE = "refs/heads/feature/0.0.1 {sha} refs/heads/feature/0.0.1 {zero}"
 SITES: dict[str, Callable[[Path], str | None]] = {
     "gate-root-whitelist": lambda ws: _gate(ws, "junk.txt"),
     "gate-protected-sessions": lambda ws: _gate(ws, ".dadaia/sessions/some-session.json"),
+    "gate-protected-state": lambda ws: _gate(ws, ".dadaia/states/spec_contexts.json"),
     "gate-protected-projected": lambda ws: _gate(ws, ".dadaia/states/install_ledger.json"),
     "gate-protected-glob": lambda ws: _gate(ws, "repos/a/secrets/k"),
     "gate-scope-names-the-bind": lambda ws: _scope_block(ws, has_id=True),
