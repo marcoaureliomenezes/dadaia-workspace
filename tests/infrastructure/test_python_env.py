@@ -124,13 +124,14 @@ def test_healthy_venv_is_a_noop(tmp_path: Path, recorder: _Recorder) -> None:
         ("0.9.9+e2e", "1.0.0", True),
         ("0.4.7", "0.5.0rc1", True),  # PEP 440: a pre-release outranks the prior final
         ("0.4.7.post1", "0.5.0.dev1", True),
+        (None, "1.0.0", True),  # the entrypoint exists but the venv's own probe fails
     ],
 )
 def test_reinit_reinstalls_only_an_older_venv(
     tmp_path: Path,
     recorder: _Recorder,
     monkeypatch: pytest.MonkeyPatch,
-    installed: str,
+    installed: str | None,
     running: str,
     installs: bool,
 ) -> None:
@@ -138,7 +139,9 @@ def test_reinit_reinstalls_only_an_older_venv(
     running build itself is untouched."""
     install_fake_dist(monkeypatch, running)
     _healthy(tmp_path)
-    recorder.installed = installed if " " in installed else f"{installed} {build_digest(None)}"
+    recorder.installed = (
+        installed if not installed or " " in installed else f"{installed} {build_digest(None)}"
+    )
     VenvPythonEnvironmentManager().ensure_workspace_venv(str(tmp_path))
     assert [c[:4] for c in recorder.commands[:1]] == (
         [[_python(tmp_path), "-m", "pip", "install"]] if installs else []
