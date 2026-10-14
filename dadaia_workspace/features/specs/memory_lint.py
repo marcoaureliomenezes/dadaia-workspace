@@ -89,10 +89,10 @@ _FENCE_RE = re.compile(r"^\s*(?:```|~~~)")
 
 def _check_narrative(result: AtomResult, content: str, body: str, product: bool) -> None:
     """One ERROR per body line carrying a history token (any memory file) or a history
-    phrase (product atoms only); fenced code and fixed-section blocks are exempt."""
+    phrase (product atoms only); fenced code is exempt."""
     offset = len(content.splitlines()) - len(body.splitlines())
     fenced = False
-    for number, line in enumerate(authored_text(body).splitlines(), start=offset + 1):
+    for number, line in enumerate(body.splitlines(), start=offset + 1):
         if _FENCE_RE.match(line):
             fenced = not fenced
             continue
@@ -144,7 +144,7 @@ def lint_atom(md_path: Path, memory_dir: Path, schema: dict[str, Any]) -> AtomRe
         result.error(f"Cannot read file: {exc}")
         return result
 
-    fm, body, problem = memory_canon.parse_atom(content)
+    fm, body, problem = memory_canon.parse_atom(authored_text(content))
     if fm is None:
         result.error(f"Frontmatter is outside the atom grammar: {problem}")
         return result
