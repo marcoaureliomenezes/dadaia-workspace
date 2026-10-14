@@ -22,7 +22,6 @@ size: MEDIUM — real git and real CLI child processes, no network.
 
 from __future__ import annotations
 
-import ast
 import contextlib
 import os
 import re
@@ -51,6 +50,7 @@ from dadaia_workspace.core.specs_version import CANONICAL_SPECS_VERSION
 from dadaia_workspace.features.spec_context.service import git_hooks_dir, install_git_hooks
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
 from tests.conftest import GIT_QUIET_INCLUDE
+from tests.core._fix_census import fix_sites
 from tests.helpers.privacy_fixtures import aws_key_shape
 
 pytestmark = [
@@ -833,17 +833,6 @@ def _drop_readme_term(world: World) -> None:
 
 # ── the census ───────────────────────────────────────────────────────────────────────
 
-_CHOKEPOINTS = {
-    "branch_policy": _PKG / "features" / "chokepoints" / "branch_policy.py",
-    "push_gate": _PKG / "features" / "chokepoints" / "push_gate.py",
-}
-#: Each module whose verbs raise, and the verbs — every ``raise`` reachable from them
-#: (``self.<method>()`` and module-level calls, transitively) is a site.
-_VERBS = {
-    "ci": (_PKG / "cli" / "commands" / "ci.py", ("push_gate_check",)),
-    "service": (_PKG / "features" / "spec_context" / "service.py", ("alive", "baseline", "dead")),
-}
-
 SITES: dict[str, tuple[Case | tuple[Case, ...] | Skip, ...]] = {
     "branch_policy._refuse_branch": (
         Case(_birth_published, _develop_at_main, replaces=True),
@@ -931,75 +920,8 @@ SITES: dict[str, tuple[Case | tuple[Case, ...] | Skip, ...]] = {
 }
 
 
-def _scopes(tree: ast.Module) -> dict[str, ast.FunctionDef]:
-    scopes: dict[str, ast.FunctionDef] = {}
-    for node in tree.body:
-        if isinstance(node, ast.ClassDef):
-            scopes |= {
-                f"{node.name}.{f.name}": f for f in node.body if isinstance(f, ast.FunctionDef)
-            }
-        elif isinstance(node, ast.FunctionDef):
-            scopes[node.name] = node
-    return scopes
-
-
-def _reachable(scopes: dict[str, ast.FunctionDef], roots: tuple[str, ...]) -> list[str]:
-    """Every scope the *roots* reach through ``self.<m>()`` or a module-level call."""
-    by_name = {qual.rsplit(".", 1)[-1]: qual for qual in scopes}
-    todo, seen = [by_name[r] for r in roots], set()
-    while todo:
-        qual = todo.pop()
-        if qual in seen:
-            continue
-        seen.add(qual)
-        for node in ast.walk(scopes[qual]):
-            func = node.func if isinstance(node, ast.Call) else None
-            callee = (
-                func.attr
-                if isinstance(func, ast.Attribute)
-                and isinstance(func.value, ast.Name)
-                and func.value.id == "self"
-                else func.id
-                if isinstance(func, ast.Name)
-                else None
-            )
-            if callee in by_name:
-                todo.append(by_name[callee])
-    return sorted(seen)
-
-
-def _fix_sites() -> list[str]:
-    """The chokepoints' refusals (a call to ``spell_fix`` or to
-    branch_policy's ``_blocked``, whose own body is the renderer) and every ``raise``
-    the verbs reach — one entry per refusal, keyed by its enclosing function."""
-    sites: list[str] = []
-    for stem, path in _CHOKEPOINTS.items():
-        for name, fn in _scopes(ast.parse(path.read_text(encoding="utf-8"))).items():
-            hits = [
-                n
-                for n in ast.walk(fn)
-                if name != "_blocked"
-                and (
-                    isinstance(n, ast.Call)
-                    and getattr(n.func, "id", "") in ("_blocked", "spell_fix")
-                )
-            ]
-            sites += [f"{stem}.{name}"] * len(hits)
-    for stem, (path, roots) in _VERBS.items():
-        scopes = _scopes(ast.parse(path.read_text(encoding="utf-8")))
-        for name in _reachable(scopes, roots):
-            raises = [
-                n
-                for n in ast.walk(scopes[name])
-                if (isinstance(n, ast.Raise) and n.exc)
-                or (isinstance(n, ast.Call) and getattr(n.func, "id", "") == "fail")
-            ]
-            sites += [f"{stem}.{name}"] * len(raises)
-    return sites
-
-
 def test_every_fix_site_has_a_case() -> None:
-    assert Counter(_fix_sites()) == {site: len(refusals) for site, refusals in SITES.items()}
+    assert Counter(fix_sites()) == {site: len(refusals) for site, refusals in SITES.items()}
 
 
 _CASES = [

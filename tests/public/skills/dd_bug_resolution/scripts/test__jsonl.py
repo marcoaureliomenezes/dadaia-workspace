@@ -40,8 +40,8 @@ def test_a_schema_that_is_not_utf8_is_reinstalled_not_restored_from_git(tmp_path
     done = _run(tmp_path, body, damage="schemas/bug-record-v1.schema.json")
 
     assert done.stdout == (
-        "Operator action: restore bug-record-v1.schema.json by re-running the workspace "
-        "install (uvx dadaia-workspace init)\n"
+        "Operator action: restore bug-record-v1.schema.json by running "
+        "`uvx dadaia-workspace init`\n"
     )
 
 
