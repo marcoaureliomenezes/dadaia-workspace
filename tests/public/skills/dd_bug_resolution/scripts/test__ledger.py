@@ -140,7 +140,7 @@ _BROKEN = [
 def test_every_check_finding_carries_its_fix(
     tmp_path: Path, script: str, files: dict[str, str]
 ) -> None:
-    """Every record each ledger script's `check --json` emits carries a non-empty fix."""
+    """Every error record each ledger script's `check --json` emits carries a non-empty fix."""
     done, _, _ = _run(tmp_path, script, files, "check", "--json")
     records = json.loads(done.stdout)
     assert done.returncode == 1 and records, done.stderr
