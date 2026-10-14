@@ -50,7 +50,7 @@ from dadaia_workspace.core.specs_version import CANONICAL_SPECS_VERSION
 from dadaia_workspace.features.spec_context.service import git_hooks_dir, install_git_hooks
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
 from tests.conftest import GIT_QUIET_INCLUDE
-from tests.core._fix_census import fix_sites
+from tests.fixtures.fix_census import fix_sites
 from tests.helpers.privacy_fixtures import aws_key_shape
 
 pytestmark = [

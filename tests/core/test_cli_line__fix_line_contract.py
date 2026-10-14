@@ -59,10 +59,10 @@ from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetM
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
 from dadaia_workspace.infrastructure.runtime_transforms.hook_wrappers import VENV_MISSING
 from tests.conftest import GIT_QUIET_INCLUDE
-from tests.core._fix_census import fix_sites
 from tests.fakes import gate_fixes
 from tests.features.backlog.test_doctor import _SOURCE, _active_entry
 from tests.features.specs.test_doctor import _make_clean_specs_tree
+from tests.fixtures.fix_census import fix_sites
 from tests.fixtures.harness_env import run_bash, suite_env
 from tests.fixtures.real_git import PushRepo
 from tests.fixtures.stores import own_venv_python, own_venv_workspace
