@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-14T19:14:11Z",
+  "generated_at": "2026-10-14T19:28:14Z",
   "features": [
     {
       "rank": 1,
@@ -810,7 +810,7 @@
         "state",
         "closure"
       ],
-      "token_estimate": 1003,
+      "token_estimate": 1017,
       "depends_on": [
         "agent-orchestration",
         "worktrees",
@@ -841,7 +841,7 @@
         "privacy",
         "git"
       ],
-      "token_estimate": 679,
+      "token_estimate": 664,
       "depends_on": [
         "context-management",
         "workspace-doctor",
