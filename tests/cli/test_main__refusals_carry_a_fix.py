@@ -21,6 +21,7 @@ import pytest
 from dadaia_workspace import container
 from dadaia_workspace.cli import main
 from dadaia_workspace.core.exceptions import WorkspaceVenvBootstrapError
+from dadaia_workspace.core.specs_version import state
 from dadaia_workspace.features.migrate.upgrade import _RETIRED_PART_HEADING
 from tests.fakes import no_worktree_rows, seed_dead_context
 
@@ -175,6 +176,12 @@ def _malformed_constitution(tmp: Path) -> Case:
     return tmp, ["specs", "init", "--specs-dir", str(tmp / "specs")]
 
 
+def _specs_dir_is_a_file(tmp: Path) -> Case:
+    tmp.mkdir(parents=True)
+    (tmp / "specs").write_text("not a directory\n")
+    return tmp, ["specs", "init", "--specs-dir", str(tmp / "specs")]
+
+
 # (id, builder(tmp, monkeypatch) -> (cwd, argv)) — the 17 measured sites.
 SITES: list[tuple[str, Callable[[Path, pytest.MonkeyPatch], Case]]] = [
     ("repo-add-invalid-slug", lambda t, m: _repo_add(t, "not a slug", "--url", "https://x.test/a.git")),
@@ -238,6 +245,18 @@ def test_refusal_prints_error_then_exactly_one_fix(
         fix = next(ln for ln in lines if ln.startswith("fix:"))
         assert "context list" not in fix
         assert "--associated-repo" in fix
+
+
+def test_specs_init_on_a_file_refuses_with_the_one_fix_of_state_and_leaves_it(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    cwd, argv = _specs_dir_is_a_file(tmp_path / "case")
+    os.chdir(cwd)
+    capsys.readouterr()
+    code = _run(argv)
+    lines = _assert_one_fix(capsys, code)
+    assert lines[-1] == f"fix: {state(cwd / 'specs')[1]}"
+    assert (cwd / "specs").read_text() == "not a directory\n"
 
 
 def test_context_alive_on_a_non_git_repo_dir_is_one_refusal(
