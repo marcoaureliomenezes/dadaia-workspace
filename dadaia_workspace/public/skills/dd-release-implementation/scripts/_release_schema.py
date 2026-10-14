@@ -51,7 +51,8 @@ class UnreadableRelease(ValueError):
 
 
 def live_id(specs: Path) -> str:
-    """The ONE live release id; :class:`UnreadableRelease` names why not and its act."""
+    """The ONE live release id; none live raises :class:`UnreadableRelease`, several the kernel
+    ``Refusal``, each with its act."""
     from _specs import choice, script  # the entry point's bootstrap resolves it
 
     release = script(Path(__file__).resolve().parent / "release.py")
