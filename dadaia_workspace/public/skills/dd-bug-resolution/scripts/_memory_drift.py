@@ -21,7 +21,7 @@ import _git
 import _jsonl
 from _platform import git_line
 from _refusal import Refusal as Refusal
-from _specs import CATALOG
+from _specs import CATALOG, script
 
 NOT_CODE = frozenset({"specs", "tests", "test", "docs"})
 
@@ -43,7 +43,7 @@ def git(repo: Path, *argv: str) -> list[str]:
     except RuntimeError as exc:  # a bound-less caller's history precondition: a cut is named first
         raise _cut(repo, f"git {' '.join(argv)} failed in {repo}") or Refusal(
             str(exc),
-            git_line(repo, "fetch", "--all"),
+            git_line(repo, *argv),
         ) from exc
     return [line for line in out.split("\n") if line]
 
@@ -56,16 +56,10 @@ def _reaches(repo: Path, bound: str) -> bool:
     return True
 
 
-def reach(repo: Path, bound: str, ledger: Path) -> str:
-    """*bound* when HEAD reaches it, else the commit that wrote it into *ledger*: a rebase
-    carries that commit along and leaves the text. A parentless hit is a shallow cut, left to
-    :func:`report`."""
-    if _reaches(repo, bound):
-        return bound
-    wrote = git(repo, "log", "--reverse", "--format=%H", f"-S{bound}", "--", str(ledger))
-    if wrote and len(git(repo, "rev-list", "--parents", "-n1", wrote[0])[0].split()) > 1:
-        return wrote[0]
-    return bound
+def reach(repo: Path, bounds: list[str]) -> str:
+    """The newest of *bounds* (newest first) HEAD reaches, else the newest: a rewrite that
+    dropped a recorded bound falls back to an older one, which only widens the window."""
+    return next((b for b in bounds if _reaches(repo, b)), bounds[0])
 
 
 def report(specs: Path, since: str, until: str = "HEAD") -> dict[str, Any]:
@@ -81,7 +75,8 @@ def report(specs: Path, since: str, until: str = "HEAD") -> dict[str, Any]:
         ).strip():
             raise Refusal(f"{bound} is not in this clone", git_line(repo, "fetch", "origin", bound))
         raise Refusal(f"{bound} is not an ancestor of HEAD — a clone of this branch lacks it (a rebase rewrote it)",
-                      git_line(repo, "merge-base", "HEAD", bound))  # fmt: skip
+                      f"{script(Path(__file__).parents[2] / 'dd-spec-navigator' / 'scripts' / 'memory.py')} drift "
+                      f"--specs {specs} --since {git(repo, 'merge-base', 'HEAD', bound)[0]}")  # fmt: skip
     catalog = json.loads(_jsonl.read_text(specs / CATALOG))
     changed = git(repo, "diff", "--name-only", f"{since}..{until}")
     return {"since": since, **worklist(catalog, changed, git(repo, "ls-files"))}

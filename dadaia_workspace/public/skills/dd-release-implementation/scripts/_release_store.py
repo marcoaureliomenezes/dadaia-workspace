@@ -59,15 +59,18 @@ def live_release(specs: Path) -> Live:
     return Live(live, release_dir, state, current_candidate(release_dir, state))
 
 
-def window_start(state: State) -> str:
-    """The memory window's start: the last memory entry's `until`, else `defined.sha`."""
-    ends = [e["until"] for e in state.get("log") or []
-            if isinstance(e, dict) and e.get("kind") == "memory" and e.get("until")]  # fmt: skip
-    if not (start := ends[-1] if ends else (state.get("defined") or {}).get("sha")):
+def window_start(state: State) -> list[str]:
+    """The memory window's start candidates, newest first: each memory entry's `until` and
+    `since`, newest entry first, then `defined.sha`."""
+    memory = [e for e in reversed(state.get("log") or []) if isinstance(e, dict) and e.get("kind") == "memory"]  # fmt: skip
+    bounds = [str(b) for e in memory for b in (e.get("until"), e.get("since")) if b]
+    if defined := (state.get("defined") or {}).get("sha"):
+        bounds.append(str(defined))
+    if not bounds:
         raise choice(Refusal("the live release has no defined.sha to open the memory window at",
                      f"{SCRIPT} phase IMPLEMENTATION --sha"),
                      "with the sha of the commit that approved the definition")  # fmt: skip
-    return str(start)
+    return bounds
 
 
 def open_bug_ids(specs: Path) -> list[str]:
