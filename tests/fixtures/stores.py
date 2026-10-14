@@ -6,7 +6,7 @@ import sysconfig
 import tempfile
 from pathlib import Path
 
-from pip._vendor.distlib.scripts import ScriptMaker
+from pip._vendor.distlib.scripts import ScriptMaker, enquote_executable
 
 from dadaia_workspace.core.platform import PLATFORM
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
@@ -58,17 +58,13 @@ def fake_venv(root: Path, cli: bool | str = False, pth: bool = False) -> Path:
             (Path(src) / "dadaia").write_text(cli)
             maker = ScriptMaker(src, str(python.parent), add_launchers=True)
             maker.clobber = True  # a re-placed stub replaces the older one
-            if " " not in str(python):  # distlib's sh form leaves a spaced path unquoted
-                maker.executable = str(
-                    python
-                )  # the shebang names this venv's python, as pip's does
+            maker.executable = enquote_executable(str(python))  # bound to this venv, as pip's is
             maker.make(str(Path(src) / "dadaia"))
     elif cli:
         shutil.copy2(Path(sys.executable).parent / name, python.with_name(name))
     if pth:
-        site = (
-            root / ".dadaia" / ".venv" / Path(sysconfig.get_path("purelib")).relative_to(sys.prefix)
-        )
+        venv = str(root / ".dadaia" / ".venv")
+        site = Path(sysconfig.get_path("purelib", "venv", {"base": venv, "platbase": venv}))
         site.mkdir(parents=True, exist_ok=True)
         (site / "deps.pth").write_text("\n".join(p for p in sys.path if p) + "\n")
     return python
