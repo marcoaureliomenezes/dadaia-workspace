@@ -245,7 +245,7 @@ def resolve_specs_dir(specs_dir: str | None) -> Path:
         if path.is_symlink():
             raise SpecsDirUnresolvedError(
                 f"Refusing a symlinked specs root: {path} is a symlink.",
-                fix=f"Operator action: point --specs-dir at the real directory, not the link {path}",
+                fix=f"Agent action: point --specs-dir at the real directory, not the link {path}",
             )
         return path.resolve()
 
@@ -255,7 +255,7 @@ def resolve_specs_dir(specs_dir: str | None) -> Path:
 
     raise SpecsDirUnresolvedError(
         "Could not resolve specs_dir. Pass --specs-dir or bind a context.",
-        fix="Operator action: pass --specs-dir with the specs/ directory, or run "
+        fix="Agent action: pass --specs-dir with the specs/ directory, or run "
         f"`{fix_line(None, 'context', 'bind')}` with a context name",
     )
 

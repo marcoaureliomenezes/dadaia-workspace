@@ -103,8 +103,8 @@ runs the two tree sections; any other run outside a workspace exits 1 with the o
 workspace-not-found error.
 
 Every printed finding is one `<CODE> <verdict> <message>` line, every error-class
-finding carries one fix line (a command, or
-`Operator action: <one act>`), and any error-class finding exits 1. There
+finding carries one fix line (a command, an
+`Agent action: <one act>`, or an `Operator action: <one act>` for what only the human may do), and any error-class finding exits 1. There
 is no score: the findings and the exit code are the run. `--json` mirrors it,
 `--redact` masks every foreign context name and repo slug, and `--fix` is the reaper —
 it moves slop to `.dadaia/reaped/<YYYYMMDD>/` under a 7-day hold; a TTL expiry acts by

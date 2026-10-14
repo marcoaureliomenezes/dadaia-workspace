@@ -42,10 +42,10 @@ def state(
     The fix names *context* when given, else *specs_dir* itself."""
     if text is None and (on_disk := specs_path_kind(specs_dir)) != "tree":
         if on_disk == "file":  # `specs init` cannot build a tree on a non-directory
-            return "file", f"Operator action: move {specs_dir} aside, it is not a directory"
+            return "file", f"Agent action: move {specs_dir} aside, it is not a directory"
         kind: State = "absent"
     elif reason := constitution_error(specs_dir, text):
-        return "malformed", f"Operator action: repair the YAML frontmatter of {reason}"
+        return "malformed", f"Agent action: repair the YAML frontmatter of {reason}"
     else:
         fm = parse(constitution_text(specs_dir) if text is None else text)
         stamp = fm.data.get("specs_pattern_version") if isinstance(fm, Frontmatter) else None

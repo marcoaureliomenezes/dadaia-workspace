@@ -81,7 +81,7 @@ into the session.
 
 `.dadaia/.venv/bin/dadaia doctor` is the one instance validator. Three sections run in fixed order —
 `workspace`, `specs`, `ledgers` — each finding one `<CODE> <verdict> <message>` line,
-every error-class finding with one fix line (a command, or `Operator action: <one act>`)
+every error-class finding with one fix line (a command, an `Agent action: <one act>`, or an `Operator action: <one act>` for what only the human may do)
 and exit 1; there is no score.
 `--json` mirrors the run; `--fix` is the reaper: it moves slop to `.dadaia/reaped/`;
 a TTL expiry acts by zone class, an OUTPUT entry held, an EPHEMERAL one deleted.
