@@ -82,7 +82,7 @@ _CMD = "command"
     pytest.param(_v047, {}, False, ("specs", _CMD), ("specs", "init", "--context", "app"), [], id="upgrade-leaves-project-specs-unmigrated-and-silent-0.4.7-tree"),
     pytest.param(_typo, {}, False, ("constitution", "agent"), None, ["repos/app/specs/constitution.md"], id="ADR0047-yaml-typo-is-an-agent-repair"),
     pytest.param(lambda t: {"app": _specs(t)}, {}, False, ("first-pass", "agent"), None,
-                 [".agents/skills/dd-audit-project/SKILL.md §first pass", "memory/QUALITY.md", "no atom"], id="shipped-stubs-first-pass"),
+                 ["the dd-audit-project skill's first pass", "memory/QUALITY.md", "no atom"], id="shipped-stubs-first-pass"),
     pytest.param(lambda t: {"app": _specs(t, audited=True)}, {}, False, ("publish", _CMD), ("context", "baseline", "app"), [], id="publish-until-on-a-remote"),
     pytest.param(lambda t: {"app": _specs(t, audited=True)}, {}, True, None, None, [], id="published-is-done"),
     pytest.param(lambda t: {"app": _specs(t, audited=True), "other": t / "repos" / "other" / "specs"}, {"focus": "app", "bound": True}, True, None, None, [], id="onboarding-next-step-names-another-context"),
