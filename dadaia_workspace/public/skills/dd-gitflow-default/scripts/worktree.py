@@ -21,7 +21,7 @@ sys.path[:0] = [
 from _git import GitError
 from _refusal import report, spell_fix
 from _worktree_end import clean, digest, merge, preflight
-from _worktree_git import rows, script, workspace_of
+from _worktree_git import quote, rows, script, workspace_of
 from _worktree_names import SCRIPT, Refusal
 from _worktree_new import new
 
@@ -53,7 +53,7 @@ def main(argv: list[str] | None = None) -> int:
     seal = verbs.add_parser("hash", help="the diff_sha256 binding a verdict carries for a sha")
     seal.add_argument("path")
     seal.add_argument("--sha", required=True)
-    verbs.add_parser("list", help="our dadaia:-locked worktrees").add_argument(
+    verbs.add_parser("list", help="our worktrees and the leftovers git does not list").add_argument(
         "--json", action="store_true"
     )
     args = parser.parse_args(argv)
@@ -75,8 +75,12 @@ def main(argv: list[str] | None = None) -> int:
             print(f"[ok] {end_verb(root, args.path, args.keep, args.drop)}")
             return 0
         found = rows(root)
-    except (Refusal, GitError) as refusal:  # a git failure no check named still ends as a refusal
-        report(refusal, getattr(refusal, "fix", f"{script(SCRIPT)} list"))
+    except Refusal as refusal:
+        report(refusal, refusal.fix)
+        return 1
+    except GitError as failure:  # no check named it: the operator's act, then the same call
+        again = " ".join(map(quote, sys.argv[1:] if argv is None else argv))
+        report(failure, f"Operator action: clear the git failure above, then rerun {script(SCRIPT)} {again}")  # fmt: skip
         return 1
     if args.json:
         print(json.dumps(found, indent=2))

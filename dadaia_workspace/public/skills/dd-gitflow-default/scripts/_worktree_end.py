@@ -431,7 +431,7 @@ def merge(root: Path, path: str, keep: list[str], drop: bool) -> str:
 def clean(root: Path, path: str, keep: list[str], drop: bool) -> str:
     repo, tree, name, onto = _target(root, path)
     if not any(Path(row["path"]).resolve() == tree for row in ours(repo)):
-        raise Refusal(f"{tree} is not a dadaia:-locked worktree", f"{script(SCRIPT)} list")
+        raise Refusal(f"{tree} is not a worktree of ours", f"{script(SCRIPT)} list")
     ahead = int(git(repo, "rev-list", "--count", f"{onto}..{branch(name)}"))
     if ahead:
         raise Refusal(
