@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-14T19:37:13Z",
+  "generated_at": "2026-10-14T19:52:49Z",
   "features": [
     {
       "rank": 1,
@@ -810,7 +810,7 @@
         "state",
         "closure"
       ],
-      "token_estimate": 1107,
+      "token_estimate": 1162,
       "depends_on": [
         "agent-orchestration",
         "worktrees",
