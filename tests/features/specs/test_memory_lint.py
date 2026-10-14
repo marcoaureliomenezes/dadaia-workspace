@@ -161,6 +161,24 @@ def test_wikilink_resolution_valid_and_broken(tmp_path: Path) -> None:
     assert not any("[[target]]" in e for e in result.errors)
 
 
+def test_a_wikilink_inside_a_fixed_section_is_not_judged_and_the_same_link_outside_is(
+    tmp_path: Path,
+) -> None:
+    """A rendered block carries ledger text, whose links the operator cannot correct."""
+    schema = load_frontmatter_schema()
+    line = "- 0007 \u2014 Split [[spec-tree]] into two atoms"
+    inside = (
+        f"## Purpose\n\n<!-- dadaia:fixed adr-list -->\n{line}\n<!-- /dadaia:fixed adr-list -->\n"
+    )
+    path = _make_atom(tmp_path, slug="ARCHITECTURE", filename="ARCHITECTURE.md", body=inside)
+    assert lint_atom(path, tmp_path, schema).errors == []
+    path = _make_atom(
+        tmp_path, slug="ARCHITECTURE", filename="ARCHITECTURE.md", body=f"## Purpose\n\n{line}\n"
+    )
+    errors = lint_atom(path, tmp_path, schema).errors
+    assert len(errors) == 1 and "Wikilink [[spec-tree]]" in errors[0], errors
+
+
 @pytest.mark.parametrize("stem", ["ARCHITECTURE", "TECHSTACK", "QUALITY"])
 def test_toplevel_trio_slug_is_its_filename_stem(tmp_path: Path, stem: str) -> None:
     """One rule, no exception table: a `slug` equals its filename stem, the top-level trio
