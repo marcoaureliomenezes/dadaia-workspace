@@ -168,7 +168,7 @@ def test_work_branch_refusals_fix_runs_verbatim(tmp_path: Path) -> None:
     git(repo, "branch", "-m", "feature/0.5.0", "dev")  # none: the fix cuts one from dev
     _fix(ws, none := run(ws, "new", "r", JOB))
     assert "no work branch" in none.stderr
-    assert git(repo, "branch", "--list", "feature/*").strip()
+    assert git(repo, "branch", "--list", "feature/0.5.0").strip()  # the live release's, not a tag's
 
 
 @pytest.mark.parametrize(
