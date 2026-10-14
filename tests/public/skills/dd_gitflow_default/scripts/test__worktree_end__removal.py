@@ -63,9 +63,12 @@ def test_a_merge_with_no_remote_still_lands_and_keeps_a_sibling_tree(root: Path)
 
 def test_list_reports_a_directory_that_holds_no_tree(root: Path) -> None:
     (root / "worktrees/r/0.5.0-rc9").mkdir()
+    (root / "worktrees/r/stray").mkdir()  # a one-level directory holding only a file
+    (root / "worktrees/r/stray/f.txt").write_text("x")
     rows = json.loads(run(root, "list", "--json").stdout)
     assert [(r["state"], r["path"]) for r in rows if r["state"] != "empty"] == [
-        ("unregistered", str(root / "worktrees/r/0.5.0-rc9"))
+        ("unregistered", str(root / "worktrees/r/0.5.0-rc9")),
+        ("unregistered", str(root / "worktrees/r/stray")),
     ]
 
 
