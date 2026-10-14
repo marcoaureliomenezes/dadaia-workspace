@@ -14,7 +14,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Literal
 
-from dadaia_workspace.core.cli_line import fix_line
+from dadaia_workspace.core.cli_line import OPERATOR_ACT, fix_line
 from dadaia_workspace.core.frontmatter import Frontmatter, parse
 from dadaia_workspace.core.gitflow import constitution_error, constitution_text, specs_tree_exists
 
@@ -44,11 +44,11 @@ def state(
         if specs_dir.is_file():  # `specs init` cannot build a tree on a file
             return (
                 "absent",
-                f"Operator action: move {specs_dir} aside, it is a file, not a directory",
+                f"{OPERATOR_ACT} move {specs_dir} aside, it is a file, not a directory",
             )
         kind: State = "absent"
     elif reason := constitution_error(specs_dir, text):
-        return "malformed", f"Operator action: repair the YAML frontmatter of {reason}"
+        return "malformed", f"{OPERATOR_ACT} repair the YAML frontmatter of {reason}"
     else:
         fm = parse(constitution_text(specs_dir) if text is None else text)
         stamp = fm.data.get("specs_pattern_version") if isinstance(fm, Frontmatter) else None
