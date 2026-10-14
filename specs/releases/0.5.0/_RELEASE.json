@@ -1,7 +1,7 @@
 {
   "schema": "release-state-v1",
   "release": "0.5.0",
-  "phase": "CLOSURE",
+  "phase": "DEFINITION",
   "defined": {
     "sha": "71eb1a091",
     "ts": "2026-10-13T15:04:49Z"
@@ -1921,6 +1921,12 @@
         "public-asset-distribution",
         "context-management"
       ]
+    },
+    {
+      "ts": "2026-10-14T21:21:22Z",
+      "agent": "release.py new",
+      "kind": "note",
+      "text": "Candidate born on 0.5.0 (prior candidate closed at 537233467)"
     }
   ]
 }
