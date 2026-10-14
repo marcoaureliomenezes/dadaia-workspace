@@ -152,8 +152,10 @@ or a task's from step 5.
    artifact GC; then the work -> integration PR merged green.
 7. **Continue or promote.** Continue: `release.py new` with the same id stacks the next
    candidate, reopening `DEFINITION`. Promote: merge the integration branch into the
-   principal by PR — that merge is the deploy; `release.py ship --sha <sha>` then
-   records it and moves the release folder to `_archive/`.
+   principal by PR — that merge is the deploy. The old work tip is tagged
+   `archive/<work-branch>` and the work branch is renamed to the next release id
+   (`git branch -m`, then `git push -u`), never cut anew; `release.py ship --sha <sha>`
+   then records the promote and moves the release folder to `_archive/`.
 
 A bug is registered once the operator confirms it; a block-list bug is fixed at once as
 a hotfix job — lineage, a RED new case, root-cause fix, GREEN, then `resolve` with the
