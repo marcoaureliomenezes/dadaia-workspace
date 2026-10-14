@@ -161,25 +161,54 @@ def _onboarding_texts() -> list[Path]:
     return [*_derived_docs(), *sorted(_MEMORY_DIR.rglob("*.md")), *skills]
 
 
-def test_no_onboarding_text_claims_offline_operation() -> None:
-    """`init` resolves its dependencies from PyPI, so no surface may call it offline."""
-    violations = [
-        f"{path.relative_to(_REPO_ROOT).as_posix()}:{number}: claims offline operation"
+def _onboarding_corpus() -> dict[str, str]:
+    return {
+        path.relative_to(_REPO_ROOT).as_posix(): path.read_text("utf-8")
         for path in _onboarding_texts()
-        for number, line in enumerate(path.read_text("utf-8").splitlines(), start=1)
+    }
+
+
+def _offline_sites(texts: dict[str, str]) -> list[str]:
+    return [
+        f"{rel}:{number}: claims offline operation"
+        for rel, text in texts.items()
+        for number, line in enumerate(text.splitlines(), start=1)
         if re.search(r"\boffline\b", line, re.IGNORECASE)
     ]
-    assert violations == [], "\n".join(violations)
+
+
+def _retired_flag_sites(texts: dict[str, str]) -> list[str]:
+    return [
+        f"{rel}:{number}: `{match.group(0).strip()}`"
+        for rel, text in texts.items()
+        for number, line in enumerate(text.splitlines(), start=1)
+        for match in _CONTEXT_CREATE_RE.finditer(line)
+        if re.search(r"--url\b|--associated-repos\b", match.group(0))
+    ]
+
+
+def test_no_onboarding_text_claims_offline_operation() -> None:
+    """`init` resolves its dependencies from PyPI, so no surface may call it offline."""
+    assert _offline_sites(_onboarding_corpus()) == []
 
 
 def test_no_onboarding_text_cites_a_retired_create_flag() -> None:
     """`context create` takes `--main-repo <url>` and repeatable `--associated-repo <url>`; a cited
     `--url` or `--associated-repos` exits 2."""
-    violations = [
-        f"{path.relative_to(_REPO_ROOT).as_posix()}:{number}: `{match.group(0).strip()}`"
-        for path in _onboarding_texts()
-        for number, line in enumerate(path.read_text("utf-8").splitlines(), start=1)
-        for match in _CONTEXT_CREATE_RE.finditer(line)
-        if re.search(r"--url\b|--associated-repos\b", match.group(0))
+    assert _retired_flag_sites(_onboarding_corpus()) == []
+
+
+def test_the_onboarding_scans_judge_operator_text_only() -> None:
+    """A line the doctor renders into a fixed section is the ledger's, not the operator's: the
+    same words as operator prose are named at their true line."""
+    offline = "- 0901 — init is never offline: it resolves from PyPI\n"
+    flag = "- 0902 — `dadaia context create --url` retires for --main-repo\n"
+    inside = f"<!-- dadaia:fixed adr-list -->\n{offline}{flag}<!-- /dadaia:fixed adr-list -->\n"
+    assert _offline_sites({"a.md": f"# A\n{inside}"}) == []
+    assert _retired_flag_sites({"a.md": f"# A\n{inside}"}) == []
+    assert _offline_sites({"a.md": f"# A\n{inside}{offline}"}) == [
+        "a.md:6: claims offline operation"
     ]
-    assert violations == [], "\n".join(violations)
+    assert _retired_flag_sites({"a.md": f"# A\n{inside}{flag}"}) == [
+        "a.md:6: `dadaia context create --url`"
+    ]
