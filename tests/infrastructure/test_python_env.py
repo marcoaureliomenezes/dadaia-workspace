@@ -652,3 +652,21 @@ def test_a_venv_without_its_python_is_refused_with_the_delete_fix_on_every_run(
         with pytest.raises(python_env_module.WorkspaceVenvBootstrapError) as exc:
             call(str(ws))
         assert exc.value.fix == fix
+
+
+def test_the_delete_fix_quotes_its_paths_as_plain_arguments_on_windows(
+    recorder: _Recorder, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Only the `uvx` command is a command line: the path to delete is prose, quoted whole."""
+    mgr = VenvPythonEnvironmentManager()
+    monkeypatch.undo()
+    windows = Capabilities.detect("win32")
+    monkeypatch.setattr(python_env_module, "PLATFORM", windows)
+    monkeypatch.setattr("dadaia_workspace.core.platform.PLATFORM", windows)
+    monkeypatch.setattr(python_env_module.subprocess, "run", _no_interpreter)
+    with pytest.raises(python_env_module.WorkspaceVenvBootstrapError) as exc:
+        mgr._assert_child_interpreter_version("C:/a b")
+    assert exc.value.fix == (
+        'Operator action: delete "C:/a b/.dadaia/.venv" and run '
+        '`uvx dadaia-workspace init "C:/a b"`'
+    )
