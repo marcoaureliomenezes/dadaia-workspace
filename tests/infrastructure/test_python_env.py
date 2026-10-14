@@ -641,7 +641,7 @@ def test_a_venv_without_its_python_is_refused_with_the_delete_fix_on_every_run(
     monkeypatch.setattr(python_env_module, "PLATFORM", windows)
     monkeypatch.setattr("dadaia_workspace.core.platform.PLATFORM", windows)
     monkeypatch.chdir(tmp_path)
-    (tmp_path / "C:/a b/.dadaia/.venv" / windows.venv_scripts_dir).mkdir(parents=True)
+    (tmp_path / "a b/.dadaia/.venv" / windows.venv_scripts_dir).mkdir(parents=True)
     monkeypatch.setattr(python_env_module.subprocess, "run", _no_interpreter)
     for call in (
         mgr._assert_child_interpreter_version,
@@ -649,8 +649,7 @@ def test_a_venv_without_its_python_is_refused_with_the_delete_fix_on_every_run(
         lambda ws: _REAL_ENSURE(mgr, ws),
     ):
         with pytest.raises(python_env_module.WorkspaceVenvBootstrapError) as exc:
-            call("C:/a b")
+            call("a b")
         assert exc.value.fix == (
-            'Operator action: delete "C:/a b/.dadaia/.venv" and run '
-            '`uvx dadaia-workspace init "C:/a b"`'
+            'Operator action: delete "a b/.dadaia/.venv" and run `uvx dadaia-workspace init "a b"`'
         )
