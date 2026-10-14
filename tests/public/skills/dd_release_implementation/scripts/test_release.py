@@ -763,6 +763,33 @@ def test_memory_opens_the_next_window_at_the_previous_until(script: Path, tmp_pa
     assert _log(specs)[-1]["since"] == until
 
 
+def test_drift_and_memory_resolve_a_recorded_bound_a_rebase_rewrote(
+    script: Path, tmp_path: Path
+) -> None:
+    """A rebase before merge rewrites the commit `until` names; the window then opens at the
+    commit that wrote the entry, which the rebase carried along, with no hand edit."""
+    root, specs, _ = _memory_repo(tmp_path, script)
+    assert _memory(script, root, specs, reviewed="alpha", changed="").returncode == 0
+    _git(root, "commit", "-qam", "memory entry")
+    work = _git(root, "branch", "--show-current")
+    stale = _log(specs)[-1]["until"]
+    _git(root, "checkout", "-q", "-b", "moved", "HEAD~2")
+    (root / "other.txt").write_text("feature moved\n", encoding="utf-8")
+    _git(root, "add", "-A")
+    _git(root, "commit", "-qm", "feature moved")
+    _git(root, "checkout", "-q", work)
+    _git(root, "rebase", "-q", "moved")
+    ancestor = subprocess.run(["git", "merge-base", "--is-ancestor", stale, "HEAD"], cwd=root)
+    assert ancestor.returncode == 1  # the rebase rewrote the recorded bound
+
+    drift = _run(script, "drift", "--specs", str(specs), cwd=root)
+    memory = _memory(script, root, specs, reviewed="", changed="")
+
+    assert drift.returncode == 0, drift.stderr
+    assert memory.returncode == 0, memory.stderr
+    assert _log(specs)[-1]["since"] == _git(root, "rev-parse", "HEAD")
+
+
 def test_a_rerun_after_the_second_reconciliation_appends_nothing(
     script: Path, tmp_path: Path
 ) -> None:

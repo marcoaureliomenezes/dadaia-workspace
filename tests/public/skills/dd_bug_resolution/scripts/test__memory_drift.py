@@ -203,7 +203,7 @@ def test_a_bound_head_does_not_reach_refuses_as_a_clean_clone_would(
 
     assert shown.stdout.splitlines() == [
         f"{orphan} is not an ancestor of HEAD — a clone of this branch lacks it (a rebase rewrote it)",
-        f"Operator action: replace {orphan[:12]} with the commit HEAD reaches in its place",
+        f"git -C {repo.as_posix()} merge-base HEAD {orphan}",
     ]
 
 
