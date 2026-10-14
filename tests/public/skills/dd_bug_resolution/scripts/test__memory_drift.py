@@ -179,13 +179,25 @@ def test_drift_requires_since_and_resolves_no_window_itself(script: Path, repo: 
     assert "--since" in result.stderr
 
 
+def _fix(script: Path, command: str, specs: Path) -> str:
+    """*command* through the ledger scripts' one fix-line builder, `with_specs`."""
+    code = (
+        f"import sys; sys.path[:0] = [{str(script.parents[2] / 'dd-bug-resolution' / 'scripts')!r}]\n"
+        f"from _specs import with_specs; print(with_specs({command!r}, {str(specs)!r}))"
+    )
+    return subprocess.run(
+        [sys.executable, "-c", code], capture_output=True, text=True, check=True
+    ).stdout.strip()
+
+
 @pytest.mark.parametrize("orphaned", ["since", "until"])
+@pytest.mark.parametrize("where", ["fixture-repo", "sp ace"])
 def test_a_bound_head_does_not_reach_refuses_as_a_clean_clone_would(
-    script: Path, repo: Path, orphaned: str
+    script: Path, repo: Path, orphaned: str, where: str
 ) -> None:
-    """A rebased-away sha still in the object
-    store is refused by the one decider every verb calls, as a single-branch clone (which
-    lacks it) refuses it."""
+    """A rebased-away sha still in the object store is refused by the one decider every verb
+    calls, as a single-branch clone (which lacks it) refuses it; its fix line, followed, runs."""
+    repo = repo.rename(repo.with_name(where))
     base = _git(repo, "rev-parse", "HEAD")
     (repo / "README.md").write_text("dropped\n", "utf-8")
     _git(repo, "add", "README.md")
@@ -193,22 +205,34 @@ def test_a_bound_head_does_not_reach_refuses_as_a_clean_clone_would(
     orphan = _git(repo, "rev-parse", "HEAD")
     _git(repo, "reset", "-q", "--hard", base)
     bounds = {"since": base, "until": base, orphaned: orphan}
-    call = (
-        f"import sys; sys.path[:0] = [{str(script.parents[2] / 'dd-bug-resolution' / 'scripts')!r}]; import _memory_drift as d\n"
-        f"try: d.report(__import__('pathlib').Path({str(repo / 'specs')!r}), "
-        f"{bounds['since']!r}, {bounds['until']!r})\n"
-        "except d.Refusal as r: print(r); print(r.fix)"
-    )
+    call = f"d.report(__import__('pathlib').Path({str(repo / 'specs')!r}), {bounds['since']!r}, {bounds['until']!r})"
 
-    shown = subprocess.run([sys.executable, "-c", call], capture_output=True, text=True, check=True)
+    message, fix = _refusal(script, call)
 
-    message, fix = shown.stdout.splitlines()
     assert message == (
         f"{orphan} is not an ancestor of HEAD — a clone of this branch lacks it (a rebase rewrote it)"
     )
-    assert fix == f"{sys.executable} {script} drift --specs {repo / 'specs'} --since {base}"
+    assert fix == _fix(script, f"{sys.executable} {script} drift --since {base}", repo / "specs")
     followed = subprocess.run(shlex.split(fix), capture_output=True, text=True, cwd=repo)
     assert followed.returncode == 1 and followed.stdout.startswith(f"[drift] since {base}\n")
+
+
+def test_a_bound_sharing_no_history_with_head_is_refused_with_a_since_from_heads_history(
+    script: Path, repo: Path
+) -> None:
+    root = _git(repo, "rev-parse", "HEAD")
+    stranger = _git(
+        repo, "commit-tree", "-m", "unrelated", "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+    )
+
+    message, fix = _refusal(
+        script, f"d.report(__import__('pathlib').Path({str(repo / 'specs')!r}), {stranger!r})"
+    )
+
+    assert message == (
+        f"{stranger} is not an ancestor of HEAD — a clone of this branch lacks it (a rebase rewrote it)"
+    )
+    assert fix == _fix(script, f"{sys.executable} {script} drift --since {root}", repo / "specs")
 
 
 def test_a_bound_a_shallow_clone_holds_beyond_its_cut_names_the_cut_not_a_rebase(
@@ -285,7 +309,7 @@ def test_the_absent_bound_fix_line_fetches_the_object_and_moves_the_refusal_on(
     assert before[1] == f"git -C {clone.as_posix()} fetch origin {side}"
     assert after == [
         f"{side} is not an ancestor of HEAD — a clone of this branch lacks it (a rebase rewrote it)",
-        f"{sys.executable} {script} drift --specs {clone / 'specs'} --since {head}",
+        _fix(script, f"{sys.executable} {script} drift --since {head}", clone / "specs"),
     ]
 
 

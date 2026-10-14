@@ -805,6 +805,31 @@ def test_a_recorded_bound_a_rewrite_unreached_widens_to_the_newest_reachable_bou
     assert _log(specs)[-1]["since"] == base
 
 
+def test_a_ledger_with_no_reachable_bound_opens_its_window_at_the_root_commit(
+    script: Path, tmp_path: Path
+) -> None:
+    """No memory entry and a `defined.sha` no rewrite left reachable: the window opens at the
+    root commit, so the closure runs with no hand edit."""
+    root, specs, base = _memory_repo(tmp_path, script)
+    gone = _git(root, "commit-tree", "-p", base, "-m", "rewritten away", "HEAD^{tree}")
+    _release(specs, "0.5.0", phase="CLOSURE", defined={"sha": gone, "ts": _TS},
+             implemented={"sha": gone, "ts": _TS})  # fmt: skip
+    code = root / "dadaia_workspace" / "features" / "alpha" / "core.py"
+    code.write_text("x = 3\n", encoding="utf-8")
+    _git(root, "commit", "-qam", "code after the rewrite")
+
+    drift = _run(script, "drift", "--specs", str(specs), cwd=root)
+    memory = _memory(script, root, specs, reviewed="alpha", changed="")
+
+    assert drift.returncode == 1, drift.stderr
+    assert drift.stdout.splitlines() == [
+        f"[drift] since {base}",
+        "  atom alpha <- dadaia_workspace/features/alpha/core.py",
+    ]
+    assert memory.returncode == 0, memory.stderr
+    assert _log(specs)[-1]["since"] == base
+
+
 def test_a_rerun_after_the_second_reconciliation_appends_nothing(
     script: Path, tmp_path: Path
 ) -> None:
