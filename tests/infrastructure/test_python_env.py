@@ -630,7 +630,9 @@ def test_a_venv_without_its_python_is_refused_with_the_delete_fix_on_every_run(
     """The pip install and the provider verification both run the venv's python: an OSError of
     either is the one refusal naming the act that clears it."""
     (Path(_venv(tmp_path)) / PLATFORM.venv_scripts_dir).mkdir(parents=True)
-    fix = f"Operator action: delete {_venv(tmp_path)} and run `uvx dadaia-workspace init {tmp_path}`"
+    fix = (
+        f"Operator action: delete {_venv(tmp_path)} and run `uvx dadaia-workspace init {tmp_path}`"
+    )
     mgr = VenvPythonEnvironmentManager()
     monkeypatch.undo()  # the recorder's stubs off: the real checks run below
     monkeypatch.setattr(python_env_module.subprocess, "run", _no_interpreter)
