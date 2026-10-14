@@ -4,7 +4,7 @@ description: >
   Run an Approved candidate to its PR: job and task worktrees, the RED-test then implementation task pair,
   the job review and merge, the Reconciliation job (phase CLOSURE, memory pass, disposition sweep, doctor)
   and _RELEASE.json entries. Use when working a task or job, closing a candidate, or writing release state.
-  Defining a candidate is dd-release-definition's; PRs, promote and branch cut are dd-gitflow-default's.
+  Defining a candidate is dd-release-definition's; PRs, promote and the next work branch are dd-gitflow-default's.
 ---
 
 # dd-release-implementation

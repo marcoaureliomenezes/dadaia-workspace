@@ -89,9 +89,14 @@ def resolve_live_candidate(specs_dir: Path) -> Path | None:
     return candidate_dir(specs_dir / "releases" / release_id) if release_id else None
 
 
-def work_branch(specs_dir: Path, flow: Gitflow) -> str:
-    """``<work><live release id>``, else ``<work>0.1.0``."""
-    return f"{flow.work_prefix}{live_release_id(specs_dir) or '0.1.0'}"
+def work_branch(repo: Path, flow: Gitflow, main: str) -> str:
+    """The repo's work branch by the skill's one rule (``work_version``); with none, the name to
+    create (``next_version``); several raise the skill's refusal. *main* is the main repo's slug."""
+    git = load_owner("dd-gitflow-default", "_worktree_git")
+    rule = {"work": flow.work_prefix, "integration": flow.integration, "main": main}
+    if git.work_versions(repo, rule):
+        return str(flow.work_prefix + git.work_version(repo, rule))
+    return str(flow.work_prefix + git.next_version(repo, rule))
 
 
 def from_mapping(block: object) -> Gitflow:

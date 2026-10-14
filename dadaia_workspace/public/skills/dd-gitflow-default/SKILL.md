@@ -24,9 +24,9 @@ The branch contract by role; the names are `specs/constitution.md`'s `gitflow:` 
 6. Definition stage: where a candidate is defined is `specs/releases/AGENTS.md`'s.
 7. Implementation stage: one commit per task, shaped per §3a.
 8. Candidate closure, on the operator's explicit order (publication): open one work → integration PR and merge it green; before that order, "finish" means merged into the work branch.
-9. After the merge, the main thread asks the operator: **promote or continue?** Continue = the next candidate's `python3 .agents/skills/dd-release-implementation/scripts/release.py new <id>`; promote = step 10.
+9. After the merge, the main thread asks the operator one question: **promote or continue?** — and, for promote, the next release `<id>` or none. Continue = the next candidate's `python3 .agents/skills/dd-release-implementation/scripts/release.py new <id>`; promote = step 10.
 10. Promote: open the PR integration → principal (the reviewer's `APPROVED` on the integration tip, §3b); its merge is the deploy.
-11. The moment the promote PR merges, record it — `python3 .agents/skills/dd-release-implementation/scripts/release.py ship --sha <sha>` — then tag the work tip as `archive/<work-name>` before deleting that work branch, and cut the next one per §2a when another release opens.
+11. After the promote PR merges, tag the work tip as `archive/<work-name>`; once the next release `<id>` is named (step 9), rename the work branch, never cut a new one: `git -C <repo> branch -m <work><old> <work><id>` (and its remote ref, when one exists: `git -C <repo> push -u origin <work><id> :<work><old>`). On it a plain tree runs `python3 .agents/skills/dd-release-implementation/scripts/release.py ship --sha <sha>`, then `release.py new <id>` in its `define` tree. Until then work continues on the old-named branch; the rename carries every commit, the ship included, to the next work → integration PR.
 12. A WT-managed worktree and its branch complete under `worktrees/AGENTS.md` §2, which owns their merge and cleanup lifecycle.
 
 - Rewriting the pushed history of, or force-pushing, the work branch or a branch that advances only by PR is refused unless the operator authorizes that act in its own turn.
@@ -44,7 +44,7 @@ The branch contract by role; the names are `specs/constitution.md`'s `gitflow:` 
 | plain `wt/<name>` | No — local only | the live work branch, else the checked-out branch, recorded | its reviewed worktree merge, with optional `verify:` |
 
 - No `v` prefix or suffix; a hotfix job is `wt/hotfix/<bug-id>`, local only, landing by its worktree merge (`worktrees/AGENTS.md` §2).
-- Exactly one live work branch, named for the live release; a job — a bug fix included — reaches it through its own worktree (`worktrees/AGENTS.md` §1).
+- Exactly one live work branch, cut from the integration branch once and renamed at each promote (§2 step 11): named for the live release, or for the next release's `<id>` once a promote named it; a job — a bug fix included — reaches it through its own worktree (`worktrees/AGENTS.md` §1).
 
 ## 3a. Commit shapes — each write in its own shape
 
@@ -65,7 +65,7 @@ The branch contract by role; the names are `specs/constitution.md`'s `gitflow:` 
 | 7 | `wt/hotfix/<bug-id>` | Specs revert, no code: the `specs/` paths of the culprit commit, put back | `Revert "<subject>"`; body `This reverts commit <sha>.` and `block: <item>` |
 | 8 | `define` | SPEC and PLAN approval: `specs/releases/<v>/rc-<N>/{SPEC,PLAN}.md` | `docs(specs): …` |
 | 9 | `reconcile`, the first-pass plain tree | Memory pass and derived docs: `specs/memory/*`, `README.md`, `docs/*.md` | `docs(memory): …` |
-| 10 | `define`, `reconcile`, a plain tree on the work branch after the promote merges (§2 step 11, `ship`) | Release state: `specs/releases/<v>/_RELEASE.json` and `specs/releases/_archive/**`, only when [`RELEASE-EVENTS.md`](../dd-release-implementation/RELEASE-EVENTS.md) requires a current entry | `chore(release): …` |
+| 10 | `define`, `reconcile`, a plain tree on the next work branch (§2 step 11, `ship`) | Release state: `specs/releases/<v>/_RELEASE.json` and `specs/releases/_archive/**`, only when [`RELEASE-EVENTS.md`](../dd-release-implementation/RELEASE-EVENTS.md) requires a current entry | `chore(release): …` |
 
 ## 3b. The PR gate
 
@@ -76,7 +76,7 @@ The branch contract by role; the names are `specs/constitution.md`'s `gitflow:` 
 
 - Current branches match §2a, and every commit since the work branch's cut matches one §3a row.
 - After a work → integration PR: the repo's `verify:` line passed, the reviewer's `APPROVED` verdict names the PR head, and the PR merged.
-- After promotion: the release's archived state records the principal merge as `shipped`, the `archive/<work-name>` tag resolves to the former work tip, the work branch is gone, and a next work branch exists when another release has opened.
+- After promotion: the `archive/<work-name>` tag resolves to the former work tip, once the next release is named the work branch carries its name and its first merge records the principal merge as `shipped` in the archived state.
 
 ## 5. References
 

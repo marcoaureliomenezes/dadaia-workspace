@@ -85,23 +85,46 @@ def flow_for(root: Path, repo: Path) -> dict[str, str]:
     return flow
 
 
-def work_version(repo: Path, flow: dict[str, str]) -> str:
+def work_versions(repo: Path, flow: dict[str, str]) -> list[str]:
+    """The versions of the repo's local work-prefix branches, whatever release is live."""
     prefix = flow["work"]
     branches = git(repo, "branch", "--list", f"{prefix}*", "--format=%(refname:short)").split()
-    versions = [b[len(prefix) :] for b in branches if SEMVER_RE.match(b[len(prefix) :])]
+    return [b[len(prefix) :] for b in branches if SEMVER_RE.match(b[len(prefix) :])]
+
+
+def next_version(repo: Path, flow: dict[str, str]) -> str:
+    """The version of the work branch to create when the repo has none."""
+    tags = [tuple(map(int, m.groups())) for t in git(repo, "tag").split() if (m := TAG_RE.match(t))]
+    major, minor, patch = max(tags, default=(0, 0, 0))
+    return sole_live(repo.parent / flow["main"] / "specs") or (f"{major}.{minor}.{patch + 1}" if tags else "0.1.0")  # fmt: skip
+
+
+class SeveralWork(Refusal):
+    """Several local work branches; *keep* is the version the rule keeps."""
+
+    def __init__(self, message: str, fix: str, keep: str) -> None:
+        super().__init__(message, fix)
+        self.keep = keep
+
+
+def work_version(repo: Path, flow: dict[str, str]) -> str:
+    prefix = flow["work"]
+    versions = work_versions(repo, flow)
     if len(versions) == 1:
         return versions[0]
     if versions:
-        stale = sorted(versions, key=lambda v: tuple(map(int, v.split("."))))[0]
-        raise Refusal(
-            f"{len(versions)} work branches", git_line(repo, "branch", "-d", f"{prefix}{stale}")
-        )
-    tags = [tuple(map(int, m.groups())) for t in git(repo, "tag").split() if (m := TAG_RE.match(t))]
-    major, minor, patch = max(tags, default=(0, 0, 0))
-    nxt = sole_live(repo.parent / flow["main"] / "specs") or (f"{major}.{minor}.{patch + 1}" if tags else "0.1.0")  # fmt: skip
+        ordered = sorted(versions, key=lambda v: tuple(map(int, v.split("."))))
+        low, high = f"{prefix}{ordered[0]}", f"{prefix}{ordered[-1]}"
+        drop = git_line(repo, "branch", "-d", low)
+        merged = git(repo, "branch", "--merged", high, "--list", low).strip()
+        raise SeveralWork(f"{len(versions)} work branches", drop if merged else f"Agent action: merge {low} into {high}, then run {drop}", ordered[-1])  # fmt: skip
+    nxt = next_version(repo, flow)
+    remote = git(
+        repo, "branch", "-r", "--list", f"*/{prefix}{nxt}", "--format=%(refname:short)"
+    ).split()
     raise Refusal(
         f"no work branch {prefix}<M.m.p>",
-        git_line(repo, "branch", f"{prefix}{nxt}", flow["integration"]),
+        git_line(repo, "branch", f"{prefix}{nxt}", remote[0] if remote else flow["integration"]),
     )
 
 
@@ -110,10 +133,12 @@ def record_base(repo: Path, name: str, ref: str) -> None:
     git(repo, "config", "--local", f"branch.{branch(name)}.dadaia-base", ref)
 
 
-def recorded_base(repo: Path, name: str, work: str = "") -> str:
-    """The persisted base of a plain tree, or the grammar-derived base of a release tree."""
+def recorded_base(repo: Path, name: str, flow: dict[str, str]) -> str:
+    """A release tree's grammar-derived base; a plain tree's persisted ref, where a work-branch
+    name resolves to the work branch as `work_version` finds it now."""
     if not plain(name):
-        return base(name, work)
+        version = NAME_RE.match(name)["v"]  # type: ignore[index]
+        return base(name, flow["work"] + (version or work_version(repo, flow)))
     ref = git(
         repo, "config", "--local", "--get", f"branch.{branch(name)}.dadaia-base", check=False
     ).strip()
@@ -122,7 +147,9 @@ def recorded_base(repo: Path, name: str, work: str = "") -> str:
             f"{branch(name)} has no recorded base ref",
             f"Agent action: recover the branch {branch(name)} from git history, then reopen the plain worktree",
         )
-    return ref
+    prefix = flow["work"]
+    named = ref.startswith(prefix) and SEMVER_RE.match(ref[len(prefix) :])
+    return prefix + work_version(repo, flow) if named else ref
 
 
 def _trees(repo: Path) -> list[dict[str, str]]:
@@ -165,10 +192,7 @@ def _age(repo: Path, name: str) -> float:
 
 def _ours(repo: Path, flow: dict[str, str], name: str, path: str) -> dict[str, object]:
     """Our tree *name*: `empty` (nothing ahead), `ready` (ahead, clean) or `open` (ahead, dirty)."""
-    match = NAME_RE.match(name)
-    assert match is not None  # `ours` admits names through this grammar.
-    work = flow["work"] + (match["v"] or work_version(repo, flow)) if not plain(name) else ""
-    span = f"{recorded_base(repo, name, work)}..{branch(name)}"
+    span = f"{recorded_base(repo, name, flow)}..{branch(name)}"
     ahead, changed = (
         int(git(repo, "rev-list", "--count", span, check=False) or 0),
         dirty(Path(path)),

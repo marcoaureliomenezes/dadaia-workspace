@@ -14,6 +14,7 @@ from dadaia_workspace.cli._fail import fail
 from dadaia_workspace.cli._specs_resolution import repo_owner, resolve_workspace_root_for_cli
 from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.gitflow import Gitflow, work_branch
+from dadaia_workspace.core.skill_owner import load_owner
 from dadaia_workspace.features.chokepoints.branch_policy import GateFixes
 from dadaia_workspace.features.spec_context.service import install_git_hooks
 
@@ -55,7 +56,13 @@ def _gate_inputs(repo_root: Path, head: str) -> tuple[Gitflow, GateFixes]:
     gitflow, warning = git.gitflow(repo_root, main)
     if warning:
         typer.echo(f"[pre-push] WARNING: {warning}", err=True)
-    work = work_branch(repo_root / "specs", gitflow)
+    try:
+        work = work_branch(repo_root, gitflow, owner[2] if owner else repo_root.name)
+    except load_owner("dd-gitflow-default", "_worktree_git").SeveralWork as several:
+        typer.echo(f"[pre-push] WARNING: {several}\nhint: {several.fix}", err=True)
+        work = gitflow.work_prefix + several.keep
+    except load_owner("dd-bug-resolution", "_refusal").Refusal as refusal:
+        fail(f"[pre-push] BLOCKED: {refusal}", fix=refusal.fix)
     cut = bool(git.git(repo_root, "for-each-ref", "--format=%(refname)", f"refs/heads/{work}"))
     fixes = GateFixes(repo=str(repo_root), work=work, cut=cut, head=head)
     return gitflow, fixes

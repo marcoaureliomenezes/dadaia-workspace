@@ -45,5 +45,4 @@ An rc is a DAG of jobs the PLAN draws, Job 1 first, the Reconciliation job last.
 - Open the work -> integration PR and merge it: `dd-gitflow-default` §3b.
 - Done when: it merges.
 
-The arc ends here. Gate -> promote -> record -> branch cut: `dd-gitflow-default` steps
-9-12.
+The arc ends here. Promote and what follows it: `dd-gitflow-default` steps 9-12.

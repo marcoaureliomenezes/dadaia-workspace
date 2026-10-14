@@ -35,7 +35,6 @@ from _worktree_git import (
     recorded_base,
     script,
     scrubbed_env,
-    work_version,
     workspace_of,
 )
 from _worktree_names import NAME_RE, SCRIPT, Refusal, branch, locate, non_code, plain, tree_path
@@ -53,9 +52,7 @@ def _target(root: Path, path: str) -> tuple[Path, Path, str, str]:
     if name is None or tail or not NAME_RE.match(name):
         raise Refusal(f"{path} is not a worktrees/<repo>/<name> path", f"{script(SCRIPT)} list")
     repo = root / "repos" / repo_name
-    flow, version = flow_for(root, repo), NAME_RE.match(name)["v"]  # type: ignore[index]
-    work = flow["work"] + (version or work_version(repo, flow)) if not plain(name) else ""
-    return repo, tree, name, recorded_base(repo, name, work)
+    return repo, tree, name, recorded_base(repo, name, flow_for(root, repo))
 
 
 def _refuse_dirty(tree: Path) -> None:

@@ -604,7 +604,7 @@ class SpecContextService:
         self._git.commit_paths(repo, message, [p for p in _ONBOARDING if (repo / p).exists()])
         anchor = git("rev-parse", "HEAD")
         flow, _ = self._git.gitflow(repo)
-        work = work_branch(repo / "specs", flow)
+        work = work_branch(repo, flow, repo.name)
         try:
             if born:
                 old = git("for-each-ref", "--format=%(objectname)", f"refs/heads/{work}")
@@ -720,11 +720,15 @@ class SpecContextService:
             flow, _ = self._git.gitflow(path, main_repo)
             branch = self._git.current_branch(path)
             if flow.role_of(branch) != "work":
+                work = work_branch(path, flow, main_repo.name)
+                cut = self._git.git(
+                    path, "for-each-ref", "--format=%(refname)", f"refs/heads/{work}"
+                )
                 raise DeadReviewRequiredError(
                     f"{lead} is on '{branch or 'a detached HEAD'}', which the gitflow never "
                     "pushes directly — dead() would push its unpushed commits there. "
                     "Nothing was touched.",
-                    fix=git_line(path, "checkout", "-b", work_branch(main_repo / "specs", flow)),
+                    fix=git_line(path, *(("switch",) if cut else ("checkout", "-b")), work),
                 )
 
     def dead(self, name: str) -> SpecContextProject:

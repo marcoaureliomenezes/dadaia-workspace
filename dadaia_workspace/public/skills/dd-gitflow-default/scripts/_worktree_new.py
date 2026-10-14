@@ -17,6 +17,7 @@ from _worktree_git import (
     record_base,
     script,
     work_version,
+    work_versions,
 )
 from _worktree_names import (
     LOCK,
@@ -62,13 +63,9 @@ def _shape(repo: Path, flow: dict[str, str], name: str) -> tuple[re.Match[str], 
 
 
 def _plain_base(root: Path, repo: Path, flow: dict[str, str]) -> str:
-    """The branch a plain tree returns to: the live work branch, else the checked-out one."""
-    if release := sole_live(root / "repos" / flow["main"] / "specs"):
-        return f"{flow['work']}{release}"
-    if start := git(repo, "branch", "--show-current").strip():
-        return start
-    raise Refusal("a plain worktree needs a checked-out base branch when no release is live",
-                  f"Agent action: switch {repo} to the branch this change should return to")  # fmt: skip
+    """The repo's one work branch; the checked-out branch only when it has none, no release is live and a branch is checked out."""
+    live = work_versions(repo, flow) or sole_live(root / "repos" / flow["main"] / "specs")
+    return (not live and git(repo, "branch", "--show-current").strip()) or flow["work"] + work_version(repo, flow)  # fmt: skip
 
 
 def _refuse_unready(root: Path, flow: dict[str, str], work: str, version: str, rc: str) -> None:
