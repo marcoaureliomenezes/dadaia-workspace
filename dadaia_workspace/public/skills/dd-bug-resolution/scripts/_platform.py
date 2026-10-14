@@ -39,7 +39,7 @@ def venv_tool(venv: Path, tool: str, caps: Caps | None = None) -> Path:
 
 
 def quote(word: str, caps: Caps | None = None) -> str:
-    """One shell word as `core/cli_line.shell_line` spells it: ``shlex`` on POSIX; on
+    """One shell word: ``shlex`` on POSIX; on
     Windows forward slashes, double quotes only around a blank."""
     if not (caps or detect()).windows:
         return shlex.quote(word)
@@ -48,7 +48,7 @@ def quote(word: str, caps: Caps | None = None) -> str:
 
 
 def head(word: str, caps: Caps | None = None) -> str:
-    """A command's first word as `core/cli_line.shell_line` spells it: on Windows a quote
+    """A command's first word: on Windows a quote
     opens after the drive letter, so the line never opens with one PowerShell reads as an
     expression."""
     caps = caps or detect()
@@ -57,5 +57,5 @@ def head(word: str, caps: Caps | None = None) -> str:
 
 
 def git_line(repo: Path | str, *argv: str) -> str:
-    """``git -C <repo> argv…`` quoted, as `core/cli_line.git_line` spells it."""
+    """``git -C <repo> argv…`` quoted."""
     return " ".join(map(quote, ("git", "-C", str(repo), *argv)))

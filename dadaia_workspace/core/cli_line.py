@@ -1,7 +1,5 @@
-"""The ONE spelling of the workspace CLI and its venv tools: absolute paths,
-so every ``fix:`` runs from any cwd — ``shlex`` on POSIX; on Windows forward slashes, a
-part holding a blank quoted whole — the executable's quote opened after its drive letter
-(``C":/a b/x.exe"``), since a line opening with a quote is a PowerShell expression."""
+"""The ONE spelling of the workspace CLI and its venv tools: absolute paths, so every
+``fix:`` runs from any cwd. The quoting rule belongs to the kernel's `_platform.py`."""
 
 from __future__ import annotations
 
