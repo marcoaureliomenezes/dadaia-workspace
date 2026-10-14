@@ -15,7 +15,7 @@ from pathlib import Path
 import pytest
 
 import dadaia_workspace.infrastructure.python_env as python_env_module
-from dadaia_workspace.core.cli_line import shell_line
+from dadaia_workspace.core.cli_line import quote, shell_line
 from dadaia_workspace.core.exceptions import DadaiaError
 from dadaia_workspace.core.platform import PLATFORM, Capabilities
 from dadaia_workspace.infrastructure.python_env import (
@@ -638,7 +638,7 @@ def test_a_venv_without_its_python_is_refused_with_the_delete_fix_on_every_run(
     ws = tmp_path / "a workspace"
     (Path(_venv(ws)) / PLATFORM.venv_scripts_dir).mkdir(parents=True)
     fix = (
-        f"Operator action: delete {shell_line(_venv(ws))} and run "
+        f"Operator action: delete {quote(_venv(ws))} and run "
         f"`{shell_line('uvx', 'dadaia-workspace', 'init', str(ws))}`"
     )
     mgr = VenvPythonEnvironmentManager()
