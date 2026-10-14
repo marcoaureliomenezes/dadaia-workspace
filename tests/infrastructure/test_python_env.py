@@ -618,3 +618,23 @@ def test_the_build_digest_follows_the_installed_bytes_of_the_payload(tmp_path: P
     whole = build_digest(_payload(tmp_path, damaged=False))
     assert build_digest(_payload(tmp_path, damaged=False)) == whole
     assert build_digest(_payload(tmp_path, damaged=True)) != whole
+
+
+def _no_interpreter(*_a: object, **_k: object) -> None:
+    raise FileNotFoundError(2, "No such file or directory")
+
+
+def test_a_venv_without_its_python_is_refused_with_the_delete_fix_on_every_run(
+    tmp_path: Path, recorder: _Recorder, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The pip install and the provider verification both run the venv's python: an OSError of
+    either is the one refusal naming the act that clears it."""
+    (Path(_venv(tmp_path)) / PLATFORM.venv_scripts_dir).mkdir(parents=True)
+    fix = f"Operator action: delete {_venv(tmp_path)} and run `uvx dadaia-workspace init {tmp_path}`"
+    mgr = VenvPythonEnvironmentManager()
+    monkeypatch.undo()  # the recorder's stubs off: the real checks run below
+    monkeypatch.setattr(python_env_module.subprocess, "run", _no_interpreter)
+    for call in (mgr._verify_venv_provider, lambda ws: _REAL_ENSURE(mgr, ws)):
+        with pytest.raises(python_env_module.WorkspaceVenvBootstrapError) as exc:
+            call(str(tmp_path))
+        assert exc.value.fix == fix
