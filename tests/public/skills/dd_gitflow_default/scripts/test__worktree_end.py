@@ -3,8 +3,7 @@ job on the work branch after its APPROVED verdict naming its CI-matrix run and t
 a `define` tree after its verdict and the ledger checks alone — HEAD as it is, by
 fast-forward, then removes and `branch -d`s the tree, re-runnable; every refusal (dirty, a
 moved work branch, no verdict, a red gate, ignored files, wrong branch, a stray blocking the
-fast-forward) carries one `fix:` that clears it; `clean` removes only an empty `dadaia:`
-worktree.
+fast-forward) carries one `fix:` that clears it; `clean` removes only an empty worktree of ours.
 Size: MEDIUM (real git, tmp workspace).
 """
 
