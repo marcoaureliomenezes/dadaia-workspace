@@ -67,10 +67,11 @@ def test_derived_views_follow_the_registry() -> None:
     assert rows["references"][2:] == ("operator", "never", "operator")
     assert frozenset({"AGENTS.md", ".gitignore"}) == wl.DADAIA_ROOT_FILES
     assert wl.DADAIAIGNORE in wl.ROOT_ALLOWED_FILES and "worktrees" in wl.ROOT_ALLOWED_DIRS
-    # the floor is what init/install create, plus the CLI's PROTECTED zone
+    # the floor is what init/install create, plus the CLI's PROTECTED zone, or the operator's
+    # own file inside one of those
     zones = [z for z in wl.DADAIA_ZONES if z in wl.provisioned_zones() or z.cls is K.PROTECTED]
     made = {"AGENTS.md", *wl.LEVEL1_SEEDS, *(f".dadaia/{z.name}" for z in zones)}
-    assert set(wl.CORE_FLOOR) <= made
+    assert all(f in made or f.rsplit("/", 1)[0] in made for f in wl.CORE_FLOOR)
 
 
 @pytest.mark.parametrize(
