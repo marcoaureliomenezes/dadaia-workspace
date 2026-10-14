@@ -21,7 +21,7 @@ def read(path: Path) -> dict[str, object]:
         shape = '{"contexts": [...]}'
         raise SchemaVersionError(
             f"{path} is not one {shape} object.",
-            f"Agent action: rewrite {path} as one {shape} object",
+            f"Operator action: rewrite {path} as one {shape} object",
         )
     return data
 

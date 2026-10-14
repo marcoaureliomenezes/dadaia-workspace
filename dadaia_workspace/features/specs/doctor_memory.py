@@ -166,7 +166,7 @@ class MemoryValidator:
                         Severity.ERROR,
                         f"{rel}: library fragment `{section_id}` is missing: {gone.filename}",
                         str(path),
-                        fix=reinstall_fix(),
+                        fix=reinstall_fix(self.specs_dir),
                     )
                 )
                 continue

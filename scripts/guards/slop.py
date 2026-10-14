@@ -73,7 +73,7 @@ def test_guard_doctor_codes(record_property):
     from dadaia_workspace.features.workspace import onboarding
     from dadaia_workspace.infrastructure.ledger_scripts import LEDGER_SCRIPTS
     from tests.core.test_cli_line__fix_line_contract import (
-        OPERATOR_ACTION,
+        AGENT_ACTION,
         PLANTS,
         REPORT_ONLY,
         WORKSPACE_PLANTS,
@@ -81,7 +81,7 @@ def test_guard_doctor_codes(record_property):
 
     rules = [*SPECS, *BACKLOG, *workspace_rules(expired_only=False, context=None)]
     codes = {c for r in rules for c in r.codes} | {s.code for s in LEDGER_SCRIPTS} | {onboarding.CODE}
-    covered = {*PLANTS, *REPORT_ONLY, *OPERATOR_ACTION, *WORKSPACE_PLANTS}
+    covered = {*PLANTS, *REPORT_ONLY, *AGENT_ACTION, *WORKSPACE_PLANTS}
     record_property("doctor", {"codes": sorted(codes), "covered": sorted(covered)})
 """
 

@@ -696,7 +696,7 @@ class SpecContextService:
                 raise DeadReviewRequiredError(
                     f"{lead} has {len(dirty)} uncommitted change(s); dead never "
                     "commits. Nothing was touched.",
-                    fix="Agent action: move "
+                    fix="Operator action: move "
                     + ", ".join(str(path / rel) for rel in dirty)
                     + " into a worktree, or discard it",
                 )

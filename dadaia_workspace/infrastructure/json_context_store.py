@@ -37,7 +37,7 @@ def parse_schema_version(data: dict, path: Path) -> int:  # type: ignore[type-ar
     text = str(_VERSION if raw is None else raw)
     if isinstance(raw, bool) or not text.isdigit():
         problem = f"spec_contexts.json schema_version {raw!r} is not a number."
-        raise SchemaVersionError(problem, f"Agent action: set it to {_VERSION} in {path}")
+        raise SchemaVersionError(problem, f"Operator action: set it to {_VERSION} in {path}")
     if int(text) > _VERSION:
         problem = f"spec_contexts.json schema_version {text} is newer than this dadaia."
         raise SchemaVersionError(problem, f"Agent action: upgrade dadaia-workspace to read {path}")
@@ -47,7 +47,7 @@ def parse_schema_version(data: dict, path: Path) -> int:  # type: ignore[type-ar
 
 def _load(path: Path) -> dict:  # type: ignore[type-arg]
     """Load spec_contexts.json through the one parse; a v1 registry refuses with the one
-    ``migrate --yes`` fix, a row missing a :data:`ROW_KEYS` key with an ``Agent action``."""
+    ``migrate --yes`` fix, a row missing a :data:`ROW_KEYS` key with an ``Operator action``."""
     data = context_registry.read(path)
     if parse_schema_version(data, path) < 2:
         problem = "spec_contexts.json holds v1 rows (ativo/inativo or schema_version < 2)."
@@ -58,7 +58,7 @@ def _load(path: Path) -> dict:  # type: ignore[type-arg]
         if missing := [k for k in ROW_KEYS if k not in row]:
             raise SchemaVersionError(
                 f"{path}: context row {row.get('name')!r} has no {', '.join(missing)}.",
-                f"Agent action: add {', '.join(missing)} to that row of {path}",
+                f"Operator action: add {', '.join(missing)} to that row of {path}",
             )
     return data
 
