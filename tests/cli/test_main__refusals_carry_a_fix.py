@@ -188,7 +188,18 @@ def _specs_dir_is_not_a_directory(tmp: Path, kind: str) -> Case:
     return tmp, ["specs", "init", "--specs-dir", str(tmp / "specs")]
 
 
-# (id, builder(tmp, monkeypatch) -> (cwd, argv)) — the 17 measured sites.
+def _symlinked_specs_dir(tmp: Path, live: bool) -> Case:
+    tmp.mkdir(parents=True)
+    if live:
+        (tmp / "real").mkdir()
+    try:
+        (tmp / "link").symlink_to(tmp / ("real" if live else "nonexistent"))
+    except OSError:
+        pytest.skip("this host cannot create symlinks")
+    return tmp, ["specs", "init", "--specs-dir", str(tmp / "link")]
+
+
+# (id, builder(tmp, monkeypatch) -> (cwd, argv)) — the 19 measured sites.
 SITES: list[tuple[str, Callable[[Path, pytest.MonkeyPatch], Case]]] = [
     ("repo-add-invalid-slug", lambda t, m: _repo_add(t, "not a slug", "--url", "https://x.test/a.git")),
     ("repo-add-different-url", lambda t, m: _repo_add_other_url(t)),
@@ -206,6 +217,8 @@ SITES: list[tuple[str, Callable[[Path, pytest.MonkeyPatch], Case]]] = [
     ("init-venv-failure", _init_venv_fails),
     ("specs-upgrade-two-tier", lambda t, m: _two_tier_architecture(t)),
     ("specs-init-malformed-constitution", lambda t, m: _malformed_constitution(t)),
+    ("specs-init-dangling-symlink-root", lambda t, m: _symlinked_specs_dir(t, live=False)),
+    ("specs-init-live-symlink-root", lambda t, m: _symlinked_specs_dir(t, live=True)),
     ("specs-upgrade-unresolved-specs-dir", lambda t, m: (_workspace(t), ["specs", "upgrade"])),
 ]  # fmt: skip
 
@@ -251,6 +264,13 @@ def test_refusal_prints_error_then_exactly_one_fix(
         fix = next(ln for ln in lines if ln.startswith("fix:"))
         assert "context list" not in fix
         assert "--associated-repo" in fix
+    if site.endswith("symlink-root"):
+        link = cwd / "link"
+        assert (
+            lines[-1]
+            == f"fix: Operator action: point --specs-dir at the real directory, not the link {link}"
+        )
+        assert not (cwd / "link").resolve().joinpath("constitution.md").exists()
 
 
 @pytest.mark.parametrize("kind", ["file", "fifo"])
