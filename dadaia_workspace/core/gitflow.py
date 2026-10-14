@@ -115,13 +115,9 @@ def constitution_path(specs_dir: Path) -> Path:
     return specs_dir / "constitution.md"
 
 
-def specs_tree_exists(specs_dir: Path) -> bool:
-    return specs_dir.is_dir()
-
-
-def specs_path_is_taken(specs_dir: Path) -> bool:
-    """Something exists at the path (a dangling symlink does not count)."""
-    return specs_dir.exists()
+def specs_path_kind(specs_dir: Path) -> Literal["tree", "file", "absent"]:
+    """What the path is: a directory, anything else that exists, or nothing (a dangling symlink)."""
+    return "tree" if specs_dir.is_dir() else "file" if specs_dir.exists() else "absent"
 
 
 def constitution_text(specs_dir: Path) -> str:

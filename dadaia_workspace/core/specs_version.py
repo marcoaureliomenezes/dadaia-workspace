@@ -16,12 +16,7 @@ from typing import Literal
 
 from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.frontmatter import Frontmatter, parse
-from dadaia_workspace.core.gitflow import (
-    constitution_error,
-    constitution_text,
-    specs_path_is_taken,
-    specs_tree_exists,
-)
+from dadaia_workspace.core.gitflow import constitution_error, constitution_text, specs_path_kind
 
 #: Single source of truth for the current canonical specs-pattern version.
 #: Bump this whenever the canon a tree must meet changes. A canon change that
@@ -45,8 +40,8 @@ def state(
     *text* when given (a pushed commit's constitution, ``""`` when it carries none), else
     of the tree on disk. A constitution whose YAML or gitflow block fails is ``malformed``.
     The fix names *context* when given, else *specs_dir* itself."""
-    if text is None and not specs_tree_exists(specs_dir):
-        if specs_path_is_taken(specs_dir):  # `specs init` cannot build a tree on a non-directory
+    if text is None and (on_disk := specs_path_kind(specs_dir)) != "tree":
+        if on_disk == "file":  # `specs init` cannot build a tree on a non-directory
             return "file", f"Operator action: move {specs_dir} aside, it is not a directory"
         kind: State = "absent"
     elif reason := constitution_error(specs_dir, text):
