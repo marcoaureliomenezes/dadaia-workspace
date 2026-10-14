@@ -13,7 +13,7 @@ import time
 from pathlib import Path
 
 from _git import git as git, parse_worktrees, scrubbed_env as scrubbed_env  # isort: skip
-from _grammar import SEMVER_RE, TAG_RE
+from _grammar import SEMVER_RE, TAG_RE, live_ids
 from _platform import git_line as git_line
 from _platform import head
 from _platform import quote as quote  # (`as`: re-exported to the worktree verbs)
@@ -98,7 +98,8 @@ def work_version(repo: Path, flow: dict[str, str]) -> str:
         )
     tags = [tuple(map(int, m.groups())) for t in git(repo, "tag").split() if (m := TAG_RE.match(t))]
     major, minor, patch = max(tags, default=(0, 0, 0))
-    nxt = f"{major}.{minor}.{patch + 1}" if tags else "0.1.0"
+    live = live_ids(repo.parent / flow["main"] / "specs")
+    nxt = live[-1] if live else f"{major}.{minor}.{patch + 1}" if tags else "0.1.0"
     raise Refusal(
         f"no work branch {prefix}<M.m.p>",
         git_line(repo, "branch", f"{prefix}{nxt}", flow["integration"]),
@@ -176,7 +177,7 @@ def _ours(repo: Path, flow: dict[str, str], name: str, path: str) -> dict[str, o
 
 def _absent(root: Path, repo: Path, held: set[str], found: list[dict[str, object]]) -> list[dict[str, object]]:  # fmt: skip
     """The leftovers git does not list: a `wt/*` branch with no tree (`orphan`), a directory two
-    levels under `worktrees/<repo>/` or an empty one level under it (`unregistered`)."""
+    levels under `worktrees/<repo>/` or an unlisted one level under it (`unregistered`)."""
     out = []
     home = tree_path(root, repo.name)
     for ref in git(repo, "for-each-ref", "--format=%(refname:short)", "refs/heads/wt/").split():
@@ -188,7 +189,7 @@ def _absent(root: Path, repo: Path, held: set[str], found: list[dict[str, object
             out.append(_row(repo, str(stray), "unregistered"))
     for folder in sorted(home.glob("*")):  # an rc folder holding no tree
         named = any(Path(str(r["path"])).parent == folder for r in (*found, *out))
-        if folder.is_dir() and not any(folder.iterdir()) and not named:
+        if folder.is_dir() and folder.resolve() not in listed and not named:
             out.append(_row(repo, str(folder), "unregistered"))
     return out
 
