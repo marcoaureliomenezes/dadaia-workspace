@@ -190,7 +190,10 @@ def _absent(root: Path, repo: Path, held: set[str], found: list[dict[str, object
     home = tree_path(root, repo.name)
     for ref in git(repo, "for-each-ref", "--format=%(refname:short)", "refs/heads/wt/").split():
         if f"refs/heads/{ref}" not in held and (name := name_of(ref)):
-            out.append(_row(repo, str(home / name), "orphan"))
+            row = _row(repo, str(home / name), "orphan")
+            if (home / name).exists():  # merge cannot clear a directory git does not know
+                row["fix"] = f"Operator action: remove the directory {row['path']}, then run `{row['fix']}`"
+            out.append(row)
     listed = {Path(str(r["path"])).resolve() for r in (*found, *out)}  # one row per path
     for stray in sorted(home.glob("*/*")):  # a name is two levels
         if stray.is_dir() and not {stray.resolve(), stray.parent.resolve()} & listed:
