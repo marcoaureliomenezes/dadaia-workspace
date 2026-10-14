@@ -15,6 +15,8 @@ import re
 from collections.abc import Collection, Iterable
 from pathlib import Path, PurePath
 
+from dadaia_workspace.core.fixed_sections import blank_fixed_sections
+
 __all__ = [
     "CITABLE_PATH_PREFIXES",
     "dead_body_pointers",
@@ -213,8 +215,8 @@ def memory_citation_violations(
     repo_root: Path | None,
     command_paths: Collection[tuple[str, ...]] | None,
 ) -> list[tuple[Path, str]]:
-    """`dead_citations` over every ``*.md`` under *memory_dir* — the doctor's
-    MEM-DRIFT-2 input, as ``(atom, violation)`` pairs.
+    """`dead_citations` over every ``*.md`` under *memory_dir*, fixed sections blanked
+    (line numbers kept) — the doctor's MEM-DRIFT-2 input, as ``(atom, violation)`` pairs.
 
     Silent (``[]``) with no command tree, no *repo_root* or no memory tree: a consumer
     whose CLI tree could not be resolved is not a consumer with drift.
@@ -225,7 +227,7 @@ def memory_citation_violations(
         (path, violation)
         for path in _markdown_files(memory_dir)
         for violation in dead_citations(
-            path.read_text(encoding="utf-8"),
+            blank_fixed_sections(path.read_text(encoding="utf-8")),
             command_paths=command_paths,
             repo_root=repo_root,
             rel=posix_relpath(path, repo_root),
