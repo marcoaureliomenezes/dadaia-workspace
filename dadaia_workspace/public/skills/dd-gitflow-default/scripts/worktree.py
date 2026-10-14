@@ -18,10 +18,11 @@ sys.path[:0] = [
     str(Path(__file__).resolve().parents[2] / "dd-bug-resolution" / "scripts"),
 ]
 
+from _git import GitError
 from _refusal import report, spell_fix
 from _worktree_end import clean, digest, merge, preflight
-from _worktree_git import rows, workspace_of
-from _worktree_names import Refusal
+from _worktree_git import rows, script, workspace_of
+from _worktree_names import SCRIPT, Refusal
 from _worktree_new import new
 
 __all__ = ["main"]
@@ -74,8 +75,8 @@ def main(argv: list[str] | None = None) -> int:
             print(f"[ok] {end_verb(root, args.path, args.keep, args.drop)}")
             return 0
         found = rows(root)
-    except Refusal as refusal:
-        report(refusal, refusal.fix)
+    except (Refusal, GitError) as refusal:  # a git failure no check named still ends as a refusal
+        report(refusal, getattr(refusal, "fix", f"{script(SCRIPT)} list"))
         return 1
     if args.json:
         print(json.dumps(found, indent=2))
