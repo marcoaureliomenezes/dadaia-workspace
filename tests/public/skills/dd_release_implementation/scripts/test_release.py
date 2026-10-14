@@ -230,6 +230,7 @@ def test_a_live_spec_without_the_bug_window_review(
     assert found.returncode == (1 if errors else 0), found.stdout
     assert [(f["path"], f["line"], bool(f["fix"])) for f in json.loads(found.stdout)] == errors
     assert f"{verdict} releases/0.5.0/rc-1/SPEC.md:1 " in listed.stdout
+    assert ("fix: " in listed.stdout) == bool(errors), listed.stdout  # an info row carries no fix
 
 
 def test_a_verb_with_no_live_release_hands_new_to_the_agent(
