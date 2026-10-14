@@ -184,5 +184,5 @@ def load_baseline() -> tuple[BaselinePattern, ...]:
     except (OSError, ValueError, LookupError, TypeError, _jsonl.Undecodable) as exc:
         raise Refusal(
             f"privacy baseline {path} is unreadable ({exc}) — no pattern was applied",
-            f"Operator action: restore {path.name} by re-running the workspace install (uvx dadaia-workspace init)",
+            _jsonl.reinstall_fix(path.name),
         ) from exc

@@ -24,11 +24,12 @@ class LineError(ValueError):
 class Undecodable(Refusal):
     """The file *path* is not UTF-8: a verb refuses with the restore act, a check reports a finding."""
 
-    def __init__(self, path: Path) -> None:
+    def __init__(self, path: Path, fix: str = "") -> None:
         target = path.resolve()
         restore = git_line(target.parent, "checkout", "--", target.name)
         super().__init__(
-            f"{path} is not valid UTF-8", f"Operator action: restore {target} with `{restore}`"
+            f"{path} is not valid UTF-8",
+            fix or f"Operator action: restore {target} with `{restore}`",
         )
         self.path = path
 
@@ -37,12 +38,21 @@ class Unreadable(Refusal):
     """A document that is not one JSON object; ``.fix`` is the act its caller names."""
 
 
-def read_text(path: Path) -> str:
-    """The text of *path*; bytes that are not UTF-8 raise :class:`Undecodable` naming it."""
+def reinstall_fix(name: str) -> str:
+    """The act that repairs a shipped file *name* the install projected."""
+    return (
+        f"Operator action: restore {name} by re-running the workspace install "
+        "(uvx dadaia-workspace init)"
+    )
+
+
+def read_text(path: Path, fix: str = "") -> str:
+    """The text of *path*; bytes that are not UTF-8 raise :class:`Undecodable` naming it, with
+    *fix* in place of the git restore a tracked file gets."""
     try:
         return path.read_text(encoding="utf-8")
     except UnicodeDecodeError as exc:
-        raise Undecodable(path) from exc
+        raise Undecodable(path, fix) from exc
 
 
 def walk(text: str) -> Iterator[tuple[int, Any, str]]:

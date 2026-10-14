@@ -49,7 +49,7 @@ def load_schema(name: str) -> dict[str, Any]:
         path = _HERE.parents[1] / _SCHEMA_OWNERS[name] / "scripts" / "schemas" / file
     else:
         path = next((_HERE.parents[2] / "schemas").rglob(file), _HERE / "schemas" / file)
-    return dict(json.loads(_jsonl.read_text(path)))
+    return dict(json.loads(_jsonl.read_text(path, _jsonl.reinstall_fix(path.name))))
 
 
 def _combinators(value: object, spec: dict[str, Any], root: dict[str, Any], where: str) -> Any:

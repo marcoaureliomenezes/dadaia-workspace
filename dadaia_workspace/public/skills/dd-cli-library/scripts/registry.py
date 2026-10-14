@@ -61,7 +61,8 @@ def load(path: Path) -> dict[str, Any]:
             "range": {"min_port": DEFAULT_MIN_PORT, "max_port": DEFAULT_MAX_PORT},
             "entries": [],
         }
-    return dict(json.loads(_jsonl.read_text(path)))
+    fix = f"Operator action: delete {path} — the next registry.py run starts an empty registry"
+    return dict(json.loads(_jsonl.read_text(path, fix)))
 
 
 def pid_alive(pid: int) -> bool:
