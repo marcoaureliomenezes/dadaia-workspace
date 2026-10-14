@@ -422,7 +422,7 @@ def _malformed(world: World) -> str:
 
 def _work(world: World) -> str:
     """The live work branch by the ONE rule."""
-    return work_branch(world.repo / "specs", DEFAULT)
+    return work_branch(world.repo, DEFAULT, world.repo.name)
 
 
 def _work_pushed(world: World, work: str = "feature/1.0.0") -> None:
@@ -870,6 +870,11 @@ SITES: dict[str, tuple[Case | tuple[Case, ...] | Skip, ...]] = {
     "push_gate._read_failure": (Skip("needs a corrupted object store; `git fsck` names it"),),
     "push_gate.push_gate_decision": (
         Case(_malformed, lambda w: _work_pushed(w, _work(w)), replaces=True),
+    ),
+    "ci._gate_inputs": (
+        Skip(
+            "it prints the work-branch rule's own fix; test_ci__push_gate_gitflow_resolution pins it"
+        ),
     ),
     "ci._repo_root": (Skip("the pre-push hook always runs inside the repo it pushes"),),
     "ci.push_gate_check": (Skip("the gate's refusal: its fix is a branch_policy/push_gate site"),),

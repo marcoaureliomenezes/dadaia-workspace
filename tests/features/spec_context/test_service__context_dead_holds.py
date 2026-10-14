@@ -131,6 +131,17 @@ def _wt(repo: Path, *, checked_out: bool) -> None:
         _git("worktree", "remove", str(tree), cwd=repo)
 
 
+def _ahead_with_work(repo: Path) -> None:
+    _git("branch", "feature/0.3.0", cwd=repo)
+    _ahead_on_main(repo)
+
+
+def _ahead_on_main(repo: Path) -> None:
+    (repo / "ahead.md").write_text("unpushed\n")
+    _git("add", "ahead.md", cwd=repo)
+    _git("commit", "-m", "ahead", cwd=repo)
+
+
 def _no_remote(repo: Path) -> None:
     _git("remote", "remove", "origin", cwd=repo)
     (repo / "notes.md").write_text("local only\n")
@@ -159,6 +170,8 @@ _REFUSALS = [
     pytest.param("main", lambda r: (r.parents[1] / ".dadaia/.venv" / PLATFORM.venv_scripts_dir / f"dadaia{PLATFORM.venv_exe_suffix}").unlink(), DeadUnpushedCommitsError, r"no workspace CLI[\s\S]*fix: uvx dadaia-workspace init \S+/ws$", id="AC1.10-rows-unreadable-fails-closed"),
     pytest.param("lib", lambda r: (r / "leftover.txt").write_text("x\n"), DeadReviewRequiredError, r"lib[\s\S]*leftover\.txt", id="A16.2-untracked-in-lib"),
     pytest.param("lib", lambda r: (r / "README.md").write_text("edited\n"), DeadReviewRequiredError, r"^Context 'proj': repo 'lib' has 1 uncommitted change\(s\); dead never commits", id="AC3.2-dirty-refusal-names-context-and-repo"),
+    pytest.param("lib", _ahead_on_main, DeadReviewRequiredError, r"fix: git -C \S+/repos/lib checkout -b feature/0\.1\.0$", id="the-fix-creates-the-work-branch"),
+    pytest.param("lib", _ahead_with_work, DeadReviewRequiredError, r"fix: git -C \S+/repos/lib switch feature/0\.3\.0$", id="the-fix-switches-to-the-existing-work-branch"),
     pytest.param("lib", _no_remote, DeadUnpushedCommitsError, "lib", id="A16.2-local-commits-no-remote-in-lib"),
     pytest.param("main", _repos_outside, ContextStateError, rf"skipped 'repos/main' \(outside the workspace\)\nfix: Agent action: free \S+{re.escape(str(Path('/', 'repos', 'main')))} for the move", id="AC2.11-hold-refused"),
     pytest.param("lib", _url_less, RepoUrlMissingError, r"fix: Agent action: add the clone URL of \S+[\\/]repos[\\/]lib as its origin remote", id="url-less-never-clone-back"),
@@ -183,6 +196,28 @@ def test_dead_refuses_an_unrecoverable_repo_anywhere_in_the_set_and_touches_noth
     assert (repo / ".git").is_dir() and (repo.parent / "lib" / ".git").is_dir()
     assert not (tmp_path / "ws" / ".dadaia" / "reaped").exists()
     assert store.get("proj").state is ContextState.ALIVE  # type: ignore[union-attr]
+
+
+def test_dead_fix_for_an_unpushable_branch_clears_the_block(tmp_path: Path) -> None:
+    """With the work branch already local the fix switches to it, and `dead` stops refusing the branch."""
+    service, _store, repo = _alive(tmp_path)
+    lib = repo.parent / "lib"
+    _ahead_with_work(lib)
+    with pytest.raises(DeadReviewRequiredError) as refused:
+        service.dead("proj")
+    (fix,) = [ln for ln in str(refused.value).splitlines() if ln.startswith("fix: ")]
+
+    subprocess.run(fix.removeprefix("fix: "), shell=True, check=True, capture_output=True)
+
+    assert _git_out(lib, "branch", "--show-current") == "feature/0.3.0"
+    with pytest.raises(DeadUnpushedCommitsError):
+        service.dead("proj")
+
+
+def _git_out(cwd: Path, *args: str) -> str:
+    return subprocess.run(
+        ["git", *args], cwd=cwd, capture_output=True, text=True, check=True
+    ).stdout.strip()
 
 
 def _unborn(repo: Path, *files: str) -> None:

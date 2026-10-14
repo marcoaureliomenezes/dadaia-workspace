@@ -10,6 +10,7 @@ import subprocess
 from pathlib import Path
 
 import pytest
+import typer
 
 from dadaia_workspace.cli.commands import ci
 from dadaia_workspace.core.cli_line import fix_line
@@ -55,11 +56,39 @@ def test_a_branch_without_specs_reads_the_newest_published_constitution(
 
 
 def test_the_gate_names_the_live_release_work_branch(repo: Path) -> None:
-    """With no live release the work branch is work/0.1.0; a live 0.5.0 names work/0.5.0."""
-    assert ci._gate_inputs(repo, "")[1].work == "work/0.1.0"
+    """The repo's one local work branch is the work branch, whatever release is live; with none,
+    a live 0.5.0 names work/0.5.0."""
+    assert ci._gate_inputs(repo, "")[1].work == "work/0.1.1"
     (repo / "specs/releases/0.5.0").mkdir(parents=True)
     (repo / "specs/releases/0.5.0/_RELEASE.json").write_text("{}", encoding="utf-8")
+    assert ci._gate_inputs(repo, "")[1].work == "work/0.1.1"
+    _git(repo, "checkout", "-q", "trunk")
+    _git(repo, "branch", "-D", "work/0.1.1")
     assert ci._gate_inputs(repo, "")[1].work == "work/0.5.0"
+
+
+def test_two_work_branches_name_the_one_the_rule_keeps_not_the_pushed_branch(repo: Path) -> None:
+    _git(repo, "branch", "work/0.1.2")
+    _git(repo, "switch", "-q", "-c", "foo")
+    assert ci._gate_inputs(repo, "foo")[1].work == "work/0.1.2"
+
+
+def test_several_live_releases_block_the_gate_with_the_refusals_own_fix(
+    repo: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    _git(repo, "switch", "-q", "-c", "foo")
+    _git(repo, "branch", "-D", "work/0.1.1")
+    for release in ("0.5.0", "0.6.0"):
+        (repo / "specs/releases" / release).mkdir(parents=True)
+        (repo / "specs/releases" / release / "_RELEASE.json").write_text("{}", encoding="utf-8")
+
+    with pytest.raises(typer.Exit):
+        ci._gate_inputs(repo, "foo")
+
+    assert capsys.readouterr().err.splitlines()[-1] == (
+        f"fix: Agent action: keep one of 0.5.0, 0.6.0 live under {repo / 'specs/releases'};"
+        " ship or move out the others"
+    )
 
 
 def test_heads_constitution_wins_over_the_working_tree(repo: Path) -> None:

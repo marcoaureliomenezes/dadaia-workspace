@@ -355,6 +355,17 @@ def test_a_work_branch_checked_out_in_another_worktree_is_refused_and_left_untou
     assert _heads(bare) == before
 
 
+def test_an_existing_local_work_branch_is_the_one_published(env, tmp_path: Path) -> None:
+    """The repo's one local work-prefix branch is published, whatever its version."""
+    svc, repo, bare = env
+    _seed(bare, tmp_path / "seed", "main", "develop")
+    _clone_onboarded(bare, repo)
+    _git(repo, "branch", "feature/0.3.0", "origin/main")
+
+    assert svc.baseline("proj") == "feature/0.3.0"
+    assert "feature/0.3.0" in _heads(bare) and "feature/0.1.0" not in _heads(bare)
+
+
 def test_a_stale_work_draft_conflict_names_the_anchor_and_never_publishes_the_old_draft(
     env, tmp_path: Path
 ) -> None:

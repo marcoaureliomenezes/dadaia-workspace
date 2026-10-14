@@ -15,7 +15,7 @@ import pytest
 
 from dadaia_workspace.core.cli_line import git_line, shell_line
 from dadaia_workspace.core.skill_owner import load_owner
-from tests.helpers.worktree_ws import JOB, TASK, approve, associate, commit, make_workspace
+from tests.helpers.worktree_ws import JOB, TASK, approve, associate, commit, make_workspace, run_fix
 from tests.helpers.worktree_ws import fixes as _fixes
 from tests.helpers.worktree_ws import git as _git
 from tests.helpers.worktree_ws import run as _run
@@ -96,25 +96,115 @@ def test_new_makes_each_shape_on_its_branch_and_base(root: Path) -> None:
     ]
 
 
-@pytest.mark.parametrize("live_release", [True, False], ids=["live-release", "no-release"])
-def test_a_plain_worktree_uses_the_release_work_branch_or_checked_out_branch(
-    root: Path, live_release: bool
+_NO_RELEASE = (("rm", "-rq", "specs/releases"), ("commit", "-qm", "no release"))
+_RENAMED = (
+    ("checkout", "-q", "feature/0.5.0"),
+    ("commit", "-q", "--allow-empty", "-m", "window"),
+    ("branch", "-m", "feature/0.5.0", "feature/0.6.0"),
+)
+_PROMOTED = (*_NO_RELEASE, ("branch", "-m", "feature/0.5.0", "feature/0.6.0"))
+
+
+@pytest.mark.parametrize(
+    ("steps", "recorded", "base"),
+    [
+        ((), "feature/0.5.0", "feature/0.5.0"),
+        ((*_NO_RELEASE, ("branch", "-D", "feature/0.5.0")), "main", "main"),
+        ((*_RENAMED,), "feature/0.6.0", "feature/0.6.0"),
+        (
+            (("branch", "trunk"), ("checkout", "-q", "trunk"), *_PROMOTED),
+            "feature/0.6.0",
+            "feature/0.6.0",
+        ),
+        ((("checkout", "-q", "--detach"), *_PROMOTED), "feature/0.6.0", "feature/0.6.0"),
+        (
+            (("branch", "dev"), ("checkout", "-q", "dev"), *_PROMOTED),
+            "feature/0.6.0",
+            "feature/0.6.0",
+        ),
+    ],
+    ids=[
+        "live-release",
+        "no-release-no-work-branch",
+        "window-commit-renamed",
+        "trunk",
+        "detached",
+        "dev",
+    ],
+)
+def test_a_plain_worktree_opens_on_the_one_work_branch_else_the_checked_out_branch(
+    root: Path, steps: tuple[tuple[str, ...], ...], recorded: str, base: str
 ) -> None:
     repo = root / "repos/r"
-    if live_release:
-        ahead = _git(repo, "commit-tree", "HEAD^{tree}", "-p", "HEAD", "-m", "work").strip()
-        _git(repo, "branch", "-f", "feature/0.5.0", ahead)
-        expected = ahead
-    else:
-        _git(repo, "rm", "-rq", "specs/releases")
-        _git(repo, "commit", "-qm", "no release")
-        expected = _git(repo, "rev-parse", "HEAD").strip()
+    for step in steps:
+        _git(repo, *step)
 
     opened = _run(root, "new", "r", "maintenance")
 
     assert opened.returncode == 0, opened.stderr
-    assert _git(repo, "rev-parse", "wt/maintenance").strip() == expected
+    assert _git(repo, "config", "branch.wt/maintenance.dadaia-base").strip() == recorded
+    assert _git(repo, "rev-parse", "wt/maintenance") == _git(repo, "rev-parse", base)
     assert (root / "worktrees/r/maintenance").is_dir()
+
+
+@pytest.mark.parametrize(
+    ("steps", "fix", "recorded"),
+    [
+        (
+            (
+                ("branch", "dev"),
+                ("checkout", "-q", "dev"),
+                ("update-ref", "refs/remotes/origin/feature/0.5.0", "main"),
+                ("branch", "-D", "feature/0.5.0"),
+            ),
+            "branch feature/0.5.0 origin/feature/0.5.0",
+            "feature/0.5.0",
+        ),
+        (
+            (
+                *_NO_RELEASE,
+                ("branch", "-D", "feature/0.5.0"),
+                ("branch", "dev"),
+                ("checkout", "-q", "--detach"),
+            ),
+            "branch feature/0.1.0 dev",
+            "feature/0.1.0",
+        ),
+    ],
+    ids=["remote-only", "detached-no-work-branch"],
+)
+def test_a_plain_worktree_refuses_without_a_local_work_branch_and_its_fix_line_opens_it(
+    root: Path, steps: tuple[tuple[str, ...], ...], fix: str, recorded: str
+) -> None:
+    repo = root / "repos/r"
+    for step in steps:
+        _git(repo, *step)
+
+    refused = _run(root, "new", "r", "maintenance")
+
+    assert refused.returncode == 1
+    assert _fixes(refused)[0].endswith(fix)
+    run_fix(root, refused)
+    assert _run(root, "new", "r", "maintenance").returncode == 0
+    assert _git(repo, "config", "branch.wt/maintenance.dadaia-base").strip() == recorded
+
+
+def test_two_work_branches_refuse_with_a_fix_that_strands_no_commit(root: Path) -> None:
+    repo = root / "repos/r"
+    _git(repo, "checkout", "-q", "feature/0.5.0")
+    _git(repo, "commit", "-q", "--allow-empty", "-m", "lower work")
+    _git(repo, "branch", "feature/0.6.0", "main")
+
+    refused = _run(root, "new", "r", "maintenance")
+
+    assert _fixes(refused) == [
+        f"fix: Agent action: merge feature/0.5.0 into feature/0.6.0, then run git -C {repo} branch -d feature/0.5.0"
+    ]
+    _git(repo, "checkout", "-q", "feature/0.6.0")
+    _git(repo, "merge", "-q", "feature/0.5.0")
+    _git(repo, "branch", "-d", "feature/0.5.0")
+    assert _run(root, "new", "r", "maintenance").returncode == 0
+    assert _git(repo, "config", "branch.wt/maintenance.dadaia-base").strip() == "feature/0.6.0"
 
 
 @pytest.mark.parametrize("name", ["0.5.0a-impl", "0.5.0b-release", "0.4.9-rc1/j1", "0.5.0-rc1/J1"])

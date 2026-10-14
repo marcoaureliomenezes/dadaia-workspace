@@ -628,6 +628,26 @@ def test_a_plain_merge_returns_to_its_recorded_base(tmp_path: Path, declared_ver
     assert landed.stdout.splitlines().count("ci job") == int(declared_verify)
 
 
+def test_a_plain_tree_opened_before_the_work_branch_is_renamed_still_merges(tmp_path: Path) -> None:
+    """A recorded work-branch name resolves through the work-branch rule, so the promote's `branch -m` leaves the tree landable."""
+    root = make_workspace(tmp_path)
+    repo = root / "repos/r"
+    git(repo, "checkout", "-q", "feature/0.5.0")
+    assert run(root, "new", "r", "early").returncode == 0
+    tree = root / "worktrees/r/early"
+    head = commit(tree, "src/a.py")
+    approve(root, head)
+    assert git(repo, "config", "branch.wt/early.dadaia-base").strip() == "feature/0.5.0"
+    git(repo, "branch", "-m", "feature/0.5.0", "feature/0.6.0")
+
+    listed = json.loads(run(root, "list", "--json").stdout)
+    landed = run(root, "merge", str(tree))
+
+    assert [t["state"] for t in listed if t["name"] == "early"] == ["ready"]
+    assert landed.returncode == 0, landed.stderr
+    assert git(repo, "rev-parse", "feature/0.6.0").strip() == head
+
+
 def test_a_verdict_citing_a_file_only_the_reviewed_tree_holds_is_accepted(root: Path) -> None:
     """The stub CLI resolves a
     `self_pull` ref as the real `reports validate` does, against `--reviewed-root` only (the repo

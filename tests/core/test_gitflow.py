@@ -7,7 +7,13 @@ from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.core.gitflow import DEFAULT, from_mapping, live_release_id
+from dadaia_workspace.core.gitflow import (
+    DEFAULT,
+    Gitflow,
+    from_mapping,
+    live_release_id,
+    work_branch,
+)
 from dadaia_workspace.core.skill_owner import load_owner
 
 
@@ -128,3 +134,69 @@ def test_the_history_rewrite_rule_scopes_to_the_branches_that_never_rebase() -> 
     ]
     assert [r for r in rows if re.search(rf"\b{r}\b", rule)] == ["work"]
     assert "advances only by PR" in rule
+
+
+def _repo(tmp_path: Path, heads: list[str], live: str | None) -> Path:
+    repo = tmp_path / "r"
+    repo.mkdir()
+    git = load_owner("dd-gitflow-default", "_worktree_git").git
+    git(repo, "init", "-q")
+    git(
+        repo,
+        "-c",
+        "user.name=t",
+        "-c",
+        "user.email=t@t",
+        "commit",
+        "-q",
+        "--allow-empty",
+        "-m",
+        "i",
+    )
+    for head in heads:
+        git(repo, "branch", head)
+    if live:
+        (repo / "specs/releases" / live).mkdir(parents=True)
+        (repo / "specs/releases" / live / "_RELEASE.json").write_text("{}")
+    return repo
+
+
+@pytest.mark.medium
+@pytest.mark.parametrize(
+    ("heads", "live", "name"),
+    [
+        (["feature/0.6.0"], "0.5.0", "feature/0.6.0"),
+        (["feature/0.6.0"], None, "feature/0.6.0"),
+        ([], "0.5.0", "feature/0.5.0"),
+    ],
+    ids=["window", "after-ship", "to-create"],
+)
+def test_the_work_branch_is_the_one_local_branch_else_the_name_to_create(
+    tmp_path: Path, heads: list[str], live: str | None, name: str
+) -> None:
+    repo = _repo(tmp_path, heads, live)
+    assert work_branch(repo, Gitflow("main", "dev", "feature/"), "r") == name
+
+
+@pytest.mark.medium
+def test_several_work_branches_refuse_with_the_skills_fix_line(tmp_path: Path) -> None:
+    repo = _repo(tmp_path, ["feature/0.5.0", "feature/0.6.0"], "0.5.0")
+    git = load_owner("dd-gitflow-default", "_worktree_git").git
+    git(repo, "switch", "-q", "feature/0.5.0")
+    git(
+        repo,
+        "-c",
+        "user.name=t",
+        "-c",
+        "user.email=t@t",
+        "commit",
+        "-q",
+        "--allow-empty",
+        "-m",
+        "lower",
+    )
+    with pytest.raises(load_owner("dd-gitflow-default", "_worktree_names").Refusal) as refused:
+        work_branch(repo, Gitflow("main", "dev", "feature/"), "r")
+    assert refused.value.fix == (
+        f"Agent action: merge feature/0.5.0 into feature/0.6.0, then run git -C {repo} branch -d feature/0.5.0"
+    )
