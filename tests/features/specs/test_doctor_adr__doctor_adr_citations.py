@@ -71,3 +71,15 @@ def test_a_superseded_id_inside_a_fixed_section_is_not_judged(tmp_path: Path) ->
 
     arch.write_text(f"prose cites ADR 0005\n\n{block}", encoding="utf-8")
     assert [i.code for i in superseded_adr_citations(specs, None)] == ["ADR-SUPERSEDED-CITATION"]
+
+
+def test_a_citation_never_spans_a_fixed_section(tmp_path: Path) -> None:
+    """The word ADR before a block and a number after it are two sentences, not a citation."""
+    specs = tmp_path / "specs"
+    _ledger(specs, {"id": "0005", "status": "superseded"})
+    (specs / "memory").mkdir()
+    block = "<!-- dadaia:fixed adr-list -->\n- 0042 — a title\n<!-- /dadaia:fixed adr-list -->\n"
+    (specs / "memory" / "ARCHITECTURE.md").write_text(
+        f"see ADR\n{block}0005 rows\n", encoding="utf-8"
+    )
+    assert superseded_adr_citations(specs, None) == []
