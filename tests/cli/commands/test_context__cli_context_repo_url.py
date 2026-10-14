@@ -142,7 +142,7 @@ def test_empty_url_refusal_ctx_url_1_doctor_flag_and_export_import_clone(
 
 def test_a_bare_associated_slug_with_no_checkout_is_refused(workspace: Path) -> None:
     """A bare associated slug with no URL and no ``repos/a`` is the dead end ``alive`` hits
-    cloning ``''`` — ``repo add`` refuses it with one operator action naming the URL to supply."""
+    cloning ``''`` — ``repo add`` refuses it with one agent action naming the URL to supply."""
     seed_dead_context(workspace, "m", "m", "https://x.test/m.git")
     add = _runner.invoke(app, ["context", "repo", "add", "m", "a"])
     assert add.exit_code == 1, add.output

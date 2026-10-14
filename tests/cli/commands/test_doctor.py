@@ -382,7 +382,7 @@ def _append(path: Path, text: str) -> None:
 
 
 #: error findings no command can repair
-#: (the remedy is the operator's content): each carries an `Operator action:` naming its file.
+#: (the remedy is the operator's content): each carries an `Agent action:` naming its file.
 OPERATOR_ACTION: dict[str, Callable[[Path], None]] = {
     "SPEC-DOC-002": _plant_headingless_memory_document,
     "SPEC-DOC-004": _plant_status_line_gone,
@@ -407,14 +407,14 @@ OPERATOR_ACTION: dict[str, Callable[[Path], None]] = {
 @pytest.mark.parametrize("code", sorted(OPERATOR_ACTION))
 def test_an_operator_action_names_the_file_to_change(code: str, repo: Path) -> None:
     """An unfixable error's fix is one
-    `Operator action:` line naming the finding's own file — never a placeholder."""
+    `Agent action:` line naming the finding's own file — never a placeholder."""
     root = repo
     OPERATOR_ACTION[code](root)
     ledgers = _ledgers_section(None, root / "specs")
     found = [f for f in (*_specs_section(_doctor(root), None).findings, *ledgers.findings) if f.code == code]  # fmt: skip
     assert found, f"{code}: the fixture did not make the rule fire"
     for finding in found:
-        assert finding.fix.startswith("Operator action: "), finding.fix
+        assert finding.fix.startswith("Agent action: "), finding.fix
         assert str(repo) in finding.fix and not re.search(r"<[^<>]+>", finding.fix)
 
 

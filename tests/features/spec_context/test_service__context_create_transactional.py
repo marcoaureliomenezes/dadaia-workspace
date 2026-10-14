@@ -161,7 +161,7 @@ def test_only_a_checkout_of_the_url_is_adopted(ws: Path, tmp_path: Path) -> None
 
 
 def test_refusal_fix_lines_never_repeat_the_failing_command(ws: Path, tmp_path: Path) -> None:
-    """A bad URL fixes to an operator action naming it, an owned slug to
+    """A bad URL fixes to an agent action naming it, an owned slug to
     its owner."""
     bad = tmp_path / "nothere.git"
     code, out = _create("bad", "--main-repo", str(bad))

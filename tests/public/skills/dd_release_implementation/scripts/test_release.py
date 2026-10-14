@@ -169,7 +169,7 @@ _SEVERAL = (
 
 def _fix_several(specs: Path) -> str:
     return (
-        f"Operator action: keep one of 0.5.0, 0.6.0 live under {specs / 'releases'};"
+        f"Agent action: keep one of 0.5.0, 0.6.0 live under {specs / 'releases'};"
         " ship or move out the others"
     )
 
@@ -241,7 +241,7 @@ def test_a_verb_with_no_live_release_hands_new_to_the_operator(
     py = Path(sys.executable).as_posix()
     assert result.returncode == 1
     assert result.stderr.splitlines()[-1] == (
-        f"fix: Operator action: run `{py} {script.as_posix()} new --specs {specs.as_posix()}` "
+        f"fix: Agent action: run `{py} {script.as_posix()} new --specs {specs.as_posix()}` "
         "with the release version you choose"
     )
 
@@ -403,7 +403,7 @@ def test_a_source_file_named_memory_is_not_a_memory_write_set(script: Path, tmp_
     assert result.returncode == 1
     assert "J1.T2" in result.stdout and "J1.T1" not in result.stdout, result.stdout
     [finding] = json.loads(_run(script, "check", "--json", "--specs", str(specs)).stdout)
-    assert finding["fix"].startswith("Operator action:"), finding
+    assert finding["fix"].startswith("Agent action:"), finding
 
 
 def test_check_refuses_a_memory_task_under_definition(script: Path, tmp_path: Path) -> None:
@@ -592,7 +592,7 @@ def test_every_refusal_carries_one_fix_that_is_not_itself_refused(
     assert len(fixes) == 1, result.stderr
     # no `<n>` — the PR number is the operator's act, supplied as it says.
     act = re.fullmatch(
-        r"Operator action: run `(.+)` with --pr set to the promote PR's .+", fixes[0]
+        r"Agent action: run `(.+)` with --pr set to the promote PR's .+", fixes[0]
     )
     command = f"{act[1]} --pr 7" if act else fixes[0]
     assert "<" not in fixes[0] and (act is not None) == (phase == "CLOSURE"), fixes[0]
@@ -1082,9 +1082,9 @@ def test_origin_names_the_right_fix_for_each_cause(script: Path, tmp_path: Path)
 
     assert [r.returncode for r in (unreadable, malformed)] == [1, 1]
     assert unreadable.stderr.splitlines()[-1] == (
-        "fix: Operator action: pass the path of an existing SPEC.md"
+        "fix: Agent action: pass the path of an existing SPEC.md"
     )
-    assert malformed.stderr.splitlines()[-1] == "fix: Operator action: edit its `**Origin:**` line"
+    assert malformed.stderr.splitlines()[-1] == "fix: Agent action: edit its `**Origin:**` line"
 
 
 def test_check_reports_a_histo_record_that_is_not_valid_json(script: Path, tmp_path: Path) -> None:

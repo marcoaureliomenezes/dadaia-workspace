@@ -1,6 +1,6 @@
 """Over random real-state starts (remote unborn / principal only / both, a tag or not, a
 session identity or not), the loop takes the printed step, executes its fix line (the
-``context`` step's operator action is played with a name and the bare remote's URL; the
+``context`` step's agent action is played with a name and the bare remote's URL; the
 ``agent`` step runs a scripted stand-in that fills memory) and asserts the step is no longer
 pending and the printed step's index strictly increases, so the loop ends within
 ``len(STEP_IDS)`` iterations.

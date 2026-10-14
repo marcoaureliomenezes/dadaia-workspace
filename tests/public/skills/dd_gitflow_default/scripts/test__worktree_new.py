@@ -167,7 +167,7 @@ def test_no_work_branch_with_several_live_releases_refuses_as_the_plain_base_doe
     assert result.returncode == 1
     (fix,) = _fixes(result)
     assert fix == (
-        f"fix: Operator action: keep one of 0.10.0, 0.5.0 live under {repo / 'specs/releases'};"
+        f"fix: Agent action: keep one of 0.10.0, 0.5.0 live under {repo / 'specs/releases'};"
         " ship or move out the others"
     )
 
@@ -269,7 +269,7 @@ def test_a_hotfix_job_needs_its_open_bug_record_on_the_work_branch(
     refused = _run(root, "new", "r", "hotfix/a-block-bug")
     assert refused.returncode == 1 and "a-block-bug" in refused.stderr
     assert _fixes(refused) == [
-        "fix: Operator action: register bug a-block-bug on feature/0.5.0 as open"
+        "fix: Agent action: register bug a-block-bug on feature/0.5.0 as open"
         " (dd-bug-registration), then open its hotfix job again"
     ]
     assert not (root / "worktrees/r/hotfix").exists()

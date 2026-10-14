@@ -77,7 +77,7 @@ def test_anything_but_a_directory_at_the_specs_path_is_its_own_kind_and_its_fix_
     """``specs init`` cannot build a tree on a non-directory, so the one fix is the operator's act."""
     specs = tmp_path / "specs"
     make(specs)
-    expected = f"Operator action: move {specs} aside, it is not a directory"
+    expected = f"Agent action: move {specs} aside, it is not a directory"
     assert specs_version.state(specs) == ("file", expected)
     assert specs_version.state(specs, context="demo") == ("file", expected)
 

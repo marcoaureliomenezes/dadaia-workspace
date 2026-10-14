@@ -160,8 +160,8 @@ _REFUSALS = [
     pytest.param("lib", lambda r: (r / "leftover.txt").write_text("x\n"), DeadReviewRequiredError, r"lib[\s\S]*leftover\.txt", id="A16.2-untracked-in-lib"),
     pytest.param("lib", lambda r: (r / "README.md").write_text("edited\n"), DeadReviewRequiredError, r"^Context 'proj': repo 'lib' has 1 uncommitted change\(s\); dead never commits", id="AC3.2-dirty-refusal-names-context-and-repo"),
     pytest.param("lib", _no_remote, DeadUnpushedCommitsError, "lib", id="A16.2-local-commits-no-remote-in-lib"),
-    pytest.param("main", _repos_outside, ContextStateError, rf"skipped 'repos/main' \(outside the workspace\)\nfix: Operator action: free \S+{re.escape(str(Path('/', 'repos', 'main')))} for the move", id="AC2.11-hold-refused"),
-    pytest.param("lib", _url_less, RepoUrlMissingError, r"fix: Operator action: add the clone URL of \S+[\\/]repos[\\/]lib as its origin remote", id="url-less-never-clone-back"),
+    pytest.param("main", _repos_outside, ContextStateError, rf"skipped 'repos/main' \(outside the workspace\)\nfix: Agent action: free \S+{re.escape(str(Path('/', 'repos', 'main')))} for the move", id="AC2.11-hold-refused"),
+    pytest.param("lib", _url_less, RepoUrlMissingError, r"fix: Agent action: add the clone URL of \S+[\\/]repos[\\/]lib as its origin remote", id="url-less-never-clone-back"),
 ]  # fmt: skip
 
 
@@ -269,7 +269,7 @@ def test_alive_refuses_a_legacy_url_less_missing_repo_with_a_fix_line(tmp_path: 
         service.alive("proj")
 
     # the operator's clone, which alive then adopts, its origin back-filled
-    clone = f"Operator action: clone the 'lib' repository into {repo.parent / 'lib'}"
+    clone = f"Agent action: clone the 'lib' repository into {repo.parent / 'lib'}"
     assert str(refused.value).endswith(f"fix: {clone}")
     assert store.get("proj").state == ContextState.DEAD  # type: ignore[union-attr]
 
@@ -290,7 +290,7 @@ def test_dead_refuses_a_dirty_checkout_with_one_fix_line_naming_every_file(tmp_p
 
     fixes = [line for line in str(refused.value).splitlines() if line.startswith("fix: ")]
     assert fixes == [
-        f"fix: Operator action: move {lib / 'README.md'}, {lib / 'new.txt'} into a worktree, or discard it",
+        f"fix: Agent action: move {lib / 'README.md'}, {lib / 'new.txt'} into a worktree, or discard it",
     ]
     assert (lib / "README.md").read_text() == "edited\n" and (lib / "new.txt").is_file()
     assert (
@@ -326,7 +326,7 @@ def test_an_oserror_in_the_hold_loop_refuses_with_a_fix_line(
     again = fix_line(tmp_path / "ws", "context", "dead", "proj")
     assert str(refused.value) == (
         "Context 'proj' stays ALIVE: skipped 'repos/main' (errno 13: Permission denied)\n"
-        f"fix: Operator action: free {repo} for the move, then run `{again}`"
+        f"fix: Agent action: free {repo} for the move, then run `{again}`"
     )
     assert (repo / ".git").is_dir()
     assert store.get("proj").state is ContextState.ALIVE  # type: ignore[union-attr]

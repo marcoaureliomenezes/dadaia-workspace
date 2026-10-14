@@ -5,7 +5,7 @@ Each case below builds the triggering state over ``file://`` remotes and hits th
 a push-gate case feeds the ref lines git hands its hook to an in-process
 ``ci push-gate-check`` (80 columns, no TTY); a baseline/alive/dead case runs the real
 command as a child process. It takes the single ``fix:`` line and runs it with ``sh -c`` —
-an ``Operator action:`` line is played by the case's *operator* instead — and runs the real
+an ``Agent action:`` or ``Operator action:`` line is played by the case's *operator* instead — and runs the real
 command (the real push through the shipped hook) again. One line without a TTY — every
 family prints through ``cli/_fail.fail`` — is proven on a real child by
 :func:`test_every_fix_line_prints_on_one_line_without_a_tty`. Progress rule:
@@ -260,7 +260,7 @@ def _single_fix(done: subprocess.CompletedProcess[str]) -> str:
 class Case:
     """*build* plants the refusal and returns the command that hits it (argv, or a shell
     line run in the repo); *operator* is the documented human step the refusal text asks
-    for before its fix (an edit), or the act an ``Operator action:`` fix names; *then* replaces the re-run when the fix renames what the
+    for before its fix (an edit), or the act an action fix names; *then* replaces the re-run when the fix renames what the
     refused command named; *done* asserts the published end state."""
 
     build: Callable[[World], list[str] | str]
@@ -315,7 +315,7 @@ def _drive(world: World, case: Case) -> None:
         fix = _single_fix(done)
         assert fix not in seen, f"no progress — the same fix line again:\n{fix}"
         seen.append(fix)
-        act = fix.startswith("Operator action: ")
+        act = fix.startswith(("Agent action: ", "Operator action: "))
         if case.operator is not None and (act or step == 0):
             case.operator(world)
         assert "<" not in fix.replace("<<", ""), f"a placeholder: {fix}"
@@ -841,7 +841,7 @@ SITES: dict[str, tuple[Case | tuple[Case, ...] | Skip, ...]] = {
             Case(_outside_with_work, _work_carries_topic, then=_MERGE_TOPIC),
             Case(_outside_detached, _work_carries_topic, then="git push -q origin feature/0.1.0"),
         ),
-        Skip("an Operator action on the git host: the PR is no command to run"),
+        Skip("an Agent action on the git host: the PR is no command to run"),
     ),
     "branch_policy.check_branch_policy": (
         Case(_mismatch, _work_pushed, then="git push -q origin feature/1.0.0"),
@@ -1002,7 +1002,7 @@ def test_a_denylisted_tag_from_a_detached_head_on_an_empty_origin_prints_no_comm
     world: World,
 ) -> None:
     """The range reaches a root commit and the ref is a tag — the refusal
-    names the operator action, prints no command, and the repo stays a repo."""
+    names the agent action, prints no command, and the repo stays a repo."""
     world.clone()
     world.deny()
     world.commit("README.md", "r\n")
@@ -1011,7 +1011,7 @@ def test_a_denylisted_tag_from_a_detached_head_on_an_empty_origin_prints_no_comm
     world.git(world.repo, "checkout", "-q", "--detach", "v0.0.1")
     done = _hit(world, "git push -q origin v0.0.1")
     output = done.stdout + done.stderr
-    assert done.returncode != 0 and "\nfix: Operator action: " in output
+    assert done.returncode != 0 and "\nfix: Agent action: " in output
     assert world.git(world.repo, "rev-parse", "HEAD") == world.git(
         world.repo, "rev-parse", "v0.0.1"
     )

@@ -40,7 +40,7 @@ def test_an_agent_write_to_a_judging_projection_is_blocked_with_one_fix_line(
     reason = _verdict(_workspace(tmp_path, monkeypatch), tool, rel)
 
     assert reason is not None
-    assert sum(line.startswith(("fix:", "Operator action:")) for line in reason.splitlines()) == 1
+    assert sum(line.startswith(("fix:", "Agent action:")) for line in reason.splitlines()) == 1
 
 
 @pytest.mark.small

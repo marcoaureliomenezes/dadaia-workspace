@@ -85,7 +85,7 @@ def test_a_non_directory_at_the_specs_dir_is_one_finding_and_moving_it_aside_cle
     sections = json.loads(run.output)["sections"]
     found = [f for section in sections.values() for f in section["findings"]]
     assert [(f["code"], f["fix"]) for f in found] == [
-        ("SPECS-ABSENT", f"Operator action: move {specs} aside, it is not a directory")
+        ("SPECS-ABSENT", f"Agent action: move {specs} aside, it is not a directory")
     ], run.output
     assert run.exit_code == 1
     specs.rename(no_instance / "moved-aside")

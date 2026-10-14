@@ -191,7 +191,7 @@ def test_an_unresolved_measured_by_refuses_the_regeneration_and_writes_nothing(
 
     assert len(refused) == 1 and "0001" in refused[0].message
     assert refused[0].fix == (
-        "Operator action: set the measured_by of ADR 0001 to a tracked path, a path::name test or"
+        "Agent action: set the measured_by of ADR 0001 to a tracked path, a path::name test or"
         " workflow-job id, or a rule code (an in-place `chore(adrs): repair` commit)."
     )
     doctor.fix()

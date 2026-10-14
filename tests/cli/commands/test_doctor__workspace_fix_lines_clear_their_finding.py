@@ -85,7 +85,7 @@ _LEDGER_ROWS = [
 def test_an_invalid_ledger_line_is_one_operator_action(
     tmp_path: Path, code: str, rel: str, committed: str, bad: str, where: int | str
 ) -> None:
-    """An invalid line is ONE finding whose fix is an `Operator action:` naming the
+    """An invalid line is ONE finding whose fix is an `Agent action:` naming the
     file, where in it, and the ledger's law; uncommitted content is discarded, else the
     commit that introduced it is reverted — never a hand edit."""
     subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)  # noqa: S603, S607
@@ -99,7 +99,7 @@ def test_an_invalid_ledger_line_is_one_operator_action(
     found = _findings_before(tmp_path, "--specs-dir", "specs")
     (fix,) = [f["fix"] for f in found if f["code"] == code]
     path = ledger.resolve()
-    assert fix.startswith("Operator action: ") and "AGENTS.md" in fix, fix
+    assert fix.startswith("Agent action: ") and "AGENTS.md" in fix, fix
     assert "<" not in fix and "by hand" not in fix, fix
     if "audits" in rel:  # a bound session writes findings directly: the governed act
         assert f"line 1 of {path} " in fix, fix
@@ -149,7 +149,7 @@ def test_a_caused_by_cycle_is_an_operator_decision(tmp_path: Path) -> None:
         {**_RECORD, "caused_by": "b-bug"},
         {**_RECORD, "id": "b-bug", "caused_by": "a-bug"},
     )
-    assert fix.startswith("Operator action: decide which of a-bug, b-bug ") and "update" in fix
+    assert fix.startswith("Agent action: decide which of a-bug, b-bug ") and "update" in fix
     assert "caused_by=none" not in fix and "<" not in fix and "AGENTS.md" in fix, fix
 
 
@@ -208,7 +208,7 @@ def _plant_long_skill(ws: Path) -> str:
     return "SKILL-MD-LENGTH"
 
 
-#: Every code this module proves: cleared by its printed fix, or an operator action .
+#: Every code this module proves: cleared by its printed fix, or an agent action .
 WORKSPACE_PLANTS = {
     **dict.fromkeys(code for code, *_ in _LEDGER_ROWS),
     "WS-ENTRY": _plant_root_slop,  # the fixable sub-rule
@@ -233,12 +233,12 @@ def test_a_workspace_finding_is_cleared_by_its_printed_fix(tmp_path: Path, plant
 @pytest.mark.skipif(sys.platform == "win32", reason="the stub CLI is a POSIX shell script")
 def test_a_long_skill_md_is_a_warning_naming_its_file(tmp_path: Path) -> None:
     """The real doctor run prints one non-error SKILL-MD-LENGTH whose
-    `Operator action:` names the projected SKILL.md."""
+    `Agent action:` names the projected SKILL.md."""
     ws = _workspace(tmp_path)
     code = _plant_long_skill(ws)
     [found] = [f for f in _findings_before(ws) if f["code"] == code]
     assert found["verdict"] == "warning"
-    assert found["fix"].startswith(f"Operator action: split {ws}/.agents/skills/long/SKILL.md ")
+    assert found["fix"].startswith(f"Agent action: split {ws}/.agents/skills/long/SKILL.md ")
 
 
 @pytest.mark.skipif(sys.platform == "win32", reason="the stub CLI is a POSIX shell script")

@@ -116,7 +116,7 @@ def test_a_git_failure_no_check_named_ends_as_one_refusal(root: Path) -> None:
     assert refused.returncode == 1 and "Traceback" not in refused.stderr
     assert "[error]" in refused.stderr
     [fix] = fixes(refused)
-    assert fix.startswith("fix: Operator action: clear the git failure above, then rerun ")
+    assert fix.startswith("fix: Agent action: clear the git failure above, then rerun ")
     assert fix.endswith(f"worktree.py merge {TREE}")  # the rerun as given, never `list`
 
 
@@ -128,7 +128,7 @@ def test_a_dirty_tree_refuses_with_one_fix_that_commits_or_removes(root: Path) -
     git(tree, "add", "specs/releases/0.5.0/rc-1/SPEC.md")
     dirty = run(root, "merge", TREE)
     assert "uncommitted" in dirty.stderr
-    add, then, *remove = fixes(dirty)[0].split("`")[1::2]  # Operator action: commit or remove
+    add, then, *remove = fixes(dirty)[0].split("`")[1::2]  # Agent action: commit or remove
     assert [add, then] == [  # the commit takes its own message
         git_line(tree, "add", "-A"),
         git_line(tree, "commit"),
@@ -153,7 +153,7 @@ def test_a_define_tree_lands_specs_only_through_the_ledger_checks(root: Path) ->
     commit(tree, "RED-job", "")  # a file the job gate would fail on: never run here
     code = run(root, "merge", str(tree))
     assert "RED-job is code" in code.stderr
-    restore, then = fixes(code)[0].split("`")[1::2]  # Operator action: restore, commit
+    restore, then = fixes(code)[0].split("`")[1::2]  # Agent action: restore, commit
     subprocess.run(restore, shell=True, check=True)  # noqa: S602 — runs as printed
     assert then == git_line(tree, "commit")
     git(tree, "commit", "-qm", "revert: RED-job")
@@ -239,7 +239,7 @@ def test_failed_fast_forward_tells_a_stray_from_a_moved_work_branch(root: Path) 
     )  # untracked in repos/r: the fast-forward would clobber it
     stray = run(root, "merge", TREE)
     assert "src/a.py" in stray.stderr and fixes(stray) == [
-        f"fix: Operator action: commit or remove the paths above in {repo}"
+        f"fix: Agent action: commit or remove the paths above in {repo}"
     ]
     (repo / "src/a.py").unlink()
     # a sibling lands while the verdict is read
@@ -411,7 +411,7 @@ def test_the_job_gate_runs_scripts_ci_job_as_argv_on_the_head_it_lands(
     assert (result.returncode, tree.exists()) == ((1, True) if red else (0, False))
     if red:
         act, line, where = fixes(result)[0].split("`")
-        assert act == "fix: Operator action: make "
+        assert act == "fix: Agent action: make "
         assert shlex.split(line) == [
             "python",
             "scripts/ci.py",
@@ -489,7 +489,7 @@ def test_a_job_gate_reads_the_work_branch_verify_line_not_its_own(
     tail = (" and commit it on feature/0.5.0" if not declared else
             " on feature/0.5.0 one argv list that starts: it runs without a shell"
             " — no VAR=value prefix, no sh -c")  # fmt: skip
-    assert fixes(refused) == [f"fix: Operator action: {act} {agents}{tail}"]
+    assert fixes(refused) == [f"fix: Agent action: {act} {agents}{tail}"]
     commit(repo, "AGENTS.md", good)
     git(tree, "rebase", "-q", "feature/0.5.0")
     approve(root, git(tree, "rev-parse", "HEAD").strip(), at="T11:00:00Z")
@@ -697,5 +697,5 @@ def test_an_unbalanced_quote_in_a_declared_line_is_one_refusal_with_one_fix(tmp_
     with pytest.raises(end.Refusal) as refused:
         end._declared_argv(tmp_path, "work", "verify:")
 
-    assert refused.value.fix.startswith("Operator action: ")
+    assert refused.value.fix.startswith("Agent action: ")
     assert "\n" not in refused.value.fix

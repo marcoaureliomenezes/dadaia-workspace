@@ -448,7 +448,7 @@ def _fix(done: subprocess.CompletedProcess[str]) -> str:
 class Case:
     """*build* plants the refusal and returns the command that hits it (argv, or a shell
     line run in the repo); *operator* is the documented human step the refusal text asks
-    for before its fix (an edit), or the act an ``Operator action:`` fix names; *then* replaces the re-run when the fix renames what the
+    for before its fix (an edit), or the act an action fix names; *then* replaces the re-run when the fix renames what the
     refused command named; *done* asserts the published end state."""
 
     build: Callable[[World], list[str] | str]
@@ -1027,7 +1027,7 @@ _REFUSALS: dict[str, tuple[Case | tuple[Case, ...] | Skip, ...]] = {
             Case(_outside_with_work, _work_carries_topic, then=_MERGE_TOPIC),
             Case(_outside_detached, _work_carries_topic, then="git push -q origin feature/0.1.0"),
         ),
-        Skip("an Operator action on the git host: the PR is no command to run"),
+        Skip("an Agent action on the git host: the PR is no command to run"),
     ),
     "branch_policy.check_branch_policy": (
         Case(_mismatch, _work_pushed, then="git push -q origin feature/1.0.0"),
@@ -1354,12 +1354,12 @@ def _clears(
 
 
 def _operator_action(ws: Path, code: str) -> str:
-    """Every finding of *code* is one `Operator action:` naming a file under the tree."""
+    """Every finding of *code* is one `Agent action:` naming a file under the tree."""
     root = _specs_tree(ws, OPERATOR_ACTION[code])
     found = [f for f in _findings(root, "specs", "ledgers") if f["code"] == code]
     assert found, f"{code}: the fixture did not make the rule fire"
     for finding in found:
-        assert finding["fix"].startswith("Operator action: ") and str(root) in finding["fix"]
+        assert finding["fix"].startswith("Agent action: ") and str(root) in finding["fix"]
     return f"fix: {found[0]['fix']}"
 
 
@@ -1413,7 +1413,7 @@ SITES |= {
 
 # ── doctor-workspace: the workspace and ledger findings' fix lines ──────────────────
 # A producer plants a finding and reads it from ``doctor --json``. A command fix runs from
-# ``repos/alpha`` and the real doctor drops the finding; an operator action names file and law.
+# ``repos/alpha`` and the real doctor drops the finding; an agent action names file and law.
 
 _WS_UNSET = (*_UNSET, "CLAUDE_CODE_SESSION_ID")
 _ENTRY = {"id": "a-entry", "title": "a", "opened": "2026-10-02", "status": "idea",
@@ -1485,7 +1485,7 @@ def _ledger_tree(ws: Path, rel: str, committed: str, bad: str) -> Path:
 
 
 def _ledger(ws: Path, code: str) -> str:
-    """Every invalid-ledger row of *code* is ONE `Operator action:` naming the file, where in
+    """Every invalid-ledger row of *code* is ONE `Agent action:` naming the file, where in
     it and the ledger's law: uncommitted content is discarded, else the introducing commit is
     reverted, never a hand edit."""
     first = ""
@@ -1495,7 +1495,7 @@ def _ledger(ws: Path, code: str) -> str:
         tree = _ledger_tree(ws, rel, committed, bad)
         (fix,) = [f["fix"] for f in _doctor(tree, "--specs-dir", "specs") if f["code"] == code]
         path = (tree / rel).resolve()
-        assert fix.startswith("Operator action: ") and "AGENTS.md" in fix, fix
+        assert fix.startswith("Agent action: ") and "AGENTS.md" in fix, fix
         assert "<" not in fix and "by hand" not in fix, fix
         if "audits" in rel:  # a bound session writes findings directly: the governed act
             assert f"line 1 of {path} " in fix, fix
@@ -1546,7 +1546,7 @@ def test_a_caused_by_cycle_is_an_operator_decision(workspace: Path) -> None:
         {**_RECORD, "caused_by": "b-bug"},
         {**_RECORD, "id": "b-bug", "caused_by": "a-bug"},
     )
-    assert fix.startswith("Operator action: decide which of a-bug, b-bug ") and "update" in fix
+    assert fix.startswith("Agent action: decide which of a-bug, b-bug ") and "update" in fix
     assert "caused_by=none" not in fix and "<" not in fix and "AGENTS.md" in fix, fix
 
 
@@ -1599,7 +1599,7 @@ def _plant_long_skill(root: Path) -> str:
 
 
 #: Every workspace-doctor code the home proves: cleared by its printed fix (a plant), or an
-#: operator action (``None``: a ledger row, or the long SKILL.md).
+#: agent action (``None``: a ledger row, or the long SKILL.md).
 WORKSPACE_PLANTS = {
     **dict.fromkeys(code for code, *_ in _LEDGER_ROWS),
     "WS-ENTRY": _plant_root_slop,
@@ -1620,12 +1620,12 @@ def _workspace_clears(ws: Path, plant: Callable[[Path], str]) -> str:
 
 
 def _long_skill(ws: Path) -> str:
-    """A long SKILL.md is one non-error finding whose `Operator action:` names that file."""
+    """A long SKILL.md is one non-error finding whose `Agent action:` names that file."""
     root = _initialized(ws)
     code = _plant_long_skill(root)
     [found] = [f for f in _doctor(root) if f["code"] == code]
     assert found["verdict"] == "warning"
-    assert found["fix"].startswith(f"Operator action: split {root}/.agents/skills/long/SKILL.md ")
+    assert found["fix"].startswith(f"Agent action: split {root}/.agents/skills/long/SKILL.md ")
     return f"fix: {found['fix']}"
 
 
@@ -1841,7 +1841,7 @@ def test_a_denylisted_tag_from_a_detached_head_on_an_empty_origin_prints_no_comm
     world: World,
 ) -> None:
     """The range reaches a root commit and the ref is a tag — the refusal
-    names the operator action, prints no command, and the repo stays a repo."""
+    names the agent action, prints no command, and the repo stays a repo."""
     world.clone()
     world.deny()
     world.commit("README.md", "r\n")
@@ -1850,7 +1850,7 @@ def test_a_denylisted_tag_from_a_detached_head_on_an_empty_origin_prints_no_comm
     world.git(world.repo, "checkout", "-q", "--detach", "tagged")
     done = _hit(world, "git push -q origin tagged")
     output = done.stdout + done.stderr
-    assert done.returncode != 0 and "\nfix: Operator action: " in output
+    assert done.returncode != 0 and "\nfix: Agent action: " in output
     assert world.git(world.repo, "rev-parse", "HEAD") == world.git(
         world.repo, "rev-parse", "tagged"
     )
@@ -1941,7 +1941,7 @@ def test_the_real_doctor_prints_every_fix_as_one_whole_runnable_line(tmp_path: P
     fixes = [line for line in lines if line.startswith("fix: ")]
     assert fixes, run.stdout
     for fix in fixes:
-        if the_fix(fix).startswith("Operator action: "):  # it names the file
+        if the_fix(fix).startswith(_ACT_LABELS):  # it names the file
             assert re.search(r"\s(/|\w:[\\/])\S", fix), fix
     # a wrapped fix would leave a continuation line that is neither a finding nor a `fix:` line
     assert [ln for ln in lines if ln and not re.match(r"(fix: |[A-Z][A-Za-z0-9-]+ )", ln)] == []

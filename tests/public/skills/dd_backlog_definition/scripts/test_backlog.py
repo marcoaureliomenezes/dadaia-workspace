@@ -296,7 +296,7 @@ def test_a_release_that_is_not_one_folder_name_is_refused(
     )  # fmt: skip
     assert done.returncode == 1
     [fix] = _fix_lines(done)
-    assert fix.startswith("fix: Operator action: pass --release with the release folder")
+    assert fix.startswith("fix: Agent action: pass --release with the release folder")
     assert len(_active(specs)) == 1
     assert _histo(specs) == []
 
@@ -337,7 +337,7 @@ def test_the_refusal_fix_names_the_flag_release_not_another_picking_one(
     )  # fmt: skip
     [fix] = _fix_lines(done)
     assert fix == (
-        "fix: Operator action: name an-idea in the backlog: clause of the first **Origin:** line "
+        "fix: Agent action: name an-idea in the backlog: clause of the first **Origin:** line "
         f"of a SPEC under {specs / 'releases/9.9.9'}, then rerun this exit with --disposition delivered."
     )
     assert "0.9.0" not in fix and "0.10.0" not in fix
@@ -374,7 +374,7 @@ def test_rejected_requires_a_reason(script: Path, tmp_path: Path) -> None:
     done = _run(script, "exit", "an-idea", "--specs", str(specs), "--disposition", "rejected")
     assert done.returncode == 1
     [fix] = _fix_lines(done)
-    assert fix.startswith("fix: Operator action:") and "--disposition rejected" in fix
+    assert fix.startswith("fix: Agent action:") and "--disposition rejected" in fix
     assert len(_active(specs)) == 1
     ok = _run(
         script, "exit", "an-idea", "--specs", str(specs),
@@ -408,7 +408,7 @@ def test_each_refusal_fix_keeps_the_chosen_disposition(
     assert done.returncode == 1
     [fix] = _fix_lines(done)
     assert "delivered" not in fix and "<" not in fix
-    if fix.startswith("fix: Operator action:"):
+    if fix.startswith("fix: Agent action:"):
         assert f"--disposition {disposition}" in fix
         assert ("bugs.py append" in fix) == (disposition == "to-bug")
         assert _histo(specs) == []
@@ -427,7 +427,7 @@ def test_a_deferred_exit_is_refused_and_the_entry_stays_live(script: Path, tmp_p
     done = _run(script, "exit", "an-idea", "--specs", str(specs), "--disposition", "deferred")
     assert done.returncode == 1
     assert _fix_lines(done) == [
-        "fix: Operator action: a postponed item stays in active[] and needs no exit."
+        "fix: Agent action: a postponed item stays in active[] and needs no exit."
     ]
     assert len(_active(specs)) == 1
     assert _histo(specs) == []

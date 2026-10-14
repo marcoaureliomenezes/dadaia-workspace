@@ -170,7 +170,7 @@ def test_an_atom_the_operator_filled_but_for_one_token_is_reported_and_kept(
     assert is_placeholder_atom(atom) is False
     [flagged] = [i for i in _doctor(specs).check() if i.code == "MEM-PLACEHOLDER-1"]
     assert flagged.fixable is False
-    assert flagged.fix == f"Operator action: replace the token in slug of {atom}"
+    assert flagged.fix == f"Agent action: replace the token in slug of {atom}"
 
     _doctor(specs).fix()
     assert atom.exists()

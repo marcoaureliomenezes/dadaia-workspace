@@ -90,7 +90,7 @@ def test_a_job_passes_and_fails_with_an_open_task_and_with_a_red_verify(root: Pa
     assert fix.endswith(f" merge {task}")
     assert run(root, "clean", str(task)).returncode == 0
     commit(job, "RED-job", "")
-    _fail(root, job, "verify: exited 1", f"Operator action: {RED_VERIFY.format(tree=job)}")
+    _fail(root, job, "verify: exited 1", f"Agent action: {RED_VERIFY.format(tree=job)}")
 
 
 def test_a_define_tree_passes_without_a_verify_run_and_fails_a_red_ledger_check(root: Path) -> None:
@@ -103,7 +103,7 @@ def test_a_define_tree_passes_without_a_verify_run_and_fails_a_red_ledger_check(
     commit(define, "specs/bugs/BUGS.jsonl", '{"id": "half"}\n')
     ledger = define / "specs/bugs/BUGS.jsonl"
     fix = (
-        f"Operator action: line 1 of {ledger} was not written by `bugs.py append` or "
+        f"Agent action: line 1 of {ledger} was not written by `bugs.py append` or "
         "`bugs.py update` (specs/bugs/AGENTS.md: never hand-edit BUGS.jsonl) — if "
         f"{ledger} has uncommitted changes, discard them (`{git_line(ledger.parent, 'checkout', '--', ledger.name)}`); "
         "otherwise revert the commit that introduced it "
@@ -120,7 +120,7 @@ def test_a_backlog_tree_fails_a_path_outside_specs(root: Path) -> None:
         root,
         tree,
         "src/a.py is code; a define or backlog tree lands specs/ only — code lands through a job",
-        f"Operator action: revert src/a.py to {BRANCH} in one commit — "
+        f"Agent action: revert src/a.py to {BRANCH} in one commit — "
         f"`{git_line(tree, 'restore', '-s', BRANCH, '-SW', '--', 'src/a.py')}` and `{git_line(tree, 'commit')}`",
     )
 
@@ -128,7 +128,7 @@ def test_a_backlog_tree_fails_a_path_outside_specs(root: Path) -> None:
 def test_a_reconcile_tree_fails_a_red_verify_as_a_job_tree_does(root: Path) -> None:
     tree = _tree(root, "0.5.0-rc1/reconcile")
     commit(tree, "RED-job", "")
-    _fail(root, tree, "verify: exited 1", f"Operator action: {RED_VERIFY.format(tree=tree)}")
+    _fail(root, tree, "verify: exited 1", f"Agent action: {RED_VERIFY.format(tree=tree)}")
 
 
 def test_a_plain_tree_passes_with_no_verify_line_and_fails_dirty(root: Path) -> None:
@@ -141,7 +141,7 @@ def test_a_plain_tree_passes_with_no_verify_line_and_fails_dirty(root: Path) -> 
     (tree / "wip").write_text("x")
     add, commit_ = git_line(tree, "add", "-A"), git_line(tree, "commit")
     fix = (
-        f"Operator action: commit them in their commit shape (`{add}` and `{commit_}`) or remove"
+        f"Agent action: commit them in their commit shape (`{add}` and `{commit_}`) or remove"
         f" them (`{git_line(tree, 'clean', '-fd')}` and `{git_line(tree, 'restore', '-SW', '.')}`)"
         " — never a stash every worktree shares"
     )
@@ -153,7 +153,7 @@ def test_a_hotfix_tree_fails_a_red_verify(root: Path) -> None:
     commit(repo, "specs/bugs/BUGS.jsonl", '{"id": "a-block-bug", "status": "open"}\n')
     tree = _tree(root, "hotfix/a-block-bug")
     commit(tree, "RED-job", "")
-    _fail(root, tree, "verify: exited 1", f"Operator action: {RED_VERIFY.format(tree=tree)}")
+    _fail(root, tree, "verify: exited 1", f"Agent action: {RED_VERIFY.format(tree=tree)}")
 
 
 def test_merge_on_a_passing_tree_without_a_verdict_refuses_only_with_the_verdict_message(

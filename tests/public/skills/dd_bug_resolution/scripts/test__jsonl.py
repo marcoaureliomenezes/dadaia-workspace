@@ -60,6 +60,6 @@ def test_a_denylist_that_is_not_utf8_is_rewritten_not_restored_from_git(tmp_path
     assert done.returncode == 1
     assert done.stderr == (
         f"[error] privacy denylist {denylist} is not one JSON object\n"
-        f"fix: Operator action: rewrite {denylist} as one JSON object mapping each term to "
+        f"fix: Agent action: rewrite {denylist} as one JSON object mapping each term to "
         "its reason\n"
     )

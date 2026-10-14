@@ -75,13 +75,13 @@ def _release_findings(specs: Path) -> tuple[list[dict[str, Any]], list[str]]:
 
 def test_a_mis_cased_phase_is_one_finding_whose_fix_clears_it(tmp_path: Path) -> None:
     """Phase 'closure' yields exactly one
-    finding, whose fix is `Operator action:` naming the file, the keys its message names and the law;
+    finding, whose fix is `Agent action:` naming the file, the keys its message names and the law;
     the repair clears it."""
     state = _live_release(tmp_path / "specs", phase="closure")
     named, _ = _release_findings(tmp_path / "specs")
     assert len(named) == 1 and named[0]["code"] == "LEDGER-RELEASE-SCHEMA", named
     assert named[0]["fix"].startswith(
-        f"Operator action: {state.resolve()} fails at the keys this finding names "
+        f"Agent action: {state.resolve()} fails at the keys this finding names "
     ), named
     log = git_line(state.resolve().parent, "log", "-p", "--", state.name)
     assert f"`{log}`" in named[0]["fix"], named

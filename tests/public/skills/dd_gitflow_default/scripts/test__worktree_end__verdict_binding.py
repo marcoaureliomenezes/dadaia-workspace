@@ -60,7 +60,7 @@ def _hand(root: Path, scope_sha: str, **fields: str) -> None:
 
 def _refusal(root: Path, result: subprocess.CompletedProcess[str], kind: str, head: str) -> None:
     """The merge refused with exactly the one `fix:` line of *kind*, and nothing landed."""
-    dispatch = (f"fix: Operator action: dispatch dd-code-reviewer on {root / TREE} at HEAD {head};"
+    dispatch = (f"fix: Agent action: dispatch dd-code-reviewer on {root / TREE} at HEAD {head};"
                 " its verdict.py run writes the verdict")  # fmt: skip
     validate = [str(cli_path(root)), "reports", "validate", "--all"]
     got = fixes(result)

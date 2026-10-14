@@ -651,5 +651,5 @@ def test_a_venv_without_its_python_is_refused_with_the_delete_fix_on_every_run(
         with pytest.raises(python_env_module.WorkspaceVenvBootstrapError) as exc:
             call("a b")
         assert exc.value.fix == (
-            'Operator action: delete "a b/.dadaia/.venv" and run `uvx dadaia-workspace init "a b"`'
+            'Agent action: delete "a b/.dadaia/.venv" and run `uvx dadaia-workspace init "a b"`'
         )

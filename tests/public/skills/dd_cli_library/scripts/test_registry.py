@@ -256,7 +256,7 @@ def test_the_delete_fix_quotes_a_path_holding_a_blank(tmp_path: Path) -> None:
     _refused(
         _run(reg, "list"),
         f"{reg} is not valid UTF-8",
-        f"Operator action: delete {load_owner('dd-bug-resolution', '_platform').quote(str(reg))} — the next registry.py run starts an empty registry",
+        f"Agent action: delete {load_owner('dd-bug-resolution', '_platform').quote(str(reg))} — the next registry.py run starts an empty registry",
     )
 
 
@@ -266,32 +266,32 @@ def test_every_registry_refusal_prints_one_error_line_and_one_fix_line(tmp_path:
     _refused(
         _run(reg, "register", "--port", "3100", "--project", "other"),
         "port 3100 is registered by project 'demo' (http://localhost:3100)",
-        "Operator action: pick another port with registry.py next, then rerun",
+        "Agent action: pick another port with registry.py next, then rerun",
     )
     _refused(
         _run(reg, "release"),
         "provide --port and/or --project",
-        "Operator action: pass --port and/or --project, then rerun",
+        "Agent action: pass --port and/or --project, then rerun",
     )
     _refused(
         _run(reg, "release", "--port", "3999"),
         "port 3999 is not registered",
-        "Operator action: run registry.py list to see the registered ports, then rerun",
+        "Agent action: run registry.py list to see the registered ports, then rerun",
     )
     _refused(
         _run(reg, "next", "--project", "z", "--min-port", "3100", "--max-port", "3100"),
         "no free ports in [3100, 3100]",
-        "Operator action: run registry.py clean, then rerun",
+        "Agent action: run registry.py clean, then rerun",
     )
     (lonely := tmp_path / "lonely").mkdir()
     _refused(
         _run_in(lonely, "list"),
         "no workspace sentinel above the cwd",
-        "Operator action: rerun with --registry and a registry file path, or from inside a workspace",
+        "Agent action: rerun with --registry and a registry file path, or from inside a workspace",
     )
     reg.write_bytes(b"\xff")
     _refused(
         _run(reg, "list"),
         f"{reg} is not valid UTF-8",
-        f"Operator action: delete {reg} — the next registry.py run starts an empty registry",
+        f"Agent action: delete {reg} — the next registry.py run starts an empty registry",
     )

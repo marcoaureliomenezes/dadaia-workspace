@@ -141,7 +141,7 @@ def test_a_bad_stdin_is_refused_and_writes_nothing(
     refused = _verdict(root, tree, sha=head, stdin=stdin)
     assert refused.returncode == 1, why
     assert refused.stderr == (
-        f"[error] {message}\nfix: Operator action: pipe one JSON object without the keys"
+        f"[error] {message}\nfix: Agent action: pipe one JSON object without the keys"
         " verdict.py owns, then rerun verdict.py\n"
     ), why
     assert _written(root) == []
@@ -207,7 +207,7 @@ def test_a_bad_context_or_slug_is_refused_by_name_and_writes_nothing_anywhere(
     assert refused.returncode == 1
     assert refused.stderr.startswith(f"[error] {name} must match ")
     assert refused.stderr.endswith(
-        f"\nfix: Operator action: pass a {name[2:]} matching that pattern, then rerun verdict.py\n"
+        f"\nfix: Agent action: pass a {name[2:]} matching that pattern, then rerun verdict.py\n"
     )
     assert "Traceback" not in refused.stderr
     assert _tree_files(tmp_path) == before
@@ -230,7 +230,7 @@ def test_a_non_object_json_is_refused_with_text_and_no_traceback(
     refused = _verdict(root, tree, sha=head, stdin=stdin)
     assert refused.returncode == 1
     assert refused.stderr == (
-        "[error] stdin is not a JSON object\nfix: Operator action: pipe one JSON object"
+        "[error] stdin is not a JSON object\nfix: Agent action: pipe one JSON object"
         " without the keys verdict.py owns, then rerun verdict.py\n"
     )
     assert _written(root) == []
@@ -250,7 +250,7 @@ def test_a_verdict_in_a_second_already_taken_never_overwrites_the_first(tmp_path
     refused = _verdict(root, tree, sha=head)
     assert refused.returncode == 1
     assert refused.stderr.startswith("[error] ") and refused.stderr.endswith(
-        "exists; rerun in a second\nfix: Operator action: rerun verdict.py in a second\n"
+        "exists; rerun in a second\nfix: Agent action: rerun verdict.py in a second\n"
     )
     assert [p.read_text() for p in taken] == ["first"] * len(taken)
     assert set(_written(root)) == set(taken)
@@ -363,7 +363,7 @@ def _real_validator(root: Path, tmp_path: Path) -> Path:
 
 
 _FINDING = {"severity": "LOW", "message": "m", "detail_md": "d", "fix_recommendation": "f"}
-_FIX = "fix: Operator action: correct {} in the stdin body ({}), then rerun verdict.py"
+_FIX = "fix: Agent action: correct {} in the stdin body ({}), then rerun verdict.py"
 _REFUSED = [
     pytest.param(
         {"findings": [{"severity": "LOW", "message": "m", "detail_md": "d"}]},
@@ -448,7 +448,7 @@ def test_a_cli_crash_without_json_or_fix_line_is_refused_with_one_operator_actio
     refused = _verdict(root, tree, sha=head)
     assert refused.returncode == 1
     assert refused.stderr == (
-        "[error] boom\nfix: Operator action: resolve the workspace CLI error above,"
+        "[error] boom\nfix: Agent action: resolve the workspace CLI error above,"
         " then rerun verdict.py\n"
     )
     assert _written(root) == []
@@ -466,7 +466,7 @@ def test_stats_outside_a_workspace_is_refused_with_one_fix_line(tmp_path: Path) 
     )
     assert refused.returncode == 1
     assert refused.stderr == (
-        "[error] no workspace above the current directory\nfix: Operator action: run"
+        "[error] no workspace above the current directory\nfix: Agent action: run"
         " verdict.py stats from inside the workspace, then rerun it\n"
     )
 

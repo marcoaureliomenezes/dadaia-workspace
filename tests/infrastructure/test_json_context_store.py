@@ -203,7 +203,7 @@ def test_a_row_missing_name_is_unreadable_at_every_method(
     ) as refused:
         call(JsonContextStore(tmp_path))
     keys = "name, repo_slug, repo_url, created_at"
-    assert refused.value.fix == f"Operator action: add {keys} to that row of {path}"
+    assert refused.value.fix == f"Agent action: add {keys} to that row of {path}"
     assert path.read_text(encoding="utf-8") == body
 
 

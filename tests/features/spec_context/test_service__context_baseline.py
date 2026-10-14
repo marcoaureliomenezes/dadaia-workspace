@@ -295,7 +295,7 @@ def test_an_origin_without_the_principal_refuses_and_publishes_nothing(env, tmp_
     assert _git(repo, "branch", "--show-current") == "feature/0.1.0"
     assert _git(repo, "for-each-ref", "--format=%(refname:short)", "refs/heads") == "feature/0.1.0"
     anchor = _git(repo, "rev-parse", "HEAD")
-    assert anchor in str(refused.value) and "Operator action: choose the principal" in str(
+    assert anchor in str(refused.value) and "Agent action: choose the principal" in str(
         refused.value
     )
 
@@ -426,9 +426,7 @@ def test_a_tool_commit_never_falls_back_to_a_tool_identity(tmp_path: Path, monke
     _git(tmp_path, "init", "-q", str(repo))
     (repo / "a.md").write_text("a\n", encoding="utf-8")
     client = GitSubprocessClient()
-    assert (
-        client.identity_fix(repo) == f"Operator action: set git user.name in the config of {repo}"
-    )
+    assert client.identity_fix(repo) == f"Agent action: set git user.name in the config of {repo}"
     with pytest.raises(GitSyncError):
         client.commit_paths(repo, "c", ["a.md"])
 

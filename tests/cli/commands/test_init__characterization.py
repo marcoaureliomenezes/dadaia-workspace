@@ -30,7 +30,7 @@ def test_init_creates_the_literal_level_one_state(tmp_path: Path) -> None:
             f"CLI: {cli}\n"
             "Sessions launch at the workspace root.\n"
             "Next (command step context): no ALIVE Spec Context — create one\n"
-            f"fix: Operator action: run {cli_word} context create with a context name and "
+            f"fix: Agent action: run {cli_word} context create with a context name and "
             "--main-repo set to the main repo's clone URL\n"
         )
         if PLATFORM.windows
@@ -40,7 +40,7 @@ def test_init_creates_the_literal_level_one_state(tmp_path: Path) -> None:
             f"CLI: {cli}\n"
             "Sessions launch at the workspace root.\n"
             "Next (command step context): no ALIVE Spec Context — create one\n"
-            f"fix: Operator action: run {cli_word} context create with a context name and "
+            f"fix: Agent action: run {cli_word} context create with a context name and "
             "--main-repo set to the main repo's clone URL\n"
         )
     )

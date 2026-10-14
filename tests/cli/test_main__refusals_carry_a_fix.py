@@ -268,7 +268,7 @@ def test_refusal_prints_error_then_exactly_one_fix(
         link = cwd / "link"
         assert (
             lines[-1]
-            == f"fix: Operator action: point --specs-dir at the real directory, not the link {link}"
+            == f"fix: Agent action: point --specs-dir at the real directory, not the link {link}"
         )
         assert not (cwd / "link").resolve().joinpath("constitution.md").exists()
 
@@ -283,7 +283,7 @@ def test_specs_init_on_a_non_directory_refuses_with_the_move_aside_fix_and_leave
     code = _run(argv)
     lines = _assert_one_fix(capsys, code)
     assert lines[0] == "Error: nothing written"
-    assert lines[-1] == f"fix: Operator action: move {cwd / 'specs'} aside, it is not a directory"
+    assert lines[-1] == f"fix: Agent action: move {cwd / 'specs'} aside, it is not a directory"
     if kind == "fifo":
         assert stat.S_ISFIFO((cwd / "specs").lstat().st_mode)
     else:

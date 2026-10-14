@@ -61,7 +61,7 @@ def test_a_missing_specs_tree_names_no_fenced_workspace_cli(ws: Path) -> None:
     refused = _fenced(ws, "bugs.py", "status")
     assert refused.returncode == 1
     assert [x for x in refused.stderr.splitlines() if x.startswith("fix: ")] == [
-        "fix: Operator action: re-run inside a repo that holds its specs/ tree"
+        "fix: Agent action: re-run inside a repo that holds its specs/ tree"
     ]
 
 

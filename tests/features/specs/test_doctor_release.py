@@ -122,6 +122,6 @@ def test_a_legacy_next_dir_is_not_live_and_new_refuses(tmp_path: Path) -> None:
     assert not (specs / "releases" / "0.6.0").exists()
     [fix] = [f["fix"] for f in _check(specs) if f["path"] == "releases/next"]  # tree8-and-027
     move = f"{(specs / 'releases/next').resolve()} into its canon shape (a bare M.m.p id)"
-    assert fix == f"Operator action: move {move}, or out of specs/"
+    assert fix == f"Agent action: move {move}, or out of specs/"
     assert resolve_active_release(specs) == (None, None)
     assert any("/next/" in i.message for i in SpecsDoctor(specs).check() if i.code == "TREE-8")

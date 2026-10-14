@@ -88,7 +88,7 @@ def test_the_printed_fix_line_succeeds_once_the_url_is_reachable(
     fixes = [ln for ln in failed.output.splitlines() if ln.startswith("fix: ")]
     create = fix_line(workspace, "context", "create", "--main-repo", str(bare))
     assert fixes == [
-        f"fix: Operator action: run `{create}` with a reachable clone URL in place of {bare}"
+        f"fix: Agent action: run `{create}` with a reachable clone URL in place of {bare}"
     ]
     assert not (workspace / "repos" / "app").exists()
 
@@ -111,7 +111,7 @@ def test_init_without_repo_closes_with_the_law_and_the_next_step(tmp_path: Path)
     closing = lines[-3:]
     assert closing[0] == _LAW
     assert closing[1].startswith("Next (")
-    assert closing[2].startswith(f"fix: Operator action: run {fix_line(ws, 'context', 'create')}")
+    assert closing[2].startswith(f"fix: Agent action: run {fix_line(ws, 'context', 'create')}")
     assert _LAW not in "\n".join(lines[:-3])
 
 

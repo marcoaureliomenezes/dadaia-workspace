@@ -362,7 +362,7 @@ def test_check_refuses_each_trio_row(
     assert (done.returncode, len(errors)) == ((1, 1) if needle else (0, 0))
     for error in errors:
         assert needle in error["message"]
-        assert error["fix"].startswith(("fix: ", "Operator action: ")) and "\n" not in error["fix"]
+        assert error["fix"].startswith(("fix: ", "Agent action: ")) and "\n" not in error["fix"]
 
 
 @pytest.mark.parametrize(
@@ -376,9 +376,7 @@ def test_phase_implementation_refuses_a_plan_without_a_dag(
 ) -> None:
     """The PLAN carries one dependency DAG; its refusal has one fix line."""
     result = _phase(script, _specs(tmp_path, plan))
-    fixes = [
-        ln for ln in result.stderr.splitlines() if ln.startswith(("fix: ", "Operator action: "))
-    ]
+    fixes = [ln for ln in result.stderr.splitlines() if ln.startswith(("fix: ", "Agent action: "))]
     assert (result.returncode, needle in result.stderr, len(fixes)) == (1, True, 1)
 
 

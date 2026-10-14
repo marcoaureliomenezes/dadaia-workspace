@@ -443,7 +443,7 @@ def test_skill_md_over_the_soft_limit_warns(tmp_path: Path, line: bytes) -> None
         False,
         False,
         f"fixture-longer/SKILL.md has {soft + 1} lines > soft limit {soft}",
-        f"Operator action: split {skill_md} into its references/*.md and/or scripts/",
+        f"Agent action: split {skill_md} into its references/*.md and/or scripts/",
     )
 
 

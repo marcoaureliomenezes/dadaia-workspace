@@ -61,7 +61,7 @@ def _every_doctor_rule() -> list[tuple[str, doctor_rules.Rule[Any]]]:
     return [("/".join(rule.codes), rule) for rule in rules]
 
 
-#: Every doctor rule's fix on a `specs` tree (a ledger's operator action is proven in
+#: Every doctor rule's fix on a `specs` tree (a ledger's agent action is proven in
 #: test_workspace_fix_lines_clear_their_finding).
 _FIX_LINES = [
     (codes, doctor_rules.rule_fix(rule, Path(), Path("specs")))
@@ -486,8 +486,8 @@ def test_the_scans_bite() -> None:
         'identity_fix = ".dadaia/.venv/bin/dadaia doctor"\n'
         'def make_fix():\n    return "finish the task by hand"\n'
         'raise Refusal("m", "git fetch origin then git push origin")\n'
-        'W = "fix: Operator action: run `bugs.py resolve|supersede` on it"\n'
-        'OK = "fix: Operator action: open the PR"\n'
+        'W = "fix: Agent action: run `bugs.py resolve|supersede` on it"\n'
+        'OK = "fix: Agent action: open the PR"\n'
         'raise Refusal("m", "git push origin")\n'
         'raise Refusal("m", shlex.join(["git", "diff", "--", a, b]))\n'
         'raise Refusal("m", "git -C " + shlex.quote(r) + " status")\n'

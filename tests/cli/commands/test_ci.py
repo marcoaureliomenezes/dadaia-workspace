@@ -235,7 +235,7 @@ def test_a_malformed_privacy_baseline_fails_the_gate_closed_with_one_fix_line(
 
     def unreadable():
         raise load_owner("dd-bug-resolution", "_refusal").Refusal(
-            "privacy baseline is unreadable", "Operator action: reinstall the workspace"
+            "privacy baseline is unreadable", "Agent action: reinstall the workspace"
         )
 
     monkeypatch.setattr(privacy_check, "load_baseline", unreadable)
@@ -251,5 +251,5 @@ def test_a_malformed_privacy_baseline_fails_the_gate_closed_with_one_fix_line(
     assert "defect" not in err
     assert "privacy baseline is unreadable" in err
     assert [ln for ln in err.splitlines() if ln.startswith("fix:")] == [
-        "fix: Operator action: reinstall the workspace"
+        "fix: Agent action: reinstall the workspace"
     ]

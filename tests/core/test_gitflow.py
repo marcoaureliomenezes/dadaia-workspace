@@ -46,7 +46,7 @@ def test_the_sole_live_release_is_the_kernels_and_several_refuse_there(tmp_path:
         "multiple live release directories carry _RELEASE.json: 0.5.0, 0.6.0 — exactly one is allowed"
     )
     assert caught.value.fix == (
-        f"Operator action: keep one of 0.5.0, 0.6.0 live under {tmp_path / 'releases'};"
+        f"Agent action: keep one of 0.5.0, 0.6.0 live under {tmp_path / 'releases'};"
         " ship or move out the others"
     )
     assert live_release_id(tmp_path) is None

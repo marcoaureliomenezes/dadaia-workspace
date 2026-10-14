@@ -90,8 +90,8 @@ id, else `DADAIA_CONTEXT`, never the cwd: sitting inside a repository is not a b
 
 `doctor` is the one instance validator; three sections run in fixed order —
 `workspace`, `specs`, `ledgers`. Every finding prints as one `<CODE> <verdict>
-<message>` line, every error-class finding carries one fix line (a command, or
-`Operator action: <one act>`), and any
+<message>` line, every error-class finding carries one fix line (a command, an
+`Agent action: <one act>`, or an `Operator action: <one act>` for what only the human may do), and any
 error-class finding exits 1. There is no score: the findings and the exit code are the
 run. `--fix` moves slop to `.dadaia/reaped/`; a TTL expiry acts by zone class, an OUTPUT
 entry held, an EPHEMERAL one deleted.

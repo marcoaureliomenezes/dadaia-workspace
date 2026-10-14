@@ -2,7 +2,7 @@
 
 The doctor reports a VENV-* finding when the workspace venv is missing or its ``dadaia``
 entrypoint is absent / non-executable. A healthy synthetic tree reports nothing, and every
-VENV-* finding is non-fixable (rebuilding a venv is an operator action).
+VENV-* finding is non-fixable (rebuilding a venv is an agent action).
 
 All fixtures are SYNTHETIC trees (mkdir/touch/chmod) — NEVER a real venv build
 (quality-assurance memory law: building real venvs in tests exhausts disk).
@@ -91,4 +91,4 @@ def test_venv_health_matrix(tmp_path: Path, case: str, setup, expect_finding: bo
     setup(tmp_path)
     venv = [i for i in _make_doctor(tmp_path).check() if i.code.startswith("VENV")]
     assert bool(venv) is expect_finding
-    assert not any(i.fixable for i in venv)  # rebuilding a venv is an operator action
+    assert not any(i.fixable for i in venv)  # rebuilding a venv is an agent action
