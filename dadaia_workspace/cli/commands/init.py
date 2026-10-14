@@ -191,7 +191,8 @@ def _reconcile_upgrade(root: Path, before: str | None, after: str | None) -> Non
             fix_line(root, "reconcile", "--expect-version", after or ""),
         )
     container.build_spec_context_service(root).refresh_hooks()
-    console.print(f"upgraded {before} -> {after}", markup=False, highlight=False)
+    line = f"upgraded {before} -> {after}" if before else f"repaired -> {after}"
+    console.print(line, markup=False, highlight=False)
 
 
 def _create_context(root: Path, plan: InitPlan) -> str:
