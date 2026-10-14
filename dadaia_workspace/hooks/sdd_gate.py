@@ -24,6 +24,17 @@ _HOOK_WIRING = frozenset(
 )
 
 
+def law_set(root: Path) -> tuple[frozenset[str], tuple[str, ...]]:
+    """What the gate classes PROTECTED in the workspace *root*: the projected paths (the install
+    ledger is the law set, plus the hook wiring and the ledger itself) and the operator's
+    ``[protected]`` globs."""
+    states = root / ".dadaia" / "states"
+    ledger = JsonInstallLedgerStore().read(states)
+    projected = frozenset(e.relpath for e in ledger.entries) if ledger else frozenset()
+    projected |= _HOOK_WIRING | {JsonInstallLedgerStore.path(states).relative_to(root).as_posix()}
+    return projected, workspace_layout.operator_globs(root)[1]
+
+
 def _evaluate_target(workspace: Path | None, raw_path: str) -> tuple[gate_policy.Decision, str]:
     """``(ALLOW, "")`` or ``(BLOCK, reason)`` for one target."""
     fpath = Path(raw_path)
@@ -46,17 +57,12 @@ def _evaluate_target(workspace: Path | None, raw_path: str) -> tuple[gate_policy
     except (ValueError, OSError):
         rel_path = fpath.as_posix()
 
-    states = effective_workspace / ".dadaia" / "states"  # the install ledger is the law set
-    ledger = JsonInstallLedgerStore().read(states)
-    projected = frozenset(e.relpath for e in ledger.entries) if ledger else frozenset()
-    projected |= _HOOK_WIRING | {
-        JsonInstallLedgerStore.path(states).relative_to(effective_workspace).as_posix()
-    }
+    projected, protected = law_set(effective_workspace)
     return gate_policy.evaluate(
         rel_path,
         root=effective_workspace,
         projected=projected,
-        protected=workspace_layout.operator_globs(effective_workspace)[1],
+        protected=protected,
         zone=zone,
         repo=repo,
         owner=owner,
