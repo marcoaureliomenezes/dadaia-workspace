@@ -5,6 +5,7 @@ tmp copy.
 
 from __future__ import annotations
 
+import shlex
 import shutil
 import subprocess
 import sys
@@ -17,10 +18,11 @@ _PROBE = "import sys; sys.path.insert(0, sys.argv[1]); import _ledger, _refusal\
 
 
 def _run(
-    tmp_path: Path, body: str, env: dict[str, str] | None = None, damage: str = ""
+    tmp_path: Path, body: str, env: dict[str, str] | None = None, damage: str = "", home: str = ""
 ) -> subprocess.CompletedProcess[str]:
-    """*body* run over a tmp copy of the kernel, whose file *damage* first holds bytes that are not UTF-8."""
-    kernel = tmp_path / "dd-bug-resolution" / "scripts"
+    """*body* run over a tmp copy of the kernel under *home*, whose file *damage* first holds
+    bytes that are not UTF-8."""
+    kernel = tmp_path / home / "dd-bug-resolution" / "scripts"
     shutil.copytree(_KERNEL, kernel, ignore=shutil.ignore_patterns("__pycache__"))
     if damage:
         (kernel / damage).write_bytes(b"\xff\xfe")
@@ -40,6 +42,20 @@ def test_a_schema_that_is_not_utf8_is_reinstalled_not_restored_from_git(tmp_path
     assert done.stdout == (
         "Operator action: restore bug-record-v1.schema.json by re-running the workspace "
         "install (uvx dadaia-workspace init)\n"
+    )
+
+
+def test_a_schema_of_the_installed_package_is_reinstalled_by_pip(tmp_path: Path) -> None:
+    body = (
+        "try:\n    _ledger.load_schema('bug-record-v1')\n"
+        "except _refusal.Refusal as refusal:\n    print(refusal.fix)\n"
+    )
+    done = _run(tmp_path, body, damage="schemas/bug-record-v1.schema.json",
+                home="site-packages/dadaia_workspace/public/skills")  # fmt: skip
+
+    assert done.stdout == (
+        "Operator action: restore bug-record-v1.schema.json by running "
+        f"`{shlex.quote(sys.executable)} -m pip install --force-reinstall dadaia-workspace`\n"
     )
 
 

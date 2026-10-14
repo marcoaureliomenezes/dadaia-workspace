@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import ast
 import re
 import shlex
+import sys
 from pathlib import Path, PurePosixPath, PureWindowsPath
 
 import pytest
@@ -56,21 +58,28 @@ def test_no_workspace_names_the_cli_of_the_running_venv(monkeypatch: pytest.Monk
 
 
 def test_the_kernel_spells_the_fix_line_and_the_reinstall_act() -> None:
+    pip = cli_line.shell_line(sys.executable, "-m", "pip", "install", "--force-reinstall", "dadaia-workspace")  # fmt: skip
     assert cli_line.spell_fix("do it") == "fix: do it"
-    assert cli_line.reinstall_fix("a.md") == (
-        "Operator action: restore a.md by re-running the workspace install "
-        "(uvx dadaia-workspace init)"
-    )
+    assert cli_line.reinstall_fix("a.md") == f"Operator action: restore a.md by running `{pip}`"
 
 
-def test_no_printer_outside_the_kernel_spells_a_fix_line_by_hand() -> None:
+def test_no_string_outside_the_kernel_spells_a_fix_line_by_hand() -> None:
     package = Path(cli_line.__file__).resolve().parents[1]
-    spelled = re.compile(r'\\nfix: |f?"fix: |fix: \{')
-    hits = [
-        f"{path.relative_to(package)}:{n}"
-        for path in package.rglob("*.py")
-        if path.name not in {"_refusal.py", "hook_wrappers.py"}  # the kernel; a shell script's text
-        for n, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1)
-        if spelled.search(line)
-    ]
+    spelled = re.compile(r"(?<![\w-])fix:")
+    hits: list[str] = []
+    for path in package.rglob("*.py"):
+        if path.name == "_refusal.py":  # the kernel
+            continue
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        docs = {id(n.body[0].value) for n in ast.walk(tree)
+                if isinstance(n, ast.Module | ast.FunctionDef | ast.ClassDef) and n.body
+                and isinstance(n.body[0], ast.Expr)}  # fmt: skip
+        hits += [
+            f"{path.relative_to(package)}:{n.lineno}"
+            for n in ast.walk(tree)
+            if isinstance(n, ast.Constant)
+            and isinstance(n.value, str)
+            and id(n) not in docs
+            and spelled.search(n.value)
+        ]
     assert hits == []
