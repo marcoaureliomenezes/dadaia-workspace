@@ -120,10 +120,8 @@ class MemoryValidator:
                 Severity.ERROR,
                 f"{path.relative_to(self.specs_dir).as_posix()} keeps a template token in {fields}",
                 str(path),
-                fixable=is_placeholder_atom(path),
-                fix=""
-                if is_placeholder_atom(path)
-                else f"Operator action: replace the token in {fields} of {path}",
+                fixable=(only := is_placeholder_atom(path)),
+                fix="" if only else f"Operator action: replace the token in {fields} of {path}",
             )
             for path in sorted(mem_dir.rglob("*.md"))
             if (fields := ", ".join(_token_fields(path)))
