@@ -48,6 +48,7 @@ def test_ensure_workspace_venv_raises_actionable_error(tmp_path: Path, monkeypat
 
     monkeypatch.setattr(pe.subprocess, "run", _boom)
     mgr = pe.VenvPythonEnvironmentManager()
+    monkeypatch.setattr(mgr, "_assert_child_interpreter_version", lambda root: None)
     with pytest.raises(pe.WorkspaceVenvBootstrapError) as exc:
         _REAL_ENSURE(mgr, str(tmp_path))
     assert "DADAIA_BOOTSTRAP_PACKAGE" in str(exc.value)
