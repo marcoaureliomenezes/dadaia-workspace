@@ -710,13 +710,13 @@ def tests_mirror_the_package(tree: Tree) -> list[str]:
             if name.startswith("test_") and "Owner:" not in tree.read(p):
                 out.append(
                     f"no-owner: {p} names no `Owner:`. "
-                    "Agent action: add an `Owner: <agent>` docstring line"
+                    f"Agent action: add an `Owner: dd-sw-engineer-sr` docstring line to {p}"
                 )
         elif name != "__init__.py" and _mirror_key(p[len("tests/") :]) not in sources:
             out.append(
                 f"loose-test: {p} mirrors no module. "
-                "Agent action: git mv it to tests/<package path>/"
-                "test_<module>.py, or under tests/fixtures/ when it tests the suite itself"
+                f"Agent action: git mv {p} under the tests/ folder that mirrors the module it tests, "
+                "or under tests/fixtures/ when it tests the suite itself"
             )
     live = [p for p in paths if p.rsplit("/", 1)[-1].startswith("test_")]
     dirs = {p.rsplit("/", 1)[0] for p in paths if p.endswith("/__init__.py") and p.count("/") > 1}
