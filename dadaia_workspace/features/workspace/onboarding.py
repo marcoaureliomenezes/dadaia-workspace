@@ -26,7 +26,6 @@ from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 
 CODE = "ONBOARDING"
 Kind = Literal["command", "agent"]
-_SKILL = Path(".agents", "skills", "dd-audit-project", "SKILL.md")
 _STUBS = ("ARCHITECTURE.md", "QUALITY.md")
 
 
@@ -98,7 +97,9 @@ STEPS: tuple[tuple[str, Kind, _Pending, Callable[[_Ctx], str]], ...] = (
         "first-pass",
         "agent",
         lambda c: f"'{c.name}' memory holds no audited content" if _first_pass(c) else None,
-        lambda c: f"Agent action: {c.root / _SKILL} §first pass — {', '.join(_first_pass(c))}",
+        lambda c: (
+            f"Agent action: run the dd-audit-project skill's first pass — {', '.join(_first_pass(c))}"
+        ),
     ),
     (
         "publish",
