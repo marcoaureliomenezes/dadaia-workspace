@@ -37,13 +37,47 @@ def _read_or_empty(path: Path) -> str:
         return ""  # never flag, never delete on uncertainty
 
 
-def is_placeholder_atom(path: Path) -> bool:
-    """True when *path* is an atom whose frontmatter carries a template token as a field value;
-    a mention in prose or a fixed section, and a top-level canon file, never is."""
+#: The non-token lines of the template atoms older scaffolds shipped; a file made of these and
+#: token lines holds no operator content.
+_TEMPLATE_LINES = frozenset(
+    {
+        "---",
+        "tags:",
+        "- feature",
+        "category: product",
+        "token_estimate: 0",
+        'last_updated: "2026-01-01"',
+        "summary: Describe the current behavior, boundaries, and operational contract.",
+        "## Current behavior",
+        "Document the shipped product truth here.",
+        "## Boundaries",
+        "Document exclusions and failure behavior here.",
+        "tldr: Uma frase descrevendo o que esta feature faz.",
+        "summary: Uma a duas frases expandindo o tldr.",
+        "## Propósito",
+        "Placeholder — documentar o propósito desta feature aqui.",
+    }
+)
+
+
+def _token_fields(path: Path) -> list[str]:
+    """The frontmatter fields of *path* whose value is a template token; a mention in prose or
+    a fixed section, and a top-level canon file, hold none."""
     if path.name in TOPLEVEL_MEMORY_FILES:
-        return False
+        return []
     fm, _body, _problem = memory_canon.parse_atom(_read_or_empty(path))
-    return any(value in _PLACEHOLDER_TOKENS for value in (fm or {}).values())
+    return [key for key, value in (fm or {}).items() if value in _PLACEHOLDER_TOKENS]
+
+
+def is_placeholder_atom(path: Path) -> bool:
+    """True when *path* carries a template token field and every other line is template text:
+    no operator content, so removing it loses nothing."""
+    return bool(_token_fields(path)) and all(
+        (line := raw.strip()) in _TEMPLATE_LINES
+        or not line
+        or any(token in line for token in _PLACEHOLDER_TOKENS)
+        for raw in _read_or_empty(path).splitlines()
+    )
 
 
 def _has_heading(path: Path) -> bool:
@@ -75,7 +109,8 @@ class MemoryValidator:
         self.specs_dir = specs_dir
 
     def check_placeholder_atoms(self) -> list[SectionFinding]:
-        """MEM-PLACEHOLDER-1: unfilled placeholder atoms; fixable by removing them."""
+        """MEM-PLACEHOLDER-1: atoms with a template token field; fixable by removing them only
+        when nothing but the template is in them."""
         mem_dir = self.specs_dir / "memory"
         if not mem_dir.is_dir():
             return []
@@ -83,13 +118,15 @@ class MemoryValidator:
             specs_finding(
                 "MEM-PLACEHOLDER-1",
                 Severity.ERROR,
-                f"{path.relative_to(self.specs_dir).as_posix()} is an unfilled placeholder atom (template "
-                "markers never replaced) — remove it or fill it with real content",
+                f"{path.relative_to(self.specs_dir).as_posix()} keeps a template token in {fields}",
                 str(path),
-                fixable=True,
+                fixable=is_placeholder_atom(path),
+                fix=""
+                if is_placeholder_atom(path)
+                else f"Operator action: replace the token in {fields} of {path}",
             )
             for path in sorted(mem_dir.rglob("*.md"))
-            if is_placeholder_atom(path)
+            if (fields := ", ".join(_token_fields(path)))
         ]
 
     def fix_placeholder_atom(self, issue: SectionFinding) -> None:
