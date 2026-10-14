@@ -74,8 +74,12 @@ def next_candidate(release_dir: Path) -> Path:
 
 def live_release_id(specs_dir: Path) -> str | None:
     """The id of the ONE live release, ``None`` with none or several."""
-    live = _grammar.live_ids(specs_dir)
-    return live[0] if len(live) == 1 else None
+    live: str | None
+    try:
+        live = _grammar.sole_live(specs_dir)
+    except load_owner("dd-bug-resolution", "_refusal").Refusal:
+        live = None
+    return live
 
 
 def resolve_live_candidate(specs_dir: Path) -> Path | None:

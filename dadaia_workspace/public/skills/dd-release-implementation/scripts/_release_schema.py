@@ -12,15 +12,7 @@ from typing import Any
 
 import _git
 import _jsonl
-from _grammar import (
-    STATE,
-    STATUS_RE,
-    TASK_ID_RE,
-    SeveralLive,
-    candidate_dir,
-    candidate_number,
-    sole_live,
-)
+from _grammar import STATE, STATUS_RE, TASK_ID_RE, candidate_dir, candidate_number, sole_live
 from _ledger import load_schema
 
 CODE = "LEDGER-RELEASE-SCHEMA"
@@ -63,12 +55,7 @@ def live_id(specs: Path) -> str:
     from _specs import choice, script  # the entry point's bootstrap resolves it
 
     release = script(Path(__file__).resolve().parent / "release.py")
-    try:
-        live = sole_live(specs)
-    except SeveralLive as several:
-        raise UnreadableRelease(f"multiple live release directories carry {STATE}: {', '.join(several.args[0])} — "
-                         "the release-candidates model allows exactly one", f"{release} check") from several  # fmt: skip
-    if live is None:
+    if (live := sole_live(specs)) is None:
         raise choice(UnreadableRelease("no live release under specs/releases/ — nothing to operate on",
                                 f"{release} new"), "with the release version you choose")  # fmt: skip
     return live

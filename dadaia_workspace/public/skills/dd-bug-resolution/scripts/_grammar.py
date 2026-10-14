@@ -7,6 +7,8 @@ import re
 from collections.abc import Iterable
 from pathlib import Path
 
+from _refusal import Refusal
+
 STATE = "_RELEASE.json"
 SEMVER_RE = re.compile(r"^\d+\.\d+\.\d+$")
 #: A candidate folder; the live one is the highest N.
@@ -33,15 +35,12 @@ def candidate_dir(release_dir: Path) -> Path | None:
     return release_dir / f"rc-{n}" if n else None
 
 
-class SeveralLive(ValueError):
-    """More than one release is live; ``args[0]`` is their sorted ids."""
-
-
 def sole_live(specs: Path) -> str | None:
-    """The one live release id, ``None`` when none is live; raises :class:`SeveralLive` when several are."""
+    """The one live release id, ``None`` when none is live; :class:`Refusal` when several are."""
     ids = live_ids(specs)
     if len(ids) > 1:
-        raise SeveralLive(ids)
+        raise Refusal(f"multiple live release directories carry {STATE}: {', '.join(ids)} — exactly one is allowed",
+                      f"Operator action: keep one of {', '.join(ids)} live under {specs / 'releases'}; ship or move out the others")  # fmt: skip
     return ids[0] if ids else None
 
 
