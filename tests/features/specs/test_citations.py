@@ -108,3 +108,20 @@ def test_the_markdown_walk_skips_symlinks(tmp_path: Path) -> None:
     (memory / "planted.md").symlink_to(tmp_path / "outside" / "planted.md")
 
     assert memory_citation_violations(memory, repo_root=repo_root, command_paths=_TREE) == []
+
+
+def test_a_dead_token_inside_a_fixed_section_is_not_judged(tmp_path: Path) -> None:
+    """Generated block text is the fragment's, judged by FIXED-2; the same token in prose still counts."""
+    memory = tmp_path / "specs" / "memory"
+    memory.mkdir(parents=True)
+    (memory / "thing.md").write_text(
+        "# A\n\n<!-- dadaia:fixed adr-list -->\n"
+        "- `dadaia_workspace/features/gone.py` `dadaia fixture-verb`\n"
+        "<!-- /dadaia:fixed adr-list -->\n\n"
+        "Run `dadaia fixture-verb`.\n",
+        encoding="utf-8",
+    )
+
+    violations = memory_citation_violations(memory, repo_root=tmp_path, command_paths=_TREE)
+
+    assert [v.split(" `")[0] for _, v in violations] == ["specs/memory/thing.md:7: dead verb"]
