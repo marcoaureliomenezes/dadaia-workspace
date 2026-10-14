@@ -172,6 +172,14 @@ def test_check_refuses_a_caused_by_cycle_or_dangling_target(
     ("J1.T3", 0),
     ("J1.S2.T3", 0),  # historical task ids stay readable
     ("J9.S9.T9", 1),  # in no tasks/<job>.md
+    ("T-050-95", 0),  # a closed rc's bold checklist item
+    ("T-047-58", 0),  # its plain checklist item
+    ("T-045-01", 0),  # its table cell
+    ("T-050-03A", 0),  # its bold lettered table cell
+    ("T-999-1", 1),  # in no row
+    ("JB.S4.T2", 0),  # a lettered table cell
+    ("JR.S1.T1", 0),  # a lettered checklist item
+    ("T-777-7", 1),  # only on a wrapped prose line
 ])  # fmt: skip
 def test_check_resolves_a_job_task_id_against_the_rc_tasks_folder(
     script: Path, tmp_path: Path, caused_by: str, code: int
@@ -180,7 +188,11 @@ def test_check_resolves_a_job_task_id_against_the_rc_tasks_folder(
     job = specs / "releases" / "0.5.0" / "rc-9" / "tasks" / "job1.md"
     job.parent.mkdir(parents=True)
     job.write_text(
-        "| J1.T3 | AC1.1 | `ci.py` |\n| J1.S2.T3 | AC1.1 | `old.py` |\n", encoding="utf-8"
+        "| J1.T3 | AC1.1 | `ci.py` |\n| J1.S2.T3 | AC1.1 | `old.py` |\n"
+        "- [x] **T-050-95 — worktree new.** `W:` `wt.py`\n- [x] T-047-58 — vocabulary.\n"
+        "| T-045-01 | FR1 |\n| **T-050-03A** | FR1 |\n"
+        "| JB.S4.T2 | AC |\n- [ ] **JR.S1.T1** — x\n  T-777-7 wraps the line above.\n",
+        encoding="utf-8",
     )
     done = _run(script, "check", "--specs", str(specs), "--json")
     assert done.returncode == code, done.stdout
