@@ -83,3 +83,14 @@ def test_a_citation_never_spans_a_fixed_section(tmp_path: Path) -> None:
         f"see ADR\n{block}0005 rows\n", encoding="utf-8"
     )
     assert superseded_adr_citations(specs, None) == []
+
+
+def test_a_whitespace_only_line_ends_a_citation_as_a_blank_line_does(tmp_path: Path) -> None:
+    specs = tmp_path / "specs"
+    _ledger(specs, {"id": "0005", "status": "superseded"})
+    (specs / "memory").mkdir()
+    note = specs / "memory" / "ARCHITECTURE.md"
+    note.write_text("see ADR\n  \n0005 rows\n", encoding="utf-8")
+    assert superseded_adr_citations(specs, None) == []
+    note.write_text("see ADR\n  0005 rows\n", encoding="utf-8")
+    assert [i.code for i in superseded_adr_citations(specs, None)] == ["ADR-SUPERSEDED-CITATION"]
