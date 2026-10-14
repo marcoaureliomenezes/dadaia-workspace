@@ -114,6 +114,9 @@ def test_doctor_judges_no_instance(tmp_path: Path, owner: str) -> None:
     (checkout / "dadaia_workspace").symlink_to(_REPO / "dadaia_workspace")
     done = _ci(checkout, "doctor", sys.executable if nested else str(fake_venv(instance, pth=True)))
     assert "doctor --specs-dir specs" in done.stdout
+    # the doctor ran to its own verdict on the bare checkout: exit 1 on a finding, never a crash
+    assert done.returncode == 1
+    assert "SPEC-DOC-001 error specs/constitution.md is missing" in done.stdout
     # The workspace section (WS-*) judges a resolved instance; the fenced run resolves none.
     assert [ln for ln in done.stdout.splitlines() if ln.startswith("WS-")] == []
 
