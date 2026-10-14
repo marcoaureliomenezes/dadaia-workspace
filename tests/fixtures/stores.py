@@ -2,6 +2,7 @@
 
 import shutil
 import sys
+import sysconfig
 import tempfile
 from pathlib import Path
 
@@ -37,13 +38,14 @@ def own_venv_python(root: Path) -> Path:
     )
 
 
-def fake_venv(root: Path, cli: bool | str = False) -> Path:
+def fake_venv(root: Path, cli: bool | str = False, pth: bool = False) -> Path:
     """`root/.dadaia/.venv` with a `python` that runs: the interpreter copied (no symlink: Windows
     needs a privilege for one) under its real name, `python` plus `PLATFORM`'s exe suffix, in
     `PLATFORM`'s scripts dir, and a `pyvenv.cfg` naming its home. With *cli*, this environment's own `dadaia` console script is
     copied beside it: the installer's launcher (an `.exe` on Windows, never a shebang text file).
     With *cli* a source text, that script (its first line `#!python`) is wrapped as pip wraps a
     console script: a launcher `.exe` on Windows, an executable shebang script elsewhere.
+    With *pth*, a `.pth` in its site-packages puts this process's `sys.path` on that `python`'s.
     Returns that `python`."""
     python = own_venv_python(root)
     python.parent.mkdir(parents=True, exist_ok=True)
@@ -56,7 +58,17 @@ def fake_venv(root: Path, cli: bool | str = False) -> Path:
             (Path(src) / "dadaia").write_text(cli)
             maker = ScriptMaker(src, str(python.parent), add_launchers=True)
             maker.clobber = True  # a re-placed stub replaces the older one
+            if " " not in str(python):  # distlib's sh form leaves a spaced path unquoted
+                maker.executable = str(
+                    python
+                )  # the shebang names this venv's python, as pip's does
             maker.make(str(Path(src) / "dadaia"))
     elif cli:
         shutil.copy2(Path(sys.executable).parent / name, python.with_name(name))
+    if pth:
+        site = (
+            root / ".dadaia" / ".venv" / Path(sysconfig.get_path("purelib")).relative_to(sys.prefix)
+        )
+        site.mkdir(parents=True, exist_ok=True)
+        (site / "deps.pth").write_text("\n".join(p for p in sys.path if p) + "\n")
     return python

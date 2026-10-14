@@ -10,7 +10,6 @@ import shlex
 import shutil
 import subprocess
 import sys
-import sysconfig
 from pathlib import Path
 
 import pytest
@@ -69,16 +68,6 @@ def _instance(root: Path) -> Path:
     return root
 
 
-def _venv_owned_by(instance: Path) -> str:
-    """A python whose ``sys.prefix`` is ``<instance>/.dadaia/.venv``: ``fake_venv``'s copy of
-    this interpreter, and a ``.pth`` onto its packages — no install."""
-    venv = instance / ".dadaia" / ".venv"
-    site = venv / Path(sysconfig.get_path("purelib")).relative_to(sys.prefix)
-    site.mkdir(parents=True)
-    (site / "deps.pth").write_text(sysconfig.get_path("purelib") + "\n")
-    return str(fake_venv(instance))
-
-
 @pytest.mark.parametrize(
     ("source", "last", "code"),
     [("import os\n", "FAILED: ruff check", 1), ("x = 1\n", "ALL PASS", 0)],
@@ -123,7 +112,7 @@ def test_doctor_judges_no_instance(tmp_path: Path, owner: str) -> None:
     nested = owner == "encloses the checkout"
     checkout = _checkout(instance / "repos" / "co" if nested else tmp_path / "co", {})
     (checkout / "dadaia_workspace").symlink_to(_REPO / "dadaia_workspace")
-    done = _ci(checkout, "doctor", sys.executable if nested else _venv_owned_by(instance))
+    done = _ci(checkout, "doctor", sys.executable if nested else str(fake_venv(instance, pth=True)))
     assert "doctor --specs-dir specs" in done.stdout
     # The workspace section (WS-*) judges a resolved instance; the fenced run resolves none.
     assert [ln for ln in done.stdout.splitlines() if ln.startswith("WS-")] == []
