@@ -423,9 +423,9 @@ def test_an_untraced_origin_id_is_cleared_by_its_printed_fix(repo: Path) -> None
     no exit is an error on the real Origin line; its printed fix writes the pointer back."""
     specs = repo / "specs"
     _write(specs / "backlog/BACKLOG.json", json.dumps(
-        {"schema": "backlog-v1", "active": [_active_entry("carried", "c", "candidate")]}))  # fmt: skip
+        {"schema": "backlog-v1", "active": [_active_entry("pending", "c", "candidate")]}))  # fmt: skip
     spec = specs / "releases" / _RELEASE / "rc-1" / "SPEC.md"
-    spec.write_text(spec.read_text("utf-8").replace("operator-demand", "backlog:carried"), "utf-8")
+    spec.write_text(spec.read_text("utf-8").replace("operator-demand", "backlog:pending"), "utf-8")
 
     def origin_errors() -> list[SectionFinding]:
         found = _ledgers_section(None, specs).findings
