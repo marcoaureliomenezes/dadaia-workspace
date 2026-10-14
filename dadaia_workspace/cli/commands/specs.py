@@ -19,7 +19,7 @@ from dadaia_workspace.cli._specs_resolution import (
 )
 from dadaia_workspace.core import gitflow, specs_version
 from dadaia_workspace.core.atomic_write import SymlinkRefusedError
-from dadaia_workspace.core.cli_line import fix_line, materialize_line
+from dadaia_workspace.core.cli_line import fix_line, materialize_line, spell_fix
 from dadaia_workspace.core.doctor_rules import SectionFinding
 from dadaia_workspace.core.gitflow import DEFAULT, Gitflow, from_mapping
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
@@ -91,7 +91,7 @@ def _echo_upgrade(specs: Path, result: UpgradeResult) -> bool:
         typer.echo(f"[repair] {will}fix {issue.code} {finding_path(issue)}")
     for issue in refused:
         typer.echo(
-            f"[refused] {issue.code} {finding_path(issue)}: {issue.message}\nfix: {issue.fix}"
+            f"[refused] {issue.code} {finding_path(issue)}: {issue.message}\n{spell_fix(issue.fix)}"
         )
     for action in [] if result.dry_run else script_repairs(specs):
         typer.echo(f"[repair] {action}")

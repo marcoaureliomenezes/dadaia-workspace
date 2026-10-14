@@ -6,7 +6,7 @@ import typer
 from rich.console import Console
 
 from dadaia_workspace import container
-from dadaia_workspace.core.cli_line import fix_line
+from dadaia_workspace.core.cli_line import fix_line, spell_fix
 from dadaia_workspace.core.exceptions import PublicAssetError
 from dadaia_workspace.core.model_registry import TEMPLATES
 from dadaia_workspace.core.models.doctor_report import DoctorStatus
@@ -93,5 +93,5 @@ def doctor() -> None:
     for line in lines:
         print(line.render())  # plain: a fix line is never wrapped at the terminal width
     if fix:
-        print(f"fix: {fix}")
+        print(spell_fix(fix))
         raise typer.Exit(1)

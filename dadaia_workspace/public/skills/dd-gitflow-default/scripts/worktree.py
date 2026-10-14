@@ -18,7 +18,7 @@ sys.path[:0] = [
     str(Path(__file__).resolve().parents[2] / "dd-bug-resolution" / "scripts"),
 ]
 
-from _refusal import report
+from _refusal import report, spell_fix
 from _worktree_end import clean, digest, merge, preflight
 from _worktree_git import rows, workspace_of
 from _worktree_names import Refusal
@@ -80,7 +80,10 @@ def main(argv: list[str] | None = None) -> int:
     if args.json:
         print(json.dumps(found, indent=2))
     for row in [] if args.json else found:
-        print(f"{row['state']}  {row['path']}" + (f"  fix: {row['fix']}" if row["fix"] else ""))
+        print(
+            f"{row['state']}  {row['path']}"
+            + (f"  {spell_fix(str(row['fix']))}" if row["fix"] else "")
+        )
     return 0
 
 

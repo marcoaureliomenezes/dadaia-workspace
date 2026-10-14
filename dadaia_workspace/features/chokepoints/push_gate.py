@@ -8,7 +8,7 @@ from collections.abc import Callable, Iterable, Iterator, Sequence
 from pathlib import Path
 from typing import Protocol
 
-from dadaia_workspace.core.cli_line import git_line
+from dadaia_workspace.core.cli_line import git_line, spell_fix
 from dadaia_workspace.core.gitflow import Gitflow
 from dadaia_workspace.core.models.git_scan import (
     ZERO_SHA,
@@ -99,7 +99,7 @@ def _rewrite_fix(ref: PushRef, object_source: ObjectSource, repo: Path, fixes: G
     else:
         oldest = object_source.unpublished(repo, ref.local_sha)[-1]
         fix = git_line(fixes.repo, "reset", "--soft", oldest)
-    return f"{_REWRITE}\nfix: {fix}"
+    return f"{_REWRITE}\n{spell_fix(fix)}"
 
 
 def _run_denylist_scan(
@@ -140,9 +140,9 @@ def _read_failure(exc: GitObjectReadError, masker: PathMasker, repo: Path) -> De
     return Decision(
         allowed=False,
         message=_fail_closed(f"reading the pushed-range git objects failed ({exc}{masked})")
-        + "\nfix: "
-        + (  # a run failure is not corruption: no fsck for it
-            "Operator action: make git runnable here, then push again"
+        + "\n"
+        + spell_fix(
+            "Operator action: make git runnable here, then push again"  # not corruption: no fsck
             if isinstance(exc, GitRunError)
             else git_line(repo, "fsck")
         ),
@@ -173,7 +173,7 @@ def push_gate_decision(
             allowed=False,
             message=_fail_closed(f"{malformed_lines} unparseable pre-push stdin line(s)")
             + "\nPush one explicit refspec.\n"
-            f"fix: {git_line(fixes.repo, 'push', 'origin', fixes.work)}",
+            + spell_fix(git_line(fixes.repo, "push", "origin", fixes.work)),
         )
     branch_refs = [r for r in refs if not r.is_deletion and not r.is_tag]
     roles = (gitflow.principal, gitflow.integration)

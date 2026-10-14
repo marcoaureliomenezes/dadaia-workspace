@@ -8,12 +8,11 @@ regex and the wikilink regex. A re-typed copy would be a second decider.
 from __future__ import annotations
 
 import re
-import sys
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from dadaia_workspace.core.cli_line import shell_line
+from dadaia_workspace.core.cli_line import reinstall_fix
 from dadaia_workspace.core.fixed_sections import (
     FIXED_SECTIONS,
     extract_fixed_section,
@@ -64,11 +63,6 @@ __all__ = [
 ]
 
 
-def reinstall_line() -> str:
-    """The act that repairs a missing or unreadable library fragment."""
-    return shell_line(sys.executable, "-m", "pip", "install", "-U", "dadaia-workspace")
-
-
 def read_fixed_fragment(public_dir: Path, section_id: str) -> str:
     """The library fragment of *section_id*: ``<public_dir>/data/fixed/<id>.md``.
 
@@ -76,7 +70,7 @@ def read_fixed_fragment(public_dir: Path, section_id: str) -> str:
     try:
         return (public_dir / "data" / "fixed" / f"{section_id}.md").read_text(encoding="utf-8")
     except UnicodeDecodeError as bad:
-        raise ValueError(reinstall_line()) from bad
+        raise ValueError(reinstall_fix(f"{section_id}.md")) from bad
 
 
 def is_forbidden_memory_heading(heading: str) -> bool:

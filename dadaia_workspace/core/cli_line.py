@@ -23,6 +23,16 @@ def without_fix(text: str) -> str:
     return str(load_owner("dd-bug-resolution", "_refusal").without_fix(text))
 
 
+def spell_fix(fix: str) -> str:
+    """The `fix:` line of *fix*: the kernel's one spelling."""
+    return str(load_owner("dd-bug-resolution", "_refusal").spell_fix(fix))
+
+
+def reinstall_fix(name: str) -> str:
+    """The act that repairs the shipped file *name*: the kernel's one decider."""
+    return str(load_owner("dd-bug-resolution", "_jsonl").reinstall_fix(name))
+
+
 def fix_line(root: PurePath | None, *argv: str) -> str:
     """``<absolute CLI> argv…`` quoted for the host shell (:func:`venv_line` for the CLI)."""
     return venv_line(root, "dadaia", *argv)

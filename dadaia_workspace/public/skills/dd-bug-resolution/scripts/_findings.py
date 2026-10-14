@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 import _jsonl
-from _refusal import fix_line
+from _refusal import spell_fix
 
 Check = Callable[[Path], list[dict[str, Any]]]
 
@@ -42,7 +42,7 @@ def print_text(findings: list[dict[str, Any]]) -> None:
             f"{found['code']} {found['verdict']} {found['path']}:{found['line']} {found['message']}"
         )
         if found.get("fix"):
-            print(fix_line(found["fix"]))
+            print(spell_fix(found["fix"]))
 
 
 def histo_findings(

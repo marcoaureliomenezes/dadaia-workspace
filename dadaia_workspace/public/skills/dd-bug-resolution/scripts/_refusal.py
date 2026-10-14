@@ -18,7 +18,7 @@ class Refusal(Exception):
 FIX = "fix: "
 
 
-def fix_line(fix: str) -> str:
+def spell_fix(fix: str) -> str:
     """The one spelling of a `fix:` line."""
     return f"{FIX}{fix}"
 
@@ -35,4 +35,4 @@ def without_fix(text: str) -> str:
 
 def report(message: object, fix: str, file: TextIO | None = None) -> None:
     """Print the one `[error]` line and the one `fix:` line of a refusal (default stderr)."""
-    print(f"[error] {message}", fix_line(fix), sep="\n", file=file or sys.stderr)
+    print(f"[error] {message}", spell_fix(fix), sep="\n", file=file or sys.stderr)

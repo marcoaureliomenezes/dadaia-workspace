@@ -11,7 +11,7 @@ from functools import partial
 from pathlib import Path
 
 from dadaia_workspace.core.atomic_write import atomic_write
-from dadaia_workspace.core.cli_line import materialize_line
+from dadaia_workspace.core.cli_line import materialize_line, reinstall_fix
 from dadaia_workspace.core.doctor_rules import SectionFinding
 from dadaia_workspace.features.specs import citations, doctor_adr, memory_canon, memory_lint
 from dadaia_workspace.features.specs.canon import default_public_dir, is_canon_path
@@ -128,10 +128,12 @@ class MemoryValidator:
                         Severity.ERROR,
                         f"{rel}: library fragment `{section_id}` is missing: {gone.filename}",
                         str(path),
-                        fix=memory_canon.reinstall_line(),
+                        fix=reinstall_fix(f"{section_id}.md"),
                     )
                 )
                 continue
+            except doctor_adr.Unreadable:
+                continue  # `adr_record_issues` names the ledger
             except ValueError as refusal:
                 message = f"{rel}: fixed law section `{section_id}` refused: {refusal}"
                 issues.append(

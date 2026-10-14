@@ -11,6 +11,7 @@ import sys
 from pathlib import Path
 
 from dadaia_workspace.core import clock, invocation, session_store, workspace_layout
+from dadaia_workspace.core.cli_line import spell_fix
 from dadaia_workspace.core.doctor_rules import SectionFinding, render_finding
 from dadaia_workspace.core.exceptions import SchemaVersionError
 from dadaia_workspace.features.spec_context import injection_policy
@@ -152,11 +153,11 @@ def _worktrees(workspace: Path, context: str) -> list[str]:
     except Exception:  # noqa: BLE001 — fail-open: a hook never crashes the session
         return []
     if failed:
-        return [f"WORKTREE warning {failed}\nfix: {fix}"]
+        return [f"WORKTREE warning {failed}\n{spell_fix(fix)}"]
     return [
         f"WORKTREE {'warning' if row['warn'] else 'info'} {row['state']} {row['path']}"
         + "".join(f"  {key}={row[key]}" for key in ("age_hours", "ahead", "dirty") if key in row)
-        + (f"\nfix: {row['fix']}" if row["fix"] else "")
+        + (f"\n{spell_fix(row['fix'])}" if row["fix"] else "")
         for row in found
     ]
 

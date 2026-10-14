@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
+from dadaia_workspace.core.cli_line import spell_fix
+
 
 class DadaiaError(Exception):
     """Base class for all dadaia-workspace domain errors; ``fix`` is its one remedy line."""
 
     def __init__(self, message: str = "", fix: str = "") -> None:
         self.message, self.fix = message, fix
-        super().__init__(f"{message}\nfix: {fix}" if fix else message)
+        super().__init__(f"{message}\n{spell_fix(fix)}" if fix else message)
 
 
 class WorkspaceNotInitializedError(DadaiaError):

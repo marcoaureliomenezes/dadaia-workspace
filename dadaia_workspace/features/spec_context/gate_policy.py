@@ -21,7 +21,7 @@ from itertools import chain
 from pathlib import PurePath
 
 from dadaia_workspace.core import workspace_layout
-from dadaia_workspace.core.cli_line import fix_line, mkdir_line, script_line
+from dadaia_workspace.core.cli_line import fix_line, mkdir_line, script_line, spell_fix
 
 __all__ = ["Decision", "PathClass", "classify_path", "evaluate"]
 
@@ -139,7 +139,7 @@ def evaluate(
         refusal, match = hit
         fix = _FIXES[refusal](root, context)
         message = workspace_layout.REFUSALS[refusal].format(path=rel_path, match=match)
-        return Decision.BLOCK, message + f"fix: {fix}"
+        return Decision.BLOCK, message + spell_fix(fix)
     if cls == PathClass.ADDITIVE or repo is None:
         return Decision.ALLOW, ""
     if owner is not None and repo not in repos and (context is not None or has_id):
@@ -155,8 +155,8 @@ def evaluate(
             if has_id
             else f"Operator action: relaunch this session with DADAIA_CONTEXT={owner}"
         )
-        return Decision.BLOCK, message + f"fix: {fix}"
+        return Decision.BLOCK, message + spell_fix(fix)
     if zone == "repo":
         message = _MERGE_ONLY_MESSAGE.format(rel_path=rel_path, repo=repo)
-        return Decision.BLOCK, message + f"fix: {script_line(_WORKTREE_SCRIPT, 'list')}"
+        return Decision.BLOCK, message + spell_fix(script_line(_WORKTREE_SCRIPT, "list"))
     return Decision.ALLOW, ""

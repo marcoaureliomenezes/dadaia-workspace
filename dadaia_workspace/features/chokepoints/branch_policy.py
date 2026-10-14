@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from dadaia_workspace.core.cli_line import git_line
+from dadaia_workspace.core.cli_line import git_line, spell_fix
 from dadaia_workspace.core.gitflow import Gitflow
 from dadaia_workspace.core.models.git_scan import SHA_SHAPE_RE, ZERO_SHA
 
@@ -96,7 +96,9 @@ def _pushable(branch: str) -> bool:
 
 def _blocked(text: str, fix: str) -> Decision:
     """One refusal with one single-command fix (no ``&&``: Windows PowerShell 5.1)."""
-    return Decision(allowed=False, message=f"[pre-push] BLOCKED: {text} ({_LAW}).\nfix: {fix}")
+    return Decision(
+        allowed=False, message=f"[pre-push] BLOCKED: {text} ({_LAW}).\n{spell_fix(fix)}"
+    )
 
 
 def _refuse_branch(

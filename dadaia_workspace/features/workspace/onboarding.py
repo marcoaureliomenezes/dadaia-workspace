@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Literal
 
 from dadaia_workspace.core import workspace_layout
-from dadaia_workspace.core.cli_line import fix_line
+from dadaia_workspace.core.cli_line import fix_line, spell_fix
 from dadaia_workspace.core.fixed_sections import strip_fixed_sections
 from dadaia_workspace.core.gitflow import constitution_error
 from dadaia_workspace.core.specs_version import state
@@ -40,7 +40,7 @@ class Step:
     command: str
 
     def text(self) -> str:
-        return f"Next ({self.kind} step {self.id}): {self.reason}\nfix: {self.command}"
+        return f"Next ({self.kind} step {self.id}): {self.reason}\n{spell_fix(self.command)}"
 
 
 @dataclass(frozen=True)

@@ -17,7 +17,7 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass, replace
 from pathlib import PurePath
 
-from dadaia_workspace.core.cli_line import fix_line
+from dadaia_workspace.core.cli_line import fix_line, spell_fix
 
 __all__ = [
     "Rule",
@@ -142,4 +142,4 @@ def _with_fix[C](
 def render_finding(finding: SectionFinding) -> str:
     """One finding, rendered: its line, plus its ``fix:`` line whenever it carries one."""
     line = f"{finding.code} {finding.verdict} {finding.message}"
-    return f"{line}\nfix: {finding.fix}" if finding.fix else line
+    return f"{line}\n{spell_fix(finding.fix)}" if finding.fix else line
