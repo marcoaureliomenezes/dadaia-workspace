@@ -188,6 +188,7 @@ def test_origin_trace_reads_the_closure_summary_instead_of_derived_ledger_fields
         ("Origin bugs:still-broken traced", "info"),
         ("Origin bugs:already-fixed traced", "info"),
     ]
+    assert all("fix" not in row for row in rows)
 
 
 def test_a_backlog_exit_rejected_by_disposition_traces(script: Path, tmp_path: Path) -> None:
