@@ -56,3 +56,18 @@ def test_a_record_holding_u2028_is_read_whole(tmp_path: Path) -> None:
     (specs / "memory").mkdir()
     (specs / "memory" / "QUALITY.md").write_text("ADR: 0005\n", encoding="utf-8")
     assert [i.code for i in superseded_adr_citations(specs, None)] == ["ADR-SUPERSEDED-CITATION"]
+
+
+def test_a_superseded_id_inside_a_fixed_section_is_not_judged(tmp_path: Path) -> None:
+    """Generated text is judged by its fragment: the id inside the block is silent, the same
+    id in prose outside it is exactly one finding."""
+    specs = tmp_path / "specs"
+    _ledger(specs, {"id": "0005", "status": "superseded"})
+    (specs / "memory").mkdir()
+    arch = specs / "memory" / "ARCHITECTURE.md"
+    block = "<!-- dadaia:fixed adr-list -->\n- 0042 — replaces ADR 0005\n<!-- /dadaia:fixed adr-list -->\n"
+    arch.write_text(block, encoding="utf-8")
+    assert superseded_adr_citations(specs, None) == []
+
+    arch.write_text(f"prose cites ADR 0005\n\n{block}", encoding="utf-8")
+    assert [i.code for i in superseded_adr_citations(specs, None)] == ["ADR-SUPERSEDED-CITATION"]
