@@ -53,3 +53,13 @@ def workspace_cli_path[P: PurePath](root: P) -> P:
     """Where the workspace CLI lives under *root*, by the kernel's rule fed the current ``PLATFORM``."""
     path: P = _owner.cli_path(root, _caps())
     return path
+
+
+def quote(word: str) -> str:
+    """One shell word for the host shell, by the kernel's rule fed the current ``PLATFORM``."""
+    return str(_owner.quote(word, _caps()))
+
+
+def head(word: str) -> str:
+    """A command's first word for the host shell, by the kernel's rule fed the current ``PLATFORM``."""
+    return str(_owner.head(word, _caps()))

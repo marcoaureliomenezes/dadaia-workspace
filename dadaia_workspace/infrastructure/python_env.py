@@ -23,13 +23,13 @@ from pathlib import Path
 from packaging.version import Version
 
 import dadaia_workspace
-from dadaia_workspace.core.cli_line import quote, shell_line
+from dadaia_workspace.core.cli_line import shell_line
 from dadaia_workspace.core.exceptions import (
     BootstrapPackageError,
     WorkspaceVenvBootstrapError,
     WorkspaceVenvNewerError,
 )
-from dadaia_workspace.core.platform import PLATFORM, venv_dir, workspace_cli_path
+from dadaia_workspace.core.platform import PLATFORM, quote, venv_dir, workspace_cli_path
 from dadaia_workspace.infrastructure.provider_version import provider_version
 
 __all__ = [

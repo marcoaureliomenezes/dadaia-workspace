@@ -5,7 +5,6 @@ part holding a blank quoted whole — the executable's quote opened after its dr
 
 from __future__ import annotations
 
-import shlex
 import sys
 from pathlib import Path, PurePath
 
@@ -63,12 +62,8 @@ def git_line(repo: str | PurePath, *argv: str) -> str:
 
 def shell_line(*parts: str) -> str:
     """*parts* joined into one command line quoted for the host shell."""
-    if platform.PLATFORM.windows:
-        head, *argv = (quote(part) for part in parts)
-        if head.startswith('"'):  # a drive path: open the quote after its first char
-            head = f'{head[1]}"{head[2:]}'
-        return " ".join((head, *argv))
-    return shlex.join(parts)
+    first, *rest = parts
+    return " ".join((platform.head(first), *map(platform.quote, rest)))
 
 
 def mkdir_line(directory: PurePath) -> str:
@@ -83,12 +78,3 @@ def materialize_line(link: PurePath, target: PurePath) -> str:
     link, never its target) — the same interpreter line on every OS."""
     code = f"import os, shutil; os.remove(r'{link}'); shutil.copyfile(r'{target}', r'{link}')"
     return shell_line(sys.executable, "-c", code)
-
-
-def quote(arg: str) -> str:
-    """One word for the host shell: ``shlex`` on POSIX; on Windows forward slashes, double
-    quotes only around a blank."""
-    if not platform.PLATFORM.windows:
-        return shlex.quote(arg)
-    arg = arg.replace("\\", "/")
-    return arg if arg and not any(c in arg for c in ' \t"') else f'"{arg}"'

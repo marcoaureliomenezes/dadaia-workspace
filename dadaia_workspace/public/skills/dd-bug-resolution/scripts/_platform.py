@@ -38,21 +38,22 @@ def venv_tool(venv: Path, tool: str, caps: Caps | None = None) -> Path:
     return venv / caps.scripts_dir / f"{tool}{caps.exe_suffix}"
 
 
-def quote(word: str) -> str:
+def quote(word: str, caps: Caps | None = None) -> str:
     """One shell word as `core/cli_line.shell_line` spells it: ``shlex`` on POSIX; on
     Windows forward slashes, double quotes only around a blank."""
-    if not detect().windows:
+    if not (caps or detect()).windows:
         return shlex.quote(word)
     word = word.replace("\\", "/")
     return word if word and not any(c in word for c in ' \t"') else f'"{word}"'
 
 
-def head(word: str) -> str:
+def head(word: str, caps: Caps | None = None) -> str:
     """A command's first word as `core/cli_line.shell_line` spells it: on Windows a quote
     opens after the drive letter, so the line never opens with one PowerShell reads as an
     expression."""
-    word = quote(word)
-    return f'{word[1]}"{word[2:]}' if detect().windows and word.startswith('"') else word
+    caps = caps or detect()
+    word = quote(word, caps)
+    return f'{word[1]}"{word[2:]}' if caps.windows and word.startswith('"') else word
 
 
 def git_line(repo: Path | str, *argv: str) -> str:
