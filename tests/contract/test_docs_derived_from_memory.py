@@ -7,6 +7,7 @@ import tomllib
 from pathlib import Path
 
 from dadaia_workspace.cli.help_digest import command_paths, render_digest
+from dadaia_workspace.core.fixed_sections import authored_text
 from dadaia_workspace.features.specs.citations import dead_citations
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -168,11 +169,16 @@ def _onboarding_corpus() -> dict[str, str]:
     }
 
 
+def _lines(text: str) -> list[tuple[int, str]]:
+    """The numbered lines an operator wrote; a generated section is the doctor's to judge."""
+    return list(enumerate(authored_text(text).splitlines(), start=1))
+
+
 def _offline_sites(texts: dict[str, str]) -> list[str]:
     return [
         f"{rel}:{number}: claims offline operation"
         for rel, text in texts.items()
-        for number, line in enumerate(text.splitlines(), start=1)
+        for number, line in _lines(text)
         if re.search(r"\boffline\b", line, re.IGNORECASE)
     ]
 
@@ -181,7 +187,7 @@ def _retired_flag_sites(texts: dict[str, str]) -> list[str]:
     return [
         f"{rel}:{number}: `{match.group(0).strip()}`"
         for rel, text in texts.items()
-        for number, line in enumerate(text.splitlines(), start=1)
+        for number, line in _lines(text)
         for match in _CONTEXT_CREATE_RE.finditer(line)
         if re.search(r"--url\b|--associated-repos\b", match.group(0))
     ]
