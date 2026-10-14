@@ -104,7 +104,7 @@ def fix_defect(fix: str) -> bool:
 def _protected_paths(fix: str) -> list[str]:
     """Each word of *fix* under a workspace's `.dadaia/` that the gate classes PROTECTED, or
     the operator's `.dadaiaignore`: a path an agent's act cannot write."""
-    words = [w for w in shlex.split(fix) if "/.dadaia" in w]
+    words = re.findall(r"\S*/\.dadaia\S*", fix)
     rels = [".dadaia" + w.split("/.dadaia", 1)[1] for w in words]
     return [r for r in rels if classify_path(r)[0] is PathClass.PROTECTED]
 
@@ -228,7 +228,7 @@ _HUMAN_ONLY = {
     "cli/commands/context.py": 1,
     "core/context_registry.py": 1,
     "features/chokepoints/push_gate.py": 1,
-    "features/spec_context/doctor.py": 1,
+    "features/spec_context/doctor.py": 2,
     "features/spec_context/gate_policy.py": 1,
     "features/spec_context/service.py": 1,
     "features/spec_context/sweep.py": 1,
@@ -242,7 +242,7 @@ _HUMAN_ONLY = {
 }
 
 
-def test_an_agent_action_is_only_what_the_law_reserves_to_the_human() -> None:
+def test_an_operator_action_is_only_what_the_law_reserves_to_the_human() -> None:
     """Exactly the reserved files spell `Operator action`, as often as the acts the law reserves
     there."""
     found = {
