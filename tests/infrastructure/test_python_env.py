@@ -633,12 +633,15 @@ def test_a_venv_without_its_python_is_refused_with_the_delete_fix_on_every_run(
     tmp_path: Path, recorder: _Recorder, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """The version check, the pip install and the provider verification all run the venv's python:
-    an OSError of any is the one refusal naming the act that clears it, its paths quoted."""
-    ws = tmp_path / "a workspace"
-    (Path(_venv(ws)) / PLATFORM.venv_scripts_dir).mkdir(parents=True)
-    fix = f"Operator action: delete '{ws}/.dadaia/.venv' and run `uvx dadaia-workspace init '{ws}'`"
+    an OSError of any is the one refusal naming the act that clears it. Only the `uvx` command is a
+    command line: the path to delete is prose, quoted whole."""
     mgr = VenvPythonEnvironmentManager()
     monkeypatch.undo()  # the recorder's stubs off: the real checks run below
+    windows = Capabilities.detect("win32")
+    monkeypatch.setattr(python_env_module, "PLATFORM", windows)
+    monkeypatch.setattr("dadaia_workspace.core.platform.PLATFORM", windows)
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "C:/a b/.dadaia/.venv" / windows.venv_scripts_dir).mkdir(parents=True)
     monkeypatch.setattr(python_env_module.subprocess, "run", _no_interpreter)
     for call in (
         mgr._assert_child_interpreter_version,
@@ -646,23 +649,8 @@ def test_a_venv_without_its_python_is_refused_with_the_delete_fix_on_every_run(
         lambda ws: _REAL_ENSURE(mgr, ws),
     ):
         with pytest.raises(python_env_module.WorkspaceVenvBootstrapError) as exc:
-            call(str(ws))
-        assert exc.value.fix == fix
-
-
-def test_the_delete_fix_quotes_its_paths_as_plain_arguments_on_windows(
-    recorder: _Recorder, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Only the `uvx` command is a command line: the path to delete is prose, quoted whole."""
-    mgr = VenvPythonEnvironmentManager()
-    monkeypatch.undo()
-    windows = Capabilities.detect("win32")
-    monkeypatch.setattr(python_env_module, "PLATFORM", windows)
-    monkeypatch.setattr("dadaia_workspace.core.platform.PLATFORM", windows)
-    monkeypatch.setattr(python_env_module.subprocess, "run", _no_interpreter)
-    with pytest.raises(python_env_module.WorkspaceVenvBootstrapError) as exc:
-        mgr._assert_child_interpreter_version("C:/a b")
-    assert exc.value.fix == (
-        'Operator action: delete "C:/a b/.dadaia/.venv" and run '
-        '`uvx dadaia-workspace init "C:/a b"`'
-    )
+            call("C:/a b")
+        assert exc.value.fix == (
+            'Operator action: delete "C:/a b/.dadaia/.venv" and run '
+            '`uvx dadaia-workspace init "C:/a b"`'
+        )
