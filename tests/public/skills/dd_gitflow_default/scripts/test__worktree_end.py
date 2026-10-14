@@ -111,6 +111,14 @@ def test_a_task_whose_job_tree_is_gone_refuses_with_the_fix_that_restores_it(
     assert run(root, "merge", str(task)).returncode == 0
 
 
+def test_a_git_failure_no_check_named_ends_as_one_refusal(root: Path) -> None:
+    (root / TREE / ".git").unlink()  # a tree git no longer recognizes
+    refused = run(root, "merge", TREE)
+    assert refused.returncode == 1 and "Traceback" not in refused.stderr
+    assert "[error]" in refused.stderr
+    assert len(fixes(refused)) == 1
+
+
 def test_a_dirty_tree_refuses_with_one_fix_that_commits_or_removes(root: Path) -> None:
     tree = root / TREE
     (tree / "wip").mkdir()  # an untracked directory, and a tracked edit staged:
