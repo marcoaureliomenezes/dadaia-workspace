@@ -10,6 +10,17 @@ import sys
 from pathlib import Path, PurePath
 
 from dadaia_workspace.core import platform
+from dadaia_workspace.core.skill_owner import load_owner
+
+
+def fix_of(text: str, default: str = "") -> str:
+    """The first `fix:` line of a child script's *text*: the kernel's one parser."""
+    return str(load_owner("dd-bug-resolution", "_refusal").fix_of(text, default))
+
+
+def without_fix(text: str) -> str:
+    """*text* with its `fix:` lines removed: the kernel's one stripper."""
+    return str(load_owner("dd-bug-resolution", "_refusal").without_fix(text))
 
 
 def fix_line(root: PurePath | None, *argv: str) -> str:

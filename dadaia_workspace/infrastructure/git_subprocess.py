@@ -4,7 +4,7 @@ import subprocess
 from collections.abc import Sequence
 from pathlib import Path
 
-from dadaia_workspace.core.cli_line import fix_line, git_line
+from dadaia_workspace.core.cli_line import fix_line, fix_of, git_line, without_fix
 from dadaia_workspace.core.exceptions import GitCloneError, GitSyncError
 from dadaia_workspace.core.gitflow import DEFAULT, Gitflow, read_gitflow
 from dadaia_workspace.core.models.git_scan import GitObjectReadError
@@ -203,9 +203,8 @@ class GitSubprocessClient:
         first ``fix:`` line of that output becomes the error's ``fix``."""
         result = _run(["git", *args], cwd=path, stdin=stdin, env=env)
         if result.returncode != 0:
-            lines = f"{result.stdout}\n{result.stderr}".strip().splitlines()
-            fix = next((ln[5:] for ln in lines if ln.startswith("fix: ")), "")
-            output = "\n".join(ln for ln in lines if not (fix and ln == f"fix: {fix}"))
+            text = f"{result.stdout}\n{result.stderr}".strip()
+            fix, output = fix_of(text), without_fix(text).strip()
             raise GitSyncError(f"git {args[0]} failed in {path}:\n{output}", fix=fix)
         return result.stdout.strip()
 

@@ -20,7 +20,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol
 
-from dadaia_workspace.core.cli_line import fix_line, script_line
+from dadaia_workspace.core.cli_line import fix_line, fix_of, script_line, without_fix
 from dadaia_workspace.core.doctor_rules import SectionFinding
 from dadaia_workspace.core.skill_owner import load_owner
 from dadaia_workspace.core.workspace_resolver import own_workspace_root
@@ -217,6 +217,10 @@ def worktree_rows(
     except (OSError, TimeoutError, ValueError) as exc:
         return [], f"list failed: {type(exc).__name__}", f"{WORKTREE_SCRIPT.invocation} list"
     if not isinstance(found, list):  # the script's refusal: reason, then its one fix line
-        reason, _, fix = done.stderr.strip().partition("\nfix: ")
-        return [], f"list failed: {reason}", fix or f"{WORKTREE_SCRIPT.invocation} list"
+        reason = without_fix(done.stderr).strip()
+        return (
+            [],
+            f"list failed: {reason}",
+            fix_of(done.stderr, f"{WORKTREE_SCRIPT.invocation} list"),
+        )
     return [r for r in found if r["repo"] in repos or r.get("registered") is False], "", ""
