@@ -108,8 +108,12 @@ def test_existing_bare_venv_is_repaired_not_skipped(tmp_path: Path, recorder: _R
     assert (recorder.venv_created, len(recorder.commands)) == ([], 1)
 
 
-def test_healthy_venv_is_a_noop(tmp_path: Path, recorder: _Recorder) -> None:
+def test_healthy_venv_is_a_noop(
+    tmp_path: Path, recorder: _Recorder, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    install_fake_dist(monkeypatch, "1.0.0")
     _healthy(tmp_path)
+    recorder.installed = f"1.0.0 {build_digest(None)}"
     VenvPythonEnvironmentManager().ensure_workspace_venv(str(tmp_path))
     assert recorder.commands == []
 
