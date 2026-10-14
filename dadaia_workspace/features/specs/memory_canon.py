@@ -70,7 +70,7 @@ def read_fixed_fragment(public_dir: Path, section_id: str) -> str:
     try:
         return (public_dir / "data" / "fixed" / f"{section_id}.md").read_text(encoding="utf-8")
     except UnicodeDecodeError as bad:
-        raise ValueError(reinstall_fix(f"{section_id}.md")) from bad
+        raise ValueError(reinstall_fix()) from bad
 
 
 def is_forbidden_memory_heading(heading: str) -> bool:

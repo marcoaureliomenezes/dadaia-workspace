@@ -280,8 +280,7 @@ def _memory_findings(specs: Path) -> list[dict[str, Any]]:
         return []
     message = (f"release is in CLOSURE with no `kind: memory` log entry stamped at or after "
                f"implemented.ts {stamp!r} — the closure reconciled no memory")  # fmt: skip
-    fix = (f"Operator action: run `{SCRIPT} memory --specs {quote(str(specs))}` with the "
-           "atom slugs the memory pass reviewed as --reviewed and changed as --changed")  # fmt: skip
+    fix = with_specs(f"{SCRIPT} drift", specs)
     return [_findings.finding(CODE, f"releases/{live.release_id}/{STATE}", 1, message, fix)]
 
 

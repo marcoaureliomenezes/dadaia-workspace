@@ -184,5 +184,5 @@ def load_baseline() -> tuple[BaselinePattern, ...]:
     except (OSError, ValueError, LookupError, TypeError, _jsonl.Undecodable) as exc:
         raise Refusal(
             f"privacy baseline {path} is unreadable ({exc}) — no pattern was applied",
-            _jsonl.reinstall_fix(path.name),
+            _jsonl.reinstall_fix(),
         ) from exc

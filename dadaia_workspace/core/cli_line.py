@@ -25,9 +25,9 @@ def spell_fix(fix: str) -> str:
     return str(load_owner("dd-bug-resolution", "_refusal").spell_fix(fix))
 
 
-def reinstall_fix(name: str) -> str:
-    """The act that repairs the shipped file *name*: the kernel's one decider."""
-    return str(load_owner("dd-bug-resolution", "_jsonl").reinstall_fix(name))
+def reinstall_fix() -> str:
+    """The command that repairs a shipped file: the kernel's one decider."""
+    return str(load_owner("dd-bug-resolution", "_jsonl").reinstall_fix())
 
 
 def fix_line(root: PurePath | None, *argv: str) -> str:

@@ -29,7 +29,7 @@ class Undecodable(Refusal):
         restore = git_line(target.parent, "checkout", "--", target.name)
         super().__init__(
             f"{path} is not valid UTF-8",
-            fix or f"Operator action: restore {target} with `{restore}`",
+            fix or restore,
         )
         self.path = path
 
@@ -38,10 +38,10 @@ class Unreadable(Refusal):
     """A document that is not one JSON object; ``.fix`` is the act its caller names."""
 
 
-def reinstall_fix(name: str) -> str:
-    """The act that repairs a shipped file *name*: `init` rewrites a projected copy and, on a
+def reinstall_fix() -> str:
+    """The command that repairs a shipped file: `init` rewrites a projected copy and, on a
     damaged installed payload, reinstalls the running build."""
-    return f"Operator action: restore {name} by running `uvx dadaia-workspace init`"
+    return "uvx dadaia-workspace init"
 
 
 def read_text(path: Path, fix: str = "") -> str:
