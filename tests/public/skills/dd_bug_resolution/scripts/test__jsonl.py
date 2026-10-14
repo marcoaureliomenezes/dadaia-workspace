@@ -38,7 +38,10 @@ def test_a_schema_that_is_not_utf8_is_reinstalled_not_restored_from_git(tmp_path
     )
     done = _run(tmp_path, body, damage="schemas/bug-record-v1.schema.json")
 
-    assert done.stdout == "uvx dadaia-workspace init\n"
+    assert (
+        done.stdout
+        == "Agent action: run `uvx dadaia-workspace init` with the workspace's directory as its first argument\n"
+    )
 
 
 def test_a_schema_of_the_installed_package_is_reinstalled_by_init(tmp_path: Path) -> None:
@@ -46,10 +49,12 @@ def test_a_schema_of_the_installed_package_is_reinstalled_by_init(tmp_path: Path
         "try:\n    _ledger.load_schema('bug-record-v1')\n"
         "except _refusal.Refusal as refusal:\n    print(refusal.fix)\n"
     )
+    (tmp_path / ".dadaia" / "states").mkdir(parents=True)
+    (tmp_path / ".dadaia" / "states" / "spec_contexts.json").write_text("{}", encoding="utf-8")
     done = _run(tmp_path, body, damage="schemas/bug-record-v1.schema.json",
-                home="site-packages/dadaia_workspace/public/skills")  # fmt: skip
+                home=".dadaia/.venv/lib/site-packages/dadaia_workspace/public/skills")  # fmt: skip
 
-    assert done.stdout == "uvx dadaia-workspace init\n"
+    assert done.stdout == f"uvx dadaia-workspace init {tmp_path.resolve()}\n"
 
 
 def test_a_denylist_that_is_not_utf8_is_rewritten_not_restored_from_git(tmp_path: Path) -> None:

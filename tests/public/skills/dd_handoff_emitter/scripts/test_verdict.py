@@ -440,7 +440,7 @@ def test_a_relative_tree_path_is_validated_as_the_resolved_tree(tmp_path: Path) 
     )
 
 
-def test_a_cli_crash_without_json_or_fix_line_is_refused_with_one_operator_action(
+def test_a_cli_crash_without_json_or_fix_line_is_refused_with_one_agent_action(
     tmp_path: Path,
 ) -> None:
     root, tree, head = _workspace(tmp_path)

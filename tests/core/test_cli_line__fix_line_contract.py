@@ -215,27 +215,31 @@ _TERM = "zorblaxquux"
 #: many times each spells `Operator action`; every other act a refusal names is the agent's.
 _HUMAN_ONLY = {
     "cli/commands/context.py": 1,
+    "core/context_registry.py": 1,
     "features/chokepoints/push_gate.py": 1,
     "features/spec_context/doctor.py": 1,
     "features/spec_context/gate_policy.py": 1,
+    "features/spec_context/service.py": 1,
     "features/spec_context/sweep.py": 1,
     "infrastructure/git_subprocess.py": 1,
-    "public/skills/dd-bug-resolution/scripts/_memory_drift.py": 2,
-    "public/skills/dd-gitflow-default/scripts/_worktree_end.py": 1,
+    "infrastructure/json_context_store.py": 3,
+    "public/skills/dd-backlog-definition/scripts/_backlog_exit.py": 1,
+    "public/skills/dd-cli-library/scripts/registry.py": 1,
+    "public/skills/dd-gitflow-default/scripts/_worktree_new.py": 1,
     "public/skills/dd-release-implementation/scripts/_release_phase.py": 2,
     "public/skills/dd-release-implementation/scripts/release.py": 2,
 }
 
 
-def test_an_operator_action_is_only_what_the_law_reserves_to_the_human() -> None:
-    """No module spells `Operator action` outside the reserved files, nor more often than the
-    acts the law reserves there."""
+def test_an_agent_action_is_only_what_the_law_reserves_to_the_human() -> None:
+    """Exactly the reserved files spell `Operator action`, as often as the acts the law reserves
+    there."""
     found = {
         p.relative_to(_PKG).as_posix(): n
         for p in _PKG.rglob("*.py")
         if (n := p.read_text(encoding="utf-8").count("Operator action"))
     }
-    assert found.items() <= _HUMAN_ONLY.items(), found
+    assert found == _HUMAN_ONLY
 
 
 @pytest.mark.parametrize(
@@ -447,13 +451,13 @@ def _fix(done: subprocess.CompletedProcess[str]) -> str:
 @dataclass(frozen=True)
 class Case:
     """*build* plants the refusal and returns the command that hits it (argv, or a shell
-    line run in the repo); *operator* is the documented human step the refusal text asks
+    line run in the repo); *before* is the documented step the refusal text asks
     for before its fix (an edit), or the act an action fix names; *then* replaces the re-run when the fix renames what the
     refused command named; *done* asserts the published end state."""
 
     build: Callable[[World], list[str] | str]
     done: Callable[[World], None]
-    operator: Callable[[World], None] | None = None
+    before: Callable[[World], None] | None = None
     then: list[str] | str | None = None
     replaces: bool = False
 
@@ -508,8 +512,8 @@ def _chain(ws: Path, case: Case) -> str:
         assert fix not in seen, f"no progress — the same fix line again:\n{fix}"
         seen.append(fix)
         act = fix.startswith(_ACT_LABELS)
-        if case.operator is not None and (act or step == 0):
-            case.operator(world)
+        if case.before is not None and (act or step == 0):
+            case.before(world)
         ran = None if act else world.run(fix, world.elsewhere)  # a fix line runs from any cwd
         assert ran is None or ran.returncode == 0, f"the fix does not run:\n{fix}\n{ran}"
         if case.replaces and step == 0:
@@ -1035,22 +1039,22 @@ _REFUSALS: dict[str, tuple[Case | tuple[Case, ...] | Skip, ...]] = {
     "push_gate._rewrite_fix": (
         (
             Case(_denylisted_not_checked_out, _clean_publish, then=_CLEAN_COMMIT_PUSH),
-            Case(_denylisted, _clean_publish, operator=_drop_term, then=_COMMIT_PUSH),
+            Case(_denylisted, _clean_publish, before=_drop_term, then=_COMMIT_PUSH),
             Case(
                 _denylisted_in_a_worktree,
                 _worktree_clean,
-                operator=_drop_worktree_term,
+                before=_drop_worktree_term,
                 then="git -C .claude/worktrees/agent-x commit -qa --amend --no-edit && "
                 "git -C .claude/worktrees/agent-x push -q origin feature/1.0.0",
             ),
-            Case(_denylisted_no_context, _clean_publish, operator=_drop_term, then=_COMMIT_PUSH),
+            Case(_denylisted_no_context, _clean_publish, before=_drop_term, then=_COMMIT_PUSH),
             Case(
                 _denylisted_advanced_integration,
                 _nothing_reverted,
-                operator=_drop_term,
+                before=_drop_term,
                 then="git commit -qa --amend --no-edit && git push -q origin feature/1.0.1",
             ),
-            Case(_non_canon, _no_junk, operator=_rm_junk, then=_COMMIT_PUSH),
+            Case(_non_canon, _no_junk, before=_rm_junk, then=_COMMIT_PUSH),
         ),
     ),
     "push_gate._read_failure": (Skip("needs a corrupted object store; `git fsck` names it"),),
@@ -1059,33 +1063,33 @@ _REFUSALS: dict[str, tuple[Case | tuple[Case, ...] | Skip, ...]] = {
     ),
     "ci._repo_root": (Skip("the pre-push hook always runs inside the repo it pushes"),),
     "ci.push_gate_check": (Skip("the gate's refusal: its fix is a branch_policy/push_gate site"),),
-    "service.SpecContextService.show": (Case(_unknown_context, _cloned, operator=_create),),
+    "service.SpecContextService.show": (Case(_unknown_context, _cloned, before=_create),),
     "service.SpecContextService.alive": (
-        Case(_no_url_no_checkout, _cloned, operator=_clone),
-        Case(_alive_remote_gone, _cloned, operator=_remote_back),
+        Case(_no_url_no_checkout, _cloned, before=_clone),
+        Case(_alive_remote_gone, _cloned, before=_remote_back),
     ),
     "service.SpecContextService.baseline": (
         Case(_no_checkout, _cloned),
-        Case(_no_identity, _baseline_done, operator=_identity),
+        Case(_no_identity, _baseline_done, before=_identity),
         Case(_never_onboarded, _baseline_done),
-        Case(_baseline_denylisted, _baseline_done, operator=_drop_draft_term, then=_AMEND_BASELINE),
+        Case(_baseline_denylisted, _baseline_done, before=_drop_draft_term, then=_AMEND_BASELINE),
     ),
     "service.SpecContextService._refuse_principal_absent": (
         Case(_draft_principal_absent, lambda w: _baseline_done(w, "rel/0.1.0", ("main", "stage"))),
     ),
     "service.SpecContextService._require_publishable": (
-        Case(_secret_draft, _baseline_done, operator=_drop_secret),
+        Case(_secret_draft, _baseline_done, before=_drop_secret),
     ),
     "service.SpecContextService._dead_preflight": (
         (
-            Case(_untracked, _dead_done, operator=_discard_notes),
-            Case(_two_untracked, _dead_done, operator=_discard_what_the_fix_names),
+            Case(_untracked, _dead_done, before=_discard_notes),
+            Case(_two_untracked, _dead_done, before=_discard_what_the_fix_names),
         ),
-        Case(_no_origin, _dead_done, operator=_origin),
+        Case(_no_origin, _dead_done, before=_origin),
         (
             Case(_unpushed_side_branch, _dead_done),
-            Case(_commits_no_remote, _dead_done, operator=_origin),
-            Case(_stashed, _dead_done, operator=_play_stash_act),
+            Case(_commits_no_remote, _dead_done, before=_origin),
+            Case(_stashed, _dead_done, before=_play_stash_act),
         ),
         (
             Case(_dirty_on_integration, _dead_via_work),
@@ -1097,7 +1101,7 @@ _REFUSALS: dict[str, tuple[Case | tuple[Case, ...] | Skip, ...]] = {
         Case(
             _dead_denylisted,
             _dead_done,
-            operator=_drop_readme_term,
+            before=_drop_readme_term,
             then="git commit -qa --amend --no-edit && "
             "../../.dadaia/.venv/bin/dadaia context dead proj",
         ),
@@ -1254,8 +1258,8 @@ REPORT_ONLY: dict[str, Callable[[Path], None]] = {
     ),
 }
 
-#: Error findings no command can repair (the remedy is the operator's content).
-OPERATOR_ACTION: dict[str, Callable[[Path], None]] = {
+#: Error findings no command can repair (the remedy is the agent's content).
+AGENT_ACTION: dict[str, Callable[[Path], None]] = {
     "SPEC-DOC-002": _plant_headingless_memory_document,
     "SPEC-DOC-004": _plant_status_line_gone,
     "TREE-8": _plant_stray_dotfile,
@@ -1353,9 +1357,9 @@ def _clears(
     return f"fix: {first['fix']}"
 
 
-def _operator_action(ws: Path, code: str) -> str:
+def _agent_action(ws: Path, code: str) -> str:
     """Every finding of *code* is one `Agent action:` naming a file under the tree."""
-    root = _specs_tree(ws, OPERATOR_ACTION[code])
+    root = _specs_tree(ws, AGENT_ACTION[code])
     found = [f for f in _findings(root, "specs", "ledgers") if f["code"] == code]
     assert found, f"{code}: the fixture did not make the rule fire"
     for finding in found:
@@ -1400,8 +1404,8 @@ SITES |= {
         if code != "WORKTREE"
     },
     **{
-        f"doctor-specs-{code}": lambda ws, code=code: _operator_action(ws, code)
-        for code in OPERATOR_ACTION
+        f"doctor-specs-{code}": lambda ws, code=code: _agent_action(ws, code)
+        for code in AGENT_ACTION
     },
     "doctor-specs-WORKTREE": _worktree,
     # a raw ``specs/AGENTS.md`` (the template an older ``specs init`` copied) is flagged
@@ -1505,7 +1509,7 @@ def _ledger(ws: Path, code: str) -> str:
                 if where == 1
                 else git_line(path.parent, "log", "-p", "--", path.name)
             )
-            assert f"`{git_line(path.parent, 'checkout', '--', path.name)}`" in fix, fix
+            assert "checkout" not in fix, fix
             assert finder in fix, fix
             assert (f"line 1 of {path} " if where == 1 else f"{path} fails at {where} ") in fix, fix
         first = first or fix
@@ -1538,7 +1542,7 @@ def test_a_dangling_caused_by_is_cleared_by_bugs_update(workspace: Path) -> None
     }
 
 
-def test_a_caused_by_cycle_is_an_operator_decision(workspace: Path) -> None:
+def test_a_caused_by_cycle_is_an_agent_decision(workspace: Path) -> None:
     """Which link of a cycle is wrong is a judgement: the fix names the cycle's records and the
     law, and sets no value."""
     _, fix = _bugs_fix(

@@ -382,8 +382,8 @@ def _append(path: Path, text: str) -> None:
 
 
 #: error findings no command can repair
-#: (the remedy is the operator's content): each carries an `Agent action:` naming its file.
-OPERATOR_ACTION: dict[str, Callable[[Path], None]] = {
+#: (the remedy is the agent's content): each carries an `Agent action:` naming its file.
+AGENT_ACTION: dict[str, Callable[[Path], None]] = {
     "SPEC-DOC-002": _plant_headingless_memory_document,
     "SPEC-DOC-004": _plant_status_line_gone,
     "TREE-8": _plant_stray_dotfile,
@@ -404,12 +404,12 @@ OPERATOR_ACTION: dict[str, Callable[[Path], None]] = {
 }  # fmt: skip
 
 
-@pytest.mark.parametrize("code", sorted(OPERATOR_ACTION))
-def test_an_operator_action_names_the_file_to_change(code: str, repo: Path) -> None:
+@pytest.mark.parametrize("code", sorted(AGENT_ACTION))
+def test_an_agent_action_names_the_file_to_change(code: str, repo: Path) -> None:
     """An unfixable error's fix is one
     `Agent action:` line naming the finding's own file — never a placeholder."""
     root = repo
-    OPERATOR_ACTION[code](root)
+    AGENT_ACTION[code](root)
     ledgers = _ledgers_section(None, root / "specs")
     found = [f for f in (*_specs_section(_doctor(root), None).findings, *ledgers.findings) if f.code == code]  # fmt: skip
     assert found, f"{code}: the fixture did not make the rule fire"

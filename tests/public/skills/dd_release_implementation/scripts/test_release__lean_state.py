@@ -258,6 +258,39 @@ def test_ship_requires_each_open_bug_flag_and_its_verbatim_authorization_note(
     assert authorization in [entry["text"] for entry in archived["log"]]
 
 
+@pytest.mark.parametrize(
+    ("log", "fix"),
+    [
+        pytest.param(
+            [_entry("summary", "carried: a-bug; backlog exits: none")],
+            "Operator action: authorize carrying a-bug, then record it in the kind: note verbatim "
+            "authorization and the kind: summary carried field",
+            id="no-authorization-is-the-operators",
+        ),
+        pytest.param(
+            [_entry("note", 'Operator authorization verbatim: "carry a-bug open"')],
+            "Agent action: add a-bug to the carried field of the kind: summary entry",
+            id="no-carry-is-the-agents",
+        ),
+    ],
+)
+def test_ship_names_who_clears_a_missing_authorization_or_carry(
+    script: Path, tmp_path: Path, log: list[dict[str, object]], fix: str
+) -> None:
+    specs = _specs(tmp_path)
+    memory = _entry("memory", "m", since="1111111", until="2222222", reviewed=[], changed=[])
+    _write_release(specs, phase="CLOSURE", log=[*log, memory])
+    (specs / "bugs").mkdir()
+    (specs / "bugs" / "BUGS.jsonl").write_text(
+        json.dumps({"id": "a-bug", "status": "open"}) + "\n", encoding="utf-8"
+    )
+    refused = _run(
+        script, "ship", "--sha", "3333333", "--allow-open", "a-bug", "--specs", str(specs)
+    )
+    assert refused.returncode == 1
+    assert refused.stderr.splitlines()[-1] == f"fix: {fix}"
+
+
 def test_closure_check_needs_the_memory_entry_but_not_git(script: Path, tmp_path: Path) -> None:
     specs = _specs(tmp_path)
     _write_release(

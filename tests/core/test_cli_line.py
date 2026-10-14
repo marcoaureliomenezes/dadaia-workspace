@@ -56,9 +56,18 @@ def test_no_workspace_names_the_cli_of_the_running_venv(monkeypatch: pytest.Monk
     assert cli_line.fix_line(None, "doctor", "--fix") == shlex.join([cli, "doctor", "--fix"])
 
 
-def test_the_kernel_spells_the_fix_line_and_the_reinstall_act() -> None:
+def test_the_kernel_spells_the_fix_line_and_the_reinstall_act(tmp_path: Path) -> None:
     assert cli_line.spell_fix("do it") == "fix: do it"
-    assert cli_line.reinstall_fix() == "uvx dadaia-workspace init"
+    assert (
+        cli_line.reinstall_fix(tmp_path)
+        == "Agent action: run `uvx dadaia-workspace init` with the workspace's directory as its first argument"
+    )
+    (tmp_path / ".dadaia" / "states").mkdir(parents=True)
+    (tmp_path / ".dadaia" / "states" / "spec_contexts.json").write_text("{}", encoding="utf-8")
+    assert (
+        cli_line.reinstall_fix(tmp_path / "specs")
+        == f"uvx dadaia-workspace init {tmp_path.resolve()}"
+    )
 
 
 def test_no_string_outside_the_kernel_spells_a_fix_line_by_hand() -> None:

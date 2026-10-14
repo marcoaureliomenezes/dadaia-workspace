@@ -11,7 +11,6 @@ from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.core.cli_line import git_line
 from tests.helpers.skill_scripts import stage_skill_scripts
 
 # verb: (skill, script, code, a tree the verb flags, a file whose bytes are not UTF-8)
@@ -29,8 +28,9 @@ _VERBS = {
 }  # fmt: skip
 
 
-def _restore(path: Path) -> str:
-    return git_line(path.parent, "checkout", "--", path.name)
+def _reencode(path: Path) -> str:
+    """The fix for a file whose first line is not UTF-8: the line, in place, nothing discarded."""
+    return f"Agent action: re-encode line 1 of {path} as UTF-8 in place; every other line stays"
 
 
 def _check(tmp_path: Path, verb: str, planted: tuple[str, bytes]):
@@ -71,7 +71,7 @@ def test_a_file_that_is_not_utf8_is_a_finding_of_the_verbs_own_code(
     (finding,) = json.loads(done.stdout)
     assert (finding["code"], finding["verdict"], finding["path"]) == (code, "error", relative)
     target = (tmp_path / "repo" / "specs" / relative).resolve()
-    assert finding["fix"] == _restore(target)
+    assert finding["fix"] == _reencode(target)
 
 
 # verb: (skill, script, argv after the script, the file whose bytes are not UTF-8)
@@ -104,7 +104,7 @@ def test_a_verb_that_reads_a_file_that_is_not_utf8_refuses_with_one_fix(
     assert done.returncode == 1 and "Traceback" not in done.stderr
     assert relative in done.stderr
     assert [ln for ln in done.stderr.splitlines() if ln.startswith("fix: ")] == [
-        f"fix: {_restore((specs / relative).resolve())}"
+        f"fix: {_reencode((specs / relative).resolve())}"
     ]
 
 
@@ -146,4 +146,49 @@ def test_the_origin_verb_names_a_spec_that_is_not_utf8_once(tmp_path: Path) -> N
     )  # fmt: skip
 
     assert done.returncode == 1
-    assert done.stderr == f"[error] {spec} is not valid UTF-8\nfix: {_restore(spec.resolve())}\n"
+    assert done.stderr == f"[error] {spec} is not valid UTF-8\nfix: {_reencode(spec.resolve())}\n"
+
+
+def test_following_the_not_utf8_fix_keeps_every_valid_record(tmp_path: Path) -> None:
+    """An uncommitted record with one Latin-1 byte is re-encoded in place: no record is lost
+    and the check passes, where a git restore would leave the committed, empty ledger."""
+    script = stage_skill_scripts("dd-bug-resolution", tmp_path / "staged" / "scripts") / "bugs.py"
+    specs = tmp_path / "repo" / "specs"
+    (specs / "bugs").mkdir(parents=True)
+    ledger = specs / "bugs" / "BUGS.jsonl"
+    ledger.write_text("", "utf-8")
+    (tmp_path / "repo" / "src").mkdir()
+    (tmp_path / "repo" / "src" / "m.py").write_text("", "utf-8")
+    for argv in (
+        ["init", "-q"],
+        ["add", "src"],
+        ["-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "s"],
+    ):
+        subprocess.run(
+            ["git", "-C", str(tmp_path / "repo"), *argv], check=True, capture_output=True
+        )
+    run = lambda *argv: subprocess.run(
+        [sys.executable, str(script), *argv, "--specs", str(specs)],
+        capture_output=True,
+        check=False,
+        text=True,
+    )  # noqa: E731, fmt: skip
+    appended = run("append", "--bug-id", "a-bug", "--reported-by", "x", "--title", "caf\u00e9",
+                   "--severity", "LOW", "--surface", "src", "--component", "c", "--context", "ctx",
+                   "--symptom", "s", "--repro", "r", "--expected", "e", "--correlates", "none")  # fmt: skip
+    assert appended.returncode == 0, appended.stderr
+    ledger.write_bytes(ledger.read_bytes().replace("caf\u00e9".encode(), b"caf\xe9"))
+
+    refused = run("check")
+    (fix,) = [
+        ln
+        for ln in refused.stderr.splitlines() + refused.stdout.splitlines()
+        if ln.startswith("fix: ")
+    ]
+    assert fix == f"fix: {_reencode(ledger.resolve())}" and "checkout" not in fix
+
+    lines = ledger.read_bytes().split(b"\n")
+    lines[0] = lines[0].decode("latin-1").encode("utf-8")
+    ledger.write_bytes(b"\n".join(lines))
+    assert run("check").returncode == 0
+    assert json.loads(ledger.read_text("utf-8").splitlines()[0])["id"] == "a-bug"

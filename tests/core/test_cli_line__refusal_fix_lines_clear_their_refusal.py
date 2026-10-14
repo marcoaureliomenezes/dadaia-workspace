@@ -5,7 +5,7 @@ Each case below builds the triggering state over ``file://`` remotes and hits th
 a push-gate case feeds the ref lines git hands its hook to an in-process
 ``ci push-gate-check`` (80 columns, no TTY); a baseline/alive/dead case runs the real
 command as a child process. It takes the single ``fix:`` line and runs it with ``sh -c`` —
-an ``Agent action:`` or ``Operator action:`` line is played by the case's *operator* instead — and runs the real
+an ``Agent action:`` or ``Operator action:`` line is played by the case's *before* step instead — and runs the real
 command (the real push through the shipped hook) again. One line without a TTY — every
 family prints through ``cli/_fail.fail`` — is proven on a real child by
 :func:`test_every_fix_line_prints_on_one_line_without_a_tty`. Progress rule:
@@ -259,13 +259,13 @@ def _single_fix(done: subprocess.CompletedProcess[str]) -> str:
 @dataclass(frozen=True)
 class Case:
     """*build* plants the refusal and returns the command that hits it (argv, or a shell
-    line run in the repo); *operator* is the documented human step the refusal text asks
+    line run in the repo); *before* is the documented step the refusal text asks
     for before its fix (an edit), or the act an action fix names; *then* replaces the re-run when the fix renames what the
     refused command named; *done* asserts the published end state."""
 
     build: Callable[[World], list[str] | str]
     done: Callable[[World], None]
-    operator: Callable[[World], None] | None = None
+    before: Callable[[World], None] | None = None
     then: list[str] | str | None = None
     replaces: bool = False
 
@@ -316,8 +316,8 @@ def _drive(world: World, case: Case) -> None:
         assert fix not in seen, f"no progress — the same fix line again:\n{fix}"
         seen.append(fix)
         act = fix.startswith(("Agent action: ", "Operator action: "))
-        if case.operator is not None and (act or step == 0):
-            case.operator(world)
+        if case.before is not None and (act or step == 0):
+            case.before(world)
         assert "<" not in fix.replace("<<", ""), f"a placeholder: {fix}"
         ran = None if act else world.run(fix, world.elsewhere)  # a fix line runs from any cwd
         assert ran is None or ran.returncode == 0, f"the fix does not run:\n{fix}\n{ran}"
@@ -849,22 +849,22 @@ SITES: dict[str, tuple[Case | tuple[Case, ...] | Skip, ...]] = {
     "push_gate._rewrite_fix": (
         (
             Case(_denylisted_not_checked_out, _clean_publish, then=_CLEAN_COMMIT_PUSH),
-            Case(_denylisted, _clean_publish, operator=_drop_term, then=_COMMIT_PUSH),
+            Case(_denylisted, _clean_publish, before=_drop_term, then=_COMMIT_PUSH),
             Case(
                 _denylisted_in_a_worktree,
                 _worktree_clean,
-                operator=_drop_worktree_term,
+                before=_drop_worktree_term,
                 then="git -C .claude/worktrees/agent-x commit -qa --amend --no-edit && "
                 "git -C .claude/worktrees/agent-x push -q origin feature/1.0.0",
             ),
-            Case(_denylisted_no_context, _clean_publish, operator=_drop_term, then=_COMMIT_PUSH),
+            Case(_denylisted_no_context, _clean_publish, before=_drop_term, then=_COMMIT_PUSH),
             Case(
                 _denylisted_advanced_integration,
                 _nothing_reverted,
-                operator=_drop_term,
+                before=_drop_term,
                 then="git commit -qa --amend --no-edit && git push -q origin feature/1.0.1",
             ),
-            Case(_non_canon, _no_junk, operator=_rm_junk, then=_COMMIT_PUSH),
+            Case(_non_canon, _no_junk, before=_rm_junk, then=_COMMIT_PUSH),
         ),
     ),
     "push_gate._read_failure": (Skip("needs a corrupted object store; `git fsck` names it"),),
@@ -873,33 +873,33 @@ SITES: dict[str, tuple[Case | tuple[Case, ...] | Skip, ...]] = {
     ),
     "ci._repo_root": (Skip("the pre-push hook always runs inside the repo it pushes"),),
     "ci.push_gate_check": (Skip("the gate's refusal: its fix is a branch_policy/push_gate site"),),
-    "service.SpecContextService.show": (Case(_unknown_context, _cloned, operator=_create),),
+    "service.SpecContextService.show": (Case(_unknown_context, _cloned, before=_create),),
     "service.SpecContextService.alive": (
-        Case(_no_url_no_checkout, _cloned, operator=_clone),
-        Case(_alive_remote_gone, _cloned, operator=_remote_back),
+        Case(_no_url_no_checkout, _cloned, before=_clone),
+        Case(_alive_remote_gone, _cloned, before=_remote_back),
     ),
     "service.SpecContextService.baseline": (
         Case(_no_checkout, _cloned),
-        Case(_no_identity, _baseline_done, operator=_identity),
+        Case(_no_identity, _baseline_done, before=_identity),
         Case(_never_onboarded, _baseline_done),
-        Case(_baseline_denylisted, _baseline_done, operator=_drop_draft_term, then=_AMEND_BASELINE),
+        Case(_baseline_denylisted, _baseline_done, before=_drop_draft_term, then=_AMEND_BASELINE),
     ),
     "service.SpecContextService._refuse_principal_absent": (
         Case(_draft_principal_absent, lambda w: _baseline_done(w, "rel/0.1.0", ("main", "stage"))),
     ),
     "service.SpecContextService._require_publishable": (
-        Case(_secret_draft, _baseline_done, operator=_drop_secret),
+        Case(_secret_draft, _baseline_done, before=_drop_secret),
     ),
     "service.SpecContextService._dead_preflight": (
         (
-            Case(_untracked, _dead_done, operator=_discard_notes),
-            Case(_two_untracked, _dead_done, operator=_discard_what_the_fix_names),
+            Case(_untracked, _dead_done, before=_discard_notes),
+            Case(_two_untracked, _dead_done, before=_discard_what_the_fix_names),
         ),
-        Case(_no_origin, _dead_done, operator=_origin),
+        Case(_no_origin, _dead_done, before=_origin),
         (
             Case(_unpushed_side_branch, _dead_done),
-            Case(_commits_no_remote, _dead_done, operator=_origin),
-            Case(_stashed, _dead_done, operator=_play_stash_act),
+            Case(_commits_no_remote, _dead_done, before=_origin),
+            Case(_stashed, _dead_done, before=_play_stash_act),
         ),
         (
             Case(_dirty_on_integration, _dead_via_work),
@@ -911,7 +911,7 @@ SITES: dict[str, tuple[Case | tuple[Case, ...] | Skip, ...]] = {
         Case(
             _dead_denylisted,
             _dead_done,
-            operator=_drop_readme_term,
+            before=_drop_readme_term,
             then="git commit -qa --amend --no-edit && "
             "../../.dadaia/.venv/bin/dadaia context dead proj",
         ),

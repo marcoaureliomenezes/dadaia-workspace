@@ -232,10 +232,10 @@ def test_a_live_spec_without_the_bug_window_review(
     assert f"{verdict} releases/0.5.0/rc-1/SPEC.md:1 " in listed.stdout
 
 
-def test_a_verb_with_no_live_release_hands_new_to_the_operator(
+def test_a_verb_with_no_live_release_hands_new_to_the_agent(
     script: Path, tmp_path: Path
 ) -> None:
-    """With no live release the one fix is the operator's `new`, version unchosen."""
+    """With no live release the one fix is the agent's `new`, version unchosen."""
     specs = _specs(tmp_path)
     result = _run(script, "phase", "IMPLEMENTATION", "--sha", "abc1234", "--specs", str(specs))
     py = Path(sys.executable).as_posix()

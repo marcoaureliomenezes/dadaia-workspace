@@ -15,6 +15,7 @@ from dadaia_workspace.core.skill_owner import load_owner
 _SOURCE = Path(load_owner("dd-bug-resolution", "_privacy").__file__ or "")
 
 _GOOD = {"id": "ok", "regex": "abc"}
+_FALLBACK = "Agent action: run `uvx dadaia-workspace init` with the workspace's directory as its first argument"
 
 
 def _baseline_at(tmp_path: Path, text: str | bytes) -> ModuleType:
@@ -46,7 +47,7 @@ def test_a_malformed_baseline_refuses_naming_the_row_with_one_fix(
     with pytest.raises(load_owner("dd-bug-resolution", "_refusal").Refusal) as caught:
         module.load_baseline()
     assert named in str(caught.value)
-    assert caught.value.fix == "uvx dadaia-workspace init"
+    assert caught.value.fix == _FALLBACK
 
 
 def test_a_wellformed_baseline_loads_every_row(tmp_path: Path) -> None:
@@ -59,4 +60,17 @@ def test_a_baseline_that_is_not_utf8_is_reinstalled_not_restored_from_git(tmp_pa
     with pytest.raises(load_owner("dd-bug-resolution", "_refusal").Refusal) as caught:
         module.load_baseline()
     assert "no pattern was applied" in str(caught.value)
-    assert caught.value.fix == "uvx dadaia-workspace init"
+    assert caught.value.fix == _FALLBACK
+
+
+def test_a_baseline_inside_a_workspace_is_reinstalled_by_init_of_that_workspace(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / ".dadaia" / "states").mkdir(parents=True)
+    (tmp_path / ".dadaia" / "states" / "spec_contexts.json").write_text("{}", encoding="utf-8")
+    inside = tmp_path / ".agents" / "skills" / "dd-bug-resolution" / "scripts"
+    inside.mkdir(parents=True)
+    module = _baseline_at(inside, b"\xff\xfe")
+    with pytest.raises(load_owner("dd-bug-resolution", "_refusal").Refusal) as caught:
+        module.load_baseline()
+    assert caught.value.fix == f"uvx dadaia-workspace init {tmp_path.resolve()}"

@@ -127,9 +127,9 @@ _DEEP = '{"contexts": ' + "[" * 100_000  # past json's recursion limit (CWE-674)
     ("body", "fix_head"),
     [(json.dumps({"schema_version": "1", "contexts": [_ATIVO]}), None),
      (json.dumps({"schema_version": "4", "contexts": [_ALIVE]}), "Agent action: "),
-     (json.dumps({"schema_version": "banana", "contexts": [_ALIVE]}), "Agent action: "),
-     (_TRUNCATED, "Agent action: rewrite "), ("{}", "Agent action: rewrite "),
-     (_DEEP, "Agent action: rewrite ")],
+     (json.dumps({"schema_version": "banana", "contexts": [_ALIVE]}), "Operator action: "),
+     (_TRUNCATED, "Operator action: rewrite "), ("{}", "Operator action: rewrite "),
+     (_DEEP, "Operator action: rewrite ")],
     ids=["v1", "newer", "banana", "AC3.9-truncated", "AC3.9-empty-object", "AC3.9-deep-nesting"],
 )  # fmt: skip
 def test_doctor_on_a_bad_registry_gives_a_finding_with_a_fix(
@@ -160,7 +160,7 @@ def test_ac3_9_an_unreadable_registry_is_reg_schema_at_every_reader(ws: Path, bo
     REG-SCHEMA, never "create a context"; the layout check admits every slug (`*`)."""
     path = ws / ".dadaia" / "states" / "spec_contexts.json"
     path.write_text(body, encoding="utf-8")
-    fix = f"fix: Agent action: rewrite {path} as one {_SHAPE} object"
+    fix = f"fix: Operator action: rewrite {path} as one {_SHAPE} object"
 
     for argv in (
         ["list"],
@@ -174,7 +174,7 @@ def test_ac3_9_an_unreadable_registry_is_reg_schema_at_every_reader(ws: Path, bo
 
     env = claude_hook_env(ws, session_id="s")
     started = run_hook_subprocess("ctx_inject", {"hook_event_name": "SessionStart"}, env)
-    assert "REG-SCHEMA" in started.stdout and "Agent action: rewrite" in started.stdout
+    assert "REG-SCHEMA" in started.stdout and "Operator action: rewrite" in started.stdout
     assert "create a context" not in started.stdout.lower(), started.stdout
     assert context_registry.registered_slugs(ws) == (frozenset("*"), frozenset("*"))
 
@@ -192,7 +192,7 @@ def test_ac3_9_doctor_fix_acts_on_nothing_over_an_unreadable_registry(ws: Path) 
 
 def test_a_registry_row_missing_a_key_is_reg_schema(ws: Path) -> None:
     """A row without ``created_at`` is unreadable, never a ``KeyError``:
-    `context list` exits 1 with one ``Agent action:`` fix line, and doctor gives one
+    `context list` exits 1 with one ``Operator action:`` fix line, and doctor gives one
     REG-SCHEMA finding carrying it."""
     _registry(ws, "2", [{k: v for k, v in _ALIVE.items() if k != "created_at"}])
 
@@ -202,7 +202,7 @@ def test_a_registry_row_missing_a_key_is_reg_schema(ws: Path) -> None:
     assert isinstance(refused.exception, SystemExit), refused.exception
     fixes = [ln for ln in refused.output.splitlines() if ln.startswith("fix: ")]
     assert refused.exit_code == 1 and len(fixes) == 1, refused.output
-    assert fixes[0].startswith("fix: Agent action: ")
+    assert fixes[0].startswith("fix: Operator action: ")
     sections = json.loads(doctor.stdout)["sections"].values()
     (fix,) = [f["fix"] for s in sections for f in s["findings"] if f["code"] == "REG-SCHEMA"]
-    assert fix.startswith("Agent action: ")
+    assert fix.startswith("Operator action: ")

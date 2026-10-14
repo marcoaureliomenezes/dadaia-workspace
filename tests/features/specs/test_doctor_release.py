@@ -77,7 +77,12 @@ def test_closure_memory_record_is_judged_by_the_script(
     script and --specs, and no placeholder."""
     specs = _specs(tmp_path, phase, log)
     record = [f for f in _check(specs) if "`kind: memory`" in f["message"]]
-    fix = f"{sys.executable} {_SCRIPT} drift --specs {specs.resolve()}"
+    run = f"{sys.executable} {_SCRIPT}"
+    fix = (
+        f"Agent action: run `{run} drift --specs {specs.resolve()}`, judge its worklist, then run "
+        f"`{run} memory --specs {specs.resolve()}` with the atom slugs the memory pass reviewed as "
+        "--reviewed and changed as --changed"
+    )
     if expected is None:
         assert record == []
     else:

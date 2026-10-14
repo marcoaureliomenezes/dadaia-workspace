@@ -150,7 +150,7 @@ def test_an_unreadable_registry_refuses_never_answers_no_context(tmp_path: Path,
         lambda: invocation.context_name_for_repo_slug(ws, "proj"),
         lambda: invocation.resolve_bind(ws, None, {"DADAIA_CONTEXT": "proj"}),
     ):
-        with pytest.raises(SchemaVersionError, match="Agent action: rewrite"):
+        with pytest.raises(SchemaVersionError, match="Operator action: rewrite"):
             read()
 
 

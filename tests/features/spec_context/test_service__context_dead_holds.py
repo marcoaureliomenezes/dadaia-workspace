@@ -290,7 +290,7 @@ def test_dead_refuses_a_dirty_checkout_with_one_fix_line_naming_every_file(tmp_p
 
     fixes = [line for line in str(refused.value).splitlines() if line.startswith("fix: ")]
     assert fixes == [
-        f"fix: Agent action: move {lib / 'README.md'}, {lib / 'new.txt'} into a worktree, or discard it",
+        f"fix: Operator action: move {lib / 'README.md'}, {lib / 'new.txt'} into a worktree, or discard it",
     ]
     assert (lib / "README.md").read_text() == "edited\n" and (lib / "new.txt").is_file()
     assert (

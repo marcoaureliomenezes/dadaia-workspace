@@ -82,12 +82,12 @@ _LEDGER_ROWS = [
 
 
 @pytest.mark.parametrize(("code", "rel", "committed", "bad", "where"), _LEDGER_ROWS)
-def test_an_invalid_ledger_line_is_one_operator_action(
+def test_an_invalid_ledger_line_is_one_agent_action(
     tmp_path: Path, code: str, rel: str, committed: str, bad: str, where: int | str
 ) -> None:
     """An invalid line is ONE finding whose fix is an `Agent action:` naming the
-    file, where in it, and the ledger's law; uncommitted content is discarded, else the
-    commit that introduced it is reverted — never a hand edit."""
+    file, where in it, and the ledger's law; the commit that introduced it is reverted, an
+    uncommitted line deleted by its author — never a discard of the whole file."""
     subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)  # noqa: S603, S607
     ledger = tmp_path / rel
     ledger.parent.mkdir(parents=True)
@@ -109,7 +109,7 @@ def test_an_invalid_ledger_line_is_one_operator_action(
         if where == 1
         else git_line(path.parent, "log", "-p", "--", path.name)
     )
-    assert f"`{git_line(path.parent, 'checkout', '--', path.name)}`" in fix, fix
+    assert "checkout" not in fix, fix
     assert finder in fix, fix
     assert (f"line 1 of {path} " if where == 1 else f"{path} fails at {where} ") in fix, fix
 
@@ -141,7 +141,7 @@ def test_a_dangling_caused_by_is_cleared_by_bugs_update(tmp_path: Path) -> None:
     }
 
 
-def test_a_caused_by_cycle_is_an_operator_decision(tmp_path: Path) -> None:
+def test_a_caused_by_cycle_is_an_agent_decision(tmp_path: Path) -> None:
     """Which link of a cycle is wrong
     is a judgement; the fix names the cycle's records and the law, and sets no value."""
     fix = _bugs(

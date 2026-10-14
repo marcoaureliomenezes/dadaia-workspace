@@ -460,7 +460,7 @@ def test_append_judges_the_surface_against_its_own_repo_under_a_foreign_git_env(
     assert len(_records(specs)) == 0
 
 
-def test_an_operator_action_run_outside_the_tree_keeps_its_specs_and_known_argv(
+def test_an_agent_action_run_outside_the_tree_keeps_its_specs_and_known_argv(
     script: Path, tmp_path: Path
 ) -> None:
     """An `Agent action: run` fix quotes the refused command with `--specs` and every known

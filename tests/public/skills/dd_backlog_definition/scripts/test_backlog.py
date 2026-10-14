@@ -408,7 +408,7 @@ def test_each_refusal_fix_keeps_the_chosen_disposition(
     assert done.returncode == 1
     [fix] = _fix_lines(done)
     assert "delivered" not in fix and "<" not in fix
-    if fix.startswith("fix: Agent action:"):
+    if fix.startswith(("fix: Agent action:", "fix: Operator action:")):
         assert f"--disposition {disposition}" in fix
         assert ("bugs.py append" in fix) == (disposition == "to-bug")
         assert _histo(specs) == []

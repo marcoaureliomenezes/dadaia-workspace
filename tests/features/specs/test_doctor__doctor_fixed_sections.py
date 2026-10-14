@@ -85,7 +85,7 @@ def test_check_is_a_no_op_for_an_absent_file(tmp_path: Path) -> None:
     ]
 
 
-_REINSTALL = "uvx dadaia-workspace init"
+_REINSTALL = "Agent action: run `uvx dadaia-workspace init` with the workspace's directory as its first argument"
 
 
 def test_check_reports_a_missing_library_fragment_as_a_non_fixable_error(tmp_path: Path) -> None:
@@ -225,13 +225,13 @@ def test_markers_without_a_ledger_render_an_empty_list(tmp_path: Path) -> None:
     assert _fixed_issues(doctor) == []
 
 
-def test_a_ledger_that_is_not_utf8_is_one_restore_finding_and_never_a_crash(
+def test_a_ledger_that_is_not_utf8_is_one_reencode_finding_and_never_a_crash(
     tmp_path: Path,
 ) -> None:
     public, specs, _ = _adr_specs(tmp_path, markers=True, measured_by="tests/test_x.py::test_one")
     ledger = specs / "ADRs" / "decisions.jsonl"
     ledger.write_bytes(b"\xff\xfe\n")
-    restore = git_line(ledger.parent, "checkout", "--", ledger.name)
+    restore = f"Agent action: re-encode line 1 of {ledger.resolve()} as UTF-8 in place; every other line stays"
 
     found = SpecsDoctor(specs, public_dir=public).check()
 

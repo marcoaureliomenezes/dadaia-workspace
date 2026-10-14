@@ -256,7 +256,7 @@ def test_the_delete_fix_quotes_a_path_holding_a_blank(tmp_path: Path) -> None:
     _refused(
         _run(reg, "list"),
         f"{reg} is not valid UTF-8",
-        f"Agent action: delete {load_owner('dd-bug-resolution', '_platform').quote(str(reg))} — the next registry.py run starts an empty registry",
+        f"Operator action: delete {load_owner('dd-bug-resolution', '_platform').quote(str(reg))} — the next registry.py run starts an empty registry",
     )
 
 
@@ -293,5 +293,5 @@ def test_every_registry_refusal_prints_one_error_line_and_one_fix_line(tmp_path:
     _refused(
         _run(reg, "list"),
         f"{reg} is not valid UTF-8",
-        f"Agent action: delete {reg} — the next registry.py run starts an empty registry",
+        f"Operator action: delete {reg} — the next registry.py run starts an empty registry",
     )
