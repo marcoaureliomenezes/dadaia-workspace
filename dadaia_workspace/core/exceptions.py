@@ -39,7 +39,7 @@ class InvalidContextNameError(DadaiaError, ValueError):
 
 
 class SpecsDirUnresolvedError(DadaiaError, ValueError):
-    """No ``--specs-dir`` was given and no bound context or workspace names one."""
+    """``resolve_specs_dir`` cannot name a specs directory: none given or bound, or the one given is a symlink."""
 
 
 class AssociatedRepoConflictError(DadaiaError):

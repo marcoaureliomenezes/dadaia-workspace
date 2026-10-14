@@ -243,9 +243,9 @@ def resolve_specs_dir(specs_dir: str | None) -> Path:
     if specs_dir:
         path = Path(specs_dir)
         if path.is_symlink():
-            raise ValueError(
-                f"Refusing a symlinked specs root: {path} is a symlink. Point "
-                "--specs-dir at the real directory instead of a link to it."
+            raise SpecsDirUnresolvedError(
+                f"Refusing a symlinked specs root: {path} is a symlink.",
+                fix=f"Operator action: point --specs-dir at the real directory, not the link {path}",
             )
         return path.resolve()
 
