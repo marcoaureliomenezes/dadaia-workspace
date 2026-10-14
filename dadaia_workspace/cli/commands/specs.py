@@ -149,7 +149,7 @@ def init(
             ctx = resolve_context_for_cli(context)
         except ValueError as exc:
             init = fix_line(None, "specs", "init", "--context")
-            fail(exc, f"Operator action: choose a registered context and run `{init}` with it")
+            fail(exc, f"Agent action: choose a registered context and run `{init}` with it")
         tree = resolve_context_specs_dir_for_cli(workspace := resolve_workspace_root(), ctx)
         if tree is None:  # a name the registry does not know owns no tree to write
             fail(f"no registered context {ctx!r}", fix_line(workspace, "context", "list"))

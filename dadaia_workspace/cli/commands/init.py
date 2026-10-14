@@ -86,7 +86,7 @@ def _plan(directory: str, harness: str, repo: str, associated: tuple[str, ...]) 
             f"harnesses: {', '.join(harness_registry.L1_ENTRY_HARNESSES)}.",
             fix
             if directory
-            else f"Operator action: run `{fix}` with the new workspace's "
+            else f"Agent action: run `{fix}` with the new workspace's "
             "directory as its first argument",
         )
     directory = directory or str(Path.cwd() / typer.prompt("Workspace name"))

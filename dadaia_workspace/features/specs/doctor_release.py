@@ -71,7 +71,7 @@ class ReleaseValidator:
                         severity=Severity.ERROR,
                         description=f"{fname} has no `**Status:**` line",
                         path=str(fpath),
-                        fix=f"Operator action: add the `**Status:**` line to {fpath}",
+                        fix=f"Agent action: add the `**Status:**` line to {fpath}",
                     )
                 )
             elif status not in CANONICAL_STATUS:
@@ -84,7 +84,7 @@ class ReleaseValidator:
                             f"Valid: {sorted(CANONICAL_STATUS)}"
                         ),
                         path=str(fpath),
-                        fix=f"Operator action: set a canonical `**Status:**` in {fpath}",
+                        fix=f"Agent action: set a canonical `**Status:**` in {fpath}",
                     )
                 )
             elif status != APPROVED and active.phase in _PHASES[1:]:

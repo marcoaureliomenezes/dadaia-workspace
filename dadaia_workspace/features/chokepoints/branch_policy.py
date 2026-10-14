@@ -127,7 +127,7 @@ def _refuse_branch(
     return _blocked(
         f"the {role} branch '{branch}' is never pushed directly — it advances only via a PR "
         f"from '{head}'",
-        f"Operator action: open a PR/MR from '{head}' into '{branch}' on your git host",
+        f"Agent action: open a PR/MR from '{head}' into '{branch}' on your git host",
     )
 
 

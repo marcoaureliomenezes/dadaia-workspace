@@ -238,5 +238,5 @@ class StructuralValidator:
             "placeholder. Never auto-fixed — it may be real content; move/rename it into the "
             "canon shape, or delete it, by hand (TREE-8).",
             str(entry),
-            fix=f"Operator action: move {entry} into its canon shape, or out of specs/",
+            fix=f"Agent action: move {entry} into its canon shape, or out of specs/",
         )

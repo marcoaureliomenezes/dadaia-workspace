@@ -93,7 +93,7 @@ def _rewrite_fix(ref: PushRef, object_source: ObjectSource, repo: Path, fixes: G
     """The uncommit-amend remedy for the first refused ref (origin is never rewritten)."""
     branch = ref.local_ref.removeprefix(HEADS_PREFIX)
     if ref.local_ref.startswith("refs/tags/") or not fixes.head:
-        fix = "Operator action: a tag or a detached HEAD has no branch to amend; push a branch."
+        fix = "Agent action: a tag or a detached HEAD has no branch to amend; push a branch."
     elif branch != ref.local_ref and branch != fixes.head:
         fix = git_line(fixes.repo, "switch", branch)
     else:

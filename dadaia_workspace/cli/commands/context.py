@@ -132,9 +132,9 @@ def create_fix(root: Path, error: Exception, name: str | None, urls: list[str]) 
         root, "context", "create", *([name] if name else []), "--main-repo", urls[0], *flags
     )
     if isinstance(error, ContextAlreadyExistsError):
-        return f"Operator action: choose a context name no context holds and run `{fix}` with it"
+        return f"Agent action: choose a context name no context holds and run `{fix}` with it"
     if isinstance(error, GitCloneError):
-        return f"Operator action: run `{fix}` with a reachable clone URL in place of {error.url}"
+        return f"Agent action: run `{fix}` with a reachable clone URL in place of {error.url}"
     return fix
 
 

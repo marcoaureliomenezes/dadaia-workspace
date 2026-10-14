@@ -38,7 +38,7 @@ RULES: tuple[SpecsRule, ...] = (
     _rule(
         ("SPEC-DOC-001",),
         lambda d: d._coherence.check_constitution(),
-        fix_help="Operator action: restore <specs>/constitution.md, then commit.",
+        fix_help="Agent action: restore <specs>/constitution.md, then commit.",
     ),
     _rule(
         ("SPEC-DOC-002",),
@@ -87,7 +87,7 @@ RULES: tuple[SpecsRule, ...] = (
     _rule(
         ("ADR-SUPERSEDED-CITATION",),
         lambda d: doctor_adr.superseded_adr_citations(d.specs_dir, d.public_dir),
-        fix_help="Operator action: cite the successor recorded in <specs>/ADRs/decisions.jsonl instead, then commit.",
+        fix_help="Agent action: cite the successor recorded in <specs>/ADRs/decisions.jsonl instead, then commit.",
     ),
     _rule(
         ("MEM-DRIFT-2",),
@@ -110,7 +110,7 @@ RULES: tuple[SpecsRule, ...] = (
     _rule(
         ("SPEC-DOC-026",),
         lambda d: d._release.check_unique_release_ids(),
-        fix_help="Operator action: rename one of the duplicated dirs under <specs>/releases, then commit.",
+        fix_help="Agent action: rename one of the duplicated dirs under <specs>/releases, then commit.",
     ),
     _rule(
         ("SPEC-DOC-046",),

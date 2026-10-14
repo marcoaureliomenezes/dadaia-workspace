@@ -86,7 +86,7 @@ STEPS: tuple[tuple[str, Kind, _Pending, Callable[[_Ctx], str]], ...] = (
         "constitution",
         "agent",
         lambda c: constitution_error(c.specs),
-        lambda c: f"Operator action: repair the YAML frontmatter of {c.specs / 'constitution.md'}",
+        lambda c: f"Agent action: repair the YAML frontmatter of {c.specs / 'constitution.md'}",
     ),
     (
         "specs",
@@ -98,7 +98,7 @@ STEPS: tuple[tuple[str, Kind, _Pending, Callable[[_Ctx], str]], ...] = (
         "first-pass",
         "agent",
         lambda c: f"'{c.name}' memory holds no audited content" if _first_pass(c) else None,
-        lambda c: f"Operator action: {c.root / _SKILL} §first pass — {', '.join(_first_pass(c))}",
+        lambda c: f"Agent action: {c.root / _SKILL} §first pass — {', '.join(_first_pass(c))}",
     ),
     (
         "publish",
@@ -121,7 +121,7 @@ def next_step(
     whether the caller's session is bound (``None``: no identity, so no ``bind`` step)."""
     if not trees:
         create = (
-            f"Operator action: run {fix_line(root, 'context', 'create')} with a context name "
+            f"Agent action: run {fix_line(root, 'context', 'create')} with a context name "
             "and --main-repo set to the main repo's clone URL"
         )
         return Step("context", "command", "no ALIVE Spec Context — create one", create)

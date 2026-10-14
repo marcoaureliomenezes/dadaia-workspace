@@ -32,7 +32,7 @@ def _repo_root() -> Path:
             check=True,
         )
     except (subprocess.CalledProcessError, FileNotFoundError):
-        fail("not inside a git repository", "Operator action: run it inside a git repository")
+        fail("not inside a git repository", "Agent action: run it inside a git repository")
     return Path(out.stdout.strip())
 
 

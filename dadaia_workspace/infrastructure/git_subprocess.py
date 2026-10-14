@@ -147,7 +147,7 @@ class GitSubprocessClient:
         it until a ``fetch --prune`` drops it (re-running the line restores it); commits with
         no remote; a stash entry, which lives only in this checkout."""
         if self.has_commits(path) and not self.has_remote(path):
-            return [f"Operator action: add the clone URL of {path} as its origin remote"]
+            return [f"Agent action: add the clone URL of {path} as its origin remote"]
         listed = _run(["git", "worktree", "list", "--porcelain"], cwd=path).stdout
         trees = [
             t["worktree"] for t in load_owner("dd-bug-resolution", "_git").parse_worktrees(listed)
@@ -174,12 +174,12 @@ class GitSubprocessClient:
 
     def identity_fix(self, path: Path) -> str:
         """The ONE identity probe — git's own rule (env, config, auto-detection): ``""``
-        when git resolves an author and a committer, else the operator action setting one."""
+        when git resolves an author and a committer, else the agent action setting one."""
         for ident in ("GIT_AUTHOR_IDENT", "GIT_COMMITTER_IDENT"):
             if _run(["git", "var", ident], cwd=path).returncode != 0:
                 named = _run(["git", "config", "user.name"], cwd=path).stdout.strip()
                 key = "user.email" if named else "user.name"
-                return f"Operator action: set git {key} in the config of {path}"
+                return f"Agent action: set git {key} in the config of {path}"
         return ""
 
     def push(self, path: Path) -> None:

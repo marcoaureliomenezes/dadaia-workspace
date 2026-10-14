@@ -121,7 +121,7 @@ class MemoryValidator:
                 f"{path.relative_to(self.specs_dir).as_posix()} keeps a template token in {fields}",
                 str(path),
                 fixable=(only := is_placeholder_atom(path)),
-                fix="" if only else f"Operator action: replace the token in {fields} of {path}",
+                fix="" if only else f"Agent action: replace the token in {fields} of {path}",
             )
             for path in sorted(mem_dir.rglob("*.md"))
             if (fields := ", ".join(_token_fields(path)))
@@ -249,7 +249,7 @@ class MemoryValidator:
                     Severity.ERROR,
                     f"memory/{rel} {problem}",
                     str(p),
-                    fix=f"Operator action: {fix}",
+                    fix=f"Agent action: {fix}",
                 )
             )
         return issues
@@ -269,7 +269,7 @@ class MemoryValidator:
                 Severity.ERROR,
                 err,
                 str(result.path),
-                fix=f"Operator action: correct {result.path} ({err})",
+                fix=f"Agent action: correct {result.path} ({err})",
             )
             for result in memory_lint.lint_directory(mem_dir, schema)
             for err in result.errors

@@ -66,7 +66,7 @@ def upgrade(
     if architecture.is_file() and _RETIRED_PART_HEADING in architecture.read_text("utf-8"):
         raise UpgradeRefused(
             f"{architecture} is two-tier ({_RETIRED_PART_HEADING!r}): nowhere safe to fold into.",
-            "Operator action: rewrite its headings as ## Principles / ## Tech Stack / "
+            "Agent action: rewrite its headings as ## Principles / ## Tech Stack / "
             f"## Structure, then re-run `{fix_line(None, 'specs', 'upgrade', '--specs-dir', str(specs_dir))}`.",
         )
 

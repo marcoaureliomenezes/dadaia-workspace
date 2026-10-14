@@ -164,7 +164,7 @@ class DoctorService:
                 f"{md.parent.name}/SKILL.md has {n} lines > soft limit {soft}",
                 False,
                 False,
-                f"Operator action: split {md} into its references/*.md and/or scripts/",
+                f"Agent action: split {md} into its references/*.md and/or scripts/",
             )
             for md in sorted((self._workspace_root / ".agents" / "skills").glob("*/SKILL.md"))
             if (n := md.read_bytes().count(b"\n")) > soft

@@ -62,13 +62,13 @@ RULES: tuple[LedgerRule, ...] = (
         ("BL-SCHEMA",),
         SECTION,
         _check_schema,
-        fix_help="Operator action: correct the entry this finding names in <specs>/backlog/BACKLOG.json, then commit.",
+        fix_help="Agent action: correct the entry this finding names in <specs>/backlog/BACKLOG.json, then commit.",
     ),
     Rule(
         ("BL-CONFLICT",),
         SECTION,
         _check_conflict,
-        fix_help="Operator action: exit one of the twins this finding names from <specs>/backlog/BACKLOG.json, then commit.",
+        fix_help="Agent action: exit one of the twins this finding names from <specs>/backlog/BACKLOG.json, then commit.",
     ),
 )
 

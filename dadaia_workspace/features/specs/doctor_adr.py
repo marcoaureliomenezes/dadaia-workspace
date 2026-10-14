@@ -146,7 +146,7 @@ def adr_list_block(specs_dir: Path) -> str:
     ``measured_by`` resolves to nothing."""
     if unresolved := unresolved_measured_by(specs_dir):
         raise ValueError(
-            "Operator action: set the measured_by of ADR "
+            "Agent action: set the measured_by of ADR "
             + ", ".join(i for i, _ in unresolved)
             + " to a tracked path, a path::name test or workflow-job id, or a rule code"
             " (an in-place `chore(adrs): repair` commit)."
