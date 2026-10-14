@@ -18,7 +18,7 @@ sources:
 
 ## Writer and transitions
 
-- `bugs.py` is the one writer and validator. Reads are `status`, `stats` and `check` (`check` prints each finding with its `fix:` line on the next line, and a ledger that is not UTF-8 is one finding carrying the restore act); writes are `append`, governance `update`, `resolve`, `supersede`, `reject` and `archive`.
+- `bugs.py` is the one writer and validator. Reads are `status`, `stats` and `check` (`check` prints each finding with its `fix:` line on the next line, and a ledger that is not UTF-8 is one finding carrying the `Agent action:` to re-encode the failing line as UTF-8 in place, every other line kept); writes are `append`, governance `update`, `resolve`, `supersede`, `reject` and `archive`.
 - Registration follows an operator-confirmed proposal naming the violated contract and reproduction. `append` refuses duplicate ids and untracked-directory surfaces (read through the kernel git runner), prints correlation candidates and subjects every supplied value to the publication privacy matcher.
 - `resolve` requires cause, lineage, solution and fix sha. `supersede` names the replacement; `reject` records the reason. The schema's mutability classes prevent generic update from changing transition-owned state.
 - `archive` moves named terminal records into the bug history. Open records cannot be archived.

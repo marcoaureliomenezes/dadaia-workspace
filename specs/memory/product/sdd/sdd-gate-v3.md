@@ -25,9 +25,9 @@ sources:
 
 ## Fix contract
 
-- Every BLOCK contains exactly one `fix: <command>` or `fix: Operator action: <one act>`.
+- Every BLOCK contains exactly one fix line, in one of three forms: `fix: <command>`, `fix: Agent action: <one act>` for an act an agent performs that no single command does, or `fix: Operator action: <one act>` only for an act the law reserves to the operator (an ADR acceptance, a secret, a `.dadaiaignore` or PROTECTED edit, a named ruling, an act outside agent reach).
 - CLI fixes are rendered by the shared command-line builder, with real values and no placeholder or command chain.
-- Root slop points to the agent's dated scratch directory; protected projection and law paths point to the owning install or operator action; an out-of-scope repository points to the owning context bind; merge-only repository writes point to the canonical worktree list.
+- Root slop points to the agent's dated scratch directory; protected projection and law paths point to the owning install or operator action; a CLI-owned state file under `.dadaia/states/` has its own lane, whose fix is the `Agent action:` to use the verb or skill script that owns it, while `.dadaia/states/privacy_denylist.json` is the operator's file and refuses with an `Operator action:`; an out-of-scope repository points to the owning context bind; merge-only repository writes point to the canonical worktree list.
 
 ## Push chokepoint
 

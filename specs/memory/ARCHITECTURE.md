@@ -267,6 +267,7 @@ flowchart TB
 - 0260 — ADR 0193 is superseded: no fixed job cap per rc; the DAG, Job 1 and the Reconciliation live in dd-release-definition
 - 0261 — ADR 0142 stays: no hard line-count limit gates any change; line counts are a readout; its measured_by is repaired
 - 0262 — The per-job CI wall-clock budget of ADR 0119 is re-frozen at measured durations, judged by dd-code-reviewer from the CI job durations
+- 0263 — A fix line has three forms: a runnable command, 'Agent action: <one act>' for an act an agent performs, and 'Operator action: <one act>' only for an act the law reserves to the human
 <!-- /dadaia:fixed adr-list -->
 
 <!-- dadaia:fixed slop-code -->
