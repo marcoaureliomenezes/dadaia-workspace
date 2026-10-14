@@ -510,3 +510,7 @@ def test_the_scans_bite() -> None:
     assert _text_sites({"docs/getting-started.md": "release-please\n"}) == [
         "docs/getting-started.md:1"
     ]
+    generated = "<!-- dadaia:fixed adr-list -->\n- 0021 — the `rc-N` shape retires\n<!-- /dadaia:fixed adr-list -->\n"
+    assert _text_sites({"specs/memory/ARCHITECTURE.md": f"# A\n{generated}the `rc-N` shape\n"}) == [
+        "specs/memory/ARCHITECTURE.md:5"
+    ]
