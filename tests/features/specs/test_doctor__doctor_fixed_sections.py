@@ -8,7 +8,6 @@ import json
 import subprocess
 from pathlib import Path
 
-from dadaia_workspace.core.cli_line import git_line
 from dadaia_workspace.features.specs.doctor import SpecsDoctor
 from dadaia_workspace.features.specs.doctor_adr import adr_record_issues
 from dadaia_workspace.features.specs.doctor_memory import MemoryValidator

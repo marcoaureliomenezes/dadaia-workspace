@@ -167,12 +167,15 @@ def test_following_the_not_utf8_fix_keeps_every_valid_record(tmp_path: Path) -> 
         subprocess.run(
             ["git", "-C", str(tmp_path / "repo"), *argv], check=True, capture_output=True
         )
-    run = lambda *argv: subprocess.run(
-        [sys.executable, str(script), *argv, "--specs", str(specs)],
-        capture_output=True,
-        check=False,
-        text=True,
-    )  # noqa: E731, fmt: skip
+
+    def run(*argv: str) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            [sys.executable, str(script), *argv, "--specs", str(specs)],
+            capture_output=True,
+            check=False,
+            text=True,
+        )
+
     appended = run("append", "--bug-id", "a-bug", "--reported-by", "x", "--title", "caf\u00e9",
                    "--severity", "LOW", "--surface", "src", "--component", "c", "--context", "ctx",
                    "--symptom", "s", "--repro", "r", "--expected", "e", "--correlates", "none")  # fmt: skip
