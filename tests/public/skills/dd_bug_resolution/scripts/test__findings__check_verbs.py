@@ -30,7 +30,7 @@ _VERBS = {
 
 
 def _restore(path: Path) -> str:
-    return f"Operator action: restore {path} with `{git_line(path.parent, 'checkout', '--', path.name)}`"
+    return git_line(path.parent, "checkout", "--", path.name)
 
 
 def _check(tmp_path: Path, verb: str, planted: tuple[str, bytes]):

@@ -85,7 +85,7 @@ def test_check_is_a_no_op_for_an_absent_file(tmp_path: Path) -> None:
     ]
 
 
-_REINSTALL = "Operator action: restore {} by running `uvx dadaia-workspace init`"
+_REINSTALL = "uvx dadaia-workspace init"
 
 
 def test_check_reports_a_missing_library_fragment_as_a_non_fixable_error(tmp_path: Path) -> None:
@@ -95,9 +95,7 @@ def test_check_reports_a_missing_library_fragment_as_a_non_fixable_error(tmp_pat
     issues = MemoryValidator(specs).check_fixed_sections(public)
     assert [(i.code, i.verdict, i.fixable) for i in issues] == [("FIXED-1", "error", False)] * 3
     assert all("library fragment" in i.message for i in issues)
-    assert [i.fix for i in issues] == [
-        _REINSTALL.format(f"{section}.md") for section in ("slop-law", "slop-code", "slop-tests")
-    ]
+    assert [i.fix for i in issues] == [_REINSTALL] * 3
 
 
 def test_fix_inserts_a_missing_block_and_refreshes_a_drifted_one(tmp_path: Path) -> None:
@@ -233,10 +231,7 @@ def test_a_ledger_that_is_not_utf8_is_one_restore_finding_and_never_a_crash(
     public, specs, _ = _adr_specs(tmp_path, markers=True, measured_by="tests/test_x.py::test_one")
     ledger = specs / "ADRs" / "decisions.jsonl"
     ledger.write_bytes(b"\xff\xfe\n")
-    restore = (
-        f"Operator action: restore {ledger} with "
-        f"`{git_line(ledger.parent, 'checkout', '--', ledger.name)}`"
-    )
+    restore = git_line(ledger.parent, "checkout", "--", ledger.name)
 
     found = SpecsDoctor(specs, public_dir=public).check()
 
@@ -258,4 +253,4 @@ def test_a_fragment_that_is_not_utf8_is_reinstalled_not_misread_as_a_refused_ren
 
     (refused,) = [i for i in SpecsDoctor(specs, public_dir=public).check() if i.code == "FIXED-2"]
 
-    assert refused.fix == _REINSTALL.format("slop-code.md")
+    assert refused.fix == _REINSTALL

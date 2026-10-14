@@ -38,10 +38,7 @@ def test_a_schema_that_is_not_utf8_is_reinstalled_not_restored_from_git(tmp_path
     )
     done = _run(tmp_path, body, damage="schemas/bug-record-v1.schema.json")
 
-    assert done.stdout == (
-        "Operator action: restore bug-record-v1.schema.json by running "
-        "`uvx dadaia-workspace init`\n"
-    )
+    assert done.stdout == "uvx dadaia-workspace init\n"
 
 
 def test_a_schema_of_the_installed_package_is_reinstalled_by_init(tmp_path: Path) -> None:
@@ -52,10 +49,7 @@ def test_a_schema_of_the_installed_package_is_reinstalled_by_init(tmp_path: Path
     done = _run(tmp_path, body, damage="schemas/bug-record-v1.schema.json",
                 home="site-packages/dadaia_workspace/public/skills")  # fmt: skip
 
-    assert done.stdout == (
-        "Operator action: restore bug-record-v1.schema.json by running "
-        "`uvx dadaia-workspace init`\n"
-    )
+    assert done.stdout == "uvx dadaia-workspace init\n"
 
 
 def test_a_denylist_that_is_not_utf8_is_rewritten_not_restored_from_git(tmp_path: Path) -> None:
