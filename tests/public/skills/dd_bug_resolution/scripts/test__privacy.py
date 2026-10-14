@@ -46,7 +46,7 @@ def test_a_malformed_baseline_refuses_naming_the_row_with_one_fix(
     with pytest.raises(load_owner("dd-bug-resolution", "_refusal").Refusal) as caught:
         module.load_baseline()
     assert named in str(caught.value)
-    assert caught.value.fix.startswith("Operator action:")
+    assert caught.value.fix == "uvx dadaia-workspace init"
 
 
 def test_a_wellformed_baseline_loads_every_row(tmp_path: Path) -> None:
