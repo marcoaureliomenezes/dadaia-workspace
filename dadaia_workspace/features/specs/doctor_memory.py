@@ -132,7 +132,7 @@ class MemoryValidator:
                     )
                 )
                 continue
-            except doctor_adr.Unreadable:
+            except doctor_adr.UndecodableLedger:
                 continue  # `adr_record_issues` names the ledger
             except ValueError as refusal:
                 message = f"{rel}: fixed law section `{section_id}` refused: {refusal}"

@@ -46,20 +46,20 @@ class ShallowClone(ValueError):
     """*specs* sits in a shallow clone: no instant can be placed in its cut history."""
 
 
-class Unreadable(ValueError):
+class UnreadableRelease(ValueError):
     """A release state or the history `candidate_at` reads is unreadable; ``args[1]`` is the act."""
 
 
 def live_id(specs: Path) -> str:
-    """The ONE live release id; :class:`Unreadable` names why not and its act."""
+    """The ONE live release id; :class:`UnreadableRelease` names why not and its act."""
     from _specs import choice, script  # the entry point's bootstrap resolves it
 
     ids, release = live_ids(specs), script(Path(__file__).resolve().parent / "release.py")
     if not ids:
-        raise choice(Unreadable("no live release under specs/releases/ — nothing to operate on",
+        raise choice(UnreadableRelease("no live release under specs/releases/ — nothing to operate on",
                                 f"{release} new"), "with the release version you choose")  # fmt: skip
     if len(ids) > 1:
-        raise Unreadable(f"multiple live release directories carry {STATE}: {', '.join(ids)} — "
+        raise UnreadableRelease(f"multiple live release directories carry {STATE}: {', '.join(ids)} — "
                          "the release-candidates model allows exactly one", f"{release} check")  # fmt: skip
     return ids[0]
 
@@ -83,7 +83,7 @@ def releases(specs: Path) -> dict[str, tuple[_dt.datetime, _dt.datetime | None]]
                 utc(shipped) if shipped else None,
             )
         except (OSError, ValueError, LookupError, TypeError, AttributeError) as exc:
-            raise Unreadable(f"{path} has no readable first log ts and shipped ts ({exc})",
+            raise UnreadableRelease(f"{path} has no readable first log ts and shipped ts ({exc})",
                              f"Operator action: repair {path} until `release.py check` passes") from None  # fmt: skip
     return spans
 
@@ -105,7 +105,7 @@ def candidate_adds(specs: Path) -> list[tuple[_dt.datetime, str, str]]:
     except RuntimeError as exc:
         from _platform import git_line  # the entry point's bootstrap resolves it
 
-        raise Unreadable(
+        raise UnreadableRelease(
             f"cannot read the history of {specs}: {exc}", git_line(specs, "fsck")
         ) from None
     adds = []
@@ -122,7 +122,7 @@ def candidate_adds(specs: Path) -> list[tuple[_dt.datetime, str, str]]:
 def candidate_at(specs: Path, instant: str) -> dict[str, str]:
     """The ONE answer to "which candidate held *instant*": the release whose half-open span
     holds it, the rc born last before it in that release, else ``unknown``; raises
-    :class:`ShallowClone`, :class:`Unreadable`, or ``ValueError`` for a bad *instant*."""
+    :class:`ShallowClone`, :class:`UnreadableRelease`, or ``ValueError`` for a bad *instant*."""
     when = utc(instant)
     adds = candidate_adds(specs)
     held = (r for r, (start, end) in releases(specs).items() if start <= when and (end is None or when < end))  # fmt: skip

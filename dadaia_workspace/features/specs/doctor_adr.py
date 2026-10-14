@@ -30,17 +30,17 @@ LEDGER = "ADRs/decisions.jsonl"
 _ADR_CITATION_RE = re.compile(r"\bADR[:\s-]+(\d{4})\b")
 
 
-class Unreadable(ValueError):
+class UndecodableLedger(ValueError):
     """The ledger is not UTF-8; the text is the fix line."""
 
 
 def _ledger_text(ledger: Path) -> str:
-    """The ledger's text; raises :class:`Unreadable` when it is not UTF-8."""
+    """The ledger's text; raises :class:`UndecodableLedger` when it is not UTF-8."""
     owner = load_owner("dd-bug-resolution", "_jsonl")
     try:
         return str(owner.read_text(ledger))
     except owner.Undecodable as bad:
-        raise Unreadable(bad.fix) from bad
+        raise UndecodableLedger(bad.fix) from bad
 
 
 def _records(text: str, status: str) -> list[dict[str, object]]:
@@ -61,7 +61,7 @@ def superseded_adr_citations(specs_dir: Path, public_dir: Path | None) -> list[S
         return []
     try:
         text = _ledger_text(ledger)
-    except Unreadable:  # `adr_record_issues` names the file
+    except UndecodableLedger:  # `adr_record_issues` names the file
         return []
     superseded = {str(r.get("id")) for r in _records(text, "superseded")}
     if not superseded:
@@ -171,7 +171,7 @@ def adr_record_issues(specs_dir: Path) -> list[SectionFinding]:
     schema = owner.load_schema("decision-record-v1")
     try:
         lines = _ledger_text(ledger).split("\n")
-    except Unreadable as bad:
+    except UndecodableLedger as bad:
         return [
             specs_finding(
                 code="LEDGER-ADR-SCHEMA",

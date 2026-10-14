@@ -5,11 +5,12 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from collections.abc import Iterable, Iterator
 from pathlib import Path
 from typing import Any
 
-from _platform import git_line
+from _platform import git_line, head, quote
 from _refusal import Refusal
 
 
@@ -39,11 +40,14 @@ class Unreadable(Refusal):
 
 
 def reinstall_fix(name: str) -> str:
-    """The act that repairs a shipped file *name* the install projected."""
-    return (
-        f"Operator action: restore {name} by re-running the workspace install "
-        "(uvx dadaia-workspace init)"
-    )
+    """The act that repairs a shipped file *name*: a force-reinstall rewrites the installed
+    package's payload, which `init` leaves alone while the build is unchanged; a projected
+    copy is rewritten by `init`."""
+    if "dadaia_workspace" in Path(__file__).parts:
+        act = " ".join((head(sys.executable), *map(quote, ("-m", "pip", "install", "--force-reinstall", "dadaia-workspace"))))  # fmt: skip
+    else:
+        act = "uvx dadaia-workspace init"
+    return f"Operator action: restore {name} by running `{act}`"
 
 
 def read_text(path: Path, fix: str = "") -> str:

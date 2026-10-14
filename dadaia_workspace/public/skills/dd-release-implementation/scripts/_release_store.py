@@ -20,7 +20,7 @@ from _jsonl import parse_object, read_text
 from _ledger import records, replace
 from _refusal import Refusal
 from _release_check import state_findings
-from _release_schema import Unreadable, current_candidate, live_id
+from _release_schema import UnreadableRelease, current_candidate, live_id
 from _specs import choice, script
 
 State = dict[str, Any]
@@ -51,7 +51,7 @@ def live_release(specs: Path) -> Live:
     """Resolve the ONE live release and read its state, or refuse naming the reason."""
     try:
         live = live_id(specs)
-    except Unreadable as exc:
+    except UnreadableRelease as exc:
         vars(refusal := Refusal(*exc.args)).update(vars(exc))  # the act's choice, if any
         raise refusal from None
     release_dir = specs / "releases" / live

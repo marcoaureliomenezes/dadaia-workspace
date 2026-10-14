@@ -13,6 +13,7 @@ import json
 from collections.abc import Mapping
 from dataclasses import dataclass, replace
 
+from dadaia_workspace.core.cli_line import spell_fix
 from dadaia_workspace.core.harness_registry import HarnessRecord, HookFormat
 
 #: The SessionStart lane: the one reaper, run as a CLI process at every
@@ -271,7 +272,8 @@ VENV_PYTHON = (
 #: What every ctx-inject firing tells the agent until the venv is fixed.
 VENV_MISSING = (
     "dadaia: no workspace venv at $ROOT/.dadaia/.venv — the gate is off.\n"
-    "fix: uvx dadaia-workspace init $ROOT\n"
+    + spell_fix("uvx dadaia-workspace init $ROOT")
+    + "\n"
 )
 
 
