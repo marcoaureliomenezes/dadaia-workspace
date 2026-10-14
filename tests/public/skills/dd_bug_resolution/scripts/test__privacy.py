@@ -4,9 +4,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
-import shlex
 import shutil
-import sys
 from pathlib import Path
 from types import ModuleType
 
@@ -62,6 +60,5 @@ def test_a_baseline_that_is_not_utf8_is_reinstalled_not_restored_from_git(tmp_pa
         module.load_baseline()
     assert "no pattern was applied" in str(caught.value)
     assert caught.value.fix == (
-        "Operator action: restore privacy_baseline.json by running "
-        f"`{shlex.quote(sys.executable)} -m pip install --force-reinstall dadaia-workspace`"
+        "Operator action: restore privacy_baseline.json by running `uvx dadaia-workspace init`"
     )

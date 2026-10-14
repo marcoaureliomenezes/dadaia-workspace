@@ -7,8 +7,9 @@ import time and restored by the ``recorder`` fixture.
 import base64
 import hashlib
 import subprocess
+import types
 import zipfile
-from importlib.metadata import Distribution
+from importlib.metadata import Distribution, FileHash, PackagePath
 from pathlib import Path
 
 import pytest
@@ -589,3 +590,24 @@ def test_interpreter_version_probe_degrades_to_none_on_timeout(
     monkeypatch.setattr(python_env_module.subprocess, "run", hanging_run)
 
     assert python_env_module._interpreter_version("/usr/bin/python-that-hangs") is None
+
+
+def _payload(root: Path, damaged: bool) -> list[PackagePath]:
+    """Two payload files and a foreign one under *root*, as the distribution's RECORD lists them."""
+    dist = types.SimpleNamespace(locate_file=lambda path: root / path)
+    names = ["dadaia_workspace/a.md", "dadaia_workspace/b.md", "other/c.md"]
+    for name in names:
+        (root / name).parent.mkdir(exist_ok=True)
+        (root / name).write_bytes(b"ok")
+    if damaged:
+        (root / "dadaia_workspace/b.md").write_bytes(b"\xff\xfe")
+    files = [PackagePath(name) for name in names]
+    for f in files:
+        f.dist, f.hash = dist, FileHash("sha256=recorded")
+    return files
+
+
+def test_the_build_digest_follows_the_installed_bytes_of_the_payload(tmp_path: Path) -> None:
+    whole = build_digest(_payload(tmp_path, damaged=False))
+    assert build_digest(_payload(tmp_path, damaged=False)) == whole
+    assert build_digest(_payload(tmp_path, damaged=True)) != whole

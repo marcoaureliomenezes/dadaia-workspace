@@ -6,10 +6,9 @@ from __future__ import annotations
 
 import json
 import subprocess
-import sys
 from pathlib import Path
 
-from dadaia_workspace.core.cli_line import git_line, shell_line
+from dadaia_workspace.core.cli_line import git_line
 from dadaia_workspace.features.specs.doctor import SpecsDoctor
 from dadaia_workspace.features.specs.doctor_adr import adr_record_issues
 from dadaia_workspace.features.specs.doctor_memory import MemoryValidator
@@ -86,9 +85,7 @@ def test_check_is_a_no_op_for_an_absent_file(tmp_path: Path) -> None:
     ]
 
 
-_REINSTALL = "Operator action: restore {} by running `%s`" % shell_line(  # noqa: UP031
-    sys.executable, "-m", "pip", "install", "--force-reinstall", "dadaia-workspace"
-)
+_REINSTALL = "Operator action: restore {} by running `uvx dadaia-workspace init`"
 
 
 def test_check_reports_a_missing_library_fragment_as_a_non_fixable_error(tmp_path: Path) -> None:

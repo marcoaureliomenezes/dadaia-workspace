@@ -5,7 +5,6 @@ tmp copy.
 
 from __future__ import annotations
 
-import shlex
 import shutil
 import subprocess
 import sys
@@ -45,7 +44,7 @@ def test_a_schema_that_is_not_utf8_is_reinstalled_not_restored_from_git(tmp_path
     )
 
 
-def test_a_schema_of_the_installed_package_is_reinstalled_by_pip(tmp_path: Path) -> None:
+def test_a_schema_of_the_installed_package_is_reinstalled_by_init(tmp_path: Path) -> None:
     body = (
         "try:\n    _ledger.load_schema('bug-record-v1')\n"
         "except _refusal.Refusal as refusal:\n    print(refusal.fix)\n"
@@ -55,7 +54,7 @@ def test_a_schema_of_the_installed_package_is_reinstalled_by_pip(tmp_path: Path)
 
     assert done.stdout == (
         "Operator action: restore bug-record-v1.schema.json by running "
-        f"`{shlex.quote(sys.executable)} -m pip install --force-reinstall dadaia-workspace`\n"
+        "`uvx dadaia-workspace init`\n"
     )
 
 

@@ -5,7 +5,6 @@ from __future__ import annotations
 import ast
 import re
 import shlex
-import sys
 from pathlib import Path, PurePosixPath, PureWindowsPath
 
 import pytest
@@ -58,9 +57,11 @@ def test_no_workspace_names_the_cli_of_the_running_venv(monkeypatch: pytest.Monk
 
 
 def test_the_kernel_spells_the_fix_line_and_the_reinstall_act() -> None:
-    pip = cli_line.shell_line(sys.executable, "-m", "pip", "install", "--force-reinstall", "dadaia-workspace")  # fmt: skip
     assert cli_line.spell_fix("do it") == "fix: do it"
-    assert cli_line.reinstall_fix("a.md") == f"Operator action: restore a.md by running `{pip}`"
+    assert (
+        cli_line.reinstall_fix("a.md")
+        == "Operator action: restore a.md by running `uvx dadaia-workspace init`"
+    )
 
 
 def test_no_string_outside_the_kernel_spells_a_fix_line_by_hand() -> None:
