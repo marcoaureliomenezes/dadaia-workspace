@@ -23,7 +23,7 @@ from pathlib import Path
 from packaging.version import Version
 
 import dadaia_workspace
-from dadaia_workspace.core.cli_line import shell_line
+from dadaia_workspace.core.cli_line import quote, shell_line
 from dadaia_workspace.core.exceptions import (
     BootstrapPackageError,
     WorkspaceVenvBootstrapError,
@@ -539,7 +539,7 @@ class VenvPythonEnvironmentManager:
         except OSError as exc:
             raise WorkspaceVenvBootstrapError(
                 f"workspace venv python cannot run: {exc}.",
-                f"Operator action: delete {shell_line(str(self._venv_path(workspace_root)))} and run "
+                f"Operator action: delete {quote(str(self._venv_path(workspace_root)))} and run "
                 f"`{shell_line('uvx', 'dadaia-workspace', 'init', workspace_root)}`",
             ) from exc
 

@@ -64,7 +64,7 @@ def git_line(repo: str | PurePath, *argv: str) -> str:
 def shell_line(*parts: str) -> str:
     """*parts* joined into one command line quoted for the host shell."""
     if platform.PLATFORM.windows:
-        head, *argv = (_win_quote(part.replace("\\", "/")) for part in parts)
+        head, *argv = (quote(part) for part in parts)
         if head.startswith('"'):  # a drive path: open the quote after its first char
             head = f'{head[1]}"{head[2:]}'
         return " ".join((head, *argv))
@@ -85,5 +85,10 @@ def materialize_line(link: PurePath, target: PurePath) -> str:
     return shell_line(sys.executable, "-c", code)
 
 
-def _win_quote(arg: str) -> str:
+def quote(arg: str) -> str:
+    """One word for the host shell: ``shlex`` on POSIX; on Windows forward slashes, double
+    quotes only around a blank."""
+    if not platform.PLATFORM.windows:
+        return shlex.quote(arg)
+    arg = arg.replace("\\", "/")
     return arg if arg and not any(c in arg for c in ' \t"') else f'"{arg}"'
