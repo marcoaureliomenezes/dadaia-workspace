@@ -130,9 +130,14 @@ def _phase(args: argparse.Namespace, specs: Path) -> int:
     return 0
 
 
+def _since(live: Live, specs: Path) -> str:
+    """The window's start, resolved to a commit HEAD reaches."""
+    return drift.reach(specs.parent, window_start(live.state), live.release_dir / STATE)
+
+
 def _drift(args: argparse.Namespace, specs: Path) -> int:
     """The worklist over the window `memory` records: last memory entry's until, else defined.sha."""
-    report = drift.report(specs, window_start(live_release(specs).state))
+    report = drift.report(specs, _since(live_release(specs), specs))
     print(json.dumps(report, indent=2) if args.json else drift.render(report))
     return 1 if report["atoms"] or report["uncovered"] else 0
 
@@ -140,7 +145,7 @@ def _drift(args: argparse.Namespace, specs: Path) -> int:
 def _memory(args: argparse.Namespace, specs: Path) -> int:
     """Append the record over the ledger-derived window, refused unless its worklist was worked."""
     live, ts = live_release(specs), utc_now()
-    since = window_start(live.state)
+    since = _since(live, specs)
     lists = [[s for s in getattr(args, n).split(",") if s] for n in ("reviewed", "changed")]
     try:
         until = drift.git(specs.parent, "rev-parse", "HEAD")[0]

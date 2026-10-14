@@ -5,7 +5,7 @@ Disclosed reference reached at `SKILL.md` step 7 — `dd-product-engineer` runs 
 ## Protocol — delete, update, add
 
 1. `phase CLOSURE` already ran, per the order in `RC-FLOW.md` step 4; no memory write before it.
-2. `python3 .agents/skills/dd-release-implementation/scripts/release.py drift` — the window opens at the live release's last `kind: memory` entry's `until`, else its `defined.sha`; exit 1 means there is work, and its output is the authoritative worklist.
+2. `python3 .agents/skills/dd-release-implementation/scripts/release.py drift` — the window opens at the live release's last `kind: memory` entry's `until`, else its `defined.sha` (a bound a rebase rewrote resolves to the commit that wrote it into `_RELEASE.json`); exit 1 means there is work, and its output is the authoritative worklist.
 3. For each listed atom, read `git diff <since>..HEAD -- <matched paths>` in full, then edit the atom in this order and no other:
    - DELETE every claim the code no longer supports — a verb, a file, a behavior, a number.
    - UPDATE every claim whose behavior changed; the tldr and summary are claims too.

@@ -48,22 +48,39 @@ def git(repo: Path, *argv: str) -> list[str]:
     return [line for line in out.split("\n") if line]
 
 
+def _reaches(repo: Path, bound: str) -> bool:
+    try:
+        _git.git(repo, "merge-base", "--is-ancestor", bound, "HEAD")
+    except RuntimeError:
+        return False
+    return True
+
+
+def reach(repo: Path, bound: str, ledger: Path) -> str:
+    """*bound* when HEAD reaches it, else the commit that wrote it into *ledger*: a rebase
+    carries that commit along and leaves the text. A parentless hit is a shallow cut, left to
+    :func:`report`."""
+    if _reaches(repo, bound):
+        return bound
+    wrote = git(repo, "log", "--reverse", "--format=%H", f"-S{bound}", "--", str(ledger))
+    if wrote and len(git(repo, "rev-list", "--parents", "-n1", wrote[0])[0].split()) > 1:
+        return wrote[0]
+    return bound
+
+
 def report(specs: Path, since: str, until: str = "HEAD") -> dict[str, Any]:
     """The worklist for the window *since*..*until* — the ONE decider every verb calls."""
     repo = specs.parent
     for bound in (since, until):  # usable = an ancestor of HEAD; absent is left to git()
-        try:
-            _git.git(repo, "merge-base", "--is-ancestor", bound, "HEAD")
+        if _reaches(repo, bound):
             continue
-        except RuntimeError:
-            pass
         if cut := _cut(repo, f"{bound} is out of reach"):  # a cut is checked first
             raise cut
         if _git.git(
             repo, "rev-parse", "--verify", "--quiet", f"{bound}^{{commit}}", check=False
         ).strip():
             raise Refusal(f"{bound} is not an ancestor of HEAD — a clone of this branch lacks it (a rebase rewrote it)",
-                          f"Operator action: replace {bound[:12]} with the commit HEAD reaches in its place")  # fmt: skip
+                          git_line(repo, "merge-base", "HEAD", bound))  # fmt: skip
     catalog = json.loads(_jsonl.read_text(specs / CATALOG))
     changed = git(repo, "diff", "--name-only", f"{since}..{until}")
     return {"since": since, **worklist(catalog, changed, git(repo, "ls-files"))}
