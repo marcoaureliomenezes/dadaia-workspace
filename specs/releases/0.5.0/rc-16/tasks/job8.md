@@ -1,0 +1,18 @@
+# Job 8 — `sync` and the per-level `AGENTS.md` written by `new` (FR8)
+
+**Status:** Draft
+
+Wave 3, waits on Job 5. Paths are repository-relative to `repos/dadaia-workspace/`. Design and evidence: PLAN §1 and the as-is review it points to.
+
+- `sync <path>` (agent default, unruled — reason: the smallest cascade the existing predicates allow, ASIS §3 seam 6): parents before children (`wt-rc` onto `feature/<v>`, each `wt-main` onto `wt-rc`, each `wt-task-k` onto its `wt-main`), found by `ours()` and sorted by depth; a tree already containing its base (`_check_ancestor`) is skipped, so a re-run finishes the cascade; the first conflict or dirty tree stops it, names the tree, exits 1 with one `Agent action` fix line; it never pushes. The `_check_ancestor` refusal's fix line becomes `dadaia worktree sync <tree>`. `_check_ancestor`, `ours`, `base_of` are consulted, never copied.
+- Per-level `AGENTS.md` (operator: 'é so porque eu não quero criar .gitkeep files … deve estar na criação'): `new` writes one into each folder it creates (`<v>/`, `rc-N/`, `job-n/`) from `levels/{version,rc,job}.md` (data beside the script, projected with the skill), once, never over an existing file; `merge`/`clean` remove a level folder that holds only that file; `list` treats it as no stray. Net ≈ +70 python, +24 text lines (reason in PLAN §6).
+- `_worktree_end.py` is edited by T2 then T4: sequential.
+
+Tasks: 4 (2 jr, 2 sr, 0 pe). `who` names the dispatched role (`dd-release-definition` §5). Parallelism: T1 and T3 start together; T2 after T1; T4 after T3 and T2.
+
+| task | who | AC | `W:` | outcome |
+|---|---|---|---|---|
+| J8.T1 | sr | AC8.1 | `tests/public/skills/dd_gitflow_default/scripts/test__worktree_sync.py`, `tests/public/skills/dd_gitflow_default/scripts/test__worktree_end.py` | RED on real git: order, skip, stop on first conflict with one fix line, dirty refusal, re-run completes, never pushes; after a lane merged into `feature/<v>`, `sync <rc>` makes the rc's `merge` pass; the ancestor refusal's fix line is `dadaia worktree sync <tree>` |
+| J8.T2 | jr | AC8.1 | `dadaia_workspace/public/skills/dd-gitflow-default/scripts/_worktree_sync.py`, `dadaia_workspace/public/skills/dd-gitflow-default/scripts/worktree.py`, `dadaia_workspace/public/skills/dd-gitflow-default/scripts/_worktree_end.py` | `sync` (+45), verb (+5), fix line; owner T1. After T1 |
+| J8.T3 | sr | AC8.2 | `tests/public/skills/dd_gitflow_default/scripts/test__worktree_new.py`, `tests/public/skills/dd_gitflow_default/scripts/test__worktree_end__removal.py` | RED: `new` writes the level file into each folder it creates, once, never over an existing file; `merge`/`clean` remove a level folder holding only that file; `list` shows no stray for it |
+| J8.T4 | jr | AC8.2 | `dadaia_workspace/public/skills/dd-gitflow-default/scripts/_worktree_new.py`, `dadaia_workspace/public/skills/dd-gitflow-default/scripts/_worktree_end.py`, `scripts/guards/slop.py`, `dadaia_workspace/public/skills/dd-gitflow-default/scripts/levels/version.md`, `dadaia_workspace/public/skills/dd-gitflow-default/scripts/levels/rc.md`, `dadaia_workspace/public/skills/dd-gitflow-default/scripts/levels/job.md` | level writer (+14); `_worktree_end.py` `_rmdir` cleanup (+6); owners T3. After T2 and T3 (`_worktree_end.py` is T2's file too) |
