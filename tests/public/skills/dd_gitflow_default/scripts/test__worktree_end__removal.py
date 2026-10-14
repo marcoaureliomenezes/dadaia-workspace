@@ -6,6 +6,7 @@ nothing behind — its parent folder once empty, and its branch on the remote wh
 from __future__ import annotations
 
 import json
+import shutil
 from pathlib import Path
 
 import pytest
@@ -81,6 +82,24 @@ def test_list_gives_one_row_per_path_the_orphan_winning(root: Path) -> None:
     assert [(r["state"], r["path"]) for r in rows if r["state"] != "empty"] == [
         ("orphan", str(root / "worktrees/r/plain"))
     ]
+
+
+def test_an_orphan_whose_directory_survives_names_the_removal_and_following_it_empties_list(
+    root: Path,
+) -> None:
+    assert run(root, "new", "r", "plain").returncode == 0
+    tree = root / "worktrees/r/plain"
+    git(root / "repos/r", "worktree", "remove", "-f", "-f", str(tree))
+    tree.mkdir()
+    (tree / "f.txt").write_text("x")
+    [row] = [r for r in json.loads(run(root, "list", "--json").stdout) if r["state"] != "empty"]
+    assert row["fix"].startswith(f"Operator action: remove the directory {tree}, then run `")
+    assert row["fix"].endswith(f"worktree.py merge {tree}`")
+    shutil.rmtree(tree)  # the operator act the fix names
+    assert run(root, "merge", str(tree)).returncode == 0
+    assert [
+        r for r in json.loads(run(root, "list", "--json").stdout) if r["state"] != "empty"
+    ] == []
 
 
 def _push_upstream(root: Path, remote_name: str) -> Path:
