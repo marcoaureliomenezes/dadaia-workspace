@@ -121,7 +121,7 @@ def _protected_paths(fix: str, root: Path) -> list[str]:
     return found
 
 
-def the_fix(message: str | None, root: Path | None = None) -> str:
+def the_fix(message: str | None, root: Path) -> str:
     """The one ``fix:`` line of *message*; raises AssertionError unless it is one act the
     gate lets run; an ``Agent action:`` under *root* names no path the gate protects."""
     assert message, "a refusal with an empty message is a stall"
@@ -130,7 +130,7 @@ def the_fix(message: str | None, root: Path | None = None) -> str:
     fix = fixes[0]
     assert not fix_defect(fix) and "<specs>" not in fix, f"not one act: {fix}"
     if fix.startswith(_ACT_LABELS):
-        assert not (root and fix.startswith("Agent action: ") and _protected_paths(fix, root)), fix
+        assert not (fix.startswith("Agent action: ") and _protected_paths(fix, root)), fix
         return fix
     argv0 = shlex.split(fix)[0]  # an absolute file, or a bare name on PATH, never cwd-relative
     on_path = "/" not in argv0 and (shutil.which(argv0) or argv0 in _PREREQUISITES)
@@ -467,9 +467,9 @@ class World:
         )
 
 
-def _fix(done: subprocess.CompletedProcess[str]) -> str:
-    """The one runnable fix line of a refusal's output."""
-    return the_fix(done.stdout + done.stderr)
+def _fix(done: subprocess.CompletedProcess[str], root: Path) -> str:
+    """The one runnable fix line of a refusal's output in the workspace *root*."""
+    return the_fix(done.stdout + done.stderr, root)
 
 
 @dataclass(frozen=True)
@@ -532,7 +532,7 @@ def _chain(ws: Path, case: Case) -> str:
     assert done.returncode != 0, f"the case planted no refusal:\n{done.stdout}{done.stderr}"
     first, seen = done.stdout + done.stderr, []
     for step in range(4):
-        fix = _fix(done)
+        fix = _fix(done, world.ws)
         assert fix not in seen, f"no progress — the same fix line again:\n{fix}"
         seen.append(fix)
         act = fix.startswith(_ACT_LABELS)
@@ -915,7 +915,7 @@ def _two_untracked(world: World) -> list[str]:
 
 def _discard_what_the_fix_names(world: World) -> None:
     """The operator discards exactly the paths the printed fix names — no more."""
-    fix = _fix(_hit(world, ["context", "dead", "proj"]))
+    fix = _fix(_hit(world, ["context", "dead", "proj"]), world.ws)
     for name in ("notes.md", "b.md"):
         if name in fix:
             (world.repo / name).unlink()
@@ -1825,7 +1825,7 @@ def test_a_fix_runs_verbatim_in_every_host_shell(blank_workspace: Path, shell: l
     if shell[0].endswith("bash.exe") and not Path(shell[0]).is_file():
         pytest.skip(f"Git Bash is not installed at {shell[0]}")
     (workspace / ".dadaiaignore").unlink()
-    root_fix = the_fix(_gate(workspace, "junk.txt"))
+    root_fix = the_fix(_gate(workspace, "junk.txt"), workspace)
     (workspace / "repos" / "demo").mkdir(parents=True)
     runs = [
         subprocess.run(
@@ -1896,7 +1896,7 @@ def test_every_fix_line_prints_on_one_line_without_a_tty(tmp_path: Path) -> None
     through the one ``cli/_fail.fail`` a real child process exercises here."""
     world = World(tmp_path / ("d" * 90))
     _unborn_dirty(world)
-    fix = _fix(world.cli("context", "dead", "proj"))
+    fix = _fix(world.cli("context", "dead", "proj"), world.ws)
     assert fix.endswith("notes.txt into a worktree, or discard it"), fix
     assert re.search(re.escape(str(world.ws)), fix)
 
@@ -1910,7 +1910,7 @@ def test_the_gate_is_read_only_and_its_rewrite_fix_uncommits_only_unpublished_wo
     published history, never a publish verb that rewrites."""
     command = _denylisted(world)
     oldest = world.git(world.repo, "rev-parse", "HEAD~1")
-    fix = _fix(_hit(world, command))
+    fix = _fix(_hit(world, command), world.ws)
     assert fix == shell_line("git", "-C", str(world.repo), "reset", "--soft", oldest)
     assert "--republish" not in world.cli("context", "baseline", "--help").stdout
 
@@ -1962,7 +1962,7 @@ def test_a_refused_baseline_push_names_the_anchor_and_the_publish_as_the_next_st
     as the step after the amend (a hand push would drop origin's merge parent)."""
     done = _hit(world, _baseline_denylisted(world))
     output = done.stdout + done.stderr
-    assert done.returncode != 0 and _fix(done).startswith("git -C")
+    assert done.returncode != 0 and _fix(done, world.ws).startswith("git -C")
     assert f"onboarding commit {world.git(world.repo, 'rev-parse', 'HEAD')}" in output
     assert fix_line(world.ws, "context", "baseline", "proj") in output.replace("\n", "")
 
@@ -1985,7 +1985,7 @@ def test_dead_after_the_operator_pulls_into_a_conflict_publishes_no_markers(
     published = world.remote_heads()["feature/1.0.0"]
     done = world.cli("context", "dead", "proj")
     output = done.stdout + done.stderr
-    fix = _fix(done)
+    fix = _fix(done, world.ws)
     assert done.returncode != 0 and "README.md" in fix and "x.md" in fix, output
     assert fix.endswith("into a worktree, or discard it"), output
     assert world.repo.is_dir() and world.remote_heads()["feature/1.0.0"] == published
@@ -2020,7 +2020,7 @@ def test_the_real_doctor_prints_every_fix_as_one_whole_runnable_line(tmp_path: P
     fixes = [line for line in lines if line.startswith("fix: ")]
     assert fixes, run.stdout
     for fix in fixes:
-        if the_fix(fix).startswith("Agent action: "):  # it names the file
+        if the_fix(fix, ws).startswith("Agent action: "):  # it names the file
             assert re.search(r"\s(/|\w:[\\/])\S", fix), fix
     # a wrapped fix would leave a continuation line that is neither a finding nor a `fix:` line
     assert [ln for ln in lines if ln and not re.match(r"(fix: |[A-Z][A-Za-z0-9-]+ )", ln)] == []
