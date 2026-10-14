@@ -24,3 +24,9 @@ class _BrokenRunner:
             stderr = ""
 
         return _Result()
+
+
+def test_an_absent_specs_dir_is_no_ledger_finding(tmp_path: Path) -> None:
+    """A missing specs tree is the specs doctor's one finding; the ledger lane adds none, since
+    its `public install` fix cannot clear it."""
+    assert script_findings(tmp_path / "bare" / "specs", runner=_BrokenRunner()) == []
