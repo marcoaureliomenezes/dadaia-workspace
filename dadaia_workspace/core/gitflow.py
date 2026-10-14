@@ -119,6 +119,11 @@ def specs_tree_exists(specs_dir: Path) -> bool:
     return specs_dir.is_dir()
 
 
+def specs_path_is_taken(specs_dir: Path) -> bool:
+    """Something exists at the path (a dangling symlink does not count)."""
+    return specs_dir.exists()
+
+
 def constitution_text(specs_dir: Path) -> str:
     constitution = constitution_path(specs_dir)
     return constitution.read_text(encoding="utf-8") if constitution.is_file() else ""
