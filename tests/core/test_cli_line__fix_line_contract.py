@@ -81,12 +81,20 @@ _HEADS = {"chmod", "gh", "git", "grep", "ls", "mkdir", "rm", "sed", *_PREREQUISI
 _SHA_B, _ZERO = "b" * 40, "0" * 40
 
 
+#: The two act labels: an act the agent performs, and one the law reserves to the human.
+_ACT_LABELS = ("Agent action: ", "Operator action: ")
+_LABEL_RE = re.compile(r"[A-Z]\w* action: ")
+
+
 def fix_defect(fix: str) -> bool:
-    """True when *fix* is neither `Operator action: <one act>` nor one command whose head is
-    no prose word; `·` stands for a value a source walk cannot know."""
+    """True when *fix* is neither `Agent action: <one act>` nor `Operator action: <one act>`
+    nor one command whose head is no prose word, or carries any other `<Word> action:` label;
+    `·` stands for a value a source walk cannot know."""
     known = fix.split("·", 1)[0]
-    if fix.startswith("Operator action: ") or " " not in known and "·" in fix:
+    if fix.startswith(_ACT_LABELS) or " " not in known and "·" in fix:
         return bool(_NOT_ONE_ACT_RE.search(fix))
+    if _LABEL_RE.match(fix):
+        return True
     head = known.split(" ", 1)[0]
     prose = re.fullmatch(r"[a-z][a-z0-9-]*", head) and head not in _HEADS
     return bool(prose or _NOT_ONE_ACT_RE.search(fix) or _NOT_ONE_COMMAND_RE.search(known))
@@ -100,7 +108,7 @@ def the_fix(message: str | None) -> str:
     assert len(fixes) == 1, f"expected exactly one 'fix:' line, got {fixes} in:\n{message}"
     fix = fixes[0]
     assert not fix_defect(fix) and "<specs>" not in fix, f"not one act: {fix}"
-    if fix.startswith("Operator action: "):
+    if fix.startswith(_ACT_LABELS):
         return fix
     argv0 = shlex.split(fix)[0]  # an absolute file, or a bare name on PATH, never cwd-relative
     on_path = "/" not in argv0 and (shutil.which(argv0) or argv0 in _PREREQUISITES)
@@ -499,7 +507,7 @@ def _chain(ws: Path, case: Case) -> str:
         fix = _fix(done)
         assert fix not in seen, f"no progress — the same fix line again:\n{fix}"
         seen.append(fix)
-        act = fix.startswith("Operator action: ")
+        act = fix.startswith(_ACT_LABELS)
         if case.operator is not None and (act or step == 0):
             case.operator(world)
         ran = None if act else world.run(fix, world.elsewhere)  # a fix line runs from any cwd
