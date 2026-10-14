@@ -17,6 +17,10 @@ CANDIDATE_RE = re.compile(r"^rc-([1-9][0-9]*)$")
 CONTEXT_NAME_RE = re.compile(r"[A-Za-z0-9_-]+")
 TAG_RE = re.compile(r"^v?(\d+)\.(\d+)\.(\d+)$")
 TASK_ID_RE = re.compile(r"^J[1-9][0-9]*(?:\.S[1-9][0-9]*)?\.T[1-9][0-9]*$")
+#: The head of a closed release's task line (a checklist item or a table cell), read by lineage only.
+HISTORICAL_TASK_RE = re.compile(
+    r"^(?:- \[.\]\s*|\|\s*)\**(T-[0-9]+-[0-9]+[A-Z]?|J[A-Z]\.S[1-9][0-9]*\.T[1-9][0-9]*)\b"
+)
 STATUS_RE = re.compile(r"^\*\*Status:\*\*\s*(.+?)\s*$", re.MULTILINE)
 #: A git object id as a human pastes it from a merge: short (7) to full (40).
 SHA_RE = re.compile(r"^[0-9a-f]{7,40}$")

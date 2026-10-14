@@ -15,7 +15,7 @@ from typing import Any
 import _findings
 import _jsonl
 import _ledger
-from _grammar import TASK_ID_RE
+from _grammar import HISTORICAL_TASK_RE, TASK_ID_RE
 from _platform import quote
 from _specs import script, with_specs
 
@@ -68,16 +68,14 @@ def invariant_errors(record: dict[str, Any]) -> Iterator[str]:
 
 
 def tasks(root: Path) -> set[str]:
-    """Every task id under *root*`/releases/`, `_archive/` included: a closed rc's `TASKS.md`
-    carries historical rows, and a job rc's `tasks/job<n>.md` carries current or historical
-    ids. The release schema's parser is the one identity grammar."""
+    """The ids under *root*`/releases/` (`_archive/` included) in every `TASKS.md` and
+    `tasks/*.md`: the id at the head of each checklist item or table cell, in either grammar,
+    plus every table cell that is a current-grammar id."""
     files = [*root.glob("releases/**/TASKS.md"), *root.glob("releases/**/tasks/*.md")]
-    return {
-        cell
-        for file in files
-        for line in _jsonl.read_text(file).splitlines()
-        for cell in (part.strip() for part in line.split("|"))
-        if TASK_ID_RE.fullmatch(cell)
+    lines = [ln for file in files for ln in _jsonl.read_text(file).splitlines()]
+    found = {m[1] for ln in lines if (m := HISTORICAL_TASK_RE.match(ln))}
+    return found | {
+        c for ln in lines for p in ln.split("|") if TASK_ID_RE.fullmatch(c := p.strip())
     }
 
 
