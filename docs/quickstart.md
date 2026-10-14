@@ -49,7 +49,9 @@ release is born the same way in its `<M.m.p>-rc<N>/define` worktree:
   next pending step with its `fix:` line at every point.
 
 **Upgrade:** re-run the same `uvx dadaia-workspace init demo --harness claude` line
-from the parent directory; it prints `upgraded A -> B`, or `already at A` when current.
+from the parent directory; it prints `upgraded A -> B`, `repaired -> B` when the venv's
+build could not be read, or `already at A` when current. A venv whose python cannot start
+is refused with a fix that deletes `.dadaia/.venv` and reruns the init line.
 Then `.dadaia/.venv/bin/dadaia specs init --context <ctx>` refreshes the project's specs law.
 
 ## 2. What the init line provisioned

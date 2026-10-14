@@ -21,7 +21,7 @@ sources:
 - The SDD gate classifies writes as ADDITIVE, PROTECTED or MUTATING. ADDITIVE zones accept their declared outputs; PROTECTED paths refuse; MUTATING repository writes are scope-checked and repository checkouts accept only the audit exception.
 - A bind's scope is its context's main and associated repositories. An identified but unbound session owns none. Worktree paths inherit the owning repository's scope.
 - The gate reads no release phase or SDD artifact and acquires no lock. A permitted write records advisory presence only where the harness has a post-tool lane.
-- Missing workspace venv wrappers warn and allow; the gate does not police which Python or CLI executable a shell command invokes.
+- The gate judges file-tool writes only: Claude Code, Codex and Kimi Code register it on their file-editing tools alone, never on the shell tool, and it does not police which Python or CLI executable a shell command invokes. Missing workspace venv wrappers warn and allow.
 
 ## Fix contract
 

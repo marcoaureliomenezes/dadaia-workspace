@@ -13,13 +13,13 @@ sources:
 ## Three pillars
 
 - An audit is the full-tree inspection lane and always runs bug history, spec compliance and memory drift together.
-- The bug pillar reads current resolution facts and each named `fix_sha`, derives recurrence and diff direction from code, and reports nine forensic metrics. Audit coverage lives in the audit record rather than a field copied into each bug.
-- The spec pillar combines doctor output with commit shapes and job-file checks: wave and task write-set disjointness, path coverage, AC test levels, cancellation reasons and post-approval immutability.
-- The memory pillar runs each canonical principle's measurement, checks decision pairing and compares product atoms with their source window.
+- The bug pillar reads current resolution facts and each named `fix_sha`, derives recurrence and diff direction from code, and reports nine forensic metrics, each against the previous audit's `AUDIT.md` read from git history. Audit coverage lives in the audit record rather than a field copied into each bug.
+- The spec pillar combines the doctor's findings at HEAD with commit shapes and job-file checks: tasks with overlapping write sets that ran in parallel, every changed path inside its job's PLAN write set, AC test levels, cancellation reasons and post-approval immutability.
+- The memory pillar runs each canonical principle's measurement and compares product atoms with their source window.
 
 ## Findings
 
-- Every finding is one `finding-record-v1` line with immutable id, pillar, severity, refs, claim and reproducible evidence.
+- Every finding is one `finding-record-v1` line with immutable id, pillar, severity, refs, claim and reproducible evidence, appended by hand; `audit.py check` validates the live findings and the archive, printing each finding with its `fix:` line.
 - Evidence is a command plus a redacted one-line result. Scratch may accompany it but is never the sole citation.
 - A finding is born `open` and moves to `resolved`, `superseded` or `rejected`. Resolved and superseded name the remediation release; rejected names the reason.
 - `audit.py disposition` rewrites only the governance triple. It rejects an unknown finding, invalid evidence or a second inconsistent disposition.

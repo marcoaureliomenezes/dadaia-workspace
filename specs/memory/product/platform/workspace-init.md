@@ -38,8 +38,9 @@ sources:
 
 ## Upgrade
 
-- Re-running `init` on an existing workspace is the upgrade; the venv's identity — its installed build (version plus a digest of the package payload) and its binding (the `dadaia` entrypoint names this venv's own python) — is compared with the running distribution's by one decider.
-- An older venv, another build of the same version, or a venv copied from another workspace (its entrypoint names the original's python) is reinstalled from the running distribution by one `<venv python> -m pip install --force-reinstall` (a failed install keeps the old build) and reconciled, printing `upgraded A -> B`; a failed reconcile exits 1 with `fix: <cli> reconcile --expect-version B`.
+- Re-running `init` on an existing workspace is the upgrade; the venv's identity — its installed build (version plus a digest of the package payload's installed bytes, so a damaged installed file is another build) and its binding (the `dadaia` entrypoint names this venv's own python) — is compared with the running distribution's by one decider.
+- An older venv, another build of the same version, or a venv copied from another workspace (its entrypoint names the original's python) is reinstalled from the running distribution by one `<venv python> -m pip install --force-reinstall` (a failed install keeps the old build) and reconciled, printing `upgraded A -> B`; a venv whose build cannot be read (its probe fails) gets the same reinstall and prints `repaired -> B`; a failed reconcile exits 1 with `fix: <cli> reconcile --expect-version B`.
+- Every run of the venv's python goes through one runner: a venv whose python cannot be started is refused, exit 1, with `workspace venv python cannot run: <reason>.` and one fix line, an `Operator action:` to delete the venv and run `uvx dadaia-workspace init <ws>`, each path quoted once by the kernel's quoting for the host shell.
 - Every init also refreshes the pre-push hook of every ALIVE repo whose installed hook is absent or byte-identical to an earlier version the library shipped (`service.hook_state`); an operator's own hook is kept ([[context-management]]).
 - The same build, bound to its own venv, prints `already at A` and writes no file under the workspace.
 - A newer venv is refused before any write, exit 1, `fix: <cli> init <ws> --harness <h>` — the workspace's own newer CLI.

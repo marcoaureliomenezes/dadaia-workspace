@@ -35,7 +35,7 @@ The main thread is the operator's session and the only dispatcher. It owns intak
 - No runtime advances the lifecycle. `_RELEASE.json`, approved definition documents, job files, worktrees, commits and handoffs are the evidence ([[release-lifecycle]]).
 - Only the main thread opens and merges canonical worktrees. A leaf works inside the path it receives and returns a validated handoff.
 - A job, plain change, `define` or backlog tree lands only after the reviewer's `APPROVED` verdict binds to its exact diff; task merges are unreviewed and enforce git hygiene plus RED/implementation separation.
-- A review is dispatched only for a tree whose `worktree.py preflight` prints `PREFLIGHT PASS`, and the reviewer receives that line; a red tree goes back unreviewed ([[worktrees]]).
+- A review is dispatched only for a tree whose `worktree.py preflight` prints `PREFLIGHT PASS`, and the reviewer receives that line instead of rerunning the tree's checks; a red tree goes back unreviewed ([[worktrees]]). A PR has no preflight, so its reviewer runs the repo's `verify:` line.
 
 ## Questions and decisions
 

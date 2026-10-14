@@ -69,7 +69,9 @@ hook and makes the context ALIVE (only `context bind` binds); a later project is
 next step with its `fix:` line.
 
 **Upgrade:** re-run the `uvx dadaia-workspace init <dir> --harness <name>` line; it
-prints `upgraded A -> B`, or `already at A`; then
+prints `upgraded A -> B`, `repaired -> B` (an unreadable venv build), or `already at A`;
+a venv whose python cannot start is refused with a fix that deletes `.dadaia/.venv` and
+reruns init; then
 `.dadaia/.venv/bin/dadaia specs init --context <ctx>` refreshes each project's specs law.
 `.dadaia/.venv/bin/dadaia harness add <name>` adds a harness later.
 

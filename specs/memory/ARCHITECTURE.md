@@ -2,7 +2,7 @@
 slug: ARCHITECTURE
 title: Architecture Memory
 tldr: The measured architecture principles, the tech stack in one line per technology, and the layer ring with its feature package map.
-summary: Canonical memory — statements, laws and diagrams of the system's structure and stack; changed only in the commit that carries an accepted ADR.
+summary: Canonical memory — statements, laws and diagrams of the system's structure and stack, each naming its code evidence; the accepted-decision list is rendered from the ADR ledger.
 tags: [architecture, layers, dependency-rules, tech-stack, sdd]
 ---
 
@@ -10,87 +10,70 @@ tags: [architecture, layers, dependency-rules, tech-stack, sdd]
 
 ### P-01 · We keep the dependency ring: core imports nothing internal, infrastructure imports only core, no layer imports upward; a feature imports the concrete infrastructure class it alone consumes.
 Measured by: `lint-imports --config setup.cfg --no-cache` — contracts `core-no-upper-layers` and `infrastructure-no-upper-layers` (zero ignored imports).
-ADR: 0243
 Rationale: the ledger shows zero adapter substitutions ever fixed a bug; the port requirement only grew the container funnel.
 
 ### P-02 · We never spawn a subprocess from a feature; process execution goes through the one infrastructure adapter, `infrastructure/subprocess_runner.py`.
 Measured by: `lint-imports --config setup.cfg --no-cache` — contract `features-no-subprocess` (direct imports only, zero ignored edges).
-ADR: none
 Rationale: one process seam keeps execution observable, fakeable and bounded.
 
 ### P-03 · We keep `core` free of OS primitives (`fcntl`, `signal`, `subprocess`, `msvcrt`); `core/platform.py` is the sole platform seam.
 Measured by: `lint-imports --config setup.cfg --no-cache` — contract `core-no-os-primitives`.
-ADR: none
 Rationale: a POSIX-only primitive in the bottom ring breaks every importer on Windows.
 
 ### P-04 · We make `core` the bottom ring: it imports no `features`, `infrastructure`, `cli` or `hooks`.
 Measured by: `lint-imports --config setup.cfg --no-cache` — contract `core-no-upper-layers` (zero ignored imports).
-ADR: none
 Rationale: the ring everything imports must import nothing, or the graph has a cycle.
 
 ### P-05 · We let `infrastructure` depend on `core` only — never on `features`, `cli` or `hooks`.
 Measured by: `lint-imports --config setup.cfg --no-cache` — contract `infrastructure-no-upper-layers` (zero ignored imports).
-ADR: none
 Rationale: an adapter that knows a use case is no longer an adapter.
 
 ### P-07 · We keep features mutually independent: they compose through the container, never through sibling imports; a helper two features need lives in each.
 Measured by: `lint-imports --config setup.cfg --no-cache` — contract `features-no-cross-feature`, whose `modules = dadaia_workspace.features.*` covers every features package.
-ADR: 0176
 Rationale: a hand-kept `modules =` list hid three real sibling edges from the check.
 
 ### P-09 · We resolve the whole Invocation — workspace root, session, context, specs dir, the session's Bind — once per process in `core.invocation.resolve`, imported directly only by `cli._specs_resolution`, `container` and `hooks`.
 Measured by: `lint-imports --config setup.cfg --no-cache` — contract `bind-resolution-seam-is-a-single-home` (zero ignored imports, none ever accepted); `pytest tests/core/test_invocation.py`.
-ADR: 0243
 Rationale: every context bug came from a second resolution path answering differently.
 
 ### P-10 · We cap every suppressed layering edge and ratchet the cap only downward; an edge is added with its reason and the cap moved in the same commit.
 Measured by: `poetry run python scripts/guards/run.py` prints `PASS ignore-cap` — `scripts/guards/slop.py`'s `IGNORE_EDGES` is the cap's one numeric home.
-ADR: 0176
 Rationale: a pinned exception list turns every new suppression into a reviewable diff.
 
 ### P-11 · We keep `core` file-I/O pure outside an authorized set of eight modules; new file I/O enters `core` only by joining that set on purpose.
 Measured by: `pytest 'tests/core/test_atomic_write__core_file_io_purity.py::test_each_question_has_one_owner[core-file-io-purity]'` (AST walk; every authorized stem must exist).
-ADR: none
 Rationale: joining the set is legal; arriving there unnoticed is not.
 
 ### P-12 · We never import the composition root from a hook; hooks reach the resolution authority directly because they are one-shot processes on the write hot path.
 Measured by: `pytest tests/core/test_atomic_write__core_file_io_purity.py -k never_imports_the_container` (`test_importing_a_hook_never_imports_the_container` over five hook modules, and `test_gate_resolution_path_never_imports_the_container` over the executed gate path, each with `container` absent from `sys.modules`).
-ADR: none
 Rationale: the composition graph costs seconds of import time per gated tool call.
 
 ### P-13 · We keep the architecture diagrams derived from live code: every diagrammed class, view module and feature package is introspected against the live tree.
 Measured by: `dadaia doctor` — `specs`-section rule `MEM-DRIFT-1` (`features/specs/doctor_memory.py`), one WARNING per package the map and the live tree disagree on.
-ADR: none
 Rationale: a diagram nobody checks is the first artifact to lie.
 
 ### P-14 · We keep the release-state reader pure: `core/release_state.py` parses and serializes already-read text and performs no file I/O.
 Measured by: `pytest 'tests/core/test_atomic_write__core_file_io_purity.py::test_each_question_has_one_owner[release-state-module-never-writes]'`.
-ADR: 0243
 Rationale: a reader that can write is a reader that can rewrite history.
 
 ### P-15 · We close the release-state envelope: `release-state-v1` carries `additionalProperties: false` at every level, a closed log-entry shape, and no harness `session_id`.
 Measured by: `pytest tests/core/test_handoff_index__handoff_schema_contract.py`.
-ADR: 0243
 Rationale: an open envelope accumulates fields until no consumer can fold it.
 
 ### P-17 · We keep the agentic-law registry structurally complete: every shipped skill and scoped `AGENTS.md` source maps to one law section, every section has an owner, persona grants exclude non-invokable skills, source and projection references resolve, and law citations name live paths, commands and body targets.
 Measured by: `pytest tests/infrastructure/test_entity_doctor.py`.
-ADR: 0238
 Rationale: structural ownership and resolvable relationships keep agentic law reachable and enforceable without duplicating its content.
 
 ### P-30 · The version, the CHANGELOG section and the tag of a release come from release-please over Conventional Commits, and promote is merging its release PR.
 Measured by: `poetry run python scripts/guards/run.py` prints `PASS release-workflow-canon` (the release workflow, the release-please manifest and config, the `pyproject.toml` version equal to the CHANGELOG's top dated section).
-ADR: 0176
 Rationale: a hand-minted version is one more writer of one fact; the commit history already holds it.
 
 ### P-31 · We hold every repo INSIDE the workspace under `repos/<slug>/`, each its own git repository with its own `specs/`; the workspace is never a monorepo, one repo is the degenerate case of many, and bootstrap is one command (`init <dir> --harness <name> [--repo <url>]`).
 Measured by: `pytest tests/e2e/test_one_line_bootstrap.py tests/core/test_workspace_resolver.py`.
-ADR: 0015
 Rationale: the law, the harness projections, the zones and the venv live outside every repo; a per-repo or monorepo tool cannot govern ten projects with one law.
 
-### P-32 · We change canonical memory (`ARCHITECTURE.md`, `QUALITY.md`) only in the commit that carries its accepted ADR, and we reconcile product memory from the window's code diff at every closure — delete, update, then add — recorded as one `kind: memory` entry naming every drifted atom.
+### P-32 · We reconcile product memory from the window's code diff at every closure — delete, update, then add — recorded as one `kind: memory` entry naming every drifted atom.
 Measured by: `poetry run python scripts/guards/run.py` prints `PASS memory-canonical-shape`; `dadaia doctor` — `specs`-section rule `LINT-1` (history lines).
-ADR: 0023
 Rationale: three closures touched every product atom and left fifteen contradicted by the code; an append protocol stacks, a diff-driven one deletes first.
 
 ## Tech Stack

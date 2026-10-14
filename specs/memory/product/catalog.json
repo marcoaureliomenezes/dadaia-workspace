@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-13T07:49:31Z",
+  "generated_at": "2026-10-14T07:42:32Z",
   "features": [
     {
       "rank": 1,
@@ -14,7 +14,7 @@
         "handoff",
         "schema"
       ],
-      "token_estimate": 571,
+      "token_estimate": 632,
       "depends_on": [
         "worktrees",
         "release-lifecycle",
@@ -42,7 +42,7 @@
         "dispatch",
         "sdd"
       ],
-      "token_estimate": 822,
+      "token_estimate": 848,
       "depends_on": [
         "worktrees",
         "release-lifecycle",
@@ -176,7 +176,7 @@
         "release",
         "packaging"
       ],
-      "token_estimate": 1262,
+      "token_estimate": 1289,
       "depends_on": [
         "release-lifecycle",
         "QUALITY",
@@ -377,7 +377,7 @@
         "paradigm",
         "pillars"
       ],
-      "token_estimate": 585,
+      "token_estimate": 621,
       "depends_on": [
         "context-management",
         "worktrees",
@@ -560,7 +560,7 @@
         "macos",
         "linux"
       ],
-      "token_estimate": 393,
+      "token_estimate": 431,
       "depends_on": [
         "bug-ledger",
         "workspace-init",
@@ -587,7 +587,7 @@
         "ports",
         "ttl"
       ],
-      "token_estimate": 340,
+      "token_estimate": 418,
       "depends_on": [
         "workspace-init",
         "agentic-entities"
@@ -611,7 +611,7 @@
         "registry",
         "onboarding"
       ],
-      "token_estimate": 1102,
+      "token_estimate": 1192,
       "depends_on": [
         "public-asset-distribution",
         "sdd-gate-v3",
@@ -646,15 +646,15 @@
         "compliance",
         "privacy"
       ],
-      "token_estimate": 3001,
+      "token_estimate": 3302,
       "depends_on": [
         "public-asset-distribution",
         "sdd-gate-v3",
         "context-management",
         "workspace-init",
         "QUALITY",
-        "specs-migration",
         "worktrees",
+        "specs-migration",
         "release-lifecycle",
         "audits-canon"
       ],
@@ -688,7 +688,7 @@
         "upgrade",
         "onboarding"
       ],
-      "token_estimate": 1912,
+      "token_estimate": 2029,
       "depends_on": [
         "context-management",
         "specs-migration",
@@ -725,7 +725,7 @@
         "specs",
         "memory"
       ],
-      "token_estimate": 350,
+      "token_estimate": 404,
       "depends_on": [
         "bug-ledger",
         "release-lifecycle",
@@ -753,7 +753,7 @@
         "ledger",
         "governance"
       ],
-      "token_estimate": 903,
+      "token_estimate": 981,
       "depends_on": [
         "agent-orchestration",
         "worktrees",
@@ -781,7 +781,7 @@
         "lineage",
         "resolution"
       ],
-      "token_estimate": 644,
+      "token_estimate": 721,
       "depends_on": [
         "public-asset-distribution",
         "release-lifecycle",
@@ -810,7 +810,7 @@
         "state",
         "closure"
       ],
-      "token_estimate": 683,
+      "token_estimate": 834,
       "depends_on": [
         "agent-orchestration",
         "worktrees",
@@ -841,7 +841,7 @@
         "privacy",
         "git"
       ],
-      "token_estimate": 526,
+      "token_estimate": 559,
       "depends_on": [
         "context-management",
         "workspace-doctor",
@@ -875,7 +875,7 @@
         "merge",
         "review"
       ],
-      "token_estimate": 751,
+      "token_estimate": 945,
       "depends_on": [
         "agent-orchestration",
         "sdd-gate-v3",

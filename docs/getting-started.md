@@ -18,7 +18,9 @@ runs through the workspace's own CLI, `.dadaia/.venv/bin/dadaia`, which `init` p
 by its absolute path.
 
 **Upgrade:** re-run the same `uvx dadaia-workspace init <dir> --harness <name>` line;
-it prints `upgraded A -> B`, or `already at A` when the workspace is current. The upgrade
+it prints `upgraded A -> B`, `repaired -> B` when the venv's build could not be read, or
+`already at A` when the workspace is current. A venv whose python cannot start is refused
+with a fix that deletes `.dadaia/.venv` and reruns the init line. The upgrade
 never writes a project repo: `.dadaia/.venv/bin/dadaia specs init --context <ctx>` then
 refreshes each project's specs law.
 
