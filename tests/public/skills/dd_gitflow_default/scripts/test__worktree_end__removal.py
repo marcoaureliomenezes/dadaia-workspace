@@ -72,6 +72,17 @@ def test_list_reports_a_directory_that_holds_no_tree(root: Path) -> None:
     ]
 
 
+def test_list_gives_one_row_per_path_the_orphan_winning(root: Path) -> None:
+    assert run(root, "new", "r", "plain").returncode == 0
+    git(root / "repos/r", "worktree", "remove", "-f", "-f", str(root / "worktrees/r/plain"))
+    (root / "worktrees/r/plain").mkdir()  # the branch stays; the directory survives, files only
+    (root / "worktrees/r/plain/f.txt").write_text("x")
+    rows = json.loads(run(root, "list", "--json").stdout)
+    assert [(r["state"], r["path"]) for r in rows if r["state"] != "empty"] == [
+        ("orphan", str(root / "worktrees/r/plain"))
+    ]
+
+
 def _push_upstream(root: Path, remote_name: str) -> Path:
     remote = root.parent / f"{remote_name}.git"
     git(root.parent, "init", "-q", "--bare", str(remote))
