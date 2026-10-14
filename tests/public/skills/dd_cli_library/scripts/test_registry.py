@@ -14,6 +14,8 @@ from typing import Any
 
 import pytest
 
+from dadaia_workspace.infrastructure.ledger_scripts import load_owner
+
 _SCRIPT = (
     Path(__file__).resolve().parents[5]
     / "dadaia_workspace"
@@ -247,7 +249,6 @@ def _refused(refused: subprocess.CompletedProcess[str], error: str, fix: str) ->
     assert refused.stderr == f"[error] {error}\nfix: {fix}\n"
 
 
-@pytest.mark.skipif(sys.platform == "win32", reason="the literal is the POSIX quoting")
 def test_the_delete_fix_quotes_a_path_holding_a_blank(tmp_path: Path) -> None:
     reg = tmp_path / "a dir" / "r.json"
     reg.parent.mkdir()
@@ -255,7 +256,7 @@ def test_the_delete_fix_quotes_a_path_holding_a_blank(tmp_path: Path) -> None:
     _refused(
         _run(reg, "list"),
         f"{reg} is not valid UTF-8",
-        f"Operator action: delete '{reg}' — the next registry.py run starts an empty registry",
+        f"Operator action: delete {load_owner('dd-bug-resolution', '_platform').quote(str(reg))} — the next registry.py run starts an empty registry",
     )
 
 

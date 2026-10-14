@@ -15,7 +15,6 @@ from pathlib import Path
 import pytest
 
 import dadaia_workspace.infrastructure.python_env as python_env_module
-from dadaia_workspace.core.cli_line import quote, shell_line
 from dadaia_workspace.core.exceptions import DadaiaError
 from dadaia_workspace.core.platform import PLATFORM, Capabilities
 from dadaia_workspace.infrastructure.python_env import (
@@ -637,10 +636,7 @@ def test_a_venv_without_its_python_is_refused_with_the_delete_fix_on_every_run(
     an OSError of any is the one refusal naming the act that clears it, its paths quoted."""
     ws = tmp_path / "a workspace"
     (Path(_venv(ws)) / PLATFORM.venv_scripts_dir).mkdir(parents=True)
-    fix = (
-        f"Operator action: delete {quote(_venv(ws))} and run "
-        f"`{shell_line('uvx', 'dadaia-workspace', 'init', str(ws))}`"
-    )
+    fix = f"Operator action: delete '{ws}/.dadaia/.venv' and run `uvx dadaia-workspace init '{ws}'`"
     mgr = VenvPythonEnvironmentManager()
     monkeypatch.undo()  # the recorder's stubs off: the real checks run below
     monkeypatch.setattr(python_env_module.subprocess, "run", _no_interpreter)
