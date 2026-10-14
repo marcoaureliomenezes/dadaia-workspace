@@ -26,7 +26,20 @@ class _BrokenRunner:
         return _Result()
 
 
-def test_an_absent_specs_dir_is_no_ledger_finding(tmp_path: Path) -> None:
-    """A missing specs tree is the specs doctor's one finding; the ledger lane adds none, since
-    its `public install` fix cannot clear it."""
-    assert script_findings(tmp_path / "bare" / "specs", runner=_BrokenRunner()) == []
+def test_a_script_refusal_forwards_its_own_fix_line(tmp_path: Path) -> None:
+    """A script that refuses with its own `fix:` line has that line on the finding, not
+    `public install`."""
+    specs = tmp_path / "bare" / "specs"
+    specs.mkdir(parents=True)
+    findings = script_findings(specs, runner=_RefusingRunner())
+    assert {f.fix for f in findings} == {"python3 do-the-thing"}
+
+
+class _RefusingRunner:
+    def run(self, argv: object, *, cwd: object = None, timeout: float | None = None) -> object:
+        class _Result:
+            returncode = 1
+            stdout = ""
+            stderr = "no specs tree\nfix: python3 do-the-thing\n"
+
+        return _Result()

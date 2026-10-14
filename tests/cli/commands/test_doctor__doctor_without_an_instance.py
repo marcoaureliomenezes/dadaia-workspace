@@ -18,6 +18,7 @@ import pytest
 from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app
+from dadaia_workspace.core.specs_version import state
 from dadaia_workspace.features.specs.canon import scaffold
 from dadaia_workspace.infrastructure.ledger_scripts import script_repairs
 
@@ -46,6 +47,22 @@ def test_explicit_specs_dir_is_read_with_no_instance_around(no_instance: Path) -
     assert payload["sections"]["workspace"]["findings"] == []
     assert "specs" in payload["sections"] and "ledgers" in payload["sections"]
     assert run.exit_code == 0, run.output
+
+
+@pytest.mark.medium
+def test_an_absent_specs_dir_is_one_finding_and_its_fix_clears_the_doctor(
+    no_instance: Path,
+) -> None:
+    specs = no_instance / "specs"
+
+    run = _runner.invoke(app, ["doctor", "--json", "--specs-dir", str(specs)])
+
+    sections = json.loads(run.output)["sections"]
+    found = [f for section in sections.values() for f in section["findings"]]
+    assert [f["fix"] for f in found] == [state(specs)[1]], run.output
+    assert run.exit_code == 1
+    assert _runner.invoke(app, ["specs", "init", "--specs-dir", str(specs)]).exit_code == 0
+    assert _runner.invoke(app, ["doctor", "--specs-dir", str(specs)]).exit_code == 0
 
 
 def test_nothing_to_read_refuses_with_one_fix(no_instance: Path) -> None:
