@@ -518,3 +518,4 @@ def test_the_scans_bite() -> None:
     assert _text_sites({"specs/memory/ARCHITECTURE.md": f"# A\n{generated}the `rc-N` shape\n"}) == [
         "specs/memory/ARCHITECTURE.md:5"
     ]
+    assert _text_sites({"dadaia_workspace/public/x.md": generated}) == []
