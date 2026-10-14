@@ -203,6 +203,47 @@ SITES: dict[str, Callable[[Path], str | None]] = {
 _PKG = Path(__file__).resolve().parents[2] / "dadaia_workspace"
 _TERM = "zorblaxquux"
 
+#: The files whose refusals name an act only the human may do (the law's reserved set), by how
+#: many times each spells `Operator action`; every other act a refusal names is the agent's.
+_HUMAN_ONLY = {
+    "cli/commands/context.py": 1,
+    "features/chokepoints/push_gate.py": 1,
+    "features/spec_context/doctor.py": 1,
+    "features/spec_context/gate_policy.py": 1,
+    "features/spec_context/sweep.py": 1,
+    "infrastructure/git_subprocess.py": 1,
+    "public/skills/dd-bug-resolution/scripts/_memory_drift.py": 2,
+    "public/skills/dd-gitflow-default/scripts/_worktree_end.py": 1,
+    "public/skills/dd-release-implementation/scripts/_release_phase.py": 2,
+    "public/skills/dd-release-implementation/scripts/release.py": 2,
+}
+
+
+def test_an_operator_action_is_only_what_the_law_reserves_to_the_human() -> None:
+    """No module spells `Operator action` outside the reserved files, nor more often than the
+    acts the law reserves there."""
+    found = {
+        p.relative_to(_PKG).as_posix(): n
+        for p in _PKG.rglob("*.py")
+        if (n := p.read_text(encoding="utf-8").count("Operator action"))
+    }
+    assert found.items() <= _HUMAN_ONLY.items(), found
+
+
+@pytest.mark.parametrize(
+    ("fix", "defect"),
+    [
+        pytest.param("Agent action: edit the Origin line of SPEC.md, then rerun it", False, id="agent-act"),
+        pytest.param("Agent action: choose a or b and rerun", False, id="agent-menu-in-words"),
+        pytest.param("Operator action: relaunch the session, then rebind", False, id="operator-act"),
+        pytest.param("Agent action: edit <file>", True, id="agent-placeholder"),
+        pytest.param("Agent action: edit a|b", True, id="agent-menu-bar"),
+        pytest.param("Human action: edit the file", True, id="third-label"),
+    ],
+)  # fmt: skip
+def test_fix_defect_judges_both_action_labels_by_one_act(fix: str, defect: bool) -> None:
+    assert fix_defect(fix) is defect
+
 
 def _constitution(
     principal: str = "main", integration: str = "develop", work: str = "feature/"
