@@ -49,7 +49,7 @@ sources:
 - The scaffold writes only absent files, each through one `O_CREAT|O_NOFOLLOW` open: an existing file or a symlinked destination is skipped, and a path escaping the tree through a symlinked parent is never written.
 - Every scoped scaffold `AGENTS.md` is the system of record of its area; no test or script pins a file's byte or line count, the one exception the library's own `behavior-map.json` `SKILL.md` line limits (`skill_md_line_soft`, a doctor warning, and `skill_md_line_ceiling`), a map that lives beside the doctor and is never staged or projected; `TREE-5` heals each by shipped hash, and operator-owned files are never overwritten ([[workspace-doctor]]).
 - The repo template lands with `dadaia specs init`: `repo-AGENTS.md` becomes the main repo's `AGENTS.md`, names its tracked `verify:` as the sole repository verification authority, and carries no test-path, stage or task-gate declaration. Once written it is operator-owned and never overwritten.
-- A memory atom still carrying the scaffold's placeholders is `MEM-PLACEHOLDER-1` in `dadaia doctor`'s `specs` section, removed by `--fix`.
+- A memory atom whose frontmatter still carries a scaffold template token is `MEM-PLACEHOLDER-1` in `dadaia doctor`'s `specs` section; `--fix` removes it only when nothing but template text is in it ([[workspace-doctor]]).
 - Consumer-repo `AGENTS.md` fan-out is gated by the canonical banner: absent creates, a stale banner is restored as `[updated]`, a bannerless file is `[foreign]` and never overwritten; a symlinked destination file is `[foreign]`.
 
 ## Shipped scripts

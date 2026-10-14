@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-14T07:42:32Z",
+  "generated_at": "2026-10-14T13:00:21Z",
   "features": [
     {
       "rank": 1,
@@ -130,7 +130,7 @@
         "projection",
         "privacy"
       ],
-      "token_estimate": 1292,
+      "token_estimate": 1310,
       "depends_on": [
         "agentic-entities",
         "bug-ledger",
@@ -646,7 +646,7 @@
         "compliance",
         "privacy"
       ],
-      "token_estimate": 3302,
+      "token_estimate": 3374,
       "depends_on": [
         "public-asset-distribution",
         "sdd-gate-v3",
@@ -781,7 +781,7 @@
         "lineage",
         "resolution"
       ],
-      "token_estimate": 721,
+      "token_estimate": 764,
       "depends_on": [
         "public-asset-distribution",
         "release-lifecycle",

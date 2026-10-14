@@ -14,7 +14,7 @@ sources:
 - `specs/bugs/BUGS.jsonl` holds one `bug-record-v1` object per id. Registration facts are immutable, resolution facts are transition-owned or write-once, and unknown fields are rejected.
 - Status is `open | resolved | superseded | rejected`. Terminal records carry `closed_at`; a reopen is a new id.
 - A resolved record persists `cause`, `solution`, `caused_by` and the 40-hex `fix_sha`. Git supplies the diff, numstat and subsequent history.
-- `caused_by` names a live or archived bug, a known task id or `none`; validation rejects dangling links and cycles.
+- `caused_by` names a live or archived bug, a known task id or `none`; a task id is known when a job file or a closed release's `TASKS.md` carries it, in the current grammar or as the head of a historical task line (`T-<n>-<n>`, lettered `J<X>.S<n>.T<n>`); validation rejects dangling links and cycles.
 
 ## Writer and transitions
 
