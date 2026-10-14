@@ -116,7 +116,9 @@ def test_a_git_failure_no_check_named_ends_as_one_refusal(root: Path) -> None:
     refused = run(root, "merge", TREE)
     assert refused.returncode == 1 and "Traceback" not in refused.stderr
     assert "[error]" in refused.stderr
-    assert len(fixes(refused)) == 1
+    [fix] = fixes(refused)
+    assert fix.startswith("fix: Operator action: clear the git failure above, then rerun ")
+    assert fix.endswith(f"worktree.py merge {TREE}")  # the rerun as given, never `list`
 
 
 def test_a_dirty_tree_refuses_with_one_fix_that_commits_or_removes(root: Path) -> None:
