@@ -23,6 +23,7 @@ from pathlib import Path
 from packaging.version import Version
 
 import dadaia_workspace
+from dadaia_workspace.core.cli_line import shell_line
 from dadaia_workspace.core.exceptions import (
     BootstrapPackageError,
     WorkspaceVenvBootstrapError,
@@ -191,6 +192,9 @@ def _version_satisfies(version: tuple[int, ...], spec: str | None) -> bool:
 _INTERPRETER_PROBE_TIMEOUT_SECONDS = 10
 
 
+_VERSION_ARGS = ("-c", "import sys; print(*sys.version_info[:3])")
+
+
 def _interpreter_version(executable: str) -> tuple[int, int, int] | None:
     """Best-effort: ask *executable* for its OWN ``sys.version_info`` by RUNNING it —
     never trust a name or a recorded config value without executing it. Any failure to
@@ -204,7 +208,7 @@ def _interpreter_version(executable: str) -> tuple[int, int, int] | None:
     """
     try:
         proc = subprocess.run(
-            [executable, "-c", "import sys; print(*sys.version_info[:3])"],
+            [executable, *_VERSION_ARGS],
             capture_output=True,
             text=True,
             encoding="utf-8",
@@ -215,6 +219,11 @@ def _interpreter_version(executable: str) -> tuple[int, int, int] | None:
         )
     except (OSError, subprocess.SubprocessError):
         return None
+    return _parsed_version(proc)
+
+
+def _parsed_version(proc: "subprocess.CompletedProcess[str]") -> tuple[int, int, int] | None:
+    """The ``(major, minor, micro)`` a :data:`_VERSION_ARGS` run printed, ``None`` when it failed."""
     if proc.returncode != 0:
         return None
     parts = proc.stdout.split()
@@ -502,7 +511,21 @@ class VenvPythonEnvironmentManager:
         check: bool = False,
         env: dict[str, str] | None = None,
     ) -> "subprocess.CompletedProcess[str]":
-        """The ONE place the venv's python runs; an ``OSError`` becomes the refusal with its fix."""
+        """Run the workspace venv's python.
+
+        Args:
+            workspace_root: The workspace whose venv python runs.
+            *args: Its command-line arguments.
+            check: Raise ``CalledProcessError`` on a non-zero exit.
+            env: The child environment; ``None`` inherits this process's.
+
+        Returns:
+            The completed process, its output captured as text.
+
+        Raises:
+            WorkspaceVenvBootstrapError: The python cannot be started; its fix deletes the venv.
+            subprocess.CalledProcessError: *check* and a non-zero exit.
+        """
         try:
             return subprocess.run(
                 [self.python_executable(workspace_root), *args],
@@ -516,8 +539,8 @@ class VenvPythonEnvironmentManager:
         except OSError as exc:
             raise WorkspaceVenvBootstrapError(
                 f"workspace venv python cannot run: {exc}.",
-                f"Operator action: delete {self._venv_path(workspace_root)} and run "
-                f"`uvx dadaia-workspace init {workspace_root}`",
+                f"Operator action: delete {shell_line(str(self._venv_path(workspace_root)))} and run "
+                f"`{shell_line('uvx', 'dadaia-workspace', 'init', workspace_root)}`",
             ) from exc
 
     def _probe_provider(self, workspace_root: str) -> "subprocess.CompletedProcess[str]":
@@ -601,7 +624,7 @@ class VenvPythonEnvironmentManager:
         required = self._running_requires_python()
         if required is None:
             return  # nothing to check against — fail open, matching provider_version()
-        version = _interpreter_version(self.python_executable(workspace_root))
+        version = _parsed_version(self._run_venv(workspace_root, *_VERSION_ARGS))
         if version is None:
             return  # could not introspect — pip install remains the final authority
         if not _version_satisfies(version, required):
