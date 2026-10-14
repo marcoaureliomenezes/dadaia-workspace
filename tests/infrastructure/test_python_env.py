@@ -552,7 +552,12 @@ def test_child_venv_version_postcondition(
     unintrospectable one fails open (pip stays the final authority)."""
     mgr = VenvPythonEnvironmentManager()
     monkeypatch.setattr(mgr, "_running_requires_python", lambda: ">=3.12,<4.0")
-    monkeypatch.setattr(python_env_module, "_interpreter_version", lambda exe: version)
+    printed = "" if version is None else " ".join(map(str, version))
+    monkeypatch.setattr(
+        mgr,
+        "_run_venv",
+        lambda *_a, **_k: subprocess.CompletedProcess([], int(version is None), printed),
+    )
     if not raises:
         mgr._assert_child_interpreter_version(str(tmp_path))
         return
