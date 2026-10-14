@@ -7,12 +7,13 @@ import re
 from pathlib import Path
 
 from _bugs_check import OPEN
-from _grammar import STATE, live_ids
+from _grammar import STATE
 from _jsonl import Unreadable, parse_object
 from _specs import parse
 from _worktree_git import (
     flow_for,
     git,
+    live_release,
     quote,
     record_base,
     script,
@@ -63,12 +64,8 @@ def _shape(repo: Path, flow: dict[str, str], name: str) -> tuple[re.Match[str], 
 
 def _plain_base(root: Path, repo: Path, flow: dict[str, str]) -> str:
     """The branch a plain tree returns to: the live work branch, else the checked-out one."""
-    releases = live_ids(root / "repos" / flow["main"] / "specs")
-    if len(releases) > 1:
-        raise Refusal("multiple live releases make the plain worktree base ambiguous",
-                      f"Operator action: make exactly one release live in repos/{flow['main']}/specs")  # fmt: skip
-    if releases:
-        return f"{flow['work']}{releases[0]}"
+    if release := live_release(root / "repos" / flow["main"] / "specs"):
+        return f"{flow['work']}{release}"
     if start := git(repo, "branch", "--show-current").strip():
         return start
     raise Refusal("a plain worktree needs a checked-out base branch when no release is live",

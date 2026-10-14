@@ -85,6 +85,15 @@ def flow_for(root: Path, repo: Path) -> dict[str, str]:
     return flow
 
 
+def live_release(main_specs: Path) -> str | None:
+    """The one live release id under *main_specs*, else None; raises Refusal when several are live."""
+    live = live_ids(main_specs)
+    if len(live) > 1:
+        raise Refusal("multiple live releases make the work branch ambiguous",
+                      f"Operator action: make exactly one release live in repos/{main_specs.parent.name}/specs")  # fmt: skip
+    return live[0] if live else None
+
+
 def work_version(repo: Path, flow: dict[str, str]) -> str:
     prefix = flow["work"]
     branches = git(repo, "branch", "--list", f"{prefix}*", "--format=%(refname:short)").split()
@@ -98,8 +107,7 @@ def work_version(repo: Path, flow: dict[str, str]) -> str:
         )
     tags = [tuple(map(int, m.groups())) for t in git(repo, "tag").split() if (m := TAG_RE.match(t))]
     major, minor, patch = max(tags, default=(0, 0, 0))
-    live = live_ids(repo.parent / flow["main"] / "specs")
-    nxt = live[-1] if live else f"{major}.{minor}.{patch + 1}" if tags else "0.1.0"
+    nxt = live_release(repo.parent / flow["main"] / "specs") or (f"{major}.{minor}.{patch + 1}" if tags else "0.1.0")  # fmt: skip
     raise Refusal(
         f"no work branch {prefix}<M.m.p>",
         git_line(repo, "branch", f"{prefix}{nxt}", flow["integration"]),
@@ -183,11 +191,11 @@ def _absent(root: Path, repo: Path, held: set[str], found: list[dict[str, object
     for ref in git(repo, "for-each-ref", "--format=%(refname:short)", "refs/heads/wt/").split():
         if f"refs/heads/{ref}" not in held and (name := name_of(ref)):
             out.append(_row(repo, str(home / name), "orphan"))
-    listed = {Path(str(r["path"])).resolve() for r in found}
+    listed = {Path(str(r["path"])).resolve() for r in (*found, *out)}  # one row per path
     for stray in sorted(home.glob("*/*")):  # a name is two levels
         if stray.is_dir() and not {stray.resolve(), stray.parent.resolve()} & listed:
             out.append(_row(repo, str(stray), "unregistered"))
-    for folder in sorted(home.glob("*")):  # an rc folder holding no tree
+    for folder in sorted(home.glob("*")):  # an unlisted one-level folder
         named = any(Path(str(r["path"])).parent == folder for r in (*found, *out))
         if folder.is_dir() and folder.resolve() not in listed and not named:
             out.append(_row(repo, str(folder), "unregistered"))
@@ -223,7 +231,7 @@ def rows(root: Path) -> list[dict[str, object]]:
     for a registered repo ours `ready` (ahead, clean), `open` (ahead, dirty) or `empty`, an
     `orphan` wt/* with no tree, a `foreign` worktree git registers (harness-native, hand-made,
     under a TTL zone), and an `unregistered` directory two levels under `worktrees/<repo>/` or
-    an empty one level under it; for a repo no context owns, each linked tree is `unregistered`
+    an unlisted one level under it; for a repo no context owns, each linked tree is `unregistered`
     with `registered: false`."""
     known, homes = gitflows(root), tree_path(root, "")
     names = sorted(
