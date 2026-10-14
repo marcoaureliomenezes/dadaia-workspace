@@ -116,7 +116,7 @@ def constitution_path(specs_dir: Path) -> Path:
 
 
 def specs_tree_exists(specs_dir: Path) -> bool:
-    return specs_dir.exists()
+    return specs_dir.is_dir()
 
 
 def constitution_text(specs_dir: Path) -> str:

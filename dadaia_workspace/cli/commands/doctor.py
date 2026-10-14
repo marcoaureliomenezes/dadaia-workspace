@@ -193,9 +193,9 @@ def _resolve_run(
     )
 
 
-def _absent_tree(specs_dir: str | None, target: Path | None) -> SectionFinding | None:
+def _absent_tree(target: Path | None) -> SectionFinding | None:
     """An explicit ``--specs-dir`` holding no tree: its one finding, carrying ``state``'s fix."""
-    kind, fix = state(target) if specs_dir and target else ("canonical", None)
+    kind, fix = state(target) if target else ("canonical", None)
     if kind != "absent":
         return None
     msg = f"no specs tree at {target}"
@@ -300,7 +300,7 @@ def doctor(
 ) -> None:
     """Report workspace, specs and ledger compliance; optionally repair."""
     workspace_root, service, scope, target = _resolve_run(specs_dir, context)
-    absent = _absent_tree(specs_dir, target)
+    absent = _absent_tree(target)
     target = None if absent else target
     specs_doctor = _build_specs_doctor(target, public_dir)
 

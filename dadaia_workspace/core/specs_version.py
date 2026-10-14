@@ -41,6 +41,11 @@ def state(
     of the tree on disk. A constitution whose YAML or gitflow block fails is ``malformed``.
     The fix names *context* when given, else *specs_dir* itself."""
     if text is None and not specs_tree_exists(specs_dir):
+        if specs_dir.is_file():  # `specs init` cannot build a tree on a file
+            return (
+                "absent",
+                f"Operator action: move {specs_dir} aside, it is a file, not a directory",
+            )
         kind: State = "absent"
     elif reason := constitution_error(specs_dir, text):
         return "malformed", f"Operator action: repair the YAML frontmatter of {reason}"
