@@ -41,6 +41,7 @@ from dadaia_workspace.core.exceptions import (
     SchemaVersionError,
     WorkspaceNotInitializedError,
 )
+from dadaia_workspace.core.specs_version import state
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.backlog import doctor as backlog_doctor
 from dadaia_workspace.features.spec_context.doctor import DoctorService, workspace_rules
@@ -99,7 +100,7 @@ def _ledgers_section(
 ) -> SectionReport:
     """The `ledgers` section — three contributors, one name.
 
-    The backlog document's BL-* rules, the ADR ledger's own reader, and the five ledger
+    The backlog document's BL-* rules, the ADR ledger's own reader, and the four ledger
     SCRIPTS: each ledger with a writer script is validated by THAT script's
     `check`, run as a subprocess here. The doctor holds no second implementation of any
     ledger schema — this is the one delegation point.
@@ -190,6 +191,15 @@ def _resolve_run(
         name,
         target if target and onboarding.specs_ready(target) else None,
     )
+
+
+def _absent_tree(specs_dir: str | None, target: Path | None) -> SectionFinding | None:
+    """An explicit ``--specs-dir`` holding no tree: its one finding, carrying ``state``'s fix."""
+    kind, fix = state(target) if specs_dir and target else ("canonical", None)
+    if kind != "absent":
+        return None
+    msg = f"no specs tree at {target}"
+    return SectionFinding("SPECS-ABSENT", "error", msg, canonical=False, error=True, fix=fix or "")
 
 
 def _bound_context() -> str | None:
@@ -290,6 +300,8 @@ def doctor(
 ) -> None:
     """Report workspace, specs and ledger compliance; optionally repair."""
     workspace_root, service, scope, target = _resolve_run(specs_dir, context)
+    absent = _absent_tree(specs_dir, target)
+    target = None if absent else target
     specs_doctor = _build_specs_doctor(target, public_dir)
 
     fixed = _apply_fixes(service, specs_doctor, scope, fix=fix, expired_only=expired_only)
@@ -305,7 +317,9 @@ def doctor(
                 _onboarding_section(workspace_root, scope, expired_only=expired_only),
             ]
         ),
-        _specs_section(specs_doctor, workspace_root),
+        SectionReport(name="specs", findings=(absent,))
+        if absent
+        else _specs_section(specs_doctor, workspace_root),
         _ledgers_section(workspace_root, target),
     ]
     # Render boundary ONLY: no doctor ever sees the redactor; every finding and fix action

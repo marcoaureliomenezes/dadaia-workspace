@@ -117,15 +117,15 @@ def resolve_script(script: LedgerScript, specs_dir: Path) -> Path | None:
     return None
 
 
-def _unrunnable(script: LedgerScript, reason: str) -> SectionFinding:
+def _unrunnable(script: LedgerScript, reason: str, fix: str = "") -> SectionFinding:
     return SectionFinding(
         code=script.code,
         verdict="error",
         message=f"{script.skill}/scripts/{script.filename} {reason}",
         canonical=False,
         error=True,
-        # The one remediation for a script that cannot run at all: re-project the skills.
-        fix=fix_line(None, "public", "install"),
+        # The script's own refusal fix, else the one for a script that cannot run: re-project.
+        fix=fix or fix_line(None, "public", "install"),
     )
 
 
@@ -144,8 +144,6 @@ def _finding(script: LedgerScript, record: dict[str, Any]) -> SectionFinding:
 
 def script_findings(specs_dir: Path, runner: _Runner | None = None) -> list[SectionFinding]:
     """Every ledger finding of every script, re-emitted as one section's findings."""
-    if not specs_dir.is_dir():  # the specs doctor reports a missing tree, with its fix
-        return []
     process = runner if runner is not None else SubprocessProcessRunner()
     findings: list[SectionFinding] = []
     for script in LEDGER_SCRIPTS:
@@ -161,7 +159,8 @@ def script_findings(specs_dir: Path, runner: _Runner | None = None) -> list[Sect
             continue
         records = _parse(result)
         if records is None:
-            findings.append(_unrunnable(script, f"check exited {result.returncode} with no JSON"))
+            reason = f"check exited {result.returncode} with no JSON"
+            findings.append(_unrunnable(script, reason, fix_of(result.stderr)))
             continue
         findings.extend(
             _finding(script, record) for record in records if record.get("verdict") != "info"
