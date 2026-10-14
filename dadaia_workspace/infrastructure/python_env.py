@@ -432,8 +432,7 @@ class VenvPythonEnvironmentManager:
                 spec = self._install_spec(scratch)
                 # ONE pip transaction replaces any installed build (same label or not)
                 # with its dependencies; on failure pip rolls back to the old build.
-                python = self.python_executable(workspace_root)
-                install_cmd = [python, "-m", "pip", "install", "--quiet", "--force-reinstall"]
+                install_cmd = ["-m", "pip", "install", "--quiet", "--force-reinstall"]
                 editable = Path(spec).is_dir()
                 if editable:
                     install_cmd.append("--editable")
@@ -441,14 +440,7 @@ class VenvPythonEnvironmentManager:
                 # pip's stream is CAPTURED — a failure must not leak a raw "ERROR: Could not find a
                 # version..." into init's output, where it reads as a masked broken bootstrap.
                 try:
-                    subprocess.run(
-                        install_cmd,
-                        check=True,
-                        capture_output=True,
-                        text=True,
-                        encoding="utf-8",
-                        errors="replace",
-                    )
+                    self._run_venv(workspace_root, *install_cmd, check=True)
                 except subprocess.CalledProcessError as exc:
                     raise WorkspaceVenvBootstrapError(
                         f"workspace venv bootstrap failed installing '{spec}'. The "
@@ -499,28 +491,46 @@ class VenvPythonEnvironmentManager:
             return None
         try:
             proc = self._probe_provider(workspace_root)
-        except OSError:
+        except WorkspaceVenvBootstrapError:
             return None
         return (proc.stdout or "").strip() or None if proc.returncode == 0 else None
 
+    def _run_venv(
+        self,
+        workspace_root: str,
+        *args: str,
+        check: bool = False,
+        env: dict[str, str] | None = None,
+    ) -> "subprocess.CompletedProcess[str]":
+        """The ONE place the venv's python runs; an ``OSError`` becomes the refusal with its fix."""
+        try:
+            return subprocess.run(
+                [self.python_executable(workspace_root), *args],
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                check=check,
+                env=env,
+            )
+        except OSError as exc:
+            raise WorkspaceVenvBootstrapError(
+                f"workspace venv python cannot run: {exc}.",
+                f"Operator action: delete {self._venv_path(workspace_root)} and run "
+                f"`uvx dadaia-workspace init {workspace_root}`",
+            ) from exc
+
     def _probe_provider(self, workspace_root: str) -> "subprocess.CompletedProcess[str]":
         """Ask the venv's own python, under a CLEAN env, which dadaia-workspace build it imports."""
-        return subprocess.run(
-            [
-                self.python_executable(workspace_root),
-                "-B",  # this probe writes no .pyc into an editable install's checkout
-                "-c",
-                f"{inspect.getsource(build_digest)}"
-                "import dadaia_workspace, importlib.metadata as m\n"
-                "d = m.distribution('dadaia-workspace')\n"
-                "print(d.version, build_digest(d.files))",
-            ],
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
+        return self._run_venv(
+            workspace_root,
+            "-B",  # this probe writes no .pyc into an editable install's checkout
+            "-c",
+            f"{inspect.getsource(build_digest)}"
+            "import dadaia_workspace, importlib.metadata as m\n"
+            "d = m.distribution('dadaia-workspace')\n"
+            "print(d.version, build_digest(d.files))",
             env={"PATH": os.environ.get("PATH", "")},
-            check=False,
         )
 
     def _resolve_child_venv_interpreter(self) -> str:
