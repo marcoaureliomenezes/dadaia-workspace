@@ -144,14 +144,13 @@ def _last_summary(state: dict[str, Any]) -> str:
 
 def _swept(state: dict[str, Any]) -> bool:
     """Whether a missing pointer is an error: the live candidate (past DEFINITION, so a stacked
-    candidate's inherited log is not its own) logged its `dispositions` entry, or shipped."""
+    candidate's inherited log is not its own) logged its closure `summary`, or shipped."""
     since = str((state.get("defined") or {}).get("ts") or "")
     return bool(
         state.get("shipped")
         or state.get("phase") != "DEFINITION"
         and any(
-            e.get("kind") == "dispositions" and str(e.get("ts")) >= since
-            for e in state.get("log") or []
+            e.get("kind") == "summary" and str(e.get("ts")) >= since for e in state.get("log") or []
         )
     )
 
