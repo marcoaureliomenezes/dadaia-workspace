@@ -26,4 +26,4 @@ Disclosed reference reached at `SKILL.md` step 7 — `dd-product-engineer` runs 
 - `product/index.md` and `product/catalog.json` are generated together — by `memory.py catalog generate` (step 6), which overwrites any hand edit.
 - `product/<area>/<slug>.md`: one atom per feature — what it does for its user, its boundaries, its current behavior, its runtime state, its dependencies as `[[slug]]` links; no implementation tour, no principle.
 
-*Done when:* the closure's single `kind: memory` entry covers every authoritative worklist entry, `.dadaia/.venv/bin/dadaia doctor` is clean, and each changed atom lands with its reconciled derived docs in the same Reconciliation merge.
+*Done when:* the closure's latest `kind: memory` entry covers every authoritative worklist entry, `.dadaia/.venv/bin/dadaia doctor` is clean, and each changed atom lands with its reconciled derived docs in the same Reconciliation merge.

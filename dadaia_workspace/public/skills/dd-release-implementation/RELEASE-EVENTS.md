@@ -23,10 +23,10 @@ release state.
 | `note` | `release.py new`, or the agent recording an operator authorization verbatim | The entry holds one fact that belongs to no typed entry. |
 | `milestone` | `release.py phase` | `{candidate, milestone, sha}` matches the transition. |
 | `summary` | `dd-product-engineer`, Read-then-Edit | Its whole text is one line of the shape `delivered: …; carried: …; backlog exits: …`. |
-| `memory` | `release.py memory` | It is the one closure entry and carries `{since, until, reviewed, changed}`. |
+| `memory` | `release.py memory` | It is the closure's latest entry and carries `{since, until, reviewed, changed}`. |
 
 `memory` is closure-only. A rerun at the same HEAD appends nothing. `release.py check`
-requires one memory entry at or after `implemented.ts` and reads no git to validate that
+requires a memory entry at or after `implemented.ts` and reads no git to validate that
 fact; `release.py drift` remains the worklist command used before the entry is written.
 
 An open bug blocks `ship` by default. A carried bug needs all three facts: one

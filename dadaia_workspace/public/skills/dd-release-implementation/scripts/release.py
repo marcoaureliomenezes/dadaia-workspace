@@ -51,7 +51,7 @@ _HELP = {
     "new": "open the next candidate: its rc-<N+1>/SPEC.md stub and _RELEASE.json, in one act",
     "phase": "move the live release to IMPLEMENTATION or CLOSURE, stamping its milestone",
     "drift": "the closure worklist over the live release's memory window (memory.py drift)",
-    "memory": "append the closure's one structured `kind: memory` entry to the live log",
+    "memory": "append a structured `kind: memory` entry to the live log",
     "ship": "record the merged promote PR: shipped, a delivered histo line, the dir archived",
     "origin": "print the ids a SPEC's **Origin:** line carries, one `<kind> <id>` per line",
     "check": "validate every _RELEASE.json under releases/ and the ship ledger",
