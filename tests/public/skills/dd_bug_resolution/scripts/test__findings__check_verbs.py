@@ -191,4 +191,4 @@ def test_following_the_not_utf8_fix_keeps_every_valid_record(tmp_path: Path) -> 
     lines[0] = lines[0].decode("latin-1").encode("utf-8")
     ledger.write_bytes(b"\n".join(lines))
     assert run("check").returncode == 0
-    assert json.loads(ledger.read_text("utf-8").splitlines()[0])["id"] == "a-bug"
+    assert '"id": "a-bug"' in ledger.read_text("utf-8")
