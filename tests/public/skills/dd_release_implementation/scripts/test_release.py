@@ -763,31 +763,46 @@ def test_memory_opens_the_next_window_at_the_previous_until(script: Path, tmp_pa
     assert _log(specs)[-1]["since"] == until
 
 
-def test_drift_and_memory_resolve_a_recorded_bound_a_rebase_rewrote(
-    script: Path, tmp_path: Path
+@pytest.mark.parametrize("rewrite", ["rebase", "fold"])
+def test_a_recorded_bound_a_rewrite_unreached_widens_to_the_newest_reachable_bound(
+    script: Path, tmp_path: Path, rewrite: str
 ) -> None:
-    """A rebase before merge rewrites the commit `until` names; the window then opens at the
-    commit that wrote the entry, which the rebase carried along, with no hand edit."""
-    root, specs, _ = _memory_repo(tmp_path, script)
+    """The commit `until` names is gone from HEAD's history: the window reopens at the newest
+    recorded bound HEAD still reaches, so every atom source that moved under the rewrite is
+    still on the worklist, and `memory` records that wider window with no hand edit."""
+    root, specs, base = _memory_repo(tmp_path, script)
+    extra = root / "dadaia_workspace" / "features" / "alpha" / "extra.py"
     assert _memory(script, root, specs, reviewed="alpha", changed="").returncode == 0
     _git(root, "commit", "-qam", "memory entry")
-    work = _git(root, "branch", "--show-current")
     stale = _log(specs)[-1]["until"]
-    _git(root, "checkout", "-q", "-b", "moved", "HEAD~2")
-    (root / "other.txt").write_text("feature moved\n", encoding="utf-8")
-    _git(root, "add", "-A")
-    _git(root, "commit", "-qm", "feature moved")
-    _git(root, "checkout", "-q", work)
-    _git(root, "rebase", "-q", "moved")
+    if rewrite == "rebase":
+        work = _git(root, "branch", "--show-current")
+        _git(root, "checkout", "-q", "-b", "moved", "HEAD~2")
+        extra.write_text("moved\n", encoding="utf-8")
+        _git(root, "add", "-A")
+        _git(root, "commit", "-qm", "feature moved")
+        _git(root, "checkout", "-q", work)
+        _git(root, "rebase", "-q", "moved")
+    else:
+        extra.write_text("after the entry\n", encoding="utf-8")
+        _git(root, "add", "-A")
+        _git(root, "commit", "-qm", "code after the entry")
+        _git(root, "reset", "-q", "--soft", base)
+        _git(root, "commit", "-qm", "folded")
     ancestor = subprocess.run(["git", "merge-base", "--is-ancestor", stale, "HEAD"], cwd=root)
-    assert ancestor.returncode == 1  # the rebase rewrote the recorded bound
+    assert ancestor.returncode == 1  # the rewrite dropped the recorded bound
 
     drift = _run(script, "drift", "--specs", str(specs), cwd=root)
-    memory = _memory(script, root, specs, reviewed="", changed="")
+    memory = _memory(script, root, specs, reviewed="alpha", changed="")
 
-    assert drift.returncode == 0, drift.stderr
+    assert drift.returncode == 1, drift.stderr
+    assert drift.stdout.splitlines() == [
+        f"[drift] since {base}",
+        "  atom alpha <- dadaia_workspace/features/alpha/core.py, "
+        "dadaia_workspace/features/alpha/extra.py",
+    ]
     assert memory.returncode == 0, memory.stderr
-    assert _log(specs)[-1]["since"] == _git(root, "rev-parse", "HEAD")
+    assert _log(specs)[-1]["since"] == base
 
 
 def test_a_rerun_after_the_second_reconciliation_appends_nothing(

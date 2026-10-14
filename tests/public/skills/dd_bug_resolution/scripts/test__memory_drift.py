@@ -202,10 +202,13 @@ def test_a_bound_head_does_not_reach_refuses_as_a_clean_clone_would(
 
     shown = subprocess.run([sys.executable, "-c", call], capture_output=True, text=True, check=True)
 
-    assert shown.stdout.splitlines() == [
-        f"{orphan} is not an ancestor of HEAD — a clone of this branch lacks it (a rebase rewrote it)",
-        f"git -C {repo.as_posix()} merge-base HEAD {orphan}",
-    ]
+    message, fix = shown.stdout.splitlines()
+    assert message == (
+        f"{orphan} is not an ancestor of HEAD — a clone of this branch lacks it (a rebase rewrote it)"
+    )
+    assert fix == f"{sys.executable} {script} drift --specs {repo / 'specs'} --since {base}"
+    followed = subprocess.run(shlex.split(fix), capture_output=True, text=True, cwd=repo)
+    assert followed.returncode == 1 and followed.stdout.startswith(f"[drift] since {base}\n")
 
 
 def test_a_bound_a_shallow_clone_holds_beyond_its_cut_names_the_cut_not_a_rebase(
@@ -241,16 +244,19 @@ def _refusal(script: Path, call: str) -> list[str]:
     return done.stdout.splitlines()
 
 
-def test_an_absent_bound_is_left_to_gits_own_refusal_not_named_a_rebase(
+def test_an_absent_bound_is_named_not_in_this_clone_with_the_fetch_that_brings_it(
     script: Path, repo: Path
 ) -> None:
     """The decider tells three bounds apart: an absent one is neither a cut nor a rebase."""
+    absent = "0" * 40
     shown = _refusal(
-        script, f"d.report(__import__('pathlib').Path({str(repo / 'specs')!r}), '0' * 40)"
+        script, f"d.report(__import__('pathlib').Path({str(repo / 'specs')!r}), {absent!r})"
     )
 
-    assert "rebase" not in shown[0] and "shallow" not in shown[0]
-    assert shown[1] == f"git -C {repo.as_posix()} fetch origin {'0' * 40}"
+    assert shown == [
+        f"{absent} is not in this clone",
+        f"git -C {repo.as_posix()} fetch origin {absent}",
+    ]
 
 
 def test_the_absent_bound_fix_line_fetches_the_object_and_moves_the_refusal_on(
@@ -269,6 +275,7 @@ def test_the_absent_bound_fix_line_fetches_the_object_and_moves_the_refusal_on(
     _git(
         tmp_path, "clone", "-q", "--single-branch", "--branch", branch, f"file://{repo}", str(clone)
     )
+    head = _git(clone, "rev-parse", "HEAD")
     call = f"d.report(__import__('pathlib').Path({str(clone / 'specs')!r}), {side!r})"
 
     before = _refusal(script, call)
@@ -278,7 +285,7 @@ def test_the_absent_bound_fix_line_fetches_the_object_and_moves_the_refusal_on(
     assert before[1] == f"git -C {clone.as_posix()} fetch origin {side}"
     assert after == [
         f"{side} is not an ancestor of HEAD — a clone of this branch lacks it (a rebase rewrote it)",
-        f"git -C {clone.as_posix()} merge-base HEAD {side}",
+        f"{sys.executable} {script} drift --specs {clone / 'specs'} --since {head}",
     ]
 
 
@@ -402,3 +409,18 @@ def test_drift_in_repo_a_answers_for_a_under_a_foreign_git_dir(
             "matched": ["dadaia_workspace/features/alpha/core.py"],
         }
     ]
+
+
+def test_a_git_read_that_fails_outside_a_cut_reruns_that_read_for_its_diagnosis(
+    script: Path, tmp_path: Path
+) -> None:
+    """A failure no fetch or unshallow clears is git's own text, with the failing read as the fix."""
+    empty = tmp_path / "empty"
+    _git(tmp_path, "init", "-q", empty.name)
+
+    shown = _refusal(
+        script, f"d.git(__import__('pathlib').Path({str(empty)!r}), 'rev-parse', 'HEAD')"
+    )
+
+    assert shown[0].startswith("git rev-parse HEAD: ")
+    assert shown[-1] == f"git -C {empty.as_posix()} rev-parse HEAD"
