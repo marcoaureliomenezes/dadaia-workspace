@@ -124,6 +124,61 @@ def test_an_atom_mentioning_a_token_in_prose_is_kept(tmp_path: Path) -> None:
     assert is_placeholder_atom(atom) is False
 
 
+_LEGACY_TEMPLATE = """---
+slug: SLUG_PLACEHOLDER
+title: TITLE_PLACEHOLDER
+tldr: Document the user-visible purpose of TITLE_PLACEHOLDER.
+summary: Describe the current behavior, boundaries, and operational contract.
+tags:
+  - SLUG_PLACEHOLDER
+---
+
+# TITLE_PLACEHOLDER
+
+## Current behavior
+
+Document the shipped product truth here.
+
+## Boundaries
+
+Document exclusions and failure behavior here.
+"""
+
+
+@pytest.mark.medium
+def test_the_legacy_memory_template_verbatim_is_still_fixable_and_removed(tmp_path: Path) -> None:
+    specs = _fresh_specs(tmp_path)
+    atom = specs / "memory" / "product" / "feature.md"
+    atom.write_text(_LEGACY_TEMPLATE, encoding="utf-8")
+    assert is_placeholder_atom(atom) is True
+    assert any(i.code == "MEM-PLACEHOLDER-1" for i in _doctor(specs).fix())
+    assert not atom.exists()
+
+
+@pytest.mark.medium
+def test_an_atom_the_operator_filled_but_for_one_token_is_reported_and_kept(
+    tmp_path: Path,
+) -> None:
+    specs = _fresh_specs(tmp_path)
+    atom = specs / "memory" / "product" / "sessions.md"
+    body = "".join(f"Operator line {n}.\n" for n in range(40))
+    atom.write_text(
+        "---\nslug: SLUG_PLACEHOLDER\ntitle: Sessions\ntldr: How sessions bind.\n"
+        f"summary: Sessions.\ntags: [sessions]\n---\n\n## Purpose\n\n{body}",
+        encoding="utf-8",
+    )
+    assert is_placeholder_atom(atom) is False
+    [flagged] = [i for i in _doctor(specs).check() if i.code == "MEM-PLACEHOLDER-1"]
+    assert flagged.fixable is False
+    lines = [ln for ln in flagged.fix.splitlines() if ln.startswith("Operator action:")]
+    assert len(lines) == 1 and str(atom) in lines[0] and "slug" in lines[0], flagged.fix
+
+    _doctor(specs).fix()
+    assert atom.exists()
+    atom.write_text(atom.read_text(encoding="utf-8").replace("SLUG_PLACEHOLDER", "sessions"))
+    assert [i for i in _doctor(specs).check() if i.code == "MEM-PLACEHOLDER-1"] == []
+
+
 def test_upgrade_dry_run_reports_without_deleting(tmp_path: Path) -> None:
     specs, atom = _placeholder_atom(tmp_path)
     upgrade_feat.upgrade(specs, remove=lambda p: sweep.remove(specs, p, p.name), dry_run=True)
