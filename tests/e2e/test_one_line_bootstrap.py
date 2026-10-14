@@ -41,6 +41,7 @@ from packaging.requirements import Requirement
 
 from dadaia_workspace.core import workspace_layout
 from dadaia_workspace.core.platform import PLATFORM
+from dadaia_workspace.infrastructure.provider_version import provider_version
 from tests.conftest import GIT_QUIET_INCLUDE
 from tests.fixtures.harness_env import suite_env
 from tests.fixtures.stores import fake_venv
@@ -139,6 +140,8 @@ def test_one_line_bootstrap_yields_a_doctor_clean_workspace(
         "init", "demo", "--harness", "claude", "--repo", str(origin), cwd=tmp_path, home=home
     )
     assert init.returncode == 0, f"init failed:\n{init.stdout}\n{init.stderr}"
+    # the seeded venv is healthy: init answers "already at", never repairs it through pip
+    assert f"already at {provider_version()}" in init.stdout.splitlines(), init.stdout
     # `init --repo` commits nothing into the user repo — clean tree, HEAD at origin.
     repo = workspace / "repos" / "demo-project"
     assert _git("status", "--porcelain", cwd=repo, home=home) == b""
