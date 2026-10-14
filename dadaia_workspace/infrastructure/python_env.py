@@ -122,14 +122,18 @@ _DEFAULT_FLOOR_MINOR = 12  # dadaia-workspace's floor today (pyproject.toml: pyt
 
 
 def build_digest(files: "Iterable[metadata.PackagePath] | None") -> str:
-    """The payload's RECORD hashes digested — the build a version label cannot name; the
-    venv probe runs this same source, so both sides hash alike."""
+    """The payload's installed bytes digested — the build a version label cannot name, and a
+    damaged file changes; the venv probe runs this same source, so both sides hash alike."""
     import hashlib
+    from pathlib import Path
 
-    rows = sorted(
-        f"{f}={f.hash.value}" for f in files or () if f.hash and f.parts[0] == "dadaia_workspace"
-    )
-    return hashlib.sha256("\n".join(rows).encode()).hexdigest()[:16]
+    digest = hashlib.sha256()
+    for f in sorted(files or (), key=str):
+        if f.parts[0] == "dadaia_workspace" and "__pycache__" not in f.parts:
+            path = Path(f.locate())
+            digest.update(f"{f}\n".encode())
+            digest.update(hashlib.sha256(path.read_bytes() if path.is_file() else b"").digest())
+    return digest.hexdigest()[:16]
 
 
 def provider_build() -> str | None:
