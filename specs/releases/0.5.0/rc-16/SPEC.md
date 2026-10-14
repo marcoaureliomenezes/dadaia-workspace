@@ -6,7 +6,7 @@
 **Opened:** 2026-10-14
 **Origin:** backlog:worktree-hierarchy; bugs:protected-globs-miss-a-plain-tree-path,new-reconcile-opens-while-a-job-is-open
 
-Sources: the as-is review at `13e3fc074` (ASIS, landing as PLAN §1; its findings H1–H9 are cited by id), the backlog and release grills of 2026-10-14, and the `worktree-hierarchy` entry. Paths are relative to `repos/dadaia-workspace/`. The decision is ADR **0264** (proposed).
+Sources: the as-is review at `13e3fc074` (ASIS, `.dadaia/reports/dadaia-workspace/rc16-definition/ASIS.md`, landing as PLAN §1; H1–H9 cited by id), the bug window (`.dadaia/reports/dadaia-workspace/rc16-definition/BUG-WINDOW.md`), the backlog and release grills of 2026-10-14, and the `worktree-hierarchy` entry. Paths are relative to `repos/dadaia-workspace/`. The decision is ADR **0264** (proposed).
 
 Operator rulings, verbatim:
 
@@ -73,9 +73,9 @@ Each fix was read with `git show`, and each series with `git log` over its unit.
 
 **REBUILD work list** (bugs law §2; each keeps the contract tests its fixes hardened):
 
-- Job 1 takes R1 (one closure-summary reader, AC1.1–AC1.2), R2 (report-only, AC1.3) and R5 (`repair`, AC1.4).
+- Job 1 takes R1 (one closure-summary reader, AC1.1), R2 (report-only, AC1.2) and R5 (`repair`, AC1.3).
 - R2's fix form is `Agent action`, by ruling. The window's draft said `Operator action`.
-- Job 5 takes R4: the WT error edge and the orphan rows, rewritten on the new layout (AC5.5).
+- Job 5 takes R4: the WT error edge and the orphan rows, rewritten on the new layout (AC5.2, AC5.6).
 - Job 6 takes R3: the absent `--specs-dir` lane (AC6.4).
 - Job 5 keeps green the contract tests of the landed REBUILDs `fb127322a`, `d2cea6103` and `4e098074c`.
 - Job 3 edits `HISTORICAL_TASK_RE`.
@@ -93,9 +93,9 @@ The worktree layer is the library's most churned surface: 49 bugs, 13 of them in
 ## 2. Measurable Goals
 
 - G1. `bugs.py status --specs specs` lists neither Origin bug as open at closure.
-- G2. There is one base decider. `git grep -nE 'dadaia-base|recorded_base|record_base|_plain_base' -- dadaia_workspace` prints nothing, and AC5.2 is green.
+- G2. There is one base decider. `git grep -nE 'dadaia-base|recorded_base|record_base|_plain_base' -- dadaia_workspace` prints nothing, and AC5.1 is green.
 - G3. The CLI is the only path. AC4.3's real-git test refuses a raw `worktree add -b wt/x` and a raw merge into the work branch, and lets `git pull` through.
-- G4. There is one grammar. The AC7.2 sweep prints nothing, and so does `grep -rnE -- '-rc<N>/|<job>--|wt/hotfix/|wt/backlog/' dadaia_workspace/public`.
+- G4. There is one grammar. The AC7.1–AC7.4 sweeps print nothing, and so does `grep -rnE -- '-rc<N>/|<job>--|wt/hotfix/|wt/backlog/' dadaia_workspace/public`.
 - G5. Size readout, never a gate. The closure summary records `git diff --shortstat <rc-16 cut>..<wt head> -- dadaia_workspace scripts`. ASIS §6 estimates +15 python lines (range −10 to +60) and +40 shell lines: four new capabilities against about 115 deleted lines. Python growth above +60 names its reason.
 - G6. The closure summary holds `verdict.py stats 0.5.0-rc16` (a readout).
 
@@ -125,46 +125,61 @@ Law text is Wave 3 (agent default, unruled — reason: text written for behaviou
 
 #### FR1 — bug-window REBUILDs R1, R2, R5 (Job 1; independent tasks in parallel)
 
-- AC1.1 (unit, RED first; R1): one reader in `_release_schema.py` returns the live candidate's closure-summary fields (delivered, carried, exits). It reads them from the last `kind: summary` entry at or after `defined.ts`, past DEFINITION.
+- AC1.1 (integration, RED first; R1): one reader in `_release_schema.py` returns the live candidate's closure-summary fields (delivered, carried, exits). It reads them from the last `kind: summary` entry at or after `defined.ts`, past DEFINITION.
   - An Origin id found only in the previous candidate's summary reads `untraced`.
-  - A bug that summary carried does not satisfy this candidate's `--allow-open`.
-  - `_trace` matches inside field values only, so an id equal to a label word (`carried`) is untraced.
-- AC1.2 (no test — reviewer `git grep`; R1): `_last_summary` and `release.py`'s summary partition leave, and `_swept`, `_trace` and `_refuse_unauthorized` consult the one reader. `_SUMMARY` stays the one grammar. The R1 contract tests in `test_release__lean_state.py` and `test_release__release_script.py` stay green unedited. Net production lines ≤ 0.
-- AC1.3 (unit, RED first; R2; operator: "Só reporta (Recommended)"): doctor reports an atom that still holds a placeholder token, with `fix: Agent action: fill or delete the atom <path>`. `doctor --fix` leaves every memory file byte-identical. `_TEMPLATE_LINES` and the unlink leave. The "mention is not flagged" and "filled atom survives `--fix`" partitions stay. The tests asserting that `--fix` removes a pure-template atom now assert that it survives; this ruling changes that product contract, and the `test(...)` commit names it.
-- AC1.4 (unit, RED first; R5): `version_change` returns `repair` when the entrypoint exists and its probe fails, and `init` prints from the action (`repaired -> B`). The `before is None` ternary leaves. The `-k probe_fails` and decider tests stay green. Net ≤ 0.
+  - A bug that summary carried does not satisfy `--allow-open`.
+  - An id equal to a label word (`carried`) is not traced by the label.
+  - `_last_summary` and `release.py`'s partition leave. `_swept`, `_trace` and `_refuse_unauthorized` consult the reader.
+  - The existing `release-check-*` partitions stay green unedited.
+  - Net production lines ≤ 0.
+- AC1.2 (unit, RED first; R2; operator: "Só reporta (Recommended)"): an atom with an unfilled placeholder is reported with `fix: Agent action: fill or delete the atom`, and `doctor --fix` leaves it byte for byte.
+  - `_TEMPLATE_LINES`, the unlink, `rules.py`'s `fix=` pair and the `slop.py:46` allowance row all leave.
+  - The "filled atom" and "mention is not flagged" partitions are unchanged.
+  - The old remove-on-`--fix` assert is rewritten, never deleted. That product-contract change comes from this ruling.
+- AC1.3 (unit, RED first; R5): `version_change` returns `repair` for an existing entrypoint whose probe fails, and `init` prints `repaired -> B` from the action.
+  - The `before is None` ternary leaves.
+  - The decider cases stay unchanged.
+  - Net ≤ 0.
 
 #### FR2 — delete `plain`; the sanction marker (Job 2; operator: "Apagar o tipo plain")
 
-- AC2.1 (unit, RED first): every git child of `_git.scrubbed_env()` and of the package git client carries `DADAIA_WT=1`, and still drops the repo-selecting `GIT_*` variables.
-- AC2.2 (unit, RED first; bug `protected-globs-miss-a-plain-tree-path`): `new <repo> <one-segment>` refuses the name as not a worktree name, with the `list` fix line, and `list` has no plain row, so no tree can open whose tail starts one level too deep. The fix commit's body names `block: security`. AC5.1 pins the glob at every new depth.
-- AC2.3 (unit; operator: "Converter em teste de recusa (Recommended)"): no test is deleted.
-  - Each plain-only test becomes a test that the plain name is refused with its fix line: `test__worktree_new.py:135,176,249`, `test__worktree_end.py:612,631` with its `:640` `dadaia-base` assert, `test__worktree_end__preflight.py:134` and `test__worktree_end__verdict_binding.py:170`.
-  - A test that uses plain only as an example runs on a job tree with every assert intact.
-- AC2.4 (no test — reviewer `git grep`): these leave: `plain()`, the plain alternative of `NAME_RE`, `record_base`, the plain half of `recorded_base`, `_plain_base`, the plain row of `_kind_checks` and the `branch.<b>.dadaia-base` config.
-- AC2.5 (unit, RED first): the SKILL-MD-LENGTH fix line opens no plain tree. It reads `Agent action: add the split of <skill>/SKILL.md to a task of the open rc, then run public install`, with real values, and it still clears its finding.
+- AC2.1 (unit, RED first): `scrubbed_env()`, and the env that `git_subprocess._run` builds, carry `{"DADAIA_WT": "1"}` and still drop the repo-selecting `GIT_*` variables.
+- AC2.2 (unit, RED first; bug `protected-globs-miss-a-plain-tree-path`; operator: "Converter em teste de recusa (Recommended)"): no test is deleted.
+  - The plain-only tests become refusal tests: `new r maintenance` exits 1 with `not a worktree name` and the `list` fix, and `merge`/`preflight` of a plain name refuse in the same way. They are `test__worktree_new.py:135,176,249`, `test__worktree_end.py:612,631`, `test__worktree_end__preflight.py:134` and `test__worktree_end__verdict_binding.py:170`.
+  - The `:640` `dadaia-base` assert becomes "no base is recorded in git config".
+  - Example-only tests run on a job tree, with the assert count per file unchanged.
+  - These leave: `plain()`, the plain alternative of `NAME_RE`, `record_base`, the plain half of `recorded_base`, `_plain_base`, the plain row of `_kind_checks` and the git-config base.
+  - No tree's tail can start one level too deep. The fix commit's body names `block: security`, and AC5.1 pins the glob at every new depth.
+- AC2.3 (unit, RED first): the SKILL-MD-LENGTH fix reads `Agent action: add the split of <skill>/SKILL.md to a task of the open rc, then run public install`, opens no plain tree, and still clears its finding.
 
 #### FR3 — retire `.S<m>` (Job 3)
 
-- AC3.1 (unit, RED first): `TASK_ID_RE.fullmatch("J1.S3.T1")` is falsy and `fullmatch("J13.T6")` is truthy. `release.py check` refuses a job file with the task id `J1.S3.T1`.
-- AC3.2 (unit): `bugs.py check` still accepts a resolved bug whose `caused_by` is `J1.S3.T1` when an archived `tasks/job1.md` carries it, because `HISTORICAL_TASK_RE` gains the `.S` form for lineage only (ASIS H6). If no live caller uses the `## Stage` parse, it leaves; otherwise the task reports it.
+- AC3.1 (unit, RED first): `TASK_ID_RE.fullmatch("J1.S3.T1")` is falsy, and `fullmatch("J13.T6")` is truthy.
+  - `bugs.py check` still accepts a resolved bug whose `caused_by` is `J1.S3.T1` when an archived `tasks/job1.md` carries it, because `HISTORICAL_TASK_RE` gains the `.S` form for lineage only (ASIS H6).
+  - `release.py check` refuses a current job file with task id `J1.S3.T1`, and still exits 0 on the repo's archived candidates.
 
 #### FR4 — ref gate, hook, CLI group (Job 4; operator: "Verbo CLI + git hook")
 
-- AC4.1 (unit, RED first): `branch_policy.check_ref_policy` refuses moving a work-role ref (`Gitflow.role_of == "work"`) to a sha other than `refs/remotes/origin/<same>`, with one runnable fix line. It passes:
-  - a move to origin's sha;
+- AC4.1 (unit, RED first): `branch_policy.check_ref_policy` refuses moving a work-role ref (`Gitflow.role_of == "work"`) to a sha other than `refs/remotes/origin/<same>`, with one runnable `fix:`. It passes:
+  - origin's sha;
   - creation and deletion;
-  - non-work refs;
-  - an update whose `old..new` touches only `specs/audits/**` (Q3, which reuses the `audit` zone predicate).
-- AC4.2 (integration): `dadaia ci ref-gate-check` reads `old new ref` lines on stdin. A refusal exits 1 with `[ref-gate] BLOCKED …` and one `fix:` line; anything else exits 0. The gitflow comes from `_gate_inputs`.
-- AC4.3 (integration, real git, hook installed):
-  - Raw `git worktree add -b wt/x` is refused; with `DADAIA_WT=1` it passes.
-  - A commit in a `wt/*` tree passes with no python call.
-  - `git branch -D wt/x` passes (ASIS H2).
-  - Raw `merge --ff-only`, `reset --hard` and `commit` on the work branch are refused.
-  - `git pull --ff-only` and `git branch -m` pass.
-  - An unresolvable runner warns and exits 0. Agent default, unruled — reason: the hook fires on every ref update, and pre-push stays the chokepoint that fails closed.
-- AC4.4 (unit): HOOKS-DRIFT-1 reports the `reference-transaction` row absent, and `install_git_hooks` writes it. This needs one `INSTALLED_GIT_HOOKS` row and one `shipped-hashes.json` entry, and no change to the installer code.
-- AC4.5 (integration): `dadaia worktree <verb> …` forwards argv, stdout and exit code to the installed `worktree.py`, and `--help` lists the verbs. With no script installed, it refuses with `fix: <dadaia> public install`.
+  - every non-work ref;
+  - an update touching only `specs/audits/**` (Q3, which reuses the `audit` zone predicate).
+- AC4.2 (integration, RED first): `dadaia ci ref-gate-check` reads `old new ref` lines on stdin. It exits 1 with `[ref-gate] BLOCKED …` and one `fix:` line on a refusal, and 0 otherwise. Its inputs come from `_gate_inputs`.
+- AC4.3 (integration, real git): the hook in a temporary repo refuses raw `worktree add -b wt/x`. It passes the following:
+  - the same command with `DADAIA_WT=1`;
+  - `branch -D wt/x` (old = new = 0, ASIS H2);
+  - `pull --ff-only` and `branch -m`.
+
+  It refuses raw `merge --ff-only`, `reset --hard` and `commit` on the work branch.
+
+  An unresolvable runner warns and exits 0 (agent default, unruled — reason: the hook fires on every ref update, and pre-push stays the fail-closed chokepoint).
+
+  HOOKS-DRIFT-1 reports the new `INSTALLED_GIT_HOOKS` row absent, and `install_git_hooks` writes it. Every fix line the hook prints is runnable.
+- AC4.4 (integration, RED first): `dadaia worktree <verb> …` forwards argv, stdout and the exit code to the installed `worktree.py`, and `--help` lists the verbs. With no script installed, it refuses with `fix: <dadaia> public install`.
+- AC4.5 (integration, real git): a commit in an existing `wt/*` tree passes (an update, old ≠ 0) with no python call.
+- AC4.6 (integration, real git): creating the tag `archive/wt/<name>` passes.
+- AC4.7 (integration, real git): creating a harness-native worktree branch (not `wt/*`, `worktrees-AGENTS.md:7`) passes.
 
 ### Wave 2 — the layout
 
@@ -172,61 +187,65 @@ Law text is Wave 3 (agent default, unruled — reason: text written for behaviou
 
 The layout is `worktrees/<repo>/<v>/{wt-hotfix-<bug>, wt-backlog-<slug>, rc-<N>/{wt-rc, job-<n>/{wt-main, wt-task-<k>}}}`. Each branch is `wt/` plus the path under `worktrees/<repo>/`.
 
+- AC5.0 (no test — support code that every owner test exercises): the fixture constants and `tests/helpers/worktree_ws.py` use the new names, and the helper's behaviour is unchanged.
 - AC5.1 (unit, RED first; defect A): `locate` keys on the first `wt-` segment.
-  - `worktrees/<r>/<v>/rc-N/job-n/wt-task-001/secrets/k` gives `(r, "<v>/rc-N/job-n/wt-task-001", ("secrets", "k"))`.
-  - A path with no `wt-` leaf gives `(r, None, ())`.
-  - A `[protected]` glob is PROTECTED at lane, rc, main and task depth (`classify_path`).
-- AC5.2 (unit, RED first): `kind_of` reads the leaf: `wt-rc`, `wt-main`, `wt-task-NNN`, `wt-hotfix-<bug>` or `wt-backlog-<slug>`. `base_of` maps task → `wt-main` → `wt-rc` → `<work><v>`, and a lane → `<work><v>`. `pushable` holds for rc, main and backlog only.
-- AC5.3 (integration, RED first): `new` opens each kind on its parent's branch, and `<v>` must name an existing local `<work><v>`.
-  - `wt-main` needs IMPLEMENTATION in the `_RELEASE.json` on its rc's `wt-rc`.
+  - `worktrees/<r>/<v>/rc-N/job-n/wt-task-001/secrets/k` → `(r, "<v>/rc-N/job-n/wt-task-001", ("secrets", "k"))`.
+  - `classify_path` returns PROTECTED at lane, rc, main and task depth.
+  - `kind_of` reads the leaf.
+  - `base_of`: task → `wt-main` → `wt-rc` → `<work><v>`; a lane → `<work><v>`.
+  - `pushable` holds for rc, main and backlog only.
+  - `name_of` gives the branch.
+- AC5.2 (unit, RED first): `ours` counts `ahead` against the parent branch. `_absent` reports an orphan `wt/*`, a non-empty stray folder and an empty one at any depth, one row per path with its removal as the fix. The rows with `registered:false` and the frozen row schema are unchanged. `record_base`/`recorded_base` leave.
+- AC5.3 (integration, RED first): `new` opens each kind on its parent's branch.
+  - `<v>` must name an existing `<work><v>`.
+  - `wt-main` needs `_RELEASE.json` IMPLEMENTATION on its rc's `wt-rc`.
   - A task needs its `wt-main`.
   - A hotfix needs its open bug.
-  - An old-grammar name refuses with a fix line in the new shape.
-- AC5.4 (integration, RED first): `merge` by kind:
-  - task → main: hygiene and test separation;
-  - main → rc, and hotfix → `<work><v>`: the job gate;
-  - backlog → `<work><v>`: specs-only plus ledgers;
+  - Old-grammar and `reconcile` names refuse with a fix in the new shape.
+- AC5.4 (integration, RED first): merge by kind.
+  - task → main: hygiene plus test separation.
+  - main → rc, and hotfix → `<work><v>`: the job gate.
+  - backlog → `<work><v>`: specs-only plus ledgers (the `define_gate` tests are ported to this kind with their asserts intact).
   - rc → `<work><v>`: the job gate plus ledgers.
 
-  An open child blocks its parent. `merge` fast-forwards in the parent's checkout. `_check_approved`, `_gate`, `_ledgers`, `_check_specs_only` and `_check_ancestor` stay untouched.
-- AC5.5 (integration; R4): `list` counts `ahead` against the parent branch. It reports an orphan `wt/*`, a non-empty stray and an empty stray at any depth, one row per path, each with its removal fix. The row schema is frozen (ASIS §3 seam 12). A `GitError` in any verb ends as one refusal with one fix line, an `Agent action` where an agent can rerun.
-- AC5.6 (no test — reviewer diff check): every test and fixture that names the old grammar is ported with the same assert strength.
+  `merge` fast-forwards in the parent's checkout, and an open child blocks its parent. `_check_approved`, `_gate`, `_ledgers`, `_check_specs_only` and `_check_ancestor` stay untouched.
+- AC5.5 (no test — strength-preserving port): the fixtures of the package readers and the hook payloads use the new names with their asserts intact. `test_branch_policy.py` keeps `pushable` and the `archive/wt` tag carve-out. A file that is already depth-agnostic is left untouched and reported.
+- AC5.6 (integration; R4): a `GitError` in any verb ends as one refusal with an `Agent action` fix, and `main` has one `GitError` edge. The `list` rows of AC5.2 are the orphan listing. The contract tests of `fb127322a`, `d2cea6103` and `4e098074c` stay green.
 
 ### Wave 3 — consumers, law, sync, onboarding
 
 #### FR6 — consumers (Job 6; carries `new-reconcile-opens-while-a-job-is-open` and R3)
 
-- AC6.1 (unit, RED first; the bug): `release.py phase CLOSURE` refuses, naming the tree, while a job, task or lane tree of the repo is open. It passes when only `wt-rc` trees are open. The `f"{nxt}/define"` exception leaves. Reconcile becomes the last commits of `wt-rc`, and no `reconcile` kind is left to open early.
-- AC6.2 (unit, RED first): `verdict.py stats <M.m.p>-rc<N>` counts the trees under `wt/<M.m.p>/rc-<N>/`, and the binding runs through `dadaia worktree hash`.
-- AC6.3 (unit, RED first as `test(...)`): every fix line that named `worktree.py` names `dadaia worktree …`. `grep -rn 'worktree\.py' dadaia_workspace .github scripts` hits only the runner's resolve constant and the script's own docstring.
-- AC6.4 (integration; R3): an explicit `--specs-dir` that holds no tree reports one finding, from the specs-section builder, carrying `state()`'s fix. The ledger lane keeps one guard. `_absent_tree` and the `target = None` reassignment leave. The REDs are the three predecessor bugs' cases with their asserts unchanged. Net ≤ 0.
+- AC6.1 (unit, RED first; the bug): `release.py phase CLOSURE` refuses while a job, task or lane tree is open and passes when only rcs' `wt-rc` trees are open. The `f"{nxt}/define"` exception leaves. The stacked `release.py new` flow is unchanged.
+- AC6.2 (unit, RED first): `verdict.py stats` counts the verdicts of trees under `wt/<M.m.p>/rc-<N>/`. The writer binds through `dadaia worktree hash`.
+- AC6.3 (unit, RED first as `test(...)`): every fix line printed by the gate, the rows reader or the kernel names `dadaia worktree …` and is runnable. `grep -rn 'worktree\.py' dadaia_workspace .github scripts` hits only the runner's resolve constant and the script's docstring.
+- AC6.4 (integration; R3): an absent explicit `--specs-dir` gives one finding, from the specs-section builder, that carries `state()`'s fix. The ledger lane keeps one guard. `_absent_tree` and `target = None` leave. The three predecessor bugs' cases keep their asserts unchanged. Net ≤ 0.
 
-#### FR7 — law, skills, agents, templates (Job 7; text only)
+#### FR7 — law, skills, agents, templates (Job 7; text only; no test — reviewer AI-surface lens, `public doctor` `[ok] public-privacy`, sweep = 0 per AC)
 
-- AC7.1 (no test — law text; reviewer AI-surface lens; `public doctor` prints `[ok] public-privacy`): `worktrees-AGENTS.md` states the hierarchy, the leaf names, the merges, the lanes, `sync` and the hook in at most 39 lines, today's count.
-- AC7.2 (no test — sweep): the ASIS J6.T2 sweep prints nothing over:
-  - the files of ASIS §2.2;
-  - `specs/releases/AGENTS.md:27`, where "define tree" becomes `wt-rc`;
-  - `dd-gitflow-default` shape 9, where the first-pass tree becomes `wt-backlog-first-pass`.
+- AC7.1: `worktrees-AGENTS.md` states the hierarchy, leaf names, the three merges, the lanes, `sync`, the hook and the cutover, in fewer lines than its 39 today.
+- AC7.2: `dd-gitflow-default` (§2a, §3a, §2 step 11, §5), `RC-FLOW.md` and `dd-release-implementation`: define and reconcile are `wt-rc` commits, and shapes 9 and 10 name their trees; no old grammar word is left.
+- AC7.3: the other skills of ASIS §2.2: old tree names and `worktree.py` become the hierarchy and `dadaia worktree`.
+- AC7.4: agents, projected map sources, data files, scaffold laws (`releases` "define tree" → `wt-rc`, `bugs` §2 hotfix text), `repo-AGENTS.md` and schema descriptions follow the new names.
 
-  `WT` reads `dadaia worktree`, and `test_gate_policy__law_states_what_the_code_does.py` stays green.
+#### FR8 — `sync` and the level `AGENTS.md` (Job 8)
 
-#### FR8 — `sync` and level `AGENTS.md` (Job 8)
-
-- AC8.1 (integration, RED first, real git; operator: "Lanes laterais para ambos"): `dadaia worktree sync <path>` rebases parents before children.
-  - The order is `wt-rc` onto `<work><v>`, each `wt-main` onto `wt-rc`, then each task onto its `wt-main`.
-  - It skips a tree that already contains its base.
-  - At the first conflict or dirty tree it stops, names that tree and exits 1 with one fix line. A re-run completes the cascade.
+- AC8.1 (integration, RED first, real git; operator: "Lanes laterais para ambos"): `dadaia worktree sync <path>` rebases parents first: `wt-rc` onto `<work><v>`, each `wt-main` onto `wt-rc`, then each task.
+  - It skips a tree that already holds its base.
+  - It stops at the first conflict or dirty tree with one fix line.
+  - A re-run completes.
   - It never pushes.
-  - After a lane merges, `sync <rc>` makes the rc's merge pass.
-  - `_check_ancestor`'s fix names `dadaia worktree sync <tree>`.
-  - Agent default, unruled — reason: the smallest cascade the existing predicates allow.
-- AC8.2 (integration, RED first; operator: "é so porque eu não quero criar .gitkeep files ... deve estar na criação"): `new` writes a 5–10 line `AGENTS.md` once into each folder it creates (`<v>/`, `rc-<N>/`, `job-<n>/`) and never over an existing one. `merge` and `clean` remove a level folder that holds only that file, and `list` reports no stray for it.
+  - After a lane lands, `sync <rc>` makes the rc's `merge` pass.
+  - The ancestor refusal's fix is `dadaia worktree sync <tree>`.
+
+  Agent default, unruled — reason: the smallest cascade the existing predicates allow.
+- AC8.2 (integration, RED first; operator: "é so porque eu não quero criar .gitkeep files ... deve estar na criação"): `new` writes a 5–10 line `AGENTS.md` once into each folder it creates (`<v>/`, `rc-<N>/`, `job-<n>/`), never over an existing file. `merge` and `clean` remove a level folder that holds only that file. `list` shows no stray for it.
 
 #### FR9 — onboarding without `plain` (Job 9; operator: "specs init corta o branch (Recommended)")
 
-- AC9.1 (integration, RED first): on a repo with no work branch, `dadaia specs init --context <ctx>` leaves a local branch `<work><next_version>`. With a work branch present it cuts nothing. It pushes nothing.
-- AC9.2 (integration): the ONBOARDING `first-pass` fix line opens `dadaia worktree new <repo> <v>/wt-backlog-first-pass` and runs the first pass there. `context baseline` publishes as today, and its tests stay green unedited. The tree it sees is the open question in §7.
+- AC9.1 (integration, RED first): `dadaia specs init` on a repo with no work branch cuts the local `<work><next_version>` and leaves it checked out. A rerun with the branch present cuts nothing, and nothing is pushed. Whether the scaffold is committed on it is pending the operator's ruling (§7).
+- AC9.2 (integration, RED first): `context baseline` on a repo whose local work branch already exists publishes it, anchor-first, and returns the work branch.
+- AC9.3 (unit, RED first): the ONBOARDING `first-pass` fix line is `Agent action: open the lane … worktree new <repo> <v>/wt-backlog-first-pass, then run the dd-audit-project first pass in it — <pending files>`. Step order and step kinds are unchanged.
 
 ### Wave 4 — promote-facing
 
@@ -235,15 +254,22 @@ The layout is `worktrees/<repo>/<v>/{wt-hotfix-<bug>, wt-backlog-<slug>, rc-<N>/
 - AC10.1 (no test — `MEMORY-UPDATE.md` in full): the atoms of ASIS §2.3 are told true.
   - `worktrees.md` is rewritten whole, which closes defect B.
   - `release-lifecycle.md:27` reads "the newest `until` HEAD reaches opens the window".
+  - The catalog and the ADR block are regenerated.
   - `memory.py check` exits 0.
-- AC10.2 (no test — derived docs): `docs/*.md`, `README.md` and `CONTEXT.md` (ASIS §2.3) name the hierarchy and `dadaia worktree`.
-- AC10.3 (no test — closure check): §4's exits are recorded, G5 and G6 are in the closure summary, and `release.py check` exits 0.
+- AC10.2 (no test — derived docs): `docs/*.md`, the byte-equal `tests/fixtures/quickstart.md`, `README.md` and `CONTEXT.md` name the hierarchy and `dadaia worktree`.
+- AC10.3 (no test — closure check): the exits of §4 are recorded; `measured_by` is repaired; G5 and G6 are in the closure summary; `bugs.py archive` has run; `release.py check` exits 0.
+- AC10.4 (no test — the rollout list in the closure summary): §4's rollout, in order.
 
 ## 4. Exits at closure
 
 - `worktree-hierarchy` exits `delivered`.
 - `protected-globs-miss-a-plain-tree-path` resolves on Job 2's fix (AC2.2), and `new-reconcile-opens-while-a-job-is-open` on Job 6's (AC6.1).
-- **Rollout**, a main-thread act after the Reconciliation merge and not a job task (Q5): `public install` projects the new WT, the hook and the law; then `ci install-hook` runs in each repo, which clears HOOKS-DRIFT-1; then `doctor`. The new layout applies from rc-17.
+- **Rollout** (AC10.4): main-thread acts after the Reconciliation merge, not job tasks (Q5).
+  1. `public install`, then `doctor --fix` and `doctor`.
+  2. `ci install-hook --force` in each repo; this clears HOOKS-DRIFT-1.
+  3. `certify` runs green.
+
+  The cleanup of off-grammar trees already ran before Job 5 (§6 Cutover). The new layout applies from rc-17.
 
 ## 5. Not in rc-16
 
@@ -295,7 +321,7 @@ The layout is `worktrees/<repo>/<v>/{wt-hotfix-<bug>, wt-backlog-<slug>, rc-<N>/
 
 ### Delivery constraints
 
-- No test or assert is removed or loosened. The tests change only where two rulings order it: AC2.3 converts the plain-only tests, and AC1.3 changes `--fix`.
+- No test or assert is removed or loosened. The tests change only where two rulings order it: AC2.2 converts the plain-only tests, and AC1.2 changes `--fix`.
 - Gate cost (root map §1): the `wt-rc` merge adds one `verify:` run and one review per rc. The hook's shell path costs about 0 s. Its python path costs 0.24 s and runs only on an unmarked move of a non-`wt/` head (ASIS §3 seam 13).
 - Public needs only shell and local git. Platform facts go through `core/platform.py`. Memory changes only at the Reconciliation.
 
@@ -310,7 +336,8 @@ The layout is `worktrees/<repo>/<v>/{wt-hotfix-<bug>, wt-backlog-<slug>, rc-<N>/
 
 ## 7. Open questions
 
-- **For the grill: FR9 against `specs init`'s "never committing" contract** (`cli/commands/specs.py:141`).
-  - The problem: a lane cut from the new `<work><v>` cannot see the specs tree that `specs init` left uncommitted. If the lane writes memory files anyway, `context baseline` meets them as add/add conflicts against its anchor commit (`service.py` `baseline`). The ruling's stated cost was only "+≈6 lines".
-  - (a), agent default, unruled: `specs init` commits its tree as the first commit of the branch it cuts, and `baseline` publishes that branch. The cost is two changed product contracts.
-  - (b): Job 9 stops at AC9.1, and AC9.2 waits for a ruling.
+- **Pending operator ruling: does `specs init` commit the scaffold on the branch it cuts? (FR9)**
+  - The conflict: a `wt-backlog-first-pass` lane cut from that branch sees only committed files. Today `specs init` commits nothing, and `test_absent_specs_scaffolds_lists_paths_and_commits_nothing` pins that, with `cli/commands/specs.py:141`.
+  - The PLAN's agent default, unruled: it commits the scaffold. That commit would be a sanctioned direct write, as the first `specs init` already is.
+  - A changed product contract needs the operator.
+  - Until the ruling, AC9.1 pins only the cut and the checkout, and AC9.3 pins the lane.
