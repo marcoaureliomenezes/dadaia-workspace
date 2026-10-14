@@ -18,7 +18,7 @@ from pathlib import Path
 from types import ModuleType
 
 from dadaia_workspace.core.doctor_rules import Rule, SectionFinding
-from dadaia_workspace.core.fixed_sections import strip_fixed_sections
+from dadaia_workspace.core.fixed_sections import authored_text
 from dadaia_workspace.features.specs.doctor_types import Severity, specs_finding
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from dadaia_workspace.infrastructure.ledger_scripts import load_owner
@@ -27,8 +27,8 @@ from dadaia_workspace.infrastructure.ledger_scripts import load_owner
 LEDGER = "ADRs/decisions.jsonl"
 
 #: The citation shapes of an ADR id in memory atoms, skills and rules: "ADR", a colon, space or
-#: hyphen, four digits.
-_ADR_CITATION_RE = re.compile(r"\bADR[:\s-]+(\d{4})\b")
+#: hyphen, four digits; a line break may join "ADR" to its number, a blank line never does.
+_ADR_CITATION_RE = re.compile(r"\bADR(?:[: \t-]|\n(?!\n))+(\d{4})\b")
 
 
 class UndecodableLedger(ValueError):
@@ -75,9 +75,7 @@ def superseded_adr_citations(specs_dir: Path, public_dir: Path | None) -> list[S
         if not root.is_dir():
             continue
         for path in sorted(root.rglob("*.md")):
-            cited = set(
-                _ADR_CITATION_RE.findall(strip_fixed_sections(path.read_text(encoding="utf-8")))
-            )
+            cited = set(_ADR_CITATION_RE.findall(authored_text(path.read_text(encoding="utf-8"))))
             for adr_id in sorted(cited & superseded):
                 issues.append(
                     specs_finding(

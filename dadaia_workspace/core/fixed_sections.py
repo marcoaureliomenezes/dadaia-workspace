@@ -54,11 +54,12 @@ _BLOCK_RE = re.compile(
 
 
 def strip_fixed_sections(text: str) -> str:
-    """*text* with every fixed section (markers and body) removed — what an operator
-    authored, independent of which fragment version ``doctor --fix`` rendered."""
+    """*text* with every fixed section (markers and body) removed, whatever fragment version
+    ``doctor --fix`` rendered — the shape a stub is compared to its shipped template by."""
     return _BLOCK_RE.sub("", text).rstrip("\n") + "\n"
 
 
-def blank_fixed_sections(text: str) -> str:
-    """*text* with every closed fixed section (markers and body) blanked, its line count kept."""
+def authored_text(text: str) -> str:
+    """What an operator authored: *text* with every closed fixed section (markers and body)
+    blanked, its line count kept — the one read every content judge of memory text goes through."""
     return _BLOCK_RE.sub(lambda m: "\n" * m.group().count("\n"), text)

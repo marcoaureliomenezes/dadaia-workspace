@@ -15,7 +15,7 @@ import re
 from collections.abc import Collection, Iterable
 from pathlib import Path, PurePath
 
-from dadaia_workspace.core.fixed_sections import blank_fixed_sections
+from dadaia_workspace.core.fixed_sections import authored_text
 
 __all__ = [
     "CITABLE_PATH_PREFIXES",
@@ -227,7 +227,7 @@ def memory_citation_violations(
         (path, violation)
         for path in _markdown_files(memory_dir)
         for violation in dead_citations(
-            blank_fixed_sections(path.read_text(encoding="utf-8")),
+            authored_text(path.read_text(encoding="utf-8")),
             command_paths=command_paths,
             repo_root=repo_root,
             rel=posix_relpath(path, repo_root),

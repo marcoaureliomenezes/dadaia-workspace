@@ -12,7 +12,7 @@ from typing import Any
 
 from jsonschema import Draft202012Validator
 
-from dadaia_workspace.core.fixed_sections import blank_fixed_sections
+from dadaia_workspace.core.fixed_sections import authored_text
 from dadaia_workspace.core.skill_owner import load_owner
 from dadaia_workspace.features.specs import memory_canon
 from dadaia_workspace.features.specs.schemas import load_schema
@@ -92,7 +92,7 @@ def _check_narrative(result: AtomResult, content: str, body: str, product: bool)
     phrase (product atoms only); fenced code and fixed-section blocks are exempt."""
     offset = len(content.splitlines()) - len(body.splitlines())
     fenced = False
-    for number, line in enumerate(blank_fixed_sections(body).splitlines(), start=offset + 1):
+    for number, line in enumerate(authored_text(body).splitlines(), start=offset + 1):
         if _FENCE_RE.match(line):
             fenced = not fenced
             continue
