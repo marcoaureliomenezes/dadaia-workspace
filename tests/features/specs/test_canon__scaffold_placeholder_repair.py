@@ -79,6 +79,51 @@ def test_filled_atom_is_never_flagged_or_removed(tmp_path: Path) -> None:
     assert atom.exists()
 
 
+_BLOCK = (
+    "<!-- dadaia:fixed adr-list -->\n- ADR-0042 — Templates stop shipping `TITLE_PLACEHOLDER`\n"
+    "<!-- /dadaia:fixed adr-list -->\n"
+)
+
+
+@pytest.mark.medium
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Operator prose documents the `SLUG_PLACEHOLDER` token.\n",
+        f"Operator prose.\n\n{_BLOCK}",
+    ],
+    ids=["prose", "fixed-section"],
+)
+def test_a_token_mentioned_in_a_canon_file_is_not_flagged_and_survives_fix(
+    tmp_path: Path, text: str
+) -> None:
+    specs = _fresh_specs(tmp_path)
+    arch = specs / "memory" / "ARCHITECTURE.md"
+    arch.write_text(text, encoding="utf-8")
+    assert is_placeholder_atom(arch) is False
+    assert [i for i in _doctor(specs).check() if i.code == "MEM-PLACEHOLDER-1"] == []
+    _doctor(specs).fix()
+    assert arch.read_text(encoding="utf-8").startswith(text.split("\n")[0])
+
+
+def test_a_canon_file_with_a_token_frontmatter_is_never_a_placeholder_atom(tmp_path: Path) -> None:
+    specs = _fresh_specs(tmp_path)
+    arch = specs / "memory" / "ARCHITECTURE.md"
+    arch.write_text(_PLACEHOLDER_ATOM, encoding="utf-8")
+    assert is_placeholder_atom(arch) is False
+
+
+def test_an_atom_mentioning_a_token_in_prose_is_kept(tmp_path: Path) -> None:
+    specs = _fresh_specs(tmp_path)
+    atom = specs / "memory" / "product" / "feature.md"
+    atom.write_text(
+        "---\nslug: feature\ntitle: Real\ntldr: x.\nsummary: y.\ntags: [feature]\n"
+        "token_estimate: 5\n---\n\n## Propósito\n\nThe `SLUG_PLACEHOLDER` token is legacy.\n",
+        encoding="utf-8",
+    )
+    assert is_placeholder_atom(atom) is False
+
+
 def test_upgrade_dry_run_reports_without_deleting(tmp_path: Path) -> None:
     specs, atom = _placeholder_atom(tmp_path)
     upgrade_feat.upgrade(specs, remove=lambda p: sweep.remove(specs, p, p.name), dry_run=True)
