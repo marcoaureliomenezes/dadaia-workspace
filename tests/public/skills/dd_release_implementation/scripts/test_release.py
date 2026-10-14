@@ -11,6 +11,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import shlex
 import subprocess
 import sys
 from pathlib import Path
@@ -828,6 +829,39 @@ def test_a_ledger_with_no_reachable_bound_opens_its_window_at_the_root_commit(
     ]
     assert memory.returncode == 0, memory.stderr
     assert _log(specs)[-1]["since"] == base
+
+
+def test_a_shallow_clone_with_no_reachable_bound_names_the_cut_and_its_fix_clears_it(
+    script: Path, tmp_path: Path
+) -> None:
+    """The root of a shallow clone is its boundary, not the window's start: with no recorded
+    bound reachable the verb refuses with the cut, and unshallowing makes it list the atom."""
+    root, specs, base = _memory_repo(tmp_path, script)
+    gone = _git(root, "commit-tree", "-p", base, "-m", "rewritten away", "HEAD^{tree}")
+    _release(specs, "0.5.0", phase="CLOSURE", defined={"sha": gone, "ts": _TS},
+             implemented={"sha": gone, "ts": _TS})  # fmt: skip
+    for n in (1, 2):
+        (root / f"later{n}.txt").write_text("later\n", encoding="utf-8")
+        _git(root, "add", "-A")
+        _git(root, "commit", "-qm", f"later {n}")
+    clone = tmp_path / "clone"
+    _git(tmp_path, "clone", "-q", "--depth", "2", f"file://{root}", str(clone))
+
+    refused = _run(script, "drift", "--specs", str(clone / "specs"), cwd=clone)
+    fix = refused.stderr.splitlines()[-1].removeprefix("fix: ")
+    subprocess.run(shlex.split(fix), check=True, capture_output=True)
+    cleared = _run(script, "drift", "--specs", str(clone / "specs"), cwd=clone)
+
+    assert refused.returncode == 1
+    assert refused.stderr.splitlines() == [
+        "[error] no recorded window bound is reachable: a shallow clone lacks the window's history",
+        f"fix: git -C {clone.as_posix()} fetch --unshallow",
+    ]
+    assert cleared.returncode == 1, cleared.stderr
+    assert cleared.stdout.splitlines() == [
+        f"[drift] since {base}",
+        "  atom alpha <- dadaia_workspace/features/alpha/core.py",
+    ]
 
 
 def test_a_rerun_after_the_second_reconciliation_appends_nothing(
