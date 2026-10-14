@@ -156,6 +156,17 @@ def test_no_work_branch_refuses_with_a_fix_that_creates_it(root: Path) -> None:
     )  # the live release's branch, cut from the flow's integration
 
 
+def test_no_work_branch_with_several_live_releases_refuses_as_the_plain_base_does(root: Path) -> None:
+    repo = root / "repos/r"
+    _git(repo, "branch", "-D", "feature/0.5.0")
+    (repo / "specs/releases/0.10.0").mkdir()
+    (repo / "specs/releases/0.10.0/_RELEASE.json").write_text("{}")
+    result = _run(root, "new", "r", JOB)
+    assert result.returncode == 1
+    (fix,) = _fixes(result)
+    assert fix == "fix: Operator action: make exactly one release live in repos/r/specs"
+
+
 @pytest.mark.parametrize(
     ("spec", "code", "out"),
     [("Approved", 0, "worktrees/a/0.5.0-rc1/j1"), ("Draft", 1, "")],
