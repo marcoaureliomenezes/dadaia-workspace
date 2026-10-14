@@ -43,7 +43,7 @@ def git(repo: Path, *argv: str) -> list[str]:
     except RuntimeError as exc:  # a bound-less caller's history precondition: a cut is named first
         raise _cut(repo, f"git {' '.join(argv)} failed in {repo}") or Refusal(
             str(exc),
-            "Operator action: run this verb from a checkout whose history holds the --since commit",
+            git_line(repo, "fetch", "--all"),
         ) from exc
     return [line for line in out.split("\n") if line]
 
@@ -71,16 +71,17 @@ def reach(repo: Path, bound: str, ledger: Path) -> str:
 def report(specs: Path, since: str, until: str = "HEAD") -> dict[str, Any]:
     """The worklist for the window *since*..*until* — the ONE decider every verb calls."""
     repo = specs.parent
-    for bound in (since, until):  # usable = an ancestor of HEAD; absent is left to git()
+    for bound in (since, until):  # usable = an ancestor of HEAD
         if _reaches(repo, bound):
             continue
         if cut := _cut(repo, f"{bound} is out of reach"):  # a cut is checked first
             raise cut
-        if _git.git(
+        if not _git.git(
             repo, "rev-parse", "--verify", "--quiet", f"{bound}^{{commit}}", check=False
         ).strip():
-            raise Refusal(f"{bound} is not an ancestor of HEAD — a clone of this branch lacks it (a rebase rewrote it)",
-                          git_line(repo, "merge-base", "HEAD", bound))  # fmt: skip
+            raise Refusal(f"{bound} is not in this clone", git_line(repo, "fetch", "origin", bound))
+        raise Refusal(f"{bound} is not an ancestor of HEAD — a clone of this branch lacks it (a rebase rewrote it)",
+                      git_line(repo, "merge-base", "HEAD", bound))  # fmt: skip
     catalog = json.loads(_jsonl.read_text(specs / CATALOG))
     changed = git(repo, "diff", "--name-only", f"{since}..{until}")
     return {"since": since, **worklist(catalog, changed, git(repo, "ls-files"))}
