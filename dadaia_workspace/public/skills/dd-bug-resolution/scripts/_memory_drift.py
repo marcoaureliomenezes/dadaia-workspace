@@ -21,7 +21,7 @@ import _git
 import _jsonl
 from _platform import git_line
 from _refusal import Refusal as Refusal
-from _specs import CATALOG, script
+from _specs import CATALOG, script, with_specs
 
 NOT_CODE = frozenset({"specs", "tests", "test", "docs"})
 
@@ -56,10 +56,15 @@ def _reaches(repo: Path, bound: str) -> bool:
     return True
 
 
+def _root(repo: Path) -> str:
+    if cut := _cut(repo, "no recorded window bound is reachable"):
+        raise cut
+    return git(repo, "rev-list", "--max-parents=0", "HEAD")[-1]
+
+
 def reach(repo: Path, bounds: list[str]) -> str:
-    """The newest of *bounds* (newest first) HEAD reaches, else the newest: a rewrite that
-    dropped a recorded bound falls back to an older one, which only widens the window."""
-    return next((b for b in bounds if _reaches(repo, b)), bounds[0])
+    """The newest of *bounds* (newest first) HEAD reaches, else the root commit: only widens."""
+    return next((b for b in bounds if _reaches(repo, b)), None) or _root(repo)
 
 
 def report(specs: Path, since: str, until: str = "HEAD") -> dict[str, Any]:
@@ -75,8 +80,8 @@ def report(specs: Path, since: str, until: str = "HEAD") -> dict[str, Any]:
         ).strip():
             raise Refusal(f"{bound} is not in this clone", git_line(repo, "fetch", "origin", bound))
         raise Refusal(f"{bound} is not an ancestor of HEAD — a clone of this branch lacks it (a rebase rewrote it)",
-                      f"{script(Path(__file__).parents[2] / 'dd-spec-navigator' / 'scripts' / 'memory.py')} drift "
-                      f"--specs {specs} --since {git(repo, 'merge-base', 'HEAD', bound)[0]}")  # fmt: skip
+                      with_specs(f"{script(Path(__file__).parents[2] / 'dd-spec-navigator' / 'scripts' / 'memory.py')} drift "
+                                 f"--since {_root(repo)}", specs))  # fmt: skip
     catalog = json.loads(_jsonl.read_text(specs / CATALOG))
     changed = git(repo, "diff", "--name-only", f"{since}..{until}")
     return {"since": since, **worklist(catalog, changed, git(repo, "ls-files"))}

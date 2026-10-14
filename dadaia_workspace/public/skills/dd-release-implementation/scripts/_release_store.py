@@ -21,7 +21,7 @@ from _ledger import records, replace
 from _refusal import Refusal
 from _release_check import state_findings
 from _release_schema import UnreadableRelease, current_candidate, live_id
-from _specs import choice, script
+from _specs import script
 
 State = dict[str, Any]
 SCRIPT = script(Path(__file__).parent / "release.py")
@@ -60,17 +60,11 @@ def live_release(specs: Path) -> Live:
 
 
 def window_start(state: State) -> list[str]:
-    """The memory window's start candidates, newest first: each memory entry's `until` and
-    `since`, newest entry first, then `defined.sha`."""
-    memory = [e for e in reversed(state.get("log") or []) if isinstance(e, dict) and e.get("kind") == "memory"]  # fmt: skip
-    bounds = [str(b) for e in memory for b in (e.get("until"), e.get("since")) if b]
-    if defined := (state.get("defined") or {}).get("sha"):
-        bounds.append(str(defined))
-    if not bounds:
-        raise choice(Refusal("the live release has no defined.sha to open the memory window at",
-                     f"{SCRIPT} phase IMPLEMENTATION --sha"),
-                     "with the sha of the commit that approved the definition")  # fmt: skip
-    return bounds
+    """The memory window's start candidates, newest first: each memory entry's `until`,
+    newest entry first, then `defined.sha`."""
+    bounds = [str(e["until"]) for e in reversed(state.get("log") or [])
+              if isinstance(e, dict) and e.get("kind") == "memory" and e.get("until")]  # fmt: skip
+    return bounds + [str(d) for d in [(state.get("defined") or {}).get("sha")] if d]
 
 
 def open_bug_ids(specs: Path) -> list[str]:

@@ -131,7 +131,7 @@ def _phase(args: argparse.Namespace, specs: Path) -> int:
 
 
 def _drift(args: argparse.Namespace, specs: Path) -> int:
-    """The worklist over the window `memory` records: last memory entry's until, else defined.sha."""
+    """The worklist over the window `memory` records: from the newest recorded bound HEAD reaches, else the root commit."""
     report = drift.report(specs, drift.reach(specs.parent, window_start(live_release(specs).state)))
     print(json.dumps(report, indent=2) if args.json else drift.render(report))
     return 1 if report["atoms"] or report["uncovered"] else 0
