@@ -6,10 +6,9 @@ from __future__ import annotations
 
 import json
 import subprocess
-import sys
 from pathlib import Path
 
-from dadaia_workspace.core.cli_line import git_line, shell_line
+from dadaia_workspace.core.cli_line import git_line
 from dadaia_workspace.features.specs.doctor import SpecsDoctor
 from dadaia_workspace.features.specs.doctor_adr import adr_record_issues
 from dadaia_workspace.features.specs.doctor_memory import MemoryValidator
@@ -86,6 +85,11 @@ def test_check_is_a_no_op_for_an_absent_file(tmp_path: Path) -> None:
     ]
 
 
+_REINSTALL = (
+    "Operator action: restore {} by re-running the workspace install (uvx dadaia-workspace init)"
+)
+
+
 def test_check_reports_a_missing_library_fragment_as_a_non_fixable_error(tmp_path: Path) -> None:
     public = tmp_path / "public"
     (public / "data" / "fixed").mkdir(parents=True)
@@ -93,6 +97,9 @@ def test_check_reports_a_missing_library_fragment_as_a_non_fixable_error(tmp_pat
     issues = MemoryValidator(specs).check_fixed_sections(public)
     assert [(i.code, i.verdict, i.fixable) for i in issues] == [("FIXED-1", "error", False)] * 3
     assert all("library fragment" in i.message for i in issues)
+    assert [i.fix for i in issues] == [
+        _REINSTALL.format(f"{section}.md") for section in ("slop-law", "slop-code", "slop-tests")
+    ]
 
 
 def test_fix_inserts_a_missing_block_and_refreshes_a_drifted_one(tmp_path: Path) -> None:
@@ -236,7 +243,7 @@ def test_a_ledger_that_is_not_utf8_is_one_restore_finding_and_never_a_crash(
     found = SpecsDoctor(specs, public_dir=public).check()
 
     assert [i.fix for i in adr_record_issues(specs)] == [restore]
-    assert [i.fix for i in found if i.code == "FIXED-2"] == [restore]
+    assert [i.code for i in found if i.code == "FIXED-2"] == []
 
 
 def test_a_fragment_that_is_not_utf8_is_reinstalled_not_misread_as_a_refused_render(
@@ -253,6 +260,4 @@ def test_a_fragment_that_is_not_utf8_is_reinstalled_not_misread_as_a_refused_ren
 
     (refused,) = [i for i in SpecsDoctor(specs, public_dir=public).check() if i.code == "FIXED-2"]
 
-    assert refused.fix == shell_line(
-        sys.executable, "-m", "pip", "install", "-U", "dadaia-workspace"
-    )
+    assert refused.fix == _REINSTALL.format("slop-code.md")

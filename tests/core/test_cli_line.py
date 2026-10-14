@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import shlex
 from pathlib import Path, PurePosixPath, PureWindowsPath
 
@@ -52,3 +53,24 @@ def test_no_workspace_names_the_cli_of_the_running_venv(monkeypatch: pytest.Monk
     monkeypatch.setattr("sys.prefix", "/cache/venvs/proj")
     cli = str(Path("/cache/venvs/proj", "bin", "dadaia"))
     assert cli_line.fix_line(None, "doctor", "--fix") == shlex.join([cli, "doctor", "--fix"])
+
+
+def test_the_kernel_spells_the_fix_line_and_the_reinstall_act() -> None:
+    assert cli_line.spell_fix("do it") == "fix: do it"
+    assert cli_line.reinstall_fix("a.md") == (
+        "Operator action: restore a.md by re-running the workspace install "
+        "(uvx dadaia-workspace init)"
+    )
+
+
+def test_no_printer_outside_the_kernel_spells_a_fix_line_by_hand() -> None:
+    package = Path(cli_line.__file__).resolve().parents[1]
+    spelled = re.compile(r'f?"[^"]*fix: |fix: \{')
+    hits = [
+        f"{path.relative_to(package)}:{n}"
+        for path in package.rglob("*.py")
+        if path.name not in {"_refusal.py", "hook_wrappers.py"}  # the kernel; a shell script's text
+        for n, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1)
+        if spelled.search(line)
+    ]
+    assert hits == []

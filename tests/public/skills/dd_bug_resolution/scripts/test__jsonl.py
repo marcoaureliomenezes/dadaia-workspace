@@ -17,10 +17,13 @@ _PROBE = "import sys; sys.path.insert(0, sys.argv[1]); import _ledger, _refusal\
 
 
 def _run(
-    tmp_path: Path, body: str, env: dict[str, str] | None = None
+    tmp_path: Path, body: str, env: dict[str, str] | None = None, damage: str = ""
 ) -> subprocess.CompletedProcess[str]:
+    """*body* run over a tmp copy of the kernel, whose file *damage* first holds bytes that are not UTF-8."""
     kernel = tmp_path / "dd-bug-resolution" / "scripts"
     shutil.copytree(_KERNEL, kernel, ignore=shutil.ignore_patterns("__pycache__"))
+    if damage:
+        (kernel / damage).write_bytes(b"\xff\xfe")
     return subprocess.run(
         [sys.executable, "-c", _PROBE + body, str(kernel)],
         capture_output=True, check=False, text=True, env=env,
@@ -28,17 +31,11 @@ def _run(
 
 
 def test_a_schema_that_is_not_utf8_is_reinstalled_not_restored_from_git(tmp_path: Path) -> None:
-    kernel = tmp_path / "dd-bug-resolution" / "scripts"
-    shutil.copytree(_KERNEL, kernel, ignore=shutil.ignore_patterns("__pycache__"))
-    (kernel / "schemas" / "bug-record-v1.schema.json").write_bytes(b"\xff\xfe")
     body = (
         "try:\n    _ledger.load_schema('bug-record-v1')\n"
         "except _refusal.Refusal as refusal:\n    print(refusal.fix)\n"
     )
-    done = subprocess.run(
-        [sys.executable, "-c", _PROBE + body, str(kernel)],
-        capture_output=True, check=False, text=True,
-    )  # fmt: skip
+    done = _run(tmp_path, body, damage="schemas/bug-record-v1.schema.json")
 
     assert done.stdout == (
         "Operator action: restore bug-record-v1.schema.json by re-running the workspace "
