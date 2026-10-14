@@ -12,12 +12,13 @@ Hermetic by construction — no network, no container:
 
 * ``--repo`` is a LOCAL bare repository, so the clone is the real git path with no remote.
 * ``HOME`` is a tmp dir and the child environment carries no inherited ``DADAIA_*``.
-* The workspace venv is pre-seeded (see ``_seed_venv_entrypoint``). ``tests/conftest.py``'s
+* The workspace venv is pre-seeded HEALTHY (see ``_seed_healthy_venv``). ``tests/conftest.py``'s
   ``_no_real_venv_in_tests`` backstop is an in-process monkeypatch and cannot reach a
-  child process, so this test honours the same law on the child's own terms: it uses
-  ``ensure_workspace_venv``'s documented idempotent-repair contract (a venv directory
-  that already carries an executable ``dadaia`` entrypoint is left alone), which is also
-  exactly what doctor's VENV-1 check asserts. No ``venv.create``, no ``pip install``.
+  child process, so this test honours the same law on the child's own terms: the seeded
+  venv's python runs and reports the running build and its ``dadaia`` entrypoint is bound
+  to it, so ``ensure_workspace_venv`` answers ``same`` and takes its no-op path (a venv
+  whose probe fails is repaired, never left alone). No ``venv.create`` or ``pip install``
+  by init.
 
 Owner: dd-sw-engineer-sr
 """
@@ -31,6 +32,8 @@ import re
 import shutil
 import subprocess
 import sys
+import sysconfig
+import venv
 import zipfile
 from importlib import metadata
 from pathlib import Path
@@ -39,7 +42,7 @@ import pytest
 from packaging.requirements import Requirement
 
 from dadaia_workspace.core import workspace_layout
-from dadaia_workspace.core.platform import PLATFORM
+from dadaia_workspace.core.platform import PLATFORM, venv_tool, workspace_cli_path
 from tests.conftest import GIT_QUIET_INCLUDE
 from tests.fixtures.harness_env import suite_env
 
@@ -96,17 +99,19 @@ def _git(*args: str, cwd: Path, home: Path) -> bytes:
     return subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True, env=env).stdout
 
 
-def _seed_venv_entrypoint(workspace: Path) -> None:
-    """Materialise ``.dadaia/.venv`` with an executable ``dadaia`` entrypoint.
+def _seed_healthy_venv(workspace: Path) -> None:
+    """Materialise ``.dadaia/.venv`` as a pip-less venv that imports THIS interpreter's packages.
 
-    The child process' equivalent of the suite's no-real-venv backstop: with the
-    entrypoint already present, ``ensure_workspace_venv`` takes its idempotent no-op
-    path and the test never builds a 30-50 MB venv nor runs ``pip``.
+    The child's equivalent of the suite's no-real-venv backstop: the venv's python runs
+    and its probe reports the running build, and the ``dadaia`` entrypoint's shebang names
+    that python, so init finds nothing to install and never builds or pips a 30-50 MB venv.
     """
-    bin_dir = workspace / ".dadaia" / ".venv" / PLATFORM.venv_scripts_dir
-    bin_dir.mkdir(parents=True)
-    entry = bin_dir / f"dadaia{PLATFORM.venv_exe_suffix}"
-    entry.write_text(f"#!{sys.executable}\n", encoding="utf-8")
+    venv_dir = workspace / ".dadaia" / ".venv"
+    venv.create(venv_dir, with_pip=False, symlinks=not PLATFORM.windows)
+    site = sysconfig.get_path("purelib", "venv", {"base": str(venv_dir), "platbase": str(venv_dir)})
+    Path(site, "running.pth").write_text("\n".join(p for p in sys.path if p), encoding="utf-8")
+    entry = workspace_cli_path(workspace)
+    entry.write_text(f"#!{venv_tool(venv_dir, 'python')}\n", encoding="utf-8")
     entry.chmod(0o755)
 
 
@@ -145,7 +150,7 @@ def test_one_line_bootstrap_yields_a_doctor_clean_workspace(
     the user repo is untouched."""
     workspace = tmp_path / "demo"
     workspace.mkdir()
-    _seed_venv_entrypoint(workspace)
+    _seed_healthy_venv(workspace)
 
     init = _dadaia(
         "init", "demo", "--harness", "claude", "--repo", str(origin), cwd=tmp_path, home=home
