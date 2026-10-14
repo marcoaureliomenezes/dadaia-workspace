@@ -33,6 +33,9 @@ _DRAFT: _Fix = lambda root, _: mkdir_line(root / ".dadaia" / "tmp")  # noqa: E73
 #: One fix per refusal, total: a new ``FloorRefusal`` member fails here, as ``REFUSALS`` does.
 _FIXES: dict[workspace_layout.FloorRefusal, _Fix] = {
     _R.LAW: lambda root, _: fix_line(root, "public", "install"),
+    _R.STATE: lambda root, _: (
+        "Agent action: use the verb that owns that state file instead of editing it"
+    ),
     _R.OPERATOR: _DRAFT,
     _R.GLOB: _DRAFT,
     _R.SESSION: lambda root, ctx: fix_line(root, "context", *(("bind", ctx) if ctx else ("list",))),

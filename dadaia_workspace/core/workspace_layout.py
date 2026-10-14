@@ -90,6 +90,7 @@ class FloorRefusal(StrEnum):
     """Why a PROTECTED write is refused; its message is ``REFUSALS[refusal]``."""
 
     LAW = "law"
+    STATE = "state"
     OPERATOR = "operator"
     GLOB = "glob"
     SESSION = "session"
@@ -107,6 +108,10 @@ REFUSALS: dict[FloorRefusal, str] = {
         "an agent changes the law at its source and re-projects.\n"
         "The source is dadaia_workspace/public/; this re-projects it:\n"
     ),
+    FloorRefusal.STATE: (
+        "[GATE] '{path}' is CLI-owned workspace state: a file tool never writes it, "
+        "the dadaia verb that owns it does.\n"
+    ),
     FloorRefusal.OPERATOR: _OPERATOR.replace("{why}", "its own file"),
     FloorRefusal.GLOB: _OPERATOR.replace("{why}", "protected glob '{match}'"),
     FloorRefusal.SESSION: (
@@ -121,7 +126,7 @@ REFUSALS: dict[FloorRefusal, str] = {
 CORE_FLOOR: dict[str, FloorRefusal] = {
     "AGENTS.md": FloorRefusal.LAW,
     DADAIAIGNORE: FloorRefusal.OPERATOR,
-    ".dadaia/states": FloorRefusal.LAW,
+    ".dadaia/states": FloorRefusal.STATE,
     ".dadaia/hooks": FloorRefusal.LAW,
     ".dadaia/agentic": FloorRefusal.LAW,
     ".dadaia/sessions": FloorRefusal.SESSION,
