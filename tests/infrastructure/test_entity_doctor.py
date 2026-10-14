@@ -27,7 +27,14 @@ import jsonschema
 import pytest
 
 from dadaia_workspace.cli.help_digest import command_paths
+from dadaia_workspace.core.cli_line import fix_line, script_line
 from dadaia_workspace.features.spec_context.doctor import DoctorService
+from dadaia_workspace.features.spec_context.gate_policy import (
+    Decision,
+    PathClass,
+    classify_path,
+    evaluate,
+)
 from dadaia_workspace.features.specs.citations import (
     dead_body_pointers_in_tree,
     dead_path_citations_in_tree,
@@ -436,15 +443,63 @@ def test_skill_md_over_the_soft_limit_warns(tmp_path: Path, line: bytes) -> None
 
     [found] = service.check_skill_md_length()
 
-    skill_md = skills / "fixture-longer" / "SKILL.md"
     assert (found.code, found.verdict, found.canonical, found.error, found.message, found.fix) == (
         "SKILL-MD-LENGTH",
         "warning",
         False,
         False,
         f"fixture-longer/SKILL.md has {soft + 1} lines > soft limit {soft}",
-        f"Agent action: split {skill_md} into its references/*.md and/or scripts/",
+        "Operator action: split fixture-longer/SKILL.md at its library source; "
+        "this workspace holds none and never edits the projection",
     )
+
+
+def test_a_long_skill_md_with_its_source_in_a_repo_is_split_there_in_a_tree(tmp_path: Path) -> None:
+    """The fix names the writable source in a worktree of the repo holding it, then the
+    reprojection; the gate lets an agent edit that path."""
+    soft = _real_map()["skill_md_line_soft"]
+    projected = tmp_path / ".agents" / "skills" / "fixture-long" / "SKILL.md"
+    source = (
+        tmp_path
+        / "repos"
+        / "lib"
+        / "dadaia_workspace"
+        / "public"
+        / "skills"
+        / "fixture-long"
+        / "SKILL.md"
+    )
+    for path in (projected, source):
+        path.parent.mkdir(parents=True)
+        path.write_bytes(b"l\n" * (soft + 1))
+    service = DoctorService(
+        context_store(tmp_path / ".dadaia" / "states"), GitSubprocessClient(), tmp_path
+    )
+
+    [found] = service.check_skill_md_length()
+
+    edited = (
+        tmp_path
+        / "worktrees"
+        / "lib"
+        / "split-fixture-long"
+        / "dadaia_workspace"
+        / "public"
+        / "skills"
+        / "fixture-long"
+        / "SKILL.md"
+    )
+    new = script_line(
+        ".agents/skills/dd-gitflow-default/scripts/worktree.py", "new", "lib", "split-fixture-long"
+    )
+    assert found.fix == (
+        f"Agent action: open the tree with `{new}`, split {edited} into its references/*.md and/or "
+        f"scripts/, merge it, then run `{fix_line(tmp_path, 'public', 'install')}`"
+    )
+    rel = edited.relative_to(tmp_path).as_posix()
+    assert classify_path(rel)[0] is not PathClass.PROTECTED
+    assert evaluate(rel, root=tmp_path, zone="worktree", repo="lib", owner="lib", context="lib",
+                    repos=frozenset({"lib"}))[0] is Decision.ALLOW  # fmt: skip
 
 
 @functools.cache

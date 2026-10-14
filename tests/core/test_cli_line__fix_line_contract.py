@@ -46,6 +46,7 @@ from dadaia_workspace.core.platform import PLATFORM, workspace_cli_path
 from dadaia_workspace.core.specs_version import CANONICAL_SPECS_VERSION
 from dadaia_workspace.features.chokepoints import push_gate_decision
 from dadaia_workspace.features.chokepoints.branch_policy import parse_push_stdin
+from dadaia_workspace.features.spec_context.gate_policy import PathClass, classify_path
 from dadaia_workspace.features.spec_context.service import git_hooks_dir, install_git_hooks
 from dadaia_workspace.features.specs import canon
 from dadaia_workspace.features.specs.canon import canon_violations
@@ -100,6 +101,14 @@ def fix_defect(fix: str) -> bool:
     return bool(prose or _NOT_ONE_ACT_RE.search(fix) or _NOT_ONE_COMMAND_RE.search(known))
 
 
+def _protected_paths(fix: str) -> list[str]:
+    """Each word of *fix* under a workspace's `.dadaia/` that the gate classes PROTECTED, or
+    the operator's `.dadaiaignore`: a path an agent's act cannot write."""
+    words = [w for w in shlex.split(fix) if "/.dadaia" in w]
+    rels = [".dadaia" + w.split("/.dadaia", 1)[1] for w in words]
+    return [r for r in rels if classify_path(r)[0] is PathClass.PROTECTED]
+
+
 def the_fix(message: str | None) -> str:
     """The one ``fix:`` line of *message*; raises AssertionError unless it is one act the
     gate lets run."""
@@ -109,6 +118,7 @@ def the_fix(message: str | None) -> str:
     fix = fixes[0]
     assert not fix_defect(fix) and "<specs>" not in fix, f"not one act: {fix}"
     if fix.startswith(_ACT_LABELS):
+        assert not fix.startswith("Agent action: ") or not _protected_paths(fix), fix
         return fix
     argv0 = shlex.split(fix)[0]  # an absolute file, or a bare name on PATH, never cwd-relative
     on_path = "/" not in argv0 and (shutil.which(argv0) or argv0 in _PREREQUISITES)
@@ -1625,12 +1635,15 @@ def _workspace_clears(ws: Path, plant: Callable[[Path], str]) -> str:
 
 
 def _long_skill(ws: Path) -> str:
-    """A long SKILL.md is one non-error finding whose `Agent action:` names that file."""
+    """A long SKILL.md is one non-error finding whose `Operator action:` names its library source."""
     root = _initialized(ws)
     code = _plant_long_skill(root)
     [found] = [f for f in _doctor(root) if f["code"] == code]
     assert found["verdict"] == "warning"
-    assert found["fix"].startswith(f"Agent action: split {root}/.agents/skills/long/SKILL.md ")
+    assert (
+        found["fix"]
+        == "Operator action: split long/SKILL.md at its library source; this workspace holds none and never edits the projection"
+    )
     return f"fix: {found['fix']}"
 
 
@@ -1946,7 +1959,7 @@ def test_the_real_doctor_prints_every_fix_as_one_whole_runnable_line(tmp_path: P
     fixes = [line for line in lines if line.startswith("fix: ")]
     assert fixes, run.stdout
     for fix in fixes:
-        if the_fix(fix).startswith(_ACT_LABELS):  # it names the file
+        if the_fix(fix).startswith("Agent action: "):  # it names the file
             assert re.search(r"\s(/|\w:[\\/])\S", fix), fix
     # a wrapped fix would leave a continuation line that is neither a finding nor a `fix:` line
     assert [ln for ln in lines if ln and not re.match(r"(fix: |[A-Z][A-Za-z0-9-]+ )", ln)] == []

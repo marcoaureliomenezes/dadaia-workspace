@@ -233,12 +233,15 @@ def test_a_workspace_finding_is_cleared_by_its_printed_fix(tmp_path: Path, plant
 @pytest.mark.skipif(sys.platform == "win32", reason="the stub CLI is a POSIX shell script")
 def test_a_long_skill_md_is_a_warning_naming_its_file(tmp_path: Path) -> None:
     """The real doctor run prints one non-error SKILL-MD-LENGTH whose
-    `Agent action:` names the projected SKILL.md."""
+    `Operator action:` names the library source, the projection being no file to edit."""
     ws = _workspace(tmp_path)
     code = _plant_long_skill(ws)
     [found] = [f for f in _findings_before(ws) if f["code"] == code]
     assert found["verdict"] == "warning"
-    assert found["fix"].startswith(f"Agent action: split {ws}/.agents/skills/long/SKILL.md ")
+    assert (
+        found["fix"]
+        == "Operator action: split long/SKILL.md at its library source; this workspace holds none and never edits the projection"
+    )
 
 
 @pytest.mark.skipif(sys.platform == "win32", reason="the stub CLI is a POSIX shell script")
