@@ -61,7 +61,7 @@ def load(path: Path) -> dict[str, Any]:
             "range": {"min_port": DEFAULT_MIN_PORT, "max_port": DEFAULT_MAX_PORT},
             "entries": [],
         }
-    fix = f"Agent action: delete {_platform.quote(str(path))} — the next registry.py run starts an empty registry"
+    fix = f"Operator action: delete {_platform.quote(str(path))} — the next registry.py run starts an empty registry"
     return dict(json.loads(_jsonl.read_text(path, fix)))
 
 

@@ -206,12 +206,16 @@ def _refuse_unauthorized(allowed: list[str], state: dict[str, Any]) -> None:
             _mentions(text.partition("carried:")[2].partition("; backlog exits:")[0], bug_id)
             for text in summaries
         )
-        if not authorized or not carried:
-            need = "authorization note" if not authorized else "closure summary carry"
+        if not authorized:
             raise Refusal(
-                f"--allow-open {bug_id} has no {need}",
-                f"Operator action: add {bug_id} to the kind: note verbatim authorization "
-                "and the kind: summary carried field",
+                f"--allow-open {bug_id} has no authorization note",
+                f"Operator action: authorize carrying {bug_id}, then record it in the kind: note "
+                "verbatim authorization and the kind: summary carried field",
+            )
+        if not carried:
+            raise Refusal(
+                f"--allow-open {bug_id} has no closure summary carry",
+                f"Agent action: add {bug_id} to the carried field of the kind: summary entry",
             )
 
 

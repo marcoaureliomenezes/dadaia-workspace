@@ -9,8 +9,9 @@ from collections.abc import Iterable, Iterator
 from pathlib import Path
 from typing import Any
 
-from _platform import git_line
+from _platform import quote
 from _refusal import Refusal
+from _root import workspace_of
 
 
 class LineError(ValueError):
@@ -22,26 +23,39 @@ class LineError(ValueError):
 
 
 class Undecodable(Refusal):
-    """The file *path* is not UTF-8: a verb refuses with the restore act, a check reports a finding."""
+    """The file *path* is not UTF-8: a verb refuses with the act that re-encodes its first bad
+    line in place, a check reports a finding."""
 
     def __init__(self, path: Path, fix: str = "") -> None:
-        target = path.resolve()
-        restore = git_line(target.parent, "checkout", "--", target.name)
+        raw = path.read_bytes().split(b"\n")
+        bad = next((n for n, line in enumerate(raw, start=1) if not _utf8(line)), 1)
         super().__init__(
             f"{path} is not valid UTF-8",
-            fix or restore,
+            fix
+            or f"Agent action: re-encode line {bad} of {path.resolve()} as UTF-8 in place; every other line stays",
         )
         self.path = path
+
+
+def _utf8(raw: bytes) -> bool:
+    try:
+        raw.decode("utf-8")
+    except UnicodeDecodeError:
+        return False
+    return True
 
 
 class Unreadable(Refusal):
     """A document that is not one JSON object; ``.fix`` is the act its caller names."""
 
 
-def reinstall_fix() -> str:
-    """The command that repairs a shipped file: `init` rewrites a projected copy and, on a
-    damaged installed payload, reinstalls the running build."""
-    return "uvx dadaia-workspace init"
+def reinstall_fix(start: Path) -> str:
+    """The command that repairs a shipped file under *start*: `init` of the workspace holding
+    it, which answers its harness from its own profile; outside every workspace, the act."""
+    root = workspace_of(start)
+    if root is None:
+        return "Agent action: run `uvx dadaia-workspace init` with the workspace's directory as its first argument"
+    return f"uvx dadaia-workspace init {quote(str(root))}"
 
 
 def read_text(path: Path, fix: str = "") -> str:

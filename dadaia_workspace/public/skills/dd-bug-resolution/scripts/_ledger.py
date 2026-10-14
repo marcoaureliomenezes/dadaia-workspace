@@ -49,7 +49,7 @@ def load_schema(name: str) -> dict[str, Any]:
         path = _HERE.parents[1] / _SCHEMA_OWNERS[name] / "scripts" / "schemas" / file
     else:
         path = next((_HERE.parents[2] / "schemas").rglob(file), _HERE / "schemas" / file)
-    return dict(json.loads(_jsonl.read_text(path, _jsonl.reinstall_fix())))
+    return dict(json.loads(_jsonl.read_text(path, _jsonl.reinstall_fix(path))))
 
 
 def _combinators(value: object, spec: dict[str, Any], root: dict[str, Any], where: str) -> Any:
@@ -145,9 +145,8 @@ def unwritten(file: Path, at: int | str, verbs: str, law: str) -> str:
     else:
         what = f"{file} fails at {at} ({law})"
         finder = f"`{git_line(file.parent, 'log', '-p', '--', file.name)}` lists them"
-    return (f"Agent action: {what} — if {file} has uncommitted changes, discard them "
-            f"(`{git_line(file.parent, 'checkout', '--', file.name)}`); otherwise revert the commit that introduced it "
-            f"({finder}), then redo the change through {verbs}")  # fmt: skip
+    return (f"Agent action: {what} — revert the commit that introduced it ({finder}), or delete "
+            f"the line if you wrote it and it is still uncommitted, then redo the change through {verbs}")  # fmt: skip
 
 
 def replace(path: Path, text: str) -> None:

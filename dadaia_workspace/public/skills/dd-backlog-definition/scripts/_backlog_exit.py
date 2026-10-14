@@ -79,7 +79,7 @@ def _bug(specs: Path, slug: str, disposition: str, reason: str | None) -> None:
     if reason not in ids:
         raise Refusal(
             f"--reason {reason!r} names no record of {bugs}: `to-bug` hands {slug!r} to a registered bug",
-            f"Agent action: register the bug {slug} becomes with bugs.py append "
+            f"Operator action: confirm the bug {slug} becomes so it is registered with bugs.py append "
             f"(dd-bug-registration), then rerun `{SCRIPT} exit {slug} --disposition {disposition} "
             f"--specs {quote(str(specs))}` "
             "with its id as --reason.",

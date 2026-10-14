@@ -44,7 +44,7 @@ def _refuse_unopened_bug(main: Path, work: str, bug: str) -> None:
         found = []
     if not any(r.get("id") == bug and r.get("status") == OPEN for r in found):
         raise Refusal(f"no open bug record {bug} on {work}",
-                      f"Agent action: register bug {bug} on {work} as open (dd-bug-registration), then open its hotfix job again")  # fmt: skip
+                      f"Operator action: confirm bug {bug} so it is registered on {work} as open (dd-bug-registration), then open its hotfix job again")  # fmt: skip
 
 
 def _shape(repo: Path, flow: dict[str, str], name: str) -> tuple[re.Match[str], str]:

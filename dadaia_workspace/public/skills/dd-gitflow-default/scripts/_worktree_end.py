@@ -243,7 +243,7 @@ def _scaffold(tree: Path, name: str) -> None:
     if git(tree, "ls-files", "--", f"tests/tmp/{job}").strip():
         raise Refusal(
             f"{folder} exists: promote each test in it into its contract's home, or the operator orders its delete, before the job lands",  # fmt: skip
-            f"Operator action: promote each test in {folder} into its contract's home, or order its delete, then commit the removal",  # fmt: skip
+            f"Agent action: promote each test in {folder} into its contract's home (a delete needs the operator's order), then commit the removal",  # fmt: skip
         )
 
 
