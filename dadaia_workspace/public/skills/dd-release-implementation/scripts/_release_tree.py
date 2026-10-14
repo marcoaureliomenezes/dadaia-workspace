@@ -159,21 +159,20 @@ def _swept(state: dict[str, Any]) -> bool:
 def _origin_row(
     specs: Path, spec: Path, line: int, live: Live, swept: bool, row: tuple[str, str, str, bool]
 ) -> dict[str, Any]:
-    """One carried id's finding: the pointer verb that writes it back, the operator act when
-    none can, else info for a standing id."""
+    """One carried id's finding: info with no fix when it stands, else the pointer verb or act."""
     kind, i, standing, writable = row
-    out = _findings.finding(CODE, spec.relative_to(specs).as_posix(), line, f"Origin {kind}:{i} {standing}", f"Agent action: name a "
-                      f"live {kind} id for {kind}:{i}, or rule it out of the Origin line of {spec}.")  # fmt: skip
+    rel, message = spec.relative_to(specs).as_posix(), f"Origin {kind}:{i} {standing}"
+    if standing == "traced" or (standing == "untraced" and not swept):
+        return {"code": CODE, "verdict": "info", "path": rel, "line": line, "message": message}
     values = {"i": quote(i), "a": quote(i.rpartition("-F")[0]), "r": live.release_id}
-    if standing == "untraced" and swept and writable:
+    if standing == "untraced" and writable:
         skill, verb = _POINTER[kind]
-        out["fix"] = with_specs(f"{script(_SKILLS / skill)} {verb.format(**values)}", specs)
-    elif standing == "untraced" and swept:
-        act = _ACT[kind].format(**values)
-        out["fix"] = f"Agent action: {act}, or rule it out of the Origin line of {spec}."
-    elif standing in ("traced", "untraced"):
-        out["verdict"] = "info"
-    return out
+        fix = with_specs(f"{script(_SKILLS / skill)} {verb.format(**values)}", specs)
+    elif standing == "untraced":
+        fix = f"Agent action: {_ACT[kind].format(**values)}, or rule it out of the Origin line of {spec}."
+    else:
+        fix = f"Agent action: name a live {kind} id for {kind}:{i}, or rule it out of the Origin line of {spec}."
+    return _findings.finding(CODE, rel, line, message, fix)
 
 
 def _origin_findings(specs: Path) -> list[dict[str, Any]]:
