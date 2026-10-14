@@ -121,13 +121,13 @@ def _window_findings(
     head = next((n for n, h in enumerate(lines, 1) if h.startswith("## ")), 1)
     if lines[head - 1 : head] == [BUG_WINDOW]:
         return []
-    return [
-        _findings.finding(CODE, rel, head, f"the live SPEC's first `## ` heading is not `{BUG_WINDOW}` (AC5.6)",
-                f"Agent action: open {spec} with `{BUG_WINDOW}` as its first `## ` heading, "
-                "reviewing the prior candidate's table and each resolved record's persisted "
-                "`fix_sha` with `git show` as `dd-bug-resolution/LINEAGE.md` defines")
-        | ({} if state.get("phase") == "DEFINITION" else {"verdict": "info"})
-    ]  # fmt: skip
+    message = f"the live SPEC's first `## ` heading is not `{BUG_WINDOW}` (AC5.6)"
+    if state.get("phase") != "DEFINITION":
+        return [_findings.info(CODE, rel, head, message)]
+    return [_findings.finding(CODE, rel, head, message,
+            f"Agent action: open {spec} with `{BUG_WINDOW}` as its first `## ` heading, "
+            "reviewing the prior candidate's table and each resolved record's persisted "
+            "`fix_sha` with `git show` as `dd-bug-resolution/LINEAGE.md` defines")]  # fmt: skip
 
 
 def _last_summary(state: dict[str, Any]) -> str:
@@ -163,7 +163,7 @@ def _origin_row(
     kind, i, standing, writable = row
     rel, message = spec.relative_to(specs).as_posix(), f"Origin {kind}:{i} {standing}"
     if standing == "traced" or (standing == "untraced" and not swept):
-        return {"code": CODE, "verdict": "info", "path": rel, "line": line, "message": message}
+        return _findings.info(CODE, rel, line, message)
     values = {"i": quote(i), "a": quote(i.rpartition("-F")[0]), "r": live.release_id}
     if standing == "untraced" and writable:
         skill, verb = _POINTER[kind]

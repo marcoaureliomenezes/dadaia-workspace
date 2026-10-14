@@ -18,6 +18,11 @@ def finding(code: str, path: str, line: int, message: str, fix: str) -> dict[str
             "fix": fix}  # fmt: skip
 
 
+def info(code: str, path: str, line: int, message: str) -> dict[str, Any]:
+    """A listing row: it asks nothing of anyone, so it carries no fix."""
+    return {"code": code, "verdict": "info", "path": path, "line": line, "message": message}
+
+
 def decodable(code: str) -> Callable[[Check], Check]:
     """Make a ``check(specs)`` report a file that is not UTF-8 as one finding of *code*."""
 
