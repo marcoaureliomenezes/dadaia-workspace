@@ -19,7 +19,7 @@ from dadaia_workspace.cli._specs_resolution import (
 )
 from dadaia_workspace.core import gitflow, specs_version
 from dadaia_workspace.core.atomic_write import SymlinkRefusedError
-from dadaia_workspace.core.cli_line import OPERATOR_ACT, fix_line, materialize_line, spell_fix
+from dadaia_workspace.core.cli_line import fix_line, materialize_line, spell_fix
 from dadaia_workspace.core.doctor_rules import SectionFinding
 from dadaia_workspace.core.gitflow import DEFAULT, Gitflow, from_mapping
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
@@ -157,8 +157,8 @@ def init(
         rerun = ("--context", ctx)
     target = resolve_specs_dir_for_cli(specs_dir)
     kind, fix = specs_version.state(target)
-    if fix and fix.startswith(OPERATOR_ACT):
-        fail("nothing written", fix)
+    if kind in ("malformed", "file"):
+        fail("nothing written", fix or "")
     flow = _gitflow(target, principal, integration, work_prefix, rerun)
     refused = False  # an unrelated error the repair left never blocks the gitflow write
     if kind == "foreign":

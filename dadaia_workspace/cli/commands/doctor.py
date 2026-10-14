@@ -196,7 +196,7 @@ def _resolve_run(
 def _absent_tree(target: Path | None) -> SectionFinding | None:
     """An explicit ``--specs-dir`` holding no tree: its one finding, carrying ``state``'s fix."""
     kind, fix = state(target) if target else ("canonical", None)
-    if kind != "absent":
+    if kind not in ("absent", "file"):
         return None
     msg = f"no specs tree at {target}"
     return SectionFinding("SPECS-ABSENT", "error", msg, canonical=False, error=True, fix=fix or "")

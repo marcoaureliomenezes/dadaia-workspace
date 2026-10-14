@@ -9,9 +9,6 @@ from pathlib import Path, PurePath
 from dadaia_workspace.core import platform
 from dadaia_workspace.core.skill_owner import load_owner
 
-#: Opens a fix no dadaia verb clears; the one spelling.
-OPERATOR_ACT = "Operator action:"
-
 
 def fix_of(text: str, default: str = "") -> str:
     """The first `fix:` line of a child script's *text*: the kernel's one parser."""
