@@ -14,8 +14,6 @@ from typing import Any
 
 import pytest
 
-from dadaia_workspace.core.cli_line import git_line
-
 _SCRIPT = (
     Path(__file__).resolve().parents[5]
     / "dadaia_workspace"
@@ -282,5 +280,5 @@ def test_every_registry_refusal_prints_one_error_line_and_one_fix_line(tmp_path:
     _refused(
         _run(reg, "list"),
         f"{reg} is not valid UTF-8",
-        f"Operator action: restore {reg} with `{git_line(reg.parent, 'checkout', '--', reg.name)}`",
+        f"Operator action: delete {reg} — the next registry.py run starts an empty registry",
     )
