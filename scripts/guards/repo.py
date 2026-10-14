@@ -756,6 +756,8 @@ def CONTROL(root: Path) -> None:
     (root / _WF / "zz.yml").write_text(
         _ROGUE + "        run: echo ${{ secrets.ANTHROPIC_KEY }}\n", "utf-8"
     )
+    with (root / _A).open("a", encoding="utf-8") as arch:
+        arch.write(_GENERATED)
 
 
 def _edit(rel: str, old: str, new: str) -> Plant:
@@ -820,6 +822,12 @@ def _unlink(rel: str) -> Plant:
 
 
 _A, _Q, _G = "specs/memory/ARCHITECTURE.md", "specs/memory/QUALITY.md", f"{_WF}/ci.yml"
+# a generated section names what the operator's rules ban: the control stays green around it
+_GENERATED = (
+    "\n<!-- dadaia:fixed adr-list -->\n"
+    "- 0904 — No dadaia-skills repository is published: see [[spec-tree]]\n"
+    "<!-- /dadaia:fixed adr-list -->\n"
+)
 # a clean job first, so a plant is judged among clean expressions and jobs
 _CLEAN = (
     "on: push\njobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n"
