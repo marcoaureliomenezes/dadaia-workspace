@@ -95,6 +95,22 @@ def test_merge_fast_forwards_removes_and_reruns(root: Path) -> None:
     assert git(repo, "branch", "--list", "wt/0.5.0-rc1/j1").strip()  # never -D
 
 
+@pytest.mark.parametrize("verb", ["merge", "preflight"])
+def test_a_task_whose_job_tree_is_gone_refuses_with_the_fix_that_restores_it(
+    root: Path, verb: str
+) -> None:
+    assert run(root, "new", "r", TASK).returncode == 0
+    task = root / "worktrees/r" / TASK
+    commit(task, "src/a.py")
+    shutil.rmtree(root / TREE)  # removed by hand: git's registry still holds it, locked
+    refused = run(root, verb, str(task))
+    assert refused.returncode == 1 and "Traceback" not in refused.stderr
+    assert "[error]" in refused.stderr
+    _fix(root, refused)
+    assert (root / TREE).is_dir()
+    assert run(root, "merge", str(task)).returncode == 0
+
+
 def test_a_dirty_tree_refuses_with_one_fix_that_commits_or_removes(root: Path) -> None:
     tree = root / TREE
     (tree / "wip").mkdir()  # an untracked directory, and a tracked edit staged:
