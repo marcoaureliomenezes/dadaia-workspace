@@ -21,7 +21,6 @@ TOPLEVEL_MEMORY_FILES = memory_canon.MEMORY_TOPLEVEL_FILES
 PRODUCT_INDEX_REL = "product/index.md"
 _ADR_LIST = "adr-list"  # the ledger-rendered block of memory/ARCHITECTURE.md
 _PLACEHOLDER_TOKENS = ("SLUG_PLACEHOLDER", "TITLE_PLACEHOLDER", "RELEASE_PLACEHOLDER")
-# An unfilled token is a tight code span around the token alone; a longer span only illustrates.
 _MD_HEADING_RE = re.compile(r"^#{1,6}\s+\S", re.MULTILINE)
 # Matched by shape, never by the package count: the count changes only at closure.
 _FEATURES_PKG_MAP_HEADING_RE = re.compile(
@@ -39,8 +38,12 @@ def _read_or_empty(path: Path) -> str:
 
 
 def is_placeholder_atom(path: Path) -> bool:
-    """True when *path* is an unfilled placeholder memory atom (template artifact)."""
-    return any(token in _read_or_empty(path) for token in _PLACEHOLDER_TOKENS)
+    """True when *path* is an atom whose frontmatter carries a template token as a field value;
+    a mention in prose or a fixed section, and a top-level canon file, never is."""
+    if path.name in TOPLEVEL_MEMORY_FILES:
+        return False
+    fm, _body, _problem = memory_canon.parse_atom(_read_or_empty(path))
+    return any(value in _PLACEHOLDER_TOKENS for value in (fm or {}).values())
 
 
 def _has_heading(path: Path) -> bool:
