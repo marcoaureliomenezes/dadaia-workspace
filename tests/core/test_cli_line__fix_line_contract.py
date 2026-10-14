@@ -11,6 +11,7 @@ size: MEDIUM — real git and real CLI child processes, no network.
 from __future__ import annotations
 
 import contextlib
+import io
 import json
 import os
 import re
@@ -37,12 +38,14 @@ from dadaia_workspace.core.cli_line import fix_line, git_line, shell_line
 from dadaia_workspace.core.doctor_rules import rule_fix
 from dadaia_workspace.core.gitflow import DEFAULT, work_branch
 from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES
+from dadaia_workspace.core.models.install_ledger import InstallLedger, LedgerEntry
 from dadaia_workspace.core.models.spec_context import (
     AssociatedRepo,
     ContextState,
     SpecContextProject,
 )
 from dadaia_workspace.core.platform import PLATFORM, workspace_cli_path
+from dadaia_workspace.core.skill_owner import load_owner
 from dadaia_workspace.core.specs_version import CANONICAL_SPECS_VERSION
 from dadaia_workspace.features.chokepoints import push_gate_decision
 from dadaia_workspace.features.chokepoints.branch_policy import parse_push_stdin
@@ -53,9 +56,10 @@ from dadaia_workspace.features.specs.canon import canon_violations
 from dadaia_workspace.features.specs.citations import dead_verb_citations
 from dadaia_workspace.features.specs.rules import RULES as SPECS_RULES
 from dadaia_workspace.features.workspace.service import WorkspaceService
-from dadaia_workspace.hooks import pre_gate
+from dadaia_workspace.hooks import pre_gate, sdd_gate
 from dadaia_workspace.infrastructure.git_objects import GitSubprocessObjectReader
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
+from dadaia_workspace.infrastructure.json_install_ledger_store import JsonInstallLedgerStore
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
 from dadaia_workspace.infrastructure.runtime_transforms.hook_wrappers import VENV_MISSING
@@ -101,24 +105,32 @@ def fix_defect(fix: str) -> bool:
     return bool(prose or _NOT_ONE_ACT_RE.search(fix) or _NOT_ONE_COMMAND_RE.search(known))
 
 
-def _protected_paths(fix: str) -> list[str]:
-    """Each word of *fix* under a workspace's `.dadaia/` that the gate classes PROTECTED, or
-    the operator's `.dadaiaignore`: a path an agent's act cannot write."""
-    words = re.findall(r"\S*/\.dadaia\S*", fix)
-    rels = [".dadaia" + w.split("/.dadaia", 1)[1] for w in words]
-    return [r for r in rels if classify_path(r)[0] is PathClass.PROTECTED]
+def _protected_paths(fix: str, root: Path) -> list[str]:
+    """Each absolute path word of *fix* under *root* that the gate classes PROTECTED, by the
+    gate's own law set (its install ledger and the operator's globs): a path an agent's act
+    cannot write."""
+    projected, protected = sdd_gate.law_set(root)
+    found: list[str] = []
+    for word in re.findall(r"/[^\s`'\"]+", fix):
+        try:
+            rel = Path(word).resolve().relative_to(root.resolve()).as_posix()
+        except ValueError:
+            continue
+        if classify_path(rel, projected, protected)[0] is PathClass.PROTECTED:
+            found.append(rel)
+    return found
 
 
-def the_fix(message: str | None) -> str:
+def the_fix(message: str | None, root: Path | None = None) -> str:
     """The one ``fix:`` line of *message*; raises AssertionError unless it is one act the
-    gate lets run."""
+    gate lets run; an ``Agent action:`` under *root* names no path the gate protects."""
     assert message, "a refusal with an empty message is a stall"
     fixes = _FIX_LINE_RE.findall(message)
     assert len(fixes) == 1, f"expected exactly one 'fix:' line, got {fixes} in:\n{message}"
     fix = fixes[0]
     assert not fix_defect(fix) and "<specs>" not in fix, f"not one act: {fix}"
     if fix.startswith(_ACT_LABELS):
-        assert not fix.startswith("Agent action: ") or not _protected_paths(fix), fix
+        assert not (root and fix.startswith("Agent action: ") and _protected_paths(fix, root)), fix
         return fix
     argv0 = shlex.split(fix)[0]  # an absolute file, or a bare name on PATH, never cwd-relative
     on_path = "/" not in argv0 and (shutil.which(argv0) or argv0 in _PREREQUISITES)
@@ -235,6 +247,7 @@ _HUMAN_ONLY = {
     "infrastructure/git_subprocess.py": 1,
     "infrastructure/json_context_store.py": 3,
     "public/skills/dd-backlog-definition/scripts/_backlog_exit.py": 1,
+    "public/skills/dd-bug-resolution/scripts/_ledger.py": 1,
     "public/skills/dd-cli-library/scripts/registry.py": 1,
     "public/skills/dd-gitflow-default/scripts/_worktree_new.py": 1,
     "public/skills/dd-release-implementation/scripts/_release_phase.py": 2,
@@ -1647,6 +1660,54 @@ def _long_skill(ws: Path) -> str:
     return f"fix: {found['fix']}"
 
 
+def _denylist_refusal(ws: Path) -> str:
+    """The skill kernel's refusal of a privacy denylist that is not one JSON object."""
+    (ws / ".dadaia" / "states" / "privacy_denylist.json").write_text("[]", encoding="utf-8")
+    err = io.StringIO()
+    with contextlib.redirect_stderr(err), pytest.raises(SystemExit):
+        load_owner("dd-bug-resolution", "_ledger").terms(ws)
+    return err.getvalue()
+
+
+def _registry_refusal(ws: Path) -> str:
+    """The server registry's refusal of a file that is not UTF-8."""
+    path = ws / ".dadaia" / "states" / "server_registry.json"
+    path.write_bytes(b"\xff\xfe")
+    with pytest.raises(load_owner("dd-bug-resolution", "_refusal").Refusal) as refused:
+        load_owner("dd-cli-library", "registry").load(path)
+    return f"[error] {refused.value}\nfix: {refused.value.fix}"
+
+
+SITES |= {
+    "skill-denylist-not-an-object": _denylist_refusal,
+    "skill-registry-not-utf8": _registry_refusal,
+}
+
+
+@pytest.mark.parametrize(
+    "rel",
+    [
+        ".agents/skills/dd-x/SKILL.md",
+        "AGENTS.md",
+        ".claude/settings.json",
+        ".dadaia/AGENTS.md",
+        "repos/a/secrets/k",
+    ],
+)
+def test_an_agent_action_naming_a_path_the_gate_protects_is_refused(
+    workspace: Path, rel: str
+) -> None:
+    """Planted, each protected class goes red; a path in a tree stays green."""
+    states = workspace / ".dadaia" / "states"
+    entries = [LedgerEntry(relpath=r, sha256="a" * 64, family="law") for r in (
+        ".agents/skills/dd-x/SKILL.md", ".claude/settings.json", ".dadaia/AGENTS.md")]  # fmt: skip
+    JsonInstallLedgerStore().write(states, InstallLedger.of(entries))
+    with pytest.raises(AssertionError):
+        the_fix(f"[error] x\nfix: Agent action: edit {workspace / rel}", workspace)
+    tree = workspace / "worktrees" / "a" / "t" / "x.py"
+    the_fix(f"[error] x\nfix: Agent action: edit {tree}", workspace)
+
+
 SITES |= {
     **{
         f"doctor-workspace-{code}": lambda ws, code=code: _ledger(ws, code)
@@ -1720,7 +1781,7 @@ _SLOW = pytest.mark.slow(reason="real git remotes and CLI child processes")
     ],
 )
 def test_every_site_carries_one_runnable_fix(workspace: Path, site: str) -> None:
-    the_fix(SITES[site](workspace))
+    the_fix(SITES[site](workspace), workspace)
 
 
 _BLOCKS = {
@@ -1737,7 +1798,7 @@ _BLOCKS = {
 
 @pytest.mark.parametrize("block", list(_BLOCKS))
 def test_every_block_carries_a_runnable_fix(workspace: Path, block: str) -> None:
-    the_fix(_BLOCKS[block](workspace))
+    the_fix(_BLOCKS[block](workspace), workspace)
 
 
 def test_every_fix_site_has_a_case() -> None:

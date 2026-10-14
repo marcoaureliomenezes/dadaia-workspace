@@ -209,7 +209,7 @@ def test_load_denylist_source_formats(
         assert refused.value.code == 1
         assert capsys.readouterr().err.splitlines() == [
             f"[error] privacy denylist {source} is not one JSON object",
-            f"fix: Agent action: rewrite {source} as one JSON object mapping each term to "
+            f"fix: Operator action: rewrite {source} as one JSON object mapping each term to "
             "its reason",
         ]
         return

@@ -195,3 +195,15 @@ def test_following_the_not_utf8_fix_keeps_every_valid_record(tmp_path: Path) -> 
     ledger.write_bytes(b"\n".join(lines))
     assert run("check").returncode == 0
     assert '"id": "a-bug"' in ledger.read_text("utf-8")
+
+
+def test_the_finding_and_its_fix_name_the_same_bad_line(tmp_path: Path) -> None:
+    done = _check(tmp_path, "bugs", ("bugs/BUGS.jsonl", b'{"a": 1}\n\xff\n'))("--json")
+
+    (finding,) = json.loads(done.stdout)
+    target = (tmp_path / "repo" / "specs" / "bugs" / "BUGS.jsonl").resolve()
+    assert finding["line"] == 2
+    assert (
+        finding["fix"]
+        == f"Agent action: re-encode line 2 of {target} as UTF-8 in place; every other line stays"
+    )

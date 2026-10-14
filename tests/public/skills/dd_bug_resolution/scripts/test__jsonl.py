@@ -57,7 +57,7 @@ def test_a_schema_of_the_installed_package_is_reinstalled_by_init(tmp_path: Path
     assert done.stdout == f"uvx dadaia-workspace init {tmp_path.resolve()}\n"
 
 
-def test_a_denylist_that_is_not_utf8_is_rewritten_not_restored_from_git(tmp_path: Path) -> None:
+def test_a_denylist_that_is_not_utf8_is_the_operators_to_rewrite(tmp_path: Path) -> None:
     denylist = tmp_path / "denylist.json"
     denylist.write_bytes(b"\xff\xfe")
     done = _run(tmp_path, "_ledger.terms(None)\n", {"DADAIA_PRIVACY_DENYLIST": str(denylist)})
@@ -65,6 +65,6 @@ def test_a_denylist_that_is_not_utf8_is_rewritten_not_restored_from_git(tmp_path
     assert done.returncode == 1
     assert done.stderr == (
         f"[error] privacy denylist {denylist} is not one JSON object\n"
-        f"fix: Agent action: rewrite {denylist} as one JSON object mapping each term to "
+        f"fix: Operator action: rewrite {denylist} as one JSON object mapping each term to "
         "its reason\n"
     )
