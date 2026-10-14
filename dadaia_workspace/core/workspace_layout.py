@@ -110,7 +110,7 @@ REFUSALS: dict[FloorRefusal, str] = {
     ),
     FloorRefusal.STATE: (
         "[GATE] '{path}' is CLI-owned workspace state: a file tool never writes it, "
-        "the dadaia verb that owns it does.\n"
+        "the verb or skill script that owns it does.\n"
     ),
     FloorRefusal.OPERATOR: _OPERATOR.replace("{why}", "its own file"),
     FloorRefusal.GLOB: _OPERATOR.replace("{why}", "protected glob '{match}'"),
@@ -126,6 +126,7 @@ REFUSALS: dict[FloorRefusal, str] = {
 CORE_FLOOR: dict[str, FloorRefusal] = {
     "AGENTS.md": FloorRefusal.LAW,
     DADAIAIGNORE: FloorRefusal.OPERATOR,
+    ".dadaia/states/privacy_denylist.json": FloorRefusal.OPERATOR,  # before its folder
     ".dadaia/states": FloorRefusal.STATE,
     ".dadaia/hooks": FloorRefusal.LAW,
     ".dadaia/agentic": FloorRefusal.LAW,

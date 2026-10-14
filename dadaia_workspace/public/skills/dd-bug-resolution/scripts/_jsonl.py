@@ -23,26 +23,16 @@ class LineError(ValueError):
 
 
 class Undecodable(Refusal):
-    """The file *path* is not UTF-8: a verb refuses with the act that re-encodes its first bad
-    line in place, a check reports a finding."""
+    """The file *path* is not UTF-8 at *line*: a verb refuses with the act that re-encodes that
+    line in place, a check reports a finding there."""
 
-    def __init__(self, path: Path, fix: str = "") -> None:
-        raw = path.read_bytes().split(b"\n")
-        bad = next((n for n, line in enumerate(raw, start=1) if not _utf8(line)), 1)
+    def __init__(self, path: Path, fix: str = "", line: int = 1) -> None:
         super().__init__(
             f"{path} is not valid UTF-8",
             fix
-            or f"Agent action: re-encode line {bad} of {path.resolve()} as UTF-8 in place; every other line stays",
+            or f"Agent action: re-encode line {line} of {path.resolve()} as UTF-8 in place; every other line stays",
         )
-        self.path = path
-
-
-def _utf8(raw: bytes) -> bool:
-    try:
-        raw.decode("utf-8")
-    except UnicodeDecodeError:
-        return False
-    return True
+        self.path, self.line = path, line
 
 
 class Unreadable(Refusal):
@@ -64,7 +54,7 @@ def read_text(path: Path, fix: str = "") -> str:
     try:
         return path.read_text(encoding="utf-8")
     except UnicodeDecodeError as exc:
-        raise Undecodable(path, fix) from exc
+        raise Undecodable(path, fix, exc.object.count(b"\n", 0, exc.start) + 1) from exc
 
 
 def walk(text: str) -> Iterator[tuple[int, Any, str]]:

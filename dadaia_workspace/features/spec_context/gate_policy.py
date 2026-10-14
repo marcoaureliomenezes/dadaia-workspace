@@ -34,7 +34,7 @@ _DRAFT: _Fix = lambda root, _: mkdir_line(root / ".dadaia" / "tmp")  # noqa: E73
 _FIXES: dict[workspace_layout.FloorRefusal, _Fix] = {
     _R.LAW: lambda root, _: fix_line(root, "public", "install"),
     _R.STATE: lambda root, _: (
-        "Agent action: use the verb that owns that state file instead of editing it"
+        "Agent action: use the verb or skill script that owns that state file instead of editing it"
     ),
     _R.OPERATOR: _DRAFT,
     _R.GLOB: _DRAFT,

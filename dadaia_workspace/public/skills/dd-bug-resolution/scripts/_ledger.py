@@ -172,7 +172,7 @@ def terms(root: Path | None) -> list[tuple[str, str]]:
         if not isinstance(raw, dict):
             report(
                 f"privacy denylist {path} is not one JSON object",
-                f"Agent action: rewrite {path} as one JSON object mapping each term to its reason",
+                f"Operator action: rewrite {path} as one JSON object mapping each term to its reason",
             )
             raise SystemExit(1)
         if raw:
