@@ -53,7 +53,7 @@ carries one executable `fix:` line or one operator act.
 *Memory* is current product truth: `specs/memory/product/**`, `ARCHITECTURE.md` and
 `QUALITY.md`. A bound session receives the constitution, technical bootstrap, catalog
 digest and open worktrees. Candidate closure runs drift, reconciles every affected atom,
-writes exactly one release `memory` entry and regenerates the catalog. Memory contains no
+writes a `memory` entry per pass and regenerates the catalog. Memory contains no
 release history.
 
 ## Bugs and backlog
