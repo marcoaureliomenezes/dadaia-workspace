@@ -152,8 +152,8 @@ def test_no_work_branch_refuses_with_a_fix_that_creates_it(root: Path) -> None:
     assert result.returncode == 1
     (fix,) = _fixes(result)
     assert (
-        fix == f"fix: {git_line(repo, 'branch', 'feature/0.1.0', 'dev')}"
-    )  # the flow's integration
+        fix == f"fix: {git_line(repo, 'branch', 'feature/0.5.0', 'dev')}"
+    )  # the live release's branch, cut from the flow's integration
 
 
 @pytest.mark.parametrize(
