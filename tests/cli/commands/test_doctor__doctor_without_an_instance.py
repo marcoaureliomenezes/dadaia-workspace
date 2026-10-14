@@ -11,6 +11,7 @@ explicit tree) the run still refuses with the one initialization message.
 from __future__ import annotations
 
 import json
+import os
 import re
 from pathlib import Path
 
@@ -18,6 +19,7 @@ import pytest
 from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app
+from dadaia_workspace.core.platform import PLATFORM
 from dadaia_workspace.core.specs_version import state
 from dadaia_workspace.features.specs.canon import scaffold
 from dadaia_workspace.infrastructure.ledger_scripts import script_repairs
@@ -66,18 +68,24 @@ def test_an_absent_specs_dir_is_one_finding_and_its_fix_clears_the_doctor(
 
 
 @pytest.mark.medium
-def test_a_file_at_the_specs_dir_is_one_finding_and_moving_it_aside_clears_the_doctor(
-    no_instance: Path,
+@pytest.mark.parametrize("kind", ["file", "fifo"])
+def test_a_non_directory_at_the_specs_dir_is_one_finding_and_moving_it_aside_clears_the_doctor(
+    kind: str, no_instance: Path
 ) -> None:
     specs = no_instance / "specs"
-    specs.write_text("", encoding="utf-8")
+    if kind == "fifo":
+        if PLATFORM.windows:
+            pytest.skip("a FIFO needs POSIX")
+        os.mkfifo(specs)
+    else:
+        specs.write_text("", encoding="utf-8")
 
     run = _runner.invoke(app, ["doctor", "--json", "--specs-dir", str(specs)])
 
     sections = json.loads(run.output)["sections"]
     found = [f for section in sections.values() for f in section["findings"]]
     assert [(f["code"], f["fix"]) for f in found] == [
-        ("SPECS-ABSENT", f"Operator action: move {specs} aside, it is a file, not a directory")
+        ("SPECS-ABSENT", f"Operator action: move {specs} aside, it is not a directory")
     ], run.output
     assert run.exit_code == 1
     specs.rename(no_instance / "moved-aside")

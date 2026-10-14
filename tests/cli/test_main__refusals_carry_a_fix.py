@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import os
 import shutil
+import stat
 import subprocess
 import sys
 from collections.abc import Callable
@@ -21,7 +22,7 @@ import pytest
 from dadaia_workspace import container
 from dadaia_workspace.cli import main
 from dadaia_workspace.core.exceptions import WorkspaceVenvBootstrapError
-from dadaia_workspace.core.specs_version import state
+from dadaia_workspace.core.platform import PLATFORM
 from dadaia_workspace.features.migrate.upgrade import _RETIRED_PART_HEADING
 from tests.fakes import no_worktree_rows, seed_dead_context
 
@@ -176,9 +177,14 @@ def _malformed_constitution(tmp: Path) -> Case:
     return tmp, ["specs", "init", "--specs-dir", str(tmp / "specs")]
 
 
-def _specs_dir_is_a_file(tmp: Path) -> Case:
+def _specs_dir_is_not_a_directory(tmp: Path, kind: str) -> Case:
     tmp.mkdir(parents=True)
-    (tmp / "specs").write_text("not a directory\n")
+    if kind == "fifo":
+        if PLATFORM.windows:
+            pytest.skip("a FIFO needs POSIX")
+        os.mkfifo(tmp / "specs")
+    else:
+        (tmp / "specs").write_text("not a directory\n")
     return tmp, ["specs", "init", "--specs-dir", str(tmp / "specs")]
 
 
@@ -247,16 +253,21 @@ def test_refusal_prints_error_then_exactly_one_fix(
         assert "--associated-repo" in fix
 
 
-def test_specs_init_on_a_file_refuses_with_the_one_fix_of_state_and_leaves_it(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+@pytest.mark.parametrize("kind", ["file", "fifo"])
+def test_specs_init_on_a_non_directory_refuses_with_the_move_aside_fix_and_leaves_it(
+    kind: str, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    cwd, argv = _specs_dir_is_a_file(tmp_path / "case")
+    cwd, argv = _specs_dir_is_not_a_directory(tmp_path / "case", kind)
     os.chdir(cwd)
     capsys.readouterr()
     code = _run(argv)
     lines = _assert_one_fix(capsys, code)
-    assert lines[-1] == f"fix: {state(cwd / 'specs')[1]}"
-    assert (cwd / "specs").read_text() == "not a directory\n"
+    assert lines[0] == "Error: nothing written"
+    assert lines[-1] == f"fix: Operator action: move {cwd / 'specs'} aside, it is not a directory"
+    if kind == "fifo":
+        assert stat.S_ISFIFO((cwd / "specs").lstat().st_mode)
+    else:
+        assert (cwd / "specs").read_text() == "not a directory\n"
 
 
 def test_context_alive_on_a_non_git_repo_dir_is_one_refusal(

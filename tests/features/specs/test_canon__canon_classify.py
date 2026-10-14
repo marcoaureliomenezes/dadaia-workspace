@@ -3,12 +3,15 @@ and its fix; the scaffolded stubs speak English with the fixed memory sections. 
 
 from __future__ import annotations
 
+import os
 import re
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
 
 from dadaia_workspace.core import specs_version
+from dadaia_workspace.core.platform import PLATFORM
 from dadaia_workspace.features.specs import canon
 
 _MALFORMED = "---\nspecs_pattern_version: 7\ngitflow: {principal: main\n---\n# C\n"
@@ -57,15 +60,35 @@ def test_state_is_the_one_reader_with_one_fix(
     assert not {"read_pattern_version", "classify"} & set(vars(specs_version))
 
 
-def test_a_file_at_the_specs_path_is_its_own_kind_and_its_fix_moves_it_aside(
-    tmp_path: Path,
+def _make_file(path: Path) -> None:
+    path.write_text("# not a tree\n", encoding="utf-8")
+
+
+def _make_fifo(path: Path) -> None:
+    if PLATFORM.windows:
+        pytest.skip("a FIFO needs POSIX")
+    os.mkfifo(path)
+
+
+@pytest.mark.parametrize("make", [_make_file, _make_fifo], ids=["file", "fifo"])
+def test_anything_but_a_directory_at_the_specs_path_is_its_own_kind_and_its_fix_moves_it_aside(
+    make: Callable[[Path], None], tmp_path: Path
 ) -> None:
-    """``specs init`` cannot build a tree on a file, so the one fix is the operator's act."""
+    """``specs init`` cannot build a tree on a non-directory, so the one fix is the operator's act."""
     specs = tmp_path / "specs"
-    specs.write_text("# not a tree\n", encoding="utf-8")
-    expected = f"Operator action: move {specs} aside, it is a file, not a directory"
+    make(specs)
+    expected = f"Operator action: move {specs} aside, it is not a directory"
     assert specs_version.state(specs) == ("file", expected)
     assert specs_version.state(specs, context="demo") == ("file", expected)
+
+
+def test_a_dangling_symlink_at_the_specs_path_is_absent(tmp_path: Path) -> None:
+    specs = tmp_path / "specs"
+    try:
+        specs.symlink_to(tmp_path / "nowhere")
+    except OSError:
+        pytest.skip("this host cannot create symlinks")
+    assert specs_version.state(specs)[0] == "absent"
 
 
 def test_the_scaffolded_stubs_are_english_with_the_fixed_memory_sections(tmp_path: Path) -> None:
