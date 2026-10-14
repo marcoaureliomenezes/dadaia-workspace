@@ -484,7 +484,7 @@ class VenvPythonEnvironmentManager:
         installed = self.installed_build(workspace_root)
         before = installed.split()[0] if installed else None
         if before is None or after is None:
-            return before, after, "same"
+            return before, after, "upgrade" if after else "same"
         if Version(before) > Version(after):
             raise WorkspaceVenvNewerError(before, after)
         # distlib writes the path after "#!", or after a double quote or a space (the
