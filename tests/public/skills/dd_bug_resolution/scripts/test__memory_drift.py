@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import os
+import shlex
 import subprocess
 import sys
 from pathlib import Path
@@ -249,9 +250,36 @@ def test_an_absent_bound_is_left_to_gits_own_refusal_not_named_a_rebase(
     )
 
     assert "rebase" not in shown[0] and "shallow" not in shown[0]
-    assert shown[1] == (
-        "Operator action: run this verb from a checkout whose history holds the --since commit"
+    assert shown[1] == f"git -C {repo.as_posix()} fetch origin {'0' * 40}"
+
+
+def test_the_absent_bound_fix_line_fetches_the_object_and_moves_the_refusal_on(
+    script: Path, repo: Path, tmp_path: Path
+) -> None:
+    """Following the fix line brings in a bound held only on another branch of the origin: the
+    refusal is then the rebase one, whose own fix line names the next command."""
+    branch = _git(repo, "branch", "--show-current")
+    _git(repo, "checkout", "-q", "-b", "side")
+    (repo / "side.txt").write_text("s\n", "utf-8")
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-qm", "side")
+    side = _git(repo, "rev-parse", "HEAD")
+    _git(repo, "checkout", "-q", branch)
+    clone = tmp_path / "clone"
+    _git(
+        tmp_path, "clone", "-q", "--single-branch", "--branch", branch, f"file://{repo}", str(clone)
     )
+    call = f"d.report(__import__('pathlib').Path({str(clone / 'specs')!r}), {side!r})"
+
+    before = _refusal(script, call)
+    subprocess.run(shlex.split(before[1]), check=True, capture_output=True)
+    after = _refusal(script, call)
+
+    assert before[1] == f"git -C {clone.as_posix()} fetch origin {side}"
+    assert after == [
+        f"{side} is not an ancestor of HEAD — a clone of this branch lacks it (a rebase rewrote it)",
+        f"git -C {clone.as_posix()} merge-base HEAD {side}",
+    ]
 
 
 def test_a_git_read_that_fails_in_a_shallow_clone_names_the_cut(
