@@ -359,6 +359,8 @@ def _kind_checks(root: Path, repo: Path, tree: Path, name: str, onto: str, into:
     """The ordered (label, check) pairs a tree of this kind must pass to land; `merge` and
     `preflight` both run this list, the verdict check labelled "verdict"; the ignored-file and
     target-checkout checks end every kind."""
+    if into != repo and not into.exists():  # a task's job tree removed by hand
+        raise Refusal(f"{into} does not exist", git_line(repo, "worktree", "add", "-f", "-f", str(into), onto))  # fmt: skip
     checks: list[tuple[str, Callable[[], object]]] = [("dirty", lambda: _refuse_dirty(tree))]
     ancestor = ("ancestor", lambda: _check_ancestor(tree, onto))
     verdict = ("verdict", lambda: _check_approved(root, tree, onto, name))
