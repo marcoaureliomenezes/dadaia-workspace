@@ -25,7 +25,7 @@ sys.path.insert(0, str(ROOT))
 
 from run import _CI, tracked  # noqa: E402
 
-from dadaia_workspace.core.fixed_sections import extract_fixed_section  # noqa: E402
+from dadaia_workspace.core.fixed_sections import authored_text, extract_fixed_section  # noqa: E402
 from dadaia_workspace.core.gitflow import read_gitflow  # noqa: E402
 from dadaia_workspace.core.specs_version import state as specs_state  # noqa: E402
 from dadaia_workspace.features.specs.canon import CANON  # noqa: E402
@@ -326,7 +326,7 @@ def workflow_never_rules(tree: Tree) -> list[str]:
         "skills-repository-published": [
             f"{p}:{n}"
             for p in surfaces
-            for n, line in enumerate(tree.read(p).splitlines(), 1)
+            for n, line in enumerate(authored_text(tree.read(p)).splitlines(), 1)
             if _SKILLS_REPO.search(line)
         ],
         # the template-injection shape: every value reaches a run body through env:
@@ -499,7 +499,8 @@ def memory_canonical_shape(tree: Tree) -> list[str]:
         )
         if not _PRINCIPLE.search(text):
             out.append(f"no-principles: {name} carries no `### P-NN` block")
-        foreign = set(re.findall(r"\[\[([^\]]+)\]\]", text)) - {"ARCHITECTURE", "QUALITY"}
+        links = set(re.findall(r"\[\[([^\]]+)\]\]", authored_text(text)))
+        foreign = links - {"ARCHITECTURE", "QUALITY"}
         if foreign:
             out.append(f"atom-link: {name} links {sorted(foreign)}")
         for h in _PRINCIPLE.finditer(text):
