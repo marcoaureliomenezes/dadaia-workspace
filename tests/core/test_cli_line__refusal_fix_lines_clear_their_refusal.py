@@ -969,7 +969,7 @@ def _reachable(scopes: dict[str, ast.FunctionDef], roots: tuple[str, ...]) -> li
 
 
 def _fix_sites() -> list[str]:
-    """The chokepoints' refusals (a string constant carrying ``fix:`` or a call to
+    """The chokepoints' refusals (a call to ``spell_fix`` or to
     branch_policy's ``_blocked``, whose own body is the renderer) and every ``raise``
     the verbs reach — one entry per refusal, keyed by its enclosing function."""
     sites: list[str] = []
@@ -980,8 +980,8 @@ def _fix_sites() -> list[str]:
                 for n in ast.walk(fn)
                 if name != "_blocked"
                 and (
-                    (isinstance(n, ast.Constant) and isinstance(n.value, str) and "fix:" in n.value)
-                    or (isinstance(n, ast.Call) and getattr(n.func, "id", "") == "_blocked")
+                    isinstance(n, ast.Call)
+                    and getattr(n.func, "id", "") in ("_blocked", "spell_fix")
                 )
             ]
             sites += [f"{stem}.{name}"] * len(hits)

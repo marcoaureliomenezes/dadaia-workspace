@@ -276,6 +276,8 @@ def _render(
             return again(table)
         case ast.Call(func=ast.Attribute(value=receiver)) if not isinstance(receiver, ast.Name):
             return again(receiver)
+        case ast.Call(func=ast.Name(id="spell_fix"), args=[arg]):  # the one `fix:` spelling
+            return f"fix: {again(arg)}"
         case ast.Call() if _callee(node) in returns:  # a local producer: what it returns
             return "·".join(map(again, returns[_callee(node)]))
         case ast.Call() if _FIX_CALL_RE.search(_callee(node)) or _callee(node)[:1].isupper():
