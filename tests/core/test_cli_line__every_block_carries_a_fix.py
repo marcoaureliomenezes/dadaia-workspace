@@ -435,14 +435,12 @@ def _text_rows(rel: str) -> list[Callable[[str], object]]:
 
 def _text_sites(texts: dict[str, str]) -> list[str]:
     """`file:line` of each line a row of :func:`_text_rows` bites; a fenced line is a
-    command line whole; product memory is read as its operator wrote it (a generated
-    section is the doctor's to judge)."""
+    command line whole; every text is read as its operator wrote it (a generated section
+    is the doctor's to judge)."""
     sites: list[str] = []
     for rel, text in texts.items():
         rows, fenced = _text_rows(rel), False
-        if rel.startswith("specs/memory/"):
-            text = authored_text(text)
-        for number, line in enumerate(text.splitlines(), start=1):
+        for number, line in enumerate(authored_text(text).splitlines(), start=1):
             fenced ^= line.startswith("```")
             whole = fenced and rel.startswith("dadaia_workspace/public/") and _bad_command(line)
             if whole or any(row(line) for row in rows):
