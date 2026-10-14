@@ -95,6 +95,7 @@ def test_an_orphan_whose_directory_survives_names_the_removal_and_following_it_e
     [row] = [r for r in json.loads(run(root, "list", "--json").stdout) if r["state"] != "empty"]
     assert row["fix"].startswith(f"Operator action: remove the directory {tree}, then run `")
     assert row["fix"].endswith(f"worktree.py merge {tree}`")
+    assert row["exit"] == row["fix"]  # the closure refusal and `context dead` print `exit`
     shutil.rmtree(tree)  # the operator act the fix names
     assert run(root, "merge", str(tree)).returncode == 0
     assert [

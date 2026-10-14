@@ -7,7 +7,8 @@ from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.core.gitflow import DEFAULT, from_mapping
+from dadaia_workspace.core.gitflow import DEFAULT, from_mapping, live_release_id
+from dadaia_workspace.core.skill_owner import load_owner
 
 
 def test_the_default_names_live_only_in_default_and_work_is_cut_from_integration() -> None:
@@ -28,6 +29,27 @@ def test_one_live_release_reader_and_no_verb_mints_a_version() -> None:
     assert [n for n, t in src.items() if "def live_ids" in t] == []
     assert [n for n, t in src.items() if re.search(r'"tag", "--sort|\]\) \+ 1\}', t)] == []
     assert "release-please owns the version" in (pkg.parent / "AGENTS.md").read_text("utf-8")
+
+
+def test_the_sole_live_release_is_the_kernels_and_several_refuse_there(tmp_path: Path) -> None:
+    """None live: None; one: its id; several: the kernel refuses, the doctor-facing reader says None."""
+    grammar, refusal = (load_owner("dd-bug-resolution", m) for m in ("_grammar", "_refusal"))
+    assert (grammar.sole_live(tmp_path), live_release_id(tmp_path)) == (None, None)
+    for rid in ("0.5.0", "0.6.0"):
+        (tmp_path / "releases" / rid).mkdir(parents=True)
+        (tmp_path / "releases" / rid / "_RELEASE.json").write_text("{}")
+        if rid == "0.5.0":
+            assert (grammar.sole_live(tmp_path), live_release_id(tmp_path)) == ("0.5.0",) * 2
+    with pytest.raises(refusal.Refusal) as caught:
+        grammar.sole_live(tmp_path)
+    assert str(caught.value) == (
+        "multiple live release directories carry _RELEASE.json: 0.5.0, 0.6.0 — exactly one is allowed"
+    )
+    assert caught.value.fix == (
+        f"Operator action: keep one of 0.5.0, 0.6.0 live under {tmp_path / 'releases'};"
+        " ship or move out the others"
+    )
+    assert live_release_id(tmp_path) is None
 
 
 @pytest.mark.parametrize(

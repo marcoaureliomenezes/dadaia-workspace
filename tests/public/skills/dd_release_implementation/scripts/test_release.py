@@ -161,6 +161,44 @@ def test_new_refuses_a_second_live_release_with_one_fix_line(script: Path, tmp_p
     assert _tree_hash(specs) == before
 
 
+_SEVERAL = (
+    "multiple live release directories carry _RELEASE.json: 0.5.0, 0.6.0 — exactly one is allowed"
+)
+
+
+def _fix_several(specs: Path) -> str:
+    return (
+        f"Operator action: keep one of 0.5.0, 0.6.0 live under {specs / 'releases'};"
+        " ship or move out the others"
+    )
+
+
+def test_check_refuses_several_live_releases_naming_each_and_the_act(
+    script: Path, tmp_path: Path
+) -> None:
+    specs = _specs(tmp_path)
+    _release(specs, "0.5.0")
+    _release(specs, "0.6.0")
+    result = _run(script, "check", "--specs", str(specs), "--json")
+    assert result.returncode == 1
+    found = [f for f in json.loads(result.stdout) if "multiple live" in f["message"]]
+    assert [(f["message"], f["fix"]) for f in found] == [(_SEVERAL, _fix_several(specs))]
+
+
+def test_a_verb_refuses_several_live_releases_with_the_one_fix_line(
+    script: Path, tmp_path: Path
+) -> None:
+    specs = _specs(tmp_path)
+    _release(specs, "0.5.0")
+    _release(specs, "0.6.0")
+    result = _run(script, "phase", "IMPLEMENTATION", "--sha", "abc1234", "--specs", str(specs))
+    assert result.returncode == 1
+    assert f"[error] {_SEVERAL}" in result.stderr
+    assert [ln for ln in result.stderr.splitlines() if ln.startswith("fix: ")] == [
+        f"fix: {_fix_several(specs)}"
+    ]
+
+
 def test_new_opens_the_rc_spec_with_the_bug_window_review(script: Path, tmp_path: Path) -> None:
     """`new` writes `## Bug window review` as the first SPEC heading."""
     specs = _specs(tmp_path)

@@ -166,7 +166,10 @@ def test_no_work_branch_with_several_live_releases_refuses_as_the_plain_base_doe
     result = _run(root, "new", "r", JOB)
     assert result.returncode == 1
     (fix,) = _fixes(result)
-    assert fix == "fix: Operator action: make exactly one release live in repos/r/specs"
+    assert fix == (
+        f"fix: Operator action: keep one of 0.10.0, 0.5.0 live under {repo / 'specs/releases'};"
+        " ship or move out the others"
+    )
 
 
 @pytest.mark.parametrize(
