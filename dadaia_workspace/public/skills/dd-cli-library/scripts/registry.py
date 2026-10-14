@@ -49,7 +49,7 @@ def find_registry(start: Path) -> Path:
         return root / ".dadaia" / "states" / "server_registry.json"
     report(
         "no workspace sentinel above the cwd",
-        "Operator action: rerun with --registry and a registry file path, or from inside a workspace",
+        "Agent action: rerun with --registry and a registry file path, or from inside a workspace",
     )
     raise SystemExit(1)
 
@@ -61,7 +61,7 @@ def load(path: Path) -> dict[str, Any]:
             "range": {"min_port": DEFAULT_MIN_PORT, "max_port": DEFAULT_MAX_PORT},
             "entries": [],
         }
-    fix = f"Operator action: delete {_platform.quote(str(path))} — the next registry.py run starts an empty registry"
+    fix = f"Agent action: delete {_platform.quote(str(path))} — the next registry.py run starts an empty registry"
     return dict(json.loads(_jsonl.read_text(path, fix)))
 
 
@@ -133,7 +133,7 @@ def cmd_next(doc: dict[str, Any], args: argparse.Namespace, path: Path) -> int:
             if not free:
                 report(
                     f"no free ports in [{args.min_port}, {args.max_port}]",
-                    "Operator action: run registry.py clean, then rerun",
+                    "Agent action: run registry.py clean, then rerun",
                 )
                 return 1
             port, is_base = free[0], False
@@ -155,7 +155,7 @@ def cmd_register(doc: dict[str, Any], args: argparse.Namespace, path: Path) -> i
                 return 0
             report(
                 f"port {args.port} is registered by project '{e['project']}' ({e['url']})",
-                "Operator action: pick another port with registry.py next, then rerun",
+                "Agent action: pick another port with registry.py next, then rerun",
             )
             return 1
     now = _now()
@@ -179,7 +179,7 @@ def cmd_release(doc: dict[str, Any], args: argparse.Namespace, path: Path) -> in
     if args.port is None and args.project is None:
         report(
             "provide --port and/or --project",
-            "Operator action: pass --port and/or --project, then rerun",
+            "Agent action: pass --port and/or --project, then rerun",
         )
         return 1
     keep: list[dict[str, Any]] = []
@@ -198,7 +198,7 @@ def cmd_release(doc: dict[str, Any], args: argparse.Namespace, path: Path) -> in
         )
         report(
             f"port {args.port} {why}",
-            "Operator action: run registry.py list to see the registered ports, then rerun",
+            "Agent action: run registry.py list to see the registered ports, then rerun",
         )
         return 1
     doc["entries"] = keep

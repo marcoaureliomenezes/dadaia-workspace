@@ -62,7 +62,7 @@ def _refuse_dirty(tree: Path) -> None:
     if dirty(tree):
         raise Refusal(
             f"{tree} has uncommitted changes",
-            f"Operator action: commit them in their commit shape (`{git_line(tree, 'add', '-A')}`"
+            f"Agent action: commit them in their commit shape (`{git_line(tree, 'add', '-A')}`"
             f" and `{git_line(tree, 'commit')}`) or remove them (`{git_line(tree, 'clean', '-fd')}`"
             f" and `{git_line(tree, 'restore', '-SW', '.')}`) — never a stash every worktree shares",
         )
@@ -125,7 +125,7 @@ def _rmdir(tree: Path) -> None:
 
 def _undo(tree: Path, work: str, rel: str) -> str:
     """The one act putting *rel* back to the work branch's version, absent included."""
-    return (f"Operator action: revert {rel} to {work} in one commit — "
+    return (f"Agent action: revert {rel} to {work} in one commit — "
             f"`{git_line(tree, 'restore', '-s', work, '-SW', '--', rel)}` and `{git_line(tree, 'commit')}`")  # fmt: skip
 
 
@@ -164,7 +164,7 @@ def _declared_argv(tree: Path, work: str, key: str) -> list[str]:
         return list(lex)
     except ValueError as error:
         raise Refusal(f"the {key} line of {work} has {error}",
-                      f"Operator action: close the quote in the {key} line of AGENTS.md on {work} and commit it") from error  # fmt: skip
+                      f"Agent action: close the quote in the {key} line of AGENTS.md on {work} and commit it") from error  # fmt: skip
 
 
 def _gate(tree: Path, work: str, *, required: bool = True) -> None:
@@ -174,7 +174,7 @@ def _gate(tree: Path, work: str, *, required: bool = True) -> None:
     root = workspace_of(tree)
     if root is None:
         raise Refusal(
-            f"no workspace owns {tree}", "Operator action: run this merge inside its workspace"
+            f"no workspace owns {tree}", "Agent action: run this merge inside its workspace"
         )
     repo_name = tree.relative_to(tree_path(root, "")).parts[0]
     agents = root / "repos" / repo_name / "AGENTS.md"
@@ -182,7 +182,7 @@ def _gate(tree: Path, work: str, *, required: bool = True) -> None:
         if not required:
             return
         raise Refusal(f"this repo declares no {key} command",
-                      f"Operator action: add this repo's job gate as a {key} line to {agents} and commit it on {work}")  # fmt: skip
+                      f"Agent action: add this repo's job gate as a {key} line to {agents} and commit it on {work}")  # fmt: skip
     env = scrubbed_env()
     env["PATH"] = os.pathsep.join([str(venv_tool(venv_dir(root), "python").parent), env.get("PATH", "")])  # fmt: skip
     try:
@@ -190,12 +190,12 @@ def _gate(tree: Path, work: str, *, required: bool = True) -> None:
                               stderr=subprocess.STDOUT)  # fmt: skip
     except OSError as error:
         raise Refusal(f"{key} {' '.join(command)!r} cannot start: {error}",
-                      f"Operator action: make the {key} line of {agents} on {work} one argv list that starts:"
+                      f"Agent action: make the {key} line of {agents} on {work} one argv list that starts:"
                       " it runs without a shell — no VAR=value prefix, no sh -c") from error  # fmt: skip
     if done.returncode:
         line = " ".join(map(quote, command))
         raise Refusal(f"{key} exited {done.returncode}",
-                      f"Operator action: make `{line}` exit 0 in {tree} and commit the fix in this worktree")  # fmt: skip
+                      f"Agent action: make `{line}` exit 0 in {tree} and commit the fix in this worktree")  # fmt: skip
 
 
 def _is_test_path(path: str, globs: list[str]) -> bool:
@@ -223,7 +223,7 @@ def _refuse_implementation_tests(tree: Path, onto: str, law: str) -> None:
         if test := next((path for path in paths if _is_test_path(path, declared)), None):
             raise Refusal(
                 f"implementation commit {commit[:12]} touches test path {test}",
-                f"Operator action: move {test} to the separate RED test dispatch and keep this implementation commit source-only",
+                f"Agent action: move {test} to the separate RED test dispatch and keep this implementation commit source-only",
             )
 
 
@@ -265,7 +265,7 @@ def _ledgers(root: Path, tree: Path) -> None:
         if done.returncode:
             out = done.stdout + done.stderr
             print(without_fix(out), end="")
-            raise Refusal(f"{name} check failed on {tree / 'specs'}", fix_of(out, f"Operator action: fix the findings above in {tree} and commit them"))  # fmt: skip
+            raise Refusal(f"{name} check failed on {tree / 'specs'}", fix_of(out, f"Agent action: fix the findings above in {tree} and commit them"))  # fmt: skip
 
 
 def _series(tree: Path, work: str, tip: str) -> list[tuple[str, str]]:
@@ -337,14 +337,14 @@ def _check_approved(root: Path, tree: Path, work: str, name: str) -> None:
     want = diff_sha256(tree, work, head)
     if any(row[3].get("diff_sha256") != want for row in decided):
         raise Refusal(f"no {REVIEWER} verdict binds the diff {head} lands",
-                      f"Operator action: dispatch {REVIEWER} on {tree} at HEAD {head}; its verdict.py run writes the verdict")  # fmt: skip
+                      f"Agent action: dispatch {REVIEWER} on {tree} at HEAD {head}; its verdict.py run writes the verdict")  # fmt: skip
 
 
 def digest(root: Path, path: str, sha: str) -> str:
     """The binding a verdict carries for *sha* of a worktree, as one JSON object."""
     _, tree, name, onto = _target(root, path)
     if git(tree, "rev-parse", "--verify", "--quiet", f"{sha}^{{commit}}", check=False).strip() != sha:  # fmt: skip
-        raise Refusal(f"{sha} is not a commit sha of {tree}", f"Operator action: pass a 40-hex commit of {tree}")  # fmt: skip
+        raise Refusal(f"{sha} is not a commit sha of {tree}", f"Agent action: pass a 40-hex commit of {tree}")  # fmt: skip
     scope = f"{branch(name)}@{git(tree, 'rev-parse', 'HEAD').strip()}"
     return json.dumps({"root": str(root), "scope": scope, "reviewed_sha": sha, "diff_sha256": diff_sha256(tree, onto, sha)})  # fmt: skip
 
@@ -422,7 +422,7 @@ def merge(root: Path, path: str, keep: list[str], drop: bool) -> str:
         git(into, "merge", "-q", "--ff-only", ref)
     except RuntimeError as error:
         _check_ancestor(tree, onto)  # moved while merge ran; else a stray the operator owns
-        fix = f"Operator action: commit or remove the paths above in {into}"
+        fix = f"Agent action: commit or remove the paths above in {into}"
         raise Refusal(f"fast-forward failed: {error}", fix) from error
     _remove(into, tree, name, kept)
     return f"{ref} merged into {onto}"

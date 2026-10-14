@@ -44,7 +44,7 @@ def _refuse_unopened_bug(main: Path, work: str, bug: str) -> None:
         found = []
     if not any(r.get("id") == bug and r.get("status") == OPEN for r in found):
         raise Refusal(f"no open bug record {bug} on {work}",
-                      f"Operator action: register bug {bug} on {work} as open (dd-bug-registration), then open its hotfix job again")  # fmt: skip
+                      f"Agent action: register bug {bug} on {work} as open (dd-bug-registration), then open its hotfix job again")  # fmt: skip
 
 
 def _shape(repo: Path, flow: dict[str, str], name: str) -> tuple[re.Match[str], str]:
@@ -68,12 +68,12 @@ def _plain_base(root: Path, repo: Path, flow: dict[str, str]) -> str:
     if start := git(repo, "branch", "--show-current").strip():
         return start
     raise Refusal("a plain worktree needs a checked-out base branch when no release is live",
-                  f"Operator action: switch {repo} to the branch this change should return to")  # fmt: skip
+                  f"Agent action: switch {repo} to the branch this change should return to")  # fmt: skip
 
 
 def _refuse_unready(root: Path, flow: dict[str, str], work: str, version: str, rc: str) -> None:
     """A job opens only while its release is in IMPLEMENTATION on *work*."""
-    fix = f"Operator action: repair {STATE} on {work} until release.py check passes"
+    fix = f"Agent action: repair {STATE} on {work} until release.py check passes"
     main = root / "repos" / flow["main"]  # the context's specs live in its main repo
     try:
         state = parse_object(git(main, "show", f"{work}:specs/releases/{version}/{STATE}", check=False), fix)  # fmt: skip

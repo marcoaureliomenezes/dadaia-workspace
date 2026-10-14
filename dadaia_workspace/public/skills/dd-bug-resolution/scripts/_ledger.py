@@ -145,7 +145,7 @@ def unwritten(file: Path, at: int | str, verbs: str, law: str) -> str:
     else:
         what = f"{file} fails at {at} ({law})"
         finder = f"`{git_line(file.parent, 'log', '-p', '--', file.name)}` lists them"
-    return (f"Operator action: {what} — if {file} has uncommitted changes, discard them "
+    return (f"Agent action: {what} — if {file} has uncommitted changes, discard them "
             f"(`{git_line(file.parent, 'checkout', '--', file.name)}`); otherwise revert the commit that introduced it "
             f"({finder}), then redo the change through {verbs}")  # fmt: skip
 
@@ -173,7 +173,7 @@ def terms(root: Path | None) -> list[tuple[str, str]]:
         if not isinstance(raw, dict):
             report(
                 f"privacy denylist {path} is not one JSON object",
-                f"Operator action: rewrite {path} as one JSON object mapping each term to its reason",
+                f"Agent action: rewrite {path} as one JSON object mapping each term to its reason",
             )
             raise SystemExit(1)
         if raw:
@@ -214,7 +214,7 @@ def private_refusal(records: Iterable[dict[str, Any]], path: Path) -> tuple[str,
             return (
                 f"field {key!r} carries {_privacy.mask(hit)!r}, which the push refuses — "
                 "nothing was written",
-                "Operator action: re-run this command with that value rewritten without the "
+                "Agent action: re-run this command with that value rewritten without the "
                 "private term",
             )
     return None

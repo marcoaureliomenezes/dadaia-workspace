@@ -73,7 +73,7 @@ def commit(
         if stamp(path) != before:
             raise Refusal(
                 f"{path.name} changed twice under this write — nothing was written",
-                "Operator action: re-run the same command, unchanged",
+                "Agent action: re-run the same command, unchanged",
             )
     if archive and histo is not None:
         replace(histo, archive(old, moved))

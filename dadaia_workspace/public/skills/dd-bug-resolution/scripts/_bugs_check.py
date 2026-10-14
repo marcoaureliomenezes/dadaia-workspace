@@ -124,7 +124,7 @@ def findings_for(
             add(seen[bug_id], f"{bug_id!r} caused_by {why}")
             bugs = script(Path(__file__).with_name("bugs.py"))
             fixes[seen[bug_id]] = (  # a cycle's wrong link is a judgement; a dangling one is not
-                f"Operator action: decide which of {', '.join(chain)} names the wrong cause and "
+                f"Agent action: decide which of {', '.join(chain)} names the wrong cause and "
                 f"set its caused_by to the real cause's id, or none, through `{bugs} update "
                 f"--specs {quote(str(root))}` ({_LAW})" if at == bug_id
                 else with_specs(f"{bugs} update {quote(bug_id)} --set caused_by=none", root)

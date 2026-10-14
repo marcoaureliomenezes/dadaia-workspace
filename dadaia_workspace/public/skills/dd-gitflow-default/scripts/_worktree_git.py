@@ -120,7 +120,7 @@ def recorded_base(repo: Path, name: str, work: str = "") -> str:
     if not ref:
         raise Refusal(
             f"{branch(name)} has no recorded base ref",
-            f"Operator action: recover the branch {branch(name)} from git history, then reopen the plain worktree",
+            f"Agent action: recover the branch {branch(name)} from git history, then reopen the plain worktree",
         )
     return ref
 
@@ -149,7 +149,7 @@ def _row(repo: Path, path: str, state: str, age: float = 0.0, **facts: object) -
     line = f"{script(SCRIPT)} {verb} {quote(path)}"
     # merge cannot clear a directory git does not know
     if state == "orphan" and Path(path).exists():
-        line = f"Operator action: remove the directory {path}, then run `{line}`"
+        line = f"Agent action: remove the directory {path}, then run `{line}`"
     return {"repo": repo.name, "path": path, "state": state, "age_hours": age, "registered": True,
             **facts, "warn": state not in ("ready", "open", "empty") or age > 24,
             "fix": line if state in ("ready", "orphan") else "",
@@ -213,7 +213,7 @@ def _unregistered(repo: Path, trees: list[dict[str, str]]) -> list[dict[str, obj
     return [
         _row(repo, t["worktree"], "unregistered", registered=False)
         | {
-            "fix": f"Operator action: land the work of {t['worktree']}, then run "
+            "fix": f"Agent action: land the work of {t['worktree']}, then run "
             f"`{git_line(repo, 'worktree', 'remove', '--force', '--force', t['worktree'])}`"
         }  # fmt: skip
         for t in trees

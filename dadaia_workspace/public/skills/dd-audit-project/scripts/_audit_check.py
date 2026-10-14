@@ -44,7 +44,7 @@ def _fix(rel: str, root: Path) -> Callable[[int], str]:
     if rel == HISTO:
         return lambda line: _ledger.unwritten(root / rel, line, "`audit.py close`", law)
     return lambda line: (
-        f"Operator action: write line {line} of {root / rel} as one finding-record-v1 "
+        f"Agent action: write line {line} of {root / rel} as one finding-record-v1 "
         f"record — a bound session writes audit findings directly; a disposition moves "
         f"only by `audit.py disposition` ({law})")  # fmt: skip
 
@@ -93,7 +93,7 @@ def check(specs: Path) -> list[Finding]:
         if not path.is_file():
             message = f"an audit directory carries {FINDINGS}; this one does not"
             out.append(_findings.finding(CODE, f"{AUDITS}/{directory.name}", 0, message,
-                       f"Operator action: write {path.resolve()} with one finding-record-v1 line per "
+                       f"Agent action: write {path.resolve()} with one finding-record-v1 line per "
                        "finding of its AUDIT.md (specs/audits/AGENTS.md)"))  # fmt: skip
             continue
         out.extend(

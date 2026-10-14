@@ -82,7 +82,7 @@ def releases(specs: Path) -> dict[str, tuple[_dt.datetime, _dt.datetime | None]]
             )
         except (OSError, ValueError, LookupError, TypeError, AttributeError) as exc:
             raise UnreadableRelease(f"{path} has no readable first log ts and shipped ts ({exc})",
-                             f"Operator action: repair {path} until `release.py check` passes") from None  # fmt: skip
+                             f"Agent action: repair {path} until `release.py check` passes") from None  # fmt: skip
     return spans
 
 

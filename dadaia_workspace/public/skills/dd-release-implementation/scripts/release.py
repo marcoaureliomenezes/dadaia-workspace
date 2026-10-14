@@ -114,7 +114,7 @@ def _origin(spec: Path) -> int:
             if isinstance(error, OSError)
             else "edit its `**Origin:**` line"
         )
-        report(f"{spec} {error}", f"Operator action: {act}")
+        report(f"{spec} {error}", f"Agent action: {act}")
         return 1
     print(
         *(f"{kind} {i}" for kind in ORIGIN_KINDS for i in carried.get(kind, [])),
@@ -170,11 +170,11 @@ def _allowed_open_bugs(args: argparse.Namespace, specs: Path) -> list[str]:
     if len(allowed) != len(args.allow_open):
         raise Refusal(
             "--allow-open repeats an id — supply exactly one flag per open bug",
-            "Operator action: remove the duplicate --allow-open flag",
+            "Agent action: remove the duplicate --allow-open flag",
         )
     if missing := sorted(set(open_ids) - set(allowed)):
         fix = (
-            f"Operator action: resolve {', '.join(missing)} before shipping"
+            f"Agent action: resolve {', '.join(missing)} before shipping"
             if not allowed
             else "Operator action: authorize each open bug carry, record the authorization "
             "verbatim in a kind: note entry, then repeat --allow-open for each id"
@@ -186,7 +186,7 @@ def _allowed_open_bugs(args: argparse.Namespace, specs: Path) -> list[str]:
     if extra := sorted(set(allowed) - set(open_ids)):
         raise Refusal(
             f"--allow-open names bug(s) not open: {', '.join(extra)}",
-            f"Operator action: remove --allow-open for {', '.join(extra)}",
+            f"Agent action: remove --allow-open for {', '.join(extra)}",
         )
     return allowed
 

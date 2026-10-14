@@ -52,7 +52,7 @@ def _bound_fix(here: Path, rerun: str, ledger: str | None) -> tuple[str, str]:
         if ledger is None or ledger.startswith("specs/audits/"):
             return with_specs(rerun, root / "repos" / repo / "specs"), ""
         return f"{script(_GITFLOW / 'worktree.py')} list", ""
-    return "Operator action: re-run inside a repo that holds its specs/ tree", ""
+    return "Agent action: re-run inside a repo that holds its specs/ tree", ""
 
 
 _GITFLOW = Path(__file__).resolve().parents[2] / "dd-gitflow-default" / "scripts"
@@ -93,6 +93,6 @@ def refuse(refusal: Exception, specs: Path) -> int:
         script(Path(sys.argv[0]))
     ):  # a command of this entry point, which takes --specs
         fix = with_specs(fix, specs)
-    fix = f"Operator action: run `{fix}` {words}" if words else fix
+    fix = f"Agent action: run `{fix}` {words}" if words else fix
     report(refusal, fix)
     return 1

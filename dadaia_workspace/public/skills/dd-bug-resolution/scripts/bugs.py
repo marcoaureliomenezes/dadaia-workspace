@@ -117,7 +117,7 @@ def _write(args: argparse.Namespace, specs: Path) -> int:
         except (OSError, GitError) as exc:
             raise Refusal(
                 f"cannot list the repo's tracked directories: {getattr(exc, 'stderr', exc)}",
-                "Operator action: point --specs at a specs tree inside a git repo",
+                "Agent action: point --specs at a specs tree inside a git repo",
             ) from None
         dirs = {part for path in listed.splitlines() for part in path.split("/")[:-1]}
         near = wr.candidates(read_records(ledger), values["surface"])
@@ -156,7 +156,7 @@ def main(argv: list[str] | None = None) -> int:
     except SymlinkRefusedError as exc:
         report(
             f"{exc} — nothing was written",
-            f"Operator action: replace {exc.path} with a regular file holding its content",
+            f"Agent action: replace {exc.path} with a regular file holding its content",
         )
         return 1
 

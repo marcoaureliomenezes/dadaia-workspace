@@ -76,7 +76,7 @@ resolve_runner() {
 if ! resolve_runner; then
     echo "[pre-push] ERROR: could not locate the dadaia runner to run the push gate." >&2
     echo "[pre-push]   tried: .dadaia/.venv/bin/dadaia walking up from $ROOT, .venv/bin/dadaia" >&2
-    echo "[pre-push]   fix: Operator action: install the workspace venv (re-run \`uvx dadaia-workspace init\` at the workspace root)." >&2
+    echo "[pre-push]   fix: Agent action: install the workspace venv (re-run \`uvx dadaia-workspace init\` at the workspace root)." >&2
     exit 1
 fi
 

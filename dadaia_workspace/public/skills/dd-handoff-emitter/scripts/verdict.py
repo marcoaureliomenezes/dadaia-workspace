@@ -33,7 +33,9 @@ _OWN = (
 
 def _body(text: str) -> dict[str, object]:
     """The stdin object. Raises `Refusal` when it is not one verdict.py may extend."""
-    fix = "Operator action: pipe one JSON object without the keys verdict.py owns, then rerun verdict.py"
+    fix = (
+        "Agent action: pipe one JSON object without the keys verdict.py owns, then rerun verdict.py"
+    )
     try:
         body = json.loads(text)
     except ValueError:
@@ -52,14 +54,14 @@ def _reason(stdout: str, stderr: str) -> Refusal:
     except (ValueError, LookupError, TypeError):  # no JSON: the CLI refused before validating
         said = stderr.splitlines()
         fix = fix_of(
-            stderr, "Operator action: resolve the workspace CLI error above, then rerun verdict.py"
+            stderr, "Agent action: resolve the workspace CLI error above, then rerun verdict.py"
         )
         why = next((x[7:] for x in said if x.startswith("Error: ")), stderr.strip() or "no output")
         return Refusal(why, fix)
     where, why = err["field_path"], err["message"]
     return Refusal(
         f"{where}: {why}",
-        f"Operator action: correct {where} in the stdin body ({why}), then rerun verdict.py",
+        f"Agent action: correct {where} in the stdin body ({why}), then rerun verdict.py",
     )
 
 
@@ -72,7 +74,7 @@ def _stats(argv: list[str]) -> int:
     if root is None:
         raise Refusal(
             "no workspace above the current directory",
-            "Operator action: run verdict.py stats from inside the workspace, then rerun it",
+            "Agent action: run verdict.py stats from inside the workspace, then rerun it",
         )
     by_tree: dict[str, list[tuple[str, str]]] = {}
     for _path, data in reviewer_records(root):
@@ -121,7 +123,7 @@ def _run(argv: list[str]) -> int:
         if not re.fullmatch(pattern, getattr(args, name)):
             raise Refusal(
                 f"--{name} must match {pattern}",
-                f"Operator action: pass a {name} matching that pattern, then rerun verdict.py",
+                f"Agent action: pass a {name} matching that pattern, then rerun verdict.py",
             )
     tree = Path(args.path).resolve()
     body = _body(sys.stdin.read())
@@ -158,7 +160,7 @@ def _run(argv: list[str]) -> int:
     except FileExistsError:
         raise Refusal(
             f"{target.name} exists; rerun in a second",
-            "Operator action: rerun verdict.py in a second",
+            "Agent action: rerun verdict.py in a second",
         ) from None
     checked = subprocess.run(
         [str(cli), "reports", "validate", str(target), "--reviewed-root", str(tree), "--json"],

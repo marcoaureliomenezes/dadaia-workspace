@@ -48,7 +48,7 @@ def _release(specs: Path, slug: str, disposition: str, release: str | None) -> N
     ):
         raise Refusal(
             f"--release {release or '(none)'} names no folder directly under {releases}",
-            f"Operator action: pass --release with the release folder under {releases} whose SPEC "
+            f"Agent action: pass --release with the release folder under {releases} whose SPEC "
             f"names {slug}, then rerun this exit with --disposition {disposition}.",
         )  # fmt: skip
     folder = releases / release
@@ -56,7 +56,7 @@ def _release(specs: Path, slug: str, disposition: str, release: str | None) -> N
         raise Refusal(
             f"--release {release}: no {folder}/rc-<N>/SPEC.md first `**Origin:**` line "
             f"picks {slug!r} — only a release that picked an item can exit it as {disposition!r}",
-            f"Operator action: name {slug} in the backlog: clause of the first **Origin:** line "
+            f"Agent action: name {slug} in the backlog: clause of the first **Origin:** line "
             f"of a SPEC under {folder}, then rerun this exit with --disposition {disposition}.",
         )  # fmt: skip
 
@@ -66,7 +66,7 @@ def _reason(specs: Path, slug: str, disposition: str, reason: str | None) -> Non
     if not (reason or "").strip():
         raise Refusal(
             f"{disposition!r} requires --reason: the histo record is the only trace of why {slug!r} left",
-            f"Operator action: rerun `{SCRIPT} exit {slug} --disposition {disposition} --specs "
+            f"Agent action: rerun `{SCRIPT} exit {slug} --disposition {disposition} --specs "
             f"{quote(str(specs))}` with a "
             f"one-line --reason saying why {slug} is refused.",
         )  # fmt: skip
@@ -79,7 +79,7 @@ def _bug(specs: Path, slug: str, disposition: str, reason: str | None) -> None:
     if reason not in ids:
         raise Refusal(
             f"--reason {reason!r} names no record of {bugs}: `to-bug` hands {slug!r} to a registered bug",
-            f"Operator action: register the bug {slug} becomes with bugs.py append "
+            f"Agent action: register the bug {slug} becomes with bugs.py append "
             f"(dd-bug-registration), then rerun `{SCRIPT} exit {slug} --disposition {disposition} "
             f"--specs {quote(str(specs))}` "
             "with its id as --reason.",
@@ -111,7 +111,7 @@ def check_exit(specs: Path, active: Items, slug: str, values: dict[str, Any]) ->
         raise Refusal(
             f"unknown disposition {disposition!r}: a backlog item exits as one of "
             f"{'|'.join(DISPOSITIONS)}",
-            "Operator action: a postponed item stays in active[] and needs no exit.",
+            "Agent action: a postponed item stays in active[] and needs no exit.",
         )
     flag, verify = EVIDENCE[disposition]
     verify(specs, slug, disposition, values[flag])

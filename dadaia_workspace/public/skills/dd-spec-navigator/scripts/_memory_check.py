@@ -32,7 +32,7 @@ def check(specs: Path) -> list[Finding]:
     except (Refusal, json.JSONDecodeError) as exc:  # the missing tree's fix makes it
         fix = getattr(exc, "fix", "")
         if not fix.startswith("mkdir"):
-            fix = (f"Operator action: correct the source atom — {exc} (specs/memory/AGENTS.md: "
+            fix = (f"Agent action: correct the source atom — {exc} (specs/memory/AGENTS.md: "
                    f"fix findings at the source atom, never in {CATALOG})")  # fmt: skip
         return [{"code": CODE, "verdict": "error", "path": CATALOG, "line": 0,
                  "message": str(exc), "fix": fix}]  # fmt: skip

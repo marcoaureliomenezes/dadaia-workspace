@@ -39,7 +39,7 @@ class Live:
 
 def read_state(path: Path) -> State:
     """One state document, refusing anything this script cannot read in full."""
-    fix = f"Operator action: repair {path} until `{SCRIPT} check` passes"
+    fix = f"Agent action: repair {path} until `{SCRIPT} check` passes"
     try:
         text = read_text(path)
     except OSError as exc:

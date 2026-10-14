@@ -80,7 +80,7 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     except GitError as failure:  # no check named it: the operator's act, then the same call
         again = " ".join(map(quote, sys.argv[1:] if argv is None else argv))
-        report(failure, f"Operator action: clear the git failure above, then rerun {script(SCRIPT)} {again}")  # fmt: skip
+        report(failure, f"Agent action: clear the git failure above, then rerun {script(SCRIPT)} {again}")  # fmt: skip
         return 1
     if args.json:
         print(json.dumps(found, indent=2))
