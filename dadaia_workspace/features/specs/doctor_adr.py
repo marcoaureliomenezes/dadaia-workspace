@@ -27,8 +27,8 @@ from dadaia_workspace.infrastructure.ledger_scripts import load_owner
 LEDGER = "ADRs/decisions.jsonl"
 
 #: The citation shapes of an ADR id in memory atoms, skills and rules: "ADR", a colon, space or
-#: hyphen, four digits; a line break may join "ADR" to its number, a blank line never does.
-_ADR_CITATION_RE = re.compile(r"\bADR(?:[: \t-]|\n(?!\n))+(\d{4})\b")
+#: hyphen, four digits; a line break may join "ADR" to its number, a blank or whitespace-only line never does.
+_ADR_CITATION_RE = re.compile(r"\bADR(?:[: \t-]|\n(?![ \t]*\n))+(\d{4})\b")
 
 
 class UndecodableLedger(ValueError):
