@@ -144,6 +144,8 @@ def _finding(script: LedgerScript, record: dict[str, Any]) -> SectionFinding:
 
 def script_findings(specs_dir: Path, runner: _Runner | None = None) -> list[SectionFinding]:
     """Every ledger finding of every script, re-emitted as one section's findings."""
+    if not specs_dir.is_dir():  # the specs doctor reports a missing tree, with its fix
+        return []
     process = runner if runner is not None else SubprocessProcessRunner()
     findings: list[SectionFinding] = []
     for script in LEDGER_SCRIPTS:
