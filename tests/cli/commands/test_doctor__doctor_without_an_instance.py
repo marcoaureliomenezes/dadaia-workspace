@@ -65,6 +65,26 @@ def test_an_absent_specs_dir_is_one_finding_and_its_fix_clears_the_doctor(
     assert _runner.invoke(app, ["doctor", "--specs-dir", str(specs)]).exit_code == 0
 
 
+@pytest.mark.medium
+def test_a_file_at_the_specs_dir_is_one_finding_and_moving_it_aside_clears_the_doctor(
+    no_instance: Path,
+) -> None:
+    specs = no_instance / "specs"
+    specs.write_text("", encoding="utf-8")
+
+    run = _runner.invoke(app, ["doctor", "--json", "--specs-dir", str(specs)])
+
+    sections = json.loads(run.output)["sections"]
+    found = [f for section in sections.values() for f in section["findings"]]
+    assert [(f["code"], f["fix"]) for f in found] == [
+        ("SPECS-ABSENT", f"Operator action: move {specs} aside, it is a file, not a directory")
+    ], run.output
+    assert run.exit_code == 1
+    specs.rename(no_instance / "moved-aside")
+    assert _runner.invoke(app, ["specs", "init", "--specs-dir", str(specs)]).exit_code == 0
+    assert _runner.invoke(app, ["doctor", "--specs-dir", str(specs)]).exit_code == 0
+
+
 def test_nothing_to_read_refuses_with_one_fix(no_instance: Path) -> None:
     run = _runner.invoke(app, ["doctor"])
 

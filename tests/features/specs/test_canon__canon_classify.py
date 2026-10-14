@@ -57,6 +57,15 @@ def test_state_is_the_one_reader_with_one_fix(
     assert not {"read_pattern_version", "classify"} & set(vars(specs_version))
 
 
+def test_a_file_at_the_specs_path_is_absent_and_its_fix_moves_it_aside(tmp_path: Path) -> None:
+    """``specs init`` cannot build a tree on a file, so the one fix is the operator's act."""
+    specs = tmp_path / "specs"
+    specs.write_text("# not a tree\n", encoding="utf-8")
+    expected = f"Operator action: move {specs} aside, it is a file, not a directory"
+    assert specs_version.state(specs) == ("absent", expected)
+    assert specs_version.state(specs, context="demo") == ("absent", expected)
+
+
 def test_the_scaffolded_stubs_are_english_with_the_fixed_memory_sections(tmp_path: Path) -> None:
     specs = tmp_path / "specs"
     canon.scaffold(specs, project_name="demo")
