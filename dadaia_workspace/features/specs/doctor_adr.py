@@ -18,6 +18,7 @@ from pathlib import Path
 from types import ModuleType
 
 from dadaia_workspace.core.doctor_rules import Rule, SectionFinding
+from dadaia_workspace.core.fixed_sections import strip_fixed_sections
 from dadaia_workspace.features.specs.doctor_types import Severity, specs_finding
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from dadaia_workspace.infrastructure.ledger_scripts import load_owner
@@ -55,7 +56,7 @@ def _records(text: str, status: str) -> list[dict[str, object]]:
 
 def superseded_adr_citations(specs_dir: Path, public_dir: Path | None) -> list[SectionFinding]:
     """Every ``*.md`` under ``specs/memory`` and the library's skills, data and scaffold
-    that cites a superseded decision id — one issue per (file, id)."""
+    that cites a superseded decision id outside its fixed sections — one issue per (file, id)."""
     ledger = specs_dir / "ADRs" / "decisions.jsonl"
     if not ledger.is_file():
         return []
@@ -74,7 +75,9 @@ def superseded_adr_citations(specs_dir: Path, public_dir: Path | None) -> list[S
         if not root.is_dir():
             continue
         for path in sorted(root.rglob("*.md")):
-            cited = set(_ADR_CITATION_RE.findall(path.read_text(encoding="utf-8")))
+            cited = set(
+                _ADR_CITATION_RE.findall(strip_fixed_sections(path.read_text(encoding="utf-8")))
+            )
             for adr_id in sorted(cited & superseded):
                 issues.append(
                     specs_finding(
