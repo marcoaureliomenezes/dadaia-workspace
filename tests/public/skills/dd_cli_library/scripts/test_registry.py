@@ -247,6 +247,18 @@ def _refused(refused: subprocess.CompletedProcess[str], error: str, fix: str) ->
     assert refused.stderr == f"[error] {error}\nfix: {fix}\n"
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="the literal is the POSIX quoting")
+def test_the_delete_fix_quotes_a_path_holding_a_blank(tmp_path: Path) -> None:
+    reg = tmp_path / "a dir" / "r.json"
+    reg.parent.mkdir()
+    reg.write_bytes(b"\xff")
+    _refused(
+        _run(reg, "list"),
+        f"{reg} is not valid UTF-8",
+        f"Operator action: delete '{reg}' — the next registry.py run starts an empty registry",
+    )
+
+
 def test_every_registry_refusal_prints_one_error_line_and_one_fix_line(tmp_path: Path) -> None:
     reg = tmp_path / "r.json"
     _run(reg, "register", "--port", "3100", "--project", "demo")
