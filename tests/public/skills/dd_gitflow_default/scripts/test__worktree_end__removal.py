@@ -74,21 +74,22 @@ def test_list_reports_a_directory_that_holds_no_tree(root: Path) -> None:
 
 
 def test_list_gives_one_row_per_path_the_orphan_winning(root: Path) -> None:
-    assert run(root, "new", "r", "plain").returncode == 0
-    git(root / "repos/r", "worktree", "remove", "-f", "-f", str(root / "worktrees/r/plain"))
-    (root / "worktrees/r/plain").mkdir()  # the branch stays; the directory survives, files only
-    (root / "worktrees/r/plain/f.txt").write_text("x")
+    assert run(root, "new", "r", "0.5.0-rc1/j2").returncode == 0
+    tree = root / "worktrees/r/0.5.0-rc1/j2"
+    git(root / "repos/r", "worktree", "remove", "-f", "-f", str(tree))
+    tree.mkdir()  # the branch stays; the directory survives, files only
+    (tree / "f.txt").write_text("x")
     rows = json.loads(run(root, "list", "--json").stdout)
     assert [(r["state"], r["path"]) for r in rows if r["state"] != "empty"] == [
-        ("orphan", str(root / "worktrees/r/plain"))
+        ("orphan", str(tree))
     ]
 
 
 def test_an_orphan_whose_directory_survives_names_the_removal_and_following_it_empties_list(
     root: Path,
 ) -> None:
-    assert run(root, "new", "r", "plain").returncode == 0
-    tree = root / "worktrees/r/plain"
+    assert run(root, "new", "r", "0.5.0-rc1/j2").returncode == 0
+    tree = root / "worktrees/r/0.5.0-rc1/j2"
     git(root / "repos/r", "worktree", "remove", "-f", "-f", str(tree))
     tree.mkdir()
     (tree / "f.txt").write_text("x")
