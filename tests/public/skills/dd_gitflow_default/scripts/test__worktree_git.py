@@ -17,7 +17,19 @@ RC = "0.5.0/rc-1/wt-rc"
 MAIN = "0.5.0/rc-1/job-1/wt-main"
 TASK = "0.5.0/rc-1/job-1/wt-task-001"
 LANE = "0.5.0/wt-hotfix-some-bug"
-_COLUMNS = {"repo", "path", "state", "age_hours", "registered", "name", "ahead", "dirty", "warn", "fix", "exit"}  # fmt: skip
+_COLUMNS = {
+    "repo",
+    "path",
+    "state",
+    "age_hours",
+    "registered",
+    "name",
+    "ahead",
+    "dirty",
+    "warn",
+    "fix",
+    "exit",
+}
 
 
 @pytest.fixture
@@ -124,3 +136,19 @@ def test_a_git_failure_in_a_row_read_ends_as_one_refusal_with_an_agent_action_fi
     assert refused.returncode == 1 and "Traceback" not in refused.stderr
     [fix] = fixes(refused)
     assert fix.startswith("fix: Agent action: ")
+
+
+def test_a_symlink_under_worktrees_is_never_walked_into(
+    root: Path, tmp_path_factory: pytest.TempPathFactory
+) -> None:
+    outside = tmp_path_factory.mktemp("outside")
+    (outside / "a/b/c").mkdir(parents=True)
+    (outside / "d").mkdir()
+    (home := root / "worktrees/r/0.5.0").mkdir(parents=True)
+    (home / "link").symlink_to(outside, target_is_directory=True)
+
+    reached = [
+        r for r in _rows(root) if Path(r["path"]).resolve().is_relative_to(outside.resolve())
+    ]
+
+    assert reached == []

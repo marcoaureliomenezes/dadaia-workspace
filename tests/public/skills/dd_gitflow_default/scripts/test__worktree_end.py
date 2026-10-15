@@ -708,6 +708,13 @@ def test_an_open_task_blocks_its_main_tree_merge(root: Path) -> None:
     assert git(root / "repos/r", "rev-parse", WORK).strip() == work
 
 
+def test_an_open_main_tree_blocks_its_release_tree_merge(root: Path) -> None:
+    refused = run(root, "merge", RC_TREE)
+
+    assert refused.returncode == 1
+    assert _argv(refused) == [sys.executable, str(SCRIPT), "merge", str(root / TREE)]
+
+
 def test_a_workflow_file_named_test_is_not_a_test_when_no_tests_line_is_declared(
     tmp_path: Path,
 ) -> None:
