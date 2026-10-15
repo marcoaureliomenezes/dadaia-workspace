@@ -191,7 +191,7 @@ def _strays(folder: Path, listed: set[Path], ancestors: set[Path]) -> list[Path]
     out: list[Path] = []
     for child in sorted(folder.glob("*")):
         here = child.resolve()
-        if child.is_dir() and here not in listed:
+        if child.is_dir() and not child.is_symlink() and here not in listed:
             sub = _strays(child, listed, ancestors)
             out += sub if sub or here in ancestors else [child]
     return out
@@ -203,8 +203,11 @@ def _absent(root: Path, repo: Path, held: set[str], found: list[dict[str, object
     out = []
     home = tree_path(root, repo.name)
     for ref in git(repo, "for-each-ref", "--format=%(refname:short)", "refs/heads/wt/").split():
-        if f"refs/heads/{ref}" not in held and (name := name_of(ref)):
-            out.append(_row(repo, str(home / name), "orphan"))
+        if f"refs/heads/{ref}" not in held:
+            row = _row(repo, str(home / ref.removeprefix("wt/")), "orphan")
+            if not name_of(ref):  # a name `merge` refuses names no merge as its exit
+                row |= {"fix": "", "exit": ""}
+            out.append(row)
     listed = {Path(str(r["path"])).resolve() for r in (*found, *out)}
     ancestors = {p for path in listed for p in path.parents}
     return out + [
@@ -242,8 +245,8 @@ def rows(root: Path) -> list[dict[str, object]]:
     """Every worktree fact of every repo with a tree under `worktrees/`, read from git alone:
     for a registered repo ours `ready` (ahead, clean), `open` (ahead, dirty) or `empty`, an
     `orphan` wt/* with no tree, a `foreign` worktree git registers (harness-native, hand-made,
-    under a TTL zone), and an `unregistered` directory two levels under `worktrees/<repo>/` or
-    an unlisted one level under it; for a repo no context owns, each linked tree is `unregistered`
+    under a TTL zone), and an `unregistered` leaf folder at any depth under `worktrees/<repo>/`
+    that no tree lists; for a repo no context owns, each linked tree is `unregistered`
     with `registered: false`."""
     known, homes = gitflows(root), tree_path(root, "")
     names = sorted(

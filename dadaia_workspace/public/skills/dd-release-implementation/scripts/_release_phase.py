@@ -72,8 +72,8 @@ def _worktree_rows(root: Path) -> list[dict[str, Any]]:
 
 
 def _refuse_open_worktrees(specs: Path) -> None:
-    """Closure waits for every open job, task or lane tree of the repo, bar its own tree: a
-    candidate's `wt-rc` tree holds no work and never blocks it. Read from the worktree owner's rows."""
+    """Closure waits for every worktree row of the repo, bar its own tree: a candidate's `wt-rc`
+    tree holds no work and never blocks it. Read from the worktree owner's rows."""
     from _ledger import workspace_of
 
     root = workspace_of(specs)
@@ -82,12 +82,13 @@ def _refuse_open_worktrees(specs: Path) -> None:
     top = _git.git(specs, "rev-parse", "--path-format=absolute", "--show-toplevel",
                    "--git-common-dir", check=False).split() or ["", ""]  # fmt: skip
     repo = Path(top[1]).parent.name
-    held = [r for r in _worktree_rows(root) if r["repo"] == repo and r["exit"]
+    held = [r for r in _worktree_rows(root) if r["repo"] == repo
             and Path(str(r["path"])).name != "wt-rc"
             and Path(str(r["path"])).resolve() != Path(top[0]).resolve()]  # fmt: skip
     if held:
+        fix = held[0]["exit"] or f"Agent action: land or remove the wt/* work at {held[0]['path']}, then close again"  # fmt: skip
         raise Refusal(f"repos/{repo} still holds {len(held)} open wt/* worktree(s) — a "
-                      "candidate closes with every one merged", str(held[0]["exit"]))  # fmt: skip
+                      "candidate closes with every one merged", str(fix))  # fmt: skip
 
 
 #: The one verb that moves each phase forward — every refusal's fix names it, so a fix
