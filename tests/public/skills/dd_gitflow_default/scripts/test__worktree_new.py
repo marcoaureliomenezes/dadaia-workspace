@@ -397,8 +397,10 @@ def test_a_name_is_accepted_as_the_backlog_slug_and_the_task_id_grammar_say(
     id, so `--` only ever separates a job from `J<n>.T<k>`; a one-segment word is no name."""
     slug = load_owner("dd-bug-resolution", "_ledger").load_schema("backlog-v1")["$defs"]["slug"]
     task_id = load_owner("dd-bug-resolution", "_grammar").TASK_ID_RE
-    accepted = word is not None and bool(re.fullmatch(slug["pattern"], word)) and (
-        task is None or bool(task_id.fullmatch(task))
+    accepted = (
+        word is not None
+        and bool(re.fullmatch(slug["pattern"], word))
+        and (task is None or bool(task_id.fullmatch(task)))
     )
     names = load_owner("dd-gitflow-default", "_worktree_names")
 
