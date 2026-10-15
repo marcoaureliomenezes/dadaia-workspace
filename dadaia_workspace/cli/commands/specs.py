@@ -17,11 +17,11 @@ from dadaia_workspace.cli._specs_resolution import (
     resolve_context_specs_dir_for_cli,
     resolve_specs_dir_for_cli,
 )
-from dadaia_workspace.core import gitflow, specs_version
+from dadaia_workspace.core import gitflow, specs_version, workspace_layout
 from dadaia_workspace.core.atomic_write import SymlinkRefusedError
 from dadaia_workspace.core.cli_line import fix_line, materialize_line, spell_fix
 from dadaia_workspace.core.doctor_rules import SectionFinding
-from dadaia_workspace.core.gitflow import DEFAULT, Gitflow, from_mapping
+from dadaia_workspace.core.gitflow import DEFAULT, Gitflow, from_mapping, work_branch
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.migrate import upgrade as upgrade_feature
 from dadaia_workspace.features.migrate.upgrade import UpgradeRefused, UpgradeResult
@@ -138,7 +138,7 @@ def init(
         help="Work-branch prefix before <M.m.p>. Default: kept, else feature/.",
     ),
 ) -> None:
-    """Bring a repo's specs/ to the canon, never committing.
+    """Bring a repo's specs/ to the canon, committing only the scaffold on a new work branch.
 
     Absent: scaffold. Upgradable or canonical: upgrade, then fill missing files. Foreign:
     after consent, `git mv specs specs-bkp` (staged) and scaffold.
@@ -185,8 +185,27 @@ def init(
     )
     if refused:
         raise typer.Exit(1)
+    if kind != "foreign":  # the foreign move stays staged for the operator to review
+        _commit_on_work_branch(target.parent, flow)
     if kind in ("absent", "foreign"):
         typer.echo(f"[ok] {target} at pattern version {specs_version.CANONICAL_SPECS_VERSION}")
+
+
+def _commit_on_work_branch(repo: Path, flow: Gitflow) -> None:
+    """Cut the local work branch when absent and commit only the scaffold on it, leaving it
+    checked out; with the branch present, or outside a git root, nothing happens."""
+    git = container.build_git_client()
+    if not git.is_git_root(repo):
+        return
+    work = work_branch(repo, flow, repo.name)
+    if git.git(repo, "for-each-ref", f"refs/heads/{work}"):
+        return
+    git.git(repo, "switch", "-c", work)
+    paths = ("specs", *(dest for _, dest in workspace_layout.REPO_LAW))
+    git.commit_paths(
+        repo, "chore: scaffold the dadaia specs", [p for p in paths if (repo / p).exists()]
+    )
+    typer.echo(f"[committed] {work}")
 
 
 def _gitflow(
