@@ -13,7 +13,7 @@ from _refusal import Refusal as Refusal
 SCRIPT = Path(__file__).parent / "worktree.py"
 LOCK = "dadaia:"
 _WORD = load_schema("backlog-v1")["$defs"]["slug"]["pattern"].removeprefix("^").removesuffix("$")
-#: One leaf grammar, e.g. 0.5.0/rc-1/job-1/wt-task-001; a tree's branch is wt/ plus its path.
+#: One leaf grammar; a tree's branch is wt/ plus its path.
 NAME_RE = re.compile(
     rf"^(?P<v>\d+\.\d+\.\d+)/(?:(?P<rc>rc-\d+)/(?:wt-rc|(?P<job>job-\d+)/wt-(?:main"
     rf"|task-(?P<task>\d{{3}})))|wt-(?:backlog-(?P<slug>{_WORD})|hotfix-(?P<bug>{_WORD})))$"
