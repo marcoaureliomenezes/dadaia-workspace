@@ -16,6 +16,7 @@ __all__ = [
     "GateFixes",
     "PushRef",
     "check_branch_policy",
+    "check_ref_policy",
     "parse_push_stdin",
 ]
 
@@ -159,3 +160,19 @@ def check_branch_policy(
                 git_line(fixes.repo, "branch", "-m", ref.local_ref[len(HEADS_PREFIX) :], branch),
             )
     return None
+
+
+def check_ref_policy(lines: list[str], gitflow: Gitflow, origin: dict[str, str]) -> Decision:
+    """The first refusal over ``<old> <new> <ref>`` lines: a work-branch update (old, new
+    non-zero) must land on origin's sha for its ref; creations, deletions, non-work refs pass."""
+    for line in filter(str.strip, lines):
+        old, new, ref = line.split()
+        branch = ref.removeprefix(HEADS_PREFIX)
+        if ZERO_SHA in (old, new) or gitflow.role_of(branch) != "work" or new == origin.get(ref):
+            continue
+        fix = f"Agent action: merge origin's {origin.get(ref)} into '{branch}' (append-only, never a rebase or force), then push it"
+        return Decision(
+            allowed=False,
+            message=f"[ref-gate] BLOCKED: '{branch}' would move to {new}, origin holds {origin.get(ref)} ({_LAW}).\n{spell_fix(fix)}",
+        )
+    return Decision(allowed=True)
