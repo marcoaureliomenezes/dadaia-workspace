@@ -25,14 +25,14 @@ worktree (`backlog/<slug>`) — only `context create` (the `--repo` clone) and t
 
 ```bash
 .dadaia/.venv/bin/dadaia context baseline "$SLUG"
-B=$(python3 .agents/skills/dd-gitflow-default/scripts/worktree.py new "$SLUG" backlog/my-first-idea | sed 's/^\[ok\] //')
+B=$(python3 .agents/skills/dd-gitflow-default/scripts/worktree.py new "$SLUG" 0.1.0/wt-backlog-my-first-idea | sed 's/^\[ok\] //')
 python3 .agents/skills/dd-backlog-definition/scripts/backlog.py new my-first-idea \
   --specs "$B/specs" --title "What I want" --description "Why I want it"
 git -C "$B" commit -qam "chore(backlog): new my-first-idea"
 ```
 
 After an APPROVED `dd-code-reviewer` verdict, `worktree.py merge "$B"` lands it; the
-release is born the same way in its `<M.m.p>-rc<N>/define` worktree:
+release is born the same way in its `<M.m.p>/rc-<N>/wt-rc` worktree:
 `release.py new 0.1.0 --specs "$R/specs" --origin backlog:my-first-idea`.
 
 - **Level 1 — workspace.** `uvx dadaia-workspace init` provisions `demo/` with its own

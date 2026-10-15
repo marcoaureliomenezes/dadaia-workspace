@@ -320,6 +320,6 @@ class TestQuickstartVerbatim:
         ws.assert_level_clean("quick", "quick", url)
         done = env.run("bash", "-euo", "pipefail", "-c", f"SLUG=quick\n{filing}", cwd=ws.path)
         assert done.returncode == 0, f"quickstart block 2 failed:\n{done.stdout}\n{done.stderr}"
-        wt = ws.path / "worktrees" / "quick" / "backlog" / "my-first-idea"
+        wt = ws.path / "worktrees" / "quick" / "0.1.0" / "wt-backlog-my-first-idea"
         assert env.git("log", "-1", "--format=%s", cwd=wt) == "chore(backlog): new my-first-idea"
         assert "my-first-idea" in env.git("show", "HEAD:specs/backlog/BACKLOG.json", cwd=wt)
