@@ -171,3 +171,44 @@ def test_the_worktree_list_parse_is_the_kernels(tmp_path: Path) -> None:
     ]
     assert len(expected) == 2
     assert GitSubprocessClient().unrecoverable(repo) == expected
+
+
+def _scaffolded(path: Path) -> Path:
+    """A repo with the scaffold committed as `specs init` leaves it (default gitflow)."""
+    repo = _repo(path)
+    (repo / "specs").mkdir()
+    (repo / "specs" / "constitution.md").write_text("# Constitution\n")
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-qm", "scaffold")
+    return repo
+
+
+@pytest.mark.parametrize(
+    ("branches", "tags", "expected"),
+    [
+        (["feature/0.3.2"], [], "0.3.2"),
+        ([], [], "0.1.0"),
+        ([], ["v1.2.3"], "1.2.4"),
+    ],
+)
+def test_work_version_is_the_live_work_branch_else_the_next_one(
+    tmp_path: Path, branches: list[str], tags: list[str], expected: str
+) -> None:
+    repo = _scaffolded(tmp_path / "r")
+    for branch in branches:
+        _git(repo, "branch", branch)
+    for tag in tags:
+        _git(repo, "tag", tag)
+
+    assert GitSubprocessClient().work_version(repo) == expected
+
+
+def test_work_version_refuses_when_several_work_branches_exist(tmp_path: Path) -> None:
+    repo = _scaffolded(tmp_path / "r")
+    for branch in ("feature/0.1.0", "feature/0.2.0"):
+        _git(repo, "branch", branch)
+
+    with pytest.raises(
+        load_owner("dd-bug-resolution", "_refusal").Refusal, match="2 work branches"
+    ):
+        GitSubprocessClient().work_version(repo)
