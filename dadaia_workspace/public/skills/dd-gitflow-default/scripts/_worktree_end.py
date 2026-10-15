@@ -38,7 +38,7 @@ from _worktree_git import (
 )
 from _worktree_names import NAME_RE, SCRIPT, Refusal, base_of, branch, kind_of, locate, tree_path
 
-#: The ledger and release checks a `define` or `backlog` merge runs, in this order.
+#: The ledger and release checks a `backlog` or `rc` merge runs, in this order.
 _LEDGERS = (("dd-bug-resolution", "bugs.py"), ("dd-backlog-definition", "backlog.py"),
             ("dd-release-implementation", "release.py"))  # fmt: skip
 
@@ -131,7 +131,7 @@ def _check_specs_only(tree: Path, work: str) -> None:
     """A backlog tree lands `specs/` alone: its merge runs no test."""
     for rel in git(tree, "diff", "--name-only", f"{work}...HEAD").splitlines():
         if not rel.startswith("specs/"):
-            raise Refusal(f"{rel} is code; a define or backlog tree lands specs/ only — "
+            raise Refusal(f"{rel} is code; a backlog tree lands specs/ only — "
                           "code lands through a job", _undo(tree, work, rel))  # fmt: skip
 
 

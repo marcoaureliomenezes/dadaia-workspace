@@ -76,7 +76,7 @@ def main(argv: list[str] | None = None) -> int:
     except Refusal as refusal:
         report(refusal, refusal.fix)
         return 1
-    except GitError as failure:  # no check named it: the operator's act, then the same call
+    except GitError as failure:  # no check named it: an agent act, then the same call
         again = " ".join(map(quote, sys.argv[1:] if argv is None else argv))
         report(failure, f"Agent action: clear the git failure above, then rerun {script(SCRIPT)} {again}")  # fmt: skip
         return 1

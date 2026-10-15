@@ -64,11 +64,6 @@ def base_of(name: str, work_prefix: str) -> str | None:
     return f"{work_prefix}{match['v']}"
 
 
-def base(name: str, work: str) -> str:
-    """`base_of` with the prefix of *work*, the work branch of the name's version; *work* if no tree."""
-    return base_of(name, work.removesuffix(name.split("/", 1)[0])) or work
-
-
 def pushable(ref: str) -> bool:
     """Whether pre-push accepts the `wt/` branch *ref*: a release, main or backlog tree's only."""
     name = name_of(ref)
