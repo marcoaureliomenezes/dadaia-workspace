@@ -27,7 +27,6 @@ from _release_schema import (
     IMPLEMENTATION,
     PHASES,
     extract_status,
-    next_candidate,
 )
 from _release_store import SCRIPT, Live, State, commit, live_release
 from _specs import choice
@@ -73,8 +72,8 @@ def _worktree_rows(root: Path) -> list[dict[str, Any]]:
 
 
 def _refuse_open_worktrees(specs: Path) -> None:
-    """Closure waits for every open `wt/*` of the repo except its own tree and the next
-    candidate's define tree — read from the worktree owner's rows."""
+    """Closure waits for every open job, task or lane tree of the repo, bar its own tree: a
+    candidate's `wt-rc` tree holds no work and never blocks it. Read from the worktree owner's rows."""
     from _ledger import workspace_of
 
     root = workspace_of(specs)
@@ -83,10 +82,8 @@ def _refuse_open_worktrees(specs: Path) -> None:
     top = _git.git(specs, "rev-parse", "--path-format=absolute", "--show-toplevel",
                    "--git-common-dir", check=False).split() or ["", ""]  # fmt: skip
     repo = Path(top[1]).parent.name
-    live = live_release(specs)
-    nxt = f"{live.release_id}-{next_candidate(live.release_dir, live.state).name.replace('-', '')}"
     held = [r for r in _worktree_rows(root) if r["repo"] == repo and r["exit"]
-            and r.get("name") != f"{nxt}/define"
+            and Path(str(r["path"])).name != "wt-rc"
             and Path(str(r["path"])).resolve() != Path(top[0]).resolve()]  # fmt: skip
     if held:
         raise Refusal(f"repos/{repo} still holds {len(held)} open wt/* worktree(s) — a "
