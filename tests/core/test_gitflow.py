@@ -212,3 +212,4 @@ def test_several_work_branches_refuse_as_the_one_error_type_that_carries_its_fix
         work_branch(repo, Gitflow("main", "dev", "feature/"), "r")
     assert refused.value.message == "2 work branches"
     assert refused.value.fix == f"git -C {repo} branch -d feature/0.5.0"
+    assert str(refused.value) == f"2 work branches\nfix: git -C {repo} branch -d feature/0.5.0"
