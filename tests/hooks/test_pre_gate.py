@@ -42,6 +42,10 @@ def _spawn(ws: Path, payload: dict[str, Any]) -> Any:
         ("apply_patch", {"command": _PATCH.format("worktrees/a/0.5.0-rc1/j1/secrets/k")}, "protected glob 'secrets'"),
         ("Write", {"file_path": "worktrees/a/0.5.0-rc1/j1/src/ok.py"}, None),
         ("Write", {"file_path": "worktrees/a/scratch/any/secrets/k"}, "protected glob 'secrets'"),  # any tree name
+        ("Write", {"file_path": "worktrees/a/scratch/secrets"}, "protected glob 'secrets'"),
+        ("Write", {"file_path": "worktrees/a/scratch/secrets/k"}, "protected glob 'secrets'"),
+        ("Write", {"file_path": "worktrees/a/x/y/z/secrets/k"}, "protected glob 'secrets'"),
+        ("Write", {"file_path": "worktrees/a/x/y/src/ok.py"}, None),
     ],
     ids=[
         "in-repo-write-is-merge-only",
@@ -55,6 +59,10 @@ def _spawn(ws: Path, payload: dict[str, Any]) -> Any:
         "AC2.5-protected-glob-in-worktree-codex-dialect",
         "AC2.5-unprotected-sibling-allowed",
         "AC1.3-protected-glob-in-any-tree-name",
+        "protected-glob-plain-tree-depth-1",
+        "protected-glob-plain-tree-depth-2",
+        "protected-glob-non-canonical-depth",
+        "unprotected-non-canonical-depth-allowed",
     ],
 )
 # fmt: on
