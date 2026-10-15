@@ -133,7 +133,7 @@ def test_a_backlog_tree_fails_a_path_outside_specs(root: Path) -> None:
     _fail(
         root,
         tree,
-        "src/a.py is code; a define or backlog tree lands specs/ only — code lands through a job",
+        "src/a.py is code; a backlog tree lands specs/ only — code lands through a job",
         f"Agent action: revert src/a.py to {BRANCH} in one commit — "
         f"`{git_line(tree, 'restore', '-s', BRANCH, '-SW', '--', 'src/a.py')}` and `{git_line(tree, 'commit')}`",
     )
