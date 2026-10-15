@@ -1265,16 +1265,11 @@ def _plant_stray_dotfile(root: Path) -> None:
 
 
 def _plant_orphan_wt(root: Path) -> None:
-    """An unmerged orphan: a job branch carries a task merge and has no tree."""
-    repo, tree = root / "repos/r", root / "worktrees/r/0.5.0-rc1/j1"
-    task = root / "worktrees/r/0.5.0-rc1/j1--t1"
+    """An unmerged orphan: a lane branch carries a commit and has no tree."""
+    repo, tree = root / "repos/r", root / "worktrees/r/0.5.0/wt-hotfix-b"
     worktree_ws.git(repo, "checkout", "-q", "feature/0.5.0")
-    worktree_ws.git(repo, "worktree", "add", "-q", "-b", "wt/0.5.0-rc1/j1", str(tree))
-    worktree_ws.git(repo, "worktree", "add", "-q", "-b", "wt/0.5.0-rc1/j1--t1", str(task))
-    worktree_ws.commit(task, "src/a.py")
-    worktree_ws.git(tree, "merge", "-q", "--ff-only", "wt/0.5.0-rc1/j1--t1")
-    worktree_ws.git(repo, "worktree", "remove", str(task))
-    worktree_ws.git(repo, "branch", "-q", "-D", "wt/0.5.0-rc1/j1--t1")
+    worktree_ws.git(repo, "worktree", "add", "-q", "-b", "wt/0.5.0/wt-hotfix-b", str(tree))
+    worktree_ws.commit(tree, "src/a.py")
     worktree_ws.git(repo, "worktree", "remove", str(tree))
 
 
@@ -1442,7 +1437,7 @@ def _worktree(ws: Path) -> str:
             break
         first = first or found[0].fix
         worktree_ws.approve(
-            root, worktree_ws.git(root / "repos/r", "rev-parse", "wt/0.5.0-rc1/j1").strip()
+            root, worktree_ws.git(root / "repos/r", "rev-parse", "wt/0.5.0/wt-hotfix-b").strip()
         )
         done = subprocess.run(found[0].fix, shell=True, cwd=root, capture_output=True, text=True)  # noqa: S602
         if done.returncode:

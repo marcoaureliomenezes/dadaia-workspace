@@ -83,19 +83,22 @@ def test_a_worktree_of_a_repo_in_no_context_is_a_finding_with_one_fix_and_a_bind
     `ctx_inject` bind block render it, and the registered repo's row is as before."""
     root = worktree_ws.make_workspace(tmp_path)
     worktree_ws.git(root / "repos/r", "checkout", "-q", "feature/0.5.0")
-    assert worktree_ws.run(root, "new", "r", "0.5.0-rc1/j1").returncode == 0
+    mine = root / "worktrees/r/0.5.0/wt-hotfix-b"
+    worktree_ws.git(
+        root / "repos/r", "worktree", "add", "-q", "-b", "wt/0.5.0/wt-hotfix-b", str(mine)
+    )
     gone = root / "repos/gone"
     gone.mkdir()
     worktree_ws.git(gone, "init", "-q")
     worktree_ws.git(gone, "commit", "-q", "--allow-empty", "-m", "init")
-    tree = root / "worktrees/gone/0.5.0-rc1/j1"
-    worktree_ws.git(gone, "worktree", "add", "-q", "-b", "wt/0.5.0-rc1/j1", str(tree))
+    tree = root / "worktrees/gone/0.5.0/wt-hotfix-b"
+    worktree_ws.git(gone, "worktree", "add", "-q", "-b", "wt/0.5.0/wt-hotfix-b", str(tree))
     doctor = worktree_ws.registered_doctor(root)
 
     found = {f.message.split(" ", 1)[1].split("  ")[0]: f for f in doctor.check_worktrees("c")}
     block = "\n".join(ctx_inject._worktrees(root, "c"))
 
-    assert str(root / "worktrees/r/0.5.0-rc1/j1") in found  # the registered repo's row stays
+    assert str(mine) in found  # the registered repo's row stays
     assert found[str(tree)].message.startswith("unregistered")
     assert found[str(tree)].fix and "\n" not in found[str(tree)].fix
     assert f"unregistered {tree}" in block
@@ -110,8 +113,8 @@ def test_the_fix_line_of_an_unregistered_tree_that_was_never_locked_removes_it(
     gone.mkdir()
     worktree_ws.git(gone, "init", "-q")
     worktree_ws.git(gone, "commit", "-q", "--allow-empty", "-m", "init")
-    tree = root / "worktrees/gone/0.5.0-rc1/j1"
-    worktree_ws.git(gone, "worktree", "add", "-q", "-b", "wt/0.5.0-rc1/j1", str(tree))
+    tree = root / "worktrees/gone/0.5.0/wt-hotfix-b"
+    worktree_ws.git(gone, "worktree", "add", "-q", "-b", "wt/0.5.0/wt-hotfix-b", str(tree))
     doctor = worktree_ws.registered_doctor(root)
     [finding] = [f for f in doctor.check_worktrees("c") if f.message.startswith("unregistered")]
 
