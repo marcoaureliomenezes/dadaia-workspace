@@ -206,3 +206,64 @@ def test_only_a_job_branch_of_wt_is_pushable(branch: str, allowed: bool) -> None
     refs, _ = parse_push_stdin(_line(branch))
     decision = check_branch_policy(refs, DEFAULT, replace(gate_fixes(), work="feature/0.5.0"))
     assert (decision is None) is allowed
+
+
+_C1 = "c" * 40
+_WORK_REF = "refs/heads/feature/0.6.0"
+
+
+def _ref_policy(lines: list[str], flow: Gitflow, origin: dict[str, str]) -> Decision:
+    # imported here so a missing function fails these rows only, not the whole file's collection
+    from dadaia_workspace.features.chokepoints.branch_policy import check_ref_policy
+
+    return check_ref_policy(lines, flow, origin)
+
+
+def test_a_work_branch_update_to_a_sha_other_than_origins_is_refused_with_one_fix() -> None:
+    decision = _ref_policy([f"{_A} {_B} {_WORK_REF}"], DEFAULT, {_WORK_REF: _C1})
+    assert not decision.allowed
+    assert "feature/0.6.0" in decision.message
+    assert decision.message.count("fix: ") == 1
+    assert decision.message.rsplit("fix: ", 1)[1].strip() != ""
+
+
+def test_a_work_branch_update_to_origins_sha_passes() -> None:
+    assert _ref_policy([f"{_A} {_B} {_WORK_REF}"], DEFAULT, {_WORK_REF: _B}).allowed
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        pytest.param(f"{_ZERO} {_B} {_WORK_REF}", id="creation"),
+        pytest.param(f"{_A} {_ZERO} {_WORK_REF}", id="deletion"),
+        pytest.param(f"{_ZERO} {_ZERO} {_WORK_REF}", id="deletion-prepared-zero-zero"),
+    ],
+)
+def test_a_work_branch_creation_or_deletion_passes(line: str) -> None:
+    assert _ref_policy([line], DEFAULT, {_WORK_REF: _C1}).allowed
+
+
+@pytest.mark.parametrize(
+    "ref",
+    [
+        pytest.param("refs/heads/develop", id="integration"),
+        pytest.param("refs/heads/main", id="principal"),
+        pytest.param("refs/heads/wt/0.6.0-rc1/job1", id="wt-branch"),
+        pytest.param("refs/heads/topic", id="outside-the-gitflow"),
+        pytest.param("refs/tags/archive/wt/x", id="archive-tag"),
+        pytest.param("refs/tags/v1", id="tag"),
+    ],
+)
+def test_a_non_work_ref_passes_whatever_its_sha(ref: str) -> None:
+    assert _ref_policy([f"{_A} {_B} {ref}"], DEFAULT, {ref: _C1}).allowed
+
+
+def test_a_custom_gitflow_work_ref_is_judged_by_its_configured_prefix() -> None:
+    refs = {"refs/heads/work/0.6.0": _C1, "refs/heads/feature/0.6.0": _C1}
+    assert not _ref_policy([f"{_A} {_B} refs/heads/work/0.6.0"], _CUSTOM, refs).allowed
+    assert _ref_policy([f"{_A} {_B} refs/heads/feature/0.6.0"], _CUSTOM, refs).allowed
+
+
+def test_one_refused_line_among_passing_lines_refuses() -> None:
+    lines = [f"{_A} {_B} refs/heads/develop", f"{_A} {_B} {_WORK_REF}", f"{_ZERO} {_B} refs/heads/wt/x"]
+    assert not _ref_policy(lines, DEFAULT, {_WORK_REF: _C1}).allowed
