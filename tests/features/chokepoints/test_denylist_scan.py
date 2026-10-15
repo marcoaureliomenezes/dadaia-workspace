@@ -58,7 +58,7 @@ def test_baseline_refuses_a_private_value_with_no_operator_terms(value: str, mas
 
 _QUAD = ".".join(("0", "10", "9", "10"))
 _LOCKS = ("poetry.lock", "package-lock.json", "uv.lock", "Cargo.lock", "yarn.lock",
-          "pnpm-lock.yaml", "Pipfile.lock", "composer.lock", "Gemfile.lock", "go.sum")  # fmt: skip
+          "pnpm-lock.yaml", "Pipfile.lock", "composer.lock", "Gemfile.lock", "packages.lock.json")  # fmt: skip
 
 
 def _hits(path: str, text: str) -> int:
@@ -78,6 +78,11 @@ def test_a_lock_file_still_loses_only_the_ipv4_pattern() -> None:
 
 
 @pytest.mark.parametrize("wrap", ["{}", "<td>{}</td>", "<{}>", ">>{}", "=>{}", "x=={}", "~{}", "^{}", "host>={}"])
+def test_an_address_as_a_folder_above_a_lock_file_is_refused() -> None:
+    """The lock-file skip covers file content only, never the path."""
+    assert _hits(f"hosts/{_QUAD}/poetry.lock", "x = 1\n") == 1
+
+
 def test_the_same_quad_in_an_ordinary_file_is_refused(wrap: str) -> None:
     """Outside the lock list the IPv4 pattern refuses in every context."""
     assert _hits("notes.md", wrap.format(_QUAD) + "\n") == 1

@@ -139,7 +139,7 @@ def test_public_law_names_no_private_pipeline() -> None:
     globs = tuple(f"public/**/*.{s}" for s in ("md", "json", "py", "sh")) + (
         "features/chokepoints/*.py",
     )
-    assert _denied_lines(globs, _PRIVATE_PIPELINE, None) == []
+    assert _denied_lines(globs, _PRIVATE_PIPELINE, '"exclude_paths"') == []
 
 
 def test_public_law_names_no_adr_number_or_library_path() -> None:
