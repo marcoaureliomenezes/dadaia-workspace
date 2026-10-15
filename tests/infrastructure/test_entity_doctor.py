@@ -27,7 +27,6 @@ import jsonschema
 import pytest
 
 from dadaia_workspace.cli.help_digest import command_paths
-from dadaia_workspace.core.cli_line import fix_line, script_line
 from dadaia_workspace.features.spec_context.doctor import DoctorService
 from dadaia_workspace.features.spec_context.gate_policy import (
     Decision,
@@ -455,8 +454,8 @@ def test_skill_md_over_the_soft_limit_warns(tmp_path: Path, line: bytes) -> None
 
 
 def test_a_long_skill_md_with_its_source_in_a_repo_is_split_there_in_a_tree(tmp_path: Path) -> None:
-    """The fix names the writable source in a worktree of the repo holding it, then the
-    reprojection; the gate lets an agent edit that path."""
+    """The fix names the split as a task of the open rc, then the reprojection; the source
+    is no PROTECTED path and the gate lets an agent edit it in a worktree."""
     soft = _real_map()["skill_md_line_soft"]
     projected = tmp_path / ".agents" / "skills" / "fixture-long" / "SKILL.md"
     source = (
@@ -478,23 +477,16 @@ def test_a_long_skill_md_with_its_source_in_a_repo_is_split_there_in_a_tree(tmp_
 
     [found] = service.check_skill_md_length()
 
-    edited = (
-        tmp_path
-        / "worktrees"
-        / "lib"
-        / "split-fixture-long"
-        / "dadaia_workspace"
-        / "public"
-        / "skills"
-        / "fixture-long"
-        / "SKILL.md"
-    )
-    new = script_line(
-        ".agents/skills/dd-gitflow-default/scripts/worktree.py", "new", "lib", "split-fixture-long"
-    )
     assert found.fix == (
-        f"Agent action: open the tree with `{new}`, split {edited} into its references/*.md and/or "
-        f"scripts/, merge it, then run `{fix_line(tmp_path, 'public', 'install')}`"
+        "Agent action: add the split of fixture-long/SKILL.md to a task of the open rc, "
+        "then run public install"
+    )
+    edited = (
+        tmp_path / "worktrees" / "lib" / "task" / source.relative_to(tmp_path / "repos" / "lib")
+    )
+    assert (
+        classify_path(source.relative_to(tmp_path).as_posix(), root=tmp_path)[0]
+        is not PathClass.PROTECTED
     )
     rel = edited.relative_to(tmp_path).as_posix()
     assert classify_path(rel, root=tmp_path)[0] is not PathClass.PROTECTED
