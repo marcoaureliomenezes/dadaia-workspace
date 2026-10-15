@@ -61,7 +61,7 @@ def test_public_projection_lifecycle(tmp_path: Path, monkeypatch: pytest.MonkeyP
     assert (install.exit_code, doctor.exit_code) == (0, 0), doctor.output
     assert len(staged) == (25 if PLATFORM.windows else 8)
     expected_install = (
-        "✓ 150 asset(s) processed:" if PLATFORM.windows else "✓ 133 asset(s) processed:"
+        "✓ 154 asset(s) processed:" if PLATFORM.windows else "✓ 137 asset(s) processed:"
     )
     assert install.output.splitlines()[0] == expected_install
     assert "fix:" not in install.output
