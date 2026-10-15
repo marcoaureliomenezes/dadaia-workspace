@@ -10,6 +10,7 @@ size: MEDIUM — real git and real CLI child processes, no network.
 
 from __future__ import annotations
 
+import ast
 import contextlib
 import io
 import json
@@ -2083,3 +2084,26 @@ def test_a_worktree_listing_fix_runs_the_public_runner(workspace: Path, site: st
 
     argv = shlex.split(fix)
     assert (Path(argv[0]), argv[1:]) == (workspace_cli_path(workspace), ["worktree", "list"])
+
+
+def test_no_fix_line_literal_in_the_library_names_the_skill_script() -> None:
+    """A `fix:` text, or an argument of `fix_line`/`spell_fix`, runs `dadaia worktree`, never `worktree.py`."""
+
+    def literal(node: ast.AST) -> str:
+        return "".join(
+            n.value
+            for n in ast.walk(node)
+            if isinstance(n, ast.Constant) and isinstance(n.value, str)
+        )
+
+    hits: list[str] = []
+    for path in sorted(_PKG.rglob("*.py")):
+        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+            carried = []
+            if isinstance(node, ast.Call) and getattr(node.func, "id", getattr(node.func, "attr", "")) in {"fix_line", "spell_fix"}:  # fmt: skip
+                carried = [*node.args, *(k.value for k in node.keywords)]
+            elif isinstance(node, ast.Constant | ast.JoinedStr) and literal(node).startswith("fix:"):  # fmt: skip
+                carried = [node]
+            if any("worktree.py" in literal(c) for c in carried):
+                hits.append(f"{path.relative_to(_PKG.parent)}:{node.lineno}")
+    assert sorted(set(hits)) == []
