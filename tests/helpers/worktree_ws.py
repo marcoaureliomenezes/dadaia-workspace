@@ -15,6 +15,7 @@ from pathlib import Path
 
 from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
 from dadaia_workspace.core.platform import PLATFORM
+from dadaia_workspace.core.skill_owner import load_owner
 from dadaia_workspace.features.spec_context.doctor import DoctorService
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from tests.fixtures.harness_env import run_bash, suite_env
@@ -27,8 +28,8 @@ SCRIPT = (
 FLOW = {"principal": "trunk", "integration": "dev", "work": "feature/"}
 #: The repo's gate: prints its argv; level L fails iff the tree holds `RED-<L>`.
 CI = 'import pathlib, sys\nprint("ci", *sys.argv[1:])\nsys.exit(pathlib.Path("RED-" + sys.argv[1]).exists())\n'
-JOB, TASK = "0.5.0-rc1/j1", "0.5.0-rc1/j1--J1.T1"
-#: The hierarchy's names: a job's main tree and its first task tree (the old-grammar pair above stays until its tests port).
+#: The hierarchy's names: a job's main tree and its first task tree (`JOB` stays for `test__specs__workspace_root`).
+JOB = "0.5.0-rc1/j1"
 NEW_JOB, NEW_TASK = "0.5.0/rc-1/job-1/wt-main", "0.5.0/rc-1/job-1/wt-task-001"
 _CLI = """#!python
 import json, sys
@@ -179,11 +180,25 @@ def commit(tree: Path, rel: str, text: str = "x = 1\n") -> str:
     return git(tree, "rev-parse", "HEAD").strip()
 
 
-def diff_hash(root: Path, sha: str) -> str:
+def _parent(name: str) -> str:
+    """The branch tree *name* is cut from, the work branch's prefix `feature/` (`base_of`)."""
+    return str(load_owner("dd-gitflow-default", "_worktree_names").base_of(name, "feature/"))
+
+
+def open_tree(root: Path, name: str) -> Path:
+    """The tree *name* as `new` leaves it (locked, on `wt/<name>` cut from its parent), made with
+    raw git so a test that does not exercise `new` never rests on it."""
+    tree = root / "worktrees/r" / name
+    git(root / "repos/r", "worktree", "add", "-q", "--lock", "--reason", f"dadaia:{name}",
+        "-b", f"wt/{name}", str(tree), _parent(name))  # fmt: skip
+    return tree
+
+
+def diff_hash(root: Path, sha: str, name: str | None = None) -> str:
     """The oracle: sha256 (UTF-8) of `git diff-tree -r -z --full-index <merge-base> <sha>` in `r`,
-    the merge-base taken against `feature/0.5.0`."""
+    the merge-base taken against the branch tree *name* is cut from; the work branch with no *name*."""
     repo = root / "repos/r"
-    base = git(repo, "merge-base", "feature/0.5.0", sha).strip()
+    base = git(repo, "merge-base", _parent(name) if name else "feature/0.5.0", sha).strip()
     diff = git(repo, "diff-tree", "-r", "-z", "--full-index", base, sha)
     return hashlib.sha256(diff.encode("utf-8")).hexdigest()
 
@@ -192,20 +207,22 @@ def approve(
     root: Path,
     sha: str,
     *,
+    name: str | None = None,
     verdict: str = "APPROVED",
     valid: bool = True,
     at: str = "T10:00:00Z",
 ) -> Path:
-    """The reviewer's verdict as `verdict.py` writes it: a handoff naming *sha*, emitted *at*."""
-    name = f"2026-10-02{at.replace(':', '')}-dd-code-reviewer-{sha[:8]}-{verdict}.handoff.json"
-    handoff = root / ".dadaia/handoff/c" / name
+    """The reviewer's verdict as `verdict.py` writes it: a handoff naming *sha*, its diff bound over
+    the base of tree *name* (the work branch with no *name*), emitted *at*."""
+    file = f"2026-10-02{at.replace(':', '')}-dd-code-reviewer-{sha[:8]}-{verdict}.handoff.json"
+    handoff = root / ".dadaia/handoff/c" / file
     handoff.parent.mkdir(parents=True, exist_ok=True)
     body = {
         "agent": "dd-code-reviewer",
         "verdict": verdict,
-        "scope": f"wt/0.5.0-rc1/j1@{sha}",
+        "scope": f"wt/{name or NEW_JOB}@{sha}",
         "reviewed_sha": sha,
-        "diff_sha256": diff_hash(root, sha),
+        "diff_sha256": diff_hash(root, sha, name),
         "produced_at": f"2026-10-02{at}",
     }
     handoff.write_text(json.dumps({**body, **({"schema_version": "1.2"} if valid else {})}))
@@ -227,12 +244,9 @@ def run_fix(root: Path, result: subprocess.CompletedProcess[str]) -> None:
 def attempt(
     root: Path, files: dict[str, str], task_id: str = "", mv: tuple[str, str] = ("", "")
 ) -> tuple[str, subprocess.CompletedProcess[str]]:
-    """Commit *files* (a `git mv` of *mv* first) in a task of `JOB` and try to merge it:
-    (the commit, the merge's result). With *task_id* (`J<n>.S<k>.T<m>`) the task tree is named for
-    it and the subject opens with it."""
-    task = f"0.5.0-rc1/j1--{task_id}" if task_id else TASK
-    assert run(root, "new", "r", task).returncode == 0
-    tree = root / "worktrees/r" / task
+    """Commit *files* (a `git mv` of *mv* first) in task `NEW_TASK` of `NEW_JOB` and try to merge
+    it: (the commit, the merge's result). With *task_id* (`J<n>.T<m>`) the subject opens with it."""
+    assert (tree := open_tree(root, NEW_TASK)).is_dir()
     if mv[0]:
         git(tree, "mv", *mv)
     for rel, text in files.items():
@@ -241,11 +255,11 @@ def attempt(
         git(tree, "add", rel)
     name = f"test({task_id}): {next(iter(files), mv[1])}" if task_id else next(iter(files), mv[1])
     git(tree, "commit", "-qm", name)
-    return git(tree, "rev-parse", "HEAD").strip(), run(root, "merge", f"worktrees/r/{task}")
+    return git(tree, "rev-parse", "HEAD").strip(), run(root, "merge", f"worktrees/r/{NEW_TASK}")
 
 
 def land(root: Path, rel: str, text: str = "x = 1\n", task_id: str = "") -> str:
-    """Commit *rel* in task `TASK` of `JOB` and merge it: a job branch takes code only so."""
+    """Commit *rel* in task `NEW_TASK` of `NEW_JOB` and merge it: a job branch takes code only so."""
     sha, merged = attempt(root, {rel: text}, task_id)
     assert merged.returncode == 0, merged.stderr
     return sha
