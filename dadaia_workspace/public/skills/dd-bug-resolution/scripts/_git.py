@@ -40,6 +40,20 @@ def git(repo: Path, *args: str, check: bool = True, input: str | None = None) ->
     return done.stdout
 
 
+def shallow(repo: Path) -> bool:
+    """Whether *repo* is a shallow clone: its history is cut."""
+    return git(repo, "rev-parse", "--is-shallow-repository", check=False).strip() == "true"
+
+
+def reaches(repo: Path, sha: str) -> bool:
+    """Whether *sha* is an ancestor of the HEAD of *repo*."""
+    try:
+        git(repo, "merge-base", "--is-ancestor", sha, "HEAD")
+    except GitError:
+        return False
+    return True
+
+
 def parse_worktrees(text: str) -> list[dict[str, str]]:
     """Every linked worktree of a `worktree list --porcelain` *text* (the main checkout excluded)."""
     parsed = [

@@ -13,12 +13,11 @@ from pathlib import Path
 from typing import Any
 
 import _findings
+import _git
 import _jsonl
 import _ledger
-from _git import git
 from _grammar import HISTORICAL_TASK_RE, TASK_ID_RE
-from _memory_drift import reaches
-from _platform import quote
+from _platform import git_line, quote
 from _specs import script, with_specs
 
 CODE = "LEDGER-BUGS-SCHEMA"
@@ -163,31 +162,22 @@ def archived_ids(text: str) -> frozenset[str]:
 
 
 def _unreached(specs: Path, text: str, root: Path) -> list[dict[str, Any]]:
-    """One finding per live record whose `fix_sha` HEAD does not reach; its fix is the `update`
-    command when exactly one reachable commit carries the bug law's `fix(bugs): <id> —` subject."""
-    bugs, repo, out = script(Path(__file__).with_name("bugs.py")), specs.parent, []
-    for n, rec, why in _jsonl.walk(text):
-        if (
-            why
-            or not isinstance(rec, dict)
-            or not rec.get("fix_sha")
-            or reaches(repo, rec["fix_sha"])
-        ):
-            continue
-        subject = f"fix(bugs): {rec['id']} \u2014"
-        found = git(
-            repo, "log", "--fixed-strings", f"--grep={subject}", "--format=%H", check=False
-        ).split()
-        update = f"{bugs} update {quote(rec['id'])} --set fix_sha="
-        fix = (
-            with_specs(update + found[0], root) if len(found) == 1
-            else f"Agent action: find the commit whose subject starts '{subject}' and run "
-            f"`{with_specs(update + 'SHA', root)}` with its 40-hex sha"
-        )  # fmt: skip
-        out.append(_findings.finding(
-            CODE, LEDGER, n, f"{rec['id']!r} fix_sha {rec['fix_sha']} is reachable from no ref", fix
-        ))  # fmt: skip
-    return out
+    """The live records whose `fix_sha` is no ancestor of HEAD, one finding each; a shallow
+    clone cannot judge them, so it is one finding for the cut."""
+    repo = specs.parent
+    shas = [(n, r) for n, r, why in _jsonl.walk(text) if not why and isinstance(r, dict) and r.get("fix_sha")]  # fmt: skip
+    if shas and _git.shallow(repo):
+        return [_findings.finding(CODE, LEDGER, shas[0][0], "the clone is shallow: no fix_sha can be judged", git_line(repo, "fetch", "--unshallow"))]  # fmt: skip
+    update = f"{script(Path(__file__).with_name('bugs.py'))} update %s --set fix_sha=SHA"
+    return [
+        _findings.finding(
+            CODE, LEDGER, n, f"{r['id']!r} fix_sha {r['fix_sha']} is no ancestor of HEAD",
+            "Agent action: find the fix commit's sha in git log and run "
+            f"`{with_specs(update % quote(r['id']), root)}`",
+        )
+        for n, r in shas
+        if not _git.reaches(repo, r["fix_sha"])
+    ]  # fmt: skip
 
 
 @_findings.decodable(CODE)
