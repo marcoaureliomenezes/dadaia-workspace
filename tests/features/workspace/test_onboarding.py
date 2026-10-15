@@ -82,7 +82,7 @@ _CMD = "command"
     pytest.param(_v047, {}, False, ("specs", _CMD), ("specs", "init", "--context", "app"), [], id="upgrade-leaves-project-specs-unmigrated-and-silent-0.4.7-tree"),
     pytest.param(_typo, {}, False, ("constitution", "agent"), None, ["repos/app/specs/constitution.md"], id="ADR0047-yaml-typo-is-an-agent-repair"),
     pytest.param(lambda t: {"app": _specs(t)}, {}, False, ("first-pass", "agent"), None,
-                 ["the dd-audit-project skill's first pass", "memory/QUALITY.md", "no atom"], id="shipped-stubs-first-pass"),
+                 ["then run the dd-audit-project first pass in it", "memory/QUALITY.md", "no atom"], id="shipped-stubs-first-pass"),
     pytest.param(lambda t: {"app": _specs(t, audited=True)}, {}, False, ("publish", _CMD), ("context", "baseline", "app"), [], id="publish-until-on-a-remote"),
     pytest.param(lambda t: {"app": _specs(t, audited=True)}, {}, True, None, None, [], id="published-is-done"),
     pytest.param(lambda t: {"app": _specs(t, audited=True), "other": t / "repos" / "other" / "specs"}, {"focus": "app", "bound": True}, True, None, None, [], id="onboarding-next-step-names-another-context"),
@@ -107,6 +107,18 @@ def test_next_step_is_derived_from_the_workspace_state(
         assert step.command == fix_line(tmp_path, *command)
     create = fix_line(tmp_path, "context", "create")  # the binary every OS prints, {} in a row
     assert all(part.format(create) in step.command.replace("\\", "/") for part in in_command)
+
+
+def test_the_first_pass_fix_opens_the_backlog_first_pass_lane(tmp_path: Path) -> None:
+    specs = _specs(tmp_path)
+    step = next_step(tmp_path, {"app": specs})
+    memory = specs / "memory"
+    pending = f"{memory / 'ARCHITECTURE.md'}, {memory / 'QUALITY.md'}, {memory / 'product'} (no atom)"
+    lane = fix_line(tmp_path, "worktree", "new", "app", "<v>/wt-backlog-first-pass")
+    assert step is not None
+    assert step.command == (
+        f"Agent action: open the lane {lane}, then run the dd-audit-project first pass in it — {pending}"
+    )
 
 
 def test_the_specs_step_reports_state_and_the_doctor_has_no_specs_version_code(tmp_path: Path) -> None:
