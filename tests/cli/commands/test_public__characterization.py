@@ -1,4 +1,4 @@
-"""Characterization of public stage/install/doctor at the public CLI."""
+"""Characterization of public install/doctor at the public CLI."""
 
 from __future__ import annotations
 
@@ -54,20 +54,16 @@ def test_public_projection_lifecycle(tmp_path: Path, monkeypatch: pytest.MonkeyP
     monkeypatch.setattr(container, "build_public_service", lambda: service)
     monkeypatch.chdir(ws)
 
-    stage = CliRunner().invoke(app, ["public", "stage"])
+    staged = service.stage(ws)
     install = CliRunner().invoke(app, ["public", "install"])
     doctor = CliRunner().invoke(app, ["public", "doctor"])
 
-    assert (stage.exit_code, install.exit_code, doctor.exit_code) == (0, 0, 0), doctor.output
-    expected_stage = (
-        "✓ 25 asset group(s) staged:" if PLATFORM.windows else "✓ 8 asset group(s) staged:"
-    )
+    assert (install.exit_code, doctor.exit_code) == (0, 0), doctor.output
+    assert len(staged) == (25 if PLATFORM.windows else 8)
     expected_install = (
         "✓ 150 asset(s) processed:" if PLATFORM.windows else "✓ 133 asset(s) processed:"
     )
-    assert stage.output.splitlines()[0] == expected_stage
     assert install.output.splitlines()[0] == expected_install
-    assert "fix:" not in stage.output
     assert "fix:" not in install.output
     assert "fix:" not in doctor.output
     doctor_lines = doctor.output.splitlines()
