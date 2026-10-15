@@ -15,7 +15,7 @@ import pytest
 from dadaia_workspace.infrastructure.ledger_scripts import load_owner
 from tests.fixtures.harness_env import suite_env
 from tests.helpers.skill_scripts import stage_skill_scripts
-from tests.helpers.worktree_ws import JOB, git, make_workspace, run
+from tests.helpers.worktree_ws import NEW_JOB, git, make_workspace, run
 
 
 @pytest.fixture
@@ -69,7 +69,8 @@ def test_the_closure_waits_for_no_worktree_of_a_fenced_workspace(
     ws: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     git(ws / "repos/r", "checkout", "-q", "feature/0.5.0")
-    assert run(ws, "new", "r", JOB).returncode == 0  # an open tree: unfenced, closure waits
+    assert run(ws, "new", "r", "0.5.0/rc-1/wt-rc").returncode == 0
+    assert run(ws, "new", "r", NEW_JOB).returncode == 0  # an open tree: unfenced, closure waits
     wait = load_owner("dd-release-implementation", "_release_phase")._refuse_open_worktrees
     monkeypatch.setenv("DADAIA_FENCED_ROOTS", str(ws))
     assert wait(ws / "repos/r/specs") is None
@@ -78,26 +79,26 @@ def test_the_closure_waits_for_no_worktree_of_a_fenced_workspace(
 @pytest.mark.parametrize(
     ("other", "spared", "legacy"),
     [
-        ("0.5.0-rc2/define", True, False),
-        ("0.5.0-rc1/j1", False, False),
-        ("0.5.0-rc3/define", False, False),
-        ("0.5.0-rc2/define", True, True),
+        ("0.5.0/rc-2/wt-rc", True, False),
+        (NEW_JOB, False, False),
+        ("0.5.0/rc-3/wt-rc", False, False),
+        ("0.5.0/rc-2/wt-rc", True, True),
     ],
 )
 def test_the_closure_spares_only_the_next_candidates_define_tree(
     ws: Path, other: str, spared: bool, legacy: bool
 ) -> None:
     """The closure of the live candidate waits for every open tree but the next candidate's
-    define tree. A legacy release folder with no `rc-<N>/` counts as the first candidate."""
+    `wt-rc` tree. A legacy release folder with no `rc-<N>/` counts as the first candidate."""
     git(ws / "repos/r", "checkout", "-q", "feature/0.5.0")
-    for name in ("0.5.0-rc1/reconcile", other):
+    for name in ("0.5.0/rc-1/wt-rc", other):
         assert run(ws, "new", "r", name).returncode == 0
         tree = ws / "worktrees/r" / name
-        (tree / "draft.scratch.md").write_text("x\n")
+        (tree / "draft.scratch.md").write_text(f"{name}\n")
         git(tree, "add", "-f", "draft.scratch.md")
         git(tree, "commit", "-qm", "draft")
     wait = load_owner("dd-release-implementation", "_release_phase")._refuse_open_worktrees
-    reconcile_specs = ws / "worktrees/r/0.5.0-rc1/reconcile/specs"
+    reconcile_specs = ws / "worktrees/r/0.5.0/rc-1/wt-rc/specs"
     if legacy:
         release = reconcile_specs / "releases/0.5.0"
         for entry in (release / "rc-1").iterdir():
