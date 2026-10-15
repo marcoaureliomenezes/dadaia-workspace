@@ -514,7 +514,11 @@ def test_origin_ids_found_only_in_the_previous_candidates_summary_are_untraced(
 ) -> None:
     log = [_at(9, "summary", _PRIOR.format("none", "x-1")), _BORN, _MEMORY]
     specs = _stacked(tmp_path, "backlog:x-1", log)
-    assert "Origin backlog:x-1 untraced" in _origin_messages(script, specs)
+    lines = _run(script, "check", "--specs", str(specs)).stdout.splitlines()
+    at = next(n for n, line in enumerate(lines) if "Origin backlog:x-1" in line)
+    assert lines[at].split(" ", 2)[1] == "info"
+    assert lines[at].endswith("Origin backlog:x-1 untraced")
+    assert not any(line.startswith("fix:") for line in lines[at + 1 :])
 
 
 def test_a_previous_candidates_carry_does_not_satisfy_allow_open(
