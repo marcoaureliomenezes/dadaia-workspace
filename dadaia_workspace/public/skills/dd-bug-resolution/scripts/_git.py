@@ -17,10 +17,10 @@ _LOCAL = frozenset({
 
 
 def scrubbed_env(parent: Mapping[str, str] | None = None) -> dict[str, str]:
-    """A child env from *parent* (default `os.environ`): repo-selecting `GIT_*` out, bytecode off."""
+    """A child env from *parent* (default `os.environ`): repo-selecting `GIT_*` out, bytecode off, `DADAIA_WT` marked."""
     return {
         k: v for k, v in (os.environ if parent is None else parent).items() if k not in _LOCAL
-    } | {"PYTHONDONTWRITEBYTECODE": "1"}
+    } | {"PYTHONDONTWRITEBYTECODE": "1", "DADAIA_WT": "1"}
 
 
 class GitError(RuntimeError):
