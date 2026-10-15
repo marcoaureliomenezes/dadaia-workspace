@@ -1,12 +1,13 @@
 """CLI command: `dadaia worktree <verb> …` — a runner of the installed `worktree.py`.
 
-Verbs: new, merge, clean, list, preflight, sync, hash. The installed script owns every verb
-and every refusal; this command forwards argv, stdout, stderr and the exit code.
+The installed script owns every verb, `--help` and every refusal; this command forwards
+argv, stdout, stderr and the exit code.
 """
 
 from __future__ import annotations
 
 import sys
+from pathlib import Path
 
 import typer
 
@@ -21,12 +22,9 @@ def worktree(
         None, metavar="VERB [ARGS]...", help="Verb and its arguments."
     ),
 ) -> None:
-    """Run a worktree verb of the installed dd-gitflow-default `worktree.py`.
-
-    Verbs: new, merge, clean, list, preflight, sync, hash.
-    """
+    """Run a worktree verb of the installed dd-gitflow-default `worktree.py`."""
     root = ledger_scripts.own_workspace_root()
-    script = ledger_scripts.resolve_script(ledger_scripts.WORKTREE_SCRIPT, root) if root else None
+    script = ledger_scripts.resolve_script(ledger_scripts.WORKTREE_SCRIPT, root or Path())
     if script is None:
         fail("worktree.py is not installed", fix=fix_line(None, "public", "install"))
     result = SubprocessProcessRunner().run([sys.executable, str(script), *(args or [])])

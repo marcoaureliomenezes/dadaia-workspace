@@ -16,9 +16,8 @@ from dadaia_workspace.cli._specs_resolution import (
     resolve_workspace_root_for_cli,
     scope,
 )
-from dadaia_workspace.core.cli_line import fix_line, git_line, without_fix
+from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.gitflow import Gitflow, work_branch
-from dadaia_workspace.core.models.git_scan import ZERO_SHA
 from dadaia_workspace.core.skill_owner import load_owner
 from dadaia_workspace.features.chokepoints.branch_policy import (
     HEADS_PREFIX,
@@ -53,21 +52,29 @@ def _no_canon_violations(paths: Iterable[str]) -> list[str]:
     return []
 
 
-def _gate_inputs(repo_root: Path, head: str) -> tuple[Gitflow, GateFixes]:
-    """The gitflow through the one reader (committed first, one warning on the default; an
-    associated repo reads its owner's main repo), the fix inputs (the repo,
-    the live work branch by the ONE rule, cut locally or not, and HEAD's branch)."""
+def _gitflow(repo_root: Path) -> tuple[Gitflow, str | None, str]:
+    """The gitflow through the one reader (committed first; an associated repo reads its
+    owner's main repo), its warning on the default, and the slug of the repo's main repo."""
     from dadaia_workspace.container import build_git_client
 
-    git = build_git_client()
     workspace = resolve_workspace_root_for_cli(repo_root)
     owner = repo_owner(workspace, repo_root)
     main = workspace / "repos" / owner[2] if owner else None
-    gitflow, warning = git.gitflow(repo_root, main)
+    gitflow, warning = build_git_client().gitflow(repo_root, main)
+    return gitflow, warning, owner[2] if owner else repo_root.name
+
+
+def _gate_inputs(repo_root: Path, head: str) -> tuple[Gitflow, GateFixes]:
+    """The gitflow with one warning on the default, the fix inputs (the repo, the live
+    work branch by the ONE rule, cut locally or not, and HEAD's branch)."""
+    from dadaia_workspace.container import build_git_client
+
+    git = build_git_client()
+    gitflow, warning, slug = _gitflow(repo_root)
     if warning:
         typer.echo(f"[pre-push] WARNING: {warning}", err=True)
     try:
-        work = work_branch(repo_root, gitflow, owner[2] if owner else repo_root.name)
+        work = work_branch(repo_root, gitflow, slug)
     except load_owner("dd-gitflow-default", "_worktree_git").SeveralWork as several:
         typer.echo(f"[pre-push] WARNING: {several}\nhint: {several.fix}", err=True)
         work = gitflow.work_prefix + several.keep
@@ -179,20 +186,13 @@ def ref_gate_check() -> None:
             "Agent action: pipe one `<old> <new> <ref>` line per ref",
         )
     git = build_git_client()
-    gitflow, _ = _gate_inputs(repo_root, git.current_branch(repo_root))
-    origin: dict[str, str] = {}
-    for _, _, ref in lines:
-        branch = ref.removeprefix(HEADS_PREFIX)
-        origin[ref] = git.git(
-            repo_root, "for-each-ref", "--format=%(objectname)", f"refs/remotes/origin/{branch}"
-        )
+    gitflow = _gitflow(repo_root)[0]
     for old, new, ref in lines:
-        if ZERO_SHA in (old, new) or not origin[ref]:
-            continue
-        decision = check_ref_policy([f"{old} {new} {ref}"], gitflow, origin)
+        tracking = f"refs/remotes/origin/{ref.removeprefix(HEADS_PREFIX)}"
+        held = git.git(repo_root, "for-each-ref", "--format=%(objectname)", tracking)
+        decision = check_ref_policy([f"{old} {new} {ref}"], gitflow, {ref: held}, repo_root.name)
         if not decision.allowed and not _audit_only(git, repo_root, old, new):
-            restore = git_line(repo_root, "update-ref", ref, origin[ref])
-            fail(without_fix(decision.message).rstrip(), restore)
+            fail(decision.message)
 
 
 @app.command("install-hook")

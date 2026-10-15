@@ -83,7 +83,11 @@ app.add_typer(help_cmd.app, name="help", rich_help_panel="Common")
 app.command(
     name="worktree",
     rich_help_panel="Common",
-    context_settings={"allow_extra_args": True, "ignore_unknown_options": True},
+    context_settings={
+        "allow_extra_args": True,
+        "ignore_unknown_options": True,
+        "help_option_names": [],
+    },
 )(worktree.worktree)
 
 
