@@ -15,6 +15,7 @@ from typing import Any
 import _findings
 import _jsonl
 import _ledger
+from _git import git
 from _grammar import HISTORICAL_TASK_RE, TASK_ID_RE
 from _memory_drift import reaches
 from _platform import quote
@@ -161,6 +162,34 @@ def archived_ids(text: str) -> frozenset[str]:
     )
 
 
+def _unreached(specs: Path, text: str, root: Path) -> list[dict[str, Any]]:
+    """One finding per live record whose `fix_sha` HEAD does not reach; its fix is the `update`
+    command when exactly one reachable commit carries the bug law's `fix(bugs): <id> —` subject."""
+    bugs, repo, out = script(Path(__file__).with_name("bugs.py")), specs.parent, []
+    for n, rec, why in _jsonl.walk(text):
+        if (
+            why
+            or not isinstance(rec, dict)
+            or not rec.get("fix_sha")
+            or reaches(repo, rec["fix_sha"])
+        ):
+            continue
+        subject = f"fix(bugs): {rec['id']} \u2014"
+        found = git(
+            repo, "log", "--fixed-strings", f"--grep={subject}", "--format=%H", check=False
+        ).split()
+        update = f"{bugs} update {quote(rec['id'])} --set fix_sha="
+        fix = (
+            with_specs(update + found[0], root) if len(found) == 1
+            else f"Agent action: find the commit whose subject starts '{subject}' and run "
+            f"`{with_specs(update + 'SHA', root)}` with its 40-hex sha"
+        )  # fmt: skip
+        out.append(_findings.finding(
+            CODE, LEDGER, n, f"{rec['id']!r} fix_sha {rec['fix_sha']} is reachable from no ref", fix
+        ))  # fmt: skip
+    return out
+
+
 @_findings.decodable(CODE)
 def check(specs: Path) -> list[dict[str, Any]]:
     """Validate the committed ledger and its archive; a young specs tree with neither is
@@ -169,16 +198,7 @@ def check(specs: Path) -> list[dict[str, Any]]:
     text = _jsonl.read_text(ledger) if ledger.is_file() else ""
     archived = _jsonl.read_text(histo) if histo.is_file() else ""
     root = specs.resolve()
-    bugs = script(Path(__file__).with_name("bugs.py"))
-    unreached = [
-        _findings.finding(
-            CODE, LEDGER, n, f"{rec['id']!r} fix_sha {rec['fix_sha']} is reachable from no ref",
-            "Agent action: set fix_sha to the fix commit's current sha through "
-            f"`{with_specs(f'{bugs} update {quote(rec['id'])} --set fix_sha=<sha>', root)}`",
-        )
-        for n, rec, why in _jsonl.walk(text)
-        if not why and isinstance(rec, dict) and rec.get("fix_sha") and not reaches(specs.parent, rec["fix_sha"])
-    ]  # fmt: skip
+    unreached = _unreached(specs, text, root)
     return sorted(
         findings_for(text, archived=archived_ids(archived), root=root) + unreached,
         key=lambda f: f["line"],
