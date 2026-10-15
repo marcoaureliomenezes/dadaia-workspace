@@ -1,5 +1,5 @@
-"""`worktree.py new` opens one tree per job or task — each name shape;
-an old-grammar name refused — and `list`; the
+"""`worktree.py new` opens each tree of the hierarchy on its parent's branch — each name shape;
+an old-grammar or `reconcile` name refused — and `list`; the
 one venv. Size: MEDIUM (real git in a tmp workspace, never the live instance).
 """
 
@@ -15,10 +15,26 @@ import pytest
 
 from dadaia_workspace.core.cli_line import git_line, shell_line
 from dadaia_workspace.core.skill_owner import load_owner
-from tests.helpers.worktree_ws import JOB, TASK, approve, associate, commit, make_workspace, run_fix
+from tests.helpers.worktree_ws import (
+    NEW_JOB,
+    NEW_TASK,
+    approve,
+    associate,
+    commit,
+    make_workspace,
+    run_fix,
+)
 from tests.helpers.worktree_ws import fixes as _fixes
 from tests.helpers.worktree_ws import git as _git
 from tests.helpers.worktree_ws import run as _run
+
+RC = "0.5.0/rc-1/wt-rc"
+LANE = "0.5.0/wt-backlog-an-idea"
+#: The one fix of a main tree refused for the rc's phase.
+PHASE_FIX = (
+    "fix: Agent action: reach phase IMPLEMENTATION in _RELEASE.json on wt/0.5.0/rc-1/wt-rc"
+    " (release.py phase), then open its job again"
+)
 
 
 @pytest.fixture
@@ -54,46 +70,77 @@ def root(definition_root: Path) -> Path:
 
 
 def test_a_release_job_needs_the_implementation_phase(definition_root: Path) -> None:
-    """An Approved SPEC does not start implementation while PLAN is still Draft."""
+    """An Approved SPEC does not start implementation while PLAN is still Draft; the rc's own tree opens."""
     _set_release(definition_root, "DEFINITION", plan="Draft")
     repo = definition_root / "repos/r"
+    assert _run(definition_root, "new", "r", RC).returncode == 0
 
-    refused = _run(definition_root, "new", "r", JOB)
+    refused = _run(definition_root, "new", "r", NEW_JOB)
 
     assert refused.returncode != 0
-    assert _fixes(refused) == [f"fix: {_script()} new r 0.5.0-rc1/define"]
-    assert not (definition_root / "worktrees/r" / JOB).exists()
-    assert _git(repo, "branch", "--list", f"wt/{JOB}").strip() == ""
+    assert _fixes(refused) == [PHASE_FIX]
+    assert not (definition_root / "worktrees/r" / NEW_JOB).exists()
+    assert _git(repo, "branch", "--list", f"wt/{NEW_JOB}").strip() == ""
 
 
-def test_reconcile_also_opens_in_closure(definition_root: Path) -> None:
-    """Reconciliation spans the IMPLEMENTATION-to-CLOSURE boundary."""
-    _set_release(definition_root, "CLOSURE")
+def test_a_main_tree_reads_the_phase_on_its_rcs_tree_not_the_work_branch(
+    definition_root: Path,
+) -> None:
+    _set_release(definition_root, "DEFINITION", plan="Draft")
+    assert _run(definition_root, "new", "r", RC).returncode == 0
+    rc_tree = definition_root / "worktrees/r" / RC
+    state = rc_tree / "specs/releases/0.5.0/_RELEASE.json"
+    state.write_text(state.read_text().replace('"DEFINITION"', '"IMPLEMENTATION"'))
+    _git(rc_tree, "commit", "-qam", "implementation")
 
-    opened = _run(definition_root, "new", "r", "0.5.0-rc1/reconcile")
+    opened = _run(definition_root, "new", "r", NEW_JOB)
 
     assert (opened.returncode, opened.stdout) == (
         0,
-        f"[ok] {definition_root / 'worktrees/r/0.5.0-rc1/reconcile'}\n",
+        f"[ok] {definition_root / 'worktrees/r' / NEW_JOB}\n",
     )
+
+
+def test_a_main_tree_needs_its_rcs_tree(root: Path) -> None:
+    refused = _run(root, "new", "r", NEW_JOB)
+
+    assert refused.returncode == 1
+    assert [f.removeprefix("fix: ") for f in _fixes(refused)] == [f"{_script()} new r {RC}"]
+    assert not (root / "worktrees/r").exists()
+
+
+@pytest.mark.parametrize("name", ["0.5.0-rc1/reconcile", "0.5.0/rc-1/wt-reconcile"])
+def test_a_reconcile_name_refuses_even_in_closure(definition_root: Path, name: str) -> None:
+    """Reconciliation is the last commits of the rc's own tree: no tree of its own, in any phase."""
+    _set_release(definition_root, "CLOSURE")
+
+    refused = _run(definition_root, "new", "r", name)
+
+    assert (refused.returncode, refused.stdout) == (1, "")
+    assert [f.removeprefix("fix: ") for f in _fixes(refused)] == [f"{_script()} list"]
+    assert not (definition_root / "worktrees/r").exists()
 
 
 def test_new_makes_each_shape_on_its_branch_and_base(root: Path) -> None:
     repo = root / "repos/r"
     ahead = _git(repo, "commit-tree", "HEAD^{tree}", "-p", "HEAD", "-m", "ahead").strip()
     _git(repo, "branch", "-f", "feature/0.5.0", ahead)  # the start point is the work branch
-    for name in (JOB, "0.5.0-rc1/define", "0.5.0-rc1/reconcile", "backlog/an-idea", TASK):
+    shas = {}
+    for name in (RC, LANE, NEW_JOB, NEW_TASK):
         result = _run(root, "new", "r", name)
         assert (result.returncode, result.stdout) == (0, f"[ok] {root / 'worktrees/r' / name}\n")
-    assert _git(repo, "rev-parse", "wt/0.5.0-rc1/define").strip() == ahead
+        shas[name] = _git(repo, "rev-parse", f"wt/{name}").strip()
+        commit(
+            root / "worktrees/r" / name, "x.py", f"x = '{name}'\n"
+        )  # the child must cut from this
+    assert (shas[RC], shas[LANE]) == (ahead, ahead)
+    assert shas[NEW_JOB] == _git(repo, "rev-parse", f"wt/{RC}").strip() != ahead
+    assert shas[NEW_TASK] == _git(repo, "rev-parse", f"wt/{NEW_JOB}").strip() != shas[NEW_JOB]
     porcelain = _git(repo, "worktree", "list", "--porcelain").splitlines()
-    assert sorted(x for x in porcelain if x.startswith("locked")) == [
-        "locked dadaia:0.5.0-rc1/define",
-        "locked dadaia:0.5.0-rc1/j1",
-        "locked dadaia:0.5.0-rc1/j1--J1.T1",
-        "locked dadaia:0.5.0-rc1/reconcile",
-        "locked dadaia:backlog/an-idea",
-    ]
+    assert sorted(x for x in porcelain if x.startswith(("locked", "branch"))) == sorted(
+        [f"locked dadaia:{n}" for n in shas] + [f"branch refs/heads/wt/{n}" for n in shas]
+        + ["branch refs/heads/main"]
+    )  # fmt: skip
 
 
 _NO_RELEASE = (("rm", "-rq", "specs/releases"), ("commit", "-qm", "no release"))
@@ -186,11 +233,29 @@ def test_two_work_branches_still_refuse_a_plain_name_with_the_list_fix(root: Pat
     _assert_plain_refused(root, _run(root, "new", "r", "maintenance"))
 
 
-@pytest.mark.parametrize("name", ["0.5.0a-impl", "0.5.0b-release", "0.4.9-rc1/j1", "0.5.0-rc1/J1"])
+@pytest.mark.parametrize(
+    "name",
+    [
+        "0.5.0a-impl",
+        "0.5.0b-release",
+        "0.4.9-rc1/j1",
+        "0.5.0-rc1/J1",
+        "0.5.0-rc1/j1",
+        "0.5.0-rc1/j1--J1.T1",
+        "0.5.0-rc1/define",
+        "backlog/an-idea",
+        "hotfix/a-block-bug",
+        "0.5.0/rc-1/wt-define",
+        "0.5.0/rc-1/job-1/wt-task-1",
+        "0.4.9/rc-1/wt-rc",
+        "0.4.9/wt-backlog-an-idea",
+    ],
+)
 def test_an_old_grammar_or_foreign_name_refuses(root: Path, name: str) -> None:
     result = _run(root, "new", "r", name)
     assert result.returncode == 1 and not (root / "worktrees/r").exists()
     assert [f.removeprefix("fix: ") for f in _fixes(result)] == [f"{_script()} list"]
+    assert "0.5.0/rc-<N>/job-<n>/wt-main" in result.stderr  # the refusal teaches the hierarchy
 
 
 def _script() -> str:
@@ -205,19 +270,20 @@ def _word(path: Path) -> str:
 
 
 def test_a_task_needs_its_job_branch_and_the_sixth_task_opens(root: Path) -> None:
-    """A task is cut from its job branch; the number of open tasks is not capped."""
-    orphan = _run(root, "new", "r", TASK)
-    assert orphan.returncode == 1 and _fixes(orphan)[0].endswith(f"worktree.py new r {JOB}")
-    assert _run(root, "new", "r", JOB).returncode == 0
+    """A task is cut from its main tree; the number of open tasks is not capped."""
+    orphan = _run(root, "new", "r", NEW_TASK)
+    assert orphan.returncode == 1 and _fixes(orphan)[0].endswith(f"worktree.py new r {NEW_JOB}")
+    assert _run(root, "new", "r", RC).returncode == 0
+    assert _run(root, "new", "r", NEW_JOB).returncode == 0
     for task in range(1, 7):
-        assert _run(root, "new", "r", f"{JOB}--J1.T{task}").returncode == 0
-    assert _run(root, "new", "r", "0.5.0-rc1/j2").returncode == 0
+        assert _run(root, "new", "r", f"0.5.0/rc-1/job-1/wt-task-{task:03d}").returncode == 0
+    assert _run(root, "new", "r", "0.5.0/rc-1/job-2/wt-main").returncode == 0
 
 
 def test_no_work_branch_refuses_with_a_fix_that_creates_it(root: Path) -> None:
     repo = root / "repos/r"
     _git(repo, "branch", "-D", "feature/0.5.0")
-    result = _run(root, "new", "r", JOB)
+    result = _run(root, "new", "r", NEW_JOB)
     assert result.returncode == 1
     (fix,) = _fixes(result)
     assert (
@@ -232,7 +298,7 @@ def test_no_work_branch_with_several_live_releases_refuses_as_the_plain_base_doe
     _git(repo, "branch", "-D", "feature/0.5.0")
     (repo / "specs/releases/0.10.0").mkdir()
     (repo / "specs/releases/0.10.0/_RELEASE.json").write_text("{}")
-    result = _run(root, "new", "r", JOB)
+    result = _run(root, "new", "r", NEW_JOB)
     assert result.returncode == 1
     (fix,) = _fixes(result)
     assert fix == (
@@ -243,38 +309,39 @@ def test_no_work_branch_with_several_live_releases_refuses_as_the_plain_base_doe
 
 @pytest.mark.parametrize(
     ("spec", "code", "out"),
-    [("Approved", 0, "worktrees/a/0.5.0-rc1/j1"), ("Draft", 1, "")],
+    [("Approved", 0, "worktrees/a/0.5.0/rc-1/job-1/wt-main"), ("Draft", 1, "")],
 )
 def test_an_associated_job_reads_the_main_repos_spec(
     root: Path, spec: str, code: int, out: str
 ) -> None:
-    """`a` carries no specs; its job reads `r`'s release on `r`'s work branch."""
+    """`a` carries no specs; its main tree reads `r`'s release on `r`'s rc tree."""
     associate(root, spec)
     if spec == "Draft":
         _set_release(root, "DEFINITION")
-    result = _run(root, "new", "a", JOB)
+    for repo in ("r", "a"):
+        assert (
+            _run(root, "new", repo, RC).returncode == 0
+        )  # the rc's own tree needs no release phase
+    result = _run(root, "new", "a", NEW_JOB)
     assert (result.returncode, result.stdout.strip()) == (code, f"[ok] {root / out}" if out else "")
-    assert [f.split(" new ")[-1] for f in _fixes(result)] == (
-        [] if code == 0 else ["r 0.5.0-rc1/define"]
-    )
-    assert _run(root, "new", "a", "0.5.0-rc1/define").returncode == 0  # definition needs none
+    assert _fixes(result) == ([] if code == 0 else [PHASE_FIX])
 
 
 def test_symlinked_worktrees_component_refuses(
     root: Path, tmp_path_factory: pytest.TempPathFactory
 ) -> None:
     (root / "worktrees").symlink_to(tmp_path_factory.mktemp("elsewhere"))
-    result = _run(root, "new", "r", JOB)
+    result = _run(root, "new", "r", NEW_JOB)
     assert result.returncode == 1 and len(_fixes(result)) == 1
     assert "symlink" in result.stderr
 
 
 def test_list_reports_ours_with_ahead_and_dirty_and_a_native_one_as_foreign(root: Path) -> None:
     repo = root / "repos/r"
-    assert _run(root, "new", "r", JOB).returncode == 0
+    assert _run(root, "new", "r", LANE).returncode == 0
     _git(repo, "worktree", "add", "-q", str(root / "native"), "-b", "native")
-    (root / "worktrees/r/0.5.0-rc1/stray").mkdir()
-    tree = root / "worktrees/r" / JOB
+    (root / "worktrees/r/0.5.0/stray").mkdir()
+    tree = root / "worktrees/r" / LANE
     (tree / "x.py").write_text("x = 1\n")
     _git(tree, "add", "x.py")
     _git(tree, "commit", "-qm", "x")
@@ -283,11 +350,11 @@ def test_list_reports_ours_with_ahead_and_dirty_and_a_native_one_as_foreign(root
     assert result.returncode == 0, result.stderr
     by_state = {row["state"]: row for row in json.loads(result.stdout)}
     row = by_state["open"]  # dirty: never `ready`, no fix shown, its exit still the merge
-    assert row["repo"] == "r" and row["name"] == JOB
+    assert row["repo"] == "r" and row["name"] == LANE
     assert row["ahead"] == 1 and row["dirty"] is True and row["age_hours"] >= 0
     assert row["fix"] == "" and row["exit"].endswith(f"merge {_word(tree)}")
     assert by_state["foreign"]["path"] == str(root / "native") and by_state["foreign"]["exit"] == ""
-    assert by_state["unregistered"]["path"] == str(root / "worktrees/r/0.5.0-rc1/stray")
+    assert by_state["unregistered"]["path"] == str(root / "worktrees/r/0.5.0/stray")
     assert not list((root / ".dadaia/states").glob("*worktree*"))
 
 
@@ -315,10 +382,10 @@ def _bug_record(root: Path, status: str | None) -> None:
 
 
 def test_a_hotfix_job_opens_with_no_rc_and_lands_on_the_work_branch(root: Path) -> None:
-    """A block-list bug is fixed as its own job — `new <repo> hotfix/<bug-id>` cuts it
+    """A block-list bug is fixed as its own job — `new <repo> <v>/wt-hotfix-<bug-id>` cuts it
     from the work branch with no rc SPEC, and its merge runs the same review and job gate."""
     _bug_record(root, "open")
-    repo, name = root / "repos/r", "hotfix/a-block-bug"
+    repo, name = root / "repos/r", "0.5.0/wt-hotfix-a-block-bug"
     opened = _run(root, "new", "r", name)
     assert (opened.returncode, opened.stdout) == (0, f"[ok] {root / 'worktrees/r' / name}\n")
     assert _git(repo, "rev-parse", "wt/" + name) == _git(repo, "rev-parse", "feature/0.5.0")
@@ -335,13 +402,13 @@ def test_a_hotfix_job_needs_its_open_bug_record_on_the_work_branch(
     root: Path, status: str | None
 ) -> None:
     _bug_record(root, status)
-    refused = _run(root, "new", "r", "hotfix/a-block-bug")
+    refused = _run(root, "new", "r", "0.5.0/wt-hotfix-a-block-bug")
     assert refused.returncode == 1 and "a-block-bug" in refused.stderr
     assert _fixes(refused) == [
         "fix: Operator action: confirm bug a-block-bug so it is registered on feature/0.5.0 as open"
         " (dd-bug-registration), then open its hotfix job again"
     ]
-    assert not (root / "worktrees/r/hotfix").exists()
+    assert not (root / "worktrees/r/0.5.0").exists()
 
 
 @pytest.mark.parametrize("state", [None, "[]", "{not json"], ids=["missing", "array", "malformed"])
@@ -359,48 +426,48 @@ def test_an_unreadable_release_state_refuses_a_job_and_creates_nothing(
         _git(repo, "add", "specs/releases")
     _git(repo, "commit", "-qm", "unreadable state")
     _git(repo, "branch", "-f", "feature/0.5.0", "HEAD")
+    assert _run(root, "new", "r", RC).returncode == 0  # the rc's own tree reads no state
 
-    refused = _run(root, "new", "r", JOB)
+    refused = _run(root, "new", "r", NEW_JOB)
 
     assert refused.returncode == 1
     assert any(
         line.startswith("[error]") for line in (refused.stdout + refused.stderr).splitlines()
     )
     assert len(_fixes(refused)) == 1
-    assert _git(repo, "branch", "--list", f"wt/{JOB}").strip() == ""
-    assert not (root / "worktrees/r" / JOB).exists()
+    assert _git(repo, "branch", "--list", f"wt/{NEW_JOB}").strip() == ""
+    assert not (root / "worktrees/r" / NEW_JOB).exists()
 
 
 @pytest.mark.parametrize(
     ("name", "word", "task"),
     [
-        ("0.5.0-rc1/a-b", "a-b", None),
-        ("0.5.0-rc1/a--J1.T1", "a", "J1.T1"),
-        ("0.5.0-rc1/a--J1.S2.T3", "a", "J1.S2.T3"),
-        ("0.5.0-rc1/a--b", "a", "b"),
-        ("0.5.0-rc1/a--T-1-1", "a", "T-1-1"),
-        ("0.5.0-rc1/1a", "1a", None),
-        ("backlog/a-b", "a-b", None),
-        ("backlog/1a", "1a", None),
-        ("hotfix/a-b", "a-b", None),
-        ("hotfix/1a", "1a", None),
-        ("a-b", None, None),
-        ("1a", "1a", None),
+        ("0.5.0/wt-backlog-a-b", "a-b", None),
+        ("0.5.0/rc-1/job-1/wt-task-001", None, "001"),
+        ("0.5.0/rc-1/job-1/wt-task-1", None, "1"),
+        ("0.5.0/rc-1/job-1/wt-task-b", None, "b"),
+        ("0.5.0/rc-1/job-1/wt-task-0001", None, "0001"),
+        ("0.5.0/rc-1/job-1/wt-main", None, None),
+        ("0.5.0/wt-backlog-a--b", "a--b", None),
+        ("0.5.0/wt-backlog-1a", "1a", None),
+        ("0.5.0/wt-hotfix-a-b", "a-b", None),
+        ("0.5.0/wt-hotfix-1a", "1a", None),
+        ("a-b", "a-b", None),
+        ("0.5.0/rc-1/wt-rc", None, None),
         ("a--b", "a--b", None),
-        ("backlog/a--b", "a--b", None),
+        ("0.5.0/wt-hotfix-a--b", "a--b", None),
     ],
 )
 def test_a_name_is_accepted_as_the_backlog_slug_and_the_task_id_grammar_say(
     name: str, word: str | None, task: str | None
 ) -> None:
-    """The job, backlog and hotfix words are the backlog `slug`; a task part is a release task
-    id, so `--` only ever separates a job from `J<n>.T<k>`; a one-segment word is no name."""
+    """The backlog and hotfix words are the backlog `slug`; a task part is three digits; a name
+    with no `wt-` leaf is no tree."""
     slug = load_owner("dd-bug-resolution", "_ledger").load_schema("backlog-v1")["$defs"]["slug"]
-    task_id = load_owner("dd-bug-resolution", "_grammar").TASK_ID_RE
     accepted = (
-        word is not None
-        and bool(re.fullmatch(slug["pattern"], word))
-        and (task is None or bool(task_id.fullmatch(task)))
+        "/wt-" in name
+        and (word is None or bool(re.fullmatch(slug["pattern"], word)))
+        and (task is None or bool(re.fullmatch(r"\d{3}", task)))
     )
     names = load_owner("dd-gitflow-default", "_worktree_names")
 
