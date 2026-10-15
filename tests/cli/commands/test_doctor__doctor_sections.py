@@ -20,9 +20,11 @@ from typing import Any
 import pytest
 from typer.testing import CliRunner
 
+from dadaia_workspace.cli.commands.doctor import _build_specs_doctor, _specs_section
 from dadaia_workspace.cli.help_digest import command_paths
 from dadaia_workspace.cli.main import app
 from dadaia_workspace.core.cli_line import git_line
+from dadaia_workspace.core.specs_version import state
 
 _runner = CliRunner()
 _REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -132,3 +134,18 @@ def test_specs_doctor_and_backlog_doctor_commands_are_gone() -> None:
     for group, verb in (("specs", "doctor"), ("backlog", "doctor")):
         result = _runner.invoke(app, [group, verb, "--help"])
         assert result.exit_code != 0, f"`dadaia {group} {verb}` still resolves"
+
+
+@pytest.mark.parametrize("kind", ["absent", "file"])
+def test_a_specs_dir_holding_no_tree_is_one_specs_section_finding_carrying_the_state_fix(
+    kind: str, tmp_path: Path
+) -> None:
+    """The specs-section builder alone decides a missing tree: one finding, `state()`'s fix."""
+    specs = tmp_path / "specs"
+    if kind == "file":
+        specs.write_text("", encoding="utf-8")
+
+    section = _specs_section(_build_specs_doctor(specs, None), None)
+
+    assert [f.fix for f in section.findings] == [state(specs)[1]], section.findings
+    assert section.failed
