@@ -50,6 +50,21 @@ def test_classification_matrix(path: str, expected: PathClass, tmp_path: Path) -
     assert classify_path(path, root=tmp_path)[0] == expected
 
 
+@pytest.mark.parametrize(
+    "path",
+    [
+        "worktrees/r/a/b/secrets/k",
+        "worktrees/r/0.5.0/wt-hotfix-b/secrets/k",
+        "worktrees/r/0.5.0/wt-backlog-s/secrets/k",
+        "worktrees/r/0.5.0/rc-1/wt-rc/secrets/k",
+        "worktrees/r/0.5.0/rc-1/job-1/wt-main/secrets/k",
+        "worktrees/r/0.5.0/rc-1/job-1/wt-task-001/secrets/k",
+    ],
+)
+def test_a_protected_glob_holds_at_every_tree_depth(path: str, tmp_path: Path) -> None:
+    assert classify_path(path, protected=("secrets/**",), root=tmp_path)[0] == P
+
+
 _A: dict[str, object] = {"context": "ctx-a", "repos": frozenset({"ctx-a", "ctx-a-infra"})}
 _DADAIA = "/ws/.dadaia/.venv/Scripts/dadaia.exe" if sys.platform == "win32" else "/ws/.dadaia/.venv/bin/dadaia"
 
