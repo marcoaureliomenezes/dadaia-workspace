@@ -1,7 +1,7 @@
 ---
 name: dd-code-review
 description: >
-  Use when reviewing a job, plain change, PR, branch or commit range, or when an audit
+  Use when reviewing a worktree (`wt-main`, `wt-rc`, a lane), PR, branch or commit range, or when an audit
   verdict needs the Bug-surface axis. Three axes reported side by side —
   Standards (repo conventions, twelve Fowler smells, SLOP.md S1-S10), Spec (the diff does
   what the approved SPEC and job files say, nothing more), Bug-surface (ledger evidence
@@ -43,7 +43,7 @@ axes are reported side by side with equal weight, so no axis hides another's fin
 - A KEEP unit the range grew is a finding.
 - A SPEC, PLAN or job file that adds a requirement applied to every task, job or deletion without its measured cost per run, or above one run of the job's `verify:` gate, is REJECTED (root map §1, the gate-cost clause).
 - A worktree's (`worktrees/AGENTS.md`) commits follow the `dd-gitflow-default` §3a rows of what they write.
-- The reviewer of a `define` tree judges each job-file `who` column against the shape rule in `dd-release-definition` §5.
+- The reviewer of a `wt-rc` tree (its define commits) judges each job-file `who` column against the shape rule in `dd-release-definition` §5.
 
 ## 4. Axis 3 — Bug-surface
 

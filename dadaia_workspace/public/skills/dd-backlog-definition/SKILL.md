@@ -12,7 +12,7 @@ description: >
 
 1. Open `specs/backlog/AGENTS.md` (the area's scoped law) and follow it.
 2. Before `backlog.py new`, read the main thread's `dd-grill-me` backlog-stage handoff (`dd-grill-me`'s `references/backlog.md`).
-3. Write in a `backlog` worktree (`worktrees/AGENTS.md`). Append via `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py new <slug> --title "…" --description "…" --provenance "<operator words or intake item + date>" --relates <slugs>|none`; validate via `.dadaia/.venv/bin/dadaia doctor` (`ledgers`
+3. Write in a `wt-backlog-<slug>` lane (`.dadaia/.venv/bin/dadaia worktree new`; `worktrees/AGENTS.md` §1). Append via `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py new <slug> --title "…" --description "…" --provenance "<operator words or intake item + date>" --relates <slugs>|none`; validate via `.dadaia/.venv/bin/dadaia doctor` (`ledgers`
    section).
 
 ## Continuous curation

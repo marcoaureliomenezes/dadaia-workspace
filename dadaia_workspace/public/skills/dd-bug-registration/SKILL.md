@@ -36,7 +36,7 @@ description: >
      --surface … --component … --context … --symptom … --repro … --expected … --correlates <ids>\|none
    ```
 2. The surface is the name of a directory tracked in the repo.
-3. In a job or `backlog/<slug>` worktree (`worktrees/AGENTS.md`), stage `BUGS.jsonl`; commit `chore(bugs): report <id>` — shape 1 of `dd-gitflow-default` §3a.
+3. In a `wt-main` or `wt-backlog-<slug>` tree (`worktrees/AGENTS.md` §1), stage `BUGS.jsonl`; commit `chore(bugs): report <id>` — shape 1 of `dd-gitflow-default` §3a.
 4. A bug belongs to the context whose tooling broke: its own `specs/bugs/`, plus an
    upstream report when the broken tool is someone else's.
 5. Hand the fix to `dd-bug-resolution` once the record exists.

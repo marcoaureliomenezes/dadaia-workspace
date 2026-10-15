@@ -41,7 +41,7 @@ Also input: `.dadaia/.venv/bin/dadaia doctor --context <ctx> --json` at HEAD.
 
 Input: every `rc-<N>/tasks/job<n>.md` the window touches and the job commits behind it (`dd-release-definition` §5 teaches the rules).
 
-1. Tasks with overlapping `W:` sets that ran in parallel (`worktrees/AGENTS.md` §3) are MEDIUM.
+1. Tasks with overlapping `W:` sets that ran in parallel (`worktrees/AGENTS.md` §2) are MEDIUM.
 2. A cancelled task keeps its row and states why; one deleted, or kept without a reason, is MEDIUM.
 3. Every path changed by a job is in its PLAN `W:` set; a breach is MEDIUM.
 4. Each AC names its test level (unit, integration, E2E, or no test with its reason); one that names none is LOW.

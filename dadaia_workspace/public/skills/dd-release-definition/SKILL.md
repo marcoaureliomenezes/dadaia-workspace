@@ -59,7 +59,7 @@ Before the SPEC or any ADR, the main thread runs `dd-grill-me` on the picked set
 ## 4. Author the SPEC, PLAN and job files
 
 1. Author the SPEC (Draft) after the grill: the picked set, its acceptance, every `superseded_by` link.
-2. Definition runs in the rc's `define` worktree (`worktrees/AGENTS.md` §1); the files' place is the releases law's.
+2. Definition runs in the rc's `wt-rc` tree, its first commits (`worktrees/AGENTS.md` §1); the files' place is the releases law's.
 3. Commit shape 5 (`dd-gitflow-default` §3a); after the operator approves SPEC and PLAN, `release.py phase IMPLEMENTATION --sha <sha>` sets `defined` (`dd-release-implementation`'s `RELEASE-EVENTS.md`).
 4. SPEC states the pick's wave ranking unprompted; SPEC says what; PLAN opens with §1 As-is review (§2) and draws the rc's DAG of jobs — Job 1 first, the Reconciliation job last, an edge where one job needs another's merge; SPEC carries `Replaces` — one bullet per current behaviour a DELETE/REBUILD row removes, or `none` with its reason.
 5. SPEC in the repo's existing domain names; only FR, AC and T- numbered; each AC names its test level (unit, integration, E2E, or no test with its reason); sizes per the releases law.
@@ -70,7 +70,7 @@ Before the SPEC or any ADR, the main thread runs `dd-grill-me` on the picked set
 - One file per job, `rc-<N>/tasks/job<n>.md`, its PLAN DAG row `Job <n>`, which names the job's wave and complete `W:` set.
 - Every job file carries a task table. Each task has id `J<n>.T<k>`, `who`, its AC, exact `W:`, owner test file and RED tests; one owner, one session (~1 h), ~100 new code lines.
 - `who` names the dispatched role: `sr` or `jr`; `pe` or `cr` for a task another persona owns. `jr`: the outcome is fully stated by its AC and `W:`; `sr`: new behaviour, design choice, root cause, RED test of a new contract, PLAN, job files, as-is review.
-- A behavior is two tasks, its RED test then its implementation, each its own dispatch and task worktree (`worktrees/AGENTS.md` §2).
+- A behavior is two tasks, its RED test then its implementation, each its own dispatch and `wt-task-<kkk>` tree (`worktrees/AGENTS.md` §1).
 - A task is `running` while its task worktree exists. A cancelled task keeps its row and reason.
 - DELETE/REBUILD tasks precede ADD tasks; a task with no statable AC is folded, or goes back to the SPEC.
 

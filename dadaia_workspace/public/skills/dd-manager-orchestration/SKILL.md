@@ -20,11 +20,11 @@ description: >
    worktree: <path>
    ```
 4. Reports land where the root `AGENTS.md` map §4 says; a report feeding another agent gets a handoff under `.dadaia/handoff/<context>/`.
-5. Open, merge and clean worktrees with `python3 .agents/skills/dd-gitflow-default/scripts/worktree.py new|merge|clean` (`worktrees/AGENTS.md`).
-6. The task is the unit of dispatch, never a job: sub-agents work disjoint tasks in parallel, one per task worktree (`worktrees/AGENTS.md` §1).
+5. Open, merge, clean and sync worktrees with `.dadaia/.venv/bin/dadaia worktree new|merge|clean|sync` (`worktrees/AGENTS.md`).
+6. The task is the unit of dispatch, never a job: sub-agents work disjoint tasks in parallel, one `wt-task-<kkk>` tree each (`worktrees/AGENTS.md` §1).
 7. Dispatch by the job file's `who:` (shape rule: `dd-release-definition` §5): `sr` → dd-sw-engineer-sr, `jr` → dd-sw-engineer-jr, `pe`/`cr` → the owning persona. Pass no model; the installed template decides.
 8. A REJECTED verdict whose finding names a `jr` task re-dispatches that task to dd-sw-engineer-sr.
-9. Dispatch a review only for a tree whose `python3 .agents/skills/dd-gitflow-default/scripts/worktree.py preflight <tree>` prints `PREFLIGHT PASS`, and hand the reviewer that line; a red tree goes back unreviewed, since the preflight replaces the implementer's own verify run before hand-off.
+9. Dispatch a review only for a tree whose `.dadaia/.venv/bin/dadaia worktree preflight <tree>` prints `PREFLIGHT PASS`, and hand the reviewer that line; a red tree goes back unreviewed, since the preflight replaces the implementer's own verify run before hand-off.
 10. A ruling carries its reproduction and a consumer sweep across every repo of the context.
 11. A rework brief names the finding's contract class, requires its RED test first and a sweep of every other site of the class, and carries the bug history to read, the seams with evidence and the merge hazards with sibling jobs.
 12. One fresh agent per task, its full scope in its first prompt; a changed scope is a new dispatch, and an agent that stops early leaves the rest to a new dispatch against the same worktree.
@@ -64,12 +64,12 @@ description: >
 |---|---|
 | Chain agents only through the main thread | Every hand-off stays traceable |
 | Merge a task only with its validation evidence | Acceptance is checked |
-| Merge a job, plain, `define` or `backlog` tree, deploy or close only after the reviewer's `APPROVED` | `worktrees/AGENTS.md` §2 |
+| Merge a `wt-main`, `wt-rc` or lane tree (`wt-backlog-*`, `wt-hotfix-*`), deploy or close only after the reviewer's `APPROVED` | `worktrees/AGENTS.md` §2 |
 | Edit production files only inside a job's or task's worktree | Each edit traces to its task |
 | Land an edit inside an open job as one of its tasks | Micro-dispatch: the ritual wait it adds outweighs the edit |
 | Keep private/project-specific details out of public assets | Security and portability |
 
 ## 4. Done when
 
-- Every job, plain, define or backlog merge names an APPROVED verdict file; every dispatch prompt carries that block.
+- Every `wt-main`, `wt-rc` or lane merge names an APPROVED verdict file; every dispatch prompt carries that block.
 - Every conflict either resolved via evidence-based authority or reported.
