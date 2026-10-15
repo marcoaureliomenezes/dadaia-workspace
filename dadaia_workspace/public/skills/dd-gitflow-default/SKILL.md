@@ -27,7 +27,7 @@ The branch contract by role; the names are `specs/constitution.md`'s `gitflow:` 
 9. After the merge, the main thread asks the operator one question: **promote or continue?** — and, for promote, the next release `<id>` or none. Continue = the next candidate's `python3 .agents/skills/dd-release-implementation/scripts/release.py new <id>`; promote = step 10.
 10. Promote: open the PR integration → principal (the reviewer's `APPROVED` on the integration tip, §3b); its merge is the deploy.
 11. After the promote PR merges, tag the work tip as `archive/<work-name>`; once the next release `<id>` is named (step 9), rename the work branch, never cut a new one: `git -C <repo> branch -m <work><old> <work><id>` (and its remote ref, when one exists: `git -C <repo> push -u origin <work><id> :<work><old>`). On it a `wt-backlog-<slug>` lane runs `python3 .agents/skills/dd-release-implementation/scripts/release.py ship --sha <sha>`, then `release.py new <id>` in the new candidate's `wt-rc`. Until then work continues on the old-named branch; the rename carries every commit, the ship included, to the next work → integration PR.
-12. A `dadaia worktree` tree and its branch complete under `worktrees/AGENTS.md` §2, which owns their merge and cleanup lifecycle.
+12. A `.dadaia/.venv/bin/dadaia worktree` tree and its branch complete under `worktrees/AGENTS.md` §2, which owns their merge and cleanup lifecycle.
 
 - Rewriting the pushed history of, or force-pushing, the work branch or a branch that advances only by PR is refused unless the operator authorizes that act in its own turn.
 
