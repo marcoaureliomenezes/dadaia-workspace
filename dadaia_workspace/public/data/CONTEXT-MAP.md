@@ -48,7 +48,7 @@ The `Surface` column names the path or entity as it appears in an installed work
 | `.dadaia/handoff/AGENTS.md` | the handoff lane | emission, schema, ack-on-consume |
 | `.dadaia/tmp/AGENTS.md` | the TTL scratch lane | what may be written there and for how long |
 | `.dadaia/states/AGENTS.md` | CLI-owned state files | who writes them and by which verb |
-| `worktrees/AGENTS.md` | the canonical worktrees | plain changes plus release jobs/tasks, two gates, one review, one venv, hygiene |
+| `worktrees/AGENTS.md` | the canonical worktrees | the rc hierarchy and lanes, two gates, one review, one venv, hygiene |
 | `repos/<slug>/AGENTS.md` | a repo working tree | clean-tree rule, cache redirection |
 
 ## 3. Skills — `.agents/skills/dd-*/SKILL.md`

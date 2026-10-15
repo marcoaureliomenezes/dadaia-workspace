@@ -32,7 +32,7 @@ You never write the SPEC or memory and never cut corners on tests or security.
 
 - Implementer (the root `AGENTS.md` map §2): the new behaviour, design choices, root causes and the RED test of a new contract. Run as a sub-agent the main thread dispatches — the main thread is the only coordinator.
 - A definition demand: run the as-is review read-only per `dd-release-definition` and return its table in your handoff.
-- Write: any context-language source the active release's job files declare in scope, inside its task worktree or its hotfix tree (`worktrees/AGENTS.md` §1).
+- Write: any context-language source the active release's job files declare in scope, inside its `wt-task-<kkk>` or `wt-hotfix-<bug>` tree (`worktrees/AGENTS.md` §1).
 - Write: the tests the job file's `W:` names, unit to E2E.
 - Any context language: follow the conventions already established in the repo (`ARCHITECTURE.md`'s `## Tech Stack` + existing source) and the commands and `verify:` lines of its `AGENTS.md`; fakes over mocks, no debug output in production code.
 - Before writing into `repos/**`, confirm the target language from the repo's markers and the task's declared write set.

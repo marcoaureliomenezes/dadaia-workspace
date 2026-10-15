@@ -49,14 +49,14 @@
 - The Bash hook wrapper accepts the workspace venv's POSIX or Windows Python; when neither is executable, it warns and exits 0, and each context-injection lane prints the `uvx dadaia-workspace init <workspace>` fix.
 - Path classes: ADDITIVE (`.dadaia/AGENTS.md`'s output and ephemeral zones) writable; PROTECTED (projected law files and hook wiring, `.dadaia/states`, `hooks`, `agentic`, `sessions`, `.dadaiaignore` and its `[protected]` globs) blocked; the rest MUTATING.
 - Every BLOCK carries exactly one fix line: `fix: <command>`, `fix: Agent action: <one act>` for an act an agent performs, or `fix: Operator action: <one act>` only for an ADR acceptance, a secret, a `.dadaiaignore` or PROTECTED edit, a ruling the law names, or an act outside the agents' reach (relaunching the session); a BLOCK whose fix is itself blocked is a Stall, CRITICAL.
-- Git chokepoints (branch contract and scope: `dd-gitflow-default` §2a): pre-push: `.dadaia/AGENTS.md` §3; `worktree.py merge` refuses a job, plain, `define` or `backlog` tree without a valid APPROVED verdict bound to its diff, and a job whose `verify:` does not exit 0; the PR gate is discipline (`dd-gitflow-default` §3b).
+- Git chokepoints (branch contract and scope: `dd-gitflow-default` §2a): pre-push: `.dadaia/AGENTS.md` §3; `dadaia worktree merge` refuses a `wt-main`, `wt-rc`, hotfix or backlog tree without a valid APPROVED verdict bound to its diff, and a tree whose `verify:` does not exit 0 (`worktrees/AGENTS.md` §2); the PR gate is discipline (`dd-gitflow-default` §3b).
 - The binding: `.dadaia/.venv/bin/dadaia context show --json`. The gate reads no SDD artifact; procedure is skill-taught and audit-measured, never gated.
 - Common behaviour lives in skills and `AGENTS.md`; a persona or hook carries only the surface its harness cannot do without; a harness fact lives in one registry row.
 
 ## 4. Where things are written
 
 - Root holds only: `<!-- root -->`; any other entry, the operator's included, needs a pattern in `.dadaiaignore`, which only the operator edits.
-- Temp: `.dadaia/tmp/<agent>/<YYYYMMDD>/`; handoffs: `.dadaia/handoff/<context>/`; HTML reports: `.dadaia/reports/<context>/`; worktrees: `worktrees/<repo>/<name>/`; caches: `.dadaia/tmp/<tool>-cache/` (absolute, harness env); anything an MCP server needs: `.dadaia/mcps/<server>/`.
+- Temp: `.dadaia/tmp/<agent>/<YYYYMMDD>/`; handoffs: `.dadaia/handoff/<context>/`; HTML reports: `.dadaia/reports/<context>/`; worktrees: `worktrees/<repo>/<v>/…`; caches: `.dadaia/tmp/<tool>-cache/` (absolute, harness env); anything an MCP server needs: `.dadaia/mcps/<server>/`.
 - A repo tree carries source and its own artifacts only — never `.dadaia/`; caches redirect by configuration (`repos/<slug>/AGENTS.md`); unexplained files are presumed yours, uncommitted work not yours is never discarded or restored, and no infrastructure is probed on a guess.
 - Credentials live outside the workspace, in the operator's own file: never create, copy, persist, commit, print or report a secret, anywhere; the operator sets a secret from a real terminal, a job that uses it verifies it (never its name), and text is scrubbed before commit, not only at push, with generic names in review and QA text.
 - Register every dev server through `dd-cli-library`.
@@ -76,7 +76,7 @@
 | handoff | `.dadaia/handoff/AGENTS.md` | emission, schema, ack |
 | tmp / states | `.dadaia/tmp/AGENTS.md`, `.dadaia/states/AGENTS.md` | TTL, state files |
 | a repo | `repos/<slug>/AGENTS.md` | clean tree, caches, tests |
-| worktrees | `worktrees/AGENTS.md` | plain changes plus release jobs/tasks, two gates, one review, one venv |
+| worktrees | `worktrees/AGENTS.md` | the rc hierarchy and lanes, two gates, one review, one venv |
 
 ## 6. Skills — `.agents/skills/dd-*`
 
