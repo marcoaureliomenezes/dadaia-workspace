@@ -47,7 +47,7 @@
 - reports validate — Validate one or more agent handoff JSON files.
 
 ## dadaia specs — SDD release-lifecycle structural checks and helpers.
-- specs init — Bring a repo's specs/ to the canon, never committing.
+- specs init — Bring a repo's specs/ to the canon, committing only the scaffold on a new work branch.
 - specs upgrade — Upgrade a specs/ tree to the canonical pattern version.
 
 ## dadaia worktree — Run a worktree verb of the installed dd-gitflow-default `worktree.py`.
