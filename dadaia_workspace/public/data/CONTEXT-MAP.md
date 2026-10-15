@@ -1,6 +1,6 @@
 # CONTEXT-MAP — the context balance of a dadaia-workspace
 
-Library document. Projected nowhere: `public stage` copies it into `.dadaia/agentic/data/`
+Library document. Projected nowhere: `public install` copies it into `.dadaia/agentic/data/`
 with the rest of `data/`, and no projection rule installs it into a runtime tree.
 
 One row per surface: what it is for and what belongs in it. A surface's size is a soft

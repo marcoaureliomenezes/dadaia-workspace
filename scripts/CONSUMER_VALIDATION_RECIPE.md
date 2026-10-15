@@ -15,7 +15,7 @@
 - F-02 seed `.dadaia/nonsense` and a 2-day-old file under `.dadaia/tmp/`; `$D doctor` → non-zero, `WS-dadaia-slop` and `WS-tmp-expired` lines; `$D doctor --fix` → slop moved under `.dadaia/reaped/<YYYYMMDD>/`; `$D doctor` → exit 0.
 - F-03 `$D certify --json` → exit 0, every check passes: `workspace-init`, `capability-contract`, `exact-version-reconciliation`, `specs-scaffold-and-doctor`, `context-empty-remote-baseline`, `context-list-show-json`, `context-bind`, `context-specs-doctor`, `reports-handoff-validation`, `context-dead-alive-delete-roundtrip`.
 - F-04 `$D doctor`; `$D public doctor`; `$D specs init --specs-dir repos/vp/specs` then `$D doctor --specs-dir repos/vp/specs` → exit 0; bare `$D specs init` at the workspace root → non-zero, no `specs/` created.
-- F-05 `$D public stage`; `$D public install`; `$D public doctor` → exit 0, every asset `[ok]`.
+- F-05 `$D public install`; `$D public doctor` → exit 0, every asset `[ok]`.
 - F-06 `$D context create alpha --main-repo file:///tmp/f06/src.git`; `$D context list --json`; `$D context show alpha --json`; `$D context dead alpha`; `$D context alive alpha`; `$D doctor --context alpha` → 0 errors, 0 warnings; `$D context dead ghost` → non-zero, no traceback.
 - F-07 `export DADAIA_SESSION_ID=f07`; unbound `$D context show --json` → `{"context": null}`; `$D context bind beta` twice → same session id, one session record.
 - F-08 pipe PreToolUse JSON payloads into `python -m dadaia_workspace.hooks.pre_gate`: with vp bound, `repos/vp/specs/bugs/BUGS.jsonl` → block, `repos/vp/specs/audits/x/AUDIT.md` → allow, `.dadaia/reports/vp/r.html` → allow; `.dadaia/sessions/x` → block; a new root entry → block; each block carries one `fix:` line that is itself allowed.

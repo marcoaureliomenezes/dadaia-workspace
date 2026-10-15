@@ -1,7 +1,5 @@
 """dadaia public subcommands."""
 
-from pathlib import Path
-
 import typer
 from rich.console import Console
 
@@ -9,41 +7,14 @@ from dadaia_workspace import container
 from dadaia_workspace.core.cli_line import fix_line, spell_fix
 from dadaia_workspace.core.exceptions import PublicAssetError
 from dadaia_workspace.core.model_registry import TEMPLATES
-from dadaia_workspace.core.models.doctor_report import DoctorStatus
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 
 app = typer.Typer(help="Manage distributed public agent assets.")
 console = Console()
 
 
-@app.command()
-def stage() -> None:
-    """Stage packaged public assets into .dadaia/agentic/."""
-    workspace_root = resolve_workspace_root()
-    # Defence-in-depth: fail staging on broken
-    # agent→skill references so a stage with dangling skills never silently succeeds (doctor
-    # also catches these post-hoc; this blocks them at the source).
-    from dadaia_workspace.infrastructure.entity_doctor import check_agent_skill_refs
-
-    public_dir = Path(__file__).resolve().parent.parent.parent / "public"
-    ref_drift = [r for r in check_agent_skill_refs(public_dir) if r.status is DoctorStatus.DRIFT]
-    if ref_drift:
-        console.print("[red]✗ staging blocked — broken agent→skill references:[/red]")
-        for issue in ref_drift:
-            console.print(f"  {issue.render()}", markup=False)
-        raise typer.Exit(1)
-    staged = container.build_public_service().stage(workspace_root)
-    if staged:
-        console.print(f"[green]✓[/green] {len(staged)} asset group(s) staged:")
-        for item in staged:
-            console.print(f"  {item}", markup=False)
-    else:
-        console.print("[dim]No assets to stage.[/dim]")
-
-
 @app.command(
-    epilog="Recipe: "
-    + " && ".join(fix_line(None, "public", v) for v in ("stage", "install", "doctor"))
+    epilog="Recipe: " + " && ".join(fix_line(None, "public", v) for v in ("install", "doctor"))
 )
 def install(
     force: bool = typer.Option(False, "--force", help="Overwrite existing files"),

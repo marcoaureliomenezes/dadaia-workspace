@@ -6,7 +6,7 @@ Each state file is written only by its owning verb or skill script; `privacy_den
 
 ## 1. Canon
 
-The closed canon of `.dadaia/states/`, rendered at `.dadaia/.venv/bin/dadaia public stage`; any other entry is slop `.dadaia/.venv/bin/dadaia doctor` reports.
+The closed canon of `.dadaia/states/`, rendered at `.dadaia/.venv/bin/dadaia public install`; any other entry is slop `.dadaia/.venv/bin/dadaia doctor` reports.
 
 <!-- canon -->
 
