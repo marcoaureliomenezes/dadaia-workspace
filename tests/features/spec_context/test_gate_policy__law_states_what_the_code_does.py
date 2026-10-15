@@ -102,7 +102,7 @@ def test_the_map_lists_every_block_the_code_has(
     """§3's `blocks:` list is set-equal
     to the code's blocks, each naming its evidence, merge-only included; the fail-open item
     `(registered_slugs)` names the merge-only block; no §3 line claims a PR check, the line naming
-    APPROVED names `worktree.py merge`."""
+    APPROVED names `dadaia worktree merge`."""
     section = _MAP.read_text("utf-8").split("## 3.")[1].split("\n## ")[0].splitlines()
     line = next((ln for ln in section if "blocks:" in ln), "")
     items = line.partition("blocks:")[2].rstrip(".").split(";")
@@ -111,7 +111,7 @@ def test_the_map_lists_every_block_the_code_has(
     assert line and len(named) == len(items) and sorted(named) == sorted(rows)
     assert [k for k, held in rows.items() if not held] == []
     assert any("merge-only" in ln for ln in section if "(registered_slugs)" in ln)
-    assert all("worktree.py merge" in ln for ln in section if "APPROVED" in ln)
+    assert all("dadaia worktree merge" in ln for ln in section if "APPROVED" in ln)
     assert not any("green" in ln for ln in section)
 
 
