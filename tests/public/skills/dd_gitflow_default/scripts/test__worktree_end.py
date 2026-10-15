@@ -713,6 +713,14 @@ def test_an_open_task_blocks_its_main_tree_merge(root: Path) -> None:
     assert git(root / "repos/r", "rev-parse", WORK).strip() == work
 
 
+def test_a_workflow_file_named_test_is_not_a_test_when_no_tests_line_is_declared(
+    tmp_path: Path,
+) -> None:
+    end = _law_end(tmp_path, b"verify: python scripts/ci.py job\n")
+
+    assert end._is_test_path(".github/workflows/test_on_push.yml", []) is False
+
+
 def _plain_tree(root: Path, name: str) -> Path:
     """A tree of any name made with raw git, as an old-layout workspace may still hold."""
     repo = root / "repos/r"
