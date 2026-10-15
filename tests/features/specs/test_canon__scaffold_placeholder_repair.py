@@ -2,7 +2,7 @@
 
 Old scaffolds shipped a raw ``memory/product/feature.md`` template
 (``SLUG_PLACEHOLDER`` & friends) that NO verb could remediate. Now: the doctor flags it as fixable
-(MEM-PLACEHOLDER-1), ``--fix`` removes it, and ``specs upgrade`` repairs even a
+(MEM-PLACEHOLDER-1) as an unfixable report, ``--fix`` keeps it, and ``specs upgrade`` repairs even a
 current-version tree (dry-run reports without deleting). Exact-token detection means
 filled atoms are never touched.
 """
@@ -54,15 +54,19 @@ def _placeholder_atom(tmp_path: Path) -> tuple[Path, Path]:
     return specs, atom
 
 
-def test_fix_removes_placeholder_and_tree_is_clean(tmp_path: Path) -> None:
-    specs, atom = _placeholder_atom(tmp_path)
-    [flagged] = [i for i in _doctor(specs).check() if i.code == "MEM-PLACEHOLDER-1"]
-    assert (flagged.fixable, flagged.verdict) == (True, "error")
+_FILL_OR_DELETE = "Agent action: fill or delete the atom"
 
-    assert any(i.code == "MEM-PLACEHOLDER-1" for i in _doctor(specs).fix())
-    assert not atom.exists()
-    errors = [f"{i.code}: {i.message}" for i in _doctor(specs).check() if i.verdict == "error"]
-    assert errors == []
+
+def test_fix_reports_placeholder_and_leaves_it_byte_for_byte(tmp_path: Path) -> None:
+    specs, atom = _placeholder_atom(tmp_path)
+    before = atom.read_bytes()
+    [flagged] = [i for i in _doctor(specs).check() if i.code == "MEM-PLACEHOLDER-1"]
+    assert (flagged.fixable, flagged.verdict, flagged.fix) == (False, "error", _FILL_OR_DELETE)
+
+    _doctor(specs).fix()
+    assert atom.read_bytes() == before
+    [still] = [i for i in _doctor(specs).check() if i.code == "MEM-PLACEHOLDER-1"]
+    assert still.fix == _FILL_OR_DELETE
 
 
 def test_filled_atom_is_never_flagged_or_removed(tmp_path: Path) -> None:
@@ -146,13 +150,15 @@ Document exclusions and failure behavior here.
 
 
 @pytest.mark.medium
-def test_the_legacy_memory_template_verbatim_is_still_fixable_and_removed(tmp_path: Path) -> None:
+def test_the_legacy_memory_template_verbatim_is_reported_and_kept(tmp_path: Path) -> None:
     specs = _fresh_specs(tmp_path)
     atom = specs / "memory" / "product" / "feature.md"
     atom.write_text(_LEGACY_TEMPLATE, encoding="utf-8")
-    assert is_placeholder_atom(atom) is True
-    assert any(i.code == "MEM-PLACEHOLDER-1" for i in _doctor(specs).fix())
-    assert not atom.exists()
+    before = atom.read_bytes()
+    [flagged] = [i for i in _doctor(specs).check() if i.code == "MEM-PLACEHOLDER-1"]
+    assert (flagged.fixable, flagged.fix) == (False, _FILL_OR_DELETE)
+    _doctor(specs).fix()
+    assert atom.read_bytes() == before
 
 
 @pytest.mark.medium

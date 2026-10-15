@@ -205,3 +205,18 @@ def test_mem_drift1_table(
 def test_mem_drift1_real_live_introspection_returns_package_names() -> None:
     live = doctor_memory._live_feature_package_names()
     assert "specs" in live and all(isinstance(name, str) and name for name in live)
+
+
+def test_unfilled_placeholder_atom_is_reported_with_the_fill_or_delete_line(tmp_path: Path) -> None:
+    specs = _make_specs_with_memory(tmp_path)
+    atom = specs / "memory" / "product" / "a" / "x.md"
+    atom.write_text(
+        "---\nslug: SLUG_PLACEHOLDER\ntitle: TITLE_PLACEHOLDER\ntldr: t\nsummary: s\n---\n\n# X\n",
+        encoding="utf-8",
+    )
+    [issue] = MemoryValidator(specs).check_placeholder_atoms()
+    assert (issue.code, issue.fixable, issue.fix) == (
+        "MEM-PLACEHOLDER-1",
+        False,
+        "Agent action: fill or delete the atom",
+    )
