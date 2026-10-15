@@ -271,7 +271,7 @@ def test_failed_fast_forward_tells_a_stray_from_a_moved_work_branch(root: Path) 
     verdict = 'elif args[:2] == ["reports", "validate"]:\n'
     patch_cli(root, verdict, f"{verdict}    import subprocess; {move}\n")
     moved = run(root, "merge", TREE)
-    assert _argv(moved) == ["git", "-C", str(tree), "rebase", WORK] and tree.exists()
+    assert _argv(moved) == ["dadaia", "worktree", "sync", str(tree)] and tree.exists()
 
 
 def test_merge_lists_ignored_files_and_keeps_them_by_its_fix(root: Path) -> None:
@@ -393,19 +393,19 @@ def test_a_verdict_carries_over_only_an_identical_patch_and_message_series(root:
 def test_a_moved_work_branch_refuses_and_its_fix_rebase_keeps_only_an_identical_patch(
     root: Path, change: str
 ) -> None:
-    """A moved work branch refuses with the rebase fix line, both branches
+    """A moved work branch refuses with the `sync` fix line, both branches
     unchanged; after it, a patch-identical rebase lands under the old verdict,
     a changed patch refuses for review."""
     repo, tree = root / "repos/r", root / TREE
     approve(root, mine := land(root, "src/a.py"))
     work = commit(root / RC_TREE, "src/z.py")
     moved = run(root, "merge", TREE)
-    assert _argv(moved) == ["git", "-C", str(tree), "rebase", WORK]
+    assert _argv(moved) == ["dadaia", "worktree", "sync", str(tree)]
     assert [
         git(repo, "rev-parse", WORK).strip(),
         git(tree, "rev-parse", "HEAD").strip(),
     ] == [work, mine]
-    _fix(root, moved)
+    assert run(root, "sync", str(tree)).returncode == 0  # the fix, run as the verb
     if change == "new-patch":
         (tree / "src/a.py").write_text("x = 2\n")
         git(tree, "commit", "-q", "--amend", "-C", "HEAD", "-a")
