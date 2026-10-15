@@ -90,6 +90,7 @@ _LEAK = re.compile(
 )
 
 
+@pytest.mark.medium
 def test_no_command_help_leaks_an_internal_id() -> None:
     """Every rendered --help states behaviour in the reader's
     words — no requirement, task or audit id, no code seam name."""
@@ -158,6 +159,7 @@ def test_every_advertised_verb_and_harness_exists() -> None:
     assert payload["harnesses"]["layer_1"] == list(L1_ENTRY_HARNESSES)
 
 
+@pytest.mark.medium
 def test_every_help_example_renders_the_venv_cli() -> None:
     """The gate blocks a bare `dadaia` first token,
     so a command path in any --help follows only the `fix_line` rendering of the CLI."""
