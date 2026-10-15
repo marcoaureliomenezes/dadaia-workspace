@@ -88,6 +88,23 @@ def test_a_level_folder_holding_a_sibling_tree_keeps_its_file(root: Path) -> Non
     assert (root / "worktrees/r" / JOB2).is_dir()
 
 
+def test_clean_of_the_last_tree_under_a_version_removes_the_version_folder(root: Path) -> None:
+    version = root / "worktrees/r/0.5.0"
+    assert (version / "AGENTS.md").is_file()
+    assert run(root, "clean", f"worktrees/r/{NEW_JOB}").returncode == 0
+    assert run(root, "clean", f"worktrees/r/{RC}").returncode == 0
+    assert not version.exists()
+
+
+def test_a_version_folder_holding_an_open_lane_keeps_its_file(root: Path) -> None:
+    lane = "0.5.0/wt-backlog-an-idea"
+    assert open_tree(root, lane).is_dir()
+    assert run(root, "clean", f"worktrees/r/{NEW_JOB}").returncode == 0
+    assert run(root, "clean", f"worktrees/r/{RC}").returncode == 0
+    assert (root / "worktrees/r/0.5.0/AGENTS.md").is_file()
+    assert (root / "worktrees/r" / lane).is_dir()
+
+
 def test_a_merge_with_no_remote_still_lands_and_keeps_a_sibling_tree(root: Path) -> None:
     """No remote is assumed: nothing to delete there, and a parent folder still holding a tree stays."""
     assert open_tree(root, JOB2).is_dir()
