@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+from dadaia_workspace.core.exceptions import DadaiaError
 from dadaia_workspace.core.gitflow import (
     DEFAULT,
     Gitflow,
@@ -200,3 +201,14 @@ def test_several_work_branches_refuse_with_the_skills_fix_line(tmp_path: Path) -
     assert refused.value.fix == (
         f"Agent action: merge feature/0.5.0 into feature/0.6.0, then run git -C {repo} branch -d feature/0.5.0"
     )
+
+
+@pytest.mark.medium
+def test_several_work_branches_refuse_as_the_one_error_type_that_carries_its_fix(
+    tmp_path: Path,
+) -> None:
+    repo = _repo(tmp_path, ["feature/0.5.0", "feature/0.6.0"], None)
+    with pytest.raises(DadaiaError) as refused:
+        work_branch(repo, Gitflow("main", "dev", "feature/"), "r")
+    assert refused.value.message == "2 work branches"
+    assert refused.value.fix == f"git -C {repo} branch -d feature/0.5.0"
