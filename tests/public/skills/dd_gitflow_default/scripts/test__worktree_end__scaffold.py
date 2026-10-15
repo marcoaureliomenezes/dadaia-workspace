@@ -116,8 +116,8 @@ def test_a_job_tree_without_a_tests_tmp_folder_passes(root: Path) -> None:
     _clears(root, job)
 
 
-@pytest.mark.parametrize("name", ["0.5.0-rc1/define", "j1"])
-def test_a_define_or_plain_tree_over_a_tracked_folder_of_its_name_passes(
+@pytest.mark.parametrize("name", ["0.5.0-rc1/define", "backlog/j1"])
+def test_a_define_or_backlog_tree_over_a_tracked_folder_of_its_name_passes(
     root: Path, name: str
 ) -> None:
     commit(root / "repos/r", f"tests/tmp/{name.rsplit('/')[-1]}/test_x.py", TEST)
