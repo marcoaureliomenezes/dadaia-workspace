@@ -233,8 +233,8 @@ _APPEND = ["append", "--bug-id", "x", "--title", "t", "--severity", "LOW", "--su
     [
         (["stats"], ("0.5.0-rc1/j5",), "{rerun} --specs {ws}/repos/demo/specs", ""),
         (_APPEND, ("0.5.0-rc1/define", "0.5.0-rc1-define/.agents"),
-         "{py} {ws}/dd-gitflow-default/scripts/worktree.py list", ""),
-        (_APPEND, (), "{py} {ws}/dd-gitflow-default/scripts/worktree.py list", ""),
+         "{ws}/.dadaia/.venv/bin/dadaia worktree list", ""),
+        (_APPEND, (), "{ws}/.dadaia/.venv/bin/dadaia worktree list", ""),
     ],
 )  # fmt: skip
 def test_a_missing_specs_tree_is_refused_never_created(
