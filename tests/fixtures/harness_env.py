@@ -122,6 +122,7 @@ def suite_env(
         "LOCALAPPDATA": str(home / "AppData" / "Local"),
         "KIMI_CODE_HOME": str(home / ".kimi-code"),
     }
+    env.pop("DADAIA_WT", None)
     for key in unset:
         env.pop(key, None)
     return env | dict(overrides or {})
