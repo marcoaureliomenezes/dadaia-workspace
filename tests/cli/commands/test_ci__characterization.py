@@ -27,7 +27,7 @@ def test_tag_deletion_is_allowed_with_the_literal_scan_mode(
     subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
     (repo / "specs").mkdir()
     (repo / "specs" / "constitution.md").write_bytes(
-        b'---\nspecs_pattern_version: 12\ngitflow: {"principal": "main", '
+        b'---\nspecs_pattern_version: 13\ngitflow: {"principal": "main", '
         b'"integration": "develop", "work": "feature/"}\n---\n'
     )
     (repo / "seed.txt").write_bytes(b"seed\n")
@@ -61,6 +61,6 @@ def test_tag_deletion_is_allowed_with_the_literal_scan_mode(
     )
     assert (repo / "seed.txt").read_bytes() == b"seed\n"
     assert (repo / "specs" / "constitution.md").read_bytes() == (
-        b'---\nspecs_pattern_version: 12\ngitflow: {"principal": "main", '
+        b'---\nspecs_pattern_version: 13\ngitflow: {"principal": "main", '
         b'"integration": "develop", "work": "feature/"}\n---\n'
     )
