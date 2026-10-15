@@ -195,7 +195,6 @@ flowchart TB
 - 0114 — Operator protections extend to worktrees: a path protected under repos/<r>/X is protected under worktrees/<r>/*/X, through the operator-protected path class (DEC-11) in the library
 - 0118 — Every projected hook carries a timeout (10 s tool lanes, 30 s session lanes); when the deciding pre-gate exceeds its 10 s the harness lets the write through unjudged, a declared fail-open window
 - 0120 — A local branch that removing a repo would lose is archived on origin as the tag archive/<branch>/<sha7>, never pushed as a branch; a wt/ branch is never pushed as a branch
-- 0125 — worktree.py new derives every worktree from the repo's work branch, creates an impl worktree only on an approved trio, and caps impl at 5 per release and release at 1 per repo and version
 - 0127 — Every ledger entry is born against the ledger that exists and re-judged at merge: backlog and bugs are correlated before they are written, a release maps every backlog entry, bug and finding it carries both ways; dd-code-review holds the per-kind merge checklist
 - 0133 — DEC-11: operator-protected paths are a section of .dadaiaignore, read by the one gate in every harness; a file-tool write matching one is refused under repos/<r>/ and worktrees/<r>/*/ alike; Bash is not covered and the law says so
 - 0135 — Each grammar has one owner, its writer: the skill script that writes an Origin line, a task line, a JSONL record or the denylist also parses it, and the package reads it only through that script
@@ -225,7 +224,6 @@ flowchart TB
 - 0183 — The files resolve's blame skips are declared by a dadaia-generated git attribute in the repo's .gitattributes
 - 0184 — ADR 0181 item 4 also covers SLOP.md:16: row S6 points at the V33 family check of scripts/guards/slop.py
 - 0187 — A bug record carries found_in, stamped at registration; introduced_in is derived on read, never typed; a record leaves the ledger only by an accepted ADR
-- 0191 — One worktree tree per job; no worktree kinds and no kind allowed sets
 - 0192 — Closure is the Reconciliation job; a memory atom and its derived sections land in one merge
 - 0210 — Any caused_by other than none makes the fix a REBUILD
 - 0211 — amends 0190: the stage level runs lint, typecheck, guards and the small tier
@@ -245,7 +243,6 @@ flowchart TB
 - 0237 — Retire public freeze and balance while preserving mandatory job review
 - 0238 — Replace document content hashes with structural entity checks and reconciled product memory
 - 0240 — The roster grows from three roles to five (dd-product-engineer, dd-code-reviewer, dd-sw-engineer-sr, dd-sw-engineer-jr, dd-researcher); model templates name tiers by alias
-- 0241 — Release closure spares the next candidate's define tree
 - 0242 — 0.5.0 publishes with zero backlog destined to it; clone detection, candidate-closure D1-D10 and launch D3a/D4 leave ADR 0122
 - 0243 — P-01, P-09, P-14 and P-15 stand as ARCHITECTURE.md states them, each on its current check
 - 0244 — A bug record carries no found_in, and archiving a terminal record is a commit-shape act that needs no ADR
@@ -268,6 +265,7 @@ flowchart TB
 - 0261 — ADR 0142 stays: no hard line-count limit gates any change; line counts are a readout; its measured_by is repaired
 - 0262 — The per-job CI wall-clock budget of ADR 0119 is re-frozen at measured durations, judged by dd-code-reviewer from the CI job durations
 - 0263 — A fix line has three forms: a runnable command, 'Agent action: <one act>' for an act an agent performs, and 'Operator action: <one act>' only for an act the law reserves to the human
+- 0264 — Worktrees are a hierarchy under worktrees/<repo>/<v>/: an rc integration branch wt-rc, a base derived from the path, the plain kind deleted, and the CLI enforced by a git hook
 <!-- /dadaia:fixed adr-list -->
 
 <!-- dadaia:fixed slop-code -->
