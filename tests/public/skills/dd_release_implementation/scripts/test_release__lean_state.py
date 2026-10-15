@@ -471,3 +471,79 @@ def test_new_on_a_milestone_less_closure_state_creates_the_next_candidate(
     assert f"{release}/rc-2/SPEC.md" in born.stdout
     assert release.joinpath("rc-2/SPEC.md").is_file()
     assert spec.read_bytes() == closed
+
+
+# --- one reader of the live candidate's closure summary ---
+
+
+def _at(hour: int, kind: str, text: str, **extra: object) -> dict[str, object]:
+    return {**_entry(kind, text, **extra), "ts": f"2026-10-08T{hour:02d}:00:00Z"}
+
+
+def _stacked(
+    tmp_path: Path, origin: str, log: list[dict[str, object]], bug_ids: tuple[str, ...] = ()
+) -> Path:
+    """A live candidate defined at 10:00 whose log holds a previous candidate's history first."""
+    specs = _specs(tmp_path)
+    release = _write_release(specs, phase="CLOSURE", log=log)
+    spec = release / "rc-1" / "SPEC.md"
+    spec.write_text(spec.read_text("utf-8").replace("operator-demand", origin), encoding="utf-8")
+    (specs / "backlog").mkdir()
+    (specs / "backlog" / "BACKLOG.json").write_text(
+        json.dumps({"active": [{"id": "x-1"}]}), encoding="utf-8"
+    )
+    (specs / "bugs").mkdir()
+    (specs / "bugs" / "BUGS.jsonl").write_text(
+        "".join(json.dumps({"id": i, "status": "open"}) + "\n" for i in bug_ids), encoding="utf-8"
+    )
+    return specs
+
+
+def _origin_messages(script: Path, specs: Path) -> list[str]:
+    checked = _run(script, "check", "--specs", str(specs), "--json")
+    return [row["message"] for row in json.loads(checked.stdout)]
+
+
+_PRIOR = "delivered: before; carried: {}; backlog exits: {}"
+_BORN = _at(10, "note", "Candidate born on 0.5.0")
+_MEMORY = _at(12, "memory", "m", since="1111111", until="2222222", reviewed=[], changed=[])
+
+
+def test_origin_ids_found_only_in_the_previous_candidates_summary_are_untraced(
+    script: Path, tmp_path: Path
+) -> None:
+    log = [_at(9, "summary", _PRIOR.format("none", "x-1")), _BORN, _MEMORY]
+    specs = _stacked(tmp_path, "backlog:x-1", log)
+    assert "Origin backlog:x-1 untraced" in _origin_messages(script, specs)
+
+
+def test_a_previous_candidates_carry_does_not_satisfy_allow_open(
+    script: Path, tmp_path: Path
+) -> None:
+    log = [
+        _at(9, "summary", _PRIOR.format("a-bug", "none")),
+        _BORN,
+        _at(11, "note", 'Operator authorization verbatim: "carry a-bug open"'),
+        _MEMORY,
+    ]
+    specs = _stacked(tmp_path, "operator-demand", log, ("a-bug",))
+    refused = _run(
+        script, "ship", "--sha", "3333333", "--allow-open", "a-bug", "--specs", str(specs)
+    )
+    assert refused.returncode == 1
+    assert refused.stderr.splitlines()[-1] == (
+        "fix: Agent action: add a-bug to the carried field of the kind: summary entry"
+    )
+
+
+@pytest.mark.parametrize("word", ["delivered", "carried", "backlog", "exits", "none"])
+def test_a_bug_id_equal_to_a_grammar_word_is_not_traced_by_the_summary_label(
+    script: Path, tmp_path: Path, word: str
+) -> None:
+    log = [
+        _BORN,
+        _at(11, "summary", "delivered: lean; carried: none; backlog exits: none"),
+        _MEMORY,
+    ]
+    specs = _stacked(tmp_path, f"bugs:{word}", log, (word,))
+    assert f"Origin bugs:{word} untraced" in _origin_messages(script, specs)
