@@ -17,7 +17,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from enum import Enum
 from itertools import chain
-from pathlib import PurePath
+from pathlib import Path, PurePath
 
 from dadaia_workspace.core import workspace_layout
 from dadaia_workspace.core.cli_line import fix_line, mkdir_line, script_line, spell_fix
@@ -67,7 +67,7 @@ class Decision(Enum):
 
 
 def _protection(
-    p: str, projected: frozenset[str], protected: tuple[str, ...]
+    p: str, projected: frozenset[str], protected: tuple[str, ...], root: PurePath
 ) -> tuple[workspace_layout.FloorRefusal, str] | None:
     """The one PROTECTED predicate, in precedence order: ``(refusal, match)`` — a *projected*
     path (LAW), a ``CORE_FLOOR`` entry (its own refusal), a *protected* glob (GLOB) — else ``None``."""
@@ -76,20 +76,25 @@ def _protection(
         chain(
             [(_R.LAW, p)] if p in projected else [],
             ((floor[f], f) for f in floor if p == f or p.startswith(f + "/")),
-            [(_R.GLOB, g)] if (g := workspace_layout.protected_glob(p, protected)) else [],
+            [(_R.GLOB, g)]
+            if (g := workspace_layout.protected_glob(Path(root), p, protected))
+            else [],
         ),
         None,
     )
 
 
 def classify_path(
-    rel_path: str, projected: frozenset[str] = frozenset(), protected: tuple[str, ...] = ()
+    rel_path: str,
+    projected: frozenset[str] = frozenset(),
+    protected: tuple[str, ...] = (),
+    root: PurePath = PurePath(),
 ) -> tuple[PathClass, tuple[workspace_layout.FloorRefusal, str] | None]:
     """(class, ``_protection`` hit) of a workspace-relative path; first match wins: PROTECTED
     (*projected*, then the floor, then a *protected* glob — ``_protection``'s order), ADDITIVE (the zone-registry ``.dadaia/``
     prefixes), else MUTATING — no ``repos/`` path is ever ADDITIVE."""
     p = rel_path.lstrip("/")
-    if hit := _protection(p, projected, protected):
+    if hit := _protection(p, projected, protected, root):
         return PathClass.PROTECTED, hit
     if any(p.startswith(x) for x in _ADDITIVE_DADAIA_PREFIXES):
         return PathClass.ADDITIVE, None
@@ -120,7 +125,7 @@ def evaluate(
     unbound one is the declared gap. Then every write in zone ``repo`` is
     refused with the ``worktree.py list`` fix. Everything else ALLOWS.
     """
-    cls, hit = classify_path(rel_path, projected, protected)
+    cls, hit = classify_path(rel_path, projected, protected, root)
     if hit:
         refusal, match = hit
         fix = _FIXES[refusal](root, context)

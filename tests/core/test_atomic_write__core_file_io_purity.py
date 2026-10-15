@@ -307,7 +307,7 @@ def test_importing_a_hook_never_imports_the_container(module: str) -> None:
 
 def test_gate_resolution_path_never_imports_the_container(tmp_path: Path) -> None:
     """The executed path: the gate's real entry judges a repo write (its BLOCK path:
-    the worktree fix, `_worktree_names.locate`, `script_line`) with the container still unimported;
+    the worktree fix, `script_line`) with the container still unimported;
     the child carries the conftest pin, so it judges THIS checkout."""
     ws = tmp_path / "ws"
     (ws / ".dadaia" / "states").mkdir(parents=True)

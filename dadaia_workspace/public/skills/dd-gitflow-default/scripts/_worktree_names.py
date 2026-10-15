@@ -31,8 +31,8 @@ NAME_RE = re.compile(
 def locate(rel: str) -> tuple[str, str | None, tuple[str, ...]] | None:
     """`(repo, tree name, repo-relative tail)` of a workspace-relative path under `repos/<r>/`
     (name `None`) or `worktrees/<r>/<a>/<b>/` at its fixed depth, whatever the name — whether
-    it is canonical is `NAME_RE`'s question, not this one; `None` elsewhere. The gate, the
-    doctor and reaper (through `list`) and every verb read a worktree path here alone."""
+    it is canonical is `NAME_RE`'s question, not this one; `None` elsewhere. Its one
+    caller is `_worktree_end`."""
     parts = PurePosixPath(rel.replace("\\", "/")).parts
     if len(parts) >= 2 and parts[0] == "repos":
         return parts[1], None, parts[2:]

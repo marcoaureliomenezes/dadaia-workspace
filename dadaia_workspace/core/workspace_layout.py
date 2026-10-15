@@ -7,14 +7,14 @@ from __future__ import annotations
 
 import fnmatch
 import re
-from collections.abc import Callable, Collection
+from collections.abc import Callable, Collection, Iterable
 from dataclasses import dataclass
 from enum import StrEnum
 from functools import cached_property
 from pathlib import Path, PurePosixPath
 from typing import Literal
 
-from dadaia_workspace.core import platform
+from dadaia_workspace.core import invocation, platform
 from dadaia_workspace.core.harness_registry import HARNESS_PROJECTION_DIRS
 from dadaia_workspace.core.release_state import CANDIDATE_RE, RELEASE_ID_RE
 
@@ -273,16 +273,25 @@ def _matches(sub: str, pattern: str) -> bool:
     return len(parts) == len(globs) and all(map(fnmatch.fnmatch, parts, globs))
 
 
-def protected_glob(rel: str, protected: tuple[str, ...]) -> str | None:
-    """The protected glob a prefix of a workspace-relative path matches, else ``None``: *rel* is
-    ``repos/<r>/…``, anchored at the repo root, or ``worktrees/<r>/…``, anchored at every
-    depth below ``<r>`` since a tree's own root is not fixed."""
+def protected_glob(root: Path, rel: str, protected: tuple[str, ...]) -> str | None:
+    """The protected glob a prefix of the repo-relative part of *rel* (workspace-relative, under
+    *root*) matches, else ``None``. Under ``repos/<r>/`` the root is the repo; under
+    ``worktrees/<r>/`` it is the nearest ancestor of *rel* below ``<r>`` holding a ``.git``
+    entry. Fails closed: a worktree path with no such ancestor matches at every depth."""
     parts = rel.replace("\\", "/").split("/")
-    if len(parts) < 3 or parts[0] not in ("repos", "worktrees"):
+    zone = invocation.scope(root, root.joinpath(*parts))[1]
+    if zone == "root":
         return None
     tail = parts[2:]
-    starts = range(len(tail)) if parts[0] == "worktrees" else range(1)
-    subs = ("/".join(tail[i : j + 1]) for i in starts for j in range(i, len(tail)))
+    anchors: Iterable[int] = (0,)
+    if zone == "worktree":
+        found = (
+            k - 2
+            for k in range(len(parts) - 1, 2, -1)
+            if root.joinpath(*parts[:k], ".git").exists()
+        )
+        anchors = (r,) if (r := next(found, None)) is not None else range(len(tail))
+    subs = ("/".join(tail[i : j + 1]) for i in anchors for j in range(i, len(tail)))
     return next((g for sub in subs for g in protected if _matches(sub, g)), None)
 
 
