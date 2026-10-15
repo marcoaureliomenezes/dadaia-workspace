@@ -20,6 +20,7 @@ from pathlib import Path
 import pytest
 
 import dadaia_workspace
+from dadaia_workspace.core.cli_line import fix_line
 
 pytestmark = pytest.mark.medium
 
@@ -101,7 +102,7 @@ def _assert_refused(r: _Repo, done: subprocess.CompletedProcess[str], before: st
     fixes = [ln for ln in done.stderr.splitlines() if "fix:" in ln]
     assert len(fixes) == 1, done.stderr
     argv = shlex.split(fixes[0].split("fix:", 1)[1])
-    assert argv[:4] == [str(r.runner), "worktree", "new", "repo"], fixes[0]
+    assert argv[:4] == [*shlex.split(fix_line(None)), "worktree", "new", "repo"], fixes[0]
     # `--help` forwards to the installed script: the line's launcher and verb resolve.
     assert subprocess.run([*argv, "--help"], capture_output=True, check=False).returncode == 0
     assert r.ok("rev-parse", f"refs/heads/{_WORK}") == before
