@@ -8,8 +8,9 @@ import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
+from dadaia_workspace.core.exceptions import DadaiaError
 from dadaia_workspace.core.frontmatter import FrontmatterError, parse, split
 from dadaia_workspace.core.skill_owner import load_owner
 
@@ -19,6 +20,7 @@ __all__ = [
     "candidate_number",
     "Gitflow",
     "Role",
+    "SeveralWorkBranches",
     "constitution_error",
     "constitution_path",
     "constitution_text",
@@ -89,14 +91,27 @@ def resolve_live_candidate(specs_dir: Path) -> Path | None:
     return candidate_dir(specs_dir / "releases" / release_id) if release_id else None
 
 
+_git = load_owner("dd-gitflow-default", "_worktree_git")
+
+
+class SeveralWorkBranches(_git.SeveralWork, DadaiaError):  # type: ignore[misc,name-defined]
+    """The skill's several-work-branches refusal as a ``DadaiaError``, so the CLI renders its fix."""
+
+    def __init__(self, several: Any) -> None:
+        _git.SeveralWork.__init__(self, several.args[0], several.fix, several.keep)
+
+
 def work_branch(repo: Path, flow: Gitflow, main: str) -> str:
     """The repo's work branch by the skill's one rule (``work_version``); with none, the name to
-    create (``next_version``); several raise the skill's refusal. *main* is the main repo's slug."""
-    git = load_owner("dd-gitflow-default", "_worktree_git")
+    create (``next_version``); several raise ``SeveralWorkBranches``, which carries the skill's
+    fix. *main* is the main repo's slug."""
     rule = {"work": flow.work_prefix, "integration": flow.integration, "main": main}
-    if git.work_versions(repo, rule):
-        return str(flow.work_prefix + git.work_version(repo, rule))
-    return str(flow.work_prefix + git.next_version(repo, rule))
+    if _git.work_versions(repo, rule):
+        try:
+            return str(flow.work_prefix + _git.work_version(repo, rule))
+        except _git.SeveralWork as several:
+            raise SeveralWorkBranches(several) from several
+    return str(flow.work_prefix + _git.next_version(repo, rule))
 
 
 def from_mapping(block: object) -> Gitflow:
