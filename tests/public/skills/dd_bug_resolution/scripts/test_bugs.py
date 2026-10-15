@@ -187,34 +187,43 @@ def test_check_refuses_a_fix_sha_that_no_ref_reaches(script: Path, tmp_path: Pat
     assert "\nfix: " in done.stdout
 
 
-def test_the_unreached_fix_sha_finding_names_the_commit_that_replaces_it(
+def test_the_unreached_fix_sha_fix_line_is_one_act_without_a_placeholder(
     script: Path, tmp_path: Path
 ) -> None:
-    """The fix line is one runnable command when exactly one reachable commit carries the bug law's subject."""
     specs = _ledger(tmp_path)
     git = ["git", "-C", str(tmp_path), "-c", "user.name=t", "-c", "user.email=t@t.test"]
-
-    def head() -> str:
-        return subprocess.run(
-            [*git, "rev-parse", "HEAD"], capture_output=True, text=True, check=True
-        ).stdout.strip()
-
-    subprocess.run([*git, "commit", "-q", "-m", "fix(bugs): a-bug \u2014 cause"], check=True)
-    old = head()
     resolved = {**_OPEN_RECORD, "status": "resolved", "closed_at": "2026-09-21T10:00:00Z",
-                "cause": "c", "solution": "s", "caused_by": "none", "fix_sha": old}  # fmt: skip
+                "cause": "c", "solution": "s", "caused_by": "none", "fix_sha": "a" * 40}  # fmt: skip
     _ledger(tmp_path, resolved)
-    subprocess.run(
-        [*git, "commit", "-q", "--amend", "-m", "fix(bugs): a-bug \u2014 cause."], check=True
-    )
-    done = _run(script, "check", "--specs", str(specs))
-    fix = done.stdout.splitlines()[-1]
-    assert fix.startswith("fix: ") and f"update a-bug --set fix_sha={head()} --specs" in fix, fix
-    subprocess.run(
-        [*git, "commit", "-q", "--allow-empty", "-m", "fix(bugs): a-bug \u2014 again"], check=True
-    )
+    subprocess.run([*git, "commit", "-q", "--allow-empty", "-m", "base"], check=True)
     fix = _run(script, "check", "--specs", str(specs)).stdout.splitlines()[-1]
     assert fix.startswith("fix: Agent action: ") and "<" not in fix, fix
+
+
+def test_a_shallow_clone_is_one_finding_not_one_per_record(script: Path, tmp_path: Path) -> None:
+    """A cut history is named once, with its own fix; no record is judged unreached."""
+    origin = tmp_path / "origin"
+    origin.mkdir()
+    git = ["git", "-C", str(origin), "-c", "user.name=t", "-c", "user.email=t@t.test"]
+    subprocess.run([*git, "init", "-q"], check=True)
+    subprocess.run([*git, "commit", "-q", "--allow-empty", "-m", "fix"], check=True)
+    sha = subprocess.run(
+        [*git, "rev-parse", "HEAD"], capture_output=True, text=True, check=True
+    ).stdout.strip()
+    resolved = [
+        {**_OPEN_RECORD, "id": i, "status": "resolved", "closed_at": "2026-09-21T10:00:00Z",
+         "cause": "c", "solution": "s", "caused_by": "none", "fix_sha": sha}
+        for i in ("a-bug", "b-bug")
+    ]  # fmt: skip
+    specs = _ledger(origin, *resolved)
+    subprocess.run([*git, "add", "specs"], check=True)
+    subprocess.run([*git, "commit", "-q", "-m", "ledger"], check=True)
+    clone = tmp_path / "clone"
+    subprocess.run(["git", "clone", "-q", "--depth", "1", origin.as_uri(), str(clone)], check=True)
+    done = _run(script, "check", "--specs", str(clone / specs.relative_to(origin)))
+    assert done.returncode == 1, done.stdout
+    assert done.stdout.count("LEDGER-BUGS-SCHEMA") == 1 and "shallow" in done.stdout, done.stdout
+    assert "fetch --unshallow" in done.stdout.splitlines()[-1]
 
 
 @pytest.mark.parametrize(("caused_by", "code"), [
