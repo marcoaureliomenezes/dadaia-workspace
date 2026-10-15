@@ -28,6 +28,8 @@ FLOW = {"principal": "trunk", "integration": "dev", "work": "feature/"}
 #: The repo's gate: prints its argv; level L fails iff the tree holds `RED-<L>`.
 CI = 'import pathlib, sys\nprint("ci", *sys.argv[1:])\nsys.exit(pathlib.Path("RED-" + sys.argv[1]).exists())\n'
 JOB, TASK = "0.5.0-rc1/j1", "0.5.0-rc1/j1--J1.T1"
+#: The hierarchy's names: a job's main tree and its first task tree (the old-grammar pair above stays until its tests port).
+NEW_JOB, NEW_TASK = "0.5.0/rc-1/job-1/wt-main", "0.5.0/rc-1/job-1/wt-task-001"
 _CLI = """#!python
 import json, sys
 args = sys.argv[1:]
