@@ -151,3 +151,23 @@ def test_a_specs_dir_holding_no_tree_is_one_specs_section_finding_carrying_the_s
     assert [f["fix"] for f in payload["sections"]["specs"]["findings"]] == [state(specs)[1]]
     assert payload["specs_dir"] == str(specs)
     assert result.exit_code == 1
+
+
+@pytest.mark.parametrize("kind", ["absent", "file"])
+def test_fix_over_a_specs_dir_holding_no_tree_writes_nothing_and_reports_the_same_finding(
+    kind: str, tmp_path: Path
+) -> None:
+    """`--fix` never builds the tree it was pointed at: the file set stays put and the one
+    finding is the one the plain run reports."""
+    specs = tmp_path / "specs"
+    if kind == "file":
+        specs.write_text("", encoding="utf-8")
+    before = sorted(p.relative_to(tmp_path) for p in tmp_path.rglob("*"))
+
+    result = _run("--specs-dir", str(specs), "--fix", "--json")
+
+    payload = json.loads(result.stdout)
+    assert sorted(p.relative_to(tmp_path) for p in tmp_path.rglob("*")) == before
+    assert [f["fix"] for f in payload["sections"]["specs"]["findings"]] == [state(specs)[1]]
+    assert payload["fixed"] == []
+    assert result.exit_code == 1
