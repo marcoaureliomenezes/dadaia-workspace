@@ -98,7 +98,8 @@ class SeveralWorkBranches(_git.SeveralWork, DadaiaError):  # type: ignore[misc,n
     """The skill's several-work-branches refusal as a ``DadaiaError``, so the CLI renders its fix."""
 
     def __init__(self, several: Any) -> None:
-        _git.SeveralWork.__init__(self, several.args[0], several.fix, several.keep)
+        DadaiaError.__init__(self, several.args[0], several.fix)
+        self.keep = several.keep
 
 
 def work_branch(repo: Path, flow: Gitflow, main: str) -> str:
