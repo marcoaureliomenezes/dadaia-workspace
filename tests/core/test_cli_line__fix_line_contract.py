@@ -211,6 +211,8 @@ def _merge_only(ws: Path) -> str:
 
 def _kernel_no_specs_tree(ws: Path) -> str:
     """A ledger write verb run where no specs tree exists, in a workspace whose CLI names its repo."""
+    if sys.platform == "win32":
+        pytest.skip("the fake workspace CLI is a shebang script")
     cli = workspace_cli_path(ws)
     cli.write_text(f'#!{sys.executable}\nprint(\'{{"main_repo": "a"}}\')\n', encoding="utf-8")
     cli.chmod(0o755)
