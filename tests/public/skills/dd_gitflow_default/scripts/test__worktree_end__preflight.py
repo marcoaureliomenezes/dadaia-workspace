@@ -14,20 +14,25 @@ import pytest
 
 from dadaia_workspace.core.cli_line import git_line, shell_line
 from tests.helpers.worktree_ws import (
-    JOB,
+    NEW_JOB,
+    NEW_TASK,
     SCRIPT,
-    TASK,
     approve,
     commit,
     fixes,
     git,
     make_workspace,
+    open_tree,
     run,
 )
 
 BRANCH = "feature/0.5.0"
-JOB_BRANCH = f"wt/{JOB}"
-DEFINE = "0.5.0-rc1/define"
+RC = "0.5.0/rc-1/wt-rc"
+JOB_BRANCH = f"wt/{NEW_JOB}"
+JOB2 = "0.5.0/rc-1/job-2/wt-main"
+BACKLOG = "0.5.0/wt-backlog-x"
+HOTFIX = "0.5.0/wt-hotfix-a-block-bug"
+RECONCILE = "0.5.0/rc-1/reconcile"
 RED_VERIFY = "make `python scripts/ci.py job` exit 0 in {tree} and commit the fix in this worktree"
 
 
@@ -36,12 +41,8 @@ def root(tmp_path: Path) -> Path:
     (tmp_path := tmp_path / "ws").mkdir()
     make_workspace(tmp_path)
     git(tmp_path / "repos/r", "checkout", "-q", BRANCH)
+    assert open_tree(tmp_path, RC).is_dir()
     return tmp_path
-
-
-def _tree(root: Path, name: str) -> Path:
-    assert run(root, "new", "r", name).returncode == 0
-    return root / "worktrees/r" / name
 
 
 def _head(tree: Path) -> str:
@@ -77,8 +78,8 @@ def _pass(root: Path, tree: Path) -> None:
 
 
 def test_a_task_passes_clean_and_rebased_and_fails_behind_its_job_branch(root: Path) -> None:
-    job = _tree(root, JOB)
-    task = _tree(root, TASK)
+    job = open_tree(root, NEW_JOB)
+    task = open_tree(root, NEW_TASK)
     commit(task, "src/a.py")
     _pass(root, task)
     commit(job, "src/b.py")
@@ -91,10 +92,10 @@ def test_a_task_passes_clean_and_rebased_and_fails_behind_its_job_branch(root: P
 
 
 def test_a_job_passes_and_fails_with_an_open_task_and_with_a_red_verify(root: Path) -> None:
-    job = _tree(root, JOB)
+    job = open_tree(root, NEW_JOB)
     commit(job, "src/a.py")
     _pass(root, job)
-    task = _tree(root, TASK)
+    task = open_tree(root, NEW_TASK)
     head, error, fix = _report(root, job)
     assert head == f"PREFLIGHT FAIL {job} {_head(job)}"
     assert error == f"[error] task worktree {task} of {JOB_BRANCH} is open"
@@ -104,15 +105,17 @@ def test_a_job_passes_and_fails_with_an_open_task_and_with_a_red_verify(root: Pa
     _fail(root, job, "verify: exited 1", f"Agent action: {RED_VERIFY.format(tree=job)}")
 
 
-def test_a_define_tree_passes_without_a_verify_run_and_fails_a_red_ledger_check(root: Path) -> None:
-    define = _tree(root, DEFINE)
-    commit(define, "specs/notes", "")
-    commit(define, "specs/RED-job", "")  # the job gate would fail on it: a define tree runs none
-    done = run(root, "preflight", str(define))
+def test_a_backlog_tree_passes_without_a_verify_run_and_fails_a_red_ledger_check(
+    root: Path,
+) -> None:
+    backlog = open_tree(root, BACKLOG)
+    commit(backlog, "specs/notes", "")
+    commit(backlog, "specs/RED-job", "")  # the job gate would fail on it: a backlog tree runs none
+    done = run(root, "preflight", str(backlog))
     assert done.returncode == 0 and "ci job" not in done.stdout + done.stderr, done.stderr
-    assert _report(root, define) == [f"PREFLIGHT PASS {define} {_head(define)}"]
-    commit(define, "specs/bugs/BUGS.jsonl", '{"id": "half"}\n')
-    ledger = define / "specs/bugs/BUGS.jsonl"
+    assert _report(root, backlog) == [f"PREFLIGHT PASS {backlog} {_head(backlog)}"]
+    commit(backlog, "specs/bugs/BUGS.jsonl", '{"id": "half"}\n')
+    ledger = backlog / "specs/bugs/BUGS.jsonl"
     fix = (
         f"Agent action: line 1 of {ledger} was not written by `bugs.py append` or "
         "`bugs.py update` (specs/bugs/AGENTS.md: never hand-edit BUGS.jsonl) — "
@@ -121,11 +124,11 @@ def test_a_define_tree_passes_without_a_verify_run_and_fails_a_red_ledger_check(
         "if you wrote it and it is still uncommitted, then redo the change through "
         "`bugs.py append` or `bugs.py update`"
     )
-    _fail(root, define, f"bugs.py check failed on {define / 'specs'}", fix)
+    _fail(root, backlog, f"bugs.py check failed on {backlog / 'specs'}", fix)
 
 
 def test_a_backlog_tree_fails_a_path_outside_specs(root: Path) -> None:
-    tree = _tree(root, "backlog/x")
+    tree = open_tree(root, BACKLOG)
     commit(tree, "src/a.py")
     _fail(
         root,
@@ -137,7 +140,10 @@ def test_a_backlog_tree_fails_a_path_outside_specs(root: Path) -> None:
 
 
 def test_a_reconcile_tree_fails_a_red_verify_as_a_job_tree_does(root: Path) -> None:
-    tree = _tree(root, "0.5.0-rc1/reconcile")
+    tree = (
+        root / "worktrees/r" / RECONCILE
+    )  # no such kind now: a raw tree, the refusal is what runs
+    git(root / "repos/r", "worktree", "add", "-q", "-b", f"wt/{RECONCILE}", str(tree), BRANCH)
     commit(tree, "RED-job", "")
     _fail(root, tree, "verify: exited 1", f"Agent action: {RED_VERIFY.format(tree=tree)}")
 
@@ -153,7 +159,7 @@ def test_a_plain_name_is_refused_as_not_a_worktree_name_with_the_list_fix(root: 
 def test_a_hotfix_tree_fails_a_red_verify(root: Path) -> None:
     repo = root / "repos/r"
     commit(repo, "specs/bugs/BUGS.jsonl", '{"id": "a-block-bug", "status": "open"}\n')
-    tree = _tree(root, "hotfix/a-block-bug")
+    tree = open_tree(root, HOTFIX)
     commit(tree, "RED-job", "")
     _fail(root, tree, "verify: exited 1", f"Agent action: {RED_VERIFY.format(tree=tree)}")
 
@@ -161,7 +167,7 @@ def test_a_hotfix_tree_fails_a_red_verify(root: Path) -> None:
 def test_merge_on_a_passing_tree_without_a_verdict_refuses_only_with_the_verdict_message(
     root: Path,
 ) -> None:
-    job = _tree(root, JOB)
+    job = open_tree(root, NEW_JOB)
     head = commit(job, "src/a.py")
     _pass(root, job)
     refused = run(root, "merge", str(job))
@@ -169,31 +175,29 @@ def test_merge_on_a_passing_tree_without_a_verdict_refuses_only_with_the_verdict
     errors = [ln for ln in refused.stderr.splitlines() if ln.startswith("[error] ")]
     assert len(errors) == 1 and errors[0].startswith(f"[error] the newest dd-code-reviewer handoff naming HEAD {head}")  # fmt: skip
     assert len(fixes(refused)) == 1
-    approve(root, head)
+    approve(root, head, name=NEW_JOB)
     assert run(root, "merge", str(job)).returncode == 0
 
 
 def _kind(root: Path, kind: str) -> tuple[Path, Path]:
     """A committed, approved tree of *kind* and the checkout its merge lands in."""
-    repo = root / "repos/r"
+    repo, rc = root / "repos/r", root / "worktrees/r" / RC
     if kind == "task":
-        job = _tree(root, JOB)
-        tree = _tree(root, TASK)
+        job = open_tree(root, NEW_JOB)
+        tree = open_tree(root, NEW_TASK)
         commit(tree, "src/a.py")
         return tree, job
     if kind == "hotfix":
         commit(repo, "specs/bugs/BUGS.jsonl", '{"id": "a-block-bug", "status": "open"}\n')
-    name = {
-        "job": JOB,
-        "job-b": "0.5.0-rc1/j2",
-        "define": DEFINE,
-        "backlog": "backlog/x",
-        "reconcile": "0.5.0-rc1/reconcile",
-        "hotfix": "hotfix/a-block-bug",
-    }[kind]
-    tree = _tree(root, name)
-    approve(root, commit(tree, "specs/notes" if kind in ("define", "backlog") else "src/a.py"))
-    return tree, repo
+    names = {"job": NEW_JOB, "job-b": JOB2, "rc": RC, "backlog": BACKLOG, "hotfix": HOTFIX}
+    if kind == "reconcile":
+        tree = root / "worktrees/r" / RECONCILE
+        git(repo, "worktree", "add", "-q", "-b", f"wt/{RECONCILE}", str(tree), BRANCH)
+    else:
+        tree = rc if kind == "rc" else open_tree(root, names[kind])
+    sha = commit(tree, "specs/notes" if kind in ("rc", "backlog") else "src/a.py")
+    approve(root, sha, name=names.get(kind))
+    return tree, rc if kind in ("job", "job-b") else repo
 
 
 def _same_refusal(root: Path, tree: Path, error: str) -> None:
@@ -207,9 +211,7 @@ def _same_refusal(root: Path, tree: Path, error: str) -> None:
     assert _lines(checked)[1:] == lines
 
 
-@pytest.mark.parametrize(
-    "kind", ["task", "job", "job-b", "define", "backlog", "reconcile", "hotfix"]
-)
+@pytest.mark.parametrize("kind", ["task", "job", "job-b", "rc", "backlog", "reconcile", "hotfix"])
 def test_preflight_refuses_an_ignored_file_neither_kept_nor_dropped_as_merge_does(
     root: Path, kind: str
 ) -> None:
@@ -218,9 +220,7 @@ def test_preflight_refuses_an_ignored_file_neither_kept_nor_dropped_as_merge_doe
     _same_refusal(root, tree, "ignored files would be lost: keep.scratch")
 
 
-@pytest.mark.parametrize(
-    "kind", ["task", "job", "job-b", "define", "backlog", "reconcile", "hotfix"]
-)
+@pytest.mark.parametrize("kind", ["task", "job", "job-b", "rc", "backlog", "reconcile", "hotfix"])
 def test_preflight_refuses_a_target_checkout_off_the_target_branch_as_merge_does(
     root: Path, kind: str
 ) -> None:

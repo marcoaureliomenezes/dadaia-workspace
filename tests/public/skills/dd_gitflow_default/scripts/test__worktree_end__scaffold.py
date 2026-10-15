@@ -13,9 +13,21 @@ from pathlib import Path
 
 import pytest
 
-from tests.helpers.worktree_ws import JOB, approve, commit, git, land, make_workspace, run
+from tests.helpers.worktree_ws import (
+    NEW_JOB,
+    approve,
+    commit,
+    git,
+    land,
+    make_workspace,
+    open_tree,
+    run,
+)
 
 BRANCH = "feature/0.5.0"
+RC = "0.5.0/rc-1/wt-rc"
+BACKLOG = "0.5.0/wt-backlog-j1"
+HOTFIX = "0.5.0/wt-hotfix-bug1"
 TEST = "def test_x():\n    pass\n"
 
 
@@ -28,8 +40,14 @@ def root(tmp_path: Path) -> Path:
 
 
 def _tree(root: Path, name: str) -> Path:
-    assert run(root, "new", "r", name).returncode == 0
-    return root / "worktrees/r" / name
+    assert (tree := open_tree(root, name)).is_dir()
+    return tree
+
+
+def _job(root: Path) -> Path:
+    """The job's main tree, its rc tree (the job's base) opened first."""
+    open_tree(root, RC)
+    return _tree(root, NEW_JOB)
 
 
 def _scaffold(tree: Path, job: str) -> None:
@@ -59,7 +77,7 @@ def _refused(root: Path, tree: Path, job: str) -> None:
 def _clears(root: Path, tree: Path) -> None:
     head = git(tree, "rev-parse", "HEAD").strip()
     assert _lines(root, "preflight", tree) == (0, [f"PREFLIGHT PASS {tree} {head}"])
-    approve(root, head)
+    approve(root, head, name=NEW_JOB)
     done = run(root, "merge", str(tree))
     assert done.returncode == 0, done.stderr
 
@@ -67,18 +85,18 @@ def _clears(root: Path, tree: Path) -> None:
 def test_a_job_tree_with_a_tracked_scaffold_is_refused_until_its_removal_is_committed(
     root: Path,
 ) -> None:
-    job = _tree(root, JOB)
-    _scaffold(job, "j1")
-    _refused(root, job, "j1")
-    git(job, "rm", "-rq", "tests/tmp/j1")
+    job = _job(root)
+    _scaffold(job, "job-1")
+    _refused(root, job, "job-1")
+    git(job, "rm", "-rq", "tests/tmp/job-1")
     git(job, "commit", "-qm", "drop the scaffold")
     _clears(root, job)
 
 
-def test_a_hotfix_tree_names_the_folder_by_the_last_segment_of_its_name(root: Path) -> None:
+def test_a_hotfix_tree_names_the_folder_by_the_bug_id_of_its_name(root: Path) -> None:
     repo = root / "repos/r"
     commit(repo, "specs/bugs/BUGS.jsonl", '{"id": "bug1", "status": "open"}\n')
-    tree = _tree(root, "hotfix/bug1")
+    tree = _tree(root, HOTFIX)
     _scaffold(tree, "bug1")
     _refused(root, tree, "bug1")
 
@@ -87,37 +105,37 @@ def test_a_scaffold_collected_then_removed_leaves_untracked_bytecode_that_blocks
     root: Path,
 ) -> None:
     commit(root / "repos/r", "tests/tmp/README.md", "scaffolding\n")
-    job = _tree(root, JOB)
-    _scaffold(job, "j1")
+    job = _job(root)
+    _scaffold(job, "job-1")
     env = {k: v for k, v in os.environ.items() if k != "PYTHONDONTWRITEBYTECODE"}
     env["HYPOTHESIS_STORAGE_DIRECTORY"] = str(root / "hypothesis")
     collected = subprocess.run(
-        [sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider", "tests/tmp/j1"],
+        [sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider", "tests/tmp/job-1"],
         cwd=job, env=env, capture_output=True, text=True,
     )  # fmt: skip
     assert collected.returncode == 0, collected.stdout
-    assert (job / "tests/tmp/j1/__pycache__").is_dir()
-    _refused(root, job, "j1")
-    git(job, "rm", "-rq", "tests/tmp/j1")
+    assert (job / "tests/tmp/job-1/__pycache__").is_dir()
+    _refused(root, job, "job-1")
+    git(job, "rm", "-rq", "tests/tmp/job-1")
     git(job, "commit", "-qm", "drop the scaffold")
-    assert (job / "tests/tmp/j1/__pycache__").is_dir()
-    assert git(job, "ls-files", "--", "tests/tmp/j1") == ""
+    assert (job / "tests/tmp/job-1/__pycache__").is_dir()
+    assert git(job, "ls-files", "--", "tests/tmp/job-1") == ""
     _clears(root, job)
 
 
 def test_a_task_tree_with_the_scaffold_merges(root: Path) -> None:
-    _tree(root, JOB)
-    land(root, "tests/tmp/j1/test_x.py", TEST, task_id="J1.T1")
+    _job(root)
+    land(root, "tests/tmp/job-1/test_x.py", TEST, task_id="J1.T1")
 
 
 def test_a_job_tree_without_a_tests_tmp_folder_passes(root: Path) -> None:
-    job = _tree(root, JOB)
+    job = _job(root)
     commit(job, "src/a.py")
     _clears(root, job)
 
 
-@pytest.mark.parametrize("name", ["0.5.0-rc1/define", "backlog/j1"])
-def test_a_define_or_backlog_tree_over_a_tracked_folder_of_its_name_passes(
+@pytest.mark.parametrize("name", [RC, BACKLOG])
+def test_a_backlog_or_rc_tree_over_a_tracked_folder_of_its_name_passes(
     root: Path, name: str
 ) -> None:
     commit(root / "repos/r", f"tests/tmp/{name.rsplit('/')[-1]}/test_x.py", TEST)
