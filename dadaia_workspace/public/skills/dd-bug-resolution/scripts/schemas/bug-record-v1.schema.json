@@ -49,7 +49,7 @@
     },
     "solution": {"type": "string", "minLength": 1, "x-mutability": "write-once"},
     "fix_sha": {
-      "type": "string", "pattern": "^[0-9a-f]{40}$", "x-mutability": "write-once"
+      "type": ["string", "null"], "pattern": "^[0-9a-f]{40}$", "x-mutability": "mutable-governance"
     },
     "superseded_by": {"type": "string", "minLength": 1, "x-mutability": "write-once"}
   }

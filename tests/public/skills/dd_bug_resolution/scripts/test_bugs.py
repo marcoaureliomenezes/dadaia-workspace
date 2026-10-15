@@ -393,10 +393,10 @@ def _records(specs: Path) -> list[dict[str, Any]]:
     return _read(specs / "bugs/BUGS.jsonl")
 
 
-def _resolve_argv(bug_id: str = "a-bug", caused_by: str = "none") -> list[str]:
+def _resolve_argv(bug_id: str = "a-bug", caused_by: str = "none", sha: str = "a" * 40) -> list[str]:
     return [
         "resolve", bug_id, "--cause", "c", "--caused-by", caused_by,
-        "--solution", "s", "--fix-sha", "a" * 40,
+        "--solution", "s", "--fix-sha", sha,
     ]  # fmt: skip
 
 
@@ -614,13 +614,18 @@ def test_the_seam_verdict_equals_the_push_verdict_over_the_published_ledger(
 
 def test_resolve_closes_the_record_at_its_own_instant(script: Path, tmp_path: Path) -> None:
     specs = _ledger(tmp_path, _OPEN_RECORD)
-    done = _run(script, *_resolve_argv(), "--specs", str(specs))
+    git = ["git", "-C", str(tmp_path), "-c", "user.name=t", "-c", "user.email=t@t.test"]
+    subprocess.run([*git, "commit", "-q", "-m", "fix"], check=True)
+    sha = subprocess.run(
+        [*git, "rev-parse", "HEAD"], capture_output=True, text=True, check=True
+    ).stdout.strip()
+    done = _run(script, *_resolve_argv(sha=sha), "--specs", str(specs))
     assert done.returncode == 0, done.stderr
     assert done.stdout.strip() == "[ok] resolved a-bug"
     [record] = _records(specs)
     assert {key: record[key] for key in ("status", "cause", "caused_by", "solution", "fix_sha")} == {
         "status": "resolved", "cause": "c", "caused_by": "none", "solution": "s",
-        "fix_sha": "a" * 40,
+        "fix_sha": sha,
     }
     assert record["closed_at"] is not None
     assert _run(script, "check", "--specs", str(specs)).returncode == 0

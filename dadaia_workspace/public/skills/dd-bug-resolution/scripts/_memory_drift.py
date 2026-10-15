@@ -48,7 +48,7 @@ def git(repo: Path, *argv: str) -> list[str]:
     return [line for line in out.split("\n") if line]
 
 
-def _reaches(repo: Path, bound: str) -> bool:
+def reaches(repo: Path, bound: str) -> bool:
     try:
         _git.git(repo, "merge-base", "--is-ancestor", bound, "HEAD")
     except RuntimeError:
@@ -64,14 +64,14 @@ def _root(repo: Path) -> str:
 
 def reach(repo: Path, bounds: list[str]) -> str:
     """The newest of *bounds* (newest first) HEAD reaches, else the root commit: only widens."""
-    return next((b for b in bounds if _reaches(repo, b)), None) or _root(repo)
+    return next((b for b in bounds if reaches(repo, b)), None) or _root(repo)
 
 
 def report(specs: Path, since: str, until: str = "HEAD") -> dict[str, Any]:
     """The worklist for the window *since*..*until* — the ONE decider every verb calls."""
     repo = specs.parent
     for bound in (since, until):  # usable = an ancestor of HEAD
-        if _reaches(repo, bound):
+        if reaches(repo, bound):
             continue
         if cut := _cut(repo, f"{bound} is out of reach"):  # a cut is checked first
             raise cut

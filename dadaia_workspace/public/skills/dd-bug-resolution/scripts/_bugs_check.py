@@ -16,6 +16,7 @@ import _findings
 import _jsonl
 import _ledger
 from _grammar import HISTORICAL_TASK_RE, TASK_ID_RE
+from _memory_drift import reaches
 from _platform import quote
 from _specs import script, with_specs
 
@@ -168,6 +169,17 @@ def check(specs: Path) -> list[dict[str, Any]]:
     text = _jsonl.read_text(ledger) if ledger.is_file() else ""
     archived = _jsonl.read_text(histo) if histo.is_file() else ""
     root = specs.resolve()
-    return findings_for(text, archived=archived_ids(archived), root=root) + histo_findings(
-        archived, root
-    )
+    bugs = script(Path(__file__).with_name("bugs.py"))
+    unreached = [
+        _findings.finding(
+            CODE, LEDGER, n, f"{rec['id']!r} fix_sha {rec['fix_sha']} is reachable from no ref",
+            "Agent action: set fix_sha to the fix commit's current sha through "
+            f"`{with_specs(f'{bugs} update {quote(rec['id'])} --set fix_sha=<sha>', root)}`",
+        )
+        for n, rec, why in _jsonl.walk(text)
+        if not why and isinstance(rec, dict) and rec.get("fix_sha") and not reaches(specs.parent, rec["fix_sha"])
+    ]  # fmt: skip
+    return sorted(
+        findings_for(text, archived=archived_ids(archived), root=root) + unreached,
+        key=lambda f: f["line"],
+    ) + histo_findings(archived, root)
