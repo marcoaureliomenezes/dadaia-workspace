@@ -195,11 +195,12 @@ def _gate(tree: Path, work: str) -> None:
 
 
 def _is_test_path(path: str, globs: list[str]) -> bool:
-    """Whether *path* is a declared test glob, or a built-in fallback when none is declared."""
+    """Whether *path* is a declared test glob, or a built-in fallback when none is declared: under
+    `tests/` or named like a test, never inside a dot-folder (`.github/`) of tooling."""
     if globs:
         return any(fnmatch.fnmatchcase(path, glob) for glob in globs)
-    name = Path(path).name
-    return (
+    *folders, name = Path(path).parts
+    return not any(f.startswith(".") for f in folders) and (
         path.startswith("tests/")
         or name.startswith("test_")
         or fnmatch.fnmatchcase(name, "*_test.*")
