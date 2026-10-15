@@ -29,6 +29,7 @@ from dadaia_workspace.core.invocation import (
 )
 from dadaia_workspace.core.invocation import resolve_session_id as _resolve_session_id
 from dadaia_workspace.core.invocation import resolve_specs_dir as _core_resolve_specs_dir
+from dadaia_workspace.core.invocation import scope as _scope
 
 #: Re-exports so a verb never reaches ``core.invocation`` directly: every consumer of the
 #: harness-session-id env-var list, the session-id rule, or the name->repo-slug mapping
@@ -37,6 +38,7 @@ HARNESS_SESSION_ID_ENV_VARS = _HARNESS_SESSION_ID_ENV_VARS
 resolve_session_id = _resolve_session_id
 alive_context_trees = _alive_context_trees
 repo_owner = _repo_owner
+scope = _scope
 
 
 def resolve_context_for_cli(explicit: str | None) -> str:

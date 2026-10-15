@@ -11,10 +11,13 @@ from pathlib import Path
 import typer
 
 from dadaia_workspace.cli._fail import fail
-from dadaia_workspace.cli._specs_resolution import repo_owner, resolve_workspace_root_for_cli
+from dadaia_workspace.cli._specs_resolution import (
+    repo_owner,
+    resolve_workspace_root_for_cli,
+    scope,
+)
 from dadaia_workspace.core.cli_line import fix_line, git_line, without_fix
 from dadaia_workspace.core.gitflow import Gitflow, work_branch
-from dadaia_workspace.core.invocation import scope
 from dadaia_workspace.core.models.git_scan import ZERO_SHA
 from dadaia_workspace.core.skill_owner import load_owner
 from dadaia_workspace.features.chokepoints.branch_policy import (
