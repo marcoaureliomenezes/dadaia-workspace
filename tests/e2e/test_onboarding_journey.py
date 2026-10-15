@@ -179,16 +179,13 @@ class Workspace:
         assert done.returncode == 0 and not errors, f"doctor not clean:\n{done.stdout}{done.stderr}"
         return payload
 
-    def assert_level_clean(
-        self, context: str, repo_slug: str, url: str, scaffolded: bool = False
-    ) -> None:
-        """Doctor 0 errors and the user repo's HEAD equals its remote's; after ``specs init``
-        (``scaffolded``) the remote's head is the one scaffold commit behind it."""
+    def assert_level_clean(self, context: str, repo_slug: str, url: str) -> None:
+        """Doctor 0 errors and the user repo's principal branch equals the remote's HEAD."""
         self.doctor_json(context)
         repo = self.path / "repos" / repo_slug
-        head = self.env.git("rev-parse", "HEAD~1" if scaffolded else "HEAD", cwd=repo)
-        remote = self.env.git("ls-remote", url, "HEAD", cwd=repo).split()[0]
-        assert head == remote, f"{repo_slug}: HEAD {head} != remote {remote}"
+        symref, tip = self.env.git("ls-remote", "--symref", url, "HEAD", cwd=repo).splitlines()
+        principal = self.env.git("rev-parse", symref.split()[1], cwd=repo)
+        assert principal == tip.split()[0], f"{repo_slug}: {symref} {principal} != remote {tip}"
 
 
 # ── fixtures ─────────────────────────────────────────────────────────────────────
@@ -298,7 +295,7 @@ def test_an_operator_journey_from_the_previous_release(env: Env) -> None:
     assert any("specs init --context second" in fix for fix in fixes), fixes
     done = ws.dadaia("specs", "init", "--context", "second")
     assert done.returncode == 0, f"{done.stdout}\n{done.stderr}"
-    ws.assert_level_clean("second", "second", repos["second"], scaffolded=True)
+    ws.assert_level_clean("second", "second", repos["second"])
 
 
 # ── the quickstart block, verbatim ────────────────────────────────────────
@@ -321,7 +318,7 @@ class TestQuickstartVerbatim:
         done = env.run("bash", "-euo", "pipefail", "-c", script, cwd=env.root)
         assert done.returncode == 0, f"quickstart failed:\n{done.stdout}\n{done.stderr}"
         ws = Workspace(env, "demo")
-        ws.assert_level_clean("quick", "quick", url, scaffolded=True)
+        ws.assert_level_clean("quick", "quick", url)
         done = env.run("bash", "-euo", "pipefail", "-c", f"SLUG=quick\n{filing}", cwd=ws.path)
         assert done.returncode == 0, f"quickstart block 2 failed:\n{done.stdout}\n{done.stderr}"
         wt = ws.path / "worktrees" / "quick" / "0.1.0" / "wt-backlog-my-first-idea"
