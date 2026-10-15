@@ -1,4 +1,4 @@
-"""A ledger record changed in place in a worktree, while the work branch appended another: merge
+"""A ledger record changed in place in a backlog-lane or rc worktree, while the work branch appended another: merge
 refuses with the rebase fix line, and that rebase stops on the ledger conflicted like any file
 (no union merge) — the record never lands twice.
 Size: MEDIUM (real git, tmp workspace).
@@ -10,17 +10,20 @@ import shlex
 import subprocess
 from pathlib import Path
 
+import pytest
+
 from dadaia_workspace.core.cli_line import git_line
 from tests.helpers.worktree_ws import commit, fixes, git, make_workspace, run
 
 
-def test_in_place_ledger_change_refuses_at_rebase(tmp_path: Path) -> None:
+@pytest.mark.parametrize("name", ["0.5.0/wt-backlog-x", "0.5.0/rc-1/wt-rc"])
+def test_in_place_ledger_change_refuses_at_rebase(tmp_path: Path, name: str) -> None:
     root, ledger = make_workspace(tmp_path), "specs/ADRs/decisions.jsonl"
-    repo, tree = root / "repos/r", root / "worktrees/r/backlog/x"
+    repo, tree = root / "repos/r", root / "worktrees/r" / name
     git(repo, "checkout", "-q", "feature/0.5.0")
     one, two = '{"id": "1", "status": "accepted"}\n', '{"id": "2", "status": "proposed"}\n'
     commit(repo, ledger, one + two)
-    assert run(root, "new", "r", "backlog/x").returncode == 0
+    assert run(root, "new", "r", name).returncode == 0
     commit(tree, ledger, one + two.replace("proposed", "accepted"))
     commit(repo, ledger, one + two + '{"id": "3", "status": "proposed"}\n')
     (fix,) = fixes(run(root, "merge", str(tree.relative_to(root))))
