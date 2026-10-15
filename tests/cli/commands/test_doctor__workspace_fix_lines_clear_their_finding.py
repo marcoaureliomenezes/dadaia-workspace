@@ -231,24 +231,26 @@ def test_a_workspace_finding_is_cleared_by_its_printed_fix(tmp_path: Path, plant
 
 
 @pytest.mark.skipif(sys.platform == "win32", reason="the stub CLI is a POSIX shell script")
-def test_a_long_skill_md_is_a_warning_whose_fix_is_an_agent_action(tmp_path: Path) -> None:
-    """The real doctor run prints one non-error SKILL-MD-LENGTH whose fix is the agent
-    action of adding the split to a task of the open rc, wherever the source lives (a repo
-    of the workspace holding it, or none); once the skill is short, the finding is gone."""
+def test_a_long_skill_md_is_a_warning_whose_fix_names_who_splits_it(tmp_path: Path) -> None:
+    """The real doctor run prints one non-error SKILL-MD-LENGTH: with a repo of the
+    workspace holding the source the fix is the agent action of adding the split to a task of
+    the open rc; with none the source is outside the workspace and the split is the
+    operator's. Once the skill is short, the finding is gone."""
     ws = _workspace(tmp_path)
     code = _plant_long_skill(ws)
     source = ws / "repos" / "lib" / "dadaia_workspace/public/skills/long/SKILL.md"
     source.parent.mkdir(parents=True)
     source.write_text("l\n")
-    for repos in (True, False):
-        if not repos:
+    fixes = [
+        "Agent action: add the split of long/SKILL.md to a task of the open rc, then run public install",
+        "Operator action: split long/SKILL.md at its library source; this workspace holds none and never edits the projection",
+    ]
+    for i, expected in enumerate(fixes):
+        if i:
             source.unlink()
         [found] = [f for f in _findings_before(ws) if f["code"] == code]
         assert found["verdict"] == "warning"
-        assert (
-            found["fix"]
-            == "Agent action: add the split of long/SKILL.md to a task of the open rc, then run public install"
-        )
+        assert found["fix"] == expected
     (ws / ".agents" / "skills" / "long" / "SKILL.md").write_text("l\n")
     assert code not in {f["code"] for f in _findings(ws)}
 
