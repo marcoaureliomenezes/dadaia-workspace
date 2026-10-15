@@ -25,6 +25,7 @@ from _release_schema import (
     CODE,
     DELIVERED,
     HISTO,
+    SUMMARY,
     current_job_writes,
     current_plan_jobs,
     job_errors,
@@ -37,7 +38,6 @@ _JOB_MERGE = re.compile(
     r"job: [a-z0-9-]+; start: \S+; end: \S+; wall: \d+; ritual_wait: \d+; dispatches: \d+; job_gate_runs: \d+"
 )
 _CURRENT_LOG_KINDS = frozenset({"milestone", "note", "summary", "memory"})
-_SUMMARY = re.compile(r"delivered: .+; carried: .+; backlog exits: .+")
 _BIRTH = re.compile(r"^(?:Candidate|Release \d+\.\d+\.\d+) born\b")
 
 
@@ -68,7 +68,7 @@ def _current_errors(
         + [
             f"log[{born + index}] kind summary must contain delivered, carried and backlog exits"
             for index, entry in enumerate(entries)
-            if entry.get("kind") == "summary" and not _SUMMARY.fullmatch(str(entry.get("text", "")))
+            if entry.get("kind") == "summary" and not SUMMARY.fullmatch(str(entry.get("text", "")))
         ]
     )
 

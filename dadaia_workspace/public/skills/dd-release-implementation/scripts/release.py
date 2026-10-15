@@ -34,6 +34,7 @@ from _release_schema import (
     _ORIGIN_GRAMMAR,
     HISTO,
     ORIGIN_KINDS,
+    closure_summary,
     origin,
 )
 from _release_store import (
@@ -194,7 +195,7 @@ def _allowed_open_bugs(args: argparse.Namespace, specs: Path) -> list[str]:
 def _refuse_unauthorized(allowed: list[str], state: dict[str, Any]) -> None:
     """Each carried open bug needs a verbatim authorization note and a closure-summary carry."""
     log = [entry for entry in state.get("log") or [] if isinstance(entry, dict)]
-    summaries = [str(entry.get("text", "")) for entry in log if entry.get("kind") == "summary"]
+    summary = closure_summary(state).get("carried", "")
     for bug_id in allowed:
         authorized = any(
             entry.get("kind") == "note"
@@ -202,10 +203,7 @@ def _refuse_unauthorized(allowed: list[str], state: dict[str, Any]) -> None:
             and _mentions(str(entry.get("text", "")), bug_id)
             for entry in log
         )
-        carried = any(
-            _mentions(text.partition("carried:")[2].partition("; backlog exits:")[0], bug_id)
-            for text in summaries
-        )
+        carried = _mentions(summary, bug_id)
         if not authorized:
             raise Refusal(
                 f"--allow-open {bug_id} has no authorization note",

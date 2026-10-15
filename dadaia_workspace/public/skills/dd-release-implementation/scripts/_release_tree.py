@@ -29,6 +29,7 @@ from _release_schema import (
     HISTO,
     MEMORY_WRITE,
     TRIO_PHASES,
+    closure_summary,
     current_candidate,
     origin,
     origin_line,
@@ -130,31 +131,6 @@ def _window_findings(
             "`fix_sha` with `git show` as `dd-bug-resolution/LINEAGE.md` defines")]  # fmt: skip
 
 
-def _last_summary(state: dict[str, Any]) -> str:
-    """The text of the log's last `kind: summary` entry, else empty."""
-    return next(
-        (
-            str(entry.get("text") or "")
-            for entry in reversed(state.get("log") or [])
-            if entry.get("kind") == "summary"
-        ),
-        "",
-    )
-
-
-def _swept(state: dict[str, Any]) -> bool:
-    """Whether a missing pointer is an error: the live candidate (past DEFINITION, so a stacked
-    candidate's inherited log is not its own) logged its closure `summary`, or shipped."""
-    since = str((state.get("defined") or {}).get("ts") or "")
-    return bool(
-        state.get("shipped")
-        or state.get("phase") != "DEFINITION"
-        and any(
-            e.get("kind") == "summary" and str(e.get("ts")) >= since for e in state.get("log") or []
-        )
-    )
-
-
 def _origin_row(
     specs: Path, spec: Path, line: int, live: Live, swept: bool, row: tuple[str, str, str, bool]
 ) -> dict[str, Any]:
@@ -187,11 +163,13 @@ def _origin_findings(specs: Path) -> list[dict[str, Any]]:
     text, rel = _jsonl.read_text(spec), spec.relative_to(specs).as_posix()
     out, line = _window_findings(spec, text, live.state, rel), origin_line(text)
     try:
-        rows = _trace(specs, live.release_id, origin(text), _last_summary(live.state))
+        rows = _trace(
+            specs, live.release_id, origin(text), "; ".join(closure_summary(live.state).values())
+        )
     except ValueError as error:
         return out + [_findings.finding(CODE, rel, line, str(error), f"Agent action: rewrite the Origin "
                               f"line {line} of {spec} to the Origin grammar ({error})")]  # fmt: skip
-    swept = _swept(live.state)
+    swept = bool(live.state.get("shipped") or closure_summary(live.state))
     return out + [_origin_row(specs, spec, line, live, swept, row) for row in rows]
 
 

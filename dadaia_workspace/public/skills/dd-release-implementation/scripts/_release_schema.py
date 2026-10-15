@@ -36,6 +36,27 @@ _ORIGIN_RE = re.compile(r"^\*\*Origin:\*\*[ \t]*(.*?)[ \t]*$", re.MULTILINE)
 _ORIGIN_GRAMMAR = "operator-demand | backlog:<ids>; bugs:<ids>; findings:<ids>, each kind once"
 
 
+#: The closure summary grammar: `delivered: …; carried: …; backlog exits: …`.
+SUMMARY = re.compile(
+    r"delivered: (?P<delivered>.+?); carried: (?P<carried>.+?); backlog exits: (?P<exits>.+)"
+)
+
+
+def closure_summary(state: dict[str, Any]) -> dict[str, str]:
+    """The live candidate's closure summary as ``delivered``, ``carried`` and ``exits``: the
+    last `kind: summary` entry at or after ``defined.ts``, past DEFINITION; empty when none
+    or malformed; the word ``none`` reads as an empty field."""
+    since = str((state.get("defined") or {}).get("ts") or "")
+    if state.get("phase") == "DEFINITION":
+        return {}
+    for entry in reversed(state.get("log") or []):
+        if entry.get("kind") == "summary" and str(entry.get("ts")) >= since:
+            found = SUMMARY.fullmatch(str(entry.get("text", "")))
+            fields = found.groupdict() if found else {}
+            return {name: "" if text == "none" else text for name, text in fields.items()}
+    return {}
+
+
 def extract_status(text: str) -> str | None:
     """The ``**Status:**`` token a SPEC, PLAN or job document carries, or ``None``."""
     match = STATUS_RE.search(text)
