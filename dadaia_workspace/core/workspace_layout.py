@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import fnmatch
 import re
-from collections.abc import Callable, Collection, Sequence
+from collections.abc import Callable, Collection
 from dataclasses import dataclass
 from enum import StrEnum
 from functools import cached_property
@@ -273,11 +273,17 @@ def _matches(sub: str, pattern: str) -> bool:
     return len(parts) == len(globs) and all(map(fnmatch.fnmatch, parts, globs))
 
 
-def protected_glob(tail: Sequence[str], protected: tuple[str, ...]) -> str | None:
-    """The protected glob a prefix of a repo-relative *tail* matches (the worktree grammar's
-    ``locate`` reads it), else ``None``."""
-    prefixes = ["/".join(tail[: n + 1]) for n in range(len(tail))]
-    return next((g for g in protected for sub in prefixes if _matches(sub, g)), None)
+def protected_glob(rel: str, protected: tuple[str, ...]) -> str | None:
+    """The protected glob a prefix of a workspace-relative path matches, else ``None``: *rel* is
+    ``repos/<r>/…``, anchored at the repo root, or ``worktrees/<r>/…``, anchored at every
+    depth below ``<r>`` since a tree's own root is not fixed."""
+    parts = rel.replace("\\", "/").split("/")
+    if len(parts) < 3 or parts[0] not in ("repos", "worktrees"):
+        return None
+    tail = parts[2:]
+    starts = range(len(tail)) if parts[0] == "worktrees" else range(1)
+    subs = ("/".join(tail[i : j + 1]) for i in starts for j in range(i, len(tail)))
+    return next((g for sub in subs for g in protected if _matches(sub, g)), None)
 
 
 def verdict(

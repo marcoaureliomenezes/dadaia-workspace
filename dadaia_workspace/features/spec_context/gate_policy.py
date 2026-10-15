@@ -16,7 +16,6 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from enum import Enum
-from functools import cache
 from itertools import chain
 from pathlib import PurePath
 
@@ -67,18 +66,6 @@ class Decision(Enum):
     BLOCK = "block"
 
 
-@cache
-def _locate() -> Callable[[str], tuple[str, str | None, tuple[str, ...]] | None]:
-    """The worktree grammar's one path reader through the one loader, imported on
-    the first protected glob judged so a gate with none pays nothing."""
-    from dadaia_workspace.infrastructure.ledger_scripts import load_owner
-
-    locate: Callable[[str], tuple[str, str | None, tuple[str, ...]] | None] = load_owner(
-        "dd-gitflow-default", "_worktree_names"
-    ).locate
-    return locate
-
-
 def _protection(
     p: str, projected: frozenset[str], protected: tuple[str, ...]
 ) -> tuple[workspace_layout.FloorRefusal, str] | None:
@@ -89,11 +76,7 @@ def _protection(
         chain(
             [(_R.LAW, p)] if p in projected else [],
             ((floor[f], f) for f in floor if p == f or p.startswith(f + "/")),
-            (
-                (_R.GLOB, g)
-                for g in protected
-                if workspace_layout.protected_glob((_locate()(p) or ("", None, ()))[2], (g,))
-            ),  # fmt: skip
+            [(_R.GLOB, g)] if (g := workspace_layout.protected_glob(p, protected)) else [],
         ),
         None,
     )
