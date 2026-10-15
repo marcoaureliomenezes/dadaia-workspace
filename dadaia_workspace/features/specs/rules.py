@@ -47,8 +47,6 @@ RULES: tuple[SpecsRule, ...] = (
     _rule(
         ("MEM-PLACEHOLDER-1",),
         lambda d: d._memory.check_placeholder_atoms(),
-        fix=lambda d, i: d._memory.fix_placeholder_atom(i),
-        fix_help=("doctor", "--fix"),
     ),
     _rule(
         ("SPEC-DOC-004",),
