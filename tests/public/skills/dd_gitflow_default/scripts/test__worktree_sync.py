@@ -74,6 +74,8 @@ def test_sync_rebases_the_tree_and_those_below_it_parents_first(root: Path) -> N
 
 def test_sync_skips_a_tree_that_holds_its_base(root: Path) -> None:
     commit(root / "worktrees/r" / RC, "src/rc2.py")  # the job is behind its tree; the tree is not
+    _move_work(root)
+    git(root / "worktrees/r" / RC, "merge", "-q", "--no-edit", WORK)  # the tree holds WORK by merge
     before = _heads(root)
     assert run(root, "sync", str(root / "worktrees/r" / RC)).returncode == 0
     after = _heads(root)
@@ -94,6 +96,10 @@ def test_sync_stops_at_the_first_conflict_with_one_fix_line_and_a_rerun_finishes
 ) -> None:
     job, task = root / "worktrees/r" / NEW_JOB, root / "worktrees/r" / NEW_TASK
     commit(job, "src/c.py", "mine\n")  # the work branch will write src/c.py too
+    git(root / "repos/r", "worktree", "remove", "-f", "-f", str(task))
+    git(root / "repos/r", "branch", "-D", f"wt/{NEW_TASK}")
+    open_tree(root, NEW_TASK)  # re-cut: the task now carries the job's conflicting commit
+    commit(task, "src/t2.py")
     _move_work(root, "src/c.py", "theirs\n")
     heads = git(job, "rev-parse", "HEAD"), git(task, "rev-parse", "HEAD")
     stopped = run(root, "sync", str(root / "worktrees/r" / RC))
