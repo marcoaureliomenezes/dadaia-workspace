@@ -193,17 +193,20 @@ def test_an_outside_ref_is_carried_onto_the_live_work_branch() -> None:
 @pytest.mark.parametrize(
     ("branch", "allowed"),
     [
-        pytest.param("wt/0.5.0-rc9/job2", True),
+        pytest.param("wt/0.5.0-rc9/job2", False, id="old-job-grammar-refused"),
+        pytest.param("wt/0.5.0/rc-9/job-2/wt-main", True, id="new-main-pushable"),
+        pytest.param("wt/0.5.0/rc-9/wt-rc", True, id="new-rc-pushable"),
+        pytest.param("wt/0.5.0/rc-9/job-2/wt-task-001", False, id="new-task-local"),
+        pytest.param("wt/backlog/an-idea", False, id="old-backlog-grammar-refused"),
+        pytest.param("wt/0.5.0/wt-backlog-an-idea", True, id="new-backlog-pushable"),
         ("wt/0.5.0-rc9/define", False),
-        ("wt/backlog/an-idea", True),
         ("wt/maintenance", False),
         ("wt/0.5.0-rc9/job2--T-1", False),
         ("wt/0.5.0a-impl", False),
     ],
 )
-def test_only_a_job_branch_of_wt_is_pushable(branch: str, allowed: bool) -> None:
-    """Pre-push accepts a job branch `wt/<M.m.p>-rc<N>/<job>` and a
-    `wt/backlog/<slug>` branch, no other `wt/` branch."""
+def test_only_a_wt_leaf_of_rc_main_or_backlog_is_pushable(branch: str, allowed: bool) -> None:
+    """Pre-push accepts the `wt/` rc, main and backlog leaves of the hierarchy, no other `wt/` branch."""
     refs, _ = parse_push_stdin(_line(branch))
     decision = check_branch_policy(refs, DEFAULT, replace(gate_fixes(), work="feature/0.5.0"))
     assert (decision is None) is allowed
@@ -261,7 +264,7 @@ def test_a_work_branch_creation_or_deletion_passes(line: str) -> None:
     [
         pytest.param("refs/heads/develop", id="integration"),
         pytest.param("refs/heads/main", id="principal"),
-        pytest.param("refs/heads/wt/0.6.0-rc1/job1", id="wt-branch"),
+        pytest.param("refs/heads/wt/0.6.0/rc-1/job-1/wt-main", id="wt-branch"),
         pytest.param("refs/heads/topic", id="outside-the-gitflow"),
         pytest.param("refs/tags/archive/wt/x", id="archive-tag"),
         pytest.param("refs/tags/v1", id="tag"),
