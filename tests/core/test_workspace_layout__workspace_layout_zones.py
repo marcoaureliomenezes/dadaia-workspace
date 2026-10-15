@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import dataclasses
+from pathlib import Path
 
 import pytest
 
@@ -98,16 +99,30 @@ def test_parse_dadaiaignore(text: str, expected: tuple[str, ...]) -> None:
     assert wl.parse_dadaiaignore(text) == (expected, (), ())
 
 
-def test_dadaiaignore_invalid_lines_and_segment_scope() -> None:
+def test_dadaiaignore_invalid_lines_and_segment_scope(tmp_path: Path) -> None:
     """``!``, ``**``, an absolute path or ``..`` is invalid, never a pattern; ``*``
     stays inside one segment, so a root pattern admits nothing below the root."""
     text = "!keep\nnotes/**\n/abs\na/../b\n*.png\n[protected]\nsecrets/\n**/k\n"
     invalid = ("!keep", "notes/**", "/abs", "a/../b", "**/k")
     assert wl.parse_dadaiaignore(text) == (("*.png",), ("secrets",), invalid)
-    assert wl.protected_glob("repos/r/secrets/k", ("secrets",)) == "secrets"
-    assert wl.protected_glob("repos/r/a/secrets", ("secrets",)) is None
-    assert wl.protected_glob("worktrees/r/x/y/z/secrets/k", ("secrets",)) == "secrets"
-    assert wl.protected_glob("worktrees/r/x/y/z/src/k", ("secrets",)) is None
+    tree = tmp_path / "worktrees" / "r" / "x" / "y"
+    (tree / "src").mkdir(parents=True)
+    (tree / ".git").write_text("gitdir: elsewhere\n", encoding="utf-8")
+
+    def pg(rel: str, *globs: str) -> str | None:
+        return wl.protected_glob(tmp_path, rel, globs or ("secrets",))
+
+    assert pg("repos/r/secrets/k") == "secrets"
+    assert pg("repos/r/a/secrets") is None
+    assert pg("worktrees/r/x/y/secrets/k") == "secrets"
+    assert pg("worktrees/r/x/y/src/secrets/k") is None  # anchored at the tree root, as under repos/
+    assert pg("worktrees/r/x/y/specs/AGENTS.md", "AGENTS.md") is None
+    assert pg("worktrees/r/x/y/AGENTS.md", "AGENTS.md") == "AGENTS.md"
+    assert pg("worktrees/r/x/y/src/k", "*.md") is None
+    assert pg("worktrees/r/x/y/docs/k", "docs") == "docs"
+    assert pg("worktrees/r/x/y/src/docs/k", "docs") is None
+    assert pg("worktrees/r/stray/z/secrets/k") == "secrets"  # no .git above: fail closed, any depth
+    assert pg("worktrees/r/x/y/z/src/k") is None
     assert wl.verdict("shot.png", False, ("*.png",), (), ()) == "operator"
     assert wl.verdict(".dadaia/shot.png", False, ("*.png",), (), ()) == "slop"
     assert wl.verdict(".dadaia/shot.png", False, (".dadaia/*.png",), (), ()) == "operator"

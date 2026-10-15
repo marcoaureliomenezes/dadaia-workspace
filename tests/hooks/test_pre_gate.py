@@ -45,6 +45,7 @@ def _spawn(ws: Path, payload: dict[str, Any]) -> Any:
         ("Write", {"file_path": "worktrees/a/scratch/secrets"}, "protected glob 'secrets'"),
         ("Write", {"file_path": "worktrees/a/scratch/secrets/k"}, "protected glob 'secrets'"),
         ("Write", {"file_path": "worktrees/a/x/y/z/secrets/k"}, "protected glob 'secrets'"),
+        ("Write", {"file_path": "worktrees/a/0.5.0-rc1/j1/src/secrets/k"}, None),  # anchored at the tree root
         ("Write", {"file_path": "worktrees/a/x/y/src/ok.py"}, None),
     ],
     ids=[
@@ -62,6 +63,7 @@ def _spawn(ws: Path, payload: dict[str, Any]) -> Any:
         "protected-glob-plain-tree-depth-1",
         "protected-glob-plain-tree-depth-2",
         "protected-glob-non-canonical-depth",
+        "protected-glob-below-the-tree-root-allowed",
         "unprotected-non-canonical-depth-allowed",
     ],
 )
@@ -77,6 +79,9 @@ def test_non_write_and_protected_matrix(
     )
     (tmp_path / "repos" / "a" / "specs").mkdir(parents=True)
     (tmp_path / ".dadaiaignore").write_text("[protected]\nsecrets\n", encoding="utf-8")
+    for tree in ("0.5.0-rc1/j1", "scratch", "scratch/any", "x/y/z"):  # a linked worktree's root holds a .git file
+        (tmp_path / "worktrees" / "a" / tree).mkdir(parents=True)
+        (tmp_path / "worktrees" / "a" / tree / ".git").write_text("gitdir: elsewhere\n", encoding="utf-8")
     rooted = {k: v if k == "command" else str(tmp_path / v) for k, v in tool_input.items()}
     block = _spawn(tmp_path, {"tool_name": tool, "tool_input": rooted}).block_envelope()
     if want is None:
