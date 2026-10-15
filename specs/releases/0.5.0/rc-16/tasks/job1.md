@@ -10,7 +10,7 @@ Wave 1, waits on —. Paths are repository-relative to `repos/dadaia-workspace/`
 - **R5 (AC1.3).** `python_env.version_change` returns the action `repair` when the entrypoint exists and its probe fails; `init._reconcile_upgrade` prints from the action and the `before is None` ternary (`init.py:194`) goes. Prior diffs: `9e4bb5a28`, `1e52fb25c`. Net lines at most 0.
 - R2 touches the placeholder detector, its rule row, the structural-text sentence and the slop allowance in one task (pre-mortem 5). Wave-1 disjointness: R1 reads no file of Job 3 (`_release_schema.py`, `test_release__release_script.py` stay Job 3's); R1's RED lands in `test_release__lean_state.py`.
 
-Tasks: 6 (2 jr, 4 sr, 0 pe). `who` names the dispatched role (`dd-release-definition` §5). Parallelism: Pairs R1 {T1→T2}, R2 {T3→T4}, R5 {T5→T6} are mutually independent: T1, T3, T5 start together.
+Tasks: 7 (2 jr, 5 sr, 0 pe). `who` names the dispatched role (`dd-release-definition` §5). Parallelism: Pairs R1 {T1→T2}, R2 {T3→T4}, R5 {T5→T6} are mutually independent: T1, T3, T5 start together.
 
 | task | who | AC | `W:` | outcome |
 |---|---|---|---|---|
@@ -20,3 +20,4 @@ Tasks: 6 (2 jr, 4 sr, 0 pe). `who` names the dispatched role (`dd-release-defini
 | J1.T4 | jr | AC1.2 | `dadaia_workspace/features/specs/doctor_memory.py`, `dadaia_workspace/features/specs/rules.py`, `dadaia_workspace/features/specs/doctor_structural.py`, `scripts/guards/slop.py` | delete the unlink and `_TEMPLATE_LINES`; report-only fix line; `rules.py:49-50` loses its `fix=` pair; `doctor_structural.py:238` 'Never auto-fixed' text agrees; the `slop.py:46` allowance row for `fix_placeholder_atom` leaves with its function (three places change together or two stay wrong); owner T3. After T3 (≈ −30 lines) |
 | J1.T5 | sr | AC1.3 | `tests/cli/commands/test_init__init_reinit_upgrade.py`, `tests/infrastructure/test_python_env.py` | RED: `version_change` returns `repair` for an existing entrypoint whose probe fails (literal action), and `init` prints `repaired -> B` from the action; the T-048-06 decider cases stay unchanged |
 | J1.T6 | jr | AC1.3 | `dadaia_workspace/infrastructure/python_env.py`, `dadaia_workspace/cli/commands/init.py` | decider returns the action; printer reads it; the ternary is gone; owner T5. After T5 (net ≤ 0) |
+| J1.T7 | sr | AC1.3 | `dadaia_workspace/infrastructure/python_env.py` | `version_change` answers `repair` on one condition; the nested-ternary dead `upgrade` arm leaves (Job 1 round-2 HIGH; feature `c21499e7c`, reviewed as `803f4cef2`) |
