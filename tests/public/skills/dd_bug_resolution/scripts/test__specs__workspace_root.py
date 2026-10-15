@@ -15,7 +15,7 @@ import pytest
 from dadaia_workspace.infrastructure.ledger_scripts import load_owner
 from tests.fixtures.harness_env import suite_env
 from tests.helpers.skill_scripts import stage_skill_scripts
-from tests.helpers.worktree_ws import NEW_JOB, git, make_workspace, run
+from tests.helpers.worktree_ws import NEW_JOB, NEW_TASK, git, make_workspace, run
 
 
 @pytest.fixture
@@ -76,27 +76,38 @@ def test_the_closure_waits_for_no_worktree_of_a_fenced_workspace(
     assert wait(ws / "repos/r/specs") is None
 
 
-@pytest.mark.parametrize(
-    ("other", "spared", "legacy"),
-    [
-        ("0.5.0/rc-2/wt-rc", True, False),
-        (NEW_JOB, False, False),
-        ("0.5.0/rc-3/wt-rc", False, False),
-        ("0.5.0/rc-2/wt-rc", True, True),
-    ],
-)
-def test_the_closure_spares_only_the_next_candidates_define_tree(
-    ws: Path, other: str, spared: bool, legacy: bool
-) -> None:
-    """The closure of the live candidate waits for every open tree but the next candidate's
-    `wt-rc` tree. A legacy release folder with no `rc-<N>/` counts as the first candidate."""
+LANE = "0.5.0/wt-backlog-x"
+
+
+def _open_drafted(ws: Path, *names: str) -> None:
+    """Each of *names* opened as a tree of repo `r` carrying one commit, so it holds an exit."""
     git(ws / "repos/r", "checkout", "-q", "feature/0.5.0")
-    for name in ("0.5.0/rc-1/wt-rc", other):
+    for name in names:
         assert run(ws, "new", "r", name).returncode == 0
         tree = ws / "worktrees/r" / name
         (tree / "draft.scratch.md").write_text(f"{name}\n")
         git(tree, "add", "-f", "draft.scratch.md")
         git(tree, "commit", "-qm", "draft")
+
+
+@pytest.mark.parametrize(
+    ("others", "held", "legacy"),
+    [
+        (("0.5.0/rc-2/wt-rc",), 0, False),
+        (("0.5.0/rc-2/wt-rc", "0.5.0/rc-3/wt-rc"), 0, False),
+        (("0.5.0/rc-2/wt-rc",), 0, True),
+        ((NEW_JOB,), 1, False),
+        ((NEW_JOB, NEW_TASK), 2, False),
+        ((LANE,), 1, False),
+    ],
+)
+def test_the_closure_waits_for_a_job_task_or_lane_tree_and_spares_every_wt_rc_tree(
+    ws: Path, others: tuple[str, ...], held: int, legacy: bool
+) -> None:
+    """The closure of the live candidate waits for every open job, task or lane tree of the
+    repo and spares the `wt-rc` trees of any candidate. A legacy release folder with no
+    `rc-<N>/` counts as the first candidate."""
+    _open_drafted(ws, "0.5.0/rc-1/wt-rc", *others)
     wait = load_owner("dd-release-implementation", "_release_phase")._refuse_open_worktrees
     reconcile_specs = ws / "worktrees/r/0.5.0/rc-1/wt-rc/specs"
     if legacy:
@@ -104,11 +115,21 @@ def test_the_closure_spares_only_the_next_candidates_define_tree(
         for entry in (release / "rc-1").iterdir():
             entry.rename(release / entry.name)
         (release / "rc-1").rmdir()
-    if spared:
+    if not held:
         assert wait(reconcile_specs) is None
     else:
         with pytest.raises(
             load_owner("dd-release-implementation", "_release_phase").Refusal,
-            match=r"repos/r still holds 1 open wt/\* worktree\(s\)",
+            match=rf"repos/r still holds {held} open wt/\* worktree\(s\)",
         ):
             wait(reconcile_specs)
+
+
+@pytest.mark.parametrize(("own", "before"), [(NEW_JOB, ("0.5.0/rc-1/wt-rc",)), (LANE, ())])
+def test_the_closure_spares_the_tree_it_runs_from_whatever_its_kind(
+    ws: Path, own: str, before: tuple[str, ...]
+) -> None:
+    """A job tree needs its candidate's `wt-rc` open first, and that one is spared too."""
+    _open_drafted(ws, *before, own)
+    wait = load_owner("dd-release-implementation", "_release_phase")._refuse_open_worktrees
+    assert wait(ws / "worktrees/r" / own / "specs") is None
