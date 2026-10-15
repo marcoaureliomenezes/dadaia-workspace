@@ -47,7 +47,7 @@ description: >
 - Current step (`RC-FLOW.md`) identified before attempting its unlock action.
 - `verify:` line green before any push; the reviewer's `APPROVED` on the work-branch head before its PR (`dd-gitflow-default` §3b).
 - The hand-back carries evidence per item, extending the engineer's evidence line: the consumer sweep for a changed grammar, format, public name or fix line (other repos as a count, never by name) and evidence for each QA-lens item of `dd-code-review` §6; old asserts follow the root map §1 test line; a bare PASS goes back unreviewed.
-- At candidate closure: the `wt-rc` carrying the reconcile merged (`RC-FLOW.md` step 4) -> candidate PR -> the promote-or-continue gate; the closure summary carries the batch of `dd-manager-orchestration` §2 step 4 and `python3 .agents/skills/dd-handoff-emitter/scripts/verdict.py stats <M.m.p>/rc-<N>`.
+- At candidate closure: the `wt-rc` carrying the reconcile merged (`RC-FLOW.md` step 4) -> candidate PR -> the promote-or-continue gate; the closure summary carries the batch of `dd-manager-orchestration` §2 step 4 and `python3 .agents/skills/dd-handoff-emitter/scripts/verdict.py stats <M.m.p>-rc<N>`.
 
 ## 4. References
 
