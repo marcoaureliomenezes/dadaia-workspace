@@ -49,3 +49,5 @@
 ## dadaia specs — SDD release-lifecycle structural checks and helpers.
 - specs init — Bring a repo's specs/ to the canon, never committing.
 - specs upgrade — Upgrade a specs/ tree to the canonical pattern version.
+
+## dadaia worktree — Run a worktree verb of the installed dd-gitflow-default `worktree.py`.

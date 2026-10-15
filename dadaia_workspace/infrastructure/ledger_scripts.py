@@ -35,6 +35,7 @@ __all__ = [
     "RELEASE_SCRIPT",
     "LedgerScript",
     "load_owner",
+    "own_workspace_root",
     "resolve_script",
     "script_findings",
     "script_repairs",

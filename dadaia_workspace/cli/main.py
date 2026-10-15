@@ -19,6 +19,7 @@ from dadaia_workspace.cli.commands import (
     reconcile,
     reports,
     specs,
+    worktree,
 )
 from dadaia_workspace.cli.commands import (
     help as help_cmd,
@@ -79,6 +80,11 @@ app.add_typer(reports.app, name="reports", rich_help_panel="Management")
 app.add_typer(specs.app, name="specs", rich_help_panel="Common")
 app.add_typer(migrate.app, name="migrate", rich_help_panel="Management")
 app.add_typer(help_cmd.app, name="help", rich_help_panel="Common")
+app.command(
+    name="worktree",
+    rich_help_panel="Common",
+    context_settings={"allow_extra_args": True, "ignore_unknown_options": True},
+)(worktree.worktree)
 
 
 #: Values of ``DADAIA_TRACEBACK`` that do NOT enable the traceback opt-in, so an
