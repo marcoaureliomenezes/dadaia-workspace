@@ -77,6 +77,34 @@ def test_the_scrub_drops_repo_selectors_and_keeps_the_callers_identity_and_confi
     assert {"GIT_AUTHOR_NAME", "GIT_CONFIG_GLOBAL"} <= set(kept)
 
 
+def test_the_scrubbed_env_marks_the_child_as_a_worktree_tool_and_still_drops_repo_selectors() -> (
+    None
+):
+    kept = load_owner("dd-bug-resolution", "_git").scrubbed_env(
+        {"GIT_DIR": "x", "GIT_WORK_TREE": "y", "HOME": "h"}
+    )
+    assert {k: kept[k] for k in ("DADAIA_WT",)} == {"DADAIA_WT": "1"}
+    assert {"GIT_DIR", "GIT_WORK_TREE"}.isdisjoint(kept)
+
+
+def test_the_git_subprocess_env_marks_the_child_and_still_drops_repo_selectors(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from dadaia_workspace.infrastructure import git_subprocess
+
+    seen: dict[str, dict[str, str]] = {}
+
+    def fake_run(args: list[str], **kw: dict[str, str]) -> subprocess.CompletedProcess[str]:
+        seen["env"] = kw["env"]
+        return subprocess.CompletedProcess(args, 0, "", "")
+
+    monkeypatch.setenv("GIT_DIR", "x")
+    monkeypatch.setattr(git_subprocess.subprocess, "run", fake_run)
+    git_subprocess._run(["git", "status"])
+    assert {k: seen["env"][k] for k in ("DADAIA_WT",) if k in seen["env"]} == {"DADAIA_WT": "1"}
+    assert "GIT_DIR" not in seen["env"]
+
+
 def test_the_scrubbed_env_forbids_bytecode_even_when_the_parent_allows_it(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
