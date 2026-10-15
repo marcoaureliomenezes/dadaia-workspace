@@ -166,9 +166,19 @@ def test_a_bound_approval_of_head_lands(root: Path) -> None:
     assert git(root / "repos/r", "rev-parse", "feature/0.5.0").strip() == head
 
 
-def test_a_plain_name_is_refused_as_not_a_worktree_name_with_the_list_fix(tmp_path: Path) -> None:
-    root = make_workspace(tmp_path)
-    git(root / "repos/r", "checkout", "-q", "feature/0.5.0")
+@pytest.mark.parametrize("verdict", ["missing", "rejected", "other-sha", "other-diff"])
+def test_a_plain_name_is_refused_as_not_a_worktree_name_whatever_the_verdict(
+    root: Path, verdict: str
+) -> None:
+    repo = root / "repos/r"
+    base = git(repo, "rev-parse", "HEAD").strip()
+    head = land(root, "src/a.py")
+    if verdict == "rejected":
+        approve(root, head, verdict="REJECTED")
+    elif verdict == "other-sha":
+        _hand(root, head, reviewed_sha=base, diff_sha256=diff_hash(root, head))
+    elif verdict == "other-diff":
+        _hand(root, head, reviewed_sha=head, diff_sha256=diff_hash(root, base))
 
     refused = run(root, "new", "r", "maintenance")
 
@@ -176,3 +186,4 @@ def test_a_plain_name_is_refused_as_not_a_worktree_name_with_the_list_fix(tmp_pa
     assert "[error] not a worktree name" in refused.stderr
     assert fixes(refused) == [f"fix: {shell_line(sys.executable, str(SCRIPT))} list"]
     assert not (root / "worktrees/r/maintenance").exists()
+    assert git(repo, "rev-parse", "feature/0.5.0").strip() == base
