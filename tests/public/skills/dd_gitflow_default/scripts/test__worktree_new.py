@@ -106,22 +106,14 @@ _PROMOTED = (*_NO_RELEASE, ("branch", "-m", "feature/0.5.0", "feature/0.6.0"))
 
 
 @pytest.mark.parametrize(
-    ("steps", "recorded", "base"),
+    "steps",
     [
-        ((), "feature/0.5.0", "feature/0.5.0"),
-        ((*_NO_RELEASE, ("branch", "-D", "feature/0.5.0")), "main", "main"),
-        ((*_RENAMED,), "feature/0.6.0", "feature/0.6.0"),
-        (
-            (("branch", "trunk"), ("checkout", "-q", "trunk"), *_PROMOTED),
-            "feature/0.6.0",
-            "feature/0.6.0",
-        ),
-        ((("checkout", "-q", "--detach"), *_PROMOTED), "feature/0.6.0", "feature/0.6.0"),
-        (
-            (("branch", "dev"), ("checkout", "-q", "dev"), *_PROMOTED),
-            "feature/0.6.0",
-            "feature/0.6.0",
-        ),
+        (),
+        (*_NO_RELEASE, ("branch", "-D", "feature/0.5.0")),
+        (*_RENAMED,),
+        (("branch", "trunk"), ("checkout", "-q", "trunk"), *_PROMOTED),
+        (("checkout", "-q", "--detach"), *_PROMOTED),
+        (("branch", "dev"), ("checkout", "-q", "dev"), *_PROMOTED),
     ],
     ids=[
         "live-release",
@@ -132,49 +124,36 @@ _PROMOTED = (*_NO_RELEASE, ("branch", "-m", "feature/0.5.0", "feature/0.6.0"))
         "dev",
     ],
 )
-def test_a_plain_worktree_opens_on_the_one_work_branch_else_the_checked_out_branch(
-    root: Path, steps: tuple[tuple[str, ...], ...], recorded: str, base: str
+def test_a_plain_name_refuses_whatever_branch_the_repo_is_on(
+    root: Path, steps: tuple[tuple[str, ...], ...]
 ) -> None:
     repo = root / "repos/r"
     for step in steps:
         _git(repo, *step)
 
-    opened = _run(root, "new", "r", "maintenance")
-
-    assert opened.returncode == 0, opened.stderr
-    assert _git(repo, "config", "branch.wt/maintenance.dadaia-base").strip() == recorded
-    assert _git(repo, "rev-parse", "wt/maintenance") == _git(repo, "rev-parse", base)
-    assert (root / "worktrees/r/maintenance").is_dir()
+    _assert_plain_refused(root, _run(root, "new", "r", "maintenance"))
 
 
 @pytest.mark.parametrize(
-    ("steps", "fix", "recorded"),
+    "steps",
     [
         (
-            (
-                ("branch", "dev"),
-                ("checkout", "-q", "dev"),
-                ("update-ref", "refs/remotes/origin/feature/0.5.0", "main"),
-                ("branch", "-D", "feature/0.5.0"),
-            ),
-            "branch feature/0.5.0 origin/feature/0.5.0",
-            "feature/0.5.0",
+            ("branch", "dev"),
+            ("checkout", "-q", "dev"),
+            ("update-ref", "refs/remotes/origin/feature/0.5.0", "main"),
+            ("branch", "-D", "feature/0.5.0"),
         ),
         (
-            (
-                *_NO_RELEASE,
-                ("branch", "-D", "feature/0.5.0"),
-                ("branch", "dev"),
-                ("checkout", "-q", "--detach"),
-            ),
-            "branch feature/0.1.0 dev",
-            "feature/0.1.0",
+            *_NO_RELEASE,
+            ("branch", "-D", "feature/0.5.0"),
+            ("branch", "dev"),
+            ("checkout", "-q", "--detach"),
         ),
     ],
     ids=["remote-only", "detached-no-work-branch"],
 )
-def test_a_plain_worktree_refuses_without_a_local_work_branch_and_its_fix_line_opens_it(
-    root: Path, steps: tuple[tuple[str, ...], ...], fix: str, recorded: str
+def test_a_plain_name_refuses_without_a_local_work_branch_with_the_list_fix(
+    root: Path, steps: tuple[tuple[str, ...], ...]
 ) -> None:
     repo = root / "repos/r"
     for step in steps:
@@ -182,29 +161,29 @@ def test_a_plain_worktree_refuses_without_a_local_work_branch_and_its_fix_line_o
 
     refused = _run(root, "new", "r", "maintenance")
 
-    assert refused.returncode == 1
-    assert _fixes(refused)[0].endswith(fix)
+    _assert_plain_refused(root, refused)
     run_fix(root, refused)
-    assert _run(root, "new", "r", "maintenance").returncode == 0
-    assert _git(repo, "config", "branch.wt/maintenance.dadaia-base").strip() == recorded
+    _assert_plain_refused(root, _run(root, "new", "r", "maintenance"))
 
 
-def test_two_work_branches_refuse_with_a_fix_that_strands_no_commit(root: Path) -> None:
+def _assert_plain_refused(root: Path, refused: subprocess.CompletedProcess[str]) -> None:
+    """A one-segment name is no worktree name: refused with the `list` fix, nothing created, no base recorded."""
+    repo = root / "repos/r"
+    assert refused.returncode == 1
+    assert "not a worktree name" in refused.stderr
+    assert [f.removeprefix("fix: ") for f in _fixes(refused)] == [f"{_script()} list"]
+    assert not (root / "worktrees/r").exists()
+    assert _git(repo, "branch", "--list", "wt/maintenance").strip() == ""
+    assert _git(repo, "config", "--get-regexp", r"dadaia-base").strip() == ""
+
+
+def test_two_work_branches_still_refuse_a_plain_name_with_the_list_fix(root: Path) -> None:
     repo = root / "repos/r"
     _git(repo, "checkout", "-q", "feature/0.5.0")
     _git(repo, "commit", "-q", "--allow-empty", "-m", "lower work")
     _git(repo, "branch", "feature/0.6.0", "main")
 
-    refused = _run(root, "new", "r", "maintenance")
-
-    assert _fixes(refused) == [
-        f"fix: Agent action: merge feature/0.5.0 into feature/0.6.0, then run git -C {repo} branch -d feature/0.5.0"
-    ]
-    _git(repo, "checkout", "-q", "feature/0.6.0")
-    _git(repo, "merge", "-q", "feature/0.5.0")
-    _git(repo, "branch", "-d", "feature/0.5.0")
-    assert _run(root, "new", "r", "maintenance").returncode == 0
-    assert _git(repo, "config", "branch.wt/maintenance.dadaia-base").strip() == "feature/0.6.0"
+    _assert_plain_refused(root, _run(root, "new", "r", "maintenance"))
 
 
 @pytest.mark.parametrize("name", ["0.5.0a-impl", "0.5.0b-release", "0.4.9-rc1/j1", "0.5.0-rc1/J1"])

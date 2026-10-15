@@ -608,44 +608,48 @@ def test_a_repo_without_a_tests_declaration_lands_a_source_only_task(root: Path)
     assert landed.returncode == 0, landed.stderr
 
 
+def _plain_tree(root: Path, name: str) -> Path:
+    """A one-segment tree made with raw git, as an old-layout workspace may still hold."""
+    repo = root / "repos/r"
+    tree = root / "worktrees/r" / name
+    git(repo, "worktree", "add", "-q", "-b", f"wt/{name}", str(tree), "feature/0.5.0")
+    return tree
+
+
 @pytest.mark.parametrize("declared_verify", [True, False], ids=["verify-once", "no-verify"])
-def test_a_plain_merge_returns_to_its_recorded_base(tmp_path: Path, declared_verify: bool) -> None:
+@pytest.mark.parametrize("verb", ["merge", "preflight"])
+def test_a_plain_tree_is_refused_by_merge_and_preflight_with_the_list_fix(
+    tmp_path: Path, declared_verify: bool, verb: str
+) -> None:
     root = make_workspace(tmp_path)
     repo = root / "repos/r"
     git(repo, "checkout", "-q", "feature/0.5.0")
     law = "verify: python scripts/ci.py job\n" if declared_verify else "# local law\n"
     commit(repo, "AGENTS.md", law)
-    opened = run(root, "new", "r", "maintenance")
-    assert opened.returncode == 0, opened.stderr
-    tree = root / "worktrees/r/maintenance"
+    tree = _plain_tree(root, "maintenance")
     head = commit(tree, "src/a.py")
     approve(root, head)
 
-    landed = run(root, "merge", str(tree))
+    refused = run(root, verb, str(tree))
 
-    assert landed.returncode == 0, landed.stderr
-    assert git(repo, "rev-parse", "feature/0.5.0").strip() == head
-    assert landed.stdout.splitlines().count("ci job") == int(declared_verify)
+    assert refused.returncode == 1
+    assert "not a worktree name" in refused.stderr
+    assert [f.removeprefix("fix: ") for f in fixes(refused)] == [
+        shell_line(sys.executable, str(SCRIPT), "list")
+    ]
+    assert git(repo, "rev-parse", "feature/0.5.0").strip() != head
 
 
-def test_a_plain_tree_opened_before_the_work_branch_is_renamed_still_merges(tmp_path: Path) -> None:
-    """A recorded work-branch name resolves through the work-branch rule, so the promote's `branch -m` leaves the tree landable."""
+def test_no_dadaia_base_key_is_ever_written_for_a_branch(tmp_path: Path) -> None:
     root = make_workspace(tmp_path)
     repo = root / "repos/r"
     git(repo, "checkout", "-q", "feature/0.5.0")
-    assert run(root, "new", "r", "early").returncode == 0
-    tree = root / "worktrees/r/early"
-    head = commit(tree, "src/a.py")
-    approve(root, head)
-    assert git(repo, "config", "branch.wt/early.dadaia-base").strip() == "feature/0.5.0"
+
+    assert run(root, "new", "r", "early").returncode == 1
     git(repo, "branch", "-m", "feature/0.5.0", "feature/0.6.0")
+    run(root, "new", "r", "early")
 
-    listed = json.loads(run(root, "list", "--json").stdout)
-    landed = run(root, "merge", str(tree))
-
-    assert [t["state"] for t in listed if t["name"] == "early"] == ["ready"]
-    assert landed.returncode == 0, landed.stderr
-    assert git(repo, "rev-parse", "feature/0.6.0").strip() == head
+    assert git(repo, "config", "--get-regexp", r"dadaia-base").strip() == ""
 
 
 def test_a_verdict_citing_a_file_only_the_reviewed_tree_holds_is_accepted(root: Path) -> None:
