@@ -649,7 +649,7 @@ def test_no_dadaia_base_key_is_ever_written_for_a_branch(tmp_path: Path) -> None
     git(repo, "branch", "-m", "feature/0.5.0", "feature/0.6.0")
     run(root, "new", "r", "early")
 
-    assert git(repo, "config", "--get-regexp", r"dadaia-base").strip() == ""
+    assert "dadaia-base" not in git(repo, "config", "--list")
 
 
 def test_a_verdict_citing_a_file_only_the_reviewed_tree_holds_is_accepted(root: Path) -> None:

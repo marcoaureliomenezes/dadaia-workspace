@@ -174,7 +174,7 @@ def _assert_plain_refused(root: Path, refused: subprocess.CompletedProcess[str])
     assert [f.removeprefix("fix: ") for f in _fixes(refused)] == [f"{_script()} list"]
     assert not (root / "worktrees/r").exists()
     assert _git(repo, "branch", "--list", "wt/maintenance").strip() == ""
-    assert _git(repo, "config", "--get-regexp", r"dadaia-base").strip() == ""
+    assert "dadaia-base" not in _git(repo, "config", "--list")
 
 
 def test_two_work_branches_still_refuse_a_plain_name_with_the_list_fix(root: Path) -> None:
@@ -384,20 +384,20 @@ def test_an_unreadable_release_state_refuses_a_job_and_creates_nothing(
         ("backlog/1a", "1a", None),
         ("hotfix/a-b", "a-b", None),
         ("hotfix/1a", "1a", None),
-        ("a-b", "a-b", None),
+        ("a-b", None, None),
         ("1a", "1a", None),
         ("a--b", "a--b", None),
         ("backlog/a--b", "a--b", None),
     ],
 )
 def test_a_name_is_accepted_as_the_backlog_slug_and_the_task_id_grammar_say(
-    name: str, word: str, task: str | None
+    name: str, word: str | None, task: str | None
 ) -> None:
-    """The job, backlog, hotfix and plain words are the backlog `slug`; a task part is a
-    release task id, so `--` only ever separates a job from `J<n>.T<k>`."""
+    """The job, backlog and hotfix words are the backlog `slug`; a task part is a release task
+    id, so `--` only ever separates a job from `J<n>.T<k>`; a one-segment word is no name."""
     slug = load_owner("dd-bug-resolution", "_ledger").load_schema("backlog-v1")["$defs"]["slug"]
     task_id = load_owner("dd-bug-resolution", "_grammar").TASK_ID_RE
-    accepted = bool(re.fullmatch(slug["pattern"], word)) and (
+    accepted = word is not None and bool(re.fullmatch(slug["pattern"], word)) and (
         task is None or bool(task_id.fullmatch(task))
     )
     names = load_owner("dd-gitflow-default", "_worktree_names")
