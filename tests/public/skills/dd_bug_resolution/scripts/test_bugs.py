@@ -187,6 +187,36 @@ def test_check_refuses_a_fix_sha_that_no_ref_reaches(script: Path, tmp_path: Pat
     assert "\nfix: " in done.stdout
 
 
+def test_the_unreached_fix_sha_finding_names_the_commit_that_replaces_it(
+    script: Path, tmp_path: Path
+) -> None:
+    """The fix line is one runnable command when exactly one reachable commit carries the bug law's subject."""
+    specs = _ledger(tmp_path)
+    git = ["git", "-C", str(tmp_path), "-c", "user.name=t", "-c", "user.email=t@t.test"]
+
+    def head() -> str:
+        return subprocess.run(
+            [*git, "rev-parse", "HEAD"], capture_output=True, text=True, check=True
+        ).stdout.strip()
+
+    subprocess.run([*git, "commit", "-q", "-m", "fix(bugs): a-bug \u2014 cause"], check=True)
+    old = head()
+    resolved = {**_OPEN_RECORD, "status": "resolved", "closed_at": "2026-09-21T10:00:00Z",
+                "cause": "c", "solution": "s", "caused_by": "none", "fix_sha": old}  # fmt: skip
+    _ledger(tmp_path, resolved)
+    subprocess.run(
+        [*git, "commit", "-q", "--amend", "-m", "fix(bugs): a-bug \u2014 cause."], check=True
+    )
+    done = _run(script, "check", "--specs", str(specs))
+    fix = done.stdout.splitlines()[-1]
+    assert fix.startswith("fix: ") and f"update a-bug --set fix_sha={head()} --specs" in fix, fix
+    subprocess.run(
+        [*git, "commit", "-q", "--allow-empty", "-m", "fix(bugs): a-bug \u2014 again"], check=True
+    )
+    fix = _run(script, "check", "--specs", str(specs)).stdout.splitlines()[-1]
+    assert fix.startswith("fix: Agent action: ") and "<" not in fix, fix
+
+
 @pytest.mark.parametrize(("caused_by", "code"), [
     ("J1.T3", 0),
     ("J1.S2.T3", 0),  # historical task ids stay readable
