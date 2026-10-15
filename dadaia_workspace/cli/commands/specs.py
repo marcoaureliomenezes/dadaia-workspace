@@ -186,8 +186,7 @@ def init(
     )
     if refused:
         raise typer.Exit(1)
-    if kind != "foreign":  # the foreign move stays staged for the operator to review
-        _commit_on_work_branch(target.parent, flow)
+    _commit_on_work_branch(target.parent, flow)
     if kind in ("absent", "foreign"):
         typer.echo(f"[ok] {target} at pattern version {specs_version.CANONICAL_SPECS_VERSION}")
 
@@ -202,10 +201,10 @@ def _commit_on_work_branch(repo: Path, flow: Gitflow) -> None:
     if git.git(repo, "for-each-ref", f"refs/heads/{work}"):
         return
     git.git(repo, "switch", "-c", work)
-    git.commit_paths(
-        repo, "chore: scaffold the dadaia specs", [p for p in ONBOARDING if (repo / p).exists()]
-    )
-    typer.echo(f"[committed] {work}")
+    paths = [p for p in ONBOARDING if (repo / p).exists()]
+    if git.git(repo, "status", "--porcelain", "--", *paths):
+        git.commit_paths(repo, "chore: scaffold the dadaia specs", paths)
+        typer.echo(f"[committed] {work}")
 
 
 def _gitflow(
