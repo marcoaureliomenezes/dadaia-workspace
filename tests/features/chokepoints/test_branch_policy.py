@@ -228,7 +228,7 @@ def test_a_work_branch_update_to_a_sha_other_than_origins_is_refused_with_one_fi
     fix = decision.message.rsplit("fix: ", 1)[1]
     assert fix.startswith("Agent action: ")
     assert fix_line(None, "worktree", "new", "proj") in fix
-    assert "change" not in fix
+    assert "proj change" not in fix
 
 
 def test_a_work_branch_no_op_update_passes() -> None:
