@@ -36,7 +36,7 @@ def test_verdict_writes_the_exact_bound_handoff(tmp_path: Path) -> None:
         stage_skill_scripts(skill, root / ".agents/skills" / skill / "scripts")
     repo = root / "repos/r"
     git(repo, "checkout", "-q", "feature/0.5.0")
-    name = "0.5.0-rc1/define"
+    name = "0.5.0/wt-backlog-note"
     assert run(root, "new", "r", name).returncode == 0
     tree = root / "worktrees/r" / name
     head = commit(tree, "specs/note.md", "reviewed\n")

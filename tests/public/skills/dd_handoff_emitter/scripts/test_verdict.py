@@ -43,15 +43,15 @@ RED = "reviewer-emits-own-verdict (ADR 0218)"
 
 
 def _workspace(tmp_path: Path) -> tuple[Path, Path, str]:
-    """A workspace whose skill scripts sit where an install puts them; a `define` tree at HEAD."""
+    """A workspace whose skill scripts sit where an install puts them; a backlog lane at HEAD."""
     assert (PKG / "public/skills" / SKILL / "scripts/verdict.py").is_file(), "verdict.py is absent"
     (root := tmp_path / "ws").mkdir()
     make_workspace(root)
     for skill in (SKILL, "dd-gitflow-default", "dd-bug-resolution", "dd-release-implementation"):
         stage_skill_scripts(skill, root / ".agents/skills" / skill / "scripts")
     git(root / "repos/r", "checkout", "-q", "feature/0.5.0")
-    assert run(root, "new", "r", "0.5.0-rc1/define").returncode == 0
-    tree = root / "worktrees/r/0.5.0-rc1/define"
+    assert run(root, "new", "r", "0.5.0/wt-backlog-notes").returncode == 0
+    tree = root / "worktrees/r/0.5.0/wt-backlog-notes"
     return root, tree, commit(tree, "specs/notes", "")
 
 
@@ -315,17 +315,17 @@ def _record(
 
 def test_stats_counts_the_rc_verdict_sequences_in_produced_at_order(tmp_path: Path) -> None:
     root, _tree, _head = _workspace(tmp_path)
-    rc99, sha = "wt/0.5.0-rc99", "@" + "a" * 40
+    rc99, sha = "wt/0.5.0/rc-99", "@" + "a" * 40
     # written out of time order: the count reads `produced_at`, not the file listing
-    _record(root, f"{rc99}/job1{sha}", "REJECTED", "03")
-    _record(root, f"{rc99}/job1{sha}", "REJECTED", "01")
-    _record(root, f"{rc99}/job1{sha}", "APPROVED", "02")
-    _record(root, f"{rc99}/job2{sha}", "APPROVED", "01", hold=True)
-    _record(root, f"{rc99}/job3{sha}", "REJECTED", "01")
-    _record(root, f"{rc99}/job3{sha}", "REJECTED", "02")
-    _record(root, f"{rc99}/job3{sha}", "APPROVED", "03")
-    _record(root, f"wt/0.5.0-rc98/job1{sha}", "REJECTED", "01")
-    _record(root, f"{rc99}/job4{sha}", "REJECTED", "01", agent="dd-sw-engineer-sr")
+    _record(root, f"{rc99}/job-1/wt-main{sha}", "REJECTED", "03")
+    _record(root, f"{rc99}/job-1/wt-main{sha}", "REJECTED", "01")
+    _record(root, f"{rc99}/job-1/wt-main{sha}", "APPROVED", "02")
+    _record(root, f"{rc99}/job-2/wt-main{sha}", "APPROVED", "01", hold=True)
+    _record(root, f"{rc99}/job-3/wt-main{sha}", "REJECTED", "01")
+    _record(root, f"{rc99}/job-3/wt-main{sha}", "REJECTED", "02")
+    _record(root, f"{rc99}/job-3/wt-main{sha}", "APPROVED", "03")
+    _record(root, f"wt/0.5.0/rc-98/job-1/wt-main{sha}", "REJECTED", "01")
+    _record(root, f"{rc99}/job-4/wt-main{sha}", "REJECTED", "01", agent="dd-sw-engineer-sr")
     script = root / ".agents/skills" / SKILL / "scripts/verdict.py"
     env = suite_env(
         os.environ,
@@ -333,7 +333,7 @@ def test_stats_counts_the_rc_verdict_sequences_in_produced_at_order(tmp_path: Pa
         overrides={"PATH": os.environ["PATH"], "HOME": str(root), "GIT_CONFIG_NOSYSTEM": "1"},
     )
     done = subprocess.run(
-        [sys.executable, str(script), "stats", "0.5.0-rc99"],
+        [sys.executable, str(script), "stats", "0.5.0/rc-99"],
         cwd=root,
         env=env,
         capture_output=True,
@@ -459,7 +459,7 @@ def test_stats_outside_a_workspace_is_refused_with_one_fix_line(tmp_path: Path) 
     (away := tmp_path / "away").mkdir()
     script = root / ".agents/skills" / SKILL / "scripts/verdict.py"
     refused = subprocess.run(
-        [sys.executable, str(script), "stats", "0.5.0-rc1"],
+        [sys.executable, str(script), "stats", "0.5.0/rc-1"],
         cwd=away,
         capture_output=True,
         text=True,
