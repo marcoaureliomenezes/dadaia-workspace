@@ -85,6 +85,13 @@ def _empty_section(name: str) -> SectionReport:
 def _specs_section(doctor: SpecsDoctor | None, root: Path | None) -> SectionReport:
     if doctor is None:
         return _empty_section("specs")
+    kind, fix = state(doctor.specs_dir)
+    if kind in ("absent", "file"):  # no rule can judge a tree that is not there: one finding
+        msg = f"no specs tree at {doctor.specs_dir}"
+        finding = SectionFinding(
+            "SPECS-ABSENT", "error", msg, canonical=False, error=True, fix=fix or ""
+        )
+        return SectionReport(name="specs", findings=(finding,))
     return run_section(
         "specs",
         SPECS_RULES,
@@ -107,7 +114,7 @@ def _ledgers_section(
     """
     from dadaia_workspace.infrastructure.ledger_scripts import script_findings
 
-    if specs_dir is None:
+    if specs_dir is None or state(specs_dir)[0] in ("absent", "file"):
         return _empty_section("ledgers")
 
     tracked = container.build_git_client().tracked(specs_dir.parent)
@@ -191,15 +198,6 @@ def _resolve_run(
         name,
         target if target and onboarding.specs_ready(target) else None,
     )
-
-
-def _absent_tree(target: Path | None) -> SectionFinding | None:
-    """An explicit ``--specs-dir`` holding no tree: its one finding, carrying ``state``'s fix."""
-    kind, fix = state(target) if target else ("canonical", None)
-    if kind not in ("absent", "file"):
-        return None
-    msg = f"no specs tree at {target}"
-    return SectionFinding("SPECS-ABSENT", "error", msg, canonical=False, error=True, fix=fix or "")
 
 
 def _bound_context() -> str | None:
@@ -300,8 +298,6 @@ def doctor(
 ) -> None:
     """Report workspace, specs and ledger compliance; optionally repair."""
     workspace_root, service, scope, target = _resolve_run(specs_dir, context)
-    absent = _absent_tree(target)
-    target = None if absent else target
     specs_doctor = _build_specs_doctor(target, public_dir)
 
     fixed = _apply_fixes(service, specs_doctor, scope, fix=fix, expired_only=expired_only)
@@ -317,9 +313,7 @@ def doctor(
                 _onboarding_section(workspace_root, scope, expired_only=expired_only),
             ]
         ),
-        SectionReport(name="specs", findings=(absent,))
-        if absent
-        else _specs_section(specs_doctor, workspace_root),
+        _specs_section(specs_doctor, workspace_root),
         _ledgers_section(workspace_root, target),
     ]
     # Render boundary ONLY: no doctor ever sees the redactor; every finding and fix action
@@ -354,7 +348,11 @@ def _apply_fixes(
     if not fix:
         return []
     fixed = [] if service is None else service.expire() if expired_only else service.fix(scope)
-    if not expired_only and specs_doctor is not None:
+    if (
+        not expired_only
+        and specs_doctor is not None
+        and state(specs_doctor.specs_dir)[0] not in ("absent", "file")
+    ):
         fixed.extend(f"[specs] {issue.code}: {finding_path(issue)}" for issue in specs_doctor.fix())
     return fixed
 
