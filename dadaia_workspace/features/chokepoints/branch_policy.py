@@ -166,17 +166,27 @@ def check_ref_policy(
     lines: list[str], gitflow: Gitflow, origin: dict[str, str], repo: str
 ) -> Decision:
     """The first refusal over ``<old> <new> <ref>`` lines: a work-branch update (old, new
-    non-zero) must land on origin's sha for its ref; creations, deletions, non-work refs
-    and a ref origin does not hold pass. The fix opens a tree for *repo*."""
+    non-zero, different) must land on origin's sha for its ref; creations, deletions, non-work refs
+    and a ref origin does not hold pass. The fix names the tree to open for *repo*."""
     for line in filter(str.strip, lines):
         old, new, ref = line.split()
         branch = ref.removeprefix(HEADS_PREFIX)
         held = origin.get(ref)
-        if ZERO_SHA in (old, new) or gitflow.role_of(branch) != "work" or held in ("", None, new):
+        if (
+            ZERO_SHA in (old, new)
+            or old == new
+            or gitflow.role_of(branch) != "work"
+            or held in ("", None, new)
+        ):
             continue
+        fix = (
+            f"Agent action: open a tree for this change with {fix_line(None, 'worktree', 'new', repo)} "
+            "and the name of a live job, a backlog slug or a hotfix bug id, then land the change "
+            "through that tree's merge"
+        )
         return Decision(
             allowed=False,
             message=f"[ref-gate] BLOCKED: '{branch}' would move to {new}, origin holds {held} ({_LAW}).\n"
-            f"{spell_fix(fix_line(None, 'worktree', 'new', repo, 'change'))}",
+            f"{spell_fix(fix)}",
         )
     return Decision(allowed=True)
