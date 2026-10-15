@@ -8,15 +8,18 @@ Size: MEDIUM (real git, tmp workspace).
 
 from __future__ import annotations
 
+import shlex
 import subprocess
 from pathlib import Path
 
 import pytest
 
+from dadaia_workspace.core.cli_line import fix_line
 from tests.helpers.worktree_ws import (
     NEW_JOB,
     NEW_TASK,
     approve,
+    cli_path,
     commit,
     fixes,
     git,
@@ -86,25 +89,22 @@ def test_sync_of_a_task_leaves_its_parents_alone(root: Path) -> None:
     assert after[:2] == before[:2] and _holds(root, f"wt/{NEW_JOB}", NEW_TASK)
 
 
-def _conflict(root: Path) -> subprocess.CompletedProcess[str]:
-    """The work branch and the job's tree both write `src/c.py`; the task is behind the job."""
-    commit(root / "worktrees/r" / NEW_JOB, "src/c.py", "mine\n")
-    _move_work(root, "src/c.py", "theirs\n")
-    return run(root, "sync", str(root / "worktrees/r" / RC))
-
-
 def test_sync_stops_at_the_first_conflict_with_one_fix_line_and_a_rerun_finishes(
     root: Path,
 ) -> None:
     job, task = root / "worktrees/r" / NEW_JOB, root / "worktrees/r" / NEW_TASK
-    task_head = git(task, "rev-parse", "HEAD")
-    stopped = _conflict(root)
+    commit(job, "src/c.py", "mine\n")  # the work branch will write src/c.py too
+    _move_work(root, "src/c.py", "theirs\n")
+    heads = git(job, "rev-parse", "HEAD"), git(task, "rev-parse", "HEAD")
+    stopped = run(root, "sync", str(root / "worktrees/r" / RC))
     assert stopped.returncode == 1 and str(job) in stopped.stderr
     assert len(fixes(stopped)) == 1 and fixes(stopped)[0].startswith("fix: Agent action: ")
-    assert git(task, "rev-parse", "HEAD") == task_head  # nothing below the conflict moved
-    subprocess.run(
-        ["git", "-C", str(job), "rebase", f"wt/{RC}"], capture_output=True
-    )  # if not under way
+    # agent default, unruled: a conflict leaves the rebase aborted, the tree at its pre-sync head
+    assert (git(job, "rev-parse", "HEAD"), git(task, "rev-parse", "HEAD")) == heads
+    underway = git(job, "rev-parse", "--path-format=absolute", "--git-path", "rebase-merge")
+    assert git(job, "status", "--porcelain") == "" and not Path(underway.strip()).exists()
+    conflicted = subprocess.run(["git", "-C", str(job), "rebase", f"wt/{RC}"], capture_output=True)
+    assert conflicted.returncode == 1  # the agent resolves it by hand
     (job / "src/c.py").write_text("resolved\n")
     git(job, "add", "src/c.py")
     git(job, "-c", "core.editor=true", "rebase", "--continue")
@@ -152,7 +152,9 @@ def test_after_a_lane_lands_sync_lets_the_release_tree_merge(root: Path) -> None
     assert run(root, "merge", str(lane)).returncode == 0
     moved = run(root, "merge", str(rc))
     assert moved.returncode == 1 and "moved past" in moved.stderr
-    assert fixes(moved) == [f"fix: dadaia worktree sync {rc}"]
-    assert run(root, "sync", str(rc)).returncode == 0
+    assert fixes(moved) == [f"fix: {fix_line(root, 'worktree', 'sync', str(rc))}"]
+    launcher, worktree, *verb = shlex.split(fixes(moved)[0].removeprefix("fix: "))
+    assert [launcher, worktree] == [str(cli_path(root)), "worktree"]
+    assert run(root, *verb).returncode == 0
     landed = run(root, "merge", str(rc))
     assert landed.returncode == 0, landed.stderr

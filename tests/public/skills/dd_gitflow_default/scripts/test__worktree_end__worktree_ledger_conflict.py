@@ -1,5 +1,5 @@
 """A ledger record changed in place in a backlog-lane or rc worktree, while the work branch appended another: merge
-refuses with the rebase fix line, and that rebase stops on the ledger conflicted like any file
+refuses with the sync fix line, and that rebase stops on the ledger conflicted like any file
 (no union merge) — the record never lands twice.
 Size: MEDIUM (real git, tmp workspace).
 """
@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.core.cli_line import git_line
+from dadaia_workspace.core.cli_line import fix_line
 from tests.helpers.worktree_ws import commit, fixes, git, make_workspace, run
 
 
@@ -27,9 +27,14 @@ def test_in_place_ledger_change_refuses_at_rebase(tmp_path: Path, name: str) -> 
     commit(tree, ledger, one + two.replace("proposed", "accepted"))
     commit(repo, ledger, one + two + '{"id": "3", "status": "proposed"}\n')
     (fix,) = fixes(run(root, "merge", str(tree.relative_to(root))))
-    assert fix == f"fix: {git_line(tree, 'rebase', 'feature/0.5.0')}"
+    assert fix == f"fix: {fix_line(root, 'worktree', 'sync', str(tree))}"
+    launcher, worktree, *verb = shlex.split(fix.removeprefix("fix: "))
+    assert [launcher, worktree] == [str(root / ".dadaia/.venv/bin/dadaia"), "worktree"]
+    assert run(root, *verb).returncode == 1  # sync stops on the conflicted ledger
     env = {"HOME": str(root), "PATH": "/usr/bin:/bin", "GIT_CONFIG_NOSYSTEM": "1"}
-    rebase = subprocess.run(shlex.split(fix.removeprefix("fix: ")), env=env, capture_output=True)
+    rebase = subprocess.run(
+        ["git", "-C", str(tree), "rebase", "feature/0.5.0"], env=env, capture_output=True
+    )
     assert rebase.returncode == 1
     assert git(tree, "diff", "--name-only", "--diff-filter=U").split() == [ledger]
     assert git(tree, "show", f"HEAD:{ledger}").count('"id": "2"') == 1

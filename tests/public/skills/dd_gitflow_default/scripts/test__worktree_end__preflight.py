@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.core.cli_line import git_line, shell_line
+from dadaia_workspace.core.cli_line import fix_line, git_line, shell_line
 from tests.helpers.worktree_ws import (
     NEW_JOB,
     NEW_TASK,
@@ -87,7 +87,7 @@ def test_a_task_passes_clean_and_rebased_and_fails_behind_its_job_branch(root: P
         root,
         task,
         f"{JOB_BRANCH} moved past this branch's base",
-        git_line(task, "rebase", JOB_BRANCH),
+        fix_line(root, "worktree", "sync", str(task)),
     )
 
 

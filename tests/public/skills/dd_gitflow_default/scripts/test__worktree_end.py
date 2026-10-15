@@ -21,7 +21,7 @@ from typing import Any
 
 import pytest
 
-from dadaia_workspace.core.cli_line import git_line, shell_line
+from dadaia_workspace.core.cli_line import fix_line, git_line, shell_line
 from dadaia_workspace.infrastructure.ledger_scripts import (
     _PACKAGE_SKILLS,
     LEDGER_SCRIPTS,
@@ -68,6 +68,20 @@ def land(root: Path, rel: str, text: str = "x = 1\n") -> str:
     merged = run(root, "merge", str(task))
     assert merged.returncode == 0, merged.stderr
     return sha
+
+
+def _sync_argv(root: Path, tree: Path) -> list[str]:
+    """The one `worktree sync <tree>` fix line as the shell splits it, the workspace launcher first."""
+    return shlex.split(fix_line(root, "worktree", "sync", str(tree)))
+
+
+def _run_printed(
+    root: Path, refused: subprocess.CompletedProcess[str]
+) -> subprocess.CompletedProcess[str]:
+    """Run the refusal's printed `<launcher> worktree <verb> …` fix as the script's own verb."""
+    launcher, worktree, *verb = _argv(refused)
+    assert [launcher, worktree] == [str(cli_path(root)), "worktree"]
+    return run(root, *verb)
 
 
 def _hotfix(root: Path) -> Path:
@@ -271,7 +285,7 @@ def test_failed_fast_forward_tells_a_stray_from_a_moved_work_branch(root: Path) 
     verdict = 'elif args[:2] == ["reports", "validate"]:\n'
     patch_cli(root, verdict, f"{verdict}    import subprocess; {move}\n")
     moved = run(root, "merge", TREE)
-    assert _argv(moved) == ["dadaia", "worktree", "sync", str(tree)] and tree.exists()
+    assert _argv(moved) == _sync_argv(root, tree) and tree.exists()
 
 
 def test_merge_lists_ignored_files_and_keeps_them_by_its_fix(root: Path) -> None:
@@ -400,12 +414,12 @@ def test_a_moved_work_branch_refuses_and_its_fix_rebase_keeps_only_an_identical_
     approve(root, mine := land(root, "src/a.py"))
     work = commit(root / RC_TREE, "src/z.py")
     moved = run(root, "merge", TREE)
-    assert _argv(moved) == ["dadaia", "worktree", "sync", str(tree)]
+    assert _argv(moved) == _sync_argv(root, tree)
     assert [
         git(repo, "rev-parse", WORK).strip(),
         git(tree, "rev-parse", "HEAD").strip(),
     ] == [work, mine]
-    assert run(root, "sync", str(tree)).returncode == 0  # the fix, run as the verb
+    assert _run_printed(root, moved).returncode == 0
     if change == "new-patch":
         (tree / "src/a.py").write_text("x = 2\n")
         git(tree, "commit", "-q", "--amend", "-C", "HEAD", "-a")
