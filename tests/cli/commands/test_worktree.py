@@ -11,6 +11,7 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
+import dadaia_workspace
 from dadaia_workspace.cli.main import app
 from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.infrastructure import ledger_scripts
@@ -42,13 +43,23 @@ def test_argv_stdout_and_exit_code_are_forwarded(workspace: Path) -> None:
     assert result.exit_code == 3
 
 
-def test_help_lists_the_verbs(workspace: Path) -> None:
+def test_a_verb_help_flag_reaches_the_script(workspace: Path) -> None:
+    _install_stub(workspace)
+    result = CliRunner().invoke(app, ["worktree", "merge", "--help"])
+    assert json.loads(result.stdout) == ["merge", "--help"]
+    assert result.exit_code == 3
+
+
+def test_help_lists_the_verbs(workspace: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """The verbs come from the script's own help, forwarded: the packaged copy answers."""
+    shipped = Path(dadaia_workspace.__file__).parent / "public" / "skills"
+    monkeypatch.setattr(ledger_scripts, "_PACKAGE_SKILLS", shipped)
     result = CliRunner().invoke(
         app, ["worktree", "--help"], env={"COLUMNS": "400", "NO_COLOR": "1"}
     )
     assert result.exit_code == 0
     words = set(re.findall(r"\w+", result.output))
-    assert {"new", "merge", "clean", "list", "preflight", "sync", "hash"} <= words
+    assert {"new", "merge", "clean", "list", "preflight", "hash"} <= words
 
 
 def test_no_installed_script_refuses_with_the_install_fix(workspace: Path) -> None:

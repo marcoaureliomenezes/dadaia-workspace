@@ -216,7 +216,7 @@ def _ref_policy(lines: list[str], flow: Gitflow, origin: dict[str, str]) -> Deci
     # imported here so a missing function fails these rows only, not the whole file's collection
     from dadaia_workspace.features.chokepoints.branch_policy import check_ref_policy
 
-    return check_ref_policy(lines, flow, origin)
+    return check_ref_policy(lines, flow, origin, "proj")
 
 
 def test_a_work_branch_update_to_a_sha_other_than_origins_is_refused_with_one_fix() -> None:
@@ -224,7 +224,14 @@ def test_a_work_branch_update_to_a_sha_other_than_origins_is_refused_with_one_fi
     assert not decision.allowed
     assert "feature/0.6.0" in decision.message
     assert decision.message.count("fix: ") == 1
-    assert decision.message.rsplit("fix: ", 1)[1].strip() != ""
+    fix = shlex.split(decision.message.rsplit("fix: ", 1)[1])
+    assert fix[1:] == ["worktree", "new", "proj", "change"]
+    assert fix[0].endswith("dadaia")
+
+
+def test_a_work_branch_with_no_origin_is_ungated() -> None:
+    assert _ref_policy([f"{_A} {_B} {_WORK_REF}"], DEFAULT, {}).allowed
+    assert _ref_policy([f"{_A} {_B} {_WORK_REF}"], DEFAULT, {_WORK_REF: ""}).allowed
 
 
 def test_a_work_branch_update_to_origins_sha_passes() -> None:

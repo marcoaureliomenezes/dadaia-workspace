@@ -1,7 +1,8 @@
 """The ``reference-transaction`` hook on real git, creation side.
 
 Each test copies the shipped script into a tmp repo's ``.git/hooks`` and drives plain git;
-a stub ``dadaia`` on PATH records every call, so "no python runner call" is observable.
+a stub ``dadaia`` at the workspace venv path the hook resolves records every call, so "no
+python runner call" is observable.
 
 Owner: dd-sw-engineer-sr
 """
@@ -9,6 +10,7 @@ Owner: dd-sw-engineer-sr
 from __future__ import annotations
 
 import os
+import shlex
 import shutil
 import stat
 import subprocess
@@ -26,15 +28,14 @@ _EMAIL = "test@example.invalid"
 
 class _Repo:
     def __init__(self, root: Path) -> None:
-        self.root = root / "repo"
+        self.root = root / "ws" / "repo"
         self.calls = root / "stub-calls.log"
-        self.bin = root / "bin"
+        self.stub = root / "ws" / ".dadaia" / ".venv" / "bin" / "dadaia"
 
     def git(
         self, *args: str, cwd: Path | None = None, wt: bool = False
     ) -> subprocess.CompletedProcess[str]:
         env = {k: v for k, v in os.environ.items() if k != "DADAIA_WT"}
-        env["PATH"] = f"{self.bin}{os.pathsep}{env['PATH']}"
         if wt:
             env["DADAIA_WT"] = "1"
         return subprocess.run(
@@ -53,10 +54,9 @@ class _Repo:
 @pytest.fixture
 def repo(tmp_path: Path) -> _Repo:
     r = _Repo(tmp_path)
-    r.bin.mkdir()
-    stub = r.bin / "dadaia"
-    stub.write_text(f'#!/bin/sh\necho "$@" >> "{r.calls}"\nexit 0\n', encoding="utf-8")
-    stub.chmod(stub.stat().st_mode | stat.S_IXUSR)
+    r.stub.parent.mkdir(parents=True)
+    r.stub.write_text(f'#!/bin/sh\necho "$@" >> "{r.calls}"\nexit 0\n', encoding="utf-8")
+    r.stub.chmod(r.stub.stat().st_mode | stat.S_IXUSR)
     r.root.mkdir()
     for args in (
         ["init", "-q", "-b", "main"],
@@ -80,18 +80,31 @@ def _add_tree(r: _Repo, name: str = "x") -> Path:
     return tree
 
 
-def test_raw_worktree_add_is_refused_with_one_runnable_fix(repo: _Repo) -> None:
-    done = repo.git("worktree", "add", "-q", "-b", "wt/x", str(repo.root.parent / "tree-x"))
+@pytest.mark.parametrize("name", ["x", "a;b"])
+def test_raw_worktree_add_is_refused_with_one_runnable_fix(repo: _Repo, name: str) -> None:
+    done = repo.git("worktree", "add", "-q", "-b", f"wt/{name}", str(repo.root.parent / "tree"))
     assert done.returncode != 0
     fixes = [ln for ln in done.stderr.splitlines() if "fix:" in ln]
     assert len(fixes) == 1, done.stderr
-    assert "dadaia worktree " in fixes[0], fixes[0]
+    argv = shlex.split(fixes[0].split("fix:", 1)[1])
+    assert argv == [str(repo.stub), "worktree", "new", "repo", name]
+    assert subprocess.run(argv, check=False).returncode == 0
+    assert repo.calls_made() == f"worktree new repo {name}\n"
     assert (
         subprocess.run(
-            ["git", "rev-parse", "--verify", "-q", "refs/heads/wt/x"], cwd=repo.root
+            ["git", "rev-parse", "--verify", "-q", f"refs/heads/wt/{name}"], cwd=repo.root
         ).returncode
         != 0
     )
+
+
+def test_raw_worktree_add_without_a_runner_names_the_agent_action(repo: _Repo) -> None:
+    repo.stub.unlink()
+    done = repo.git("worktree", "add", "-q", "-b", "wt/x", str(repo.root.parent / "tree"))
+    assert done.returncode != 0
+    fixes = [ln for ln in done.stderr.splitlines() if "fix:" in ln]
+    assert len(fixes) == 1, done.stderr
+    assert fixes[0].startswith("fix: Agent action: ")
 
 
 def test_worktree_add_with_the_marker_passes(repo: _Repo) -> None:
@@ -122,7 +135,30 @@ def test_wt_clean_path_passes(repo: _Repo) -> None:
     assert repo.git("for-each-ref", "refs/heads/wt/").stdout == ""
 
 
+def test_an_update_to_origins_sha_and_a_non_branch_ref_make_no_runner_call(repo: _Repo) -> None:
+    remote = repo.root.parent / "origin.git"
+    assert repo.git("init", "-q", "--bare", str(remote)).returncode == 0
+    assert repo.git("remote", "add", "origin", str(remote)).returncode == 0
+    assert repo.git("push", "-q", "origin", "main").returncode == 0
+    assert repo.git("fetch", "-q", "origin").returncode == 0
+    assert repo.git("commit", "-q", "--allow-empty", "-m", "ahead").returncode == 0
+    ahead = repo.git("rev-parse", "HEAD").stdout.strip()
+    base = repo.git("rev-parse", "origin/main").stdout.strip()
+    repo.calls.unlink(missing_ok=True)
+    assert repo.git("reset", "-q", "--hard", "origin/main").returncode == 0
+    assert repo.git("update-ref", "refs/stash", base).returncode == 0
+    assert repo.git("update-ref", "refs/stash", ahead, base).returncode == 0
+    assert repo.calls_made() == ""
+
+
+def test_the_marker_passes_every_update_without_a_runner_call(repo: _Repo) -> None:
+    done = repo.git("commit", "-q", "--allow-empty", "-m", "marked", wt=True)
+    assert done.returncode == 0, done.stderr
+    assert repo.calls_made() == ""
+
+
 def test_unresolvable_runner_warns_and_exits_zero(repo: _Repo) -> None:
+    repo.stub.unlink()
     git_dir = str(Path(shutil.which("git") or "/usr/bin/git").parent)
     env = {"PATH": f"{git_dir}{os.pathsep}/usr/bin{os.pathsep}/bin", "HOME": str(repo.root)}
     done = subprocess.run(

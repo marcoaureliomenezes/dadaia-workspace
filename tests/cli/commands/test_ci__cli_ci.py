@@ -83,10 +83,10 @@ def _ref_gate(monkeypatch, repo: Path, *lines: str):
     return _runner.invoke(app, ["ci", "ref-gate-check"], input="".join(f"{x}\n" for x in lines))
 
 
-def test_ref_gate_refuses_a_work_update_off_origin_with_one_runnable_fix(
+def test_ref_gate_refuses_a_work_update_off_origin_with_the_worktree_route(
     monkeypatch, tmp_path: Path
 ) -> None:
-    """The printed fix is run as printed and puts the work ref back on origin's sha."""
+    """The one fix opens a tree through the worktree tool; no ref moves."""
     repo, base = _work_repo(tmp_path)
     tip = _commit(repo, **{"src__a.py": "x = 1\n"})
 
@@ -95,10 +95,10 @@ def test_ref_gate_refuses_a_work_update_off_origin_with_one_runnable_fix(
     assert result.exit_code == 1
     assert "[ref-gate] BLOCKED" in result.output
     assert result.output.count("fix: ") == 1
-    fix = result.output.rsplit("fix: ", 1)[1].strip()
-    assert fix.startswith("git ")
-    subprocess.run(shlex.split(fix), check=True)
-    assert _git(repo, "rev-parse", _WORK_REF) == base
+    fix = shlex.split(result.output.rsplit("fix: ", 1)[1])
+    assert fix[0].endswith("dadaia")
+    assert fix[1:] == ["worktree", "new", "repo", "change"]
+    assert _git(repo, "rev-parse", _WORK_REF) == tip
 
 
 def test_ref_gate_passes_the_origin_sha_creation_and_a_non_work_ref(
@@ -112,6 +112,14 @@ def test_ref_gate_passes_the_origin_sha_creation_and_a_non_work_ref(
     assert _ref_gate(monkeypatch, repo, f"{zero} {tip} {_WORK_REF}").exit_code == 0
     assert _ref_gate(monkeypatch, repo, f"{base} {tip} refs/heads/wt/x").exit_code == 0
     assert _ref_gate(monkeypatch, repo).exit_code == 0
+
+
+def test_ref_gate_passes_a_work_branch_with_no_origin(monkeypatch, tmp_path: Path) -> None:
+    repo, base = _work_repo(tmp_path)
+    tip = _commit(repo, **{"src__a.py": "x = 1\n"})
+    _git(repo, "update-ref", "-d", f"refs/remotes/origin/{_WORK}")
+
+    assert _ref_gate(monkeypatch, repo, f"{base} {tip} {_WORK_REF}").exit_code == 0
 
 
 def test_ref_gate_passes_a_work_update_touching_only_audits(monkeypatch, tmp_path: Path) -> None:
