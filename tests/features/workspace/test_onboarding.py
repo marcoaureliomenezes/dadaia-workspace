@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import shutil
+import subprocess
 from collections.abc import Callable
 from pathlib import Path
 
@@ -110,11 +111,16 @@ def test_next_step_is_derived_from_the_workspace_state(
 
 
 def test_the_first_pass_fix_opens_the_backlog_first_pass_lane(tmp_path: Path) -> None:
-    specs = _specs(tmp_path)
+    specs = _specs(tmp_path, "proj")  # the repo slug differs from the context name
+    repo = specs.parent
+    for argv in (("init", "-q"), ("commit", "-q", "--allow-empty", "-m", "i"), ("branch", "feature/0.1.0")):
+        subprocess.run(
+            ["git", "-C", str(repo), "-c", "user.name=t", "-c", "user.email=t@t", *argv], check=True
+        )
     step = next_step(tmp_path, {"app": specs})
     memory = specs / "memory"
     pending = f"{memory / 'ARCHITECTURE.md'}, {memory / 'QUALITY.md'}, {memory / 'product'} (no atom)"
-    lane = fix_line(tmp_path, "worktree", "new", "app", "<v>/wt-backlog-first-pass")
+    lane = fix_line(tmp_path, "worktree", "new", "proj", "0.1.0/wt-backlog-first-pass")
     assert step is not None
     assert step.command == (
         f"Agent action: open the lane {lane}, then run the dd-audit-project first pass in it — {pending}"
