@@ -24,7 +24,7 @@ from functools import partial
 from pathlib import Path
 
 from dadaia_workspace.core import context_registry, session_store, workspace_layout
-from dadaia_workspace.core.cli_line import fix_line, script_line, shell_line
+from dadaia_workspace.core.cli_line import fix_line, shell_line
 from dadaia_workspace.core.doctor_rules import Rule, SectionFinding
 from dadaia_workspace.core.exceptions import SchemaVersionError
 from dadaia_workspace.core.harness_registry import (
@@ -155,23 +155,19 @@ class DoctorService:
         return [SectionFinding("PROJECTION", "drift", message, False, True, fix)] if fix else []
 
     def _split_skill_fix(self, skill: str) -> str:
-        """The fix for a long projected SKILL.md: split its source in a tree of the repo that
-        holds it, then reproject; no repo holds it, the library's to split."""
-        root = self._workspace_root
-        found = sorted(root.glob(f"repos/*/dadaia_workspace/public/skills/{skill}/SKILL.md"))
-        if not found:
+        """The fix for a long projected SKILL.md: an agent task when a repo holds its source,
+        else the operator's act, since no workspace path holds the source."""
+        found = self._workspace_root.glob(
+            f"repos/*/dadaia_workspace/public/skills/{skill}/SKILL.md"
+        )
+        if next(found, None) is None:
             return (
                 f"Operator action: split {skill}/SKILL.md at its library source; "
                 "this workspace holds none and never edits the projection"
             )
-        repo, tree = found[0].relative_to(root / "repos").parts[0], f"split-{skill}"
-        edited = root / "worktrees" / repo / tree / found[0].relative_to(root / "repos" / repo)
-        new = script_line(
-            ".agents/skills/dd-gitflow-default/scripts/worktree.py", "new", repo, tree
-        )
         return (
-            f"Agent action: open the tree with `{new}`, split {edited} into its "
-            f"references/*.md and/or scripts/, merge it, then run `{fix_line(root, 'public', 'install')}`"
+            f"Agent action: add the split of {skill}/SKILL.md to a task of the open rc, "
+            "then run public install"
         )
 
     def check_skill_md_length(self) -> list[SectionFinding]:
