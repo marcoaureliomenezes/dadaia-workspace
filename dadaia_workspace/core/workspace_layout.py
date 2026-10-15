@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import fnmatch
 import re
-from collections.abc import Callable, Collection, Iterable
+from collections.abc import Callable, Collection
 from dataclasses import dataclass
 from enum import StrEnum
 from functools import cached_property
@@ -276,21 +276,18 @@ def _matches(sub: str, pattern: str) -> bool:
 def protected_glob(root: Path, rel: str, protected: tuple[str, ...]) -> str | None:
     """The protected glob a prefix of the repo-relative part of *rel* (workspace-relative, under
     *root*) matches, else ``None``. Under ``repos/<r>/`` the root is the repo; under
-    ``worktrees/<r>/`` it is the nearest ancestor of *rel* below ``<r>`` holding a ``.git``
-    entry. Fails closed: a worktree path with no such ancestor matches at every depth."""
+    ``worktrees/<r>/`` every ancestor of *rel* below ``<r>`` holding a ``.git`` entry is a root,
+    so a planted entry only adds one. Fails closed: with none, it matches at every depth."""
     parts = rel.replace("\\", "/").split("/")
     zone = invocation.scope(root, root.joinpath(*parts))[1]
     if zone == "root":
         return None
     tail = parts[2:]
-    anchors: Iterable[int] = (0,)
+    anchors = [0]
     if zone == "worktree":
-        found = (
-            k - 2
-            for k in range(len(parts) - 1, 2, -1)
-            if root.joinpath(*parts[:k], ".git").exists()
-        )
-        anchors = (r,) if (r := next(found, None)) is not None else range(len(tail))
+        anchors = [
+            k - 2 for k in range(3, len(parts)) if root.joinpath(*parts[:k], ".git").exists()
+        ] or list(range(len(tail)))
     subs = ("/".join(tail[i : j + 1]) for i in anchors for j in range(i, len(tail)))
     return next((g for sub in subs for g in protected if _matches(sub, g)), None)
 

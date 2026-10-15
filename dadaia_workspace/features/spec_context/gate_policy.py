@@ -88,7 +88,8 @@ def classify_path(
     rel_path: str,
     projected: frozenset[str] = frozenset(),
     protected: tuple[str, ...] = (),
-    root: PurePath = PurePath(),
+    *,
+    root: PurePath,
 ) -> tuple[PathClass, tuple[workspace_layout.FloorRefusal, str] | None]:
     """(class, ``_protection`` hit) of a workspace-relative path; first match wins: PROTECTED
     (*projected*, then the floor, then a *protected* glob — ``_protection``'s order), ADDITIVE (the zone-registry ``.dadaia/``
@@ -125,7 +126,7 @@ def evaluate(
     unbound one is the declared gap. Then every write in zone ``repo`` is
     refused with the ``worktree.py list`` fix. Everything else ALLOWS.
     """
-    cls, hit = classify_path(rel_path, projected, protected, root)
+    cls, hit = classify_path(rel_path, projected, protected, root=root)
     if hit:
         refusal, match = hit
         fix = _FIXES[refusal](root, context)
