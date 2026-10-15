@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
-"""`worktree.py new`: open and lock one canonical worktree by its name."""
+"""`worktree.py new`: open and lock one canonical worktree by its name, on its parent's branch."""
 
 from __future__ import annotations
 
-import re
 from pathlib import Path
 
 from _bugs_check import OPEN
@@ -23,8 +22,9 @@ from _worktree_names import (
     NAME_RE,
     SCRIPT,
     Refusal,
-    base,
+    base_of,
     branch,
+    kind_of,
     tree_path,
 )
 
@@ -46,48 +46,34 @@ def _refuse_unopened_bug(main: Path, work: str, bug: str) -> None:
                       f"Operator action: confirm bug {bug} so it is registered on {work} as open (dd-bug-registration), then open its hotfix job again")  # fmt: skip
 
 
-def _shape(repo: Path, flow: dict[str, str], name: str) -> tuple[re.Match[str], str]:
-    """The grammar match of *name* and the live release version it must name."""
-    match = NAME_RE.match(name)
-    version = work_version(repo, flow) if match else ""
-    if match is None or (match["v"] is not None and match["v"] != version):
-        raise not_a_name(name, version)
-    return match, version
-
-
-def _refuse_unready(root: Path, flow: dict[str, str], work: str, version: str, rc: str) -> None:
-    """A job opens only while its release is in IMPLEMENTATION on *work*."""
-    fix = f"Agent action: repair {STATE} on {work} until release.py check passes"
-    main = root / "repos" / flow["main"]  # the context's specs live in its main repo
+def _refuse_unready(main: Path, version: str, rc: str) -> None:
+    """A main tree opens only while its release is in IMPLEMENTATION on the rc's `wt-rc` branch."""
+    rc_branch = branch(f"{version}/{rc}/wt-rc")
+    fix = f"Agent action: repair {STATE} on {rc_branch} until release.py check passes"
     try:
-        state = parse_object(git(main, "show", f"{work}:specs/releases/{version}/{STATE}", check=False), fix)  # fmt: skip
+        state = parse_object(git(main, "show", f"{rc_branch}:specs/releases/{version}/{STATE}", check=False), fix)  # fmt: skip
     except Unreadable as bad:
-        raise Refusal(f"{STATE} on {work}: {bad}", bad.fix) from bad
+        raise Refusal(f"{STATE} on {rc_branch}: {bad}", bad.fix) from bad
     if state.get("phase") != "IMPLEMENTATION":
-        raise Refusal(f"a job needs release {version} in phase IMPLEMENTATION on {work}",
-                      f"{script(SCRIPT)} new {quote(flow['main'])} {rc}/define")  # fmt: skip
-
-
-def _refuse_task(repo: Path, match: re.Match[str], start: str) -> None:
-    """A task is cut from its job branch."""
-    if not git(repo, "branch", "--list", start).strip():
-        job = f"{match['rc']}/{match['job']}"
-        raise Refusal(f"no job branch {start}", f"{script(SCRIPT)} new {quote(repo.name)} {job}")
+        raise Refusal(f"a job needs release {version} in phase IMPLEMENTATION on {rc_branch}",
+                      f"Agent action: reach phase IMPLEMENTATION in {STATE} on {rc_branch} (release.py phase), then open its job again")  # fmt: skip
 
 
 def new(root: Path, repo_name: str, name: str) -> Path:
     repo = root / "repos" / repo_name
     _refuse_symlink(root, repo_name)
     flow = flow_for(root, repo)
-    match, version = _shape(repo, flow, name)
-    work = f"{flow['work']}{version}"
-    if match["rc"] and match["job"] not in ("define", "reconcile"):
-        _refuse_unready(root, flow, work, version, match["rc"])
-    if match["bug"]:  # a block-list hotfix: no rc SPEC, only its open bug
-        _refuse_unopened_bug(root / "repos" / flow["main"], work, match["bug"])
-    start = base(name, work)
-    if match["task"]:
-        _refuse_task(repo, match, start)
+    match = NAME_RE.match(name)
+    version = work_version(repo, flow) if match else ""
+    if match is None or match["v"] != version:
+        raise not_a_name(name, version)
+    start = base_of(name, flow["work"]) or ""
+    if not git(repo, "branch", "--list", start).strip():  # a tree is cut from its parent's branch
+        raise Refusal(f"no {start} branch", f"{script(SCRIPT)} new {quote(repo.name)} {start.removeprefix('wt/')}")  # fmt: skip
+    if kind_of(name) == "main":
+        _refuse_unready(root / "repos" / flow["main"], version, match["rc"])
+    if match["bug"]:
+        _refuse_unopened_bug(root / "repos" / flow["main"], start, match["bug"])
     tree = tree_path(root, repo_name, name)
     if git(repo, "branch", "--list", branch(name)).strip():
         raise Refusal(f"{branch(name)} exists", f"{script(SCRIPT)} list")
