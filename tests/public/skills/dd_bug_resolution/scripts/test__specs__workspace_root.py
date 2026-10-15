@@ -15,7 +15,7 @@ import pytest
 from dadaia_workspace.infrastructure.ledger_scripts import load_owner
 from tests.fixtures.harness_env import suite_env
 from tests.helpers.skill_scripts import stage_skill_scripts
-from tests.helpers.worktree_ws import NEW_JOB, NEW_TASK, git, make_workspace, run
+from tests.helpers.worktree_ws import NEW_JOB, NEW_TASK, commit, git, make_workspace, run
 
 
 @pytest.fixture
@@ -133,3 +133,44 @@ def test_the_closure_spares_the_tree_it_runs_from_whatever_its_kind(
     _open_drafted(ws, *before, own)
     wait = load_owner("dd-release-implementation", "_release_phase")._refuse_open_worktrees
     assert wait(ws / "worktrees/r" / own / "specs") is None
+
+
+def _legacy(ws: Path, name: str, *, tree: bool = True) -> Path:
+    """The old-grammar branch `wt/<name>` with one unmerged commit, on a tree at `worktrees/r/<name>`
+    (`tree=False`: the tree removed, the branch left an orphan)."""
+    repo, path = ws / "repos/r", ws / "worktrees/r" / name
+    git(repo, "worktree", "add", "-q", "-b", f"wt/{name}", str(path), "feature/0.5.0")
+    commit(path, "legacy.txt")
+    if not tree:
+        git(repo, "worktree", "remove", str(path))
+    return path
+
+
+@pytest.mark.parametrize("tree", [True, False], ids=["open-tree", "orphan-branch"])
+def test_the_closure_waits_for_an_old_layout_job_tree_or_orphan_branch(
+    ws: Path, tree: bool
+) -> None:
+    """A tree or branch of the old grammar is still work: the closure of the new layout holds it."""
+    _open_drafted(ws, "0.5.0/rc-1/wt-rc")
+    _legacy(ws, "0.5.0-rc1/j1", tree=tree)
+    mod = load_owner("dd-release-implementation", "_release_phase")
+    with pytest.raises(mod.Refusal, match=r"repos/r still holds 1 open wt/\* worktree\(s\)"):
+        mod._refuse_open_worktrees(ws / "worktrees/r/0.5.0/rc-1/wt-rc/specs")
+
+
+@pytest.mark.parametrize(("others", "held"), [((), 0), (("0.5.0-rc1/j1",), 1)])
+def test_the_closure_run_from_an_old_layout_tree_spares_it_and_waits_for_the_others(
+    ws: Path, others: tuple[str, ...], held: int
+) -> None:
+    """From an old-layout `reconcile` tree the closure spares its own tree; another open
+    old-layout tree still holds it."""
+    git(ws / "repos/r", "checkout", "-q", "feature/0.5.0")
+    own = _legacy(ws, "0.5.0-rc1/reconcile")
+    for name in others:
+        _legacy(ws, name)
+    mod = load_owner("dd-release-implementation", "_release_phase")
+    if not held:
+        assert mod._refuse_open_worktrees(own / "specs") is None
+    else:
+        with pytest.raises(mod.Refusal, match=rf"repos/r still holds {held} open wt/\* worktree"):
+            mod._refuse_open_worktrees(own / "specs")
