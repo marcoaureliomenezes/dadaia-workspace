@@ -7,17 +7,16 @@ import re
 from pathlib import Path
 
 from _bugs_check import OPEN
-from _grammar import STATE, sole_live
+from _grammar import STATE
 from _jsonl import Unreadable, parse_object
 from _specs import parse
 from _worktree_git import (
     flow_for,
     git,
+    not_a_name,
     quote,
-    record_base,
     script,
     work_version,
-    work_versions,
 )
 from _worktree_names import (
     LOCK,
@@ -26,7 +25,6 @@ from _worktree_names import (
     Refusal,
     base,
     branch,
-    plain,
     tree_path,
 )
 
@@ -51,21 +49,10 @@ def _refuse_unopened_bug(main: Path, work: str, bug: str) -> None:
 def _shape(repo: Path, flow: dict[str, str], name: str) -> tuple[re.Match[str], str]:
     """The grammar match of *name* and the live release version it must name."""
     match = NAME_RE.match(name)
-    version = work_version(repo, flow) if not (match and plain(name)) else ""
+    version = work_version(repo, flow) if match else ""
     if match is None or (match["v"] is not None and match["v"] != version):
-        version = version or work_version(repo, flow)
-        shape = f"{version}-rc<N>/<job>[--<task-id>]"
-        raise Refusal(
-            f"{name!r} is not a worktree name: {shape}, {version}-rc<N>/define, backlog/<slug> or hotfix/<bug-id>",
-            f"{script(SCRIPT)} list",
-        )
+        raise not_a_name(name, version)
     return match, version
-
-
-def _plain_base(root: Path, repo: Path, flow: dict[str, str]) -> str:
-    """The repo's one work branch; the checked-out branch only when it has none, no release is live and a branch is checked out."""
-    live = work_versions(repo, flow) or sole_live(root / "repos" / flow["main"] / "specs")
-    return (not live and git(repo, "branch", "--show-current").strip()) or flow["work"] + work_version(repo, flow)  # fmt: skip
 
 
 def _refuse_unready(root: Path, flow: dict[str, str], work: str, version: str, rc: str) -> None:
@@ -93,7 +80,7 @@ def new(root: Path, repo_name: str, name: str) -> Path:
     _refuse_symlink(root, repo_name)
     flow = flow_for(root, repo)
     match, version = _shape(repo, flow, name)
-    work = _plain_base(root, repo, flow) if plain(name) else f"{flow['work']}{version}"
+    work = f"{flow['work']}{version}"
     if match["rc"] and match["job"] not in ("define", "reconcile"):
         _refuse_unready(root, flow, work, version, match["rc"])
     if match["bug"]:  # a block-list hotfix: no rc SPEC, only its open bug
@@ -106,6 +93,4 @@ def new(root: Path, repo_name: str, name: str) -> Path:
         raise Refusal(f"{branch(name)} exists", f"{script(SCRIPT)} list")
     git(repo, "worktree", "add", "-q", "--lock", "--reason", f"{LOCK}{name}", "-b", branch(name),
         str(tree), start)  # fmt: skip
-    if plain(name):
-        record_base(repo, name, start)
     return tree

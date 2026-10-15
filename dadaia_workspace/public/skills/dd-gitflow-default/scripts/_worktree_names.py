@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""The worktree name grammar and its one path reader: one-segment plain changes plus release,
-backlog and hotfix trees. A task tree is cut from its job branch and lands back on it."""
+"""The worktree name grammar and its one path reader: release, backlog and hotfix trees. A task
+tree is cut from its job branch and lands back on it."""
 
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ _WORD = _unanchored(load_schema("backlog-v1")["$defs"]["slug"]["pattern"])
 _TASK = rf"(?:--(?P<task>{_unanchored(TASK_ID_RE.pattern)}))?"
 NAME_RE = re.compile(
     rf"^(?:(?P<rc>(?P<v>\d+\.\d+\.\d+)-rc\d+)/(?P<job>{_WORD}){_TASK}|backlog/(?P<slug>{_WORD})"
-    rf"|hotfix/(?P<bug>{_WORD})|(?P<plain>(?!(?:backlog|hotfix)$){_WORD}))$"
+    rf"|hotfix/(?P<bug>{_WORD}))$"
 )
 
 
@@ -61,12 +61,6 @@ def base(name: str, work: str) -> str:
     """The branch tree *name* is cut from and lands on: its job branch for a task, else *work*."""
     match = NAME_RE.match(name)
     return branch(f"{match['rc']}/{match['job']}") if match and match["task"] else work
-
-
-def plain(name: str) -> bool:
-    """Whether *name* is the one-segment light-worktree shape."""
-    match = NAME_RE.match(name)
-    return bool(match and match["plain"])
 
 
 def non_code(name: str) -> bool:

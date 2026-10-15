@@ -20,7 +20,7 @@ from _platform import quote as quote  # (`as`: re-exported to the worktree verbs
 from _specs import script as script
 from _specs import workspace_cli
 from _specs import workspace_of as workspace_of
-from _worktree_names import NAME_RE, SCRIPT, Refusal, base, branch, name_of, plain, tree_path
+from _worktree_names import NAME_RE, SCRIPT, Refusal, base, branch, name_of, tree_path
 
 
 def diff_sha256(tree: Path, work: str, tip: str) -> str:
@@ -128,28 +128,19 @@ def work_version(repo: Path, flow: dict[str, str]) -> str:
     )
 
 
-def record_base(repo: Path, name: str, ref: str) -> None:
-    """Persist the one base ref a plain worktree must return to."""
-    git(repo, "config", "--local", f"branch.{branch(name)}.dadaia-base", ref)
+def not_a_name(name: str, live: str = "") -> Refusal:
+    """The one refusal of a name the grammar does not take; its one fix lists the trees."""
+    shape = live or "<M.m.p>"
+    return Refusal(
+        f"not a worktree name: {name!r} (expected {shape}-rc<N>/<job>[--<task-id>], {shape}-rc<N>/define, backlog/<slug> or hotfix/<bug-id>)",
+        f"{script(SCRIPT)} list",
+    )
 
 
 def recorded_base(repo: Path, name: str, flow: dict[str, str]) -> str:
-    """A release tree's grammar-derived base; a plain tree's persisted ref, where a work-branch
-    name resolves to the work branch as `work_version` finds it now."""
-    if not plain(name):
-        version = NAME_RE.match(name)["v"]  # type: ignore[index]
-        return base(name, flow["work"] + (version or work_version(repo, flow)))
-    ref = git(
-        repo, "config", "--local", "--get", f"branch.{branch(name)}.dadaia-base", check=False
-    ).strip()
-    if not ref:
-        raise Refusal(
-            f"{branch(name)} has no recorded base ref",
-            f"Agent action: recover the branch {branch(name)} from git history, then reopen the plain worktree",
-        )
-    prefix = flow["work"]
-    named = ref.startswith(prefix) and SEMVER_RE.match(ref[len(prefix) :])
-    return prefix + work_version(repo, flow) if named else ref
+    """A tree's base: its job branch for a task, else the work branch its name derives."""
+    version = NAME_RE.match(name)["v"]  # type: ignore[index]
+    return base(name, flow["work"] + (version or work_version(repo, flow)))
 
 
 def _trees(repo: Path) -> list[dict[str, str]]:

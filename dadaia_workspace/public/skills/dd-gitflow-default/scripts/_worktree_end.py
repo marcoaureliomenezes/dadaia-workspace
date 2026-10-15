@@ -30,6 +30,7 @@ from _worktree_git import (
     flow_for,
     git,
     git_line,
+    not_a_name,
     ours,
     quote,
     recorded_base,
@@ -37,7 +38,7 @@ from _worktree_git import (
     scrubbed_env,
     workspace_of,
 )
-from _worktree_names import NAME_RE, SCRIPT, Refusal, branch, locate, non_code, plain, tree_path
+from _worktree_names import NAME_RE, SCRIPT, Refusal, branch, locate, non_code, tree_path
 
 #: The ledger and release checks a `define` or `backlog` merge runs, in this order.
 _LEDGERS = (("dd-bug-resolution", "bugs.py"), ("dd-backlog-definition", "backlog.py"),
@@ -49,8 +50,10 @@ def _target(root: Path, path: str) -> tuple[Path, Path, str, str]:
     tree = Path(path).resolve()
     rel = tree.relative_to(root).as_posix() if tree.is_relative_to(root) else ""
     repo_name, name, tail = locate(rel) or ("", None, ())
-    if name is None or tail or not NAME_RE.match(name):
+    if name is None or tail:
         raise Refusal(f"{path} is not a worktrees/<repo>/<name> path", f"{script(SCRIPT)} list")
+    if not NAME_RE.match(name):
+        raise not_a_name(name)
     repo = root / "repos" / repo_name
     return repo, tree, name, recorded_base(repo, name, flow_for(root, repo))
 
@@ -164,8 +167,8 @@ def _declared_argv(tree: Path, work: str, key: str) -> list[str]:
                       f"Agent action: close the quote in the {key} line of AGENTS.md on {work} and commit it") from error  # fmt: skip
 
 
-def _gate(tree: Path, work: str, *, required: bool = True) -> None:
-    """Run *work*'s tracked `verify:` once; a plain tree may omit the declaration."""
+def _gate(tree: Path, work: str) -> None:
+    """Run *work*'s tracked `verify:` once."""
     key = "verify:"
     command = _declared_argv(tree, work, key)
     root = workspace_of(tree)
@@ -176,8 +179,6 @@ def _gate(tree: Path, work: str, *, required: bool = True) -> None:
     repo_name = tree.relative_to(tree_path(root, "")).parts[0]
     agents = root / "repos" / repo_name / "AGENTS.md"
     if not command:
-        if not required:
-            return
         raise Refusal(f"this repo declares no {key} command",
                       f"Agent action: add this repo's job gate as a {key} line to {agents} and commit it on {work}")  # fmt: skip
     env = scrubbed_env()
@@ -365,8 +366,6 @@ def _kind_checks(root: Path, repo: Path, tree: Path, name: str, onto: str, into:
         checks += [ancestor, ("tests", lambda: _refuse_implementation_tests(tree, onto, _target(root, str(into))[3])), ("job clean", lambda: _refuse_dirty(into))]  # fmt: skip
     elif non_code(name):
         checks += [("specs only", lambda: _check_specs_only(tree, onto)), ancestor, verdict, ("ledgers", lambda: _ledgers(root, tree))]  # fmt: skip
-    elif plain(name):
-        checks += [ancestor, verdict, ("verify", lambda: _gate(tree, onto, required=False))]
     else:
         checks += [("open tasks", lambda: _open_tasks(repo, name)), ("scaffold", lambda: _scaffold(tree, name)), ancestor, verdict, ("verify", lambda: _gate(tree, onto))]  # fmt: skip
     return checks + [("ignored", lambda: _kept(tree, "merge", keep, drop)), ("target", lambda: _on_target(into, onto))]  # fmt: skip
