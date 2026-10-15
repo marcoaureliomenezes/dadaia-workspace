@@ -40,6 +40,7 @@ from tests.helpers.worktree_ws import (
     fixes,
     git,
     make_workspace,
+    open_tree,
     patch_cli,
     run,
 )
@@ -50,28 +51,19 @@ WORK = f"wt/{RC}"  # the branch a job's main tree lands on
 TREE, RC_TREE = f"worktrees/r/{NEW_JOB}", f"worktrees/r/{RC}"
 
 
-def _open(root: Path, name: str, base: str) -> Path:
-    """The tree *name* as `new` leaves it (locked, on `wt/<name>` cut from *base*), made with raw
-    git so a merge test never rests on `new`."""
-    tree = root / "worktrees/r" / name
-    git(root / "repos/r", "worktree", "add", "-q", "--lock", "--reason", f"dadaia:{name}",
-        "-b", f"wt/{name}", str(tree), base)  # fmt: skip
-    return tree
-
-
 @pytest.fixture
 def root(tmp_path: Path) -> Path:
     (tmp_path := tmp_path / "my ws").mkdir()  # every fix runs as printed: quoted
     make_workspace(tmp_path)
     git(tmp_path / "repos/r", "checkout", "-q", "feature/0.5.0")
-    _open(tmp_path, RC, "feature/0.5.0")
-    _open(tmp_path, NEW_JOB, WORK)
+    open_tree(tmp_path, RC)
+    open_tree(tmp_path, NEW_JOB)
     return tmp_path
 
 
 def land(root: Path, rel: str, text: str = "x = 1\n") -> str:
     """Commit *rel* in the job's first task tree and merge it into the job's main tree."""
-    task = _open(root, NEW_TASK, f"wt/{NEW_JOB}")
+    task = open_tree(root, NEW_TASK)
     sha = commit(task, rel, text)
     merged = run(root, "merge", str(task))
     assert merged.returncode == 0, merged.stderr
@@ -82,7 +74,7 @@ def _hotfix(root: Path) -> Path:
     """A hotfix tree of an open bug the work branch holds."""
     ledger = '{"id": "some-bug", "status": "open"}\n'
     commit(root / "repos/r", "specs/bugs/BUGS.jsonl", ledger)
-    return _open(root, HOTFIX, "feature/0.5.0")
+    return open_tree(root, HOTFIX)
 
 
 def _argv(result: subprocess.CompletedProcess[str]) -> list[str]:
@@ -105,11 +97,14 @@ def test_merge_fast_forwards_removes_and_reruns(root: Path) -> None:
     result = run(root, "merge", TREE)
     assert result.returncode == 0, result.stderr
     assert git(repo, "rev-parse", WORK).strip() == sha  # HEAD as approved
-    assert not tree.exists() and not git(repo, "branch", "--list", "wt/0.5.0/rc-1/job-1/*").strip()
+    assert not tree.exists()
+    assert git(repo, "branch", "--list", "wt/*", "--format=%(refname:short)").split() == [WORK]
     assert run(root, "merge", TREE).returncode == 0  # a finished merge re-runs clean
     assert run(root, "new", "r", NEW_JOB).returncode == 0
     shutil.rmtree(tree)  # the dadaia:-locked tree deleted by hand: an orphan, its exit clears it
-    (row,) = (r for r in json.loads(run(root, "list", "--json").stdout) if r["state"] == "orphan")
+    rows = json.loads(run(root, "list", "--json").stdout)
+    assert len(rows) == 2  # the release tree and the orphan
+    (row,) = (r for r in rows if r["state"] == "orphan")
     assert (row["state"], row["path"]) == ("orphan", str(tree))
     assert run(root, *shlex.split(row["exit"])[2:]).returncode == 0
     assert [r["path"] for r in json.loads(run(root, "list", "--json").stdout)] == [
@@ -128,7 +123,7 @@ def test_merge_fast_forwards_removes_and_reruns(root: Path) -> None:
 def test_a_task_whose_job_tree_is_gone_refuses_with_the_fix_that_restores_it(
     root: Path, verb: str
 ) -> None:
-    task = _open(root, NEW_TASK, f"wt/{NEW_JOB}")
+    task = open_tree(root, NEW_TASK)
     commit(task, "src/a.py")
     shutil.rmtree(root / TREE)  # removed by hand: git's registry still holds it, locked
     refused = run(root, verb, str(task))
@@ -173,7 +168,7 @@ def test_a_dirty_tree_refuses_with_one_fix_that_commits_or_removes(root: Path) -
 def test_a_backlog_tree_lands_specs_only_through_the_ledger_checks(root: Path) -> None:
     """A `backlog` merge runs the ledger, trio and release checks alone — an
     invalid ledger refuses, a valid one lands with no test run; code refuses with its undo."""
-    repo, tree = root / "repos/r", _open(root, BACKLOG, "feature/0.5.0")
+    repo, tree = root / "repos/r", open_tree(root, BACKLOG)
     commit(tree, "specs/bugs/BUGS.jsonl", '{"id": "half"}\n')
     approve(root, git(tree, "rev-parse", "HEAD").strip())
     invalid = run(root, "merge", str(tree))
@@ -314,12 +309,12 @@ def test_release_closure_waits_for_every_other_wt(tmp_path: Path) -> None:
     (root := tmp_path / "ws").mkdir()
     make_workspace(root)
     git(root / "repos/r", "checkout", "-q", "feature/0.5.0")
-    _open(root, RC, "feature/0.5.0")
+    open_tree(root, RC)
     specs = root / RC_TREE / "specs"
     write_release_phase(specs, "0.5.0", "IMPLEMENTATION")
     (specs / "releases/_archive").mkdir()
     (specs / "releases/_archive/releases_histo.jsonl").write_text("")
-    _open(root, NEW_JOB, WORK)  # empty
+    open_tree(root, NEW_JOB)  # empty
     for skill in (
         "dd-spec-navigator",
         "dd-gitflow-default",
@@ -609,7 +604,7 @@ def test_an_implementation_commit_cannot_carry_a_test(root: Path, law: str, test
         "verify: python scripts/ci.py job\n" + law,
     )
     git(job, "merge", "-q", "--ff-only", WORK)
-    task = _open(root, NEW_TASK, f"wt/{NEW_JOB}")
+    task = open_tree(root, NEW_TASK)
     for rel in ("src/feature.py", test_path):
         (task / rel).parent.mkdir(parents=True, exist_ok=True)
         (task / rel).write_text("value = 1\n", encoding="utf-8")
@@ -627,7 +622,7 @@ def test_a_repo_without_a_tests_declaration_lands_a_source_only_task(root: Path)
     job = root / TREE
     commit(root / RC_TREE, "AGENTS.md", "verify: python scripts/ci.py job\n")
     git(job, "merge", "-q", "--ff-only", WORK)
-    task = _open(root, NEW_TASK, f"wt/{NEW_JOB}")
+    task = open_tree(root, NEW_TASK)
     commit(task, "src/feature.py")
 
     landed = run(root, "merge", str(task))
@@ -637,7 +632,7 @@ def test_a_repo_without_a_tests_declaration_lands_a_source_only_task(root: Path)
 
 def _task_tree(root: Path, rel: str = "src/a.py") -> tuple[Path, str]:
     """An open task tree of the job holding one commit: (tree, its sha)."""
-    task = _open(root, NEW_TASK, f"wt/{NEW_JOB}")
+    task = open_tree(root, NEW_TASK)
     return task, commit(task, rel)
 
 

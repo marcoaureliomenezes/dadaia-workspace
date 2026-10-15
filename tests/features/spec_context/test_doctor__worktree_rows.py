@@ -83,10 +83,8 @@ def test_a_worktree_of_a_repo_in_no_context_is_a_finding_with_one_fix_and_a_bind
     `ctx_inject` bind block render it, and the registered repo's row is as before."""
     root = worktree_ws.make_workspace(tmp_path)
     worktree_ws.git(root / "repos/r", "checkout", "-q", "feature/0.5.0")
-    mine = root / "worktrees/r/0.5.0/wt-hotfix-b"
-    worktree_ws.git(
-        root / "repos/r", "worktree", "add", "-q", "-b", "wt/0.5.0/wt-hotfix-b", str(mine)
-    )
+    assert worktree_ws.run(root, "new", "r", "0.5.0/wt-backlog-b").returncode == 0
+    mine = root / "worktrees/r/0.5.0/wt-backlog-b"
     gone = root / "repos/gone"
     gone.mkdir()
     worktree_ws.git(gone, "init", "-q")

@@ -92,11 +92,11 @@ def test_doctor_lists_the_contexts_worktrees_from_git_and_touches_none(tmp_path:
     root = worktree_ws.make_workspace(tmp_path)
     repo = root / "repos/r"
     worktree_ws.git(repo, "checkout", "-q", "feature/0.5.0")
-    ready, empty = root / "worktrees/r/0.5.0/wt-hotfix-a", root / "worktrees/r/0.5.0/wt-hotfix-b"
-    for tree in (ready, empty):
-        worktree_ws.git(repo, "worktree", "add", "-q", "-b", f"wt/0.5.0/{tree.name}", str(tree))
+    for lane in ("a", "b"):
+        assert worktree_ws.run(root, "new", "r", f"0.5.0/wt-backlog-{lane}").returncode == 0
+    ready, empty = root / "worktrees/r/0.5.0/wt-backlog-a", root / "worktrees/r/0.5.0/wt-backlog-b"
     worktree_ws.commit(ready, "src/a.py")
-    log = repo / ".git/logs/refs/heads/wt/0.5.0/wt-hotfix-a"  # age is the branch's birth
+    log = repo / ".git/logs/refs/heads/wt/0.5.0/wt-backlog-a"  # age is the branch's birth
     log.write_text(re.sub(r"> \d+ ", f"> {int(_TWO_DAYS_AGO)} ", log.read_text(), count=1))
     foreign = root / ".dadaia/tmp/claude/20200101/wt-a"
     # a canonical wt/ branch outside worktrees/r/ is still foreign — its merge would refuse

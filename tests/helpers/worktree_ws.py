@@ -186,12 +186,10 @@ def _parent(name: str) -> str:
 
 
 def open_tree(root: Path, name: str) -> Path:
-    """The tree *name* as `new` leaves it (locked, on `wt/<name>` cut from its parent), made with
-    raw git so a test that does not exercise `new` never rests on it."""
-    tree = root / "worktrees/r" / name
-    git(root / "repos/r", "worktree", "add", "-q", "--lock", "--reason", f"dadaia:{name}",
-        "-b", f"wt/{name}", str(tree), _parent(name))  # fmt: skip
-    return tree
+    """The tree *name* opened by `new`, which must succeed."""
+    created = run(root, "new", "r", name)
+    assert created.returncode == 0, created.stderr
+    return root / "worktrees/r" / name
 
 
 def diff_hash(root: Path, sha: str, name: str | None = None) -> str:
