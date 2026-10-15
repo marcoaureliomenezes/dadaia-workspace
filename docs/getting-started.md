@@ -79,11 +79,12 @@ and the open worktrees once.
 .dadaia/.venv/bin/dadaia specs init --context <ctx> [--replace-foreign]
 ```
 
-`specs init` (3a) brings the main repo's `specs/` to the canon and never commits: an
+`specs init` (3a) brings the main repo's `specs/` to the canon: an
 absent tree is scaffolded, a dadaia tree is upgraded and its missing files filled, and a
-foreign `specs/` is moved to `specs-bkp/` (`git mv`, staged) after consent —
-`--replace-foreign` gives it without asking. The `dd-audit-project` first pass (3b) fills
-memory and is done when memory holds real content (`.dadaia/.venv/bin/dadaia doctor --context <ctx>` exit 0), never by a
+foreign `specs/` is moved to `specs-bkp/` (`git mv`) after consent —
+`--replace-foreign` gives it without asking. On a repo with no work branch it cuts the
+local one and commits only the scaffold (the move included) on it; it never pushes. The
+`dd-audit-project` first pass (3b) fills memory in the `wt-backlog-first-pass` lane and is done when memory holds real content (`.dadaia/.venv/bin/dadaia doctor --context <ctx>` exit 0), never by a
 stamp. `context baseline <ctx>` (3c) publishes the principal, integration and work
 branches; a re-run is a no-op.
 
@@ -118,9 +119,11 @@ A candidate is one closed-scope cycle inside the live release. Nothing drives it
 documents are the state, the ledger scripts move the records, and the job files and
 task commits are the trace.
 
-After `context baseline`, each step writes inside a worktree that then merges: a
-`backlog/<slug>` one for step 1, the candidate's `define` one for steps 2 and 3, a job's
-or a task's from step 5.
+After `context baseline`, each step writes inside a worktree that then merges into its
+parent, all under `worktrees/<repo>/<M.m.p>/`: a `wt-backlog-<slug>` lane for step 1;
+the candidate's `rc-<N>/wt-rc`, its integration branch, for steps 2, 3, 4 and 6; a job's
+`rc-<N>/job-<n>/wt-main` and its `wt-task-<kkk>` trees from step 5. `.dadaia/.venv/bin/dadaia worktree <verb>`
+runs every worktree verb: `new`, `merge`, `preflight`, `sync`, `clean`, `hash`, `list`.
 
 1. **Demand enters the backlog.** Only the operator creates demand;
    `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py new <slug> --relates <slugs>|none`
@@ -134,30 +137,35 @@ or a task's from step 5.
    REBUILD, UPDATE or KEEP, then ADD only for what no unit can carry; the mandatory
    grill; then `SPEC.md` (its `Replaces` naming what DELETE/REBUILD rows remove),
    `PLAN.md` (opening with that table as §1, then the job DAG with waves and exact `W:` sets) and
-   one job file per job, `tasks/<job>.md`, in that `rc-<N>/`, in one
-   definition commit on the work branch (`<work>M.m.p`; the names are the
+   one job file per job, `tasks/<job>.md`, in that `rc-<N>/`, as the first commits of
+   the `wt-rc`, cut from the work branch (`<work>M.m.p`; the names are the
    `gitflow:` block of `specs/constitution.md`).
 4. **Open implementation.** `release.py phase IMPLEMENTATION --sha <sha>` requires
    `SPEC.md` and `PLAN.md` `**Status:** Approved`, PLAN's `## DAG` with wave and exact
    `W:` sets, and lean job files containing task id, AC and exact `W:`, then stamps `defined`.
-5. **Run the jobs.** Each job opens its worktree by `worktree.py new`. Each behavior
-   gets two task worktrees: the first commits its acceptance test RED; a fresh second
-   task implements without touching a test path. Task merge checks hygiene and that
-   separation. Job merge runs the tracked `verify:` once and requires the reviewer's
-   one `APPROVED`, bound to the exact diff.
-6. **Close the candidate.** The Reconciliation job, in its `reconcile` worktree:
-   `release.py phase CLOSURE --sha <sha>` (no other open `wt/*` worktree), memory
+5. **Run the jobs.** Each job opens its `wt-main` by `.dadaia/.venv/bin/dadaia worktree new`
+   once the `wt-rc` reads `IMPLEMENTATION`. Each behavior gets two task worktrees: the
+   first commits its acceptance test RED; a fresh second task implements without
+   touching a test path. Task merge into `wt-main` checks hygiene and that separation.
+   Job merge into `wt-rc` runs the tracked `verify:` once and requires the reviewer's
+   one `APPROVED`, bound to the exact diff. When a lane lands meanwhile,
+   `.dadaia/.venv/bin/dadaia worktree sync <wt-rc path>` rebases the rc and its trees,
+   parents first.
+6. **Close the candidate.** The Reconciliation, as the last commits of the `wt-rc`:
+   `release.py phase CLOSURE --sha <sha>` (no job, task or lane tree open), memory
    reconciliation with its derived docs, the closure `log` entries, the disposition
    sweep (`backlog.py exit`, `audit.py disposition`/`close`, `bugs.py archive`),
-   artifact GC; then the work -> integration PR merged green.
+   artifact GC; then the `wt-rc` merges into the work branch through the job gate plus
+   the ledger checks, and the work -> integration PR merges green.
 7. **Continue or promote.** Continue: `release.py new` with the same id stacks the next
    candidate, reopening `DEFINITION`. Promote: merge the integration branch into the
    principal by PR — that merge is the deploy. The old work tip is tagged
    `archive/<work-branch>` and the work branch is renamed to the next release id
-   (`git branch -m`, then `git push -u`), never cut anew; `release.py ship --sha <sha>`
-   then records the promote and moves the release folder to `_archive/`.
+   (`git branch -m`, then `git push -u`), never cut anew; `release.py ship --sha <sha>`,
+   in a backlog lane on that branch, then records the promote and moves the release
+   folder to `_archive/`.
 
-A bug is registered once the operator confirms it; a block-list bug is fixed at once as
-a hotfix job — lineage, a RED new case, root-cause fix, GREEN, then `resolve` with the
+A bug is registered once the operator confirms it; a block-list bug is fixed at once in
+a `wt-hotfix-<bug-id>` lane — lineage, a RED new case, root-cause fix, GREEN, then `resolve` with the
 implementation sha. Any other bug becomes explicit candidate scope; ship refuses it while
 open unless the operator authorizes that exact id and the authorization is recorded.

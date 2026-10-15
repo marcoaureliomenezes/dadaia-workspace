@@ -69,7 +69,7 @@ A repo's existing `specs/` that is not a dadaia tree at canon v6 or later; `spec
 _Avoid_: legacy specs, old specs, migration source
 
 **specs-bkp**:
-The repo-root directory a foreign specs tree is moved to (`git mv`, staged) by `specs init --replace-foreign`; read-only input to the first pass.
+The repo-root directory a foreign specs tree is moved to (`git mv`, committed with the scaffold on a work branch `specs init` cuts) by `specs init --replace-foreign`; read-only input to the first pass.
 _Avoid_: specs backup, specs.old, archive
 
 **First pass**:
@@ -107,8 +107,8 @@ A region with one write rule. A `.dadaia/` zone is a row of `core.workspace_layo
 _Avoid_: area (for a zone), lane
 
 **Worktree**:
-A canonical git worktree that reaches `repos/<repo>` only by `worktree.py merge`: a plain change is `worktrees/<repo>/<name>/` on `wt/<name>`; a release job is `worktrees/<repo>/<M.m.p>-rc<N>/<job>/` with one `<job>--<task-id>/` per task; `define/`, `reconcile/`, `backlog/` and `hotfix/` are the reserved workflow shapes. Rules: `worktrees/AGENTS.md`.
-_Avoid_: sandbox, harness worktree (a `.claude/worktrees/**` tree is not one), worktree kind (retired)
+A canonical git worktree `worktrees/<repo>/<name>/` on `wt/<name>`, its name its path under `<M.m.p>/`: `rc-<N>/wt-rc` (the rc's integration branch), `rc-<N>/job-<n>/wt-main` (a job), `rc-<N>/job-<n>/wt-task-<kkk>` (a task) and the lanes `wt-backlog-<slug>` and `wt-hotfix-<bug-id>`. Each is cut from its parent and lands on it by `.dadaia/.venv/bin/dadaia worktree merge`; a `wt-rc` and a lane land on the work branch, so `repos/<repo>` receives only merges. Rules: `worktrees/AGENTS.md`.
+_Avoid_: sandbox, harness worktree (a `.claude/worktrees/**` tree is not one), plain, define or reconcile tree (retired)
 
 **Stall**:
 The flow cannot advance because an enforcement point (gate, chokepoint, doctor exit, CLI refusal) refuses the next action the law itself requires; every BLOCK carries one executable `fix:` line, and a BLOCK whose fix is itself blocked is a CRITICAL bug by definition (operator ruling 2026-09-12).
@@ -306,7 +306,7 @@ The operator's file at the workspace root, PROTECTED from agents: one root-relat
 _Avoid_: instance exceptions, allowlist, whitelist (the root whitelist is the gate's law, not the operator's patterns)
 
 **Protected section**:
-The `.dadaiaignore` lines after a `[protected]` header: repo-relative globs, same grammar, that make a match under `repos/<r>/` or `worktrees/<r>/<name>/` PROTECTED — beside the code floor (`CORE_FLOOR`) and the install ledger (ADR 0133). Bash writes are not judged.
+The `.dadaiaignore` lines after a `[protected]` header: repo-relative globs, same grammar, that make a match under `repos/<r>/` or under any tree in `worktrees/<r>/` PROTECTED — beside the code floor (`CORE_FLOOR`) and the install ledger (ADR 0133). Bash writes are not judged.
 _Avoid_: protected list, deny list
 
 ## Authorities
@@ -355,11 +355,11 @@ _Avoid_: closed surface
 One rc's run, a DAG of jobs; not a file.
 
 **Job**:
-One measured feature: one worktree, one review and one gate at its merge; Job 1 executes the SPEC's `## Bug window review` verdicts.
+One measured feature: one `wt-main` worktree, one review and one gate at its merge into the rc's `wt-rc`; Job 1 executes the SPEC's `## Bug window review` verdicts.
 _Avoid_: CI job (a GitHub Actions job)
 
 **Task**:
-One exact `W:` set and AC, one session and one worktree cut from its job branch; the unit of dispatch. New behavior uses a RED-test task followed by a fresh implementation task.
+One exact `W:` set and AC, one session and one `wt-task-<kkk>` worktree cut from its job's `wt-main`; the unit of dispatch. New behavior uses a RED-test task followed by a fresh implementation task.
 
 **Envelope**:
 The complete `W:` set a PLAN declares for a job; every changed path is also in exactly one task's `W:`.
@@ -371,11 +371,11 @@ A file two same-wave jobs or two tasks would write; the PLAN adds an edge or rep
 A merged job's wall time from its last task commit to its pushed merge: gates, review, CI waits.
 
 **Hotfix**:
-A block-list bug's fix (bugs law §2), outside the DAG.
-_Avoid_: hotfix/* branch
+A block-list bug's fix in its `<M.m.p>/wt-hotfix-<bug-id>` lane (bugs law §2), outside the DAG.
+_Avoid_: hotfix/* branch, hotfix job
 
 **Reconciliation**:
-An rc's last job, outside the job cap: memory and derived docs.
+An rc's closing work, the last commits of its `wt-rc` once every job merged: memory and derived docs.
 
 ## Tests
 

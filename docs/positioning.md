@@ -7,7 +7,7 @@ projects.
 
 A workspace is one folder, and the agent session launches at its root, always.
 Projects live in repos inside it — `repos/<slug>/` — which take agent work only as
-merges from their worktrees under `worktrees/<repo>/`. Governance lives outside every
+merges from their worktree hierarchy under `worktrees/<repo>/<M.m.p>/`. Governance lives outside every
 repo: the root `AGENTS.md` map, the scoped `AGENTS.md` files, `.agents/skills`,
 `.agents/agents` and `.dadaia/` sit above them all.
 
@@ -39,7 +39,8 @@ exports `DADAIA_SESSION_ID` before it binds, or carries the binding in `DADAIA_C
 The bind carries a scope — the main repo plus its associated repos — and a MUTATING
 file-tool write into a repo outside it is refused, naming the bind that would allow it;
 an unbound session with an id owns no repo. A repo checkout receives only merges: agents
-write a repo inside its worktrees and land them by `worktree.py merge`, audits aside.
+write a repo inside its worktrees and land each on its parent by
+`.dadaia/.venv/bin/dadaia worktree merge`, audits aside.
 
 ## Ten repositories, one law
 

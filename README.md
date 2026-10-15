@@ -63,8 +63,9 @@ access. Every later command runs through the workspace's own CLI,
 hook and makes the context ALIVE (only `context bind` binds); a later project is
 `.dadaia/.venv/bin/dadaia context create --main-repo <url> [--associated-repo <url>]`.
 **Specs:** `.dadaia/.venv/bin/dadaia specs init --context <slug>` brings the repo's
-`specs/` to the canon, moving a foreign tree to `specs-bkp/` after consent; the
-`dd-audit-project` first pass fills memory (done by real content, never a stamp) and
+`specs/` to the canon, moving a foreign tree to `specs-bkp/` after consent, and on a repo
+with no work branch cuts the local one and commits the scaffold on it; the
+`dd-audit-project` first pass fills memory in the `wt-backlog-first-pass` lane (done by real content, never a stamp) and
 `.dadaia/.venv/bin/dadaia context baseline <slug>` publishes it. `doctor` prints each
 next step with its `fix:` line.
 
@@ -106,13 +107,13 @@ through the gate asserting ALLOW. No lease, lock or wait path exists; the gate r
 `_RELEASE.json`.
 
 Work runs as candidates inside one live release: a picked set, an as-is review of every
-unit it touches, a grill, SPEC, a PLAN drawing a DAG of jobs and one job file per job; each task runs in its own worktree and
-lands on its job branch after its gate, each job lands only after the reviewer's `APPROVED`, then the
-Reconciliation job closes it — memory reconciliation, disposition sweep — and the work -> integration merge follows (branch names: the constitution's `gitflow:`). The
+unit it touches, a grill, SPEC, a PLAN drawing a DAG of jobs and one job file per job; the candidate lives on its `wt-rc` worktree, each task runs in its own worktree and
+lands on its job's `wt-main` after its gate, each job lands on the `wt-rc` only after the reviewer's `APPROVED`, then the
+Reconciliation closes it — memory reconciliation, disposition sweep — the `wt-rc` lands on the work branch and the work -> integration merge follows; `.dadaia/.venv/bin/dadaia worktree <verb>` runs every worktree verb (branch names: the constitution's `gitflow:`). The
 ledger scripts under `.agents/skills/*/scripts/` (`bugs.py`, `backlog.py`,
 `release.py`, `audit.py`) are each record's one writer. A bug is proposed to the
-operator and registered only after confirmation; a block-list bug is fixed at once as a
-hotfix job with a RED test, while any other bug becomes explicit candidate scope. Ship
+operator and registered only after confirmation; a block-list bug is fixed at once in a
+`wt-hotfix-<bug-id>` lane with a RED test, while any other bug becomes explicit candidate scope. Ship
 may carry an open bug only with the operator's exact recorded authorization. Completed work leaves as a `handoff-v1` record, validated by
 `.dadaia/.venv/bin/dadaia reports validate`.
 
