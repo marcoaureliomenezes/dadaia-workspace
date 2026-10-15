@@ -56,6 +56,34 @@ def test_baseline_refuses_a_private_value_with_no_operator_terms(value: str, mas
     assert mask in (None, outcome.hits[0].masked_term)
 
 
+_QUAD = ".".join(("0", "10", "9", "10"))
+_LOCKS = ("poetry.lock", "package-lock.json", "uv.lock", "Cargo.lock", "yarn.lock",
+          "pnpm-lock.yaml", "Pipfile.lock", "composer.lock", "Gemfile.lock", "go.sum")  # fmt: skip
+
+
+def _hits(path: str, text: str) -> int:
+    return len(scan_objects([_obj(text, path=path)], terms=(), patterns=load_baseline_patterns()).hits)
+
+
+@pytest.mark.parametrize("path", [*_LOCKS, "sub/dir/poetry.lock"])
+@pytest.mark.parametrize("text", [f'version = "{_QUAD}"\n', f'py4j = ">={_QUAD},<{_QUAD}"\n'])
+def test_a_generated_lock_file_is_not_refused_for_a_four_part_version(path: str, text: str) -> None:
+    """A lock file's four-part version is not an address."""
+    assert _hits(path, text) == 0
+
+
+def test_a_lock_file_still_loses_only_the_ipv4_pattern() -> None:
+    """Another pattern still refuses inside a lock file."""
+    assert _hits("poetry.lock", "owner = " + "someone" + "@" + "acme-corp.io\n") == 1
+
+
+@pytest.mark.parametrize("wrap", ["{}", "<td>{}</td>", "<{}>", ">>{}", "=>{}", "x=={}", "~{}", "^{}", "host>={}"])
+def test_the_same_quad_in_an_ordinary_file_is_refused(wrap: str) -> None:
+    """Outside the lock list the IPv4 pattern refuses in every context."""
+    assert _hits("notes.md", wrap.format(_QUAD) + "\n") == 1
+    assert _hits("poetry.lock.md", wrap.format(_QUAD) + "\n") == 1
+
+
 # fmt: off
 @pytest.mark.parametrize("text", [
     pytest.param("loopback at 127.0.0.1\n", id="loopback"),
