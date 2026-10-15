@@ -183,7 +183,7 @@ def ref_gate_check() -> None:
     if any(len(parts) != 3 for parts in lines):
         fail(
             "[ref-gate] BLOCKED: a ref line is not `<old> <new> <ref>`",
-            "Agent action: pipe one `<old> <new> <ref>` line per ref",
+            "Agent action: pipe one line per ref update, each holding the old sha, the new sha and the ref name",
         )
     git = build_git_client()
     gitflow = _gitflow(repo_root)[0]
