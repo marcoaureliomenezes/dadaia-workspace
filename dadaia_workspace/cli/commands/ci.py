@@ -12,11 +12,18 @@ import typer
 
 from dadaia_workspace.cli._fail import fail
 from dadaia_workspace.cli._specs_resolution import repo_owner, resolve_workspace_root_for_cli
-from dadaia_workspace.core.cli_line import fix_line
+from dadaia_workspace.core.cli_line import fix_line, git_line, without_fix
 from dadaia_workspace.core.gitflow import Gitflow, work_branch
+from dadaia_workspace.core.invocation import scope
+from dadaia_workspace.core.models.git_scan import ZERO_SHA
 from dadaia_workspace.core.skill_owner import load_owner
-from dadaia_workspace.features.chokepoints.branch_policy import GateFixes
+from dadaia_workspace.features.chokepoints.branch_policy import (
+    HEADS_PREFIX,
+    GateFixes,
+    check_ref_policy,
+)
 from dadaia_workspace.features.spec_context.service import install_git_hooks
+from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 
 app = typer.Typer(help="Git-hook chokepoints: the pre-push gate and its installer.")
 
@@ -144,6 +151,45 @@ def push_gate_check() -> None:
 
     if not decision.allowed:
         fail(decision.message)
+
+
+def _audit_only(git: GitSubprocessClient, repo_root: Path, old: str, new: str) -> bool:
+    """True when the non-empty paths changed in ``old..new`` all sit in the ``audit`` zone."""
+    paths = git.git(repo_root, "diff", "--name-only", f"{old}..{new}").splitlines()
+    anchor = Path(repo_root.anchor)
+    return bool(paths) and all(
+        scope(anchor, anchor / "repos" / repo_root.name / p)[1] == "audit" for p in paths
+    )
+
+
+@app.command("ref-gate-check")
+def ref_gate_check() -> None:
+    """Reference-transaction gate: ``<old> <new> <ref>`` lines on stdin; a work-branch update
+    must land on origin's sha, unless it touches only ``specs/audits/**``."""
+    from dadaia_workspace.container import build_git_client
+
+    repo_root = _repo_root()
+    lines = [raw.split() for raw in sys.stdin.read().splitlines() if raw.strip()]
+    if any(len(parts) != 3 for parts in lines):
+        fail(
+            "[ref-gate] BLOCKED: a ref line is not `<old> <new> <ref>`",
+            "Agent action: pipe one `<old> <new> <ref>` line per ref",
+        )
+    git = build_git_client()
+    gitflow, _ = _gate_inputs(repo_root, git.current_branch(repo_root))
+    origin: dict[str, str] = {}
+    for _, _, ref in lines:
+        branch = ref.removeprefix(HEADS_PREFIX)
+        origin[ref] = git.git(
+            repo_root, "for-each-ref", "--format=%(objectname)", f"refs/remotes/origin/{branch}"
+        )
+    for old, new, ref in lines:
+        if ZERO_SHA in (old, new) or not origin[ref]:
+            continue
+        decision = check_ref_policy([f"{old} {new} {ref}"], gitflow, origin)
+        if not decision.allowed and not _audit_only(git, repo_root, old, new):
+            restore = git_line(repo_root, "update-ref", ref, origin[ref])
+            fail(without_fix(decision.message).rstrip(), restore)
 
 
 @app.command("install-hook")
