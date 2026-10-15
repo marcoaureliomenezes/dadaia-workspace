@@ -98,7 +98,8 @@ STEPS: tuple[tuple[str, Kind, _Pending, Callable[[_Ctx], str]], ...] = (
         "agent",
         lambda c: f"'{c.name}' memory holds no audited content" if _first_pass(c) else None,
         lambda c: (
-            f"Agent action: run the dd-audit-project skill's first pass — {', '.join(_first_pass(c))}"
+            f"Agent action: open the lane {fix_line(c.root, 'worktree', 'new', c.specs.parent.name, f'{GitSubprocessClient().work_version(c.specs.parent)}/wt-backlog-first-pass')}"
+            f", then run the dd-audit-project first pass in it — {', '.join(_first_pass(c))}"
         ),
     ),
     (

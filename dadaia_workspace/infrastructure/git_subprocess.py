@@ -6,7 +6,7 @@ from pathlib import Path
 
 from dadaia_workspace.core.cli_line import fix_line, fix_of, git_line, without_fix
 from dadaia_workspace.core.exceptions import GitCloneError, GitSyncError
-from dadaia_workspace.core.gitflow import DEFAULT, Gitflow, read_gitflow
+from dadaia_workspace.core.gitflow import DEFAULT, Gitflow, read_gitflow, work_branch
 from dadaia_workspace.core.models.git_scan import GitObjectReadError
 from dadaia_workspace.core.skill_owner import load_owner
 from dadaia_workspace.infrastructure.git_objects import unpublished
@@ -230,6 +230,13 @@ class GitSubprocessClient:
         rel = "specs/constitution.md"
         result = _run(["git", "log", "--remotes=origin", "-n1", "--format=%H", "--", rel], cwd=path)
         return born.returncode == 0 and bool(result.stdout.strip())
+
+    def work_version(self, path: Path) -> str:
+        """The work-branch version of the repo at *path*, by the committed gitflow's work prefix:
+        the one local work branch's version, else the next one to create. Raises the skill's
+        refusal when several work branches exist."""
+        flow = self.gitflow(path)[0]
+        return work_branch(path, flow, path.name).removeprefix(flow.work_prefix)
 
     def committed_text(self, path: Path, rel: str) -> str | None:
         """*rel* at HEAD, else at the newest commit touching it on a local branch or an
