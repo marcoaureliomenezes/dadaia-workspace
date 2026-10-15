@@ -229,13 +229,16 @@ def test_mutability_is_declared_per_property_and_the_rewrite_spares_the_core(
     kind: str, categories: set[str]
 ) -> None:
     """Every property carries ``x-mutability`` in its closed set; ``required`` is
-    every property but the write-once ones; the governance rewrite touches no immutable-core field.
+    every property but the write-once ones and `fix_sha`, absent until a resolve sets it; the governance rewrite touches no immutable-core field.
     A finding's only mutable fields are disposition/release/reason."""
     properties = _schema(kind)["properties"]
     mutability = {name: spec["x-mutability"] for name, spec in properties.items()}
     assert set(mutability.values()) == categories
     required = set(_schema(kind)["required"])
-    assert required == {n for n, c in mutability.items() if c != "write-once"}
+    unset_until_resolved = {"fix_sha"} if kind == "bug" else set()
+    assert (
+        required == {n for n, c in mutability.items() if c != "write-once"} - unset_until_resolved
+    )
     assert not {n for n in _REWRITE[kind] if mutability[n] == "immutable-core"}
     if kind == "finding":
         assert {n for n, c in mutability.items() if c == "mutable-governance"} == set(

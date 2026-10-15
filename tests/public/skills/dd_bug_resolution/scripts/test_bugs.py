@@ -771,14 +771,23 @@ def test_update_refuses_a_field_it_does_not_own(
 
 
 def test_a_write_once_field_refuses_a_differing_second_write(script: Path, tmp_path: Path) -> None:
-    """`fix_sha` is write-once: a differing second value is refused."""
+    """`solution` is write-once: a differing second value is refused."""
     specs = _ledger(tmp_path, _OPEN_RECORD)
-    first = _run(script, "update", "a-bug", "--set", f"fix_sha={'a' * 40}", "--specs", str(specs))
-    second = _run(script, "update", "a-bug", "--set", f"fix_sha={'b' * 40}", "--specs", str(specs))
+    first = _run(script, "update", "a-bug", "--set", "solution=one", "--specs", str(specs))
+    second = _run(script, "update", "a-bug", "--set", "solution=two", "--specs", str(specs))
     assert first.returncode == 0, first.stderr
     assert second.returncode == 1
     assert "write-once" in second.stderr
-    assert _records(specs)[0]["fix_sha"] == "a" * 40
+    assert _records(specs)[0]["solution"] == "one"
+
+
+def test_fix_sha_is_repointed_by_update(script: Path, tmp_path: Path) -> None:
+    """A rebase rewrites the fix commit, so `fix_sha` is the one resolution fact `update` may change."""
+    specs = _ledger(tmp_path, _OPEN_RECORD)
+    for sha in ("a" * 40, "b" * 40):
+        done = _run(script, "update", "a-bug", "--set", f"fix_sha={sha}", "--specs", str(specs))
+        assert done.returncode == 0, done.stderr
+        assert _records(specs)[0]["fix_sha"] == sha
 
 
 def test_status_and_stats_read_the_ledger(script: Path, tmp_path: Path) -> None:
