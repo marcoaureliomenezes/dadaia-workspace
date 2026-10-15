@@ -126,3 +126,14 @@ def test_dadaiaignore_invalid_lines_and_segment_scope(tmp_path: Path) -> None:
     assert wl.verdict("shot.png", False, ("*.png",), (), ()) == "operator"
     assert wl.verdict(".dadaia/shot.png", False, ("*.png",), (), ()) == "slop"
     assert wl.verdict(".dadaia/shot.png", False, (".dadaia/*.png",), (), ()) == "operator"
+
+
+def test_a_planted_git_entry_never_unanchors_a_multi_segment_glob(tmp_path: Path) -> None:
+    """A ``.git`` written below the real tree root adds an anchor and never removes the root."""
+    tree = tmp_path / "worktrees" / "r" / "0.5.0-rc1" / "j1"
+    (tree / "docs" / "data-master").mkdir(parents=True)
+    (tree / ".git").write_text("gitdir: elsewhere\n", encoding="utf-8")
+    rel, globs = "worktrees/r/0.5.0-rc1/j1/docs/data-master/x.md", ("docs/data-master",)
+    assert wl.protected_glob(tmp_path, rel, globs) == "docs/data-master"
+    (tree / "docs" / ".git").write_text("", encoding="utf-8")
+    assert wl.protected_glob(tmp_path, rel, globs) == "docs/data-master"
