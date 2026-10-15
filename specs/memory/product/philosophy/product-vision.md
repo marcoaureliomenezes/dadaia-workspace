@@ -33,7 +33,7 @@ sources:
 
 - A human initializes the workspace, creates or adopts a context, initializes its specs, completes the first memory pass and publishes the project. `doctor` reports the next real-state step and one fix line ([[workspace-init]], [[workspace-doctor]]).
 - An agent reads the root map, the scoped law for the area, the relevant memory and the approved release artifacts, then works through the owning ledger scripts and worktree gates.
-- A repository declares one tracked `verify:` command. Job and plain-change merges run it when present; task merges enforce RED/implementation separation without a second repository command ([[worktrees]]).
+- A repository declares one tracked `verify:` command. The job, rc and hotfix merges run it and refuse a repository that declares none; task merges enforce RED/implementation separation without a second repository command ([[worktrees]]).
 - Human documents and agent-facing indices are reconciled from current product memory. The CLI reference is generated from the live command tree; text identity is not a product-truth mechanism.
 
 ## Dependencies

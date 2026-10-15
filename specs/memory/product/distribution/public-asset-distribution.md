@@ -2,7 +2,7 @@
 slug: public-asset-distribution
 title: public-asset-distribution
 tldr: Public install stages packaged assets and projects shared law, agents, skills and every registered harness; public doctor reports projection drift.
-summary: The stage, install and doctor chain that distributes the agentic surface — deterministic staging, rendered personas, whole-folder skills, registry-derived harness files, specs scaffold, projection pruning and privacy checks.
+summary: The install and doctor chain that distributes the agentic surface — deterministic staging, rendered personas, whole-folder skills, registry-derived harness files, specs scaffold, projection pruning and privacy checks.
 tags: [public, assets, distribution, projection, privacy]
 sources:
   - dadaia_workspace/features/public/**
@@ -24,8 +24,8 @@ sources:
 
 ## The chain
 
-- `dadaia public stage` copies `dadaia_workspace/public/` into `.dadaia/agentic/<type>/` with a SHA256 manifest that carries no timestamp, so an unchanged stage writes identical bytes, rendering the registry tables (zones, root canon, repo exclusions, specs canon) into the law fragments so every canon table in the projected law is the registry itself, and rendering the source spelling of the venv CLI through the one idempotent `workspace_layout.render_registry_tables` path; shipped history and the current law are compared after that same forward rendering for the host platform.
-- `dadaia public install` first refreshes staging, then projects the authored set — the root `AGENTS.md` map, scoped `AGENTS.md` files, `.agents/skills/` and `.agents/agents/` — plus each registered harness's agents, hooks and rule files. A separate `public stage` remains available for inspection.
+- `dadaia public install` stages first: it copies `dadaia_workspace/public/` into `.dadaia/agentic/<type>/` with a SHA256 manifest that carries no timestamp, so an unchanged stage writes identical bytes, rendering the registry tables (zones, root canon, repo exclusions, specs canon) into the law fragments so every canon table in the projected law is the registry itself, and rendering the source spelling of the venv CLI through the one idempotent `workspace_layout.render_registry_tables` path; shipped history and the current law are compared after that same forward rendering for the host platform.
+- It then projects the authored set — the root `AGENTS.md` map, scoped `AGENTS.md` files, `.agents/skills/` and `.agents/agents/` — plus each registered harness's agents, hooks and rule files. No separate staging verb exists.
 - One harness registry drives every per-harness file: each harness is one record naming its directory, its persona transcode and its hook format, so adding a harness is one data row ([[agentic-entities]]).
 - Hooks are the Python package `dadaia_workspace/hooks/`, rendered into each harness's own hook format; a harness action with no pre-event would be declared `ungated` in its dialect row (one `public doctor` WARN); every harness gates its pre-tool event, so none is declared.
 - Install compares content, not existence: a differing staged hash overwrites without `--force`, which is reserved for a hand-edited projection; an operator's own keys in a shared settings file are left alone.

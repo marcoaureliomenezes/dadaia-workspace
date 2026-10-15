@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-14T19:52:49Z",
+  "generated_at": "2026-10-15T23:15:42Z",
   "features": [
     {
       "rank": 1,
@@ -14,7 +14,7 @@
         "handoff",
         "schema"
       ],
-      "token_estimate": 632,
+      "token_estimate": 647,
       "depends_on": [
         "worktrees",
         "release-lifecycle",
@@ -42,7 +42,7 @@
         "dispatch",
         "sdd"
       ],
-      "token_estimate": 848,
+      "token_estimate": 846,
       "depends_on": [
         "worktrees",
         "release-lifecycle",
@@ -121,7 +121,7 @@
       "title": "public-asset-distribution",
       "area": "distribution",
       "tldr": "Public install stages packaged assets and projects shared law, agents, skills and every registered harness; public doctor reports projection drift.",
-      "summary": "The stage, install and doctor chain that distributes the agentic surface — deterministic staging, rendered personas, whole-folder skills, registry-derived harness files, specs scaffold, projection pruning and privacy checks.",
+      "summary": "The install and doctor chain that distributes the agentic surface — deterministic staging, rendered personas, whole-folder skills, registry-derived harness files, specs scaffold, projection pruning and privacy checks.",
       "path": "specs/memory/product/distribution/public-asset-distribution.md",
       "tags": [
         "public",
@@ -130,7 +130,7 @@
         "projection",
         "privacy"
       ],
-      "token_estimate": 1310,
+      "token_estimate": 1303,
       "depends_on": [
         "agentic-entities",
         "bug-ledger",
@@ -176,7 +176,7 @@
         "release",
         "packaging"
       ],
-      "token_estimate": 1289,
+      "token_estimate": 1331,
       "depends_on": [
         "release-lifecycle",
         "QUALITY",
@@ -377,7 +377,7 @@
         "paradigm",
         "pillars"
       ],
-      "token_estimate": 647,
+      "token_estimate": 656,
       "depends_on": [
         "context-management",
         "worktrees",
@@ -409,7 +409,7 @@
         "lifecycle",
         "concurrency"
       ],
-      "token_estimate": 597,
+      "token_estimate": 626,
       "depends_on": [
         "context-management",
         "specs-migration",
@@ -611,7 +611,7 @@
         "registry",
         "onboarding"
       ],
-      "token_estimate": 1192,
+      "token_estimate": 1264,
       "depends_on": [
         "public-asset-distribution",
         "sdd-gate-v3",
@@ -646,7 +646,7 @@
         "compliance",
         "privacy"
       ],
-      "token_estimate": 3540,
+      "token_estimate": 3576,
       "depends_on": [
         "public-asset-distribution",
         "sdd-gate-v3",
@@ -688,7 +688,7 @@
         "upgrade",
         "onboarding"
       ],
-      "token_estimate": 2041,
+      "token_estimate": 2088,
       "depends_on": [
         "context-management",
         "specs-migration",
@@ -699,6 +699,7 @@
         "sdd-gate-v3",
         "agent-orchestration",
         "harness-kimi-code",
+        "worktrees",
         "cross-platform-portability"
       ],
       "sources": [
@@ -781,7 +782,7 @@
         "lineage",
         "resolution"
       ],
-      "token_estimate": 782,
+      "token_estimate": 790,
       "depends_on": [
         "public-asset-distribution",
         "release-lifecycle",
@@ -810,7 +811,7 @@
         "state",
         "closure"
       ],
-      "token_estimate": 1162,
+      "token_estimate": 1226,
       "depends_on": [
         "agent-orchestration",
         "worktrees",
@@ -841,11 +842,11 @@
         "privacy",
         "git"
       ],
-      "token_estimate": 664,
+      "token_estimate": 786,
       "depends_on": [
+        "worktrees",
         "context-management",
         "workspace-doctor",
-        "worktrees",
         "agentic-entities",
         "public-asset-distribution",
         "ARCHITECTURE"
@@ -865,8 +866,8 @@
       "slug": "worktrees",
       "title": "worktrees",
       "area": "sdd",
-      "tldr": "Repository changes are isolated in canonical plain, release, task, backlog or hotfix worktrees and land by worktree.py merge after the gate for that tree shape.",
-      "summary": "The worktree grammar, recorded bases, RED/implementation separation, one reviewed job or plain-change gate, the preflight that runs that gate without the verdict, merge cleanup and closure holds.",
+      "tldr": "Worktrees nest under worktrees/<repo>/<v>/ — wt-rc, wt-main, wt-task and the backlog and hotfix lanes — and each merges into its parent after its gate.",
+      "summary": "The one path grammar and the base it derives, the per-kind gates (task separation, the reviewed job gate, the rc's ledger checks), preflight, sync, the level AGENTS.md files, merge cleanup, the rows list and closure holds.",
       "path": "specs/memory/product/sdd/worktrees.md",
       "tags": [
         "worktrees",
@@ -875,14 +876,14 @@
         "merge",
         "review"
       ],
-      "token_estimate": 1106,
+      "token_estimate": 1453,
       "depends_on": [
         "agent-orchestration",
-        "sdd-gate-v3",
         "release-lifecycle",
+        "context-management",
+        "sdd-gate-v3",
         "bug-ledger",
-        "workspace-doctor",
-        "context-management"
+        "workspace-doctor"
       ],
       "sources": [
         "dadaia_workspace/public/skills/dd-gitflow-default/scripts/worktree.py",
@@ -890,7 +891,10 @@
         "dadaia_workspace/public/skills/dd-gitflow-default/scripts/_worktree_git.py",
         "dadaia_workspace/public/skills/dd-gitflow-default/scripts/_worktree_names.py",
         "dadaia_workspace/public/skills/dd-gitflow-default/scripts/_worktree_new.py",
-        "dadaia_workspace/public/data/worktrees-AGENTS.md"
+        "dadaia_workspace/public/skills/dd-gitflow-default/scripts/_worktree_sync.py",
+        "dadaia_workspace/public/skills/dd-gitflow-default/scripts/levels/*.md",
+        "dadaia_workspace/public/data/worktrees-AGENTS.md",
+        "dadaia_workspace/cli/commands/worktree.py"
       ]
     }
   ]

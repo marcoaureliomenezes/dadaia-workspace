@@ -33,9 +33,10 @@ sources:
 
 - The installed pre-push hook invokes `dadaia ci push-gate-check` and reads git's ref lines before network I/O.
 - First refusal wins: malformed input; branch policy; specs canon over the net pushed tree; privacy scan over newly published objects.
-- Pushable branches are the live work branch, release job branches and backlog branches. Principal and integration branches advance by their governed PR paths, apart from empty bootstrap births.
-- The privacy scan combines the operator denylist with the packaged structural baseline, checks paths and text after control-character normalization, scans tags, and never prints an unmasked secret.
+- Pushable branches are the live work branch and the `wt-rc`, `wt-main` and backlog-lane branches ([[worktrees]]). Principal and integration branches advance by their governed PR paths, apart from empty bootstrap births.
+- The privacy scan combines the operator denylist with the packaged structural baseline, checks paths and text after control-character normalization, scans tags, and never prints an unmasked secret. A baseline pattern may name file paths whose content it skips, never their path: the IPv4 pattern skips generated lock files, whose four-part versions read as addresses.
 - Already-published bytes can be amnestied only at the same path with a resolvable base. An unreadable range or git-object failure refuses rather than claiming coverage.
+- `dadaia ci ref-gate-check` reads `<old> <new> <ref>` lines on stdin and refuses moving a work-branch ref to a sha other than the one origin holds for it, with `[ref-gate] BLOCKED` and one fix naming the `new` verb of `dadaia worktree`; a creation, a deletion, any other ref, a ref origin does not hold and an update touching only `specs/audits/**` pass.
 - Security review is the reviewer's security lens on each PR head; consumer repositories receive no library CI workflow.
 
 ## Dependencies

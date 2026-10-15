@@ -63,4 +63,4 @@
 | `bug-ledger` | bug-ledger | BUGS.jsonl stores one lean current record per confirmed defect; its writer persists registration and resolution facts while git owns derived history. |
 | `release-lifecycle` | release-lifecycle | One live release grows through closed-scope candidates; _RELEASE.json holds current phase, milestones and a lean append-only narrative. |
 | `sdd-gate-v3` | sdd-gate-v3 | No-lock enforcement combines root-entry hygiene and SDD write policy before tools, then applies branch, specs-canon and privacy checks at push. |
-| `worktrees` | worktrees | Repository changes are isolated in canonical plain, release, task, backlog or hotfix worktrees and land by worktree.py merge after the gate for that tree shape. |
+| `worktrees` | worktrees | Worktrees nest under worktrees/<repo>/<v>/ — wt-rc, wt-main, wt-task and the backlog and hotfix lanes — and each merges into its parent after its gate. |

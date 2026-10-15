@@ -24,7 +24,7 @@ sources:
 - `archive` moves named terminal records into the bug history. Open records cannot be archived.
 - Every candidate ledger is validated before atomic replacement, so a refusal leaves both live and archived bytes unchanged.
 - Every timestamp comes from the one clock; no verb takes a timestamp argument.
-- `dd-bug-resolution/scripts` also holds the kernel the other skill scripts and the package load for every shared fact: the refusal with its one printer and the one `fix:` spelling and parser, the git runner with its scrubbed environment (repo-selecting `GIT_*` removed, bytecode writing off, so no child it starts writes `__pycache__`), the decode-aware text and JSONL reader, the atomic writer, the context-name grammar, the one live-release decider, the closure worklist decider, the frontmatter parser, the clock, the platform facts, the workspace-root walk and the privacy matcher with its baseline ([[public-asset-distribution]]).
+- `dd-bug-resolution/scripts` also holds the kernel the other skill scripts and the package load for every shared fact: the refusal with its one printer and the one `fix:` spelling and parser, the git runner with its scrubbed environment (repo-selecting `GIT_*` removed, bytecode writing off, so no child it starts writes `__pycache__`, and `DADAIA_WT=1` marking a sanctioned run), the decode-aware text and JSONL reader, the atomic writer, the context-name grammar, the one live-release decider, the closure worklist decider, the frontmatter parser, the clock, the platform facts, the workspace-root walk and the privacy matcher with its baseline ([[public-asset-distribution]]).
 
 ## Resolution discipline
 
