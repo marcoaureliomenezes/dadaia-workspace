@@ -179,11 +179,14 @@ class Workspace:
         assert done.returncode == 0 and not errors, f"doctor not clean:\n{done.stdout}{done.stderr}"
         return payload
 
-    def assert_level_clean(self, context: str, repo_slug: str, url: str) -> None:
-        """Doctor 0 errors and the user repo's HEAD equals its remote's."""
+    def assert_level_clean(
+        self, context: str, repo_slug: str, url: str, scaffolded: bool = False
+    ) -> None:
+        """Doctor 0 errors and the user repo's HEAD equals its remote's; after ``specs init``
+        (``scaffolded``) the remote's head is the one scaffold commit behind it."""
         self.doctor_json(context)
         repo = self.path / "repos" / repo_slug
-        head = self.env.git("rev-parse", "HEAD", cwd=repo)
+        head = self.env.git("rev-parse", "HEAD~1" if scaffolded else "HEAD", cwd=repo)
         remote = self.env.git("ls-remote", url, "HEAD", cwd=repo).split()[0]
         assert head == remote, f"{repo_slug}: HEAD {head} != remote {remote}"
 
@@ -261,11 +264,12 @@ def test_an_operator_journey_from_the_previous_release(env: Env) -> None:
     assert f"upgraded {previous} -> {_E2E_VERSION}" in done.stdout, done.stdout
     version = ws.dadaia("--version")
     assert _E2E_VERSION in version.stdout, version.stdout
-    # The upgrade never writes a user repo; level 3 re-run refreshes its specs law.
+    # The upgrade never writes a user repo; level 3 commits only the scaffold on the work branch.
     refreshed = ws.dadaia("specs", "init", "--context", "green")
     assert refreshed.returncode == 0, f"{refreshed.stdout}\n{refreshed.stderr}"
     ws.doctor_json("green")
-    assert env.git("rev-parse", "HEAD", cwd=repo) == head
+    assert env.git("rev-parse", "HEAD~1", cwd=repo) == head
+    assert env.git("log", "-1", "--format=%s", cwd=repo) == "chore: scaffold the dadaia specs"
     again = env.uvx("init", "up")
     assert again.returncode == 0 and f"already at {_E2E_VERSION}" in again.stdout
 
@@ -294,7 +298,7 @@ def test_an_operator_journey_from_the_previous_release(env: Env) -> None:
     assert any("specs init --context second" in fix for fix in fixes), fixes
     done = ws.dadaia("specs", "init", "--context", "second")
     assert done.returncode == 0, f"{done.stdout}\n{done.stderr}"
-    ws.assert_level_clean("second", "second", repos["second"])
+    ws.assert_level_clean("second", "second", repos["second"], scaffolded=True)
 
 
 # ── the quickstart block, verbatim ────────────────────────────────────────
@@ -317,7 +321,7 @@ class TestQuickstartVerbatim:
         done = env.run("bash", "-euo", "pipefail", "-c", script, cwd=env.root)
         assert done.returncode == 0, f"quickstart failed:\n{done.stdout}\n{done.stderr}"
         ws = Workspace(env, "demo")
-        ws.assert_level_clean("quick", "quick", url)
+        ws.assert_level_clean("quick", "quick", url, scaffolded=True)
         done = env.run("bash", "-euo", "pipefail", "-c", f"SLUG=quick\n{filing}", cwd=ws.path)
         assert done.returncode == 0, f"quickstart block 2 failed:\n{done.stdout}\n{done.stderr}"
         wt = ws.path / "worktrees" / "quick" / "0.1.0" / "wt-backlog-my-first-idea"

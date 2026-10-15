@@ -46,7 +46,7 @@ dadaia init /workspace --harness claude --repo file:///srv/demo.git
 cd /workspace/repos/demo
 [ -d specs ] || /workspace/.dadaia/.venv/bin/dadaia specs init --context demo  # 0.4.7 scaffolds specs at clone
 git add -A && { git diff --cached --quiet || git commit -qm "chore(specs): onboard demo"; }
-git switch -qc feature/0.1.0
+git switch -qC feature/0.1.0  # specs init already cut it (0.4.7 did not)
 git switch -qc strip-punctuation
 cat > slug.py <<'EOF'
 import re
