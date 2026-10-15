@@ -73,7 +73,9 @@ def _foreign(repo: Path) -> dict[str, bytes]:
     return _snapshot(specs)
 
 
-def test_absent_specs_scaffolds_lists_paths_and_commits_nothing(repo: Path) -> None:
+def test_absent_specs_scaffolds_lists_paths_and_commits_only_the_scaffold_on_the_new_branch(
+    repo: Path,
+) -> None:
     head = _git(repo, "rev-parse", "HEAD")
 
     result = _runner.invoke(app, ["specs", "init", "--context", "c"])
@@ -85,9 +87,45 @@ def test_absent_specs_scaffolds_lists_paths_and_commits_nothing(repo: Path) -> N
     assert {("specs", "constitution.md"), ("memory", "ARCHITECTURE.md")} <= created
     # A fresh scaffold is doctor-clean — no issue at all.
     assert [i.to_dict() for i in SpecsDoctor(repo / "specs").check()] == []
-    assert _git(repo, "rev-parse", "HEAD") == head
+    assert _git(repo, "rev-parse", "--abbrev-ref", "HEAD") == "feature/0.1.0"
+    assert _git(repo, "rev-parse", "HEAD~1") == head
+    committed = _git(repo, "diff", "--name-only", head, "HEAD").splitlines()
+    assert committed
+    assert all(ln.startswith(("specs/", "AGENTS.md")) for ln in committed)
+    assert _git(repo, "status", "--porcelain") == ""
     assert repo.name in (repo / "AGENTS.md").read_text(encoding="utf-8")
     assert f"[created] {repo / 'AGENTS.md'}" in result.output
+
+
+def test_init_on_an_unborn_repo_lands_the_root_commit_on_the_work_branch(
+    repo: Path, tmp_path: Path
+) -> None:
+    unborn = tmp_path / "repos" / "u"
+    unborn.mkdir()
+    _git(unborn, "init", "-q")
+    states = tmp_path / ".dadaia" / "states" / "spec_contexts.json"
+    states.write_text(
+        json.dumps({"contexts": [{"name": "u", "repo_slug": "u", "state": "alive"}]}),
+        encoding="utf-8",
+    )
+
+    result = _runner.invoke(app, ["specs", "init", "--context", "u"])
+
+    assert result.exit_code == 0, result.output
+    assert _git(unborn, "rev-parse", "--abbrev-ref", "HEAD") == "feature/0.1.0"
+    assert _git(unborn, "rev-list", "--count", "HEAD") == "1"
+    assert _git(unborn, "status", "--porcelain") == ""
+
+
+def test_init_with_the_work_branch_present_cuts_and_commits_nothing(repo: Path) -> None:
+    _git(repo, "checkout", "-q", "-b", "feature/0.1.0")
+    head = _git(repo, "rev-parse", "HEAD")
+
+    result = _runner.invoke(app, ["specs", "init", "--context", "c"])
+
+    assert result.exit_code == 0, result.output
+    assert _git(repo, "rev-parse", "HEAD") == head
+    assert _git(repo, "branch", "--list", "feature/*").replace("*", "").split() == ["feature/0.1.0"]
 
 
 def test_the_catalog_pair_is_written_by_its_one_generator(repo: Path) -> None:
