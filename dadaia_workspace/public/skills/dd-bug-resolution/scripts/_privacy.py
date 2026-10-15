@@ -145,21 +145,24 @@ class Redactor:
 
 class BaselinePattern(NamedTuple):
     """A compiled structural pattern from the packaged baseline. ``exclude_rationale`` is
-    required whenever ``exclude`` is set (checked by the doctor); ``None`` otherwise."""
+    required whenever ``exclude`` is set (checked by the doctor); ``None`` otherwise.
+    ``skip_paths`` matches the blob paths the pattern never scans."""
 
     id: str
     regex: re.Pattern[str]
     reason: str
     exclude: re.Pattern[str] | None
     exclude_rationale: str | None = None
+    skip_paths: re.Pattern[str] | None = None
 
 
 def _pattern(entry: object, number: int) -> BaselinePattern:
     if not isinstance(entry, dict) or not isinstance(entry.get("regex"), str):
         raise ValueError(f"row {number} is not an object with a string 'regex'")
-    exclude = entry.get("exclude_regex")
+    exclude, skip = entry.get("exclude_regex"), entry.get("exclude_paths")
     try:
         regex, carve = re.compile(entry["regex"]), re.compile(exclude) if exclude else None
+        skip_paths = re.compile(skip) if skip else None
     except re.error as exc:
         raise ValueError(f"row {number} ({entry.get('id', '?')}) has a bad regex: {exc}") from exc
     rationale = entry.get("exclude_rationale")
@@ -169,6 +172,7 @@ def _pattern(entry: object, number: int) -> BaselinePattern:
         reason=str(entry.get("reason", "structural privacy match")),
         exclude=carve,
         exclude_rationale=rationale if isinstance(rationale, str) else None,
+        skip_paths=skip_paths,
     )
 
 

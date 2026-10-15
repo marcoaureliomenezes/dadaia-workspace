@@ -139,6 +139,7 @@ class _CountingPattern:
     id: str = "zz-synthetic"
     reason: str = "synthetic"
     exclude: re.Pattern[str] | None = None
+    skip_paths: re.Pattern[str] | None = None
 
 
 def test_first_match_short_circuits_at_the_first_hit_line() -> None:

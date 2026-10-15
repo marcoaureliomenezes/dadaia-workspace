@@ -55,6 +55,7 @@ if TYPE_CHECKING:
         reason: str
         exclude: re.Pattern[str] | None
         exclude_rationale: str | None
+        skip_paths: re.Pattern[str] | None
 
         def __init__(
             self,
@@ -63,6 +64,7 @@ if TYPE_CHECKING:
             reason: str,
             exclude: re.Pattern[str] | None,
             exclude_rationale: str | None = ...,
+            skip_paths: re.Pattern[str] | None = ...,
         ) -> None: ...
 else:
     Redactor = _owner.Redactor

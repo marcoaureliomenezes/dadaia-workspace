@@ -1,7 +1,7 @@
 {
   "_header": {
     "name": "public-privacy baseline structural denylist",
-    "version": 16,
+    "version": 17,
     "description": "Versioned, fail-closed baseline of STRUCTURAL regex patterns scanned against public/ assets when no operator denylist is present. Operator terms (DADAIA_PRIVACY_DENYLIST / .dadaia/states/privacy_denylist.json) are ADDITIVE and merge on top of this baseline. Patterns are conservative to avoid false positives on SHA hashes in lockfiles, doc/loopback IP ranges, and example hostnames. Edit only via an approved release task; bump 'version' on change. Every pattern carrying an 'exclude_regex' carve-out MUST also carry an 'exclude_rationale' string (v0.4.3 FR12/A12.1) — a doctor/CI check (privacy_check._check_baseline_exclude_rationale) flags any carve-out missing one, on every 'dadaia public doctor' run. Since v11 (0.5.0 AC5.6) this file plus the operator terms is the ONE secret registry: the pre-push matcher applies it, and baseline / dead --commit call that same matcher in-process; every pattern also runs against each pushed path, and key-file-path (anchored to a whole path segment at the end of its input) is the one pattern written for paths.",
     "released_in": "v0.1.10",
     "excludes": [
@@ -27,8 +27,9 @@
       "id": "ipv4-literal",
       "regex": "(?<![\\w.])(?:25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)(?:\\.(?:25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)){3}(?![\\w.])",
       "reason": "IPv4 address literal",
+      "exclude_paths": "(?:^|/)(?:po[e]try\\.lock|uv\\.lock|Pipfile\\.lock|package-lock\\.json|yarn\\.lock|pnpm-lock\\.yaml|Cargo\\.lock|composer\\.lock|Gemfile\\.lock|go\\.sum)$",
       "exclude_regex": "^(?:127\\.|0\\.0\\.0\\.0$|192\\.0\\.2\\.|198\\.51\\.100\\.|203\\.0\\.113\\.|255\\.255\\.255\\.255$|0\\.0\\.0\\.0)",
-      "exclude_rationale": "loopback (127.0.0.0/8), the null route 0.0.0.0, RFC 5737 documentation ranges (192.0.2.0/24, 198.51.100.0/24, 203.0.113.0/24), and the broadcast address 255.255.255.255 are conventional non-identifying examples, never a real operator host."
+      "exclude_rationale": "loopback (127.0.0.0/8), the null route 0.0.0.0, RFC 5737 documentation ranges (192.0.2.0/24, 198.51.100.0/24, 203.0.113.0/24), and the broadcast address 255.255.255.255 are conventional non-identifying examples, never a real operator host. The pattern is also skipped for the basenames in exclude_paths: generated lock files, one per ecosystem tool (Python x3, JS x3, Rust, PHP, Ruby, Go), listed by basename in exclude_paths, whose dependency version ranges are four-part versions no regex can tell from an address; every other pattern still applies to them."
     },
     {
       "id": "ipv6-literal",
