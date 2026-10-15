@@ -5,7 +5,7 @@ Each `specs/` ledger has exactly one validator: the skill script that also write
 This module runs each script's `check --specs <dir> --json` and re-emits its findings.
 It lives in `infrastructure/` because running a subprocess is an infrastructure act
 (`features` may not import `subprocess` — setup.cfg). Its rows are the one table of
-the scripts' paths: every `fix:` naming a ledger script spells it by `<ROW>.invocation`.
+the scripts' paths.
 
 The interpreter is always `sys.executable`: the installed script may have no exec bit
 (Windows), and the venv's Python is the one that must read the tree.
@@ -20,7 +20,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol
 
-from dadaia_workspace.core.cli_line import fix_line, fix_of, script_line, without_fix
+from dadaia_workspace.core.cli_line import fix_line, fix_of, without_fix
 from dadaia_workspace.core.doctor_rules import SectionFinding
 from dadaia_workspace.core.skill_owner import load_owner
 from dadaia_workspace.core.workspace_resolver import own_workspace_root
@@ -67,11 +67,6 @@ class LedgerScript:
     @property
     def code(self) -> str:
         return f"LEDGER-{self.name}-SCHEMA"
-
-    @property
-    def invocation(self) -> str:
-        """The `fix:` spelling — the installed path, run through the interpreter."""
-        return script_line(f".agents/skills/{self.skill}/scripts/{self.filename}")
 
 
 #: One row per ledger script. A new ledger is a row, never a branch.
@@ -207,22 +202,22 @@ def _parse(result: Any) -> list[dict[str, Any]] | None:
 def worktree_rows(
     root: Path, repos: Collection[str], runner: _Runner | None = None
 ) -> tuple[list[dict[str, Any]], str, str]:
-    """Read the owner's bounded ``worktree.py list --json`` result once: the rows of *repos* (a
+    """Read the owner's bounded ``list --json`` result once: the rows of *repos* (a
     context's) plus the rows no context owns (``registered: false``), never another context's."""
     path = resolve_script(WORKTREE_SCRIPT, root)
     if path is None:
-        return [], "list failed: worktree.py is not installed", fix_line(root, "public", "install")
+        return [], "list failed: runner is not installed", fix_line(root, "public", "install")
     process = runner if runner is not None else SubprocessProcessRunner()
     try:
         done = process.run([sys.executable, str(path), "list", "--json"], cwd=root, timeout=10.0)
         found = json.loads(done.stdout) if done.returncode == 0 else None
     except (OSError, TimeoutError, ValueError) as exc:
-        return [], f"list failed: {type(exc).__name__}", f"{WORKTREE_SCRIPT.invocation} list"
+        return [], f"list failed: {type(exc).__name__}", fix_line(root, "worktree", "list")
     if not isinstance(found, list):  # the script's refusal: reason, then its one fix line
         reason = without_fix(done.stderr).strip()
         return (
             [],
             f"list failed: {reason}",
-            fix_of(done.stderr, f"{WORKTREE_SCRIPT.invocation} list"),
+            fix_of(done.stderr, fix_line(root, "worktree", "list")),
         )
     return [r for r in found if r["repo"] in repos or r.get("registered") is False], "", ""

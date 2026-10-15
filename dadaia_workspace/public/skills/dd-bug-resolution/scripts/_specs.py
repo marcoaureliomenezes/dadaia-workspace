@@ -20,7 +20,7 @@ CATALOG = "memory/product/catalog.json"
 def find_specs(given: Path | None, *, ledger: str | None = None) -> Path:
     """*given*, else the nearest git-rooted ``specs/`` at or above the cwd — never created:
     a missing tree refuses, its fix rerunning on the bound context's tree — for a verb
-    writing *ledger* (repo-relative), the repo's first open worktree."""
+    writing *ledger* (repo-relative), the fix lists the repo's worktrees."""
     here = Path.cwd().resolve()
     trees = (
         [given] if given else [d / "specs" for d in (here, *here.parents) if (d / ".git").exists()]
@@ -51,11 +51,8 @@ def _bound_fix(here: Path, rerun: str, ledger: str | None) -> tuple[str, str]:
             return f"{head(str(cli))} context list", ""
         if ledger is None or ledger.startswith("specs/audits/"):
             return with_specs(rerun, root / "repos" / repo / "specs"), ""
-        return f"{script(_GITFLOW / 'worktree.py')} list", ""
+        return f"{head(str(cli))} worktree list", ""
     return "Agent action: re-run inside a repo that holds its specs/ tree", ""
-
-
-_GITFLOW = Path(__file__).resolve().parents[2] / "dd-gitflow-default" / "scripts"
 
 
 def script(path: Path) -> str:

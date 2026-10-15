@@ -20,7 +20,7 @@ from itertools import chain
 from pathlib import Path, PurePath
 
 from dadaia_workspace.core import workspace_layout
-from dadaia_workspace.core.cli_line import fix_line, mkdir_line, script_line, spell_fix
+from dadaia_workspace.core.cli_line import fix_line, mkdir_line, spell_fix
 
 __all__ = ["Decision", "PathClass", "classify_path", "evaluate"]
 
@@ -49,7 +49,6 @@ _MERGE_ONLY_MESSAGE = (
     "[GATE] '{rel_path}' is under repos/{repo}/, which receives only merges: "
     "write it inside a worktree of {repo}.\n"
 )
-_WORKTREE_SCRIPT = ".agents/skills/dd-gitflow-default/scripts/worktree.py"
 
 
 class PathClass(Enum):
@@ -124,7 +123,7 @@ def evaluate(
     bind's *repos* is refused with ``context bind <owner>`` — an unbound session with an id
     owns nothing; an id-less one bound by env is told to relaunch; an id-less
     unbound one is the declared gap. Then every write in zone ``repo`` is
-    refused with the ``worktree.py list`` fix. Everything else ALLOWS.
+    refused with the ``dadaia worktree list`` fix. Everything else ALLOWS.
     """
     cls, hit = classify_path(rel_path, projected, protected, root=root)
     if hit:
@@ -150,5 +149,5 @@ def evaluate(
         return Decision.BLOCK, message + spell_fix(fix)
     if zone == "repo":
         message = _MERGE_ONLY_MESSAGE.format(rel_path=rel_path, repo=repo)
-        return Decision.BLOCK, message + spell_fix(script_line(_WORKTREE_SCRIPT, "list"))
+        return Decision.BLOCK, message + spell_fix(fix_line(root, "worktree", "list"))
     return Decision.ALLOW, ""
