@@ -81,3 +81,29 @@ def test_install_over_an_unreadable_hook_never_raises(
     assert not written or hook.read_bytes() == _SHIPPED.read_bytes()
     aside = hook.with_name("pre-push.unreadable")
     assert aside.exists() is (layout != "absent" and force)
+
+
+def test_install_writes_the_reference_transaction_hook_executable(tmp_path: Path) -> None:
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    hook = tmp_path / ".git" / "hooks" / "reference-transaction"
+    assert hook in install_git_hooks(tmp_path)
+    shipped = workspace_layout.public_scripts_dir() / "reference-transaction.sh"
+    assert hook.read_bytes() == shipped.read_bytes()
+    assert os.access(hook, os.X_OK)
+
+
+def test_install_never_overwrites_an_operators_reference_transaction_hook(tmp_path: Path) -> None:
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    hook = tmp_path / ".git" / "hooks" / "reference-transaction"
+    hook.write_bytes(b"#!/bin/sh\necho mine\n")
+    assert hook not in install_git_hooks(tmp_path)
+    assert hook.read_bytes() == b"#!/bin/sh\necho mine\n"
+
+
+def test_the_reference_transaction_hook_is_recorded_as_shipped() -> None:
+    shipped = workspace_layout.public_scripts_dir() / "reference-transaction.sh"
+    history = load_shipped_hashes(workspace_layout.public_scripts_dir().parent / "templates")
+    assert (
+        hashlib.sha256(shipped.read_bytes()).hexdigest()
+        in history["scripts/reference-transaction.sh"]
+    )

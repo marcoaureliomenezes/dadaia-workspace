@@ -144,3 +144,18 @@ def test_a_non_git_repo_listed_first_never_hides_a_drifted_one(tmp_path: Path) -
     found = DoctorService(store, None, root).check_installed_hooks()  # type: ignore[arg-type]
     assert {f.code for f in found} == {"HOOKS-DRIFT-1"}
     assert all(f.message.startswith("repos/demo/") for f in found)
+
+
+def test_a_repo_without_the_reference_transaction_hook_is_told_so(tmp_path: Path) -> None:
+    """The ref-gate hook is a shipped row: a repo holding only the pre-push gate lacks it."""
+    root = _workspace(tmp_path, installed=False)
+    hooks = root / "repos" / "demo" / ".git" / "hooks"
+    shipped = workspace_layout.public_scripts_dir() / "pre-push-ci-gate.sh"
+    (hooks / "pre-push").write_bytes(shipped.read_bytes())
+    found = DoctorService(_Store([_ctx("demo")]), None, root).check_installed_hooks()  # type: ignore[arg-type]
+    [finding] = [f for f in found if "reference-transaction" in f.message]
+    assert finding.code == "HOOKS-DRIFT-1"
+    assert finding.message.startswith("repos/demo/.git/hooks/reference-transaction is absent — ")
+    assert " ci install-hook --force --repo " in finding.fix
+    assert finding.fix.endswith((root / "repos" / "demo").as_posix())
+    assert len(found) == 1
