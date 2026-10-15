@@ -34,6 +34,7 @@ def _install_stub(workspace: Path) -> None:
     (scripts / "worktree.py").write_text(_STUB, encoding="utf-8")
 
 
+@pytest.mark.medium
 def test_argv_stdout_and_exit_code_are_forwarded(workspace: Path) -> None:
     _install_stub(workspace)
     result = CliRunner().invoke(app, ["worktree", "merge", "wt/x", "--sha", "abc"])
