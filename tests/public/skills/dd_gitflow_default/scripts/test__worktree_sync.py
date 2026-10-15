@@ -65,7 +65,7 @@ def test_sync_rebases_the_tree_and_those_below_it_parents_first(root: Path) -> N
     result = run(root, "sync", str(root / "worktrees/r" / RC))
     assert result.returncode == 0, result.stderr
     # a child holds its parent's rebased tip only if the parent went first
-    bases = [WORK, *(f"wt/{name}" for name in CHAIN)]
+    bases = [WORK, *(f"wt/{name}" for name in CHAIN[:-1])]
     assert [_holds(root, base, name) for base, name in zip(bases, CHAIN, strict=True)] == [True] * 3
     for name in CHAIN:  # every tree keeps its own commit
         leaf = name.rsplit("/", 1)[1]
