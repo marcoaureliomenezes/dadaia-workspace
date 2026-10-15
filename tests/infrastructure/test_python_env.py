@@ -152,6 +152,18 @@ def test_reinit_reinstalls_only_an_older_venv(
     )
 
 
+def test_version_change_answers_repair_when_the_probe_of_an_existing_entrypoint_fails(
+    tmp_path: Path, recorder: _Recorder, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    install_fake_dist(monkeypatch, "1.0.0")
+    _healthy(tmp_path)
+    recorder.installed = None
+
+    change = VenvPythonEnvironmentManager().version_change(str(tmp_path))
+
+    assert change == (None, "1.0.0", "repair")
+
+
 @pytest.mark.parametrize(
     ("ws_name", "origin", "form", "installs"),
     [

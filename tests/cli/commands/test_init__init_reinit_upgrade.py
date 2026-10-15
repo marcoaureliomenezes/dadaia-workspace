@@ -107,6 +107,36 @@ def test_a_venv_whose_probe_fails_reports_the_repair_not_a_version(
     assert "None" not in result.output
 
 
+def test_init_prints_the_repair_line_from_the_deciders_action(
+    workspace: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        VenvPythonEnvironmentManager,
+        "version_change",
+        lambda self, ws: ("0.4.7", "0.4.8", "repair"),
+    )
+    reconciled: list[str] = []
+    monkeypatch.setattr(
+        init_module,
+        "reconcile_workspace",
+        lambda root, *, expected_version, **_: (
+            reconciled.append(expected_version) or type("R", (), {"ok": True, "error": None})()
+        ),
+    )
+    monkeypatch.setattr(
+        init_module.container,
+        "build_spec_context_service",
+        lambda root: type("S", (), {"refresh_hooks": lambda _s: None})(),
+    )
+
+    result = _runner.invoke(app, ["init", str(workspace)])
+
+    assert result.exit_code == 0, result.output
+    assert "repaired -> 0.4.8" in result.output
+    assert "upgraded" not in result.output
+    assert reconciled == ["0.4.8"]
+
+
 def test_a_failed_reconcile_prints_the_windows_fix_line(
     workspace: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
