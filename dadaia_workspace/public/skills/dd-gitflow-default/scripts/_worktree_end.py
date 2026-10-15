@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
-"""`worktree.py merge|clean`: end one canonical worktree — land it on the branch it
-was cut from after its gate, or drop an empty one — never with `--force` or `-D`,
-re-runnable after a stop. A task lands on its job branch after test separation, unreviewed; a
-job lands on the work branch after its review and the job gate; a `define` or `backlog` tree
-lands `specs/` after its review and the ledger checks alone. The job gate is the repo's own
-declared `verify:` line, run as one argv list."""
+"""`worktree.py merge|clean`: end one canonical worktree — land it on its parent's branch after
+its gate, or drop an empty one — never with `--force` or `-D`, re-runnable after a stop. A task
+lands after test separation, unreviewed; a main tree, a rc (plus the ledger checks) and a hotfix
+after their review and the job gate; a backlog tree lands `specs/` after its review and the ledger
+checks alone. The job gate is the repo's own declared `verify:` line, run as one argv list."""
 
 from __future__ import annotations
 
@@ -33,12 +32,11 @@ from _worktree_git import (
     not_a_name,
     ours,
     quote,
-    recorded_base,
     script,
     scrubbed_env,
     workspace_of,
 )
-from _worktree_names import NAME_RE, SCRIPT, Refusal, branch, locate, non_code, tree_path
+from _worktree_names import NAME_RE, SCRIPT, Refusal, base_of, branch, kind_of, locate, tree_path
 
 #: The ledger and release checks a `define` or `backlog` merge runs, in this order.
 _LEDGERS = (("dd-bug-resolution", "bugs.py"), ("dd-backlog-definition", "backlog.py"),
@@ -50,12 +48,12 @@ def _target(root: Path, path: str) -> tuple[Path, Path, str, str]:
     tree = Path(path).resolve()
     rel = tree.relative_to(root).as_posix() if tree.is_relative_to(root) else ""
     repo_name, name, tail = locate(rel) or ("", None, ())
-    if name is None or tail:
+    if tail or not repo_name:
         raise Refusal(f"{path} is not a worktrees/<repo>/<name> path", f"{script(SCRIPT)} list")
-    if not NAME_RE.match(name):
-        raise not_a_name(name)
+    if name is None or not NAME_RE.match(name):
+        raise not_a_name(name or rel.split("/", 2)[-1])
     repo = root / "repos" / repo_name
-    return repo, tree, name, recorded_base(repo, name, flow_for(root, repo))
+    return repo, tree, name, base_of(name, flow_for(root, repo)["work"])  # type: ignore[return-value]
 
 
 def _refuse_dirty(tree: Path) -> None:
@@ -91,7 +89,7 @@ def _kept(tree: Path, verb: str, keep: list[str], drop: bool) -> list[str]:
 
 def _remove(into: Path, tree: Path, name: str, kept: list[str]) -> None:
     """Copy *kept* into the repo *into* and drop the tree, its branch (on the remote too, when it
-    was pushed) and the rc folder it leaves empty."""
+    was pushed) and the folder it leaves empty."""
     for rel in kept:
         source, target = tree / rel, into / rel
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -118,7 +116,7 @@ def _remove(into: Path, tree: Path, name: str, kept: list[str]) -> None:
 
 
 def _rmdir(tree: Path) -> None:
-    """Drop the rc folder *tree* leaves empty; a folder still holding another tree stays."""
+    """Drop the folder *tree* leaves empty; a folder still holding another tree stays."""
     if tree.parent.is_dir() and not any(tree.parent.iterdir()):
         tree.parent.rmdir()
 
@@ -130,7 +128,7 @@ def _undo(tree: Path, work: str, rel: str) -> str:
 
 
 def _check_specs_only(tree: Path, work: str) -> None:
-    """A `define` or `backlog` tree lands `specs/` alone: its merge runs no test."""
+    """A backlog tree lands `specs/` alone: its merge runs no test."""
     for rel in git(tree, "diff", "--name-only", f"{work}...HEAD").splitlines():
         if not rel.startswith("specs/"):
             raise Refusal(f"{rel} is code; a define or backlog tree lands specs/ only — "
@@ -225,11 +223,12 @@ def _refuse_implementation_tests(tree: Path, onto: str, law: str) -> None:
             )
 
 
-def _open_tasks(repo: Path, name: str) -> None:
-    """A stage closes, and a job lands, only with none of its task worktrees open."""
+def _open_children(repo: Path, name: str) -> None:
+    """A rc or main tree lands only with none of the trees below its folder open."""
+    folder = name.rpartition("/")[0] + "/"
     for row in ours(repo):
-        if row["name"].startswith(f"{name}--"):
-            raise Refusal(f"task worktree {row['path']} of {branch(name)} is open",
+        if row["name"].startswith(folder) and row["name"] != name:
+            raise Refusal(f"{kind_of(row['name'])} worktree {row['path']} of {branch(name)} is open",
                           f"{script(SCRIPT)} merge {quote(row['path'])}")  # fmt: skip
 
 
@@ -258,7 +257,7 @@ def _checks(root: Path, tree: Path) -> Iterator[tuple[str, subprocess.CompletedP
 
 
 def _ledgers(root: Path, tree: Path) -> None:
-    """A `define` or `backlog` merge's whole gate: the ledger checks and the doctor on the tree, a red one relaying its own first `fix:` line."""
+    """A rc or backlog merge's ledger gate: the ledger checks and the doctor on the tree, a red one relaying its own first `fix:` line."""
     for name, done in _checks(root, tree):
         if done.returncode:
             out = done.stdout + done.stderr
@@ -348,7 +347,7 @@ def digest(root: Path, path: str, sha: str) -> str:
 
 
 def _into(repo: Path, onto: str) -> Path:
-    """The checkout *onto* is checked out in: its job's tree for a job branch, else the repo."""
+    """The checkout *onto* is checked out in: its tree for a `wt/` branch, else the repo."""
     name = onto.removeprefix("wt/")
     return tree_path(repo.parents[1], repo.name, name) if onto.startswith("wt/") else repo
 
@@ -357,17 +356,24 @@ def _kind_checks(root: Path, repo: Path, tree: Path, name: str, onto: str, into:
     """The ordered (label, check) pairs a tree of this kind must pass to land; `merge` and
     `preflight` both run this list, the verdict check labelled "verdict"; the ignored-file and
     target-checkout checks end every kind."""
-    if into != repo and not into.exists():  # a task's job tree removed by hand
+    if not into.exists():  # the parent's tree removed by hand
         raise Refusal(f"{into} does not exist", git_line(repo, "worktree", "add", "-f", "-f", str(into), onto))  # fmt: skip
-    checks: list[tuple[str, Callable[[], object]]] = [("dirty", lambda: _refuse_dirty(tree))]
     ancestor = ("ancestor", lambda: _check_ancestor(tree, onto))
     verdict = ("verdict", lambda: _check_approved(root, tree, onto, name))
-    if into != repo:  # a task: hygiene and implementation/test separation, no gate or verdict
-        checks += [ancestor, ("tests", lambda: _refuse_implementation_tests(tree, onto, _target(root, str(into))[3])), ("job clean", lambda: _refuse_dirty(into))]  # fmt: skip
-    elif non_code(name):
-        checks += [("specs only", lambda: _check_specs_only(tree, onto)), ancestor, verdict, ("ledgers", lambda: _ledgers(root, tree))]  # fmt: skip
-    else:
-        checks += [("open tasks", lambda: _open_tasks(repo, name)), ("scaffold", lambda: _scaffold(tree, name)), ancestor, verdict, ("verify", lambda: _gate(tree, onto))]  # fmt: skip
+    gate = [ancestor, verdict, ("verify", lambda: _gate(tree, onto))]
+    children = ("open children", lambda: _open_children(repo, name))
+    scaffold = ("scaffold", lambda: _scaffold(tree, name))
+    ledgers = ("ledgers", lambda: _ledgers(root, tree))
+    specs = ("specs only", lambda: _check_specs_only(tree, onto))
+    tests = ("tests", lambda: _refuse_implementation_tests(tree, onto, _target(root, str(into))[3]))
+    table: dict[str | None, list[tuple[str, Callable[[], object]]]] = {
+        "task": [ancestor, tests, ("job clean", lambda: _refuse_dirty(into))],
+        "main": [children, scaffold, *gate],
+        "hotfix": [scaffold, *gate],
+        "backlog": [specs, ancestor, verdict, ledgers],
+        "rc": [children, *gate, ledgers],
+    }
+    checks = [("dirty", lambda: _refuse_dirty(tree)), *table[kind_of(name)]]
     return checks + [("ignored", lambda: _kept(tree, "merge", keep, drop)), ("target", lambda: _on_target(into, onto))]  # fmt: skip
 
 

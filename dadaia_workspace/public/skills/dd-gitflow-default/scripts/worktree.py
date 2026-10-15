@@ -31,13 +31,11 @@ __all__ = ["main"]
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     verbs = parser.add_subparsers(dest="verb", required=True)
-    make = verbs.add_parser(
-        "new", help="open a plain change, job, task, define or backlog worktree"
-    )
+    make = verbs.add_parser("new", help="open an rc, main, task, backlog or hotfix worktree")
     make.add_argument("repo")
     make.add_argument(
         "name",
-        help="<name>, <M.m.p>-rc<N>/<job>[--<task-id>], <M.m.p>-rc<N>/define, backlog/<slug>, hotfix/<bug-id>",
+        help="<M.m.p>/rc-<N>/wt-rc, <M.m.p>/rc-<N>/job-<n>/wt-main or wt-task-<kkk>, <M.m.p>/wt-backlog-<slug>, <M.m.p>/wt-hotfix-<bug-id>",
     )
 
     def end_args(end: argparse.ArgumentParser) -> None:
@@ -47,7 +45,7 @@ def main(argv: list[str] | None = None) -> int:
         )
         end.add_argument("--drop", action="store_true", help="discard the other ignored files")
 
-    end_args(verbs.add_parser("merge", help="land a worktree on its branch after its gate"))
+    end_args(verbs.add_parser("merge", help="land a worktree on its parent after its gate"))
     end_args(verbs.add_parser("preflight", help="every check merge runs but the verdict, all failures printed"))  # fmt: skip
     end_args(verbs.add_parser("clean", help="remove a merged or commit-less worktree"))
     seal = verbs.add_parser("hash", help="the diff_sha256 binding a verdict carries for a sha")

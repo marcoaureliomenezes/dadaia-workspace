@@ -20,7 +20,7 @@ from _platform import quote as quote  # (`as`: re-exported to the worktree verbs
 from _specs import script as script
 from _specs import workspace_cli
 from _specs import workspace_of as workspace_of
-from _worktree_names import NAME_RE, SCRIPT, Refusal, base, base_of, branch, name_of, tree_path
+from _worktree_names import SCRIPT, Refusal, base_of, branch, name_of, tree_path
 
 
 def diff_sha256(tree: Path, work: str, tip: str) -> str:
@@ -135,12 +135,6 @@ def not_a_name(name: str, live: str = "") -> Refusal:
         f"not a worktree name: {name!r} (expected {shape}/rc-<N>/wt-rc, {shape}/rc-<N>/job-<n>/wt-main, {shape}/rc-<N>/job-<n>/wt-task-<kkk>, {shape}/wt-backlog-<slug> or {shape}/wt-hotfix-<bug>)",  # fmt: skip
         f"{script(SCRIPT)} list",
     )
-
-
-def recorded_base(repo: Path, name: str, flow: dict[str, str]) -> str:
-    """A tree's base: its job branch for a task, else the work branch its name derives."""
-    version = NAME_RE.match(name)["v"]  # type: ignore[index]
-    return base(name, flow["work"] + (version or work_version(repo, flow)))
 
 
 def _trees(repo: Path) -> list[dict[str, str]]:
