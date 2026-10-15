@@ -44,11 +44,11 @@ from dadaia_workspace.infrastructure.ledger_scripts import worktree_rows as ledg
 _log = logging.getLogger(__name__)
 
 #: What onboarding writes into a main repo — the only paths ``baseline`` commits.
-_ONBOARDING = ("specs", "specs-bkp", *(dest for _, dest in workspace_layout.REPO_LAW))
+ONBOARDING = ("specs", "specs-bkp", *(dest for _, dest in workspace_layout.REPO_LAW))
 
 
 def _onboarded(rel: str) -> bool:
-    return any(rel == p or rel.startswith(f"{p}/") for p in _ONBOARDING)
+    return any(rel == p or rel.startswith(f"{p}/") for p in ONBOARDING)
 
 
 WorktreeRows = Callable[[Path, Collection[str]], tuple[list[dict[str, Any]], str, str]]
@@ -601,7 +601,7 @@ class SpecContextService:
         born = self._git.has_commits(repo)
         if born:
             git("switch", "--detach")
-        self._git.commit_paths(repo, message, [p for p in _ONBOARDING if (repo / p).exists()])
+        self._git.commit_paths(repo, message, [p for p in ONBOARDING if (repo / p).exists()])
         anchor = git("rev-parse", "HEAD")
         flow, _ = self._git.gitflow(repo)
         work = work_branch(repo, flow, repo.name)

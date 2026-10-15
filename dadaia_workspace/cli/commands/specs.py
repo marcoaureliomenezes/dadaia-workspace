@@ -17,7 +17,7 @@ from dadaia_workspace.cli._specs_resolution import (
     resolve_context_specs_dir_for_cli,
     resolve_specs_dir_for_cli,
 )
-from dadaia_workspace.core import gitflow, specs_version, workspace_layout
+from dadaia_workspace.core import gitflow, specs_version
 from dadaia_workspace.core.atomic_write import SymlinkRefusedError
 from dadaia_workspace.core.cli_line import fix_line, materialize_line, spell_fix
 from dadaia_workspace.core.doctor_rules import SectionFinding
@@ -26,6 +26,7 @@ from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.migrate import upgrade as upgrade_feature
 from dadaia_workspace.features.migrate.upgrade import UpgradeRefused, UpgradeResult
 from dadaia_workspace.features.spec_context import sweep
+from dadaia_workspace.features.spec_context.service import ONBOARDING
 from dadaia_workspace.features.specs import SpecsDoctor, canon
 from dadaia_workspace.features.specs.doctor_types import finding_path
 from dadaia_workspace.infrastructure.ledger_scripts import script_repairs
@@ -201,9 +202,8 @@ def _commit_on_work_branch(repo: Path, flow: Gitflow) -> None:
     if git.git(repo, "for-each-ref", f"refs/heads/{work}"):
         return
     git.git(repo, "switch", "-c", work)
-    paths = ("specs", *(dest for _, dest in workspace_layout.REPO_LAW))
     git.commit_paths(
-        repo, "chore: scaffold the dadaia specs", [p for p in paths if (repo / p).exists()]
+        repo, "chore: scaffold the dadaia specs", [p for p in ONBOARDING if (repo / p).exists()]
     )
     typer.echo(f"[committed] {work}")
 
