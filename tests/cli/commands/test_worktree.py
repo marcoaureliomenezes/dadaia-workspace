@@ -43,6 +43,7 @@ def test_argv_stdout_and_exit_code_are_forwarded(workspace: Path) -> None:
     assert result.exit_code == 3
 
 
+@pytest.mark.medium
 def test_a_verb_help_flag_reaches_the_script(workspace: Path) -> None:
     _install_stub(workspace)
     result = CliRunner().invoke(app, ["worktree", "merge", "--help"])
@@ -50,10 +51,16 @@ def test_a_verb_help_flag_reaches_the_script(workspace: Path) -> None:
     assert result.exit_code == 3
 
 
-def test_help_lists_the_verbs(workspace: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+@pytest.mark.medium
+@pytest.mark.parametrize("owned", [True, False], ids=["in-a-workspace", "outside-any-workspace"])
+def test_help_lists_the_verbs(
+    workspace: Path, monkeypatch: pytest.MonkeyPatch, owned: bool
+) -> None:
     """The verbs come from the script's own help, forwarded: the packaged copy answers."""
     shipped = Path(dadaia_workspace.__file__).parent / "public" / "skills"
     monkeypatch.setattr(ledger_scripts, "_PACKAGE_SKILLS", shipped)
+    if not owned:
+        monkeypatch.setattr(ledger_scripts, "own_workspace_root", lambda: None)
     result = CliRunner().invoke(
         app, ["worktree", "--help"], env={"COLUMNS": "400", "NO_COLOR": "1"}
     )
