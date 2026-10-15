@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Canonical worktrees `worktrees/<repo>/<name>` on branch `wt/<name>`, stdlib
 only: `new` opens one, `merge` lands it after its checks, `clean` drops an empty one,
-`hash` prints a verdict's binding, `list` reads ours from git.
+`hash` prints a verdict's binding, `sync` rebases a tree and those below it, `list` reads ours from git.
 """
 
 from __future__ import annotations
@@ -24,6 +24,7 @@ from _worktree_end import clean, digest, merge, preflight
 from _worktree_git import quote, rows, script, workspace_of
 from _worktree_names import SCRIPT, Refusal
 from _worktree_new import new
+from _worktree_sync import sync
 
 __all__ = ["main"]
 
@@ -48,6 +49,9 @@ def main(argv: list[str] | None = None) -> int:
     end_args(verbs.add_parser("merge", help="land a worktree on its parent after its gate"))
     end_args(verbs.add_parser("preflight", help="every check merge runs but the verdict, all failures printed"))  # fmt: skip
     end_args(verbs.add_parser("clean", help="remove a merged or commit-less worktree"))
+    verbs.add_parser(
+        "sync", help="rebase a tree and the trees below it, parents first"
+    ).add_argument("path")
     seal = verbs.add_parser("hash", help="the diff_sha256 binding a verdict carries for a sha")
     seal.add_argument("path")
     seal.add_argument("--sha", required=True)
@@ -62,6 +66,9 @@ def main(argv: list[str] | None = None) -> int:
             )
         if args.verb == "new":
             print(f"[ok] {new(root, args.repo, args.name)}")
+            return 0
+        if args.verb == "sync":
+            print(f"[ok] {sync(root, args.path)}")
             return 0
         if args.verb == "hash":
             print(digest(root, args.path, args.sha))

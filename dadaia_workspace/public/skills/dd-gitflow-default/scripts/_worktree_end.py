@@ -135,13 +135,13 @@ def _check_specs_only(tree: Path, work: str) -> None:
                           "code lands through a job", _undo(tree, work, rel))  # fmt: skip
 
 
-def _check_ancestor(tree: Path, work: str) -> None:
+def _check_ancestor(root: Path, tree: Path, work: str) -> None:
     """*work* must be an ancestor of HEAD: `merge` lands HEAD as it is, never rebased."""
     try:
         git(tree, "merge-base", "--is-ancestor", work, "HEAD")
     except RuntimeError as error:
         raise Refusal(
-            f"{work} moved past this branch's base", git_line(tree, "rebase", work)
+            f"{work} moved past this branch's base", cli_line(root, "worktree", "sync", str(tree))
         ) from error
 
 
@@ -359,7 +359,7 @@ def _kind_checks(root: Path, repo: Path, tree: Path, name: str, onto: str, into:
     target-checkout checks end every kind."""
     if not into.exists():  # the parent's tree removed by hand
         raise Refusal(f"{into} does not exist", git_line(repo, "worktree", "add", "-f", "-f", str(into), onto))  # fmt: skip
-    ancestor = ("ancestor", lambda: _check_ancestor(tree, onto))
+    ancestor = ("ancestor", lambda: _check_ancestor(root, tree, onto))
     verdict = ("verdict", lambda: _check_approved(root, tree, onto, name))
     gate = [ancestor, verdict, ("verify", lambda: _gate(tree, onto))]
     children = ("open children", lambda: _open_children(repo, name))
@@ -424,7 +424,7 @@ def merge(root: Path, path: str, keep: list[str], drop: bool) -> str:
     try:
         git(into, "merge", "-q", "--ff-only", ref)
     except RuntimeError as error:
-        _check_ancestor(tree, onto)  # moved while merge ran; else a stray the operator owns
+        _check_ancestor(root, tree, onto)  # moved while merge ran; else a stray the operator owns
         fix = f"Agent action: commit or remove the paths above in {into}"
         raise Refusal(f"fast-forward failed: {error}", fix) from error
     _remove(into, tree, name, kept)
