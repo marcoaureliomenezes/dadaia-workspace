@@ -325,6 +325,7 @@ def test_stats_counts_the_rc_verdict_sequences_in_produced_at_order(tmp_path: Pa
     _record(root, f"{rc99}/job-3/wt-main{sha}", "REJECTED", "02")
     _record(root, f"{rc99}/job-3/wt-main{sha}", "APPROVED", "03")
     _record(root, f"wt/0.5.0/rc-98/job-1/wt-main{sha}", "REJECTED", "01")
+    _record(root, f"wt/0.5.0-rc99/job-1/wt-main{sha}", "REJECTED", "01")  # old layout: not counted
     _record(root, f"{rc99}/job-4/wt-main{sha}", "REJECTED", "01", agent="dd-sw-engineer-sr")
     script = root / ".agents/skills" / SKILL / "scripts/verdict.py"
     env = suite_env(
@@ -333,7 +334,7 @@ def test_stats_counts_the_rc_verdict_sequences_in_produced_at_order(tmp_path: Pa
         overrides={"PATH": os.environ["PATH"], "HOME": str(root), "GIT_CONFIG_NOSYSTEM": "1"},
     )
     done = subprocess.run(
-        [sys.executable, str(script), "stats", "0.5.0/rc-99"],
+        [sys.executable, str(script), "stats", "0.5.0-rc99"],
         cwd=root,
         env=env,
         capture_output=True,
@@ -459,7 +460,7 @@ def test_stats_outside_a_workspace_is_refused_with_one_fix_line(tmp_path: Path) 
     (away := tmp_path / "away").mkdir()
     script = root / ".agents/skills" / SKILL / "scripts/verdict.py"
     refused = subprocess.run(
-        [sys.executable, str(script), "stats", "0.5.0/rc-1"],
+        [sys.executable, str(script), "stats", "0.5.0-rc1"],
         cwd=away,
         capture_output=True,
         text=True,
