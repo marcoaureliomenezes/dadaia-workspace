@@ -171,15 +171,15 @@ def init(
     console.print(f"CLI: {workspace_cli_path(root)}", markup=False, highlight=False, soft_wrap=True)
     console.print(_LAW_NOTE, markup=False, soft_wrap=True)
 
-    if action == "upgrade":
-        _reconcile_upgrade(root, before, after)
+    if action in ("upgrade", "repair"):
+        _reconcile_upgrade(root, action, before, after)
     elif before is not None:
         console.print(f"already at {before}", markup=False, highlight=False)
 
     print_next_step(root, _create_context(root, plan) if plan.repo else None)
 
 
-def _reconcile_upgrade(root: Path, before: str | None, after: str | None) -> None:
+def _reconcile_upgrade(root: Path, action: str, before: str | None, after: str | None) -> None:
     """Re-init is the upgrade: the freshly installed venv is reconciled."""
     result = reconcile_workspace(
         root,
@@ -191,7 +191,7 @@ def _reconcile_upgrade(root: Path, before: str | None, after: str | None) -> Non
             fix_line(root, "reconcile", "--expect-version", after or ""),
         )
     container.build_spec_context_service(root).refresh_hooks()
-    line = f"upgraded {before} -> {after}" if before else f"repaired -> {after}"
+    line = f"repaired -> {after}" if action == "repair" else f"upgraded {before} -> {after}"
     console.print(line, markup=False, highlight=False)
 
 
