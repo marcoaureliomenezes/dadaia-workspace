@@ -1,46 +1,35 @@
 #!/usr/bin/env python3
-"""The worktree name grammar and its one path reader: release, backlog and hotfix trees. A task
-tree is cut from its job branch and lands back on it."""
+"""The worktree path grammar and its one reader: a tree's name is its path under `worktrees/<repo>/`,
+its leaf (`wt-rc`, `wt-main`, `wt-task-NNN`, `wt-backlog-<slug>`, `wt-hotfix-<bug>`) fixes its kind."""
 
 from __future__ import annotations
 
 import re
 from pathlib import Path, PurePosixPath
 
-from _grammar import TASK_ID_RE
 from _ledger import load_schema
 from _refusal import Refusal as Refusal
 
 SCRIPT = Path(__file__).parent / "worktree.py"
 LOCK = "dadaia:"
-
-
-def _unanchored(pattern: str) -> str:
-    return pattern.removeprefix("^").removesuffix("$")
-
-
-#: The backlog slug (single hyphens: `--` separates a job from its task) and the release task id.
-_WORD = _unanchored(load_schema("backlog-v1")["$defs"]["slug"]["pattern"])
-_TASK = rf"(?:--(?P<task>{_unanchored(TASK_ID_RE.pattern)}))?"
+_WORD = load_schema("backlog-v1")["$defs"]["slug"]["pattern"].removeprefix("^").removesuffix("$")
+#: The one leaf grammar: `<v>/rc-N/wt-rc`, `<v>/rc-N/job-n/wt-main|wt-task-NNN`, `<v>/wt-backlog-*|wt-hotfix-*`.
 NAME_RE = re.compile(
-    rf"^(?:(?P<rc>(?P<v>\d+\.\d+\.\d+)-rc\d+)/(?P<job>{_WORD}){_TASK}|backlog/(?P<slug>{_WORD})"
-    rf"|hotfix/(?P<bug>{_WORD}))$"
+    rf"^(?P<v>\d+\.\d+\.\d+)/(?:(?P<rc>rc-\d+)/(?:wt-rc|(?P<job>job-\d+)/wt-(?:main"
+    rf"|task-(?P<task>\d{{3}})))|wt-(?:backlog-(?P<slug>{_WORD})|hotfix-(?P<bug>{_WORD})))$"
 )
 
 
 def locate(rel: str) -> tuple[str, str | None, tuple[str, ...]] | None:
-    """`(repo, tree name, repo-relative tail)` of a workspace-relative path under `repos/<r>/`
-    (name `None`) or `worktrees/<r>/<a>/<b>/` at its fixed depth, whatever the name — whether
-    it is canonical is `NAME_RE`'s question, not this one; `None` elsewhere. Its one
-    caller is `_worktree_end`."""
+    """`(repo, tree name, tail)` of a path under `worktrees/<repo>/`: the name runs to the first
+    `wt-` segment, `(repo, None, ())` when there is none; `None` elsewhere."""
     parts = PurePosixPath(rel.replace("\\", "/")).parts
-    if len(parts) >= 2 and parts[0] == "repos":
-        return parts[1], None, parts[2:]
-    if len(parts) >= 4 and parts[0] == "worktrees":
-        return parts[1], f"{parts[2]}/{parts[3]}", parts[4:]
-    if len(parts) >= 3 and parts[0] == "worktrees":
-        return parts[1], parts[2], parts[3:]
-    return None
+    if len(parts) < 3 or parts[0] != "worktrees":
+        return None
+    leaf = next((i for i in range(2, len(parts)) if parts[i].startswith("wt-")), None)
+    if leaf is None:
+        return parts[1], None, ()
+    return parts[1], "/".join(parts[2 : leaf + 1]), parts[leaf + 1 :]
 
 
 def tree_path(root: Path, repo: str, name: str = "") -> Path:
@@ -52,29 +41,40 @@ def branch(name: str) -> str:
     return f"wt/{name}"
 
 
+def kind_of(name: str) -> str | None:
+    """`task`, `main`, `rc`, `backlog` or `hotfix` by the leaf of tree *name*; `None` if no tree."""
+    return name.rsplit("/", 1)[-1].split("-")[1] if NAME_RE.match(name) else None
+
+
 def name_of(ref: str) -> str | None:
     """The tree name a `wt/` branch *ref* belongs to, `None` for any other branch."""
     return ref[3:] if ref.startswith("wt/") and NAME_RE.match(ref[3:]) else None
 
 
-def base(name: str, work: str) -> str:
-    """The branch tree *name* is cut from and lands on: its job branch for a task, else *work*."""
+def base_of(name: str, work_prefix: str) -> str | None:
+    """The branch tree *name* is cut from: a task's `wt-main`, a main's `wt-rc`, else the work
+    branch `<work_prefix><v>`; `None` if *name* is no tree."""
     match = NAME_RE.match(name)
-    return branch(f"{match['rc']}/{match['job']}") if match and match["task"] else work
+    if match is None:
+        return None
+    if match["task"]:
+        return branch(f"{match['v']}/{match['rc']}/{match['job']}/wt-main")
+    if match["job"]:
+        return branch(f"{match['v']}/{match['rc']}/wt-rc")
+    return f"{work_prefix}{match['v']}"
+
+
+def base(name: str, work: str) -> str:
+    """`base_of` with the prefix of *work*, the work branch of the name's version; *work* if no tree."""
+    return base_of(name, work.removesuffix(name.split("/", 1)[0])) or work
 
 
 def non_code(name: str) -> bool:
-    """A `define` or `backlog` tree: its merge lands `specs/` only, reviewed, untested."""
-    match = NAME_RE.match(name)
-    return match is not None and (match["job"] == "define" or match["slug"] is not None)
+    """A backlog tree: its merge lands `specs/` only, reviewed, untested."""
+    return kind_of(name) == "backlog"
 
 
 def pushable(ref: str) -> bool:
-    """A `wt/` branch pre-push accepts: a job's or a backlog tree's; never a task's, `define`'s
-    or any other `wt/` branch."""
-    match = NAME_RE.match(name_of(ref) or "")
-    return bool(
-        match
-        and not match["task"]
-        and (match["slug"] is not None or match["job"] not in (None, "define"))
-    )
+    """Whether pre-push accepts the `wt/` branch *ref*: a release, main or backlog tree's only."""
+    name = name_of(ref)
+    return name is not None and kind_of(name) in ("rc", "main", "backlog")
