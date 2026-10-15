@@ -168,6 +168,25 @@ def test_check_refuses_a_caused_by_cycle_or_dangling_target(
     assert done.returncode == (1 if needle == "cycle" else 0), done.stdout
 
 
+def test_check_refuses_a_fix_sha_that_no_ref_reaches(script: Path, tmp_path: Path) -> None:
+    """A rebase rewrites the fix commit; the recorded sha then names nothing a reader can `git show`."""
+    specs = _ledger(tmp_path)
+    git = ["git", "-C", str(tmp_path), "-c", "user.name=t", "-c", "user.email=t@t.test"]
+    subprocess.run([*git, "commit", "-q", "-m", "fix"], check=True)
+    sha = subprocess.run(
+        [*git, "rev-parse", "HEAD"], capture_output=True, text=True, check=True
+    ).stdout.strip()
+    resolved = {**_OPEN_RECORD, "status": "resolved", "closed_at": "2026-09-21T10:00:00Z",
+                "cause": "c", "solution": "s", "caused_by": "none", "fix_sha": sha}  # fmt: skip
+    _ledger(tmp_path, resolved)
+    assert _run(script, "check", "--specs", str(specs)).returncode == 0
+    subprocess.run([*git, "commit", "-q", "--amend", "-m", "fix, rebased"], check=True)
+    done = _run(script, "check", "--specs", str(specs))
+    assert done.returncode == 1, done.stdout
+    assert "bugs/BUGS.jsonl:1" in done.stdout and sha in done.stdout
+    assert "\nfix: " in done.stdout
+
+
 @pytest.mark.parametrize(("caused_by", "code"), [
     ("J1.T3", 0),
     ("J1.S2.T3", 0),  # historical task ids stay readable
