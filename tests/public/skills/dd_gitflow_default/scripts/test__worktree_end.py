@@ -479,7 +479,7 @@ def test_a_declared_verify_line_runs_as_argv_never_through_a_shell(root: Path) -
     commit(root / RC_TREE, "AGENTS.md", line)
     git(root / TREE, "merge", "-q", "--ff-only", WORK)
     head = land(root, "src/a.py")
-    approve(root, head)
+    approve(root, head, name=NEW_JOB)
     result = run(root, "merge", TREE)
     assert result.returncode == 0, result.stderr
     assert "ci job ; touch PWNED $(touch PWNED2)" in result.stdout.splitlines()
@@ -512,7 +512,7 @@ def test_a_job_gate_reads_the_work_branch_verify_line_not_its_own(
     commit(rc, "AGENTS.md", (f"verify: {declared}\n" if declared else "") + rest)
     git(tree, "merge", "-q", "--ff-only", WORK)
     land(root, "AGENTS.md", good)  # the job's own line never judges it
-    approve(root, land(root, "src/a.py"))
+    approve(root, land(root, "src/a.py"), name=NEW_JOB)
     refused = run(root, "merge", TREE)
     assert refused.returncode == 1 and "Traceback" not in refused.stderr
     tail = (f" and commit it on {WORK}" if not declared else
@@ -521,7 +521,7 @@ def test_a_job_gate_reads_the_work_branch_verify_line_not_its_own(
     assert fixes(refused) == [f"fix: Agent action: {act} {agents}{tail}"]
     commit(rc, "AGENTS.md", good)
     git(tree, "rebase", "-q", WORK)
-    approve(root, git(tree, "rev-parse", "HEAD").strip(), at="T11:00:00Z")
+    approve(root, git(tree, "rev-parse", "HEAD").strip(), at="T11:00:00Z", name=NEW_JOB)
     landed = run(root, "merge", TREE)
     assert landed.returncode == 0, landed.stderr
 
@@ -587,7 +587,7 @@ def test_a_repo_declaring_only_verify_lines_lands_a_task_and_its_job(root: Path)
                   for k, lv in (("", "job"), ("-stage", "stage"), ("-task", "task")))  # fmt: skip
     commit(root / RC_TREE, "AGENTS.md", law)
     git(root / TREE, "merge", "-q", "--ff-only", WORK)
-    approve(root, sha := land(root, "src/a.py"))
+    approve(root, sha := land(root, "src/a.py"), name=NEW_JOB)
     landed = run(root, "merge", TREE)
     assert landed.returncode == 0, landed.stderr
     assert git(root / "repos/r", "rev-parse", WORK).strip() == sha
