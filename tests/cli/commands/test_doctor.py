@@ -197,7 +197,6 @@ PLANTS: dict[str, Plant] = {
     "WORKTREE": Plant(_plant_orphan_wt),
     "TREE-5": Plant(_plant_missing_root_agents),
     "SPEC-DOC-034": Plant(_plant_nothing),
-    "MEM-PLACEHOLDER-1": Plant(_plant_placeholder_atom),
     "FIXED-1": Plant(_plant_fixed_block_gone),
     "FIXED-2": Plant(_plant_fixed_block_drifted),
     "GITFLOW-1": Plant(_plant_gitflow_gone, {"<specs>": "specs"}),
@@ -385,6 +384,7 @@ def _append(path: Path, text: str) -> None:
 #: (the remedy is the agent's content): each carries an `Agent action:` naming its file.
 AGENT_ACTION: dict[str, Callable[[Path], None]] = {
     "SPEC-DOC-002": _plant_headingless_memory_document,
+    "MEM-PLACEHOLDER-1": _plant_placeholder_atom,
     "SPEC-DOC-004": _plant_status_line_gone,
     "TREE-8": _plant_stray_dotfile,
     "LINT-1": lambda r: _write(r / "specs" / "memory" / "product" / "testarea" / "x.md", "# X\n"),

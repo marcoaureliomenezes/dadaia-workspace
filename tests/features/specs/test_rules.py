@@ -47,7 +47,6 @@ def test_fix_dispatch_and_help_derive_from_the_registry() -> None:
         "TREE-4",
         "TREE-5",
         "SPEC-DOC-034",
-        "MEM-PLACEHOLDER-1",
         "FIXED-1",
         "FIXED-2",
         "SPEC-DOC-046",  # the legacy RELEASE.json rename

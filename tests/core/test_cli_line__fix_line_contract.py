@@ -1266,7 +1266,6 @@ PLANTS: dict[str, Callable[[Path], None]] = {
     "WORKTREE": _plant_orphan_wt,
     "TREE-5": _plant_missing_root_agents,
     "SPEC-DOC-034": _plant_nothing,
-    "MEM-PLACEHOLDER-1": _plant_placeholder_atom,
     "FIXED-1": _plant_fixed_block_gone,
     "FIXED-2": _plant_fixed_block_drifted,
     "GITFLOW-1": _plant_gitflow_gone,
@@ -1290,6 +1289,7 @@ REPORT_ONLY: dict[str, Callable[[Path], None]] = {
 #: Error findings no command can repair (the remedy is the agent's content).
 AGENT_ACTION: dict[str, Callable[[Path], None]] = {
     "SPEC-DOC-002": _plant_headingless_memory_document,
+    "MEM-PLACEHOLDER-1": _plant_placeholder_atom,
     "SPEC-DOC-004": _plant_status_line_gone,
     "TREE-8": _plant_stray_dotfile,
     "LINT-1": lambda r: _write(r / "specs" / "memory" / "product" / "testarea" / "x.md", "# X\n"),
