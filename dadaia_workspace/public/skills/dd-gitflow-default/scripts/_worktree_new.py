@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import shutil
 from pathlib import Path
 
 from _bugs_check import OPEN
@@ -27,6 +28,15 @@ from _worktree_names import (
     kind_of,
     tree_path,
 )
+
+_LEVELS = Path(__file__).parent / "levels"
+_LEVEL_FILES = ("version", "rc", "job")  # the folder at each depth under worktrees/<repo>/
+
+
+def _level_folders(home: Path, name: str) -> list[tuple[Path, str]]:
+    """The level folders *name* sits in under *home*, outermost first, each with its level file."""
+    parts = name.split("/")[:-1]
+    return [(home.joinpath(*parts[:i]), level) for i, level in enumerate(_LEVEL_FILES[: len(parts)], 1)]  # fmt: skip
 
 
 def _refuse_symlink(root: Path, repo_name: str) -> None:
@@ -77,6 +87,9 @@ def new(root: Path, repo_name: str, name: str) -> Path:
     tree = tree_path(root, repo_name, name)
     if git(repo, "branch", "--list", branch(name)).strip():
         raise Refusal(f"{branch(name)} exists", f"{script(SCRIPT)} list")
+    made = [(folder, level) for folder, level in _level_folders(tree_path(root, repo_name), name) if not folder.exists()]  # fmt: skip
     git(repo, "worktree", "add", "-q", "--lock", "--reason", f"{LOCK}{name}", "-b", branch(name),
         str(tree), start)  # fmt: skip
+    for folder, level in made:
+        shutil.copyfile(_LEVELS / f"{level}.md", folder / "AGENTS.md")
     return tree

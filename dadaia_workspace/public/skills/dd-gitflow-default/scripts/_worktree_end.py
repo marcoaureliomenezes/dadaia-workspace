@@ -112,13 +112,20 @@ def _remove(into: Path, tree: Path, name: str, kept: list[str]) -> None:
     git(into, "worktree", "unlock", str(tree), check=False)
     git(into, "worktree", "remove", str(tree))
     git(into, "branch", "-d", branch(name))
-    _rmdir(tree)
+    _rmdir(tree, name)
 
 
-def _rmdir(tree: Path) -> None:
-    """Drop the folder *tree* leaves empty; a folder still holding another tree stays."""
-    if tree.parent.is_dir() and not any(tree.parent.iterdir()):
-        tree.parent.rmdir()
+def _rmdir(tree: Path, name: str) -> None:
+    """Drop the folders *tree* leaves empty, its level folders cascading outward; a folder holding
+    anything beyond its own AGENTS.md stops the cascade."""
+    for folder in list(tree.parents)[: max(len(name.split("/")) - 1, 1)]:
+        if not folder.is_dir():
+            continue
+        level = folder / "AGENTS.md"
+        if any(p != level for p in folder.iterdir()):
+            return
+        level.unlink(missing_ok=True)
+        folder.rmdir()
 
 
 def _undo(tree: Path, work: str, rel: str) -> str:
@@ -416,7 +423,7 @@ def merge(root: Path, path: str, keep: list[str], drop: bool) -> str:
                     f"{ref} is unmerged: {error}",
                     git_line(repo, "worktree", "add", str(tree), ref),
                 ) from error
-        _rmdir(tree)
+        _rmdir(tree, name)
         return f"{ref} merged into {onto}"
     for _, check in _kind_checks(root, repo, tree, name, onto, into, keep, drop):
         check()
