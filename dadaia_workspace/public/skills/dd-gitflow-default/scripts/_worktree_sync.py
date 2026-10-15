@@ -49,7 +49,7 @@ def sync(root: Path, path: str) -> str:
         if _holds(root, tree, base):
             continue
         try:
-            git(tree, "rebase", base)
+            git(tree, "rebase", "--fork-point", base)
         except RuntimeError as error:
             git(tree, "rebase", "--abort", check=False)
             fix = (
