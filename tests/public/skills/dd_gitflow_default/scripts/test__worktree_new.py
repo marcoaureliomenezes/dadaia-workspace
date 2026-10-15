@@ -480,7 +480,10 @@ def test_new_writes_one_level_file_into_each_folder_it_creates(root: Path) -> No
     base = root / "worktrees/r"
     levels = [base / "0.5.0", base / "0.5.0/rc-1", base / "0.5.0/rc-1/job-1"]
     assert [(p / "AGENTS.md").is_file() for p in levels] == [True, True, True]
-    assert not (base / NEW_JOB / "AGENTS.md").exists()  # the tree is no level folder
+    tree_file = (base / NEW_JOB / "AGENTS.md").read_text()
+    assert (
+        tree_file == "verify: python scripts/ci.py job\n" != (levels[2] / "AGENTS.md").read_text()
+    )
 
 
 def test_new_never_writes_over_an_existing_level_file_nor_rewrites_one(root: Path) -> None:
