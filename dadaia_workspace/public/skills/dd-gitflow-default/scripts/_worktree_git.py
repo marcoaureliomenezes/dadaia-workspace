@@ -193,7 +193,9 @@ def _strays(folder: Path, listed: set[Path], ancestors: set[Path]) -> list[Path]
         here = child.resolve()
         if child.is_dir() and not child.is_symlink() and here not in listed:
             sub = _strays(child, listed, ancestors)
-            out += sub if sub or here in ancestors else [child]
+            # a level folder holding only its AGENTS.md is layout, not a stray
+            layout = [p.name for p in child.iterdir()] == ["AGENTS.md"]
+            out += sub if sub or here in ancestors or layout else [child]
     return out
 
 
