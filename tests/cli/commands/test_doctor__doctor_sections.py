@@ -20,7 +20,6 @@ from typing import Any
 import pytest
 from typer.testing import CliRunner
 
-from dadaia_workspace.cli.commands.doctor import _build_specs_doctor, _specs_section
 from dadaia_workspace.cli.help_digest import command_paths
 from dadaia_workspace.cli.main import app
 from dadaia_workspace.core.cli_line import git_line
@@ -140,12 +139,15 @@ def test_specs_doctor_and_backlog_doctor_commands_are_gone() -> None:
 def test_a_specs_dir_holding_no_tree_is_one_specs_section_finding_carrying_the_state_fix(
     kind: str, tmp_path: Path
 ) -> None:
-    """The specs-section builder alone decides a missing tree: one finding, `state()`'s fix."""
+    """The specs section holds the one finding carrying `state()`'s fix, and the payload still
+    names the tree the run resolved."""
     specs = tmp_path / "specs"
     if kind == "file":
         specs.write_text("", encoding="utf-8")
 
-    section = _specs_section(_build_specs_doctor(specs, None), None)
+    result = _run("--specs-dir", str(specs), "--json")
 
-    assert [f.fix for f in section.findings] == [state(specs)[1]], section.findings
-    assert section.failed
+    payload = json.loads(result.stdout)
+    assert [f["fix"] for f in payload["sections"]["specs"]["findings"]] == [state(specs)[1]]
+    assert payload["specs_dir"] == str(specs)
+    assert result.exit_code == 1
