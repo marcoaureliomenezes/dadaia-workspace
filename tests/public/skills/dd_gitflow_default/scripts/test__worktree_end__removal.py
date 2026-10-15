@@ -65,6 +65,29 @@ def test_clean_removes_the_emptied_job_folder_and_the_pushed_branch(root: Path) 
     assert _on_the_remote(root) == ""
 
 
+def test_a_merge_removes_a_level_folder_left_holding_only_its_file(root: Path) -> None:
+    approve(root, land(root, "src/a.py"), name=NEW_JOB)
+    assert (root / "worktrees/r/0.5.0/rc-1/job-1/AGENTS.md").is_file()
+    assert run(root, "merge", f"worktrees/r/{NEW_JOB}").returncode == 0
+    assert not (root / "worktrees/r/0.5.0/rc-1/job-1").exists()
+    assert (root / "worktrees/r" / RC).is_dir()  # the rc folder still holds its tree
+
+
+def test_clean_removes_a_level_folder_left_holding_only_its_file(root: Path) -> None:
+    rc_folder = root / "worktrees/r/0.5.0/rc-1"
+    assert (rc_folder / "job-1/AGENTS.md").is_file() and (rc_folder / "AGENTS.md").is_file()
+    assert run(root, "clean", f"worktrees/r/{NEW_JOB}").returncode == 0
+    assert run(root, "clean", f"worktrees/r/{RC}").returncode == 0
+    assert not rc_folder.exists()
+
+
+def test_a_level_folder_holding_a_sibling_tree_keeps_its_file(root: Path) -> None:
+    assert open_tree(root, JOB2).is_dir()
+    assert run(root, "clean", f"worktrees/r/{NEW_JOB}").returncode == 0
+    assert (root / "worktrees/r/0.5.0/rc-1/AGENTS.md").is_file()
+    assert (root / "worktrees/r" / JOB2).is_dir()
+
+
 def test_a_merge_with_no_remote_still_lands_and_keeps_a_sibling_tree(root: Path) -> None:
     """No remote is assumed: nothing to delete there, and a parent folder still holding a tree stays."""
     assert open_tree(root, JOB2).is_dir()

@@ -472,3 +472,39 @@ def test_a_name_is_accepted_as_the_backlog_slug_and_the_task_id_grammar_say(
     names = load_owner("dd-gitflow-default", "_worktree_names")
 
     assert bool(names.NAME_RE.match(name)) is accepted
+
+
+def test_new_writes_one_level_file_into_each_folder_it_creates(root: Path) -> None:
+    for name in (RC, NEW_JOB):
+        assert _run(root, "new", "r", name).returncode == 0
+    base = root / "worktrees/r"
+    levels = [base / "0.5.0", base / "0.5.0/rc-1", base / "0.5.0/rc-1/job-1"]
+    assert [(p / "AGENTS.md").is_file() for p in levels] == [True, True, True]
+    assert not (base / NEW_JOB / "AGENTS.md").exists()  # the tree is no level folder
+
+
+def test_new_never_writes_over_an_existing_level_file_nor_rewrites_one(root: Path) -> None:
+    version = root / "worktrees/r/0.5.0"
+    version.mkdir(parents=True)
+    (version / "AGENTS.md").write_text("mine\n")
+    assert _run(root, "new", "r", RC).returncode == 0
+    assert (version / "AGENTS.md").read_text() == "mine\n"
+    rc_file = version / "rc-1/AGENTS.md"
+    assert rc_file.is_file()
+    rc_file.write_text("edited\n")
+    assert _run(root, "new", "r", NEW_JOB).returncode == 0
+    assert _run(root, "new", "r", "0.5.0/rc-1/job-2/wt-main").returncode == 0
+    assert rc_file.read_text() == "edited\n"
+    assert (version / "AGENTS.md").read_text() == "mine\n"
+
+
+def test_list_shows_no_stray_for_a_level_folder_holding_only_its_file(root: Path) -> None:
+    repo = root / "repos/r"
+    assert _run(root, "new", "r", RC).returncode == 0
+    tree = root / "worktrees/r" / NEW_JOB
+    assert _run(root, "new", "r", NEW_JOB).returncode == 0
+    _git(repo, "worktree", "remove", "-f", "-f", str(tree))
+    _git(repo, "branch", "-D", f"wt/{NEW_JOB}")
+    assert (tree.parent / "AGENTS.md").is_file() and not tree.exists()
+    rows = json.loads(_run(root, "list", "--json").stdout)
+    assert [r["path"] for r in rows if r["state"] == "unregistered"] == []
