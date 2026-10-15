@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.core.cli_line import mkdir_line, script_line
+from dadaia_workspace.core.cli_line import mkdir_line
 from dadaia_workspace.features.spec_context.gate_policy import (
     Decision,
     PathClass,
@@ -70,7 +70,7 @@ _DADAIA = "/ws/.dadaia/.venv/Scripts/dadaia.exe" if sys.platform == "win32" else
 
 
 def _wt(repo: str) -> str:
-    return "fix: " + script_line(".agents/skills/dd-gitflow-default/scripts/worktree.py", "list")
+    return f"fix: {_DADAIA} worktree list"
 
 
 def _at(zone: str, repo: str, owner: str | None = None, **session: object) -> dict[str, object]:

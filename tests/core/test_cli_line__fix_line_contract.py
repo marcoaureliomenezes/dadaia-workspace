@@ -201,6 +201,24 @@ def _push(ws: Path, line: str = "", files: dict[str, str] | None = None, **kwarg
     return decision.message
 
 
+def _merge_only(ws: Path) -> str:
+    """A write into the bound context's own repo: merge-only, the fix lists the worktrees."""
+    from dadaia_workspace.features.spec_context.gate_policy import evaluate
+
+    return evaluate("repos/a/x.py", root=ws, zone="repo", repo="a", owner="a",
+                    context="a", repos=frozenset({"a"}), has_id=True)[1]  # fmt: skip
+
+
+def _kernel_no_specs_tree(ws: Path) -> str:
+    """A ledger write verb run where no specs tree exists, in a workspace whose CLI names its repo."""
+    cli = workspace_cli_path(ws)
+    cli.write_text(f'#!{sys.executable}\nprint(\'{{"main_repo": "a"}}\')\n', encoding="utf-8")
+    cli.chmod(0o755)
+    kernel = _PKG / "public" / "skills" / "dd-bug-resolution" / "scripts"
+    code = f"import sys; sys.path[:0] = [{str(kernel)!r}]; import _specs; _specs.find_specs(None, ledger='specs/bugs/BUGS.jsonl')"  # fmt: skip
+    return subprocess.run([sys.executable, "-c", code], cwd=ws, capture_output=True, text=True, check=False).stderr  # fmt: skip
+
+
 _FEATURE = "refs/heads/feature/0.0.1 {sha} refs/heads/feature/0.0.1 {zero}"
 SITES: dict[str, Callable[[Path], str | None]] = {
     "gate-root-whitelist": lambda ws: _gate(ws, "junk.txt"),
@@ -210,6 +228,8 @@ SITES: dict[str, Callable[[Path], str | None]] = {
     "gate-protected-glob": lambda ws: _gate(ws, "repos/a/secrets/k"),
     "gate-scope-names-the-bind": lambda ws: _scope_block(ws, has_id=True),
     "gate-id-less-session-relaunch": lambda ws: _scope_block(ws, has_id=False),
+    "gate-merge-only-lists-the-worktrees": _merge_only,
+    "kernel-no-specs-tree-lists-the-worktrees": _kernel_no_specs_tree,
     "hook-missing-venv": lambda ws: VENV_MISSING.replace("$ROOT", ws.as_posix()),
     "push-malformed-stdin": lambda ws: _push(ws, malformed_lines=1),
     "push-main": lambda ws: _push(ws, "refs/heads/main {sha} refs/heads/main {other}"),
@@ -2050,3 +2070,14 @@ def test_the_real_doctor_prints_every_fix_as_one_whole_runnable_line(tmp_path: P
             assert re.search(r"\s(/|\w:[\\/])\S", fix), fix
     # a wrapped fix would leave a continuation line that is neither a finding nor a `fix:` line
     assert [ln for ln in lines if ln and not re.match(r"(fix: |[A-Z][A-Za-z0-9-]+ )", ln)] == []
+
+
+@pytest.mark.parametrize(
+    "site", ["gate-merge-only-lists-the-worktrees", "kernel-no-specs-tree-lists-the-worktrees"]
+)
+def test_a_worktree_listing_fix_runs_the_public_runner(workspace: Path, site: str) -> None:
+    """The gate and the kernel send the agent to `dadaia worktree list`, never to the skill script."""
+    fix = the_fix(SITES[site](workspace), workspace)
+
+    argv = shlex.split(fix)
+    assert (Path(argv[0]), argv[1:]) == (workspace_cli_path(workspace), ["worktree", "list"])

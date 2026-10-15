@@ -117,3 +117,30 @@ def test_worktree_rows_keeps_the_contexts_repos_and_the_rows_no_context_owns(
     found, failed, fix = worktree_rows(tmp_path, {"mine"}, runner=_Runner())
 
     assert ([r["path"] for r in found], failed, fix) == (["/w/a", "/w/c"], "", "")
+
+
+class _Refused:
+    returncode, stdout, stderr = 1, "", "no repo here\n"
+
+
+class _Broken:
+    def run(self, argv: object, **_: object) -> object:
+        raise OSError("gone")
+
+
+class _Refuses:
+    def run(self, argv: object, **_: object) -> object:
+        return _Refused()
+
+
+@pytest.mark.parametrize(
+    "runner", [_Broken(), _Refuses()], ids=["spawn-fails", "refuses-without-a-fix"]
+)
+def test_a_failed_worktree_read_names_the_public_runner_as_its_fix(
+    tmp_path: Path, runner: object
+) -> None:
+    """The fix is the workspace CLI's `worktree list`, never the skill script's path."""
+    found, failed, fix = worktree_rows(tmp_path, {"mine"}, runner=runner)  # type: ignore[arg-type]
+
+    assert found == [] and failed.startswith("list failed: ")
+    assert fix == cli_line.fix_line(tmp_path, "worktree", "list")
