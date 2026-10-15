@@ -9,12 +9,15 @@ from __future__ import annotations
 import json
 import shlex
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
 
+from dadaia_workspace.core.cli_line import shell_line
 from tests.helpers.worktree_ws import (
     JOB,
+    SCRIPT,
     approve,
     cli_path,
     commit,
@@ -163,27 +166,13 @@ def test_a_bound_approval_of_head_lands(root: Path) -> None:
     assert git(root / "repos/r", "rev-parse", "feature/0.5.0").strip() == head
 
 
-@pytest.mark.parametrize(
-    "verdict",
-    ["missing", "rejected", "other-sha", "other-diff"],
-)
-def test_a_plain_merge_refuses_without_a_bound_approval(tmp_path: Path, verdict: str) -> None:
+def test_a_plain_name_is_refused_as_not_a_worktree_name_with_the_list_fix(tmp_path: Path) -> None:
     root = make_workspace(tmp_path)
-    repo = root / "repos/r"
-    git(repo, "checkout", "-q", "feature/0.5.0")
-    base = git(repo, "rev-parse", "HEAD").strip()
-    assert run(root, "new", "r", "maintenance").returncode == 0
-    tree = root / "worktrees/r/maintenance"
-    head = commit(tree, "src/a.py")
-    if verdict == "rejected":
-        approve(root, head, verdict="REJECTED")
-    elif verdict == "other-sha":
-        _hand(root, head, reviewed_sha=base, diff_sha256=diff_hash(root, head))
-    elif verdict == "other-diff":
-        _hand(root, head, reviewed_sha=head, diff_sha256=diff_hash(root, base))
+    git(root / "repos/r", "checkout", "-q", "feature/0.5.0")
 
-    refused = run(root, "merge", str(tree))
+    refused = run(root, "new", "r", "maintenance")
 
     assert refused.returncode == 1
-    assert tree.exists()
-    assert git(repo, "rev-parse", "feature/0.5.0").strip() == base
+    assert "[error] not a worktree name" in refused.stderr
+    assert fixes(refused) == [f"fix: {shell_line(sys.executable, str(SCRIPT))} list"]
+    assert not (root / "worktrees/r/maintenance").exists()

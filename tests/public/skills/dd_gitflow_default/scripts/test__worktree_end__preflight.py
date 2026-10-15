@@ -7,12 +7,23 @@ Size: MEDIUM (real git, tmp workspace, a stub CLI).
 from __future__ import annotations
 
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.core.cli_line import git_line
-from tests.helpers.worktree_ws import JOB, TASK, approve, commit, fixes, git, make_workspace, run
+from dadaia_workspace.core.cli_line import git_line, shell_line
+from tests.helpers.worktree_ws import (
+    JOB,
+    SCRIPT,
+    TASK,
+    approve,
+    commit,
+    fixes,
+    git,
+    make_workspace,
+    run,
+)
 
 BRANCH = "feature/0.5.0"
 JOB_BRANCH = f"wt/{JOB}"
@@ -131,21 +142,12 @@ def test_a_reconcile_tree_fails_a_red_verify_as_a_job_tree_does(root: Path) -> N
     _fail(root, tree, "verify: exited 1", f"Agent action: {RED_VERIFY.format(tree=tree)}")
 
 
-def test_a_plain_tree_passes_with_no_verify_line_and_fails_dirty(root: Path) -> None:
-    repo = root / "repos/r"
-    (repo / "AGENTS.md").write_text("no gate declared\n")
-    git(repo, "commit", "-qam", "no verify")
-    tree = _tree(root, "fix-a")
-    commit(tree, "RED-job", "")  # a red gate would refuse: none is declared, none runs
-    _pass(root, tree)
-    (tree / "wip").write_text("x")
-    add, commit_ = git_line(tree, "add", "-A"), git_line(tree, "commit")
-    fix = (
-        f"Agent action: commit them in their commit shape (`{add}` and `{commit_}`) or remove"
-        f" them (`{git_line(tree, 'clean', '-fd')}` and `{git_line(tree, 'restore', '-SW', '.')}`)"
-        " — never a stash every worktree shares"
-    )
-    _fail(root, tree, f"{tree} has uncommitted changes", fix)
+def test_a_plain_name_is_refused_as_not_a_worktree_name_with_the_list_fix(root: Path) -> None:
+    refused = run(root, "new", "r", "fix-a")
+    assert refused.returncode == 1
+    assert "[error] not a worktree name" in refused.stderr
+    assert fixes(refused) == [f"fix: {shell_line(sys.executable, str(SCRIPT))} list"]
+    assert not (root / "worktrees/r/fix-a").exists()
 
 
 def test_a_hotfix_tree_fails_a_red_verify(root: Path) -> None:
@@ -183,7 +185,7 @@ def _kind(root: Path, kind: str) -> tuple[Path, Path]:
         commit(repo, "specs/bugs/BUGS.jsonl", '{"id": "a-block-bug", "status": "open"}\n')
     name = {
         "job": JOB,
-        "plain": "fix-a",
+        "job-b": "0.5.0-rc1/j2",
         "define": DEFINE,
         "backlog": "backlog/x",
         "reconcile": "0.5.0-rc1/reconcile",
@@ -206,7 +208,7 @@ def _same_refusal(root: Path, tree: Path, error: str) -> None:
 
 
 @pytest.mark.parametrize(
-    "kind", ["task", "job", "plain", "define", "backlog", "reconcile", "hotfix"]
+    "kind", ["task", "job", "job-b", "define", "backlog", "reconcile", "hotfix"]
 )
 def test_preflight_refuses_an_ignored_file_neither_kept_nor_dropped_as_merge_does(
     root: Path, kind: str
@@ -217,7 +219,7 @@ def test_preflight_refuses_an_ignored_file_neither_kept_nor_dropped_as_merge_doe
 
 
 @pytest.mark.parametrize(
-    "kind", ["task", "job", "plain", "define", "backlog", "reconcile", "hotfix"]
+    "kind", ["task", "job", "job-b", "define", "backlog", "reconcile", "hotfix"]
 )
 def test_preflight_refuses_a_target_checkout_off_the_target_branch_as_merge_does(
     root: Path, kind: str
