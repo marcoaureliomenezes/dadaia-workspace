@@ -1,5 +1,6 @@
 """``specs init --context`` on the three tree kinds — absent scaffolds, dadaia upgrades, foreign
-moves to ``specs-bkp/`` only when confirmed — never committing. Size: MEDIUM (real git repo on
+moves to ``specs-bkp/`` only when confirmed — each committing its scaffold (and the move) on a
+newly cut work branch. Size: MEDIUM (real git repo on
 disk)."""
 
 from __future__ import annotations
@@ -168,7 +169,7 @@ def test_a_v6_tree_ends_v7_with_a_clean_doctor(repo: Path) -> None:
     assert not (repo / "specs-bkp").exists()
 
 
-def test_replace_foreign_moves_to_specs_bkp_staged_then_scaffolds(repo: Path) -> None:
+def test_replace_foreign_moves_to_specs_bkp_and_commits_it_with_the_scaffold(repo: Path) -> None:
     old = _foreign(repo)
     head = _git(repo, "rev-parse", "HEAD")
 
@@ -176,10 +177,12 @@ def test_replace_foreign_moves_to_specs_bkp_staged_then_scaffolds(repo: Path) ->
 
     assert result.exit_code == 0, result.output
     assert _snapshot(repo / "specs-bkp") == old
-    assert _git(repo, "rev-parse", "HEAD") == head
-    staged = _git(repo, "diff", "--cached", "--name-status").splitlines()
-    assert "R100\tspecs/README.md\tspecs-bkp/README.md" in staged
-    assert "R100\tspecs/features/login.md\tspecs-bkp/features/login.md" in staged
+    assert _git(repo, "rev-parse", "--abbrev-ref", "HEAD") == "feature/0.1.0"
+    assert _git(repo, "rev-parse", "HEAD~1") == head
+    moved = _git(repo, "diff", "--name-status", "-M", head, "HEAD").splitlines()
+    assert "R100\tspecs/README.md\tspecs-bkp/README.md" in moved
+    assert "R100\tspecs/features/login.md\tspecs-bkp/features/login.md" in moved
+    assert _git(repo, "status", "--porcelain") == ""
     assert _doctor_errors(repo / "specs") == []
 
 
