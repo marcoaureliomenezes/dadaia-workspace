@@ -1,14 +1,13 @@
 """The derived onboarding step list — one fixture per step, plus its invariant.
 
 Size: SMALL (unit): the
-one git read is patched at the adapter; the real-git behaviour is the property test's.
+two git reads (``published``, ``work_version``) are patched at the adapter; the real-git behaviour is the property test's.
 """
 
 from __future__ import annotations
 
 import json
 import shutil
-import subprocess
 from collections.abc import Callable
 from pathlib import Path
 
@@ -19,15 +18,16 @@ from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.specs_version import CANONICAL_SPECS_VERSION, state
 from dadaia_workspace.features.specs.rules import RULES
 from dadaia_workspace.features.workspace.onboarding import next_step
-from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 
+_CLIENT = "dadaia_workspace.infrastructure.git_subprocess.GitSubprocessClient"  # by name: importing it would size the module medium
 _SCAFFOLD = workspace_layout.public_scripts_dir().parent / "scaffold"
 
 
 @pytest.fixture(autouse=True)
 def _git(monkeypatch: pytest.MonkeyPatch) -> dict[str, bool]:
     remote = {"published": False}
-    monkeypatch.setattr(GitSubprocessClient, "published", lambda _s, _p: remote["published"])
+    monkeypatch.setattr(f"{_CLIENT}.published", lambda _s, _p: remote["published"])
+    monkeypatch.setattr(f"{_CLIENT}.work_version", lambda _s, _p: "0.1.0", raising=False)
     return remote
 
 
@@ -112,11 +112,6 @@ def test_next_step_is_derived_from_the_workspace_state(
 
 def test_the_first_pass_fix_opens_the_backlog_first_pass_lane(tmp_path: Path) -> None:
     specs = _specs(tmp_path, "proj")  # the repo slug differs from the context name
-    repo = specs.parent
-    for argv in (("init", "-q"), ("commit", "-q", "--allow-empty", "-m", "i"), ("branch", "feature/0.1.0")):
-        subprocess.run(
-            ["git", "-C", str(repo), "-c", "user.name=t", "-c", "user.email=t@t", *argv], check=True
-        )
     step = next_step(tmp_path, {"app": specs})
     memory = specs / "memory"
     pending = f"{memory / 'ARCHITECTURE.md'}, {memory / 'QUALITY.md'}, {memory / 'product'} (no atom)"
