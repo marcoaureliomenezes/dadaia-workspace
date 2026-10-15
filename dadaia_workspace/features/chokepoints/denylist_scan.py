@@ -118,7 +118,6 @@ def _first_match(
     same path's published content; ``None`` suppresses nothing), yields the same value
     (case-normalized) from the same source; keyed on the value, so a prior email never
     amnesties a brand-new one. Only ``masked_term`` leaves this module."""
-    patterns = [p for p in patterns if not (p.skip_paths and p.skip_paths.search(obj.path))]
     published = published_matches(obj.prior_text, terms, patterns)
     # A control character never splits a term out of reach: stripped first.
     for lineno, line_text in enumerate(UNSAFE_FORMAT_CHARS_RE.sub("", obj.text).splitlines(), 1):
@@ -166,7 +165,8 @@ def scan_objects(
                     path=obj.path, size_bytes=obj.size_bytes, scanned_bytes=obj.scanned_bytes
                 )
             )
-        hit = _first_match(obj, term_list, pattern_list)
+        content = [p for p in pattern_list if not (p.skip_paths and p.skip_paths.search(obj.path))]
+        hit = _first_match(obj, term_list, content)
         if hit is not None:
             hits.append(hit)
     return ScanOutcome(

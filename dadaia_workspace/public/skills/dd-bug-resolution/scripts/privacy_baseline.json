@@ -27,9 +27,9 @@
       "id": "ipv4-literal",
       "regex": "(?<![\\w.])(?:25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)(?:\\.(?:25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)){3}(?![\\w.])",
       "reason": "IPv4 address literal",
-      "exclude_paths": "(?:^|/)(?:po[e]try\\.lock|uv\\.lock|Pipfile\\.lock|package-lock\\.json|yarn\\.lock|pnpm-lock\\.yaml|Cargo\\.lock|composer\\.lock|Gemfile\\.lock|go\\.sum)$",
+      "exclude_paths": "(?:^|/)(?:poetry\\.lock|uv\\.lock|Pipfile\\.lock|package-lock\\.json|yarn\\.lock|pnpm-lock\\.yaml|Cargo\\.lock|composer\\.lock|Gemfile\\.lock|packages\\.lock\\.json)$",
       "exclude_regex": "^(?:127\\.|0\\.0\\.0\\.0$|192\\.0\\.2\\.|198\\.51\\.100\\.|203\\.0\\.113\\.|255\\.255\\.255\\.255$|0\\.0\\.0\\.0)",
-      "exclude_rationale": "loopback (127.0.0.0/8), the null route 0.0.0.0, RFC 5737 documentation ranges (192.0.2.0/24, 198.51.100.0/24, 203.0.113.0/24), and the broadcast address 255.255.255.255 are conventional non-identifying examples, never a real operator host. The pattern is also skipped for the basenames in exclude_paths: generated lock files, one per ecosystem tool (Python x3, JS x3, Rust, PHP, Ruby, Go), listed by basename in exclude_paths, whose dependency version ranges are four-part versions no regex can tell from an address; every other pattern still applies to them."
+      "exclude_rationale": "loopback (127.0.0.0/8), the null route 0.0.0.0, RFC 5737 documentation ranges (192.0.2.0/24, 198.51.100.0/24, 203.0.113.0/24), and the broadcast address 255.255.255.255 are conventional non-identifying examples, never a real operator host. The pattern is also skipped, in file content only and never in the path, for the basenames in exclude_paths: generated lock files, one per ecosystem tool (Python x3, JS x3, Rust, PHP, Ruby, .NET), listed by basename in exclude_paths, whose dependency version ranges are four-part versions no regex can tell from an address; every other pattern still applies to them."
     },
     {
       "id": "ipv6-literal",
