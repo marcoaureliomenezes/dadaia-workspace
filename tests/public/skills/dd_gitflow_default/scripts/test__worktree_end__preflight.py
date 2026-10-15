@@ -139,13 +139,26 @@ def test_a_backlog_tree_fails_a_path_outside_specs(root: Path) -> None:
     )
 
 
-def test_a_reconcile_tree_fails_a_red_verify_as_a_job_tree_does(root: Path) -> None:
+def _not_a_name(root: Path, tree: Path) -> None:
+    """A name the grammar does not take (no kind now): merge and preflight each refuse it as not a
+    worktree name with the one `list` fix, the T8 plain-tree shape."""
+    for verb in ("merge", "preflight"):
+        refused = run(root, verb, str(tree))
+        assert refused.returncode == 1
+        assert "not a worktree name" in refused.stderr
+        assert [f.removeprefix("fix: ") for f in fixes(refused)] == [
+            shell_line(sys.executable, str(SCRIPT), "list")
+        ]
+
+
+def test_a_reconcile_tree_is_refused_by_merge_and_preflight_as_not_a_worktree_name(
+    root: Path,
+) -> None:
     tree = (
         root / "worktrees/r" / RECONCILE
     )  # no such kind now: a raw tree, the refusal is what runs
     git(root / "repos/r", "worktree", "add", "-q", "-b", f"wt/{RECONCILE}", str(tree), BRANCH)
-    commit(tree, "RED-job", "")
-    _fail(root, tree, "verify: exited 1", f"Agent action: {RED_VERIFY.format(tree=tree)}")
+    _not_a_name(root, tree)
 
 
 def test_a_plain_name_is_refused_as_not_a_worktree_name_with_the_list_fix(root: Path) -> None:
@@ -216,6 +229,8 @@ def test_preflight_refuses_an_ignored_file_neither_kept_nor_dropped_as_merge_doe
     root: Path, kind: str
 ) -> None:
     tree, _ = _kind(root, kind)
+    if kind == "reconcile":
+        return _not_a_name(root, tree)
     (tree / "keep.scratch").write_text("x")
     _same_refusal(root, tree, "ignored files would be lost: keep.scratch")
 
@@ -225,5 +240,7 @@ def test_preflight_refuses_a_target_checkout_off_the_target_branch_as_merge_does
     root: Path, kind: str
 ) -> None:
     tree, into = _kind(root, kind)
+    if kind == "reconcile":
+        return _not_a_name(root, tree)
     git(into, "switch", "-q", "-c", "elsewhere")
     _same_refusal(root, tree, f"{into} is not on ")
