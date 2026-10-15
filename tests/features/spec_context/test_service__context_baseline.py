@@ -15,7 +15,9 @@ from collections.abc import Callable
 from pathlib import Path
 
 import pytest
+from typer.testing import CliRunner
 
+from dadaia_workspace.cli.main import app
 from dadaia_workspace.container import scan_publish_candidates
 from dadaia_workspace.core import workspace_layout
 from dadaia_workspace.core.exceptions import ContextStateError, GitSyncError
@@ -276,6 +278,27 @@ def test_second_run_is_a_no_op(env, tmp_path: Path, seeded) -> None:
     before, head = _heads(bare), _git(repo, "rev-parse", "HEAD")
     assert svc.baseline("proj") == ""
     assert _heads(bare) == before and _git(repo, "rev-parse", "HEAD") == head
+
+
+@pytest.mark.parametrize("seeded", [(), ("main", "develop")], ids=["empty", "adopted"])
+def test_a_scaffold_already_committed_on_the_work_branch_is_published(
+    env, tmp_path: Path, seeded, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The state `specs init` leaves (work branch cut, scaffold committed on it, checked
+    out) publishes anchor-first; nothing left to commit is not an error."""
+    svc, repo, bare = env
+    if seeded:
+        _seed(bare, tmp_path / "seed", *seeded)
+    _git(repo.parent, "clone", "-q", bare.as_uri(), str(repo))
+    _identity(repo)
+    monkeypatch.chdir(tmp_path / "ws")
+    done = CliRunner().invoke(app, ["specs", "init", "--context", "proj"])
+    assert done.exit_code == 0, done.output
+    assert _git(repo, "rev-parse", "--abbrev-ref", "HEAD") == _WORK
+    assert svc.baseline("proj") == _WORK
+    assert {"main", "develop", _WORK} <= set(_heads(bare))
+    assert _git(repo, "rev-parse", "HEAD") == _git(repo, "rev-parse", "@{u}") == _heads(bare)[_WORK]
+    assert "specs/constitution.md" in _tree(bare, _WORK)
 
 
 def test_an_origin_without_the_principal_refuses_and_publishes_nothing(env, tmp_path: Path) -> None:
