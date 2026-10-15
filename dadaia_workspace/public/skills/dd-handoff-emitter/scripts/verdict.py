@@ -79,7 +79,7 @@ def _stats(argv: list[str]) -> int:
     by_tree: dict[str, list[tuple[str, str]]] = {}
     for _path, data in reviewer_records(root):
         branch = str(data.get("scope", "")).partition("@")[0]
-        if branch.startswith(f"wt/{rc}/"):
+        if branch.startswith(f"wt/{rc.replace('-rc', '/rc-', 1)}/"):
             by_tree.setdefault(branch, []).append(
                 (str(data.get("produced_at")), str(data.get("verdict")))
             )
