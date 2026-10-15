@@ -19,20 +19,21 @@ cd demo
 .dadaia/.venv/bin/dadaia doctor --context "$SLUG"
 ```
 
-After the 3b first pass (below), publish and file the first entry in a `backlog`
-worktree (`backlog/<slug>`) — only `context create` (the `--repo` clone) and the first `specs init` write
+After the 3b first pass (below), publish and file the first entry in a backlog lane,
+the worktree `<v>/wt-backlog-<slug>` — only `context create` (the `--repo` clone) and the first `specs init` write
 `specs/` directly (ADR 0154):
 
 ```bash
 .dadaia/.venv/bin/dadaia context baseline "$SLUG"
-B=$(python3 .agents/skills/dd-gitflow-default/scripts/worktree.py new "$SLUG" 0.1.0/wt-backlog-my-first-idea | sed 's/^\[ok\] //')
+B=$(.dadaia/.venv/bin/dadaia worktree new "$SLUG" 0.1.0/wt-backlog-my-first-idea | sed 's/^\[ok\] //')
 python3 .agents/skills/dd-backlog-definition/scripts/backlog.py new my-first-idea \
   --specs "$B/specs" --title "What I want" --description "Why I want it"
 git -C "$B" commit -qam "chore(backlog): new my-first-idea"
 ```
 
-After an APPROVED `dd-code-reviewer` verdict, `worktree.py merge "$B"` lands it; the
-release is born the same way in its `<M.m.p>/rc-<N>/wt-rc` worktree:
+After an APPROVED `dd-code-reviewer` verdict, `.dadaia/.venv/bin/dadaia worktree merge "$B"` lands it
+on the work branch; the release is born the same way in its `<M.m.p>/rc-<N>/wt-rc` worktree,
+the rc's integration branch that its jobs' `job-<n>/wt-main` trees merge into:
 `release.py new 0.1.0 --specs "$R/specs" --origin backlog:my-first-idea`.
 
 - **Level 1 — workspace.** `uvx dadaia-workspace init` provisions `demo/` with its own
@@ -41,10 +42,11 @@ release is born the same way in its `<M.m.p>/rc-<N>/wt-rc` worktree:
 - **Level 2 — project.** `--repo` clones the repo into `repos/<slug>/`, installs the
   pre-push hook and makes the context (named after the slug) ALIVE; only `context bind`
   binds a session (§3).
-- **Level 3 — specs.** 3a `specs init` brings the repo's `specs/` to the canon; a foreign
+- **Level 3 — specs.** 3a `specs init` brings the repo's `specs/` to the canon and, on a
+  repo with no work branch, cuts the local one and commits only the scaffold on it; a foreign
   `specs/` is refused until `--replace-foreign` moves it to `specs-bkp/` (to
   `specs-bkp/<UTC>/` when a backup already exists).
-  3b the `dd-audit-project` first pass fills memory — done when it holds real content,
+  3b the `dd-audit-project` first pass fills memory in the `wt-backlog-first-pass` lane — done when it holds real content,
   never by a stamp. 3c `context baseline <slug>` publishes the specs. `doctor` prints the
   next pending step with its `fix:` line at every point.
 
@@ -104,8 +106,8 @@ entry held, an EPHEMERAL one deleted.
 `active[]` — the operator's demand queue; from the workspace root `--specs` names the
 context's specs tree, since no `specs/` sits at or above the cwd. The script is the
 document's one writer and validator: every write validates the bytes it is about to
-commit. Only the operator creates demand, and the document is written in a `backlog/<slug>`
-worktree.
+commit. Only the operator creates demand, and the document is written in a `<v>/wt-backlog-<slug>`
+lane.
 
 ## 6. The first release
 
