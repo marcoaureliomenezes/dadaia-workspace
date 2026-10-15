@@ -41,7 +41,7 @@ from dadaia_workspace.core.exceptions import (
     SchemaVersionError,
     WorkspaceNotInitializedError,
 )
-from dadaia_workspace.core.specs_version import state
+from dadaia_workspace.core.specs_version import NO_TREE, state
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.backlog import doctor as backlog_doctor
 from dadaia_workspace.features.spec_context.doctor import DoctorService, workspace_rules
@@ -82,15 +82,15 @@ def _empty_section(name: str) -> SectionReport:
     return SectionReport(name=name, findings=())
 
 
-def _specs_section(doctor: SpecsDoctor | None, root: Path | None) -> SectionReport:
-    if doctor is None:
-        return _empty_section("specs")
-    kind, fix = state(doctor.specs_dir)
-    if kind in ("absent", "file"):  # no rule can judge a tree that is not there: one finding
-        msg = f"no specs tree at {doctor.specs_dir}"
-        finding = SectionFinding(
-            "SPECS-ABSENT", "error", msg, canonical=False, error=True, fix=fix or ""
-        )
+def _specs_section(
+    doctor: SpecsDoctor | None, root: Path | None, specs_dir: Path | None = None
+) -> SectionReport:
+    if doctor is None:  # no rule can judge a tree that is not there: one finding
+        if specs_dir is None:
+            return _empty_section("specs")
+        msg = f"no specs tree at {specs_dir}"
+        fix = state(specs_dir)[1] or ""
+        finding = SectionFinding("SPECS-ABSENT", "error", msg, canonical=False, error=True, fix=fix)
         return SectionReport(name="specs", findings=(finding,))
     return run_section(
         "specs",
@@ -114,7 +114,7 @@ def _ledgers_section(
     """
     from dadaia_workspace.infrastructure.ledger_scripts import script_findings
 
-    if specs_dir is None or state(specs_dir)[0] in ("absent", "file"):
+    if specs_dir is None or state(specs_dir)[0] in NO_TREE:
         return _empty_section("ledgers")
 
     tracked = container.build_git_client().tracked(specs_dir.parent)
@@ -137,8 +137,8 @@ def _ledgers_section(
 
 
 def _build_specs_doctor(specs_dir: Path | None, public_dir: str | None) -> SpecsDoctor | None:
-    """``None`` in, ``None`` out: a workspace with no specs tree has no specs doctor."""
-    if specs_dir is None:
+    """A workspace with no specs tree has no specs doctor."""
+    if specs_dir is None or state(specs_dir)[0] in NO_TREE:
         return None
     resolved_public = Path(public_dir).resolve() if public_dir else _detect_public_dir(specs_dir)
     return SpecsDoctor(
@@ -313,7 +313,7 @@ def doctor(
                 _onboarding_section(workspace_root, scope, expired_only=expired_only),
             ]
         ),
-        _specs_section(specs_doctor, workspace_root),
+        _specs_section(specs_doctor, workspace_root, target),
         _ledgers_section(workspace_root, target),
     ]
     # Render boundary ONLY: no doctor ever sees the redactor; every finding and fix action
@@ -348,11 +348,7 @@ def _apply_fixes(
     if not fix:
         return []
     fixed = [] if service is None else service.expire() if expired_only else service.fix(scope)
-    if (
-        not expired_only
-        and specs_doctor is not None
-        and state(specs_doctor.specs_dir)[0] not in ("absent", "file")
-    ):
+    if not expired_only and specs_doctor is not None:
         fixed.extend(f"[specs] {issue.code}: {finding_path(issue)}" for issue in specs_doctor.fix())
     return fixed
 

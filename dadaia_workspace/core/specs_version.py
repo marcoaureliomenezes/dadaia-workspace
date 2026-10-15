@@ -31,6 +31,8 @@ OLDEST_UPGRADABLE_VERSION = 6
 #: or while the stamp is unpublished (``test_a_canon_change_bumps_the_stamp`` computes it).
 CANON_AT = {12: "bd5cd7e3c3acda50"}
 State = Literal["absent", "file", "malformed", "foreign", "upgradable", "canonical"]
+#: The kinds that hold no tree: nothing to read, rule or repair.
+NO_TREE: frozenset[State] = frozenset({"absent", "file"})
 
 
 def state(
