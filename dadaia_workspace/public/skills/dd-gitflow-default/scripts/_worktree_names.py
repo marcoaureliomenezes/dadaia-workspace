@@ -69,11 +69,6 @@ def base(name: str, work: str) -> str:
     return base_of(name, work.removesuffix(name.split("/", 1)[0])) or work
 
 
-def non_code(name: str) -> bool:
-    """A backlog tree: its merge lands `specs/` only, reviewed, untested."""
-    return kind_of(name) == "backlog"
-
-
 def pushable(ref: str) -> bool:
     """Whether pre-push accepts the `wt/` branch *ref*: a release, main or backlog tree's only."""
     name = name_of(ref)

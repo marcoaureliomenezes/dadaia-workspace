@@ -125,14 +125,14 @@ Sweep counts (ASIS §2): 18 production `.py` files, 29 law/skill/agent/template 
 | Job 1 | 6 | 4 | 2 | 0 |
 | Job 2 | 8 | 4 | 4 | 0 |
 | Job 3 | 10 | 6 | 4 | 0 |
-| Job 4 | 18 | 7 | 11 | 0 |
+| Job 4 | 19 | 7 | 12 | 0 |
 | Job 5 | 6 | 3 | 3 | 0 |
 | Job 6 | 4 | 1 | 3 | 0 |
 | Job 7 | 4 | 2 | 2 | 0 |
 | Job 8 | 6 | 5 | 1 | 0 |
 | Job 9 | 3 | 2 | 1 | 0 |
 | Job 10 | 2 | 1 | 0 | 1 |
-| total | 67 | 35 | 31 | 1 |
+| total | 68 | 35 | 32 | 1 |
 
 ## 2. Notes for the main thread
 
