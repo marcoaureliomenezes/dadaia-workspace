@@ -76,7 +76,7 @@ def _gate_inputs(repo_root: Path, head: str) -> tuple[Gitflow, GateFixes]:
     try:
         work = work_branch(repo_root, gitflow, slug)
     except load_owner("dd-gitflow-default", "_worktree_git").SeveralWork as several:
-        typer.echo(f"[pre-push] WARNING: {several}\nhint: {several.fix}", err=True)
+        typer.echo(f"[pre-push] WARNING: {several.message}\nhint: {several.fix}", err=True)
         work = gitflow.work_prefix + several.keep
     except load_owner("dd-bug-resolution", "_refusal").Refusal as refusal:
         fail(f"[pre-push] BLOCKED: {refusal}", fix=refusal.fix)
