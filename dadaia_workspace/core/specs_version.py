@@ -21,7 +21,7 @@ from dadaia_workspace.core.gitflow import constitution_error, constitution_text,
 #: Single source of truth for the current canonical specs-pattern version.
 #: Bump this whenever the canon a tree must meet changes. A canon change that
 #: keeps the stamp leaves every older tree reading ``canonical`` while the doctor is red.
-CANONICAL_SPECS_VERSION = 12
+CANONICAL_SPECS_VERSION = 13
 
 #: The oldest stamp the upgrade starts from — and so the oldest a tree may
 #: carry and still be a dadaia tree; anything older is foreign.
@@ -29,7 +29,7 @@ OLDEST_UPGRADABLE_VERSION = 6
 
 #: The canon fingerprint each stamp was cut at — re-pinned only together with a stamp bump,
 #: or while the stamp is unpublished (``test_a_canon_change_bumps_the_stamp`` computes it).
-CANON_AT = {12: "bd5cd7e3c3acda50"}
+CANON_AT = {13: "a2c4f69622de9238"}
 State = Literal["absent", "file", "malformed", "foreign", "upgradable", "canonical"]
 #: The kinds that hold no tree: nothing to read, rule or repair.
 NO_TREE: frozenset[State] = frozenset({"absent", "file"})
