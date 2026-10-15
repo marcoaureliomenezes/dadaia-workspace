@@ -12,6 +12,7 @@ from typing import Any
 
 import pytest
 
+from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.hooks import pre_gate
 from tests.fixtures.harness_env import claude_hook_env, run_hook_subprocess
 
@@ -31,7 +32,7 @@ def _spawn(ws: Path, payload: dict[str, Any]) -> Any:
 @pytest.mark.parametrize(
     ("tool", "tool_input", "want"),
     [
-        ("Write", {"file_path": "repos/a/src/thing.py"}, "worktree.py list"),
+        ("Write", {"file_path": "repos/a/src/thing.py"}, "@wt"),
         ("NotebookEdit", {"notebook_path": "junk.ipynb"}, None),
         ("Read", {"file_path": "x"}, None),
         ("Write", {"file_path": ".dadaia/sessions/a.json"}, "SEC-01"),
@@ -73,6 +74,7 @@ def test_non_write_and_protected_matrix(
 ) -> None:
     """Through one spawn, pre_gate reproduces the standalone sdd_gate and root_whitelist
     verdicts (paths are workspace-relative; ``want`` names the block reason)."""
+    want = want and want.replace("@wt", fix_line(tmp_path, "worktree", "list"))
     (tmp_path / ".dadaia" / "states").mkdir(parents=True)
     (tmp_path / ".dadaia" / "states" / "spec_contexts.json").write_text(
         json.dumps({"contexts": [{"repo_slug": "a", "state": "alive"}]}), encoding="utf-8"

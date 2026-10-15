@@ -15,6 +15,7 @@ from typing import Any
 import pytest
 
 from dadaia_workspace.core import session_store
+from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.workspace_resolver import FENCE_ENV
 from tests.fixtures.harness_env import claude_hook_env, run_hook_subprocess
 
@@ -56,7 +57,7 @@ def _row(id: str, target: Any, want: str | None = None, **opts: Any) -> Any:
              "SEC-01", fence=True),
         _row("worktree-agents-md-is-never-law-A1.1", _WT_A + "AGENTS.md", records=_BOUND_A),
         _row("AC1.1-bound-repos-write-names-the-worktree", "repos/a/src/x.py",
-             "worktree.py list", records=_BOUND_A),
+             "@wt", records=_BOUND_A),
         _row("apply-patch-a-later-protected-header-blocks-T-014-02",
              _PATCH.format(".dadaia/sessions/runtime/a.ptr"), "SEC-01", tool="apply_patch"),
         _row("apply-patch-all-headers-allowed", _PATCH.format("docs/notes.md"), tool="apply_patch"),
@@ -107,6 +108,7 @@ def test_gate_verdict(tmp_path: Path, target: Any, want: str | None, opts: dict[
     now = datetime.now(tz=UTC).isoformat()
     for sid, record in opts.get("records", {}).items():
         session_store.write_session(ws, sid, {"session_id": sid, "last_seen_at": now, **record})
+    want = want and want.replace("@wt", fix_line(ws, "worktree", "list"))
     tool = opts.get("tool", "Write")
     if tool == "apply_patch":
         tool_input: dict[str, Any] = {"command": target}
