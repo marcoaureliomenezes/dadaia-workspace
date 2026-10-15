@@ -20,7 +20,7 @@ from _platform import quote as quote  # (`as`: re-exported to the worktree verbs
 from _specs import script as script
 from _specs import workspace_cli
 from _specs import workspace_of as workspace_of
-from _worktree_names import NAME_RE, SCRIPT, Refusal, base, branch, name_of, tree_path
+from _worktree_names import NAME_RE, SCRIPT, Refusal, base, base_of, branch, name_of, tree_path
 
 
 def diff_sha256(tree: Path, work: str, tip: str) -> str:
@@ -130,9 +130,9 @@ def work_version(repo: Path, flow: dict[str, str]) -> str:
 
 def not_a_name(name: str, live: str = "") -> Refusal:
     """The one refusal of a name the grammar does not take; its one fix lists the trees."""
-    shape = live or "<M.m.p>"
+    shape = live or "0.5.0"
     return Refusal(
-        f"not a worktree name: {name!r} (expected {shape}-rc<N>/<job>[--<task-id>], {shape}-rc<N>/define, backlog/<slug> or hotfix/<bug-id>)",
+        f"not a worktree name: {name!r} (expected {shape}/rc-<N>/wt-rc, {shape}/rc-<N>/job-<n>/wt-main, {shape}/rc-<N>/job-<n>/wt-task-<kkk>, {shape}/wt-backlog-<slug> or {shape}/wt-hotfix-<bug>)",  # fmt: skip
         f"{script(SCRIPT)} list",
     )
 
@@ -183,7 +183,7 @@ def _age(repo: Path, name: str) -> float:
 
 def _ours(repo: Path, flow: dict[str, str], name: str, path: str) -> dict[str, object]:
     """Our tree *name*: `empty` (nothing ahead), `ready` (ahead, clean) or `open` (ahead, dirty)."""
-    span = f"{recorded_base(repo, name, flow)}..{branch(name)}"
+    span = f"{base_of(name, flow['work'])}..{branch(name)}"
     ahead, changed = (
         int(git(repo, "rev-list", "--count", span, check=False) or 0),
         dirty(Path(path)),
@@ -192,23 +192,32 @@ def _ours(repo: Path, flow: dict[str, str], name: str, path: str) -> dict[str, o
     return _row(repo, path, state, _age(repo, name), name=name, ahead=ahead, dirty=changed)
 
 
+def _strays(folder: Path, listed: set[Path], ancestors: set[Path]) -> list[Path]:
+    """The leaf folders under *folder* that no tree lists nor is an ancestor of one: strays at any depth."""
+    out: list[Path] = []
+    for child in sorted(folder.glob("*")):
+        here = child.resolve()
+        if child.is_dir() and here not in listed:
+            sub = _strays(child, listed, ancestors)
+            out += sub if sub or here in ancestors else [child]
+    return out
+
+
 def _absent(root: Path, repo: Path, held: set[str], found: list[dict[str, object]]) -> list[dict[str, object]]:  # fmt: skip
-    """The leftovers git does not list: a `wt/*` branch with no tree (`orphan`), a directory two
-    levels under `worktrees/<repo>/` or an unlisted one level under it (`unregistered`)."""
+    """The leftovers git does not list: a `wt/*` branch with no tree (`orphan`), and each stray
+    folder under `worktrees/<repo>/` (`unregistered`), one row per path whose removal is its fix."""
     out = []
     home = tree_path(root, repo.name)
     for ref in git(repo, "for-each-ref", "--format=%(refname:short)", "refs/heads/wt/").split():
         if f"refs/heads/{ref}" not in held and (name := name_of(ref)):
             out.append(_row(repo, str(home / name), "orphan"))
-    listed = {Path(str(r["path"])).resolve() for r in (*found, *out)}  # one row per path
-    for stray in sorted(home.glob("*/*")):  # a name is two levels
-        if stray.is_dir() and not {stray.resolve(), stray.parent.resolve()} & listed:
-            out.append(_row(repo, str(stray), "unregistered"))
-    for folder in sorted(home.glob("*")):  # an unlisted one-level folder
-        named = any(Path(str(r["path"])).parent == folder for r in (*found, *out))
-        if folder.is_dir() and folder.resolve() not in listed and not named:
-            out.append(_row(repo, str(folder), "unregistered"))
-    return out
+    listed = {Path(str(r["path"])).resolve() for r in (*found, *out)}
+    ancestors = {p for path in listed for p in path.parents}
+    return out + [
+        _row(repo, str(stray), "unregistered")
+        | {"fix": f"Agent action: remove the directory {stray}"}
+        for stray in _strays(home, listed, ancestors)
+    ]
 
 
 def _repo_rows(root: Path, repo: Path, flow: dict[str, str]) -> list[dict[str, object]]:
