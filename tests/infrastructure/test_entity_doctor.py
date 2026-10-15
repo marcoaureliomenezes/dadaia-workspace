@@ -497,7 +497,7 @@ def test_a_long_skill_md_with_its_source_in_a_repo_is_split_there_in_a_tree(tmp_
         f"scripts/, merge it, then run `{fix_line(tmp_path, 'public', 'install')}`"
     )
     rel = edited.relative_to(tmp_path).as_posix()
-    assert classify_path(rel)[0] is not PathClass.PROTECTED
+    assert classify_path(rel, root=tmp_path)[0] is not PathClass.PROTECTED
     assert evaluate(rel, root=tmp_path, zone="worktree", repo="lib", owner="lib", context="lib",
                     repos=frozenset({"lib"}))[0] is Decision.ALLOW  # fmt: skip
 

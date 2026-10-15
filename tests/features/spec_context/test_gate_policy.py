@@ -46,8 +46,8 @@ _IN_REPO = (
     *[pytest.param(p, M, id=f"AC3.1-retired-mirror-{p}") for p in (".codex/AGENTS.md", ".kimi-code/AGENTS.md", ".agents/AGENTS.md", ".claude/rules/AGENTS.md")],
 ])
 # fmt: on
-def test_classification_matrix(path: str, expected: PathClass) -> None:
-    assert classify_path(path)[0] == expected
+def test_classification_matrix(path: str, expected: PathClass, tmp_path: Path) -> None:
+    assert classify_path(path, root=tmp_path)[0] == expected
 
 
 _A: dict[str, object] = {"context": "ctx-a", "repos": frozenset({"ctx-a", "ctx-a-infra"})}

@@ -116,7 +116,7 @@ def _protected_paths(fix: str, root: Path) -> list[str]:
             rel = Path(word).resolve().relative_to(root.resolve()).as_posix()
         except ValueError:
             continue
-        if classify_path(rel, projected, protected)[0] is PathClass.PROTECTED:
+        if classify_path(rel, projected, protected, root)[0] is PathClass.PROTECTED:
             found.append(rel)
     return found
 
