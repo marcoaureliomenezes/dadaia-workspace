@@ -101,10 +101,8 @@ def _assert_refused(r: _Repo, done: subprocess.CompletedProcess[str], before: st
     assert "[ref-gate] BLOCKED" in done.stderr
     fixes = [ln for ln in done.stderr.splitlines() if "fix:" in ln]
     assert len(fixes) == 1, done.stderr
-    argv = shlex.split(fixes[0].split("fix:", 1)[1])
-    assert argv[:4] == [*shlex.split(fix_line(None)), "worktree", "new", "repo"], fixes[0]
-    # `--help` forwards to the installed script: the line's launcher and verb resolve.
-    assert subprocess.run([*argv, "--help"], capture_output=True, check=False).returncode == 0
+    assert fixes[0].startswith("fix: Agent action: "), fixes[0]
+    assert fix_line(None, "worktree", "new", "repo") in fixes[0]
     assert r.ok("rev-parse", f"refs/heads/{_WORK}") == before
 
 
@@ -173,3 +171,27 @@ def test_a_runner_fault_warns_and_lets_the_commit_through(repo: _Repo, code: int
     assert done.returncode == 0, done.stderr
     assert "boom" in done.stderr
     assert "ref gate failed" in done.stderr
+
+
+def _ahead_by_a_marked_merge(repo: _Repo) -> None:
+    """The normal state between a worktree merge and the push: local is ahead of origin."""
+    other = _other_ahead(repo)
+    assert repo.git("merge", "-q", "--ff-only", other, wt=True).returncode == 0
+
+
+def test_stash_and_hard_reset_pass_on_a_work_branch_ahead_of_origin(repo: _Repo) -> None:
+    _ahead_by_a_marked_merge(repo)
+    before = repo.ok("rev-parse", "HEAD")
+    (repo.root / "f.txt").write_text("x\n", encoding="utf-8")
+    repo.ok("add", "f.txt")
+    stashed = repo.git("stash")
+    assert stashed.returncode == 0, stashed.stderr
+    reset = repo.git("reset", "--hard")
+    assert reset.returncode == 0, reset.stderr
+    assert repo.ok("rev-parse", "HEAD") == before
+
+
+def test_a_raw_commit_is_still_refused_on_a_work_branch_ahead_of_origin(repo: _Repo) -> None:
+    _ahead_by_a_marked_merge(repo)
+    before = repo.ok("rev-parse", "HEAD")
+    _assert_refused(repo, repo.git("commit", "-q", "--allow-empty", "-m", "raw"), before)

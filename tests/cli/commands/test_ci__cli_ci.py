@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import shlex
 import subprocess
 from pathlib import Path
 
@@ -10,6 +9,7 @@ from typer.testing import CliRunner
 
 from dadaia_workspace.cli.commands import ci
 from dadaia_workspace.cli.main import app
+from dadaia_workspace.core.cli_line import fix_line
 
 _runner = CliRunner()
 
@@ -95,9 +95,9 @@ def test_ref_gate_refuses_a_work_update_off_origin_with_the_worktree_route(
     assert result.exit_code == 1
     assert "[ref-gate] BLOCKED" in result.output
     assert result.output.count("fix: ") == 1
-    fix = shlex.split(result.output.rsplit("fix: ", 1)[1])
-    assert fix[0].endswith("dadaia")
-    assert fix[1:] == ["worktree", "new", "repo", "change"]
+    fix = result.output.rsplit("fix: ", 1)[1]
+    assert fix.startswith("Agent action: ")
+    assert fix_line(None, "worktree", "new", "repo") in fix
     assert _git(repo, "rev-parse", _WORK_REF) == tip
 
 

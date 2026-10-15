@@ -1045,6 +1045,29 @@ def _drop_readme_term(world: World) -> None:
     (world.repo / "README.md").write_text("a\n", encoding="utf-8")
 
 
+def _work_ahead_of_origin(world: World) -> str:
+    """The work branch is ahead of its published self; the command is the hook's ref line
+    for that update, fed to the real ``ci ref-gate-check``."""
+    _published(world)
+    world.commit("w.md", "w\n", branch="feature/0.1.0")
+    world.git(world.repo, "push", "-q", "-u", "origin", "feature/0.1.0")
+    world.commit("more.md", "m\n")
+    cli = workspace_cli_path(world.ws)
+    return (
+        "printf '%s %s refs/heads/feature/0.1.0\\n' $(git rev-parse HEAD~1) $(git rev-parse HEAD)"
+        f" | {cli} ci ref-gate-check"
+    )
+
+
+def _land_the_work_branch(world: World) -> None:
+    """What a tree's merge and push leave: origin holds the work branch's tip."""
+    world.git(world.repo, "push", "-q", "origin", "feature/0.1.0")
+
+
+def _work_pushed_0_1_0(world: World) -> None:
+    assert world.remote_heads()["feature/0.1.0"] == world.git(world.repo, "rev-parse", "HEAD")
+
+
 # ── the census ───────────────────────────────────────────────────────────────────────
 
 _REFUSALS: dict[str, tuple[Case | tuple[Case, ...] | Skip, ...]] = {
@@ -1059,6 +1082,9 @@ _REFUSALS: dict[str, tuple[Case | tuple[Case, ...] | Skip, ...]] = {
     ),
     "branch_policy.check_branch_policy": (
         Case(_mismatch, _work_pushed, then="git push -q origin feature/1.0.0"),
+    ),
+    "branch_policy.check_ref_policy": (
+        Case(_work_ahead_of_origin, _work_pushed_0_1_0, before=_land_the_work_branch),
     ),
     "push_gate._rewrite_fix": (
         (

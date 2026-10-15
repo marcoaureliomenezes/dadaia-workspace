@@ -13,6 +13,7 @@ from pathlib import Path
 
 import pytest
 
+from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.gitflow import DEFAULT, Gitflow
 from dadaia_workspace.features.chokepoints import Decision, push_gate_decision
 from dadaia_workspace.features.chokepoints.branch_policy import (
@@ -224,9 +225,14 @@ def test_a_work_branch_update_to_a_sha_other_than_origins_is_refused_with_one_fi
     assert not decision.allowed
     assert "feature/0.6.0" in decision.message
     assert decision.message.count("fix: ") == 1
-    fix = shlex.split(decision.message.rsplit("fix: ", 1)[1])
-    assert fix[1:] == ["worktree", "new", "proj", "change"]
-    assert fix[0].endswith("dadaia")
+    fix = decision.message.rsplit("fix: ", 1)[1]
+    assert fix.startswith("Agent action: ")
+    assert fix_line(None, "worktree", "new", "proj") in fix
+    assert "change" not in fix
+
+
+def test_a_work_branch_no_op_update_passes() -> None:
+    assert _ref_policy([f"{_B} {_B} {_WORK_REF}"], DEFAULT, {_WORK_REF: _C1}).allowed
 
 
 def test_a_work_branch_with_no_origin_is_ungated() -> None:
