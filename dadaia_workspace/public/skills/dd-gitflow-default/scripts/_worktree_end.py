@@ -16,6 +16,7 @@ import subprocess
 import sys
 from collections.abc import Callable, Iterator
 from datetime import datetime
+from functools import partial
 from pathlib import Path
 
 from _handoffs import REVIEWER, reviewer_records
@@ -360,28 +361,24 @@ def _into(repo: Path, onto: str) -> Path:
     return tree_path(repo.parents[1], repo.name, name) if onto.startswith("wt/") else repo
 
 
-def _kind_checks(root: Path, repo: Path, tree: Path, name: str, onto: str, into: Path, keep: list[str], drop: bool) -> list[tuple[str, Callable[[], object]]]:  # fmt: skip
-    """The ordered (label, check) pairs a tree of this kind must pass to land; `merge` runs
-    this list; the ignored-file and target-checkout checks end every kind."""
+def _kind_checks(root: Path, repo: Path, tree: Path, name: str, onto: str, into: Path) -> list[Callable[[], object]]:  # fmt: skip
+    """The ordered checks a tree of this kind must pass to land, before `merge`'s own ending checks."""
     if not into.exists():  # the parent's tree removed by hand
         raise Refusal(f"{into} does not exist", git_line(repo, "worktree", "add", "-f", "-f", str(into), onto))  # fmt: skip
-    ancestor = ("ancestor", lambda: _check_ancestor(root, tree, onto))
-    verdict = ("verdict", lambda: _check_approved(root, tree, onto, name))
-    gate = [ancestor, verdict, ("verify", lambda: _gate(tree, onto))]
-    children = ("open children", lambda: _open_children(repo, name))
-    scaffold = ("scaffold", lambda: _scaffold(tree, name))
-    ledgers = ("ledgers", lambda: _ledgers(root, tree))
-    specs = ("specs only", lambda: _check_specs_only(tree, onto))
-    tests = ("tests", lambda: _refuse_implementation_tests(tree, onto, _target(root, str(into))[3]))
-    table: dict[str | None, list[tuple[str, Callable[[], object]]]] = {
-        "task": [ancestor, tests, ("job clean", lambda: _refuse_dirty(into))],
+    ancestor = partial(_check_ancestor, root, tree, onto)
+    verdict = partial(_check_approved, root, tree, onto, name)
+    gate = [ancestor, verdict, partial(_gate, tree, onto)]
+    children, scaffold = partial(_open_children, repo, name), partial(_scaffold, tree, name)
+    ledgers, specs = partial(_ledgers, root, tree), partial(_check_specs_only, tree, onto)
+    tests = lambda: _refuse_implementation_tests(tree, onto, _target(root, str(into))[3])  # noqa: E731
+    table: dict[str | None, list[Callable[[], object]]] = {
+        "task": [ancestor, tests, partial(_refuse_dirty, into)],
         "main": [children, scaffold, *gate],
         "hotfix": [scaffold, *gate],
         "backlog": [specs, ancestor, verdict, ledgers],
         "rc": [children, *gate, ledgers],
     }
-    checks = [("dirty", lambda: _refuse_dirty(tree)), *table[kind_of(name)]]
-    return checks + [("ignored", lambda: _kept(tree, "merge", keep, drop)), ("target", lambda: _on_target(into, onto))]  # fmt: skip
+    return [partial(_refuse_dirty, tree), *table[kind_of(name)]]
 
 
 def _on_target(into: Path, onto: str) -> None:
@@ -405,9 +402,10 @@ def merge(root: Path, path: str, keep: list[str], drop: bool) -> str:
                 ) from error
         _rmdir(tree, name)
         return f"{ref} merged into {onto}"
-    for _, check in _kind_checks(root, repo, tree, name, onto, into, keep, drop):
+    for check in _kind_checks(root, repo, tree, name, onto, into):
         check()
     kept = _kept(tree, "merge", keep, drop)
+    _on_target(into, onto)
     try:
         git(into, "merge", "-q", "--ff-only", ref)
     except RuntimeError as error:
