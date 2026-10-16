@@ -11,6 +11,7 @@ import pytest
 from dadaia_workspace.core.models.git_scan import ZERO_SHA, GitObjectReadError, ScannedObject
 from dadaia_workspace.infrastructure import git_objects
 from dadaia_workspace.infrastructure.git_objects import GitSubprocessObjectReader, unpublished
+from tests.helpers.oslib import run, run_bytes, write_text
 
 pytestmark = pytest.mark.slow
 
@@ -19,9 +20,7 @@ Tree = dict[str, "str | bytes | None"]  # path -> content; None deletes the path
 
 
 def _git(args: list[str], cwd: Path) -> str:
-    return subprocess.run(
-        ["git", *args], cwd=cwd, capture_output=True, text=True, check=True
-    ).stdout.strip()
+    return run(["git", *args], cwd=cwd, check=True).stdout.strip()
 
 
 def _repo(tmp_path: Path, *commits: Tree) -> tuple[Path, list[str]]:
@@ -42,7 +41,7 @@ def _repo(tmp_path: Path, *commits: Tree) -> tuple[Path, list[str]]:
             if isinstance(content, bytes):
                 target.write_bytes(content)
             else:
-                target.write_text(content)
+                write_text(target, content)
         _git(["add", "-A"], repo)
         _git(["commit", "-q", "--allow-empty", "-m", f"c{i}"], repo)
         shas.append(_git(["rev-parse", "HEAD"], repo))
@@ -63,7 +62,7 @@ def _bodies(objects: list[ScannedObject], kind: str = "commit") -> list[ScannedO
 
 def _publish(repo: Path, tmp_path: Path, branch: str) -> None:
     remote = tmp_path / "origin.git"
-    subprocess.run(["git", "init", "-q", "--bare", str(remote)], check=True)
+    run(["git", "init", "-q", "--bare", str(remote)], check=True)
     _git(["remote", "add", "origin", str(remote)], repo)
     _git(["push", "-q", "origin", f"HEAD:refs/heads/{branch}"], repo)
     _git(["fetch", "-q", "origin"], repo)
@@ -248,7 +247,6 @@ def test_a_corrupt_or_failing_git_answer_raises_the_typed_error(
     fabricated undecodable object."""
     repo, (base, tip) = _repo(tmp_path, {"a.txt": "hello\n"}, {"a.txt": "edited\n"})
     blob = _git(["rev-parse", "HEAD:a.txt"], repo)
-    real_run = subprocess.run
 
     def is_target(args: list[str], stdin: bytes) -> bool:
         check = args[:2] == ["git", "cat-file"] and args[2].startswith("--batch-check")
@@ -264,12 +262,12 @@ def test_a_corrupt_or_failing_git_answer_raises_the_typed_error(
         stdin = kwargs.get("input") or b""
         assert isinstance(stdin, bytes)
         if not is_target(args, stdin):
-            return real_run(args, **kwargs)  # type: ignore[call-overload, no-any-return]
+            return run_bytes(args, **kwargs)  # type: ignore[arg-type]
         if isinstance(reply, str):
             return _out(reply.format(blob=blob))(args)
         return reply(args)
 
-    monkeypatch.setattr(git_objects.subprocess, "run", fake)
+    monkeypatch.setattr(git_objects.platform, "run_bytes", fake)
     yielded: list[ScannedObject] = []
     with pytest.raises(GitObjectReadError, match=match):
         yielded.extend(GitSubprocessObjectReader().new_objects(repo, tip, base))
@@ -315,21 +313,17 @@ def test_mergetag_embedded_tag_body_reaches_the_matcher(tmp_path: Path) -> None:
     """CWE-184: a signed-tag merge folds the tag's body into the commit HEADER region;
     its body is scanned, its own header lines are not (synthetic block, no GPG key)."""
     repo, (base,) = _repo(tmp_path, {"a.txt": "x\n"})
-    raw = subprocess.run(
-        ["git", "cat-file", "commit", base], cwd=repo, capture_output=True, check=True
-    ).stdout
+    raw = run_bytes(["git", "cat-file", "commit", base], cwd=repo).stdout
     header, _, rest = raw.partition(b"\n\n")
     block = (
         b"mergetag object " + base.encode() + b"\n type commit\n tag v9\n"
         b" tagger T <t@example.com> 1700000000 +0000\n \n SECRET-IN-MERGETAG-BODY probe\n"
     )
     sha = (
-        subprocess.run(
+        run_bytes(
             ["git", "hash-object", "-t", "commit", "-w", "--stdin"],
             cwd=repo,
             input=header + b"\n" + block + b"\n\n" + rest,
-            capture_output=True,
-            check=True,
         )
         .stdout.decode()
         .strip()
@@ -346,8 +340,8 @@ def test_a_new_branch_keeps_amnesty_for_what_origin_already_published(tmp_path: 
     repo, (base,) = _repo(tmp_path, {"ledger.jsonl": "first\n"})
     _publish(repo, tmp_path, "develop")
     _git(["checkout", "-q", "-b", "feature/1.0.0"], repo)
-    (repo / "ledger.jsonl").write_text("first\nsecond\n")
-    (repo / "brand-new.md").write_text("new\n")
+    write_text(repo / "ledger.jsonl", "first\nsecond\n")
+    write_text(repo / "brand-new.md", "new\n")
     _git(["add", "-A"], repo)
     _git(["commit", "-q", "-m", "c1"], repo)
     tip = _git(["rev-parse", "HEAD"], repo)
@@ -362,7 +356,7 @@ def test_a_new_branch_keeps_amnesty_for_what_origin_already_published(tmp_path: 
 def _published_repo(tmp_path: Path) -> tuple[Path, str]:
     """A repo whose one commit is already on a bare ``origin``."""
     remote = tmp_path / "origin.git"
-    subprocess.run(["git", "init", "-q", "--bare", str(remote)], check=True)
+    run(["git", "init", "-q", "--bare", str(remote)], check=True)
     repo, (sha,) = _repo(tmp_path, {"a.txt": "first\n"})
     _git(["remote", "add", "origin", str(remote)], repo)
     _git(["push", "-q", "origin", "HEAD:refs/heads/main"], repo)
@@ -410,3 +404,14 @@ def test_an_unresolvable_or_option_shaped_sha_fails_closed(tmp_path: Path, sha: 
     """Unreadable counts as unpublished: never a birth, never an empty range."""
     repo, _ = _published_repo(tmp_path)
     assert GitSubprocessObjectReader().unpublished(repo, sha) == [sha]
+
+
+def test_an_oversized_blob_read_that_cannot_start_git_raises_the_typed_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def refuse(*_a: object, **_k: object) -> None:
+        raise FileNotFoundError(2, "No such file or directory")
+
+    monkeypatch.setattr(git_objects.platform, "popen_bytes", refuse)
+    with pytest.raises(GitObjectReadError, match="git could not run"):
+        git_objects._read_oversized_blob_prefix(tmp_path, "a" * 40)

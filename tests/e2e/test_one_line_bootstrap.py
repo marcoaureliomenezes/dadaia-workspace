@@ -45,6 +45,7 @@ from dadaia_workspace.infrastructure.provider_version import provider_version
 from tests.conftest import GIT_QUIET_INCLUDE
 from tests.fixtures.harness_env import suite_env
 from tests.fixtures.stores import fake_venv
+from tests.helpers.oslib import run, write_text
 
 pytestmark = [pytest.mark.e2e, pytest.mark.slow]
 
@@ -57,7 +58,7 @@ def _child_env(home: Path) -> dict[str, str]:
     """A clean environment: no inherited ``DADAIA_*`` but the suite's fence (the dev CLI's
     own workspace is never this child's), a tmp ``HOME``, a git identity."""
     keep = "DADAIA_FENCED_ROOTS"
-    (home / "gitconfig").write_text(GIT_QUIET_INCLUDE, encoding="utf-8")
+    write_text(home / "gitconfig", GIT_QUIET_INCLUDE)
     env = {
         k: v
         for k, v in suite_env(os.environ, Path.home()).items()
@@ -84,19 +85,12 @@ def _dadaia(
 ) -> subprocess.CompletedProcess[str]:
     env = _child_env(home)
     env.update(extra_env or {})
-    return subprocess.run(
-        [str(_CONSOLE_SCRIPT), *argv],
-        cwd=cwd,
-        env=env,
-        capture_output=True,
-        text=True,
-        timeout=_TIMEOUT,
-    )
+    return run([str(_CONSOLE_SCRIPT), *argv], cwd=cwd, env=env, timeout=_TIMEOUT)
 
 
-def _git(*args: str, cwd: Path, home: Path) -> bytes:
+def _git(*args: str, cwd: Path, home: Path) -> str:
     env = _child_env(home)
-    return subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True, env=env).stdout
+    return run(["git", *args], cwd=cwd, check=True, env=env).stdout
 
 
 @pytest.fixture()
@@ -115,7 +109,7 @@ def origin(tmp_path: Path, home: Path) -> Path:
     work = tmp_path / "seed"
     work.mkdir()
     _git("init", "--initial-branch=main", cwd=work, home=home)
-    (work / "README.md").write_text("# demo-project\n", encoding="utf-8")
+    write_text(work / "README.md", "# demo-project\n")
     _git("add", "README.md", cwd=work, home=home)
     _git("commit", "-m", "seed", cwd=work, home=home)
     _git("remote", "add", "origin", str(bare), cwd=work, home=home)
@@ -144,7 +138,7 @@ def test_one_line_bootstrap_yields_a_doctor_clean_workspace(
     assert f"already at {provider_version()}" in init.stdout.splitlines(), init.stdout
     # `init --repo` commits nothing into the user repo — clean tree, HEAD at origin.
     repo = workspace / "repos" / "demo-project"
-    assert _git("status", "--porcelain", cwd=repo, home=home) == b""
+    assert _git("status", "--porcelain", cwd=repo, home=home) == ""
     assert _git("rev-parse", "HEAD", cwd=repo, home=home) == _git(
         "rev-parse", "main", cwd=origin, home=home
     )
@@ -190,7 +184,7 @@ def _build_wheel(source: Path, dest: Path) -> Path:
     installed beside this interpreter, so pip never reaches for an index.
     """
     dest.mkdir(parents=True, exist_ok=True)
-    subprocess.run(  # noqa: S603
+    run(
         [
             str(Path(sys.executable).parent / "pip"),
             "wheel",
@@ -200,10 +194,8 @@ def _build_wheel(source: Path, dest: Path) -> Path:
             "--wheel-dir",
             str(dest),
             str(source),
-        ],  # fmt: skip
+        ],
         check=True,
-        capture_output=True,
-        text=True,
         timeout=_TIMEOUT,
         env=suite_env(os.environ, Path.home()) | {"PIP_NO_INDEX": "1"},
     )
@@ -256,7 +248,7 @@ def _decoy_source(tmp_path: Path) -> Path:
     shutil.copytree(
         _REPO_ROOT / "dadaia_workspace", source / "dadaia_workspace", dirs_exist_ok=True
     )
-    (source / "dadaia_workspace" / _DECOY_MODULE).write_text("INDEX = True\n", encoding="utf-8")
+    write_text(source / "dadaia_workspace" / _DECOY_MODULE, "INDEX = True\n")
     return source
 
 
@@ -293,15 +285,11 @@ def test_the_workspace_venv_carries_the_bootstrappers_own_bytes(tmp_path: Path, 
     # the consumer path (no pyproject.toml beside the package) rather than the editable
     # self-hosting one.
     bootstrapper = tmp_path / "bootstrapper"
-    subprocess.run(  # noqa: S603
-        [sys.executable, "-m", "venv", str(bootstrapper)], check=True, capture_output=True
-    )
+    run([sys.executable, "-m", "venv", str(bootstrapper)], check=True)
     boot_bin = bootstrapper / PLATFORM.venv_scripts_dir
-    subprocess.run(  # noqa: S603
+    run(
         [str(boot_bin / "pip"), "install", "--quiet", str(real_wheel)],
         check=True,
-        capture_output=True,
-        text=True,
         timeout=_TIMEOUT,
         env=suite_env(os.environ, Path.home()) | {"PIP_NO_INDEX": "1", "PIP_FIND_LINKS": str(deps)},
     )
@@ -313,12 +301,10 @@ def test_the_workspace_venv_carries_the_bootstrappers_own_bytes(tmp_path: Path, 
     # own installed wheel and take the consumer path.
     env.pop("PYTHONPATH", None)
     env.update(PIP_NO_INDEX="1", PIP_FIND_LINKS=f"{deps} {decoy_dir}")
-    init = subprocess.run(  # noqa: S603
+    init = run(
         [str(boot_bin / f"dadaia{PLATFORM.venv_exe_suffix}"), "init", "ws", "--harness", "claude"],
         cwd=tmp_path,
         env=env,
-        capture_output=True,
-        text=True,
         timeout=_TIMEOUT,
     )
     assert init.returncode == 0, f"init failed:\n{init.stdout}\n{init.stderr}"
@@ -330,10 +316,8 @@ def test_the_workspace_venv_carries_the_bootstrappers_own_bytes(tmp_path: Path, 
         "the workspace venv carries the INDEX's bytes, not the bootstrapper's"
     )
 
-    help_text = subprocess.run(  # noqa: S603
+    help_text = run(
         [str(venv_bin / f"dadaia{PLATFORM.venv_exe_suffix}"), "init", "--help"],
-        capture_output=True,
-        text=True,
         timeout=_TIMEOUT,
         env=suite_env(_child_env(home), home, unset=("PYTHONPATH",)),
     )

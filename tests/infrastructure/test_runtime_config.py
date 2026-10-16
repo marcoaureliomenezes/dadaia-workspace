@@ -6,7 +6,6 @@ tests/infrastructure/runtime_transforms/test_hook_wrappers.py.
 from __future__ import annotations
 
 import shutil
-import subprocess
 import tomllib
 from pathlib import Path
 
@@ -23,6 +22,7 @@ from dadaia_workspace.infrastructure.runtime_config import (
 from dadaia_workspace.infrastructure.runtime_transforms.hook_wrappers import (
     hook_wrapper_contents,
 )
+from tests.helpers.oslib import run, write_text
 
 _HOME = Path("/tmp/kimi-home-test")
 _SHIMS = hook_wrapper_contents(HARNESS_RECORDS["kimi-code"])
@@ -104,20 +104,14 @@ def test_kimi_hook_shims_keys_and_prologue() -> None:
 @pytest.mark.parametrize("body", _SHIMS.values())
 def test_kimi_hook_shims_are_valid_sh_syntax(body: str, tmp_path: Path) -> None:
     shim = tmp_path / "shim.sh"
-    shim.write_text(body, encoding="utf-8")
-    subprocess.run(["sh", "-n", str(shim)], check=True)
+    write_text(shim, body)
+    run(["sh", "-n", str(shim)], check=True)
 
 
 @pytest.mark.skipif(shutil.which("sh") is None, reason="POSIX sh unavailable")
 def test_pre_gate_shim_fails_open_outside_dadaia_workspaces(tmp_path: Path) -> None:
     shim = tmp_path / "pre-gate.sh"
-    shim.write_text(_SHIMS["dadaia-kimi-pre-gate.sh"], encoding="utf-8")
-    proc = subprocess.run(
-        ["sh", str(shim)],
-        input='{"tool_name": "Write"}',
-        cwd=tmp_path,
-        capture_output=True,
-        text=True,
-    )
+    write_text(shim, _SHIMS["dadaia-kimi-pre-gate.sh"])
+    proc = run(["sh", str(shim)], input='{"tool_name": "Write"}', cwd=tmp_path)
     assert proc.returncode == 0
     assert proc.stderr == ""

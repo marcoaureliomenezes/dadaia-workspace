@@ -11,6 +11,7 @@ import pytest
 
 from dadaia_workspace.core.exceptions import PublicAssetError
 from dadaia_workspace.core.model_registry import ResolvedAgentModel
+from tests.helpers.oslib import make_readonly, read_text, write_text
 
 _BUG = "merge-gate-accepts-verdict-written-by-the-merger"
 
@@ -41,7 +42,7 @@ _PACK_BODY = (
 
 def _staged_agent_md(tmp_path: Path, name: str, text: str) -> Path:
     path = tmp_path / f"{name}.md"
-    path.write_text(text, encoding="utf-8")
+    write_text(path, text)
     return path
 
 
@@ -123,7 +124,7 @@ def test_privilege_derives_from_read_only_on_both_harnesses(
         assert line in fm
     assert ("disallowedTools" in "\n".join(fm)) == (declared == "true")
     md = tmp_path / "dd-sw-engineer-sr.md"
-    md.write_text(body, encoding="utf-8")
+    write_text(md, body)
     toml = codex_agent_toml_bytes(md, "dd-sw-engineer-sr", resolved).decode("utf-8")
     assert f'sandbox_mode = "{sandbox}"' in toml
 
@@ -140,7 +141,7 @@ def test_a_read_only_persona_gets_the_workspace_write_codex_sandbox(tmp_path: Pa
     assert "permissionMode: default" in fm
     assert "disallowedTools: [Edit, Write, NotebookEdit]" in fm
     md = tmp_path / "dd-sw-engineer-sr.md"
-    md.write_text(body, encoding="utf-8")
+    write_text(md, body)
     toml = codex_agent_toml_bytes(md, "dd-sw-engineer-sr", resolved).decode("utf-8")
     assert 'sandbox_mode = "workspace-write"' in toml
 
@@ -161,7 +162,7 @@ def test_a_persona_without_read_only_never_renders(tmp_path: Path, body: str) ->
     with pytest.raises(PublicAssetError, match="read_only"):
         render_claude_agent(body, resolved)
     md = tmp_path / "dd-sw-engineer-sr.md"
-    md.write_text(body, encoding="utf-8")
+    write_text(md, body)
     with pytest.raises(PublicAssetError, match="read_only"):
         codex_agent_toml_bytes(md, "dd-sw-engineer-sr", resolved)
 
@@ -269,11 +270,11 @@ def test_force_rerenders_diverged_claude_projection_to_render_output(
         label="claude:agents/dd-sw-engineer-sr.md", harness="claude", dst=dst, render=_render
     )
     install_rules((rule,), force=False)
-    assert dst.read_text(encoding="utf-8") == expected
+    assert read_text(dst) == expected
 
-    dst.write_text("# hand-edited divergence\n", encoding="utf-8")
+    write_text(dst, "# hand-edited divergence\n")
     install_rules((rule,), force=True)
-    after = dst.read_text(encoding="utf-8")
+    after = read_text(dst)
     assert after == expected, "--force must restore the RENDER output"
     assert after != _GENERIC_BODY, "--force must never re-copy raw staged bytes"
 
@@ -285,7 +286,7 @@ def test_install_rules_rewrites_a_read_only_projection(tmp_path: Path) -> None:
 
     dst = tmp_path / "AGENTS.md"
     dst.write_bytes(b"old")
-    dst.chmod(0o444)
+    make_readonly(dst)
     rule = ProjectionRule(
         label="law",
         harness="claude",
@@ -324,6 +325,6 @@ def test_the_real_personas_parse_to_a_typed_read_only() -> None:
     )
     assert len(personas) == 5
     for persona in personas:
-        parsed = parse(persona.read_text(encoding="utf-8"))
+        parsed = parse(read_text(persona))
         assert isinstance(parsed, Frontmatter), persona.name
         assert type(parsed.data["read_only"]) is bool, persona.name

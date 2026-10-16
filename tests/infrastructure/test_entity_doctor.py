@@ -42,6 +42,7 @@ from dadaia_workspace.features.specs.citations import (
 )
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from tests.fixtures.stores import context_store
+from tests.helpers.oslib import Undecodable, read_text, write_text
 from tests.helpers.scan_population import assert_populated
 
 _PKG_ROOT = Path(__file__).resolve().parents[2] / "dadaia_workspace"
@@ -73,7 +74,7 @@ _LAW_SOURCE_RELPATH = "dadaia_workspace/public/data/AGENTS.md"
 
 
 def _load_json(path: Path) -> dict[str, Any]:
-    result: dict[str, Any] = json.loads(path.read_text(encoding="utf-8"))
+    result: dict[str, Any] = json.loads(read_text(path))
     return result
 
 
@@ -82,7 +83,7 @@ def _real_map() -> dict[str, Any]:
 
 
 def _law_section_titles(law_path: Path = _LAW_PATH) -> set[str]:
-    return {m.group(1).strip() for m in _HEADING_RE.finditer(law_path.read_text(encoding="utf-8"))}
+    return {m.group(1).strip() for m in _HEADING_RE.finditer(read_text(law_path))}
 
 
 def _section_title(section_field: str) -> str:
@@ -163,7 +164,7 @@ def _find_ceiling_violations(map_data: dict[str, Any], skills_dir: Path) -> list
     return [
         f"{md.parent.name}: {n} lines > ceiling {ceiling}"
         for md in sorted(skills_dir.glob("*/SKILL.md"))
-        if (n := len(md.read_text(encoding="utf-8").splitlines())) > ceiling
+        if (n := len(read_text(md).splitlines())) > ceiling
     ]
 
 
@@ -187,7 +188,7 @@ def _globs_overlap(glob_a: str, glob_b: str) -> bool:
 
 
 def _frontmatter(md_path: Path) -> str:
-    fm = _FRONTMATTER_RE.match(md_path.read_text(encoding="utf-8"))
+    fm = _FRONTMATTER_RE.match(read_text(md_path))
     return fm.group(1) if fm else ""
 
 
@@ -401,7 +402,7 @@ def test_a_planted_map_violation_turns_red(case: str) -> None:
 
 def _write_skill(skills_dir: Path, name: str, text: str) -> None:
     (skills_dir / name).mkdir(parents=True)
-    (skills_dir / name / "SKILL.md").write_text(text, encoding="utf-8")
+    write_text(skills_dir / name / "SKILL.md", text)
 
 
 def test_an_oversized_skill_md_and_an_undeclared_overlap_turn_red(tmp_path: Path) -> None:
@@ -516,8 +517,8 @@ def _projected_specs_agents_relpath(repo_root: Path) -> str | None:
             public_dir=templates_dir.parent,
         )
         target = specs_dir / "AGENTS.md"
-        rendered = render_registry_tables(source.read_text(encoding="utf-8"))
-        if target not in created or target.read_text(encoding="utf-8") != rendered:
+        rendered = render_registry_tables(read_text(source))
+        if target not in created or read_text(target) != rendered:
             return None
     return "AGENTS.md"
 
@@ -547,7 +548,7 @@ def test_projected_specs_agents_md_citation_survives_bare_checkout() -> None:
 def _fixture_skill(tmp_path: Path, body: str) -> Path:
     skill = tmp_path / "fixture-repo" / "dadaia_workspace" / "public" / "skills" / "fixture-skill"
     skill.mkdir(parents=True)
-    (skill / "SKILL.md").write_text(body, encoding="utf-8")
+    write_text(skill / "SKILL.md", body)
     return tmp_path / "fixture-repo"
 
 
@@ -582,10 +583,10 @@ def test_mutation_fixture_12_dead_body_pointer_turns_red(tmp_path: Path) -> None
     """A dead skill pointer, a dead section pointer and a dead scoped-rule pointer are each flagged."""
     public = tmp_path / "fixture-repo" / "dadaia_workspace" / "public"
     (public / "skills" / "dd-real").mkdir(parents=True)
-    (public / "skills" / "dd-real" / "SKILL.md").write_text("## 1. When\n", encoding="utf-8")
-    (public / "skills" / "dd-real" / "NOTES.md").write_text(
+    write_text(public / "skills" / "dd-real" / "SKILL.md", "## 1. When\n")
+    write_text(
+        public / "skills" / "dd-real" / "NOTES.md",
         "See `dd-gone`.\nSee `dd-real` §9.\nSee `nowhere-AGENTS.md`.\nSee `dd-real` §1.\n",
-        encoding="utf-8",
     )
 
     violations = dead_body_pointers_in_tree((public / "skills",), public, tmp_path / "fixture-repo")
@@ -618,7 +619,7 @@ def test_every_cited_dadaia_invocation_names_a_real_verb_and_option() -> None:
         (f"{posix_relpath(md, _REPO_ROOT)}:{number}", token)
         for md in files
         if md.is_file() and not md.is_symlink()
-        for number, line in enumerate(md.read_text(encoding="utf-8").splitlines(), start=1)
+        for number, line in enumerate(read_text(md).splitlines(), start=1)
         for token in re.findall(r"`([^`\n]+)`", line)
     ]
     violations: list[str] = []
@@ -658,7 +659,7 @@ def _self_invoked_verb_paths() -> list[tuple[str, tuple[str, ...]]]:
         if path.is_symlink():
             continue
         rel = path.relative_to(_REPO_ROOT).as_posix()
-        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+        for node in ast.walk(ast.parse(read_text(path))):
             argvs: list[list[ast.expr]] = []
             if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
                 if node.func.id in {"cli", "doctor_clean"}:
@@ -700,13 +701,13 @@ def test_every_cited_skill_script_verb_exists() -> None:
     for script in sorted(_PUBLIC.glob("skills/*/scripts/[a-z]*.py")):
         found = verbs.setdefault(script.stem, set())
         for source in [script, *script.parent.glob(f"_{script.stem}*.py")]:
-            found.update(_ADD_PARSER_RE.findall(source.read_text(encoding="utf-8")))
+            found.update(_ADD_PARSER_RE.findall(read_text(source)))
     verbs = {name: found for name, found in verbs.items() if found}
     assert "catalog" in verbs.get("memory", set()), "script verb scan mis-rooted"
     violations: list[str] = []
     for md_path in sorted(_PUBLIC.rglob("*.md")):
         rel = md_path.relative_to(_REPO_ROOT).as_posix()
-        for number, line in enumerate(md_path.read_text(encoding="utf-8").splitlines(), 1):
+        for number, line in enumerate(read_text(md_path).splitlines(), 1):
             cited = [(m.group(1), m.group(2)) for m in _INLINE_VERB_RE.finditer(line)]
             for listed in _LISTED_VERBS_RE.finditer(line):
                 cited += [
@@ -719,3 +720,28 @@ def test_every_cited_skill_script_verb_exists() -> None:
                 if script in verbs and verb not in verbs[script]
             ]
     assert violations == [], "\n".join(violations)
+
+
+@pytest.mark.parametrize("check", ["skill-refs", "persona-content", "registry"])
+def test_an_authored_file_that_is_not_utf8_is_undecodable_not_a_codec_error(
+    tmp_path: Path, check: str
+) -> None:
+    from dadaia_workspace.infrastructure import entity_doctor
+
+    latin = tmp_path / "agents" / "a.md"
+    latin.parent.mkdir()
+    latin.write_bytes(b"---\nname: a\n---\ncaf\xe9\n")
+    registry = tmp_path / "entities" / "registry.json"
+    registry.parent.mkdir()
+    registry.write_bytes(b'{"x": "caf\xe9"}')
+    calls = {
+        "skill-refs": (entity_doctor.check_agent_skill_refs, (tmp_path,), latin),
+        "persona-content": (entity_doctor._persona_content_drift, ("a", latin.parent), latin),
+        "registry": (entity_doctor.check_entities_derivation, (tmp_path,), registry),
+    }
+    call, args, bad = calls[check]
+
+    with pytest.raises(Undecodable) as refused:
+        call(*args)
+
+    assert refused.value.path == bad

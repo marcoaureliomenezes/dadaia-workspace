@@ -19,6 +19,7 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.infrastructure import ledger_scripts
+from tests.helpers.oslib import write_text
 
 _PACKAGE_SKILLS = Path(ledger_scripts.__file__).resolve().parents[1] / "public" / "skills"
 _SCRIPT = ledger_scripts.LEDGER_SCRIPTS[0]
@@ -29,7 +30,7 @@ def _tree_with_skills(root: Path) -> Path:
     (root / "specs").mkdir(parents=True, exist_ok=True)
     scripts = root / ".agents" / "skills" / _SCRIPT.skill / "scripts"
     scripts.mkdir(parents=True)
-    (scripts / _SCRIPT.filename).write_text("", encoding="utf-8")
+    write_text(scripts / _SCRIPT.filename, "")
     return scripts / _SCRIPT.filename
 
 
@@ -37,7 +38,7 @@ def _launch_from(root: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Pretend this process runs from *root*'s workspace venv (``own_workspace_root``)."""
     states = root / ".dadaia" / "states"
     states.mkdir(parents=True, exist_ok=True)
-    (states / "spec_contexts.json").write_text("{}", encoding="utf-8")
+    write_text(states / "spec_contexts.json", "{}")
     monkeypatch.setattr(sys, "prefix", str(root / ".dadaia" / ".venv"))
 
 

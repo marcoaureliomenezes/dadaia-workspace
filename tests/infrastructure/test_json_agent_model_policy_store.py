@@ -26,6 +26,7 @@ from tests.fixtures._store_contract import (
     assert_unknown_top_level_field_rejected,
     assert_wrong_schema_version_rejected,
 )
+from tests.helpers.oslib import Undecodable, read_text, write_text
 
 
 def _store(tmp_path: Path, **kwargs: object) -> JsonAgentModelPolicyStore:
@@ -65,7 +66,7 @@ def test_load_contract(tmp_path: Path) -> None:
 def test_load_rejection_matrix(tmp_path: Path, doc: object, match: str) -> None:
     store = _store(tmp_path)
     store.path.parent.mkdir(parents=True)
-    store.path.write_text(json.dumps(doc), encoding="utf-8")
+    write_text(store.path, json.dumps(doc))
     with pytest.raises(AgentModelPolicyStoreError, match=match):
         store.load()
 
@@ -88,7 +89,7 @@ def test_overrides_refused_with_runnable_fix(
         "applied_template": applied_template,
         "overrides": {"dd-sw-engineer-sr": {"effort": "medium"}},
     }
-    store.path.write_text(json.dumps(doc), encoding="utf-8")
+    write_text(store.path, json.dumps(doc))
     with pytest.raises(AgentModelPolicyStoreError, match="overrides") as raised:
         store.load()
     assert fix_line(tmp_path, "public", "install", "--template", template) in raised.value.fix  # type: ignore[attr-defined]
@@ -97,7 +98,7 @@ def test_overrides_refused_with_runnable_fix(
 def test_applied_template_only_round_trip(tmp_path: Path) -> None:
     store = _store(tmp_path)
     store.save(AgentModelPolicyOverlay(applied_template="max-quality"))
-    assert json.loads(store.path.read_text(encoding="utf-8")) == {
+    assert json.loads(read_text(store.path)) == {
         "schema_version": "agent-model-policy-v1",
         "applied_template": "max-quality",
     }
@@ -112,3 +113,14 @@ def test_save_atomic_last_good_and_reload(tmp_path: Path) -> None:
     assert_save_is_atomic_no_tmp_leftover(_store(tmp_path / "atomic"), first)
     assert_last_good_snapshot_of_prior_valid_file(_store(tmp_path / "lastgood"), first, second)
     assert_saved_value_reloads_identically(_store(tmp_path / "reload"), second)
+
+
+def test_an_overlay_that_is_not_utf8_is_undecodable_not_a_codec_error(tmp_path: Path) -> None:
+    store = _store(tmp_path)
+    store.path.parent.mkdir(parents=True)
+    store.path.write_bytes(b'{"applied_template": "caf\xe9"}')
+
+    with pytest.raises(Undecodable) as refused:
+        store.load()
+
+    assert refused.value.path == store.path

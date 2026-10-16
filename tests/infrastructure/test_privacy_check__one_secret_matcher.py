@@ -27,6 +27,7 @@ from dadaia_workspace.infrastructure.privacy_check import (
     _PUBLIC_PRIVACY_TEXT_SUFFIXES,  # allow-private-import: which suffixes the doctor reads
     check_public_privacy,
 )
+from tests.helpers.oslib import write_text
 
 _DASHES = "-" * 5
 _TERM = "zz" + "fixtureterm"
@@ -112,7 +113,7 @@ _MATRIX: list[tuple[str, str, str | bytes, bool]] = [
 @pytest.fixture(autouse=True)
 def _operator_term(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     denylist = tmp_path / "denylist.json"
-    denylist.write_text(json.dumps({_TERM: "fixture term"}))
+    write_text(denylist, json.dumps({_TERM: "fixture term"}))
     monkeypatch.setenv("DADAIA_PRIVACY_DENYLIST", str(denylist))
 
 
@@ -130,7 +131,7 @@ def _publish_refuses(root: Path, name: str, content: str | bytes) -> bool:
     """The publish side: the in-process matcher ``context baseline`` runs over the same
     file, untracked in its repo."""
     target = root / name
-    target.write_bytes(content) if isinstance(content, bytes) else target.write_text(content)
+    target.write_bytes(content) if isinstance(content, bytes) else write_text(target, content)
     return bool(scan_publish_candidates(root, [name]))
 
 
@@ -145,6 +146,6 @@ def test_pre_push_and_publish_preflight_agree(
     if isinstance(content, str) and Path(name).suffix in _PUBLIC_PRIVACY_TEXT_SUFFIXES:
         public = tmp_path / "lib" / "dadaia_workspace" / "public"
         public.mkdir(parents=True)
-        (public / name).write_text(content)
+        write_text(public / name, content)
         lines = check_public_privacy(public, lambda d: d.iterdir())
         assert any(line.status is DoctorStatus.ERROR for line in lines) is refused, case

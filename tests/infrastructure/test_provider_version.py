@@ -15,13 +15,14 @@ from dadaia_workspace.cli.main import app
 from dadaia_workspace.features.reconcile.service import reconcile_workspace
 from dadaia_workspace.infrastructure.provider_version import provider_version
 from tests.fixtures.provider_dist import install_fake_dist
+from tests.helpers.oslib import read_text, write_text
 
 _PKG = Path(__file__).resolve().parents[2] / "dadaia_workspace"
 
 
 def _source(tmp_path: Path, version: str) -> Path:
     (tmp_path / "src").mkdir()
-    (tmp_path / "src" / "pyproject.toml").write_text(f'[tool.poetry]\nversion = "{version}"\n')
+    write_text(tmp_path / "src" / "pyproject.toml", f'[tool.poetry]\nversion = "{version}"\n')
     return tmp_path / "src"
 
 
@@ -71,7 +72,7 @@ def test_the_running_version_is_read_in_one_place() -> None:
     for path in sorted(_PKG.rglob("*.py")):
         if path == _PKG / "infrastructure" / "provider_version.py":
             continue
-        for node in ast.walk(ast.parse(path.read_text("utf-8"))):
+        for node in ast.walk(ast.parse(read_text(path))):
             if (
                 isinstance(node, ast.Call)
                 and ast.unparse(node.func).split(".")[-1] == "version"

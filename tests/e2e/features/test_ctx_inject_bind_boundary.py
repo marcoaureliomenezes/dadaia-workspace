@@ -17,6 +17,7 @@ import sys
 from pathlib import Path
 
 from tests.fixtures.harness_env import claude_hook_env, run_hook_subprocess
+from tests.helpers.oslib import read_text, run, write_text
 
 
 def _add_context(workspace: Path, slug: str, *, tech: str) -> None:
@@ -25,7 +26,7 @@ def _add_context(workspace: Path, slug: str, *, tech: str) -> None:
     states.mkdir(parents=True, exist_ok=True)
     registry = states / "spec_contexts.json"
     if registry.is_file():
-        data = json.loads(registry.read_text(encoding="utf-8"))
+        data = json.loads(read_text(registry))
     else:
         data = {"schema_version": "2", "contexts": []}
     data["contexts"].append(
@@ -40,15 +41,13 @@ def _add_context(workspace: Path, slug: str, *, tech: str) -> None:
             "current_branch": "main",
         }
     )
-    registry.write_text(json.dumps(data), encoding="utf-8")
+    write_text(registry, json.dumps(data))
 
     mem = workspace / "repos" / slug / "specs" / "memory"
     (mem / "product").mkdir(parents=True, exist_ok=True)
-    (mem / "ARCHITECTURE.md").write_text(
-        f"# Architecture\n\n## Tech Stack\n\n{tech}", encoding="utf-8"
-    )
-    (mem / "product" / "catalog.json").write_text('{"features": []}', encoding="utf-8")
-    (mem.parent / "constitution.md").write_text(f"# {slug} CONSTITUTION-MARKER\n", "utf-8")
+    write_text(mem / "ARCHITECTURE.md", f"# Architecture\n\n## Tech Stack\n\n{tech}")
+    write_text(mem / "product" / "catalog.json", '{"features": []}')
+    write_text(mem.parent / "constitution.md", f"# {slug} CONSTITUTION-MARKER\n")
 
 
 def _real_bind(
@@ -66,7 +65,7 @@ def _real_bind(
     a bind with no matching harness env, minting its own sid.
     """
     env = claude_hook_env(workspace, session_id=session_id) if session_id else None
-    proc = subprocess.run(
+    proc = run(
         [
             sys.executable,
             "-m",
@@ -77,8 +76,6 @@ def _real_bind(
         ],
         cwd=str(workspace),
         env=env,
-        capture_output=True,
-        text=True,
         timeout=60.0,
     )
     return proc

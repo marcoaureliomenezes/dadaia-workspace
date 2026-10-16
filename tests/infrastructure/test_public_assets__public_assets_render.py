@@ -20,6 +20,7 @@ from dadaia_workspace.core.workspace_layout import (
     render_registry_tables,
 )
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
+from tests.helpers.oslib import read_text
 
 
 def test_zones_placeholder_renders_one_row_per_zone() -> None:
@@ -51,13 +52,9 @@ def test_stage_renders_every_data_fragment_before_the_manifest_hashes_it(
     agentic = tmp_path / ".dadaia" / "agentic"
     fragments = sorted(agentic.rglob("*.md"))
     assert fragments
-    leftovers = [
-        p.name
-        for p in fragments
-        if render_registry_tables(p.read_text("utf-8")) != p.read_text("utf-8")
-    ]
+    leftovers = [p.name for p in fragments if render_registry_tables(read_text(p)) != read_text(p)]
     assert not leftovers
-    manifest = json.loads((agentic / "manifest.json").read_text("utf-8"))
+    manifest = json.loads(read_text(agentic / "manifest.json"))
     recorded = {a["path"]: a["sha256"] for a in manifest["assets"]}
     for name in ("dadaia-AGENTS.md", "states-AGENTS.md"):
         rendered = agentic / "data" / name

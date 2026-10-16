@@ -19,17 +19,14 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.core.specs_version import CANONICAL_SPECS_VERSION
+from tests.helpers.oslib import read_text, run, write_text
 
 _MARKER = "specs_pattern_version"
 
 
 def _cli(cwd: Path, *args: str) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        [sys.executable, "-m", "dadaia_workspace.cli.main", *args],
-        cwd=str(cwd),
-        capture_output=True,
-        text=True,
-        timeout=120.0,
+    return run(
+        [sys.executable, "-m", "dadaia_workspace.cli.main", *args], cwd=str(cwd), timeout=120.0
     )
 
 
@@ -58,7 +55,7 @@ def test_upgrade_refuses_a_tree_state_does_not_walk_and_writes_nothing(
     specs = tmp_path / "specs"
     if constitution is not None:
         specs.mkdir()
-        (specs / "constitution.md").write_text(constitution, encoding="utf-8")
+        write_text(specs / "constitution.md", constitution)
     before = _snapshot(tmp_path)
     upgrade = _cli(tmp_path, "specs", "upgrade", "--specs-dir", str(specs))
     assert upgrade.returncode != 0, upgrade.stdout
@@ -72,7 +69,7 @@ def test_upgrade_at_the_canonical_version_is_a_byte_identical_no_op(tmp_path: Pa
     init = _cli(root, "specs", "init", "--specs-dir", str(root / "specs"))
     assert init.returncode == 0, init.stderr or init.stdout
     specs = root / "specs"
-    assert str(CANONICAL_SPECS_VERSION) in (specs / "constitution.md").read_text(encoding="utf-8")
+    assert str(CANONICAL_SPECS_VERSION) in read_text(specs / "constitution.md")
     before = _snapshot(specs)
 
     upgrade = _cli(root, "specs", "upgrade", "--specs-dir", str(specs))
@@ -100,11 +97,9 @@ def _seed_v6_tree(root: Path, architecture: str) -> Path:
     """A consumer tree stamped 6, carrying ``memory/TECHSTACK.md``."""
     specs = root / "consumer" / "specs"
     (specs / "memory").mkdir(parents=True)
-    (specs / "constitution.md").write_text(
-        f"---\n{_MARKER}: 6\n---\n\n# Constitution — consumer\n", encoding="utf-8"
-    )
-    (specs / "memory" / "ARCHITECTURE.md").write_text(architecture, encoding="utf-8")
-    (specs / "memory" / "TECHSTACK.md").write_text(_V6_TECHSTACK, encoding="utf-8")
+    write_text(specs / "constitution.md", f"---\n{_MARKER}: 6\n---\n\n# Constitution — consumer\n")
+    write_text(specs / "memory" / "ARCHITECTURE.md", architecture)
+    write_text(specs / "memory" / "TECHSTACK.md", _V6_TECHSTACK)
     return specs
 
 
@@ -118,7 +113,7 @@ def test_upgrade_folds_techstack_into_architecture_and_deletes_it(tmp_path: Path
     assert not (specs / "memory" / "TECHSTACK.md").exists(), (
         "the upgrade hop deletes the file it folded"
     )
-    architecture = (specs / "memory" / "ARCHITECTURE.md").read_text(encoding="utf-8")
+    architecture = read_text(specs / "memory" / "ARCHITECTURE.md")
     assert architecture.startswith(_V6_ARCHITECTURE.rstrip("\n")), (
         "the consumer's own architecture text is kept verbatim, ahead of the fold"
     )
@@ -127,9 +122,7 @@ def test_upgrade_folds_techstack_into_architecture_and_deletes_it(tmp_path: Path
     assert "## Languages\n\nCONSUMER_STACK_SENTINEL" in architecture
     assert "slug: TECHSTACK" not in architecture
     assert architecture.index("## Principles") < architecture.index("## Tech Stack")
-    assert f"{_MARKER}: {CANONICAL_SPECS_VERSION}" in (specs / "constitution.md").read_text(
-        encoding="utf-8"
-    )
+    assert f"{_MARKER}: {CANONICAL_SPECS_VERSION}" in read_text(specs / "constitution.md")
 
 
 def test_upgrade_refuses_a_two_tier_tree_without_stamping_or_writing(tmp_path: Path) -> None:
@@ -144,4 +137,4 @@ def test_upgrade_refuses_a_two_tier_tree_without_stamping_or_writing(tmp_path: P
     assert upgrade.returncode != 0, upgrade.stdout
     assert "two-tier" in (upgrade.stderr + upgrade.stdout)
     assert _snapshot(specs) == before
-    assert f"{_MARKER}: 6" in (specs / "constitution.md").read_text(encoding="utf-8")
+    assert f"{_MARKER}: 6" in read_text(specs / "constitution.md")

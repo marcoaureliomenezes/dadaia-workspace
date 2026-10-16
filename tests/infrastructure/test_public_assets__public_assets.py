@@ -19,6 +19,7 @@ from dadaia_workspace.infrastructure.privacy_check import (
     load_privacy_terms,
 )
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
+from tests.helpers.oslib import read_text, write_text
 
 
 def _host(*labels: str) -> str:
@@ -116,7 +117,7 @@ def test_public_privacy_doctor_verdict(
     Portuguese control vocabulary is shown raw.
     """
     (tmp_path / "public" / "data").mkdir(parents=True)
-    (tmp_path / "public" / "data" / name).write_text(text, encoding="utf-8")
+    write_text(tmp_path / "public" / "data" / name, text)
     report = [line.render() for line in _manager(tmp_path / "public")._check_public_privacy()]  # noqa: SLF001
     if flagged is None:
         assert report == ["[ok] public-privacy (baseline structural scan, no operator denylist)"]
@@ -130,7 +131,7 @@ def test_stage_copies_no_bytecode_cache(tmp_path: Path) -> None:
     """Stage copies no __pycache__."""
     scripts = tmp_path / "public" / "skills" / "sample" / "scripts"
     (scripts / "__pycache__").mkdir(parents=True)
-    (scripts / "run.py").write_text("print(1)\n", encoding="utf-8")
+    write_text(scripts / "run.py", "print(1)\n")
     (scripts / "__pycache__" / "run.cpython-312.pyc").write_bytes(b"\x00")
     (tmp_path / "ws").mkdir()
     _manager(tmp_path / "public").stage(tmp_path / "ws")
@@ -142,10 +143,10 @@ def test_stage_copies_no_bytecode_cache(tmp_path: Path) -> None:
 def test_shipped_baseline_header_and_single_line_documented_carve_outs() -> None:
     """The shipped baseline header is versioned; its regexes are single-line; every carve-out has a rationale."""
     raw = json.loads(
-        (
+        read_text(
             Path(__file__).parents[2]
             / "dadaia_workspace/public/skills/dd-bug-resolution/scripts/privacy_baseline.json"
-        ).read_text(encoding="utf-8")
+        )
     )
     assert raw["_header"]["version"] == 17
     excludes = " ".join(raw["_header"]["excludes"])
@@ -201,7 +202,7 @@ def test_load_denylist_source_formats(
     """The dict is the one grammar; any other
     shape or an unreadable file is refused naming the file. Missing or absent loads as empty."""
     source = tmp_path / "d.json"
-    source.write_text(json.dumps(payload), encoding="utf-8")
+    write_text(source, json.dumps(payload))
     monkeypatch.setenv("DADAIA_PRIVACY_DENYLIST", str(source))
     if name == "list_of_strings":
         with pytest.raises(SystemExit) as refused:
@@ -216,7 +217,7 @@ def test_load_denylist_source_formats(
     assert load_privacy_terms() == (("foo", "reason-a"), ("bar", "reason-b"))
     (tmp_path / "no_workspace").mkdir()
     monkeypatch.chdir(tmp_path / "no_workspace")
-    (tmp_path / "malformed.json").write_text("{not valid json", encoding="utf-8")
+    write_text(tmp_path / "malformed.json", "{not valid json")
     monkeypatch.setenv("DADAIA_PRIVACY_DENYLIST", str(tmp_path / "malformed.json"))
     with pytest.raises(SystemExit):
         load_privacy_terms()
@@ -232,11 +233,9 @@ def test_load_denylist_env_precedence_and_workspace_fallback(
     """The env var wins over <workspace>/.dadaia/states/privacy_denylist.json; the file is the fallback."""
     states = tmp_path / "ws" / ".dadaia" / "states"
     states.mkdir(parents=True)
-    (states / "spec_contexts.json").write_text("{}", encoding="utf-8")
-    (states / "privacy_denylist.json").write_text(
-        json.dumps({"from-file": "file"}), encoding="utf-8"
-    )
-    (tmp_path / "env.json").write_text(json.dumps({"from-env": "env"}), encoding="utf-8")
+    write_text(states / "spec_contexts.json", "{}")
+    write_text(states / "privacy_denylist.json", json.dumps({"from-file": "file"}))
+    write_text(tmp_path / "env.json", json.dumps({"from-env": "env"}))
     monkeypatch.setenv("DADAIA_PRIVACY_DENYLIST", str(tmp_path / "env.json"))
     monkeypatch.chdir(tmp_path / "ws")
     assert load_privacy_terms() == (("from-env", "env"),)

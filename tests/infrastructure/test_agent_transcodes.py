@@ -18,6 +18,7 @@ from dadaia_workspace.infrastructure.agent_transcodes import AGENT_RULE_BUILDERS
 from dadaia_workspace.infrastructure.install_plan import InstallPlan
 from dadaia_workspace.infrastructure.projection import ProjectionRule
 from dadaia_workspace.infrastructure.public_assets_common import iter_public_files
+from tests.helpers.oslib import Undecodable
 
 _PUBLIC = Path(__file__).resolve().parents[2] / "dadaia_workspace" / "public"
 
@@ -112,3 +113,24 @@ def test_each_new_record_is_registered_with_a_directory_and_a_hook_format(harnes
     assert harness in L1_ENTRY_HARNESSES
     assert record.directory is not None
     assert record.hooks.value.endswith("-hooks")
+
+
+@pytest.mark.parametrize("render", ["copilot", "codex"])
+def test_a_persona_that_is_not_utf8_is_undecodable_not_a_codec_error(
+    tmp_path: Path, render: str
+) -> None:
+    from dadaia_workspace.infrastructure.agent_transcodes import (
+        codex_agent_toml_bytes,
+        copilot_agent_md_bytes,
+    )
+
+    persona = tmp_path / "a.md"
+    persona.write_bytes(b"---\nname: a\n---\ncaf\xe9\n")
+
+    with pytest.raises(Undecodable) as refused:
+        if render == "copilot":
+            copilot_agent_md_bytes(persona)
+        else:
+            codex_agent_toml_bytes(persona, "a", None)
+
+    assert refused.value.path == persona

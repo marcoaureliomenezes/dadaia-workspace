@@ -8,14 +8,13 @@ method size and responsibility are review signals.
 from __future__ import annotations
 
 import ast
-import os
 import re
-import subprocess
 import sys
 from pathlib import Path
 
 import pytest
 
+from tests.helpers.oslib import is_executable, read_text, run, write_text
 from tests.helpers.scan_population import assert_populated
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -36,7 +35,7 @@ def _owner_scripts() -> list[Path]:
 
 
 def _imported_roots(path: Path) -> set[str]:
-    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    tree = ast.parse(read_text(path), filename=str(path))
     roots: set[str] = set()
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
@@ -52,7 +51,7 @@ _KERNEL_MODULES = {module.stem for module in _KERNEL.glob("*.py")}
 
 def _path_statements(script: Path) -> list[str]:
     """The source of every statement that edits `sys.path`."""
-    text = script.read_text(encoding="utf-8")
+    text = read_text(script)
     return [
         ast.get_source_segment(text, node) or ""
         for node in ast.walk(ast.parse(text))
@@ -95,16 +94,14 @@ def test_skill_owner_script_meets_the_contract(script: Path) -> None:
         f"{script.name} imports non-stdlib module(s) {sorted(foreign)} — a skill script "
         "runs from a projected skill folder with no library on sys.path (FR1)."
     )
-    assert script.read_text(encoding="utf-8").startswith("#!/usr/bin/env python3\n"), (
+    assert read_text(script).startswith("#!/usr/bin/env python3\n"), (
         f"{script.name} is missing the `#!/usr/bin/env python3` shebang."
     )
-    assert os.access(script, os.X_OK), f"{script.name} is not executable (exec bit unset)."
+    assert is_executable(script), f"{script.name} is not executable (exec bit unset)."
     if script.name.startswith("_"):
         return  # a sibling module, imported by its entry point — it has no argv surface
 
-    done = subprocess.run(
-        [sys.executable, str(script), "--help"], capture_output=True, text=True, check=False
-    )
+    done = run([sys.executable, str(script), "--help"], check=False)
     assert done.returncode == 0, f"{script.name} --help exited {done.returncode}: {done.stderr}"
 
 
@@ -119,10 +116,10 @@ def test_a_planted_cross_skill_import_or_path_line_bites(tmp_path: Path) -> None
     folder = tmp_path / "dd-release-implementation" / "scripts"
     folder.mkdir(parents=True)
     plant = folder / "_plant.py"
-    plant.write_text("import _memory_catalog\n", "utf-8")
+    write_text(plant, "import _memory_catalog\n")
     assert _foreign_imports(plant) == {"_memory_catalog"}
-    plant.write_text(
-        'import sys\nsys.path.insert(0, str(HERE.parent.parent / "dd-spec-navigator"))\n', "utf-8"
+    write_text(
+        plant, 'import sys\nsys.path.insert(0, str(HERE.parent.parent / "dd-spec-navigator"))\n'
     )
     assert len(_path_violations(plant)) == 1
 
@@ -136,12 +133,7 @@ def test_ledger_owner_scripts_expose_check() -> None:
     for script in _owner_scripts():
         if script.name not in _LEDGER_OWNER_SCRIPTS:
             continue
-        done = subprocess.run(
-            [sys.executable, str(script), "check", "--help"],
-            capture_output=True,
-            text=True,
-            check=False,
-        )
+        done = run([sys.executable, str(script), "check", "--help"], check=False)
         assert done.returncode == 0, f"{script.name} has no `check` subcommand: {done.stderr}"
 
 
@@ -198,9 +190,7 @@ def test_no_package_module_loads_a_script_or_parses_a_grammar_but_its_owner() ->
     modules = _package_modules()
     assert_populated({p.name for p in modules}, sentinel="ledger_scripts.py")
     found = [
-        v
-        for p in modules
-        for v in _violations(p.read_text("utf-8"), p.relative_to(_PACKAGE).as_posix())
+        v for p in modules for v in _violations(read_text(p), p.relative_to(_PACKAGE).as_posix())
     ]
     assert found == []
 
@@ -220,7 +210,7 @@ def test_a_planted_second_loader_or_parser_bites(planted: str) -> None:
 
 @pytest.mark.parametrize("rel", _OWNERS)
 def test_each_owner_sits_at_its_pinned_location(rel: str) -> None:
-    tree = ast.parse((_PACKAGE / rel).read_text("utf-8"))
+    tree = ast.parse(read_text(_PACKAGE / rel))
     defined = {
         t.id if isinstance(t, ast.Name) else getattr(t, "name", None)
         for node in tree.body

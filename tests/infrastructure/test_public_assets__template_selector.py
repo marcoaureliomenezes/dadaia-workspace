@@ -14,6 +14,7 @@ from dadaia_workspace.core.model_registry import CORE_AGENTS, TEMPLATES, resolve
 from dadaia_workspace.infrastructure.json_agent_model_policy_store import JsonAgentModelPolicyStore
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from tests.helpers.harness_profile import register_all
+from tests.helpers.oslib import read_text
 
 
 def _other_template() -> str:
@@ -30,7 +31,7 @@ def _other_template() -> str:
 
 
 def _frontmatter(ws: Path, agent: str) -> dict[str, str]:
-    text = (ws / ".claude" / "agents" / f"{agent}.md").read_text(encoding="utf-8")
+    text = read_text(ws / ".claude" / "agents" / f"{agent}.md")
     pairs = (line.partition(":") for line in text.split("---\n", 2)[1].splitlines())
     return {k: v.strip() for k, _, v in pairs if not k.startswith(" ")}
 

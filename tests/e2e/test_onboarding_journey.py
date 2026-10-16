@@ -41,6 +41,8 @@ import pytest
 from dadaia_workspace.core.platform import PLATFORM
 from tests.conftest import GIT_QUIET_INCLUDE
 from tests.fixtures.harness_env import suite_env
+from tests.helpers.oslib import read_text, write_text
+from tests.helpers.oslib import run as os_run
 from tests.helpers.previous_release import previous_release, published_releases
 
 _UVX = shutil.which("uvx")
@@ -59,9 +61,9 @@ _REQUIRE_UVX = bool(os.environ.get("DADAIA_REQUIRE_UVX"))
 
 _TIMEOUT = 600.0
 _REPO_ROOT = Path(__file__).resolve().parents[2]
-_SOURCE_VERSION: str = tomllib.loads((_REPO_ROOT / "pyproject.toml").read_text("utf-8"))["tool"][
-    "poetry"
-]["version"]
+_SOURCE_VERSION: str = tomllib.loads(read_text(_REPO_ROOT / "pyproject.toml"))["tool"]["poetry"][
+    "version"
+]
 # Local version segment: the built wheel differs from the last PyPI release.
 _E2E_VERSION = f"{_SOURCE_VERSION}+e2e"
 
@@ -97,14 +99,12 @@ class Env:
             GIT_CONFIG_GLOBAL=str(self.home_dir / "gitconfig"),
             GIT_CONFIG_SYSTEM=os.devnull,
         )
-        (self.home_dir / "gitconfig").write_text(GIT_QUIET_INCLUDE, encoding="utf-8")
+        write_text(self.home_dir / "gitconfig", GIT_QUIET_INCLUDE)
         self.git("config", "--global", "init.defaultBranch", "main", cwd=root)
         self._launchers: dict[str, Path] = {}
 
     def run(self, *argv: str, cwd: Path) -> subprocess.CompletedProcess[str]:
-        return subprocess.run(  # noqa: S603
-            list(argv), cwd=cwd, env=self.env, capture_output=True, text=True, timeout=_TIMEOUT
-        )
+        return os_run(list(argv), cwd=cwd, env=self.env, timeout=_TIMEOUT)
 
     def git(self, *args: str, cwd: Path) -> str:
         done = self.run("git", *args, cwd=cwd)
@@ -136,16 +136,17 @@ class Env:
         """A file:// bare repo ``<name>.git`` with one commit; *specs* seeds its tree."""
         work = self.fixtures / f"src-{name}"
         (work / "app").mkdir(parents=True)
-        (work / "README.md").write_text(f"# {name}\n", encoding="utf-8")
-        (work / "app" / "core.py").write_text("def f():\n    return 1\n", encoding="utf-8")
+        write_text(work / "README.md", f"# {name}\n")
+        write_text(work / "app" / "core.py", "def f():\n    return 1\n")
         if specs == "foreign":
             (work / "specs" / "features").mkdir(parents=True)
-            (work / "specs" / "features" / "login.md").write_text("# my spec\n", encoding="utf-8")
-            (work / "specs" / "README.md").write_text("x\n", encoding="utf-8")
+            write_text(work / "specs" / "features" / "login.md", "# my spec\n")
+            write_text(work / "specs" / "README.md", "x\n")
         elif specs == "dadaia6":
             (work / "specs").mkdir()
-            (work / "specs" / "constitution.md").write_text(
-                "---\nspecs_pattern_version: 6\n---\n# constitution\n", encoding="utf-8"
+            write_text(
+                work / "specs" / "constitution.md",
+                "---\nspecs_pattern_version: 6\n---\n# constitution\n",
             )
         self.git("init", "-q", cwd=work)
         self.git("add", "-A", cwd=work)
@@ -198,18 +199,18 @@ def wheel(tmp_path_factory: pytest.TempPathFactory) -> Path:
     source = root / "src"
     source.mkdir()
     shutil.copy2(_REPO_ROOT / "README.md", source / "README.md")
-    pyproject = (_REPO_ROOT / "pyproject.toml").read_text("utf-8")
+    pyproject = read_text(_REPO_ROOT / "pyproject.toml")
     pyproject = pyproject.replace(
         f'version = "{_SOURCE_VERSION}"', f'version = "{_E2E_VERSION}"', 1
     )
-    (source / "pyproject.toml").write_text(pyproject, encoding="utf-8")
+    write_text(source / "pyproject.toml", pyproject)
     shutil.copytree(
         _REPO_ROOT / "dadaia_workspace",
         source / "dadaia_workspace",
         ignore=shutil.ignore_patterns("__pycache__"),
     )
     dist = root / "dist"
-    subprocess.run(  # noqa: S603
+    os_run(
         [
             str(Path(sys.executable).parent / "pip"),
             "wheel",
@@ -219,10 +220,8 @@ def wheel(tmp_path_factory: pytest.TempPathFactory) -> Path:
             "--wheel-dir",
             str(dist),
             str(source),
-        ],  # fmt: skip
+        ],
         check=True,
-        capture_output=True,
-        text=True,
         timeout=_TIMEOUT,
         env=suite_env(os.environ, Path.home()) | {"PIP_NO_INDEX": "1"},
     )
@@ -309,7 +308,7 @@ class TestQuickstartVerbatim:
     byte-equal to ``docs/quickstart.md`` (the ``workspace-quickstart-fixture`` guard)."""
 
     def test_the_quickstart_block_runs_as_printed(self, env: Env) -> None:
-        text = (_REPO_ROOT / "tests" / "fixtures" / "quickstart.md").read_text("utf-8")
+        text = read_text(_REPO_ROOT / "tests" / "fixtures" / "quickstart.md")
         block, filing = re.findall(r"```bash\n(.*?)```", text, re.DOTALL)[:2]
         url = env.bare("quick")
         script, count = re.subn(r"^REPO_URL=.*$", f"REPO_URL={url}", block, flags=re.M)

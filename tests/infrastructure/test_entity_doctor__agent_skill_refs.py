@@ -12,6 +12,7 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.infrastructure.entity_doctor import check_agent_skill_refs
+from tests.helpers.oslib import write_text
 
 
 def _rendered(result: object) -> list[str]:
@@ -38,13 +39,13 @@ body
 def _mk_skill(base: Path, slug: str) -> None:
     d = base / slug
     d.mkdir(parents=True)
-    (d / "SKILL.md").write_text(f"---\nname: {slug}\n---\n", encoding="utf-8")
+    write_text(d / "SKILL.md", f"---\nname: {slug}\n---\n")
 
 
 def _mk_agent(path: Path, name: str, skills: list[str]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     lines = "\n".join(f"  - {s}" for s in skills)
-    path.write_text(_AGENT_TEMPLATE.format(name=name, skills=lines), encoding="utf-8")
+    write_text(path, _AGENT_TEMPLATE.format(name=name, skills=lines))
 
 
 def _public_tree(tmp_path: Path) -> Path:

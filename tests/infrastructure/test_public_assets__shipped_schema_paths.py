@@ -13,6 +13,7 @@ from pathlib import Path
 import pytest
 
 import dadaia_workspace
+from tests.helpers.oslib import read_text
 
 pytestmark = pytest.mark.small
 
@@ -40,7 +41,7 @@ def _citations() -> list[tuple[str, str]]:
     for f in sorted(PUBLIC.rglob("*")):
         if f.suffix not in _TEXT or f.name.endswith(".schema.json") or not f.is_file():
             continue
-        for n, line in enumerate(f.read_text(encoding="utf-8").splitlines(), 1):
+        for n, line in enumerate(read_text(f).splitlines(), 1):
             found += [(f"{f.relative_to(PUBLIC)}:{n}", p) for p in _PATH.findall(line)]
     return found
 

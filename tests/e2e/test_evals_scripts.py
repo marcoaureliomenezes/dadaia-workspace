@@ -9,11 +9,12 @@ from __future__ import annotations
 
 import json
 import os
-import subprocess
 import sys
 from pathlib import Path
 
 import pytest
+
+from tests.helpers.oslib import run, write_text
 
 pytestmark = pytest.mark.e2e
 
@@ -27,7 +28,7 @@ _TOKEN = "sk-ant-" + "oat01-" + "PLANTED" * 6
 def _run(script: str, *args: Path, env: dict[str, str] | None = None) -> int:
     full = {k: v for k, v in os.environ.items() if k != "SCAN_SECRET"} | (env or {})
     cmd = [sys.executable, str(_ROOT / "evals" / "scripts" / script), *map(str, args)]
-    return subprocess.run(cmd, env=full, capture_output=True, timeout=60, check=False).returncode
+    return run(cmd, env=full, timeout=60).returncode
 
 
 def _scan(tmp_path: Path, content: str | bytes, name: str, env: dict[str, str] | None) -> int:
@@ -60,12 +61,12 @@ def test_scan_missing_path_is_red(tmp_path: Path) -> None:
 
 def _job(root: Path, task: str, rewards: list[float]) -> None:
     root.mkdir(parents=True, exist_ok=True)
-    (root / "result.json").write_text(json.dumps({"stats": {}}))
+    write_text(root / "result.json", json.dumps({"stats": {}}))
     for i, r in enumerate(rewards):
         d = root / f"{task}__{i}"
         d.mkdir(parents=True)
         body = {"task_name": f"dadaia-evals/{task}", "verifier_result": {"rewards": {"reward": r}}}
-        (d / "result.json").write_text(json.dumps(body))
+        write_text(d / "result.json", json.dumps(body))
 
 
 @pytest.mark.parametrize(

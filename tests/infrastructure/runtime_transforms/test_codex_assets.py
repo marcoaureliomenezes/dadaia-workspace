@@ -20,6 +20,7 @@ from dadaia_workspace.infrastructure.runtime_config import codex_config
 from dadaia_workspace.infrastructure.runtime_transforms.codex_assets import (
     _CODEX_SKILL_REF_PREFIXES,
 )
+from tests.helpers.oslib import write_text
 
 _PUBLIC = Path(__file__).resolve().parents[3] / "dadaia_workspace" / "public"
 
@@ -37,16 +38,15 @@ def _rendered(result: object) -> list[str]:
 def _make_codex_agent(workspace: Path, name: str, body: str) -> None:
     agents = workspace / ".codex" / "agents"
     agents.mkdir(parents=True, exist_ok=True)
-    (agents / f"{name}.toml").write_text(
-        f'name = "{name}"\ndeveloper_instructions = """\n{body}\n"""\n',
-        encoding="utf-8",
+    write_text(
+        agents / f"{name}.toml", f'name = "{name}"\ndeveloper_instructions = """\n{body}\n"""\n'
     )
 
 
 def _make_skill(workspace: Path, slug: str) -> None:
     skill_dir = workspace / ".agents" / "skills" / slug
     skill_dir.mkdir(parents=True, exist_ok=True)
-    (skill_dir / "SKILL.md").write_text(f"---\nname: {slug}\n---\n", encoding="utf-8")
+    write_text(skill_dir / "SKILL.md", f"---\nname: {slug}\n---\n")
 
 
 def test_dcx7_reports_a_non_existent_dd_skill_reference(tmp_path: Path) -> None:
@@ -124,3 +124,14 @@ def test_a_bom_crlf_persona_projects_the_same_codex_bytes_as_its_lf_twin(tmp_pat
     assert codex_agent_toml_bytes(
         tmp_path / "crlf" / "agents" / f"{name}.md", name, resolved
     ) == codex_agent_toml_bytes(tmp_path / "lf" / "agents" / f"{name}.md", name, resolved)
+
+
+def test_a_persona_that_is_not_utf8_is_skipped_by_the_agents_config_blocks(tmp_path: Path) -> None:
+    from dadaia_workspace.infrastructure.runtime_transforms import codex_assets
+
+    write_text(tmp_path / "good.md", "---\nname: good\n---\nbody\n")
+    (tmp_path / "latin.md").write_bytes(b"---\nname: latin\n---\ncaf\xe9\n")
+
+    blocks = codex_assets._render_agents_config_file_blocks(tmp_path)
+
+    assert blocks == '[agents."good"]\nconfig_file = "agents/good.toml"\n'

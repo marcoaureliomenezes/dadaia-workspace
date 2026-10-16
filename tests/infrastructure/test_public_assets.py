@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import json
 import shutil
-import subprocess
 from pathlib import Path
 
 import pytest
@@ -23,6 +22,7 @@ from dadaia_workspace.infrastructure.entity_doctor import check_agent_skill_refs
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from tests.helpers import public_asset_roster
 from tests.helpers.harness_profile import register_all
+from tests.helpers.oslib import read_text, run, write_text
 from tests.helpers.privacy_fixtures import private_ip
 from tests.helpers.scan_population import assert_populated
 from tests.helpers.skill_inventory_oracle import skill_names
@@ -66,7 +66,7 @@ def test_stage_manifest_and_install_all(tmp_path: Path, monkeypatch: pytest.Monk
     assert sorted(p.name for p in agentic.iterdir()) == [
         "agents", "data", "manifest.json", "schemas", "skills",
     ]  # fmt: skip
-    manifest = json.loads((agentic / "manifest.json").read_text(encoding="utf-8"))
+    manifest = json.loads(read_text(agentic / "manifest.json"))
     assert manifest["schema_version"] == "1"
     assert any(asset["path"] == "data/AGENTS.md" for asset in manifest["assets"])
     assert all({"path", "sha256", "type"} <= set(asset) for asset in manifest["assets"])
@@ -114,9 +114,9 @@ def test_install_refuses_source_root_overwrite_skip_force_and_doctor_drift_track
     source_root = tmp_path / "dadaia-workspace"
     source_root.mkdir()
     (source_root / "dadaia_workspace" / "public").mkdir(parents=True)
-    (source_root / "pyproject.toml").write_text(
+    write_text(
+        source_root / "pyproject.toml",
         '[tool.poetry]\nname = "dadaia-workspace"\nversion = "0.0.0"\n',
-        encoding="utf-8",
     )
 
     source_root_manager = FileSystemPublicAssetManager()
@@ -130,12 +130,12 @@ def test_install_refuses_source_root_overwrite_skip_force_and_doctor_drift_track
     workspace = tmp_path / "ws"
     agents_md = workspace / "AGENTS.md"
     agents_md.parent.mkdir(parents=True, exist_ok=True)
-    agents_md.write_text("custom\n", encoding="utf-8")
+    write_text(agents_md, "custom\n")
 
     manager = FileSystemPublicAssetManager()
     manager.install(workspace)
 
-    content = agents_md.read_text(encoding="utf-8")
+    content = read_text(agents_md)
     assert content != "custom\n", "Expected stale AGENTS.md to be overwritten"
     assert "AI agent" in content or "dadaia" in content.lower()
     canonical_content = content
@@ -143,16 +143,16 @@ def test_install_refuses_source_root_overwrite_skip_force_and_doctor_drift_track
 
     # Second install: same hash -> skip (no-op).
     manager.install(workspace)
-    assert agents_md.read_text(encoding="utf-8") == canonical_content
+    assert read_text(agents_md) == canonical_content
     assert agents_md.stat().st_mtime == mtime_before
 
     # force=True overwrites even when a stale placeholder is reintroduced.
     force_ws = tmp_path / "force-ws"
     force_agents = force_ws / "AGENTS.md"
     force_agents.parent.mkdir(parents=True, exist_ok=True)
-    force_agents.write_text("custom\n", encoding="utf-8")
+    write_text(force_agents, "custom\n")
     FileSystemPublicAssetManager().install(force_ws, force=True)
-    force_content = force_agents.read_text(encoding="utf-8")
+    force_content = read_text(force_agents)
     assert force_content != "custom\n"
     assert "# dadaia-workspace" in force_content
 
@@ -167,7 +167,7 @@ def test_install_refuses_source_root_overwrite_skip_force_and_doctor_drift_track
     assert "[ok] dadaia:tmp/AGENTS.md" in clean_report
     assert "[ok] dadaia:states/AGENTS.md" in clean_report
 
-    (drift_ws / ".dadaia" / "states" / "AGENTS.md").write_text("drift\n", encoding="utf-8")
+    write_text(drift_ws / ".dadaia" / "states" / "AGENTS.md", "drift\n")
     drift_report = _rendered(drift_manager.doctor(drift_ws))
     assert "[drift] dadaia:states/AGENTS.md" in drift_report
 
@@ -182,7 +182,7 @@ _PRIVACY_TEST_TERM = private_ip()
 def _seed_denylist_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """Seed the denylist via env var (location-independent; avoids .dadaia/ in lib repo)."""
     source = tmp_path / "privacy_denylist.json"
-    source.write_text(json.dumps({_PRIVACY_TEST_TERM: "test private IP"}), encoding="utf-8")
+    write_text(source, json.dumps({_PRIVACY_TEST_TERM: "test private IP"}))
     monkeypatch.setenv("DADAIA_PRIVACY_DENYLIST", str(source))
 
 
@@ -195,9 +195,7 @@ def test_public_privacy_gate_flags_identifiers(
     public_dir = repo_root / "dadaia_workspace" / "public"
     data_dir = public_dir / "data"
     data_dir.mkdir(parents=True)
-    (data_dir / "AGENTS.md").write_text(
-        f"Private endpoint: {_PRIVACY_TEST_TERM}\n", encoding="utf-8"
-    )
+    write_text(data_dir / "AGENTS.md", f"Private endpoint: {_PRIVACY_TEST_TERM}\n")
 
     manager = FileSystemPublicAssetManager()
     manager._public_dir = public_dir  # noqa: SLF001
@@ -223,7 +221,7 @@ def test_public_privacy_gate_flags_identifiers(
 
 
 def _claude_frontmatter(ws: Path, agent: str) -> dict[str, str]:
-    text = (ws / ".claude" / "agents" / f"{agent}.md").read_text(encoding="utf-8")
+    text = read_text(ws / ".claude" / "agents" / f"{agent}.md")
     fm = text.split("---\n", 2)[1]
     out: dict[str, str] = {}
     for line in fm.splitlines():
@@ -234,7 +232,7 @@ def _claude_frontmatter(ws: Path, agent: str) -> dict[str, str]:
 
 
 def _codex_toml_fields(ws: Path, agent: str) -> dict[str, str]:
-    text = (ws / ".codex" / "agents" / f"{agent}.toml").read_text(encoding="utf-8")
+    text = read_text(ws / ".codex" / "agents" / f"{agent}.toml")
     out: dict[str, str] = {}
     for line in text.splitlines():
         if " = " in line and not line.startswith(" "):
@@ -293,14 +291,14 @@ def test_model_policy_overlay_lockstep_rendering_invalid_fails_loud_and_doctor_r
     # An overlay change moves the .claude md AND .codex toml together at install.
     states = ws / ".dadaia" / "states"
     states.mkdir(parents=True, exist_ok=True)
-    (states / "agent_model_policy.json").write_text(
+    write_text(
+        states / "agent_model_policy.json",
         json.dumps(
             {
                 "schema_version": "agent-model-policy-v1",
                 "applied_template": "max-quality",
             }
         ),
-        encoding="utf-8",
     )
     manager.install(ws)
 
@@ -347,14 +345,14 @@ def test_model_policy_overlay_lockstep_rendering_invalid_fails_loud_and_doctor_r
     before = (invalid_ws / ".claude" / "agents" / "dd-sw-engineer-sr.md").read_bytes()
 
     invalid_states = invalid_ws / ".dadaia" / "states"
-    (invalid_states / "agent_model_policy.json").write_text(
+    write_text(
+        invalid_states / "agent_model_policy.json",
         json.dumps(
             {
                 "schema_version": "agent-model-policy-v1",
                 "applied_template": "no-such-template",
             }
         ),
-        encoding="utf-8",
     )
     with pytest.raises(AgentModelPolicyStoreError):
         invalid_manager.install(invalid_ws)
@@ -374,14 +372,14 @@ def test_model_policy_overlay_lockstep_rendering_invalid_fails_loud_and_doctor_r
 
     doctor_states = doctor_ws / ".dadaia" / "states"
     doctor_states.mkdir(parents=True, exist_ok=True)
-    (doctor_states / "agent_model_policy.json").write_text(
+    write_text(
+        doctor_states / "agent_model_policy.json",
         json.dumps(
             {
                 "schema_version": "agent-model-policy-v1",
                 "applied_template": "max-quality",
             }
         ),
-        encoding="utf-8",
     )
     doctor_manager.install(doctor_ws)
 
@@ -401,7 +399,7 @@ def test_model_policy_overlay_lockstep_rendering_invalid_fails_loud_and_doctor_r
     assert law_lines and all(r.startswith("[ok]") for r in law_lines), law_lines[:5]
 
     target = doctor_ws / ".claude" / "agents" / "dd-sw-engineer-sr.md"
-    target.write_text(target.read_text(encoding="utf-8") + "\nHAND EDIT\n", encoding="utf-8")
+    write_text(target, read_text(target) + "\nHAND EDIT\n")
     reports2 = _rendered(doctor_manager.doctor(doctor_ws))
     assert any(
         r.startswith("[drift]") and r.endswith("agents:agents/dd-sw-engineer-sr.md")
@@ -411,7 +409,7 @@ def test_model_policy_overlay_lockstep_rendering_invalid_fails_loud_and_doctor_r
         r.startswith("[ok]") and r.endswith("claude:agents/dd-sw-engineer-sr.md") for r in reports2
     ), "the claude view is a link: it is correct as long as it points at the authored set"
 
-    (doctor_states / "agent_model_policy.json").write_text("{not json", encoding="utf-8")
+    write_text(doctor_states / "agent_model_policy.json", "{not json")
     reports3 = _rendered(doctor_manager.doctor(doctor_ws))
     assert any(r.startswith("[drift]") and "agent-model-policy" in r for r in reports3), [
         r for r in reports3 if "policy" in r
@@ -453,9 +451,9 @@ def test_a_single_skill_rename_is_green_everywhere_after_one_place(
     old_ref, new_ref = f"  - {old_name}\n", f"  - {new_name}\n"
     rewritten_agents = 0
     for agent_file in (mirror_public / "agents").glob("*.md"):
-        text = agent_file.read_text(encoding="utf-8")
+        text = read_text(agent_file)
         if old_ref in text:
-            agent_file.write_text(text.replace(old_ref, new_ref), encoding="utf-8")
+            write_text(agent_file, text.replace(old_ref, new_ref))
             rewritten_agents += 1
     assert rewritten_agents >= 1, "expected at least one agent frontmatter file to reference it"
 
@@ -495,9 +493,7 @@ def test_the_three_design_skills_are_gone_from_stage_install_and_the_shipped_tre
     shutil.copytree(public_asset_roster.default_public_dir(), earlier)
     for name in _DESIGN_SKILLS:
         (earlier / "skills" / name).mkdir()
-        (earlier / "skills" / name / "SKILL.md").write_text(
-            f"---\nname: {name}\n---\n", encoding="utf-8"
-        )
+        write_text(earlier / "skills" / name / "SKILL.md", f"---\nname: {name}\n---\n")
     register_all(ws)
     old_manager = FileSystemPublicAssetManager()
     old_manager._public_dir = earlier  # noqa: SLF001 — exercise the earlier tree only
@@ -515,10 +511,7 @@ def test_the_three_design_skills_are_gone_from_stage_install_and_the_shipped_tre
     assert not [line for line in report if line.startswith(("[drift]", "[missing]", "[error]"))]
 
     repo = Path(__file__).resolve().parents[2]
-    hits = subprocess.run(
-        ["git", "grep", "-nE", "|".join(_DESIGN_SKILLS), "--", "dadaia_workspace", "tests", "CONTEXT.md"],
-        cwd=repo, capture_output=True, text=True, check=False,
-    ).stdout.splitlines()  # fmt: skip
+    hits = run(["git", "grep", "-nE", "|".join(_DESIGN_SKILLS), "--", "dadaia_workspace", "tests", "CONTEXT.md"], cwd=repo, check=False).stdout.splitlines()  # fmt: skip
     # this file spells the names only through f"dd-{n}", so it cannot self-match
     assert hits == []
 
@@ -567,14 +560,14 @@ def test_install_prunes_the_instance_copy_of_the_deleted_engineer(tmp_path: Path
     """An instance a prior install filled with the retired engineer loses it."""
     earlier = tmp_path / "earlier" / "dadaia_workspace" / "public"
     shutil.copytree(public_asset_roster.default_public_dir(), earlier)
-    reviewer = (earlier / "agents" / "dd-code-reviewer.md").read_text(encoding="utf-8")
+    reviewer = read_text(earlier / "agents" / "dd-code-reviewer.md")
     # The earlier library's engineer was a core persona with a model cell; outside today's
     # CORE_AGENTS it renders only through an authored alias (fail-closed otherwise).
     retired = reviewer.replace("dd-code-reviewer", _OLD_ENGINEER)
     retired = retired.replace(
         f"name: {_OLD_ENGINEER}\n", f"name: {_OLD_ENGINEER}\nmodel: sonnet\n", 1
     )
-    (earlier / "agents" / f"{_OLD_ENGINEER}.md").write_text(retired, encoding="utf-8")
+    write_text(earlier / "agents" / f"{_OLD_ENGINEER}.md", retired)
     ws = tmp_path / "ws"
     register_all(ws)
     old = FileSystemPublicAssetManager()
@@ -599,7 +592,7 @@ def test_the_researcher_projects_read_only_with_six_tools_no_skills_and_its_two_
 
     fm = _claude_frontmatter(ws, "dd-researcher")
     assert fm["read_only"] == _claude_frontmatter(ws, "dd-code-reviewer")["read_only"] == "true"
-    text = (ws / ".claude" / "agents" / "dd-researcher.md").read_text(encoding="utf-8")
+    text = read_text(ws / ".claude" / "agents" / "dd-researcher.md")
     assert _RESEARCHER_TOOLS in text
     assert fm["skills"] == ""
     body = text.split("\n---\n", 1)[1].lower()

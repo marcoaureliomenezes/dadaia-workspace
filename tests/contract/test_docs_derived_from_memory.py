@@ -9,6 +9,7 @@ from pathlib import Path
 from dadaia_workspace.cli.help_digest import command_paths, render_digest
 from dadaia_workspace.core.fixed_sections import authored_text
 from dadaia_workspace.features.specs.citations import dead_citations
+from tests.helpers.oslib import read_text
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _MEMORY_DIR = _REPO_ROOT / "specs" / "memory"
@@ -50,7 +51,7 @@ _DOCS_URL = "https://github.com/marcoaureliomenezes/dadaia-workspace/tree/main/d
 def test_the_agent_index_lists_every_page_of_the_site() -> None:
     """`llms.txt` is the agent's map of the human site: a page it does not name is a page
     no agent finds, so the list is the `docs/` glob and nothing narrower."""
-    index = (_REPO_ROOT / "llms.txt").read_text("utf-8")
+    index = read_text(_REPO_ROOT / "llms.txt")
     missing = sorted(
         p.relative_to(_REPO_ROOT).as_posix()
         for p in _DOCS_DIR.glob("*.md")
@@ -63,7 +64,7 @@ def test_the_agent_index_lists_every_page_of_the_site() -> None:
 def test_the_readme_sends_a_reader_to_the_docs_folder() -> None:
     """The Documentation URL and the README both name the repository's docs folder; no Pages
     site exists."""
-    readme = (_REPO_ROOT / "README.md").read_text("utf-8")
+    readme = read_text(_REPO_ROOT / "README.md")
 
     assert _DOCS_URL in readme
     assert _pyproject_poetry()["urls"]["Documentation"] == _DOCS_URL  # type: ignore[index]
@@ -73,7 +74,7 @@ def test_the_readme_sends_a_reader_to_the_docs_folder() -> None:
 def test_every_readme_link_is_absolute() -> None:
     """PyPI renders the README outside the checkout, where a relative link or image target is a dead
     end."""
-    readme = (_REPO_ROOT / "README.md").read_text("utf-8")
+    readme = read_text(_REPO_ROOT / "README.md")
     targets = re.findall(r"\]\(([^)\s]+)", readme) + re.findall(r'(?:src|href)="([^"]+)"', readme)
     relative = [t for t in targets if not re.match(r"(?:https?:|mailto:|#)", t)]
     assert relative == []
@@ -82,7 +83,7 @@ def test_every_readme_link_is_absolute() -> None:
 def test_the_cli_reference_is_the_committed_output_of_the_generator() -> None:
     """`docs/cli.md` carries no atom marker — it IS `render_digest()`'s output, header
     line included; regenerate with `dadaia help tree > docs/cli.md`."""
-    committed = (_DOCS_DIR / "cli.md").read_text("utf-8")
+    committed = read_text(_DOCS_DIR / "cli.md")
 
     assert committed == render_digest(), (
         "docs/cli.md drifted from the live command tree — "
@@ -100,7 +101,7 @@ def test_no_derived_document_cites_a_dead_verb_or_path() -> None:
         for doc in [*_derived_docs(), _DOCS_DIR / "cli.md"]
         if doc.is_file()
         for v in dead_citations(
-            doc.read_text("utf-8"),
+            read_text(doc),
             command_paths=paths,
             repo_root=_REPO_ROOT,
             rel=doc.relative_to(_REPO_ROOT).as_posix(),
@@ -112,7 +113,7 @@ def test_no_derived_document_cites_a_dead_verb_or_path() -> None:
 
 def _readme_tagline() -> str:
     """The README's first non-badge paragraph — PyPI's summary line, in prose."""
-    for block in (_REPO_ROOT / "README.md").read_text("utf-8").split("\n\n"):
+    for block in read_text(_REPO_ROOT / "README.md").split("\n\n"):
         line = block.strip()
         if not line or line.startswith(("#", "[![", "<!--")):
             continue
@@ -121,7 +122,7 @@ def _readme_tagline() -> str:
 
 
 def _llms_tagline() -> str:
-    for line in (_REPO_ROOT / "llms.txt").read_text("utf-8").splitlines():
+    for line in read_text(_REPO_ROOT / "llms.txt").splitlines():
         if line.startswith("> "):
             return " ".join(line[2:].split())
     raise AssertionError("llms.txt carries no `> ` tagline line")
@@ -164,8 +165,7 @@ def _onboarding_texts() -> list[Path]:
 
 def _onboarding_corpus() -> dict[str, str]:
     return {
-        path.relative_to(_REPO_ROOT).as_posix(): path.read_text("utf-8")
-        for path in _onboarding_texts()
+        path.relative_to(_REPO_ROOT).as_posix(): read_text(path) for path in _onboarding_texts()
     }
 
 

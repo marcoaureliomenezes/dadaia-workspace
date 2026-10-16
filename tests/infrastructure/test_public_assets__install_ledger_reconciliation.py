@@ -7,6 +7,7 @@ from pathlib import Path
 
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from tests.helpers.harness_profile import register_all
+from tests.helpers.oslib import read_text, write_text
 
 
 def _install_all(ws: Path) -> FileSystemPublicAssetManager:
@@ -29,7 +30,7 @@ def test_retired_family_is_pruned_on_next_install(tmp_path: Path) -> None:
     gone = ws / ".agents" / "skills" / pristine / "SKILL.md"
     kept = ws / ".agents" / "skills" / edited / "SKILL.md"
     assert gone.is_file()
-    kept.write_text(kept.read_text(encoding="utf-8") + "\nOPERATOR EDIT\n", encoding="utf-8")
+    write_text(kept, read_text(kept) + "\nOPERATOR EDIT\n")
 
     shutil.rmtree(skills_src)
     installed = mgr.install(ws)
@@ -51,7 +52,7 @@ def test_no_ledger_bootstrap_prunes_nothing(tmp_path: Path) -> None:
     ledger.unlink()
     stray = ws / ".agents" / "skills" / "operator-own-skill" / "SKILL.md"
     stray.parent.mkdir(parents=True)
-    stray.write_text("mine\n", encoding="utf-8")
+    write_text(stray, "mine\n")
 
     installed = mgr.install(ws)
 

@@ -15,14 +15,16 @@ from pathlib import Path
 import pytest
 
 import dadaia_workspace.infrastructure.python_env as python_env_module
+from dadaia_workspace.core import platform
 from dadaia_workspace.core.exceptions import DadaiaError
-from dadaia_workspace.core.platform import PLATFORM, Capabilities
+from dadaia_workspace.core.platform import Capabilities
 from dadaia_workspace.infrastructure.python_env import (
     VenvPythonEnvironmentManager,
     build_digest,
     repack_installed_wheel,
 )
 from tests.fixtures.provider_dist import install_fake_dist
+from tests.helpers.oslib import detect, python_in, venv_dir, venv_tool, write_text
 
 _REAL_ENSURE = VenvPythonEnvironmentManager.ensure_workspace_venv
 
@@ -36,7 +38,7 @@ class _Recorder:
 
 @pytest.fixture()
 def recorder(monkeypatch: pytest.MonkeyPatch) -> _Recorder:
-    """Fake ``subprocess.run`` plus the interpreter/verification probes, which have
+    """Fake child-process call plus the interpreter/verification probes, which have
     their own tests below."""
     rec = _Recorder()
 
@@ -44,7 +46,7 @@ def recorder(monkeypatch: pytest.MonkeyPatch) -> _Recorder:
         rec.commands.append(list(cmd))
         if cmd[1:3] == ["-m", "venv"]:
             rec.venv_created.append(cmd[-1])
-            (Path(cmd[-1]) / PLATFORM.venv_scripts_dir).mkdir(parents=True, exist_ok=True)
+            python_in(Path(cmd[-1])).parent.mkdir(parents=True, exist_ok=True)
 
     cls = VenvPythonEnvironmentManager
     monkeypatch.setattr(python_env_module.subprocess, "run", fake_run)
@@ -61,7 +63,7 @@ def _venv(ws: Path) -> str:
 
 
 def _python(ws: Path) -> str:
-    return str(Path(_venv(ws)) / PLATFORM.venv_scripts_dir / f"python{PLATFORM.venv_exe_suffix}")
+    return str(python_in(Path(_venv(ws))))
 
 
 # The entry-script forms pip's distlib writes over the interpreter path.
@@ -73,7 +75,7 @@ _LAUNCHER = 'MZ\x90\x00launcher\x00PK#!"{}"\r\n'  # Windows: launcher bytes, the
 
 def _healthy(ws: Path, root: Path | None = None, form: str = _PLAIN) -> None:
     """The ``dadaia`` entrypoint in ``form``, naming ``root``'s venv python (``ws``'s by default)."""
-    entry = Path(_venv(ws)) / PLATFORM.venv_scripts_dir / f"dadaia{PLATFORM.venv_exe_suffix}"
+    entry = venv_tool(Path(_venv(ws)), "dadaia")
     entry.parent.mkdir(parents=True)
     entry.write_bytes(form.format(_python(root or ws)).encode("utf-8"))
 
@@ -82,7 +84,7 @@ def _wheel_install(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Run as a wheel install: no pyproject.toml beside the package."""
     site = tmp_path / "site-packages" / "dadaia_workspace"
     site.mkdir(parents=True)
-    (site / "__init__.py").write_text("")
+    write_text(site / "__init__.py", "")
     monkeypatch.setattr(python_env_module.dadaia_workspace, "__file__", str(site / "__init__.py"))
     monkeypatch.setattr(python_env_module.metadata, "version", lambda name: "9.9.9")
 
@@ -103,7 +105,7 @@ def test_fresh_bootstrap_creates_venv_and_installs_package(
 
 def test_existing_bare_venv_is_repaired_not_skipped(tmp_path: Path, recorder: _Recorder) -> None:
     """The VENV-1 state: venv dir present, entrypoint missing -> install, no re-create."""
-    (Path(_venv(tmp_path)) / PLATFORM.venv_scripts_dir).mkdir(parents=True)
+    python_in(Path(_venv(tmp_path))).parent.mkdir(parents=True)
     VenvPythonEnvironmentManager().ensure_workspace_venv(str(tmp_path))
     assert (recorder.venv_created, len(recorder.commands)) == ([], 1)
 
@@ -284,8 +286,8 @@ def _installed_dist(root: Path, record: str) -> Path:
     site = root / "site"
     dist_info = site / "fakepkg-0.1.0.dist-info"
     dist_info.mkdir(parents=True)
-    (dist_info / "METADATA").write_text("Metadata-Version: 2.1\nName: fakepkg\nVersion: 0.1.0\n")
-    (dist_info / "RECORD").write_text(record)
+    write_text(dist_info / "METADATA", "Metadata-Version: 2.1\nName: fakepkg\nVersion: 0.1.0\n")
+    write_text(dist_info / "RECORD", record)
     return dist_info
 
 
@@ -297,9 +299,10 @@ def test_repack_installed_wheel_produces_a_valid_wheel(tmp_path: Path) -> None:
         "fakepkg-0.1.0.dist-info/WHEEL,,\nfakepkg-0.1.0.dist-info/RECORD,,\n",
     )
     (dist_info.parent / "fakepkg").mkdir()
-    (dist_info.parent / "fakepkg" / "__init__.py").write_text("VALUE = 1\n")
-    (dist_info / "WHEEL").write_text(
-        "Wheel-Version: 1.0\nGenerator: test\nRoot-Is-Purelib: true\nTag: py3-none-any\n"
+    write_text(dist_info.parent / "fakepkg" / "__init__.py", "VALUE = 1\n")
+    write_text(
+        dist_info / "WHEEL",
+        "Wheel-Version: 1.0\nGenerator: test\nRoot-Is-Purelib: true\nTag: py3-none-any\n",
     )
 
     wheel = repack_installed_wheel(tmp_path / "out", dist=Distribution.at(dist_info))
@@ -319,7 +322,7 @@ def test_repack_returns_none_for_editable_install(tmp_path: Path) -> None:
     dist_info = _installed_dist(
         tmp_path, "__editable__.fakepkg.pth,,\nfakepkg-0.1.0.dist-info/METADATA,,\n"
     )
-    (dist_info.parent / "__editable__.fakepkg.pth").write_text("/src\n")
+    write_text(dist_info.parent / "__editable__.fakepkg.pth", "/src\n")
     assert repack_installed_wheel(tmp_path / "out", dist=Distribution.at(dist_info)) is None
 
 
@@ -334,7 +337,7 @@ def test_a_failed_reinstall_is_narrated_and_keeps_the_old_build(
     recorder.installed = "0.0.1 old-build"
     mgr = VenvPythonEnvironmentManager()
     monkeypatch.setattr(mgr, "_install_spec", lambda workspace_root: "/tmp/w.whl")
-    entry = Path(_venv(tmp_path)) / PLATFORM.venv_scripts_dir / f"dadaia{PLATFORM.venv_exe_suffix}"
+    entry = venv_tool(Path(_venv(tmp_path)), "dadaia")
     seen: list[list[str]] = []
 
     def failing_pip(cmd: list[str], check: bool = False, **kwargs: object) -> None:
@@ -456,8 +459,8 @@ def test_is_fully_qualified_per_host_flavor(
     monkeypatch: pytest.MonkeyPatch, host: str, path: str, ok: bool
 ) -> None:
     """CWE-426: a Windows drive-relative path passes ``isabs`` yet is not fully qualified."""
-    monkeypatch.setattr(python_env_module, "PLATFORM", Capabilities.detect(host))
-    assert python_env_module._is_fully_qualified(path) is ok
+    monkeypatch.setattr("dadaia_workspace.core.platform.PLATFORM", Capabilities.detect(host))
+    assert platform.is_fully_qualified(path) is ok
 
 
 @pytest.mark.parametrize(
@@ -468,6 +471,7 @@ def test_path_candidates_keep_only_absolute_which_results(
     monkeypatch: pytest.MonkeyPatch, which: str, expected: list[str]
 ) -> None:
     """Candidate lookup order."""
+    monkeypatch.setattr("dadaia_workspace.core.platform.PLATFORM", Capabilities.detect("linux"))
     monkeypatch.setattr(
         python_env_module.shutil, "which", lambda name: which if which.endswith(name) else None
     )
@@ -481,9 +485,49 @@ def test_pyvenv_executable_keeps_only_an_absolute_value(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, value: str, expected: str | None
 ) -> None:
     """A hand-edited relative ``pyvenv.cfg`` value is never returned."""
-    (tmp_path / "pyvenv.cfg").write_text(f"executable = {value}\n", encoding="utf-8")
+    monkeypatch.setattr("dadaia_workspace.core.platform.PLATFORM", Capabilities.detect("linux"))
+    write_text(tmp_path / "pyvenv.cfg", f"executable = {value}\n")
     monkeypatch.setattr(python_env_module.sys, "prefix", str(tmp_path))
     assert python_env_module._current_venv_pyvenv_executable() == expected
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [("C:\\Python312\\python.exe", "C:\\Python312\\python.exe"), ("\\tools\\python.exe", None)],
+)
+def test_pyvenv_executable_is_judged_by_the_door_host(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, value: str, expected: str | None
+) -> None:
+    """On a Windows host a drive path is fully qualified and a drive-relative one is not."""
+    monkeypatch.setattr("dadaia_workspace.core.platform.PLATFORM", Capabilities.detect("win32"))
+    write_text(tmp_path / "pyvenv.cfg", f"executable = {value}\n")
+    monkeypatch.setattr(python_env_module.sys, "prefix", str(tmp_path))
+    assert python_env_module._current_venv_pyvenv_executable() == expected
+
+
+def test_pyvenv_cfg_with_bytes_that_are_not_utf8_still_names_its_executable(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The file is the interpreter's, not ours: a latin-1 ``home`` line does not hide ``executable``."""
+    monkeypatch.setattr("dadaia_workspace.core.platform.PLATFORM", Capabilities.detect("linux"))
+    (tmp_path / "pyvenv.cfg").write_bytes(b"home = /caf\xe9\nexecutable = /usr/bin/python3.12\n")
+    monkeypatch.setattr(python_env_module.sys, "prefix", str(tmp_path))
+    assert python_env_module._current_venv_pyvenv_executable() == "/usr/bin/python3.12"
+
+
+def test_path_candidates_are_judged_by_the_door_host(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("dadaia_workspace.core.platform.PLATFORM", Capabilities.detect("win32"))
+    monkeypatch.setattr(python_env_module.shutil, "which", lambda name: f"C:\\Python\\{name}.exe")
+    assert python_env_module._path_candidates(12) == [
+        "C:\\Python\\python3.13.exe",
+        "C:\\Python\\python3.12.exe",
+    ]
+
+
+def test_the_venv_python_is_where_the_door_host_keeps_it(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("dadaia_workspace.core.platform.PLATFORM", Capabilities.detect("win32"))
+    got = VenvPythonEnvironmentManager().python_executable("ws")
+    assert got == str(python_in(venv_dir(Path("ws")), detect("win32")))
 
 
 _V310, _V312 = (3, 10, 12), (3, 12, 13)
@@ -512,6 +556,14 @@ _V310, _V312 = (3, 10, 12), (3, 12, 13)
         pytest.param("linux", "python3", [], {"python3": _V312}, None, id="relative-never-probed"),
         pytest.param(
             "win32",
+            "C:\\Python312\\python.exe",
+            [],
+            {"C:\\Python312\\python.exe": _V312},
+            "C:\\Python312\\python.exe",
+            id="drive-path-probed",
+        ),
+        pytest.param(
+            "win32",
             "\\tools\\python.exe",
             [],
             {"\\tools\\python.exe": _V312},
@@ -531,7 +583,7 @@ def test_child_venv_interpreter_is_the_first_candidate_satisfying_requires_pytho
     """Base executable, then pyvenv.cfg, then PATH (CWE-426); a relative candidate is never spawned;
     nothing satisfying raises naming the requirement and what was tried."""
     mgr = VenvPythonEnvironmentManager()
-    monkeypatch.setattr(python_env_module, "PLATFORM", Capabilities.detect(host))
+    monkeypatch.setattr("dadaia_workspace.core.platform.PLATFORM", Capabilities.detect(host))
     monkeypatch.setattr(mgr, "_running_requires_python", lambda: ">=3.12,<4.0")
     base = "/usr/bin/python3" if host == "linux" else ""
     monkeypatch.setattr(python_env_module.sys, "_base_executable", base, raising=False)
@@ -604,7 +656,7 @@ def test_interpreter_version_probe_passes_a_bounded_timeout_and_devnull_stdin(
 def test_interpreter_version_probe_degrades_to_none_on_timeout(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """A candidate that would otherwise hang (``subprocess.run`` raising
+    """A candidate that would otherwise hang (the child-process call raising
     ``TimeoutExpired`` once the bound is enforced) degrades to ``None`` and is skipped —
     never propagates and never hangs the caller."""
 
@@ -650,10 +702,9 @@ def test_a_venv_without_its_python_is_refused_with_the_delete_fix_on_every_run(
     mgr = VenvPythonEnvironmentManager()
     monkeypatch.undo()  # the recorder's stubs off: the real checks run below
     windows = Capabilities.detect("win32")
-    monkeypatch.setattr(python_env_module, "PLATFORM", windows)
     monkeypatch.setattr("dadaia_workspace.core.platform.PLATFORM", windows)
     monkeypatch.chdir(tmp_path)
-    (tmp_path / "a b/.dadaia/.venv" / windows.venv_scripts_dir).mkdir(parents=True)
+    python_in(tmp_path / "a b/.dadaia/.venv", detect("win32")).parent.mkdir(parents=True)
     monkeypatch.setattr(python_env_module.subprocess, "run", _no_interpreter)
     for call in (
         mgr._assert_child_interpreter_version,

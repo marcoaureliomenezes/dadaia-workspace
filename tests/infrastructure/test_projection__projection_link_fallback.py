@@ -1,4 +1,4 @@
-"""Windows without Developer Mode raises ``OSError`` from ``os.symlink``. The projection
+"""Windows without Developer Mode raises ``OSError`` from the symlink call. The projection
 must still deliver the content — and the ledger must still be able to tell that entry
 apart from a real link, which ``read_bytes()`` never can: it follows the link.
 """
@@ -14,13 +14,14 @@ import pytest
 from dadaia_workspace.core.models.install_ledger import InstallLedger, LedgerEntry
 from dadaia_workspace.infrastructure.projection import ProjectionRule, install_rules, link_render
 from dadaia_workspace.infrastructure.public_assets_common import _entry_digest, read_link_target
+from tests.helpers.oslib import read_text, write_text
 
 
 def _authored(root: Path) -> Path:
     skill = root / ".agents" / "skills" / "dd-example"
     skill.mkdir(parents=True)
-    (skill / "SKILL.md").write_text("---\nname: dd-example\n---\nbody\n", encoding="utf-8")
-    (skill / "NOTES.md").write_text("deeper\n", encoding="utf-8")
+    write_text(skill / "SKILL.md", "---\nname: dd-example\n---\nbody\n")
+    write_text(skill / "NOTES.md", "deeper\n")
     return skill
 
 
@@ -42,7 +43,7 @@ def test_symlink_path_writes_one_relative_link_recorded_as_symlink(tmp_path: Pat
 
     assert [(line.path, line.kind) for line in transcript.lines] == [(rule.dst, "symlink")]
     assert read_link_target(rule.dst) == "../../.agents/skills/dd-example"
-    assert (rule.dst / "SKILL.md").read_text(encoding="utf-8").startswith("---")
+    assert read_text(rule.dst / "SKILL.md").startswith("---")
 
 
 def test_copy_fallback_when_symlink_raises_is_hash_equal_and_kinded_copy(

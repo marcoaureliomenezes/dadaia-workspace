@@ -6,6 +6,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from tests.helpers.oslib import read_text
+
 
 def test_harness_independent_checks_live_in_entity_doctor() -> None:
     from dadaia_workspace.infrastructure import codex_doctor, entity_doctor
@@ -28,5 +30,5 @@ def test_compare_content_dead_code_is_gone() -> None:
 def test_public_assets_carries_no_underscore_reexport_shim() -> None:
     from dadaia_workspace.infrastructure import public_assets
 
-    src = Path(public_assets.__file__).read_text(encoding="utf-8")
+    src = read_text(Path(public_assets.__file__))
     assert "noqa: F401" not in src

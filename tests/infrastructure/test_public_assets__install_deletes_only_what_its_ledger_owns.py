@@ -9,6 +9,7 @@ import pytest
 
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from tests.helpers.harness_profile import register_all
+from tests.helpers.oslib import read_text
 
 pytestmark = pytest.mark.slow(reason="full public install into a tmp workspace")
 
@@ -47,7 +48,7 @@ def test_operator_files_outside_the_ledger_survive_public_install(tmp_path: Path
         assert not [line for line in output if rel in line], rel
     rules = sorted(p.name for p in (ws / ".codex" / "rules").iterdir())
     assert rules == ["dadaia-command-policy.rules"]
-    config = (ws / ".codex" / "config.toml").read_text(encoding="utf-8")
+    config = read_text(ws / ".codex" / "config.toml")
     assert "[skills]" not in config and "approved_commands" not in config
 
 
@@ -55,7 +56,7 @@ def test_the_install_modules_delete_only_through_the_ledger_prune() -> None:
     """Only the ledger prune, its empty-dir tidy-up and `stage` call a deleter."""
     found: set[str] = set()
     for name in ("projection_rules.py", "install_helpers.py", "public_assets.py"):
-        tree = ast.parse((_INFRA / name).read_text(encoding="utf-8"))
+        tree = ast.parse(read_text(_INFRA / name))
         for fn in ast.walk(tree):
             if not isinstance(fn, ast.FunctionDef | ast.AsyncFunctionDef):
                 continue

@@ -28,6 +28,7 @@ from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetM
 from dadaia_workspace.infrastructure.public_assets_common import read_link_target
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
 from dadaia_workspace.infrastructure.runtime_config import claude_hooks
+from tests.helpers.oslib import read_text
 
 #: Hook events Claude Code dispatches. An event outside this set is accepted into
 #: settings.json and then never fires.
@@ -107,7 +108,7 @@ def projected(tmp_path_factory: pytest.TempPathFactory) -> Path:
 
 
 def _frontmatter(path: Path) -> dict[str, object]:
-    text = path.read_text(encoding="utf-8")
+    text = read_text(path)
     assert text.startswith("---\n"), f"{path.name}: no frontmatter block"
     _, _, rest = text.partition("---\n")
     block, sep, _ = rest.partition("\n---")
@@ -157,7 +158,7 @@ def test_settings_hook_events_and_matchers_are_claude_code_valid(projected: Path
     they catch a typo and nothing else. This checks the emitted values against Claude Code's
     vocabulary instead.
     """
-    settings = json.loads((projected / ".claude" / "settings.json").read_text(encoding="utf-8"))
+    settings = json.loads(read_text(projected / ".claude" / "settings.json"))
     hooks = settings["hooks"]
     unknown_events = sorted(set(hooks) - _CLAUDE_HOOK_EVENTS)
     assert not unknown_events, f"settings.json declares unknown hook event(s): {unknown_events}"
@@ -237,3 +238,22 @@ def test_claude_entries_are_symlinks_onto_the_authored_agents_set(projected: Pat
         )
         body = resolved if resolved.is_file() else resolved / "SKILL.md"
         assert _frontmatter(body)
+
+
+def test_a_host_without_exec_bits_projects_every_file_runnable_and_never_reads_drift(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from dadaia_workspace.core.platform import Capabilities
+    from dadaia_workspace.infrastructure.projection import doctor_rules, tree_bytes_rules
+    from tests.helpers.oslib import write_text
+
+    monkeypatch.setattr("dadaia_workspace.core.platform.PLATFORM", Capabilities.detect("win32"))
+    (tmp_path / "src").mkdir()
+    (tmp_path / "dst").mkdir()
+    write_text(tmp_path / "src" / "hook.sh", "echo\n")
+    write_text(tmp_path / "dst" / "hook.sh", "echo\n")
+
+    (rule,) = tree_bytes_rules(tmp_path / "src", tmp_path / "dst", harness="a", label_prefix="s/")
+
+    assert rule.mode == 0o755
+    assert [line.render() for line in doctor_rules([rule])] == ["[ok] s/hook.sh"]

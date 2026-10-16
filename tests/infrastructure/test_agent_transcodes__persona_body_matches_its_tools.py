@@ -12,6 +12,7 @@ import pytest
 from dadaia_workspace.core.model_registry import ResolvedAgentModel
 from dadaia_workspace.infrastructure.agent_transcodes import codex_agent_toml_bytes
 from dadaia_workspace.infrastructure.install_helpers import render_claude_agent
+from tests.helpers.oslib import read_text
 
 _AGENTS = Path(__file__).resolve().parents[2] / "dadaia_workspace" / "public" / "agents"
 _PERSONAS = sorted(_AGENTS.glob("*.md"))
@@ -28,7 +29,7 @@ _RESOLVED = ResolvedAgentModel(model="sonnet", effort="high", source="default")
 def test_a_persona_body_never_requires_a_missing_tool(persona: Path) -> None:
     """The rendered Claude agent and
     Codex TOML of a persona without Write never instruct a write."""
-    claude = render_claude_agent(persona.read_text(encoding="utf-8"), _RESOLVED)
+    claude = render_claude_agent(read_text(persona), _RESOLVED)
     if "disallowedTools: [Edit, Write, NotebookEdit]" not in claude:
         return
     codex = codex_agent_toml_bytes(persona, persona.stem, _RESOLVED).decode("utf-8")

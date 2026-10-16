@@ -5,7 +5,6 @@ Size: MEDIUM (a real `public stage` into a temp dir; each entry point run as a s
 
 from __future__ import annotations
 
-import subprocess
 import sys
 from pathlib import Path
 
@@ -13,6 +12,7 @@ import pytest
 
 from dadaia_workspace.infrastructure import public_assets
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
+from tests.helpers.oslib import read_text, run
 
 pytestmark = pytest.mark.slow(reason="real public stage into a temp dir + subprocess runs")
 
@@ -44,7 +44,7 @@ _SRC_SKILLS = Path(__file__).resolve().parents[2] / "dadaia_workspace" / "public
 _ENTRY_POINTS = sorted(
     p.relative_to(_SRC_SKILLS).as_posix()
     for p in _SRC_SKILLS.glob("*/scripts/*.py")
-    if not p.name.startswith("_") and "__main__" in p.read_text(encoding="utf-8")
+    if not p.name.startswith("_") and "__main__" in read_text(p)
 )
 
 
@@ -87,12 +87,7 @@ def test_entry_points_were_found() -> None:
 def test_entry_point_help_runs_with_a_clean_sys_path(
     rel: str, skills: Path, tmp_path: Path
 ) -> None:
-    done = subprocess.run(
-        [sys.executable, "-I", "-B", str(skills / rel), "--help"],
-        cwd=tmp_path,
-        env={},
-        capture_output=True,
-        text=True,
-        check=False,
+    done = run(
+        [sys.executable, "-I", "-B", str(skills / rel), "--help"], cwd=tmp_path, env={}, check=False
     )
     assert done.returncode == 0, done.stderr[-600:]

@@ -15,12 +15,13 @@ from dadaia_workspace.core.exceptions import GitCloneError, GitSyncError
 from dadaia_workspace.core.skill_owner import load_owner
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from tests.conftest import _GIT_QUIET
+from tests.helpers.oslib import run, run_line, write_text
 
 pytestmark = pytest.mark.slow
 
 
 def _git(cwd: Path, *args: str) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True)
+    return run(["git", *args], cwd=cwd)
 
 
 def _repo(path: Path) -> Path:
@@ -28,7 +29,7 @@ def _repo(path: Path) -> Path:
     _git(path, "init", "-q")
     _git(path, "config", "user.email", "op@example.com")
     _git(path, "config", "user.name", "Operator")
-    (path / "README.md").write_text("init")
+    write_text(path / "README.md", "init")
     _git(path, "add", "-A")
     _git(path, "commit", "-qm", "init")
     return path
@@ -47,7 +48,7 @@ def test_repo_lifecycle_clone_dirty_commit_remote_branch_checkout_and_error_path
     client.clone(str(src), dest)
 
     assert client.dirty_paths(dest) == []
-    (dest / "new.txt").write_text("hello")
+    write_text(dest / "new.txt", "hello")
     _git(dest, "mv", "README.md", "R.md")
     assert client.dirty_paths(dest) == ["R.md", "new.txt"]
     _git(dest, "reset", "-q", "--hard")
@@ -72,10 +73,10 @@ def test_a_failed_git_step_carries_gits_full_output(tmp_path: Path) -> None:
     repo = _repo(tmp_path / "r")
     client = GitSubprocessClient()
     client.git(repo, "checkout", "-q", "-b", "b")
-    (repo / "README.md").write_text("b")
+    write_text(repo / "README.md", "b")
     client.git(repo, "commit", "-qam", "b")
     client.git(repo, "checkout", "-q", "-")
-    (repo / "README.md").write_text("c")
+    write_text(repo / "README.md", "c")
     client.git(repo, "commit", "-qam", "c")
     with pytest.raises(GitSyncError, match="CONFLICT"):
         client.git(repo, "merge", "b")
@@ -87,7 +88,7 @@ def test_push_first_push_sets_upstream_and_mismatched_branch_uses_explicit_refsp
     """Plain ``git push`` fails under push.default=simple when the upstream name differs; the
     client pushes HEAD:<upstream branch> instead."""
     bare = tmp_path / "bare.git"
-    subprocess.run(["git", "init", "-q", "--bare", str(bare)], check=True)
+    run(["git", "init", "-q", "--bare", str(bare)], check=True)
     local = _repo(tmp_path / "local")
     _git(local, "remote", "add", "origin", str(bare))
     client = GitSubprocessClient()
@@ -108,9 +109,9 @@ def test_push_first_push_sets_upstream_and_mismatched_branch_uses_explicit_refsp
 def test_commit_paths_ignores_operator_pre_staged_unrelated_content(tmp_path: Path) -> None:
     """The commit is path-scoped; the operator's staged file stays staged."""
     repo = _repo(tmp_path / "repo")
-    (repo / "operator-staged.txt").write_text("operator content")
+    write_text(repo / "operator-staged.txt", "operator content")
     _git(repo, "add", "operator-staged.txt")
-    (repo / "tool-written.txt").write_text("tool content")
+    write_text(repo / "tool-written.txt", "tool content")
 
     GitSubprocessClient().commit_paths(repo, "chore(scaffold): tool write", ["tool-written.txt"])
 
@@ -131,7 +132,7 @@ def test_clone_writes_longpaths_into_the_clone_config(
 
 
 def _commit_file(repo: Path, name: str) -> str:
-    (repo / name).write_text(name)
+    write_text(repo / name, name)
     _git(repo, "add", "-A")
     _git(repo, "commit", "-qm", name)
     return _git(repo, "rev-parse", "HEAD").stdout.strip()
@@ -178,7 +179,7 @@ def _scaffolded(path: Path) -> Path:
     """A repo with the scaffold committed as `specs init` leaves it (default gitflow)."""
     repo = _repo(path)
     (repo / "specs").mkdir()
-    (repo / "specs" / "constitution.md").write_text("# Constitution\n")
+    write_text(repo / "specs" / "constitution.md", "# Constitution\n")
     _git(repo, "add", "-A")
     _git(repo, "commit", "-qm", "scaffold")
     return repo
@@ -226,7 +227,7 @@ def test_the_several_work_branches_fix_runs_and_clears_the_refusal(
     _git(repo, "switch", "-qc", "feature/0.1.0")
     if not merged:
         _git(repo, "branch", "feature/0.2.0")
-    (repo / "low.txt").write_text("low")
+    write_text(repo / "low.txt", "low")
     _git(repo, "add", "-A")
     _git(repo, "commit", "-qm", "low only")
     if merged:
@@ -241,6 +242,6 @@ def test_the_several_work_branches_fix_runs_and_clears_the_refusal(
     for step in steps:
         if not merged and step.startswith(git_line(repo, "branch", "-d")):
             _git(repo, "merge", "-q", "feature/0.1.0")  # the agent's merge act
-        done = subprocess.run(step, shell=True, capture_output=True, text=True)  # noqa: S602
+        done = run_line(step)
         assert done.returncode == 0, done.stderr
     assert client.work_version(repo) == "0.2.0"

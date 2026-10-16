@@ -28,6 +28,7 @@ from dadaia_workspace.infrastructure.projection import ProjectionRule
 from dadaia_workspace.infrastructure.projection_rules import (
     HOOK_RULE_BUILDERS,
 )
+from tests.helpers.oslib import read_text
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _PUBLIC = _REPO_ROOT / "dadaia_workspace" / "public"
@@ -97,7 +98,7 @@ def test_no_hook_artifact_references_an_undefined_behaviour(
 ) -> None:
     """No file exists for a behaviour the workspace does not define: every entrypoint a
     projected hook artifact names must trace to a Deterministic Behavior."""
-    behaviors_blob = json.dumps(json.loads(_REGISTRY.read_text(encoding="utf-8"))["behaviors"])
+    behaviors_blob = json.dumps(json.loads(read_text(_REGISTRY))["behaviors"])
     referenced = set()
     for text in _rendered(_hook_rules(record, workspace)).values():
         referenced.update(_ENTRYPOINT_RE.findall(text))
@@ -148,7 +149,7 @@ def test_the_behaviour_table_is_derived_and_the_registry_declares_it(workspace: 
         for record in _derived_records()
     }
     assert derived == _BEHAVIOUR_TABLE
-    behaviors = {b["id"]: b for b in json.loads(_REGISTRY.read_text("utf-8"))["behaviors"]}
+    behaviors = {b["id"]: b for b in json.loads(read_text(_REGISTRY))["behaviors"]}
     gaps = behaviors["context-memory-injection"].get("gaps", {})
     for harness, wired in _BEHAVIOUR_TABLE.items():
         assert ("ctx_inject" in wired) is (harness not in gaps)
@@ -159,7 +160,7 @@ def test_no_text_claims_behaviour_parity() -> None:
     never claims "only serialization" differs nor that "no harness adds a behaviour".
     (The memory atom's copy is reconciled at the closure memory pass — dd-product-engineer.)"""
     hooks_py = _REPO_ROOT / "dadaia_workspace/infrastructure/runtime_transforms/hook_wrappers.py"
-    text = " ".join(hooks_py.read_text("utf-8").split()).replace("*", "").lower()
+    text = " ".join(read_text(hooks_py).split()).replace("*", "").lower()
     assert "only serialization" not in text
     assert "no harness adds a behaviour" not in text
     assert "same four" not in text
@@ -168,6 +169,6 @@ def test_no_text_claims_behaviour_parity() -> None:
 def test_runtime_config_bakes_no_interpreter() -> None:
     """No render-time
     interpreter: runtime_config never reads sys.executable or builds a venv path."""
-    source = (_REPO_ROOT / "dadaia_workspace/infrastructure/runtime_config.py").read_text("utf-8")
+    source = read_text(_REPO_ROOT / "dadaia_workspace/infrastructure/runtime_config.py")
     assert "sys.executable" not in source
     assert "venv_scripts_dir" not in source

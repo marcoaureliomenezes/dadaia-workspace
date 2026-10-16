@@ -19,6 +19,7 @@ from dadaia_workspace.core.models.spec_context import (
 )
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
 from tests.fixtures.stores import context_store
+from tests.helpers.oslib import Undecodable, read_text, write_text
 
 
 def _make_ctx(
@@ -107,7 +108,7 @@ def test_associated_repos_round_trip_through_store(tmp_path: Path) -> None:
     assert fetched is not None
     assert fetched.associated_repos == ctx.associated_repos
 
-    raw = json.loads((tmp_path / "spec_contexts.json").read_text())
+    raw = json.loads(read_text(tmp_path / "spec_contexts.json"))
     row = raw["contexts"][0]
     assert row["associated_repos"] == [
         {"slug": "assoc-a", "url": "https://github.com/org/assoc-a"},
@@ -140,7 +141,7 @@ def test_v2_registry_loads_with_empty_associated_repos(tmp_path: Path) -> None:
             }
         ],
     }
-    (tmp_path / "spec_contexts.json").write_text(json.dumps(v2_payload), encoding="utf-8")
+    write_text(tmp_path / "spec_contexts.json", json.dumps(v2_payload))
     store = JsonContextStore(tmp_path)
 
     fetched = store.get("legacy-ctx")
@@ -171,7 +172,7 @@ def test_a_fresh_store_writes_v3_rows_without_legacy_fields(tmp_path: Path) -> N
     )
     fresh_store.save(ctx)
     fresh_ctx_file = fresh_ws / "spec_contexts.json"
-    data = json.loads(fresh_ctx_file.read_text())
+    data = json.loads(read_text(fresh_ctx_file))
     row = data["contexts"][0]
     assert "is_primary" not in row
     assert "activated_at" not in row
@@ -197,21 +198,30 @@ def test_a_row_missing_name_is_unreadable_at_every_method(
     method, never a KeyError; the registry file is left as it was."""
     path = tmp_path / "spec_contexts.json"
     body = json.dumps({"schema_version": 3, "contexts": [{"state": "alive"}]})
-    path.write_text(body, encoding="utf-8")
+    write_text(path, body)
     with pytest.raises(
         SchemaVersionError, match="has no name, repo_slug, repo_url, created_at"
     ) as refused:
         call(JsonContextStore(tmp_path))
     keys = "name, repo_slug, repo_url, created_at"
     assert refused.value.fix == f"Operator action: add {keys} to that row of {path}"
-    assert path.read_text(encoding="utf-8") == body
+    assert read_text(path) == body
 
 
 def test_a_refused_row_is_named_by_its_name(tmp_path: Path) -> None:
     """The refusal names the row to repair; a row keeping its name is named."""
     path = tmp_path / "spec_contexts.json"
     row = {"name": "beta", "state": "alive", "repo_slug": "beta", "repo_url": "u"}
-    path.write_text(json.dumps({"schema_version": 3, "contexts": [row]}), encoding="utf-8")
+    write_text(path, json.dumps({"schema_version": 3, "contexts": [row]}))
     with pytest.raises(SchemaVersionError) as refused:
         JsonContextStore(tmp_path).list_all()
     assert refused.value.message == f"{path}: context row 'beta' has no created_at."
+
+
+def test_a_registry_that_is_not_utf8_is_undecodable_not_a_codec_error(tmp_path: Path) -> None:
+    (tmp_path / "spec_contexts.json").write_bytes(b'{"contexts": "caf\xe9"}')
+
+    with pytest.raises(Undecodable) as refused:
+        JsonContextStore(tmp_path).read_raw()
+
+    assert refused.value.path == tmp_path / "spec_contexts.json"

@@ -30,6 +30,7 @@ from pathlib import Path
 import pytest
 
 from tests.fixtures.harness_env import suite_env
+from tests.helpers.oslib import read_text, run, write_text
 
 pytestmark = pytest.mark.slow(reason="each case spawns git, scripts/ci.py and pytest")
 _REPO = Path(__file__).resolve().parents[2]
@@ -62,7 +63,7 @@ _FILES = {
 
 
 def _git(repo: Path, *args: str) -> None:
-    subprocess.run(["git", "-C", str(repo), *args], check=True, capture_output=True)
+    run(["git", "-C", str(repo), *args], check=True)
 
 
 def _repo(root: Path) -> Path:
@@ -72,8 +73,8 @@ def _repo(root: Path) -> Path:
             shutil.copyfile(_REPO / "scripts" / name, root / "scripts" / name)
     for rel, text in _FILES.items():
         (root / rel).parent.mkdir(parents=True, exist_ok=True)
-        (root / rel).write_text(text, encoding="utf-8")
-    (root / ".gitignore").write_text("ran.log\n", encoding="utf-8")
+        write_text(root / rel, text)
+    write_text(root / ".gitignore", "ran.log\n")
     _git(root, "init", "-q")
     _git(root, "add", "-A")
     _git(root, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", "base")
@@ -82,8 +83,8 @@ def _repo(root: Path) -> Path:
 
 def _changed(root: Path, edits: dict[str, str]) -> subprocess.CompletedProcess[str]:
     for rel, text in edits.items():
-        (root / rel).write_text(text, encoding="utf-8")
-    return subprocess.run(
+        write_text(root / rel, text)
+    return run(
         [sys.executable, "scripts/ci.py", "--changed"],
         cwd=root,
         env=suite_env(
@@ -95,8 +96,6 @@ def _changed(root: Path, edits: dict[str, str]) -> subprocess.CompletedProcess[s
                 if k == "PYTHONDONTWRITEBYTECODE" or k.startswith(("COV_CORE_", "COVERAGE"))
             ),
         ),
-        capture_output=True,
-        text=True,
         check=False,
     )
 
@@ -106,7 +105,7 @@ def _lines(done: subprocess.CompletedProcess[str], prefix: str) -> list[str]:
 
 
 def _ran(root: Path) -> list[str]:
-    return sorted((root / "ran.log").read_text("utf-8").split())
+    return sorted(read_text(root / "ran.log").split())
 
 
 def test_a_changed_module_selects_the_tests_importing_it_transitively_and_runs_them(
@@ -155,18 +154,11 @@ def test_explicit_paths_select_their_tests_without_reading_the_working_tree(
 ) -> None:
     root = _repo(tmp_path)
     (root / "pkg").mkdir()
-    (root / "pkg/__init__.py").write_text("", encoding="utf-8")
-    (root / "pkg/m.py").write_text("LIMIT = 10\n", encoding="utf-8")
-    (root / "tests/test_m.py").write_text(_test("from pkg import m\n"), encoding="utf-8")
+    write_text(root / "pkg/__init__.py", "")
+    write_text(root / "pkg/m.py", "LIMIT = 10\n")
+    write_text(root / "tests/test_m.py", _test("from pkg import m\n"))
     _git(root, "add", "-A")
     _git(root, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", "pkg")
-    (root / "README.md").write_text("changed\n", encoding="utf-8")
-    done = subprocess.run(
-        [sys.executable, "scripts/impact.py", "pkg/m.py"],
-        cwd=root,
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        check=False,
-    )
+    write_text(root / "README.md", "changed\n")
+    done = run([sys.executable, "scripts/impact.py", "pkg/m.py"], cwd=root, check=False)
     assert done.stdout.splitlines() == ["test: tests/test_m.py"]

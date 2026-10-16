@@ -23,6 +23,7 @@ import pytest
 
 from dadaia_workspace.infrastructure.privacy_check import PORTUGUESE_CONTROL_TERMS
 from tests.fixtures.real_git import git
+from tests.helpers.oslib import read_text, write_text
 from tests.helpers.scan_population import assert_populated
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -44,7 +45,7 @@ def test_bytecode_contract_judges_tracked_files_not_the_working_tree(tmp_path: P
     cache = tmp_path / "dadaia_workspace" / "public" / "scripts" / "__pycache__"
     cache.mkdir(parents=True)
     (cache / "x.pyc").write_bytes(b"\x00")
-    (tmp_path / ".gitignore").write_text("__pycache__/\n", encoding="utf-8")
+    write_text(tmp_path / ".gitignore", "__pycache__/\n")
     assert tracked_bytecode(tmp_path) == []
 
     git(tmp_path, "add", "-f", str(cache / "x.pyc"))
@@ -60,7 +61,7 @@ def test_pre_push_ci_gate_ships_pyproject_excludes_bytecode_and_scripts_leave_no
     assert_populated(listing, sentinel="pre-push-ci-gate.sh")
 
     pyproject = _REPO_ROOT / "pyproject.toml"
-    data = tomllib.loads(pyproject.read_text(encoding="utf-8"))
+    data = tomllib.loads(read_text(pyproject))
     exclude = data["tool"]["poetry"].get("exclude", [])
     assert "**/__pycache__" in exclude
     assert "**/*.pyc" in exclude
@@ -83,7 +84,7 @@ def _denied_lines(globs: tuple[str, ...], pattern: str, spare: str | None) -> li
     hits = []
     for path in paths:
         try:
-            lines = path.read_text(encoding="utf-8").splitlines()
+            lines = read_text(path).splitlines()
         except UnicodeDecodeError:
             continue
         rel = path.relative_to(_PKG).as_posix()
@@ -200,7 +201,7 @@ def test_all_shipped_text_invokes_the_cli_by_its_venv_path() -> None:
         f"{name}:{n}: `{span.strip()}`"
         for path in paths
         for name in [path.relative_to(_REPO_ROOT).as_posix()]
-        for n, span in _code_spans(path.read_text("utf-8"))
+        for n, span in _code_spans(read_text(path))
         if _bare_invocations(span) and (name, n) != _BANNER_SPAN
     ]
     assert violations == [], "\n".join(violations)
@@ -250,7 +251,7 @@ def test_every_flag_cited_beside_a_venv_call_exists_in_that_verbs_help() -> None
     violations = [
         f"{path.relative_to(_REPO_ROOT).as_posix()}:{n}: {dead}"
         for path in _shipped_text()
-        for n, span in _code_spans(path.read_text("utf-8"))
+        for n, span in _code_spans(read_text(path))
         for dead in _dead_flags(span, tree)
     ]
     assert violations == [], "\n".join(violations)
@@ -267,7 +268,7 @@ def test_the_retired_persona_name_stays_out_of_library_and_tests() -> None:
     hits = []
     for path in paths:
         try:
-            lines = path.read_text(encoding="utf-8").splitlines()
+            lines = read_text(path).splitlines()
         except UnicodeDecodeError:
             continue
         rel = path.relative_to(_REPO_ROOT).as_posix()
@@ -281,7 +282,7 @@ def test_the_persona_scan_survives_an_untracked_scratch_file_deleted_mid_scan(
     scratch = _REPO_ROOT / "tests" / "tmp" / f"persona-race-{uuid.uuid4().hex[:8]}"
     scratch.mkdir(parents=True)
     try:
-        (scratch / "test_gone.py").write_text("X = 1\n", encoding="utf-8")
+        write_text(scratch / "test_gone.py", "X = 1\n")
 
         listed = assert_populated
 
@@ -293,3 +294,16 @@ def test_the_persona_scan_survives_an_untracked_scratch_file_deleted_mid_scan(
         test_the_retired_persona_name_stays_out_of_library_and_tests()
     finally:
         shutil.rmtree(scratch, ignore_errors=True)
+
+
+def test_a_public_file_that_is_not_utf8_is_skipped_by_the_scan(tmp_path: Path) -> None:
+    from dadaia_workspace.core.models.doctor_report import DoctorStatus
+    from dadaia_workspace.infrastructure.privacy_check import check_public_privacy
+
+    public = tmp_path / "lib" / "dadaia_workspace" / "public"
+    public.mkdir(parents=True)
+    (public / "latin.md").write_bytes(b"caf\xe9\n")
+
+    lines = check_public_privacy(public, lambda d: d.iterdir())
+
+    assert [line.status for line in lines] == [DoctorStatus.OK]

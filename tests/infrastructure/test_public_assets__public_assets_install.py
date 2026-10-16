@@ -10,6 +10,7 @@ import pytest
 from dadaia_workspace.core.exceptions import PublicAssetError
 from dadaia_workspace.infrastructure.json_install_ledger_store import JsonInstallLedgerStore
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
+from tests.helpers.oslib import write_text
 
 pytestmark = pytest.mark.slow(reason="public asset install writes projected workspace files")
 
@@ -25,7 +26,7 @@ def _build_minimal_agentic_dir(tmp_path: Path) -> tuple[Path, Path]:
         "generated_at": "2026-01-01T00:00:00+00:00",
         "assets": [],
     }
-    (agentic_dir / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+    write_text(agentic_dir / "manifest.json", json.dumps(manifest))
     return agentic_dir, workspace_root
 
 
@@ -72,7 +73,7 @@ def test_install_restages_a_staging_older_than_the_package(tmp_path: Path) -> No
     manager = FileSystemPublicAssetManager()
     manager.install(workspace_root, harness="claude")
     staged = workspace_root / ".dadaia" / "agentic" / "skills" / "dd-grill-me" / "SKILL.md"
-    staged.write_text("older package\n", encoding="utf-8")
+    write_text(staged, "older package\n")
 
     manager.install(workspace_root, harness="claude")
 

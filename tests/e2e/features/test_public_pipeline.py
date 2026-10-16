@@ -17,6 +17,7 @@ from typer.testing import CliRunner
 from dadaia_workspace.cli.main import app as cli_app
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from tests.helpers.harness_profile import register_all
+from tests.helpers.oslib import link, read_text, write_text
 
 _runner = CliRunner()
 #: Required YAML fields in every STAGED agent's frontmatter; `model`/`effort` are
@@ -65,7 +66,7 @@ class TestContentConsistency:
         agents_dir = workspace / ".dadaia" / "agentic" / "agents"
         skills_dir = workspace / ".dadaia" / "agentic" / "skills"
         for agent_file in sorted(agents_dir.glob("*.md")):
-            content = agent_file.read_text(encoding="utf-8")
+            content = read_text(agent_file)
             unresolved = [
                 s for s in _parse_skills_list(content) if not (skills_dir / s / "SKILL.md").exists()
             ]
@@ -76,14 +77,12 @@ class TestContentConsistency:
                     agent_file.name
                 )
         for agent_file in sorted((workspace / ".claude" / "agents").glob("*.md")):
-            content = agent_file.read_text(encoding="utf-8")
+            content = read_text(agent_file)
             assert _is_plugin_stub(content) or "tools:" in content, agent_file.name
         assert [
             d.name for d in skills_dir.iterdir() if d.is_dir() and not (d / "SKILL.md").exists()
         ] == []
-        registry = (skills_dir / "dd-cli-library" / "scripts" / "registry.py").read_text(
-            encoding="utf-8"
-        )
+        registry = read_text(skills_dir / "dd-cli-library" / "scripts" / "registry.py")
         for verb in ("register", "release", "next", "clean"):
             assert f'sub.add_parser("{verb}")' in registry, verb
 
@@ -104,9 +103,7 @@ class TestDoctor:
         mgr = _staged_install(workspace)
         target = workspace / ".claude" / "agents" / f"{agent}.md"
         if mutation == "drift":
-            target.write_text(
-                target.read_text(encoding="utf-8") + "\n# drifted\n", encoding="utf-8"
-            )
+            write_text(target, read_text(target) + "\n# drifted\n")
         else:
             target.unlink()
         report = [line.render() for line in mgr.doctor(workspace)]
@@ -114,7 +111,7 @@ class TestDoctor:
 
 
 def _ctx_inject_registered(claude_dir: Path) -> bool:
-    settings = json.loads((claude_dir / "settings.json").read_text(encoding="utf-8"))
+    settings = json.loads(read_text(claude_dir / "settings.json"))
     commands = [
         h["command"]
         for entry in settings.get("hooks", {}).get("UserPromptSubmit", [])
@@ -122,7 +119,7 @@ def _ctx_inject_registered(claude_dir: Path) -> bool:
     ]
     wrapper = claude_dir.parent / ".dadaia" / "hooks" / "claude-ctx-inject"
     return any(c.endswith("/.dadaia/hooks/claude-ctx-inject") for c in commands) and (
-        "dadaia_workspace.hooks.ctx_inject" in wrapper.read_text(encoding="utf-8")
+        "dadaia_workspace.hooks.ctx_inject" in read_text(wrapper)
     )
 
 
@@ -157,7 +154,7 @@ class TestPerProfileInit:
         assert [p for p in absent if (ws / p).exists()] == []
         assert harness != "claude" or _ctx_inject_registered(ws / ".claude")
         profile = ws / ".dadaia" / "states" / "harness_profile.json"
-        assert json.loads(profile.read_text(encoding="utf-8"))["harnesses"] == [harness]
+        assert json.loads(read_text(profile))["harnesses"] == [harness]
         report = [line.render() for line in _manager().doctor(ws)]
         assert [
             line for line in report if line.startswith(("[missing]", "[drift]", "[fail]"))
@@ -194,10 +191,11 @@ class TestLinkViewDoctor:
         foreign = tmp_path / "foreign"
         foreign.mkdir()
         entry.unlink()
-        entry.symlink_to(foreign, target_is_directory=True)
+        if not link(str(foreign), entry, is_dir=True):
+            pytest.skip("the host refuses symlinks")
 
         sentinel = workspace / ".dadaia" / "states" / "spec_contexts.json"
-        sentinel.write_text('{"schema_version": "2", "contexts": []}', encoding="utf-8")
+        write_text(sentinel, '{"schema_version": "2", "contexts": []}')
         monkeypatch.chdir(workspace)
         monkeypatch.delenv("COLUMNS", raising=False)
         assert len(str(workspace)) >= 61
@@ -224,7 +222,7 @@ class TestLinkViewDoctor:
                 copied.parent.mkdir(parents=True, exist_ok=True)
                 copied.write_bytes(source.read_bytes())
         skill_md = entry / "SKILL.md"
-        skill_md.write_text(skill_md.read_text(encoding="utf-8") + "\ndrifted\n", encoding="utf-8")
+        write_text(skill_md, read_text(skill_md) + "\ndrifted\n")
 
         report = [line.render() for line in mgr.doctor(workspace)]
 

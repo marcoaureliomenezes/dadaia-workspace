@@ -13,6 +13,8 @@ from pathlib import Path
 
 import pytest
 
+from tests.helpers.oslib import run, write_text
+
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
@@ -28,23 +30,13 @@ pytestmark = [pytest.mark.e2e, pytest.mark.slow]
 
 def _run(*args: str, cwd: Path) -> subprocess.CompletedProcess[str]:
     """Run a dadaia CLI command; always capture stdout+stderr as text."""
-    return subprocess.run(
-        [*_CLI, *args],
-        cwd=str(cwd),
-        capture_output=True,
-        text=True,
-    )
+    return run([*_CLI, *args], cwd=str(cwd))
 
 
 def _bootstrap(workspace: Path) -> None:
     """Bootstrap a fresh dadaia workspace via `dadaia init <workspace> --harness claude`."""
     workspace.mkdir(parents=True, exist_ok=True)
-    result = subprocess.run(
-        [*_CLI, "init", str(workspace), "--harness", "claude"],
-        cwd=str(workspace),
-        capture_output=True,
-        text=True,
-    )
+    result = run([*_CLI, "init", str(workspace), "--harness", "claude"], cwd=str(workspace))
     assert result.returncode == 0, (
         f"dadaia init failed (exit {result.returncode}):\n"
         f"stdout: {result.stdout}\nstderr: {result.stderr}"
@@ -57,12 +49,12 @@ def _bootstrap(workspace: Path) -> None:
 def _write_valid_handoff(base_dir: Path, stem: str = "report") -> Path:
     """Write a minimal valid .handoff.json with a companion HTML artifact."""
     artifact = base_dir / f"{stem}.html"
-    artifact.write_text(f"<html>{stem}</html>", encoding="utf-8")
+    write_text(artifact, f"<html>{stem}</html>")
     content_hash = hashlib.sha256(artifact.read_bytes()).hexdigest()
 
     atom = base_dir / "specs" / "memory" / "ARCHITECTURE.md"  # the atom it self-pulled
     atom.parent.mkdir(parents=True, exist_ok=True)
-    atom.write_text("# Architecture\n", encoding="utf-8")
+    write_text(atom, "# Architecture\n")
     doc = {
         "schema_version": "handoff-v1.2",
         "self_pull": {"refs": ["specs/memory/ARCHITECTURE.md"]},
@@ -79,7 +71,7 @@ def _write_valid_handoff(base_dir: Path, stem: str = "report") -> Path:
         },
     }
     handoff_path = base_dir / f"{stem}.handoff.json"
-    handoff_path.write_text(json.dumps(doc), encoding="utf-8")
+    write_text(handoff_path, json.dumps(doc))
     return handoff_path
 
 

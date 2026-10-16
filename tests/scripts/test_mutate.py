@@ -17,6 +17,7 @@ import pytest
 
 from scripts import mutate
 from tests.fixtures.harness_env import suite_env
+from tests.helpers.oslib import read_text, run, write_text
 
 pytestmark = pytest.mark.slow(reason="each case spawns git, scripts/mutate.py and pytest")
 _REPO = Path(__file__).resolve().parents[2]
@@ -31,16 +32,12 @@ _AGAIN = 'def test_below_again():\n    assert under(3) == "yes"\n'
 
 
 def _git(repo: Path, *args: str) -> None:
-    subprocess.run(
-        ["git", "-C", str(repo), "-c", "user.name=t", "-c", "user.email=t@t", *args],
-        check=True,
-        capture_output=True,
-    )
+    run(["git", "-C", str(repo), "-c", "user.name=t", "-c", "user.email=t@t", *args], check=True)
 
 
 def _write(root: Path, rel: str, text: str) -> None:
     (root / rel).parent.mkdir(parents=True, exist_ok=True)
-    (root / rel).write_text(text, encoding="utf-8")
+    write_text(root / rel, text)
 
 
 def _planted(root: Path, *, extra_test: str = "", files: dict[str, str] | None = None) -> Path:
@@ -64,7 +61,7 @@ def _planted(root: Path, *, extra_test: str = "", files: dict[str, str] | None =
 
 
 def _run(root: Path, *args: str) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
+    return run(
         [sys.executable, "scripts/mutate.py", *args],
         cwd=root,
         env=suite_env(
@@ -76,9 +73,6 @@ def _run(root: Path, *args: str) -> subprocess.CompletedProcess[str]:
                 if k == "PYTHONDONTWRITEBYTECODE" or k.startswith(("COV_CORE_", "COVERAGE"))
             ),
         ),
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
         check=False,
     )
 
@@ -96,7 +90,7 @@ def test_a_diff_is_mutated_line_by_line_and_reports_survivors_kills_and_coverage
         "diff branch coverage 2/2",
     ]
     assert done.returncode == 0
-    assert (root / "pkg/m.py").read_text("utf-8") == _HEAD_M
+    assert read_text(root / "pkg/m.py") == _HEAD_M
 
 
 def test_a_coverage_key_with_backslashes_is_the_changed_file(
@@ -105,7 +99,7 @@ def test_a_coverage_key_with_backslashes_is_the_changed_file(
     def fake_run(*args: str, **_: object) -> None:
         report = next(a for a in args if a.startswith("--cov-report=json:")).split(":", 1)[1]
         files = {"pkg\\m.py": {"executed_lines": [5, 6], "missing_lines": [7]}}
-        Path(report).write_text(json.dumps({"files": files}), "utf-8")
+        write_text(Path(report), json.dumps({"files": files}))
 
     monkeypatch.setattr(mutate, "_run", fake_run)
 
@@ -161,7 +155,7 @@ _TEST_TWO = (
     'def test_a():\n    assert two.a() == "a"\n\n\n'
     "def test_b():\n"
     '    assert two.b() == "b"\n'
-    "    assert 'return \"a\"' in Path(two.__file__).read_text()\n"
+    "    assert b'return \"a\"' in Path(two.__file__).read_bytes()\n"
 )
 
 
@@ -246,16 +240,15 @@ def test_a_red_baseline_exits_1_before_any_mutation(tmp_path: Path) -> None:
     done = _run(root, "--module", "pkg/m.py", "--tests", "tests/test_red.py")
     assert done.stdout.splitlines() == ["BASELINE RED pkg/m.py: tests/test_red.py::test_fails"]
     assert done.returncode == 1
-    assert (root / "pkg/m.py").read_text("utf-8") == _HEAD_M
+    assert read_text(root / "pkg/m.py") == _HEAD_M
 
 
 _CHILD_TEST = (
-    "import os\nimport subprocess\nimport sys\n\n\n"
+    "import os\nimport sys\nfrom subprocess import run\n\n\n"
     "def test_spawns():\n"
     '    env = {k: v for k, v in os.environ.items() if not k.startswith(("COV", "COVERAGE"))}\n'
     "    code = \"from pkg.child import f; assert f() == 'c'\"\n"
-    '    done = subprocess.run([sys.executable, "-c", code], env=env, check=False)\n'
-    "    assert done.returncode == 0\n"
+    '    assert run([sys.executable, "-c", code], env=env).returncode == 0\n'
 )
 
 

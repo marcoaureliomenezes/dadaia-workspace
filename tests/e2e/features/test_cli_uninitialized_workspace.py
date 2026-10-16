@@ -15,6 +15,8 @@ from pathlib import Path
 
 import pytest
 
+from tests.helpers.oslib import run
+
 _VERBS = [
     ["doctor"],
     ["public", "doctor"],
@@ -22,12 +24,8 @@ _VERBS = [
 
 
 def _cli(cwd: Path, *args: str) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        [sys.executable, "-m", "dadaia_workspace.cli.main", *args],
-        cwd=str(cwd),
-        capture_output=True,
-        text=True,
-        timeout=120.0,
+    return run(
+        [sys.executable, "-m", "dadaia_workspace.cli.main", *args], cwd=str(cwd), timeout=120.0
     )
 
 

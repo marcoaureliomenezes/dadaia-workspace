@@ -20,6 +20,7 @@ from dadaia_workspace.infrastructure.agent_transcodes import codex_agent_toml_by
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from tests.fixtures.real_git import git
 from tests.helpers.harness_profile import register_all
+from tests.helpers.oslib import decode, read_text, write_text
 
 pytestmark = pytest.mark.slow(reason="real public stage + install into tmp_path")
 
@@ -50,7 +51,7 @@ def test_every_staged_family_has_a_registered_production_reader(tmp_path: Path) 
 
     assert staged == sorted(_READERS)
     for family, reader in _READERS.items():
-        assert family.split(".")[0] in (_PKG / reader).read_text(encoding="utf-8"), family
+        assert family.split(".")[0] in read_text(_PKG / reader), family
 
 
 def test_rules_is_no_claude_family_and_only_the_codex_policy(tmp_path: Path) -> None:
@@ -70,9 +71,8 @@ def test_rules_is_no_claude_family_and_only_the_codex_policy(tmp_path: Path) -> 
 
 def _persona_without_model(tmp_path: Path) -> Path:
     persona = tmp_path / "dd-extra.md"
-    persona.write_text(
-        "---\nname: dd-extra\ndescription: x\nactivity_class: MUTATING\n---\n# body\n",
-        encoding="utf-8",
+    write_text(
+        persona, "---\nname: dd-extra\ndescription: x\nactivity_class: MUTATING\n---\n# body\n"
     )
     return persona
 
@@ -122,7 +122,7 @@ def test_no_retired_fixture_role() -> None:
             root / p for p in git(root, "ls-files", "tests", "dadaia_workspace").splitlines()
         )
         if path.suffix in {".py", ".json"} and path.name != Path(__file__).name
-        for name in _FIXTURE_AGENT.findall(path.read_text(encoding="utf-8", errors="replace"))
+        for name in _FIXTURE_AGENT.findall(decode(path.read_bytes()))
         if name in _RETIRED_ROLES
     ]
     assert retired == []
@@ -140,7 +140,7 @@ def test_the_retired_role_scan_survives_an_untracked_scratch_file_deleted_mid_sc
         return read(self, *args, **kwargs)  # type: ignore[arg-type]
 
     try:
-        (scratch / "test_gone.py").write_text("X = 1\n", encoding="utf-8")
+        write_text(scratch / "test_gone.py", "X = 1\n")
         monkeypatch.setattr(Path, "read_text", read_after_delete)
         test_no_retired_fixture_role()
     finally:

@@ -11,11 +11,12 @@ from __future__ import annotations
 import json
 import re
 import shutil
-import subprocess
 from pathlib import Path
 
 import pytest
 import yaml
+
+from tests.helpers.oslib import read_text, run
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _PUBLIC = _REPO_ROOT / "dadaia_workspace" / "public"
@@ -34,7 +35,7 @@ _QUALIFIER = "inside a dadaia workspace"
 
 
 def _standalone_skills() -> list[str]:
-    data = json.loads(_MAP.read_text(encoding="utf-8"))
+    data = json.loads(read_text(_MAP))
     names = data.get("standalone_skills")
     assert isinstance(names, list) and names, (
         "`standalone_skills` is missing or empty in "
@@ -45,7 +46,7 @@ def _standalone_skills() -> list[str]:
 
 
 def _frontmatter(path: Path) -> dict[str, object]:
-    match = _FRONTMATTER_RE.match(path.read_text(encoding="utf-8"))
+    match = _FRONTMATTER_RE.match(read_text(path))
     assert match, f"{path.relative_to(_REPO_ROOT)}: no YAML frontmatter block"
     loaded = yaml.safe_load(match.group(1))
     assert isinstance(loaded, dict), f"{path.relative_to(_REPO_ROOT)}: frontmatter is not a mapping"
@@ -53,7 +54,7 @@ def _frontmatter(path: Path) -> dict[str, object]:
 
 
 def _body(path: Path) -> str:
-    text = path.read_text(encoding="utf-8")
+    text = read_text(path)
     match = _FRONTMATTER_RE.match(text)
     return text[match.end() :] if match else text
 
@@ -120,11 +121,5 @@ def test_skills_ref_validates_the_directory(skill_dir: Path) -> None:
     executable = shutil.which("skills-ref")
     if executable is None:
         pytest.skip("skills-ref is not installed")
-    result = subprocess.run(  # noqa: S603
-        [executable, "validate", str(skill_dir)],
-        capture_output=True,
-        text=True,
-        timeout=60,
-        check=False,
-    )
+    result = run([executable, "validate", str(skill_dir)], timeout=60, check=False)
     assert result.returncode == 0, f"{skill_dir.name}: {result.stdout}\n{result.stderr}"

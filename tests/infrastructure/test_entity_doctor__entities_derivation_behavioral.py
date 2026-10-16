@@ -31,6 +31,7 @@ from dadaia_workspace.infrastructure.runtime_transforms.hook_wrappers import (
     HookDialect,
     HookLane,
 )
+from tests.helpers.oslib import read_text, write_text
 
 _GATE_MODULE = "dadaia_workspace.hooks.pre_gate"
 
@@ -86,28 +87,28 @@ def _clean_scratch(root: Path) -> Path:
         "rules": [],
         "universal": {},
     }
-    (public_dir / "entities" / "registry.json").write_text(json.dumps(registry))
+    write_text(public_dir / "entities" / "registry.json", json.dumps(registry))
     for pid in ("alpha", "beta"):
-        (public_dir / "agents" / f"{pid}.md").write_text(f"---\nname: {pid}\n---\nBody.\n")
-    (root / "hooks" / "pre_gate.py").write_text("# stub\n")
+        write_text(public_dir / "agents" / f"{pid}.md", f"---\nname: {pid}\n---\nBody.\n")
+    write_text(root / "hooks" / "pre_gate.py", "# stub\n")
     return public_dir
 
 
 def _edit_behavior(root: Path, **change: object) -> None:
     path = root / "public" / "entities" / "registry.json"
-    data = json.loads(path.read_text())
+    data = json.loads(read_text(path))
     data["behaviors"][0].update(change)
-    path.write_text(json.dumps(data))
+    write_text(path, json.dumps(data))
 
 
 def _module_becomes_package(root: Path) -> None:
     (root / "hooks" / "pre_gate.py").unlink()
     (root / "hooks" / "pre_gate").mkdir()
-    (root / "hooks" / "pre_gate" / "__init__.py").write_text("")
+    write_text(root / "hooks" / "pre_gate" / "__init__.py", "")
 
 
 def _stub(root: Path) -> None:
-    (root / "public" / "agents" / "alpha.md").write_text("placeholder prose, no frontmatter\n")
+    write_text(root / "public" / "agents" / "alpha.md", "placeholder prose, no frontmatter\n")
 
 
 def _module_gone(root: Path) -> None:
@@ -138,8 +139,8 @@ _GONE = "references module 'dadaia_workspace.hooks.pre_gate' which no longer exi
         ),
         pytest.param(_stub, [_STUB], id="stub-body"),
         pytest.param(
-            lambda root: (root / "public" / "agents" / "alpha.md").write_text(
-                "---\nname: beta\n---\nBody.\n"
+            lambda root: write_text(
+                root / "public" / "agents" / "alpha.md", "---\nname: beta\n---\nBody.\n"
             ),
             ["frontmatter name 'beta' does not match its filename"],
             id="identity-swap",
@@ -187,7 +188,7 @@ def test_a_hook_module_no_behavior_names_blocks(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     public_dir = _clean_scratch(tmp_path)
-    (tmp_path / "hooks" / "orphan.py").write_text("# stub\n")
+    write_text(tmp_path / "hooks" / "orphan.py", "# stub\n")
     dialects = dict(entity_doctor.HOOK_DIALECTS)
     dialects[HookFormat.CLAUDE_SETTINGS] = HookDialect(
         lanes=(
