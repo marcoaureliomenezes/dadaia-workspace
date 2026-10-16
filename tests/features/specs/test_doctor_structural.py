@@ -10,6 +10,7 @@ from pathlib import Path
 
 import pytest
 
+from dadaia_workspace.core import platform
 from dadaia_workspace.core.template_history import (
     SHIPPED_HASHES_FILENAME,
     was_shipped,
@@ -85,6 +86,34 @@ def test_shipped_history_records_the_current_canonical_template(tmp_path: Path) 
     written = (specs / "AGENTS.md").read_text(encoding="utf-8")
     assert was_shipped(written, "specs-AGENTS.md", _REAL_TEMPLATES_DIR)
     assert was_shipped(_CANONICAL_TEXT, "specs-AGENTS.md", _REAL_TEMPLATES_DIR)
+
+
+# Written with the project name filled in, so the file's own bytes are never what is on disk.
+_PROJECT_FILLED = {"scaffold/memory/ARCHITECTURE.md", "scaffold/memory/QUALITY.md"}
+
+
+@pytest.mark.parametrize("host", ["linux", "win32"])
+def test_shipped_history_records_every_shipped_asset_for_every_host(
+    host: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Whatever host renders a shipped asset's current file, the history recognises it."""
+    monkeypatch.setattr(platform, "PLATFORM", platform.Capabilities.detect(host))
+    public = _REAL_TEMPLATES_DIR.parent
+    history = json.loads(
+        (_REAL_TEMPLATES_DIR / SHIPPED_HASHES_FILENAME).read_text(encoding="utf-8")
+    )
+    unknown = [
+        asset
+        for asset in history.keys() - _PROJECT_FILLED
+        if not was_shipped(
+            (public / ("templates" if "/" not in asset else "") / asset).read_text(
+                encoding="utf-8"
+            ),
+            asset,
+            _REAL_TEMPLATES_DIR,
+        )
+    ]
+    assert unknown == []
 
 
 # The same history covers every scoped scaffold law file.
