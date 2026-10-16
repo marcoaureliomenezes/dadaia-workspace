@@ -486,9 +486,9 @@ class World:
         return dict(line.split() for line in out.splitlines())
 
     def deny(self) -> None:
-        (self.ws / ".dadaia" / "states" / "privacy_denylist.json").write_text(
-            f'{{"{_TERM}": "t"}}', encoding="utf-8"
-        )
+        denylist = self.ws / ".dadaia" / "states" / "privacy_denylist.json"
+        denylist.write_text(f'{{"{_TERM}": "t"}}', encoding="utf-8")
+        self.env["DADAIA_PRIVACY_DENYLIST"] = str(denylist)  # the fix runs from any cwd
 
 
 def _fix(done: subprocess.CompletedProcess[str], root: Path) -> str:
