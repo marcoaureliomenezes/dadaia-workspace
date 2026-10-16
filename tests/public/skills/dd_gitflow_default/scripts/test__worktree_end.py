@@ -164,13 +164,15 @@ def test_a_dirty_tree_refuses_with_one_fix_that_commits_or_removes(root: Path) -
     (tree / "wip/x.py").write_text("")
     (tree / "specs/releases/0.5.0/rc-1/SPEC.md").write_text("dirty")
     git(tree, "add", "specs/releases/0.5.0/rc-1/SPEC.md")
+    git(tree, "rm", "-q", "specs/releases/0.5.0/rc-1/PLAN.md")  # a staged deletion
     dirty = run(root, "merge", TREE)
     assert "uncommitted" in dirty.stderr
-    add, then, *remove = fixes(dirty)[0].split("`")[1::2]  # Agent action: commit or remove
-    assert [add, then] == [  # the commit takes its own message
-        git_line(tree, "add", "-A"),
+    listing, then, *remove = fixes(dirty)[0].split("`")[1::2]  # Agent action: commit or remove
+    assert [listing, then] == [  # the commit takes its own message
+        git_line(tree, "status", "--short"),
         git_line(tree, "commit"),
     ]
+    assert subprocess.run(listing, shell=True, capture_output=True).returncode == 0  # noqa: S602
     for step in remove:
         subprocess.run(step, shell=True, check=True, capture_output=True)  # noqa: S602
     assert git(tree, "status", "--porcelain") == ""  # removed, clean,
