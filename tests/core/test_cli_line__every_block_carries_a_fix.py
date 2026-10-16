@@ -44,7 +44,7 @@ def test_cli_line_and_the_scripts_render_one_argv_as_one_line(
     kernel_git_line = load_owner("dd-bug-resolution", "_platform").git_line
     assert kernel_git_line(tmp_path / "a b", *rest) == git_line(tmp_path / "a b", *rest)
     script = tmp_path / "s p" / "x.py"
-    assert specs.script(script) == shell_line(sys.executable, str(script.resolve()))
+    assert specs.script(script).inline() == shell_line(sys.executable, str(script.resolve()))
 
 
 # ── dadaia doctor rules: every fix rendered by `rule_fix` ───────────────────────
@@ -276,6 +276,8 @@ def _render(
             return again(receiver)
         case ast.Call(func=ast.Name(id="spell_fix"), args=[arg]):  # the one `fix:` spelling
             return f"fix: {again(arg)}"
+        case ast.Call(func=ast.Name(id="SCRIPT"), args=args):  # words after the script's prefix
+            return " ".join(["·", *map(again, args)])
         case ast.Call() if _callee(node) in returns:  # a local producer: what it returns
             return "·".join(map(again, returns[_callee(node)]))
         case ast.Call() if _FIX_CALL_RE.search(_callee(node)) or _callee(node)[:1].isupper():
