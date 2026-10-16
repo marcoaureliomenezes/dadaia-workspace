@@ -46,14 +46,14 @@ def _refuse_symlink(root: Path, repo_name: str) -> None:
 
 
 def _refuse_unopened_bug(main: Path, work: str, bug: str) -> None:
-    """A hotfix job is the fix of one bug the main repo's ledger holds open on *work*."""
+    """A hotfix lane is the fix of one bug the main repo's ledger holds open on *work*."""
     try:
         found = parse(git(main, "show", f"{work}:specs/bugs/BUGS.jsonl", check=False))
     except ValueError:
         found = []
     if not any(r.get("id") == bug and r.get("status") == OPEN for r in found):
         raise Refusal(f"no open bug record {bug} on {work}",
-                      f"Operator action: confirm bug {bug} so it is registered on {work} as open (dd-bug-registration), then open its hotfix job again")  # fmt: skip
+                      f"Operator action: confirm bug {bug} so it is registered on {work} as open (dd-bug-registration), then open its hotfix lane again")  # fmt: skip
 
 
 def _refuse_unready(main: Path, version: str, rc: str) -> None:
