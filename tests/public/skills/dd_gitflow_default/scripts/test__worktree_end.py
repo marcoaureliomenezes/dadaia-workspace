@@ -208,8 +208,10 @@ def test_work_branch_refusals_fix_runs_verbatim(tmp_path: Path) -> None:
     make_workspace(ws)
     repo = ws / "repos/r"
     git(repo, "branch", "feature/0.4.9", "feature/0.5.0")  # two work branches: the older goes
-    _fix(ws, two := run(ws, "new", "r", RC))
+    two = run(ws, "new", "r", RC)
     assert "2 work branches" in two.stderr
+    for step in fixes(two)[0].split("`")[1::2]:  # Agent action: the backticked steps, in order
+        subprocess.run(step, shell=True, check=True, capture_output=True)  # noqa: S602
     assert not git(repo, "branch", "--list", "feature/0.4.9").strip()
     git(repo, "branch", "-m", "feature/0.5.0", "dev")  # none: the fix cuts one from dev
     _fix(ws, none := run(ws, "new", "r", RC))
