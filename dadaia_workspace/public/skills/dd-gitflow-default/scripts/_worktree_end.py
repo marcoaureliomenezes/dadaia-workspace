@@ -58,7 +58,8 @@ def _target(root: Path, path: str) -> tuple[Path, Path, str, str]:
 
 
 def _refuse_dirty(tree: Path) -> None:
-    if paths := dirty(tree):
+    if dirty(tree):
+        paths = git(tree, "ls-files", "-m", "-o", "--exclude-standard").splitlines()
         raise Refusal(
             f"{tree} has uncommitted changes",
             f"Agent action: commit them in their commit shape (`{git_line(tree, 'add', '--', *paths)}`"
