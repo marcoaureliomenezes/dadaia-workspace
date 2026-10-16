@@ -390,6 +390,8 @@ def _ops(root: Path, hook: str, bound: bool) -> int:
         _bind(root, "s", "c0")
     env = {**claude_hook_env(root, session_id="s"), "PYTHONPATH": os.environ.get("PYTHONPATH", "")}
     env.pop("DADAIA_CONTEXT", None)
+    # A cold, never-written cache: import opens are then the same on every run and machine.
+    env |= {"PYTHONPYCACHEPREFIX": str(root / "cold-pyc"), "PYTHONDONTWRITEBYTECODE": "1"}
     done = subprocess.run(
         [sys.executable, "-c", _COUNTING_DRIVER.format(hook=hook)],
         input=json.dumps({"session_id": "s"}), env=env, cwd=root,
