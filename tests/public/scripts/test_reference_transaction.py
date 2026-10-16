@@ -200,3 +200,13 @@ def test_the_repos_own_venv_is_the_last_resort(repo: _Repo) -> None:
     done = repo.git("worktree", "add", "-q", "-b", "wt/x", str(repo.root.parent / "tree"))
     assert done.returncode != 0
     assert "[ref-gate] BLOCKED refs/heads/wt/x" in done.stderr, done.stderr
+
+
+def test_a_venv_without_the_package_is_a_runner_fault_and_passes(repo: _Repo) -> None:
+    """A half-installed workspace (the interpreter cannot import the hook) must not brick git."""
+    env = suite_env(os.environ, repo.root, unset=("PYTHONPATH",))
+    done = run(
+        ["git", "commit", "-q", "--allow-empty", "-m", "x"], cwd=repo.root, env=env, timeout=60
+    )
+    assert done.returncode == 0, done.stderr
+    assert "update allowed" in done.stderr, done.stderr
