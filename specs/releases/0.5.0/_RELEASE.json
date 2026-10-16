@@ -1982,6 +1982,20 @@
       "agent": "dd-product-engineer",
       "kind": "summary",
       "text": "delivered: rc-16 the worktree hierarchy under ADR 0264 (supersedes 0125, 0191, 0241; amends 0120): worktrees/<repo>/<v>/ with a real rc integration branch wt-rc, a base derived from the path, the plain kind deleted, `dadaia worktree` as the one runner and a reference-transaction ref gate installed by `ci install-hook` (Jobs 1-9); the closure waits for job, task and lane trees (AC5.1, AC5.5); memory, derived docs and the closure ledgers reconciled (Job 10, memory reconciled: 15 changed, 4 reviewed); bugs resolved inside rc-16: 20, all archived at closure, with the Origin bug new-reconcile-opens-while-a-job-is-open fixed by J4.T18 and the hotfix protected-globs-miss-a-plain-tree-path resolved in the closure batch; the job gate is `python scripts/ci.py job` and the preflight verb is deleted (job-gate-runs-the-whole-ci-line-and-preflight-runs-it-again, 58c415a56 and 7c5bd1f35); G4 ruling: the AC6.1 grep excludes the cutover line worktrees-AGENTS.md:27; G5 size readout: Job 9 adds +112 production lines against the SPEC estimate of +60 python, because the privacy remedy became a gated verb, and the rc as a whole is +834/-553 python and +76/-0 shell (`git diff --numstat 96b9008b8..cafc4003d -- dadaia_workspace scripts`); G6 verdict.py stats 0.5.0-rc16: 14 sequences, 25 verdicts, 11 rejected, first-pass rejected 8/14; rollout (AC10.4, the main thread's acts after the Reconciliation merge, no migration code), in order: (1) the cleanup 'Agente arruma, sem perda' in every repo holding an old-grammar tree (empty dirs and branches with no own commit deleted, a tree with own work turned into tag archive/wt/<name> before removal; known: worktrees/rand-engine/0.8.0-rc1/define live and 4 commits ahead so its owner merges or tags it first, worktrees/rand-engine/0.7.0-rc1 empty dir, worktrees/<consumer>/0.12.0b-impl with wt/0.12.0{a,b,c}), (2) `public install`, `doctor --fix`, `doctor`, (3) `ci install-hook --force` per repo, (4) `certify`; carried: the eight rc-16 intake and late-review backlog entries (worktree-scripts-loose-ends, skill-kernel-loose-ends, package-loose-ends, push-gate-remedy-follow-ups, law-and-docs-text-loose-ends, test-quality-loose-ends, ref-gate-hardening-follow-ups, several-work-fix-line-follow-ups), no open bug; backlog exits: worktree-hierarchy (delivered)."
+    },
+    {
+      "ts": "2026-10-16T05:28:32Z",
+      "agent": "release.py memory",
+      "kind": "memory",
+      "text": "Memory reconciled over 1c43b993d3cc8178905aaa3fdd9b29aa35a0a376..4cf528bee476: 1 reviewed, 1 changed.",
+      "since": "1c43b993d3cc8178905aaa3fdd9b29aa35a0a376",
+      "until": "4cf528bee476184126ef1f36c6c6f8d47f474a00",
+      "reviewed": [
+        "public-asset-distribution"
+      ],
+      "changed": [
+        "product-vision"
+      ]
     }
   ]
 }
