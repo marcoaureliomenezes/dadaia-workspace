@@ -13,6 +13,7 @@ from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 
+from dadaia_workspace.core import platform
 from dadaia_workspace.core.atomic_write import atomic_write
 from dadaia_workspace.core.models.spec_context import CONTEXT_NAME_RE as _NAME_RE
 
@@ -51,8 +52,8 @@ def session_record_path(workspace: Path, session_id: str, *, create: bool = Fals
 def read_session(workspace: Path, session_id: str) -> dict[str, object] | None:
     """The session record, or ``None`` on any error."""
     try:
-        data = json.loads(session_record_path(workspace, session_id).read_text(encoding="utf-8"))
-    except (OSError, ValueError):
+        data = json.loads(platform.read_text(session_record_path(workspace, session_id)))
+    except (OSError, ValueError, platform.Undecodable):
         return None
     return data if isinstance(data, dict) else None
 
@@ -60,7 +61,7 @@ def read_session(workspace: Path, session_id: str) -> dict[str, object] | None:
 def write_session(workspace: Path, session_id: str, record: dict[str, object]) -> None:
     """Write the session record atomically. Raises on validation/OS error."""
     path = session_record_path(workspace, session_id, create=True)
-    atomic_write(path, json.dumps(record, indent=2), ensure_parent=True, newline=None)
+    atomic_write(path, json.dumps(record, indent=2), ensure_parent=True)
 
 
 def touch_last_seen_at(workspace: Path, session_id: str, *, now: str) -> dict[str, object] | None:

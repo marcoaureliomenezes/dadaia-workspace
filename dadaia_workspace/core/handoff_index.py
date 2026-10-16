@@ -16,6 +16,7 @@ from typing import Any
 
 from jsonschema import Draft202012Validator
 
+from dadaia_workspace.core import platform
 from dadaia_workspace.core.exceptions import HandoffSchemaError, HandoffValidationError
 from dadaia_workspace.core.invocation import repo_slug_for_context
 
@@ -44,8 +45,8 @@ class Handoff:
     def load(cls, path: Path) -> Handoff:
         """Read + parse ``path``. Never raises — malformed JSON is recorded, not thrown."""
         try:
-            doc = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError) as exc:
+            doc = json.loads(platform.read_text(path))
+        except (OSError, json.JSONDecodeError, platform.Undecodable) as exc:
             return cls(path=path, malformed_error=f"malformed JSON: {exc}")
         if not isinstance(doc, dict):
             return cls(path=path, malformed_error="handoff document is not a JSON object")
@@ -162,7 +163,7 @@ class HandoffIndex:
         if self._schema is None:
             path = self._workspace_root / ".dadaia/agentic/schemas/handoff-v1.schema.json"
             try:
-                self._schema = json.loads(path.read_text(encoding="utf-8"))
+                self._schema = json.loads(platform.read_text(path))
             except (OSError, json.JSONDecodeError) as exc:
                 raise HandoffSchemaError(f"Schema unreadable: {path}: {exc}") from exc
         return self._schema

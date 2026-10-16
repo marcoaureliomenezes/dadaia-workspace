@@ -16,6 +16,7 @@ from dadaia_workspace.cli._specs_resolution import (
     resolve_workspace_root_for_cli,
     scope,
 )
+from dadaia_workspace.core import platform
 from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.exceptions import GitSyncError
 from dadaia_workspace.core.gitflow import Gitflow, work_branch
@@ -36,14 +37,7 @@ app = typer.Typer(help="Git-hook chokepoints: the pre-push and ref gates and the
 def _repo_root() -> Path:
     """Resolve the enclosing git repo root, or fail with a clear message."""
     try:
-        out = subprocess.run(
-            ["git", "rev-parse", "--show-toplevel"],
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            check=True,
-        )
+        out = platform.run(["git", "rev-parse", "--show-toplevel"], check=True)
     except (subprocess.CalledProcessError, FileNotFoundError):
         fail("not inside a git repository", "Agent action: run it inside a git repository")
     return Path(out.stdout.strip())

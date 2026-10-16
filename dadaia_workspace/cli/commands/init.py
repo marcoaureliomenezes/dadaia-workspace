@@ -41,14 +41,14 @@ class InitPlan:
     repo: str = ""
     associated: tuple[str, ...] = ()
 
-    def command(self, directory: object = None) -> str:
+    def command(self, directory: object = None, runner: tuple[str, ...] = _INIT) -> str:
         """The ``init`` invocation that runs this plan — every flag it carries, so a
         ``fix:`` line built from it never drops a level (*directory* overrides DIR)."""
         target = str(self.directory if directory is None else directory)
         flags = [("--repo", self.repo)] if self.repo else []
         flags += [("--associated-repo", url) for url in self.associated]
         return shell_line(
-            *_INIT, *filter(None, [target]), "--harness", self.harness, *sum(flags, ())
+            *runner, *filter(None, [target]), "--harness", self.harness, *sum(flags, ())
         )
 
 
@@ -82,13 +82,13 @@ def _plan(directory: str, harness: str, repo: str, associated: tuple[str, ...]) 
         return InitPlan(directory, harness, repo, associated)
     first = harness_registry.L1_ENTRY_HARNESSES[0]
     if not _interactive():
-        fix = InitPlan(directory or "", harness or first, repo, associated).command()
+        plan = InitPlan(directory or "", harness or first, repo, associated)
         fail(
             "init needs DIR and --harness when no terminal can answer prompts; "
             f"harnesses: {', '.join(harness_registry.L1_ENTRY_HARNESSES)}.",
-            fix
+            plan.command()
             if directory
-            else f"Agent action: run `{fix}` with the new workspace's "
+            else f"Agent action: run `{plan.command()}` with the new workspace's "
             "directory as its first argument",
         )
     directory = directory or str(Path.cwd() / typer.prompt("Workspace name"))
@@ -159,7 +159,9 @@ def init(
         before, after, action = svc.venv_change(root)
         installed = svc.init(root, skip_assets=skip_assets, harnesses=(chosen,), template=template)
     except WorkspaceVenvBootstrapError as exc:
-        fail(exc, fix_line(root, "init", str(root), "--harness", chosen))
+        cli = workspace_cli_path(root)  # the venv's own init only where the venv exists
+        runner = (str(cli), "init") if cli.is_file() else _INIT
+        fail(exc, replace(plan, harness=chosen).command(root, runner))
 
     console.print(f"[green]✓[/green] Workspace {root} ({chosen})", highlight=False, soft_wrap=True)
     if skip_assets:

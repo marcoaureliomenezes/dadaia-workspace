@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 from typing import cast
 
+from dadaia_workspace.core import platform
 from dadaia_workspace.core.exceptions import SchemaVersionError
 
 
@@ -14,8 +15,13 @@ def read(path: Path) -> dict[str, object]:
     """THE registry parse: the ``{"contexts": [...]}`` object at *path*. Absent, unparseable
     or any other shape (``{}`` included) is unreadable, never empty: :class:`SchemaVersionError`."""
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, RecursionError, ValueError):  # too deep a nest is unreadable too
+        data = json.loads(platform.read_text(path))
+    except (
+        OSError,
+        RecursionError,
+        ValueError,
+        platform.Undecodable,
+    ):  # too deep a nest is unreadable too
         data = None
     if not isinstance(data, dict) or not isinstance(data.get("contexts"), list):
         shape = '{"contexts": [...]}'

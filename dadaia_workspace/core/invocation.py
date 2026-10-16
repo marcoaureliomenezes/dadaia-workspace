@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
-from dadaia_workspace.core import context_registry, workspace_resolver
+from dadaia_workspace.core import context_registry, platform, workspace_resolver
 from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.exceptions import SpecsDirUnresolvedError
 from dadaia_workspace.core.models.spec_context import CONTEXT_NAME_RE
@@ -242,7 +242,7 @@ def resolve_specs_dir(specs_dir: str | None) -> Path:
     a ``cwd/specs`` fallback."""
     if specs_dir:
         path = Path(specs_dir)
-        if path.is_symlink():
+        if platform.is_link(path):
             raise SpecsDirUnresolvedError(
                 f"Refusing a symlinked specs root: {path} is a symlink.",
                 fix=f"Agent action: point --specs-dir at the real directory, not the link {path}",

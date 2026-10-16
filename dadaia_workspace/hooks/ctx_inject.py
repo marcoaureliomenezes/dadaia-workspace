@@ -10,7 +10,7 @@ import os
 import sys
 from pathlib import Path
 
-from dadaia_workspace.core import clock, invocation, session_store, workspace_layout
+from dadaia_workspace.core import clock, invocation, platform, session_store, workspace_layout
 from dadaia_workspace.core.cli_line import spell_fix
 from dadaia_workspace.core.doctor_rules import SectionFinding, render_finding
 from dadaia_workspace.core.exceptions import SchemaVersionError
@@ -74,21 +74,21 @@ def _build_memory(specs_dir: Path) -> str:
         return ""
     parts = ["", "=== workspace memory (constitution + tech + catalog) ==="]
     with contextlib.suppress(OSError):
-        parts.append((specs_dir / "constitution.md").read_text(encoding="utf-8").strip())
+        parts.append(platform.read_text(specs_dir / "constitution.md").strip())
     architecture = memory_dir / "ARCHITECTURE.md"
     if architecture.is_file():
         with contextlib.suppress(OSError):
-            section = _tech_stack_section(architecture.read_text(encoding="utf-8"))
+            section = _tech_stack_section(platform.read_text(architecture))
             if section:
                 parts.append(section)
     catalog = memory_dir / "product" / "catalog.json"
     index = memory_dir / "product" / "index.md"
     if catalog.is_file():
         with contextlib.suppress(OSError):
-            parts.append(_digest_catalog(catalog.read_text(encoding="utf-8")))
+            parts.append(_digest_catalog(platform.read_text(catalog)))
     elif index.is_file():
         with contextlib.suppress(OSError):
-            parts.append(index.read_text(encoding="utf-8"))
+            parts.append(platform.read_text(index))
     parts.append("=== end memory bootstrap ===")
     return "\n".join(parts)
 
@@ -101,7 +101,7 @@ def _read_sentinel(sentinel: Path) -> tuple[float | None, str, str]:
         return None, "", ""
     text = ""
     with contextlib.suppress(OSError):
-        text = sentinel.read_text(encoding="utf-8")
+        text = platform.read_text(sentinel)
     fields = dict(line.split("=", 1) for line in text.splitlines() if "=" in line)
     return mtime, fields.get("ctx", "").strip(), fields.get("bind", "").strip()
 
@@ -109,13 +109,13 @@ def _read_sentinel(sentinel: Path) -> tuple[float | None, str, str]:
 def _stamp_sentinel(tmp_dir: Path, sentinel: Path, slug: str, bind_id: str) -> None:
     with contextlib.suppress(OSError):
         tmp_dir.mkdir(parents=True, exist_ok=True)
-        sentinel.write_text(f"ctx={slug}\nbind={bind_id}\n" if slug else "", encoding="utf-8")
+        platform.write_text(sentinel, f"ctx={slug}\nbind={bind_id}\n" if slug else "")
 
 
 def _read_help_digest(workspace: Path) -> str:
     """The CLI help digest install/reconcile built, or ``""`` — the hook never builds it."""
     try:
-        return (workspace / ".dadaia" / "agentic" / "help-digest.md").read_text(encoding="utf-8")
+        return str(platform.read_text(workspace / ".dadaia" / "agentic" / "help-digest.md"))
     except OSError:
         return ""
 
@@ -175,6 +175,7 @@ def _emit_bootstrap(workspace: Path, context: str) -> None:
 
 
 def main() -> int:
+    platform.use_utf8_stdio()
     payload = _common.read_stdin_json()
     workspace = invocation.resolve_root(cwd=Path.cwd(), target_path=None)
     if workspace is None:
@@ -193,7 +194,7 @@ def main() -> int:
         event = "postcompact"
         with contextlib.suppress(OSError):
             tmp_dir.mkdir(parents=True, exist_ok=True)
-            compact_marker.write_text("", encoding="utf-8")
+            platform.write_text(compact_marker, "")
     elif "SessionStart" in (os.environ.get("DADAIA_HOOK_EVENT"), payload.get("hook_event_name")):
         # compact/clear re-enter this session; a resume continues it; anything else is new
         source = payload.get("source")

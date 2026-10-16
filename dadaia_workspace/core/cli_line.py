@@ -67,12 +67,14 @@ def shell_line(*parts: str) -> str:
 def mkdir_line(directory: PurePath) -> str:
     """Create *directory* and its parents, idempotent — one interpreter line that runs
     unchanged under sh, bash, cmd and PowerShell (no shell builtin differs per OS)."""
-    code = f"import pathlib; pathlib.Path(r'{directory}').mkdir(parents=True, exist_ok=True)"
-    return platform.command(sys.executable, "-c", code)
+    code = "import pathlib, sys; pathlib.Path(sys.argv[1]).mkdir(parents=True, exist_ok=True)"
+    return platform.command(sys.executable, "-c", code, str(directory))
 
 
 def materialize_line(link: PurePath, target: PurePath) -> str:
     """Replace the symlink *link* by a regular copy of *target* (``os.remove`` drops the
     link, never its target) — the same interpreter line on every OS."""
-    code = f"import os, shutil; os.remove(r'{link}'); shutil.copyfile(r'{target}', r'{link}')"
-    return platform.command(sys.executable, "-c", code)
+    code = (
+        "import os, shutil, sys; os.remove(sys.argv[1]); shutil.copyfile(sys.argv[2], sys.argv[1])"
+    )
+    return platform.command(sys.executable, "-c", code, str(link), str(target))

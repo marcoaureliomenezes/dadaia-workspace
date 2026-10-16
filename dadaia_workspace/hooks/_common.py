@@ -1,6 +1,5 @@
 """Shared primitives of the Python governance hooks: stdin JSON, payload normalization,
-write-target extraction and the block/allow envelopes. Every file read or
-write passes ``encoding="utf-8"`` (Windows defaults to the locale code page)."""
+write-target extraction and the block/allow envelopes."""
 
 from __future__ import annotations
 
@@ -8,6 +7,8 @@ import contextlib
 import json
 import sys
 from typing import Any
+
+from dadaia_workspace.core import platform
 
 WRITE_TOOLS = frozenset({"Write", "write_file", "Edit", "edit_file", "MultiEdit", "NotebookEdit"})
 WRITE_TOOLS |= {"apply_patch"}
@@ -17,7 +18,7 @@ _PATCH_PREFIXES = ("*** Update File: ", "*** Add File: ", "*** Delete File: ")
 def read_stdin_json() -> dict[str, Any]:
     """The hook JSON envelope from stdin; ``{}`` on any failure (fail-open)."""
     try:
-        data = json.loads(sys.stdin.read())
+        data = json.loads(platform.decode(sys.stdin.buffer.read()))
     except Exception:  # noqa: BLE001 — fail-open: a stdin read error must never crash a hook
         return {}
     return data if isinstance(data, dict) else {}

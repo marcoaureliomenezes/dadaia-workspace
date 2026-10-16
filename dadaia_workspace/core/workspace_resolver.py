@@ -88,7 +88,7 @@ def not_initialized(
     ``.dadaia/``, and one ``fix:`` — the uvx bootstrap (a CLI owning a workspace never
     gets here: :func:`own_workspace_root` is the walk's first rung)."""
     partial = (
-        f" Skipped (partial .dadaia/, no states/): {', '.join(map(str, skipped))}."
+        f" Skipped (partial .dadaia/, no states/): {', '.join(str(p) for p in skipped)}."
         if skipped
         else ""
     )

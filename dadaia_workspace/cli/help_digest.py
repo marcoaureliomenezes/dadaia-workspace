@@ -12,6 +12,8 @@ from __future__ import annotations
 import functools
 from pathlib import Path
 
+from dadaia_workspace.core import platform
+
 __all__ = ["DIGEST_REL", "command_paths", "digest_path", "render_digest", "write_digest"]
 
 #: Workspace-relative location of the digest (projected state, not a public/ asset).
@@ -115,10 +117,10 @@ def write_digest(workspace_root: Path) -> Path | None:
     try:
         path = digest_path(workspace_root)
         text = render_digest()
-        if path.is_file() and path.read_text(encoding="utf-8") == text:
+        if path.is_file() and platform.read_text(path) == text:
             return path
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(text, encoding="utf-8")
+        platform.write_text(path, text)
         return path
     except Exception:  # noqa: BLE001 — advisory artifact only
         return None

@@ -236,8 +236,8 @@ def operator_globs(workspace: Path) -> tuple[tuple[str, ...], tuple[str, ...], t
     """The one reader of ``<workspace>/.dadaiaignore``, for the gate and the doctor; absent
     or unreadable is no pattern."""
     try:
-        text = (workspace / DADAIAIGNORE).read_text(encoding="utf-8")
-    except OSError:
+        text = platform.read_text(workspace / DADAIAIGNORE)
+    except (OSError, platform.Undecodable):
         return (), (), ()
     return parse_dadaiaignore(text)
 
@@ -246,7 +246,7 @@ def dadaiaignore_seed(workspace: Path) -> str:
     """What a new ``.dadaiaignore`` starts with — ``init`` and ``doctor --fix`` alike: the
     legacy ``states/instance_exceptions.txt`` 1:1 (then held as slop), else the template."""
     try:
-        return (workspace / ".dadaia" / "states" / "instance_exceptions.txt").read_text("utf-8")
+        return str(platform.read_text(workspace / ".dadaia" / "states" / "instance_exceptions.txt"))
     except OSError:
         return (
             "# Operator-only: root-relative patterns, * within a segment, / = dir,\n"
@@ -264,7 +264,7 @@ LEVEL1_SEEDS: dict[str, Callable[[Path], str]] = {
 
 def occupied(entry: Path) -> bool:
     """An entry is present when it is on disk, a dangling link included — never followed."""
-    return entry.is_symlink() or entry.exists()
+    return platform.is_link(entry) or entry.exists()
 
 
 def _matches(sub: str, pattern: str) -> bool:
@@ -594,12 +594,10 @@ _PLACEHOLDERS: dict[str, Callable[[], str]] = {
 }
 
 
-_SOURCE_CLI = ".venv/bin/dadaia"
-
-
 def render_workspace_cli(text: str) -> str:
     """Render the workspace CLI source for this host."""
-    return text.replace(_SOURCE_CLI, str(platform.venv_tool(PurePosixPath(".venv"), "dadaia")))
+    host = platform.venv_tool(PurePosixPath(".venv"), "dadaia").as_posix()
+    return text.replace(platform.canonical_cli(host), host)
 
 
 def render_registry_tables(text: str) -> str:

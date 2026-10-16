@@ -14,7 +14,7 @@ console = Console()
 
 
 @app.command(
-    epilog="Recipe: " + " && ".join(fix_line(None, "public", v) for v in ("install", "doctor"))
+    epilog="Recipe:\n\n" + "\n\n".join(fix_line(None, "public", v) for v in ("install", "doctor"))
 )
 def install(
     force: bool = typer.Option(False, "--force", help="Overwrite existing files"),
