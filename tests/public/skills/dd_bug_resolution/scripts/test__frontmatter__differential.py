@@ -14,7 +14,6 @@ import importlib.util
 import json
 import re
 import shutil
-import subprocess
 import uuid
 from pathlib import Path
 
@@ -22,15 +21,14 @@ import pytest
 import yaml
 
 from dadaia_workspace.core.skill_owner import load_owner
+from tests.helpers.oslib import read_text, run, write_text
 
 _ROOT = Path(__file__).resolve().parents[5]
 _BLOCK = re.compile(r"\A---[ \t]*\n(.*?)\n---[ \t]*\n?", re.DOTALL)
 
 
 def _tracked(*spec: str) -> list[Path]:
-    out = subprocess.run(
-        ["git", "-C", str(_ROOT), "ls-files", "-z", "--", *spec], capture_output=True, check=True
-    ).stdout.decode()
+    out = run(["git", "-C", str(_ROOT), "ls-files", "-z", "--", *spec], check=True).stdout
     return sorted(_ROOT / p for p in out.split("\0") if p)
 
 
@@ -63,7 +61,7 @@ def _assert_equals_or_refuses(block: str) -> None:
 def test_every_shipped_and_instance_frontmatter_equals_safe_load_or_is_refused(
     path: Path,
 ) -> None:
-    block = _block(path.read_text(encoding="utf-8"))
+    block = _block(read_text(path))
     if block is not None:
         _assert_equals_or_refuses(block)
 
@@ -71,7 +69,7 @@ def test_every_shipped_and_instance_frontmatter_equals_safe_load_or_is_refused(
 def test_every_inline_frontmatter_literal_of_the_suite_equals_safe_load_or_is_refused() -> None:
     seen = 0
     for path in _TESTS:
-        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+        for node in ast.walk(ast.parse(read_text(path))):
             if isinstance(node, ast.Constant) and isinstance(node.value, str):
                 block = _block(node.value)
                 if block is not None:
@@ -84,7 +82,7 @@ def test_the_suite_walk_holds_no_untracked_file() -> None:
     scratch = _ROOT / "tests/tmp" / f"race-probe-{uuid.uuid4().hex[:8]}"
     scratch.mkdir(parents=True, exist_ok=True)
     try:
-        (scratch / "test_gone.py").write_text("X = 1\n", encoding="utf-8")
+        write_text(scratch / "test_gone.py", "X = 1\n")
         spec = importlib.util.spec_from_file_location("_differential_probe", Path(__file__))
         assert spec and spec.loader
         module = importlib.util.module_from_spec(spec)
@@ -95,7 +93,7 @@ def test_the_suite_walk_holds_no_untracked_file() -> None:
 
 
 def test_the_pinned_mutation_corpus_equals_safe_load_or_is_refused() -> None:
-    cases = json.loads(_CORPUS.read_text(encoding="utf-8"))["cases"]
+    cases = json.loads(read_text(_CORPUS))["cases"]
     assert len(cases) >= 3000
     for case in cases:
         _assert_equals_or_refuses(case)

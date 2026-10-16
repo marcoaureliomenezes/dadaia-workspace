@@ -18,6 +18,8 @@ import pytest
 from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.skill_owner import load_owner
 from tests.fixtures.harness_env import suite_env
+from tests.helpers.oslib import read_text, write_text
+from tests.helpers.oslib import run as os_run
 from tests.helpers.skill_scripts import stage_skill_scripts
 from tests.helpers.worktree_ws import commit, fixes, git, make_workspace, patch_cli, run
 
@@ -80,14 +82,7 @@ def _verdict(
         Path.home(),
         overrides={"PATH": os.environ["PATH"], "HOME": str(root), "GIT_CONFIG_NOSYSTEM": "1"},
     )
-    return subprocess.run(
-        cmd,
-        cwd=cwd or root,
-        env=env,
-        capture_output=True,
-        text=True,
-        input=json.dumps(BODY) if stdin is None else stdin,
-    )
+    return os_run(cmd, cwd=cwd or root, env=env, input=json.dumps(BODY) if stdin is None else stdin)
 
 
 def _written(root: Path) -> list[Path]:
@@ -102,14 +97,14 @@ def test_a_verdict_binds_the_head_it_judged_and_the_merge_lands_on_it(tmp_path: 
     assert path.parent == root / ".dadaia/handoff/c" and path.name.endswith(
         "-dd-code-reviewer-s.handoff.json"
     )
-    body = json.loads(path.read_text())
+    body = json.loads(read_text(path))
     assert (
         body["reviewed_sha"] == head
         and body["agent"] == "dd-code-reviewer"
         and body["verdict"] == "APPROVED"
     )
     assert done.stdout.strip() == str(path)
-    schema = json.loads((PKG / "public/schemas/handoff-v1.schema.json").read_text())
+    schema = json.loads(read_text(PKG / "public/schemas/handoff-v1.schema.json"))
     jsonschema.validate(body, schema)
     landed = run(root, "merge", str(tree))
     assert landed.returncode == 0, landed.stderr
@@ -156,11 +151,9 @@ def test_a_path_that_is_no_worktree_is_refused_with_the_hash_verbs_own_words(
         root / ".agents/skills/dd-gitflow-default/scripts/worktree.py"
     )  # its fix line names itself
     hash_cmd = [sys.executable, str(staged), "hash", str(plain), "--sha", head]
-    own = subprocess.run(
+    own = os_run(
         hash_cmd,
         cwd=root,
-        capture_output=True,
-        text=True,
         env=suite_env(
             os.environ, Path.home(), overrides={"PATH": os.environ["PATH"], "HOME": str(root)}
         ),
@@ -246,13 +239,13 @@ def test_a_verdict_in_a_second_already_taken_never_overwrites_the_first(tmp_path
         for i in range(-2, 8)  # every second the run can stamp
     ]
     for path in taken:
-        path.write_text("first")
+        write_text(path, "first")
     refused = _verdict(root, tree, sha=head)
     assert refused.returncode == 1
     assert refused.stderr.startswith("[error] ") and refused.stderr.endswith(
         "exists; rerun in a second\nfix: Agent action: rerun verdict.py in a second\n"
     )
-    assert [p.read_text() for p in taken] == ["first"] * len(taken)
+    assert [read_text(p) for p in taken] == ["first"] * len(taken)
     assert set(_written(root)) == set(taken)
 
 
@@ -261,7 +254,7 @@ def test_the_file_name_stamp_and_produced_at_are_one_instant(tmp_path: Path) -> 
     assert _verdict(root, tree, sha=head).returncode == 0
     (path,) = _written(root)
     stamp = path.name.removesuffix("-dd-code-reviewer-s.handoff.json")
-    produced = json.loads(path.read_text())["produced_at"]
+    produced = json.loads(read_text(path))["produced_at"]
     assert datetime.strptime(stamp, "%Y-%m-%dT%H%M%SZ") == datetime.strptime(
         produced, "%Y-%m-%dT%H:%M:%SZ"
     )
@@ -305,12 +298,12 @@ def _record(
         "diff_sha256": "b" * 64,
         **BODY,
     }
-    schema = json.loads((PKG / "public/schemas/handoff-v1.schema.json").read_text())
+    schema = json.loads(read_text(PKG / "public/schemas/handoff-v1.schema.json"))
     jsonschema.validate(body, schema)
     base = root / (".dadaia/reaped/x/.dadaia/handoff/c" if hold else ".dadaia/handoff/c")
     base.mkdir(parents=True, exist_ok=True)
     name = f"{produced.replace(':', '')}-{agent}-{verdict}-{scope.replace('/', '_')}.handoff.json"
-    (base / name).write_text(json.dumps(body, indent=2) + "\n")
+    write_text(base / name, json.dumps(body, indent=2) + "\n")
 
 
 def test_stats_counts_the_rc_verdict_sequences_in_produced_at_order(tmp_path: Path) -> None:
@@ -333,13 +326,7 @@ def test_stats_counts_the_rc_verdict_sequences_in_produced_at_order(tmp_path: Pa
         Path.home(),
         overrides={"PATH": os.environ["PATH"], "HOME": str(root), "GIT_CONFIG_NOSYSTEM": "1"},
     )
-    done = subprocess.run(
-        [sys.executable, str(script), "stats", "0.5.0-rc99"],
-        cwd=root,
-        env=env,
-        capture_output=True,
-        text=True,
-    )
+    done = os_run([sys.executable, str(script), "stats", "0.5.0-rc99"], cwd=root, env=env)
     assert (done.returncode, done.stdout) == (
         0,
         "sequences 4\nverdicts 7\nrejected 4\nfirst_pass_rejected 3/4\n",
@@ -348,8 +335,12 @@ def test_stats_counts_the_rc_verdict_sequences_in_produced_at_order(tmp_path: Pa
 
 _STUB_VALIDATE = '    sys.exit(0 if "schema_version" in json.load(open(args[2])) else 1)'
 _REAL_VALIDATE = """    open({log!r}, "a").write(json.dumps(args) + chr(10))
-    import subprocess
-    sys.exit(subprocess.run([{py!r}, "-m", "dadaia_workspace", *args]).returncode)"""
+    sys.path.insert(0, {kernel!r})
+    from _platform import run
+    done = run([{py!r}, "-m", "dadaia_workspace", *args])
+    sys.stdout.write(done.stdout)
+    sys.stderr.write(done.stderr)
+    sys.exit(done.returncode)"""
 
 
 def _real_validator(root: Path, tmp_path: Path) -> Path:
@@ -357,9 +348,17 @@ def _real_validator(root: Path, tmp_path: Path) -> Path:
     log = tmp_path / "validate.argv"
     schemas = root / ".dadaia/agentic/schemas"
     schemas.mkdir(parents=True)
-    (root / ".dadaia/states/spec_contexts.json").write_text('{"contexts": []}')
+    write_text(root / ".dadaia/states/spec_contexts.json", '{"contexts": []}')
     shutil.copy(PKG / "public/schemas/handoff-v1.schema.json", schemas)
-    patch_cli(root, _STUB_VALIDATE, _REAL_VALIDATE.format(log=str(log), py=sys.executable))
+    patch_cli(
+        root,
+        _STUB_VALIDATE,
+        _REAL_VALIDATE.format(
+            log=str(log),
+            py=sys.executable,
+            kernel=str(PKG / "public/skills/dd-bug-resolution/scripts"),
+        ),
+    )
     return log
 
 
@@ -421,7 +420,7 @@ def test_a_verdict_citing_a_file_only_the_reviewed_tree_holds_is_written_and_val
     assert done.returncode == 0, done.stderr
     (path,) = _written(root)
     assert done.stdout.strip() == str(path)
-    assert log.read_text() == (
+    assert read_text(log) == (
         json.dumps(["reports", "validate", str(path), "--reviewed-root", str(tree), "--json"])
         + "\n"
     )
@@ -435,7 +434,7 @@ def test_a_relative_tree_path_is_validated_as_the_resolved_tree(tmp_path: Path) 
     done = _verdict(root, ".", sha=head, stdin=json.dumps(body), cwd=tree)
     assert done.returncode == 0, done.stderr
     (path,) = _written(root)
-    assert log.read_text() == (
+    assert read_text(log) == (
         json.dumps(["reports", "validate", str(path), "--reviewed-root", str(tree), "--json"])
         + "\n"
     )
@@ -459,12 +458,7 @@ def test_stats_outside_a_workspace_is_refused_with_one_fix_line(tmp_path: Path) 
     root, _tree, _head = _workspace(tmp_path)
     (away := tmp_path / "away").mkdir()
     script = root / ".agents/skills" / SKILL / "scripts/verdict.py"
-    refused = subprocess.run(
-        [sys.executable, str(script), "stats", "0.5.0-rc1"],
-        cwd=away,
-        capture_output=True,
-        text=True,
-    )
+    refused = os_run([sys.executable, str(script), "stats", "0.5.0-rc1"], cwd=away)
     assert refused.returncode == 1
     assert refused.stderr == (
         "[error] no workspace above the current directory\nfix: Agent action: run"

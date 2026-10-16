@@ -19,13 +19,12 @@ from typing import Any
 
 import pytest
 
+from tests.helpers.oslib import read_text, run, write_text
 from tests.helpers.skill_scripts import stage_skill_scripts
 
 _PUBLIC = Path(__file__).resolve().parents[5] / "dadaia_workspace" / "public"
 _HISTO_SCHEMA = json.loads(
-    (
-        _PUBLIC / "skills/dd-backlog-definition/scripts/schemas/histo-record-v1.schema.json"
-    ).read_text()
+    read_text(_PUBLIC / "skills/dd-backlog-definition/scripts/schemas/histo-record-v1.schema.json")
 )
 TERMINAL_DISPOSITIONS = tuple(_HISTO_SCHEMA["properties"]["disposition"]["enum"])
 _HISTO = (
@@ -92,12 +91,9 @@ def _run(
     skills, specs = _stage(tmp_path), tmp_path / "specs"
     for rel, text in files.items():
         (specs / rel).parent.mkdir(parents=True, exist_ok=True)
-        (specs / rel).write_text(text, encoding="utf-8")
+        write_text(specs / rel, text)
     before = _hashes(specs)
-    done = subprocess.run(
-        [sys.executable, str(skills / script), *argv, "--specs", str(specs)],
-        capture_output=True, text=True, check=False,
-    )  # fmt: skip
+    done = run([sys.executable, str(skills / script), *argv, "--specs", str(specs)], check=False)  # fmt: skip
     return done, before, _hashes(specs)
 
 
@@ -294,7 +290,7 @@ def test_the_ledger_walk_skips_a_fenced_root(tmp_path: Path, monkeypatch: pytest
     ledger = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(ledger)
     (tmp_path / ".dadaia/states").mkdir(parents=True)
-    (tmp_path / ".dadaia/states/spec_contexts.json").write_text("{}", encoding="utf-8")
+    write_text(tmp_path / ".dadaia/states/spec_contexts.json", "{}")
     (tmp_path / "specs").mkdir()
     assert ledger.workspace_of(tmp_path / "specs") == tmp_path.resolve()
     monkeypatch.setenv("DADAIA_FENCED_ROOTS", str(tmp_path))

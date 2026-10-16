@@ -15,6 +15,7 @@ import pytest
 from dadaia_workspace.core.release_state import RELEASE_ID_RE
 from dadaia_workspace.features.specs.canon import is_canon_path
 from tests.fixtures.harness_env import suite_env
+from tests.helpers.oslib import run, write_text
 
 _REPO_ROOT = Path(__file__).resolve().parents[5]
 _SCRIPTS = _REPO_ROOT / "dadaia_workspace/public/skills/dd-release-implementation/scripts"
@@ -40,8 +41,8 @@ def test_one_release_id_grammar_everywhere(tmp_path: Path, release_id: str, lega
     assert bool(RELEASE_ID_RE.match(release_id)) is legal
     assert is_canon_path(f"releases/{release_id}/rc-1/SPEC.md") is legal
     (tmp_path / "specs" / "releases").mkdir(parents=True)
-    new = subprocess.run([sys.executable, str(_SCRIPTS / "release.py"), "new", release_id,
-                          "--specs", str(tmp_path / "specs")], capture_output=True, text=True)  # fmt: skip
+    new = run([sys.executable, str(_SCRIPTS / "release.py"), "new", release_id,
+                          "--specs", str(tmp_path / "specs")])  # fmt: skip
     assert (new.returncode == 0) is legal, new.stderr
 
 
@@ -59,8 +60,7 @@ def test_the_release_instant_reader_reads_an_instant_with_no_offset_as_utc() -> 
     instants = ["2026-10-06T23:30:00", "2026-10-06T23:30:00Z", "2026-10-06T23:30:00+00:00",
                 "2026-10-06T23:30:00-03:00", "not-a-timestamp", ""]  # fmt: skip
     env = suite_env(os.environ, Path.home(), overrides={"TZ": "UTC+3"})
-    out = subprocess.run([sys.executable, "-c", probe, str(_SCRIPTS), *instants],
-                         capture_output=True, text=True, env=env, check=True)  # fmt: skip
+    out = run([sys.executable, "-c", probe, str(_SCRIPTS), *instants], env=env, check=True)  # fmt: skip
     assert out.stdout.split() == ["2026-10-06T23:30:00+00:00"] * 3 + ["2026-10-07T02:30:00+00:00"] + ["ValueError"] * 2  # fmt: skip
 
 
@@ -224,16 +224,16 @@ def test_the_next_candidate_is_the_last_milestone_plus_one(
     for n in folders:
         (tmp_path / f"rc-{n}").mkdir()
     if 2 in folders:
-        (tmp_path / "rc-2" / "SPEC.md").write_text("draft")
+        write_text(tmp_path / "rc-2" / "SPEC.md", "draft")
     for name in files:
-        (tmp_path / name).write_text("")
+        write_text(tmp_path / name, "")
     assert _release_schema.next_candidate(tmp_path, _state(*stamps)) == tmp_path / expected
 
 
 def test_the_next_candidate_with_no_state_is_the_highest_folder_plus_one(tmp_path: Path) -> None:
     for n in (1, 4):
         (tmp_path / f"rc-{n}").mkdir()
-    (tmp_path / "rc-9").write_text("")
+    write_text(tmp_path / "rc-9", "")
     assert _release_schema.next_candidate(tmp_path, None) == tmp_path / "rc-5"
 
 
@@ -257,7 +257,7 @@ def test_a_state_with_no_milestone_reads_the_folders(
     for n in folders:
         (tmp_path / f"rc-{n}").mkdir()
     if flat:
-        (tmp_path / "SPEC.md").write_text("flat")
+        write_text(tmp_path / "SPEC.md", "flat")
     state = {"phase": "CLOSURE", "log": []}
     assert _release_schema.next_candidate(tmp_path, state) == tmp_path / next_rc
     assert _release_schema.next_candidate(tmp_path, None) == tmp_path / stateless_rc
@@ -267,8 +267,7 @@ def test_a_state_with_no_milestone_reads_the_folders(
 
 
 def _git(*args: str, cwd: Path) -> None:
-    subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@t", *args], cwd=cwd, check=True,
-                   capture_output=True, env={**os.environ, "GIT_CONFIG_GLOBAL": os.devnull})  # fmt: skip
+    run(["git", "-c", "user.name=t", "-c", "user.email=t@t", *args], cwd=cwd, check=True, env={**os.environ, "GIT_CONFIG_GLOBAL": os.devnull})  # fmt: skip
 
 
 def _repo(path: Path, *, spec: bool) -> Path:
@@ -277,11 +276,11 @@ def _repo(path: Path, *, spec: bool) -> Path:
     _git("init", "-q", cwd=path)
     if spec:
         (path / "releases/0.5.0/rc-1").mkdir(parents=True)
-        (path / "releases/0.5.0/rc-1/SPEC.md").write_text("**Status:** Draft\n")
-    (path / "f").write_text("1")
+        write_text(path / "releases/0.5.0/rc-1/SPEC.md", "**Status:** Draft\n")
+    write_text(path / "f", "1")
     _git("add", "-A", cwd=path)
     _git("commit", "-qm", "one", cwd=path)
-    (path / "f").write_text("2")
+    write_text(path / "f", "2")
     _git("commit", "-qam", "two", cwd=path)
     return path
 
@@ -295,8 +294,7 @@ def _adds_under_foreign_git_env(specs: Path, other: Path) -> subprocess.Complete
         "print([[a, b] for _, a, b in r.candidate_adds(__import__('pathlib').Path(sys.argv[2]))])\n"
     )  # fmt: skip
     env = {**os.environ, "GIT_DIR": str(other / ".git"), "GIT_WORK_TREE": str(other)}
-    return subprocess.run([sys.executable, "-c", probe, str(_SCRIPTS), str(specs)],
-                          capture_output=True, text=True, env=env, check=False)  # fmt: skip
+    return run([sys.executable, "-c", probe, str(_SCRIPTS), str(specs)], env=env, check=False)  # fmt: skip
 
 
 def test_the_birth_log_answers_for_the_repo_given_not_for_git_dir(tmp_path: Path) -> None:
@@ -312,8 +310,7 @@ def test_the_shallow_check_answers_for_the_repo_given_not_for_git_dir(tmp_path: 
     """A shallow GIT_DIR repo B must not make the full repo A read as shallow."""
     a, b = _repo(tmp_path / "a", spec=True), _repo(tmp_path / "src", spec=False)
     shallow = tmp_path / "shallow"
-    subprocess.run(["git", "clone", "-q", "--depth", "1", f"file://{b}", str(shallow)], check=True,
-                   capture_output=True, env={**os.environ, "GIT_CONFIG_GLOBAL": os.devnull})  # fmt: skip
+    run(["git", "clone", "-q", "--depth", "1", f"file://{b}", str(shallow)], check=True, env={**os.environ, "GIT_CONFIG_GLOBAL": os.devnull})  # fmt: skip
     out = _adds_under_foreign_git_env(a, shallow)
     assert out.returncode == 0, out.stderr
     assert out.stdout.strip() == "[['0.5.0', 'rc-1']]"

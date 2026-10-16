@@ -12,6 +12,7 @@ import pytest
 
 from dadaia_workspace.core.cli_line import shell_line
 from dadaia_workspace.core.skill_owner import load_owner
+from tests.helpers.oslib import write_text
 
 _SOURCE = Path(load_owner("dd-bug-resolution", "_privacy").__file__ or "")
 
@@ -68,7 +69,7 @@ def test_a_baseline_inside_a_workspace_is_reinstalled_by_init_of_that_workspace(
     tmp_path: Path,
 ) -> None:
     (tmp_path / ".dadaia" / "states").mkdir(parents=True)
-    (tmp_path / ".dadaia" / "states" / "spec_contexts.json").write_text("{}", encoding="utf-8")
+    write_text(tmp_path / ".dadaia" / "states" / "spec_contexts.json", "{}")
     inside = tmp_path / ".agents" / "skills" / "dd-bug-resolution" / "scripts"
     inside.mkdir(parents=True)
     module = _baseline_at(inside, b"\xff\xfe")

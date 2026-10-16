@@ -11,6 +11,8 @@ from pathlib import Path
 
 import pytest
 
+from tests.helpers.oslib import read_text, write_text
+from tests.helpers.oslib import run as os_run
 from tests.helpers.skill_scripts import stage_skill_scripts
 
 # verb: (skill, script, code, a tree the verb flags, a file whose bytes are not UTF-8)
@@ -41,10 +43,7 @@ def _check(tmp_path: Path, verb: str, planted: tuple[str, bytes]):
     target = specs / planted[0]
     target.parent.mkdir(parents=True)
     target.write_bytes(planted[1])
-    return lambda *flags: subprocess.run(
-        [sys.executable, str(script), "check", "--specs", str(specs), *flags],
-        capture_output=True, check=False, text=True,
-    )  # fmt: skip
+    return lambda *flags: os_run([sys.executable, str(script), "check", "--specs", str(specs), *flags], check=False)  # fmt: skip
 
 
 @pytest.mark.parametrize("verb", _VERBS)
@@ -96,10 +95,7 @@ def test_a_verb_that_reads_a_file_that_is_not_utf8_refuses_with_one_fix(
     specs = tmp_path / "repo" / "specs"
     (specs / relative).parent.mkdir(parents=True)
     (specs / relative).write_bytes(b"\xff\xfe\n")
-    done = subprocess.run(
-        [sys.executable, str(script), *argv, "--specs", str(specs)],
-        capture_output=True, check=False, text=True,
-    )  # fmt: skip
+    done = os_run([sys.executable, str(script), *argv, "--specs", str(specs)], check=False)  # fmt: skip
 
     assert done.returncode == 1 and "Traceback" not in done.stderr
     assert str(Path(relative)) in done.stderr
@@ -118,19 +114,16 @@ def test_a_release_check_names_the_undecodable_file_and_not_the_spec_it_was_reac
     specs = tmp_path / "repo" / "specs"
     rc = specs / "releases" / "0.5.0" / "rc-1"
     (rc / "tasks").mkdir(parents=True)
-    (rc / "SPEC.md").write_text("# S\n\n**Status:** Approved\n**Origin:** bugs:x\n\n", "utf-8")
-    (rc / "PLAN.md").write_text("# P\n\n**Status:** Approved\n\n", "utf-8")
+    write_text(rc / "SPEC.md", "# S\n\n**Status:** Approved\n**Origin:** bugs:x\n\n")
+    write_text(rc / "PLAN.md", "# P\n\n**Status:** Approved\n\n")
     state = {"schema": "release-state-v1", "release": "0.5.0", "phase": "DEFINITION",
              "defined": None, "implemented": None, "shipped": None, "log": []}  # fmt: skip
-    (specs / "releases" / "0.5.0" / "_RELEASE.json").write_text(json.dumps(state), "utf-8")
+    write_text(specs / "releases" / "0.5.0" / "_RELEASE.json", json.dumps(state))
     (specs / "bugs").mkdir()
-    (specs / "bugs" / "BUGS.jsonl").write_text("", "utf-8")
+    write_text(specs / "bugs" / "BUGS.jsonl", "")
     (specs / relative).write_bytes(b"\xff\xfe\n")
     script = stage_skill_scripts("dd-release-implementation", tmp_path / "staged" / "scripts")
-    done = subprocess.run(
-        [sys.executable, str(script / "release.py"), "check", "--specs", str(specs), "--json"],
-        capture_output=True, check=False, text=True,
-    )  # fmt: skip
+    done = os_run([sys.executable, str(script / "release.py"), "check", "--specs", str(specs), "--json"], check=False)  # fmt: skip
 
     assert done.returncode == 1 and "Traceback" not in done.stderr
     assert [f["path"] for f in json.loads(done.stdout)] == [relative]
@@ -140,10 +133,7 @@ def test_the_origin_verb_names_a_spec_that_is_not_utf8_once(tmp_path: Path) -> N
     script = stage_skill_scripts("dd-release-implementation", tmp_path / "staged" / "scripts")
     spec = tmp_path / "SPEC.md"
     spec.write_bytes(b"\xff\xfe\n")
-    done = subprocess.run(
-        [sys.executable, str(script / "release.py"), "origin", str(spec)],
-        capture_output=True, check=False, text=True,
-    )  # fmt: skip
+    done = os_run([sys.executable, str(script / "release.py"), "origin", str(spec)], check=False)  # fmt: skip
 
     assert done.returncode == 1
     assert done.stderr == f"[error] {spec} is not valid UTF-8\nfix: {_reencode(spec.resolve())}\n"
@@ -156,25 +146,18 @@ def test_following_the_not_utf8_fix_keeps_every_valid_record(tmp_path: Path) -> 
     specs = tmp_path / "repo" / "specs"
     (specs / "bugs").mkdir(parents=True)
     ledger = specs / "bugs" / "BUGS.jsonl"
-    ledger.write_text("", "utf-8")
+    write_text(ledger, "")
     (tmp_path / "repo" / "src").mkdir()
-    (tmp_path / "repo" / "src" / "m.py").write_text("", "utf-8")
+    write_text(tmp_path / "repo" / "src" / "m.py", "")
     for argv in (
         ["init", "-q"],
         ["add", "src"],
         ["-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "s"],
     ):
-        subprocess.run(
-            ["git", "-C", str(tmp_path / "repo"), *argv], check=True, capture_output=True
-        )
+        os_run(["git", "-C", str(tmp_path / "repo"), *argv], check=True)
 
     def run(*argv: str) -> subprocess.CompletedProcess[str]:
-        return subprocess.run(
-            [sys.executable, str(script), *argv, "--specs", str(specs)],
-            capture_output=True,
-            check=False,
-            text=True,
-        )
+        return os_run([sys.executable, str(script), *argv, "--specs", str(specs)], check=False)
 
     appended = run("append", "--bug-id", "a-bug", "--reported-by", "x", "--title", "caf\u00e9",
                    "--severity", "LOW", "--surface", "src", "--component", "c", "--context", "ctx",
@@ -194,7 +177,7 @@ def test_following_the_not_utf8_fix_keeps_every_valid_record(tmp_path: Path) -> 
     lines[0] = lines[0].decode("latin-1").encode("utf-8")
     ledger.write_bytes(b"\n".join(lines))
     assert run("check").returncode == 0
-    assert '"id": "a-bug"' in ledger.read_text("utf-8")
+    assert '"id": "a-bug"' in read_text(ledger)
 
 
 def test_the_finding_and_its_fix_name_the_same_bad_line(tmp_path: Path) -> None:

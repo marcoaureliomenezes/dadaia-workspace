@@ -10,6 +10,7 @@ from typing import Any
 import pytest
 
 from dadaia_workspace.core.skill_owner import load_owner
+from tests.helpers.oslib import read_text
 
 _PERSONA = (
     Path(__file__).resolve().parents[5] / "dadaia_workspace/public/agents/dd-sw-engineer-sr.md"
@@ -36,7 +37,7 @@ def test_a_bom_constitution_keeps_its_gitflow_block() -> None:
 
 
 def test_a_crlf_persona_keeps_every_field_of_its_lf_twin() -> None:
-    lf = _PERSONA.read_text(encoding="utf-8")
+    lf = read_text(_PERSONA)
     parsed = _load(lf.replace("\n", "\r\n"))
     assert parsed == _load(lf)
     assert parsed["read_only"] is False

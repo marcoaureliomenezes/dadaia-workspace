@@ -12,6 +12,7 @@ import pytest
 
 from dadaia_workspace.core.skill_owner import load_owner
 from tests.fixtures.harness_env import suite_env
+from tests.helpers.oslib import read_text, replace, run, write_text
 from tests.helpers.skill_scripts import stage_skill_scripts
 
 _TS = "2026-10-08T12:00:00Z"
@@ -29,16 +30,14 @@ def script(tmp_path: Path) -> Path:
 
 
 def _run(script: Path, *argv: str) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        [sys.executable, str(script), *argv], capture_output=True, text=True, check=False
-    )
+    return run([sys.executable, str(script), *argv], check=False)
 
 
 def _specs(tmp_path: Path) -> Path:
     specs = tmp_path / "specs"
     archive = specs / "releases" / "_archive"
     archive.mkdir(parents=True)
-    archive.joinpath("releases_histo.jsonl").write_text("", encoding="utf-8")
+    write_text(archive.joinpath("releases_histo.jsonl"), "")
     return specs
 
 
@@ -69,30 +68,30 @@ def _write_release(
     candidate = release / "rc-1"
     tasks = candidate / "tasks"
     tasks.mkdir(parents=True)
-    candidate.joinpath("SPEC.md").write_text(
+    write_text(
+        candidate.joinpath("SPEC.md"),
         "# SPEC\n\n**Status:** Approved\n**Origin:** operator-demand\n\n"
         "## Bug window review\n\n## 1. Problem\n",
-        encoding="utf-8",
     )
     second_path = "src/a.py" if overlap else "src/b.py"
-    candidate.joinpath("PLAN.md").write_text(
+    write_text(
+        candidate.joinpath("PLAN.md"),
         "# PLAN\n\n**Status:** Approved\n\n## As-is review\n\n"
         "| unit | today | bugs | verdict | why |\n|---|---|---|---|---|\n"
         "| release | heavy | 0 | REBUILD | lean |\n\n"
         "## DAG\n\n| job | waits on | wave | `W:` |\n|---|---|---|---|\n"
         "| Job 1 | — | 1 | `src/a.py` |\n"
         f"| Job 2 | — | 1 | `{second_path}` |\n",
-        encoding="utf-8",
     )
-    tasks.joinpath("job1.md").write_text(
+    write_text(
+        tasks.joinpath("job1.md"),
         "# Job 1\n\n| task | AC | `W:` | outcome |\n|---|---|---|---|\n"
         "| J1.T1 | AC3.3 | `src/a.py` | owner |\n",
-        encoding="utf-8",
     )
-    tasks.joinpath("job2.md").write_text(
+    write_text(
+        tasks.joinpath("job2.md"),
         "# Job 2\n\n| task | AC | `W:` | outcome |\n|---|---|---|---|\n"
         f"| J2.T1 | AC3.4 | `{second_path}` | owner |\n",
-        encoding="utf-8",
     )
     state = {
         "schema": "release-state-v1",
@@ -105,9 +104,7 @@ def _write_release(
         "shipped": None,
         "log": log or _milestones(phase),
     }
-    release.joinpath("_RELEASE.json").write_text(
-        json.dumps(state, indent=2) + "\n", encoding="utf-8"
-    )
+    write_text(release.joinpath("_RELEASE.json"), json.dumps(state, indent=2) + "\n")
     return release
 
 
@@ -133,7 +130,7 @@ def test_new_spec_uses_the_seven_approved_default_sections(script: Path, tmp_pat
     assert created.returncode == 0, created.stderr
     headings = [
         line
-        for line in specs.joinpath("releases/0.6.0/rc-1/SPEC.md").read_text("utf-8").splitlines()
+        for line in read_text(specs.joinpath("releases/0.6.0/rc-1/SPEC.md")).splitlines()
         if line.startswith("## ")
     ]
     assert headings == [
@@ -175,9 +172,9 @@ def test_check_reads_legacy_log_history_but_rejects_a_new_legacy_kind(
     assert _run(script, "check", "--specs", str(specs)).returncode == 0
 
     state_path = release / "_RELEASE.json"
-    state = json.loads(state_path.read_text("utf-8"))
+    state = json.loads(read_text(state_path))
     state["log"].append(_entry("reviews", "new legacy-shaped record"))
-    state_path.write_text(json.dumps(state, indent=2) + "\n", encoding="utf-8")
+    write_text(state_path, json.dumps(state, indent=2) + "\n")
     refused = _run(script, "check", "--specs", str(specs), "--json")
     assert refused.returncode == 1
     assert "reviews" in json.loads(refused.stdout)[0]["message"]
@@ -225,7 +222,8 @@ def test_ship_requires_each_open_bug_flag_and_its_verbatim_authorization_note(
     _write_release(specs, phase="CLOSURE", log=log)
     bugs = specs / "bugs" / "BUGS.jsonl"
     bugs.parent.mkdir()
-    bugs.write_text(
+    write_text(
+        bugs,
         json.dumps(
             {
                 "id": "a-bug",
@@ -233,7 +231,6 @@ def test_ship_requires_each_open_bug_flag_and_its_verbatim_authorization_note(
             }
         )
         + "\n",
-        encoding="utf-8",
     )
 
     refused = _run(script, "ship", "--sha", "3333333", "--specs", str(specs))
@@ -251,10 +248,8 @@ def test_ship_requires_each_open_bug_flag_and_its_verbatim_authorization_note(
         str(specs),
     )
     assert shipped.returncode == 0, shipped.stderr
-    assert json.loads(bugs.read_text("utf-8"))["status"] == "open"
-    archived = json.loads(
-        specs.joinpath("releases/_archive/0.5.0/_RELEASE.json").read_text("utf-8")
-    )
+    assert json.loads(read_text(bugs))["status"] == "open"
+    archived = json.loads(read_text(specs.joinpath("releases/_archive/0.5.0/_RELEASE.json")))
     assert authorization in [entry["text"] for entry in archived["log"]]
 
 
@@ -281,9 +276,7 @@ def test_ship_names_who_clears_a_missing_authorization_or_carry(
     memory = _entry("memory", "m", since="1111111", until="2222222", reviewed=[], changed=[])
     _write_release(specs, phase="CLOSURE", log=[*log, memory])
     (specs / "bugs").mkdir()
-    (specs / "bugs" / "BUGS.jsonl").write_text(
-        json.dumps({"id": "a-bug", "status": "open"}) + "\n", encoding="utf-8"
-    )
+    write_text(specs / "bugs" / "BUGS.jsonl", json.dumps({"id": "a-bug", "status": "open"}) + "\n")
     refused = _run(
         script, "ship", "--sha", "3333333", "--allow-open", "a-bug", "--specs", str(specs)
     )
@@ -308,10 +301,8 @@ def test_closure_check_needs_the_memory_entry_but_not_git(script: Path, tmp_path
             ),
         ],
     )
-    checked = subprocess.run(
+    checked = run(
         [sys.executable, str(script), "check", "--specs", str(specs), "--json"],
-        capture_output=True,
-        text=True,
         check=False,
         env=suite_env(os.environ, Path.home(), overrides={"PATH": ""}),
     )
@@ -347,13 +338,10 @@ def test_ship_refuses_every_open_bug_then_carries_each_authorized_id(
         ],
     )
     if live_candidate == "rc-2":
-        release.joinpath("rc-1").rename(release / live_candidate)
+        replace(release / "rc-1", release / live_candidate)
     bugs = specs / "bugs" / "BUGS.jsonl"
     bugs.parent.mkdir()
-    bugs.write_text(
-        json.dumps({"id": "a-bug", "status": "open"}) + "\n",
-        encoding="utf-8",
-    )
+    write_text(bugs, json.dumps({"id": "a-bug", "status": "open"}) + "\n")
     state = release / "_RELEASE.json"
     histo = specs / "releases/_archive/releases_histo.jsonl"
     before = (state.read_bytes(), histo.read_bytes())
@@ -378,10 +366,8 @@ def test_ship_refuses_every_open_bug_then_carries_each_authorized_id(
     )
 
     assert shipped.returncode == 0, shipped.stderr
-    assert json.loads(bugs.read_text("utf-8"))["status"] == "open"
-    archived = json.loads(
-        specs.joinpath("releases/_archive/0.5.0/_RELEASE.json").read_text("utf-8")
-    )
+    assert json.loads(read_text(bugs))["status"] == "open"
+    archived = json.loads(read_text(specs.joinpath("releases/_archive/0.5.0/_RELEASE.json")))
     assert authorization in [entry["text"] for entry in archived["log"]]
 
 
@@ -421,7 +407,7 @@ def test_new_at_closure_adopts_the_drafted_next_candidate(script: Path, tmp_path
     assert born.returncode == 0, born.stderr
     assert release.joinpath("rc-2/SPEC.md").read_bytes() == draft
     assert not release.joinpath("rc-3").exists()
-    assert json.loads(release.joinpath("_RELEASE.json").read_text("utf-8"))["phase"] == "DEFINITION"
+    assert json.loads(read_text(release.joinpath("_RELEASE.json")))["phase"] == "DEFINITION"
 
 
 def test_a_refused_birth_leaves_the_draft_in_place(script: Path, tmp_path: Path) -> None:
@@ -444,14 +430,14 @@ def test_origin_prints_the_ids_by_kind(
     script: Path, tmp_path: Path, line: str, printed: str
 ) -> None:
     spec = tmp_path / "SPEC.md"
-    spec.write_text(f"# SPEC\n\n**Origin:** {line}\n", encoding="utf-8")
+    write_text(spec, f"# SPEC\n\n**Origin:** {line}\n")
     shown = _run(script, "origin", str(spec))
     assert (shown.returncode, shown.stdout) == (0, printed)
 
 
 def test_origin_refuses_a_malformed_line_with_one_fix_line(script: Path, tmp_path: Path) -> None:
     spec = tmp_path / "SPEC.md"
-    spec.write_text("# SPEC\n\n**Origin:** backlog:\n", encoding="utf-8")
+    write_text(spec, "# SPEC\n\n**Origin:** backlog:\n")
     refused = _run(script, "origin", str(spec))
     assert refused.returncode == 1
     assert refused.stdout == ""
@@ -487,14 +473,13 @@ def _stacked(
     specs = _specs(tmp_path)
     release = _write_release(specs, phase="CLOSURE", log=log)
     spec = release / "rc-1" / "SPEC.md"
-    spec.write_text(spec.read_text("utf-8").replace("operator-demand", origin), encoding="utf-8")
+    write_text(spec, read_text(spec).replace("operator-demand", origin))
     (specs / "backlog").mkdir()
-    (specs / "backlog" / "BACKLOG.json").write_text(
-        json.dumps({"active": [{"id": "x-1"}]}), encoding="utf-8"
-    )
+    write_text(specs / "backlog" / "BACKLOG.json", json.dumps({"active": [{"id": "x-1"}]}))
     (specs / "bugs").mkdir()
-    (specs / "bugs" / "BUGS.jsonl").write_text(
-        "".join(json.dumps({"id": i, "status": "open"}) + "\n" for i in bug_ids), encoding="utf-8"
+    write_text(
+        specs / "bugs" / "BUGS.jsonl",
+        "".join(json.dumps({"id": i, "status": "open"}) + "\n" for i in bug_ids),
     )
     return specs
 

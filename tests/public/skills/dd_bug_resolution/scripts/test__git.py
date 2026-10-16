@@ -25,6 +25,7 @@ from types import ModuleType
 import pytest
 
 from dadaia_workspace.core.skill_owner import load_owner
+from tests.helpers.oslib import run, write_text
 
 _PORCELAIN = (
     "worktree /w/repo\nHEAD 1111111111111111111111111111111111111111\nbranch refs/heads/main\n\n"
@@ -40,13 +41,13 @@ def _clean() -> dict[str, str]:
 
 
 def _sh(*args: str, cwd: Path) -> None:
-    subprocess.run(["git", *args], cwd=cwd, env=_clean(), check=True, capture_output=True)
+    run(["git", *args], cwd=cwd, env=_clean(), check=True)
 
 
 def _repo(path: Path) -> Path:
     path.mkdir()
     _sh("init", "-q", "-b", "main", cwd=path)
-    (path / "f.txt").write_text("published\n", encoding="utf-8")
+    write_text(path / "f.txt", "published\n")
     _sh("add", "f.txt", cwd=path)
     _sh("-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "c", cwd=path)
     return path
@@ -118,11 +119,9 @@ def test_a_child_python_on_the_scrubbed_env_writes_no_bytecode(
     monkeypatch.setenv("PYTHONDONTWRITEBYTECODE", "0")
     pkg = tmp_path / "pkg"
     pkg.mkdir()
-    (pkg / "__init__.py").write_text("X = 1\n", encoding="utf-8")
+    write_text(pkg / "__init__.py", "X = 1\n")
     env = load_owner("dd-bug-resolution", "_git").scrubbed_env() | {"PYTHONPATH": str(tmp_path)}
-    done = subprocess.run(
-        [sys.executable, "-c", "import pkg"], env=env, cwd=tmp_path, capture_output=True, text=True, check=False
-    )  # fmt: skip
+    done = run([sys.executable, "-c", "import pkg"], env=env, cwd=tmp_path, check=False)  # fmt: skip
     assert done.returncode == 0, done.stderr
     assert list(tmp_path.rglob("__pycache__")) == []
 

@@ -10,11 +10,11 @@ from __future__ import annotations
 
 import re
 import shutil
-import subprocess
 import uuid
 from pathlib import Path
 
 import dadaia_workspace
+from tests.helpers.oslib import read_text, run, write_text
 
 _PKG = Path(dadaia_workspace.__file__).resolve().parent
 _TESTS = _PKG.parent / "tests"
@@ -34,11 +34,9 @@ _SCOPES = (_PKG / "core", _PKG / "features", _PKG / "cli", _PKG / "hooks")
 
 
 def _files() -> list[Path]:
-    tests = subprocess.run(
-        ["git", "-C", str(_TESTS.parent), "ls-files", "-z", "--", "tests/*.py"],
-        capture_output=True,
-        check=True,
-    ).stdout.decode()
+    tests = run(
+        ["git", "-C", str(_TESTS.parent), "ls-files", "-z", "--", "tests/*.py"], check=True
+    ).stdout
     return [
         *(p for scope in _SCOPES for p in scope.rglob("*.py")),
         *(_TESTS.parent / t for t in tests.split("\0") if t),
@@ -50,7 +48,7 @@ def _offenders() -> list[str]:
     for path in _files():
         if "__pycache__" in path.parts or path.name == Path(__file__).name:
             continue
-        for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+        for lineno, line in enumerate(read_text(path).splitlines(), 1):
             if _DEAD_RE.search(line):
                 hits.append(f"{path.relative_to(_PKG.parent).as_posix()}:{lineno}: {line.strip()}")
     return hits
@@ -78,7 +76,7 @@ def test_an_untracked_scratch_file_under_tests_is_not_judged() -> None:
     scratch = _TESTS / "tmp" / f"exit-probe-{uuid.uuid4().hex[:8]}"
     scratch.mkdir(parents=True, exist_ok=True)
     try:
-        (scratch / "test_gone.py").write_text("X = 'CONSUMED'\n", encoding="utf-8")
+        write_text(scratch / "test_gone.py", "X = 'CONSUMED'\n")
         hits = _offenders()
     finally:
         shutil.rmtree(scratch, ignore_errors=True)

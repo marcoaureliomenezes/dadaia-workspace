@@ -13,6 +13,7 @@ import pytest
 
 from dadaia_workspace.core.skill_owner import load_owner
 from tests.fixtures.harness_env import suite_env
+from tests.helpers.oslib import read_text, run, write_text
 from tests.helpers.skill_scripts import stage_skill_scripts
 
 pytestmark = [
@@ -52,7 +53,7 @@ def _bytes(*records: dict[str, object]) -> bytes:
 
 
 def _git(repo: Path, *args: str) -> None:
-    subprocess.run(
+    run(
         [
             "git",
             "-c",
@@ -63,8 +64,6 @@ def _git(repo: Path, *args: str) -> None:
         ],
         cwd=repo,
         env=suite_env(os.environ, repo),
-        capture_output=True,
-        text=True,
         check=True,
     )
 
@@ -82,14 +81,7 @@ def _run(
             "raise SystemExit(bugs.main(sys.argv[1:]))"
         )
         command = [sys.executable, "-c", bootstrap, str(script.parent), *args]
-    return subprocess.run(
-        command,
-        cwd=repo,
-        env=suite_env(os.environ, repo),
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    return run(command, cwd=repo, env=suite_env(os.environ, repo), check=False)
 
 
 def test_all_public_bug_verbs_pin_output_and_each_ledger_write(tmp_path: Path) -> None:
@@ -106,7 +98,7 @@ def test_all_public_bug_verbs_pin_output_and_each_ledger_write(tmp_path: Path) -
     ledger.parent.mkdir(parents=True)
     source = repo / "src/module.py"
     source.parent.mkdir(parents=True)
-    source.write_text("value = 1\n", encoding="utf-8")
+    write_text(source, "value = 1\n")
     replacement = _open("replacement")
     rejected = _open("to-reject")
     resolved = _open("to-resolve")
@@ -158,7 +150,7 @@ def test_all_public_bug_verbs_pin_output_and_each_ledger_write(tmp_path: Path) -
         "--specs",
         str(specs),
     )
-    records = load_owner("dd-bug-resolution", "_ledger").parse(ledger.read_text(encoding="utf-8"))
+    records = load_owner("dd-bug-resolution", "_ledger").parse(read_text(ledger))
     stamped = records[-1]
     assert re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", stamped["ts"])
     appended["ts"] = stamped["ts"]
@@ -299,7 +291,7 @@ def test_append_rejects_ts_option_as_unknown(tmp_path: Path) -> None:
     ledger.parent.mkdir(parents=True)
     ledger.write_bytes(b"")
     (repo / "src").mkdir()
-    (repo / "src/module.py").write_text("value = 1\n", encoding="utf-8")
+    write_text(repo / "src/module.py", "value = 1\n")
     _git(repo.parent, "init", "-q", str(repo))
     _git(repo, "add", "-A")
     _git(repo, "commit", "-qm", "fixture")

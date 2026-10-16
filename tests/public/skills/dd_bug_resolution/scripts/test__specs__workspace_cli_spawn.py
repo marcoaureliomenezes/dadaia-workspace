@@ -13,6 +13,7 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.core.skill_owner import load_owner
+from tests.helpers.oslib import cli_path, command, write_text
 
 
 def _bound_fix(ws: Path, _capsys: pytest.CaptureFixture[str], _mp: pytest.MonkeyPatch) -> str:
@@ -28,7 +29,7 @@ def _worktree_cli(ws: Path, _capsys: pytest.CaptureFixture[str], _mp: pytest.Mon
 
 def _verdict(ws: Path, capsys: pytest.CaptureFixture[str], mp: pytest.MonkeyPatch) -> str:
     verdict = load_owner("dd-handoff-emitter", "verdict")
-    real = subprocess.run
+    real = verdict.run
     bound = {"scope": "wt/x@1", "reviewed_sha": "1" * 40, "diff_sha256": "2" * 64, "root": str(ws)}
 
     def run(cmd: list[str], *a: object, **k: object) -> subprocess.CompletedProcess[str]:
@@ -36,7 +37,7 @@ def _verdict(ws: Path, capsys: pytest.CaptureFixture[str], mp: pytest.MonkeyPatc
             return subprocess.CompletedProcess(cmd, 0, json.dumps(bound), "")
         return real(cmd, *a, **k)  # type: ignore[call-overload,no-any-return]
 
-    mp.setattr(verdict.subprocess, "run", run)
+    mp.setattr(verdict, "run", run)
     mp.setattr(sys, "stdin", io.StringIO("{}"))
     argv = [str(ws), "--sha", "1" * 40, "--context", "c", "--slug", "s", "--verdict", "APPROVED", "--reason", "r"]  # fmt: skip
     assert verdict.main(argv) == 1
@@ -44,7 +45,6 @@ def _verdict(ws: Path, capsys: pytest.CaptureFixture[str], mp: pytest.MonkeyPatc
     return next(x[5:] for x in capsys.readouterr().err.splitlines() if x.startswith("fix: "))
 
 
-@pytest.mark.skipif(sys.platform == "win32", reason="a non-executable file is a POSIX mode")
 @pytest.mark.parametrize("caller", [_bound_fix, _worktree_cli, _verdict])
 def test_a_workspace_cli_that_cannot_run_refuses_with_the_install_fix(
     tmp_path: Path,
@@ -52,10 +52,11 @@ def test_a_workspace_cli_that_cannot_run_refuses_with_the_install_fix(
     monkeypatch: pytest.MonkeyPatch,
     caller: Callable[[Path, pytest.CaptureFixture[str], pytest.MonkeyPatch], str],
 ) -> None:
-    (cli := tmp_path / ".dadaia/.venv/bin/dadaia").parent.mkdir(parents=True)
-    cli.write_text("#!/bin/sh\n", "utf-8")
-    cli.chmod(0o644)
+    (cli := cli_path(tmp_path)).parent.mkdir(parents=True)
+    write_text(cli, "#!/bin/sh\n")
     (tmp_path / ".dadaia/states").mkdir()
-    (tmp_path / ".dadaia/states/spec_contexts.json").write_text("{}")
+    write_text(tmp_path / ".dadaia/states/spec_contexts.json", "{}")
     (tmp_path / "repos/r").mkdir(parents=True)
-    assert caller(tmp_path, capsys, monkeypatch) == f"uvx dadaia-workspace init {tmp_path}"
+    assert caller(tmp_path, capsys, monkeypatch) == command(
+        "uvx", "dadaia-workspace", "init", str(tmp_path)
+    )

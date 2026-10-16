@@ -12,6 +12,7 @@ import pytest
 
 from dadaia_workspace.core.platform import PLATFORM
 from tests.fixtures.harness_env import suite_env
+from tests.helpers.oslib import run, write_text
 from tests.helpers.skill_scripts import stage_skill_scripts
 
 pytestmark = pytest.mark.slow(reason="runs the public scripts over a real Git repository")
@@ -129,18 +130,11 @@ def _run(
             "raise SystemExit(memory.main(sys.argv[1:]))"
         )
         command = [sys.executable, "-c", bootstrap, str(script.parent), *args]
-    return subprocess.run(
-        command,
-        cwd=repo,
-        env=suite_env(os.environ, repo),
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    return run(command, cwd=repo, env=suite_env(os.environ, repo), check=False)
 
 
 def _git(repo: Path, *args: str) -> str:
-    result = subprocess.run(
+    result = run(
         [
             "git",
             "-c",
@@ -151,8 +145,6 @@ def _git(repo: Path, *args: str) -> str:
         ],
         cwd=repo,
         env=suite_env(os.environ, repo),
-        capture_output=True,
-        text=True,
         check=True,
     )
     return result.stdout.strip()
@@ -167,7 +159,7 @@ def test_catalog_generate_and_drift_pin_exit_output_and_artifacts(tmp_path: Path
     product = repo / "specs/memory/product"
     atom = product / "platform/alpha.md"
     atom.parent.mkdir(parents=True)
-    atom.write_text(_ATOM, encoding="utf-8")
+    write_text(atom, _ATOM)
     stale_catalog = b'{"generated_at":"2000-01-01T00:00:00Z","features":[]}\n'
     stale_index = b"# stale catalog fixture\n"
     (product / "catalog.json").write_bytes(stale_catalog)
@@ -178,7 +170,7 @@ def test_catalog_generate_and_drift_pin_exit_output_and_artifacts(tmp_path: Path
     assert stale_index != expected_index
     source = repo / "src/alpha/core.py"
     source.parent.mkdir(parents=True)
-    source.write_text("value = 1\n", encoding="utf-8")
+    write_text(source, "value = 1\n")
     _git(repo.parent, "init", "-q", str(repo))
 
     generated = _run(
@@ -202,7 +194,7 @@ def test_catalog_generate_and_drift_pin_exit_output_and_artifacts(tmp_path: Path
     _git(repo, "add", "-A")
     _git(repo, "commit", "-qm", "base")
     base = _git(repo, "rev-parse", "HEAD")
-    source.write_text("value = 2\n", encoding="utf-8")
+    write_text(source, "value = 2\n")
     _git(repo, "commit", "-qam", "change alpha")
 
     drifted = _run(

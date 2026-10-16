@@ -14,6 +14,8 @@ import pytest
 
 from dadaia_workspace.infrastructure.ledger_scripts import load_owner
 from tests.fixtures.harness_env import suite_env
+from tests.helpers.oslib import replace, write_text
+from tests.helpers.oslib import run as os_run
 from tests.helpers.skill_scripts import stage_skill_scripts
 from tests.helpers.worktree_ws import NEW_JOB, NEW_TASK, commit, git, make_workspace, run
 
@@ -39,10 +41,7 @@ def _fenced(ws: Path, script: str, *argv: str) -> subprocess.CompletedProcess[st
     """*script* of the staged skills, run from `ws/folder` with the workspace fenced."""
     path = next((ws / ".agents/skills").glob(f"*/scripts/{script}"))
     env = suite_env(os.environ, Path.home(), overrides={"DADAIA_FENCED_ROOTS": str(ws)})
-    return subprocess.run(
-        [sys.executable, str(path), *argv],
-        cwd=ws / "folder", env=env, capture_output=True, text=True,
-    )  # fmt: skip
+    return os_run([sys.executable, str(path), *argv], cwd=ws / "folder", env=env)  # fmt: skip
 
 
 def test_the_worktree_script_finds_no_root_in_a_fenced_workspace(ws: Path) -> None:
@@ -85,7 +84,7 @@ def _open_drafted(ws: Path, *names: str) -> None:
     for name in names:
         assert run(ws, "new", "r", name).returncode == 0
         tree = ws / "worktrees/r" / name
-        (tree / "draft.scratch.md").write_text(f"{name}\n")
+        write_text(tree / "draft.scratch.md", f"{name}\n")
         git(tree, "add", "-f", "draft.scratch.md")
         git(tree, "commit", "-qm", "draft")
 
@@ -113,7 +112,7 @@ def test_the_closure_waits_for_a_job_task_or_lane_tree_and_spares_every_wt_rc_tr
     if legacy:
         release = reconcile_specs / "releases/0.5.0"
         for entry in (release / "rc-1").iterdir():
-            entry.rename(release / entry.name)
+            replace(entry, release / entry.name)
         (release / "rc-1").rmdir()
     if not held:
         assert wait(reconcile_specs) is None

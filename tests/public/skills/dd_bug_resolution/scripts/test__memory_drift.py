@@ -10,14 +10,15 @@ from __future__ import annotations
 
 import json
 import os
-import shlex
 import subprocess
 import sys
 from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.core.cli_line import git_line, shell_line
+from dadaia_workspace.core.cli_line import git_line
+from tests.fixtures.harness_env import git_bash
+from tests.helpers.oslib import command, read_text, replace, run, write_text
 from tests.helpers.skill_scripts import stage_skill_scripts
 
 pytestmark = pytest.mark.slow(reason="runs git over a tmp repository")
@@ -40,9 +41,7 @@ sources:{sources}
 
 
 def _git(cwd: Path, *argv: str) -> str:
-    return subprocess.run(
-        ["git", *argv], cwd=cwd, capture_output=True, text=True, check=True
-    ).stdout.strip()
+    return run(["git", *argv], cwd=cwd, check=True).stdout.strip()
 
 
 @pytest.fixture
@@ -59,25 +58,22 @@ def repo(tmp_path: Path, script: Path) -> Path:
     root = tmp_path / "fixture-repo"
     for package in ("alpha", "beta"):
         (root / "dadaia_workspace" / "features" / package).mkdir(parents=True)
-        (root / "dadaia_workspace" / "features" / package / "__init__.py").write_text("", "utf-8")
-        (root / "dadaia_workspace" / "features" / package / "core.py").write_text(
-            "x = 1\n", "utf-8"
-        )
+        write_text(root / "dadaia_workspace" / "features" / package / "__init__.py", "")
+        write_text(root / "dadaia_workspace" / "features" / package / "core.py", "x = 1\n")
     (root / "dadaia_workspace" / "hooks").mkdir(parents=True)
-    (root / "dadaia_workspace" / "hooks" / "ctx_inject.py").write_text("y = 1\n", "utf-8")
+    write_text(root / "dadaia_workspace" / "hooks" / "ctx_inject.py", "y = 1\n")
     area = root / "specs" / "memory" / "product" / "platform"
     area.mkdir(parents=True)
-    (area / "alpha.md").write_text(
-        _ATOM.format(slug="alpha", sources="\n  - dadaia_workspace/features/alpha/**"), "utf-8"
+    write_text(
+        area / "alpha.md",
+        _ATOM.format(slug="alpha", sources="\n  - dadaia_workspace/features/alpha/**"),
     )
 
     _git(root.parent, "init", "-q", root.name)
     _git(root, "config", "user.email", "fixture@example.invalid")
     _git(root, "config", "user.name", "fixture")
-    subprocess.run(
+    run(
         [sys.executable, str(script), "catalog", "generate", "--specs", str(root / "specs")],
-        capture_output=True,
-        text=True,
         check=True,
     )
     _git(root, "add", "-A")
@@ -86,10 +82,8 @@ def repo(tmp_path: Path, script: Path) -> Path:
 
 
 def _run(script: Path, repo: Path, *argv: str) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
+    return run(
         [sys.executable, str(script), "drift", "--specs", str(repo / "specs"), *argv],
-        capture_output=True,
-        text=True,
         check=False,
         cwd=repo,
     )
@@ -97,7 +91,7 @@ def _run(script: Path, repo: Path, *argv: str) -> subprocess.CompletedProcess[st
 
 def test_a_changed_source_lists_its_atom_with_the_matched_path(script: Path, repo: Path) -> None:
     base = _git(repo, "rev-parse", "HEAD")
-    (repo / "dadaia_workspace" / "features" / "alpha" / "core.py").write_text("x = 2\n", "utf-8")
+    write_text(repo / "dadaia_workspace" / "features" / "alpha" / "core.py", "x = 2\n")
     _git(repo, "commit", "-aqm", "touch alpha")
 
     result = _run(script, repo, "--since", base, "--json")
@@ -128,24 +122,23 @@ def test_every_code_directory_no_atom_covers_is_listed(script: Path, repo: Path)
 def test_a_window_with_nothing_drifted_exits_zero(script: Path, repo: Path) -> None:
     """Coverage for beta and the hook too: an empty worklist is the only exit-0 state."""
     area = repo / "specs" / "memory" / "product" / "platform"
-    (area / "beta.md").write_text(
+    write_text(
+        area / "beta.md",
         _ATOM.format(
             slug="beta",
             sources=(
                 "\n  - dadaia_workspace/features/beta/**\n  - dadaia_workspace/hooks/ctx_inject.py"
             ),
         ),
-        "utf-8",
     )
-    subprocess.run(
+    run(
         [sys.executable, str(script), "catalog", "generate", "--specs", str(repo / "specs")],
         check=True,
-        capture_output=True,
     )
     _git(repo, "add", "-A")
     _git(repo, "commit", "-qm", "cover beta")
     base = _git(repo, "rev-parse", "HEAD")
-    (repo / "README.md").write_text("unrelated\n", "utf-8")
+    write_text(repo / "README.md", "unrelated\n")
     _git(repo, "add", "-A")
     _git(repo, "commit", "-qm", "unrelated change")
 
@@ -159,10 +152,10 @@ def test_an_atom_without_sources_covers_nothing(script: Path, repo: Path) -> Non
     """`sources` arrives atom by atom: a catalog entry without the field is tolerated and
     simply covers no code — never a traceback, never a silent full-tree pass."""
     catalog = repo / "specs" / "memory" / "product" / "catalog.json"
-    document = json.loads(catalog.read_text("utf-8"))
+    document = json.loads(read_text(catalog))
     for entry in document["features"]:
         entry.pop("sources", None)
-    catalog.write_text(json.dumps(document, ensure_ascii=False, indent=2) + "\n", "utf-8")
+    write_text(catalog, json.dumps(document, ensure_ascii=False, indent=2) + "\n")
     _git(repo, "commit", "-aqm", "catalog without sources")
     base = _git(repo, "rev-parse", "HEAD")
 
@@ -180,15 +173,9 @@ def test_drift_requires_since_and_resolves_no_window_itself(script: Path, repo: 
     assert "--since" in result.stderr
 
 
-def _fix(script: Path, command: str, specs: Path) -> str:
-    """*command* through the ledger scripts' one fix-line builder, `with_specs`."""
-    code = (
-        f"import sys; sys.path[:0] = [{str(script.parents[2] / 'dd-bug-resolution' / 'scripts')!r}]\n"
-        f"from _specs import with_specs; print(with_specs({command!r}, {str(specs)!r}))"
-    )
-    return subprocess.run(
-        [sys.executable, "-c", code], capture_output=True, text=True, check=True
-    ).stdout.strip()
+def _fix(script: Path, since: str, specs: Path) -> str:
+    """The finished `drift --since` line over its own words, the tree last."""
+    return command(sys.executable, str(script), "drift", "--since", since, "--specs", str(specs))
 
 
 @pytest.mark.parametrize("orphaned", ["since", "until"])
@@ -198,9 +185,11 @@ def test_a_bound_head_does_not_reach_refuses_as_a_clean_clone_would(
 ) -> None:
     """A rebased-away sha still in the object store is refused by the one decider every verb
     calls, as a single-branch clone (which lacks it) refuses it; its fix line, followed, runs."""
-    repo = repo.rename(repo.with_name(where))
+    moved = repo.with_name(where)
+    replace(repo, moved)
+    repo = moved
     base = _git(repo, "rev-parse", "HEAD")
-    (repo / "README.md").write_text("dropped\n", "utf-8")
+    write_text(repo / "README.md", "dropped\n")
     _git(repo, "add", "README.md")
     _git(repo, "commit", "-qm", "dropped by a rebase")
     orphan = _git(repo, "rev-parse", "HEAD")
@@ -213,10 +202,8 @@ def test_a_bound_head_does_not_reach_refuses_as_a_clean_clone_would(
     assert message == (
         f"{orphan} is not an ancestor of HEAD — a clone of this branch lacks it (a rebase rewrote it)"
     )
-    assert fix == _fix(
-        script, shell_line(sys.executable, str(script), "drift", "--since", base), repo / "specs"
-    )
-    followed = subprocess.run(shlex.split(fix), capture_output=True, text=True, cwd=repo)
+    assert fix == _fix(script, base, repo / "specs")
+    followed = run([git_bash(), "-c", fix], cwd=repo)
     assert followed.returncode == 1 and followed.stdout.startswith(f"[drift] since {base}\n")
 
 
@@ -235,9 +222,7 @@ def test_a_bound_sharing_no_history_with_head_is_refused_with_a_since_from_heads
     assert message == (
         f"{stranger} is not an ancestor of HEAD — a clone of this branch lacks it (a rebase rewrote it)"
     )
-    assert fix == _fix(
-        script, shell_line(sys.executable, str(script), "drift", "--since", root), repo / "specs"
-    )
+    assert fix == _fix(script, root, repo / "specs")
 
 
 def test_a_bound_a_shallow_clone_holds_beyond_its_cut_names_the_cut_not_a_rebase(
@@ -247,7 +232,7 @@ def test_a_bound_a_shallow_clone_holds_beyond_its_cut_names_the_cut_not_a_rebase
     older bound by sha holds it, yet HEAD does not reach it through the cut history; the
     refusal names the cut and its fix line, never a rebase."""
     older = _git(repo, "rev-parse", "HEAD")
-    (repo / "later.txt").write_text("later\n", "utf-8")
+    write_text(repo / "later.txt", "later\n")
     _git(repo, "add", "-A")
     _git(repo, "commit", "-qm", "later")
     clone = tmp_path / "clone"
@@ -269,7 +254,7 @@ def _refusal(script: Path, call: str) -> list[str]:
         f"import sys; sys.path[:0] = [{str(script.parents[2] / 'dd-bug-resolution' / 'scripts')!r}]; import _memory_drift as d\n"
         f"try: {call}\nexcept d.Refusal as r: print(r); print(r.fix)"
     )
-    done = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, check=True)
+    done = run([sys.executable, "-c", code], check=True)
     return done.stdout.splitlines()
 
 
@@ -295,7 +280,7 @@ def test_the_absent_bound_fix_line_fetches_the_object_and_moves_the_refusal_on(
     refusal is then the rebase one, whose own fix line names the next command."""
     branch = _git(repo, "branch", "--show-current")
     _git(repo, "checkout", "-q", "-b", "side")
-    (repo / "side.txt").write_text("s\n", "utf-8")
+    write_text(repo / "side.txt", "s\n")
     _git(repo, "add", "-A")
     _git(repo, "commit", "-qm", "side")
     side = _git(repo, "rev-parse", "HEAD")
@@ -308,17 +293,13 @@ def test_the_absent_bound_fix_line_fetches_the_object_and_moves_the_refusal_on(
     call = f"d.report(__import__('pathlib').Path({str(clone / 'specs')!r}), {side!r})"
 
     before = _refusal(script, call)
-    subprocess.run(shlex.split(before[1]), check=True, capture_output=True)
+    run([git_bash(), "-c", before[1]], check=True)
     after = _refusal(script, call)
 
     assert before[1] == git_line(clone, "fetch", "origin", side)
     assert after == [
         f"{side} is not an ancestor of HEAD — a clone of this branch lacks it (a rebase rewrote it)",
-        _fix(
-            script,
-            shell_line(sys.executable, str(script), "drift", "--since", head),
-            clone / "specs",
-        ),
+        _fix(script, head, clone / "specs"),
     ]
 
 
@@ -326,7 +307,7 @@ def test_a_git_read_that_fails_in_a_shallow_clone_names_the_cut(
     script: Path, repo: Path, tmp_path: Path
 ) -> None:
     """A caller that passes no bound (release.py, _release_tree.py) gets the same cut naming."""
-    (repo / "later.txt").write_text("later\n", "utf-8")
+    write_text(repo / "later.txt", "later\n")
     _git(repo, "add", "-A")
     _git(repo, "commit", "-qm", "later")
     clone = tmp_path / "clone"
@@ -350,11 +331,9 @@ def _release_drift(script: Path, repo: Path, state: dict[str, object]) -> dict[s
         "dd-release-implementation", script.parents[2] / "dd-release-implementation" / "scripts"
     )
     (repo / "specs" / "releases" / "9.9.9").mkdir(parents=True)
-    (repo / "specs" / "releases" / "9.9.9" / "_RELEASE.json").write_text(json.dumps(state))
-    result = subprocess.run(
-        [sys.executable, str(release / "release.py"), "drift", "--specs", str(repo / "specs"),
-         "--json"], capture_output=True, text=True, check=False, cwd=repo,
-    )  # fmt: skip
+    write_text(repo / "specs" / "releases" / "9.9.9" / "_RELEASE.json", json.dumps(state))
+    result = run([sys.executable, str(release / "release.py"), "drift", "--specs", str(repo / "specs"),
+         "--json"], check=False, cwd=repo)  # fmt: skip
     assert result.returncode in (0, 1), result.stderr
     return dict(json.loads(result.stdout))
 
@@ -363,7 +342,7 @@ def test_the_closure_window_opens_at_the_live_release_defined_sha(script: Path, 
     """The closure worklist is asked with no sha; with no memory entry the window opens at
     defined.sha."""
     base = _git(repo, "rev-parse", "HEAD")
-    (repo / "dadaia_workspace" / "features" / "alpha" / "core.py").write_text("x = 2\n", "utf-8")
+    write_text(repo / "dadaia_workspace" / "features" / "alpha" / "core.py", "x = 2\n")
     _git(repo, "commit", "-aqm", "touch alpha")
 
     report = _release_drift(script, repo, {"defined": {"sha": base}, "log": []})
@@ -375,7 +354,7 @@ def test_the_closure_window_opens_at_the_live_release_defined_sha(script: Path, 
 def test_the_closure_window_opens_at_the_last_memory_entry_until(script: Path, repo: Path) -> None:
     """A recorded `kind: memory` entry moves the window start to its `until`."""
     base = _git(repo, "rev-parse", "HEAD")
-    (repo / "README.md").write_text("later\n", "utf-8")
+    write_text(repo / "README.md", "later\n")
     _git(repo, "add", "README.md")
     _git(repo, "commit", "-qm", "later")
     until = _git(repo, "rev-parse", "HEAD")
@@ -399,7 +378,7 @@ def test_any_tracked_file_makes_its_directory_a_unit(
     """No language list — a `.c` dir is a unit; a unit is a directory, so a
     root-level file or one under a dot-dir is never listed."""
     (repo / path).parent.mkdir(parents=True, exist_ok=True)
-    (repo / path).write_text("z = 1\n", "utf-8")
+    write_text(repo / path, "z = 1\n")
     _git(repo, "add", path)
     _git(repo, "commit", "-qm", "code")
     base = _git(repo, "rev-parse", "HEAD")
@@ -418,21 +397,19 @@ def test_drift_in_repo_a_answers_for_a_under_a_foreign_git_dir(
     """The navigator runner: GIT_DIR and GIT_WORK_TREE both on repo B (GIT_DIR alone
     lets git take the cwd as the work tree and pass by accident); the window of A still reads A."""
     base = _git(repo, "rev-parse", "HEAD")
-    (repo / "dadaia_workspace" / "features" / "alpha" / "core.py").write_text("x = 2\n", "utf-8")
+    write_text(repo / "dadaia_workspace" / "features" / "alpha" / "core.py", "x = 2\n")
     _git(repo, "commit", "-aqm", "touch alpha")
     other = tmp_path / "other"
     _git(tmp_path, "init", "-q", other.name)
     _git(other, "config", "user.email", "fixture@example.invalid")
     _git(other, "config", "user.name", "fixture")
-    (other / "unrelated.txt").write_text("b\n", "utf-8")
+    write_text(other / "unrelated.txt", "b\n")
     _git(other, "add", "-A")
     _git(other, "commit", "-qm", "other")
     env = {**os.environ, "GIT_DIR": str(other / ".git"), "GIT_WORK_TREE": str(other)}
 
-    result = subprocess.run(
-        [sys.executable, str(script), "drift", "--specs", str(repo / "specs"), "--since", base,
-         "--json"], capture_output=True, text=True, check=False, cwd=repo, env=env,
-    )  # fmt: skip
+    result = run([sys.executable, str(script), "drift", "--specs", str(repo / "specs"), "--since", base,
+         "--json"], check=False, cwd=repo, env=env)  # fmt: skip
 
     assert result.returncode == 1, result.stderr
     assert json.loads(result.stdout)["atoms"] == [

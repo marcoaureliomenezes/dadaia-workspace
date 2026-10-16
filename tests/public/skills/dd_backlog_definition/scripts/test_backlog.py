@@ -10,8 +10,6 @@ from __future__ import annotations
 
 import datetime
 import json
-import os
-import shlex
 import subprocess
 import sys
 from pathlib import Path
@@ -19,6 +17,8 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.infrastructure.ledger_scripts import load_owner
+from tests.fixtures.harness_env import git_bash
+from tests.helpers.oslib import is_executable, read_text, run, write_text
 from tests.helpers.skill_scripts import stage_skill_scripts
 
 _PUBLIC = Path(__file__).resolve().parents[5] / "dadaia_workspace" / "public"
@@ -39,25 +39,19 @@ def script(tmp_path: Path) -> Path:
 def _specs(root: Path, *active: dict[str, object]) -> Path:
     specs = root / "specs"
     (specs / "backlog").mkdir(parents=True, exist_ok=True)
-    (specs / "backlog" / "BACKLOG.json").write_text(
+    write_text(
+        specs / "backlog" / "BACKLOG.json",
         json.dumps({"schema": "backlog-v1", "active": list(active)}, indent=2) + "\n",
-        encoding="utf-8",
     )
     return specs
 
 
 def _run(script: Path, *argv: str, cwd: Path | None = None) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        [sys.executable, str(script), *argv],
-        capture_output=True,
-        text=True,
-        check=False,
-        cwd=str(cwd) if cwd else None,
-    )
+    return run([sys.executable, str(script), *argv], check=False, cwd=str(cwd) if cwd else None)
 
 
 def _active(specs: Path) -> list[dict[str, object]]:
-    document = json.loads((specs / "backlog" / "BACKLOG.json").read_text(encoding="utf-8"))
+    document = json.loads(read_text(specs / "backlog" / "BACKLOG.json"))
     items: list[dict[str, object]] = document["active"]
     return items
 
@@ -83,8 +77,8 @@ def _fix_lines(done: subprocess.CompletedProcess[str]) -> list[str]:
 
 
 def test_script_is_executable_and_has_a_shebang() -> None:
-    assert os.access(_SOURCE, os.X_OK)
-    assert _SOURCE.read_text(encoding="utf-8").startswith("#!/usr/bin/env python3\n")
+    assert is_executable(_SOURCE)
+    assert read_text(_SOURCE).startswith("#!/usr/bin/env python3\n")
 
 
 def test_clean_document_checks_green(script: Path, tmp_path: Path) -> None:
@@ -120,7 +114,7 @@ def test_new_over_a_malformed_privacy_baseline_exits_one_with_one_fix_line(
     script: Path, tmp_path: Path
 ) -> None:
     baseline = tmp_path / "skills" / "dd-bug-resolution" / "scripts" / "privacy_baseline.json"
-    baseline.write_text('{"patterns": [{"id": "x"}]}', encoding="utf-8")
+    write_text(baseline, '{"patterns": [{"id": "x"}]}')
     specs = _specs(tmp_path)
     done = _run(script, "new", "an-idea", "--specs", str(specs))
     assert done.returncode == 1
@@ -289,7 +283,7 @@ def test_a_release_that_is_not_one_folder_name_is_refused(
     specs = _specs(tmp_path)
     _run(script, "new", "an-idea", "--specs", str(specs))
     _pick(specs)
-    (specs / "releases/AGENTS.md").write_text("# law\n")
+    write_text(specs / "releases/AGENTS.md", "# law\n")
     done = _run(
         script, "exit", "an-idea", "--specs", str(specs),
         "--disposition", "delivered", "--release", release.format(specs=specs),
@@ -309,7 +303,7 @@ def test_delivered_ignores_another_release_with_an_origin_less_spec(
     _run(script, "new", "an-idea", "--specs", str(specs))
     _pick(specs)
     (specs / "releases/0.4.8/rc-1").mkdir(parents=True)
-    (specs / "releases/0.4.8/rc-1/SPEC.md").write_text("# a draft with no origin\n")
+    write_text(specs / "releases/0.4.8/rc-1/SPEC.md", "# a draft with no origin\n")
     done = _run(
         script, "exit", "an-idea", "--specs", str(specs),
         "--disposition", "delivered", "--release", "0.4.7",
@@ -330,7 +324,7 @@ def test_the_refusal_fix_names_the_flag_release_not_another_picking_one(
         ("9.9.9", "operator-demand"),
     ):
         (specs / f"releases/{release}/rc-1").mkdir(parents=True)
-        (specs / f"releases/{release}/rc-1/SPEC.md").write_text(f"**Origin:** {origin}\n")
+        write_text(specs / f"releases/{release}/rc-1/SPEC.md", f"**Origin:** {origin}\n")
     done = _run(
         script, "exit", "an-idea", "--specs", str(specs),
         "--disposition", "delivered", "--release", "9.9.9",
@@ -360,7 +354,7 @@ def test_exit_reads_origin_through_the_release_parser(
     _run(script, "new", "an-idea", "--specs", str(specs))
     _pick(specs, "operator-demand")
     spec = specs / "releases/0.4.7/rc-1/SPEC.md"
-    spec.write_text(spec.read_text("utf-8").replace("**Origin:** operator-demand", origin), "utf-8")
+    write_text(spec, read_text(spec).replace("**Origin:** operator-demand", origin))
     done = _run(
         script, "exit", "an-idea", "--specs", str(specs),
         "--disposition", "delivered", "--release", "0.4.7",
@@ -413,7 +407,7 @@ def test_each_refusal_fix_keeps_the_chosen_disposition(
         assert ("bugs.py append" in fix) == (disposition == "to-bug")
         assert _histo(specs) == []
         return
-    ran = subprocess.run(shlex.split(fix.removeprefix("fix: ")), capture_output=True, check=False)
+    ran = run([git_bash(), "-c", fix.removeprefix("fix: ")])
     assert ran.returncode == 0, ran.stderr
     assert [r["disposition"] for r in _histo(specs)] == [disposition]
 
@@ -442,7 +436,7 @@ def test_to_bug_exits_only_into_a_registered_bug(
     specs = _specs(tmp_path)
     _run(script, "new", "an-idea", "--specs", str(specs))
     (specs / "bugs").mkdir()
-    (specs / "bugs" / "BUGS.jsonl").write_text(json.dumps({"id": "a-bug"}) + "\n", "utf-8")
+    write_text(specs / "bugs" / "BUGS.jsonl", json.dumps({"id": "a-bug"}) + "\n")
     done = _run(
         script, "exit", "an-idea", "--specs", str(specs), "--disposition", "to-bug",
         "--reason", bug,
@@ -527,7 +521,8 @@ def test_check_reports_a_histo_record_off_the_backlog_vocabulary(
     specs = _specs(tmp_path)
     histo = specs / "backlog" / "_archive" / "backlog_histo.jsonl"
     histo.parent.mkdir(parents=True, exist_ok=True)
-    histo.write_text(
+    write_text(
+        histo,
         json.dumps(
             {
                 "id": "x",
@@ -540,7 +535,6 @@ def test_check_reports_a_histo_record_off_the_backlog_vocabulary(
             }  # fmt: skip
         )
         + "\n",
-        encoding="utf-8",
     )
     done = _run(script, "check", "--specs", str(specs))
     assert done.returncode == 1
@@ -597,9 +591,9 @@ def test_a_refused_exit_leaves_both_backlog_files_byte_intact(script: Path, tmp_
     <other-slug>` runs, then it exits 1 and BACKLOG.json and backlog_histo.jsonl are both
     byte-identical." Run twice: a retry appends nothing either."""
     specs = _exited(script, tmp_path)
-    document = json.loads((specs / "backlog" / "BACKLOG.json").read_text(encoding="utf-8"))
+    document = json.loads(read_text(specs / "backlog" / "BACKLOG.json"))
     document["active"].append({"id": "broken", "status": "Idea"})
-    (specs / "backlog" / "BACKLOG.json").write_text(json.dumps(document), encoding="utf-8")
+    write_text(specs / "backlog" / "BACKLOG.json", json.dumps(document))
     before = _pair(specs)
 
     for _ in range(2):
@@ -641,16 +635,16 @@ def test_the_backlog_seam_amnesties_a_term_origin_already_holds(
     root = tmp_path / "repo"
     specs = _specs(root)
     git = ["git", "-C", str(root), "-c", "user.name=t", "-c", "user.email=t@t.invalid"]
-    subprocess.run([*git, "init", "-q"], check=True)
+    run([*git, "init", "-q"], check=True)
     assert _run(script, "new", "first", "--specs", str(specs), "--description", first).returncode == 0
-    subprocess.run([*git, "add", "-A"], check=True)
-    subprocess.run([*git, "commit", "-qm", "published"], check=True)
+    run([*git, "add", "-A"], check=True)
+    run([*git, "commit", "-qm", "published"], check=True)
     origin = tmp_path / "origin.git"
-    subprocess.run(["git", "init", "-q", "--bare", str(origin)], check=True)
-    subprocess.run([*git, "remote", "add", "origin", str(origin)], check=True)
-    subprocess.run([*git, "push", "-q", "origin", "HEAD"], check=True)
+    run(["git", "init", "-q", "--bare", str(origin)], check=True)
+    run([*git, "remote", "add", "origin", str(origin)], check=True)
+    run([*git, "push", "-q", "origin", "HEAD"], check=True)
     denylist = tmp_path / "denylist.json"
-    denylist.write_text(json.dumps({"acme": "client"}), encoding="utf-8")
+    write_text(denylist, json.dumps({"acme": "client"}))
     monkeypatch.setenv("DADAIA_PRIVACY_DENYLIST", str(denylist))
 
     done = _run(script, "new", "second", "--specs", str(specs), "--relates", "first",

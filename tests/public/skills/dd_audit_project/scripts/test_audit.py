@@ -16,6 +16,7 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.infrastructure.ledger_scripts import load_owner
+from tests.helpers.oslib import read_text, run, write_text
 from tests.helpers.skill_scripts import stage_skill_scripts
 
 _PUBLIC = Path(__file__).resolve().parents[5] / "dadaia_workspace" / "public"
@@ -51,18 +52,16 @@ def specs(tmp_path: Path) -> Path:
     audit_dir = tree / "audits" / _AUDIT
     audit_dir.mkdir(parents=True)
     (tree / "audits" / "_archive").mkdir()
-    (audit_dir / "AUDIT.md").write_text("# audit\n", encoding="utf-8")
-    (audit_dir / "FINDINGS.jsonl").write_text(
+    write_text(audit_dir / "AUDIT.md", "# audit\n")
+    write_text(
+        audit_dir / "FINDINGS.jsonl",
         "".join(json.dumps(_finding(i), sort_keys=True) + "\n" for i in (1, 2)),
-        encoding="utf-8",
     )
     return tree
 
 
 def _run(script: Path, *argv: str) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        [sys.executable, str(script), *argv], capture_output=True, text=True, check=False
-    )
+    return run([sys.executable, str(script), *argv], check=False)
 
 
 def _histo(specs: Path) -> list[dict[str, object]]:
@@ -95,7 +94,7 @@ def test_a_write_verb_refuses_and_leaves_every_byte(
     directory; an `_archive` id is refused; every write verb runs check over the candidate
     bytes."""
     for directory in (specs / "audits" / _AUDIT, specs / "audits" / "_archive"):
-        (directory / "FINDINGS.jsonl").write_text(json.dumps(finding) + "\n", encoding="utf-8")
+        write_text(directory / "FINDINGS.jsonl", json.dumps(finding) + "\n")
     before = (specs / "audits" / _AUDIT / "FINDINGS.jsonl").read_bytes()
 
     result = _run(script, *argv, "--specs", str(specs))
@@ -156,9 +155,7 @@ def test_check_passes_on_a_valid_tree_and_fails_on_a_broken_record(
     assert clean.returncode == 0, clean.stdout + clean.stderr
 
     findings = specs / "audits" / _AUDIT / "FINDINGS.jsonl"
-    findings.write_text(
-        json.dumps(_finding(1, severity="URGENT"), sort_keys=True) + "\n", encoding="utf-8"
-    )
+    write_text(findings, json.dumps(_finding(1, severity="URGENT"), sort_keys=True) + "\n")
     broken = _run(script, "check", "--specs", str(specs))
 
     assert broken.returncode == 1
@@ -179,8 +176,8 @@ def test_close_without_a_resolved_finding_never_records_resolved(
     """All rejected gives the histo disposition rejected, never resolved; a clean audit
     still closes."""
     records = [_finding(i + 1, disposition=v, reason="r") for i, v in enumerate(verdicts)]
-    (specs / "audits" / _AUDIT / "FINDINGS.jsonl").write_text(
-        "".join(json.dumps(r) + "\n" for r in records), encoding="utf-8"
+    write_text(
+        specs / "audits" / _AUDIT / "FINDINGS.jsonl", "".join(json.dumps(r) + "\n" for r in records)
     )
 
     # A histo record without its window-end sha is unrecordable.
@@ -200,4 +197,4 @@ def test_the_doctor_neither_folds_findings_nor_recommends_close() -> None:
 
     assert not [r.codes for r in RULES if "close" in str(r.fix_help)]
     specs_src = Path(__file__).resolve().parents[5] / "dadaia_workspace" / "features" / "specs"
-    assert not [p for p in specs_src.glob("*.py") if "from_dict" in p.read_text("utf-8")]
+    assert not [p for p in specs_src.glob("*.py") if "from_dict" in read_text(p)]

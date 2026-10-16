@@ -6,7 +6,6 @@ from __future__ import annotations
 
 import json
 import re
-import subprocess
 import sys
 from pathlib import Path
 
@@ -14,6 +13,7 @@ import pytest
 
 import dadaia_workspace
 from dadaia_workspace.infrastructure.ledger_scripts import load_owner
+from tests.helpers.oslib import read_text, run, write_text
 from tests.helpers.skill_scripts import stage_skill_scripts
 
 _PUBLIC = Path(dadaia_workspace.__file__).resolve().parent / "public"
@@ -24,7 +24,7 @@ def test_no_law_or_skill_names_the_picked_status_or_consumes() -> None:
     hits = [
         f"{p.relative_to(_PUBLIC)}:{n}"
         for p in _PUBLIC.rglob("*.md")
-        for n, line in enumerate(p.read_text(encoding="utf-8").splitlines(), 1)
+        for n, line in enumerate(read_text(p).splitlines(), 1)
         if pattern.search(line)
     ]
     assert hits == []
@@ -61,13 +61,10 @@ def _new_accepts(tmp_path: Path, slug: str) -> bool:
     script = stage_skill_scripts("dd-backlog-definition", tmp_path / "skills" / "bd" / "scripts")
     specs = tmp_path / "specs"
     (specs / "backlog").mkdir(parents=True)
-    (specs / "backlog" / "BACKLOG.json").write_text(
-        json.dumps({"schema": "backlog-v1", "active": []}), encoding="utf-8"
+    write_text(
+        specs / "backlog" / "BACKLOG.json", json.dumps({"schema": "backlog-v1", "active": []})
     )
-    done = subprocess.run(
-        [sys.executable, "-B", str(script / "backlog.py"), "new", slug, "--specs", str(specs)],
-        capture_output=True, text=True, check=False,
-    )  # fmt: skip
+    done = run([sys.executable, "-B", str(script / "backlog.py"), "new", slug, "--specs", str(specs)], check=False)  # fmt: skip
     return done.returncode == 0
 
 

@@ -20,6 +20,8 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.features.specs.memory_lint import lint_atom, load_frontmatter_schema
+from tests.fixtures.harness_env import git_bash
+from tests.helpers.oslib import read_text, run, write_text
 from tests.helpers.skill_scripts import stage_skill_scripts
 
 _REPO = Path(__file__).resolve().parents[5]
@@ -47,9 +49,7 @@ def specs(tmp_path: Path) -> Path:
 
 
 def _run(script: Path, *argv: str) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        [sys.executable, str(script), *argv], capture_output=True, text=True, check=False
-    )
+    return run([sys.executable, str(script), *argv], check=False)
 
 
 def test_catalog_generate_byte_reproduces_the_committed_catalog_and_index(
@@ -77,33 +77,28 @@ def test_catalog_generate_rebuilds_the_committed_content_from_the_atoms_alone(
     """The stamp is the only field carried over: with both generated files deleted, the
     atoms alone reproduce every committed entry and every rendered row."""
     product = specs / "memory" / "product"
-    committed = json.loads(
-        (_REPO / "specs" / "memory" / "product" / "catalog.json").read_text("utf-8")
-    )
-    committed_index = (_REPO / "specs" / "memory" / "product" / "index.md").read_text("utf-8")
+    committed = json.loads(read_text(_REPO / "specs" / "memory" / "product" / "catalog.json"))
+    committed_index = read_text(_REPO / "specs" / "memory" / "product" / "index.md")
     (product / "catalog.json").unlink()
     (product / "index.md").unlink()
 
     assert _run(script, "catalog", "generate", "--specs", str(specs)).returncode == 0
 
-    rebuilt = json.loads((product / "catalog.json").read_text("utf-8"))
+    rebuilt = json.loads(read_text(product / "catalog.json"))
     assert rebuilt["features"] == committed["features"]
     assert rebuilt["generated_at"] != committed["generated_at"]
     catalog_section = committed_index.split("## Feature catalog\n\n", 1)[1]
-    assert catalog_section.rstrip("\n") in (product / "index.md").read_text("utf-8")
+    assert catalog_section.rstrip("\n") in read_text(product / "index.md")
 
 
 def test_catalog_generate_preserves_non_catalog_sections_verbatim(
     script: Path, specs: Path
 ) -> None:
     index = specs / "memory" / "product" / "index.md"
-    index.write_text(
-        index.read_text(encoding="utf-8") + "\n## Operator notes\n\nkept verbatim.\n",
-        encoding="utf-8",
-    )
+    write_text(index, read_text(index) + "\n## Operator notes\n\nkept verbatim.\n")
 
     assert _run(script, "catalog", "generate", "--specs", str(specs)).returncode == 0
-    assert index.read_text(encoding="utf-8").endswith("## Operator notes\n\nkept verbatim.\n")
+    assert read_text(index).endswith("## Operator notes\n\nkept verbatim.\n")
 
 
 def test_check_passes_in_a_checkout_folder_not_named_after_the_repo(
@@ -114,9 +109,7 @@ def test_check_passes_in_a_checkout_folder_not_named_after_the_repo(
     result = _run(script, "check", "--specs", str(specs))
 
     assert result.returncode == 0, result.stdout
-    assert "any-checkout-name" not in (specs / "memory" / "product" / "catalog.json").read_text(
-        encoding="utf-8"
-    )
+    assert "any-checkout-name" not in read_text(specs / "memory" / "product" / "catalog.json")
 
 
 def test_check_ignores_frontmatter_the_library_lint_owns(script: Path, specs: Path) -> None:
@@ -125,10 +118,10 @@ def test_check_ignores_frontmatter_the_library_lint_owns(script: Path, specs: Pa
     assert _run(script, "check", "--specs", str(specs)).returncode == 0
 
     atom = next((specs / "memory" / "product").glob("*/*.md"))
-    lines = atom.read_text(encoding="utf-8").splitlines(keepends=True)
-    atom.write_text(
+    lines = read_text(atom).splitlines(keepends=True)
+    write_text(
+        atom,
         "".join(f"tldr: {'x' * 161}\n" if line.startswith("tldr: ") else line for line in lines),
-        encoding="utf-8",
     )
     over_ceiling = _run(script, "check", "--specs", str(specs))
 
@@ -141,9 +134,9 @@ def test_check_ignores_frontmatter_the_library_lint_owns(script: Path, specs: Pa
 
 def test_check_flags_a_catalog_that_drifted_from_the_atoms(script: Path, specs: Path) -> None:
     catalog = specs / "memory" / "product" / "catalog.json"
-    document = json.loads(catalog.read_text(encoding="utf-8"))
+    document = json.loads(read_text(catalog))
     document["features"] = document["features"][:-1]
-    catalog.write_text(json.dumps(document, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    write_text(catalog, json.dumps(document, ensure_ascii=False, indent=2) + "\n")
 
     result = _run(script, "check", "--specs", str(specs))
 
@@ -155,10 +148,7 @@ def test_check_flags_an_index_that_drifted_from_the_atoms(script: Path, specs: P
     """Both halves of the generated pair are checked — index.md is not the catalog's
     shadow, it is the second file `catalog generate` writes in the same act."""
     index = specs / "memory" / "product" / "index.md"
-    index.write_text(
-        index.read_text(encoding="utf-8").replace("| `agent-comms` |", "| `agent-coms` |", 1),
-        encoding="utf-8",
-    )
+    write_text(index, read_text(index).replace("| `agent-comms` |", "| `agent-coms` |", 1))
 
     result = _run(script, "check", "--specs", str(specs))
 
@@ -172,12 +162,12 @@ def test_a_drifted_pair_names_the_generator_as_its_fix(
     """A catalog written by an older generator (it carried `context`) is
     drift whose fix regenerates the pair by its absolute specs path, from any directory."""
     catalog = specs / "memory" / "product" / "catalog.json"
-    document = {"context": "old-folder", **json.loads(catalog.read_text(encoding="utf-8"))}
-    catalog.write_text(json.dumps(document, ensure_ascii=False, indent=2) + "\n", "utf-8")
+    document = {"context": "old-folder", **json.loads(read_text(catalog))}
+    write_text(catalog, json.dumps(document, ensure_ascii=False, indent=2) + "\n")
 
     (finding,) = json.loads(_run(script, "check", "--specs", str(specs), "--json").stdout)
 
-    assert subprocess.run(finding["fix"], shell=True, cwd=tmp_path, check=False).returncode == 0
+    assert run([git_bash(), "-c", finding["fix"]], cwd=tmp_path).returncode == 0
     assert _run(script, "check", "--specs", str(specs)).returncode == 0
 
 
@@ -199,8 +189,8 @@ def test_generate_check_and_lint1_reach_one_verdict_per_atom(
     generate names the atom and writes nothing."""
     atom = next((specs / "memory" / "product").glob("*/*.md"))
     new = line if line.startswith("tags") else f"{line}\ntags: [x]"
-    text = re.sub(r"^tags: .*$", lambda _: new, atom.read_text("utf-8"), count=1, flags=re.M)
-    atom.write_text(text, encoding="utf-8")
+    text = re.sub(r"^tags: .*$", lambda _: new, read_text(atom), count=1, flags=re.M)
+    write_text(atom, text)
     catalog = (specs / "memory" / "product" / "catalog.json").read_bytes()
 
     generate = _run(script, "catalog", "generate", "--specs", str(specs))
@@ -225,7 +215,7 @@ def test_every_committed_atom_parses_to_the_dict_safe_load_reads() -> None:
     atoms = sorted((_REPO / "specs" / "memory" / "product").glob("*/*.md"))
     assert len(atoms) >= 29
     for atom in atoms:
-        text = atom.read_text(encoding="utf-8")
+        text = read_text(atom)
         data, _body, error = parse(text)
         assert error is None, atom.name
         assert data == yaml.safe_load(text.split("\n---\n", 1)[0].removeprefix("---\n")), atom.name

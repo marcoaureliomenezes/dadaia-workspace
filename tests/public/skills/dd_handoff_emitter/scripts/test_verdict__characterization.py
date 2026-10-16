@@ -4,13 +4,14 @@ from __future__ import annotations
 
 import json
 import os
-import subprocess
 import sys
 from pathlib import Path
 
 import pytest
 
 from tests.fixtures.harness_env import suite_env
+from tests.helpers.oslib import read_text
+from tests.helpers.oslib import run as os_run
 from tests.helpers.skill_scripts import stage_skill_scripts
 from tests.helpers.worktree_ws import commit, diff_hash, git, make_workspace, run
 
@@ -49,7 +50,7 @@ def test_verdict_writes_the_exact_bound_handoff(tmp_path: Path) -> None:
         f"_clock.now_iso = lambda: {_NOW!r}\n"
         "raise SystemExit(verdict.main(sys.argv[1:]))"
     )
-    result = subprocess.run(
+    result = os_run(
         [
             sys.executable,
             "-c",
@@ -70,8 +71,6 @@ def test_verdict_writes_the_exact_bound_handoff(tmp_path: Path) -> None:
         cwd=root,
         env=suite_env(os.environ, root),
         input=json.dumps(_BODY),
-        capture_output=True,
-        text=True,
         check=False,
     )
 
@@ -83,7 +82,7 @@ def test_verdict_writes_the_exact_bound_handoff(tmp_path: Path) -> None:
     assert result.stdout == f"{target}\n"
     assert target.parent == root / ".dadaia/handoff/catalog"
     assert target.name == "2026-10-09T123456Z-dd-code-reviewer-characterization.handoff.json"
-    document = json.loads(target.read_text(encoding="utf-8"))
+    document = json.loads(read_text(target))
     assert document == {
         "schema_version": "handoff-v1.2",
         "agent": "dd-code-reviewer",
