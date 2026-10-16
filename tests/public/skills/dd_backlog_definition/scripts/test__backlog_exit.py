@@ -9,6 +9,8 @@ Size: SMALL (reads the shipped source tree; no subprocess, no fixture, no networ
 from __future__ import annotations
 
 import re
+import shutil
+import uuid
 from pathlib import Path
 
 import dadaia_workspace
@@ -60,3 +62,14 @@ def test_the_consumed_histo_file_and_ledger_module_are_gone() -> None:
     specs_dir = _PKG.parent / "specs"
     stale = specs_dir / "backlog" / "_archive" / "consumed_backlog_histo.jsonl"
     assert not stale.exists(), f"{stale} holds stalled provisional records — deleted"
+
+
+def test_an_untracked_scratch_file_under_tests_is_not_judged() -> None:
+    scratch = _TESTS / "tmp" / f"exit-probe-{uuid.uuid4().hex[:8]}"
+    scratch.mkdir(parents=True, exist_ok=True)
+    try:
+        (scratch / "test_gone.py").write_text("X = 'CONSUMED'\n", encoding="utf-8")
+        hits = _offenders()
+    finally:
+        shutil.rmtree(scratch, ignore_errors=True)
+    assert [h for h in hits if scratch.name in h] == []
