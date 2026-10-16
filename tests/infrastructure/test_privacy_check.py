@@ -261,12 +261,8 @@ _RETIRED_PERSONA = "dd-" + "software-engineer"
 
 def test_the_retired_persona_name_stays_out_of_library_and_tests() -> None:
     """No text file under dadaia_workspace/ or tests/ names the retired persona."""
-    paths = sorted(
-        p
-        for root in ("dadaia_workspace", "tests")
-        for p in (_REPO_ROOT / root).rglob("*")
-        if p.is_file() and "__pycache__" not in p.parts
-    )
+    tracked = git(_REPO_ROOT, "ls-files", "dadaia_workspace", "tests").splitlines()
+    paths = sorted(_REPO_ROOT / p for p in tracked if "__pycache__" not in p.split("/"))
     assert_populated(paths, sentinel=Path(__file__))
     hits = []
     for path in paths:
