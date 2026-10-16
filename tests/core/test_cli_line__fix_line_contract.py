@@ -425,16 +425,17 @@ class World:
             install_git_hooks(self.repo, force=True)
 
     def run(
-        self, argv: list[str] | str, cwd: Path, stdin: str = ""
+        self, argv: list[str] | str, cwd: Path, stdin: str = "", setup: bool = False
     ) -> subprocess.CompletedProcess[str]:
         shell = isinstance(argv, str)
+        env = self.env | {"DADAIA_WT": "1"} if setup else self.env
         return subprocess.run(  # noqa: S603
             ["sh", "-c", argv] if shell else argv,
-            cwd=cwd, env=self.env, input=stdin, capture_output=True, text=True, timeout=50,
+            cwd=cwd, env=env, input=stdin, capture_output=True, text=True, timeout=50,
         )  # fmt: skip
 
     def git(self, cwd: Path, *args: str) -> str:
-        done = self.run(["git", *args], cwd)
+        done = self.run(["git", *args], cwd, setup=True)
         assert done.returncode == 0, f"git {args}: {done.stderr}"
         return done.stdout.strip()
 
@@ -518,8 +519,10 @@ class Skip:
 
 def _hit(world: World, command: list[str] | str) -> subprocess.CompletedProcess[str]:
     if isinstance(command, str):
-        return world.run(command, world.repo)
-    return world.cli(*command) if command[0] != "git" else world.run(command, world.repo)
+        return world.run(command, world.repo, setup=True)
+    return (
+        world.cli(*command) if command[0] != "git" else world.run(command, world.repo, setup=True)
+    )
 
 
 def _push_gate(world: World, push: str) -> subprocess.CompletedProcess[str]:
