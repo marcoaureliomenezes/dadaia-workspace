@@ -64,14 +64,23 @@ class _Repo:
         return done.stdout.strip()
 
 
+@pytest.fixture(params=["sha1", "sha256"])
+def object_format(request: pytest.FixtureRequest) -> str:
+    return request.param
+
+
 @pytest.fixture
 def repo(tmp_path: Path) -> _Repo:
+    return _make_repo(tmp_path, "sha1")
+
+
+def _make_repo(tmp_path: Path, fmt: str) -> _Repo:
     r = _Repo(tmp_path)
     r.install_runner(_REAL)
     r.root.mkdir()
-    r.ok("init", "-q", "--bare", str(r.origin), cwd=tmp_path)
+    r.ok("init", "-q", f"--object-format={fmt}", "--bare", str(r.origin), cwd=tmp_path)
     for args in (
-        ["init", "-q", "-b", "main"],
+        ["init", "-q", f"--object-format={fmt}", "-b", "main"],
         ["config", "user.email", "test@example.invalid"],
         ["config", "user.name", "Test"],
         ["commit", "-q", "--allow-empty", "-m", "init"],
@@ -133,7 +142,10 @@ def test_raw_update_ref_without_an_old_sha_on_the_work_branch_is_refused(repo: _
     _assert_refused(repo, done, before)
 
 
-def test_raw_branch_force_move_of_the_work_branch_is_refused(repo: _Repo) -> None:
+def test_raw_branch_force_move_of_the_work_branch_is_refused_in_either_object_format(
+    tmp_path: Path, object_format: str
+) -> None:
+    repo = _make_repo(tmp_path, object_format)
     before = repo.ok("rev-parse", "HEAD")
     other = _other_ahead(repo)
     repo.ok("checkout", "-q", "other")

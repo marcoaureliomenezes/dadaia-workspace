@@ -5,6 +5,7 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
+import pytest
 from typer.testing import CliRunner
 
 from dadaia_workspace.cli.commands import ci
@@ -112,8 +113,9 @@ def test_ref_gate_passes_the_origin_sha_creation_and_a_non_work_ref(
     assert _ref_gate(monkeypatch, repo).exit_code == 0
 
 
+@pytest.mark.parametrize("zeros", [40, 64])
 def test_ref_gate_refuses_a_zero_old_line_for_an_existing_work_ref_off_origin(
-    monkeypatch, tmp_path: Path
+    monkeypatch, tmp_path: Path, zeros: int
 ) -> None:
     """``git branch -f`` and ``update-ref`` with no old sha hand git's zero old sha."""
     repo, _ = _work_repo(tmp_path)
@@ -121,7 +123,7 @@ def test_ref_gate_refuses_a_zero_old_line_for_an_existing_work_ref_off_origin(
     other = _commit(repo, **{"src__b.py": "y = 2\n"})
     _git(repo, "update-ref", _WORK_REF, _git(repo, "rev-parse", "HEAD~1"))
 
-    result = _ref_gate(monkeypatch, repo, f"{'0' * 40} {other} {_WORK_REF}")
+    result = _ref_gate(monkeypatch, repo, f"{'0' * zeros} {other} {_WORK_REF}")
 
     assert result.exit_code == 1
     assert "[ref-gate] BLOCKED" in result.output
