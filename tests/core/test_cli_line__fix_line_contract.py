@@ -16,7 +16,6 @@ import io
 import json
 import os
 import re
-import shlex
 import shutil
 import site
 import subprocess
@@ -45,7 +44,7 @@ from dadaia_workspace.core.models.spec_context import (
     ContextState,
     SpecContextProject,
 )
-from dadaia_workspace.core.platform import PLATFORM, workspace_cli_path
+from dadaia_workspace.core.platform import PLATFORM, command, workspace_cli_path
 from dadaia_workspace.core.skill_owner import load_owner
 from dadaia_workspace.core.specs_version import CANONICAL_SPECS_VERSION
 from dadaia_workspace.features.chokepoints import push_gate_decision
@@ -133,7 +132,7 @@ def the_fix(message: str | None, root: Path) -> str:
     if fix.startswith(_ACT_LABELS):
         assert not (fix.startswith("Agent action: ") and _protected_paths(fix, root)), fix
         return fix
-    argv0 = shlex.split(fix)[0]  # an absolute file, or a bare name on PATH, never cwd-relative
+    argv0 = fix.split()[0]  # an absolute file, or a bare name on PATH, never cwd-relative
     on_path = "/" not in argv0 and (shutil.which(argv0) or argv0 in _PREREQUISITES)
     assert on_path or (Path(argv0).is_absolute() and Path(argv0).is_file()), fix
     block = pre_gate.evaluate_payload({"tool_name": "Bash", "tool_input": {"command": fix}})
@@ -1557,7 +1556,7 @@ def _from_alpha(root: Path, fix: str) -> None:
     """Runs *fix* from ``repos/alpha`` (a fix runs from any cwd)."""
     elsewhere = root / "repos" / "alpha"
     elsewhere.mkdir(parents=True, exist_ok=True)
-    ran = run_bash(shlex.join(shlex.split(fix)), cwd=elsewhere, env=_ws_env())
+    ran = run_bash(fix, cwd=elsewhere, env=_ws_env())
     assert ran.returncode == 0, ran.stdout + ran.stderr
 
 
@@ -2102,8 +2101,7 @@ def test_a_worktree_listing_fix_runs_the_public_runner(workspace: Path, site: st
     """The gate and the kernel send the agent to `dadaia worktree list`, never to the skill script."""
     fix = the_fix(SITES[site](workspace), workspace)
 
-    argv = shlex.split(fix)
-    assert (Path(argv[0]), argv[1:]) == (workspace_cli_path(workspace), ["worktree", "list"])
+    assert fix == command(str(workspace_cli_path(workspace)), "worktree", "list")
 
 
 def test_no_fix_line_literal_in_the_library_names_the_skill_script() -> None:

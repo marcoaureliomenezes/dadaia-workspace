@@ -11,6 +11,7 @@ import pytest
 
 from dadaia_workspace.core import cli_line
 from dadaia_workspace.core.platform import Capabilities, workspace_cli_path
+from dadaia_workspace.core.skill_owner import load_owner
 
 
 def test_posix_cli_path_and_fix_line(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -24,26 +25,52 @@ def test_posix_cli_path_and_fix_line(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_windows_cli_path_and_fix_line(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Forward slashes;
-    a part with a blank quoted whole, `-c` code one word; the executable's quote opens after
-    its drive letter, as a line opening with a quote is a PowerShell expression."""
+    """Forward slashes; a part with a blank quoted whole, `-c` code one word; a head with a blank
+    has no spelling that runs in cmd, PowerShell and Git Bash alike, so the line is an Agent action."""
     monkeypatch.setattr("dadaia_workspace.core.platform.PLATFORM", Capabilities.detect("win32"))
     root = PureWindowsPath(r"C:\ws\my ws")
     assert workspace_cli_path(root) == PureWindowsPath(
         r"C:\ws\my ws\.dadaia\.venv\Scripts\dadaia.exe"
     )
-    assert (
-        cli_line.fix_line(root, "doctor", "--fix")
-        == 'C":/ws/my ws/.dadaia/.venv/Scripts/dadaia.exe" doctor --fix'
+    assert cli_line.fix_line(PureWindowsPath(r"C:\ws"), "doctor", "--fix") == (
+        "C:/ws/.dadaia/.venv/Scripts/dadaia.exe doctor --fix"
+    )
+    cli = "C:/ws/my ws/.dadaia/.venv/Scripts/dadaia.exe"
+    assert cli_line.fix_line(root, "doctor", "--fix") == (
+        f"Agent action: run {cli} doctor --fix, quoting {cli} for your shell"
     )
     monkeypatch.setattr("sys.executable", r"C:\my ws\python.exe")
     assert cli_line.mkdir_line(PureWindowsPath(r"C:\my ws\tmp")) == (
-        'C":/my ws/python.exe" -c "import pathlib; '
-        "pathlib.Path(r'C:/my ws/tmp').mkdir(parents=True, exist_ok=True)\""
+        'Agent action: run C:/my ws/python.exe -c "import pathlib; '
+        "pathlib.Path(r'C:/my ws/tmp').mkdir(parents=True, exist_ok=True)\", "
+        "quoting C:/my ws/python.exe for your shell"
     )
     assert (
         cli_line.shell_line("git", "-C", r"C:\ws\repos\app", "status")
         == "git -C C:/ws/repos/app status"
+    )
+
+
+@pytest.mark.parametrize("platform", ["linux", "win32"])
+def test_cli_line_renders_every_argv_as_the_kernel_does(
+    platform: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """One producer: the package's renderers are the kernel's `command`, an unspellable word's
+    Agent action included, so no argv is spelled two ways."""
+    caps = Capabilities.detect(platform)
+    monkeypatch.setattr("dadaia_workspace.core.platform.PLATFORM", caps)
+    owner = load_owner("dd-bug-resolution", "_platform")
+    kernel = owner.detect(platform)
+    for argv in (
+        ("git", "commit", "-m", "it's $HOME"),
+        ("uvx", "dadaia-workspace", "init", "C:/Users/Shared/Jo$x/my ws"),
+        ("C:/Program Files/x.exe", "a b"),
+    ):
+        assert cli_line.shell_line(*argv) == owner.command(*argv, caps=kernel)
+    assert cli_line.git_line(
+        "C:/Users/Shared/my ws", "commit", "-m", "it's $HOME"
+    ) == owner.command(
+        "git", "-C", "C:/Users/Shared/my ws", "commit", "-m", "it's $HOME", caps=kernel
     )
 
 

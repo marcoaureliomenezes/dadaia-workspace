@@ -8,7 +8,6 @@ import ast
 import functools
 import importlib.util
 import re
-import shlex
 import subprocess
 import sys
 from collections.abc import Callable
@@ -34,7 +33,7 @@ def test_cli_line_and_the_scripts_render_one_argv_as_one_line(
 ) -> None:
     """One argv through ``core/cli_line`` and the scripts' ``_platform`` and ``_specs``
     renders one line — a blank, a quote and a ``$`` included, the head's too."""
-    monkeypatch.setattr("sys.executable", str(tmp_path / "Program Files (x86)" / "python"))
+    monkeypatch.setattr("sys.executable", str(tmp_path / "py" / "python"))
     loader = importlib.util.spec_from_file_location(
         "_specs_pinned", _PUBLIC_SKILLS / "dd-bug-resolution" / "scripts" / "_specs.py"
     )
@@ -132,10 +131,8 @@ def _unresolved_paths(command: str) -> list[str]:
     """Every unquoted path token (a slash, no root list to go stale; a ``--flag=value`` carries it
     in the value) whose directory is neither tracked here nor guaranteed by the specs canon:
     a fix creates, edits or deletes its leaf, so only the directory holding it must exist."""
-    lexer = shlex.shlex(command, posix=False)
-    lexer.whitespace_split = True
     unresolved: list[str] = []
-    for raw in lexer:
+    for raw in command.split():
         token = _FLAG_VALUE_RE.sub("", raw.removeprefix(_REPO_ROOT.as_posix() + "/"))
         if raw == _VENV_PYTHON or token.startswith((".dadaia/", "'", '"', "-", ">", "&", "|")):
             continue  # the interpreter, the venv binary (the CLI arm), a quoted script
@@ -156,7 +153,7 @@ def test_every_doctor_fix_target_resolves_on_disk(codes: str, command: str) -> N
     by absolute path, whose subcommand takes ``--help``."""
     assert not _defect(command) and "<specs>" not in command, command
     assert _unresolved_paths(command) == [], f"{codes}: {command!r}"
-    tokens = shlex.split(command)
+    tokens = command.split()
     if command.startswith(fix_line(Path())):
         assert _cli_command(tokens[1:]), f"{codes}: no such verb: {command!r}"
     if "/scripts/" not in command:
