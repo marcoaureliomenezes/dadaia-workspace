@@ -291,7 +291,7 @@ def test_one_refused_line_among_passing_lines_refuses() -> None:
     assert not _ref_policy(lines, DEFAULT, {_WORK_REF: _C1}).allowed
 
 
-_AUDIT = ["specs/audits/20261016-x/AUDIT.md"]
+_AUDIT = ["audit"]
 _LINE = f"{_A} {_B} {_WORK_REF}"
 
 
@@ -302,8 +302,8 @@ def test_a_descendant_move_touching_only_audit_paths_passes() -> None:
 @pytest.mark.parametrize(
     "facts",
     [
-        pytest.param((True, ["src/core.py", "specs/audits/core.py"]), id="rename-into-audits"),
-        pytest.param((True, _AUDIT + ["src/core.py"]), id="audit-plus-code"),
+        pytest.param((True, ["repo", "audit"]), id="rename-into-audits"),
+        pytest.param((True, ["audit", "repo"]), id="audit-plus-code"),
         pytest.param((True, []), id="no-changed-path"),
         pytest.param((False, _AUDIT), id="non-descendant-audit-only-tree"),
     ],
