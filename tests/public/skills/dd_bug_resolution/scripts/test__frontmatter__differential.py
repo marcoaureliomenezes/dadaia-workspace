@@ -15,6 +15,7 @@ import json
 import re
 import shutil
 import subprocess
+import uuid
 from pathlib import Path
 
 import pytest
@@ -80,8 +81,8 @@ def test_every_inline_frontmatter_literal_of_the_suite_equals_safe_load_or_is_re
 
 
 def test_the_suite_walk_holds_no_untracked_file() -> None:
-    scratch = _ROOT / "tests/tmp/race-probe-differential"
-    scratch.mkdir(parents=True)
+    scratch = _ROOT / "tests/tmp" / f"race-probe-{uuid.uuid4().hex[:8]}"
+    scratch.mkdir(parents=True, exist_ok=True)
     try:
         (scratch / "test_gone.py").write_text("X = 1\n", encoding="utf-8")
         spec = importlib.util.spec_from_file_location("_differential_probe", Path(__file__))
@@ -89,7 +90,7 @@ def test_the_suite_walk_holds_no_untracked_file() -> None:
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
     finally:
-        shutil.rmtree(scratch)
+        shutil.rmtree(scratch, ignore_errors=True)
     assert scratch / "test_gone.py" not in module._TESTS
 
 
