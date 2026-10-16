@@ -23,9 +23,11 @@ sys.path[:0] = [
 ]
 
 import _findings
-import _jsonl
+import _ledger
 from _clock import now_iso as utc_now
 from _grammar import SHA_RE, STATE
+from _platform import Undecodable, read_text, use_utf8_stdio
+from _platform import replace as move
 from _refusal import Refusal, report
 from _release_check import ship_histo_findings
 from _release_new import new_release
@@ -40,6 +42,7 @@ from _release_schema import (
 from _release_store import (
     SCRIPT,
     Live,
+    at_head,
     commit,
     live_release,
     open_bug_ids,
@@ -105,8 +108,8 @@ def _new(args: argparse.Namespace, specs: Path) -> int:
 
 def _origin(spec: Path) -> int:
     try:
-        carried = origin(_jsonl.read_text(spec))
-    except _jsonl.Undecodable as bad:
+        carried = origin(read_text(spec))
+    except Undecodable as bad:
         report(bad, bad.fix)
         return 1
     except (OSError, ValueError) as error:
@@ -157,7 +160,7 @@ def _memory(args: argparse.Namespace, specs: Path) -> int:
     except drift.Refusal as refusal:
         raise Refusal(str(refusal), refusal.fix) from refusal
     if errors:
-        raise Refusal(errors[0], f"{SCRIPT} memory --help")
+        raise Refusal(errors[0], SCRIPT("memory", "--help"))
     commit(live.release_dir / STATE, f"releases/{live.release_id}/{STATE}",
            lambda state: {**state, "log": [*(state.get("log") or []), entry]})  # fmt: skip
     print(f"[ok] release {live.release_id} log <- kind memory {since}..{until[:12]} ({ts})")
@@ -223,14 +226,14 @@ def _record_ship(args: argparse.Namespace, specs: Path, live: Live, ts: str) -> 
                        "release": live.release_id, "reason": None, "entry": None,
                        "summary": None}) + "\n"  # fmt: skip
     histo = specs / HISTO
-    if errors := ship_histo_findings((_jsonl.read_text(histo) if histo.is_file() else "") + line):
+    kept = read_text(histo) if histo.is_file() else ""
+    if errors := ship_histo_findings(kept + line):
         raise Refusal(f"the ship ledger would not pass check: {errors[-1]['message']}",
-                      f"{SCRIPT} check")  # fmt: skip
+                      SCRIPT("check"))  # fmt: skip
     commit(live.release_dir / STATE, f"releases/{live.release_id}/{STATE}",
            lambda s: {**s, "shipped": {"sha": args.sha, "pr": int(args.pr) if args.pr else None, "ts": ts}})  # fmt: skip
-    with histo.open("a", encoding="utf-8") as ledger:
-        ledger.write(line)
-    live.release_dir.rename(specs / "releases" / "_archive" / live.release_id)
+    _ledger.replace(histo, kept + line)
+    move(live.release_dir, specs / "releases" / "_archive" / live.release_id)
 
 
 def _ship(args: argparse.Namespace, specs: Path) -> int:
@@ -238,9 +241,8 @@ def _ship(args: argparse.Namespace, specs: Path) -> int:
     moved to `_archive/<v>/`, never deleted; refused on any `ship_findings`."""
     live, ts = live_release(specs), utc_now()
     if not (SHA_RE.match(args.sha) and (args.pr is None or args.pr.isdigit() and int(args.pr) > 0)):
-        sha = args.sha if SHA_RE.match(args.sha) else "$(git rev-parse --short HEAD)"
         raise choice(Refusal(f"--sha {args.sha!r} / --pr {args.pr!r}: a hex sha and, if given, a PR number",
-                             f"{SCRIPT} ship --sha {sha}"), SHIP_PR)  # fmt: skip
+                             SCRIPT("ship", "--sha", args.sha) if SHA_RE.match(args.sha) else at_head(specs, "ship")), SHIP_PR)  # fmt: skip
     if found := ship_findings(specs):
         raise Refusal(found[0]["message"], found[0]["fix"])
     _refuse_unauthorized(_allowed_open_bugs(args, specs), live.state)
@@ -256,6 +258,7 @@ _VERBS = {"new": _new, "phase": _phase, "drift": _drift, "memory": _memory, "shi
 
 
 def main(argv: list[str] | None = None) -> int:
+    use_utf8_stdio()
     args = _parser().parse_args(argv)
     if args.verb == "origin":
         return _origin(args.spec)

@@ -11,9 +11,10 @@ from pathlib import Path
 import _clock
 from _grammar import SEMVER_RE, STATE, live_ids
 from _ledger import records, replace
+from _platform import command, is_link, write_text
 from _refusal import Refusal
 from _release_schema import next_candidate
-from _release_store import SCRIPT, State, read_state, validated
+from _release_store import SCRIPT, State, at_head, read_state, validated
 from _release_tree import BUG_WINDOW, tree_findings
 
 SPEC_STUB = """\
@@ -96,25 +97,25 @@ def refuse_unfree(specs: Path, release_id: str) -> State | None:
     if not SEMVER_RE.match(release_id):
         raise Refusal(
             f"{release_id!r} is not a bare SemVer release id (M.m.p)",
-            f"{SCRIPT} new 0.1.23",
+            SCRIPT("new", "0.1.23"),
         )
     releases, live = specs / "releases", live_ids(specs)
     release_dir = releases / release_id
     for path in (releases, release_dir, release_dir / STATE):
-        if path.is_symlink():
+        if is_link(path):
             raise Refusal(
                 f"{path.name} resolves through a symlink — refusing to mint through one",
-                f"ls -l {releases}",
+                command("ls", "-l", str(releases)),
             )
     if findings := tree_findings(specs):
         first = f"{findings[0]['path']} {findings[0]['message']}"
-        raise Refusal(f"a release opens only on a clean tree: {first}", f"{SCRIPT} check")
+        raise Refusal(f"a release opens only on a clean tree: {first}", SCRIPT("check"))
     others = [other for other in live if other != release_id]
     if others:
         raise Refusal(
             f"a live release already exists ({', '.join(others)}) — exactly one is allowed: "
             f"stack the next candidate on it, or ship {others[0]} first",
-            f"{SCRIPT} check",
+            SCRIPT("check"),
         )
     if release_id not in live:
         return None
@@ -123,7 +124,7 @@ def refuse_unfree(specs: Path, release_id: str) -> State | None:
         raise Refusal(
             f"release {release_id} is live in phase {prior.get('phase')!r} — the next "
             "candidate is stacked only on a closed one",
-            f"{SCRIPT} phase CLOSURE --sha $(git rev-parse --short HEAD)",
+            at_head(specs, "phase", "CLOSURE"),
         )
     return prior
 
@@ -142,8 +143,8 @@ def new_release(specs: Path, release_id: str, today: str, origin: str) -> Path:
     candidate.mkdir(parents=True, exist_ok=True)
     try:
         if not drafted:
-            spec.write_text(SPEC_STUB.format(release_id=release_id, today=today, origin=origin,
-                scope=seeded_scope(specs, origin), bug_window=BUG_WINDOW), encoding="utf-8")  # fmt: skip
+            write_text(spec, SPEC_STUB.format(release_id=release_id, today=today, origin=origin,
+                scope=seeded_scope(specs, origin), bug_window=BUG_WINDOW))  # fmt: skip
         replace(release_dir / STATE, text)
     except BaseException:
         if made:

@@ -13,9 +13,9 @@ from pathlib import Path
 from typing import Any
 
 import _findings
-import _jsonl
 import _ledger
 from _ledger import SPECS, load_schema, validate
+from _platform import read_text
 
 CODE = "LEDGER-FINDINGS-SCHEMA"
 AUDITS = "audits"
@@ -98,12 +98,12 @@ def check(specs: Path) -> list[Finding]:
             continue
         out.extend(
             live_findings(
-                _jsonl.read_text(path),
+                read_text(path),
                 f"{AUDITS}/{directory.name}/{FINDINGS}",
                 specs.resolve(),
             )
         )
     archive = specs / HISTO
     if archive.is_file():
-        out.extend(archive_findings(_jsonl.read_text(archive), specs.resolve()))
+        out.extend(archive_findings(read_text(archive), specs.resolve()))
     return out

@@ -2,7 +2,7 @@
 """The ONE write path onto the backlog files: read -> apply -> validate -> replace.
 
 Every write goes through :func:`commit`: build the candidate bytes, run the SAME `check`
-they will be validated by, then `os.replace` atomically. A concurrent write is detected
+they will be validated by, then an atomic replace. A concurrent write is detected
 by the file's own (size, mtime) and re-applied once — a race surfaces and retries.
 
 An exit is a removal plus an append: the PAIR is checked first, then the histo record is
@@ -21,6 +21,7 @@ import _jsonl
 from _backlog_check import pair_findings
 from _backlog_schema import HISTO, LEDGER
 from _ledger import private_refusal, replace
+from _platform import read_text
 from _refusal import Refusal
 from _specs import script
 
@@ -33,12 +34,12 @@ def read_active(path: Path) -> Items:
     read in full refuses the read rather than being silently rewritten without it."""
     if not path.is_file():
         return []
-    document = _jsonl.parse_object(_jsonl.read_text(path), f"{SCRIPT} check")
+    document = _jsonl.parse_object(read_text(path), SCRIPT("check"))
     active = document.get("active")
     if not isinstance(active, list):
         raise Refusal(
             f"{path.name} carries no 'active' array — it is not a backlog-v1 document",
-            f"{SCRIPT} check",
+            SCRIPT("check"),
         )
     return active
 
@@ -64,7 +65,7 @@ def commit(
             text,
             f"{LEDGER} + {HISTO}",
             lambda t: pair_findings(t, old + appended),
-            f"{SCRIPT} check",
+            SCRIPT("check"),
         )
 
     return _commit.commit(

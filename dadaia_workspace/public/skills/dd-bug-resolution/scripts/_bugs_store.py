@@ -41,7 +41,7 @@ def _validator(path: Path, rel: str) -> Callable[[Records, Records, str, Records
             _jsonl.serialize(written),
             rel,
             lambda text: findings_for(text, rel, known, path.parents[1]),
-            f"{script(Path(__file__).parent / 'bugs.py')} check",
+            script(Path(__file__).parent / "bugs.py")("check"),
         )
 
     return validate
@@ -70,5 +70,5 @@ def by_id(records: Records, bug_id: str) -> dict[str, Any]:
             return record
     raise Refusal(
         f"no bug record with id {bug_id!r} in this ledger",
-        f"{script(Path(__file__).parent / 'bugs.py')} status --all",
+        script(Path(__file__).parent / "bugs.py")("status", "--all"),
     )

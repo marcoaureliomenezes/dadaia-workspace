@@ -80,7 +80,7 @@ def close(specs: Path, audit: str, sha: str) -> str:
         raise choice(Refusal(f"audit {audit!r} still carries {len(open_ids)} undispositioned "
                      f"finding(s): {', '.join(open_ids)}. Every finding gets a disposition "
                      "before the audit closes",
-                     f"{SCRIPT} disposition {audit} {open_ids[0]}"),
+                     SCRIPT("disposition", audit, open_ids[0])),
                      "with the --disposition it earned and the evidence that requires")  # fmt: skip
     releases = sorted({str(r["release"]) for r in records if r.get("release")})
     if len(releases) > 1:
@@ -88,7 +88,9 @@ def close(specs: Path, audit: str, sha: str) -> str:
         raise Refusal(
             f"audit {audit!r} names {len(releases)} remediation releases "
             f"({', '.join(releases)}); an audit generates at most one",
-            f"{SCRIPT} disposition {audit} {other} --disposition resolved --release {releases[0]}",
+            SCRIPT(
+                "disposition", audit, other, "--disposition", "resolved", "--release", releases[0]
+            ),
         )
     pillars = Counter(str(record.get("pillar")) for record in records)
     verdicts = Counter(str(record.get("disposition")) for record in records)

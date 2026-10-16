@@ -28,6 +28,7 @@ sys.path[:0] = [
 import _audit_verbs as vb
 import _findings
 from _audit_check import DISPOSITIONS, check
+from _platform import use_utf8_stdio
 from _refusal import Refusal
 from _specs import find_specs, refuse
 
@@ -60,6 +61,7 @@ def _parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
+    use_utf8_stdio()
     args = _parser().parse_args(argv)
     specs = find_specs(args.specs)
     if args.verb == "check":

@@ -20,6 +20,7 @@ from _atomic import SymlinkRefusedError
 from _bugs_check import LEDGER, OPEN, STATUS_BY_VERB, check
 from _bugs_store import Refusal, commit, read_records
 from _git import GitError, git
+from _platform import use_utf8_stdio
 from _refusal import report
 from _specs import find_specs, refuse
 
@@ -137,6 +138,7 @@ def _write(args: argparse.Namespace, specs: Path) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
+    use_utf8_stdio()
     args = _parser().parse_args(argv)
     reads = args.verb in ("check", "status", "stats")
     specs = find_specs(args.specs, ledger=None if reads else f"specs/{LEDGER}")

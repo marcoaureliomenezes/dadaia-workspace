@@ -25,7 +25,7 @@ def parse_intents(raw: list[str] | None) -> list[dict[str, Any]]:
         if match is None or match.group("kind") not in KINDS:
             raise Refusal(
                 f"intent {item!r} is not '<kind>:<ref>=<change>' with kind in {list(KINDS)}",
-                f"{SCRIPT} new --help",
+                SCRIPT("new", "--help"),
             )
         intents.append(
             {

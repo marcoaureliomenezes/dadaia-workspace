@@ -11,9 +11,9 @@ from pathlib import Path
 from typing import Any
 
 import _git
-import _jsonl
 from _grammar import STATE, STATUS_RE, TASK_ID_RE, candidate_dir, candidate_number, sole_live
 from _ledger import load_schema
+from _platform import read_text
 
 CODE = "LEDGER-RELEASE-SCHEMA"
 HISTO = "releases/_archive/releases_histo.jsonl"
@@ -79,7 +79,7 @@ def live_id(specs: Path) -> str:
     release = script(Path(__file__).resolve().parent / "release.py")
     if (live := sole_live(specs)) is None:
         raise choice(UnreadableRelease("no live release under specs/releases/ — nothing to operate on",
-                                f"{release} new"), "with the release version you choose")  # fmt: skip
+                                release("new")), "with the release version you choose")  # fmt: skip
     return live
 
 
@@ -95,7 +95,7 @@ def releases(specs: Path) -> dict[str, tuple[_dt.datetime, _dt.datetime | None]]
     spans: dict[str, tuple[_dt.datetime, _dt.datetime | None]] = {}
     for path in [*(specs / "releases").glob(f"*/{STATE}"), *(specs / "releases/_archive").glob(f"*/{STATE}")]:  # fmt: skip
         try:
-            state = json.loads(_jsonl.read_text(path))
+            state = json.loads(read_text(path))
             shipped = (state.get("shipped") or {}).get("ts")
             spans[path.parent.name] = (
                 utc(state["log"][0]["ts"]),

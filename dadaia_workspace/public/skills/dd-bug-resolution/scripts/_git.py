@@ -4,9 +4,10 @@
 from __future__ import annotations
 
 import os
-import subprocess
 from collections.abc import Mapping
 from pathlib import Path
+
+from _platform import run
 
 #: `git rev-parse --local-env-vars` less the config injectors: what makes git answer for another repo. Identity, config and ssh are the caller's.
 _LOCAL = frozenset({
@@ -32,9 +33,7 @@ class GitError(RuntimeError):
 
 
 def git(repo: Path, *args: str, check: bool = True, input: str | None = None) -> str:
-    done = subprocess.run(
-        ["git", "-C", str(repo), *args], env=scrubbed_env(), capture_output=True, text=True, encoding="utf-8", errors="replace", input=input
-    )  # fmt: skip
+    done = run(["git", "-C", str(repo), *args], env=scrubbed_env(), input=input)
     if check and done.returncode:
         raise GitError(args, done.stderr.strip())
     return done.stdout

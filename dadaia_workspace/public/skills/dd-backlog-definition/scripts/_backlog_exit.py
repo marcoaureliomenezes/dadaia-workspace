@@ -9,7 +9,6 @@ exited must be told so rather than diagnosed for a status it no longer has.
 
 from __future__ import annotations
 
-import subprocess
 import sys
 from pathlib import Path
 from typing import Any
@@ -19,7 +18,7 @@ import _git
 from _backlog_schema import DISPOSITIONS
 from _backlog_store import SCRIPT, Items
 from _bugs_store import read_records
-from _platform import quote
+from _platform import command, run
 from _refusal import Refusal, fix_of
 
 #: `release.py`'s Origin parser, run as its own script: the one reader of the line.
@@ -30,11 +29,10 @@ _RELEASE = (
 
 def _origin_ids(spec: Path) -> list[str]:
     """The `backlog:` ids of *spec*'s first Origin line, as `release.py origin` prints them."""
-    done = subprocess.run([sys.executable, str(_RELEASE), "origin", str(spec)], env=_git.scrubbed_env(),
-                          capture_output=True, text=True, encoding="utf-8", errors="replace", check=False)  # fmt: skip
+    done = run([sys.executable, str(_RELEASE), "origin", str(spec)], env=_git.scrubbed_env())
     if done.returncode:
         lines = done.stderr.splitlines()
-        fix = fix_of(done.stderr, f"{sys.executable} {_RELEASE} origin {spec}")
+        fix = fix_of(done.stderr, command(sys.executable, str(_RELEASE), "origin", str(spec)))
         raise Refusal(f"Origin unreadable: {lines[0] if lines else done.returncode}", fix)
     return [ln[len("backlog ") :] for ln in done.stdout.splitlines() if ln.startswith("backlog ")]
 
@@ -66,8 +64,7 @@ def _reason(specs: Path, slug: str, disposition: str, reason: str | None) -> Non
     if not (reason or "").strip():
         raise Refusal(
             f"{disposition!r} requires --reason: the histo record is the only trace of why {slug!r} left",
-            f"Agent action: rerun `{SCRIPT} exit {slug} --disposition {disposition} --specs "
-            f"{quote(str(specs))}` with a "
+            f"Agent action: rerun `{SCRIPT.inline('exit', slug, '--disposition', disposition, specs=specs)}` with a "
             f"one-line --reason saying why {slug} is refused.",
         )  # fmt: skip
 
@@ -80,8 +77,8 @@ def _bug(specs: Path, slug: str, disposition: str, reason: str | None) -> None:
         raise Refusal(
             f"--reason {reason!r} names no record of {bugs}: `to-bug` hands {slug!r} to a registered bug",
             f"Operator action: confirm the bug {slug} becomes so it is registered with bugs.py append "
-            f"(dd-bug-registration), then rerun `{SCRIPT} exit {slug} --disposition {disposition} "
-            f"--specs {quote(str(specs))}` "
+            f"(dd-bug-registration), then rerun "
+            f"`{SCRIPT.inline('exit', slug, '--disposition', disposition, specs=specs)}` "
             "with its id as --reason.",
         )  # fmt: skip
 

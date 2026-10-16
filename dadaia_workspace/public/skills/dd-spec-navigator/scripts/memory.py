@@ -28,6 +28,7 @@ import _memory_catalog as cat
 import _memory_drift as dft
 from _memory_check import check
 from _memory_schema import INDEX
+from _platform import use_utf8_stdio, write_text
 from _refusal import Refusal
 from _specs import CATALOG, find_specs, refuse
 
@@ -52,8 +53,8 @@ def _parser() -> argparse.ArgumentParser:
 def _generate(specs: Path) -> str:
     """Rewrite BOTH generated files from the atoms — one act, no half-refresh."""
     catalog = cat.generate(specs)
-    (specs / CATALOG).write_text(cat.catalog_text(catalog), encoding="utf-8")
-    (specs / INDEX).write_text(cat.render(specs, catalog), encoding="utf-8")
+    write_text(specs / CATALOG, cat.catalog_text(catalog))
+    write_text(specs / INDEX, cat.render(specs, catalog))
     count = len(catalog["features"])
     return f"[ok] {CATALOG} and {INDEX} written ({count} feature{'s' if count != 1 else ''})"
 
@@ -66,6 +67,7 @@ def _drift(args: argparse.Namespace, specs: Path) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
+    use_utf8_stdio()
     args = _parser().parse_args(argv)
     reads = args.verb in ("check", "drift")
     specs = find_specs(args.specs, ledger=None if reads else "specs/memory/product/catalog.json")

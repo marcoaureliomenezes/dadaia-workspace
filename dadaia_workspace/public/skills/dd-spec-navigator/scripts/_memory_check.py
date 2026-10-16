@@ -13,11 +13,11 @@ from pathlib import Path
 from typing import Any
 
 import _findings
-import _jsonl
 import _memory_catalog as cat
 from _memory_schema import CODE, INDEX
+from _platform import Undecodable, read_text
 from _refusal import Refusal
-from _specs import CATALOG, script, with_specs
+from _specs import CATALOG, script
 
 Finding = dict[str, Any]
 
@@ -27,7 +27,7 @@ def check(specs: Path) -> list[Finding]:
     """The catalog and index as they would be regenerated, against what is on disk."""
     try:
         catalog = cat.generate(specs)
-    except _jsonl.Undecodable:
+    except Undecodable:
         raise  # `decodable` names the file; it is no atom or catalog fault
     except (Refusal, json.JSONDecodeError) as exc:  # the missing tree's fix makes it
         fix = getattr(exc, "fix", "")
@@ -44,13 +44,13 @@ def check(specs: Path) -> list[Finding]:
         path = specs / name
         if not path.is_file():
             out.append({"path": name, "line": 0, "message": f"{path.name} does not exist"})
-        elif _jsonl.read_text(path) != rendered:
+        elif read_text(path) != rendered:
             out.append({
                 "path": name, "line": 0,
                 "message": f"{path.name} does not match the atoms it is generated from",
             })  # fmt: skip
-    fix = with_specs(
-        f"{script(Path(__file__).with_name('memory.py'))} catalog generate", specs.resolve()
+    fix = script(Path(__file__).with_name("memory.py"))(
+        "catalog", "generate", specs=specs.resolve()
     )
     for finding in out:  # the pair is regenerated, never hand-fixed: the fix line clears it
         finding |= {"code": CODE, "verdict": "error", "fix": fix}

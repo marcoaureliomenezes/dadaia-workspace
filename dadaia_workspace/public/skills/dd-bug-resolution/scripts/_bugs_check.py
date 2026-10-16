@@ -18,9 +18,9 @@ import _git
 import _jsonl
 import _ledger
 from _grammar import HISTORICAL_TASK_RE, TASK_ID_RE
-from _platform import git_line, quote
+from _platform import git_line, read_text
 from _root import STATES as _STATES
-from _specs import script, with_specs
+from _specs import script
 
 CODE = "LEDGER-BUGS-SCHEMA"
 LEDGER = "bugs/BUGS.jsonl"
@@ -75,7 +75,7 @@ def tasks(root: Path) -> set[str]:
     `tasks/*.md`: the id at the head of each checklist item or table cell, in either grammar,
     plus every table cell that is a current-grammar id."""
     files = [*root.glob("releases/**/TASKS.md"), *root.glob("releases/**/tasks/*.md")]
-    lines = [ln for file in files for ln in _jsonl.read_text(file).splitlines()]
+    lines = [ln for file in files for ln in read_text(file).splitlines()]
     found = {m[1] for ln in lines if (m := HISTORICAL_TASK_RE.match(ln))}
     return found | {
         c for ln in lines for p in ln.split("|") if TASK_ID_RE.fullmatch(c := p.strip())
@@ -128,9 +128,8 @@ def findings_for(
             bugs = script(Path(__file__).with_name("bugs.py"))
             fixes[seen[bug_id]] = (  # a cycle's wrong link is a judgement; a dangling one is not
                 f"Agent action: decide which of {', '.join(chain)} names the wrong cause and "
-                f"set its caused_by to the real cause's id, or none, through `{bugs} update "
-                f"--specs {quote(str(root))}` ({_LAW})" if at == bug_id
-                else with_specs(f"{bugs} update {quote(bug_id)} --set caused_by=none", root)
+                f"set its caused_by to the real cause's id, or none, through `{bugs.inline('update', specs=root)}` ({_LAW})" if at == bug_id
+                else bugs("update", bug_id, "--set", "caused_by=none", specs=root)
             )  # fmt: skip
     return [
         _findings.finding(CODE, rel, n, "; ".join(m),
@@ -170,7 +169,7 @@ def _associated(specs: Path) -> list[Path]:
     main = Path(_git.git(specs.parent, "rev-parse", "--path-format=absolute", "--git-common-dir", check=False).strip()).parent  # fmt: skip
     root = main.parent.parent
     try:
-        rows = json.loads(_jsonl.read_text(root / _STATES / "spec_contexts.json"))["contexts"]
+        rows = json.loads(read_text(root / _STATES / "spec_contexts.json"))["contexts"]
         slugs = [a["slug"] for r in rows if r.get("repo_slug") == main.name for a in r["associated_repos"]]  # fmt: skip
     except (OSError, ValueError, LookupError, TypeError):
         return []
@@ -193,7 +192,7 @@ def _unreached(specs: Path, text: str, root: Path) -> list[dict[str, Any]]:
         _findings.finding(
             CODE, LEDGER, n, f"{r['id']!r} fix_sha {r['fix_sha']} is no ancestor of HEAD of {', '.join(p.name for p in repos)}",
             "Agent action: find the fix commit's sha in git log and run "
-            f"`{with_specs(f'{update} update {quote(r['id'])} --set fix_sha=SHA', root)}`",
+            f"`{update.inline('update', r['id'], '--set', 'fix_sha=SHA', specs=root)}`",
         )
         for n, r in missed
     ]  # fmt: skip
@@ -204,8 +203,8 @@ def check(specs: Path) -> list[dict[str, Any]]:
     """Validate the committed ledger and its archive; a young specs tree with neither is
     not a finding. A merge can join two valid writes into a cycle: check re-judges."""
     ledger, histo = specs / LEDGER, specs / HISTO
-    text = _jsonl.read_text(ledger) if ledger.is_file() else ""
-    archived = _jsonl.read_text(histo) if histo.is_file() else ""
+    text = read_text(ledger) if ledger.is_file() else ""
+    archived = read_text(histo) if histo.is_file() else ""
     root = specs.resolve()
     unreached = _unreached(specs, text, root)
     return sorted(

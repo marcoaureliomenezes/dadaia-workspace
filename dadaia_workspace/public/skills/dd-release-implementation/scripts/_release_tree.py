@@ -14,11 +14,10 @@ from pathlib import Path
 from typing import Any
 
 import _findings
-import _jsonl
 import _memory_drift as drift
 from _grammar import SEMVER_RE, SHA_RE, STATE, sole_live
 from _ledger import records
-from _platform import quote
+from _platform import read_text
 from _refusal import Refusal
 from _release_check import candidate_errors, ship_histo_findings, state_findings
 from _release_phase import NEXT
@@ -34,8 +33,8 @@ from _release_schema import (
     origin,
     origin_line,
 )
-from _release_store import SCRIPT, Live, live_release
-from _specs import script, with_specs
+from _release_store import SCRIPT, Live, at_head, live_release
+from _specs import script
 
 __all__ = ["check", "drift", "memory_errors", "ship_findings", "tree_findings"]
 
@@ -43,9 +42,9 @@ _SKILLS = Path(__file__).resolve().parents[2]
 #: The verb writing a LIVE record's pointer back to the release (`{i}` the id, `{r}` it).
 _POINTER = {
     "backlog": ("dd-backlog-definition/scripts/backlog.py",
-                "exit {i} --disposition delivered --release {r}"),
+                ("exit", "{i}", "--disposition", "delivered", "--release", "{r}")),
     "findings": ("dd-audit-project/scripts/audit.py",
-                 "disposition {a} {i} --disposition resolved --release {r}"),
+                 ("disposition", "{a}", "{i}", "--disposition", "resolved", "--release", "{r}")),
 }  # fmt: skip
 #: The one operator act for a record no verb can point back alone (no placeholder).
 _ACT = {
@@ -66,7 +65,7 @@ def _trace(
     its closed audit's record), ``untraced`` while it does not yet, else why it is wrong;
     ``live`` when a verb can still write its pointer (an active entry, an open audit's finding)."""
     document = specs / "backlog" / "BACKLOG.json"
-    active = json.loads(_jsonl.read_text(document)) if document.is_file() else {}
+    active = json.loads(read_text(document)) if document.is_file() else {}
     exits = records(specs / "backlog/_archive/backlog_histo.jsonl")
     bugs = {r.get("id"): r for p in ("BUGS.jsonl", "_archive/bugs_histo.jsonl")
             for r in records(specs / "bugs" / p)}  # fmt: skip
@@ -139,10 +138,10 @@ def _origin_row(
     rel, message = spec.relative_to(specs).as_posix(), f"Origin {kind}:{i} {standing}"
     if standing == "traced" or (standing == "untraced" and not swept):
         return _findings.info(CODE, rel, line, message)
-    values = {"i": quote(i), "a": quote(i.rpartition("-F")[0]), "r": live.release_id}
+    values = {"i": i, "a": i.rpartition("-F")[0], "r": live.release_id}
     if standing == "untraced" and writable:
         skill, verb = _POINTER[kind]
-        fix = with_specs(f"{script(_SKILLS / skill)} {verb.format(**values)}", specs)
+        fix: str = script(_SKILLS / skill)(*(w.format(**values) for w in verb), specs=specs)
     elif standing == "untraced":
         fix = f"Agent action: {_ACT[kind].format(**values)}, or rule it out of the Origin line of {spec}."
     else:
@@ -160,7 +159,7 @@ def _origin_findings(specs: Path) -> list[dict[str, Any]]:
     spec = live.candidate / "SPEC.md" if live.candidate else None
     if spec is None or not spec.is_file():
         return []
-    text, rel = _jsonl.read_text(spec), spec.relative_to(specs).as_posix()
+    text, rel = read_text(spec), spec.relative_to(specs).as_posix()
     out, line = _window_findings(spec, text, live.state, rel), origin_line(text)
     try:
         rows = _trace(
@@ -187,7 +186,7 @@ def _definition_findings(
     try:  # `defined` is the commit that approved the SPEC and PLAN, never HEAD: impl commits follow it
         docs = [str(candidate / n) for n in ("SPEC.md", "PLAN.md")]
         sha = drift.git(specs.parent, "log", "-1", "--format=%h", "--", *docs)[0]
-        fix = with_specs(f"{SCRIPT} {NEXT['DEFINITION']} --sha {sha}", specs)
+        fix: str = SCRIPT(*NEXT["DEFINITION"].split(), "--sha", sha, specs=specs)
     except (drift.Refusal, OSError, IndexError):  # no history, no git binary
         fix = f"Agent action: run `{NEXT['DEFINITION']}` at the commit approving {candidate}"
     return [_findings.finding(CODE, rel, 1, "; ".join(found), fix)]
@@ -200,7 +199,7 @@ def _directory_findings(release_dir: Path, specs: Path) -> list[dict[str, Any]]:
     if not path.is_file():
         return [_findings.finding(CODE, dir_rel, 1, f"release directory carries no {STATE}", f"Agent action: "
                         f"restore {path} from git history, or move {release_dir} out of specs/")]  # fmt: skip
-    text = _jsonl.read_text(path)
+    text = read_text(path)
     if findings := state_findings(text, f"{dir_rel}/{STATE}", specs.resolve()):
         return findings
     state = json.loads(text)
@@ -256,8 +255,8 @@ def _memory_findings(specs: Path) -> list[dict[str, Any]]:
         return []
     message = (f"release is in CLOSURE with no `kind: memory` log entry stamped at or after "
                f"implemented.ts {stamp!r} — the closure reconciled no memory")  # fmt: skip
-    fix = (f"Agent action: run `{with_specs(f'{SCRIPT} drift', specs)}`, judge its worklist, then run "
-           f"`{with_specs(f'{SCRIPT} memory', specs)}` with the atom slugs the memory pass reviewed as "
+    fix = (f"Agent action: run `{SCRIPT.inline('drift', specs=specs)}`, judge its worklist, then run "
+           f"`{SCRIPT.inline('memory', specs=specs)}` with the atom slugs the memory pass reviewed as "
            "--reviewed and changed as --changed")  # fmt: skip
     return [_findings.finding(CODE, f"releases/{live.release_id}/{STATE}", 1, message, fix)]
 
@@ -279,12 +278,12 @@ def tree_findings(specs: Path) -> list[dict[str, Any]]:
     except Refusal as several:
         findings.append(_findings.finding(CODE, "releases", 1, str(several), several.fix))
     if (specs / HISTO).is_file():
-        findings += ship_histo_findings(_jsonl.read_text(specs / HISTO), specs.resolve())
+        findings += ship_histo_findings(read_text(specs / HISTO), specs.resolve())
     for path in sorted(releases.glob(f"_archive/*/{STATE}")):
         # An archived state names its ship.
         rel, act = path.relative_to(specs).as_posix(), f"rewrite {path.resolve()} as one JSON "
         try:
-            state = json.loads(_jsonl.read_text(path))
+            state = json.loads(read_text(path))
         except json.JSONDecodeError as error:
             findings.append(_findings.finding(CODE, rel, 1, f"archived state is not valid JSON: {error}",
                                     f"Agent action: {act}object, from git history"))  # fmt: skip
@@ -314,7 +313,7 @@ def ship_findings(specs: Path) -> list[dict[str, Any]]:
     if phase != "CLOSURE":
         found.append(_findings.finding(CODE, rel, 1, f"release {live.release_id} is in phase {phase!r} — "
                      "only a CLOSURE release ships",
-                     f"{SCRIPT} {NEXT.get(phase, 'check')} --sha $(git rev-parse --short HEAD)"))  # fmt: skip
+                     at_head(specs, *NEXT.get(phase, "check").split())))  # fmt: skip
     if (archive := specs / "releases" / "_archive" / live.release_id).exists():
         found.append(_findings.finding(CODE, rel, 1, f"release {live.release_id} is live and already "
                      f"archived at {archive}", f"Agent action: decide which of "

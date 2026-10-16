@@ -33,7 +33,7 @@ def transition(
     evidence remains in git and tests."""
     missing = [name for name in REQUIRED_BY_VERB[verb] if not (values.get(name) or "").strip()]
     if missing:
-        raise choice(Refusal(f"transition {verb!r} refused — {', '.join(map(repr, missing))} required"),
+        raise choice(Refusal(f"transition {verb!r} refused — {', '.join(repr(m) for m in missing)} required"),
                      f"with {', '.join('--' + m.replace('_', '-') for m in missing)} set")  # fmt: skip
     record = by_id(records, bug_id)
     updated = dict(record)

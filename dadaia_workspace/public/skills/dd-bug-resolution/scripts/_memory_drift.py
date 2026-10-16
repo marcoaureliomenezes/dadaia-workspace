@@ -18,10 +18,9 @@ from pathlib import Path
 from typing import Any
 
 import _git
-import _jsonl
-from _platform import git_line
+from _platform import git_line, read_text
 from _refusal import Refusal as Refusal
-from _specs import CATALOG, script, with_specs
+from _specs import CATALOG, script
 
 NOT_CODE = frozenset({"specs", "tests", "test", "docs"})
 
@@ -72,9 +71,9 @@ def report(specs: Path, since: str, until: str = "HEAD") -> dict[str, Any]:
         ).strip():
             raise Refusal(f"{bound} is not in this clone", git_line(repo, "fetch", "origin", bound))
         raise Refusal(f"{bound} is not an ancestor of HEAD — a clone of this branch lacks it (a rebase rewrote it)",
-                      with_specs(f"{script(Path(__file__).parents[2] / 'dd-spec-navigator' / 'scripts' / 'memory.py')} drift "
-                                 f"--since {_root(repo)}", specs))  # fmt: skip
-    catalog = json.loads(_jsonl.read_text(specs / CATALOG))
+                      script(Path(__file__).parents[2] / "dd-spec-navigator" / "scripts" / "memory.py")(
+                          "drift", "--since", _root(repo), specs=specs))  # fmt: skip
+    catalog = json.loads(read_text(specs / CATALOG))
     changed = git(repo, "diff", "--name-only", f"{since}..{until}")
     return {"since": since, **worklist(catalog, changed, git(repo, "ls-files"))}
 

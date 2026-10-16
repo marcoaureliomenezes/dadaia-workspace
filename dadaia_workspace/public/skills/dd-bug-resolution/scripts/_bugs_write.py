@@ -74,11 +74,11 @@ def _set(record: dict[str, Any], key: str, value: Any) -> None:
         raise Refusal(
             f"bug-record field {key!r} is write-once and already set — a second write "
             "with a different value is refused",
-            f"{_SCRIPT} status --all",
+            _SCRIPT("status", "--all"),
         )
     if key in CORE and record.get(key) != value:
         raise choice(Refusal(f"bug-record field {key!r} is immutable-core and cannot be changed",
-                     f"{_SCRIPT} append"),
+                     _SCRIPT("append")),
                      "with a new --bug-id, filing the changed value as a new record")  # fmt: skip
     record[key] = value
 
@@ -96,10 +96,10 @@ def apply_update(records: Records, bug_id: str, changes: dict[str, str]) -> Reco
             )
             raise choice(Refusal(f"bug-record field {key!r} is written only by {verb}"
                          + "".join(f", {t}" for t in twins),
-                         f"{_SCRIPT} {verb} {bug_id}"),
+                         _SCRIPT(verb, bug_id)),
                          f"or its {', '.join(twins)} twin, {hint}" if twins else hint)  # fmt: skip
         if key not in _MUTABILITY:
-            raise Refusal(f"unknown bug-record field {key!r}", f"{_SCRIPT} update --help")
+            raise Refusal(f"unknown bug-record field {key!r}", _SCRIPT("update", "--help"))
     record = by_id(records, bug_id)
     updated = dict(record)
     for key, value in changes.items():
@@ -115,7 +115,7 @@ def _parsed(key: str, value: str) -> Any:
         return json.loads(value)
     except json.JSONDecodeError as exc:
         raise Refusal(
-            f"--set {key}= must be a JSON object ({exc.msg})", f"{_SCRIPT} update --help"
+            f"--set {key}= must be a JSON object ({exc.msg})", _SCRIPT("update", "--help")
         ) from None
 
 
@@ -124,7 +124,7 @@ def archive(records: Records, ids: list[str]) -> Records:
     moving = [by_id(records, bug_id) for bug_id in ids]
     if still := [str(r["id"]) for r in moving if r.get("status") not in TERMINAL]:
         raise Refusal(f"{', '.join(still)} still open — only a terminal record is archived",
-                      f"{_SCRIPT} status")  # fmt: skip
+                      _SCRIPT("status"))  # fmt: skip
     return [r for r in records if r not in moving]
 
 
@@ -134,6 +134,6 @@ def parse_set_options(raw: list[str]) -> dict[str, str]:
     for item in raw:
         field, sep, value = item.partition("=")
         if not sep or not field.strip():
-            raise Refusal(f"--set {item!r} must be 'field=value'", f"{_SCRIPT} update --help")
+            raise Refusal(f"--set {item!r} must be 'field=value'", _SCRIPT("update", "--help"))
         changes[field.strip()] = value
     return changes

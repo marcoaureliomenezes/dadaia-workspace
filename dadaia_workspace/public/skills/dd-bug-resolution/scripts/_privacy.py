@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any, NamedTuple
 
 import _jsonl
+from _platform import Undecodable, read_text
 from _refusal import Refusal
 
 __all__ = [
@@ -183,9 +184,9 @@ def load_baseline() -> tuple[BaselinePattern, ...]:
     naming the row."""
     path = Path(__file__).with_name("privacy_baseline.json")
     try:
-        rows = json.loads(_jsonl.read_text(path))["patterns"]
+        rows = json.loads(read_text(path))["patterns"]
         return tuple(_pattern(row, number) for number, row in enumerate(rows, start=1))
-    except (OSError, ValueError, LookupError, TypeError, _jsonl.Undecodable) as exc:
+    except (OSError, ValueError, LookupError, TypeError, Undecodable) as exc:
         raise Refusal(
             f"privacy baseline {path} is unreadable ({exc}) — no pattern was applied",
             _jsonl.reinstall_fix(path),

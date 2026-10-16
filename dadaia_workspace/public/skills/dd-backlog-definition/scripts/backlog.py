@@ -32,6 +32,7 @@ import _jsonl
 from _backlog_check import check
 from _backlog_schema import DISPOSITIONS, HISTO, LEDGER
 from _backlog_store import commit, read_active
+from _platform import use_utf8_stdio
 from _refusal import Refusal
 from _specs import find_specs, refuse
 
@@ -83,6 +84,7 @@ def _exit(args: argparse.Namespace, specs: Path) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
+    use_utf8_stdio()
     args = _parser().parse_args(argv)
     specs = find_specs(args.specs, ledger=None if args.verb == "check" else f"specs/{LEDGER}")
     if args.verb == "check":

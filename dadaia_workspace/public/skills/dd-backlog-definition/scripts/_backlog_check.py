@@ -27,6 +27,7 @@ from _backlog_schema import (
     TERMINAL,
 )
 from _ledger import SPECS, load_schema, validate
+from _platform import read_text
 
 
 def _fix(path: str, at: int | str, root: Path) -> str:
@@ -103,7 +104,7 @@ def histo_findings(text: str, root: Path = SPECS) -> list[dict[str, Any]]:
 @_findings.decodable(CODE)
 def check(specs: Path) -> list[dict[str, Any]]:
     """Validate both committed files; a young specs tree with neither is not a finding."""
-    document, histo = (_jsonl.read_text(p) if p.is_file() else "" for p in (specs / LEDGER, specs / HISTO))  # fmt: skip
+    document, histo = (read_text(p) if p.is_file() else "" for p in (specs / LEDGER, specs / HISTO))  # fmt: skip
     return pair_findings(document or None, histo, specs.resolve())
 
 

@@ -3,7 +3,7 @@
 
 `disposition` rewrites one finding's governance triple in the FINDINGS.jsonl it lives
 in; `close` appends one record to the archive and deletes the directory. Both build the
-candidate bytes, run the SAME `check` they will be validated by, then `os.replace`.
+candidate bytes, run the SAME `check` they will be validated by, then an atomic replace.
 """
 
 from __future__ import annotations
@@ -15,6 +15,7 @@ import _commit
 import _jsonl
 from _audit_check import AUDITS, FINDINGS, HISTO, archive_findings, live_findings
 from _ledger import replace
+from _platform import read_text
 from _refusal import Refusal
 from _specs import script
 
@@ -48,13 +49,13 @@ def audit_dir(specs: Path, audit: str, fix: str) -> Path:
 def read_findings(directory: Path) -> list[dict[str, Any]]:
     """Every record of *directory*'s FINDINGS.jsonl, refused unless the document passes
     the same check every write runs — no verb writes the pair from an invalid document."""
-    text = _jsonl.read_text(directory / FINDINGS)
+    text = read_text(directory / FINDINGS)
     problems = live_findings(text, f"{AUDITS}/{directory.name}/{FINDINGS}")
     if problems:
         raise Refusal(
             f"specs/{AUDITS}/{directory.name}/{FINDINGS} line {problems[0]['line']} does not "
             f"pass check ({problems[0]['message']}) — nothing was written",
-            f"{SCRIPT} check",
+            SCRIPT("check"),
         )
     return _jsonl.load(text)
 
@@ -65,7 +66,7 @@ def write_findings(directory: Path, records: list[dict[str, Any]]) -> None:
     rel = f"{AUDITS}/{directory.name}/{FINDINGS}"
     replace(
         directory / FINDINGS,
-        _commit.validated(text, FINDINGS, lambda t: live_findings(t, rel), f"{SCRIPT} check"),
+        _commit.validated(text, FINDINGS, lambda t: live_findings(t, rel), SCRIPT("check")),
     )
 
 
@@ -73,7 +74,7 @@ def append_histo(specs: Path, record: dict[str, Any]) -> None:
     """Append one validated terminal record to the append-only archive. The record is
     validated ALONE — a pre-v6 line already in the file is history, not this write's
     business."""
-    line = _commit.validated(_jsonl.serialize([record]), HISTO, archive_findings, f"{SCRIPT} check")
+    line = _commit.validated(_jsonl.serialize([record]), HISTO, archive_findings, SCRIPT("check"))
     path = specs / HISTO
-    existing = _jsonl.read_text(path) if path.is_file() else ""
+    existing = read_text(path) if path.is_file() else ""
     replace(path, existing + line)

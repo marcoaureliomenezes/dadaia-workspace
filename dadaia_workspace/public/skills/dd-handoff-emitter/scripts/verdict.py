@@ -6,7 +6,6 @@ from __future__ import annotations
 import argparse
 import json
 import re
-import subprocess
 import sys
 from pathlib import Path
 
@@ -21,6 +20,7 @@ import _root
 from _git import scrubbed_env
 from _grammar import CONTEXT_NAME_RE
 from _handoffs import REVIEWER, reviewer_records
+from _platform import run, use_utf8_stdio, write_text
 from _refusal import Refusal, fix_of, report
 from _specs import run_cli
 
@@ -100,6 +100,7 @@ def _stats(argv: list[str]) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
+    use_utf8_stdio()
     try:
         return _run(sys.argv[1:] if argv is None else argv)
     except Refusal as refusal:
@@ -127,11 +128,7 @@ def _run(argv: list[str]) -> int:
             )
     tree = Path(args.path).resolve()
     body = _body(sys.stdin.read())
-    done = subprocess.run(
-        [sys.executable, str(_WORKTREE), "hash", str(tree), "--sha", args.sha],
-        capture_output=True,
-        text=True, encoding="utf-8", errors="replace",
-    )  # fmt: skip
+    done = run([sys.executable, str(_WORKTREE), "hash", str(tree), "--sha", args.sha])
     if done.returncode:
         sys.stderr.write(done.stderr)
         return done.returncode
@@ -154,8 +151,8 @@ def _run(argv: list[str]) -> int:
     out.mkdir(parents=True, exist_ok=True)
     target = out / f"{now.replace(':', '')}-{REVIEWER}-{args.slug}.handoff.json"
     try:
-        with target.open("x", encoding="utf-8") as fh:
-            fh.write(json.dumps(handoff, indent=2) + "\n")
+        target.touch(exist_ok=False)
+        write_text(target, json.dumps(handoff, indent=2) + "\n")
     except FileExistsError:
         raise Refusal(
             f"{target.name} exists; rerun in a second",

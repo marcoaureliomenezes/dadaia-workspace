@@ -19,6 +19,8 @@ import json
 import re
 from typing import Any, NamedTuple
 
+from _platform import decode
+
 __all__ = ["NotAMapping", "parse", "split"]
 
 _SPLIT = re.compile(r"\A---[ \t]*\n(.*?)\n---[ \t]*\n?", re.DOTALL)
@@ -43,7 +45,7 @@ class NotAMapping(ValueError):
 
 def split(text: str) -> tuple[str, str] | None:
     """``(block, body)`` of the leading ``---`` block of *text*, or ``None``."""
-    text = text.removeprefix("﻿").replace("\r\n", "\n")
+    text = decode(text.encode())  # callers pass read_text output; a lone surrogate would raise
     match = _SPLIT.match(text)
     return (match.group(1), text[match.end() :]) if match else None
 

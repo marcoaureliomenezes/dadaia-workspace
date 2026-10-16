@@ -18,7 +18,7 @@ import _jsonl
 import _privacy
 from _commit import stamp as stamp
 from _findings import finding as finding
-from _platform import git_line
+from _platform import Undecodable, git_inline, read_text
 from _refusal import report
 from _root import STATES as _STATES
 from _root import workspace_of as workspace_of
@@ -49,7 +49,7 @@ def load_schema(name: str) -> dict[str, Any]:
         path = _HERE.parents[1] / _SCHEMA_OWNERS[name] / "scripts" / "schemas" / file
     else:
         path = next((_HERE.parents[2] / "schemas").rglob(file), _HERE / "schemas" / file)
-    return dict(json.loads(_jsonl.read_text(path, _jsonl.reinstall_fix(path))))
+    return dict(json.loads(read_text(path, _jsonl.reinstall_fix(path))))
 
 
 def _combinators(value: object, spec: dict[str, Any], root: dict[str, Any], where: str) -> Any:
@@ -140,11 +140,11 @@ def unwritten(file: Path, at: int | str, verbs: str, law: str) -> str:
     line one commit owns, so its commits are listed whole."""
     if isinstance(at, int):
         what = f"line {at} of {file} was not written by {verbs} ({law})"
-        log = git_line(file.parent, "log", "-L", f"{at},{at}:{file.name}")
+        log = git_inline(file.parent, "log", "-L", f"{at},{at}:{file.name}")
         finder = f"`{log}` finds it"
     else:
         what = f"{file} fails at {at} ({law})"
-        finder = f"`{git_line(file.parent, 'log', '-p', '--', file.name)}` lists them"
+        finder = f"`{git_inline(file.parent, 'log', '-p', '--', file.name)}` lists them"
     return (f"Agent action: {what} — revert the commit that introduced it ({finder}), or delete "
             f"the line if you wrote it and it is still uncommitted, then redo the change through {verbs}")  # fmt: skip
 
@@ -166,8 +166,8 @@ def terms(root: Path | None) -> list[tuple[str, str]]:
         if not path.exists():
             continue
         try:
-            raw = json.loads(_jsonl.read_text(path))
-        except (OSError, ValueError, _jsonl.Undecodable):
+            raw = json.loads(read_text(path))
+        except (OSError, ValueError, Undecodable):
             raw = None
         if not isinstance(raw, dict):
             report(

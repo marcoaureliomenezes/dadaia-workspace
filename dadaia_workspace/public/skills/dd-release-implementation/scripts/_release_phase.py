@@ -8,15 +8,14 @@ and its milestone move in one act, so they cannot disagree.
 from __future__ import annotations
 
 import json
-import subprocess
 import sys
 from pathlib import Path
 from typing import Any
 
 import _clock
 import _git
-import _jsonl
 from _grammar import SHA_RE, STATE
+from _platform import command, read_text, run
 from _refusal import Refusal, fix_of
 from _release_check import candidate_errors
 from _release_schema import (
@@ -28,7 +27,7 @@ from _release_schema import (
     PHASES,
     extract_status,
 )
-from _release_store import SCRIPT, Live, State, commit, live_release
+from _release_store import SCRIPT, Live, State, at_head, commit, live_release
 from _specs import choice
 
 #: DEFINITION is `new`'s; each later phase has one predecessor (out-of-order = re-run).
@@ -47,7 +46,7 @@ def _refuse_unapproved_docs(live: Live) -> Path:
                 f"release {live.release_id} has no {document.relative_to(live.release_dir).as_posix()}",
                 f"Operator action: write {document.resolve()} carrying '**Status:** {APPROVED}'",
             )
-        status = extract_status(_jsonl.read_text(document))
+        status = extract_status(read_text(document))
         if status != APPROVED:
             raise Refusal(
                 f"{document.relative_to(live.release_dir).as_posix()} of release {live.release_id} "
@@ -61,11 +60,10 @@ def _refuse_unapproved_docs(live: Live) -> Path:
 def _worktree_rows(root: Path) -> list[dict[str, Any]]:
     """The rows of `worktree.py list --json`, the worktrees' one owner, run as its own script."""
     owner = Path(__file__).resolve().parents[2] / "dd-gitflow-default" / "scripts" / "worktree.py"
-    done = subprocess.run([sys.executable, str(owner), "list", "--json"], cwd=root, env=_git.scrubbed_env(),
-                          capture_output=True, text=True, encoding="utf-8", errors="replace", check=False)  # fmt: skip
+    done = run([sys.executable, str(owner), "list", "--json"], cwd=root, env=_git.scrubbed_env())
     if done.returncode:
         lines = done.stderr.splitlines()
-        fix = fix_of(done.stderr, f"{sys.executable} {owner} list")
+        fix = fix_of(done.stderr, command(sys.executable, str(owner), "list"))
         raise Refusal(f"worktree rows unreadable: {lines[0] if lines else done.returncode}", fix)
     rows: list[dict[str, Any]] = json.loads(done.stdout)
     return rows
@@ -108,7 +106,7 @@ def set_phase(specs: Path, phase: str, sha: str) -> tuple[str, str]:
     if not SHA_RE.match(sha):
         raise Refusal(
             f"--sha {sha!r} is not a 7-40 character lowercase hex commit sha",
-            f"{SCRIPT} phase {phase} --sha $(git rev-parse --short HEAD)",
+            at_head(specs, "phase", phase),
         )
     live = live_release(specs)
     current = str(live.state.get("phase"))
@@ -116,7 +114,7 @@ def set_phase(specs: Path, phase: str, sha: str) -> tuple[str, str]:
         refusal = Refusal(
             f"release {live.release_id} is in phase {current!r} — `phase` writes "
             f"{IMPLEMENTATION} after {DEFINITION} and {CLOSURE} after {IMPLEMENTATION}, once each",
-            f"{SCRIPT} {NEXT.get(current, 'check')} --sha {sha}",
+            SCRIPT(*NEXT.get(current, "check").split(), "--sha", sha),
         )
         raise choice(refusal, SUPPLY.get(current, ""))
     ts, candidate = _clock.now_iso(), live.candidate

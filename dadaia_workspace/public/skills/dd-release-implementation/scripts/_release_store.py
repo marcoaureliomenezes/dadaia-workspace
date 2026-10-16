@@ -15,7 +15,8 @@ from pathlib import Path
 from typing import Any
 
 import _commit
-from _grammar import STATE
+import _git
+from _grammar import SHA_RE, STATE
 from _jsonl import parse_object, read_text
 from _ledger import records, replace
 from _refusal import Refusal
@@ -25,6 +26,18 @@ from _specs import script
 
 State = dict[str, Any]
 SCRIPT = script(Path(__file__).parent / "release.py")
+
+
+def at_head(specs: Path, *words: str) -> str:
+    """The fix line of SCRIPT *words* at the short sha of the repo's HEAD; the act that supplies
+    the sha when git cannot answer."""
+    try:
+        sha = _git.git(specs.parent, "rev-parse", "--short", "HEAD", check=False).strip()
+    except OSError:
+        sha = ""
+    if SHA_RE.match(sha):
+        return SCRIPT(*words, "--sha", sha)
+    return f"Agent action: run `{SCRIPT.inline(*words)}` with --sha set to the short sha of HEAD"
 
 
 @dataclass(frozen=True)
@@ -39,7 +52,7 @@ class Live:
 
 def read_state(path: Path) -> State:
     """One state document, refusing anything this script cannot read in full."""
-    fix = f"Agent action: repair {path} until `{SCRIPT} check` passes"
+    fix = f"Agent action: repair {path} until `{SCRIPT.inline('check')}` passes"
     try:
         text = read_text(path)
     except OSError as exc:
@@ -78,7 +91,7 @@ def open_bug_ids(specs: Path) -> list[str]:
 
 def validated(state: State, rel: str) -> str:
     text = json.dumps(state, indent=2, ensure_ascii=False) + "\n"  # the canonical bytes
-    return _commit.validated(text, rel, lambda t: state_findings(t, rel), f"{SCRIPT} check")
+    return _commit.validated(text, rel, lambda t: state_findings(t, rel), SCRIPT("check"))
 
 
 def commit(path: Path, rel: str, apply: Callable[[State], State]) -> State:

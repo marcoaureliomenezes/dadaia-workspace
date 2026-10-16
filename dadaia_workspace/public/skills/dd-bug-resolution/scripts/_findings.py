@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 import _jsonl
+from _platform import Undecodable
 from _refusal import spell_fix
 
 Check = Callable[[Path], list[dict[str, Any]]]
@@ -30,7 +31,7 @@ def decodable(code: str) -> Callable[[Check], Check]:
         def run(specs: Path) -> list[dict[str, Any]]:
             try:
                 return check(specs)
-            except _jsonl.Undecodable as bad:
+            except Undecodable as bad:
                 root, path = specs.resolve(), bad.path.resolve()
                 rel = path.relative_to(root).as_posix() if path.is_relative_to(root) else str(path)
                 return [finding(code, rel, bad.line, "the file is not valid UTF-8", bad.fix)]
