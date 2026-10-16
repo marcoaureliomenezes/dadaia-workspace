@@ -1,6 +1,7 @@
 """`fake_venv` builds the venv layout of the platform it is told, and the `python` in it runs."""
 
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -73,3 +74,17 @@ def test_fake_venv_pth_puts_the_running_packages_on_the_venv_python(tmp_path: Pa
         [str(fake_venv(tmp_path / "bare")), "-c", code], capture_output=True, text=True
     )
     assert bare.returncode != 0
+
+
+def test_fake_venv_copies_the_base_interpreter_not_the_running_venvs(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    decoy = tmp_path / "decoy-python"
+    decoy.write_bytes(b"not the base interpreter")
+    monkeypatch.setattr("sys.executable", str(decoy))
+    root = tmp_path / "ws"
+    python = fake_venv(root)
+    base = Path(sys._base_executable).resolve()
+    assert python.read_bytes() == base.read_bytes()
+    cfg = (root / ".dadaia" / ".venv" / "pyvenv.cfg").read_text()
+    assert cfg == f"home = {base.parent}\n"
