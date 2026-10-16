@@ -24,6 +24,7 @@ from dadaia_workspace.core.models.git_scan import (
     GitObjectReadError,
     GitRunError,
     ScannedObject,
+    is_zero_sha,
 )
 from dadaia_workspace.core.redaction import PUBLISHED, publication_boundaries
 
@@ -88,7 +89,7 @@ def _is_resolvable_commit(repo: Path, sha: str) -> bool:
     ``--upload-pack=...``) is rejected, never interpolated (CWE-88). Used by
     :func:`_base_exclusions` to decide whether *remote_sha* is an extra ``--not`` target.
     """
-    if not sha or sha == ZERO_SHA or not SHA_SHAPE_RE.match(sha):
+    if is_zero_sha(sha) or not SHA_SHAPE_RE.match(sha):
         return False
     result = _run(["git", "cat-file", "-e", f"{sha}^{{commit}}"], repo)
     return result.returncode == 0
@@ -166,7 +167,7 @@ def _is_annotated_tag(repo: Path, sha: str) -> bool:
     separate tag body exists to scan). Shape-checked BEFORE interpolation into the
     ``git cat-file -t`` argv, mirroring :func:`_is_resolvable_commit` (CWE-88).
     """
-    if not sha or sha == ZERO_SHA or not SHA_SHAPE_RE.match(sha):
+    if is_zero_sha(sha) or not SHA_SHAPE_RE.match(sha):
         return False
     result = _run(["git", "cat-file", "-t", sha], repo)
     return result.returncode == 0 and _decode(result.stdout).strip() == "tag"
@@ -706,7 +707,7 @@ class GitSubprocessObjectReader:
         different from every publication boundary; an empty range nets nothing; a range
         with no boundary (bootstrap) nets the tip's whole ``specs/``. A force-push
         re-judges paths carried from the overwritten tip (it is no boundary)."""
-        if not SHA_SHAPE_RE.match(local_sha) or local_sha == ZERO_SHA:
+        if not SHA_SHAPE_RE.match(local_sha) or is_zero_sha(local_sha):
             return []
         exclusions = _base_exclusions(repo, remote_sha)
         if not _range_commit_shas(repo, local_sha, exclusions):
@@ -723,7 +724,7 @@ class GitSubprocessObjectReader:
         return sorted(netted or ())
 
     def new_objects(self, repo: Path, local_sha: str, remote_sha: str) -> Iterator[ScannedObject]:
-        if not local_sha or local_sha == ZERO_SHA:
+        if not local_sha or is_zero_sha(local_sha):
             return
         # The shape check of `_is_resolvable_commit`, applied to `local_sha` before it reaches
         # `_rev_list_candidates`'s `git rev-list` argv (CWE-88): an option-shaped value is

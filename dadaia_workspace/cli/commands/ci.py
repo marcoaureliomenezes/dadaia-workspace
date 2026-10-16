@@ -19,7 +19,7 @@ from dadaia_workspace.cli._specs_resolution import (
 from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.exceptions import GitSyncError
 from dadaia_workspace.core.gitflow import Gitflow, work_branch
-from dadaia_workspace.core.models.git_scan import ZERO_SHA
+from dadaia_workspace.core.models.git_scan import ZERO_SHA, is_zero_sha
 from dadaia_workspace.core.skill_owner import load_owner
 from dadaia_workspace.features.chokepoints.branch_policy import (
     HEADS_PREFIX,
@@ -96,7 +96,6 @@ def _rewrite_unpublished(repo: Path, oldest: str, message: str | None) -> None:
     *message* replaces the message only when the gate lists a commit message. The git calls
     carry the sanctioned-tool marker (``git_subprocess``): the ref gate passes them."""
     from dadaia_workspace.container import build_git_client, build_git_object_reader
-    from dadaia_workspace.core.models.git_scan import ZERO_SHA
     from dadaia_workspace.features.chokepoints.push_gate import GateDecision
 
     git = build_git_client()
@@ -269,7 +268,7 @@ def ref_gate_check() -> None:
         tracking = f"refs/remotes/origin/{ref.removeprefix(HEADS_PREFIX)}"
         held = git.git(repo_root, "for-each-ref", "--format=%(objectname)", tracking)
         # git hands a zero old sha for a forced move too; the ref still holds its value in `prepared`.
-        if old == ZERO_SHA:
+        if is_zero_sha(old):
             old = git.git(repo_root, "for-each-ref", "--format=%(objectname)", ref) or old
         decision = check_ref_policy([f"{old} {new} {ref}"], gitflow, {ref: held}, repo_root.name)
         if not decision.allowed and not _audit_only(git, repo_root, old, new):

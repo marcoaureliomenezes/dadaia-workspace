@@ -9,7 +9,7 @@ from dataclasses import dataclass
 
 from dadaia_workspace.core.cli_line import fix_line, git_line, spell_fix
 from dadaia_workspace.core.gitflow import Gitflow
-from dadaia_workspace.core.models.git_scan import SHA_SHAPE_RE, ZERO_SHA
+from dadaia_workspace.core.models.git_scan import SHA_SHAPE_RE, is_zero_sha
 
 __all__ = [
     "Decision",
@@ -42,7 +42,7 @@ class PushRef:
 
     @property
     def is_deletion(self) -> bool:
-        return self.local_sha == ZERO_SHA or not self.local_sha
+        return is_zero_sha(self.local_sha) or not self.local_sha
 
     @property
     def is_tag(self) -> bool:
@@ -107,7 +107,7 @@ def _refuse_branch(
 ) -> Decision:
     """Actionable refusal for a non-pushable ref (*branch* ``None``: not a branch head)."""
     role = gitflow.role_of(branch) if branch is not None else None
-    if role is not None and ref.remote_sha == ZERO_SHA:
+    if role is not None and is_zero_sha(ref.remote_sha):
         other = gitflow.integration if role == "principal" else gitflow.principal
         return _blocked(
             f"creating the {role} branch '{branch}' on an origin that already holds "
@@ -173,7 +173,8 @@ def check_ref_policy(
         branch = ref.removeprefix(HEADS_PREFIX)
         held = origin.get(ref)
         if (
-            ZERO_SHA in (old, new)
+            is_zero_sha(old)
+            or is_zero_sha(new)
             or old == new
             or gitflow.role_of(branch) != "work"
             or held in ("", None, new)

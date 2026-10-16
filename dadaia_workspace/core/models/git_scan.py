@@ -23,6 +23,11 @@ ZERO_SHA = "0" * 40
 SHA_SHAPE_RE = load_owner("dd-bug-resolution", "_grammar").OBJECT_ID_RE
 
 
+def is_zero_sha(sha: str) -> bool:
+    """True when *sha* is git's absent-object sentinel: an object id of only zeros, SHA-1 or SHA-256."""
+    return bool(SHA_SHAPE_RE.match(sha)) and not sha.strip("0")
+
+
 @dataclass(frozen=True)
 class ScannedObject:
     """One blob or message body newly reachable in a pushed range.
@@ -74,4 +79,4 @@ class GitRunError(GitObjectReadError):
     """git itself could not run (missing, timed out): the object store is not at fault."""
 
 
-__all__ = ["ZERO_SHA", "GitObjectReadError", "GitRunError", "ScannedObject"]
+__all__ = ["ZERO_SHA", "is_zero_sha", "GitObjectReadError", "GitRunError", "ScannedObject"]

@@ -12,10 +12,10 @@ from typing import Protocol
 from dadaia_workspace.core.cli_line import fix_line, git_line, spell_fix
 from dadaia_workspace.core.gitflow import Gitflow
 from dadaia_workspace.core.models.git_scan import (
-    ZERO_SHA,
     GitObjectReadError,
     GitRunError,
     ScannedObject,
+    is_zero_sha,
 )
 from dadaia_workspace.features.chokepoints.branch_policy import (
     HEADS_PREFIX,
@@ -199,7 +199,7 @@ def push_gate_decision(
     unborn = [
         r
         for r in branch_refs
-        if r.remote_sha == ZERO_SHA and r.remote_ref.removeprefix(HEADS_PREFIX) in roles
+        if is_zero_sha(r.remote_sha) and r.remote_ref.removeprefix(HEADS_PREFIX) in roles
     ]
     bootstrap = bool(unborn) and not any(object_source.remote_branch(repo, b) for b in roles)
     births = frozenset(
