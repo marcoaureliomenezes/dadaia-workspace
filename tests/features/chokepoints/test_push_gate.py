@@ -25,6 +25,7 @@ from dadaia_workspace.infrastructure.git_objects import GitSubprocessObjectReade
 from dadaia_workspace.infrastructure.ledger_scripts import load_owner
 from tests.fakes import gate_fixes
 from tests.fixtures.real_git import ZERO, PushRepo, git
+from tests.helpers.oslib import write_text
 
 _SHA_A = "a" * 40
 _TERM = "zz-secret-term"
@@ -264,8 +265,8 @@ def test_a_ledger_verb_outside_the_workspace_loads_the_pre_push_terms(
     workspace, the ledger write seam finds the terms from its `--specs` tree, as pre-push does."""
     states = tmp_path / "ws" / ".dadaia" / "states"
     states.mkdir(parents=True)
-    (states / "spec_contexts.json").write_text('{"contexts": []}')
-    (states / "privacy_denylist.json").write_text(json.dumps(dict(_TERMS)))
+    write_text(states / "spec_contexts.json", '{"contexts": []}')
+    write_text(states / "privacy_denylist.json", json.dumps(dict(_TERMS)))
     specs = tmp_path / "ws" / "repos" / "r" / "specs"
     specs.mkdir(parents=True)
     monkeypatch.delenv("DADAIA_PRIVACY_DENYLIST", raising=False)

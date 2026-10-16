@@ -9,7 +9,6 @@ can notice.
 from __future__ import annotations
 
 import re
-import subprocess
 from pathlib import Path
 
 import pytest
@@ -18,6 +17,7 @@ from dadaia_workspace.core import workspace_layout
 from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
 from dadaia_workspace.features.spec_context.doctor import DoctorService, workspace_rules
+from tests.helpers.oslib import read_text, run
 
 
 class _Store:
@@ -57,7 +57,7 @@ def _workspace(
     repo.mkdir(parents=True)
     if not git:
         return tmp_path
-    subprocess.run(["git", "init", "-q", str(repo)], check=True)
+    run(["git", "init", "-q", str(repo)], check=True)
     for target, source in workspace_layout.INSTALLED_GIT_HOOKS if installed else ():
         if target == "pre-push" and missing:
             continue
@@ -96,9 +96,7 @@ def test_a_gate_git_never_runs_is_a_finding(tmp_path: Path) -> None:
     """The gate sits in .git/hooks but
     core.hooksPath sends git elsewhere — an error finding with a runnable fix, never healthy."""
     root = _workspace(tmp_path)
-    subprocess.run(
-        ["git", "-C", str(root / "repos" / "demo"), "config", "core.hooksPath", ".husky"]
-    )
+    run(["git", "-C", str(root / "repos" / "demo"), "config", "core.hooksPath", ".husky"])
     rule = next(r for r in workspace_rules() if "HOOKS-DRIFT-1" in r.codes)
     found = rule.run(DoctorService(_Store([_ctx("demo")]), None, root))  # type: ignore[arg-type]
     assert [f.error for f in found] == [True, True]
@@ -113,7 +111,7 @@ def test_no_module_computes_the_hooks_dir_itself() -> None:
     resolver (`git rev-parse --git-path hooks`); no code builds `.git/hooks` by hand."""
     package = Path(workspace_layout.__file__).parents[1]
     hand_built = re.compile(r"""["']\.git["']\s*/\s*["']hooks["']|["']\.git/hooks""")
-    offenders = [p for p in package.rglob("*.py") if hand_built.search(p.read_text("utf-8"))]
+    offenders = [p for p in package.rglob("*.py") if hand_built.search(read_text(p))]
     assert offenders == []
 
 

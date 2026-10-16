@@ -50,7 +50,7 @@ from functools import partial
 from pathlib import Path
 from typing import Literal
 
-from dadaia_workspace.core import clock
+from dadaia_workspace.core import clock, platform
 from dadaia_workspace.core.atomic_write import SymlinkRefusedError, atomic_write
 from dadaia_workspace.core.gitflow import DEFAULT
 from dadaia_workspace.core.specs_version import CANONICAL_SPECS_VERSION
@@ -207,7 +207,7 @@ def default_public_dir() -> Path:
 def _render(entry: CanonEntry, *, public_dir: Path, context: dict[str, str]) -> str:
     kind, template = TEMPLATES[entry.shape]
     if kind == "copy":
-        text = render_registry_tables((public_dir / template).read_text(encoding="utf-8"))
+        text = render_registry_tables(platform.read_text(public_dir / template))
     elif kind == "static":
         text = template
     else:
@@ -274,9 +274,7 @@ def scaffold_repo_law(
 
 
 def _fill_repo_name(template: Path, project_name: str) -> str:
-    return render_registry_tables(template.read_text(encoding="utf-8")).replace(
-        "<repo-name>", project_name
-    )
+    return render_registry_tables(platform.read_text(template)).replace("<repo-name>", project_name)
 
 
 def _write_absent(root: Path, writes: list[tuple[Path, Callable[[], str], bool]]) -> list[Path]:
@@ -287,7 +285,7 @@ def _write_absent(root: Path, writes: list[tuple[Path, Callable[[], str], bool]]
     created: list[Path] = []
     for target, render, overwrite in writes:
         anchor = next(p for p in (target.parent, *target.parent.parents) if p.exists() or p == root)
-        if root.is_symlink() or anchor.resolve() != root.resolve() / anchor.relative_to(root):
+        if platform.is_link(root) or anchor.resolve() != root.resolve() / anchor.relative_to(root):
             continue
         if target.exists() and not overwrite:
             continue

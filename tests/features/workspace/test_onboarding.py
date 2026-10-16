@@ -8,18 +8,21 @@ from __future__ import annotations
 
 import json
 import shutil
+import sys
 from collections.abc import Callable
 from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.core import workspace_layout
+from dadaia_workspace.core import platform, workspace_layout
 from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.gitflow import SeveralWorkBranches
 from dadaia_workspace.core.skill_owner import load_owner
 from dadaia_workspace.core.specs_version import CANONICAL_SPECS_VERSION, state
 from dadaia_workspace.features.specs.rules import RULES
 from dadaia_workspace.features.workspace.onboarding import next_step
+from tests.helpers.oslib import write_text
+from tests.helpers.oslib import write_text as os_write_text
 
 _CLIENT = "dadaia_workspace.infrastructure.git_subprocess.GitSubprocessClient"  # by name: importing it would size the module medium
 _SCAFFOLD = workspace_layout.public_scripts_dir().parent / "scaffold"
@@ -37,14 +40,14 @@ def _specs(tmp_path: Path, name: str = "app", *, audited: bool = False) -> Path:
     specs = tmp_path / "repos" / name / "specs"
     (specs / "memory" / "product").mkdir(parents=True)
     stamp = f"---\nspecs_pattern_version: {CANONICAL_SPECS_VERSION}\n---\n# c\n"
-    (specs / "constitution.md").write_text(stamp, "utf-8")
+    os_write_text(specs / "constitution.md", stamp)
     for stub in ("ARCHITECTURE.md", "QUALITY.md"):
         shutil.copyfile(_SCAFFOLD / "memory" / stub, specs / "memory" / stub)
     if audited:
         for stub in ("ARCHITECTURE.md", "QUALITY.md"):
-            (specs / "memory" / stub).write_text(f"# {stub}\n\nreal content\n", "utf-8")
-        (specs / "memory" / "product" / "catalog.json").write_text(
-            json.dumps({"features": [{"slug": "x"}]}), "utf-8"
+            os_write_text(specs / "memory" / stub, f"# {stub}\n\nreal content\n")
+        os_write_text(
+            specs / "memory" / "product" / "catalog.json", json.dumps({"features": [{"slug": "x"}]})
         )
     return specs
 
@@ -60,15 +63,15 @@ def _foreign(tmp: Path) -> dict[str, Path]:
 
 def _typo(tmp: Path) -> dict[str, Path]:
     specs = _specs(tmp, audited=True)
-    (specs / "constitution.md").write_text(
-        "---\nspecs_pattern_version: 7\ngitflow: {principal: main\n---\n"
+    write_text(
+        specs / "constitution.md", "---\nspecs_pattern_version: 7\ngitflow: {principal: main\n---\n"
     )
     return {"app": specs}
 
 
 def _v047(tmp: Path) -> dict[str, Path]:
     specs = _specs(tmp, audited=True)
-    (specs / "constitution.md").write_text("---\nspecs_pattern_version: 7\n---\n# c\n", "utf-8")
+    os_write_text(specs / "constitution.md", "---\nspecs_pattern_version: 7\n---\n# c\n")
     return {"app": specs}
 
 
@@ -138,7 +141,7 @@ def test_i1_an_audits_histo_stamp_changes_no_step(tmp_path: Path) -> None:
     before = next_step(tmp_path, {"app": specs})
     histo = specs / "audits" / "_archive" / "audits_histo.jsonl"
     histo.parent.mkdir(parents=True)
-    histo.write_text('{"id": "first"}\n', encoding="utf-8")
+    write_text(histo, '{"id": "first"}\n')
     assert next_step(tmp_path, {"app": specs}) == before
 
 
@@ -183,3 +186,20 @@ def test_several_work_branches_make_the_first_pass_an_agent_step_with_the_refusa
         f"Agent action: {first}, then open the lane {lane}, then run the dd-audit-project first pass in it — {pending}"
     )
     assert step.text().count("fix:") == 1
+
+
+
+def _cli(root: Path | None, *words: str) -> str:
+    venv = platform.venv_dir(root) if root is not None else Path(sys.prefix)
+    return platform.inline(*platform.cli_argv(venv), *words)
+
+
+def test_the_context_create_step_quotes_a_workspace_holding_a_blank(tmp_path: Path) -> None:
+    root = tmp_path / "a b"
+
+    step = next_step(root, {})
+
+    assert step is not None
+    assert (
+        f"Agent action: run {_cli(root, 'context', 'create')} with a context name" in step.command
+    )

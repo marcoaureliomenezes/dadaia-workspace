@@ -14,6 +14,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Literal
 
+from dadaia_workspace.core import platform
 from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.frontmatter import Frontmatter, parse
 from dadaia_workspace.core.gitflow import constitution_error, constitution_text, specs_path_kind
@@ -35,6 +36,16 @@ State = Literal["absent", "file", "malformed", "foreign", "upgradable", "canonic
 NO_TREE: frozenset[State] = frozenset({"absent", "file"})
 
 
+def _repair_act(specs_dir: Path, text: str | None) -> str | None:
+    """The act that repairs a constitution that cannot be trusted, else ``None``: re-encode
+    when it is not UTF-8, repair its YAML when its frontmatter fails."""
+    try:
+        reason = constitution_error(specs_dir, text)
+    except platform.Undecodable as bad:
+        return str(bad.fix)
+    return reason and f"Agent action: repair the YAML frontmatter of {reason}"
+
+
 def state(
     specs_dir: Path, text: str | None = None, *, root: Path | None = None, context: str = ""
 ) -> tuple[State, str | None]:
@@ -46,8 +57,8 @@ def state(
         if on_disk == "file":  # `specs init` cannot build a tree on a non-directory
             return "file", f"Agent action: move {specs_dir} aside, it is not a directory"
         kind: State = "absent"
-    elif reason := constitution_error(specs_dir, text):
-        return "malformed", f"Agent action: repair the YAML frontmatter of {reason}"
+    elif act := _repair_act(specs_dir, text):
+        return "malformed", act
     else:
         fm = parse(constitution_text(specs_dir) if text is None else text)
         stamp = fm.data.get("specs_pattern_version") if isinstance(fm, Frontmatter) else None

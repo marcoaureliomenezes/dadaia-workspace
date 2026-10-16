@@ -7,8 +7,7 @@ every write under repos/<r>/ outside specs/audits/ names the worktree of the rig
 
 from __future__ import annotations
 
-import sys
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 import pytest
 
@@ -19,6 +18,7 @@ from dadaia_workspace.features.spec_context.gate_policy import (
     classify_path,
     evaluate,
 )
+from tests.helpers.oslib import cli_path
 
 _ROOT = Path("/ws")
 A, M, P = PathClass.ADDITIVE, PathClass.MUTATING, PathClass.PROTECTED
@@ -66,7 +66,7 @@ def test_a_protected_glob_holds_at_every_tree_depth(path: str, tmp_path: Path) -
 
 
 _A: dict[str, object] = {"context": "ctx-a", "repos": frozenset({"ctx-a", "ctx-a-infra"})}
-_DADAIA = "/ws/.dadaia/.venv/Scripts/dadaia.exe" if sys.platform == "win32" else "/ws/.dadaia/.venv/bin/dadaia"
+_DADAIA = str(cli_path(PurePosixPath("/ws")))
 
 
 def _wt(repo: str) -> str:

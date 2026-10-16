@@ -10,6 +10,7 @@ from contextlib import suppress
 from functools import partial
 from pathlib import Path
 
+from dadaia_workspace.core import platform
 from dadaia_workspace.core.atomic_write import atomic_write
 from dadaia_workspace.core.cli_line import materialize_line, reinstall_fix
 from dadaia_workspace.core.doctor_rules import SectionFinding
@@ -32,7 +33,7 @@ _PKGS_NODE_RE = re.compile(r'pkgs\["([^"]*)"\]')
 
 def _read_or_empty(path: Path) -> str:
     try:
-        return path.read_text(encoding="utf-8")
+        return str(platform.read_text(path))
     except OSError:
         return ""  # never flag, never delete on uncertainty
 
@@ -54,7 +55,7 @@ def is_placeholder_atom(path: Path) -> bool:
 
 def _has_heading(path: Path) -> bool:
     """An ATX heading in the atom's body — its whole text when the frontmatter does not parse."""
-    content = path.read_text(encoding="utf-8")
+    content = platform.read_text(path)
     fm, body, _problem = memory_canon.parse_atom(content)
     return bool(_MD_HEADING_RE.search(body if fm is not None else content))
 
@@ -122,7 +123,7 @@ class MemoryValidator:
             path = self.specs_dir / rel
             if not path.is_file():
                 continue
-            body = memory_canon.extract_fixed_section(path.read_text(encoding="utf-8"), section_id)
+            body = memory_canon.extract_fixed_section(platform.read_text(path), section_id)
             if body is None and optional:
                 continue
             try:
@@ -138,8 +139,6 @@ class MemoryValidator:
                     )
                 )
                 continue
-            except doctor_adr.UndecodableLedger:
-                continue  # `adr_record_issues` names the ledger
             except ValueError as refusal:
                 message = f"{rel}: fixed law section `{section_id}` refused: {refusal}"
                 issues.append(
@@ -164,8 +163,8 @@ class MemoryValidator:
                     Severity.ERROR,
                     f"{rel}: fixed law section `{section_id}` {state}",
                     str(path),
-                    fixable=not path.is_symlink(),
-                    fix=materialize_line(path, path.resolve()) if path.is_symlink() else "",
+                    fixable=not platform.is_link(path),
+                    fix=materialize_line(path, path.resolve()) if platform.is_link(path) else "",
                 )
             )
         return issues
@@ -178,7 +177,7 @@ class MemoryValidator:
             return
         path = Path(named)
         rel = path.relative_to(self.specs_dir).as_posix()
-        text = path.read_text(encoding="utf-8")
+        text = platform.read_text(path)
         for block_rel, section_id, render, optional in self._fixed_blocks(public_dir):
             if block_rel != rel or (
                 optional and memory_canon.extract_fixed_section(text, section_id) is None
@@ -209,7 +208,7 @@ class MemoryValidator:
                 if _has_heading(p):
                     continue
                 problem, fix = "has no non-empty heading", f"give {p} a `#` heading"
-            except Exception as e:
+            except (OSError, ValueError) as e:
                 problem, fix = f"is not parseable: {e}", f"repair {p}"
             issues.append(
                 specs_finding(
@@ -271,7 +270,7 @@ class MemoryValidator:
         architecture_md = self.specs_dir / "memory" / "ARCHITECTURE.md"
         if not architecture_md.is_file():
             return []
-        text = architecture_md.read_text(encoding="utf-8")
+        text = platform.read_text(architecture_md)
         heading = _FEATURES_PKG_MAP_HEADING_RE.search(text)
         mermaid = _mermaid_block_after_heading(text, heading.end()) if heading else None
         pkgs_match = _PKGS_NODE_RE.search(mermaid) if mermaid is not None else None

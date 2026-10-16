@@ -5,15 +5,14 @@ an operator's own hook (undecodable included) stays untouched."""
 from __future__ import annotations
 
 import hashlib
-import os
-import subprocess
 from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.core import workspace_layout
+from dadaia_workspace.core import platform, workspace_layout
 from dadaia_workspace.core.template_history import load_shipped_hashes
 from dadaia_workspace.features.spec_context.service import install_git_hooks
+from tests.helpers.oslib import is_executable, link, run, write_text
 
 _SHIPPED = workspace_layout.public_scripts_dir() / "pre-push-ci-gate.sh"
 _OLD = b"#!/bin/sh\n# an older shipped gate\n"
@@ -40,7 +39,7 @@ def test_install_refreshes_only_a_hook_we_shipped(
         "dadaia_workspace.core.template_history.load_shipped_hashes",
         lambda _d: {"scripts/pre-push-ci-gate.sh": {hashlib.sha256(_OLD).hexdigest()}},
     )
-    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    run(["git", "init", "-q", str(tmp_path)], check=True)
     hook = tmp_path / ".git" / "hooks" / "pre-push"
     hook.write_bytes(installed)
     assert install_git_hooks(tmp_path) == ([hook] if refreshed else []) + [_ref_tx(tmp_path)]
@@ -53,16 +52,14 @@ def _ref_tx(repo: Path) -> Path:
 
 def _hook_as(repo: Path, layout: str) -> Path:
     """A repo whose pre-push hook is *layout*: absent, a directory, or a link to a directory."""
-    subprocess.run(["git", "init", "-q", str(repo)], check=True)
+    run(["git", "init", "-q", str(repo)], check=True)
     hook = repo / ".git" / "hooks" / "pre-push"
     if layout == "directory":
         hook.mkdir()  # reading a directory raises an OSError that is no FileNotFoundError
     if layout == "link-to-a-directory":
         (repo / "elsewhere").mkdir()
-        (repo / "elsewhere" / "keep").write_text("mine", encoding="utf-8")
-        try:
-            hook.symlink_to(repo / "elsewhere", target_is_directory=True)
-        except OSError:
+        write_text(repo / "elsewhere" / "keep", "mine")
+        if not link(str(repo / "elsewhere"), hook, is_dir=True):
             pytest.skip("this host cannot link")
     return hook
 
@@ -82,7 +79,7 @@ def test_install_over_an_unreadable_hook_never_raises(
     ]
     assert hook.is_file() is written
     assert hook.is_symlink() is (layout == "link-to-a-directory" and not written)
-    assert (hook.is_file() and os.access(hook, os.X_OK)) is written
+    assert (hook.is_file() and is_executable(hook)) is written
     assert (tmp_path / "elsewhere" / "keep").exists() is (layout == "link-to-a-directory")
     assert not written or hook.read_bytes() == _SHIPPED.read_bytes()
     aside = hook.with_name("pre-push.unreadable")
@@ -90,16 +87,16 @@ def test_install_over_an_unreadable_hook_never_raises(
 
 
 def test_install_writes_the_reference_transaction_hook_executable(tmp_path: Path) -> None:
-    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    run(["git", "init", "-q", str(tmp_path)], check=True)
     hook = tmp_path / ".git" / "hooks" / "reference-transaction"
     assert hook in install_git_hooks(tmp_path)
     shipped = workspace_layout.public_scripts_dir() / "reference-transaction.sh"
     assert hook.read_bytes() == shipped.read_bytes()
-    assert os.access(hook, os.X_OK)
+    assert is_executable(hook)
 
 
 def test_install_never_overwrites_an_operators_reference_transaction_hook(tmp_path: Path) -> None:
-    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    run(["git", "init", "-q", str(tmp_path)], check=True)
     hook = tmp_path / ".git" / "hooks" / "reference-transaction"
     hook.write_bytes(b"#!/bin/sh\necho mine\n")
     assert hook not in install_git_hooks(tmp_path)
@@ -113,3 +110,15 @@ def test_the_reference_transaction_hook_is_recorded_as_shipped() -> None:
         hashlib.sha256(shipped.read_bytes()).hexdigest()
         in history["scripts/reference-transaction.sh"]
     )
+
+
+
+@pytest.mark.medium
+def test_the_non_git_refusal_quotes_a_repo_holding_a_blank(tmp_path: Path) -> None:
+    repo = tmp_path / "a b"
+    repo.mkdir()
+
+    with pytest.raises(Exception) as refused:  # noqa: PT011 — NotAGitRepositoryError
+        install_git_hooks(repo)
+
+    assert f"or '{platform.git_inline(repo, 'init')}'" in refused.value.fix  # type: ignore[attr-defined]

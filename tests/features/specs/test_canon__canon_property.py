@@ -22,6 +22,7 @@ import pytest
 from dadaia_workspace.features.specs import SpecsDoctor
 from dadaia_workspace.features.specs import canon as canon_mod
 from dadaia_workspace.features.specs.canon import scaffold
+from tests.helpers.oslib import write_text
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 _TEMPLATES_DIR = _REPO_ROOT / "dadaia_workspace" / "public" / "templates"
@@ -66,10 +67,9 @@ def _fresh_release(tmp_path: Path) -> Path:
     (release_dir / "rc-1").mkdir(parents=True)
     for artifact in ("SPEC.md", "PLAN.md", "TASKS.md"):
         origin = "**Origin:** operator-demand\n" if artifact == "SPEC.md" else ""
-        (release_dir / "rc-1" / artifact).write_text(
-            f"**Status:** Draft\n{origin}", encoding="utf-8"
-        )
-    (release_dir / "_RELEASE.json").write_text(
+        write_text(release_dir / "rc-1" / artifact, f"**Status:** Draft\n{origin}")
+    write_text(
+        release_dir / "_RELEASE.json",
         json.dumps(
             {
                 "schema": "release-state-v1",
@@ -90,7 +90,6 @@ def _fresh_release(tmp_path: Path) -> Path:
             indent=2,
         )
         + "\n",
-        encoding="utf-8",
     )
     return specs_dir
 

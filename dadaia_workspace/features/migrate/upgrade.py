@@ -13,9 +13,10 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from dadaia_workspace.core import platform
 from dadaia_workspace.core import specs_version as _version
 from dadaia_workspace.core.atomic_write import atomic_write
-from dadaia_workspace.core.cli_line import fix_line
+from dadaia_workspace.core.doctor_rules import inline_cli
 from dadaia_workspace.core.exceptions import DadaiaError
 from dadaia_workspace.core.frontmatter import split
 from dadaia_workspace.core.gitflow import candidate_dir, merge_frontmatter, next_candidate
@@ -63,11 +64,11 @@ def upgrade(
         raise UpgradeRefused(f"specs tree {specs_dir} is {kind}; nothing written.", fix or "")
     goal = _version.CANONICAL_SPECS_VERSION
     architecture = specs_dir / "memory" / "ARCHITECTURE.md"
-    if architecture.is_file() and _RETIRED_PART_HEADING in architecture.read_text("utf-8"):
+    if architecture.is_file() and _RETIRED_PART_HEADING in platform.read_text(architecture):
         raise UpgradeRefused(
             f"{architecture} is two-tier ({_RETIRED_PART_HEADING!r}): nowhere safe to fold into.",
             "Agent action: rewrite its headings as ## Principles / ## Tech Stack / "
-            f"## Structure, then re-run `{fix_line(None, 'specs', 'upgrade', '--specs-dir', str(specs_dir))}`.",
+            f"## Structure, then re-run `{inline_cli(None, 'specs', 'upgrade', '--specs-dir', str(specs_dir))}`.",
         )
 
     if dry_run:
@@ -117,7 +118,7 @@ def fold_flat_trio(specs_dir: Path) -> list[Path]:
     planned = plan_flat_trio_fold(specs_dir)
     for source, target in planned:
         target.parent.mkdir(exist_ok=True)
-        source.rename(target)
+        platform.replace(source, target)
     return [source for source, _ in planned]
 
 
@@ -150,8 +151,8 @@ def fold_tech_stack(specs_dir: Path, remove: Callable[[Path], object]) -> list[P
 
 def _fold(tech: Path, remove: Callable[[Path], object]) -> bool:
     architecture = tech.parent / "ARCHITECTURE.md"
-    body = _tech_stack_body(tech.read_text(encoding="utf-8"))
-    original = architecture.read_text(encoding="utf-8")
+    body = _tech_stack_body(platform.read_text(tech))
+    original = platform.read_text(architecture)
     atomic_write(architecture, f"{original.rstrip(chr(10))}\n\n{_TECH_STACK_HEADING}\n\n{body}\n")
     folded = False
     try:
@@ -211,7 +212,7 @@ def plan_status_token_rewrites(specs_dir: Path) -> list[Path]:
     return [
         target
         for source, target in _live_trio_documents(specs_dir)
-        if _rewrite_status_line(text := source.read_text(encoding="utf-8")) != text
+        if _rewrite_status_line(text := platform.read_text(source)) != text
     ]
 
 
@@ -219,7 +220,7 @@ def rewrite_status_tokens(specs_dir: Path) -> list[Path]:
     """Rewrite the planned set in place, returning what was rewritten."""
     rewritten = plan_status_token_rewrites(specs_dir)
     for path in rewritten:
-        text = path.read_text(encoding="utf-8")
+        text = platform.read_text(path)
         atomic_write(path, _rewrite_status_line(text))
     return rewritten
 

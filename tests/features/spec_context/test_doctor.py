@@ -34,6 +34,8 @@ from dadaia_workspace.features.spec_context.doctor import (
 )
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from tests.fixtures.stores import context_store
+from tests.helpers.oslib import link, read_text, write_text
+from tests.helpers.oslib import write_text as os_write_text
 
 _TTL_ZONE = next(z for z in zones_with_ttl() if z.cls is ZoneClass.EPHEMERAL)
 _STATE_ZONE = next(z for z in zones_with_canon() if z.creator is Creator.INIT)
@@ -49,20 +51,19 @@ def _make_doctor(root: Path) -> DoctorService:
 def _init_workspace(root: Path) -> None:
     """The minimal compliant skeleton: every INIT/INSTALL zone present, the level-1 seeds."""
     for name in LEVEL1_SEEDS:
-        (root / name).write_text("", encoding="utf-8")
+        write_text(root / name, "")
     dadaia = root / ".dadaia"
     for zone in provisioned_zones():
         (dadaia / zone.name).mkdir(parents=True, exist_ok=True)
-    (dadaia / _STATE_ZONE.name / "spec_contexts.json").write_text(
-        '{"schema_version": "2", "contexts": []}', encoding="utf-8"
+    write_text(
+        dadaia / _STATE_ZONE.name / "spec_contexts.json", '{"schema_version": "2", "contexts": []}'
     )
     _write_ledger(root)
-    _profile(root).write_text(
-        json.dumps({"schema_version": "1", "harnesses": list(L1_ENTRY_HARNESSES)}),
-        encoding="utf-8",
+    write_text(
+        _profile(root), json.dumps({"schema_version": "1", "harnesses": list(L1_ENTRY_HARNESSES)})
     )
     (root / "repos").mkdir()
-    (root / "AGENTS.md").write_text("# agents", encoding="utf-8")
+    write_text(root / "AGENTS.md", "# agents")
 
 
 def _profile(root: Path) -> Path:
@@ -79,13 +80,14 @@ def _by_path(findings: tuple[Finding, ...]) -> dict[str, Finding]:
 
 def _write_ledger(root: Path, *relpaths: str) -> None:
     entries = [{"relpath": rel, "sha256": "0" * 64, "family": "test"} for rel in relpaths]
-    (root / ".dadaia" / _STATE_ZONE.name / "install_ledger.json").write_text(
-        json.dumps({"schema_version": "1", "entries": entries}), encoding="utf-8"
+    write_text(
+        root / ".dadaia" / _STATE_ZONE.name / "install_ledger.json",
+        json.dumps({"schema_version": "1", "entries": entries}),
     )
     for rel in relpaths:
         target = root / rel
         target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text("projected", encoding="utf-8")
+        write_text(target, "projected")
 
 
 _REGISTRY = json.dumps({"contexts": [
@@ -120,7 +122,7 @@ def test_four_places_classify_every_entry(
     unreadable registry keeps every ``repos/<r>`` and ``worktrees/<r>``."""
     _init_workspace(tmp_path)
     dadaia = tmp_path / ".dadaia"
-    (dadaia / _STATE_ZONE.name / "spec_contexts.json").write_text(registry, encoding="utf-8")
+    write_text(dadaia / _STATE_ZONE.name / "spec_contexts.json", registry)
     for name in (
         ".claude",
         ".git",
@@ -134,11 +136,11 @@ def test_four_places_classify_every_entry(
     for name in ("dead-r", "kept", "assoc-r"):
         (tmp_path / "worktrees" / name).mkdir(parents=True)
     for name in ("random_junk.txt", "shot.png", "worktrees/AGENTS.md"):
-        (tmp_path / name).write_text("x", encoding="utf-8")
+        write_text(tmp_path / name, "x")
     for name in (*DADAIA_ROOT_FILES, ".DS_Store", "kept.png"):
-        (dadaia / name).write_text("x", encoding="utf-8")
-    (tmp_path / DADAIAIGNORE).write_text(
-        "# comment\n*.png\n.dadaia/*.png\nrepos/kept\nworktrees/kept\n", encoding="utf-8"
+        write_text(dadaia / name, "x")
+    write_text(
+        tmp_path / DADAIAIGNORE, "# comment\n*.png\n.dadaia/*.png\nrepos/kept\nworktrees/kept\n"
     )
 
     found = _make_doctor(tmp_path).scan()
@@ -154,10 +156,10 @@ def test_absent_init_or_install_zone_is_missing_and_fixable(tmp_path: Path) -> N
     (tmp_path / ".dadaia" / _INSTALL_ZONE.name).rmdir()
     stale = tmp_path / ".dadaia" / _OPERATOR_ZONE.name / "clone" / "README.md"
     stale.parent.mkdir(parents=True)
-    stale.write_text("reference", encoding="utf-8")
+    write_text(stale, "reference")
     _age(stale)
     (tmp_path / ".dadaia" / ".venv" / "lib").mkdir(parents=True)
-    (tmp_path / ".dadaia" / ".venv" / "lib" / "site.py").write_text("", encoding="utf-8")
+    write_text(tmp_path / ".dadaia" / ".venv" / "lib" / "site.py", "")
 
     findings = _make_doctor(tmp_path).scan()
 
@@ -167,7 +169,7 @@ def test_absent_init_or_install_zone_is_missing_and_fixable(tmp_path: Path) -> N
     assert not any(_OPERATOR_ZONE.name in f.code for f in findings)
     assert not any("README.md" in f.path or "site.py" in f.path for f in findings)
     _make_doctor(tmp_path).fix()
-    assert stale.read_text(encoding="utf-8") == "reference"
+    assert read_text(stale) == "reference"
 
 
 # ---------------------------------------------------------------------------
@@ -182,17 +184,15 @@ def test_closed_canon_zones_flag_every_non_canon_entry_and_fix_removes_it(tmp_pa
     _init_workspace(tmp_path)
     dadaia = tmp_path / ".dadaia"
     (dadaia / _STATE_ZONE.name / "ctx_locks").mkdir()
-    (dadaia / _STATE_ZONE.name / "ctx_locks" / "stale.lock.json").write_text("{}", "utf-8")
+    os_write_text(dadaia / _STATE_ZONE.name / "ctx_locks" / "stale.lock.json", "{}")
     sessions = next(z for z in zones_with_canon() if z.cls is ZoneClass.PROTECTED)
     (dadaia / sessions.name / "runtime").mkdir(parents=True)
-    (dadaia / sessions.name / "corrupt.json").write_text("{", "utf-8")  # canon name, unreadable
+    os_write_text(dadaia / sessions.name / "corrupt.json", "{")  # canon name, unreadable
     for zone in zones_with_canon():
         assert zone.canon is not None
         (dadaia / zone.name).mkdir(exist_ok=True)
         (dadaia / zone.name / "stray.bin").write_bytes(b"")
-        (dadaia / zone.name / sorted(zone.canon)[0].replace("*", "sample")).write_text(
-            "{}", "utf-8"
-        )
+        os_write_text(dadaia / zone.name / sorted(zone.canon)[0].replace("*", "sample"), "{}")
 
     found = _by_path(_make_doctor(tmp_path).scan())
 
@@ -231,7 +231,7 @@ def test_absent_harness_profile_is_missing_and_fix_seeds_it_from_present_dirs(
     assert actions == [
         f"WS-{_STATE_ZONE.name}-missing: created '{_STATE_ZONE.name}/harness_profile.json'"
     ]
-    assert json.loads(_profile(tmp_path).read_text(encoding="utf-8")) == {
+    assert json.loads(read_text(_profile(tmp_path))) == {
         "schema_version": "1",
         "harnesses": ["claude", "codex"],
     }
@@ -247,7 +247,7 @@ def test_ttl_walk_treats_an_entry_that_vanishes_mid_walk_as_absent(
     zone_dir = tmp_path / ".dadaia" / _TTL_ZONE.name
     zone_dir.mkdir(exist_ok=True)
     gone_file = zone_dir / "gone.txt"
-    gone_file.write_text("", encoding="utf-8")
+    write_text(gone_file, "")
     gone_dir = zone_dir / "gone_dir"
     gone_dir.mkdir()
     (stale := zone_dir / "stale.txt").touch()
@@ -286,9 +286,9 @@ def test_fix_skips_and_reports_an_undeletable_entry_and_finishes_the_pass(
     locked = zone / "x" / "deps"
     locked.mkdir(parents=True)
     undeletable = locked / "a.js"
-    undeletable.write_text("", encoding="utf-8")
+    write_text(undeletable, "")
     other = zone / "y.txt"
-    other.write_text("", encoding="utf-8")
+    write_text(other, "")
     for path in (undeletable, other, locked, locked.parent):
         _age(path)
     real_unlink = os.unlink
@@ -323,22 +323,22 @@ def test_a_symlinked_zone_root_is_never_walked(
     ws = tmp_path / "ws"
     ws.mkdir()
     _init_workspace(ws)
-    (ws / ".dadaia" / _STATE_ZONE.name / "spec_contexts.json").write_text(_REGISTRY, "utf-8")
+    os_write_text(ws / ".dadaia" / _STATE_ZONE.name / "spec_contexts.json", _REGISTRY)
     target = (ws / "repos" / "main-r") if target_inside_workspace else (tmp_path / "outside")
     target.mkdir(parents=True)
     victim = target / "old.txt"
-    victim.write_text("keep", encoding="utf-8")
+    write_text(victim, "keep")
     _age(victim)
     zone_dir = ws / ".dadaia" / _TTL_ZONE.name
     if zone_dir.exists():
         zone_dir.rmdir()
-    zone_dir.symlink_to(target, target_is_directory=True)
+    assert link(str(target), zone_dir, is_dir=True)
 
     findings = _make_doctor(ws).scan()
     actions = _make_doctor(ws).fix()
 
     assert not any("old.txt" in f.path for f in findings), [f.path for f in findings]
-    assert victim.read_text(encoding="utf-8") == "keep"
+    assert read_text(victim) == "keep"
     assert zone_dir.is_symlink()
     assert actions == []
 
@@ -352,12 +352,12 @@ def test_fix_migrates_the_legacy_exceptions_and_never_touches_operator_files(
     _init_workspace(tmp_path)
     (tmp_path / DADAIAIGNORE).unlink()
     legacy = tmp_path / ".dadaia/states/instance_exceptions.txt"
-    legacy.write_text("*.png\n!keep\n", encoding="utf-8")
+    write_text(legacy, "*.png\n!keep\n")
     (tmp_path / "shot.png").write_bytes(b"PNG")  # admitted only by the migrated line
-    (tmp_path / ".env").write_text("K=v\n", encoding="utf-8")
+    write_text(tmp_path / ".env", "K=v\n")
     assert _by_path(_make_doctor(tmp_path).scan())[DADAIAIGNORE].verdict is FindingVerdict.MISSING
     _make_doctor(tmp_path).fix()
-    assert (tmp_path / DADAIAIGNORE).read_text(encoding="utf-8") == "*.png\n!keep\n"
+    assert read_text(tmp_path / DADAIAIGNORE) == "*.png\n!keep\n"
     assert not legacy.exists()
     assert (tmp_path / "shot.png").exists()  # judged after the seed, never reaped
     found = [f for f in _make_doctor(tmp_path).scan() if f.verdict is FindingVerdict.SLOP]
@@ -375,17 +375,17 @@ def test_fix_on_a_root_holding_a_git_dir_moves_nothing(tmp_path: Path) -> None:
     _init_workspace(tmp_path)
     (tmp_path / ".git").mkdir()
     head = tmp_path / ".git" / "HEAD"
-    head.write_text("ref: refs/heads/main\n", encoding="utf-8")
+    write_text(head, "ref: refs/heads/main\n")
     (git,) = [f for f in _make_doctor(tmp_path).scan() if f.path == ".git"]
     assert git.verdict is FindingVerdict.SLOP and not git.fixable
     assert git.fix.startswith("Operator action:")
     _make_doctor(tmp_path).fix()
-    assert head.read_text(encoding="utf-8") == "ref: refs/heads/main\n"
+    assert read_text(head) == "ref: refs/heads/main\n"
 
 
 def test_a_root_git_dir_the_operator_named_is_judged_clean_with_no_fix_line(tmp_path: Path) -> None:
     _init_workspace(tmp_path)
-    (tmp_path / DADAIAIGNORE).write_text(".git\n", encoding="utf-8")
+    write_text(tmp_path / DADAIAIGNORE, ".git\n")
     (tmp_path / ".git").mkdir()
     (git,) = [f for f in _make_doctor(tmp_path).scan() if f.path == ".git"]
     assert git.verdict is not FindingVerdict.SLOP and git.fix == ""

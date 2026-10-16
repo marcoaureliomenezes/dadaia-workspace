@@ -8,12 +8,12 @@ Size: MEDIUM — the real section, each ledger script a child process.
 from __future__ import annotations
 
 import json
-import subprocess
 from pathlib import Path
 
 import pytest
 
 from dadaia_workspace.cli.commands.doctor import _ledgers_section
+from tests.helpers.oslib import run, write_text
 
 _SOURCE = "class Widget:\n    pass\n"
 _LEDGER = "LEDGER-BACKLOG-SCHEMA"
@@ -79,9 +79,9 @@ def test_the_doctor_judges_a_live_entry_as_backlog_py_check_does(row: str, tmp_p
     specs = tmp_path / "specs"
     (specs / "backlog").mkdir(parents=True)
     (tmp_path / "pkg").mkdir()
-    (tmp_path / "pkg" / "m.py").write_text(_SOURCE, encoding="utf-8")
-    (tmp_path / "pkg" / "w.go").write_text("type Widget struct{}\n", encoding="utf-8")
-    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)  # noqa: S603, S607
+    write_text(tmp_path / "pkg" / "m.py", _SOURCE)
+    write_text(tmp_path / "pkg" / "w.go", "type Widget struct{}\n")
+    run(["git", "init", "-q"], cwd=tmp_path, check=True)  # noqa: S603, S607
     active = [
         _active_entry(
             f"e{n}",
@@ -94,8 +94,8 @@ def test_the_doctor_judges_a_live_entry_as_backlog_py_check_does(row: str, tmp_p
         )  # fmt: skip
         for n, (s, r, c, *x) in enumerate(entries)
     ]
-    (specs / "backlog" / "BACKLOG.json").write_text(
-        json.dumps({"schema": "backlog-v1", "active": active}), encoding="utf-8"
+    write_text(
+        specs / "backlog" / "BACKLOG.json", json.dumps({"schema": "backlog-v1", "active": active})
     )
     section = _ledgers_section(None, specs)
     found = [f for f in section.findings if f.code.startswith(("BL-", _LEDGER))]

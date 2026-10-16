@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import os
 import re
-import subprocess
 import sys
 import time
 from pathlib import Path
@@ -23,6 +22,7 @@ from dadaia_workspace.features.spec_context.doctor import DoctorService
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from tests.fixtures.stores import context_store
 from tests.helpers import worktree_ws
+from tests.helpers.oslib import read_text, run, write_text
 
 _TWO_DAYS_AGO = time.time() - 2 * 86_400
 
@@ -30,26 +30,27 @@ pytestmark = pytest.mark.slow(reason="real git init + worktree add subprocesses"
 
 
 def _git(cwd: Path, *args: str) -> str:
-    done = subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True, check=True)
+    done = run(["git", *args], cwd=cwd, check=True)
     return done.stdout
 
 
 def _workspace_with_worktree(root: Path, worktree_rel: str) -> tuple[Path, Path]:
     for zone in ("tmp", "states", "sessions", "reaped"):
         (root / ".dadaia" / zone).mkdir(parents=True, exist_ok=True)
-    (root / ".dadaia" / "states" / "spec_contexts.json").write_text(
-        '{"contexts": [{"name": "lib", "repo_slug": "lib", "state": "alive"}]}', encoding="utf-8"
+    write_text(
+        root / ".dadaia" / "states" / "spec_contexts.json",
+        '{"contexts": [{"name": "lib", "repo_slug": "lib", "state": "alive"}]}',
     )
     repo = root / "repos" / "lib"
     repo.mkdir(parents=True)
     _git(repo, "init", "-q", "-b", "main")
-    (repo / "f.txt").write_text("f", encoding="utf-8")
+    write_text(repo / "f.txt", "f")
     _git(repo, "add", "f.txt")
     _git(repo, "commit", "-q", "-m", "init")
     worktree = root / worktree_rel
     worktree.parent.mkdir(parents=True, exist_ok=True)
     _git(repo, "worktree", "add", "-q", "-b", "wt/a", str(worktree))
-    (worktree / "uncommitted.txt").write_text("work in progress", encoding="utf-8")
+    write_text(worktree / "uncommitted.txt", "work in progress")
     return repo, worktree
 
 
@@ -82,7 +83,7 @@ def test_doctor_fix_never_reaps_or_moves_a_linked_worktree(
 
     _fix(tmp_path)
 
-    assert (worktree / "uncommitted.txt").read_text(encoding="utf-8") == "work in progress"
+    assert read_text(worktree / "uncommitted.txt") == "work in progress"
     assert (worktree / ".git").is_file()
     assert "prunable" not in _git(repo, "worktree", "list", "--porcelain")
 
@@ -97,7 +98,7 @@ def test_doctor_lists_the_contexts_worktrees_from_git_and_touches_none(tmp_path:
     ready, empty = root / "worktrees/r/0.5.0/wt-backlog-a", root / "worktrees/r/0.5.0/wt-backlog-b"
     worktree_ws.commit(ready, "src/a.py")
     log = repo / ".git/logs/refs/heads/wt/0.5.0/wt-backlog-a"  # age is the branch's birth
-    log.write_text(re.sub(r"> \d+ ", f"> {int(_TWO_DAYS_AGO)} ", log.read_text(), count=1))
+    write_text(log, re.sub(r"> \d+ ", f"> {int(_TWO_DAYS_AGO)} ", read_text(log), count=1))
     foreign = root / ".dadaia/tmp/claude/20200101/wt-a"
     # a canonical wt/ branch outside worktrees/r/ is still foreign — its merge would refuse
     worktree_ws.git(repo, "worktree", "add", "-q", "-b", "wt/0.5.0/wt-hotfix-d", str(foreign))
@@ -118,7 +119,7 @@ def test_doctor_lists_the_contexts_worktrees_from_git_and_touches_none(tmp_path:
     assert not [f for f in doctor.scan_ttl() if "20200101" in f.path]
     assert found[str(root / "worktrees/r/0.5.0/wt-hotfix-c")].message.startswith("orphan")
     assert found[str(root / "worktrees/r/0.5.0/stray")].message.startswith("unregistered")
-    (ready / "wip.txt").write_text("x")
+    write_text(ready / "wip.txt", "x")
     assert [f.fix for f in doctor.check_worktrees("c") if str(ready) in f.message] == [""]  # dirty
     doctor.fix()
     assert ready.is_dir() and empty.is_dir() and foreign.is_dir()

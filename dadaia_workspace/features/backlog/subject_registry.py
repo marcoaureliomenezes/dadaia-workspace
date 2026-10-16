@@ -25,6 +25,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
 
+from dadaia_workspace.core import platform
 from dadaia_workspace.core.models.backlog import SubjectKind
 
 __all__ = [
@@ -77,8 +78,8 @@ def _derive_catalog_anchors(catalog_path: Path) -> set[str]:
     """Derive feature slugs (and product-atom ids) from ``catalog.json``."""
     anchors: set[str] = set()
     try:
-        data = json.loads(catalog_path.read_text(encoding="utf-8"))
-    except (OSError, ValueError, json.JSONDecodeError):
+        data = json.loads(platform.read_text(catalog_path))
+    except (OSError, ValueError, platform.Undecodable):
         return anchors
     if not isinstance(data, dict):
         return anchors
@@ -115,8 +116,8 @@ def _derive_doc_anchors(specs_dir: Path) -> set[str]:
         return anchors
     for md in sorted(memory_dir.rglob("*.md")):
         try:
-            content = md.read_text(encoding="utf-8")
-        except (OSError, ValueError):
+            content = platform.read_text(md)
+        except (OSError, ValueError, platform.Undecodable):
             continue
         for match in _SPECDOC_RE.finditer(content):
             anchors.add(match.group(0))
@@ -146,8 +147,8 @@ def _derive_invariant_anchors(specs_dir: Path) -> set[str]:
         if not path.is_file():
             continue
         try:
-            content = path.read_text(encoding="utf-8")
-        except (OSError, ValueError):
+            content = platform.read_text(path)
+        except (OSError, ValueError, platform.Undecodable):
             continue
         for match in _INVARIANT_RE.finditer(content):
             anchors.add(match.group(0))
@@ -215,8 +216,8 @@ class Registry:
         if result.anchor is None or not word:
             return result
         try:
-            text = (self._repo / result.anchor.id).read_text(encoding="utf-8")
-        except (OSError, ValueError):
+            text = platform.read_text(self._repo / result.anchor.id)
+        except (OSError, ValueError, platform.Undecodable):
             text = ""
         if re.search(rf"(?<!\w){re.escape(word)}(?!\w)", text) is None:
             return BindResult(

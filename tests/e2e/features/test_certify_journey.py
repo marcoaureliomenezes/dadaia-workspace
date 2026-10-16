@@ -23,6 +23,7 @@ from dadaia_workspace.infrastructure.certification_process import (
 )
 from tests.fixtures.harness_env import suite_env
 from tests.fixtures.stores import own_venv_python, own_venv_workspace
+from tests.helpers.oslib import write_text
 
 pytestmark = pytest.mark.e2e
 
@@ -45,7 +46,7 @@ class _Children(SubprocessCertificationProcess):
             return CertificationProcessResult(1, "", "not exercised")
         if list(argv[3:4]) == ["init"]:
             (own_venv_workspace(Path(argv[4])) / ".dadaia" / "nonsense").mkdir()
-            (Path(argv[4]) / "notes.txt").write_text("operator notes", encoding="utf-8")
+            write_text(Path(argv[4]) / "notes.txt", "operator notes")
             return CertificationProcessResult(0, "", "")
         path = os.pathsep.join([str((env or {}).get("PYTHONPATH")), *site.getsitepackages()])
         argv = [self._python if argv[0] == sys.executable else argv[0], *argv[1:]]

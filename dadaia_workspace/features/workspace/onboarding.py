@@ -16,8 +16,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
-from dadaia_workspace.core import workspace_layout
+from dadaia_workspace.core import platform, workspace_layout
 from dadaia_workspace.core.cli_line import fix_line, spell_fix
+from dadaia_workspace.core.doctor_rules import inline_cli
 from dadaia_workspace.core.fixed_sections import strip_fixed_sections
 from dadaia_workspace.core.gitflow import SeveralWorkBranches, constitution_error
 from dadaia_workspace.core.specs_version import state
@@ -54,6 +55,13 @@ def specs_ready(specs_dir: Path) -> bool:
     return state(specs_dir)[0] == "canonical"
 
 
+def _constitution_reason(c: _Ctx) -> str | None:
+    try:
+        return constitution_error(c.specs)
+    except platform.Undecodable as bad:
+        return f"{bad.path}: is not valid UTF-8"
+
+
 def _unbound(c: _Ctx) -> str | None:
     return "this session has no context binding" if c.bound is False else None
 
@@ -63,15 +71,15 @@ def _first_pass(c: _Ctx) -> list[str]:
     pending = []
     for name in _STUBS:
         path = c.specs / "memory" / name
-        text = path.read_text(encoding="utf-8") if path.is_file() else ""
+        text = platform.read_text(path) if path.is_file() else ""
         if not text or was_shipped(
             strip_fixed_sections(text), f"scaffold/memory/{name}", templates
         ):
             pending.append(str(path))
     try:
-        catalog = json.loads((c.specs / "memory" / "product" / "catalog.json").read_text("utf-8"))
+        catalog = json.loads(platform.read_text(c.specs / "memory" / "product" / "catalog.json"))
         atoms = bool(catalog.get("features"))
-    except (OSError, ValueError, AttributeError):
+    except (OSError, ValueError, AttributeError, platform.Undecodable):
         atoms = False
     return pending if atoms else [*pending, f"{c.specs / 'memory' / 'product'} (no atom)"]
 
@@ -83,7 +91,7 @@ def _first_pass_fix(c: _Ctx) -> str:
         version = GitSubprocessClient().work_version(repo)
     except SeveralWorkBranches as several:
         version, lead = several.keep, several.fix.removeprefix("Agent action: ") + ", then "
-    lane = fix_line(c.root, "worktree", "new", repo.name, f"{version}/wt-backlog-first-pass")
+    lane = inline_cli(c.root, "worktree", "new", repo.name, f"{version}/wt-backlog-first-pass")
     return (
         f"Agent action: {lead}open the lane {lane}"
         f", then run the dd-audit-project first pass in it — {', '.join(_first_pass(c))}"
@@ -98,8 +106,8 @@ STEPS: tuple[tuple[str, Kind, _Pending, Callable[[_Ctx], str]], ...] = (
     (
         "constitution",
         "agent",
-        lambda c: constitution_error(c.specs),
-        lambda c: f"Agent action: repair the YAML frontmatter of {c.specs / 'constitution.md'}",
+        _constitution_reason,
+        lambda c: str(state(c.specs)[1]),
     ),
     (
         "specs",
@@ -134,7 +142,7 @@ def next_step(
     whether the caller's session is bound (``None``: no identity, so no ``bind`` step)."""
     if not trees:
         create = (
-            f"Agent action: run {fix_line(root, 'context', 'create')} with a context name "
+            f"Agent action: run {inline_cli(root, 'context', 'create')} with a context name "
             "and --main-repo set to the main repo's clone URL"
         )
         return Step("context", "command", "no ALIVE Spec Context — create one", create)

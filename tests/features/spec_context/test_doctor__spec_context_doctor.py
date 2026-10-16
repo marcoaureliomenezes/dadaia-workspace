@@ -7,7 +7,6 @@ import pytest
 
 pytest.importorskip("fcntl")
 
-import stat  # noqa: E402
 from dataclasses import replace  # noqa: E402
 from pathlib import Path  # noqa: E402
 
@@ -25,6 +24,7 @@ from dadaia_workspace.features.spec_context.doctor import (  # noqa: E402
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
 from tests.fixtures.stores import context_store
+from tests.helpers.oslib import link, make_executable, read_text, write_text
 
 
 def _make_healthy_venv(root: Path) -> None:
@@ -35,8 +35,8 @@ def _make_healthy_venv(root: Path) -> None:
     bindir = root / ".dadaia" / ".venv" / PLATFORM.venv_scripts_dir
     bindir.mkdir(parents=True, exist_ok=True)
     entry = bindir / f"dadaia{PLATFORM.venv_exe_suffix}"
-    entry.write_text("#!/bin/sh\n")
-    entry.chmod(entry.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+    write_text(entry, "#!/bin/sh\n")
+    make_executable(entry)
 
 
 def _ctx(
@@ -135,7 +135,7 @@ def test_inv5_holds_a_main_or_associated_repo_of_a_dead_context(tmp_path: Path, 
     ctx = _with_lib(_ctx("stale", state=ContextState.DEAD))
     repo_dir = tmp_path / "repos" / slug
     repo_dir.mkdir(parents=True)
-    (repo_dir / "work.txt").write_text("keep\n")
+    write_text(repo_dir / "work.txt", "keep\n")
     svc, _ = _make_doctor(tmp_path, [ctx])
 
     msg = f"Context 'stale' is dead but repo '{slug}' is on disk"
@@ -146,7 +146,7 @@ def test_inv5_holds_a_main_or_associated_repo_of_a_dead_context(tmp_path: Path, 
     svc.fix()
 
     held = list(tmp_path.glob(f".dadaia/reaped/*/repos/{slug}/work.txt"))
-    assert [p.read_text() for p in held] == ["keep\n"]
+    assert [read_text(p) for p in held] == ["keep\n"]
     assert not repo_dir.exists()
     assert svc.fix() == []
 
@@ -188,7 +188,7 @@ def test_inv5_fix_refuses_a_dead_slug_that_resolves_outside_repos(tmp_path: Path
     root itself) is never rmtree'd: the step reports a skipped action and every entry of
     the workspace survives."""
     (tmp_path / "repos" / "victim").mkdir(parents=True)
-    (tmp_path / "repos" / "victim" / "keep.txt").write_text("keep", encoding="utf-8")
+    write_text(tmp_path / "repos" / "victim" / "keep.txt", "keep")
     (tmp_path / ".dadaia" / "states").mkdir(parents=True)
     victim = _ctx("victim", state=ContextState.ALIVE)  # registered: the layout keeps repos/victim
     svc, _ = _make_doctor(
@@ -197,7 +197,7 @@ def test_inv5_fix_refuses_a_dead_slug_that_resolves_outside_repos(tmp_path: Path
 
     actions = svc.fix()
 
-    assert (tmp_path / "repos" / "victim" / "keep.txt").read_text(encoding="utf-8") == "keep"
+    assert read_text(tmp_path / "repos" / "victim" / "keep.txt") == "keep"
     assert (tmp_path / ".dadaia" / "states").is_dir()
     inv5 = [a for a in actions if a.startswith("INV-5:")]
     assert len(inv5) == 2 and all("skipped" in a and "outside" in a for a in inv5), actions
@@ -208,15 +208,15 @@ def test_inv5_fix_never_follows_a_symlinked_repo_dir(tmp_path: Path) -> None:
     ``repos/``; the target is neither removed nor emptied."""
     outside = tmp_path / "outside"
     outside.mkdir()
-    (outside / "keep.txt").write_text("keep", encoding="utf-8")
+    write_text(outside / "keep.txt", "keep")
     ws = tmp_path / "ws"
     (ws / "repos").mkdir(parents=True)
-    (ws / "repos" / "stale").symlink_to(outside, target_is_directory=True)
+    assert link(str(outside), ws / "repos" / "stale", is_dir=True)
     svc, _ = _make_doctor(ws, [_ctx("stale")])
 
     actions = svc.fix()
 
-    assert (outside / "keep.txt").read_text(encoding="utf-8") == "keep"
+    assert read_text(outside / "keep.txt") == "keep"
     assert [a for a in actions if a.startswith("INV-5:")] == [
         "INV-5: skipped 'repos/stale' (outside repos/)"
     ]

@@ -14,7 +14,7 @@ The package holds three modules:
 
 All decision/action functions are pure: every I/O and process seam is injected, so the
 CLI wires the real container adapters and the tests drive synthetic facts. Zero
-subprocess, zero ``os.kill`` — the push-gate's git object reads arrive via the injected
+subprocess, no process control — the push-gate's git object reads arrive via the injected
 ``object_source`` (the git object reader),
 and its specs-canon predicates arrive via the injected
 ``canon_violations_fn`` callable, which this package never

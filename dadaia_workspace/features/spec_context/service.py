@@ -12,8 +12,9 @@ from functools import partial
 from pathlib import Path
 from typing import Any, Protocol
 
-from dadaia_workspace.core import clock, workspace_layout
+from dadaia_workspace.core import clock, platform, workspace_layout
 from dadaia_workspace.core.cli_line import fix_line, git_line, shell_line
+from dadaia_workspace.core.doctor_rules import git_inline, inline_cli
 from dadaia_workspace.core.exceptions import (
     AssociatedRepoConflictError,
     AssociatedRepoNotFoundError,
@@ -93,7 +94,7 @@ class DeadUnpushedCommitsError(DadaiaError):
 def _worktree_git_dir(tree: Path) -> Path:
     """The common git dir a move of linked worktree *tree* runs from — Windows refuses to
     rename a process's cwd, so never *tree* itself."""
-    gitdir = (tree / ".git").read_text(encoding="utf-8").removeprefix("gitdir:").strip()
+    gitdir: str = platform.read_text(tree / ".git").removeprefix("gitdir:").strip()
     return (tree / gitdir).parents[1]
 
 
@@ -152,7 +153,7 @@ def hook_state(installed: Path, source: str) -> tuple[HookState, str]:
         return HookState.UNREADABLE, exc.strerror or ""
     if raw == (scripts / source).read_bytes():
         return HookState.CURRENT, ""
-    text = raw.decode("utf-8", errors="replace").replace("\r\n", "\n")
+    text = platform.decode(raw)
     ours = was_shipped(text, f"scripts/{source}", scripts.parent / "templates")
     return (HookState.STALE if ours else HookState.DIFFERS), ""
 
@@ -167,7 +168,7 @@ def install_git_hooks(repo_root: Path, *, force: bool = False) -> list[Path]:
     if hooks_dir is None:
         raise NotAGitRepositoryError(
             f"{repo_root} is not a git repository",
-            fix=f"Agent action: run it on a git repository, or '{git_line(repo_root, 'init')}'",
+            fix=f"Agent action: run it on a git repository, or '{git_inline(repo_root, 'init')}'",
         )
     hooks_dir.mkdir(parents=True, exist_ok=True)
     written = []
@@ -176,9 +177,9 @@ def install_git_hooks(repo_root: Path, *, force: bool = False) -> list[Path]:
         state, _ = hook_state(dest, source)
         if force or state in (HookState.ABSENT, HookState.STALE):
             if state is HookState.UNREADABLE:  # copyfile opens its target: set aside what cannot be
-                dest.rename(dest.with_name(f"{dest.name}.unreadable"))
+                platform.replace(dest, dest.with_name(f"{dest.name}.unreadable"))
             shutil.copyfile(workspace_layout.public_scripts_dir() / source, dest)
-            dest.chmod(0o755)
+            platform.make_executable(dest)
             written.append(dest)
     return written
 
@@ -320,7 +321,7 @@ class SpecContextService:
                     f"'{slug}' is already owned by context '{other.name}' (as its own main "
                     "repo or one of its associated repos). 'repos/<slug>' is a namespace every "
                     f"context shares — registering it on '{name}' too would let "
-                    f"'{fix_line(self._workspace_root, 'context', 'dead', name)}' push "
+                    f"'{inline_cli(self._workspace_root, 'context', 'dead', name)}' push "
                     f"and delete '{other.name}''s working "
                     "tree.",
                     fix=f"Agent action: choose a different slug, or coordinate with '{other.name}'",
@@ -649,7 +650,7 @@ class SpecContextService:
             fix_line(self._workspace_root, *argv, found[0])
             if len(found) == 1
             else "Agent action: choose the principal branch origin holds and run "
-            f"`{fix_line(self._workspace_root, *argv)}` with it"
+            f"`{inline_cli(self._workspace_root, *argv)}` with it"
         )
         raise ContextStateError(
             f"Context '{name}': origin holds no principal '{flow.principal}' (origin candidates: "

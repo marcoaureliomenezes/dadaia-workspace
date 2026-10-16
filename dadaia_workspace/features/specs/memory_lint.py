@@ -12,6 +12,7 @@ from typing import Any
 
 from jsonschema import Draft202012Validator
 
+from dadaia_workspace.core import platform
 from dadaia_workspace.core.fixed_sections import authored_text
 from dadaia_workspace.core.skill_owner import load_owner
 from dadaia_workspace.features.specs import memory_canon
@@ -139,7 +140,7 @@ def _is_product_atom(md_path: Path, memory_dir: Path) -> bool:
 def lint_atom(md_path: Path, memory_dir: Path, schema: dict[str, Any]) -> AtomResult:
     result = AtomResult(md_path)
     try:
-        content = md_path.read_text(encoding="utf-8")
+        content = platform.read_text(md_path)
     except OSError as exc:
         result.error(f"Cannot read file: {exc}")
         return result

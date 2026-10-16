@@ -9,7 +9,6 @@ Real git over ``file://`` bare remotes (MEDIUM): the contract is git's own branc
 from __future__ import annotations
 
 import shutil
-import subprocess
 import sys
 from collections.abc import Callable
 from pathlib import Path
@@ -29,6 +28,8 @@ from dadaia_workspace.features.spec_context.service import (
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from tests.conftest import GIT_QUIET_INCLUDE
 from tests.fixtures.stores import context_store
+from tests.helpers.oslib import make_executable, read_text, run, write_text
+from tests.helpers.oslib import run as os_run
 from tests.helpers.privacy_fixtures import aws_key_shape
 
 _WORK = "feature/0.1.0"
@@ -39,9 +40,7 @@ _CONSTITUTION = (
 
 
 def _git(cwd: Path, *args: str) -> str:
-    return subprocess.run(
-        ["git", *args], cwd=cwd, capture_output=True, text=True, check=True
-    ).stdout.strip()
+    return run(["git", *args], cwd=cwd, check=True).stdout.strip()
 
 
 def _identity(repo: Path) -> None:
@@ -51,7 +50,7 @@ def _identity(repo: Path) -> None:
 
 @pytest.fixture(autouse=True)
 def _no_global_git(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    (tmp_path / "gitconfig").write_text(GIT_QUIET_INCLUDE, encoding="utf-8")
+    write_text(tmp_path / "gitconfig", GIT_QUIET_INCLUDE)
     monkeypatch.setenv("GIT_CONFIG_GLOBAL", str(tmp_path / "gitconfig"))
     monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
 
@@ -63,7 +62,7 @@ def _seed(bare: Path, work: Path, *branches: str, tag: str = "") -> None:
     for n, branch in enumerate(branches):
         if n:
             _git(work, "checkout", "-q", "-b", branch)
-        (work / "README.md").write_text(f"r{n}\n", encoding="utf-8")
+        write_text(work / "README.md", f"r{n}\n")
         _git(work, "add", "README.md")
         _git(work, "commit", "-qm", f"c{n}")
     if tag:
@@ -90,8 +89,8 @@ def _clone_onboarded(bare: Path, repo: Path, identity: bool = True) -> None:
     if identity:
         _identity(repo)
     (repo / "specs").mkdir()
-    (repo / "specs" / "constitution.md").write_text(_CONSTITUTION, encoding="utf-8")
-    (repo / "AGENTS.md").write_text("# law\n", encoding="utf-8")
+    write_text(repo / "specs" / "constitution.md", _CONSTITUTION)
+    write_text(repo / "AGENTS.md", "# law\n")
 
 
 def _heads(bare: Path) -> dict[str, str]:
@@ -113,13 +112,13 @@ def _published(repo: Path, bare: Path, work: str = _WORK, base: str = "develop")
 
 
 def _ancestor(repo: Path, old: str, new: str) -> bool:
-    done = subprocess.run(["git", "merge-base", "--is-ancestor", old, new], cwd=repo)
+    done = os_run(["git", "merge-base", "--is-ancestor", old, new], cwd=repo)
     return done.returncode == 0
 
 
 def _commit_file(repo: Path, rel: str, text: str = "x\n") -> None:
     (repo / rel).parent.mkdir(parents=True, exist_ok=True)
-    (repo / rel).write_text(text, encoding="utf-8")
+    write_text(repo / rel, text)
     _git(repo, "add", rel)
     _git(repo, "commit", "-qm", rel)
 
@@ -131,7 +130,7 @@ def _draft(
         "{principal: main, integration: develop, work: feature/}",
         f"{{principal: {principal}, integration: {integration}, work: {work}}}",
     )
-    return lambda repo: (repo / "specs" / "constitution.md").write_text(text, encoding="utf-8")
+    return lambda repo: write_text(repo / "specs" / "constitution.md", text)
 
 
 def _tree(bare: Path, ref: str) -> list[str]:
@@ -174,17 +173,17 @@ _ADOPTIONS = [
         lambda r, b, s: set(_heads(b)) == {"main", "develop", "release/0.1.0"}
         and _ancestor(r, _heads(b)["develop"], "release/0.1.0"),
         id="H4-release-prefix-from-the-committed-draft"),
-    pytest.param(("master",), "master", "", lambda r: (_draft("master")(r), _commit_file(r, "specs/constitution.md", (r / "specs/constitution.md").read_text())), _WORK,
+    pytest.param(("master",), "master", "", lambda r: (_draft("master")(r), _commit_file(r, "specs/constitution.md", read_text(r / "specs/constitution.md"))), _WORK,
         lambda r, b, s: "specs/constitution.md" in _tree(b, _WORK) and (r / "specs/constitution.md").is_file(),
         id="P7c-specs-committed-on-the-principal-are-published"),
     pytest.param(("main", "develop"), "", "", lambda r: _commit_file(r, "app.py"), _WORK,
         lambda r, b, s: "app.py" in _tree(b, _WORK),
         id="P8-local-principal-commits-carried-onto-work"),
-    pytest.param(("main",), "", "", lambda r: (r / "README.md").write_text("operator\n"), _WORK,
+    pytest.param(("main",), "", "", lambda r: write_text(r / "README.md", "operator\n"), _WORK,
         lambda r, b, s: _published(r, b) and _git(r, "status", "--porcelain") == "M README.md",
         id="h-dirty-work-outside-the-paths-rides-along-uncommitted"),
-    pytest.param((), "", "", lambda r: (r / "notes.md").write_text("operator\n"), _WORK,
-        lambda r, b, s: (r / "notes.md").read_text() == "operator\n" and "notes.md" not in _tree(b, _WORK),
+    pytest.param((), "", "", lambda r: write_text(r / "notes.md", "operator\n"), _WORK,
+        lambda r, b, s: read_text(r / "notes.md") == "operator\n" and "notes.md" not in _tree(b, _WORK),
         id="unborn-clone-keeps-its-untracked-foreign-files"),
 ]  # fmt: skip
 
@@ -248,7 +247,6 @@ def test_baseline_adopts_origin_and_publishes_the_draft(
     assert then(repo, bare, seed_heads), _heads(bare)
 
 
-@pytest.mark.skipif(sys.platform == "win32", reason="the shipped pre-push hook is bash")
 @pytest.mark.parametrize("seeded", [(), ("main",)], ids=["empty", "principal-only"])
 def test_every_publish_passes_the_shipped_pre_push_gate(env, tmp_path: Path, seeded) -> None:
     """The real shipped pre-push gate (this interpreter's CLI) admits the first publish and
@@ -259,11 +257,11 @@ def test_every_publish_passes_the_shipped_pre_push_gate(env, tmp_path: Path, see
     _clone_onboarded(bare, repo)
     runner = tmp_path / ".dadaia" / ".venv" / "bin" / "dadaia"
     runner.parent.mkdir(parents=True)
-    runner.write_text(f'#!/bin/sh\nexec "{sys.executable}" -m dadaia_workspace "$@"\n')
-    runner.chmod(0o755)
+    write_text(runner, f'#!/bin/sh\nexec "{sys.executable}" -m dadaia_workspace "$@"\n')
+    make_executable(runner)
     hook = repo / ".git" / "hooks" / "pre-push"
     shutil.copyfile(workspace_layout.public_scripts_dir() / "pre-push-ci-gate.sh", hook)
-    hook.chmod(0o755)
+    make_executable(hook)
     assert svc.baseline("proj") == "feature/0.1.0"
     assert {"main", "develop", "feature/0.1.0"} <= set(_heads(bare))
 
@@ -309,12 +307,12 @@ def test_an_origin_without_the_principal_refuses_and_publishes_nothing(env, tmp_
     svc, repo, bare = env
     _seed(bare, tmp_path / "seed", "develop")
     _clone_onboarded(bare, repo)
-    (repo / "README.md").write_text("OPERATOR\n", encoding="utf-8")
+    write_text(repo / "README.md", "OPERATOR\n")
     before = _heads(bare)
     with pytest.raises(ContextStateError, match="'main'") as refused:
         svc.baseline("proj")
     assert _heads(bare) == before
-    assert (repo / "README.md").read_text(encoding="utf-8") == "OPERATOR\n"
+    assert read_text(repo / "README.md") == "OPERATOR\n"
     assert _git(repo, "branch", "--show-current") == "feature/0.1.0"
     assert _git(repo, "for-each-ref", "--format=%(refname:short)", "refs/heads") == "feature/0.1.0"
     anchor = _git(repo, "rev-parse", "HEAD")
@@ -344,9 +342,9 @@ def test_a_never_onboarded_repo_is_refused_with_the_specs_init_fix(env, tmp_path
     _git(repo.parent, "clone", "-q", bare.as_uri(), str(repo))
     _identity(repo)
     before, head = _heads(bare), _git(repo, "rev-parse", "HEAD")
-    (repo / ".gitignore").write_text("specs/\n", encoding="utf-8")
+    write_text(repo / ".gitignore", "specs/\n")
     (repo / "specs").mkdir()
-    (repo / "specs" / "constitution.md").write_text(_CONSTITUTION, encoding="utf-8")
+    write_text(repo / "specs" / "constitution.md", _CONSTITUTION)
     with pytest.raises(ContextStateError, match="no committable specs/constitution.md") as refused:
         svc.baseline("proj")
     assert str(refused.value).endswith("specs init --context proj")
@@ -366,7 +364,7 @@ def test_a_work_branch_checked_out_in_another_worktree_is_refused_and_left_untou
     _git(repo, "branch", "feature/0.1.0", "origin/main")
     wt = tmp_path / "wt"
     _git(repo, "worktree", "add", "-q", str(wt), "feature/0.1.0")
-    (wt / "new.py").write_text("operator staged work\n", encoding="utf-8")
+    write_text(wt / "new.py", "operator staged work\n")
     _git(wt, "add", "new.py")
     tip, before = _git(repo, "rev-parse", "feature/0.1.0"), _heads(bare)
     with pytest.raises(GitSyncError, match="refusing to fetch into branch") as refused:
@@ -398,11 +396,11 @@ def test_a_stale_work_draft_conflict_names_the_anchor_and_never_publishes_the_ol
     _seed(bare, tmp_path / "seed", "main", "develop")
     _clone_onboarded(bare, repo)
     _git(repo, "switch", "-q", "-c", "feature/0.1.0")
-    (repo / "AGENTS.md").write_text("# old draft\n", encoding="utf-8")
+    write_text(repo / "AGENTS.md", "# old draft\n")
     _git(repo, "add", "AGENTS.md")
     _git(repo, "commit", "-qm", "old draft")
     _git(repo, "switch", "-q", "main")
-    (repo / "AGENTS.md").write_text("# new draft\n", encoding="utf-8")
+    write_text(repo / "AGENTS.md", "# new draft\n")
     before = _heads(bare)
     with pytest.raises(GitSyncError, match="CONFLICT") as refused:
         svc.baseline("proj")
@@ -420,11 +418,11 @@ def test_unrelated_operator_history_keeps_gits_refusal(env, tmp_path: Path) -> N
     _git(repo.parent, "init", "-q", "-b", "main", str(repo))
     _identity(repo)
     _git(repo, "remote", "add", "origin", bare.as_uri())
-    (repo / "app.py").write_text("x\n", encoding="utf-8")
+    write_text(repo / "app.py", "x\n")
     _git(repo, "add", "app.py")
     _git(repo, "commit", "-qm", "operator root")
     (repo / "specs").mkdir()
-    (repo / "specs" / "constitution.md").write_text(_CONSTITUTION, encoding="utf-8")
+    write_text(repo / "specs" / "constitution.md", _CONSTITUTION)
     with pytest.raises(GitSyncError, match="unrelated histories"):
         svc.baseline("proj")
 
@@ -436,7 +434,7 @@ def test_a_draft_origin_tracks_is_never_stashed_away(env, tmp_path: Path) -> Non
     seed = tmp_path / "seed"
     _seed(bare, seed, "main")
     _git(seed, "checkout", "-q", "-b", "develop")
-    (seed / "AGENTS.md").write_text("upstream agents\n", encoding="utf-8")
+    write_text(seed / "AGENTS.md", "upstream agents\n")
     _git(seed, "add", "AGENTS.md")
     _git(seed, "commit", "-qm", "a")
     _git(seed, "push", "-q", bare.as_uri(), "develop")
@@ -450,15 +448,13 @@ def test_a_draft_origin_tracks_is_never_stashed_away(env, tmp_path: Path) -> Non
 
 def test_a_tool_commit_never_falls_back_to_a_tool_identity(tmp_path: Path, monkeypatch) -> None:
     """One identity rule (git's own) — no hard-coded fallback author."""
-    (tmp_path / "gitconfig").write_text(
-        f"{GIT_QUIET_INCLUDE}[user]\n\tuseConfigOnly = true\n", encoding="utf-8"
-    )
+    write_text(tmp_path / "gitconfig", f"{GIT_QUIET_INCLUDE}[user]\n\tuseConfigOnly = true\n")
     for var in ("NAME", "EMAIL"):
         monkeypatch.delenv(f"GIT_AUTHOR_{var}", raising=False)
         monkeypatch.delenv(f"GIT_COMMITTER_{var}", raising=False)
     repo = tmp_path / "r"
     _git(tmp_path, "init", "-q", str(repo))
-    (repo / "a.md").write_text("a\n", encoding="utf-8")
+    write_text(repo / "a.md", "a\n")
     client = GitSubprocessClient()
     assert client.identity_fix(repo) == f"Agent action: set git user.name in the config of {repo}"
     with pytest.raises(GitSyncError):
@@ -486,7 +482,7 @@ def test_a_secret_under_a_non_ascii_name_refuses_before_any_write(
     if seeded:
         _seed(bare, tmp_path / "seed", *seeded)
     _clone_onboarded(bare, repo)
-    (repo / "specs" / "memória.md").write_text(f"k={aws_key_shape()}\n", encoding="utf-8")
+    write_text(repo / "specs" / "memória.md", f"k={aws_key_shape()}\n")
     before, branch = _heads(bare), _git(repo, "branch", "--show-current")
     with pytest.raises(DeadSecretFoundError) as refused:
         svc.baseline("proj")
@@ -503,7 +499,7 @@ def test_a_second_foreign_backup_is_published_inside_specs_bkp(env, tmp_path: Pa
     _identity(seed)
     for rel in ("specs/features/login.md", "specs-bkp/old.md"):
         (seed / rel).parent.mkdir(parents=True, exist_ok=True)
-        (seed / rel).write_text(f"{rel}\n", encoding="utf-8")
+        write_text(seed / rel, f"{rel}\n")
     _git(seed, "add", ".")
     _git(seed, "commit", "-qm", "foreign")
     _git(seed, "push", "-q", bare.as_uri(), "main")
@@ -511,8 +507,8 @@ def test_a_second_foreign_backup_is_published_inside_specs_bkp(env, tmp_path: Pa
     _identity(repo)
     GitSubprocessClient().move(repo, "specs", "specs-bkp/20260101T000000Z")
     (repo / "specs").mkdir()
-    (repo / "specs" / "constitution.md").write_text(_CONSTITUTION, encoding="utf-8")
-    (repo / "AGENTS.md").write_text("# law\n", encoding="utf-8")
+    write_text(repo / "specs" / "constitution.md", _CONSTITUTION)
+    write_text(repo / "AGENTS.md", "# law\n")
     assert svc.baseline("proj") == "feature/0.1.0"
     pushed = _git(bare, "ls-tree", "-r", "--name-only", "feature/0.1.0").splitlines()
     assert "specs-bkp/20260101T000000Z/features/login.md" in pushed
@@ -527,6 +523,6 @@ def test_the_publish_code_never_rewrites_forces_or_deletes() -> None:
         "features/spec_context/service.py",
         "features/chokepoints/branch_policy.py",
     ):
-        text = (pkg / rel).read_text(encoding="utf-8")
+        text = read_text(pkg / rel)
         for verb in ('"-f"', '"reset"', '"rebase"', '"--force"', '"--delete"', "--republish"):
             assert verb not in text, f"{rel} carries {verb}"

@@ -15,7 +15,6 @@ ALLOWed entries the reaper then moved.
 
 from __future__ import annotations
 
-import shlex
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
@@ -27,6 +26,7 @@ from dadaia_workspace.features.spec_context.doctor import DoctorService, Finding
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from tests.fixtures.harness_env import claude_hook_env, run_hook_subprocess
 from tests.fixtures.stores import context_store
+from tests.helpers.oslib import command, write_text
 
 # (target, pre-existing dir or None, exception glob or None, gate allows)
 _TABLE = [
@@ -50,13 +50,11 @@ def test_gate_allows_iff_the_doctor_keeps_the_entry(
 ) -> None:
     for zone in ("tmp", "states", "sessions", "reaped"):
         (tmp_path / ".dadaia" / zone).mkdir(parents=True, exist_ok=True)
-    (tmp_path / ".dadaia" / "states" / "spec_contexts.json").write_text(
-        '{"contexts": []}', encoding="utf-8"
-    )
+    write_text(tmp_path / ".dadaia" / "states" / "spec_contexts.json", '{"contexts": []}')
     if existing is not None:
         (tmp_path / existing).mkdir()
     if glob is not None:
-        (tmp_path / DADAIAIGNORE).write_text(f"{glob}\n", encoding="utf-8")
+        write_text(tmp_path / DADAIAIGNORE, f"{glob}\n")
     path = tmp_path / target
     payload = {"tool_name": "Write", "tool_input": {"file_path": str(path), "content": "x"}}
 
@@ -69,16 +67,16 @@ def test_gate_allows_iff_the_doctor_keeps_the_entry(
     if block is not None:  # The one fix names the owning zone, never the globs
         (fix,) = [ln for ln in block["reason"].splitlines() if ln.startswith("fix: ")]
         tmp = tmp_path.resolve() / ".dadaia" / "tmp" / "main-thread"  # the agent's own day dir
-        assert shlex.split(fix[len("fix: ") :]) in [
-            [
+        assert fix[len("fix: ") :] in [
+            command(
                 Path(sys.executable).as_posix(),
                 "-c",
                 f"import pathlib; pathlib.Path(r'{(tmp / day).as_posix()}').mkdir(parents=True, exist_ok=True)",
-            ]
+            )
             for day in days
         ]
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text("x", encoding="utf-8")
+    write_text(path, "x")
     findings = DoctorService(
         context_store(tmp_path / ".dadaia" / "states"), GitSubprocessClient(), tmp_path
     ).scan()

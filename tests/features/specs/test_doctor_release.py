@@ -17,6 +17,8 @@ from dadaia_workspace.core.cli_line import shell_line
 from dadaia_workspace.features.specs.doctor import SpecsDoctor
 from dadaia_workspace.features.specs.doctor_common import resolve_active_release
 from dadaia_workspace.features.specs.doctor_release import ReleaseValidator
+from tests.helpers.oslib import run as os_run
+from tests.helpers.oslib import write_text
 from tests.helpers.release_state import PLAN
 
 _REPO = Path(__file__).resolve().parents[3]
@@ -25,8 +27,7 @@ _IMPLEMENTED = "2026-09-22T10:00:00Z"
 
 
 def _run(*argv: str) -> subprocess.CompletedProcess[str]:
-    return subprocess.run([sys.executable, str(_SCRIPT), *argv], capture_output=True,
-                          text=True, check=False)  # fmt: skip
+    return os_run([sys.executable, str(_SCRIPT), *argv], check=False)  # fmt: skip
 
 
 def _check(specs: Path) -> list[dict[str, Any]]:
@@ -45,15 +46,15 @@ def _specs(
     release_dir = specs / "releases" / rid
     (release_dir / "rc-1").mkdir(parents=True, exist_ok=True)
     for name in ("SPEC.md", "PLAN.md", "TASKS.md") if trio else ():
-        (release_dir / "rc-1" / name).write_text(
+        write_text(
+            release_dir / "rc-1" / name,
             f"# x\n\n**Status:** Approved\n\n{PLAN if name == 'PLAN.md' else ''}",
-            encoding="utf-8",
         )
-    (release_dir / "_RELEASE.json").write_text(json.dumps({
+    write_text(release_dir / "_RELEASE.json", json.dumps({
         "schema": "release-state-v1", "release": rid, "phase": phase,
         "defined": {"sha": "0000001", "ts": "2026-09-20T10:00:00Z"},
         "implemented": {"sha": "0000002", "ts": _IMPLEMENTED}, "shipped": None, "log": log,
-    }), encoding="utf-8")  # fmt: skip
+    }))  # fmt: skip
     return specs
 
 
@@ -102,13 +103,14 @@ def test_release_doctor_judges_status_only_on_the_two_candidate_documents(
 ) -> None:
     specs = _specs(tmp_path, "IMPLEMENTATION", [])
     candidate = specs / "releases/0.5.0/rc-1"
-    candidate.joinpath("SPEC.md").write_text(
+    write_text(
+        candidate.joinpath("SPEC.md"),
         "# S\n\n**Status:** Approved\n**Origin:** customer-conversation\n\n"
         "## Bug window review\n\n## User-added section\n",
-        encoding="utf-8",
     )
-    candidate.joinpath("TASKS.md").write_text(
-        "# historical task index\n\n**Status:** Not a candidate status\n", encoding="utf-8"
+    write_text(
+        candidate.joinpath("TASKS.md"),
+        "# historical task index\n\n**Status:** Not a candidate status\n",
     )
 
     validator = ReleaseValidator(specs)

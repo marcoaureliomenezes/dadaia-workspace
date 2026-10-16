@@ -15,6 +15,7 @@ import re
 from collections.abc import Collection, Iterable
 from pathlib import Path, PurePath
 
+from dadaia_workspace.core import platform
 from dadaia_workspace.core.fixed_sections import authored_text
 
 __all__ = [
@@ -77,7 +78,7 @@ def _resolves_inside(repo_root: Path, token: str) -> bool:
     file INSIDE *repo_root*. A token that escapes the checkout — by traversal or through
     a symlink — is dead by definition, so existence is never probed outside the repo."""
     candidate = repo_root / token
-    if candidate.is_symlink():
+    if platform.is_link(candidate):
         return False
     try:
         resolved = candidate.resolve()
@@ -179,8 +180,7 @@ def dead_citations(
 def _numbered_headings(skill_md: Path) -> set[str]:
     """The `N` of every `## N.`/`## Na.` heading of *skill_md* — `## 3a.` answers §3."""
     return {
-        m.group(1)
-        for m in re.finditer(r"^## (\d+)[a-z]?\.", skill_md.read_text(encoding="utf-8"), re.M)
+        m.group(1) for m in re.finditer(r"^## (\d+)[a-z]?\.", platform.read_text(skill_md), re.M)
     }
 
 
@@ -229,7 +229,7 @@ def memory_citation_violations(
         (path, violation)
         for path in _markdown_files(memory_dir)
         for violation in dead_citations(
-            authored_text(path.read_text(encoding="utf-8")),
+            authored_text(platform.read_text(path)),
             command_paths=command_paths,
             repo_root=repo_root,
             rel=posix_relpath(path, repo_root),
@@ -239,7 +239,7 @@ def memory_citation_violations(
 
 def _markdown_files(root: Path) -> list[Path]:
     """Symlinks are skipped — the walk stays inside the tree it was handed (CWE-22)."""
-    return sorted(p for p in root.glob("**/*.md") if not p.is_symlink())
+    return sorted(p for p in root.glob("**/*.md") if not platform.is_link(p))
 
 
 def dead_path_citations_in_tree(
@@ -249,7 +249,7 @@ def dead_path_citations_in_tree(
     violations: list[str] = []
     for md_path in _markdown_files(public_dir):
         violations += dead_path_citations(
-            md_path.read_text(encoding="utf-8"),
+            platform.read_text(md_path),
             rel=posix_relpath(md_path, repo_root),
             repo_root=repo_root,
             exempt=exempt,
@@ -266,7 +266,7 @@ def dead_verb_citations_in_tree(
     violations: list[str] = []
     for md_path in _markdown_files(public_dir):
         violations += dead_verb_citations(
-            md_path.read_text(encoding="utf-8"),
+            platform.read_text(md_path),
             rel=posix_relpath(md_path, repo_root),
             command_paths=command_paths,
         )
@@ -281,7 +281,7 @@ def dead_body_pointers_in_tree(
     for root in roots:
         for md_path in _markdown_files(root):
             violations += dead_body_pointers(
-                md_path.read_text(encoding="utf-8"),
+                platform.read_text(md_path),
                 rel=posix_relpath(md_path, repo_root),
                 public_dir=public_dir,
             )

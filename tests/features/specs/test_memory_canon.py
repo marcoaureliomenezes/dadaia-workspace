@@ -12,6 +12,7 @@ from dadaia_workspace.features.specs import (
     memory_canon,
     memory_lint,
 )
+from tests.helpers.oslib import write_text
 
 
 def test_memory_canon_facts_are_one_object_everywhere() -> None:
@@ -39,10 +40,10 @@ def test_lint_flags_the_headings_the_doctor_flags(tmp_path: Path) -> None:
     memory_dir = tmp_path / "memory"
     (memory_dir / "product" / "area").mkdir(parents=True)
     atom = memory_dir / "product" / "area" / "sample.md"
-    atom.write_text(
+    write_text(
+        atom,
         "---\nslug: sample\ntitle: Sample\ncategory: support\ntldr: One line.\n"
         "summary: Summary line.\ntags: [x]\n---\n# Sample\n\n## Version\n\nbody\n\n## Historico\n\nbody\n",
-        encoding="utf-8",
     )
     schema = memory_lint.load_frontmatter_schema()
     result = memory_lint.lint_atom(atom, memory_dir, schema)

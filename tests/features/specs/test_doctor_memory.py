@@ -21,6 +21,7 @@ import pytest
 from dadaia_workspace.features.specs import doctor_memory
 from dadaia_workspace.features.specs.doctor_memory import MemoryValidator
 from dadaia_workspace.features.specs.doctor_types import finding_path
+from tests.helpers.oslib import write_text
 
 _VALID_FRONTMATTER = """---
 slug: {slug}
@@ -41,9 +42,9 @@ def _make_specs_with_memory(tmp_path: Path) -> Path:
 
 def test_lint1_clean_atom_produces_no_issues(tmp_path: Path) -> None:
     specs = _make_specs_with_memory(tmp_path)
-    (specs / "memory" / "product" / "a" / "architecture.md").write_text(
+    write_text(
+        specs / "memory" / "product" / "a" / "architecture.md",
         _VALID_FRONTMATTER.format(slug="architecture") + "\n## Purpose\n\nclean atom\n",
-        encoding="utf-8",
     )
 
     issues = MemoryValidator(specs).check_lint1_memory_atoms()
@@ -53,9 +54,9 @@ def test_lint1_clean_atom_produces_no_issues(tmp_path: Path) -> None:
 
 def test_lint1_forbidden_heading_maps_to_error(tmp_path: Path) -> None:
     specs = _make_specs_with_memory(tmp_path)
-    (specs / "memory" / "product" / "a" / "architecture.md").write_text(
+    write_text(
+        specs / "memory" / "product" / "a" / "architecture.md",
         _VALID_FRONTMATTER.format(slug="architecture") + "\n## Changelog\n\nnot allowed\n",
-        encoding="utf-8",
     )
 
     issues = MemoryValidator(specs).check_lint1_memory_atoms()
@@ -71,10 +72,10 @@ def test_lint1_unknown_heading_produces_no_issue(tmp_path: Path) -> None:
     """A heading nobody has ever seen before is neither an error nor a warning at the doctor
     mapping layer."""
     specs = _make_specs_with_memory(tmp_path)
-    (specs / "memory" / "product" / "a" / "architecture.md").write_text(
+    write_text(
+        specs / "memory" / "product" / "a" / "architecture.md",
         _VALID_FRONTMATTER.format(slug="architecture")
         + "\n## Some Brand New Never Before Seen Heading\n\ncontent\n",
-        encoding="utf-8",
     )
 
     issues = MemoryValidator(specs).check_lint1_memory_atoms()
@@ -87,13 +88,13 @@ def test_lint1_error_atom_and_clean_atom_coexist_only_the_error_surfaces(tmp_pat
     atom surfaces, while a sibling atom with an ordinary (never-curated) heading
     contributes nothing — exactly one issue, not silently swallowed or duplicated."""
     specs = _make_specs_with_memory(tmp_path)
-    (specs / "memory" / "product" / "a" / "architecture.md").write_text(
+    write_text(
+        specs / "memory" / "product" / "a" / "architecture.md",
         _VALID_FRONTMATTER.format(slug="architecture") + "\n## History\n\nforbidden\n",
-        encoding="utf-8",
     )
-    (specs / "memory" / "product" / "a" / "tech-stack.md").write_text(
+    write_text(
+        specs / "memory" / "product" / "a" / "tech-stack.md",
         _VALID_FRONTMATTER.format(slug="tech-stack") + "\n## Some Other Heading\n\nx\n",
-        encoding="utf-8",
     )
 
     issues = MemoryValidator(specs).check_lint1_memory_atoms()
@@ -125,14 +126,12 @@ def test_lint1_emits_one_single_line_issue_per_atom_error(tmp_path: Path) -> Non
     `  [path] ERROR:` lines."""
     specs = _make_specs_with_memory(tmp_path)
     architecture = specs / "memory" / "product" / "a" / "architecture.md"
-    architecture.write_text(
+    write_text(
+        architecture,
         _VALID_FRONTMATTER.format(slug="architecture") + "\n## History\n\nx\n## Changelog\n",
-        encoding="utf-8",
     )
     quality = specs / "memory" / "product" / "a" / "quality.md"
-    quality.write_text(
-        _VALID_FRONTMATTER.format(slug="quality") + "\n## History\n\nx\n", encoding="utf-8"
-    )
+    write_text(quality, _VALID_FRONTMATTER.format(slug="quality") + "\n## History\n\nx\n")
 
     issues = MemoryValidator(specs).check_lint1_memory_atoms()
 
@@ -189,7 +188,7 @@ def test_mem_drift1_table(
     specs = tmp_path / "specs"
     (specs / "memory").mkdir(parents=True)
     if architecture is not None:
-        (specs / "memory" / "ARCHITECTURE.md").write_text(architecture, encoding="utf-8")
+        write_text(specs / "memory" / "ARCHITECTURE.md", architecture)
     monkeypatch.setattr(doctor_memory, "_live_feature_package_names", lambda: live)
 
     issues = MemoryValidator(specs).check_mem_drift1_features_package_map()
@@ -210,9 +209,9 @@ def test_mem_drift1_real_live_introspection_returns_package_names() -> None:
 def test_unfilled_placeholder_atom_is_reported_with_the_fill_or_delete_line(tmp_path: Path) -> None:
     specs = _make_specs_with_memory(tmp_path)
     atom = specs / "memory" / "product" / "a" / "x.md"
-    atom.write_text(
+    write_text(
+        atom,
         "---\nslug: SLUG_PLACEHOLDER\ntitle: TITLE_PLACEHOLDER\ntldr: t\nsummary: s\n---\n\n# X\n",
-        encoding="utf-8",
     )
     [issue] = MemoryValidator(specs).check_placeholder_atoms()
     assert (issue.code, issue.fixable, issue.fix) == (

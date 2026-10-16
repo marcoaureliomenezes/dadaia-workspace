@@ -16,13 +16,15 @@ from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app
 from dadaia_workspace.features.specs.canon import default_public_dir, scaffold
+from tests.helpers.oslib import read_text, write_text
+from tests.helpers.oslib import run as os_run
 
 _MEMORY = default_public_dir() / "skills" / "dd-spec-navigator" / "scripts" / "memory.py"
 
 
 def _check(specs: Path) -> subprocess.CompletedProcess[str]:
     argv = [sys.executable, str(_MEMORY), "check", "--specs", str(specs)]
-    return subprocess.run(argv, capture_output=True, text=True, check=False)
+    return os_run(argv, check=False)
 
 
 def test_specs_upgrade_regenerates_a_catalog_an_older_generator_wrote(tmp_path: Path) -> None:
@@ -30,11 +32,11 @@ def test_specs_upgrade_regenerates_a_catalog_an_older_generator_wrote(tmp_path: 
     scaffold(specs, project_name="proj")
     catalog = specs / "memory" / "product" / "catalog.json"
     older = {"generated_at": "2026-01-01T00:00:00Z", "context": "proj", "features": []}
-    catalog.write_text(json.dumps(older, indent=2) + "\n", encoding="utf-8")
+    write_text(catalog, json.dumps(older, indent=2) + "\n")
     assert _check(specs).returncode == 1
 
     run = CliRunner().invoke(app, ["specs", "upgrade", "--specs-dir", str(specs)])
 
     assert run.exit_code == 0, run.output
     assert _check(specs).returncode == 0, _check(specs).stdout
-    assert "context" not in json.loads(catalog.read_text(encoding="utf-8"))
+    assert "context" not in json.loads(read_text(catalog))

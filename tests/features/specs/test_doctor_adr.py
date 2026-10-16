@@ -5,7 +5,6 @@ doctor's LEDGER-ADR-SCHEMA rule (``features/specs/doctor_adr``), the one ADR aut
 from __future__ import annotations
 
 import json
-import subprocess
 from pathlib import Path
 
 import pytest
@@ -13,13 +12,16 @@ from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app
 from dadaia_workspace.features.specs.doctor_adr import adr_record_issues
+from tests.helpers.oslib import read_text, write_text
+from tests.helpers.oslib import run as os_run
+from tests.helpers.oslib import write_text as os_write_text
 
 
 def _ledger(tmp_path: Path, ids: list[str], **fields: object) -> Path:
     specs = tmp_path / "specs"
     (specs / "ADRs").mkdir(parents=True)
     lines = [json.dumps({**_VALID_RECORD, **fields, "id": i}) for i in ids]
-    (specs / "ADRs" / "decisions.jsonl").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    write_text(specs / "ADRs" / "decisions.jsonl", "\n".join(lines) + "\n")
     return specs
 
 
@@ -128,7 +130,7 @@ def test_each_record_shape_is_judged_by_the_doctor(
     states — `_ledger.validate` is the one engine."""
     record = {k: v for k, v in {**_VALID_RECORD, **change}.items() if v is not _ABSENT}
     (tmp_path / "ADRs").mkdir()
-    (tmp_path / "ADRs" / "decisions.jsonl").write_text(json.dumps(record) + "\n", "utf-8")
+    os_write_text(tmp_path / "ADRs" / "decisions.jsonl", json.dumps(record) + "\n")
     issues = adr_record_issues(tmp_path)
     assert [i.message.removesuffix(" (ADRs/decisions.jsonl:1)") for i in issues] == expected
 
@@ -140,7 +142,7 @@ def test_an_unreadable_line_is_its_own_finding_and_the_next_record_is_still_read
     still judged (here: its id is the first, so 0001..N holds)."""
     specs = _ledger(tmp_path, ["0001"])
     ledger = specs / "ADRs" / "decisions.jsonl"
-    ledger.write_text("{not json\n[1]\n" + ledger.read_text("utf-8"), "utf-8")
+    os_write_text(ledger, "{not json\n[1]\n" + read_text(ledger))
     assert [i.message for i in adr_record_issues(specs)] == [
         "line is not valid JSON (Expecting property name enclosed in double quotes) (ADRs/decisions.jsonl:1)",
         "line is not a JSON object (ADRs/decisions.jsonl:2)",
@@ -189,7 +191,7 @@ def test_only_a_ruled_record_changes_an_accepted_one(
     specs = _ledger(tmp_path, ["0001"], **_RULED)
     ledger = specs / "ADRs" / "decisions.jsonl"
     successor = {**_VALID_RECORD, **change, "id": "0002", "amends": "0001"}
-    ledger.write_text(ledger.read_text("utf-8") + json.dumps(successor) + "\n", "utf-8")
+    os_write_text(ledger, read_text(ledger) + json.dumps(successor) + "\n")
     assert [i.message.rsplit(" (", 1)[0] for i in adr_record_issues(specs)] == expected
 
 
@@ -212,9 +214,9 @@ def _options_ledger(tmp_path: Path, last: str, **fields: object) -> Path:
     """A gap-free ledger 0001..`last`; only the last record carries `fields`."""
     specs = _ledger(tmp_path, [f"{n:04d}" for n in range(1, int(last) + 1)])
     ledger = specs / "ADRs" / "decisions.jsonl"
-    *head, _ = ledger.read_text("utf-8").splitlines()
+    *head, _ = read_text(ledger).splitlines()
     tail = json.dumps({**_VALID_RECORD, **fields, "id": last})
-    ledger.write_text("\n".join([*head, tail]) + "\n", "utf-8")
+    os_write_text(ledger, "\n".join([*head, tail]) + "\n")
     return specs
 
 
@@ -261,15 +263,16 @@ def test_options_below_two_or_missing_a_field_are_refused(
 
 def _tracked_repo(tmp_path: Path, records: list[dict[str, object]]) -> Path:
     """A real git repo tracking one test file, its specs ledger holding *records*."""
-    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    os_run(["git", "init", "-q", str(tmp_path)], check=True)
     (tmp_path / "tests").mkdir()
-    (tmp_path / "tests" / "test_x.py").write_text("def test_one():\n    pass\n", encoding="utf-8")
+    write_text(tmp_path / "tests" / "test_x.py", "def test_one():\n    pass\n")
     specs = tmp_path / "specs"
     (specs / "ADRs").mkdir(parents=True)
-    (specs / "ADRs" / "decisions.jsonl").write_text(
-        "".join(json.dumps({**_VALID_RECORD, **r}) + "\n" for r in records), encoding="utf-8"
+    write_text(
+        specs / "ADRs" / "decisions.jsonl",
+        "".join(json.dumps({**_VALID_RECORD, **r}) + "\n" for r in records),
     )
-    subprocess.run(["git", "-C", str(tmp_path), "add", "-A"], check=True)
+    os_run(["git", "-C", str(tmp_path), "add", "-A"], check=True)
     return specs
 
 
@@ -321,14 +324,12 @@ def test_a_job_resolves_only_as_a_workflow_node_id_and_a_code_only_if_the_doctor
         ],
     )
     (tmp_path / ".github" / "workflows").mkdir(parents=True)
-    (tmp_path / ".github" / "workflows" / "ci.yml").write_text(
-        "jobs:\n  doctor:\n    runs-on: x\n", encoding="utf-8"
-    )
-    (tmp_path / "tests" / "test_y.py").write_text(
+    write_text(tmp_path / ".github" / "workflows" / "ci.yml", "jobs:\n  doctor:\n    runs-on: x\n")
+    write_text(
+        tmp_path / "tests" / "test_y.py",
         'CODE = "ZZ-GHOST"\n\n\nclass TestFoo:\n    def test_bar(self):\n        pass\n',
-        encoding="utf-8",
     )
-    subprocess.run(["git", "-C", str(tmp_path), "add", "-A"], check=True)
+    os_run(["git", "-C", str(tmp_path), "add", "-A"], check=True)
     assert unresolved_measured_by(specs) == [
         ("0001", "the doctor flags it"),
         ("0004", "ZZ-GHOST"),

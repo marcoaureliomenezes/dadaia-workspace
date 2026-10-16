@@ -87,7 +87,6 @@ def execute_migration(store: JsonContextStore, workspace_root: Path) -> None:
                     for ctx in raw.get("contexts", [])
                 ],
             },
-            newline=None,
         )
         if primary_file.exists():
             primary_file.unlink()

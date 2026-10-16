@@ -14,6 +14,7 @@ from functools import partial
 from pathlib import Path
 from typing import Any
 
+from dadaia_workspace.core import platform
 from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES
 from dadaia_workspace.core.redaction import Redactor
 from dadaia_workspace.core.skill_owner import load_owner
@@ -254,9 +255,10 @@ def certify(
     pythonpath = os.pathsep.join(
         [*source_pythonpath, *([inherited_pythonpath] if inherited_pythonpath else [])]
     )
-    env = load_owner("dd-bug-resolution", "_git").scrubbed_env(fenced_env(target)) | {
-        "HOME": str(home)  # every child acts on the sandbox only
-    }
+    # every child acts on the sandbox only
+    env = load_owner("dd-bug-resolution", "_git").scrubbed_env(
+        fenced_env(target)
+    ) | platform.home_env(home)
     if pythonpath:
         env["PYTHONPATH"] = pythonpath
     else:
@@ -382,7 +384,8 @@ def certify(
     def handoff_validation() -> str:
         path = target / ".dadaia" / "handoff" / "certified-consumer" / "cert.handoff.json"
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(
+        platform.write_text(
+            path,
             json.dumps(
                 {
                     "schema_version": "handoff-v1.2",
@@ -396,7 +399,6 @@ def certify(
                 }
             )
             + "\n",
-            encoding="utf-8",
         )
         cli("reports", "validate", str(path), "--json")
         return "reports validate accepted a handoff-v1.2 record"

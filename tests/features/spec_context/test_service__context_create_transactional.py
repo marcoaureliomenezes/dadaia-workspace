@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import subprocess
 from pathlib import Path
 
 import pytest
@@ -23,19 +22,14 @@ from dadaia_workspace.infrastructure.public_assets import (  # noqa: E402
 from dadaia_workspace.infrastructure.python_env import (  # noqa: E402
     VenvPythonEnvironmentManager,
 )
+from tests.helpers.oslib import read_text, run, write_text
 
 _runner = CliRunner()
 _SID = "sess_create01"
 
 
 def _git(*args: str, cwd: Path | None = None) -> str:
-    return subprocess.run(
-        ["git", *args],
-        cwd=cwd,
-        check=True,
-        capture_output=True,
-        text=True,
-    ).stdout.strip()
+    return run(["git", *args], cwd=cwd, check=True).stdout.strip()
 
 
 def _remote(parent: Path, name: str) -> Path:
@@ -43,7 +37,7 @@ def _remote(parent: Path, name: str) -> Path:
     _git("init", "-q", "--bare", "-b", "main", str(bare))
     seed = parent / f"seed-{name}"
     _git("clone", "-q", str(bare), str(seed))
-    (seed / "README.md").write_text("hi\n", encoding="utf-8")
+    write_text(seed / "README.md", "hi\n")
     _git("add", "README.md", cwd=seed)
     _git("commit", "-qm", "init", cwd=seed)
     _git("push", "-q", "origin", "HEAD:main", cwd=seed)
@@ -54,7 +48,7 @@ def _names(ws: Path) -> list[str]:
     path = ws / ".dadaia" / "states" / "spec_contexts.json"
     if not path.exists():
         return []
-    contexts = json.loads(path.read_text(encoding="utf-8")).get("contexts", {})
+    contexts = json.loads(read_text(path)).get("contexts", {})
     return [c["name"] for c in contexts] if isinstance(contexts, list) else list(contexts)
 
 

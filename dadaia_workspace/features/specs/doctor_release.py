@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from dadaia_workspace.core import platform
 from dadaia_workspace.core.doctor_rules import SectionFinding
 from dadaia_workspace.core.release_state import (
     LEGACY_RELEASE_STATE_FILENAME,
@@ -38,7 +39,7 @@ def _extract_status(md_path: Path) -> str | None:
     """Read a release artifact's declared status. Parsing itself is core.spec_status."""
     if not md_path.exists():
         return None
-    return extract_status(md_path.read_text(encoding="utf-8"))
+    return extract_status(platform.read_text(md_path))
 
 
 class ReleaseValidator:
@@ -152,4 +153,4 @@ class ReleaseValidator:
         if (named := finding_path(issue)) and Path(named).name == LEGACY_RELEASE_STATE_FILENAME:
             legacy = Path(named)
             if legacy.is_file() and not legacy.with_name(RELEASE_STATE_FILENAME).exists():
-                legacy.rename(legacy.with_name(RELEASE_STATE_FILENAME))
+                platform.replace(legacy, legacy.with_name(RELEASE_STATE_FILENAME))

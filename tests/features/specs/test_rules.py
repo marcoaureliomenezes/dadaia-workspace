@@ -10,17 +10,18 @@ from pathlib import Path
 
 from dadaia_workspace.features.specs import rules as rules_mod
 from dadaia_workspace.features.specs.doctor import SpecsDoctor
+from tests.helpers.oslib import read_text, write_text
 
 
 def _minimal_specs(tmp_path: Path) -> Path:
     specs = tmp_path / "specs"
     (specs / "memory" / "product").mkdir(parents=True)
     (specs / "releases" / "1.2.3").mkdir(parents=True)
-    (specs / "releases" / "1.2.3" / "_RELEASE.json").write_text(
+    write_text(
+        specs / "releases" / "1.2.3" / "_RELEASE.json",
         '{"schema": "release-state-v1", "release": "1.2.3", "phase": "IMPLEMENTATION",'
         ' "defined": null, "implemented": null, "shipped": null,'
         ' "log": []}',
-        encoding="utf-8",
     )
     return specs
 
@@ -58,9 +59,7 @@ def test_fix_dispatch_and_help_derive_from_the_registry() -> None:
 
 
 def test_cli_fix_help_is_the_derived_text() -> None:
-    src = (
-        Path(__file__).resolve().parents[3] / "dadaia_workspace/cli/commands/doctor.py"
-    ).read_text(encoding="utf-8")
+    src = read_text(Path(__file__).resolve().parents[3] / "dadaia_workspace/cli/commands/doctor.py")
     assert "render_fix_help()" in src
     assert "TREE-3: render missing memory HTML" not in src
 

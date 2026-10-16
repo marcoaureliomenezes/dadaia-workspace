@@ -13,21 +13,42 @@ Pure module — no I/O; its one internal edge is ``core.cli_line``, the CLI spel
 
 from __future__ import annotations
 
+import sys
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, replace
-from pathlib import PurePath
+from pathlib import Path, PurePath
 
+from dadaia_workspace.core import platform
 from dadaia_workspace.core.cli_line import fix_line, spell_fix
+from dadaia_workspace.core.platform import Undecodable
+from dadaia_workspace.core.skill_owner import load_owner
 
 __all__ = [
     "Rule",
     "SectionFinding",
     "SectionReport",
+    "git_inline",
+    "inline",
+    "inline_cli",
     "merge_sections",
     "render_finding",
     "rule_fix",
+    "run_rule",
     "run_section",
 ]
+
+
+_KERNEL = load_owner("dd-bug-resolution", "_platform")
+#: Words as text inside a sentence (the kernel's ``inline``, the door's once it carries it).
+inline = _KERNEL.inline
+git_inline = _KERNEL.git_inline
+
+
+def inline_cli(root: PurePath | None, *argv: str) -> str:
+    """The workspace CLI (the venv running now when *root* is ``None``) and *argv* as text
+    inside a sentence; a finished fix is :func:`~dadaia_workspace.core.cli_line.fix_line`."""
+    venv = platform.venv_dir(root) if root is not None else Path(sys.prefix)
+    return str(inline(str(platform.venv_tool(venv, "dadaia")), *argv))
 
 
 @dataclass(frozen=True)
@@ -87,20 +108,39 @@ class SectionReport:
         return any(f.error for f in self.findings)
 
 
+def run_rule[C](rule: Rule[C], context: C, seen: set[str]) -> list[SectionFinding]:
+    """*rule*'s findings; a document that is not UTF-8 ends the rule and is reported once per
+    path across the run (*seen*) as ``SPEC-DOC-002`` carrying the act that re-encodes it."""
+    try:
+        return rule.run(context)
+    except Undecodable as bad:
+        if str(bad.path) in seen:
+            return []
+        seen.add(str(bad.path))
+        message = f"{bad.path} is not valid UTF-8"
+        extra = (("path", str(bad.path)),)
+        return [
+            SectionFinding("SPEC-DOC-002", "error", message, False, True, bad.fix, False, extra)
+        ]
+
+
 def run_section[C](
     name: str,
     rules: Sequence[Rule[C]],
     context: C,
     root: PurePath | None,
     specs: PurePath | None = None,
+    seen: set[str] | None = None,
 ) -> SectionReport:
     """Run every rule of one section over its context.
 
     *root* is the workspace a CLI remedy runs from (``None`` when no instance surrounds the run: the running CLI).
+    *seen* is the set of non-UTF-8 paths already reported; the doctor passes one to every section of a run.
     """
     findings: list[SectionFinding] = []
+    seen = set() if seen is None else seen
     for rule in rules:
-        for issue in rule.run(context):
+        for issue in run_rule(rule, context, seen):
             findings.append(_with_fix(issue, rule, root, specs))
     return SectionReport(name=name, findings=tuple(findings))
 

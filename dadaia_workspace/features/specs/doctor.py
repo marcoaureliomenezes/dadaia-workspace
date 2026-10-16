@@ -25,7 +25,7 @@ from __future__ import annotations
 from collections.abc import Collection
 from pathlib import Path
 
-from dadaia_workspace.core.doctor_rules import SectionFinding
+from dadaia_workspace.core.doctor_rules import SectionFinding, run_rule
 from dadaia_workspace.features.specs.doctor_closure_audit import ClosureAuditValidator
 from dadaia_workspace.features.specs.doctor_coherence import CoherenceValidator
 from dadaia_workspace.features.specs.doctor_memory import MemoryValidator
@@ -110,8 +110,9 @@ class SpecsDoctor:
         tree = SpecsTree(self.specs_dir)
         self._release.tree = tree
         issues: list[SectionFinding] = []
+        seen: set[str] = set()
         for rule in RULES:
-            issues.extend(rule.run(self))
+            issues.extend(run_rule(rule, self, seen))
         return issues
 
     def fix(self, issues: list[SectionFinding] | None = None) -> list[SectionFinding]:

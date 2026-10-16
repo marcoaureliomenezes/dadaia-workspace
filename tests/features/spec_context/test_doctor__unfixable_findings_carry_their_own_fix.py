@@ -5,15 +5,12 @@ Size: MEDIUM (real git repo, the doctor's own section assembly, the CLI in-proce
 
 from __future__ import annotations
 
-import shlex
-import subprocess
 from pathlib import Path
 
 import pytest
 from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app
-from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.doctor_rules import run_section
 from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
 from dadaia_workspace.features.spec_context.doctor import (
@@ -23,6 +20,7 @@ from dadaia_workspace.features.spec_context.doctor import (
 )
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from tests.fixtures.stores import context_store
+from tests.helpers.oslib import cli_path, command, run
 
 
 def _ctx(name: str, slug: str, *, url: str = "", alive: bool = True) -> SpecContextProject:
@@ -41,11 +39,9 @@ def _workspace(tmp_path: Path) -> Path:
     ws = tmp_path / "ws"
     repo = ws / "repos" / "demo"
     repo.mkdir(parents=True)
-    subprocess.run(["git", "init", "-q", "-b", "main"], cwd=repo, check=True)
-    subprocess.run(
-        ["git", "remote", "add", "origin", "https://example.invalid/demo.git"],
-        cwd=repo,
-        check=True,
+    run(["git", "init", "-q", "-b", "main"], cwd=repo, check=True)
+    run(
+        ["git", "remote", "add", "origin", "https://example.invalid/demo.git"], cwd=repo, check=True
     )
     store = context_store(ws / ".dadaia" / "states")
     store.save(_ctx("demo", "demo"))  # alive, empty repo_url -> CTX-URL-1
@@ -81,10 +77,10 @@ def test_the_printed_ctx_url_fix_clears_ctx_url_1(
     appears for that context."""
     ws = _workspace(tmp_path)
     ((_message, fix),) = _findings(ws)["CTX-URL-1"]
-    argv = shlex.split(fix)
-    assert argv[0] == shlex.split(fix_line(ws))[0]
+    words = ("context", "alive", "demo")
+    assert fix == command(str(cli_path(ws)), *words)
     monkeypatch.chdir(ws)
-    result = CliRunner().invoke(app, argv[1:])
+    result = CliRunner().invoke(app, list(words))
 
     after = _findings(ws)
     assert "CTX-URL-1" not in after, result.output

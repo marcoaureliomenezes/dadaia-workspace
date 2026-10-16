@@ -23,7 +23,6 @@ Size: MEDIUM — real git and bare origins in tmp_path (the question is a git qu
 from __future__ import annotations
 
 import re
-import subprocess
 import sys
 from collections.abc import Callable
 from dataclasses import replace
@@ -50,13 +49,14 @@ from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
 from tests.fixtures.harness_env import retire_tree
 from tests.fixtures.stores import context_store, fake_venv
+from tests.helpers.oslib import link, read_text, run, run_line, write_text
 from tests.helpers.privacy_fixtures import aws_key_shape
 
 pytestmark = pytest.mark.slow
 
 
 def _git(*args: str, cwd: Path) -> None:
-    subprocess.run(["git", *args], cwd=cwd, capture_output=True, check=True)
+    run(["git", *args], cwd=cwd, check=True)
 
 
 def _published(tmp_path: Path, repo: Path) -> Path:
@@ -66,8 +66,8 @@ def _published(tmp_path: Path, repo: Path) -> Path:
     _git("clone", str(bare), str(repo), cwd=tmp_path)
     _git("config", "user.email", "t@example.com", cwd=repo)
     _git("config", "user.name", "T", cwd=repo)
-    (repo / "README.md").write_text("init\n")
-    (repo / ".gitignore").write_text(".worktrees/\nignored.txt\n")
+    write_text(repo / "README.md", "init\n")
+    write_text(repo / ".gitignore", ".worktrees/\nignored.txt\n")
     _git("add", "README.md", ".gitignore", cwd=repo)
     _git("commit", "-m", "init", cwd=repo)
     _git("push", "-u", "origin", "HEAD", cwd=repo)
@@ -103,7 +103,7 @@ def _alive(
 
 def _side_branch(repo: Path) -> None:
     _git("switch", "-c", "topic", cwd=repo)
-    (repo / "t.txt").write_text("work\n")
+    write_text(repo / "t.txt", "work\n")
     _git("add", "t.txt", cwd=repo)
     _git("commit", "-m", "topic work", cwd=repo)
     _git("switch", "main", cwd=repo)
@@ -113,7 +113,7 @@ def _worktree(repo: Path) -> None:
     outside = repo.parents[2] / "wt"
     _git("worktree", "add", "-b", "wt", str(outside), cwd=repo)
     _git("push", "-u", "origin", "wt", cwd=repo)
-    (outside / "uncommitted.txt").write_text("keep\n")
+    write_text(outside / "uncommitted.txt", "keep\n")
 
 
 def _wt(repo: Path, *, checked_out: bool) -> None:
@@ -122,7 +122,7 @@ def _wt(repo: Path, *, checked_out: bool) -> None:
     tree = repo.parents[1] / "worktrees" / repo.name / "0.5.0/wt-hotfix-b"
     _git("branch", "feature/0.5.0", cwd=repo)  # the work branch it is ahead of
     _git("worktree", "add", "-b", "wt/0.5.0/wt-hotfix-b", str(tree), cwd=repo)
-    (tree / "w.txt").write_text("w\n")
+    write_text(tree / "w.txt", "w\n")
     _git("add", "w.txt", cwd=tree)
     _git("-c", "user.name=T", "-c", "user.email=t@example.com", "commit", "-qm", "w", cwd=tree)
     if checked_out:
@@ -137,14 +137,14 @@ def _ahead_with_work(repo: Path) -> None:
 
 
 def _ahead_on_main(repo: Path) -> None:
-    (repo / "ahead.md").write_text("unpushed\n")
+    write_text(repo / "ahead.md", "unpushed\n")
     _git("add", "ahead.md", cwd=repo)
     _git("commit", "-m", "ahead", cwd=repo)
 
 
 def _no_remote(repo: Path) -> None:
     _git("remote", "remove", "origin", cwd=repo)
-    (repo / "notes.md").write_text("local only\n")
+    write_text(repo / "notes.md", "local only\n")
     _git("add", "notes.md", cwd=repo)
     _git("commit", "-m", "local only", cwd=repo)
 
@@ -158,7 +158,7 @@ def _repos_outside(repo: Path) -> None:
     """`repos/` resolves outside the workspace: preflight passes, the hold refuses."""
     outside = repo.parents[2] / "outside"
     repo.parent.rename(outside)
-    repo.parent.symlink_to(outside)
+    assert link(str(outside), repo.parent, is_dir=False)
 
 
 _REFUSALS = [
@@ -168,8 +168,8 @@ _REFUSALS = [
     pytest.param("lib", partial(_wt, checked_out=True), DeadUnpushedCommitsError, rf"fix: {re.escape(shell_line(sys.executable))} \S+worktree\.py merge \S+/worktrees/lib/0\.5\.0/wt-hotfix-b$", id="AC1.10-open-wt-worktree"),
     pytest.param("main", partial(_wt, checked_out=False), DeadUnpushedCommitsError, rf"fix: {re.escape(shell_line(sys.executable))} \S+worktree\.py merge \S+/worktrees/main/0\.5\.0/wt-hotfix-b$", id="AC1.10-unpushed-orphan-wt"),
     pytest.param("main", lambda r: (r.parents[1] / ".dadaia/.venv" / PLATFORM.venv_scripts_dir / f"dadaia{PLATFORM.venv_exe_suffix}").unlink(), DeadUnpushedCommitsError, r"no workspace CLI[\s\S]*fix: uvx dadaia-workspace init \S+/ws$", id="AC1.10-rows-unreadable-fails-closed"),
-    pytest.param("lib", lambda r: (r / "leftover.txt").write_text("x\n"), DeadReviewRequiredError, r"lib[\s\S]*leftover\.txt", id="A16.2-untracked-in-lib"),
-    pytest.param("lib", lambda r: (r / "README.md").write_text("edited\n"), DeadReviewRequiredError, r"^Context 'proj': repo 'lib' has 1 uncommitted change\(s\); dead never commits", id="AC3.2-dirty-refusal-names-context-and-repo"),
+    pytest.param("lib", lambda r: write_text(r / "leftover.txt", "x\n"), DeadReviewRequiredError, r"lib[\s\S]*leftover\.txt", id="A16.2-untracked-in-lib"),
+    pytest.param("lib", lambda r: write_text(r / "README.md", "edited\n"), DeadReviewRequiredError, r"^Context 'proj': repo 'lib' has 1 uncommitted change\(s\); dead never commits", id="AC3.2-dirty-refusal-names-context-and-repo"),
     pytest.param("lib", _ahead_on_main, DeadReviewRequiredError, r"fix: git -C \S+/repos/lib checkout -b feature/0\.1\.0$", id="the-fix-creates-the-work-branch"),
     pytest.param("lib", _ahead_with_work, DeadReviewRequiredError, r"fix: git -C \S+/repos/lib switch feature/0\.3\.0$", id="the-fix-switches-to-the-existing-work-branch"),
     pytest.param("lib", _no_remote, DeadUnpushedCommitsError, "lib", id="A16.2-local-commits-no-remote-in-lib"),
@@ -207,7 +207,7 @@ def test_dead_fix_for_an_unpushable_branch_clears_the_block(tmp_path: Path) -> N
         service.dead("proj")
     (fix,) = [ln for ln in str(refused.value).splitlines() if ln.startswith("fix: ")]
 
-    subprocess.run(fix.removeprefix("fix: "), shell=True, check=True, capture_output=True)
+    run_line(fix.removeprefix("fix: "), check=True)
 
     assert _git_out(lib, "branch", "--show-current") == "feature/0.3.0"
     with pytest.raises(DeadUnpushedCommitsError):
@@ -215,9 +215,7 @@ def test_dead_fix_for_an_unpushable_branch_clears_the_block(tmp_path: Path) -> N
 
 
 def _git_out(cwd: Path, *args: str) -> str:
-    return subprocess.run(
-        ["git", *args], cwd=cwd, capture_output=True, text=True, check=True
-    ).stdout.strip()
+    return run(["git", *args], cwd=cwd, check=True).stdout.strip()
 
 
 def _unborn(repo: Path, *files: str) -> None:
@@ -225,12 +223,12 @@ def _unborn(repo: Path, *files: str) -> None:
     _git("init", str(repo), cwd=repo.parent)
     _git("remote", "add", "origin", str(repo.parents[2] / "vanished.git"), cwd=repo)
     for name in files:
-        (repo / name).write_text("scaffold\n")
+        write_text(repo / name, "scaffold\n")
 
 
 _HOLDS = [
     pytest.param(lambda r: None, "README.md", "init\n", id="C1-clean-set"),
-    pytest.param(lambda r: (r / "ignored.txt").write_text(f"k={aws_key_shape()}\n"), "ignored.txt", None, id="gitignored-is-not-untracked"),
+    pytest.param(lambda r: write_text(r / "ignored.txt", f"k={aws_key_shape()}\n"), "ignored.txt", None, id="gitignored-is-not-untracked"),
     pytest.param(_unborn, ".git/HEAD", None, id="unborn-empty-clone-no-push"),
 ]  # fmt: skip
 
@@ -246,9 +244,9 @@ def test_dead_holds_every_repo_of_the_set_under_reaped(
     service.dead("proj")
 
     reaped = tmp_path / "ws" / ".dadaia" / "reaped"
-    assert [p.read_text() for p in reaped.glob("*/repos/main/README.md")] == ["init\n"]
+    assert [read_text(p) for p in reaped.glob("*/repos/main/README.md")] == ["init\n"]
     kept = list(reaped.glob(f"*/repos/lib/{held}"))
-    assert len(kept) == 1 and (content is None or kept[0].read_text() == content)
+    assert len(kept) == 1 and (content is None or read_text(kept[0]) == content)
     assert not repo.exists() and not (repo.parent / "lib").exists()
     assert store.get("proj").state is ContextState.DEAD  # type: ignore[union-attr]
 
@@ -262,21 +260,21 @@ def test_c2_a_nested_foreign_worktree_is_refused_and_its_fix_clears_it(tmp_path:
     _published(tmp_path, other)
     nested = repo / ".worktrees" / "wt"
     _git("worktree", "add", "-b", "wt", str(nested), cwd=other)
-    (nested / "uncommitted.txt").write_text("keep\n")
+    write_text(nested / "uncommitted.txt", "keep\n")
 
     with pytest.raises(DeadUnpushedCommitsError) as refused:
         service.dead("proj")
 
-    assert (nested / "uncommitted.txt").read_text() == "keep\n"
+    assert read_text(nested / "uncommitted.txt") == "keep\n"
     assert store.get("proj").state is ContextState.ALIVE  # type: ignore[union-attr]
     fix = str(refused.value).rsplit("fix: ", 1)[1]
     move = f"{fix.split('`')[1]} {tmp_path / 'kept'}"
     # Git runs from the common git dir, never inside the tree it moves: Windows refuses
     # to rename a process's cwd.
     assert Path(move.split()[2]).samefile(other / ".git"), fix
-    subprocess.run(move, shell=True, check=True, capture_output=True)  # noqa: S602
+    run_line(move, check=True)
     service.dead("proj")
-    assert (tmp_path / "kept" / "uncommitted.txt").read_text() == "keep\n"
+    assert read_text(tmp_path / "kept" / "uncommitted.txt") == "keep\n"
     assert store.get("proj").state is ContextState.DEAD  # type: ignore[union-attr]
 
 
@@ -314,11 +312,9 @@ def test_dead_refuses_a_dirty_checkout_with_one_fix_line_naming_every_file(tmp_p
     refuses with exactly one fix line naming every dirty path and leaves tree and origin untouched."""
     service, store, repo = _alive(tmp_path)
     lib = repo.parent / "lib"
-    (lib / "README.md").write_text("edited\n")
-    (lib / "new.txt").write_text("new\n")
-    origin_before = subprocess.run(
-        ["git", "ls-remote", str(tmp_path / "lib.git")], capture_output=True, text=True, check=True
-    ).stdout
+    write_text(lib / "README.md", "edited\n")
+    write_text(lib / "new.txt", "new\n")
+    origin_before = run(["git", "ls-remote", str(tmp_path / "lib.git")], check=True).stdout
 
     with pytest.raises(DeadReviewRequiredError) as refused:
         service.dead("proj")
@@ -327,16 +323,8 @@ def test_dead_refuses_a_dirty_checkout_with_one_fix_line_naming_every_file(tmp_p
     assert fixes == [
         f"fix: Operator action: move {lib / 'README.md'}, {lib / 'new.txt'} into a worktree, or discard it",
     ]
-    assert (lib / "README.md").read_text() == "edited\n" and (lib / "new.txt").is_file()
-    assert (
-        subprocess.run(
-            ["git", "ls-remote", str(tmp_path / "lib.git")],
-            capture_output=True,
-            text=True,
-            check=True,
-        ).stdout
-        == origin_before
-    )
+    assert read_text(lib / "README.md") == "edited\n" and (lib / "new.txt").is_file()
+    assert run(["git", "ls-remote", str(tmp_path / "lib.git")], check=True).stdout == origin_before
     assert store.get("proj").state is ContextState.ALIVE  # type: ignore[union-attr]
 
 

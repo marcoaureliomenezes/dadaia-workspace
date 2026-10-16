@@ -5,13 +5,14 @@ through its registry (check + fix) and the validator's own interface.
 from __future__ import annotations
 
 import json
-import subprocess
 from pathlib import Path
 
+from dadaia_workspace.core.doctor_rules import run_section
 from dadaia_workspace.features.specs.doctor import SpecsDoctor
-from dadaia_workspace.features.specs.doctor_adr import adr_record_issues
+from dadaia_workspace.features.specs.doctor_adr import LEDGER_RULES
 from dadaia_workspace.features.specs.doctor_memory import MemoryValidator
 from dadaia_workspace.features.specs.doctor_types import finding_path
+from tests.helpers.oslib import read_text, run, write_text
 
 _FRAGMENTS = {
     "slop-law": "## Slop — workspace law (fixed)\n- LAW_BULLET\n",
@@ -24,7 +25,7 @@ def _public_dir(tmp_path: Path) -> Path:
     fixed = tmp_path / "public" / "data" / "fixed"
     fixed.mkdir(parents=True)
     for section_id, fragment in _FRAGMENTS.items():
-        (fixed / f"{section_id}.md").write_text(fragment, encoding="utf-8")
+        write_text(fixed / f"{section_id}.md", fragment)
     return tmp_path / "public"
 
 
@@ -35,9 +36,9 @@ def _block(section_id: str, body: str) -> str:
 def _specs(tmp_path: Path, *, constitution: str, architecture: str, quality: str) -> Path:
     specs = tmp_path / "specs"
     (specs / "memory").mkdir(parents=True)
-    (specs / "constitution.md").write_text(constitution, encoding="utf-8")
-    (specs / "memory" / "ARCHITECTURE.md").write_text(architecture, encoding="utf-8")
-    (specs / "memory" / "QUALITY.md").write_text(quality, encoding="utf-8")
+    write_text(specs / "constitution.md", constitution)
+    write_text(specs / "memory" / "ARCHITECTURE.md", architecture)
+    write_text(specs / "memory" / "QUALITY.md", quality)
     return specs
 
 
@@ -77,7 +78,7 @@ def test_check_is_a_no_op_for_an_absent_file(tmp_path: Path) -> None:
     public = _public_dir(tmp_path)
     specs = tmp_path / "specs"
     (specs / "memory").mkdir(parents=True)
-    (specs / "constitution.md").write_text("# C\n", encoding="utf-8")
+    write_text(specs / "constitution.md", "# C\n")
     issues = MemoryValidator(specs).check_fixed_sections(public)
     assert [(i.code, Path(finding_path(i) or "").name) for i in issues] == [
         ("FIXED-1", "constitution.md")
@@ -113,13 +114,13 @@ def test_fix_inserts_a_missing_block_and_refreshes_a_drifted_one(tmp_path: Path)
     fixed = doctor.fix()
 
     assert [i.code for i in fixed if i.code.startswith("FIXED")] == ["FIXED-1", "FIXED-2"]
-    assert (specs / "constitution.md").read_text(encoding="utf-8") == (
+    assert read_text(specs / "constitution.md") == (
         "# C\n\n" + _block("slop-law", _FRAGMENTS["slop-law"])
     )
-    assert (specs / "memory" / "ARCHITECTURE.md").read_text(encoding="utf-8") == (
+    assert read_text(specs / "memory" / "ARCHITECTURE.md") == (
         "# A\n\n" + _block("slop-code", _FRAGMENTS["slop-code"]) + "\n## Tail\n"
     )
-    assert (specs / "memory" / "QUALITY.md").read_text(encoding="utf-8") == (
+    assert read_text(specs / "memory" / "QUALITY.md") == (
         "# Q\n\n" + _block("slop-tests", _FRAGMENTS["slop-tests"])
     )
     assert _fixed_issues(doctor) == []
@@ -148,11 +149,11 @@ def _adr_specs(tmp_path: Path, *, markers: bool, measured_by: str) -> tuple[Path
         "measured_by": measured_by,
     }
     (specs / "ADRs").mkdir()
-    (specs / "ADRs" / "decisions.jsonl").write_text(json.dumps(record) + "\n", encoding="utf-8")
-    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    write_text(specs / "ADRs" / "decisions.jsonl", json.dumps(record) + "\n")
+    run(["git", "init", "-q", str(tmp_path)], check=True)
     (tmp_path / "tests").mkdir()
-    (tmp_path / "tests" / "test_x.py").write_text("def test_one():\n    pass\n", encoding="utf-8")
-    subprocess.run(["git", "-C", str(tmp_path), "add", "-A"], check=True)
+    write_text(tmp_path / "tests" / "test_x.py", "def test_one():\n    pass\n")
+    run(["git", "-C", str(tmp_path), "add", "-A"], check=True)
     return public, specs, specs / "memory" / "ARCHITECTURE.md"
 
 
@@ -165,7 +166,7 @@ def test_a_stale_adr_list_block_is_fixed_2_and_fix_regenerates_it(tmp_path: Path
 
     doctor.fix()
 
-    assert architecture.read_text(encoding="utf-8") == (
+    assert read_text(architecture) == (
         "# A\n\n"
         + _block("slop-code", _FRAGMENTS["slop-code"])
         + "\n"
@@ -183,7 +184,7 @@ def test_an_unresolved_measured_by_refuses_the_regeneration_and_writes_nothing(
     tmp_path: Path,
 ) -> None:
     public, specs, architecture = _adr_specs(tmp_path, markers=True, measured_by="tests/missing.py")
-    before = architecture.read_text(encoding="utf-8")
+    before = read_text(architecture)
     doctor = SpecsDoctor(specs, public_dir=public)
 
     refused = [i for i in doctor.check() if i.code == "FIXED-2"]
@@ -194,20 +195,18 @@ def test_an_unresolved_measured_by_refuses_the_regeneration_and_writes_nothing(
         " workflow-job id, or a rule code (an in-place `chore(adrs): repair` commit)."
     )
     doctor.fix()
-    assert architecture.read_text(encoding="utf-8") == before
+    assert read_text(architecture) == before
 
 
 def test_a_refused_adr_list_does_not_withhold_the_other_blocks_of_the_file(tmp_path: Path) -> None:
     public, specs, architecture = _adr_specs(tmp_path, markers=True, measured_by="tests/missing.py")
-    drifted = architecture.read_text(encoding="utf-8").replace(_FRAGMENTS["slop-code"], "drifted\n")
-    architecture.write_text(drifted, encoding="utf-8")
+    drifted = read_text(architecture).replace(_FRAGMENTS["slop-code"], "drifted\n")
+    write_text(architecture, drifted)
     doctor = SpecsDoctor(specs, public_dir=public)
 
     doctor.fix()
 
-    assert architecture.read_text(encoding="utf-8") == drifted.replace(
-        "drifted\n", _FRAGMENTS["slop-code"]
-    )
+    assert read_text(architecture) == drifted.replace("drifted\n", _FRAGMENTS["slop-code"])
 
 
 def test_markers_without_a_ledger_render_an_empty_list(tmp_path: Path) -> None:
@@ -220,7 +219,7 @@ def test_markers_without_a_ledger_render_an_empty_list(tmp_path: Path) -> None:
 
     doctor.fix()
 
-    assert architecture.read_text(encoding="utf-8").endswith(_block("adr-list", ""))
+    assert read_text(architecture).endswith(_block("adr-list", ""))
     assert _fixed_issues(doctor) == []
 
 
@@ -234,11 +233,12 @@ def test_a_ledger_that_is_not_utf8_is_one_reencode_finding_and_never_a_crash(
 
     found = SpecsDoctor(specs, public_dir=public).check()
 
-    assert [i.fix for i in adr_record_issues(specs)] == [restore]
+    ledgers = run_section("ledgers", LEDGER_RULES, specs, None, specs)
+    assert [i.fix for i in ledgers.findings] == [restore]
     assert [i.code for i in found if i.code == "FIXED-2"] == []
 
 
-def test_a_fragment_that_is_not_utf8_is_reinstalled_not_misread_as_a_refused_render(
+def test_a_fragment_that_is_not_utf8_is_one_reinstall_finding_never_a_refused_render(
     tmp_path: Path,
 ) -> None:
     public = _public_dir(tmp_path)
@@ -250,6 +250,8 @@ def test_a_fragment_that_is_not_utf8_is_reinstalled_not_misread_as_a_refused_ren
         quality="# Q\n",
     )
 
-    (refused,) = [i for i in SpecsDoctor(specs, public_dir=public).check() if i.code == "FIXED-2"]
+    found = SpecsDoctor(specs, public_dir=public).check()
 
-    assert refused.fix == _REINSTALL
+    assert [(i.code, i.fix) for i in found if i.code in ("FIXED-2", "SPEC-DOC-002")] == [
+        ("SPEC-DOC-002", _REINSTALL)
+    ]

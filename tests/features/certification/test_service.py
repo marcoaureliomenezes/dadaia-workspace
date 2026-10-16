@@ -42,6 +42,7 @@ from dadaia_workspace.infrastructure.certification_process import (
     CertificationProcessResult,
     SubprocessCertificationProcess,
 )
+from tests.helpers.oslib import read_text
 
 
 class _FakeCertificationProcess:
@@ -284,9 +285,7 @@ class _BareConfigSeen(SubprocessCertificationProcess):
     ) -> CertificationProcessResult:
         if argv[0] != "git":
             if "--main-repo" in argv:
-                self.bare_config = (Path(argv[argv.index("--main-repo") + 1]) / "config").read_text(
-                    encoding="utf-8"
-                )
+                self.bare_config = read_text(Path(argv[argv.index("--main-repo") + 1]) / "config")
             return CertificationProcessResult(0 if argv[3:4] == ["init"] else 1, "", "")
         return super().run(argv, cwd=cwd, env=env, timeout=timeout)
 

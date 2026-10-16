@@ -25,6 +25,7 @@ from tests.fakes import register_dead  # noqa: E402
 from tests.fixtures.real_git import clone, seeded_remote
 from tests.fixtures.real_git import git as run_git
 from tests.fixtures.stores import context_store
+from tests.helpers.oslib import write_text
 
 
 @pytest.fixture()
@@ -65,7 +66,7 @@ def test_alive_leaves_a_preexisting_specs_tree_untouched_and_hooks_the_repo(
     repo = clone(remote, workspace_root / "repos" / "my-repo")
     head = run_git(repo, "rev-parse", "HEAD")
     (repo / "specs").mkdir(parents=True)
-    (repo / "specs" / "constitution.md").write_text("# operator\n", encoding="utf-8")
+    write_text(repo / "specs" / "constitution.md", "# operator\n")
 
     svc.alive("proj")
 

@@ -16,6 +16,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+from dadaia_workspace.core import platform
 from dadaia_workspace.core.gitflow import live_release_id
 from dadaia_workspace.core.release_state import CANDIDATE_RE, RELEASE_STATE_FILENAME
 from dadaia_workspace.core.skill_owner import load_owner
@@ -36,7 +37,7 @@ def resolve_active_release(specs_dir: Path) -> tuple[str | None, str | None]:
         return None, None
     jsonl = load_owner("dd-bug-resolution", "_jsonl")
     try:
-        text = (specs_dir / "releases" / release_id / RELEASE_STATE_FILENAME).read_text("utf-8")
+        text = platform.read_text(specs_dir / "releases" / release_id / RELEASE_STATE_FILENAME)
         phase = jsonl.parse_object(text, "").get("phase")
     except (OSError, jsonl.Unreadable):
         return None, None

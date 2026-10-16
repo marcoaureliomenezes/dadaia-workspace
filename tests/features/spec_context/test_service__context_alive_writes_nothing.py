@@ -7,7 +7,6 @@ holds it (HEAD unchanged, porcelain clean, no ``specs/``) with the pre-push hook
 
 from __future__ import annotations
 
-import subprocess
 from pathlib import Path
 
 import pytest
@@ -26,22 +25,22 @@ from dadaia_workspace.features.spec_context.service import (
 )
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient  # noqa: E402
 from tests.fixtures.stores import context_store
+from tests.helpers.oslib import run, write_text
+from tests.helpers.oslib import run as os_run
 
 
 def _git(cwd: Path, *args: str) -> str:
-    return subprocess.run(
-        ["git", *args], cwd=cwd, capture_output=True, text=True, check=True
-    ).stdout.strip()
+    return run(["git", *args], cwd=cwd, check=True).stdout.strip()
 
 
 def _seeded_remote(tmp_path: Path, name: str) -> tuple[Path, str]:
     bare = tmp_path / f"{name}.git"
-    subprocess.run(["git", "init", "--bare", "-q", str(bare)], check=True)
+    os_run(["git", "init", "--bare", "-q", str(bare)], check=True)
     seed = tmp_path / f"seed-{name}"
-    subprocess.run(["git", "clone", "-q", str(bare), str(seed)], check=True)
+    os_run(["git", "clone", "-q", str(bare), str(seed)], check=True)
     _git(seed, "config", "user.email", "test@example.com")
     _git(seed, "config", "user.name", "Test")
-    (seed / "README.md").write_text("init\n", encoding="utf-8")
+    write_text(seed / "README.md", "init\n")
     _git(seed, "add", "README.md")
     _git(seed, "commit", "-q", "-m", "init")
     _git(seed, "push", "-q", "-u", "origin", "HEAD")
@@ -93,11 +92,11 @@ def test_an_adopted_checkouts_own_pre_push_survives_create_and_alive(tmp_path: P
     workspace = tmp_path / "ws"
     states = workspace / ".dadaia" / "states"
     states.mkdir(parents=True)
-    (states / "spec_contexts.json").write_text('{"contexts": []}', encoding="utf-8")
+    write_text(states / "spec_contexts.json", '{"contexts": []}')
     main_url, _ = _seeded_remote(tmp_path, "app")
     assoc_url, _ = _seeded_remote(tmp_path, "lib")
     adopted = workspace / "repos" / "app"
-    subprocess.run(["git", "clone", "-q", str(main_url), str(adopted)], check=True)
+    os_run(["git", "clone", "-q", str(main_url), str(adopted)], check=True)
     own = b"#!/bin/sh\n# the operator's own pre-push\nexit 0\n"
     (adopted / ".git" / "hooks" / "pre-push").write_bytes(own)
     service = container.build_spec_context_service(workspace)

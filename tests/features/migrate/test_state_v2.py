@@ -13,6 +13,7 @@ import pytest
 
 from dadaia_workspace.features.migrate.state_v2 import execute_migration, plan_migration
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
+from tests.helpers.oslib import write_text
 
 
 def _write_v1(states_dir: Path, contexts: list[dict[str, Any]] | None = None) -> None:
@@ -33,7 +34,7 @@ def _write_v1(states_dir: Path, contexts: list[dict[str, Any]] | None = None) ->
             }
         ],
     }
-    (states_dir / "spec_contexts.json").write_text(json.dumps(data))
+    write_text(states_dir / "spec_contexts.json", json.dumps(data))
 
 
 def _write_v2(states_dir: Path) -> None:
@@ -53,7 +54,7 @@ def _write_v2(states_dir: Path) -> None:
             }
         ],
     }
-    (states_dir / "spec_contexts.json").write_text(json.dumps(data))
+    write_text(states_dir / "spec_contexts.json", json.dumps(data))
 
 
 def _workspace(tmp_path: Path) -> tuple[Path, Path]:
@@ -148,7 +149,7 @@ def test_execute_migration_side_effects_and_v2_noop(tmp_path: Path) -> None:
     ws, states = _workspace(tmp_path)
     _write_v1(states)
     primary = states / "primary_context.json"
-    primary.write_text(json.dumps({"name": "my-ctx", "repo_slug": "my-ctx", "specs_dir": "/x"}))
+    write_text(primary, json.dumps({"name": "my-ctx", "repo_slug": "my-ctx", "specs_dir": "/x"}))
     assert primary.exists()
 
     execute_migration(JsonContextStore(states), ws)

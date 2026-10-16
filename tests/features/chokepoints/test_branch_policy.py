@@ -6,7 +6,6 @@ Every row runs under the default gitflow or a custom one (``trunk``/``next``/``w
 
 from __future__ import annotations
 
-import shlex
 from collections.abc import Callable
 from dataclasses import replace
 from pathlib import Path
@@ -25,6 +24,7 @@ from dadaia_workspace.features.specs.canon import canon_violations
 from dadaia_workspace.infrastructure.git_objects import GitSubprocessObjectReader
 from tests.fakes import gate_fixes
 from tests.fixtures.real_git import PushRepo
+from tests.helpers.oslib import command
 
 _A = "a" * 40
 _B = "b" * 40
@@ -50,8 +50,8 @@ def _line(local: str, remote: str | None = None, remote_sha: str = _ZERO, sha: s
     return f"refs/heads/{local} {sha} refs/heads/{remote or local} {remote_sha}"
 
 
-def _fix(decision: Decision) -> list[str]:
-    return shlex.split(decision.message.rsplit("fix: ", 1)[1])
+def _fix(decision: Decision) -> str:
+    return decision.message.rsplit("fix: ", 1)[1]
 
 
 def _birth(role: str) -> Scenario:
@@ -118,9 +118,8 @@ def test_the_gate_allows(repo: PushRepo, flow: Gitflow, scenario: Scenario) -> N
     assert decision.allowed, decision.message
 
 
-_WORK = "{prefix}0.6.0"  # the live work branch, never the <M.m.p> pattern
-_PR_TO_INTEGRATION = ["Agent", "action:", "open", "a", "PR/MR", "from", _WORK, "into", "{integration}", "on", "your", "git", "host"]
-_PR_TO_PRINCIPAL = ["Agent", "action:", "open", "a", "PR/MR", "from", "{integration}", "into", "{principal}", "on", "your", "git", "host"]
+_PR_TO_INTEGRATION = "Agent action: open a PR/MR from '{prefix}0.6.0' into '{integration}' on your git host"
+_PR_TO_PRINCIPAL = "Agent action: open a PR/MR from '{integration}' into '{principal}' on your git host"
 
 
 def _birth_fix(tip: str, role: str) -> list[str]:
@@ -148,14 +147,17 @@ def _birth_fix(tip: str, role: str) -> list[str]:
 ])
 # fmt: on
 def test_the_gate_refuses_with_the_configured_fix(
-    repo: PushRepo, flow: Gitflow, scenario: Scenario, named: str, fix: list[str] | None
+    repo: PushRepo, flow: Gitflow, scenario: Scenario, named: str, fix: list[str] | str | None
 ) -> None:
     """Each refusal names the configured branches; its fix is one command, no `&&` (PowerShell 5.1 has none)."""
     names = {"principal": flow.principal, "integration": flow.integration, "prefix": flow.work_prefix}
     decision = _decide(scenario(repo, flow), repo, flow)
     assert not decision.allowed
     assert named.format(**names) in decision.message
-    assert fix is None or _fix(decision) == [part.format(**names) for part in fix]
+    if isinstance(fix, str):
+        assert _fix(decision) == fix.format(**names)
+    else:
+        assert fix is None or _fix(decision) == command(*[part.format(**names) for part in fix])
 
 
 # fmt: off
@@ -178,7 +180,7 @@ def test_a_branch_outside_the_gitflow_is_refused_naming_the_work_branch(
     assert not decision.allowed
     assert "outside the gitflow" in decision.message
     assert all(word in decision.message for word in (branch, flow.principal, flow.integration, flow.work_prefix))
-    assert _fix(decision) == ["git", "-C", "/repo", "switch", "-c", f"{flow.work_prefix}0.6.0", _A]
+    assert _fix(decision) == command("git", "-C", "/repo", "switch", "-c", f"{flow.work_prefix}0.6.0", _A)
 
 
 def test_an_outside_ref_is_carried_onto_the_live_work_branch() -> None:
@@ -188,7 +190,7 @@ def test_an_outside_ref_is_carried_onto_the_live_work_branch() -> None:
     decision = check_branch_policy(refs, _CUSTOM, replace(gate_fixes(), work="work/1.2.3", cut=True))
     assert decision is not None and "'work/1.2.3'" in decision.message
     assert f"merge {_A}" in decision.message
-    assert _fix(decision) == ["git", "-C", "/repo", "switch", "work/1.2.3"]
+    assert _fix(decision) == command("git", "-C", "/repo", "switch", "work/1.2.3")
 
 
 @pytest.mark.parametrize(

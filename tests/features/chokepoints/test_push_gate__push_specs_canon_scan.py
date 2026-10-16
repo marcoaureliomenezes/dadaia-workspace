@@ -20,6 +20,7 @@ from dadaia_workspace.features.specs.canon import canon_violations
 from dadaia_workspace.infrastructure.git_objects import GitSubprocessObjectReader
 from tests.fakes import gate_fixes
 from tests.fixtures.real_git import ZERO, PushRepo, git
+from tests.helpers.oslib import write_text
 
 
 @pytest.fixture()
@@ -96,7 +97,7 @@ def test_the_canon_scan_refuses_a_non_canon_path_in_the_pushed_range(
 def test_a_push_allows_an_uncited_law_edit(repo: PushRepo) -> None:
     remote = repo.commit({"AGENTS.md": "# law\n- keep\n- drop\n"})
     repo.publish()
-    (repo.path / "AGENTS.md").write_text("# law\n- keep\n", encoding="utf-8")
+    write_text(repo.path / "AGENTS.md", "# law\n- keep\n")
     sha = repo.commit({}, "chore: simplify law")
 
     decision = _decide(repo, _BRANCH.format(sha=sha, remote=remote))

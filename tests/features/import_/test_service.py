@@ -22,6 +22,7 @@ from dadaia_workspace.features.spec_context.service import SpecContextService
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
 from tests.fixtures.stores import context_store
+from tests.helpers.oslib import write_text
 
 _EXPORT = {
     "schema_version": "spec-contexts-export-v1",
@@ -74,7 +75,7 @@ def _importer(tmp_path: Path, store: JsonContextStore) -> ImportService:
 
 def _export_file(tmp_path: Path, *records: dict[str, object]) -> Path:
     file = tmp_path / "spec-contexts.json"
-    file.write_text(json.dumps({**_EXPORT, "contexts": list(records)}), encoding="utf-8")
+    write_text(file, json.dumps({**_EXPORT, "contexts": list(records)}))
     return file
 
 
@@ -93,7 +94,7 @@ def _record(name: str, slug: str, **overrides: object) -> dict[str, object]:
 
 def test_import_saves_unknown_names_dead_and_skips_known_names(tmp_path: Path) -> None:
     file = tmp_path / "spec-contexts.json"
-    file.write_text(json.dumps(_EXPORT), encoding="utf-8")
+    write_text(file, json.dumps(_EXPORT))
     store = context_store(tmp_path / "states")
     store.save(_ALPHA)
 
@@ -186,7 +187,7 @@ def test_import_rejects_files_outside_the_contract(
 ) -> None:
     file = tmp_path / "spec-contexts.json"
     if content is not None:
-        file.write_text(content, encoding="utf-8")
+        write_text(file, content)
     store = context_store(tmp_path / "states")
 
     with pytest.raises(ValueError, match=reason):

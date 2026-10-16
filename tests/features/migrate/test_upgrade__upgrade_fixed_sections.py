@@ -15,6 +15,7 @@ from dadaia_workspace.core import specs_version
 from dadaia_workspace.core.fixed_sections import FIXED_SECTIONS
 from dadaia_workspace.core.gitflow import merge_frontmatter
 from dadaia_workspace.features.specs import SpecsDoctor, canon
+from tests.helpers.oslib import read_text, write_text
 
 _PUBLIC = Path(__file__).resolve().parents[3] / "dadaia_workspace" / "public"
 #: specs/bugs/AGENTS.md as published at 570af642 (its sha256 is in shipped-hashes.json).
@@ -30,7 +31,7 @@ def _v6_tree(tmp_path: Path) -> Path:
     canon.scaffold(specs, project_name="v6")
     for rel, _ in FIXED_SECTIONS:
         path = specs / rel
-        path.write_text(_FIXED_BLOCK.sub("\n", path.read_text(encoding="utf-8")), encoding="utf-8")
+        write_text(path, _FIXED_BLOCK.sub("\n", read_text(path)))
     merge_frontmatter(specs, specs_pattern_version=6)
     return specs
 

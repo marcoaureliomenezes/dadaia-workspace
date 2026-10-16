@@ -13,6 +13,7 @@ from pathlib import Path
 from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
 from dadaia_workspace.features.spec_context.doctor import DoctorService
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
+from tests.helpers.oslib import write_text
 
 
 class _Store:
@@ -29,12 +30,13 @@ class _Store:
 def _workspace(tmp_path: Path) -> Path:
     ws = tmp_path / "ws"
     (ws / ".dadaia" / "states").mkdir(parents=True)
-    (ws / ".dadaia" / "states" / "spec_contexts.json").write_text(
-        '{"contexts": [{"name": "demo", "repo_slug": "demo", "state": "alive"}]}'
+    write_text(
+        ws / ".dadaia" / "states" / "spec_contexts.json",
+        '{"contexts": [{"name": "demo", "repo_slug": "demo", "state": "alive"}]}',
     )
     repo = ws / "repos" / "demo"
     (repo / ".venv" / "bin").mkdir(parents=True)
-    (repo / ".venv" / "bin" / "python").write_text("#!/bin/sh\n", encoding="utf-8")
+    write_text(repo / ".venv" / "bin" / "python", "#!/bin/sh\n")
     (repo / ".venv" / ".dadaia").mkdir()
     (repo / ".dadaia").mkdir()
     (repo / ".pytest_cache").mkdir()

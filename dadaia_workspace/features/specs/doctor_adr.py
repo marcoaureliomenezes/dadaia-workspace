@@ -17,6 +17,8 @@ from functools import cache
 from pathlib import Path
 from types import ModuleType
 
+from dadaia_workspace.core import platform
+from dadaia_workspace.core.cli_line import reinstall_fix
 from dadaia_workspace.core.doctor_rules import Rule, SectionFinding
 from dadaia_workspace.core.fixed_sections import authored_text
 from dadaia_workspace.features.specs.doctor_types import Severity, specs_finding
@@ -29,19 +31,6 @@ LEDGER = "ADRs/decisions.jsonl"
 #: The citation shapes of an ADR id in memory atoms, skills and rules: "ADR", a colon, space or
 #: hyphen, four digits; a line break may join "ADR" to its number, a blank or whitespace-only line never does.
 _ADR_CITATION_RE = re.compile(r"\bADR(?:[: \t-]|\n(?![ \t]*\n))+(\d{4})\b")
-
-
-class UndecodableLedger(ValueError):
-    """The ledger is not UTF-8; the text is the fix line."""
-
-
-def _ledger_text(ledger: Path) -> str:
-    """The ledger's text; raises :class:`UndecodableLedger` when it is not UTF-8."""
-    owner = load_owner("dd-bug-resolution", "_jsonl")
-    try:
-        return str(owner.read_text(ledger))
-    except owner.Undecodable as bad:
-        raise UndecodableLedger(bad.fix) from bad
 
 
 def _records(text: str, status: str) -> list[dict[str, object]]:
@@ -60,22 +49,19 @@ def superseded_adr_citations(specs_dir: Path, public_dir: Path | None) -> list[S
     ledger = specs_dir / "ADRs" / "decisions.jsonl"
     if not ledger.is_file():
         return []
-    try:
-        text = _ledger_text(ledger)
-    except UndecodableLedger:  # `adr_record_issues` names the file
-        return []
-    superseded = {str(r.get("id")) for r in _records(text, "superseded")}
+    superseded = {str(r.get("id")) for r in _records(platform.read_text(ledger), "superseded")}
     if not superseded:
         return []
-    roots = [specs_dir / "memory"]
+    roots = [(specs_dir / "memory", "")]
     if public_dir is not None:
-        roots.extend([public_dir / "skills", public_dir / "data", public_dir / "scaffold"])
+        library = reinstall_fix(public_dir)
+        roots += [(public_dir / d, library) for d in ("skills", "data", "scaffold")]
     issues: list[SectionFinding] = []
-    for root in roots:
+    for root, fix in roots:
         if not root.is_dir():
             continue
         for path in sorted(root.rglob("*.md")):
-            cited = set(_ADR_CITATION_RE.findall(authored_text(path.read_text(encoding="utf-8"))))
+            cited = set(_ADR_CITATION_RE.findall(authored_text(platform.read_text(path, fix))))
             for adr_id in sorted(cited & superseded):
                 issues.append(
                     specs_finding(
@@ -102,13 +88,13 @@ def _doctor_codes() -> frozenset[str]:
     return frozenset(
         code
         for path in package.rglob("*.py")
-        for code in _CODE_RE.findall(path.read_text(encoding="utf-8", errors="replace"))
+        for code in _CODE_RE.findall(platform.decode(path.read_bytes()))
     )
 
 
 def _accepted(specs_dir: Path) -> list[dict[str, object]]:
     ledger = specs_dir / LEDGER
-    return _records(_ledger_text(ledger), "accepted") if ledger.is_file() else []
+    return _records(platform.read_text(ledger), "accepted") if ledger.is_file() else []
 
 
 def unresolved_measured_by(specs_dir: Path) -> list[tuple[str, str]]:
@@ -123,8 +109,7 @@ def unresolved_measured_by(specs_dir: Path) -> list[tuple[str, str]]:
         for token in (t.rstrip(".:,") for t in _TOKEN_RE.findall(text)):
             path, *nodes = token.split("::")
             if path in tracked and (
-                not nodes
-                or nodes[-1] in (root / path).read_text(encoding="utf-8", errors="replace")
+                not nodes or nodes[-1] in platform.decode((root / path).read_bytes())
             ):
                 return True
             if not nodes and token in _doctor_codes():
@@ -170,19 +155,7 @@ def adr_record_issues(specs_dir: Path) -> list[SectionFinding]:
     records: list[tuple[int, dict[str, object]]] = []
     owner = load_owner("dd-bug-resolution", "_ledger")
     schema = owner.load_schema("decision-record-v1")
-    try:
-        lines = _ledger_text(ledger).split("\n")
-    except UndecodableLedger as bad:
-        return [
-            specs_finding(
-                code="LEDGER-ADR-SCHEMA",
-                severity=Severity.ERROR,
-                description=f"{LEDGER} is not valid UTF-8",
-                path=LEDGER,
-                fix=str(bad),
-            )
-        ]
-    for number, raw in enumerate(lines, start=1):
+    for number, raw in enumerate(platform.read_text(ledger).split("\n"), start=1):
         try:
             parsed = owner.parse(raw)
         except owner.LineError as exc:

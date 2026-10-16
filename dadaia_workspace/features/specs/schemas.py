@@ -15,6 +15,8 @@ import json
 from pathlib import Path
 from typing import Any, cast
 
+from dadaia_workspace.core import platform
+
 __all__ = [
     "SCHEMA_ROOT",
     "load_schema",
@@ -36,4 +38,4 @@ def load_schema(name: str) -> dict[str, Any]:
             f"{name}.schema.json not found at {path} "
             "— the installed dadaia-workspace package is incomplete."
         )
-    return cast(dict[str, Any], json.loads(path.read_text(encoding="utf-8")))
+    return cast(dict[str, Any], json.loads(platform.read_text(path)))

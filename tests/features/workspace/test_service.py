@@ -2,13 +2,16 @@
 
 import json
 import os
+import sys
 from pathlib import Path
 
 import pytest
 
+from dadaia_workspace.core import platform
 from dadaia_workspace.core.workspace_layout import provisioned_zones
 from dadaia_workspace.features.workspace.service import WorkspaceService
 from tests.fakes import FakePublicAssetManager, FakePythonEnvironmentManager
+from tests.helpers.oslib import link, read_text, write_text
 
 
 @pytest.fixture()
@@ -45,7 +48,7 @@ def test_init_creates_only_registry_init_zones_and_canon_seeds(
     assert not (workspace_root / ".codex").exists()
 
     spec_contexts_path = dadaia / "states" / "spec_contexts.json"
-    assert json.loads(spec_contexts_path.read_text()) == {"schema_version": "2", "contexts": []}
+    assert json.loads(read_text(spec_contexts_path)) == {"schema_version": "2", "contexts": []}
     expected = (
         b'{\r\n  "schema_version": "2",\r\n  "contexts": []\r\n}'
         if os.linesep == "\r\n"
@@ -53,7 +56,7 @@ def test_init_creates_only_registry_init_zones_and_canon_seeds(
     )
     assert spec_contexts_path.read_bytes() == expected
 
-    registry_data = json.loads((dadaia / "states" / "server_registry.json").read_text())
+    registry_data = json.loads(read_text(dadaia / "states" / "server_registry.json"))
     assert registry_data["version"] == "1"
     assert registry_data["entries"] == []
 
@@ -61,7 +64,7 @@ def test_init_creates_only_registry_init_zones_and_canon_seeds(
     occupied_registry = b'{\r\n  "version": "1",\r\n  "contexts": [{"name": "x"}]\r\n}\r\n'
     spec_contexts_path.write_bytes(occupied_registry)
     service.init(workspace_root, harnesses=("claude", "codex"), skip_assets=True)
-    data = json.loads(spec_contexts_path.read_text())
+    data = json.loads(read_text(spec_contexts_path))
     assert data["contexts"] == [{"name": "x"}]
     assert spec_contexts_path.read_bytes() == occupied_registry
 
@@ -114,11 +117,11 @@ def test_a_refused_hold_leaves_the_list_form_denylist_in_place(workspace_root: P
     )
     denylist = workspace_root / ".dadaia" / "states" / "privacy_denylist.json"
     denylist.parent.mkdir(parents=True)
-    denylist.write_text('["zz-term-a"]', encoding="utf-8")
+    write_text(denylist, '["zz-term-a"]')
 
     refused.init(workspace_root, harnesses=("claude",), skip_assets=True)
 
-    assert denylist.read_text(encoding="utf-8") == '["zz-term-a"]'
+    assert read_text(denylist) == '["zz-term-a"]'
 
 
 def test_a_symlinked_list_form_denylist_is_refused_and_left_untouched(workspace_root: Path) -> None:
@@ -134,10 +137,39 @@ def test_a_symlinked_list_form_denylist_is_refused_and_left_untouched(workspace_
     states = workspace_root / ".dadaia" / "states"
     states.mkdir(parents=True)
     target = workspace_root / "elsewhere.json"
-    target.write_text('["zz-term-a"]', encoding="utf-8")
+    write_text(target, '["zz-term-a"]')
     denylist = states / "privacy_denylist.json"
-    denylist.symlink_to(target)
+    assert link(str(target), denylist, is_dir=False)
 
     migrating.init(workspace_root, harnesses=("claude",), skip_assets=True)
 
-    assert (denylist.is_symlink(), target.read_text(encoding="utf-8")) == (True, '["zz-term-a"]')
+    assert (denylist.is_symlink(), read_text(target)) == (True, '["zz-term-a"]')
+
+
+def test_a_denylist_that_is_not_utf8_is_left_alone_and_init_goes_on(workspace_root: Path) -> None:
+    """The legacy-form migration reads it to convert it; what it cannot read it leaves, as it
+    leaves every other file it cannot convert."""
+    denylist = workspace_root / ".dadaia" / "states" / "privacy_denylist.json"
+    denylist.parent.mkdir(parents=True)
+    denylist.write_bytes('["zz-term-é"]'.encode("cp1252"))
+
+    WorkspaceService(
+        public_assets=FakePublicAssetManager(), python_env=FakePythonEnvironmentManager()
+    ).init(workspace_root, harnesses=("claude",), skip_assets=True)
+
+    assert denylist.read_bytes() == '["zz-term-é"]'.encode("cp1252")
+
+
+def _cli(root: Path | None, *words: str) -> str:
+    venv = platform.venv_dir(root) if root is not None else Path(sys.prefix)
+    return platform.inline(*platform.cli_argv(venv), *words)
+
+
+def test_the_ungated_warning_quotes_a_workspace_holding_a_blank(tmp_path: Path) -> None:
+    root = tmp_path / "a b"
+
+    lines = WorkspaceService(
+        public_assets=FakePublicAssetManager(), python_env=FakePythonEnvironmentManager()
+    ).init(root, harnesses=("claude",), skip_assets=True)
+
+    assert any(f"until '{_cli(root, 'public', 'install')}' runs" in ln for ln in lines), lines

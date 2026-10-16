@@ -25,7 +25,6 @@ module — the established convention for this feature.
 from __future__ import annotations
 
 import json
-import subprocess
 import sys
 from pathlib import Path
 
@@ -34,6 +33,7 @@ from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app
 from tests.fixtures.harness_env import claude_hook_env, run_hook_subprocess
+from tests.helpers.oslib import run, write_text
 from tests.helpers.release_state import write_release_phase
 
 _runner = CliRunner()
@@ -64,12 +64,8 @@ _MAIN_PHASE = "IMPLEMENTATION"
 
 
 def _git(cwd: Path, *args: str) -> None:
-    proc = subprocess.run(
-        ["git", "-c", "user.email=t@test", "-c", "user.name=t", *args],
-        cwd=str(cwd),
-        capture_output=True,
-        text=True,
-        timeout=30.0,
+    proc = run(
+        ["git", "-c", "user.email=t@test", "-c", "user.name=t", *args], cwd=str(cwd), timeout=30.0
     )
     assert proc.returncode == 0, f"git {args}: {proc.stderr or proc.stdout}"
 
@@ -79,16 +75,16 @@ def _seed_main_repo(repo: Path) -> None:
     release_dir = repo / "specs" / "releases" / _MAIN_RELEASE
     release_dir.mkdir(parents=True)
     for name in ("SPEC.md", "PLAN.md", "TASKS.md"):
-        (release_dir / name).write_text(f"# {name}\n\n**Status:** Approved\n", encoding="utf-8")
+        write_text(release_dir / name, f"# {name}\n\n**Status:** Approved\n")
     # The live phase is read directly off
     # RELEASE.json (core.release_state.parse_release_state).
     write_release_phase(repo / "specs", _MAIN_RELEASE, _MAIN_PHASE)
     mem = repo / "specs" / "memory" / "product"
     mem.mkdir(parents=True)
-    (repo / "specs" / "memory" / "TECHSTACK.md").write_text("# tech\nmain\n", encoding="utf-8")
+    write_text(repo / "specs" / "memory" / "TECHSTACK.md", "# tech\nmain\n")
     # The catalog pair is written by its ONE writer (the doctor's
     # `ledgers` section validates it by running that same script), never hand-shaped here.
-    subprocess.run(
+    run(
         [
             sys.executable,
             str(_MEMORY_SCRIPT),
@@ -98,7 +94,6 @@ def _seed_main_repo(repo: Path) -> None:
             str(repo / "specs"),
         ],
         check=True,
-        capture_output=True,
         timeout=60,
     )
     # (backlog doctor) an empty backlog/ dir with NO BACKLOG.json is a clean no-op.
@@ -115,11 +110,13 @@ def _seed_associated_repo(repo: Path) -> None:
     # repo's OWN RELEASE.json, which must never be read while resolving inside it.
     write_release_phase(repo / "specs", _ASSOC_RELEASE, _ASSOC_PHASE)
     (repo / "specs" / "memory").mkdir(parents=True)
-    (repo / "specs" / "memory" / "TECHSTACK.md").write_text(
-        f"# the associated repo's OWN tech stack\n{_ASSOC_MEMORY_MARKER}\n", encoding="utf-8"
+    write_text(
+        repo / "specs" / "memory" / "TECHSTACK.md",
+        f"# the associated repo's OWN tech stack\n{_ASSOC_MEMORY_MARKER}\n",
     )
     (repo / "specs" / "backlog").mkdir(parents=True)
-    (repo / "specs" / "backlog" / "BACKLOG.json").write_text(
+    write_text(
+        repo / "specs" / "backlog" / "BACKLOG.json",
         json.dumps(
             {
                 "schema": "backlog-v1",
@@ -133,7 +130,6 @@ def _seed_associated_repo(repo: Path) -> None:
                 ],
             }
         ),
-        encoding="utf-8",
     )
     _git(repo, "-c", "init.defaultBranch=main", "init")
     _git(repo, "add", "-A")
@@ -145,7 +141,8 @@ def workspace(tmp_path: Path) -> Path:
     ws = tmp_path / "ws"
     states = ws / ".dadaia" / "states"
     states.mkdir(parents=True)
-    (states / "spec_contexts.json").write_text(
+    write_text(
+        states / "spec_contexts.json",
         json.dumps(
             {
                 "schema_version": "3",
@@ -164,7 +161,6 @@ def workspace(tmp_path: Path) -> Path:
                 ],
             }
         ),
-        encoding="utf-8",
     )
     _seed_main_repo(ws / "repos" / _MAIN_SLUG)
     _seed_associated_repo(ws / "repos" / _ASSOC_SLUG)

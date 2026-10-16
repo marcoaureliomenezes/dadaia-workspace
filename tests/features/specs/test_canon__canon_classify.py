@@ -13,6 +13,7 @@ import pytest
 from dadaia_workspace.core import specs_version
 from dadaia_workspace.core.platform import PLATFORM
 from dadaia_workspace.features.specs import canon
+from tests.helpers.oslib import link, read_text, write_text
 
 _MALFORMED = "---\nspecs_pattern_version: 7\ngitflow: {principal: main\n---\n# C\n"
 
@@ -53,7 +54,7 @@ def test_state_is_the_one_reader_with_one_fix(
     if text is not None:
         specs.mkdir()
         if text:
-            (specs / "constitution.md").write_text(text, encoding="utf-8")
+            write_text(specs / "constitution.md", text)
     found, fix = specs_version.state(specs, context="demo")
     assert found == kind
     assert fix == fix_tail if fix_tail is None else fix is not None and fix_tail in fix
@@ -61,7 +62,7 @@ def test_state_is_the_one_reader_with_one_fix(
 
 
 def _make_file(path: Path) -> None:
-    path.write_text("# not a tree\n", encoding="utf-8")
+    write_text(path, "# not a tree\n")
 
 
 def _make_fifo(path: Path) -> None:
@@ -84,9 +85,7 @@ def test_anything_but_a_directory_at_the_specs_path_is_its_own_kind_and_its_fix_
 
 def test_a_dangling_symlink_at_the_specs_path_is_absent(tmp_path: Path) -> None:
     specs = tmp_path / "specs"
-    try:
-        specs.symlink_to(tmp_path / "nowhere")
-    except OSError:
+    if not link(str(tmp_path / "nowhere"), specs, is_dir=False):
         pytest.skip("this host cannot create symlinks")
     assert specs_version.state(specs)[0] == "absent"
 
@@ -95,12 +94,12 @@ def test_the_scaffolded_stubs_are_english_with_the_fixed_memory_sections(tmp_pat
     specs = tmp_path / "specs"
     canon.scaffold(specs, project_name="demo")
 
-    constitution = (specs / "constitution.md").read_text(encoding="utf-8")
+    constitution = read_text(specs / "constitution.md")
     assert "## Purpose" in constitution
     assert not re.search(r"Propósito|Invariantes|Exclusões|Definir", constitution)
 
     def headings(rel: str) -> list[str]:
-        text = (specs / "memory" / rel).read_text(encoding="utf-8")
+        text = read_text(specs / "memory" / rel)
         return re.findall(r"^## (.+)$", text, re.MULTILINE)
 
     assert headings("ARCHITECTURE.md") == ["Principles", "Tech Stack", "Structure"]

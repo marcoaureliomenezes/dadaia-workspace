@@ -7,8 +7,9 @@ from __future__ import annotations
 import hashlib
 from pathlib import Path
 
+from dadaia_workspace.core import platform
 from dadaia_workspace.core.atomic_write import atomic_write
-from dadaia_workspace.core.cli_line import mkdir_line, shell_line
+from dadaia_workspace.core.cli_line import mkdir_line, reinstall_fix, shell_line
 from dadaia_workspace.core.doctor_rules import SectionFinding
 from dadaia_workspace.core.template_history import was_shipped
 from dadaia_workspace.core.workspace_layout import (
@@ -99,7 +100,10 @@ class StructuralValidator:
         src = self._scaffold_dir / target.name / "AGENTS.md" if self._scaffold_dir else None
         agents_md = target / "AGENTS.md"
         if not agents_md.exists():
-            atomic_write(agents_md, src.read_text(encoding="utf-8") if src and src.exists() else "")
+            atomic_write(
+                agents_md,
+                platform.read_text(src, reinstall_fix(src)) if src and src.exists() else "",
+            )
 
     def _tree5_targets(self) -> list[tuple[Path, Path, str]]:
         """The CLOSED set of law files: (projection, canonical source, shipped asset name)."""
@@ -143,14 +147,16 @@ class StructuralValidator:
         if not dst.exists():
             return [self._tree5_missing(dst, True)]
         label = f"specs/{dst.relative_to(self.specs_dir).as_posix()}"
-        canonical_text = render_registry_tables(canonical_path.read_text(encoding="utf-8"))
-        current_text = dst.read_text(encoding="utf-8")
+        canonical_text = render_registry_tables(
+            platform.read_text(canonical_path, reinstall_fix(canonical_path))
+        )
+        current_text = platform.read_text(dst)
         canonical_hash = _sha(canonical_text)
         current_hash = _sha(render_workspace_cli(current_text))
         if canonical_hash == current_hash:
             return []
         # A symlinked projection is never repaired (the write would leave the tree): never fixable.
-        if was_shipped(current_text, asset, self._templates_dir) and not dst.is_symlink():
+        if was_shipped(current_text, asset, self._templates_dir) and not platform.is_link(dst):
             return [
                 specs_finding(
                     "TREE-5",
@@ -201,11 +207,13 @@ class StructuralValidator:
             if not canonical_path.exists():
                 continue
             if dst.exists() and not was_shipped(
-                dst.read_text(encoding="utf-8"), asset_name, self._templates_dir
+                platform.read_text(dst), asset_name, self._templates_dir
             ):
                 continue
             dst.parent.mkdir(parents=True, exist_ok=True)
-            law = render_registry_tables(canonical_path.read_text(encoding="utf-8"))
+            law = render_registry_tables(
+                platform.read_text(canonical_path, reinstall_fix(canonical_path))
+            )
             atomic_write(dst, law, preserve_mode=True)
             return
 

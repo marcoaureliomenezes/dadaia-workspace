@@ -9,6 +9,7 @@ import pytest
 
 from dadaia_workspace.features.migrate.upgrade import plan_empty_ideas_dir, remove_empty_ideas_dir
 from dadaia_workspace.features.spec_context import sweep
+from tests.helpers.oslib import link, write_text
 
 
 @pytest.mark.parametrize(
@@ -24,10 +25,10 @@ def test_upgrade_removes_an_ideas_dir_holding_only_its_agents_md(
     ideas = specs / "releases" / "_ideas"
     for rel in files:
         (ideas / rel).parent.mkdir(parents=True, exist_ok=True)
-        (ideas / rel).write_text("x\n", encoding="utf-8")
+        write_text(ideas / rel, "x\n")
     if outside:  # releases/ resolves outside the specs tree: the deleter refuses
         (specs / "releases").rename(tmp_path / "elsewhere")
-        (specs / "releases").symlink_to(tmp_path / "elsewhere")
+        assert link(str(tmp_path / "elsewhere"), specs / "releases", is_dir=False)
 
     assert plan_empty_ideas_dir(specs) == ([ideas] if files == ["AGENTS.md"] else [])
     assert remove_empty_ideas_dir(specs, lambda p: sweep.remove(specs, p, p.name)) == (

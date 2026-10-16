@@ -19,6 +19,7 @@ from dadaia_workspace.features.chokepoints.branch_policy import Decision, PushRe
 from dadaia_workspace.features.specs.canon import canon_violations
 from dadaia_workspace.infrastructure.git_objects import GitSubprocessObjectReader
 from tests.fakes import gate_fixes
+from tests.helpers.oslib import run, write_text
 
 _T = "zz-frozen-invariant-term"
 _ZERO = "0" * 40
@@ -26,7 +27,7 @@ _ARCHIVED = "specs/releases/_archive/0.4.0/notes.md"
 
 
 def _git(args: list[str], cwd: Path) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True, check=True)
+    return run(["git", *args], cwd=cwd, check=True)
 
 
 def _init_repo(path: Path) -> None:
@@ -71,7 +72,7 @@ def test_the_amnesty_is_bound_to_the_path_that_already_published_the_value(
     _init_repo(repo)
     for rel, text in published.items():
         (repo / rel).parent.mkdir(parents=True, exist_ok=True)
-        (repo / rel).write_text(text)
+        write_text(repo / rel, text)
     base = _commit(repo, "already-published")
     if ref == "branch":
         origin = tmp_path / "origin.git"
@@ -84,7 +85,7 @@ def test_the_amnesty_is_bound_to_the_path_that_already_published_the_value(
         (repo / rel).unlink()
     for rel, text in pushed.items():
         (repo / rel).parent.mkdir(parents=True, exist_ok=True)
-        (repo / rel).write_text(text)
+        write_text(repo / rel, text)
     tip = _commit(repo, "the pushed range")
     push = (
         PushRef("refs/heads/feature/1.0.0", tip, "refs/heads/feature/1.0.0", _ZERO)
@@ -106,9 +107,9 @@ def test_prior_side_lookup_failure_refuses_naming_the_failure_and_no_verify(
     REAL adapter wired into ``push_gate_decision``."""
     repo = tmp_path / "repo"
     _init_repo(repo)
-    (repo / "notes.md").write_text("published content\n")
+    write_text(repo / "notes.md", "published content\n")
     already_published_sha = _commit(repo, "already-published")
-    (repo / "notes.md").write_text("edited content\n")
+    write_text(repo / "notes.md", "edited content\n")
     tip_sha = _commit(repo, "edit")
 
     from dadaia_workspace.infrastructure import git_objects as git_objects_module

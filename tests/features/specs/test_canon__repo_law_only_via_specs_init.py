@@ -19,6 +19,7 @@ from dadaia_workspace.core.models.install_ledger import InstallLedger, LedgerEnt
 from dadaia_workspace.features.specs.canon import scaffold_repo_law
 from dadaia_workspace.infrastructure.json_install_ledger_store import JsonInstallLedgerStore
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
+from tests.helpers.oslib import read_text, write_text
 
 _PUBLIC = Path(__file__).resolve().parents[3] / "dadaia_workspace" / "public"
 
@@ -39,8 +40,8 @@ def _workspace(tmp_path: Path) -> tuple[Path, Path]:
         "dead_since": None,
         "current_branch": "main",
     }
-    (states / "spec_contexts.json").write_text(
-        json.dumps({"schema_version": "2", "contexts": [row]}), encoding="utf-8"
+    write_text(
+        states / "spec_contexts.json", json.dumps({"schema_version": "2", "contexts": [row]})
     )
     return ws, repo
 
@@ -56,7 +57,7 @@ def test_install_first_then_specs_init_leaves_the_repo_template(tmp_path: Path) 
 
     scaffold_repo_law(repo, project_name="zz-product")
 
-    law = (repo / "AGENTS.md").read_text(encoding="utf-8")
+    law = read_text(repo / "AGENTS.md")
     assert law.startswith("# zz-product")
 
 
@@ -66,8 +67,8 @@ def test_an_operator_edit_to_repo_law_survives_install(tmp_path: Path, banner: b
     across install and install --force, and public doctor reports nothing for it."""
     ws, repo = _workspace(tmp_path)
     law = repo / "AGENTS.md"
-    head = (_PUBLIC / "data" / "AGENTS.md").read_text(encoding="utf-8") if banner else "# law\n"
-    law.write_text(head + "- zz operator rule\n", encoding="utf-8")
+    head = read_text(_PUBLIC / "data" / "AGENTS.md") if banner else "# law\n"
+    write_text(law, head + "- zz operator rule\n")
     edited = law.read_bytes()
 
     manager = FileSystemPublicAssetManager()
@@ -82,7 +83,7 @@ def test_a_formerly_ledgered_repo_copy_is_forgotten_never_pruned(tmp_path: Path)
     """A repos/ path a former release ledgered is forgotten, never pruned."""
     ws, repo = _workspace(tmp_path)
     old = repo / "AGENTS.md"
-    old.write_text("# former root-map copy\n", encoding="utf-8")
+    write_text(old, "# former root-map copy\n")
     entry = LedgerEntry(
         relpath="repos/zz-product/AGENTS.md",
         sha256=hashlib.sha256(old.read_bytes()).hexdigest(),
@@ -94,7 +95,7 @@ def test_a_formerly_ledgered_repo_copy_is_forgotten_never_pruned(tmp_path: Path)
 
     FileSystemPublicAssetManager().install(ws)
 
-    assert old.read_text(encoding="utf-8") == "# former root-map copy\n"
+    assert read_text(old) == "# former root-map copy\n"
     ledger = JsonInstallLedgerStore().read(states)
     assert ledger is not None
     assert "repos/zz-product/AGENTS.md" not in ledger.by_relpath()

@@ -22,6 +22,7 @@ from dadaia_workspace.features.workspace import service as service_module
 from dadaia_workspace.features.workspace.service import WorkspaceService
 from dadaia_workspace.infrastructure.json_harness_profile_store import JsonHarnessProfileStore
 from tests.fakes import FakePublicAssetManager, FakePythonEnvironmentManager
+from tests.helpers.oslib import read_text
 
 
 @pytest.fixture()
@@ -54,7 +55,7 @@ def test_init_persists_the_harness_profile_through_the_one_store(
         service.init(tmp_path, skip_assets=True, harnesses=harnesses)
 
     assert JsonHarnessProfileStore().read(tmp_path / ".dadaia" / "states") == HarnessProfile(schema_version="1", harnesses=expected)
-    assert json.loads(_profile_path(tmp_path).read_text(encoding="utf-8")) == {"schema_version": "1", "harnesses": list(expected)}
+    assert json.loads(read_text(_profile_path(tmp_path))) == {"schema_version": "1", "harnesses": list(expected)}
     if inits[1:] == inits[:1]:
         assert (_profile_path(tmp_path).read_bytes(), _profile_path(tmp_path).stat().st_mtime_ns) == before
 

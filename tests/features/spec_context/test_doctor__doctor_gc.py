@@ -25,15 +25,15 @@ from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
 from dadaia_workspace.infrastructure.json_harness_profile_store import JsonHarnessProfileStore
 from tests.fixtures.harness_env import claude_hook_env, run_hook_subprocess
 from tests.fixtures.stores import context_store
+from tests.helpers.oslib import link, read_text, write_text
+from tests.helpers.oslib import write_text as os_write_text
 
 
 def _make_workspace(tmp_path: Path) -> Path:
     ws = tmp_path / "ws"
     ws.mkdir()
     (ws / ".dadaia" / "states").mkdir(parents=True)
-    (ws / ".dadaia" / "states" / "spec_contexts.json").write_text(
-        '{"contexts": []}', encoding="utf-8"
-    )
+    write_text(ws / ".dadaia" / "states" / "spec_contexts.json", '{"contexts": []}')
     (ws / ".dadaia" / "sessions").mkdir(parents=True)
     (ws / "repos").mkdir()
     return ws
@@ -73,12 +73,10 @@ def test_gc_deletion_matrix(tmp_path: Path) -> None:
     ws = _make_workspace(tmp_path)
     locks = ws / ".dadaia" / "states" / "ctx_locks"
     locks.mkdir(parents=True)
-    (locks / "myctx.lock.json").write_text(
-        json.dumps({"context": "myctx", "heartbeat": _stale()}), encoding="utf-8"
-    )
-    (locks / "myctx.lock.sentinel").write_text("", encoding="utf-8")
-    (locks / "badctx.lock.json").write_text("NOT JSON {{{", encoding="utf-8")
-    (locks / "incompletectx.lock.json").write_text('{"context": "x"}', encoding="utf-8")
+    write_text(locks / "myctx.lock.json", json.dumps({"context": "myctx", "heartbeat": _stale()}))
+    write_text(locks / "myctx.lock.sentinel", "")
+    write_text(locks / "badctx.lock.json", "NOT JSON {{{")
+    write_text(locks / "incompletectx.lock.json", '{"context": "x"}')
     expired = _bind(ws, "old-sess-001", _stale())
 
     actions = _make_doctor(ws).fix()
@@ -119,7 +117,7 @@ def test_no_stale_records(
     sid = "sess_01"
     if sessions_outside:
         (ws / ".dadaia" / "sessions").rename(tmp_path / "elsewhere")
-        (ws / ".dadaia" / "sessions").symlink_to(tmp_path / "elsewhere")
+        assert link(str(tmp_path / "elsewhere"), ws / ".dadaia" / "sessions", is_dir=False)
     record = _bind(ws, sid, _stale() if idle is None else _ago(idle))
     if renew:
         # the heartbeat never reaps.
@@ -161,15 +159,15 @@ def test_a_ttl_expiry_is_its_zone_class_act(
     ws = _make_workspace(tmp_path)
     victim = tmp_path / "outside" / "keep.txt"
     victim.parent.mkdir()
-    victim.write_text("keep", encoding="utf-8")
+    write_text(victim, "keep")
     entry = ws / ".dadaia" / rel
     entry.parent.mkdir(parents=True, exist_ok=True)
     if rel.endswith("link"):
         if os.utime not in os.supports_follow_symlinks:
             pytest.skip("ageing a link itself needs utime(follow_symlinks=False)")
-        entry.symlink_to(victim.parent, target_is_directory=True)
+        assert link(str(victim.parent), entry, is_dir=True)
     else:
-        entry.write_text('{"findings": [{"message": "bug-proposal: x"}]}', encoding="utf-8")
+        write_text(entry, '{"findings": [{"message": "bug-proposal: x"}]}')
     zone = next(z for z in DADAIA_ZONES if z.name == rel.split("/")[0])
     stamp = time.time() - (zone.ttl_seconds or 0) - past_ttl
     os.utime(entry, (stamp, stamp), **({"follow_symlinks": False} if entry.is_symlink() else {}))
@@ -184,7 +182,7 @@ def test_a_ttl_expiry_is_its_zone_class_act(
     assert (entry.is_symlink() or entry.exists(), bool(held)) == (after == "kept", after == "held")
     remaining = [f.verdict for f in doctor.scan_ttl()]
     assert remaining == ([FindingVerdict.REAPED] if after == "held" else [])
-    assert victim.read_text(encoding="utf-8") == "keep"
+    assert read_text(victim) == "keep"
     assert any("skipped 'states/harness_profile.json' (errno 13" in a for a in actions), actions
     # The rows cover exactly these two classes; a new TTL class needs a row here.
     assert {z.cls for z in zones_with_ttl()} <= {ZoneClass.OUTPUT, ZoneClass.EPHEMERAL}
@@ -203,7 +201,7 @@ def test_the_expire_lane_walks_each_expired_entry_once(
     ws = _make_workspace(tmp_path)
     entry = ws / ".dadaia" / "tmp" / "agent" / "20200101"
     (entry / "deep").mkdir(parents=True)
-    (entry / "deep" / "f.txt").write_text("x", encoding="utf-8")
+    write_text(entry / "deep" / "f.txt", "x")
     for path in (entry / "deep" / "f.txt", entry / "deep", entry):
         os.utime(path, (0, 0))
     walked: list[Path] = []
@@ -229,7 +227,7 @@ def test_scan_leaves_an_expired_worktree_holder_to_its_worktree_row(tmp_path: Pa
     tmp = ws / ".dadaia" / "tmp"
     holder, plain = tmp / "a" / "20200101", tmp / "b" / "20200101"
     (holder / "wt").mkdir(parents=True)
-    (holder / "wt" / ".git").write_text("gitdir: /elsewhere/.git/worktrees/wt\n", "utf-8")
+    os_write_text(holder / "wt" / ".git", "gitdir: /elsewhere/.git/worktrees/wt\n")
     plain.mkdir(parents=True)
     stamp = time.time() - 3 * 86_400 - 60
     for path in (holder / "wt" / ".git", holder / "wt", holder, holder.parent, plain, plain.parent):

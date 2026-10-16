@@ -7,7 +7,6 @@ Size: SMALL (tmp_path, CliRunner in-process, no subprocess).
 from __future__ import annotations
 
 import hashlib
-import shlex
 import sys
 from pathlib import Path
 
@@ -15,11 +14,18 @@ import pytest
 from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app
+from dadaia_workspace.core import platform
 from dadaia_workspace.core.atomic_write import SymlinkRefusedError, atomic_write
+from dadaia_workspace.core.exceptions import DadaiaError
 from dadaia_workspace.core.gitflow import merge_frontmatter
-from dadaia_workspace.features.migrate.upgrade import fold_tech_stack, upgrade
+from dadaia_workspace.features.migrate.upgrade import (
+    fold_tech_stack,
+    upgrade,
+)
 from dadaia_workspace.features.spec_context import sweep
 from dadaia_workspace.features.specs import SpecsDoctor, canon
+from tests.helpers.oslib import command, read_text, write_text
+from tests.helpers.oslib import link as make_link
 
 _PUBLIC = Path(__file__).resolve().parents[3] / "dadaia_workspace" / "public"
 _OUTSIDE = (  # a valid atom: the only error left is the refused symlink
@@ -32,7 +38,7 @@ def _materialize(link: Path, target: Path) -> str:
     """The literal fix: one interpreter line, the same on every OS (paths in ``/``)."""
     lnk, tgt = link.as_posix(), target.as_posix()
     code = f"import os, shutil; os.remove(r'{lnk}'); shutil.copyfile(r'{tgt}', r'{lnk}')"
-    return shlex.join([Path(sys.executable).as_posix(), "-c", code])
+    return command(Path(sys.executable).as_posix(), "-c", code)
 
 
 def _md5(path: Path) -> str:
@@ -43,25 +49,25 @@ def _tree_with_linked_quality(tmp_path: Path) -> tuple[Path, Path]:
     specs = tmp_path / "repo" / "specs"
     canon.scaffold(specs, project_name="p")
     outside = tmp_path / "outside.md"
-    outside.write_text(_OUTSIDE, encoding="utf-8")
+    write_text(outside, _OUTSIDE)
     quality = specs / "memory" / "QUALITY.md"
     quality.unlink()
-    quality.symlink_to(outside)
+    assert make_link(str(outside), quality, is_dir=False)
     return specs, outside
 
 
 def test_b4_the_one_writer_refuses_a_symlinked_destination(tmp_path: Path) -> None:
     """The one writer never replaces or writes through a link."""
     outside = tmp_path / "outside.md"
-    outside.write_text("keep\n", encoding="utf-8")
+    write_text(outside, "keep\n")
     link = tmp_path / "link.md"
-    link.symlink_to(outside)
+    assert make_link(str(outside), link, is_dir=False)
 
     with pytest.raises(SymlinkRefusedError) as info:
         atomic_write(link, "new\n")
 
     assert link.is_symlink()
-    assert outside.read_text(encoding="utf-8") == "keep\n"
+    assert read_text(outside) == "keep\n"
     assert str(info.value) == f"{link} is a symlink; refusing to write it"
     assert [p.name for p in tmp_path.iterdir() if p.name.endswith(".tmp")] == []
 
@@ -80,13 +86,13 @@ def test_b1_specs_upgrade_refuses_a_symlinked_quality_md_with_its_fix(tmp_path: 
     link = specs / "memory" / "QUALITY.md"
     assert f"[refused] FIXED-1 {link}" in result.output
     (fix,) = [ln[len("fix: ") :] for ln in result.output.splitlines() if ln.startswith("fix: ")]
-    assert shlex.split(fix) == shlex.split(_materialize(link, outside))
+    assert fix == _materialize(link, outside)
     assert _md5(outside) == before
     assert (specs / "memory" / "QUALITY.md").is_symlink()
     doctor = SpecsDoctor(specs, public_dir=_PUBLIC, templates_dir=_PUBLIC / "templates")
     quality = [i for i in doctor.check() if i.code.startswith("FIXED")]
-    assert [(i.code, i.fixable, shlex.split(i.fix)) for i in quality] == [
-        ("FIXED-1", False, shlex.split(_materialize(link, outside)))
+    assert [(i.code, i.fixable, i.fix) for i in quality] == [
+        ("FIXED-1", False, _materialize(link, outside))
     ]
 
 
@@ -96,11 +102,11 @@ def _v6_tree_linking(tmp_path: Path, linked: str) -> tuple[Path, Path]:
     specs = tmp_path / "repo" / "specs"
     canon.scaffold(specs, project_name="p")
     merge_frontmatter(specs, specs_pattern_version=6)
-    (specs / "memory" / "ARCHITECTURE.md").write_text("# Architecture\n", encoding="utf-8")
-    (specs / "memory" / "TECHSTACK.md").write_text("# Tech\n\npython\n", encoding="utf-8")
+    write_text(specs / "memory" / "ARCHITECTURE.md", "# Architecture\n")
+    write_text(specs / "memory" / "TECHSTACK.md", "# Tech\n\npython\n")
     outside = tmp_path / "outside"
     (specs / linked).rename(outside)
-    (specs / linked).symlink_to(outside)
+    assert make_link(str(outside), specs / linked, is_dir=False)
     return specs, outside / "ARCHITECTURE.md" if outside.is_dir() else outside
 
 
@@ -111,7 +117,7 @@ def test_b1_the_tech_stack_fold_refuses_a_symlinked_architecture_md(tmp_path: Pa
     with pytest.raises(SymlinkRefusedError):
         upgrade(specs, remove=lambda p: sweep.remove(specs, p, p.name))
 
-    assert arch.read_text(encoding="utf-8") == "# Architecture\n"
+    assert read_text(arch) == "# Architecture\n"
 
 
 def test_a_fold_whose_delete_does_not_succeed_restores_architecture_md(tmp_path: Path) -> None:
@@ -128,7 +134,7 @@ def test_a_fold_whose_delete_does_not_succeed_restores_architecture_md(tmp_path:
     with pytest.raises(OSError, match="Permission denied"):
         fold_tech_stack(specs, boom)
 
-    assert arch.read_text(encoding="utf-8") == "# Architecture\n"
+    assert read_text(arch) == "# Architecture\n"
 
 
 def test_b2_doctor_fix_leaves_a_symlinked_quality_md_a_link(tmp_path: Path) -> None:
@@ -141,3 +147,24 @@ def test_b2_doctor_fix_leaves_a_symlinked_quality_md_a_link(tmp_path: Path) -> N
 
     assert (specs / "memory" / "QUALITY.md").is_symlink()
     assert _md5(outside) == before
+
+
+def _cli(root: Path | None, *words: str) -> str:
+    venv = platform.venv_dir(root) if root is not None else Path(sys.prefix)
+    return platform.inline(*platform.cli_argv(venv), *words)
+
+
+def test_the_two_tier_refusal_quotes_a_specs_dir_holding_a_blank(tmp_path: Path) -> None:
+    specs = tmp_path / "a b" / "specs"
+    canon.scaffold(specs, project_name="p")
+    merge_frontmatter(specs, specs_pattern_version=6)
+    write_text(
+        specs / "memory" / "ARCHITECTURE.md",
+        "# A\n\n## Part 1 — Principles\n",
+    )
+
+    with pytest.raises(DadaiaError) as refused:
+        upgrade(specs, remove=lambda _path: None)
+
+    rerun = _cli(None, "specs", "upgrade", "--specs-dir", str(specs))
+    assert f"then re-run `{rerun}`." in refused.value.fix  # type: ignore[attr-defined]

@@ -14,6 +14,7 @@ from dadaia_workspace.features.specs.memory_lint import (
     load_frontmatter_schema,
     main,
 )
+from tests.helpers.oslib import read_text, write_text
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 
@@ -47,7 +48,7 @@ def _make_atom(
     lines.append("---")
     content = "\n".join(lines) + "\n\n" + body
     path = dir_path / (filename or f"{slug}.md")
-    path.write_text(content, encoding="utf-8")
+    write_text(path, content)
     return path
 
 
@@ -112,7 +113,7 @@ def test_missing_required_frontmatter_field_is_an_error(tmp_path: Path) -> None:
         "---\n\n## Purpose\n\nBody.\n"
     )
     path = tmp_path / "test-atom.md"
-    path.write_text(content, encoding="utf-8")
+    write_text(path, content)
 
     result = lint_atom(path, tmp_path, schema)
 
@@ -126,7 +127,7 @@ def test_multiple_missing_required_fields_are_all_reported(tmp_path: Path) -> No
     schema = load_frontmatter_schema()
     content = "---\nslug: test-atom\n---\n\n## Purpose\n\nBody.\n"
     path = tmp_path / "test-atom.md"
-    path.write_text(content, encoding="utf-8")
+    write_text(path, content)
 
     result = lint_atom(path, tmp_path, schema)
 
@@ -231,7 +232,7 @@ def test_lint_directory_scans_toplevel_and_product_subdir_excludes_index(
     product_dir = tmp_path / "product"
     product_dir.mkdir()
     _make_atom(product_dir, slug="feature-a")
-    (product_dir / "index.md").write_text("# TOC\n", encoding="utf-8")  # no frontmatter, excluded
+    write_text(product_dir / "index.md", "# TOC\n")  # no frontmatter, excluded
 
     results = lint_directory(tmp_path, schema)
 
@@ -287,7 +288,7 @@ def test_agent_tier_property_absent_from_schema() -> None:
 def _product_tree(tmp_path: Path) -> tuple[Path, Path]:
     """A repo with one real source file and an empty `specs/memory/product/area/`."""
     (tmp_path / "src").mkdir()
-    (tmp_path / "src" / "code.py").write_text("x = 1\n", encoding="utf-8")
+    write_text(tmp_path / "src" / "code.py", "x = 1\n")
     memory_dir = tmp_path / "specs" / "memory"
     area = memory_dir / "product" / "area"
     area.mkdir(parents=True)
@@ -353,7 +354,7 @@ def _product(tmp_path: Path, body: str) -> list[str]:
     memory = tmp_path / "specs" / "memory"
     area = memory / "product" / "area"
     area.mkdir(parents=True)
-    (tmp_path / "pyproject.toml").write_text("", encoding="utf-8")
+    write_text(tmp_path / "pyproject.toml", "")
     path = _make_atom(area, slug="atom", body=body, extra_fm_fields=_SOURCES_FM)
     return _narrative(lint_atom(path, memory, load_frontmatter_schema()).errors)
 
@@ -398,7 +399,7 @@ def test_narrative_token_in_any_memory_file_names_its_line(tmp_path: Path, line:
     body = f"## Purpose\n\nCurrent truth.\n{line}\n"
     path = _make_atom(tmp_path, slug="QUALITY", filename="QUALITY.md", body=body)
     errors = _narrative(lint_atom(path, tmp_path, load_frontmatter_schema()).errors)
-    expected = _body_line(path.read_text(encoding="utf-8"), line)
+    expected = _body_line(read_text(path), line)
     assert len(errors) == 1, errors
     assert errors[0].startswith(f"MEM-NARRATIVE-1 line {expected}:"), errors
 
@@ -433,7 +434,7 @@ def test_narrative_history_phrase_in_a_product_atom(tmp_path: Path, phrase: str)
     line = f"The verb {phrase} here."
     errors = _product(tmp_path, f"## Purpose\n\nCurrent truth.\n{line}\n")
     atom = tmp_path / "specs" / "memory" / "product" / "area" / "atom.md"
-    expected = _body_line(atom.read_text(encoding="utf-8"), line)
+    expected = _body_line(read_text(atom), line)
     assert len(errors) == 1, errors
     assert errors[0].startswith(f"MEM-NARRATIVE-1 line {expected}:"), errors
 

@@ -17,6 +17,7 @@ import pytest
 from dadaia_workspace.features.specs import SpecsDoctor
 from dadaia_workspace.features.specs.canon import scaffold
 from dadaia_workspace.features.specs.doctor_types import finding_path
+from tests.helpers.oslib import read_text, write_text
 
 _REPO_ROOT = Path(__file__).parent.parent.parent.parent
 _TEMPLATES_DIR = _REPO_ROOT / "dadaia_workspace" / "public" / "templates"
@@ -67,7 +68,7 @@ def test_tree8_reports_a_non_canon_path_and_fix_never_deletes_it(tmp_path: Path,
     specs_dir = _make_v6_tree(tmp_path)
     stray = specs_dir / rel
     stray.parent.mkdir(parents=True, exist_ok=True)
-    stray.write_text("operator content\n", encoding="utf-8")
+    write_text(stray, "operator content\n")
     flagged = (
         specs_dir / rel.split("/")[0] if rel.split("/")[0] in ("features", "foundation") else stray
     )
@@ -79,7 +80,7 @@ def test_tree8_reports_a_non_canon_path_and_fix_never_deletes_it(tmp_path: Path,
     ]
 
     doctor.fix(issues)
-    assert stray.read_text(encoding="utf-8") == "operator content\n"
+    assert read_text(stray) == "operator content\n"
     assert [i.code for i in doctor.check()] == ["TREE-8"]
 
     flagged.rename(tmp_path / "moved-out")

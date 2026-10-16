@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import stat
 from collections.abc import Callable
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
+from dadaia_workspace.core import platform
 from dadaia_workspace.core.atomic_write import atomic_write
+from dadaia_workspace.core.doctor_rules import inline
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
 from dadaia_workspace.infrastructure.provider_version import provider_version
 
@@ -114,44 +117,26 @@ def _ownership_preflight(workspace_root: Path) -> str | None:
     projection step later dies mid-transaction with a bare PermissionError. This
     preflight names the offending path, its owner, and the exact repair command —
     the transaction never starts on a guaranteed failure. Returns ``None`` when every
-    checked path is writable by the current effective uid (or ownership cannot be
-    determined, e.g. non-POSIX platforms such as Windows, where ``pwd``/``geteuid``
-    do not exist).
+    checked path is writable by the current user, or on a host with no ownership
+    semantics such as Windows.
     """
-    import os
-
-    if not hasattr(os, "geteuid"):
-        return None  # Non-POSIX platform: ownership semantics do not apply.
-    try:
-        import pwd
-    except ImportError:  # pragma: no cover — Windows has no account database
-        pwd = None  # type: ignore[assignment]
+    uid = platform.effective_uid()
+    if uid is None:
+        return None
 
     def _check(path: Path) -> str | None:
         if not path.exists():
             return None
-        try:
-            st = path.stat()
-        except OSError:
-            return None
-        if st.st_uid != os.geteuid():
-            owner: str
-            if pwd is not None:
-                try:
-                    owner = pwd.getpwuid(st.st_uid).pw_name
-                except KeyError:
-                    owner = str(st.st_uid)
-            else:
-                owner = str(st.st_uid)
+        if (owner := platform.file_owner(path)) is not None and owner[0] != uid:
+            repair = inline("sudo", "chown", "-R", str(uid), str(workspace_root / ".dadaia"))
             return (
-                f"{path} is owned by '{owner}' (uid {st.st_uid}), not by the current user "
-                f"(uid {os.geteuid()}) — reconcile cannot write projections there. "
-                f"Repair with: sudo chown -R {os.geteuid()}:{os.getegid()} "
-                f"{workspace_root / '.dadaia'} (or fix the elevated process that created it)."
+                f"{path} is owned by '{owner[1]}' (uid {owner[0]}), not by the current user "
+                f"(uid {uid}) — reconcile cannot write projections there. "
+                f"Repair with: {repair} (or fix the elevated process that created it)."
             )
-        if not os.access(path, os.W_OK):
+        if not platform.can_write(path):
             return (
-                f"{path} is not writable by the current user (mode {oct(st.st_mode & 0o777)}) — "
+                f"{path} is not writable by the current user (mode {stat.filemode(path.stat().st_mode)}) — "
                 "reconcile cannot write projections there."
             )
         return None

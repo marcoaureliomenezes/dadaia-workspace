@@ -18,6 +18,7 @@ from dadaia_workspace.features.spec_context import sweep
 from dadaia_workspace.features.specs.canon import scaffold
 from dadaia_workspace.features.specs.doctor import SpecsDoctor
 from dadaia_workspace.features.specs.doctor_memory import is_placeholder_atom
+from tests.helpers.oslib import effective_uid, make_readonly, make_writable, read_text, write_text
 
 _TEMPLATES_DIR = Path(__file__).resolve().parents[3] / "dadaia_workspace" / "public" / "templates"
 
@@ -50,7 +51,7 @@ def _doctor(specs: Path) -> SpecsDoctor:
 def _placeholder_atom(tmp_path: Path) -> tuple[Path, Path]:
     specs = _fresh_specs(tmp_path)
     atom = specs / "memory" / "product" / "feature.md"
-    atom.write_text(_PLACEHOLDER_ATOM, encoding="utf-8")
+    write_text(atom, _PLACEHOLDER_ATOM)
     return specs, atom
 
 
@@ -72,11 +73,11 @@ def test_fix_reports_placeholder_and_leaves_it_byte_for_byte(tmp_path: Path) -> 
 def test_filled_atom_is_never_flagged_or_removed(tmp_path: Path) -> None:
     specs = _fresh_specs(tmp_path)
     atom = specs / "memory" / "product" / "feature.md"
-    atom.write_text(
+    write_text(
+        atom,
         "---\nslug: feature\ntitle: Real Feature\ntldr: A real feature.\n"
         "summary: This placeholder text in prose is NOT a template marker.\n"
         "tags: [feature]\ntoken_estimate: 50\n---\n\n## Propósito\n\nReal content.\n",
-        encoding="utf-8",
     )
     assert is_placeholder_atom(atom) is False
     assert [i for i in _doctor(specs).check() if i.code == "MEM-PLACEHOLDER-1"] == []
@@ -103,27 +104,27 @@ def test_a_token_mentioned_in_a_canon_file_is_not_flagged_and_survives_fix(
 ) -> None:
     specs = _fresh_specs(tmp_path)
     arch = specs / "memory" / "ARCHITECTURE.md"
-    arch.write_text(text, encoding="utf-8")
+    write_text(arch, text)
     assert is_placeholder_atom(arch) is False
     assert [i for i in _doctor(specs).check() if i.code == "MEM-PLACEHOLDER-1"] == []
     _doctor(specs).fix()
-    assert arch.read_text(encoding="utf-8").startswith(text.split("\n")[0])
+    assert read_text(arch).startswith(text.split("\n")[0])
 
 
 def test_a_canon_file_with_a_token_frontmatter_is_never_a_placeholder_atom(tmp_path: Path) -> None:
     specs = _fresh_specs(tmp_path)
     arch = specs / "memory" / "ARCHITECTURE.md"
-    arch.write_text(_PLACEHOLDER_ATOM, encoding="utf-8")
+    write_text(arch, _PLACEHOLDER_ATOM)
     assert is_placeholder_atom(arch) is False
 
 
 def test_an_atom_mentioning_a_token_in_prose_is_kept(tmp_path: Path) -> None:
     specs = _fresh_specs(tmp_path)
     atom = specs / "memory" / "product" / "feature.md"
-    atom.write_text(
+    write_text(
+        atom,
         "---\nslug: feature\ntitle: Real\ntldr: x.\nsummary: y.\ntags: [feature]\n"
         "token_estimate: 5\n---\n\n## Propósito\n\nThe `SLUG_PLACEHOLDER` token is legacy.\n",
-        encoding="utf-8",
     )
     assert is_placeholder_atom(atom) is False
 
@@ -153,7 +154,7 @@ Document exclusions and failure behavior here.
 def test_the_legacy_memory_template_verbatim_is_reported_and_kept(tmp_path: Path) -> None:
     specs = _fresh_specs(tmp_path)
     atom = specs / "memory" / "product" / "feature.md"
-    atom.write_text(_LEGACY_TEMPLATE, encoding="utf-8")
+    write_text(atom, _LEGACY_TEMPLATE)
     before = atom.read_bytes()
     [flagged] = [i for i in _doctor(specs).check() if i.code == "MEM-PLACEHOLDER-1"]
     assert (flagged.fixable, flagged.fix) == (False, _FILL_OR_DELETE)
@@ -168,10 +169,10 @@ def test_an_atom_the_operator_filled_but_for_one_token_is_reported_and_kept(
     specs = _fresh_specs(tmp_path)
     atom = specs / "memory" / "product" / "sessions.md"
     body = "".join(f"Operator line {n}.\n" for n in range(40))
-    atom.write_text(
+    write_text(
+        atom,
         "---\nslug: SLUG_PLACEHOLDER\ntitle: Sessions\ntldr: How sessions bind.\n"
         f"summary: Sessions.\ntags: [sessions]\n---\n\n## Purpose\n\n{body}",
-        encoding="utf-8",
     )
     assert is_placeholder_atom(atom) is False
     [flagged] = [i for i in _doctor(specs).check() if i.code == "MEM-PLACEHOLDER-1"]
@@ -180,7 +181,7 @@ def test_an_atom_the_operator_filled_but_for_one_token_is_reported_and_kept(
 
     _doctor(specs).fix()
     assert atom.exists()
-    atom.write_text(atom.read_text(encoding="utf-8").replace("SLUG_PLACEHOLDER", "sessions"))
+    write_text(atom, read_text(atom).replace("SLUG_PLACEHOLDER", "sessions"))
     assert [i for i in _doctor(specs).check() if i.code == "MEM-PLACEHOLDER-1"] == []
 
 
@@ -193,10 +194,8 @@ def test_upgrade_dry_run_reports_without_deleting(tmp_path: Path) -> None:
 def test_reconcile_ownership_preflight_names_owner_and_repair(tmp_path: Path) -> None:
     """A mixed-ownership workspace gets an actionable
     ownership error (path + owner + chown command), never a bare Permission denied."""
-    import os
-
-    if not hasattr(os, "geteuid"):
-        pytest.skip("POSIX-only ownership semantics")
+    if effective_uid() is None:
+        pytest.skip("this host has no ownership semantics")
 
     from dadaia_workspace.features.reconcile.service import _ownership_preflight
 
@@ -204,11 +203,11 @@ def test_reconcile_ownership_preflight_names_owner_and_repair(tmp_path: Path) ->
     assert _ownership_preflight(tmp_path) is None
 
     agentic = tmp_path / ".dadaia" / "agentic"
-    agentic.chmod(0o500)
+    make_readonly(agentic)
     error = _ownership_preflight(tmp_path)
     assert error is not None
     if "owned by" in error:
         assert "chown" in error
     else:
         assert "not writable" in error
-    agentic.chmod(0o755)
+    make_writable(agentic)

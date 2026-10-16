@@ -12,6 +12,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+from dadaia_workspace.core import platform
 from dadaia_workspace.core.cli_line import reinstall_fix
 from dadaia_workspace.core.fixed_sections import (
     FIXED_SECTIONS,
@@ -66,11 +67,9 @@ __all__ = [
 def read_fixed_fragment(public_dir: Path, section_id: str) -> str:
     """The library fragment of *section_id*: ``<public_dir>/data/fixed/<id>.md``.
 
-    Raises ValueError, whose text is the one fix line, when the file is not UTF-8."""
-    try:
-        return (public_dir / "data" / "fixed" / f"{section_id}.md").read_text(encoding="utf-8")
-    except UnicodeDecodeError as bad:
-        raise ValueError(reinstall_fix(public_dir)) from bad
+    Raises Undecodable, carrying the reinstall act, when the file is not UTF-8."""
+    path = public_dir / "data" / "fixed" / f"{section_id}.md"
+    return str(platform.read_text(path, reinstall_fix(public_dir)))
 
 
 def is_forbidden_memory_heading(heading: str) -> bool:

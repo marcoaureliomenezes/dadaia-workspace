@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
 
+from dadaia_workspace.core import platform
 from dadaia_workspace.core.exceptions import DadaiaError
 from dadaia_workspace.core.frontmatter import FrontmatterError, parse, split
 from dadaia_workspace.core.skill_owner import load_owner
@@ -143,7 +144,7 @@ def specs_path_kind(specs_dir: Path) -> Literal["tree", "file", "absent"]:
 
 def constitution_text(specs_dir: Path) -> str:
     constitution = constitution_path(specs_dir)
-    return constitution.read_text(encoding="utf-8") if constitution.is_file() else ""
+    return platform.read_text(constitution) if constitution.is_file() else ""
 
 
 def _gitflow_block(text: str) -> tuple[Gitflow | None, str | None]:
@@ -194,7 +195,7 @@ def merge_frontmatter(
     }
     updates = {k: json.dumps(v) for k, v in values.items() if v is not None}  # JSON is YAML
     constitution = constitution_path(specs_dir)
-    text = constitution.read_text(encoding="utf-8") if constitution.exists() else ""
+    text = platform.read_text(constitution) if constitution.exists() else ""
     parts = split(text)
     lines = parts[0].split("\n") if parts else []
     kept: list[str] = []
@@ -206,6 +207,6 @@ def merge_frontmatter(
         skipping = ":" in line and key in updates
         kept.append(f"{key}: {updates.pop(key)}" if skipping else line)
     kept.extend(f"{key}: {value}" for key, value in updates.items())
-    constitution.write_text(
-        "---\n" + "\n".join(kept) + "\n---\n" + (parts[1] if parts else text), encoding="utf-8"
+    platform.write_text(
+        constitution, "---\n" + "\n".join(kept) + "\n---\n" + (parts[1] if parts else text)
     )

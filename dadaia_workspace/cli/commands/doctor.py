@@ -61,7 +61,12 @@ _TEMPLATES_DIR = Path(__file__).parent.parent.parent / "public" / "templates"
 
 
 def _workspace_section(
-    service: DoctorService | None, root: Path | None, scope: str | None, *, expired_only: bool
+    service: DoctorService | None,
+    root: Path | None,
+    scope: str | None,
+    *,
+    expired_only: bool,
+    seen: set[str] | None = None,
 ) -> SectionReport:
     """`workspace`: the instance walk. Its findings already ARE the normalized record —
     the feature owns the translation of its own verdict vocabulary, so the adapter here
@@ -74,6 +79,7 @@ def _workspace_section(
         workspace_rules(expired_only=expired_only, context=scope),
         service,
         root,
+        seen=seen,
     )
 
 
@@ -83,7 +89,10 @@ def _empty_section(name: str) -> SectionReport:
 
 
 def _specs_section(
-    doctor: SpecsDoctor | None, root: Path | None, specs_dir: Path | None = None
+    doctor: SpecsDoctor | None,
+    root: Path | None,
+    specs_dir: Path | None = None,
+    seen: set[str] | None = None,
 ) -> SectionReport:
     if doctor is None:  # no rule can judge a tree that is not there: one finding
         if specs_dir is None:
@@ -98,12 +107,14 @@ def _specs_section(
         doctor,
         root,
         doctor.specs_dir,
+        seen,
     )
 
 
 def _ledgers_section(
     root: Path | None,
     specs_dir: Path | None,
+    seen: set[str] | None = None,
 ) -> SectionReport:
     """The `ledgers` section — three contributors, one name.
 
@@ -121,13 +132,8 @@ def _ledgers_section(
     context = backlog_doctor.build_context(specs_dir, tracked)
     return merge_sections(
         [
-            run_section("ledgers", backlog_doctor.RULES, context, root, specs_dir),
-            run_section(
-                "ledgers",
-                doctor_adr.LEDGER_RULES,
-                specs_dir,
-                root,
-            ),
+            run_section("ledgers", backlog_doctor.RULES, context, root, specs_dir, seen),
+            run_section("ledgers", doctor_adr.LEDGER_RULES, specs_dir, root, seen=seen),
             SectionReport(name="ledgers", findings=tuple(script_findings(specs_dir))),
         ]
     )
@@ -306,15 +312,18 @@ def doctor(
         for action in fixed:
             typer.echo(render(action))
         return
+    seen: set[str] = set()
     reports = [
         merge_sections(
             [
-                _workspace_section(service, workspace_root, scope, expired_only=expired_only),
+                _workspace_section(
+                    service, workspace_root, scope, expired_only=expired_only, seen=seen
+                ),
                 _onboarding_section(workspace_root, scope, expired_only=expired_only),
             ]
         ),
-        _specs_section(specs_doctor, workspace_root, target),
-        _ledgers_section(workspace_root, target),
+        _specs_section(specs_doctor, workspace_root, target, seen),
+        _ledgers_section(workspace_root, target, seen),
     ]
     # Render boundary ONLY: no doctor ever sees the redactor; every finding and fix action
     # keeps carrying true names inside the sections themselves.

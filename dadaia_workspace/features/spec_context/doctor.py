@@ -23,7 +23,7 @@ from enum import StrEnum
 from functools import partial
 from pathlib import Path
 
-from dadaia_workspace.core import context_registry, session_store, workspace_layout
+from dadaia_workspace.core import context_registry, platform, session_store, workspace_layout
 from dadaia_workspace.core.cli_line import fix_line, shell_line
 from dadaia_workspace.core.doctor_rules import Rule, SectionFinding
 from dadaia_workspace.core.exceptions import SchemaVersionError
@@ -33,7 +33,6 @@ from dadaia_workspace.core.harness_registry import (
 from dadaia_workspace.core.models.doctor_report import DoctorLine
 from dadaia_workspace.core.models.harness_profile import HarnessProfile
 from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
-from dadaia_workspace.core.platform import PLATFORM
 from dadaia_workspace.core.workspace_layout import Zone, ZoneClass
 from dadaia_workspace.features.spec_context import sweep
 from dadaia_workspace.features.spec_context.service import (
@@ -221,11 +220,11 @@ class DoctorService:
     def _check_venv_health(self) -> list[SectionFinding]:
         """VENV-1 — the workspace venv exists with an executable ``dadaia`` entrypoint.
 
-        Windows-safe — the scripts dir / exe suffix come from ``PLATFORM``
-        and the exec check uses ``os.access``. Not fixable: rebuilding a venv is an operator
+        The entrypoint's place and its exec check are the kernel's. Not fixable: rebuilding a venv is an operator
         action (``dadaia init`` / re-bootstrap), never an auto-repair.
         """
-        venv_bin = self._dadaia / ".venv" / PLATFORM.venv_scripts_dir
+        entry = platform.workspace_cli_path(self._workspace_root)
+        venv_bin = entry.parent
         if not venv_bin.is_dir():
             return [
                 _invariant(
@@ -234,7 +233,6 @@ class DoctorService:
                     shell_line("uvx", "dadaia-workspace", "init", str(self._workspace_root)),
                 )
             ]
-        entry = venv_bin / f"dadaia{PLATFORM.venv_exe_suffix}"
         if not entry.is_file():
             return [
                 _invariant(
@@ -243,7 +241,7 @@ class DoctorService:
                     shell_line("uvx", "dadaia-workspace", "init", str(self._workspace_root)),
                 )
             ]
-        if not os.access(entry, os.X_OK):
+        if not platform.is_executable(entry):
             return [
                 _invariant(
                     "VENV-1",
@@ -422,7 +420,7 @@ class DoctorService:
                             )
                         )
                         continue
-                    if entry.is_dir() and not entry.is_symlink():
+                    if entry.is_dir() and not platform.is_link(entry):
                         pending.append(entry)
         return out
 
@@ -634,7 +632,7 @@ class DoctorService:
             )
             JsonHarnessProfileStore().write(self._states, HarnessProfile.of(present))
         elif (seed := workspace_layout.LEVEL1_SEEDS.get(finding.path)) is not None:
-            finding.target.write_text(seed(self._workspace_root), encoding="utf-8")
+            platform.write_text(finding.target, seed(self._workspace_root))
         else:
             finding.target.mkdir(parents=True, exist_ok=True)
         return f"created '{finding.path}'"
