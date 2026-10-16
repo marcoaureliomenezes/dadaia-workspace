@@ -43,8 +43,12 @@ def test_install_refreshes_only_a_hook_we_shipped(
     subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
     hook = tmp_path / ".git" / "hooks" / "pre-push"
     hook.write_bytes(installed)
-    assert install_git_hooks(tmp_path) == ([hook] if refreshed else [])
+    assert install_git_hooks(tmp_path) == ([hook] if refreshed else []) + [_ref_tx(tmp_path)]
     assert hook.read_bytes() == (_SHIPPED.read_bytes() if refreshed else installed)
+
+
+def _ref_tx(repo: Path) -> Path:
+    return repo / ".git" / "hooks" / "reference-transaction"
 
 
 def _hook_as(repo: Path, layout: str) -> Path:
@@ -73,7 +77,9 @@ def test_install_over_an_unreadable_hook_never_raises(
     leaves what it cannot read, and an absent hook is installed executable either way."""
     hook = _hook_as(tmp_path, layout)
     written = layout == "absent" or force
-    assert install_git_hooks(tmp_path, force=force) == ([hook] if written else [])
+    assert install_git_hooks(tmp_path, force=force) == ([hook] if written else []) + [
+        _ref_tx(tmp_path)
+    ]
     assert hook.is_file() is written
     assert hook.is_symlink() is (layout == "link-to-a-directory" and not written)
     assert (hook.is_file() and os.access(hook, os.X_OK)) is written

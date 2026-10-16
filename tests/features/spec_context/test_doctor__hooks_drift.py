@@ -41,7 +41,12 @@ def _ctx(name: str, state: ContextState = ContextState.ALIVE) -> SpecContextProj
 
 
 def _workspace(
-    tmp_path: Path, *, drifted: bool = False, installed: bool = True, git: bool = True
+    tmp_path: Path,
+    *,
+    drifted: bool = False,
+    installed: bool = True,
+    missing: bool = False,
+    git: bool = True,
 ) -> Path:
     repo = tmp_path / "repos" / "demo"
     repo.mkdir(parents=True)
@@ -49,9 +54,11 @@ def _workspace(
         return tmp_path
     subprocess.run(["git", "init", "-q", str(repo)], check=True)
     for target, source in workspace_layout.INSTALLED_GIT_HOOKS if installed else ():
+        if target == "pre-push" and missing:
+            continue
         shipped = (workspace_layout.public_scripts_dir() / source).read_bytes()
         (repo / ".git" / "hooks" / target).write_bytes(
-            b"# hand-edited\n" + shipped if drifted else shipped
+            b"# hand-edited\n" + shipped if drifted and target == "pre-push" else shipped
         )
     return tmp_path
 
@@ -60,7 +67,7 @@ def _workspace(
 @pytest.mark.parametrize(("layout", "state", "finding"), [
     pytest.param({}, ContextState.ALIVE, False, id="matching-shipped-hooks"),
     pytest.param({"drifted": True}, ContextState.ALIVE, True, id="drifted-hook"),
-    pytest.param({"installed": False}, ContextState.ALIVE, True, id="missing-hook-is-the-same-finding"),
+    pytest.param({"missing": True}, ContextState.ALIVE, True, id="missing-hook-is-the-same-finding"),
     pytest.param({"drifted": True}, ContextState.DEAD, False, id="dead-context-never-checked"),
     pytest.param({"git": False}, ContextState.ALIVE, False, id="not-a-git-checkout-never-a-finding"),
 ])
@@ -88,9 +95,12 @@ def test_a_gate_git_never_runs_is_a_finding(tmp_path: Path) -> None:
         ["git", "-C", str(root / "repos" / "demo"), "config", "core.hooksPath", ".husky"]
     )
     rule = next(r for r in workspace_rules() if "HOOKS-DRIFT-1" in r.codes)
-    [finding] = rule.run(DoctorService(_Store([_ctx("demo")]), None, root))  # type: ignore[arg-type]
-    assert finding.error
-    assert "repos/demo/.husky/pre-push" in finding.message
+    found = rule.run(DoctorService(_Store([_ctx("demo")]), None, root))  # type: ignore[arg-type]
+    assert [f.error for f in found] == [True, True]
+    assert [f.message.split(" ")[0] for f in found] == [
+        "repos/demo/.husky/pre-push",
+        "repos/demo/.husky/reference-transaction",
+    ]
 
 
 def test_no_module_computes_the_hooks_dir_itself() -> None:
@@ -105,7 +115,7 @@ def test_no_module_computes_the_hooks_dir_itself() -> None:
 # fmt: off
 @pytest.mark.parametrize(("layout", "observed", "other"), [
     pytest.param({"drifted": True}, r"differs from the shipped \S+$", "absent", id="edited-hook-differs"),
-    pytest.param({"installed": False}, r"is absent$", "differs", id="deleted-hook-is-absent"),
+    pytest.param({"missing": True}, r"is absent$", "differs", id="deleted-hook-is-absent"),
 ])
 # fmt: on
 def test_hooks_drift_1_names_the_observed_state_with_one_code_and_one_fix(
