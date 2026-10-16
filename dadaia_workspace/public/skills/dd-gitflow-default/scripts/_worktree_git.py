@@ -109,7 +109,9 @@ def work_version(repo: Path, flow: dict[str, str]) -> str:
         low, high = f"{prefix}{ordered[0]}", f"{prefix}{ordered[-1]}"
         drop = git_line(repo, "branch", "-d", low)
         merged = git(repo, "branch", "--merged", high, "--list", low).strip()
-        raise SeveralWork(f"{len(versions)} work branches", drop if merged else f"Agent action: merge {low} into {high}, then run {drop}", ordered[-1])  # fmt: skip
+        then = "run" if merged else f"merge {low} into {high}, then run"
+        fix = f"Agent action: run `{git_line(repo, 'switch', high)}`, then {then} `{drop}`"
+        raise SeveralWork(f"{len(versions)} work branches", fix, ordered[-1])
     nxt = next_version(repo, flow)
     remote = git(
         repo, "branch", "-r", "--list", f"*/{prefix}{nxt}", "--format=%(refname:short)"

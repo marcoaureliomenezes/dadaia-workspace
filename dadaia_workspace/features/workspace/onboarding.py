@@ -82,8 +82,7 @@ def _first_pass_fix(c: _Ctx) -> str:
     try:
         version = GitSubprocessClient().work_version(repo)
     except SeveralWorkBranches as several:
-        version, act = several.keep, several.fix.removeprefix("Agent action: ")
-        lead = f"{act if act != several.fix else 'run ' + act}, then "
+        version, lead = several.keep, several.fix.removeprefix("Agent action: ") + ", then "
     lane = fix_line(c.root, "worktree", "new", repo.name, f"{version}/wt-backlog-first-pass")
     return (
         f"Agent action: {lead}open the lane {lane}"
