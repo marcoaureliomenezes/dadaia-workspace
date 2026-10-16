@@ -27,8 +27,9 @@ def seeded_remote(
 
 
 def clone(remote: Path, dest: Path) -> Path:
-    """A working clone of *remote* at *dest*."""
-    git(remote.parent, "clone", "-q", str(remote), str(dest))
+    """A working clone of *remote* at *dest*; its origin is the ``file://`` URL, which git keeps
+    as written (it rewrites a Windows path)."""
+    git(remote.parent, "clone", "-q", remote.as_uri(), str(dest))
     return dest
 
 

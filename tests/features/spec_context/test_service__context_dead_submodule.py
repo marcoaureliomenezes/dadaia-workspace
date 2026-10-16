@@ -7,8 +7,6 @@ from pathlib import Path
 
 import pytest
 
-pytest.importorskip("fcntl")
-
 from dadaia_workspace.core.models.spec_context import ContextState  # noqa: E402
 from tests.features.spec_context.test_service__context_dead_holds import (  # noqa: E402
     _alive,

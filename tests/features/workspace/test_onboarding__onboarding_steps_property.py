@@ -31,8 +31,6 @@ from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentMana
 from tests.conftest import GIT_QUIET_INCLUDE
 from tests.helpers.oslib import cli_path, command, make_executable, run, write_text
 
-pytest.importorskip("fcntl")
-
 _runner = CliRunner()
 #: The words each command step prints as its fix.
 _WORDS = {
@@ -92,7 +90,7 @@ def _git_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     # its runner is stubbed out — the gate itself is proven by the push journeys.
     hooks = tmp_path / "hooks"
     hooks.mkdir()
-    runner = tmp_path / ".dadaia" / ".venv" / "bin" / "dadaia"  # the hook's venv walk
+    runner = cli_path(tmp_path)  # the hook's venv walk
     runner.parent.mkdir(parents=True)
     write_text(runner, "#!/bin/sh\ncat >/dev/null\n")
     make_executable(runner)

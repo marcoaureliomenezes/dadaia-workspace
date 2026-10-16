@@ -10,11 +10,9 @@ All fixtures are SYNTHETIC trees (mkdir/touch/chmod) — NEVER a real venv build
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
-
-pytest.importorskip("fcntl")
-
-from pathlib import Path  # noqa: E402
 
 from dadaia_workspace.features.spec_context.doctor import DoctorService  # noqa: E402
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient

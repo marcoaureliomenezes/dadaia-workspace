@@ -2,21 +2,18 @@
 
 from __future__ import annotations
 
-# Guard: skip this entire module on platforms where fcntl is not available (e.g. Windows).
-import pytest
-
-pytest.importorskip("fcntl")
-
 from dataclasses import replace  # noqa: E402
 from pathlib import Path  # noqa: E402
 
+import pytest
+
+from dadaia_workspace.core.cli_line import cli_words  # noqa: E402
 from dadaia_workspace.core.doctor_rules import SectionFinding  # noqa: E402
 from dadaia_workspace.core.models.spec_context import (  # noqa: E402
     AssociatedRepo,
     ContextState,
     SpecContextProject,
 )
-from dadaia_workspace.core.platform import PLATFORM  # noqa: E402
 from dadaia_workspace.features.spec_context.doctor import (  # noqa: E402
     DoctorService,
     workspace_rules,
@@ -24,7 +21,7 @@ from dadaia_workspace.features.spec_context.doctor import (  # noqa: E402
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
 from tests.fixtures.stores import context_store
-from tests.helpers.oslib import link, make_executable, read_text, write_text
+from tests.helpers.oslib import cli_path, command, link, make_executable, read_text, write_text
 
 
 def _make_healthy_venv(root: Path) -> None:
@@ -32,9 +29,8 @@ def _make_healthy_venv(root: Path) -> None:
 
     Synthetic only (mkdir/touch/chmod) — never a real venv build (QA memory law).
     """
-    bindir = root / ".dadaia" / ".venv" / PLATFORM.venv_scripts_dir
-    bindir.mkdir(parents=True, exist_ok=True)
-    entry = bindir / f"dadaia{PLATFORM.venv_exe_suffix}"
+    entry = cli_path(root)
+    entry.parent.mkdir(parents=True, exist_ok=True)
     write_text(entry, "#!/bin/sh\n")
     make_executable(entry)
 
@@ -103,7 +99,7 @@ def test_inv4_names_a_missing_main_or_associated_repo_with_the_alive_fix(
     assert [(i.message, i.fixable) for i in inv4] == [
         (f"Context 'missing' is alive but repo '{missing}' not on disk", False)
     ]
-    assert inv4[0].fix.endswith("dadaia context alive missing")
+    assert inv4[0].fix == command(*cli_words(tmp_path, "context", "alive", "missing"))
 
 
 @pytest.mark.parametrize(

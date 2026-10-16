@@ -7,14 +7,11 @@ writes under ``specs/``.
 
 from __future__ import annotations
 
-# Guard: skip this entire module on platforms where fcntl is not available (e.g. Windows).
+import json
+import os
+from pathlib import Path
+
 import pytest
-
-pytest.importorskip("fcntl")
-
-import json  # noqa: E402
-import os  # noqa: E402
-from pathlib import Path  # noqa: E402
 
 from dadaia_workspace.cli._specs_resolution import (  # noqa: E402
     resolve_context_for_cli,

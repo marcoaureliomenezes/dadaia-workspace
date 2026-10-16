@@ -26,8 +26,6 @@ from dadaia_workspace.features.migrate.upgrade import _RETIRED_PART_HEADING
 from tests.fakes import no_worktree_rows, seed_dead_context
 from tests.helpers.oslib import link, read_text, run, write_text
 
-pytest.importorskip("fcntl")  # POSIX-only: bare git remotes and file:// URLs; Windows skips
-
 _GIT_ENV = {
     "GIT_AUTHOR_NAME": "t",
     "GIT_AUTHOR_EMAIL": "t@t.test",
@@ -72,7 +70,7 @@ def _bare_remote(tmp: Path) -> Path:
 
 def _alive_foo(tmp: Path, bare: Path) -> Path:
     root = _workspace(tmp)
-    seed_dead_context(root, "foo", "foo", f"file://{bare}")
+    seed_dead_context(root, "foo", "foo", bare.as_uri())
     os.chdir(root)
     _run(["context", "alive", "foo"])
     return root
@@ -181,8 +179,6 @@ def _malformed_constitution(tmp: Path) -> Case:
 def _specs_dir_is_not_a_directory(tmp: Path, kind: str) -> Case:
     tmp.mkdir(parents=True)
     if kind == "fifo":
-        if PLATFORM.windows:
-            pytest.skip("a FIFO needs POSIX")
         os.mkfifo(tmp / "specs")
     else:
         write_text(tmp / "specs", "not a directory\n")
@@ -193,8 +189,7 @@ def _symlinked_specs_dir(tmp: Path, live: bool) -> Case:
     tmp.mkdir(parents=True)
     if live:
         (tmp / "real").mkdir()
-    if not link(str(tmp / ("real" if live else "nonexistent")), tmp / "link", is_dir=live):
-        pytest.skip("this host refuses symlinks")
+    assert link(str(tmp / ("real" if live else "nonexistent")), tmp / "link", is_dir=live)
     return tmp, ["specs", "init", "--specs-dir", str(tmp / "link")]
 
 
@@ -272,7 +267,8 @@ def test_refusal_prints_error_then_exactly_one_fix(
         assert not (cwd / "link").resolve().joinpath("constitution.md").exists()
 
 
-@pytest.mark.parametrize("kind", ["file", "fifo"])
+# A FIFO is a POSIX file type: the host that cannot make one has no such case to refuse.
+@pytest.mark.parametrize("kind", ["file", *([] if PLATFORM.windows else ["fifo"])])
 def test_specs_init_on_a_non_directory_refuses_with_the_move_aside_fix_and_leaves_it(
     kind: str, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:

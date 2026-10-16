@@ -12,12 +12,10 @@ import shutil
 from pathlib import Path
 
 import pytest
-
-pytest.importorskip("fcntl")
-
 from typer.testing import CliRunner  # noqa: E402
 
 from dadaia_workspace.cli.main import app  # noqa: E402
+from dadaia_workspace.core.cli_line import cli_words
 from dadaia_workspace.core.exceptions import RepoUrlMissingError
 from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES
 from dadaia_workspace.features.workspace.service import WorkspaceService  # noqa: E402
@@ -28,7 +26,7 @@ from dadaia_workspace.infrastructure.python_env import (  # noqa: E402
     VenvPythonEnvironmentManager,
 )
 from tests.fakes import seed_dead_context
-from tests.helpers.oslib import read_text, run, write_text
+from tests.helpers.oslib import command, read_text, run, write_text
 
 _runner = CliRunner()
 _HAS_GIT = shutil.which("git") is not None
@@ -136,6 +134,5 @@ def test_a_bare_associated_slug_with_no_checkout_is_refused(workspace: Path) -> 
     seed_dead_context(workspace, "m", "m", "https://x.test/m.git")
     add = _runner.invoke(app, ["context", "repo", "add", "m", "a"])
     assert add.exit_code == 1, add.output
-    assert ".dadaia/.venv/bin/dadaia context repo add m a --url` with the repo's clone URL" in (
-        add.output
-    )
+    add_line = command(*cli_words(workspace, "context", "repo", "add", "m", "a", "--url"))
+    assert f"{add_line}` with the repo's clone URL" in add.output

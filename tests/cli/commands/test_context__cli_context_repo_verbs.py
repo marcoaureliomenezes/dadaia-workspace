@@ -9,9 +9,6 @@ import json
 from pathlib import Path
 
 import pytest
-
-pytest.importorskip("fcntl")
-
 from typer.testing import CliRunner  # noqa: E402
 
 from dadaia_workspace.cli.main import app  # noqa: E402

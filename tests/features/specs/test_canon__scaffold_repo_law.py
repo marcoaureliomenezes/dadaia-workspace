@@ -8,16 +8,7 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.features.specs import canon
-from tests.helpers.oslib import (
-    effective_uid,
-    link,
-    make_readonly,
-    make_writable,
-    read_text,
-    write_text,
-)
-
-pytest.importorskip("fcntl")  # POSIX symlink + O_NOFOLLOW semantics
+from tests.helpers.oslib import link, read_text, write_text
 
 _BODIES = {"repo-AGENTS.md": "# repo law\n"}
 
@@ -81,18 +72,21 @@ def test_scaffold_never_writes_through_a_symlinked_parent_dir(tmp_path: Path) ->
     assert list(outside.iterdir()) == []
 
 
-def test_an_unwritable_directory_raises_instead_of_skipping(tmp_path: Path, public: Path) -> None:
-    """Only an existing file or a symlinked target is skipped."""
-    if effective_uid() == 0:
-        pytest.skip("root ignores directory permissions")
+def test_a_refused_write_raises_instead_of_skipping(
+    tmp_path: Path, public: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Only an existing file or a symlinked target is skipped; a write the host refuses (an
+    unwritable directory: no mode bit makes one on Windows) propagates."""
+
+    def refuse(*_args: object, **_kw: object) -> None:
+        raise PermissionError("read-only directory")
+
+    monkeypatch.setattr(canon, "atomic_write", refuse)
     repo = tmp_path / "repo"
     repo.mkdir()
-    make_readonly(repo)
-    try:
-        with pytest.raises(PermissionError):
-            canon.scaffold_repo_law(repo, project_name="p", public_dir=public)
-    finally:
-        make_writable(repo)
+    with pytest.raises(PermissionError):
+        canon.scaffold_repo_law(repo, project_name="p", public_dir=public)
+    assert list(repo.iterdir()) == []
 
 
 def test_repo_law_heading_carries_the_project_name(tmp_path: Path, public: Path) -> None:

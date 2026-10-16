@@ -9,10 +9,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
-
-pytest.importorskip("fcntl")
-
 from dadaia_workspace.container import scan_publish_candidates
 from dadaia_workspace.core.models.spec_context import (  # noqa: E402
     AssociatedRepo,
@@ -59,10 +55,10 @@ def test_alive_on_dead_context_writes_no_specs_commits_nothing_and_hooks_every_r
         SpecContextProject(
             name="app",
             repo_slug="app",
-            repo_url=str(main_url),
+            repo_url=main_url.as_uri(),
             state=ContextState.DEAD,
             created_at="2026-09-24T00:00:00Z",
-            associated_repos=(AssociatedRepo(slug="lib", url=str(assoc_url)),),
+            associated_repos=(AssociatedRepo(slug="lib", url=assoc_url.as_uri()),),
         )
     )
     service = SpecContextService(
@@ -96,12 +92,12 @@ def test_an_adopted_checkouts_own_pre_push_survives_create_and_alive(tmp_path: P
     main_url, _ = _seeded_remote(tmp_path, "app")
     assoc_url, _ = _seeded_remote(tmp_path, "lib")
     adopted = workspace / "repos" / "app"
-    os_run(["git", "clone", "-q", str(main_url), str(adopted)], check=True)
+    os_run(["git", "clone", "-q", main_url.as_uri(), str(adopted)], check=True)
     own = b"#!/bin/sh\n# the operator's own pre-push\nexit 0\n"
     (adopted / ".git" / "hooks" / "pre-push").write_bytes(own)
     service = container.build_spec_context_service(workspace)
 
-    service.create(str(main_url), associated_urls=(str(assoc_url),))
+    service.create(main_url.as_uri(), associated_urls=(assoc_url.as_uri(),))
     service.alive("app")
 
     assert (adopted / ".git" / "hooks" / "pre-push").read_bytes() == own

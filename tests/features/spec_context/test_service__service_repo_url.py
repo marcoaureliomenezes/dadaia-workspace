@@ -12,11 +12,9 @@ BEFORE rmtree — are the data-loss guards this file exists to keep.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
-
-pytest.importorskip("fcntl")
-
-from pathlib import Path  # noqa: E402
 
 from dadaia_workspace.container import scan_publish_candidates
 from dadaia_workspace.core.exceptions import RepoUrlMissingError  # noqa: E402
@@ -101,5 +99,5 @@ def test_alive_and_dead_backfill_an_empty_repo_url_from_origin(
     ctx = getattr(fake_service, verb)("foo")
 
     assert ctx.state == (ContextState.ALIVE if verb == "alive" else ContextState.DEAD)
-    assert ctx.repo_url == store.get("foo").repo_url == str(remote)  # type: ignore[union-attr]
+    assert ctx.repo_url == store.get("foo").repo_url == remote.as_uri()  # type: ignore[union-attr]
     assert repo.exists() is (verb == "alive")

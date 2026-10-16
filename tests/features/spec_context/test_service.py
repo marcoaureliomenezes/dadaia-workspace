@@ -9,13 +9,9 @@ guard this file keeps, alongside the non-writable-files dead() contract.
 
 from __future__ import annotations
 
-import pytest
-
-# Guard: skip this entire module on platforms where fcntl is not available (e.g. Windows).
-
-pytest.importorskip("fcntl")
-
 from pathlib import Path  # noqa: E402
+
+import pytest
 
 from dadaia_workspace.container import scan_publish_candidates
 from dadaia_workspace.features.spec_context.service import SpecContextService  # noqa: E402
