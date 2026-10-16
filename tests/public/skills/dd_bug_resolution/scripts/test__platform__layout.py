@@ -49,13 +49,9 @@ def test_norm_sep_spells_a_foreign_path_with_forward_slashes() -> None:
     assert K.norm_sep("a\\b/c\\") == "a/b/c/"
 
 
-def test_cli_argv_heads_a_windows_line_with_the_venv_python_never_the_launcher() -> None:
+def test_cli_argv_is_the_console_script_on_every_host() -> None:
     venv = PurePosixPath("/ws/.dadaia/.venv")
-    assert K.cli_argv(venv, WIN) == [
-        "/ws/.dadaia/.venv/Scripts/python.exe",
-        "-m",
-        "dadaia_workspace",
-    ]
+    assert K.cli_argv(venv, WIN) == ["/ws/.dadaia/.venv/Scripts/dadaia.exe"]
     assert K.cli_argv(venv, POSIX) == ["/ws/.dadaia/.venv/bin/dadaia"]
 
 

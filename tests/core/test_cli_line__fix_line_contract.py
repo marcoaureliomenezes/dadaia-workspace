@@ -44,13 +44,7 @@ from dadaia_workspace.core.models.spec_context import (
     ContextState,
     SpecContextProject,
 )
-from dadaia_workspace.core.platform import (
-    PLATFORM,
-    cli_argv,
-    command,
-    venv_dir,
-    workspace_cli_path,
-)
+from dadaia_workspace.core.platform import PLATFORM, command, workspace_cli_path
 from dadaia_workspace.core.skill_owner import load_owner
 from dadaia_workspace.core.specs_version import CANONICAL_SPECS_VERSION
 from dadaia_workspace.features.chokepoints import push_gate_decision
@@ -76,7 +70,7 @@ from tests.features.specs.test_doctor import _make_clean_specs_tree
 from tests.fixtures.fix_census import fix_sites
 from tests.fixtures.harness_env import git_bash, run_bash, suite_env
 from tests.fixtures.real_git import PushRepo
-from tests.fixtures.stores import fake_venv, own_venv_python, own_venv_workspace
+from tests.fixtures.stores import own_venv_python, own_venv_workspace
 from tests.helpers import oslib, worktree_ws
 from tests.helpers.privacy_fixtures import aws_key_shape
 
@@ -138,14 +132,13 @@ def the_fix(message: str | None, root: Path) -> str:
     if fix.startswith(_ACT_LABELS):
         assert not (fix.startswith("Agent action: ") and _protected_paths(fix, root)), fix
         return fix
-    cli = command(*cli_argv(venv_dir(root)))
-    if fix == cli or fix.startswith(f"{cli} "):  # the CLI line: its head is a file that exists
-        assert Path(cli_argv(venv_dir(root))[0]).is_file(), fix
-        argv0 = ""
+    cli = command(str(workspace_cli_path(root)))
+    if fix == cli or fix.startswith(f"{cli} "):  # the CLI line, whole: its head must exist
+        assert workspace_cli_path(root).is_file(), fix
     else:
         argv0 = fix.split()[0]  # an absolute file, or a bare name on PATH, never cwd-relative
-    on_path = "/" not in argv0 and (shutil.which(argv0) or argv0 in _PREREQUISITES)
-    assert not argv0 or on_path or (Path(argv0).is_absolute() and Path(argv0).is_file()), fix
+        on_path = "/" not in argv0 and (shutil.which(argv0) or argv0 in _PREREQUISITES)
+        assert on_path or (Path(argv0).is_absolute() and Path(argv0).is_file()), fix
     block = pre_gate.evaluate_payload({"tool_name": "Bash", "tool_input": {"command": fix}})
     assert block is None, f"the fix command is itself blocked:\n{fix}\n{block}"
     return fix
@@ -158,15 +151,10 @@ def _workspace(root: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     )
     (root / ".dadaia" / "sessions").mkdir(parents=True)
     (root / ".dadaiaignore").write_text("[protected]\nsecrets\n", encoding="utf-8")
-    if (
-        PLATFORM.windows
-    ):  # the CLI heads a line as the venv's python.exe: a real one that runs the module
-        fake_venv(root, pth=True)
-    else:
-        stand_in = shutil.which("true")  # a real exe, exit 0
-        assert stand_in, "the host has no stand-in executable"
-        workspace_cli_path(root).parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy(stand_in, workspace_cli_path(root))
+    stand_in = shutil.which("whoami" if sys.platform == "win32" else "true")  # a real exe, exit 0
+    assert stand_in, "the host has no stand-in executable"
+    workspace_cli_path(root).parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy(stand_in, workspace_cli_path(root))
     monkeypatch.chdir(root)
     return root
 
@@ -1905,36 +1893,45 @@ def _shell_argv(shell: str) -> list[str]:
     return argv
 
 
+def _in_shell(shell: str, line: str, cwd: Path) -> subprocess.CompletedProcess[str]:
+    argv = _shell_argv(shell)
+    # cmd /s strips the outer quotes of its raw tail; list2cmdline's \" is not cmd syntax.
+    command_line = f'{subprocess.list2cmdline(argv)} "{line}"' if shell == "cmd" else [*argv, line]
+    return subprocess.run(command_line, cwd=cwd, capture_output=True, text=True, timeout=120, check=False)  # fmt: skip
+
+
 @pytest.mark.parametrize("shell", oslib.shells_for(oslib.detect()))
 def test_a_fix_runs_verbatim_in_every_host_shell(blank_workspace: Path, shell: str) -> None:
-    """The root refusal's fix and a CLI fix line run verbatim in each shell the host offers
-    (POSIX ``sh``; on Windows cmd, PowerShell and Git Bash): the root fix from ``repos/demo``,
-    twice, never writing the exceptions file, in a root that holds a blank."""
+    """In a root that holds a blank, the root refusal's fix runs verbatim from ``repos/demo``,
+    twice, never writing the exceptions file, in each shell the host offers (POSIX ``sh``; on
+    Windows cmd, PowerShell and Git Bash). The CLI fix runs too, except on Windows: its head
+    holds a blank, which no spelling gets through all three shells, so it is an Agent action."""
     workspace = blank_workspace
-    argv = _shell_argv(shell)
     (workspace / ".dadaiaignore").unlink()
     root_fix = the_fix(_gate(workspace, "junk.txt"), workspace)
     (workspace / "repos" / "demo").mkdir(parents=True)
-    runs = [
-        subprocess.run(
-            # cmd /s strips the outer quotes of its raw tail; list2cmdline's \" is not cmd syntax.
-            f'{subprocess.list2cmdline(argv)} "{line}"' if shell == "cmd" else [*argv, line],
-            cwd=workspace / "repos" / "demo",
-            capture_output=True,
-            text=True,
-            timeout=120,
-            check=False,
-        )  # fmt: skip
-        for line in (root_fix, root_fix, fix_line(workspace, "--version"))
-    ]
-    assert [r.returncode for r in runs] == [0, 0, 0], [r.stderr for r in runs]
-    # The CLI ran, not a shell echo of its quoted path (PowerShell exits 0 on an expression).
-    direct = subprocess.run(
-        [*cli_argv(venv_dir(workspace)), "--version"], capture_output=True, text=True, check=True
-    )
-    assert runs[2].stdout.strip() == direct.stdout.strip()
+    runs = [_in_shell(shell, root_fix, workspace / "repos" / "demo") for _ in range(2)]
+    assert [r.returncode for r in runs] == [0, 0], [r.stderr for r in runs]
+    cli_fix = fix_line(workspace)
+    if oslib.detect().windows:
+        assert cli_fix.startswith("Agent action: run ")
+    else:
+        assert _in_shell(shell, cli_fix, workspace / "repos" / "demo").returncode == 0
     assert (workspace / ".dadaia" / "tmp").is_dir()
     assert not (workspace / ".dadaiaignore").exists()  # the fix never writes the operator's file
+
+
+@pytest.mark.parametrize("shell", oslib.shells_for(oslib.detect()))
+def test_a_cli_fix_without_a_blank_runs_the_cli_in_every_host_shell(
+    workspace: Path, shell: str
+) -> None:
+    """The CLI ran, not a shell echo of its quoted path (PowerShell exits 0 on an expression)."""
+    run = _in_shell(shell, fix_line(workspace), workspace)
+    direct = subprocess.run(
+        [workspace_cli_path(workspace)], capture_output=True, text=True, check=True
+    )
+    assert run.returncode == 0, run.stderr
+    assert run.stdout.strip() == direct.stdout.strip()
 
 
 @_SLOW

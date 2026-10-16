@@ -75,6 +75,13 @@ def run_line(line: str, **kw: object) -> subprocess.CompletedProcess[str]:
     return run([*shell, line], **kw)  # type: ignore[arg-type]
 
 
+def make_venv(path: Path) -> Path:
+    """A real ``python -m venv --copies`` at *path* (on Windows its ``python.exe`` is CPython's
+    redirector, as in production); returns its interpreter."""
+    run([sys._base_executable, "-m", "venv", "--copies", "--without-pip", str(path)], check=True)
+    return python_in(path)
+
+
 def stub_cli(directory: Path, name: str, source: str, python: Path | None = None) -> Path:
     """A runnable fake CLI *name* in *directory*: *source*, a python script whose first line is
     ``#!python``, bound to *python* (default the base interpreter) as pip binds a console script.

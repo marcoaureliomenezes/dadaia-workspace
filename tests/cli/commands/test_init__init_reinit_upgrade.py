@@ -153,12 +153,9 @@ def test_a_failed_reconcile_prints_the_windows_fix_line(
 
     result = _runner.invoke(app, ["init", str(workspace)])
 
-    exe = workspace.resolve() / ".dadaia" / ".venv" / "Scripts" / "python.exe"
+    exe = workspace.resolve() / ".dadaia" / ".venv" / "Scripts" / "dadaia.exe"
     assert result.exit_code == 1
-    assert (
-        f"fix: {exe.as_posix()} -m dadaia_workspace reconcile --expect-version 0.4.8"
-        in result.output
-    )
+    assert f"fix: {exe.as_posix()} reconcile --expect-version 0.4.8" in result.output
 
 
 def test_older_running_version_exits_1_with_the_pinned_fix(

@@ -24,40 +24,30 @@ def test_posix_cli_path_and_fix_line(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_windows_cli_path_and_fix_line(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Forward slashes; a part with a blank quoted whole, `-c` code one word; the CLI heads a
-    Windows line as the venv's python.exe running the module, never the pip launcher, and a
-    root with a blank spells that head `C":..."`."""
+    """Forward slashes; a part with a blank quoted whole, `-c` code one word; a head with a blank
+    has no spelling that runs in cmd, PowerShell and Git Bash alike, so the line is an Agent action."""
     monkeypatch.setattr("dadaia_workspace.core.platform.PLATFORM", Capabilities.detect("win32"))
     root = PureWindowsPath(r"C:\ws\my ws")
     assert workspace_cli_path(root) == PureWindowsPath(
         r"C:\ws\my ws\.dadaia\.venv\Scripts\dadaia.exe"
     )
     assert cli_line.fix_line(PureWindowsPath(r"C:\ws"), "doctor", "--fix") == (
-        "C:/ws/.dadaia/.venv/Scripts/python.exe -m dadaia_workspace doctor --fix"
+        "C:/ws/.dadaia/.venv/Scripts/dadaia.exe doctor --fix"
     )
+    cli = r"C:\ws\my ws\.dadaia\.venv\Scripts\dadaia.exe"  # the Agent action shows the real value
     assert cli_line.fix_line(root, "doctor", "--fix") == (
-        'C":/ws/my ws/.dadaia/.venv/Scripts/python.exe" -m dadaia_workspace doctor --fix'
+        f"Agent action: run {cli} doctor --fix, quoting {cli} for your shell"
     )
     monkeypatch.setattr("sys.executable", r"C:\my ws\python.exe")
     assert cli_line.mkdir_line(PureWindowsPath(r"C:\my ws\tmp")) == (
-        'C":/my ws/python.exe" -c "import pathlib; '
-        "pathlib.Path(r'C:/my ws/tmp').mkdir(parents=True, exist_ok=True)\""
+        'Agent action: run C:\\my ws\\python.exe -c "import pathlib; '
+        "pathlib.Path(r'C:/my ws/tmp').mkdir(parents=True, exist_ok=True)\", "
+        "quoting C:\\my ws\\python.exe for your shell"
     )
     assert (
         cli_line.shell_line("git", "-C", r"C:\ws\repos\app", "status")
         == "git -C C:/ws/repos/app status"
     )
-
-
-@pytest.mark.parametrize("root", [r"C:\ws", r"C:\ws\my ws"])
-def test_no_windows_fix_line_names_the_pip_launcher(
-    root: str, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """The launcher garbles a quoted path in cmd: the venv's python.exe heads the line instead."""
-    monkeypatch.setattr("dadaia_workspace.core.platform.PLATFORM", Capabilities.detect("win32"))
-    line = cli_line.fix_line(PureWindowsPath(root), "doctor")
-    assert "dadaia.exe" not in line
-    assert "python.exe" in line
 
 
 @pytest.mark.parametrize("platform", ["linux", "win32"])
