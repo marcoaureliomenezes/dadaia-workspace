@@ -24,7 +24,14 @@ import pytest
 from dadaia_workspace.core.atomic_write import SymlinkRefusedError
 from dadaia_workspace.core.atomic_write import atomic_write as shim_write
 from dadaia_workspace.core.skill_owner import load_owner
-from tests.helpers.oslib import is_link, make_readonly, read_text, run, write_text
+from tests.helpers.oslib import (
+    PERMISSIONS_ENFORCED,
+    is_link,
+    make_readonly,
+    read_text,
+    run,
+    write_text,
+)
 from tests.helpers.oslib import link as os_link
 
 _ROOT = Path(__file__).resolve().parents[5]
@@ -41,16 +48,16 @@ _Write = Callable[..., None]
 
 
 def _moded(path: Path, text: str) -> int:
-    """Write *text* to *path* read-only, a mode that differs from a fresh sibling's in a non-exec
-    bit on every host; the mode."""
+    """Write *text* to *path*, read-only where permissions bind (then its mode differs from a
+    fresh sibling's in a non-exec bit under any umask); the mode."""
     write_text(path, text)
-    make_readonly(path)
-    sibling = path.with_name("fresh-" + path.name)
-    write_text(sibling, text)
-    mode = stat.S_IMODE(path.stat().st_mode)
-    assert (mode ^ stat.S_IMODE(sibling.stat().st_mode)) & ~0o111
-    sibling.unlink()
-    return mode
+    if PERMISSIONS_ENFORCED:
+        make_readonly(path)
+        sibling = path.with_name("fresh-" + path.name)
+        write_text(sibling, text)
+        assert (stat.S_IMODE(path.stat().st_mode) ^ stat.S_IMODE(sibling.stat().st_mode)) & ~0o111
+        sibling.unlink()
+    return stat.S_IMODE(path.stat().st_mode)
 
 
 def _symlink(path: Path, target: Path) -> None:
