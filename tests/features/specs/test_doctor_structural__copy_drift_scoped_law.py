@@ -16,6 +16,7 @@ from dadaia_workspace.core.platform import Capabilities
 from dadaia_workspace.core.template_history import SHIPPED_HASHES_FILENAME
 from dadaia_workspace.core.workspace_layout import render_registry_tables
 from dadaia_workspace.features.specs.doctor import SpecsDoctor
+from dadaia_workspace.features.specs.doctor_types import finding_path
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 _PUBLIC = _REPO_ROOT / "dadaia_workspace" / "public"
@@ -56,7 +57,7 @@ def _memory_issues(tmp_path: Path, content: str | None) -> list[str]:
     return [
         f"{i.code} {i.verdict} {i.message}"
         for i in doctor.check()
-        if i.message.endswith("memory/AGENTS.md)")
+        if Path(finding_path(i) or "").as_posix().endswith("memory/AGENTS.md")
     ]
 
 

@@ -124,7 +124,7 @@ def test_refusal_message_shape_and_ten_item_cap(repo: PushRepo) -> None:
                  "already-published history never needs a rewrite"):  # fmt: skip
         assert part in message
     assert "2 more" in message or "and 2" in message
-    assert message.endswith(f"fix: {git_line('/repo', 'switch', 'feature/0.0.1')}")
+    assert message.endswith("fix: git -C /repo switch feature/0.0.1")
     assert _TERM not in message
 
 
@@ -237,7 +237,7 @@ def test_a_git_read_failure_refuses_with_its_own_fix(
 # fmt: off
 @pytest.mark.parametrize(("ref", "head", "end"), [
     pytest.param(_branch, "feature/0.0.1", "fix: {verb}", id="N3-rewrite-verb-from-oldest-unpublished"),
-    pytest.param(_branch, "main", "fix: {switch}", id="H1-not-checked-out-switch-first"),
+    pytest.param(_branch, "main", "fix: git -C /repo switch feature/0.0.1", id="H1-not-checked-out-switch-first"),
     pytest.param(lambda sha: _tag(sha, "v0.0.1"), "feature/0.0.1", None, id="N3-tag-operator-action-no-command"),
 ])
 # fmt: on
@@ -254,7 +254,7 @@ def test_the_rewrite_fix_runs_the_verb_from_the_oldest_unpublished_commit(
         assert "\nfix: Agent action: " in message and message.count("\nfix: ") == 1
     else:
         verb = fix_line(None, "ci", "push-gate-check", "--repo", "/repo", "--rewrite-from", oldest)
-        assert message.endswith(end.format(verb=verb, switch=git_line("/repo", "switch", "feature/0.0.1"))) and message.count("\nfix: ") == 1
+        assert message.endswith(end.format(verb=verb)) and message.count("\nfix: ") == 1
 
 
 def test_a_ledger_verb_outside_the_workspace_loads_the_pre_push_terms(

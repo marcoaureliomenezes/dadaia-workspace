@@ -18,6 +18,7 @@ from dadaia_workspace.core.template_history import (
 from dadaia_workspace.core.workspace_layout import render_registry_tables
 from dadaia_workspace.features.specs import canon
 from dadaia_workspace.features.specs.doctor import SpecsDoctor
+from dadaia_workspace.features.specs.doctor_types import finding_path
 
 _REPO_ROOT = Path(__file__).parents[3]
 _REAL_TEMPLATES_DIR = _REPO_ROOT / "dadaia_workspace" / "public" / "templates"
@@ -153,7 +154,9 @@ def test_stale_shipped_scoped_law_is_refreshed(tmp_path: Path) -> None:
 
     doctor = SpecsDoctor(specs, public_dir=public)
     issues = [i for i in doctor.check() if i.code == "TREE-5"]
-    scoped = [i for i in issues if i.message.endswith("releases/AGENTS.md)")]
+    scoped = [
+        i for i in issues if Path(finding_path(i) or "").as_posix().endswith("releases/AGENTS.md")
+    ]
     assert scoped and scoped[0].fixable, "a stale shipped scoped projection must be fixable"
 
     doctor.fix(issues)
