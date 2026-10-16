@@ -16,7 +16,7 @@ compatibility: Standalone Agent Skill; the full lifecycle lives in a dadaia-work
 
 1. Inside a dadaia workspace, open `specs/bugs/AGENTS.md` (the area's scoped law) and follow it — its redaction rule
    covers the whole arc: commands, outputs, captured artifacts.
-2. Hotfix job or candidate scope: `specs/bugs/AGENTS.md` §2.
+2. Hotfix lane or candidate scope: `specs/bugs/AGENTS.md` §2.
 3. When to fix: `specs/bugs/AGENTS.md` §2; bugs that share a cause are fixed together.
 4. Cap: two fix attempts on one bug, then a fresh session with a written diagnosis.
 

@@ -3,7 +3,7 @@ name: dd-release-definition
 description: >
   Define the live release's next closed-scope candidate from bugs, backlog items and audit findings:
   pick the set, the As-is review (PLAN §1), the SPEC, the PLAN's job DAG and the rc-<N>/tasks/job<n>.md
-  job files. Use when drafting a candidate in its define tree or writing its SPEC, PLAN or a job file.
+  job files. Use when drafting a candidate in its `wt-rc` or writing its SPEC, PLAN or a job file.
   The grill is the main thread's dd-grill-me; implementing tasks is dd-release-implementation's.
 ---
 
@@ -29,7 +29,7 @@ description: >
 - One row per touched unit, columns `unit | today | bugs | verdict | why`; DELETE vs KEEP is the deletion test (`dd-code-review` SLOP.md); a duplicated decider lists every copy with `path:line`, and a repro where the copies diverge; verdicts follow the root map §1 work order, ADD only for what no unit can carry (`today` `—`, `why` says why).
 - REBUILD is mandatory when the unit carries ≥ 2 bugs, the demand changes its fundamental behaviour, the change would need a flag, branch, special case or second path, or its contract contradicts the demand; the engineer and the reviewer judge these triggers.
 - §1.1 Authorities: one row per touched question, one authority each; `consults` call it, `deleted` leave with the row's bug.
-- A row that REBUILDs or DELETEs a grammar, format, public name or fix line names its consumers; a read-only `dd-researcher` pre-mortem precedes the define review and the PLAN answers each hit.
+- A row that REBUILDs or DELETEs a grammar, format, public name or fix line names its consumers; a read-only `dd-researcher` pre-mortem precedes the SPEC approval and the PLAN answers each hit.
 - The PLAN §1 skeleton:
 
 ```markdown
@@ -61,7 +61,7 @@ Before the SPEC or any ADR, the main thread runs `dd-grill-me` on the picked set
 1. Author the SPEC (Draft) after the grill: the picked set, its acceptance, every `superseded_by` link.
 2. Definition runs in the rc's `wt-rc` tree, its first commits (`worktrees/AGENTS.md` §1); the files' place is the releases law's.
 3. Commit shape 5 (`dd-gitflow-default` §3a); after the operator approves SPEC and PLAN, `release.py phase IMPLEMENTATION --sha <sha>` sets `defined` (`dd-release-implementation`'s `RELEASE-EVENTS.md`).
-4. SPEC states the pick's wave ranking unprompted; SPEC says what; PLAN opens with §1 As-is review (§2) and draws the rc's DAG of jobs — Job 1 first, the Reconciliation job last, an edge where one job needs another's merge; SPEC carries `Replaces` — one bullet per current behaviour a DELETE/REBUILD row removes, or `none` with its reason.
+4. SPEC states the pick's wave ranking unprompted; SPEC says what; PLAN opens with §1 As-is review (§2) and draws the rc's DAG of jobs — Job 1 first (the reconcile is the `wt-rc`'s last commits, `RC-FLOW.md` step 4), an edge where one job needs another's merge; SPEC carries `Replaces` — one bullet per current behaviour a DELETE/REBUILD row removes, or `none` with its reason.
 5. SPEC in the repo's existing domain names; only FR, AC and T- numbered; each AC names its test level (unit, integration, E2E, or no test with its reason); sizes per the releases law.
 6. After the PLAN, only for a technical decision past the threshold, run `dd-grill-me` with its `references/plan.md`.
 

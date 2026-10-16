@@ -35,7 +35,7 @@ The branch contract by role; the names are `specs/constitution.md`'s `gitflow:` 
 
 | Branch | Pushable | Cut from | Advances by |
 |---|---|---|---|
-| work `<work>M.m.p` | Yes — valid name (each merge into it ran `verify:`; no rerun before a push) | integration | its `wt-rc` and lane merges |
+| work `<work>M.m.p` | Yes — valid name (each `wt-rc` and hotfix merge into it ran `verify:`; no rerun before a push) | integration | its `wt-rc` and lane merges, and direct `specs/audits/**` commits |
 | integration | No — advances only by PR | principal (bootstrap only) | PR from the row above, one per candidate |
 | principal | No — advances only by PR | — | PR from the integration branch, at the final `rc` |
 | rc `wt/<M.m.p>/rc-<N>/wt-rc` | Yes | work | its merge into the work branch (`worktrees/AGENTS.md` §2) |
@@ -44,7 +44,7 @@ The branch contract by role; the names are `specs/constitution.md`'s `gitflow:` 
 | lane `wt/<M.m.p>/wt-backlog-<slug>` (Yes), `wt/<M.m.p>/wt-hotfix-<bug-id>` (No, local only) | as named | work | its merge into the work branch (`worktrees/AGENTS.md` §2) |
 
 - No `v` prefix or suffix; leaf names and parents: `worktrees/AGENTS.md` §1.
-- Exactly one live work branch, cut from the integration branch once and renamed at each promote (§2 step 11): named for the live release, or for the next release's `<id>` once a promote named it; every change reaches it through an rc's `wt-rc` or a lane (`worktrees/AGENTS.md` §1).
+- Exactly one live work branch, cut from the integration branch once and renamed at each promote (§2 step 11): named for the live release, or for the next release's `<id>` once a promote named it; every change but an audit reaches it through an rc's `wt-rc` or a lane (`worktrees/AGENTS.md` §1).
 
 ## 3a. Commit shapes — each write in its own shape
 
@@ -52,19 +52,20 @@ The branch contract by role; the names are `specs/constitution.md`'s `gitflow:` 
 
 | # | Tree | Write | Message |
 |---|---|---|---|
-| 1 | a job, `wt-backlog-<slug>` | Bug registration: `specs/bugs/BUGS.jsonl` | `chore(bugs): report <id>` |
+| 1 | a `wt-main` or `wt-hotfix` tree, `wt-backlog-<slug>`; an audit commit: `specs/audits/AGENTS.md` | Bug registration: `specs/bugs/BUGS.jsonl` | `chore(bugs): report <id>` |
 | 2 | `wt-backlog-<slug>`, `wt-rc` (reconcile) | Backlog entry or exit: `specs/backlog/BACKLOG.json`, `specs/backlog/_archive/backlog_histo.jsonl` | `chore(backlog): …` |
 | 2 | `wt-backlog-<slug>`, `wt-rc` (define) | ADR proposal: `specs/ADRs/decisions.jsonl` | `docs(adr): propose <slug>` |
 | 2 | `wt-backlog-<slug>`, `wt-rc` (define, reconcile) | In-place `measured_by` repair: `specs/ADRs/decisions.jsonl` | `chore(adrs): repair …` |
 | 2 | `wt-rc` (define, reconcile) | ADR acceptance: `specs/ADRs/decisions.jsonl`, `specs/memory/*` | `docs(adr): accept <slug>` |
-| 3 | a job | Bug fix or REBUILD: `<code>`, red loop in the body, a hotfix's naming `block: <item>`; the regression test lands first as a `test(` commit (a task's shape 6, or the hotfix lane's) | `fix(bugs): <id> — <cause>`; a REBUILD `refactor(bugs): <id> — REBUILD <unit>: …`; a group names its N ids |
-| 4 | a job | Terminal transition without code (`resolve` after its named shape-3 fix commit, `supersede`, `reject`): `specs/bugs/BUGS.jsonl` | `chore(bugs): <verb> <id> — <reason, by task-id, or fix sha>`; per class `chore(bugs): <verb> class <class> — <reason>`, one id per body line |
-| 4 | a job | Archive terminal bugs: `specs/bugs/BUGS.jsonl`, `specs/bugs/_archive/bugs_histo.jsonl` | `chore(bugs): archive <ids>` |
+| 3 | a `wt-main` or `wt-hotfix` tree | Bug fix or REBUILD: `<code>`, red loop in the body, a hotfix's naming `block: <item>`; the regression test lands first as a `test(` commit (a task's shape 6, or the hotfix lane's) | `fix(bugs): <id> — <cause>`; a REBUILD `refactor(bugs): <id> — REBUILD <unit>: …`; a group names its N ids |
+| 4 | a `wt-main` or `wt-hotfix` tree | Terminal transition without code (`resolve` after its named shape-3 fix commit, `supersede`, `reject`): `specs/bugs/BUGS.jsonl` | `chore(bugs): <verb> <id> — <reason, by task-id, or fix sha>`; per class `chore(bugs): <verb> class <class> — <reason>`, one id per body line |
+| 4 | a `wt-main` or `wt-hotfix` tree | Archive terminal bugs: `specs/bugs/BUGS.jsonl`, `specs/bugs/_archive/bugs_histo.jsonl` | `chore(bugs): archive <ids>` |
 | 5 | `wt-rc` (define) | Release definition, and a candidate's birth (`release.py new` writes `_RELEASE.json` and the SPEC stub in one transaction): `specs/releases/<v>/rc-<N>/*`, `specs/releases/<v>/_RELEASE.json` | `feat(specs): define candidate …` |
 | 6 | a task tree | Task: its `W:` | `conventional-commit(<id>): description`, a REBUILD `refactor(<id>): REBUILD <unit> — …` |
 | 7 | `wt-hotfix-<bug-id>` | Specs revert, no code: the `specs/` paths of the culprit commit, put back | `Revert "<subject>"`; body `This reverts commit <sha>.` and `block: <item>` |
 | 8 | `wt-rc` (define) | SPEC and PLAN approval: `specs/releases/<v>/rc-<N>/{SPEC,PLAN}.md` | `docs(specs): …` |
-| 9 | `wt-rc` (reconcile), the `wt-backlog-first-pass` lane | Memory pass and derived docs: `specs/memory/*`, `README.md`, `docs/*.md` | `docs(memory): …` |
+| 9 | `wt-rc` (reconcile) | Memory pass and derived docs: `specs/memory/*`, `README.md`, `docs/*.md` | `docs(memory): …` |
+| 9 | the `wt-backlog-first-pass` lane | Memory pass: `specs/memory/*` | `docs(memory): …` |
 | 10 | `wt-rc` (define, reconcile), a `wt-backlog-<slug>` lane on the next work branch (§2 step 11, `ship`) | Release state: `specs/releases/<v>/_RELEASE.json` and `specs/releases/_archive/**`, only when [`RELEASE-EVENTS.md`](../dd-release-implementation/RELEASE-EVENTS.md) requires a current entry | `chore(release): …` |
 
 ## 3b. The PR gate
@@ -82,4 +83,4 @@ The branch contract by role; the names are `specs/constitution.md`'s `gitflow:` 
 
 - Run `.dadaia/.venv/bin/dadaia worktree --help` (verbs `new`, `merge`, `sync`, `clean`, `hash`, `list`); run it, never read its source; the rules: `worktrees/AGENTS.md`.
 - [`CICD-AUTOMATION.md`](CICD-AUTOMATION.md) — optional: plug your own pipeline into the repo's `verify:` lines.
-- Push chokepoints: `.dadaia/AGENTS.md` §3; every other rule here is discipline upheld by agents and reviewers.
+- Chokepoints: `.dadaia/AGENTS.md` §3 and `worktrees/AGENTS.md`; every other rule here is discipline upheld by agents and reviewers.

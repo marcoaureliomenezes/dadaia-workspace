@@ -11,13 +11,11 @@ tags:
 
 ## Principles
 
-- TDD: every new behaviour is born with a test that fails first; a bug fix reproduces the
-  defect in a test before the fix.
-- Reviews judge the artifact by its SPEC; an absent history is no ground for rejection.
+No principle is recorded yet.
 
 ## Test architecture
 
-Size by what a test reaches, never its folder: SMALL = no process and no real git; MEDIUM =
+Size by what a test reaches: SMALL = no process and no real git; MEDIUM =
 a subprocess or real git; LARGE = `tests/e2e`. Test basics: the root `AGENTS.md` map §1.
 
 ## Gates
