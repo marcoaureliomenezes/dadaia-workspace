@@ -52,7 +52,7 @@ The branch contract by role; the names are `specs/constitution.md`'s `gitflow:` 
 
 | # | Tree | Write | Message |
 |---|---|---|---|
-| 1 | a `wt-main` or `wt-hotfix` tree, `wt-backlog-<slug>`; an audit commit: `specs/audits/AGENTS.md` | Bug registration: `specs/bugs/BUGS.jsonl` | `chore(bugs): report <id>` |
+| 1 | `wt-main`, `wt-backlog-<slug>` | Bug registration: `specs/bugs/BUGS.jsonl` | `chore(bugs): report <id>` |
 | 2 | `wt-backlog-<slug>`, `wt-rc` (reconcile) | Backlog entry or exit: `specs/backlog/BACKLOG.json`, `specs/backlog/_archive/backlog_histo.jsonl` | `chore(backlog): …` |
 | 2 | `wt-backlog-<slug>`, `wt-rc` (define) | ADR proposal: `specs/ADRs/decisions.jsonl` | `docs(adr): propose <slug>` |
 | 2 | `wt-backlog-<slug>`, `wt-rc` (define, reconcile) | In-place `measured_by` repair: `specs/ADRs/decisions.jsonl` | `chore(adrs): repair …` |

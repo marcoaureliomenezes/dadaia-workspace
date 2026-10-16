@@ -3,7 +3,7 @@
 Scope: this file governs only `worktrees/**`.
 
 - `WT` below is `.dadaia/.venv/bin/dadaia worktree` — the one interface that opens, lists, merges, cleans and syncs a worktree (`new|merge|clean|list|sync|hash`); only the main thread opens and merges. A subagent works only inside the path it was given.
-- The reference-transaction ref gate refuses creating a `wt/*` branch and moving a work branch; it passes a move only when the new sha is origin's sha, or when the old sha is an ancestor of the new one and every path changed between them (renames off) is under `specs/audits/**`; a failed fact read refuses, and the hook lets the update through when no runner is found. Every dadaia CLI and skill-script git call carries the marker that passes it (set by `_git.py`/`git_subprocess`).
+- The reference-transaction ref gate refuses creating a `wt/*` branch and moving a work branch; it passes a move only when the new sha is origin's sha, or when the old sha is an ancestor of the new one and every path changed between them (renames off) is under `specs/audits/**`; a failed ancestry or diff read refuses, and the hook lets the update through when no runner is found or the runner faults. Every dadaia CLI and skill-script git call carries the marker that passes it (set by `_git.py`/`git_subprocess`).
 - Only `WT`-opened trees carry SDD work; a harness-native worktree (`.claude/worktrees/**`, a scratchpad) stays outside.
 
 ## 1. The tree
@@ -20,7 +20,7 @@ Scope: this file governs only `worktrees/**`.
 1. Task into `wt-main`: shape 6 of `dd-gitflow-default` §3a, a RED-test subject starts `test(`; `WT merge <task path>` refuses an implementation commit that touches the repo's `tests:` globs (built-in fallback when none) or a dirty `wt-main`, then fast-forwards. A RED-test and its implementation use separate task trees.
 2. `wt-main` into `wt-rc`, and `wt-rc` and a `wt-hotfix` into `<work><v>`: `dd-code-reviewer` reviews `git diff <base>...HEAD` once and writes its verdict with `verdict.py` (`dd-handoff-emitter`). `WT merge` lands HEAD as it is only when the tree is clean, HEAD contains its base, no tree below it is open, no path is tracked under `tests/tmp/<job>/`, a valid APPROVED verdict names HEAD or the equivalent reviewed patch series with a matching `diff_sha256`, and the base's tracked `verify:` passes (a repo without one refuses). A `wt-rc` adds `bugs.py check`, `backlog.py check`, `release.py check` and `.dadaia/.venv/bin/dadaia doctor --specs-dir <tree>/specs`.
 3. `wt-backlog-*` into `<work><v>`: `specs/` only, one review plus those same checks, no test.
-4. Each merge fast-forwards its base, removes the tree and deletes its branch; the work branch receives only closed rcs and lanes. Release closure refuses while any job, task or lane tree is open.
+4. Each merge fast-forwards its base, removes the tree and deletes its branch; the work branch receives only closed rcs and lanes, audits aside. Release closure refuses while any job, task or lane tree is open.
 
 - A lane that lands during an open rc moves `<work><v>`: `WT sync <wt-rc path>` rebases `wt-rc`, each `wt-main` and each task, parents first, never pushing; it stops at the first conflict with one fix line and a re-run finishes. A ledger conflict is redone by the ledger's own writer, never hand-merged. `WT merge` re-runs cleanly after any stop.
 - Jobs of one PLAN wave and tasks of one job run in parallel only with disjoint exact `W:` sets.
