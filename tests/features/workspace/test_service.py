@@ -2,12 +2,12 @@
 
 import json
 import os
-import sys
 from pathlib import Path
 
 import pytest
 
 from dadaia_workspace.core import platform
+from dadaia_workspace.core.cli_line import cli_words
 from dadaia_workspace.core.workspace_layout import provisioned_zones
 from dadaia_workspace.features.workspace.service import WorkspaceService
 from tests.fakes import FakePublicAssetManager, FakePythonEnvironmentManager
@@ -160,11 +160,6 @@ def test_a_denylist_that_is_not_utf8_is_left_alone_and_init_goes_on(workspace_ro
     assert denylist.read_bytes() == '["zz-term-é"]'.encode("cp1252")
 
 
-def _cli(root: Path | None, *words: str) -> str:
-    venv = platform.venv_dir(root) if root is not None else Path(sys.prefix)
-    return platform.inline(*platform.cli_argv(venv), *words)
-
-
 def test_the_ungated_warning_quotes_a_workspace_holding_a_blank(tmp_path: Path) -> None:
     root = tmp_path / "a b"
 
@@ -172,4 +167,7 @@ def test_the_ungated_warning_quotes_a_workspace_holding_a_blank(tmp_path: Path) 
         public_assets=FakePublicAssetManager(), python_env=FakePythonEnvironmentManager()
     ).init(root, harnesses=("claude",), skip_assets=True)
 
-    assert any(f"until '{_cli(root, 'public', 'install')}' runs" in ln for ln in lines), lines
+    assert any(
+        f"until '{platform.inline(*cli_words(root, 'public', 'install'))}' runs" in ln
+        for ln in lines
+    ), lines

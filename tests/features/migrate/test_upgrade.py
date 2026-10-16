@@ -16,6 +16,7 @@ from typer.testing import CliRunner
 from dadaia_workspace.cli.main import app
 from dadaia_workspace.core import platform
 from dadaia_workspace.core.atomic_write import SymlinkRefusedError, atomic_write
+from dadaia_workspace.core.cli_line import cli_words
 from dadaia_workspace.core.exceptions import DadaiaError
 from dadaia_workspace.core.gitflow import merge_frontmatter
 from dadaia_workspace.features.migrate.upgrade import (
@@ -35,10 +36,11 @@ _OUTSIDE = (  # a valid atom: the only error left is the refused symlink
 
 
 def _materialize(link: Path, target: Path) -> str:
-    """The literal fix: one interpreter line, the same on every OS (paths in ``/``)."""
-    lnk, tgt = link.as_posix(), target.as_posix()
-    code = f"import os, shutil; os.remove(r'{lnk}'); shutil.copyfile(r'{tgt}', r'{lnk}')"
-    return command(Path(sys.executable).as_posix(), "-c", code)
+    """The literal fix: one interpreter line, the same on every OS ."""
+    code = (
+        "import os, shutil, sys; os.remove(sys.argv[1]); shutil.copyfile(sys.argv[2], sys.argv[1])"
+    )
+    return command(sys.executable, "-c", code, str(link), str(target))
 
 
 def _md5(path: Path) -> str:
@@ -149,11 +151,6 @@ def test_b2_doctor_fix_leaves_a_symlinked_quality_md_a_link(tmp_path: Path) -> N
     assert _md5(outside) == before
 
 
-def _cli(root: Path | None, *words: str) -> str:
-    venv = platform.venv_dir(root) if root is not None else Path(sys.prefix)
-    return platform.inline(*platform.cli_argv(venv), *words)
-
-
 def test_the_two_tier_refusal_quotes_a_specs_dir_holding_a_blank(tmp_path: Path) -> None:
     specs = tmp_path / "a b" / "specs"
     canon.scaffold(specs, project_name="p")
@@ -166,5 +163,5 @@ def test_the_two_tier_refusal_quotes_a_specs_dir_holding_a_blank(tmp_path: Path)
     with pytest.raises(DadaiaError) as refused:
         upgrade(specs, remove=lambda _path: None)
 
-    rerun = _cli(None, "specs", "upgrade", "--specs-dir", str(specs))
+    rerun = platform.inline(*cli_words(None, "specs", "upgrade", "--specs-dir", str(specs)))
     assert f"then re-run `{rerun}`." in refused.value.fix  # type: ignore[attr-defined]

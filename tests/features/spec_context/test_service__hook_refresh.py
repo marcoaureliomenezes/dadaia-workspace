@@ -10,6 +10,7 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.core import platform, workspace_layout
+from dadaia_workspace.core.exceptions import NotAGitRepositoryError
 from dadaia_workspace.core.template_history import load_shipped_hashes
 from dadaia_workspace.features.spec_context.service import install_git_hooks
 from tests.helpers.oslib import is_executable, link, run, write_text
@@ -118,7 +119,7 @@ def test_the_non_git_refusal_quotes_a_repo_holding_a_blank(tmp_path: Path) -> No
     repo = tmp_path / "a b"
     repo.mkdir()
 
-    with pytest.raises(Exception) as refused:  # noqa: PT011 — NotAGitRepositoryError
+    with pytest.raises(NotAGitRepositoryError) as refused:
         install_git_hooks(repo)
 
-    assert f"or '{platform.git_inline(repo, 'init')}'" in refused.value.fix  # type: ignore[attr-defined]
+    assert f"or '{platform.git_inline(repo, 'init')}'" in refused.value.fix

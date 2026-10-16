@@ -69,9 +69,10 @@ def test_gate_allows_iff_the_doctor_keeps_the_entry(
         tmp = tmp_path.resolve() / ".dadaia" / "tmp" / "main-thread"  # the agent's own day dir
         assert fix[len("fix: ") :] in [
             command(
-                Path(sys.executable).as_posix(),
+                sys.executable,
                 "-c",
-                f"import pathlib; pathlib.Path(r'{(tmp / day).as_posix()}').mkdir(parents=True, exist_ok=True)",
+                "import pathlib, sys; pathlib.Path(sys.argv[1]).mkdir(parents=True, exist_ok=True)",
+                str(tmp / day),
             )
             for day in days
         ]

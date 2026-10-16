@@ -8,14 +8,13 @@ from __future__ import annotations
 
 import json
 import shutil
-import sys
 from collections.abc import Callable
 from pathlib import Path
 
 import pytest
 
 from dadaia_workspace.core import platform, workspace_layout
-from dadaia_workspace.core.cli_line import fix_line
+from dadaia_workspace.core.cli_line import cli_words, fix_line
 from dadaia_workspace.core.gitflow import SeveralWorkBranches
 from dadaia_workspace.core.skill_owner import load_owner
 from dadaia_workspace.core.specs_version import CANONICAL_SPECS_VERSION, state
@@ -189,9 +188,6 @@ def test_several_work_branches_make_the_first_pass_an_agent_step_with_the_refusa
 
 
 
-def _cli(root: Path | None, *words: str) -> str:
-    venv = platform.venv_dir(root) if root is not None else Path(sys.prefix)
-    return platform.inline(*platform.cli_argv(venv), *words)
 
 
 def test_the_context_create_step_quotes_a_workspace_holding_a_blank(tmp_path: Path) -> None:
@@ -201,5 +197,5 @@ def test_the_context_create_step_quotes_a_workspace_holding_a_blank(tmp_path: Pa
 
     assert step is not None
     assert (
-        f"Agent action: run {_cli(root, 'context', 'create')} with a context name" in step.command
+        f"Agent action: run {platform.inline(*cli_words(root, 'context', 'create'))} with a context name" in step.command
     )
