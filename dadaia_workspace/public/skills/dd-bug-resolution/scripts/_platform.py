@@ -87,7 +87,7 @@ def is_fully_qualified(candidate: str, caps: Caps | None = None) -> bool:
 def canonical_cli(text: str, caps: Caps | None = None) -> str:
     """*text* with this host's spelling of the venv CLI replaced by the source form, so a digest of
     it is one value on every host."""
-    host = " ".join(cli_argv(PurePosixPath(".venv"), caps))
+    host = venv_tool(PurePosixPath(".venv"), "dadaia", caps).as_posix()
     return text.replace(host, ".venv/bin/dadaia")
 
 
