@@ -375,7 +375,9 @@ import runpy, sys
 _SEAM = ("open", "os.listdir", "os.scandir", "os.mkdir", "os.remove", "os.rename",
          "subprocess.Popen")
 ops = [0]
-sys.addaudithook(lambda event, _: ops.__setitem__(0, ops[0] + (event in _SEAM)))
+# Opens of .py/.pyc are the import system's and move with the bytecode cache, not with the lane.
+sys.addaudithook(lambda event, a: ops.__setitem__(
+    0, ops[0] + (event in _SEAM and not str(a[0]).endswith((".py", ".pyc")))))
 try:
     runpy.run_module("dadaia_workspace.hooks.{hook}", run_name="__main__")
 except SystemExit:
