@@ -220,4 +220,3 @@ def test_amending_the_published_tip_is_refused(repo: _Repo) -> None:
     before = repo.ok("rev-parse", "HEAD")
     done = repo.git("commit", "-q", "--allow-empty", "--amend", "-m", "rewritten")
     _assert_refused(repo, done, before)
-
