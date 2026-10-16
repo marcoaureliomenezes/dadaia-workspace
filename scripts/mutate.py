@@ -31,7 +31,7 @@ import sys
 import tempfile
 import time
 import tokenize
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 
 from coverage import CoverageData
 
@@ -184,10 +184,11 @@ def _coverage(changed: dict[str, set[int]], env: dict[str, str]) -> list[str]:
             sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider", "-p", "scripts.covdata",
             "--cov", "--cov-branch", f"--cov-report=json:{report}", env=env,
         )  # fmt: skip
-        files = json.loads(report.read_text("utf-8"))["files"] if report.exists() else {}
+        raw = json.loads(report.read_text("utf-8"))["files"] if report.exists() else {}
+    files = {PureWindowsPath(k): v for k, v in raw.items()}  # coverage spells keys per host
     hit = {k: 0 for k in ("lines", "all_lines", "branches", "all_branches")}
     for name, lines in changed.items():
-        data = files.get(name) or files.get(str(ROOT / name)) or {}
+        data = files.get(PureWindowsPath(name)) or files.get(PureWindowsPath(ROOT / name)) or {}
         done, todo = data.get("executed_lines", []), data.get("missing_lines", [])
         hit["lines"] += len(lines & set(done))
         hit["all_lines"] += len(lines & set(done + todo))
