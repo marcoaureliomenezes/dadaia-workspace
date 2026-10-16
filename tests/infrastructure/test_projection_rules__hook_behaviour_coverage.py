@@ -128,10 +128,10 @@ def test_every_projected_wrapper_is_projected_executable(
 _BEHAVIOUR_TABLE = {
     "claude": {"ctx_inject", "pre_gate", "reaper", "sdd_post_gate"},
     "codex": {"ctx_inject", "pre_gate", "reaper", "sdd_post_gate"},
-    "kimi-code": {"ctx_inject", "pre_gate", "reaper", "sdd_post_gate"},
+    "kimi-code": {"ctx_inject", "pre_gate", "reaper", "sdd_post_gate", "translate"},
     "devin": {"ctx_inject", "pre_gate", "reaper"},
-    "cursor": {"ctx_inject", "pre_gate", "reaper"},
-    "copilot": {"ctx_inject", "pre_gate", "reaper"},
+    "cursor": {"ctx_inject", "pre_gate", "reaper", "translate"},
+    "copilot": {"ctx_inject", "pre_gate", "reaper", "translate"},
 }
 _BEHAVIOUR_RE = re.compile(r"-m dadaia_workspace(?:\.hooks\.([a-z_]+)| doctor)")
 
