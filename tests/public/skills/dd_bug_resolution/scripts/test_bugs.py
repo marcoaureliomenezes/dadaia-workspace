@@ -226,6 +226,29 @@ def test_a_shallow_clone_is_one_finding_not_one_per_record(script: Path, tmp_pat
     assert "fetch --unshallow" in done.stdout.splitlines()[-1]
 
 
+def test_a_shallow_clone_whose_history_holds_every_fix_sha_is_clean(
+    script: Path, tmp_path: Path
+) -> None:
+    """Reachability is judged first: a cut is named only for a sha the clone cannot place."""
+    origin = tmp_path / "origin"
+    origin.mkdir()
+    git = ["git", "-C", str(origin), "-c", "user.name=t", "-c", "user.email=t@t.test"]
+    subprocess.run([*git, "init", "-q"], check=True)
+    subprocess.run([*git, "commit", "-q", "--allow-empty", "-m", "fix"], check=True)
+    sha = subprocess.run(
+        [*git, "rev-parse", "HEAD"], capture_output=True, text=True, check=True
+    ).stdout.strip()
+    resolved = {**_OPEN_RECORD, "status": "resolved", "closed_at": "2026-09-21T10:00:00Z",
+                "cause": "c", "solution": "s", "caused_by": "none", "fix_sha": sha}  # fmt: skip
+    specs = _ledger(origin, resolved)
+    subprocess.run([*git, "add", "specs"], check=True)
+    subprocess.run([*git, "commit", "-q", "-m", "ledger"], check=True)
+    clone = tmp_path / "clone"
+    subprocess.run(["git", "clone", "-q", "--depth", "2", origin.as_uri(), str(clone)], check=True)
+    done = _run(script, "check", "--specs", str(clone / specs.relative_to(origin)))
+    assert done.returncode == 0, done.stdout
+
+
 @pytest.mark.parametrize(("caused_by", "code"), [
     ("J1.T3", 0),
     ("J1.S2.T3", 0),  # historical task ids stay readable
