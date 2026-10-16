@@ -276,8 +276,10 @@ def _render(
             return again(receiver)
         case ast.Call(func=ast.Name(id="spell_fix"), args=[arg]):  # the one `fix:` spelling
             return f"fix: {again(arg)}"
-        case ast.Call(func=ast.Name(id="SCRIPT"), args=args):  # words after the script's prefix
-            return " ".join(["·", *map(again, args)])
+        case ast.Call(
+            func=ast.Name(id="SCRIPT" | "_SCRIPT"), args=args, keywords=kws
+        ):  # words after the script's prefix
+            return " ".join(["·", *map(again, [*args, *(k.value for k in kws)])])
         case ast.Call() if _callee(node) in returns:  # a local producer: what it returns
             return "·".join(map(again, returns[_callee(node)]))
         case ast.Call() if _FIX_CALL_RE.search(_callee(node)) or _callee(node)[:1].isupper():
@@ -489,9 +491,12 @@ def test_the_scans_bite() -> None:
         'raise Refusal("m", "git push origin")\n'
         'raise Refusal("m", shlex.join(["git", "diff", "--", a, b]))\n'
         'raise Refusal("m", "git -C " + shlex.quote(r) + " status")\n'
+        'raise Refusal("m", SCRIPT("check", specs=s))\n'
+        'raise Refusal("m", SCRIPT("check", note="dadaia doctor"))\n'
+        'raise Refusal("m", _SCRIPT("check", "dadaia doctor"))\n'
     )
     assert _code_sites({"m.py": ast.parse(source)}) == [
-        f"m.py:{n}" for n in (1, 12, 13, 2, 3, 4, 5, 6, 8, 9)
+        f"m.py:{n}" for n in (1, 12, 13, 15, 16, 2, 3, 4, 5, 6, 8, 9)
     ]
     shipped = (
         "made by `dadaia public install`\n"
