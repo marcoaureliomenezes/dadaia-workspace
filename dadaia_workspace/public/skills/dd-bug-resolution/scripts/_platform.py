@@ -373,9 +373,7 @@ def spell(word: str, caps: Caps | None = None, *, head: bool = False) -> str | N
     POSIX: ``shlex``. Windows (PowerShell, cmd and Git Bash read the result alike): backslashes
     become ``/``; letters and digits of any alphabet and ``._-/:+`` stay bare (``=`` too, except in
     a command head, where cmd splits on it); a number-like word, anything else and the empty word go
-    in double quotes, except a head: none of its quoted forms runs alike in the three shells (a
-    leading quote is an expression to PowerShell, ``C"…"`` garbles a pip launcher in cmd), so a head
-    needing a quote has no spelling; a word holding ``" $ ` % !``, a line break, U+2018-U+201E or a Unicode space
+    in double quotes; a word holding ``" $ ` % !``, a line break, U+2018-U+201E or a Unicode space
     other than blank and tab has no spelling. :func:`quote`, :func:`head` and :func:`command` are
     its forms."""
     if not (caps or detect()).windows:
@@ -389,8 +387,6 @@ def spell(word: str, caps: Caps | None = None, *, head: bool = False) -> str | N
     bare = word and all(c.isalnum() or c in "._-/:+" or (c == "=" and not head) for c in word)
     if bare and (_NUMBER_LIKE.fullmatch(word) and not _PLAIN_INT.fullmatch(word)):
         bare = False
-    if head and not bare:  # no quoted head runs alike in cmd, PowerShell and Git Bash
-        return None
     return word if bare else f'"{word}"'
 
 
@@ -401,8 +397,13 @@ def quote(word: str, caps: Caps | None = None) -> str:
 
 
 def head(word: str, caps: Caps | None = None) -> str:
-    """A command's first word; one with no spelling stands as itself."""
-    return spell(word, caps, head=True) or word
+    """A command's first word: on Windows a quote opens after the first character, as a line
+    opening with one is a PowerShell expression."""
+    caps = caps or detect()
+    spelled = spell(word, caps, head=True)
+    if spelled is None:
+        return word
+    return f'{spelled[1]}"{spelled[2:]}' if caps.windows and spelled.startswith('"') else spelled
 
 
 def _shown(word: str) -> str:
@@ -410,7 +411,8 @@ def _shown(word: str) -> str:
 
 
 def _spelled(argv: Sequence[str], caps: Caps) -> list[str | None]:
-    return [spell(argv[0], caps, head=True), *(spell(w, caps) for w in argv[1:])]
+    first = head(argv[0], caps) if spell(argv[0], caps, head=True) is not None else None
+    return [first, *(spell(w, caps) for w in argv[1:])]
 
 
 def _inline(argv: Sequence[str], caps: Caps) -> tuple[str, bool]:
