@@ -184,19 +184,6 @@
       ]
     },
     {
-      "id": "worktree-hierarchy",
-      "title": "Hierarchical worktrees: rc integration branch, path-derived base, CLI + git hook",
-      "opened": "2026-10-14",
-      "status": "idea",
-      "description": "Layout: worktrees/<repo>/<v>/{wt-hotfix-<bug>, wt-backlog-<slug>, rc-<N>/{wt-rc, job-<n>/{wt-main, wt-task-<k>}}}, <v> from feature/<v>, <k> the T<k> of J<n>.T<k> in 3 digits. A leaf merges into the integrating wt-* of its parent folder (wt-task-<k> -> wt-main -> wt-rc); wt-rc and the lanes merge into feature/<v>, so feature/<v> receives only closed rcs plus lanes. The branch is wt/ plus the path under worktrees/<repo>/, so the base derives from the path: one decider, no recorded base. wt-rc is a real integration branch: define is its first commits, reconcile its last; its merge reuses the job gate as is (APPROVED over the rc's commits, verify:, ledger checks; no new gate function). The plain kind is deleted (a bug goes to the hotfix lane or a next-rc job, a promote to PR + release.py ship). Hotfix and backlog become side lanes <v>/wt-hotfix-<bug> and <v>/wt-backlog-<slug> merging straight into feature/<v>; an open rc rebases in cascade (wt-rc, each wt-main, each task) through a sync verb. dadaia worktree new|merge|clean|list|preflight|sync is the only interface, enforced by a reference-transaction git hook installed beside pre-push: it refuses creating wt/* and moving feature/* outside the CLI, while a move to a sha equal to refs/remotes/origin/<same> passes, so git pull works. On folder creation the CLI writes a 5-10 line organisational AGENTS.md at <v>/, rc-<N>/ and job-<n>/ in place of .gitkeep. Out of scope: per-context layout (worktree-layout-per-context stays an idea). A new ADR supersedes ADR 0191 and covers the stale ADRs 0097 and 0107. Delivery: Arm A, its own rc after rc-15, built in the old layout; the new layout applies from the next rc. Evidence and edge cases: .dadaia/reports/dadaia-workspace/worktree-hierarchy-review/index.html sections 2, 4, 7.",
-      "provenance": "Operator demand + dd-grill-me, 2026-10-14 (grill handoff 2026-10-14T031129Z-main-thread-grill-worktree-hierarchy). Operator: 'Precisamos revisar a politica de worktrees ... Toda interface para criar essas worktrees deve ser via CLI'. Rulings: 'Integra\u00e7\u00e3o real'; 'Lanes laterais para ambos'; 'Verbo CLI + git hook'; 'Apagar o tipo plain'; 'Reusar o gate de job'. Per-level AGENTS.md: '\u00e9 so porque eu n\u00e3o quero criar .gitkeep files ... deve estar na cria\u00e7\u00e3o'. Agent defaults (leaf names, branch = path, sync verb, Arm A delivery, per-context layout out of scope): 'O resto confirmamos'.",
-      "relates": [
-        "worktree-layout-per-context",
-        "task-worktree-cap-removed",
-        "reconcile-tree-writes-have-a-commit-shape"
-      ]
-    },
-    {
       "id": "worktree-scripts-loose-ends",
       "title": "Worktree scripts: one owner for the level-folder rule, the leftover review LOWs and the verdict rebind of back-to-back ledger merges",
       "opened": "2026-10-16",
