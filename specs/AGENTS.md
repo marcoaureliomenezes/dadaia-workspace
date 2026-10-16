@@ -33,7 +33,7 @@ Scope: this file governs only the `specs/` tree of one Spec Context Project.
 
 - The live release's `_RELEASE.json` `phase` reads `IMPLEMENTATION`: `release.py phase` enters it only when the candidate's SPEC and PLAN both carry `**Status:** Approved`.
 - The task is a row of its job file (`rc-<N>/tasks/job<n>.md`), and its declared write set names every file touched.
-- Any item missing: stop and emit the §7 `[SDD BLOCKED]` block naming it. A hotfix job needs only its open bug (`specs/bugs/AGENTS.md` §2).
+- Any item missing: stop and emit the §7 `[SDD BLOCKED]` block naming it. A hotfix lane needs only its open bug (`specs/bugs/AGENTS.md` §2).
 
 ## 4. Artifact authority
 
