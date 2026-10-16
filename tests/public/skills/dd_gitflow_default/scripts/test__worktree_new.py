@@ -406,7 +406,7 @@ def test_a_hotfix_job_needs_its_open_bug_record_on_the_work_branch(
     assert refused.returncode == 1 and "a-block-bug" in refused.stderr
     assert _fixes(refused) == [
         "fix: Operator action: confirm bug a-block-bug so it is registered on feature/0.5.0 as open"
-        " (dd-bug-registration), then open its hotfix job again"
+        " (dd-bug-registration), then open its hotfix lane again"
     ]
     assert not (root / "worktrees/r/0.5.0").exists()
 
