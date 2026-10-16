@@ -17,8 +17,8 @@ from _grammar import SEMVER_RE, TAG_RE, sole_live
 from _platform import git_line as git_line
 from _platform import head
 from _platform import quote as quote  # (`as`: re-exported to the worktree verbs)
+from _specs import run_cli, workspace_cli
 from _specs import script as script
-from _specs import workspace_cli
 from _specs import workspace_of as workspace_of
 from _worktree_names import SCRIPT, Refusal, base_of, branch, name_of, tree_path
 
@@ -37,18 +37,10 @@ def dirty(tree: Path) -> bool:
 def cli(root: Path, *args: str, tree: Path | None = None) -> subprocess.CompletedProcess[str]:
     """One read-only run of the workspace CLI — the owner of every package grammar. With *tree*
     the run acts on that tree alone: its cwd, every root above it fenced."""
-    run = subprocess.run  # stdin closed: a CLI never waits on the caller's pipe
     fence = (
         {"DADAIA_FENCED_ROOTS": os.pathsep.join(map(str, tree.resolve().parents))} if tree else {}
     )
-    return run(
-        [str(workspace_cli(root)), *args],
-        cwd=tree or root,
-        env=scrubbed_env() | fence,
-        stdin=subprocess.DEVNULL,
-        capture_output=True,
-        text=True, encoding="utf-8", errors="replace",
-    )  # fmt: skip
+    return run_cli(root, *args, cwd=tree or root, env=scrubbed_env() | fence, stdin=subprocess.DEVNULL)  # fmt: skip
 
 
 def cli_line(root: Path, *args: str) -> str:

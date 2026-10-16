@@ -22,7 +22,7 @@ from _git import scrubbed_env
 from _grammar import CONTEXT_NAME_RE
 from _handoffs import REVIEWER, reviewer_records
 from _refusal import Refusal, fix_of, report
-from _specs import workspace_cli
+from _specs import run_cli
 
 _WORKTREE = Path(__file__).resolve().parents[2] / "dd-gitflow-default" / "scripts" / "worktree.py"
 _OWN = (
@@ -150,7 +150,6 @@ def _run(argv: list[str]) -> int:
         **body,
     }
     root = Path(bound["root"])
-    cli = workspace_cli(root)
     out = root / ".dadaia/handoff" / args.context
     out.mkdir(parents=True, exist_ok=True)
     target = out / f"{now.replace(':', '')}-{REVIEWER}-{args.slug}.handoff.json"
@@ -162,16 +161,13 @@ def _run(argv: list[str]) -> int:
             f"{target.name} exists; rerun in a second",
             "Agent action: rerun verdict.py in a second",
         ) from None
-    checked = subprocess.run(
-        [str(cli), "reports", "validate", str(target), "--reviewed-root", str(tree), "--json"],
-        cwd=root,
-        env=scrubbed_env(),
-        capture_output=True,
-        text=True, encoding="utf-8", errors="replace",
-    )  # fmt: skip
-    if checked.returncode:
+    try:
+        checked = run_cli(root, "reports", "validate", str(target), "--reviewed-root", str(tree), "--json", env=scrubbed_env())  # fmt: skip
+        if checked.returncode:
+            raise _reason(checked.stdout, checked.stderr)
+    except Refusal:
         _atomic.atomic_write(target, None)
-        raise _reason(checked.stdout, checked.stderr)
+        raise
     print(target)
     return 0
 

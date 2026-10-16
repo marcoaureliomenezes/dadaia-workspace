@@ -36,23 +36,40 @@ def workspace_cli(root: Path) -> Path:
     """The installed workspace CLI under *root*. Raises `Refusal` carrying the install fix."""
     if (cli := cli_path(root)).exists():
         return cli
-    raise Refusal("no workspace CLI", f"uvx dadaia-workspace init {quote(str(root))}")
+    raise Refusal("no workspace CLI", _install(root))
+
+
+def run_cli(
+    root: Path,
+    *args: str,
+    cwd: Path | None = None,
+    env: dict[str, str] | None = None,
+    stdin: int | None = None,
+) -> subprocess.CompletedProcess[str]:
+    """The ONE spawn of the workspace CLI: *args* run from *cwd* (default *root*).
+    Raises `Refusal` carrying the install fix when the CLI is missing or cannot start."""
+    try:
+        return subprocess.run([str(workspace_cli(root)), *args], cwd=cwd or root, env=env, stdin=stdin, capture_output=True, text=True, encoding="utf-8", errors="replace")  # fmt: skip
+    except OSError as error:
+        raise Refusal(f"the workspace CLI cannot start: {error}", _install(root)) from error
+
+
+def _install(root: Path) -> str:
+    return f"uvx dadaia-workspace init {quote(str(root))}"
 
 
 def _bound_fix(here: Path, rerun: str, ledger: str | None) -> tuple[str, str]:
-    root = workspace_of(here)
-    if root and (cli := cli_path(root)).exists():
-        shown = subprocess.run(
-            [str(cli), "context", "show", "--json"], capture_output=True, text=True, encoding="utf-8", errors="replace"
-        )  # fmt: skip
-        try:
-            repo = str(json.loads(shown.stdout)["main_repo"])
-        except (ValueError, LookupError, TypeError):
-            return f"{head(str(cli))} context list", ""
-        if ledger is None or ledger.startswith("specs/audits/"):
-            return with_specs(rerun, root / "repos" / repo / "specs"), ""
-        return f"{head(str(cli))} worktree list", ""
-    return "Agent action: re-run inside a repo that holds its specs/ tree", ""
+    if not (root := workspace_of(here)):
+        return "Agent action: re-run inside a repo that holds its specs/ tree", ""
+    try:
+        repo = str(json.loads(run_cli(root, "context", "show", "--json").stdout)["main_repo"])
+    except Refusal as refusal:
+        return refusal.fix, ""
+    except (ValueError, LookupError, TypeError):
+        return f"{head(str(cli_path(root)))} context list", ""
+    if ledger is None or ledger.startswith("specs/audits/"):
+        return with_specs(rerun, root / "repos" / repo / "specs"), ""
+    return f"{head(str(cli_path(root)))} worktree list", ""
 
 
 def script(path: Path) -> str:
