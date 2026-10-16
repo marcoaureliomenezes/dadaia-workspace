@@ -28,6 +28,7 @@ from tests.helpers.worktree_ws import (
     make_workspace,
     open_tree,
     run,
+    spelled,
 )
 
 RC = "0.5.0/rc-1/wt-rc"
@@ -68,7 +69,7 @@ def _refusal(root: Path, result: subprocess.CompletedProcess[str], kind: str, he
     """The merge refused with exactly the one `fix:` line of *kind*, and nothing landed."""
     dispatch = (f"fix: Agent action: dispatch dd-code-reviewer on {root / TREE} at HEAD {head};"
                 " its verdict.py run writes the verdict")  # fmt: skip
-    validate = shlex.split(shell_line(str(cli_path(root)), "reports", "validate", "--all"))
+    validate = spelled(str(cli_path(root)), "reports", "validate", "--all")
     got = fixes(result)
     if kind == VALIDATE_ALL:  # the one line, split as the shell will
         got = [shlex.split(g[5:]) for g in got]

@@ -25,6 +25,7 @@ from typing import Any
 
 import pytest
 
+from dadaia_workspace.core.cli_line import mkdir_line
 from dadaia_workspace.core.workspace_layout import DADAIAIGNORE
 from dadaia_workspace.core.workspace_resolver import FENCE_ENV
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
@@ -177,7 +178,7 @@ def test_the_fix_creates_the_agents_own_temp_dir(
     assert block is not None
     fix = block["reason"].rsplit("fix: ", 1)[1]
     tmp = tmp_path.resolve() / ".dadaia" / "tmp" / segment  # the hook prints it resolved, POSIX
-    assert any((tmp / day).as_posix() in fix for day in days)
+    assert any(mkdir_line(tmp / day) in fix for day in days)
 
 
 @pytest.mark.parametrize(

@@ -3,12 +3,11 @@
 from __future__ import annotations
 
 import json
-import shlex
 from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.core.platform import PLATFORM
+from dadaia_workspace.core.platform import PLATFORM, head
 from tests.fixtures.harness_env import claude_hook_env, run_hook_subprocess
 
 
@@ -32,8 +31,7 @@ def test_unbound_session_emits_preflight_once_and_stamps_exact_sentinel(tmp_path
         / PLATFORM.venv_scripts_dir
         / f"dadaia{PLATFORM.venv_exe_suffix}"
     )
-    cli_text = str(cli).replace("\\", "/")
-    cli_word = f'{cli_text[0]}"{cli_text[1:]}"' if PLATFORM.windows else shlex.quote(cli_text)
+    cli_word = head(str(cli))
     assert result.returncode == 0
     assert result.stdout == (
         "[no bound context]\n"

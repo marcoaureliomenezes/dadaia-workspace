@@ -19,6 +19,7 @@ from unittest.mock import ANY
 
 import pytest
 
+from dadaia_workspace.core.cli_line import git_line, shell_line
 from dadaia_workspace.infrastructure.ledger_scripts import load_owner
 from tests.helpers.release_state import PLAN
 from tests.helpers.skill_scripts import stage_skill_scripts
@@ -239,10 +240,9 @@ def test_a_verb_with_no_live_release_hands_new_to_the_agent(
     """With no live release the one fix is the agent's `new`, version unchosen."""
     specs = _specs(tmp_path)
     result = _run(script, "phase", "IMPLEMENTATION", "--sha", "abc1234", "--specs", str(specs))
-    py = Path(sys.executable).as_posix()
     assert result.returncode == 1
     assert result.stderr.splitlines()[-1] == (
-        f"fix: Agent action: run `{py} {script.as_posix()} new --specs {specs.as_posix()}` "
+        f"fix: Agent action: run `{shell_line(sys.executable, str(script), 'new', '--specs', str(specs))}` "
         "with the release version you choose"
     )
 
@@ -856,7 +856,7 @@ def test_a_shallow_clone_with_no_reachable_bound_names_the_cut_and_its_fix_clear
     assert refused.returncode == 1
     assert refused.stderr.splitlines() == [
         "[error] no recorded window bound is reachable: a shallow clone lacks the window's history",
-        f"fix: git -C {clone.as_posix()} fetch --unshallow",
+        f"fix: {git_line(clone, 'fetch', '--unshallow')}",
     ]
     assert cleared.returncode == 1, cleared.stderr
     assert cleared.stdout.splitlines() == [

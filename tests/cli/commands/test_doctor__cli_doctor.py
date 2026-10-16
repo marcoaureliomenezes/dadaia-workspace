@@ -7,6 +7,7 @@ import pytest
 from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app
+from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES
 from dadaia_workspace.features.workspace.service import WorkspaceService
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
@@ -85,4 +86,4 @@ def test_both_doctors_give_one_answer_on_a_disarmed_gate(workspace: Path, disarm
         assert result.exit_code == 1, result.output
         fixes = [ln for ln in result.output.splitlines() if ln.endswith(" public install")]
         assert len(fixes) == 1, result.output
-        assert fixes[0].startswith(f"fix: {workspace.as_posix()}/.dadaia/.venv/"), fixes
+        assert fixes == [f"fix: {fix_line(workspace, 'public', 'install')}"], fixes

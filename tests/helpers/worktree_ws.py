@@ -9,10 +9,12 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import shlex
 import subprocess
 import sys
 from pathlib import Path
 
+from dadaia_workspace.core.cli_line import shell_line
 from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
 from dadaia_workspace.core.platform import PLATFORM
 from dadaia_workspace.core.skill_owner import load_owner
@@ -47,6 +49,11 @@ elif args[:1] == ["doctor"]:
 else:
     sys.stdin.read()
 """
+
+
+def spelled(*parts: str) -> list[str]:
+    """The argv the kernel's `shell_line` of *parts* splits to: the expected side of a printed fix."""
+    return shlex.split(shell_line(*parts))
 
 
 def cli_path(root: Path) -> Path:

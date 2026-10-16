@@ -56,7 +56,7 @@ def _memory_issues(tmp_path: Path, content: str | None) -> list[str]:
     return [
         f"{i.code} {i.verdict} {i.message}"
         for i in doctor.check()
-        if i.message.replace("\\", "/").endswith("memory/AGENTS.md)")
+        if i.message.endswith("memory/AGENTS.md)")
     ]
 
 

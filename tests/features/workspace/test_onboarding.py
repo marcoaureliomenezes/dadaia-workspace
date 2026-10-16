@@ -109,7 +109,7 @@ def test_next_step_is_derived_from_the_workspace_state(
     if command:
         assert step.command == fix_line(tmp_path, *command)
     create = fix_line(tmp_path, "context", "create")  # the binary every OS prints, {} in a row
-    assert all(part.format(create) in step.command.replace("\\", "/") for part in in_command)
+    assert all(part.format(create) in step.command for part in in_command)
 
 
 def test_the_first_pass_fix_opens_the_backlog_first_pass_lane(tmp_path: Path) -> None:

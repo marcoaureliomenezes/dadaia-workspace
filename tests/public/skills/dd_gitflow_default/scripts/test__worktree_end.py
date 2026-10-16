@@ -43,6 +43,7 @@ from tests.helpers.worktree_ws import (
     open_tree,
     patch_cli,
     run,
+    spelled,
 )
 from tests.helpers.worktree_ws import run_fix as _fix
 
@@ -80,7 +81,7 @@ def _run_printed(
 ) -> subprocess.CompletedProcess[str]:
     """Run the refusal's printed `<launcher> worktree <verb> …` fix as the script's own verb."""
     launcher, worktree, *verb = _argv(refused)
-    assert [launcher, worktree] == _spelled(str(cli_path(root)), "worktree")
+    assert [launcher, worktree] == spelled(str(cli_path(root)), "worktree")
     return run(root, *verb)
 
 
@@ -95,11 +96,6 @@ def _argv(result: subprocess.CompletedProcess[str]) -> list[str]:
     """The one fix line, split as the shell will: the expected argv is the oracle."""
     (fix,) = fixes(result)
     return shlex.split(fix.removeprefix("fix: "))
-
-
-def _spelled(*parts: str) -> list[str]:
-    """The argv the kernel's `shell_line` of *parts* splits to: the expected side of `_argv`."""
-    return shlex.split(shell_line(*parts))
 
 
 def test_merge_fast_forwards_removes_and_reruns(root: Path) -> None:
@@ -130,7 +126,7 @@ def test_merge_fast_forwards_removes_and_reruns(root: Path) -> None:
     git(repo, "worktree", "add", "-q", "-b", f"wt/{NEW_JOB}", str(tree), WORK)
     commit(tree, "src/b.py")
     git(repo, "worktree", "remove", str(tree))  # interrupted: tree gone, its commit unmerged
-    assert _argv(run(root, "merge", TREE)) == _spelled(
+    assert _argv(run(root, "merge", TREE)) == spelled(
         *("git", "-C", str(repo), "worktree", "add", str(tree), f"wt/{NEW_JOB}")
     )
     assert git(repo, "branch", "--list", f"wt/{NEW_JOB}").strip()  # never -D
@@ -270,7 +266,7 @@ def test_merge_needs_a_valid_approval_of_the_exact_head(
     expected = [str(cli_path(root)), "reports", "validate", str(target)]
     if named:
         expected += ["--reviewed-root", str(root / TREE)]
-    assert _argv(result) == _spelled(*expected)
+    assert _argv(result) == spelled(*expected)
     assert git(root / "repos/r", "rev-parse", WORK).strip() != head
 
 
@@ -305,7 +301,7 @@ def test_merge_lists_ignored_files_and_keeps_them_by_its_fix(root: Path) -> None
     refused = run(root, "merge", TREE)
     assert "my notes.scratch" in refused.stderr and "__pycache__" not in refused.stderr
     wrong_branch = run(root, "merge", TREE, "--keep", "my notes.scratch")
-    assert _argv(wrong_branch) == _spelled("git", "-C", str(rc), "switch", WORK)
+    assert _argv(wrong_branch) == spelled("git", "-C", str(rc), "switch", WORK)
     _fix(root, wrong_branch)
     _fix(root, refused)
     assert (rc / "my notes.scratch").read_text() == "keep me" and not tree.exists()
@@ -381,7 +377,7 @@ def test_merge_without_a_verdict_refuses_with_only_the_verdict_message(root: Pat
 def test_clean_removes_only_an_empty_worktree_of_ours(root: Path) -> None:
     repo, tree = root / "repos/r", root / TREE
     commit(tree, "src/a.py")
-    assert _argv(run(root, "clean", TREE)) == _spelled(
+    assert _argv(run(root, "clean", TREE)) == spelled(
         sys.executable, str(SCRIPT), "merge", str(tree)
     )
     git(tree, "reset", "-q", "--hard", WORK)
@@ -432,7 +428,7 @@ def test_a_verdict_carries_over_only_an_identical_patch_and_message_series(root:
     approve(root, approved := git(tree, "rev-parse", "HEAD").strip())
     commit(root / RC_TREE, "src/z.py")
     git(repo, "config", "color.ui", "always")
-    refusal = _spelled(str(cli_path(root)), "reports", "validate", "--all")
+    refusal = spelled(str(cli_path(root)), "reports", "validate", "--all")
     work = git(repo, "rev-parse", WORK)
     for change in (
         [("rm", "-q", "src/a.py"), ("commit", "-q", "--amend", "-C", "HEAD")],  # same message
@@ -794,7 +790,7 @@ def test_an_open_task_blocks_its_main_tree_merge(root: Path) -> None:
     refused = run(root, "merge", TREE)
 
     assert refused.returncode == 1
-    assert _argv(refused) == _spelled(sys.executable, str(SCRIPT), "merge", str(task))
+    assert _argv(refused) == spelled(sys.executable, str(SCRIPT), "merge", str(task))
     assert git(root / "repos/r", "rev-parse", WORK).strip() == work
 
 
@@ -802,7 +798,7 @@ def test_an_open_main_tree_blocks_its_release_tree_merge(root: Path) -> None:
     refused = run(root, "merge", RC_TREE)
 
     assert refused.returncode == 1
-    assert _argv(refused) == _spelled(sys.executable, str(SCRIPT), "merge", str(root / TREE))
+    assert _argv(refused) == spelled(sys.executable, str(SCRIPT), "merge", str(root / TREE))
 
 
 def test_a_workflow_file_named_test_is_not_a_test_when_no_tests_line_is_declared(

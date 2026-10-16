@@ -15,6 +15,7 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.core import workspace_layout
+from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
 from dadaia_workspace.features.spec_context.doctor import DoctorService, workspace_rules
 
@@ -28,6 +29,10 @@ class _Store:
 
     def get(self, name: str) -> SpecContextProject | None:
         return next((c for c in self._contexts if c.name == name), None)
+
+
+def _install_hook(root: Path) -> str:
+    return fix_line(root, "ci", "install-hook", "--force", "--repo", str(root / "repos" / "demo"))
 
 
 def _ctx(name: str, state: ContextState = ContextState.ALIVE) -> SpecContextProject:
@@ -129,9 +134,7 @@ def test_hooks_drift_1_names_the_observed_state_with_one_code_and_one_fix(
         head = f.message.split(" — ")[0]
         assert head.startswith("repos/demo/.git/hooks/") and re.search(observed, head)
         assert other not in f.message
-        # `fix_line` prints forward slashes on every host
-        assert f.fix.startswith(root.as_posix()) and " ci install-hook --force --repo " in f.fix
-        assert f.fix.endswith((root / "repos" / "demo").as_posix())
+        assert f.fix == _install_hook(root)
 
 
 def test_an_unreadable_hook_is_said_unreadable_never_differing(tmp_path: Path) -> None:
@@ -166,6 +169,5 @@ def test_a_repo_without_the_reference_transaction_hook_is_told_so(tmp_path: Path
     [finding] = [f for f in found if "reference-transaction" in f.message]
     assert finding.code == "HOOKS-DRIFT-1"
     assert finding.message.startswith("repos/demo/.git/hooks/reference-transaction is absent — ")
-    assert " ci install-hook --force --repo " in finding.fix
-    assert finding.fix.endswith((root / "repos" / "demo").as_posix())
+    assert finding.fix == _install_hook(root)
     assert len(found) == 1

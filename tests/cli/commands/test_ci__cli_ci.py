@@ -11,6 +11,7 @@ from typer.testing import CliRunner
 from dadaia_workspace.cli.commands import ci
 from dadaia_workspace.cli.main import app
 from dadaia_workspace.core.cli_line import fix_line
+from dadaia_workspace.core.platform import quote
 
 _runner = CliRunner()
 
@@ -36,7 +37,7 @@ def test_install_hook_writes_and_refuses_overwrite_without_force(
     # second call without --force is refused (pre-push already present).
     refused = _runner.invoke(app, ["ci", "install-hook"])
     assert refused.exit_code == 1
-    assert f"ci install-hook --force --repo {tmp_path.as_posix()}" in refused.output
+    assert f"ci install-hook --force --repo {quote(str(tmp_path))}" in refused.output
     assert "fix: " in refused.output
     # --force overwrites both.
     assert _runner.invoke(app, ["ci", "install-hook", "--force"]).exit_code == 0

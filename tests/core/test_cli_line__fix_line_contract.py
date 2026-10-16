@@ -759,7 +759,7 @@ def _denylisted_in_a_worktree(world: World) -> str:
     (wt / "notes.md").write_text(f"a {_TERM} b\n", encoding="utf-8")
     world.git(wt, "add", "notes.md")
     world.git(wt, "commit", "-qm", "n")
-    return f"git -C {wt} push -q origin feature/1.0.0"
+    return git_line(wt, "push", "-q", "origin", "feature/1.0.0")
 
 
 def _drop_worktree_term(world: World) -> None:

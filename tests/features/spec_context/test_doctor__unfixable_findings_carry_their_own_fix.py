@@ -5,7 +5,6 @@ Size: MEDIUM (real git repo, the doctor's own section assembly, the CLI in-proce
 
 from __future__ import annotations
 
-import os
 import shlex
 import subprocess
 from pathlib import Path
@@ -14,6 +13,7 @@ import pytest
 from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app
+from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.doctor_rules import run_section
 from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
 from dadaia_workspace.features.spec_context.doctor import (
@@ -82,7 +82,7 @@ def test_the_printed_ctx_url_fix_clears_ctx_url_1(
     ws = _workspace(tmp_path)
     ((_message, fix),) = _findings(ws)["CTX-URL-1"]
     argv = shlex.split(fix)
-    assert argv[0] == (ws / ".dadaia" / ".venv" / "bin" / "dadaia").as_posix() or os.name == "nt"
+    assert argv[0] == shlex.split(fix_line(ws))[0]
     monkeypatch.chdir(ws)
     result = CliRunner().invoke(app, argv[1:])
 

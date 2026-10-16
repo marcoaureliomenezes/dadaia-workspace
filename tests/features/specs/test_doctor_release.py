@@ -13,6 +13,7 @@ from typing import Any
 
 import pytest
 
+from dadaia_workspace.core.cli_line import shell_line
 from dadaia_workspace.features.specs.doctor import SpecsDoctor
 from dadaia_workspace.features.specs.doctor_common import resolve_active_release
 from dadaia_workspace.features.specs.doctor_release import ReleaseValidator
@@ -77,17 +78,18 @@ def test_closure_memory_record_is_judged_by_the_script(
     script and --specs, and no placeholder."""
     specs = _specs(tmp_path, phase, log)
     record = [f for f in _check(specs) if "`kind: memory`" in f["message"]]
-    run = f"{sys.executable} {_SCRIPT}"
+    run = (sys.executable, str(_SCRIPT))
+    where = ("--specs", str(specs.resolve()))
     fix = (
-        f"Agent action: run `{run} drift --specs {specs.resolve()}`, judge its worklist, then run "
-        f"`{run} memory --specs {specs.resolve()}` with the atom slugs the memory pass reviewed as "
+        f"Agent action: run `{shell_line(*run, 'drift', *where)}`, judge its worklist, then run "
+        f"`{shell_line(*run, 'memory', *where)}` with the atom slugs the memory pass reviewed as "
         "--reviewed and changed as --changed"
     )
     if expected is None:
         assert record == []
     else:
         assert len(record) == 1 and expected in record[0]["message"], record
-        assert record[0]["fix"].replace("\\", "/") == fix.replace("\\", "/"), record
+        assert record[0]["fix"] == fix, record
 
 
 def test_a_live_release_in_implementation_missing_its_trio_is_one_finding(tmp_path: Path) -> None:

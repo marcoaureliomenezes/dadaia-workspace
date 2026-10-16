@@ -12,8 +12,8 @@ from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.core.cli_line import fix_line, shell_line
-from tests.helpers.worktree_ws import cli_path, commit, fixes, git, make_workspace, run
+from dadaia_workspace.core.cli_line import fix_line
+from tests.helpers.worktree_ws import cli_path, commit, fixes, git, make_workspace, run, spelled
 
 
 @pytest.mark.parametrize("name", ["0.5.0/wt-backlog-x", "0.5.0/rc-1/wt-rc"])
@@ -29,7 +29,7 @@ def test_in_place_ledger_change_refuses_at_rebase(tmp_path: Path, name: str) -> 
     (fix,) = fixes(run(root, "merge", str(tree.relative_to(root))))
     assert fix == f"fix: {fix_line(root, 'worktree', 'sync', str(tree))}"
     launcher, worktree, *verb = shlex.split(fix.removeprefix("fix: "))
-    assert [launcher, worktree] == shlex.split(shell_line(str(cli_path(root)), "worktree"))
+    assert [launcher, worktree] == spelled(str(cli_path(root)), "worktree")
     assert run(root, *verb).returncode == 1  # sync stops on the conflicted ledger
     env = {"HOME": str(root), "PATH": "/usr/bin:/bin", "GIT_CONFIG_NOSYSTEM": "1"}
     rebase = subprocess.run(

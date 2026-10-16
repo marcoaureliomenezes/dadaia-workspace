@@ -2,14 +2,13 @@
 
 from __future__ import annotations
 
-import shlex
 from pathlib import Path
 
 import pytest
 from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app
-from dadaia_workspace.core.platform import PLATFORM
+from dadaia_workspace.core.platform import PLATFORM, head
 
 
 @pytest.mark.medium
@@ -21,8 +20,7 @@ def test_init_creates_the_literal_level_one_state(tmp_path: Path) -> None:
 
     assert result.exit_code == 0
     cli = ws / ".dadaia" / ".venv" / PLATFORM.venv_scripts_dir / f"dadaia{PLATFORM.venv_exe_suffix}"
-    cli_text = str(cli).replace("\\", "/")
-    cli_word = f'{cli_text[0]}"{cli_text[1:]}"' if PLATFORM.windows else shlex.quote(cli_text)
+    cli_word = head(str(cli))
     expected_output = (
         (
             f"✓ Workspace {ws} (claude)\n"

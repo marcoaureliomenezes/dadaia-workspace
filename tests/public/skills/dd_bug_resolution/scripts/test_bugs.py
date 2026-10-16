@@ -19,6 +19,8 @@ from typing import Any
 
 import pytest
 
+from dadaia_workspace.core.cli_line import shell_line
+from dadaia_workspace.core.platform import quote
 from dadaia_workspace.infrastructure.ledger_scripts import load_owner
 from tests.helpers.skill_scripts import stage_skill_scripts
 
@@ -292,8 +294,8 @@ def test_check_resolves_a_job_task_id_against_the_rc_tasks_folder(
     done = _run(script, "check", "--specs", str(specs), "--json")
     assert done.returncode == code, done.stdout
     fixes = [f["fix"] for f in json.loads(done.stdout)]
-    assert fixes == ([f"{Path(sys.executable).as_posix()} {script.as_posix()} update a-bug"
-                      f" --set caused_by=none --specs {specs.as_posix()}"]
+    assert fixes == ([shell_line(sys.executable, str(script), "update", "a-bug",
+                                  "--set", "caused_by=none", "--specs", str(specs))]
                      if code else []), fixes  # fmt: skip
 
 
@@ -569,7 +571,7 @@ def test_an_agent_action_run_outside_the_tree_keeps_its_specs_and_known_argv(
     (fix,) = [ln for ln in done.stderr.splitlines() if ln.startswith("fix: ")]
     command = fix.split("`")[1]
     assert (
-        fix.startswith("fix: Agent action: run `") and f"--specs {specs.as_posix()}" in command
+        fix.startswith("fix: Agent action: run `") and f"--specs {quote(str(specs))}" in command
     ), fix
     assert "--bug-id b" in command and "--correlates none" in command, fix
 
@@ -727,8 +729,8 @@ def test_a_write_refuses_the_lineage_check_refuses(
     assert done.returncode == 1
     assert "caused_by" in done.stderr
     # the fix runs as printed, from any cwd
-    fix = f"fix: {sys.executable} {script} check --specs {specs.resolve()}"
-    assert fix.replace("\\", "/") in done.stderr.replace("\\", "/")
+    fix = f"fix: {shell_line(sys.executable, str(script), 'check', '--specs', str(specs.resolve()))}"
+    assert fix in done.stderr
     assert (specs / "bugs" / "BUGS.jsonl").read_bytes() == before
 
 

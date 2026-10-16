@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+from dadaia_workspace.core.cli_line import git_line
 from dadaia_workspace.core.exceptions import DadaiaError
 from dadaia_workspace.core.gitflow import (
     DEFAULT,
@@ -199,7 +200,7 @@ def test_several_work_branches_refuse_with_the_skills_fix_line(tmp_path: Path) -
     with pytest.raises(load_owner("dd-gitflow-default", "_worktree_names").Refusal) as refused:
         work_branch(repo, Gitflow("main", "dev", "feature/"), "r")
     assert refused.value.fix == (
-        f"Agent action: run `git -C {repo.as_posix()} switch feature/0.6.0`, then merge feature/0.5.0 into feature/0.6.0, then run `git -C {repo.as_posix()} branch -d feature/0.5.0`"
+        f"Agent action: run `{git_line(repo, 'switch', 'feature/0.6.0')}`, then merge feature/0.5.0 into feature/0.6.0, then run `{git_line(repo, 'branch', '-d', 'feature/0.5.0')}`"
     )
 
 
@@ -211,6 +212,6 @@ def test_several_work_branches_refuse_as_the_one_error_type_that_carries_its_fix
     with pytest.raises(DadaiaError) as refused:
         work_branch(repo, Gitflow("main", "dev", "feature/"), "r")
     assert refused.value.message == "2 work branches"
-    fix = f"Agent action: run `git -C {repo.as_posix()} switch feature/0.6.0`, then run `git -C {repo.as_posix()} branch -d feature/0.5.0`"
+    fix = f"Agent action: run `{git_line(repo, 'switch', 'feature/0.6.0')}`, then run `{git_line(repo, 'branch', '-d', 'feature/0.5.0')}`"
     assert refused.value.fix == fix
     assert str(refused.value) == f"2 work branches\nfix: {fix}"
