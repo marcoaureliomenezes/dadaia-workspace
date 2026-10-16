@@ -61,8 +61,8 @@ def _refuse_dirty(tree: Path) -> None:
     if dirty(tree):
         raise Refusal(
             f"{tree} has uncommitted changes",
-            f"Agent action: commit them in their commit shape (`{git_line(tree, 'add', '-A')}`"
-            f" and `{git_line(tree, 'commit')}`) or remove them (`{git_line(tree, 'clean', '-fd')}`"
+            f"Agent action: stage the paths `{git_line(tree, 'status', '--short')}` lists and commit them"
+            f" in their commit shape (`{git_line(tree, 'commit')}`) or remove them (`{git_line(tree, 'clean', '-fd')}`"
             f" and `{git_line(tree, 'restore', '-SW', '.')}`) — never a stash every worktree shares",
         )
 
