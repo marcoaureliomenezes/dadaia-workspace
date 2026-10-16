@@ -272,7 +272,9 @@ VENV_PYTHON = (
 #: What every ctx-inject firing tells the agent until the venv is fixed.
 VENV_MISSING = (
     "dadaia: no workspace venv at $ROOT/.dadaia/.venv — the gate is off.\n"
-    + spell_fix("uvx dadaia-workspace init $ROOT")
+    + spell_fix(
+        "Agent action: run `uvx dadaia-workspace init` with the workspace directory as its first argument"
+    )
     + "\n"
 )
 
@@ -283,27 +285,6 @@ def _tell(lane: HookLane) -> str:
         return ""
     slot = "'\"$ESC\"'" if lane.speaks else "'\"$ROOT\"'"
     return f"  printf '%s' '{slot.join(envelope(dict(lane.env), VENV_MISSING).split('$ROOT'))}'\n"
-
-
-def _translator(answer: HookAnswer) -> str:
-    """Remap the gate's native envelope into *answer*'s shape, as parsed JSON (never a
-    key-order text match). Only a deny is answered — no wrapper emits an explicit allow
-    No single quote: it is embedded in a single-quoted ``sh`` word."""
-    say = (
-        f'sys.stderr.write(reason + "\\n")\n    raise SystemExit({answer.exit_code})\n'
-        if answer.exit_code
-        else f'print(json.dumps({{"{answer.decision_key}": "deny", "{answer.reason_key}": reason}}))\n'
-    )
-    return (
-        "import json,sys\n"
-        "try:\n"
-        '    out = json.load(sys.stdin).get("hookSpecificOutput", {})\n'
-        "except Exception:\n"
-        "    raise SystemExit(0)\n"
-        'if out.get("permissionDecision") == "deny":\n'
-        '    reason = out.get("permissionDecisionReason", "")\n'
-        f"    {say}"
-    )
 
 
 def hook_wrapper_contents(record: HarnessRecord) -> dict[str, str]:
@@ -318,9 +299,14 @@ def hook_wrapper_contents(record: HarnessRecord) -> dict[str, str]:
         exports = "".join(f'{key}="{value}"\nexport {key}\n' for key, value in lane.env)
         run = f'"$PYTHON_BIN" -B -m {lane.argv}'
         if answer is not None and lane.decides:
+            words = (
+                str(answer.exit_code)
+                if answer.exit_code
+                else f"{answer.decision_key} {answer.reason_key}"
+            )
             body = (
                 f"_envelope=$({run}) || exit 0\n"
-                f"printf '%s' \"$_envelope\" | \"$PYTHON_BIN\" -B -c '{_translator(answer)}'\n"
+                f'printf \'%s\' "$_envelope" | "$PYTHON_BIN" -B -m dadaia_workspace.hooks.translate {words}\n'
             )
         elif answer is not None and not answer.exit_code and not lane.speaks:
             body = f"exec {run} >&2\n"  # stdout is this harness's decision channel
