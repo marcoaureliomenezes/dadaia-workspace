@@ -14,6 +14,7 @@ import importlib.util
 import json
 import re
 import shutil
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -23,10 +24,17 @@ from dadaia_workspace.core.skill_owner import load_owner
 
 _ROOT = Path(__file__).resolve().parents[5]
 _BLOCK = re.compile(r"\A---[ \t]*\n(.*?)\n---[ \t]*\n?", re.DOTALL)
-_SHIPPED = sorted(
-    [*(_ROOT / "dadaia_workspace/public").rglob("*.md"), *(_ROOT / "specs").rglob("*.md")]
-)
-_TESTS = sorted((_ROOT / "tests").rglob("*.py"))
+
+
+def _tracked(*spec: str) -> list[Path]:
+    out = subprocess.run(
+        ["git", "-C", str(_ROOT), "ls-files", "-z", "--", *spec], capture_output=True, check=True
+    ).stdout.decode()
+    return sorted(_ROOT / p for p in out.split("\0") if p)
+
+
+_SHIPPED = _tracked("dadaia_workspace/public/*.md", "specs/*.md")
+_TESTS = _tracked("tests/*.py")
 _CORPUS = _ROOT / "tests/fixtures/frontmatter_mutations.json"
 
 
