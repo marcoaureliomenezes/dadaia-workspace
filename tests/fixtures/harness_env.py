@@ -61,6 +61,7 @@ from typing import Any, Final
 
 from dadaia_workspace.core import platform
 from dadaia_workspace.core.skill_owner import load_owner
+from tests.helpers import oslib
 
 __all__ = [
     "ALLOWLISTED_DADAIA_ENV",
@@ -425,14 +426,12 @@ def run_hook_subprocess(
     effective_cwd = cwd if cwd is not None else env.get("PWD")
     # PYTHONPATH pins the checkout for every test subprocess — one rule in tests/conftest.py.
     env = {**env, "PYTHONPATH": os.environ.get("PYTHONPATH", "")}
-    proc = subprocess.run(
+    proc = oslib.run(
         cmd,
         input=json.dumps(payload) if raw is None else raw,
-        capture_output=True,
-        text=True,
         env=env,
         timeout=timeout,
-        cwd=str(effective_cwd) if effective_cwd else None,
+        cwd=Path(effective_cwd) if effective_cwd else None,
     )
     return HookResult(returncode=proc.returncode, stdout=proc.stdout, stderr=proc.stderr)
 

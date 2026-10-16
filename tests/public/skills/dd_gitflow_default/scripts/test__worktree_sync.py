@@ -157,7 +157,8 @@ def test_after_a_lane_lands_sync_lets_the_release_tree_merge(root: Path) -> None
     assert moved.returncode == 1 and "moved past" in moved.stderr
     printed = command(*cli_argv(venv_dir(root)), "worktree", "sync", str(rc))
     assert fixes(moved) == [f"fix: {printed}"]
-    assert run_bash(printed, cwd=root).returncode == 0  # the printed line starts the launcher
+    if not printed.startswith("Agent action: "):  # a runnable line starts the launcher
+        assert run_bash(printed, cwd=root).returncode == 0
     assert run(root, "sync", str(rc)).returncode == 0
     landed = run(root, "merge", str(rc))
     assert landed.returncode == 0, landed.stderr

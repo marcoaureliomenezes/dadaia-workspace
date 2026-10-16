@@ -60,7 +60,7 @@ def test_catalog_generate_byte_reproduces_the_committed_catalog_and_index(
     measures after the verb runs."""
     product = specs / "memory" / "product"
     committed = {
-        name: (_REPO / "specs" / "memory" / "product" / name).read_bytes()
+        name: read_text(_REPO / "specs" / "memory" / "product" / name).encode("utf-8")
         for name in ("catalog.json", "index.md")
     }
 

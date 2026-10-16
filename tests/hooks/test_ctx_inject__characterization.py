@@ -7,9 +7,9 @@ from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.core.platform import PLATFORM, head
+from dadaia_workspace.core.platform import PLATFORM
 from tests.fixtures.harness_env import claude_hook_env, run_hook_subprocess
-from tests.helpers.oslib import write_text
+from tests.helpers.oslib import inline, write_text
 
 
 @pytest.mark.medium
@@ -30,14 +30,13 @@ def test_unbound_session_emits_preflight_once_and_stamps_exact_sentinel(tmp_path
         / PLATFORM.venv_scripts_dir
         / f"dadaia{PLATFORM.venv_exe_suffix}"
     )
-    cli_word = head(str(cli))
+    create = inline(str(cli), "context", "create")
     assert result.returncode == 0
     assert result.stdout == (
         "[no bound context]\n"
         "Next (command step context): no ALIVE Spec Context — create one\n"
         "fix: Agent action: run "
-        f"{cli_word} context create with a context name and --main-repo set to the main repo's "
-        "clone URL\n"
+        f"{create} with a context name and --main-repo set to the main repo's clone URL\n"
     )
     assert result.stderr == ""
     sentinel = workspace / ".dadaia/tmp/hooks/ctx-inject-fired-characterization-session"

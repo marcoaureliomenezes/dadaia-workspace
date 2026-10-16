@@ -28,7 +28,16 @@ from dadaia_workspace.features.spec_context.service import (
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from tests.conftest import GIT_QUIET_INCLUDE
 from tests.fixtures.stores import context_store
-from tests.helpers.oslib import make_executable, read_text, run, write_text
+from tests.helpers.oslib import (
+    cli_argv,
+    command,
+    inline,
+    make_executable,
+    read_text,
+    run,
+    venv_dir,
+    write_text,
+)
 from tests.helpers.oslib import run as os_run
 from tests.helpers.privacy_fixtures import aws_key_shape
 
@@ -330,7 +339,8 @@ def test_several_principal_candidates_are_listed_never_guessed(env, tmp_path: Pa
     with pytest.raises(ContextStateError) as refused:
         svc.baseline("proj")
     message = str(refused.value)
-    assert "master, trunk" in message and message.endswith("--principal` with it")
+    words = inline(*cli_argv(venv_dir(repo.parents[1])), "specs", "init", "--context", "proj", "--principal")  # fmt: skip
+    assert "master, trunk" in message and message.endswith(f"`{words}` with it")
 
 
 def test_the_principal_choice_renders_the_cli_words_inline(
@@ -361,7 +371,8 @@ def test_a_never_onboarded_repo_is_refused_with_the_specs_init_fix(env, tmp_path
     write_text(repo / "specs" / "constitution.md", _CONSTITUTION)
     with pytest.raises(ContextStateError, match="no committable specs/constitution.md") as refused:
         svc.baseline("proj")
-    assert str(refused.value).endswith("specs init --context proj")
+    fix = command(*cli_argv(venv_dir(repo.parents[1])), "specs", "init", "--context", "proj")
+    assert str(refused.value).endswith(fix)
     assert _heads(bare) == before and _git(repo, "rev-parse", "HEAD") == head
     assert _git(repo, "branch", "--show-current") == "main"
 
