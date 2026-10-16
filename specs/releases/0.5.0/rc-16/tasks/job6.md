@@ -2,7 +2,7 @@
 
 **Status:** Draft
 
-Wave 3, waits on Job 4. Paths are repository-relative to `repos/dadaia-workspace/`. Design and evidence: PLAN §1 and the as-is review it points to.
+Wave 4, waits on Jobs 4, 5 and 7. Paths are repository-relative to `repos/dadaia-workspace/`. Design and evidence: PLAN §1 and the as-is review it points to.
 
 - Text only, no `.py`. Law text for behaviour not yet built would drift, so it follows Job 4 (agent default, unruled). Every AI-entity change follows `dd-ai-eng-knowhow` AUTHORING and passes the reviewer's AI-surface lens; `public doctor` must print `[ok] public-privacy`; an edited `SKILL.md` stays under the SKILL-MD-LENGTH limit.
 - Sweep after every task: `grep -n '<job>--\|/define\|/reconcile\|plain\|wt/hotfix/\|wt/backlog/\|worktree\.py' <the task's files>` = 0, except the runner's own mention. `WT` means `dadaia worktree …` everywhere. Shape 9's 'first-pass plain tree' becomes the `wt-backlog-first-pass` lane (Job 8) in `dd-gitflow-default/SKILL.md:67` and map §7 3b (`data/AGENTS.md`).
