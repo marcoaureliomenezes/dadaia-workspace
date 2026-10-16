@@ -10,9 +10,8 @@ from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.core.platform import cli_argv
 from tests.fixtures.harness_env import run_bash
-from tests.helpers.oslib import command, venv_dir
+from tests.helpers.oslib import cli_argv, command, venv_dir
 from tests.helpers.oslib import run as os_run
 from tests.helpers.worktree_ws import commit, fixes, git, make_workspace, run
 

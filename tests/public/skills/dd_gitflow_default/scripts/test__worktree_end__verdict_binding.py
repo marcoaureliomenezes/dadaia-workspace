@@ -14,8 +14,7 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.core.cli_line import shell_line
-from dadaia_workspace.core.platform import cli_argv
-from tests.helpers.oslib import command, venv_dir, write_text
+from tests.helpers.oslib import cli_argv, command, venv_dir, write_text
 from tests.helpers.worktree_ws import (
     NEW_JOB,
     SCRIPT,

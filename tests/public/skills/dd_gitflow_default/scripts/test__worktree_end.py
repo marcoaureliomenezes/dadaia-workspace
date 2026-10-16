@@ -22,14 +22,13 @@ from typing import Any
 import pytest
 
 from dadaia_workspace.core.cli_line import fix_line, git_line, shell_line
-from dadaia_workspace.core.platform import cli_argv
 from dadaia_workspace.infrastructure.ledger_scripts import (
     _PACKAGE_SKILLS,
     LEDGER_SCRIPTS,
     load_owner,
 )
 from tests.fixtures.harness_env import run_bash, run_python, suite_env
-from tests.helpers.oslib import command, read_text, venv_dir, write_text
+from tests.helpers.oslib import cli_argv, command, read_text, venv_dir, write_text
 from tests.helpers.oslib import run as os_run
 from tests.helpers.release_state import write_release_phase
 from tests.helpers.skill_scripts import stage_skill_scripts
