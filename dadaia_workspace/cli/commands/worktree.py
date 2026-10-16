@@ -26,7 +26,7 @@ def worktree(
     root = ledger_scripts.own_workspace_root()
     script = ledger_scripts.resolve_script(ledger_scripts.WORKTREE_SCRIPT, root or Path())
     if script is None:
-        fail("worktree.py is not installed", fix=fix_line(None, "public", "install"))
+        fail("the dd-gitflow-default worktree scripts are not installed", fix=fix_line(None, "public", "install"))
     result = SubprocessProcessRunner().run([sys.executable, str(script), *(args or [])])
     sys.stdout.write(result.stdout)
     sys.stderr.write(result.stderr)
