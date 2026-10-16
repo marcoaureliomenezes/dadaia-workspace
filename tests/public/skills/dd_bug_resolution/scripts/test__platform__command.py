@@ -166,7 +166,7 @@ _ROUND_TRIP = [
     "a/b-c_d.txt", "my dir/Program Files (x86)/x", "José/my ws/x",
     "0x10", "1e3", "1kb", "10d", "007", "-1.5",
 ]  # fmt: skip
-_AVAILABLE = [s for s in _SHELLS if s == "bash" or shutil.which(s)]
+_AVAILABLE = [s for s in oslib.shells_for(K.detect()) if s == "bash" or shutil.which(s)]
 _ECHO = "import sys; print(ascii(sys.argv[1:]))"
 
 
