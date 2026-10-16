@@ -385,11 +385,14 @@ finally:
 """
 
 
-def _ops(root: Path, hook: str, bound: bool) -> int:
+def _ops(root: Path, hook: str, bound: bool, pycache: tuple[Path, bool] | None = None) -> int:
     if bound:
         _bind(root, "s", "c0")
     env = {**claude_hook_env(root, session_id="s"), "PYTHONPATH": os.environ.get("PYTHONPATH", "")}
     env.pop("DADAIA_CONTEXT", None)
+    if pycache:
+        env["PYTHONPYCACHEPREFIX"] = str(pycache[0])
+        env["PYTHONDONTWRITEBYTECODE"] = "" if pycache[1] else "1"
     done = subprocess.run(
         [sys.executable, "-c", _COUNTING_DRIVER.format(hook=hook)],
         input=json.dumps({"session_id": "s"}), env=env, cwd=root,
@@ -423,6 +426,16 @@ def test_hook_lane_cost_does_not_grow_with_the_registry(
         for n in (2, 20)
     )
     assert twenty == two
+
+
+def test_hook_lane_cost_is_the_same_with_a_cold_and_a_warm_bytecode_cache(tmp_path: Path) -> None:
+    """The count does not depend on whether the imported modules' ``.pyc`` files exist."""
+    cache = tmp_path / "pyc"
+    cold, _, warm = (
+        _ops(_ws(tmp_path / str(i), {"name": "c0"}), "ctx_inject", True, (cache, i == 1))
+        for i in range(3)
+    )
+    assert warm == cold
 
 
 def test_two_same_second_binds_each_reinject_once(tmp_path: Path) -> None:
