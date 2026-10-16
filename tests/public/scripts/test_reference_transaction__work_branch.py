@@ -252,9 +252,18 @@ def test_a_rebase_under_a_raw_commit_is_refused(repo: _Repo) -> None:
     _assert_refused(repo, done, before)
 
 
-def _verb(repo: _Repo, *args: str) -> subprocess.CompletedProcess[str]:
+def _verb(repo: _Repo, oldest: str, *args: str) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
-        [str(repo.runner), "ci", "rewrite-unpublished", "--repo", str(repo.root), *args],
+        [
+            str(repo.runner),
+            "ci",
+            "push-gate-check",
+            "--repo",
+            str(repo.root),
+            "--rewrite-from",
+            oldest,
+            *args,
+        ],
         capture_output=True,
         text=True,
         timeout=60,

@@ -1974,7 +1974,9 @@ def test_the_gate_is_read_only_and_its_rewrite_fix_uncommits_only_unpublished_wo
     command = _denylisted(world)
     oldest = world.git(world.repo, "rev-parse", "HEAD~1")
     fix = _fix(_hit(world, command), world.ws)
-    assert fix == fix_line(None, "ci", "rewrite-unpublished", "--repo", str(world.repo), oldest)
+    assert fix == fix_line(
+        world.ws, "ci", "push-gate-check", "--repo", str(world.repo), "--rewrite-from", oldest
+    )
     assert "--republish" not in world.cli("context", "baseline", "--help").stdout
 
 

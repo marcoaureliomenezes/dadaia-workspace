@@ -253,7 +253,7 @@ def test_the_rewrite_fix_runs_the_verb_from_the_oldest_unpublished_commit(
     if end is None:
         assert "\nfix: Agent action: " in message and message.count("\nfix: ") == 1
     else:
-        verb = fix_line(None, "ci", "rewrite-unpublished", "--repo", "/repo", oldest)
+        verb = fix_line(None, "ci", "push-gate-check", "--repo", "/repo", "--rewrite-from", oldest)
         assert message.endswith(end.format(verb=verb)) and message.count("\nfix: ") == 1
 
 
