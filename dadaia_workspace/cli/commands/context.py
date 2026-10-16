@@ -148,7 +148,7 @@ def create(
         [], "--associated-repo", help="Clone URL of an associated repo; repeatable"
     ),
 ) -> None:
-    """Clone (or adopt) every repo, install the pre-push hook, make the context ALIVE —
+    """Clone (or adopt) every repo, install the pre-push and reference-transaction hooks, make the context ALIVE —
     one step; on failure nothing is left behind."""
     ws = resolve_workspace_root()
     try:
