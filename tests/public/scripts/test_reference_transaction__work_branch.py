@@ -272,6 +272,13 @@ def test_the_rewrite_verb_commits_the_unpublished_range_as_one_commit(repo: _Rep
     assert repo.ok("show", "--name-only", "--format=", _WORK) == "scrubbed.txt"
 
 
+def test_the_rewrite_verb_takes_a_new_message(repo: _Repo) -> None:
+    _two_unpublished(repo)
+    done = _verb(repo, repo.ok("rev-parse", "HEAD~1"), "--message", "clean message")
+    assert done.returncode == 0, done.stderr
+    assert repo.ok("log", "-1", "--format=%s", _WORK) == "clean message"
+
+
 def test_the_rewrite_verb_refuses_a_commit_origin_already_holds(repo: _Repo) -> None:
     _two_unpublished(repo)
     before = repo.ok("rev-parse", "HEAD")
