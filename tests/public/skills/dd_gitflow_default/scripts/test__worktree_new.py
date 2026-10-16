@@ -47,7 +47,10 @@ def _set_release(root: Path, phase: str, *, plan: str = "Approved") -> None:
     repo = root / "repos/r"
     release = repo / "specs/releases/0.5.0"
     plan_md = release / "rc-1/PLAN.md"
-    plan_md.write_text(plan_md.read_text().replace("**Status:** Approved", f"**Status:** {plan}"))
+    plan_md.write_text(
+        plan_md.read_text(encoding="utf-8").replace("**Status:** Approved", f"**Status:** {plan}"),
+        encoding="utf-8",
+    )
     state_path = release / "_RELEASE.json"
     state = json.loads(state_path.read_text())
     state["phase"] = phase

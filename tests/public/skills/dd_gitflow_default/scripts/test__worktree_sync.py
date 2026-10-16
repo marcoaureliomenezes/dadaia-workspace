@@ -153,7 +153,11 @@ def test_after_a_lane_lands_sync_lets_the_release_tree_merge(root: Path) -> None
     approve(root, commit(rc, "src/r.py"), name=RC)
     lane = open_tree(root, LANE)
     plan = "specs/releases/0.5.0/rc-1/PLAN.md"
-    draft = (lane / plan).read_text().replace("**Status:** Approved", "**Status:** Draft", 1)
+    draft = (
+        (lane / plan)
+        .read_text(encoding="utf-8")
+        .replace("**Status:** Approved", "**Status:** Draft", 1)
+    )
     approve(root, commit(lane, plan, draft), name=LANE)
     assert run(root, "merge", str(lane)).returncode == 0
     moved = run(root, "merge", str(rc))

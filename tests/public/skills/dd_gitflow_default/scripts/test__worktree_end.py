@@ -195,7 +195,7 @@ def test_a_backlog_tree_lands_specs_only_through_the_ledger_checks(root: Path) -
     assert then == git_line(tree, "commit")
     git(tree, "commit", "-qm", "revert: RED-job")
     plan = tree / "specs/releases/0.5.0/rc-1/PLAN.md"
-    draft = plan.read_text().replace("**Status:** Approved", "**Status:** Draft", 1)
+    draft = plan.read_text(encoding="utf-8").replace("**Status:** Approved", "**Status:** Draft", 1)
     approve(root, sha := commit(tree, "specs/releases/0.5.0/rc-1/PLAN.md", draft))
     landed = run(root, "merge", str(tree))
     assert landed.returncode == 0, landed.stderr

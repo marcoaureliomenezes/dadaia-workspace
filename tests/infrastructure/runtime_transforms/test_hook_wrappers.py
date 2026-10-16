@@ -70,7 +70,7 @@ def _run(ws: Path, harness: str, case: str, **env_extra: str) -> subprocess.Comp
     else:
         name = "dadaia-kimi-pre-gate.sh" if harness == "kimi-code" else f"{harness}-pre-gate"
         body = hook_wrapper_contents(HARNESS_RECORDS[harness])[name]
-        (ws / ".dadaia" / "hooks" / name).write_text(body)
+        (ws / ".dadaia" / "hooks" / name).write_text(body, encoding="utf-8")
         argv = [git_bash(), str(ws / ".dadaia" / "hooks" / name)]
     env = suite_env(os.environ, Path.home(), overrides=env_extra)
     return subprocess.run(
@@ -160,7 +160,7 @@ def test_ac1_2_every_ctx_inject_wrapper_answers_on_stdout(ws: Path, harness: str
     names = sorted(n for n, body in wrappers.items() if "hooks.ctx_inject" in body and n in docs)
     assert names, harness
     for name in names:
-        (ws / ".dadaia" / "hooks" / name).write_text(wrappers[name])
+        (ws / ".dadaia" / "hooks" / name).write_text(wrappers[name], encoding="utf-8")
         shutil.rmtree(ws / MARKER_DIR, ignore_errors=True)  # each wrapper starts fresh
         for _ in range(2 if vendor else 1):
             out = subprocess.run(

@@ -54,7 +54,9 @@ def _claude_pre_gate() -> str:
 
 def _kimi_shim(where: Path) -> Path:
     shim = where / "dadaia-kimi-pre-gate.sh"
-    shim.write_text(hook_wrapper_contents(HARNESS_RECORDS["kimi-code"])[shim.name])
+    shim.write_text(
+        hook_wrapper_contents(HARNESS_RECORDS["kimi-code"])[shim.name], encoding="utf-8"
+    )
     return shim
 
 

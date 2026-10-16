@@ -29,7 +29,7 @@ def test_retired_family_is_pruned_on_next_install(tmp_path: Path) -> None:
     gone = ws / ".agents" / "skills" / pristine / "SKILL.md"
     kept = ws / ".agents" / "skills" / edited / "SKILL.md"
     assert gone.is_file()
-    kept.write_text(kept.read_text(encoding="utf-8") + "\nOPERATOR EDIT\n")
+    kept.write_text(kept.read_text(encoding="utf-8") + "\nOPERATOR EDIT\n", encoding="utf-8")
 
     shutil.rmtree(skills_src)
     installed = mgr.install(ws)
