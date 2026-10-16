@@ -260,7 +260,7 @@ def ref_gate_check() -> None:
         behind = git.git(repo_root, "rev-list", "-n1", f"{new}..{old}")
         paths = git.git(repo_root, "diff", "--no-renames", "--name-only", f"{old}..{new}")
         anchor = Path(repo_root.anchor)
-        zones = [
+        zones: list[str] = [
             scope(anchor, anchor / "repos" / repo_root.name / p)[1] for p in paths.splitlines()
         ]
         return not behind, zones
