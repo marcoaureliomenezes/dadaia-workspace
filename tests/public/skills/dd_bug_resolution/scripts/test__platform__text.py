@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 import os
 import subprocess
 import sys
@@ -13,6 +14,7 @@ from dadaia_workspace.core.skill_owner import load_owner
 
 K = load_owner("dd-bug-resolution", "_platform")
 _KERNEL_DIR = Path(K.__file__).parent
+_ENTRY_POINTS = sorted(_KERNEL_DIR.parents[1].glob("*/scripts/[!_]*.py"))
 
 
 def test_read_text_decodes_utf8_and_translates_crlf(tmp_path: Path) -> None:
@@ -75,3 +77,12 @@ def test_use_utf8_stdio_lets_a_cp1252_pipe_print_a_check_mark() -> None:
         env={**os.environ, "PYTHONIOENCODING": "cp1252"},
     )
     assert (done.returncode, done.stdout.strip()) == (0, "✓".encode())
+
+
+@pytest.mark.parametrize("entry", _ENTRY_POINTS, ids=lambda p: p.name)
+def test_every_skill_entry_point_makes_its_stdio_utf8(entry: Path) -> None:
+    main = next(
+        n for n in ast.walk(ast.parse(K.read_text(entry))) if getattr(n, "name", "") == "main"
+    )
+    calls = {getattr(c.func, "id", "") for c in ast.walk(main) if isinstance(c, ast.Call)}
+    assert "use_utf8_stdio" in calls
