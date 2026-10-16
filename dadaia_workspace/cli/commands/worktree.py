@@ -1,11 +1,13 @@
 """CLI command: `dadaia worktree <verb> …` — a runner of the installed `worktree.py`.
 
 The installed script owns every verb, `--help` and every refusal; this command forwards
-argv, stdout, stderr and the exit code.
+argv, stdout, stderr and the exit code, and marks the run `DADAIA_WT=1` for the
+reference-transaction hook, so the hook's own fix line works over a projected runner that lags it.
 """
 
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
@@ -30,7 +32,9 @@ def worktree(
             "the dd-gitflow-default worktree scripts are not installed",
             fix=fix_line(None, "public", "install"),
         )
-    result = SubprocessProcessRunner().run([sys.executable, str(script), *(args or [])])
+    result = SubprocessProcessRunner().run(
+        [sys.executable, str(script), *(args or [])], env=os.environ | {"DADAIA_WT": "1"}
+    )
     sys.stdout.write(result.stdout)
     sys.stderr.write(result.stderr)
     raise typer.Exit(result.returncode)
