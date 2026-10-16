@@ -1,7 +1,6 @@
 """The census of every atomic write in the package is DERIVED by scan, never a hand-kept list:
 a function that writes content to a local name (``.write_text``/``.write_bytes``) and then
-swaps that same name into place (``os.replace``/``Path.replace``, or the OS boundary's
-``write_text``/``replace``). Plain renames of an
+swaps that same name into place (``os.replace``/``Path.replace``). Plain renames of an
 existing file (log rotation, DB quarantine) never write first, so they never match.
 """
 
@@ -35,30 +34,11 @@ def _writes_then_replaces(func: ast.FunctionDef | ast.AsyncFunctionDef) -> bool:
             and isinstance(node.func.value, ast.Name)
         ):
             written_names.add(node.func.value.id)
-        # the boundary's writer: write_text(path, text)
-        if (
-            isinstance(node, ast.Call)
-            and isinstance(node.func, ast.Name)
-            and node.func.id == "write_text"
-            and node.args
-            and isinstance(node.args[0], ast.Name)
-        ):
-            written_names.add(node.args[0].id)
 
     if not written_names:
         return False
 
     for node in ast.walk(func):
-        # the boundary's swap: replace(src, dst)
-        if (
-            isinstance(node, ast.Call)
-            and isinstance(node.func, ast.Name)
-            and node.func.id == "replace"
-            and node.args
-            and isinstance(node.args[0], ast.Name)
-            and node.args[0].id in written_names
-        ):
-            return True
         if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)):
             continue
         if node.func.attr != "replace":

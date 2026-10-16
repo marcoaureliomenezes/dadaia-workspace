@@ -3,11 +3,13 @@
 import shutil
 import sys
 import sysconfig
+import tempfile
 from pathlib import Path
+
+from pip._vendor.distlib.scripts import ScriptMaker, enquote_executable
 
 from dadaia_workspace.core.platform import PLATFORM
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
-from tests.helpers.oslib import stub_cli
 
 
 def context_store(states_dir: Path) -> JsonContextStore:
@@ -52,7 +54,12 @@ def fake_venv(root: Path, cli: bool | str = False, pth: bool = False) -> Path:
     (root / ".dadaia" / ".venv" / "pyvenv.cfg").write_text(f"home = {real.parent}\n")
     name = f"dadaia{PLATFORM.venv_exe_suffix}"
     if isinstance(cli, str):
-        stub_cli(python.parent, "dadaia", cli, python)  # bound to this venv, as pip's is
+        with tempfile.TemporaryDirectory() as src:
+            (Path(src) / "dadaia").write_text(cli)
+            maker = ScriptMaker(src, str(python.parent), add_launchers=True)
+            maker.clobber = True  # a re-placed stub replaces the older one
+            maker.executable = enquote_executable(str(python))  # bound to this venv, as pip's is
+            maker.make(str(Path(src) / "dadaia"))
     elif cli:
         shutil.copy2(Path(sys.executable).parent / name, python.with_name(name))
     if pth:

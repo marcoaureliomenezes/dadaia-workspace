@@ -5,6 +5,7 @@ whose facts are the kernel's ``_platform`` (the one host reader); tests swap it:
 
 from __future__ import annotations
 
+import sys
 from dataclasses import dataclass
 from pathlib import PurePath
 from typing import Any
@@ -56,7 +57,7 @@ def workspace_cli_path[P: PurePath](root: P) -> P:
 
 
 def quote(word: str) -> str:
-    """One argument inside a sentence for the host shell, by the kernel's rule fed the current ``PLATFORM``."""
+    """One shell word for the host shell, by the kernel's rule fed the current ``PLATFORM``."""
     return str(_owner.quote(word, _caps()))
 
 
@@ -65,57 +66,8 @@ def head(word: str) -> str:
     return str(_owner.head(word, _caps()))
 
 
-def command(*argv: str) -> str:
-    """The finished command line of *argv* for the host shell, by the kernel's rule fed the current ``PLATFORM``."""
-    return str(_owner.command(*argv, caps=_caps()))
-
-
-def python_in[P: PurePath](venv: P) -> P:
-    """Where *venv* keeps its interpreter on the current ``PLATFORM``."""
-    path: P = _owner.python_in(venv, _caps())
-    return path
-
-
-def is_fully_qualified(candidate: str) -> bool:
-    """Whether *candidate* is rooted on the current ``PLATFORM``."""
-    return bool(_owner.is_fully_qualified(candidate, _caps()))
-
-
-def canonical_cli(text: str) -> str:
-    """*text* with the current ``PLATFORM``'s venv CLI spelling replaced by the source form."""
-    return str(_owner.canonical_cli(text, _caps()))
-
-
-def home_env(home: PurePath) -> dict[str, str]:
-    """The variables a child reads its home from on the current ``PLATFORM``."""
-    return dict(_owner.home_env(home, _caps()))
-
-
-def is_executable(path: PurePath) -> bool:
-    """Whether *path* is runnable on the current ``PLATFORM``."""
-    return bool(_owner.is_executable(path, _caps()))
-
-
-def make_executable(path: PurePath) -> None:
-    """Add the exec bits to *path* on the current ``PLATFORM``."""
-    _owner.make_executable(path, _caps())
-
-
-# The kernel's functions that read no capability: the door hands them out unchanged.
-Undecodable = _owner.Undecodable
-can_write = _owner.can_write
-decode = _owner.decode
-effective_uid = _owner.effective_uid
-file_owner = _owner.file_owner
-is_link = _owner.is_link
-link = _owner.link
-make_writable = _owner.make_writable
-norm_sep = _owner.norm_sep
-popen = _owner.popen
-popen_bytes = _owner.popen_bytes
-read_text = _owner.read_text
-replace = _owner.replace
-run = _owner.run
-run_bytes = _owner.run_bytes
-use_utf8_stdio = _owner.use_utf8_stdio
-write_text = _owner.write_text
+def use_utf8_stdio() -> None:
+    """Make stdout and stderr UTF-8 whatever the host pipe defaults to (cp1252 on Windows)."""
+    for stream in (sys.stdout, sys.stderr):
+        if reconfigure := getattr(stream, "reconfigure", None):
+            reconfigure(encoding="utf-8", errors=stream.errors)

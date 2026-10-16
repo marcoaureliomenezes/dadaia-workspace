@@ -5,13 +5,9 @@ Tests pass the platform to ``Capabilities.detect`` so ``PLATFORM`` is not distur
 
 from __future__ import annotations
 
-from pathlib import Path, PurePosixPath
-
 import pytest
 
-from dadaia_workspace.core import platform
 from dadaia_workspace.core.platform import PLATFORM, Capabilities
-from dadaia_workspace.core.skill_owner import load_owner
 
 
 @pytest.mark.parametrize(
@@ -29,36 +25,3 @@ def test_platform_singleton_frozen_and_equivalent_construction() -> None:
     with pytest.raises((AttributeError, TypeError)):
         PLATFORM.venv_exe_suffix = ""  # type: ignore[misc]
     assert Capabilities.detect() == PLATFORM  # no argument reads sys.platform
-
-
-_NO_CAPS_NEEDED = [
-    "Undecodable", "decode", "effective_uid", "file_owner", "is_link", "link",
-    "make_writable", "norm_sep", "popen", "popen_bytes", "read_text", "replace", "run",
-    "run_bytes", "use_utf8_stdio", "write_text", "can_write",
-]  # fmt: skip
-
-
-@pytest.mark.parametrize("name", _NO_CAPS_NEEDED)
-def test_the_door_hands_out_the_kernels_own_function(name: str) -> None:
-    owner = load_owner("dd-bug-resolution", "_platform")
-    assert getattr(platform, name) is getattr(owner, name)
-
-
-@pytest.mark.parametrize(
-    ("name", "args"),
-    [
-        ("quote", ("a b",)),
-        ("head", ("C:/a b/x",)),
-        ("command", ("C:/a b/x", "c d")),
-        ("is_fully_qualified", ("\\tools",)),
-        ("canonical_cli", ("x .venv/Scripts/dadaia.exe",)),
-        ("home_env", (Path("/h"),)),
-        ("python_in", (PurePosixPath("/v"),)),
-    ],
-)
-def test_the_door_feeds_the_kernel_the_platform_it_holds(
-    name: str, args: tuple[object, ...], monkeypatch: pytest.MonkeyPatch
-) -> None:
-    owner = load_owner("dd-bug-resolution", "_platform")
-    monkeypatch.setattr(platform, "PLATFORM", Capabilities.detect("win32"))
-    assert getattr(platform, name)(*args) == getattr(owner, name)(*args, caps=owner.detect("win32"))

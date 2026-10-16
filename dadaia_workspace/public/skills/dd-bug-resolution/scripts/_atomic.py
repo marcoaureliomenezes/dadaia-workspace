@@ -4,11 +4,11 @@
 from __future__ import annotations
 
 import contextlib
+import os
 import shutil
+import time
 import uuid
 from pathlib import Path
-
-from _platform import replace, write_text
 
 __all__ = ["SymlinkRefusedError", "atomic_write", "refuse_symlink"]
 
@@ -40,7 +40,9 @@ def atomic_write(
 
     *newline* is ``Path.write_text``'s (``""`` keeps LF on every platform; ignored for bytes).
     *preserve_mode* copies the old mode onto the temp sibling; *ensure_parent* makes the parent.
-    The temp sibling never survives a failure; the swap is the boundary's ``replace``.
+    The temp sibling never survives a failure. A held-open destination (``PermissionError``,
+    Windows) is retried 49 times 0.01 s apart before the final raising swap; the retry is
+    platform-blind because POSIX never raises it there.
     """
     refuse_symlink(path)
     if content is None:
@@ -53,11 +55,15 @@ def atomic_write(
         if isinstance(content, bytes):
             tmp.write_bytes(content)
         else:
-            write_text(tmp, content, newline=newline)
+            tmp.write_text(content, encoding="utf-8", newline=newline)
         if preserve_mode and path.exists():
             with contextlib.suppress(OSError):
                 shutil.copymode(path, tmp)
-        replace(tmp, path)
+        for _ in range(49):
+            with contextlib.suppress(PermissionError):
+                return os.replace(tmp, path)
+            time.sleep(0.01)
+        os.replace(tmp, path)
     finally:
         with contextlib.suppress(OSError):
             tmp.unlink(missing_ok=True)
