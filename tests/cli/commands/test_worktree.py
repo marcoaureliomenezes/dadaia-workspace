@@ -86,9 +86,26 @@ def test_a_runner_that_lags_the_hook_still_creates_a_wt_branch(
     git = lambda *a: subprocess.run(["git", "-C", str(repo), *a], check=True, capture_output=True)  # noqa: E731
     repo.mkdir()
     git("init", "-q", "-b", "main")
-    git("-c", "user.email=a@b.invalid", "-c", "user.name=n", "commit", "-q", "--allow-empty", "-m", "i")
+    git(
+        "-c",
+        "user.email=a@b.invalid",
+        "-c",
+        "user.name=n",
+        "commit",
+        "-q",
+        "--allow-empty",
+        "-m",
+        "i",
+    )
     hook = repo / ".git" / "hooks" / "reference-transaction"
-    hook.write_bytes((Path(dadaia_workspace.__file__).parent / "public" / "scripts" / "reference-transaction.sh").read_bytes())
+    hook.write_bytes(
+        (
+            Path(dadaia_workspace.__file__).parent
+            / "public"
+            / "scripts"
+            / "reference-transaction.sh"
+        ).read_bytes()
+    )
     hook.chmod(0o755)
     scripts = workspace / ".agents" / "skills" / "dd-gitflow-default" / "scripts"
     scripts.mkdir(parents=True)
@@ -98,4 +115,7 @@ def test_a_runner_that_lags_the_hook_still_creates_a_wt_branch(
     )
     result = CliRunner().invoke(app, ["worktree", "new", "repo", "x"])
     assert result.exit_code == 0
-    assert "wt/x" in subprocess.run(["git", "-C", str(repo), "branch"], capture_output=True, text=True).stdout
+    assert (
+        "wt/x"
+        in subprocess.run(["git", "-C", str(repo), "branch"], capture_output=True, text=True).stdout
+    )
