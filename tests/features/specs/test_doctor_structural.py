@@ -15,6 +15,7 @@ from dadaia_workspace.core.template_history import (
     SHIPPED_HASHES_FILENAME,
     was_shipped,
 )
+from dadaia_workspace.core.workspace_layout import render_registry_tables
 from dadaia_workspace.features.specs import canon
 from dadaia_workspace.features.specs.doctor import SpecsDoctor
 
@@ -92,26 +93,28 @@ def test_shipped_history_records_the_current_canonical_template(tmp_path: Path) 
 _PROJECT_FILLED = {"scaffold/memory/ARCHITECTURE.md", "scaffold/memory/QUALITY.md"}
 
 
+def _held_text(asset: str) -> str:
+    """The bytes a workspace of the current host holds for *asset*: hook scripts are installed
+    as they are, every other asset through the installer's render."""
+    public = _REAL_TEMPLATES_DIR.parent
+    source = public / ("templates" if "/" not in asset else "") / asset
+    text = source.read_text(encoding="utf-8")
+    return text if asset.startswith("scripts/") else render_registry_tables(text)
+
+
 @pytest.mark.parametrize("host", ["linux", "win32"])
 def test_shipped_history_records_every_shipped_asset_for_every_host(
     host: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Whatever host renders a shipped asset's current file, the history recognises it."""
+    """Whatever host a workspace runs on, the history recognises the current asset it holds."""
     monkeypatch.setattr(platform, "PLATFORM", platform.Capabilities.detect(host))
-    public = _REAL_TEMPLATES_DIR.parent
     history = json.loads(
         (_REAL_TEMPLATES_DIR / SHIPPED_HASHES_FILENAME).read_text(encoding="utf-8")
     )
     unknown = [
         asset
-        for asset in history.keys() - _PROJECT_FILLED
-        if not was_shipped(
-            (public / ("templates" if "/" not in asset else "") / asset).read_text(
-                encoding="utf-8"
-            ),
-            asset,
-            _REAL_TEMPLATES_DIR,
-        )
+        for asset in sorted(history.keys() - _PROJECT_FILLED)
+        if not was_shipped(_held_text(asset), asset, _REAL_TEMPLATES_DIR)
     ]
     assert unknown == []
 
