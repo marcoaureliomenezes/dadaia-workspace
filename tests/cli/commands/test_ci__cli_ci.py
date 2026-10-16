@@ -131,11 +131,12 @@ def test_ref_gate_refuses_a_zero_old_line_for_an_existing_work_ref_off_origin(
 
 
 def test_ref_gate_passes_a_zero_old_line_creating_the_work_ref(monkeypatch, tmp_path: Path) -> None:
-    repo, _ = _work_repo(tmp_path)
+    repo, base = _work_repo(tmp_path)
     tip = _commit(repo, **{"src__a.py": "x = 1\n"})
     _git(repo, "update-ref", "-d", _WORK_REF)
 
-    assert _ref_gate(monkeypatch, repo, f"{'0' * 40} {tip} {_WORK_REF}").exit_code == 0
+    assert _ref_gate(monkeypatch, repo, f"{'0' * 40} {base} {_WORK_REF}").exit_code == 0
+    assert _ref_gate(monkeypatch, repo, f"{'0' * 40} {tip} {_WORK_REF}").exit_code == 1
 
 
 def test_ref_gate_passes_a_work_branch_with_no_origin(monkeypatch, tmp_path: Path) -> None:
