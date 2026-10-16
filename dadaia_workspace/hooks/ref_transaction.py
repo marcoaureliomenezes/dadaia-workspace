@@ -20,6 +20,8 @@ from pathlib import Path
 from types import ModuleType
 
 _HEADS, _WT = "refs/heads/", "refs/heads/wt/"
+#: The exit code of a refusal; the interpreter's own failure is 1, which the shim lets through.
+_BLOCKED = 3
 
 
 def _zero(sha: str) -> bool:
@@ -101,4 +103,4 @@ if __name__ == "__main__":
     except Exception as exc:  # noqa: BLE001 — fail open: this hook fires on every ref update
         sys.stderr.write(f"reference-transaction: {exc!r}; update allowed\n")
         code = 0
-    sys.exit(code)
+    sys.exit(_BLOCKED if code else 0)
