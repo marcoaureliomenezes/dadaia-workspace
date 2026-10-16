@@ -206,7 +206,11 @@ def worktree_rows(
     context's) plus the rows no context owns (``registered: false``), never another context's."""
     path = resolve_script(WORKTREE_SCRIPT, root)
     if path is None:
-        return [], "list failed: the dd-gitflow-default worktree scripts are not installed", fix_line(root, "public", "install")
+        return (
+            [],
+            "list failed: the dd-gitflow-default worktree scripts are not installed",
+            fix_line(root, "public", "install"),
+        )
     process = runner if runner is not None else SubprocessProcessRunner()
     try:
         done = process.run([sys.executable, str(path), "list", "--json"], cwd=root, timeout=10.0)
