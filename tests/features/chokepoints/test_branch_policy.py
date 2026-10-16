@@ -256,13 +256,22 @@ def test_a_work_branch_update_to_origins_sha_passes() -> None:
 @pytest.mark.parametrize(
     "line",
     [
-        pytest.param(f"{_ZERO} {_B} {_WORK_REF}", id="creation"),
         pytest.param(f"{_A} {_ZERO} {_WORK_REF}", id="deletion"),
         pytest.param(f"{_ZERO} {_ZERO} {_WORK_REF}", id="deletion-prepared-zero-zero"),
     ],
 )
-def test_a_work_branch_creation_or_deletion_passes(line: str) -> None:
+def test_a_work_branch_deletion_passes(line: str) -> None:
     assert _ref_policy([line], DEFAULT, {_WORK_REF: _C1}).allowed
+
+
+def test_a_work_branch_creation_is_judged_as_a_move_from_origins_sha() -> None:
+    creation = f"{_ZERO} {_B} {_WORK_REF}"
+    assert _ref_policy([creation], DEFAULT, {_WORK_REF: _B}).allowed
+    assert _ref_policy([creation], DEFAULT, {}).allowed
+    assert _ref_policy([creation], DEFAULT, {_WORK_REF: ""}).allowed
+    refused = _ref_policy([creation], DEFAULT, {_WORK_REF: _C1})
+    assert not refused.allowed
+    assert refused.message.count("fix: ") == 1
 
 
 @pytest.mark.parametrize(

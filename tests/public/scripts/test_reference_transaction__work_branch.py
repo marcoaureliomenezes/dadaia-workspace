@@ -170,6 +170,35 @@ def test_pull_ff_only_from_origin_passes(repo: _Repo, tmp_path: Path) -> None:
     assert repo.ok("rev-parse", f"refs/remotes/origin/{_WORK}") == pushed
 
 
+def _deleted_then(repo: _Repo, create: tuple[str, ...]) -> subprocess.CompletedProcess[str]:
+    repo.ok("checkout", "-q", "main")
+    assert repo.git("branch", "-D", _WORK).returncode == 0
+    return repo.git(*create)
+
+
+@pytest.mark.parametrize("plumbing", [False, True], ids=["branch", "update-ref"])
+def test_recreating_a_deleted_work_branch_at_another_commit_is_refused(
+    repo: _Repo, plumbing: bool
+) -> None:
+    other = _other_ahead(repo)
+    repo.ok("checkout", "-q", "main")
+    if plumbing:
+        assert repo.git("update-ref", "-d", f"refs/heads/{_WORK}").returncode == 0
+        done = repo.git("update-ref", f"refs/heads/{_WORK}", other)
+    else:
+        done = _deleted_then(repo, ("branch", _WORK, other))
+    assert done.returncode != 0
+    assert "[ref-gate] BLOCKED" in done.stderr
+    assert repo.git("rev-parse", "-q", "--verify", f"refs/heads/{_WORK}").returncode != 0
+
+
+def test_recreating_a_deleted_work_branch_at_origins_sha_passes(repo: _Repo) -> None:
+    held = repo.ok("rev-parse", f"origin/{_WORK}")
+    done = _deleted_then(repo, ("branch", _WORK, f"origin/{_WORK}"))
+    assert done.returncode == 0, done.stderr
+    assert repo.ok("rev-parse", f"refs/heads/{_WORK}") == held
+
+
 def test_branch_rename_passes(repo: _Repo) -> None:
     done = repo.git("branch", "-m", _WORK, "feature/0.5.1")
     assert done.returncode == 0, done.stderr
