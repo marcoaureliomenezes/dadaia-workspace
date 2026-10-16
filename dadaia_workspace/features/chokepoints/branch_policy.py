@@ -183,22 +183,21 @@ def check_ref_policy(
     repo: str,
     moved: Callable[[str, str], tuple[bool, list[str]]],
 ) -> Decision:
-    """The first refusal over ``<old> <new> <ref>`` lines: a work-branch update (old, new
-    non-zero, different) must land on origin's sha for its ref, or be an audit-only descendant
-    move per ``moved(old, new) -> (old is an ancestor of new, zone of each renames-off changed path)``, read
-    only for a move that would otherwise be refused; creations, deletions, non-work refs and a
-    ref origin does not hold pass. The fix names the tree to open for *repo*."""
+    """The first refusal over ``<old> <new> <ref>`` lines: a work-branch update or creation
+    (new non-zero, different from old) must land on origin's sha for its ref, or be an audit-only
+    descendant move per ``moved(old, new) -> (old is an ancestor of new, zone of each renames-off
+    changed path)``, read only for a move that would otherwise be refused; deletions, non-work refs
+    and a ref origin does not hold pass. The fix names the tree to open for *repo*."""
     for line in filter(str.strip, lines):
         old, new, ref = line.split()
         branch = ref.removeprefix(HEADS_PREFIX)
         held = origin.get(ref)
         if (
-            is_zero_sha(old)
-            or is_zero_sha(new)
+            is_zero_sha(new)
             or old == new
             or gitflow.role_of(branch) != "work"
             or held in ("", None, new)
-            or _audit_descendant(moved, old, new)
+            or (not is_zero_sha(old) and _audit_descendant(moved, old, new))
         ):
             continue
         fix = (
