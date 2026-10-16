@@ -17,7 +17,7 @@ from _grammar import SEMVER_RE, TAG_RE, sole_live
 from _platform import cli_argv, command, venv_dir
 from _platform import git_line as git_line
 from _platform import quote as quote  # (`as`: re-exported to the worktree verbs)
-from _specs import run_cli, workspace_cli
+from _specs import run_cli
 from _specs import script as script
 from _specs import workspace_of as workspace_of
 from _worktree_names import SCRIPT, Refusal, base_of, branch, name_of, tree_path
@@ -45,7 +45,6 @@ def cli(root: Path, *args: str, tree: Path | None = None) -> subprocess.Complete
 
 def cli_line(root: Path, *args: str) -> str:
     """The fix line running :func:`cli` with *args*, quoted for the host shell."""
-    workspace_cli(root)
     return command(*cli_argv(venv_dir(root)), *args)
 
 
