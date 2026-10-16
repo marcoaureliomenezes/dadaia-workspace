@@ -167,7 +167,9 @@ def _two_tier_architecture(tmp: Path) -> Case:
     os.chdir(g)
     assert _run(["specs", "init", "--specs-dir", str(g / "specs")]) == 0
     arch = g / "specs/memory/ARCHITECTURE.md"
-    arch.write_text(arch.read_text() + "\n" + _RETIRED_PART_HEADING + "\n")
+    arch.write_text(
+        arch.read_text(encoding="utf-8") + "\n" + _RETIRED_PART_HEADING + "\n", encoding="utf-8"
+    )
     return g, ["specs", "upgrade", "--specs-dir", str(g / "specs")]
 
 

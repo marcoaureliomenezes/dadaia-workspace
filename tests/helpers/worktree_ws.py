@@ -104,7 +104,8 @@ def make_workspace(root: Path) -> Path:
         "## DAG\n\n"
         "| job | wave | waits on | `W:` |\n"
         "|---|---|---|---|\n"
-        "| Job 1 | 1 | — | `src/a.py` |\n"
+        "| Job 1 | 1 | — | `src/a.py` |\n",
+        encoding="utf-8",
     )
     tasks = rel / "tasks"
     tasks.mkdir()
@@ -174,7 +175,7 @@ def fixes(result: subprocess.CompletedProcess[str]) -> list[str]:
 
 def commit(tree: Path, rel: str, text: str = "x = 1\n") -> str:
     (tree / rel).parent.mkdir(parents=True, exist_ok=True)
-    (tree / rel).write_text(text)
+    (tree / rel).write_text(text, encoding="utf-8")
     git(tree, "add", rel)
     git(tree, "commit", "-q", "--allow-empty", "-m", rel)
     return git(tree, "rev-parse", "HEAD").strip()
@@ -249,7 +250,7 @@ def attempt(
         git(tree, "mv", *mv)
     for rel, text in files.items():
         (tree / rel).parent.mkdir(parents=True, exist_ok=True)
-        (tree / rel).write_text(text)
+        (tree / rel).write_text(text, encoding="utf-8")
         git(tree, "add", rel)
     name = f"test({task_id}): {next(iter(files), mv[1])}" if task_id else next(iter(files), mv[1])
     git(tree, "commit", "-qm", name)

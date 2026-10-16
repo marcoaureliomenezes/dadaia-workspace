@@ -108,7 +108,8 @@ def _plant_fixed_block_drifted(root: Path) -> None:
     quality.write_text(
         text.replace(
             "<!-- dadaia:fixed slop-tests -->\n", "<!-- dadaia:fixed slop-tests -->\n- edited\n"
-        )
+        ),
+        encoding="utf-8",
     )
 
 
