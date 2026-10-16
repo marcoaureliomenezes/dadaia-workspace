@@ -167,25 +167,13 @@ def test_a_dirty_tree_refuses_with_one_fix_that_commits_or_removes(root: Path) -
     gone = git(tree, "ls-files", "--", "specs/releases/0.5.0/rc-1/PLAN.md").strip()
     assert gone  # a tracked path, deleted below
     (tree / gone).unlink()
-    for odd in (
-        "café.py",
-        "a b.py",
-    ):  # git C-quotes the first and a reader splitting on blanks breaks the second
+    for odd in ("café.py", "a b.py"):  # git C-quotes the first and a reader splitting on blanks breaks the second
         (tree / odd).write_text("")
     dirty = run(root, "merge", TREE)
     assert "uncommitted" in dirty.stderr
     add, then, *remove = fixes(dirty)[0].split("`")[1::2]  # Agent action: commit or remove
     assert [add, then] == [  # the commit takes its own message
-        git_line(
-            tree,
-            "add",
-            "--",
-            gone,
-            "specs/releases/0.5.0/rc-1/SPEC.md",
-            "a b.py",
-            "café.py",
-            "wip/x.py",
-        ),
+        git_line(tree, "add", "--", gone, "specs/releases/0.5.0/rc-1/SPEC.md", "a b.py", "café.py", "wip/x.py"),
         git_line(tree, "commit"),
     ]
     for step in remove:
