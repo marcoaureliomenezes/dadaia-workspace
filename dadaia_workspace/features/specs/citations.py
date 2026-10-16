@@ -150,6 +150,8 @@ def dead_verb_citations(
                     verb_path = (v1,)
                 else:
                     verb_path = (v1, v2)
+                if v2 and not any(p[:1] == (v1,) and p[1:] for p in command_paths):
+                    verb_path = (v1,)  # a leaf's next word is its argument
                 if not verb_path or verb_path in command_paths:
                     continue
                 violations.append(
