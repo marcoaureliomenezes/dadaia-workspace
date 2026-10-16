@@ -12,10 +12,12 @@ Wave 4, waits on Jobs 1–8. Paths are repository-relative to `repos/dadaia-work
   - a red sweep is a finding returned to the main thread (a PLAN amendment), never a write outside `W:`.
 - Net production lines ≈ +1 (one row), tests ≈ +60.
 
-Tasks: 3 (1 jr, 2 sr, 0 pe). `who` names the dispatched role (`dd-release-definition` §5). Parallelism: {T1→T2} and {T3} are independent and start together (disjoint `W:`).
+Tasks: 5 (1 jr, 4 sr, 0 pe). `who` names the dispatched role (`dd-release-definition` §5). Parallelism: {T1→T2} and {T3} are independent and start together (disjoint `W:`).
 
 | task | who | AC | `W:` | outcome |
 |---|---|---|---|---|
 | J9.T1 | sr | AC9.1 | `tests/features/spec_context/test_doctor__hooks_drift.py`, `tests/features/spec_context/test_service__hook_refresh.py` | RED: HOOKS-DRIFT-1 reports the `reference-transaction` row absent in a repo that lacks it, with a runnable `ci install-hook --force` fix; `install_git_hooks` writes it, marker-guarded and executable; the existing pre-push row cases keep their asserts |
 | J9.T2 | jr | AC9.1 | `dadaia_workspace/core/workspace_layout.py`, `dadaia_workspace/public/templates/shipped-hashes.json` | one `INSTALLED_GIT_HOOKS` row (+1), one append-only hash entry; owner T1. After T1 |
 | J9.T3 | sr | AC9.2 | `tests/core/test_cli_line__fix_line_contract.py` | RED-or-green sweep test per the intro: no `fix:`-prefixed or `fix_line`/`spell_fix` string literal in `dadaia_workspace/**/*.py` names `worktree.py`; the commit body lists the two greps with their hit counts |
+| J9.T4 | sr | AC9.1 | `tests/core/test_cli_line__fix_line_contract.py`, `tests/core/test_cli_line__refusal_fix_lines_clear_their_refusal.py`, `tests/features/spec_context/test_doctor__hooks_drift.py`, `tests/features/spec_context/test_service__hook_refresh.py` | the activated hook's effect on existing asserts: group A names the row, group B setup git carries `DADAIA_WT=1` (main-thread ruling 2026-10-16, J9.T4: setup commits only) |
+| J9.T5 | sr | AC9.1, AC9.2 | `tests/core/test_cli_line__fix_line_contract.py`, `tests/core/test_cli_line__refusal_fix_lines_clear_their_refusal.py`, `tests/public/scripts/test_reference_transaction__work_branch.py`, `dadaia_workspace/cli/commands/ci.py`, `dadaia_workspace/cli/commands/worktree.py`, `dadaia_workspace/infrastructure/ledger_scripts.py`, `dadaia_workspace/public/schemas/handoff-v1.schema.json` | review rework. Ruling 2026-10-16, J9.T5: the J9.T4 ruling covered setup commits only, so `_hit` runs unbypassed (`dead_denylisted` red: the privacy remedy's amend met the ref gate); `ref-gate-check` admits a move that rewrites only commits origin does not hold (+14), one decider beside the audit-only exemption; the 4 sweep hits are reworded (ruling: reword, no SPEC change) |
