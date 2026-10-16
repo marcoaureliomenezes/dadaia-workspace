@@ -18,6 +18,7 @@ from dadaia_workspace.cli.main import app
 from dadaia_workspace.core.exceptions import PublicAssetError
 from dadaia_workspace.infrastructure.agent_transcodes import codex_agent_toml_bytes
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
+from tests.fixtures.real_git import git
 from tests.helpers.harness_profile import register_all
 
 pytestmark = pytest.mark.slow(reason="real public stage + install into tmp_path")
@@ -114,11 +115,12 @@ _FIXTURE_AGENT = re.compile(r"""\bagent"?\s*[:=]\s*["']([a-z-]+)["']""")
 def test_no_retired_fixture_role() -> None:
     """No retired role is a fixture agent under
     tests/ or in production."""
-    tests = Path(__file__).resolve().parents[1]
+    root = _PKG.parent
     retired = [
         f"{path}:{name}"
-        for root in (tests, _PKG)
-        for path in sorted(root.rglob("*"))
+        for path in sorted(
+            root / p for p in git(root, "ls-files", "tests", "dadaia_workspace").splitlines()
+        )
         if path.suffix in {".py", ".json"} and path.name != Path(__file__).name
         for name in _FIXTURE_AGENT.findall(path.read_text(encoding="utf-8", errors="replace"))
         if name in _RETIRED_ROLES
