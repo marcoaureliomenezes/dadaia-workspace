@@ -30,7 +30,7 @@ from dadaia_workspace.features.chokepoints.branch_policy import (
 )
 from dadaia_workspace.features.spec_context.service import install_git_hooks
 
-app = typer.Typer(help="Git-hook chokepoints: the pre-push gate and its installer.")
+app = typer.Typer(help="Git-hook chokepoints: the pre-push and ref gates and their installer.")
 
 
 def _repo_root() -> Path:
@@ -283,7 +283,7 @@ def install_hook(
     force: bool = typer.Option(False, "--force", help="Overwrite existing git hooks."),
     repo: Path | None = typer.Option(None, "--repo", help="Target repo. Default: cwd's repo."),
 ) -> None:
-    """Install the pre-push CI/security gate."""
+    """Install the pre-push and reference-transaction gates."""
     repo = repo or _repo_root()
     installed = install_git_hooks(repo, force=force)
     if not installed:
@@ -292,4 +292,4 @@ def install_hook(
             fix_line(None, "ci", "install-hook", "--force", "--repo", str(repo)),
         )
     for target in installed:
-        typer.echo(f"Installed pre-push CI + security gate -> {target}")
+        typer.echo(f"Installed {target.name} hook -> {target}")
