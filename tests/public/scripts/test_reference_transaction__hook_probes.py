@@ -16,7 +16,7 @@ from dadaia_workspace.infrastructure.runtime_transforms.hook_wrappers import VEN
 from tests.helpers.oslib import detect, read_text, venv_tool
 
 _SCRIPTS = Path(dadaia_workspace.__file__).parent / "public" / "scripts"
-_PROBE = re.compile(r"\b(?:bin|Scripts)/[\w.]+")
+_PROBE = re.compile(r"(?:\$1|\.venv)/((?:bin|Scripts)/[\w.]+)")
 
 
 def _kernel(tool: str) -> set[str]:

@@ -191,3 +191,12 @@ def test_with_no_venv_at_all_the_shim_warns_and_passes(repo: _Repo) -> None:
     done = repo.git("commit", "-q", "--allow-empty", "-m", "no venv")
     assert done.returncode == 0, done.stderr
     assert "could not locate the dadaia runner" in done.stderr, done.stderr
+
+
+def test_the_repos_own_venv_is_the_last_resort(repo: _Repo) -> None:
+    """No workspace venv above the repo: the hook runs from the repo's own `.venv`."""
+    _no_venv(repo)
+    oslib.make_venv(repo.root / ".venv")
+    done = repo.git("worktree", "add", "-q", "-b", "wt/x", str(repo.root.parent / "tree"))
+    assert done.returncode != 0
+    assert "[ref-gate] BLOCKED refs/heads/wt/x" in done.stderr, done.stderr

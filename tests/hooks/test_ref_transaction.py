@@ -17,7 +17,7 @@ from dadaia_workspace.core.platform import Capabilities
 from dadaia_workspace.hooks import ref_transaction
 from tests.fixtures.harness_env import suite_env
 from tests.helpers import oslib
-from tests.helpers.oslib import run, write_text
+from tests.helpers.oslib import make_executable, run, write_text
 
 pytestmark = pytest.mark.medium
 
@@ -44,6 +44,7 @@ def _venv(tmp_path: Path, name: str, caps: oslib.Caps | None) -> Path:
         cli = oslib.venv_tool(venv, "dadaia", caps)
         cli.parent.mkdir(parents=True)
         write_text(cli, "")
+        make_executable(cli, caps)
     return venv
 
 
@@ -86,3 +87,13 @@ def test_an_update_of_a_wt_branch_loads_no_kernel(tmp_path: Path) -> None:
     )
     done = run([sys.executable, "-B", "-c", code], env=suite_env(os.environ, tmp_path), timeout=60)
     assert done.returncode == 0, done.stderr
+
+
+def test_a_fault_of_the_hook_itself_warns_and_lets_the_update_through(tmp_path: Path) -> None:
+    """With no `git` to find, the hook cannot judge a branch update; it fails open."""
+    env = suite_env(os.environ, tmp_path, overrides={"PATH": ""})
+    line = f"{_SHA} {_OTHER} refs/heads/main\n"
+    argv = [sys.executable, "-B", "-m", "dadaia_workspace.hooks.ref_transaction"]
+    done = run(argv, input=line, cwd=tmp_path, env=env, timeout=60)
+    assert done.returncode == 0, done.stderr
+    assert "update allowed" in done.stderr, done.stderr
