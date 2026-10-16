@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import os
 import shutil
-import stat
 import subprocess
 from pathlib import Path
 
@@ -21,6 +20,7 @@ import dadaia_workspace
 from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.platform import PLATFORM
 from tests.fixtures.stores import fake_venv, own_venv_python
+from tests.helpers.oslib import make_executable, run, write_text
 
 pytestmark = pytest.mark.medium
 
@@ -50,14 +50,7 @@ class _Repo:
         env = {k: v for k, v in os.environ.items() if k != "DADAIA_WT"}
         if wt:
             env["DADAIA_WT"] = "1"
-        return subprocess.run(
-            ["git", *args],
-            cwd=cwd or self.root,
-            env=env,
-            capture_output=True,
-            text=True,
-            timeout=60,
-        )
+        return run(["git", *args], cwd=cwd or self.root, env=env, timeout=60)
 
     def ok(self, *args: str, cwd: Path | None = None) -> str:
         done = self.git(*args, cwd=cwd)
@@ -94,7 +87,7 @@ def _make_repo(tmp_path: Path, fmt: str) -> _Repo:
     assert _SCRIPT.is_file(), f"hook script missing: {_SCRIPT}"
     hook = r.root / ".git" / "hooks" / "reference-transaction"
     shutil.copy(_SCRIPT, hook)
-    hook.chmod(hook.stat().st_mode | stat.S_IXUSR)
+    make_executable(hook)
     return r
 
 
@@ -215,14 +208,14 @@ def test_a_marked_ff_merge_of_a_wt_branch_into_the_work_branch_passes(repo: _Rep
 def test_an_audit_only_commit_on_the_work_branch_passes(repo: _Repo) -> None:
     audit = repo.root / "specs" / "audits"
     audit.mkdir(parents=True)
-    (audit / "2026-10-14.md").write_text("finding\n", encoding="utf-8")
+    write_text(audit / "2026-10-14.md", "finding\n")
     repo.ok("add", "-A")
     done = repo.git("commit", "-q", "-m", "audit")
     assert done.returncode == 0, done.stderr
 
 
 def test_a_code_file_renamed_into_audits_on_the_work_branch_is_refused(repo: _Repo) -> None:
-    (repo.root / "core.py").write_text("x = 1\n", encoding="utf-8")
+    write_text(repo.root / "core.py", "x = 1\n")
     repo.ok("add", "core.py")
     assert repo.git("commit", "-q", "-m", "code", wt=True).returncode == 0
     before = repo.ok("rev-parse", "HEAD")
@@ -235,7 +228,7 @@ def test_a_move_to_a_non_descendant_whose_diff_is_only_audits_is_refused(repo: _
     before = repo.ok("rev-parse", "HEAD")
     repo.ok("checkout", "-q", "-b", "other")
     (repo.root / "specs" / "audits").mkdir(parents=True)
-    (repo.root / "specs" / "audits" / "f.md").write_text("finding\n", encoding="utf-8")
+    write_text(repo.root / "specs" / "audits" / "f.md", "finding\n")
     repo.ok("add", "-A")
     repo.ok("commit", "-q", "-m", "audit")
     orphan = repo.ok("commit-tree", repo.ok("rev-parse", "other^{tree}"), "-m", "orphan")
@@ -261,7 +254,7 @@ def _ahead_by_a_marked_merge(repo: _Repo) -> None:
 def test_stash_and_hard_reset_pass_on_a_work_branch_ahead_of_origin(repo: _Repo) -> None:
     _ahead_by_a_marked_merge(repo)
     before = repo.ok("rev-parse", "HEAD")
-    (repo.root / "f.txt").write_text("x\n", encoding="utf-8")
+    write_text(repo.root / "f.txt", "x\n")
     repo.ok("add", "f.txt")
     stashed = repo.git("stash")
     assert stashed.returncode == 0, stashed.stderr
@@ -284,7 +277,7 @@ def _two_unpublished(repo: _Repo) -> None:
 def _raw_branch_under_origin(repo: _Repo) -> str:
     """A branch off origin's tip holding one raw (unmarked, never merged) commit."""
     repo.ok("checkout", "-q", "-b", "raw", f"origin/{_WORK}")
-    (repo.root / "raw.txt").write_text("raw\n", encoding="utf-8")
+    write_text(repo.root / "raw.txt", "raw\n")
     repo.ok("add", "raw.txt")
     repo.ok("commit", "-q", "-m", "raw")
     sha = repo.ok("rev-parse", "HEAD")
@@ -302,7 +295,7 @@ def test_amending_the_unpublished_tip_is_refused(repo: _Repo) -> None:
 def test_an_amend_that_adds_content_is_refused(repo: _Repo) -> None:
     _ahead_by_a_marked_merge(repo)
     before = repo.ok("rev-parse", "HEAD")
-    (repo.root / "added.txt").write_text("raw\n", encoding="utf-8")
+    write_text(repo.root / "added.txt", "raw\n")
     repo.ok("add", "added.txt")
     done = repo.git("commit", "-q", "--amend", "--no-edit")
     _assert_refused(repo, done, before)
@@ -337,7 +330,7 @@ _TERM = "zzprivateterm"
 def _verb(
     repo: _Repo, oldest: str, *args: str, env: dict[str, str] | None = None
 ) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
+    return run(
         [
             str(repo.runner),
             "ci",
@@ -348,8 +341,6 @@ def _verb(
             oldest,
             *args,
         ],
-        capture_output=True,
-        text=True,
         timeout=60,
         env={**os.environ, **(env or {})},
     )
@@ -359,8 +350,8 @@ def _leak(repo: _Repo, tmp_path: Path, *, in_message: bool = False) -> tuple[str
     """One unpublished commit carrying the denylisted term (in a file, or only in its message);
     returns that commit and the env naming the denylist."""
     denylist = tmp_path / "denylist.json"
-    denylist.write_text(f'{{"{_TERM}": "t"}}', encoding="utf-8")
-    (repo.root / "leak.txt").write_text(f"a {'' if in_message else _TERM}\n", encoding="utf-8")
+    write_text(denylist, f'{{"{_TERM}": "t"}}')
+    write_text(repo.root / "leak.txt", f"a {'' if in_message else _TERM}\n")
     repo.ok("add", "leak.txt")
     message = f"mentions {_TERM}" if in_message else "leak"
     assert repo.git("commit", "-q", "-m", message, wt=True).returncode == 0
@@ -379,7 +370,7 @@ def test_the_rewrite_verb_refuses_unrelated_staged_content_when_the_gate_lists_n
 ) -> None:
     _ahead_by_a_marked_merge(repo)
     before = repo.ok("rev-parse", "HEAD")
-    (repo.root / "unreviewed.py").write_text("x = 1\n", encoding="utf-8")
+    write_text(repo.root / "unreviewed.py", "x = 1\n")
     repo.ok("add", "unreviewed.py")
     done = _verb(repo, before, "--message", "looks reviewed")
     _assert_verb_refused(repo, done, before)
@@ -390,8 +381,8 @@ def test_the_rewrite_verb_refuses_a_remedy_that_also_adds_a_path(
     repo: _Repo, tmp_path: Path
 ) -> None:
     oldest, env = _leak(repo, tmp_path)
-    (repo.root / "leak.txt").write_text("a\n", encoding="utf-8")
-    (repo.root / "extra.txt").write_text("x\n", encoding="utf-8")
+    write_text(repo.root / "leak.txt", "a\n")
+    write_text(repo.root / "extra.txt", "x\n")
     repo.ok("add", "extra.txt")
     done = _verb(repo, oldest, env=env)
     _assert_verb_refused(repo, done, oldest)
@@ -401,7 +392,7 @@ def test_the_rewrite_verb_refuses_a_new_message_when_the_gate_lists_no_message(
     repo: _Repo, tmp_path: Path
 ) -> None:
     oldest, env = _leak(repo, tmp_path)
-    (repo.root / "leak.txt").write_text("a\n", encoding="utf-8")
+    write_text(repo.root / "leak.txt", "a\n")
     done = _verb(repo, oldest, "--message", "looks reviewed", env=env)
     _assert_verb_refused(repo, done, oldest)
 
@@ -410,20 +401,18 @@ def test_the_rewrite_verb_removes_a_listed_term_and_clears_the_gate(
     repo: _Repo, tmp_path: Path
 ) -> None:
     oldest, env = _leak(repo, tmp_path)
-    (repo.root / "leak.txt").write_text("a\n", encoding="utf-8")
+    write_text(repo.root / "leak.txt", "a\n")
     done = _verb(repo, oldest, env=env)
     assert done.returncode == 0, done.stderr
     assert repo.ok("rev-list", "--count", f"origin/{_WORK}..{_WORK}") == "1"
     assert _TERM not in repo.ok("show", f"{_WORK}:leak.txt")
     tip = repo.ok("rev-parse", _WORK)
     held = repo.ok("rev-parse", f"origin/{_WORK}")
-    gate = subprocess.run(
+    gate = run(
         [str(repo.runner), "ci", "push-gate-check"],
         input=f"refs/heads/{_WORK} {tip} refs/heads/{_WORK} {held}\n",
         cwd=repo.root,
         env={**os.environ, **env},
-        capture_output=True,
-        text=True,
         timeout=60,
     )
     assert gate.returncode == 0, gate.stderr

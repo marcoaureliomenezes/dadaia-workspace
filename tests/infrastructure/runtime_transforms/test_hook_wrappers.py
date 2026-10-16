@@ -32,6 +32,7 @@ from dadaia_workspace.infrastructure.runtime_transforms.hook_wrappers import (
 )
 from tests.fixtures.harness_env import git_bash, suite_env
 from tests.fixtures.stores import fake_venv, own_venv_python
+from tests.helpers.oslib import read_text, run, write_text
 
 pytestmark = pytest.mark.slow
 
@@ -44,12 +45,14 @@ _CLAUDE = {"new-root": "deny", "protected": "deny", "scope": "allow"}
 def ws(tmp_path: Path) -> Path:
     fake_venv(tmp_path)
     (tmp_path / ".dadaia" / "states").mkdir()
-    (tmp_path / ".dadaia" / "states" / "spec_contexts.json").write_text(
-        '{"schema_version": "2", "contexts": [{"name": "demo", "state": "alive", "repo_slug": "demo"}]}'
+    write_text(
+        tmp_path / ".dadaia" / "states" / "spec_contexts.json",
+        '{"schema_version": "2", "contexts": [{"name": "demo", "state": "alive", "repo_slug": "demo"}]}',
     )  # the payloads write under worktrees/demo/
     ledger = {"relpath": "AGENTS.md", "sha256": "0" * 64, "family": "root", "kind": "file"}
-    (tmp_path / ".dadaia" / "states" / "install_ledger.json").write_text(  # projects AGENTS.md
-        json.dumps({"schema_version": "1", "entries": [ledger]})
+    write_text(
+        tmp_path / ".dadaia" / "states" / "install_ledger.json",
+        json.dumps({"schema_version": "1", "entries": [ledger]}),
     )
     (tmp_path / ".dadaia" / "hooks").mkdir()
     (tmp_path / "repos").mkdir()
@@ -59,7 +62,7 @@ def ws(tmp_path: Path) -> Path:
 def _run(ws: Path, harness: str, case: str, **env_extra: str) -> subprocess.CompletedProcess[str]:
     fixture, repos = (_FIXTURES / harness / f"{case}.json"), case == "repos"
     fixture = fixture.with_name("scope.json") if repos else fixture  # the scope write, in repos/
-    payload = fixture.read_text().replace("{ws}", ws.as_posix())
+    payload = read_text(fixture).replace("{ws}", ws.as_posix())
     payload = (
         payload.replace("worktrees/demo/0.5.0/rc-1/job-1/wt-main/", "repos/demo/")
         if repos
@@ -70,12 +73,10 @@ def _run(ws: Path, harness: str, case: str, **env_extra: str) -> subprocess.Comp
     else:
         name = "dadaia-kimi-pre-gate.sh" if harness == "kimi-code" else f"{harness}-pre-gate"
         body = hook_wrapper_contents(HARNESS_RECORDS[harness])[name]
-        (ws / ".dadaia" / "hooks" / name).write_text(body, encoding="utf-8")
+        write_text(ws / ".dadaia" / "hooks" / name, body)
         argv = [git_bash(), str(ws / ".dadaia" / "hooks" / name)]
     env = suite_env(os.environ, Path.home(), overrides=env_extra)
-    return subprocess.run(
-        argv, input=payload, capture_output=True, text=True, cwd=ws, env=env, timeout=60
-    )
+    return run(argv, input=payload, cwd=ws, env=env, timeout=60)
 
 
 def _verdict(harness: str, proc: subprocess.CompletedProcess[str]) -> str:
@@ -110,7 +111,7 @@ def test_ac3_9_a_bound_session_over_a_truncated_registry_still_blocks(
     session_store.write_session(
         ws, "s", {"session_id": "s", "last_seen_at": now, "context": "demo"}
     )
-    (ws / ".dadaia" / "states" / "spec_contexts.json").write_text(body)
+    write_text(ws / ".dadaia" / "states" / "spec_contexts.json", body)
     assert _verdict(harness, _run(ws, harness, case, DADAIA_SESSION_ID="s")) == "deny"
 
 
@@ -150,8 +151,9 @@ def test_b5_kimi_prints_the_reason_with_real_newlines_and_exits_2(ws: Path) -> N
 def test_ac1_2_every_ctx_inject_wrapper_answers_on_stdout(ws: Path, harness: str) -> None:
     """A bound id-less session gets its context on the wrapper's STDOUT (never ``>&2``); Cursor
     and Copilot twice, as two sessionStarts are two new sessions."""
-    (ws / ".dadaia/states/spec_contexts.json").write_text(
-        json.dumps({"contexts": [{"name": "alpha", "state": "alive", "repo_slug": "alpha"}]})
+    write_text(
+        ws / ".dadaia/states/spec_contexts.json",
+        json.dumps({"contexts": [{"name": "alpha", "state": "alive", "repo_slug": "alpha"}]}),
     )
     vendor = {"cursor": "additional_context", "copilot": "additionalContext"}.get(harness)
     env = suite_env(os.environ, Path.home(), overrides={"DADAIA_CONTEXT": "alpha"})
@@ -160,11 +162,8 @@ def test_ac1_2_every_ctx_inject_wrapper_answers_on_stdout(ws: Path, harness: str
     names = sorted(n for n, body in wrappers.items() if "hooks.ctx_inject" in body and n in docs)
     assert names, harness
     for name in names:
-        (ws / ".dadaia" / "hooks" / name).write_text(wrappers[name], encoding="utf-8")
+        write_text(ws / ".dadaia" / "hooks" / name, wrappers[name])
         shutil.rmtree(ws / MARKER_DIR, ignore_errors=True)  # each wrapper starts fresh
         for _ in range(2 if vendor else 1):
-            out = subprocess.run(
-                [git_bash(), str(ws / ".dadaia" / "hooks" / name)],
-                input="{}", capture_output=True, text=True, cwd=ws, env=env, timeout=60,
-            ).stdout  # fmt: skip
+            out = run([git_bash(), str(ws / ".dadaia" / "hooks" / name)], input="{}", cwd=ws, env=env, timeout=60).stdout  # fmt: skip
             assert "[alpha]" in (json.loads(out)[vendor] if vendor else out), (name, out)

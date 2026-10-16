@@ -10,9 +10,7 @@ Owner: dd-sw-engineer-sr
 from __future__ import annotations
 
 import os
-import shlex
 import shutil
-import stat
 import subprocess
 from pathlib import Path
 
@@ -20,7 +18,10 @@ import pytest
 
 import dadaia_workspace
 from dadaia_workspace.core.platform import PLATFORM
+from tests.fixtures.harness_env import git_bash, suite_env
 from tests.fixtures.stores import fake_venv, own_venv_python
+from tests.helpers import oslib
+from tests.helpers.oslib import make_executable, read_text, run
 
 pytestmark = pytest.mark.medium
 
@@ -29,10 +30,10 @@ _EMAIL = "test@example.invalid"
 
 
 class _Repo:
-    def __init__(self, root: Path) -> None:
-        self.root = root / "ws" / "repo"
+    def __init__(self, root: Path, ws: str = "ws") -> None:
+        self.root = root / ws / "repo"
         self.calls = root / "stub-calls.log"
-        self.stub = own_venv_python(root / "ws").with_name(f"dadaia{PLATFORM.venv_exe_suffix}")
+        self.stub = own_venv_python(root / ws).with_name(f"dadaia{PLATFORM.venv_exe_suffix}")
 
     def git(
         self, *args: str, cwd: Path | None = None, wt: bool = False
@@ -40,22 +41,14 @@ class _Repo:
         env = {k: v for k, v in os.environ.items() if k != "DADAIA_WT"}
         if wt:
             env["DADAIA_WT"] = "1"
-        return subprocess.run(
-            ["git", *args],
-            cwd=cwd or self.root,
-            env=env,
-            capture_output=True,
-            text=True,
-            timeout=60,
-        )
+        return run(["git", *args], cwd=cwd or self.root, env=env, timeout=60)
 
     def calls_made(self) -> str:
-        return self.calls.read_text(encoding="utf-8") if self.calls.exists() else ""
+        return read_text(self.calls) if self.calls.exists() else ""
 
 
-@pytest.fixture
-def repo(tmp_path: Path) -> _Repo:
-    r = _Repo(tmp_path)
+def _make_repo(tmp_path: Path, ws: str) -> _Repo:
+    r = _Repo(tmp_path, ws)
     record = f"import sys\nopen({str(r.calls)!r}, 'a', newline='\\n').write(' '.join(sys.argv[1:]) + '\\n')\n"
     fake_venv(r.root.parent, cli="#!python\n" + record)
     r.root.mkdir()
@@ -70,8 +63,13 @@ def repo(tmp_path: Path) -> _Repo:
     assert _SCRIPT.is_file(), f"hook script missing: {_SCRIPT}"
     hook = r.root / ".git" / "hooks" / "reference-transaction"
     shutil.copy(_SCRIPT, hook)
-    hook.chmod(hook.stat().st_mode | stat.S_IXUSR)
+    make_executable(hook)
     return r
+
+
+@pytest.fixture
+def repo(tmp_path: Path) -> _Repo:
+    return _make_repo(tmp_path, "ws")
 
 
 def _add_tree(r: _Repo, name: str = "x") -> Path:
@@ -81,18 +79,21 @@ def _add_tree(r: _Repo, name: str = "x") -> Path:
     return tree
 
 
-@pytest.mark.parametrize("name", ["x", "a;b"])
-def test_raw_worktree_add_is_refused_with_one_runnable_fix(repo: _Repo, name: str) -> None:
+@pytest.mark.parametrize(("ws", "name"), [("ws", "x"), ("ws", "a;b"), ("my ws", "x")])
+def test_raw_worktree_add_is_refused_with_one_runnable_fix(
+    tmp_path: Path, ws: str, name: str
+) -> None:
+    repo = _make_repo(tmp_path, ws)
     done = repo.git("worktree", "add", "-q", "-b", f"wt/{name}", str(repo.root.parent / "tree"))
     assert done.returncode != 0
     fixes = [ln for ln in done.stderr.splitlines() if "fix:" in ln]
     assert len(fixes) == 1, done.stderr
-    argv = shlex.split(fixes[0].split("fix:", 1)[1])
-    assert [Path(argv[0]), *argv[1:]] == [repo.stub, "worktree", "new", "repo", name]
-    assert subprocess.run(argv, check=False).returncode == 0
+    line = oslib.command(str(repo.stub), "worktree", "new", "repo", name)
+    assert fixes[0] == f"fix: {line}"
+    assert oslib.run_line(line).returncode == 0
     assert repo.calls_made() == f"worktree new repo {name}\n"
     assert (
-        subprocess.run(
+        run(
             ["git", "rev-parse", "--verify", "-q", f"refs/heads/wt/{name}"], cwd=repo.root
         ).returncode
         != 0
@@ -160,15 +161,33 @@ def test_the_marker_passes_every_update_without_a_runner_call(repo: _Repo) -> No
 
 def test_unresolvable_runner_warns_and_exits_zero(repo: _Repo) -> None:
     repo.stub.unlink()
-    git_dir = str(Path(shutil.which("git") or "/usr/bin/git").parent)
-    env = {"PATH": f"{git_dir}{os.pathsep}/usr/bin{os.pathsep}/bin", "HOME": str(repo.root)}
-    done = subprocess.run(
+    git_dir = str(Path(shutil.which("git") or "git").parent)
+    env = suite_env(os.environ, repo.root, overrides={"PATH": f"{git_dir}{os.pathsep}{os.defpath}"})
+    done = run(
         ["git", "commit", "-q", "--allow-empty", "-m", "on main"],
         cwd=repo.root,
         env=env,
-        capture_output=True,
-        text=True,
         timeout=60,
     )
+    assert done.returncode == 0, done.stderr
+    assert "could not locate the dadaia runner" in done.stderr, done.stderr
+
+
+def _no_venv(repo: _Repo) -> None:
+    shutil.rmtree(repo.root.parent / ".dadaia")
+
+
+def test_a_firing_other_than_prepared_decides_nothing(repo: _Repo) -> None:
+    """git fires the hook again as `committed`; the shim leaves before it looks for a venv."""
+    _no_venv(repo)
+    hook = repo.root / ".git" / "hooks" / "reference-transaction"
+    env = suite_env(os.environ, repo.root)
+    done = run([git_bash(), str(hook), "committed"], cwd=repo.root, input="", env=env, timeout=60)
+    assert (done.returncode, done.stderr) == (0, "")
+
+
+def test_with_no_venv_at_all_the_shim_warns_and_passes(repo: _Repo) -> None:
+    _no_venv(repo)
+    done = repo.git("commit", "-q", "--allow-empty", "-m", "no venv")
     assert done.returncode == 0, done.stderr
     assert "could not locate the dadaia runner" in done.stderr, done.stderr

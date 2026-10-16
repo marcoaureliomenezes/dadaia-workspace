@@ -1,7 +1,8 @@
 """The ``reference-transaction`` hook on real git, the refs it lets through.
 
 Each test copies the shipped script into a tmp repo's ``.git/hooks`` and drives plain git;
-a stub ``dadaia`` on PATH records every call, so "no python runner call" is observable.
+a stub ``dadaia`` at the workspace venv path the hook resolves records every call, so "no python
+runner call" is observable.
 
 Owner: dd-sw-engineer-sr
 """
@@ -10,13 +11,14 @@ from __future__ import annotations
 
 import os
 import shutil
-import stat
 import subprocess
 from pathlib import Path
 
 import pytest
 
 import dadaia_workspace
+from tests.fixtures.stores import fake_venv
+from tests.helpers.oslib import make_executable, read_text, run
 
 pytestmark = pytest.mark.medium
 
@@ -26,37 +28,26 @@ _EMAIL = "test@example.invalid"
 
 class _Repo:
     def __init__(self, root: Path) -> None:
-        self.root = root / "repo"
+        self.root = root / "ws" / "repo"
         self.calls = root / "stub-calls.log"
-        self.bin = root / "bin"
 
     def git(
         self, *args: str, cwd: Path | None = None, wt: bool = False
     ) -> subprocess.CompletedProcess[str]:
         env = {k: v for k, v in os.environ.items() if k != "DADAIA_WT"}
-        env["PATH"] = f"{self.bin}{os.pathsep}{env['PATH']}"
         if wt:
             env["DADAIA_WT"] = "1"
-        return subprocess.run(
-            ["git", *args],
-            cwd=cwd or self.root,
-            env=env,
-            capture_output=True,
-            text=True,
-            timeout=60,
-        )
+        return run(["git", *args], cwd=cwd or self.root, env=env, timeout=60)
 
     def calls_made(self) -> str:
-        return self.calls.read_text(encoding="utf-8") if self.calls.exists() else ""
+        return read_text(self.calls) if self.calls.exists() else ""
 
 
 @pytest.fixture
 def repo(tmp_path: Path) -> _Repo:
     r = _Repo(tmp_path)
-    r.bin.mkdir()
-    stub = r.bin / "dadaia"
-    stub.write_text(f'#!/bin/sh\necho "$@" >> "{r.calls}"\nexit 0\n', encoding="utf-8")
-    stub.chmod(stub.stat().st_mode | stat.S_IXUSR)
+    record = f"import sys\nopen({str(r.calls)!r}, 'a', newline='\\n').write(' '.join(sys.argv[1:]) + '\\n')\n"
+    fake_venv(r.root.parent, cli="#!python\n" + record)
     r.root.mkdir()
     for args in (
         ["init", "-q", "-b", "main"],
@@ -69,7 +60,7 @@ def repo(tmp_path: Path) -> _Repo:
     assert _SCRIPT.is_file(), f"hook script missing: {_SCRIPT}"
     hook = r.root / ".git" / "hooks" / "reference-transaction"
     shutil.copy(_SCRIPT, hook)
-    hook.chmod(hook.stat().st_mode | stat.S_IXUSR)
+    make_executable(hook)
     return r
 
 
