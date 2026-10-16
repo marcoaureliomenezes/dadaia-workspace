@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import re
 import shutil
+import uuid
 from pathlib import Path
 from unittest.mock import patch
 
@@ -123,3 +124,23 @@ def test_no_retired_fixture_role() -> None:
         if name in _RETIRED_ROLES
     ]
     assert retired == []
+
+
+def test_the_retired_role_scan_survives_an_untracked_scratch_file_deleted_mid_scan(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    scratch = _PKG.parent / "tests" / "tmp" / f"role-race-{uuid.uuid4().hex[:8]}"
+    scratch.mkdir(parents=True)
+    read = Path.read_text
+
+    def read_after_delete(self: Path, *args: object, **kwargs: object) -> str:
+        shutil.rmtree(scratch, ignore_errors=True)
+        return read(self, *args, **kwargs)  # type: ignore[arg-type]
+
+    try:
+        (scratch / "test_gone.py").write_text("X = 1\n", encoding="utf-8")
+        monkeypatch.setattr(Path, "read_text", read_after_delete)
+        test_no_retired_fixture_role()
+    finally:
+        monkeypatch.undo()
+        shutil.rmtree(scratch, ignore_errors=True)
