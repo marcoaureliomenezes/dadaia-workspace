@@ -10,8 +10,10 @@ enumerated at collection and parsed inside the test; the mutation corpus is comm
 from __future__ import annotations
 
 import ast
+import importlib.util
 import json
 import re
+import shutil
 from pathlib import Path
 
 import pytest
@@ -67,6 +69,20 @@ def test_every_inline_frontmatter_literal_of_the_suite_equals_safe_load_or_is_re
                     seen += 1
                     _assert_equals_or_refuses(block)
     assert seen > 20
+
+
+def test_the_suite_walk_holds_no_untracked_file() -> None:
+    scratch = _ROOT / "tests/tmp/race-probe-differential"
+    scratch.mkdir(parents=True)
+    try:
+        (scratch / "test_gone.py").write_text("X = 1\n", encoding="utf-8")
+        spec = importlib.util.spec_from_file_location("_differential_probe", Path(__file__))
+        assert spec and spec.loader
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+    finally:
+        shutil.rmtree(scratch)
+    assert scratch / "test_gone.py" not in module._TESTS
 
 
 def test_the_pinned_mutation_corpus_equals_safe_load_or_is_refused() -> None:
