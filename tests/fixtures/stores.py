@@ -39,7 +39,7 @@ def own_venv_python(root: Path) -> Path:
 
 
 def fake_venv(root: Path, cli: bool | str = False, pth: bool = False) -> Path:
-    """`root/.dadaia/.venv` with a `python` that runs: the interpreter copied (no symlink: Windows
+    """`root/.dadaia/.venv` with a `python` that runs: the base interpreter copied (no symlink: Windows
     needs a privilege for one) under its real name, `python` plus `PLATFORM`'s exe suffix, in
     `PLATFORM`'s scripts dir, and a `pyvenv.cfg` naming its home. With *cli*, this environment's own `dadaia` console script is
     copied beside it: the installer's launcher (an `.exe` on Windows, never a shebang text file).
@@ -49,7 +49,7 @@ def fake_venv(root: Path, cli: bool | str = False, pth: bool = False) -> Path:
     Returns that `python`."""
     python = own_venv_python(root)
     python.parent.mkdir(parents=True, exist_ok=True)
-    real = Path(sys.executable).resolve()
+    real = Path(sys._base_executable).resolve()  # sys.executable is the venv redirector on Windows
     shutil.copy2(real, python)
     (root / ".dadaia" / ".venv" / "pyvenv.cfg").write_text(f"home = {real.parent}\n")
     name = f"dadaia{PLATFORM.venv_exe_suffix}"
