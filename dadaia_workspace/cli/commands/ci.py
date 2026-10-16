@@ -263,7 +263,7 @@ def ref_gate_check() -> None:
         zones = [
             scope(anchor, anchor / "repos" / repo_root.name / p)[1] for p in paths.splitlines()
         ]
-        return not behind, list(zones)
+        return not behind, zones
 
     for old, new, ref in lines:
         tracking = f"refs/remotes/origin/{ref.removeprefix(HEADS_PREFIX)}"
