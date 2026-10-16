@@ -15,6 +15,7 @@ import pytest
 
 from dadaia_workspace.core.cli_line import git_line, shell_line
 from dadaia_workspace.core.skill_owner import load_owner
+from tests.helpers.oslib import link, read_text, run, write_text
 from tests.helpers.worktree_ws import (
     NEW_JOB,
     NEW_TASK,
@@ -47,12 +48,9 @@ def _set_release(root: Path, phase: str, *, plan: str = "Approved") -> None:
     repo = root / "repos/r"
     release = repo / "specs/releases/0.5.0"
     plan_md = release / "rc-1/PLAN.md"
-    plan_md.write_text(
-        plan_md.read_text(encoding="utf-8").replace("**Status:** Approved", f"**Status:** {plan}"),
-        encoding="utf-8",
-    )
+    write_text(plan_md, read_text(plan_md).replace("**Status:** Approved", f"**Status:** {plan}"))
     state_path = release / "_RELEASE.json"
-    state = json.loads(state_path.read_text())
+    state = json.loads(read_text(state_path))
     state["phase"] = phase
     state["defined"] = (
         {"sha": "def1234", "ts": "2026-10-09T10:00:00Z"} if phase != "DEFINITION" else None
@@ -60,7 +58,7 @@ def _set_release(root: Path, phase: str, *, plan: str = "Approved") -> None:
     state["implemented"] = (
         {"sha": "abc1234", "ts": "2026-10-09T11:00:00Z"} if phase == "CLOSURE" else None
     )
-    state_path.write_text(json.dumps(state))
+    write_text(state_path, json.dumps(state))
     _git(repo, "add", "specs/releases")
     _git(repo, "commit", "-qm", f"release {phase}")
     _git(repo, "branch", "-f", "feature/0.5.0", "HEAD")
@@ -93,7 +91,7 @@ def test_a_main_tree_reads_the_phase_on_its_rcs_tree_not_the_work_branch(
     assert _run(definition_root, "new", "r", RC).returncode == 0
     rc_tree = definition_root / "worktrees/r" / RC
     state = rc_tree / "specs/releases/0.5.0/_RELEASE.json"
-    state.write_text(state.read_text().replace('"DEFINITION"', '"IMPLEMENTATION"'))
+    write_text(state, read_text(state).replace('"DEFINITION"', '"IMPLEMENTATION"'))
     _git(rc_tree, "commit", "-qam", "implementation")
 
     opened = _run(definition_root, "new", "r", NEW_JOB)
@@ -300,7 +298,7 @@ def test_no_work_branch_with_several_live_releases_refuses_as_the_plain_base_doe
     repo = root / "repos/r"
     _git(repo, "branch", "-D", "feature/0.5.0")
     (repo / "specs/releases/0.10.0").mkdir()
-    (repo / "specs/releases/0.10.0/_RELEASE.json").write_text("{}")
+    write_text(repo / "specs/releases/0.10.0/_RELEASE.json", "{}")
     result = _run(root, "new", "r", NEW_JOB)
     assert result.returncode == 1
     (fix,) = _fixes(result)
@@ -333,7 +331,7 @@ def test_an_associated_job_reads_the_main_repos_spec(
 def test_symlinked_worktrees_component_refuses(
     root: Path, tmp_path_factory: pytest.TempPathFactory
 ) -> None:
-    (root / "worktrees").symlink_to(tmp_path_factory.mktemp("elsewhere"))
+    assert link(str(tmp_path_factory.mktemp("elsewhere")), root / "worktrees", is_dir=True)
     result = _run(root, "new", "r", NEW_JOB)
     assert result.returncode == 1 and len(_fixes(result)) == 1
     assert "symlink" in result.stderr
@@ -345,10 +343,10 @@ def test_list_reports_ours_with_ahead_and_dirty_and_a_native_one_as_foreign(root
     _git(repo, "worktree", "add", "-q", str(root / "native"), "-b", "native")
     (root / "worktrees/r/0.5.0/stray").mkdir()
     tree = root / "worktrees/r" / LANE
-    (tree / "x.py").write_text("x = 1\n")
+    write_text(tree / "x.py", "x = 1\n")
     _git(tree, "add", "x.py")
     _git(tree, "commit", "-qm", "x")
-    (tree / "y.py").write_text("")
+    write_text(tree / "y.py", "")
     result = _run(root, "list", "--json")
     assert result.returncode == 0, result.stderr
     by_state = {row["state"]: row for row in json.loads(result.stdout)}
@@ -366,10 +364,7 @@ def test_the_one_venv_imports_the_checkout_it_runs_from() -> None:
     spawned from the suite's hermetic cwd imports THIS checkout (the conftest PYTHONPATH
     pin), and no checkout carries its own venv."""
     checkout = Path(__file__).resolve().parents[5]
-    child = subprocess.run(
-        [sys.executable, "-c", "import dadaia_workspace; print(dadaia_workspace.__file__)"],
-        capture_output=True, text=True, check=True,
-    )  # fmt: skip
+    child = run([sys.executable, "-c", "import dadaia_workspace; print(dadaia_workspace.__file__)"], check=True)  # fmt: skip
     assert Path(child.stdout.strip()).resolve().is_relative_to(checkout)
     assert not (checkout / ".venv").exists()
 
@@ -425,7 +420,7 @@ def test_an_unreadable_release_state_refuses_a_job_and_creates_nothing(
     if state is None:
         _git(repo, "rm", "-q", "specs/releases/0.5.0/_RELEASE.json")
     else:
-        path.write_text(state)
+        write_text(path, state)
         _git(repo, "add", "specs/releases")
     _git(repo, "commit", "-qm", "unreadable state")
     _git(repo, "branch", "-f", "feature/0.5.0", "HEAD")
@@ -483,25 +478,23 @@ def test_new_writes_one_level_file_into_each_folder_it_creates(root: Path) -> No
     base = root / "worktrees/r"
     levels = [base / "0.5.0", base / "0.5.0/rc-1", base / "0.5.0/rc-1/job-1"]
     assert [(p / "AGENTS.md").is_file() for p in levels] == [True, True, True]
-    tree_file = (base / NEW_JOB / "AGENTS.md").read_text()
-    assert (
-        tree_file == "verify: python scripts/ci.py job\n" != (levels[2] / "AGENTS.md").read_text()
-    )
+    tree_file = read_text(base / NEW_JOB / "AGENTS.md")
+    assert tree_file == "verify: python scripts/ci.py job\n" != read_text(levels[2] / "AGENTS.md")
 
 
 def test_new_never_writes_over_an_existing_level_file_nor_rewrites_one(root: Path) -> None:
     version = root / "worktrees/r/0.5.0"
     version.mkdir(parents=True)
-    (version / "AGENTS.md").write_text("mine\n")
+    write_text(version / "AGENTS.md", "mine\n")
     assert _run(root, "new", "r", RC).returncode == 0
-    assert (version / "AGENTS.md").read_text() == "mine\n"
+    assert read_text(version / "AGENTS.md") == "mine\n"
     rc_file = version / "rc-1/AGENTS.md"
     assert rc_file.is_file()
-    rc_file.write_text("edited\n")
+    write_text(rc_file, "edited\n")
     assert _run(root, "new", "r", NEW_JOB).returncode == 0
     assert _run(root, "new", "r", "0.5.0/rc-1/job-2/wt-main").returncode == 0
-    assert rc_file.read_text() == "edited\n"
-    assert (version / "AGENTS.md").read_text() == "mine\n"
+    assert read_text(rc_file) == "edited\n"
+    assert read_text(version / "AGENTS.md") == "mine\n"
 
 
 def test_list_shows_no_stray_for_a_level_folder_holding_only_its_file(root: Path) -> None:

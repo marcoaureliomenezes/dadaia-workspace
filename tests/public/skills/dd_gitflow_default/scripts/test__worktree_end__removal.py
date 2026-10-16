@@ -12,6 +12,7 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.core.platform import quote
+from tests.helpers.oslib import write_text
 from tests.helpers.worktree_ws import (
     NEW_JOB,
     approve,
@@ -117,7 +118,7 @@ def test_a_merge_with_no_remote_still_lands_and_keeps_a_sibling_tree(root: Path)
 def test_list_reports_a_directory_that_holds_no_tree(root: Path) -> None:
     (root / "worktrees/r/0.5.0-rc9").mkdir(parents=True)
     (root / "worktrees/r/stray").mkdir()  # a one-level directory holding only a file
-    (root / "worktrees/r/stray/f.txt").write_text("x")
+    write_text(root / "worktrees/r/stray/f.txt", "x")
     rows = json.loads(run(root, "list", "--json").stdout)
     assert [(r["state"], r["path"]) for r in rows if r["state"] != "empty"] == [
         ("unregistered", str(root / "worktrees/r/0.5.0-rc9")),
@@ -129,7 +130,7 @@ def test_list_gives_one_row_per_path_the_orphan_winning(root: Path) -> None:
     assert (tree := open_tree(root, JOB2)).is_dir()
     git(root / "repos/r", "worktree", "remove", "-f", "-f", str(tree))
     tree.mkdir()  # the branch stays; the directory survives, files only
-    (tree / "f.txt").write_text("x")
+    write_text(tree / "f.txt", "x")
     rows = json.loads(run(root, "list", "--json").stdout)
     assert [(r["state"], r["path"]) for r in rows if r["state"] != "empty"] == [
         ("orphan", str(tree))
@@ -142,7 +143,7 @@ def test_an_orphan_whose_directory_survives_names_the_removal_and_following_it_e
     assert (tree := open_tree(root, JOB2)).is_dir()
     git(root / "repos/r", "worktree", "remove", "-f", "-f", str(tree))
     tree.mkdir()
-    (tree / "f.txt").write_text("x")
+    write_text(tree / "f.txt", "x")
     [row] = [r for r in json.loads(run(root, "list", "--json").stdout) if r["state"] != "empty"]
     assert row["fix"].startswith(f"Agent action: remove the directory {tree}, then run `")
     assert row["fix"].endswith(f"worktree.py merge {quote(str(tree))}`")

@@ -8,25 +8,24 @@ Size: MEDIUM (real git, tmp workspace).
 
 from __future__ import annotations
 
-import shlex
-import subprocess
 from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.core.cli_line import fix_line
+from dadaia_workspace.core.platform import cli_argv
+from tests.fixtures.harness_env import run_bash
+from tests.helpers.oslib import command, read_text, venv_dir, write_text
+from tests.helpers.oslib import run as os_run
 from tests.helpers.worktree_ws import (
     NEW_JOB,
     NEW_TASK,
     approve,
-    cli_path,
     commit,
     fixes,
     git,
     make_workspace,
     open_tree,
     run,
-    spelled,
 )
 
 WORK = "feature/0.5.0"
@@ -47,7 +46,7 @@ def root(tmp_path: Path) -> Path:
 
 def _holds(root: Path, base: str, name: str) -> bool:
     """Whether the tree *name* has *base* as an ancestor."""
-    probe = subprocess.run(
+    probe = os_run(
         ["git", "-C", str(root / "repos/r"), "merge-base", "--is-ancestor", base, f"wt/{name}"]
     )
     return probe.returncode == 0
@@ -70,7 +69,7 @@ def test_sync_rebases_the_tree_and_those_below_it_parents_first(root: Path) -> N
     assert [_holds(root, base, name) for base, name in zip(bases, CHAIN, strict=True)] == [True] * 3
     for name in CHAIN:  # every tree keeps its own commit
         leaf = name.rsplit("/", 1)[1]
-        assert (root / "worktrees/r" / name / f"src/{leaf}.py").read_text() == "x = 1\n"
+        assert read_text(root / "worktrees/r" / name / f"src/{leaf}.py") == "x = 1\n"
 
 
 def test_sync_skips_a_tree_that_holds_its_base(root: Path) -> None:
@@ -110,27 +109,25 @@ def test_sync_stops_at_the_first_conflict_with_one_fix_line_and_a_rerun_finishes
     assert (git(job, "rev-parse", "HEAD"), git(task, "rev-parse", "HEAD")) == heads
     underway = git(job, "rev-parse", "--path-format=absolute", "--git-path", "rebase-merge")
     assert git(job, "status", "--porcelain") == "" and not Path(underway.strip()).exists()
-    conflicted = subprocess.run(["git", "-C", str(job), "rebase", f"wt/{RC}"], capture_output=True)
+    conflicted = os_run(["git", "-C", str(job), "rebase", f"wt/{RC}"])
     assert conflicted.returncode == 1  # the agent resolves it by hand
-    (job / "src/c.py").write_text("resolved\n")
+    write_text(job / "src/c.py", "resolved\n")
     git(job, "add", "src/c.py")
     git(job, "-c", "core.editor=true", "rebase", "--continue")
     again = run(root, "sync", str(root / "worktrees/r" / RC))
     assert again.returncode == 0, again.stderr
-    assert (
-        _holds(root, f"wt/{NEW_JOB}", NEW_TASK) and (task / "src/c.py").read_text() == "resolved\n"
-    )
+    assert _holds(root, f"wt/{NEW_JOB}", NEW_TASK) and read_text(task / "src/c.py") == "resolved\n"
 
 
 def test_sync_refuses_a_dirty_tree_and_touches_nothing_below_it(root: Path) -> None:
     job, task = root / "worktrees/r" / NEW_JOB, root / "worktrees/r" / NEW_TASK
     _move_work(root)
-    (job / "src/main.py").write_text("edited\n")
+    write_text(job / "src/main.py", "edited\n")
     heads = git(job, "rev-parse", "HEAD"), git(task, "rev-parse", "HEAD")
     refused = run(root, "sync", str(root / "worktrees/r" / RC))
     assert refused.returncode == 1 and str(job) in refused.stderr and len(fixes(refused)) == 1
     assert (git(job, "rev-parse", "HEAD"), git(task, "rev-parse", "HEAD")) == heads
-    assert (job / "src/main.py").read_text() == "edited\n"
+    assert read_text(job / "src/main.py") == "edited\n"
 
 
 def test_sync_never_pushes(root: Path, tmp_path: Path) -> None:
@@ -154,18 +151,14 @@ def test_after_a_lane_lands_sync_lets_the_release_tree_merge(root: Path) -> None
     approve(root, commit(rc, "src/r.py"), name=RC)
     lane = open_tree(root, LANE)
     plan = "specs/releases/0.5.0/rc-1/PLAN.md"
-    draft = (
-        (lane / plan)
-        .read_text(encoding="utf-8")
-        .replace("**Status:** Approved", "**Status:** Draft", 1)
-    )
+    draft = read_text(lane / plan).replace("**Status:** Approved", "**Status:** Draft", 1)
     approve(root, commit(lane, plan, draft), name=LANE)
     assert run(root, "merge", str(lane)).returncode == 0
     moved = run(root, "merge", str(rc))
     assert moved.returncode == 1 and "moved past" in moved.stderr
-    assert fixes(moved) == [f"fix: {fix_line(root, 'worktree', 'sync', str(rc))}"]
-    launcher, worktree, *verb = shlex.split(fixes(moved)[0].removeprefix("fix: "))
-    assert [launcher, worktree] == spelled(str(cli_path(root)), "worktree")
-    assert run(root, *verb).returncode == 0
+    printed = command(*cli_argv(venv_dir(root)), "worktree", "sync", str(rc))
+    assert fixes(moved) == [f"fix: {printed}"]
+    assert run_bash(printed, cwd=root).returncode == 0  # the printed line starts the launcher
+    assert run(root, "sync", str(rc)).returncode == 0
     landed = run(root, "merge", str(rc))
     assert landed.returncode == 0, landed.stderr

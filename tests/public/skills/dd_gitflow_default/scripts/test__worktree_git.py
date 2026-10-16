@@ -12,6 +12,7 @@ from typing import Any
 import pytest
 
 from dadaia_workspace.core.platform import quote
+from tests.helpers.oslib import link, write_text
 from tests.helpers.worktree_ws import commit, fixes, git, make_workspace, run
 
 RC = "0.5.0/rc-1/wt-rc"
@@ -107,7 +108,7 @@ def test_a_stray_folder_at_any_depth_is_one_row_whose_fix_removes_it(
     folder = root / "worktrees/r" / stray
     folder.mkdir(parents=True)
     if filled:
-        (folder / "f.txt").write_text("x")
+        write_text(folder / "f.txt", "x")
 
     unregistered = [(r["path"], r["fix"]) for r in _rows(root) if r["state"] == "unregistered"]
 
@@ -118,7 +119,7 @@ def test_an_orphans_surviving_directory_is_the_orphans_row_alone(root: Path) -> 
     git(root / "repos/r", "branch", f"wt/{LANE}", "feature/0.5.0")
     folder = root / "worktrees/r" / LANE
     folder.mkdir(parents=True)
-    (folder / "f.txt").write_text("x")
+    write_text(folder / "f.txt", "x")
 
     [row] = _rows(root)
 
@@ -146,7 +147,7 @@ def test_a_symlink_under_worktrees_is_never_walked_into(
     (outside / "a/b/c").mkdir(parents=True)
     (outside / "d").mkdir()
     (home := root / "worktrees/r/0.5.0").mkdir(parents=True)
-    (home / "link").symlink_to(outside, target_is_directory=True)
+    assert link(str(outside), home / "link", is_dir=True)
 
     reached = [
         r for r in _rows(root) if Path(r["path"]).resolve().is_relative_to(outside.resolve())

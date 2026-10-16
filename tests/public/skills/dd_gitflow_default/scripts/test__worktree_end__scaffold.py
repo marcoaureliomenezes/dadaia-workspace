@@ -7,12 +7,12 @@ Size: MEDIUM (real git, a tmp workspace, a stub CLI).
 from __future__ import annotations
 
 import os
-import subprocess
 import sys
 from pathlib import Path
 
 import pytest
 
+from tests.helpers.oslib import run as os_run
 from tests.helpers.worktree_ws import (
     NEW_JOB,
     approve,
@@ -106,10 +106,7 @@ def test_a_scaffold_collected_then_removed_leaves_untracked_bytecode_that_blocks
     _scaffold(job, "job-1")
     env = {k: v for k, v in os.environ.items() if k != "PYTHONDONTWRITEBYTECODE"}
     env["HYPOTHESIS_STORAGE_DIRECTORY"] = str(root / "hypothesis")
-    collected = subprocess.run(
-        [sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider", "tests/tmp/job-1"],
-        cwd=job, env=env, capture_output=True, text=True,
-    )  # fmt: skip
+    collected = os_run([sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider", "tests/tmp/job-1"], cwd=job, env=env)  # fmt: skip
     assert collected.returncode == 0, collected.stdout
     assert (job / "tests/tmp/job-1/__pycache__").is_dir()
     _refused(root, job, "job-1")

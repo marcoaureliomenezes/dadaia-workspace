@@ -7,7 +7,6 @@ Size: MEDIUM (real git, tmp workspace, a stub CLI).
 from __future__ import annotations
 
 import json
-import shlex
 import subprocess
 import sys
 from pathlib import Path
@@ -15,11 +14,12 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.core.cli_line import shell_line
+from dadaia_workspace.core.platform import cli_argv
+from tests.helpers.oslib import command, venv_dir, write_text
 from tests.helpers.worktree_ws import (
     NEW_JOB,
     SCRIPT,
     approve,
-    cli_path,
     commit,
     diff_hash,
     fixes,
@@ -28,7 +28,6 @@ from tests.helpers.worktree_ws import (
     make_workspace,
     open_tree,
     run,
-    spelled,
 )
 
 RC = "0.5.0/rc-1/wt-rc"
@@ -51,7 +50,8 @@ def _hand(root: Path, scope_sha: str, **fields: str) -> None:
     """A valid APPROVED a hand wrote: `scope` names *scope_sha*, *fields* ride beside it."""
     handoff = root / ".dadaia/handoff/c/2026-10-02T100000Z-dd-code-reviewer-hand.handoff.json"
     handoff.parent.mkdir(parents=True, exist_ok=True)
-    handoff.write_text(
+    write_text(
+        handoff,
         json.dumps(
             {
                 "schema_version": "1.2",
@@ -61,7 +61,7 @@ def _hand(root: Path, scope_sha: str, **fields: str) -> None:
                 "produced_at": "2026-10-02T10:00:00Z",
                 **fields,
             }
-        )
+        ),
     )
 
 
@@ -69,10 +69,8 @@ def _refusal(root: Path, result: subprocess.CompletedProcess[str], kind: str, he
     """The merge refused with exactly the one `fix:` line of *kind*, and nothing landed."""
     dispatch = (f"fix: Agent action: dispatch dd-code-reviewer on {root / TREE} at HEAD {head};"
                 " its verdict.py run writes the verdict")  # fmt: skip
-    validate = spelled(str(cli_path(root)), "reports", "validate", "--all")
+    validate = f"fix: {command(*cli_argv(venv_dir(root)), 'reports', 'validate', '--all')}"
     got = fixes(result)
-    if kind == VALIDATE_ALL:  # the one line, split as the shell will
-        got = [shlex.split(g[5:]) for g in got]
     want = [validate] if kind == VALIDATE_ALL else [dispatch]
     assert result.returncode == 1 and got == want, result.stderr
     assert git(root / "repos/r", "rev-parse", f"wt/{RC}").strip() != head
