@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import json
 import re
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -73,3 +74,28 @@ def test_no_installed_script_refuses_with_the_install_fix(workspace: Path) -> No
     result = CliRunner().invoke(app, ["worktree", "list"])
     assert result.exit_code != 0
     assert f"fix: {fix_line(None, 'public', 'install')}" in result.output
+
+
+@pytest.mark.medium
+def test_a_runner_that_lags_the_hook_still_creates_a_wt_branch(
+    workspace: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The BLOCK's fix line is `worktree new`: the forwarder marks the run, whatever the projected runner does."""
+    monkeypatch.delenv("DADAIA_WT", raising=False)
+    repo = workspace / "repo"
+    git = lambda *a: subprocess.run(["git", "-C", str(repo), *a], check=True, capture_output=True)  # noqa: E731
+    repo.mkdir()
+    git("init", "-q", "-b", "main")
+    git("-c", "user.email=a@b.invalid", "-c", "user.name=n", "commit", "-q", "--allow-empty", "-m", "i")
+    hook = repo / ".git" / "hooks" / "reference-transaction"
+    hook.write_bytes((Path(dadaia_workspace.__file__).parent / "public" / "scripts" / "reference-transaction.sh").read_bytes())
+    hook.chmod(0o755)
+    scripts = workspace / ".agents" / "skills" / "dd-gitflow-default" / "scripts"
+    scripts.mkdir(parents=True)
+    (scripts / "worktree.py").write_text(
+        f"import subprocess, sys\nsys.exit(subprocess.run(['git', '-C', {str(repo)!r}, 'branch', 'wt/x']).returncode)\n",
+        encoding="utf-8",
+    )
+    result = CliRunner().invoke(app, ["worktree", "new", "repo", "x"])
+    assert result.exit_code == 0
+    assert "wt/x" in subprocess.run(["git", "-C", str(repo), "branch"], capture_output=True, text=True).stdout
