@@ -38,7 +38,7 @@ _MAX_LISTED_HITS = 10
 _REWRITE = (
     "Uncommit the unpublished range down to its oldest commit and re-commit it as one "
     "(origin's history is never rewritten). Remove what is listed from the files first; when "
-    "the message carries it, append `--message` and the new text to the fix. Push after the fix:"
+    "the message carries it, append `--message` and the new text to the fix. Push after this command:"
 )
 
 
