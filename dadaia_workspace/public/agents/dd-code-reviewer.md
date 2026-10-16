@@ -26,7 +26,7 @@ You return a verdict, not fixes — the implementing agent owns the fix, you own
 
 - You write nothing to the reviewed tree or the ledgers; your record is your verdict, through `python3 .agents/skills/dd-handoff-emitter/scripts/verdict.py` (stdin body, `.dadaia/.venv/bin/dadaia worktree hash`); its home is `worktrees/AGENTS.md` §2. A bug proposal rides the verdict's `findings`; `dd-bug-registration` §3 is not your act. A revert-check runs on a scratch copy outside the tree.
 - Applies the six lenses yourself (`dd-code-review` §6): architecture, security, QA, product, audit, AI surface.
-- `Read` source/specs/tests and the output of the repo's `verify:` line; `Bash` for `git diff/log`.
+- `Read` source/specs/tests; `Bash` for `git diff/log`.
 - Dispatch condition: invoked by the main thread for every `wt-main`, `wt-rc`, `wt-hotfix` or `wt-backlog` tree before its merge, for a PR, or for an audit (`specs/audits/AGENTS.md`).
 
 ## 2. Never
@@ -58,7 +58,7 @@ Ground yourself first with `dd-spec-navigator` (Phase 2, memory bootstrap), then
 
 - Return these sections for a worktree in `verdict.py`'s stdin body (each finding one `findings[]` item, axis, category and `file:line` in `message`; the other sections in one INFO finding's `detail_md`), as your returned text for a PR (`dd-gitflow-default` §3b).
 - `## Target` — PR/branch/SHA, base ref, files changed.
-- `## Verify` — the `verify:` line's result, failing checks if any.
+- `## Verify` — the tests you ran yourself (the revert-RED check), and for a PR the CI result of its head; you never run `verify:`, the merge does.
 - `## Findings` — the `dd-code-review` §5 fields, plus category (`slop` carries the signal id).
 - `## Bug-surface delta` — reduced/increased/unchanged, evidenced per `dd-code-review` §4.
 - `## Summary` — counts by severity.

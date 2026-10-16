@@ -35,7 +35,7 @@ The branch contract by role; the names are `specs/constitution.md`'s `gitflow:` 
 
 | Branch | Pushable | Cut from | Advances by |
 |---|---|---|---|
-| work `<work>M.m.p` | Yes — valid name (run `verify:` first) | integration | its `wt-rc` and lane merges |
+| work `<work>M.m.p` | Yes — valid name (each merge into it ran `verify:`; no rerun before a push) | integration | its `wt-rc` and lane merges |
 | integration | No — advances only by PR | principal (bootstrap only) | PR from the row above, one per candidate |
 | principal | No — advances only by PR | — | PR from the integration branch, at the final `rc` |
 | rc `wt/<M.m.p>/rc-<N>/wt-rc` | Yes | work | its merge into the work branch (`worktrees/AGENTS.md` §2) |
