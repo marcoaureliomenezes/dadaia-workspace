@@ -9,7 +9,6 @@ Every other repair is the doctor's (``specs upgrade`` runs its repair set).
 
 from __future__ import annotations
 
-import sys
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -17,6 +16,7 @@ from pathlib import Path
 from dadaia_workspace.core import platform
 from dadaia_workspace.core import specs_version as _version
 from dadaia_workspace.core.atomic_write import atomic_write
+from dadaia_workspace.core.cli_line import cli_words
 from dadaia_workspace.core.exceptions import DadaiaError
 from dadaia_workspace.core.frontmatter import split
 from dadaia_workspace.core.gitflow import candidate_dir, merge_frontmatter, next_candidate
@@ -68,7 +68,7 @@ def upgrade(
         raise UpgradeRefused(
             f"{architecture} is two-tier ({_RETIRED_PART_HEADING!r}): nowhere safe to fold into.",
             "Agent action: rewrite its headings as ## Principles / ## Tech Stack / "
-            f"## Structure, then re-run `{platform.inline(*platform.cli_argv(Path(sys.prefix)), 'specs', 'upgrade', '--specs-dir', str(specs_dir))}`.",
+            f"## Structure, then re-run `{platform.inline(*cli_words(None, 'specs', 'upgrade', '--specs-dir', str(specs_dir)))}`.",
         )
 
     if dry_run:

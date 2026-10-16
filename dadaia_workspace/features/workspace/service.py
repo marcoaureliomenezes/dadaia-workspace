@@ -6,6 +6,7 @@ from pathlib import Path
 
 from dadaia_workspace.core import platform
 from dadaia_workspace.core.atomic_write import atomic_write, refuse_symlink
+from dadaia_workspace.core.cli_line import cli_words
 from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES
 from dadaia_workspace.core.models.harness_profile import HarnessProfile
 from dadaia_workspace.core.workspace_layout import LEVEL1_SEEDS, occupied, provisioned_zones
@@ -74,7 +75,7 @@ class WorkspaceService:
             return self._public_assets.install(workspace_root, template=template)
         return [
             "[warn] assets skipped — no hooks configured; the workspace is ungated "
-            f"until '{platform.inline(*platform.cli_argv(platform.venv_dir(workspace_root)), 'public', 'install')}' runs"
+            f"until '{platform.inline(*cli_words(workspace_root, 'public', 'install'))}' runs"
         ]
 
     def venv_change(self, workspace_root: Path) -> tuple[str | None, str | None, str]:

@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any, Protocol
 
 from dadaia_workspace.core import clock, platform, workspace_layout
-from dadaia_workspace.core.cli_line import fix_line, git_line, shell_line
+from dadaia_workspace.core.cli_line import cli_words, fix_line, git_line, shell_line
 from dadaia_workspace.core.exceptions import (
     AssociatedRepoConflictError,
     AssociatedRepoNotFoundError,
@@ -320,7 +320,7 @@ class SpecContextService:
                     f"'{slug}' is already owned by context '{other.name}' (as its own main "
                     "repo or one of its associated repos). 'repos/<slug>' is a namespace every "
                     f"context shares — registering it on '{name}' too would let "
-                    f"'{platform.inline(*platform.cli_argv(platform.venv_dir(self._workspace_root)), 'context', 'dead', name)}' push "
+                    f"'{platform.inline(*cli_words(self._workspace_root, 'context', 'dead', name))}' push "
                     f"and delete '{other.name}''s working "
                     "tree.",
                     fix=f"Agent action: choose a different slug, or coordinate with '{other.name}'",
@@ -649,7 +649,7 @@ class SpecContextService:
             fix_line(self._workspace_root, *argv, found[0])
             if len(found) == 1
             else "Agent action: choose the principal branch origin holds and run "
-            f"`{platform.inline(*platform.cli_argv(platform.venv_dir(self._workspace_root)), *argv)}` with it"
+            f"`{platform.inline(*cli_words(self._workspace_root, *argv))}` with it"
         )
         raise ContextStateError(
             f"Context '{name}': origin holds no principal '{flow.principal}' (origin candidates: "

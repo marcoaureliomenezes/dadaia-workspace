@@ -30,10 +30,16 @@ def reinstall_fix(start: Path) -> str:
     return str(load_owner("dd-bug-resolution", "_jsonl").reinstall_fix(start))
 
 
+def cli_words(root: PurePath | None, *argv: str) -> tuple[str, ...]:
+    """The words that run the workspace CLI of *root* (the venv running now when ``None``) with
+    *argv*: rendered once, by ``command`` for a fix or ``platform.inline`` inside a sentence."""
+    venv = platform.venv_dir(root) if root is not None else Path(sys.prefix)
+    return (*platform.cli_argv(venv), *argv)
+
+
 def fix_line(root: PurePath | None, *argv: str) -> str:
     """``<absolute CLI> argv…`` quoted for the host shell (:func:`venv_line` for the CLI)."""
-    venv = platform.venv_dir(root) if root is not None else Path(sys.prefix)
-    return platform.command(*platform.cli_argv(venv), *argv)
+    return platform.command(*cli_words(root, *argv))
 
 
 #: The skills this package ships — present wherever the running CLI is installed.
