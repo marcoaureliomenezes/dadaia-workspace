@@ -11,6 +11,7 @@ import pytest
 
 from dadaia_workspace.core.skill_owner import load_owner
 from tests.fixtures.harness_env import git_bash
+from tests.fixtures.stores import fake_venv
 from tests.helpers import oslib
 
 K = load_owner("dd-bug-resolution", "_platform")
@@ -185,7 +186,6 @@ def test_every_installed_shell_hands_the_words_back_unchanged(shell: str) -> Non
 def test_a_command_head_with_a_blank_runs_in_every_installed_shell(
     shell: str, tmp_path: Path
 ) -> None:
-    (tmp_path / "a b").mkdir()
-    stub = oslib.stub_cli(tmp_path / "a b", "echoargs", f"#!python\n{_ECHO}\n")
-    line = K.command(str(stub), "x", "y z")
+    python = fake_venv(tmp_path / "a b")
+    line = K.command(str(python), "-c", _ECHO, "x", "y z")
     assert _through(shell, line) == (0, "['x', 'y z']")
