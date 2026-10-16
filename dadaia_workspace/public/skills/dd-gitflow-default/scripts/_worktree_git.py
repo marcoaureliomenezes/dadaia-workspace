@@ -29,9 +29,10 @@ def diff_sha256(tree: Path, work: str, tip: str) -> str:
     return hashlib.sha256(git(tree, "diff-tree", "-r", "-z", "--full-index", base, tip).encode()).hexdigest()  # fmt: skip
 
 
-def dirty(tree: Path) -> bool:
-    """Whether *tree* holds an uncommitted change or an untracked file."""
-    return bool(git(tree, "status", "--porcelain").strip())
+def dirty(tree: Path) -> list[str]:
+    """The paths *tree* holds uncommitted or untracked, verbatim (`-z`: never C-quoted); `[]` when clean."""
+    listing = git(tree, "status", "--porcelain", "-z", "-uall", "--no-renames")
+    return [entry[3:] for entry in listing.split("\0") if entry]
 
 
 def cli(root: Path, *args: str, tree: Path | None = None) -> subprocess.CompletedProcess[str]:
@@ -174,7 +175,7 @@ def _ours(repo: Path, flow: dict[str, str], name: str, path: str) -> dict[str, o
     span = f"{base_of(name, flow['work'])}..{branch(name)}"
     ahead, changed = (
         int(git(repo, "rev-list", "--count", span, check=False) or 0),
-        dirty(Path(path)),
+        bool(dirty(Path(path))),
     )
     state = "empty" if not ahead else "open" if changed else "ready"
     return _row(repo, path, state, _age(repo, name), name=name, ahead=ahead, dirty=changed)
