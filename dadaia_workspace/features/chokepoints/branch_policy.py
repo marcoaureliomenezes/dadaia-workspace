@@ -5,9 +5,11 @@ has no internal-package dependency, so siblings import it from here)."""
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 
 from dadaia_workspace.core.cli_line import fix_line, git_line, spell_fix
+from dadaia_workspace.core.exceptions import GitSyncError
 from dadaia_workspace.core.gitflow import Gitflow
 from dadaia_workspace.core.models.git_scan import SHA_SHAPE_RE, is_zero_sha
 
@@ -162,12 +164,30 @@ def check_branch_policy(
     return None
 
 
+def _audit_descendant(
+    moved: Callable[[str, str], tuple[bool, list[str]]], old: str, new: str
+) -> bool:
+    """True when *old* is an ancestor of *new* and every changed path, at least one, is in the
+    ``audit`` zone; an unreadable fact is False."""
+    try:
+        descendant, zones = moved(old, new)
+    except GitSyncError:
+        return False
+    return descendant and bool(zones) and set(zones) == {"audit"}
+
+
 def check_ref_policy(
-    lines: list[str], gitflow: Gitflow, origin: dict[str, str], repo: str
+    lines: list[str],
+    gitflow: Gitflow,
+    origin: dict[str, str],
+    repo: str,
+    moved: Callable[[str, str], tuple[bool, list[str]]],
 ) -> Decision:
     """The first refusal over ``<old> <new> <ref>`` lines: a work-branch update (old, new
-    non-zero, different) must land on origin's sha for its ref; creations, deletions, non-work refs
-    and a ref origin does not hold pass. The fix names the tree to open for *repo*."""
+    non-zero, different) must land on origin's sha for its ref, or be an audit-only descendant
+    move per ``moved(old, new) -> (old is an ancestor of new, zone of each renames-off changed path)``, read
+    only for a move that would otherwise be refused; creations, deletions, non-work refs and a
+    ref origin does not hold pass. The fix names the tree to open for *repo*."""
     for line in filter(str.strip, lines):
         old, new, ref = line.split()
         branch = ref.removeprefix(HEADS_PREFIX)
@@ -178,6 +198,7 @@ def check_ref_policy(
             or old == new
             or gitflow.role_of(branch) != "work"
             or held in ("", None, new)
+            or _audit_descendant(moved, old, new)
         ):
             continue
         fix = (

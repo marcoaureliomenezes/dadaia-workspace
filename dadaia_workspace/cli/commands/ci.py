@@ -29,7 +29,6 @@ from dadaia_workspace.features.chokepoints.branch_policy import (
     parse_push_stdin,
 )
 from dadaia_workspace.features.spec_context.service import install_git_hooks
-from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 
 app = typer.Typer(help="Git-hook chokepoints: the pre-push gate and its installer.")
 
@@ -240,19 +239,10 @@ def push_gate_check(
         fail(decision.message)
 
 
-def _audit_only(git: GitSubprocessClient, repo_root: Path, old: str, new: str) -> bool:
-    """True when the non-empty paths changed in ``old..new`` all sit in the ``audit`` zone."""
-    paths = git.git(repo_root, "diff", "--name-only", f"{old}..{new}").splitlines()
-    anchor = Path(repo_root.anchor)
-    return bool(paths) and all(
-        scope(anchor, anchor / "repos" / repo_root.name / p)[1] == "audit" for p in paths
-    )
-
-
 @app.command("ref-gate-check")
 def ref_gate_check() -> None:
     """Reference-transaction gate: ``<old> <new> <ref>`` lines on stdin; a work-branch update
-    must land on origin's sha, unless it touches only ``specs/audits/**``."""
+    must land on origin's sha, or be a descendant move touching only ``specs/audits/**``."""
     from dadaia_workspace.container import build_git_client
 
     repo_root = _repo_root()
@@ -264,14 +254,27 @@ def ref_gate_check() -> None:
         )
     git = build_git_client()
     gitflow = _gitflow(repo_root)[0]
+
+    def moved(old: str, new: str) -> tuple[bool, list[str]]:
+        # rev-list exits 0 either way, so only a real fault raises; --no-renames keeps both paths of a rename
+        behind = git.git(repo_root, "rev-list", "-n1", f"{new}..{old}")
+        paths = git.git(repo_root, "diff", "--no-renames", "--name-only", f"{old}..{new}")
+        anchor = Path(repo_root.anchor)
+        zones = [
+            scope(anchor, anchor / "repos" / repo_root.name / p)[1] for p in paths.splitlines()
+        ]
+        return not behind, list(zones)
+
     for old, new, ref in lines:
         tracking = f"refs/remotes/origin/{ref.removeprefix(HEADS_PREFIX)}"
         held = git.git(repo_root, "for-each-ref", "--format=%(objectname)", tracking)
         # git hands a zero old sha for a forced move too; the ref still holds its value in `prepared`.
         if is_zero_sha(old):
             old = git.git(repo_root, "for-each-ref", "--format=%(objectname)", ref) or old
-        decision = check_ref_policy([f"{old} {new} {ref}"], gitflow, {ref: held}, repo_root.name)
-        if not decision.allowed and not _audit_only(git, repo_root, old, new):
+        decision = check_ref_policy(
+            [f"{old} {new} {ref}"], gitflow, {ref: held}, repo_root.name, moved
+        )
+        if not decision.allowed:
             fail(decision.message)
 
 
