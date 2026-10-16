@@ -20,7 +20,7 @@ from pathlib import Path
 
 from _handoffs import REVIEWER, reviewer_records
 from _platform import venv_dir, venv_tool
-from _refusal import fix_of, report, without_fix
+from _refusal import fix_of, without_fix
 from _worktree_git import (
     cli,
     cli_line,
@@ -361,9 +361,8 @@ def _into(repo: Path, onto: str) -> Path:
 
 
 def _kind_checks(root: Path, repo: Path, tree: Path, name: str, onto: str, into: Path, keep: list[str], drop: bool) -> list[tuple[str, Callable[[], object]]]:  # fmt: skip
-    """The ordered (label, check) pairs a tree of this kind must pass to land; `merge` and
-    `preflight` both run this list, the verdict check labelled "verdict"; the ignored-file and
-    target-checkout checks end every kind."""
+    """The ordered (label, check) pairs a tree of this kind must pass to land; `merge` runs
+    this list; the ignored-file and target-checkout checks end every kind."""
     if not into.exists():  # the parent's tree removed by hand
         raise Refusal(f"{into} does not exist", git_line(repo, "worktree", "add", "-f", "-f", str(into), onto))  # fmt: skip
     ancestor = ("ancestor", lambda: _check_ancestor(root, tree, onto))
@@ -388,25 +387,6 @@ def _kind_checks(root: Path, repo: Path, tree: Path, name: str, onto: str, into:
 def _on_target(into: Path, onto: str) -> None:
     if git(into, "branch", "--show-current").strip() != onto:
         raise Refusal(f"{into} is not on {onto}", git_line(into, "switch", onto))
-
-
-def preflight(root: Path, path: str, keep: list[str], drop: bool) -> int:
-    """`merge` without the verdict: run every other check of the tree's kind, collect each refusal."""
-    repo, tree, name, onto = _target(root, path)
-    if not tree.exists():
-        raise Refusal(f"{tree} does not exist", f"{script(SCRIPT)} list")
-    failed = []
-    for label, check in _kind_checks(root, repo, tree, name, onto, _into(repo, onto), keep, drop):
-        try:
-            label == "verdict" or check()
-        except Refusal as refusal:
-            failed.append(refusal)
-    print(
-        f"PREFLIGHT {'FAIL' if failed else 'PASS'} {tree} {git(tree, 'rev-parse', 'HEAD').strip()}"
-    )
-    for red in failed:
-        report(red, red.fix, sys.stdout)
-    return 1 if failed else 0
 
 
 def merge(root: Path, path: str, keep: list[str], drop: bool) -> str:

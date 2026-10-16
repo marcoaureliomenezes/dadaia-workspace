@@ -20,7 +20,7 @@ sys.path[:0] = [
 
 from _git import GitError
 from _refusal import report, spell_fix
-from _worktree_end import clean, digest, merge, preflight
+from _worktree_end import clean, digest, merge
 from _worktree_git import quote, rows, script, workspace_of
 from _worktree_names import SCRIPT, Refusal
 from _worktree_new import new
@@ -47,7 +47,6 @@ def main(argv: list[str] | None = None) -> int:
         end.add_argument("--drop", action="store_true", help="discard the other ignored files")
 
     end_args(verbs.add_parser("merge", help="land a worktree on its parent after its gate"))
-    end_args(verbs.add_parser("preflight", help="every check merge runs but the verdict, all failures printed"))  # fmt: skip
     end_args(verbs.add_parser("clean", help="remove a merged or commit-less worktree"))
     verbs.add_parser(
         "sync", help="rebase a tree and the trees below it, parents first"
@@ -73,8 +72,6 @@ def main(argv: list[str] | None = None) -> int:
         if args.verb == "hash":
             print(digest(root, args.path, args.sha))
             return 0
-        if args.verb == "preflight":
-            return preflight(root, args.path, args.keep, args.drop)
         if args.verb in ("merge", "clean"):
             end_verb = merge if args.verb == "merge" else clean
             print(f"[ok] {end_verb(root, args.path, args.keep, args.drop)}")

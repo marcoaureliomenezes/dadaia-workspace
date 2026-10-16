@@ -24,12 +24,11 @@ description: >
 6. The task is the unit of dispatch, never a job: sub-agents work disjoint tasks in parallel, one `wt-task-<kkk>` tree each (`worktrees/AGENTS.md` §1).
 7. Dispatch by the job file's `who:` (shape rule: `dd-release-definition` §5): `sr` → dd-sw-engineer-sr, `jr` → dd-sw-engineer-jr, `pe`/`cr` → the owning persona. Pass no model; the installed template decides.
 8. A REJECTED verdict whose finding names a `jr` task re-dispatches that task to dd-sw-engineer-sr.
-9. Dispatch a review only for a tree whose `.dadaia/.venv/bin/dadaia worktree preflight <tree>` prints `PREFLIGHT PASS`, and hand the reviewer that line; a red tree goes back unreviewed, since the preflight replaces the implementer's own verify run before hand-off.
-10. A ruling carries its reproduction and a consumer sweep across every repo of the context.
-11. A rework brief names the finding's contract class, requires its RED test first and a sweep of every other site of the class, and carries the bug history to read, the seams with evidence and the merge hazards with sibling jobs.
-12. One fresh agent per task, its full scope in its first prompt; a changed scope is a new dispatch, and an agent that stops early leaves the rest to a new dispatch against the same worktree.
-13. Check commits, files and test runs yourself; a handoff reported but not written does not count.
-14. A status answer counts each open class with its number.
+9. A ruling carries its reproduction and a consumer sweep across every repo of the context.
+10. A rework brief names the finding's contract class, requires its RED test first and a sweep of every other site of the class, and carries the bug history to read, the seams with evidence and the merge hazards with sibling jobs.
+11. One fresh agent per task, its full scope in its first prompt; a changed scope is a new dispatch, and an agent that stops early leaves the rest to a new dispatch against the same worktree.
+12. Check commits, files and test runs yourself; a handoff reported but not written does not count.
+13. A status answer counts each open class with its number.
 
 ## 2. Conflict resolution
 

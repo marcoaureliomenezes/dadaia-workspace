@@ -2,7 +2,7 @@
 
 Scope: this file governs only `worktrees/**`.
 
-- `WT` below is `.dadaia/.venv/bin/dadaia worktree` — the one interface that opens, lists, merges, cleans and syncs a worktree (`new|merge|clean|list|preflight|sync|hash`); only the main thread opens and merges. A subagent works only inside the path it was given.
+- `WT` below is `.dadaia/.venv/bin/dadaia worktree` — the one interface that opens, lists, merges, cleans and syncs a worktree (`new|merge|clean|list|sync|hash`); only the main thread opens and merges. A subagent works only inside the path it was given.
 - A reference-transaction hook refuses a raw `git worktree add`/`git branch wt/*` and a raw move of a work branch; only `WT` passes it.
 - Only `WT`-opened trees carry SDD work; a harness-native worktree (`.claude/worktrees/**`, a scratchpad) stays outside.
 
