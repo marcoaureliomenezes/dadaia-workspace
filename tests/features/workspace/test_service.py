@@ -2,12 +2,11 @@
 
 import json
 import os
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.core import platform
-from dadaia_workspace.core.cli_line import cli_words
 from dadaia_workspace.core.workspace_layout import provisioned_zones
 from dadaia_workspace.features.workspace.service import WorkspaceService
 from tests.fakes import FakePublicAssetManager, FakePythonEnvironmentManager
@@ -160,14 +159,11 @@ def test_a_denylist_that_is_not_utf8_is_left_alone_and_init_goes_on(workspace_ro
     assert denylist.read_bytes() == '["zz-term-é"]'.encode("cp1252")
 
 
-def test_the_ungated_warning_quotes_a_workspace_holding_a_blank(tmp_path: Path) -> None:
-    root = tmp_path / "a b"
-
+def test_the_ungated_warning_renders_the_cli_words_inline(
+    tmp_path: Path, sentence: Callable[..., str]
+) -> None:
     lines = WorkspaceService(
         public_assets=FakePublicAssetManager(), python_env=FakePythonEnvironmentManager()
-    ).init(root, harnesses=("claude",), skip_assets=True)
+    ).init(tmp_path / "ws", harnesses=("claude",), skip_assets=True)
 
-    assert any(
-        f"until '{platform.inline(*cli_words(root, 'public', 'install'))}' runs" in ln
-        for ln in lines
-    ), lines
+    assert any(f"until '{sentence('public', 'install')}' runs" in ln for ln in lines), lines

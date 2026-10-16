@@ -13,8 +13,8 @@ from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.core import platform, workspace_layout
-from dadaia_workspace.core.cli_line import cli_words, fix_line
+from dadaia_workspace.core import workspace_layout
+from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.gitflow import SeveralWorkBranches
 from dadaia_workspace.core.skill_owner import load_owner
 from dadaia_workspace.core.specs_version import CANONICAL_SPECS_VERSION, state
@@ -190,12 +190,23 @@ def test_several_work_branches_make_the_first_pass_an_agent_step_with_the_refusa
 
 
 
-def test_the_context_create_step_quotes_a_workspace_holding_a_blank(tmp_path: Path) -> None:
-    root = tmp_path / "a b"
-
-    step = next_step(root, {})
+def test_the_context_create_step_renders_the_cli_words_inline(
+    tmp_path: Path, sentence: Callable[..., str]
+) -> None:
+    step = next_step(tmp_path, {})
 
     assert step is not None
-    assert (
-        f"Agent action: run {platform.inline(*cli_words(root, 'context', 'create'))} with a context name" in step.command
+    assert step.command == (
+        f"Agent action: run {sentence('context', 'create')} with a context name "
+        "and --main-repo set to the main repo's clone URL"
     )
+
+
+def test_the_first_pass_lane_renders_the_cli_words_inline(
+    tmp_path: Path, sentence: Callable[..., str]
+) -> None:
+    step = next_step(tmp_path, {"app": _specs(tmp_path, "proj")})
+
+    assert step is not None
+    lane = sentence("worktree", "new", "proj", "0.1.0/wt-backlog-first-pass")
+    assert f"Agent action: open the lane {lane}, then run the dd-audit-project" in step.command

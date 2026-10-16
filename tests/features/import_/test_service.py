@@ -6,6 +6,7 @@ Size: SMALL — the input file is the documented example; the store is a fake.
 """
 
 import json
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
@@ -208,3 +209,23 @@ def test_import_refuses_a_record_missing_a_field_naming_it(tmp_path: Path) -> No
     assert "name" in str(caught.value)
     assert str(caught.value).count("fix:") == 1
     assert store.list_all() == []
+
+
+@pytest.mark.parametrize(
+    ("content", "tail"),
+    [
+        (None, "'{export}'."),
+        (json.dumps({**_EXPORT, "schema_version": "x"}), "only '{export}' output"),
+    ],
+)
+def test_the_export_hint_renders_the_cli_words_inline(
+    tmp_path: Path, content: str | None, tail: str, sentence: Callable[..., str]
+) -> None:
+    file = tmp_path / "spec-contexts.json"
+    if content is not None:
+        write_text(file, content)
+
+    with pytest.raises(ValueError) as refused:
+        _importer(tmp_path, context_store(tmp_path / "states")).run(file)
+
+    assert tail.format(export=sentence("export")) in str(refused.value)

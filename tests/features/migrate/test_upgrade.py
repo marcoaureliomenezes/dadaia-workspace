@@ -8,15 +8,14 @@ from __future__ import annotations
 
 import hashlib
 import sys
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
 from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app
-from dadaia_workspace.core import platform
 from dadaia_workspace.core.atomic_write import SymlinkRefusedError, atomic_write
-from dadaia_workspace.core.cli_line import cli_words
 from dadaia_workspace.core.exceptions import DadaiaError
 from dadaia_workspace.core.gitflow import merge_frontmatter
 from dadaia_workspace.features.migrate.upgrade import (
@@ -151,8 +150,10 @@ def test_b2_doctor_fix_leaves_a_symlinked_quality_md_a_link(tmp_path: Path) -> N
     assert _md5(outside) == before
 
 
-def test_the_two_tier_refusal_quotes_a_specs_dir_holding_a_blank(tmp_path: Path) -> None:
-    specs = tmp_path / "a b" / "specs"
+def test_the_two_tier_refusal_renders_the_cli_words_inline(
+    tmp_path: Path, sentence: Callable[..., str]
+) -> None:
+    specs = tmp_path / "specs"
     canon.scaffold(specs, project_name="p")
     merge_frontmatter(specs, specs_pattern_version=6)
     write_text(
@@ -163,5 +164,5 @@ def test_the_two_tier_refusal_quotes_a_specs_dir_holding_a_blank(tmp_path: Path)
     with pytest.raises(DadaiaError) as refused:
         upgrade(specs, remove=lambda _path: None)
 
-    rerun = platform.inline(*cli_words(None, "specs", "upgrade", "--specs-dir", str(specs)))
+    rerun = sentence("specs", "upgrade", "--specs-dir", str(specs))
     assert f"then re-run `{rerun}`." in refused.value.fix  # type: ignore[attr-defined]

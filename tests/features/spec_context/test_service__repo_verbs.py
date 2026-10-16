@@ -12,6 +12,7 @@ on-disk-left-untouched messaging) is proven in
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
@@ -114,6 +115,15 @@ def test_add_repo_refuses_slug_owned_by_another_context_as_main_repo(
         assert service.add_repo(context, slug, url)[1] is added
     stored = seeded.get("proj")
     assert stored is not None and stored.associated_repos == final
+
+
+def test_the_slug_conflict_renders_the_cli_words_inline(
+    service: SpecContextService, seeded: JsonContextStore, sentence: Callable[..., str]
+) -> None:
+    with pytest.raises(AssociatedRepoConflictError) as refused:
+        service.add_repo("proj", "other-repo", _URL)
+
+    assert f"'{sentence('context', 'dead', 'proj')}' push " in str(refused.value)
 
 
 def test_add_repo_own_main_slug_is_a_no_op(service: SpecContextService, seeded: JsonContextStore) -> None:

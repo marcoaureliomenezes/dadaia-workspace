@@ -242,6 +242,14 @@ def test_a_work_branch_update_to_a_sha_other_than_origins_is_refused_with_one_fi
     assert "proj change" not in fix
 
 
+def test_the_open_a_tree_fix_renders_the_cli_words_inline(sentence: Callable[..., str]) -> None:
+    decision = _ref_policy([f"{_A} {_B} {_WORK_REF}"], DEFAULT, {_WORK_REF: _C1})
+
+    assert f"open a tree for this change with {sentence('worktree', 'new', 'proj')} and the name" in (
+        decision.message
+    )
+
+
 def test_a_work_branch_no_op_update_passes() -> None:
     assert _ref_policy([f"{_B} {_B} {_WORK_REF}"], DEFAULT, {_WORK_REF: _C1}).allowed
 

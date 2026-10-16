@@ -26,9 +26,24 @@ def test_the_specs_state_names_the_reencode_act(tmp_path: Path) -> None:
     assert state(specs) == ("malformed", act)
 
 
-def test_the_constitution_step_names_the_reencode_act(tmp_path: Path) -> None:
+def test_the_constitution_step_states_the_cause_and_names_the_reencode_act(tmp_path: Path) -> None:
     specs, act = _specs(tmp_path)
 
     step = next_step(tmp_path, {"proj": specs}, "proj")
 
-    assert step is not None and (step.id, step.kind, step.command) == ("constitution", "agent", act)
+    assert step is not None and step.id == "constitution" and step.kind == "agent"
+    assert (step.reason, step.command) == (f"{specs / 'constitution.md'}: is not valid UTF-8", act)
+
+
+def test_the_constitution_step_states_the_yaml_cause_and_names_the_repair_act(
+    tmp_path: Path,
+) -> None:
+    specs = tmp_path / "specs"
+    specs.mkdir()
+    (specs / "constitution.md").write_text("---\ngitflow: {principal: main\n---\n# c\n", "utf-8")
+
+    step = next_step(tmp_path, {"proj": specs}, "proj")
+
+    assert step is not None and step.id == "constitution"
+    assert step.reason.startswith(f"{specs / 'constitution.md'}: ")
+    assert step.command == f"Agent action: repair the YAML frontmatter of {step.reason}"

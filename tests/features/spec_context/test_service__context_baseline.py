@@ -333,6 +333,20 @@ def test_several_principal_candidates_are_listed_never_guessed(env, tmp_path: Pa
     assert "master, trunk" in message and message.endswith("--principal` with it")
 
 
+def test_the_principal_choice_renders_the_cli_words_inline(
+    env, tmp_path: Path, sentence: Callable[..., str]
+) -> None:
+    svc, repo, bare = env
+    _seed(bare, tmp_path / "seed", "trunk", "master")
+    _git(bare, "symbolic-ref", "HEAD", "refs/heads/trunk")
+    _clone_onboarded(bare, repo)
+    with pytest.raises(ContextStateError) as refused:
+        svc.baseline("proj")
+
+    words = sentence("specs", "init", "--context", "proj", "--principal")
+    assert refused.value.fix.endswith(f"and run `{words}` with it")  # type: ignore[attr-defined]
+
+
 def test_a_never_onboarded_repo_is_refused_with_the_specs_init_fix(env, tmp_path: Path) -> None:
     """A constitution git would not commit (here: ignored) is
     refused before any write, so HEAD holds one after every anchor — never 'published'
