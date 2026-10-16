@@ -106,12 +106,33 @@ def test_ref_gate_passes_the_origin_sha_creation_and_a_non_work_ref(
 ) -> None:
     repo, base = _work_repo(tmp_path)
     tip = _commit(repo, **{"src__a.py": "x = 1\n"})
-    zero = "0" * 40
 
     assert _ref_gate(monkeypatch, repo, f"{tip} {base} {_WORK_REF}").exit_code == 0
-    assert _ref_gate(monkeypatch, repo, f"{zero} {tip} {_WORK_REF}").exit_code == 0
     assert _ref_gate(monkeypatch, repo, f"{base} {tip} refs/heads/wt/x").exit_code == 0
     assert _ref_gate(monkeypatch, repo).exit_code == 0
+
+
+def test_ref_gate_refuses_a_zero_old_line_for_an_existing_work_ref_off_origin(
+    monkeypatch, tmp_path: Path
+) -> None:
+    """``git branch -f`` and ``update-ref`` with no old sha hand git's zero old sha."""
+    repo, _ = _work_repo(tmp_path)
+    _commit(repo, **{"src__a.py": "x = 1\n"})
+    other = _commit(repo, **{"src__b.py": "y = 2\n"})
+    _git(repo, "update-ref", _WORK_REF, _git(repo, "rev-parse", "HEAD~1"))
+
+    result = _ref_gate(monkeypatch, repo, f"{'0' * 40} {other} {_WORK_REF}")
+
+    assert result.exit_code == 1
+    assert "[ref-gate] BLOCKED" in result.output
+
+
+def test_ref_gate_passes_a_zero_old_line_creating_the_work_ref(monkeypatch, tmp_path: Path) -> None:
+    repo, _ = _work_repo(tmp_path)
+    tip = _commit(repo, **{"src__a.py": "x = 1\n"})
+    _git(repo, "update-ref", "-d", _WORK_REF)
+
+    assert _ref_gate(monkeypatch, repo, f"{'0' * 40} {tip} {_WORK_REF}").exit_code == 0
 
 
 def test_ref_gate_passes_a_work_branch_with_no_origin(monkeypatch, tmp_path: Path) -> None:

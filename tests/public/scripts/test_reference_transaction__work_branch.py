@@ -126,6 +126,21 @@ def test_raw_hard_reset_on_the_work_branch_is_refused(repo: _Repo) -> None:
     _assert_refused(repo, done, before)
 
 
+def test_raw_update_ref_without_an_old_sha_on_the_work_branch_is_refused(repo: _Repo) -> None:
+    before = repo.ok("rev-parse", "HEAD")
+    other = _other_ahead(repo)
+    done = repo.git("update-ref", f"refs/heads/{_WORK}", other)
+    _assert_refused(repo, done, before)
+
+
+def test_raw_branch_force_move_of_the_work_branch_is_refused(repo: _Repo) -> None:
+    before = repo.ok("rev-parse", "HEAD")
+    other = _other_ahead(repo)
+    repo.ok("checkout", "-q", "other")
+    done = repo.git("branch", "-f", _WORK, other)
+    _assert_refused(repo, done, before)
+
+
 def test_pull_ff_only_from_origin_passes(repo: _Repo, tmp_path: Path) -> None:
     peer = tmp_path / "peer"
     repo.ok("clone", "-q", "-b", _WORK, str(repo.origin), str(peer), cwd=tmp_path)
