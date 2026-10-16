@@ -8,6 +8,7 @@ commit, so a writer/validator disagreement is unrepresentable. The schema is
 
 from __future__ import annotations
 
+import json
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
@@ -18,6 +19,7 @@ import _jsonl
 import _ledger
 from _grammar import HISTORICAL_TASK_RE, TASK_ID_RE
 from _platform import git_line, quote
+from _root import STATES as _STATES
 from _specs import script, with_specs
 
 CODE = "LEDGER-BUGS-SCHEMA"
@@ -161,17 +163,35 @@ def archived_ids(text: str) -> frozenset[str]:
     )
 
 
+def _associated(specs: Path) -> list[Path]:
+    """The checkouts of the associated repos of the context whose main repo holds *specs*. The
+    registry is read at `<root>/.dadaia/states` beside `repos/<main>/.git`, a git fact: the
+    gate's fence blocks a walk to the workspace and its CLI alike. None when it does not answer."""
+    main = Path(_git.git(specs.parent, "rev-parse", "--path-format=absolute", "--git-common-dir", check=False).strip()).parent  # fmt: skip
+    root = main.parent.parent
+    try:
+        rows = json.loads(_jsonl.read_text(root / _STATES / "spec_contexts.json"))["contexts"]
+        slugs = [a["slug"] for r in rows if r.get("repo_slug") == main.name for a in r["associated_repos"]]  # fmt: skip
+    except (OSError, ValueError, LookupError, TypeError):
+        return []
+    return [p for s in slugs if (p := root / "repos" / s).is_dir()]
+
+
 def _unreached(specs: Path, text: str, root: Path) -> list[dict[str, Any]]:
-    """The live records whose `fix_sha` is no ancestor of HEAD, one finding each; in a shallow
-    clone a miss cannot be judged, so the misses are one finding for the cut."""
-    repo, update = specs.parent, script(Path(__file__).with_name("bugs.py"))
+    """The live records whose `fix_sha` no repo of the context reaches from its HEAD, one
+    finding each; where a repo is a shallow clone a miss cannot be judged, so the misses are
+    one finding for the cut."""
+    repos, update = [specs.parent], script(Path(__file__).with_name("bugs.py"))
     shas = [(n, r) for n, r, why in _jsonl.walk(text) if not why and isinstance(r, dict) and r.get("fix_sha")]  # fmt: skip
-    missed = [(n, r) for n, r in shas if not _git.reaches(repo, r["fix_sha"])]
-    if missed and _git.shallow(repo):
-        return [_findings.finding(CODE, LEDGER, missed[0][0], "the clone is shallow: no fix_sha can be judged", git_line(repo, "fetch", "--unshallow"))]  # fmt: skip
+    missed = [(n, r) for n, r in shas if not _git.reaches(repos[0], r["fix_sha"])]
+    if missed:
+        repos += _associated(specs)
+        missed = [(n, r) for n, r in missed if not any(_git.reaches(p, r["fix_sha"]) for p in repos[1:])]  # fmt: skip
+    if missed and (cut := next((p for p in repos if _git.shallow(p)), None)):
+        return [_findings.finding(CODE, LEDGER, missed[0][0], "the clone is shallow: no fix_sha can be judged", git_line(cut, "fetch", "--unshallow"))]  # fmt: skip
     return [
         _findings.finding(
-            CODE, LEDGER, n, f"{r['id']!r} fix_sha {r['fix_sha']} is no ancestor of HEAD",
+            CODE, LEDGER, n, f"{r['id']!r} fix_sha {r['fix_sha']} is no ancestor of HEAD of {', '.join(p.name for p in repos)}",
             "Agent action: find the fix commit's sha in git log and run "
             f"`{with_specs(f'{update} update {quote(r['id'])} --set fix_sha=SHA', root)}`",
         )
