@@ -821,6 +821,13 @@ def test_a_declared_line_splits_on_whitespace_alone(
     assert end._declared_argv(tmp_path, "work", key) == argv
 
 
+def test_the_repo_job_gate_is_the_job_level_of_ci_py(tmp_path: Path) -> None:
+    """This repo's own `AGENTS.md` declares `python scripts/ci.py job` as its `verify:` line."""
+    law = (Path(__file__).resolve().parents[5] / "AGENTS.md").read_bytes()
+
+    assert _law_end(tmp_path, law)._declared_argv(tmp_path, "work", "verify:") == ["python", "scripts/ci.py", "job"]  # fmt: skip
+
+
 @pytest.mark.parametrize(
     ("law", "argv"),
     [
