@@ -30,12 +30,16 @@ class Unreadable(Refusal):
     """A document that is not one JSON object; ``.fix`` is the act its caller names."""
 
 
+#: The act that repairs a workspace whose location is unknown.
+REINSTALL_ACT = "Agent action: run `uvx dadaia-workspace init` with the workspace's directory as its first argument"
+
+
 def reinstall_fix(start: Path) -> str:
     """The command that repairs a shipped file under *start*: `init` of the workspace holding
     it, which answers its harness from its own profile; outside every workspace, the act."""
     root = workspace_of(start)
     if root is None:
-        return "Agent action: run `uvx dadaia-workspace init` with the workspace's directory as its first argument"
+        return REINSTALL_ACT
     return f"uvx dadaia-workspace init {quote(str(root))}"
 
 

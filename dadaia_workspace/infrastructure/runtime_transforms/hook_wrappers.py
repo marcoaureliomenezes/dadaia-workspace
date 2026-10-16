@@ -15,6 +15,7 @@ from dataclasses import dataclass, replace
 
 from dadaia_workspace.core.cli_line import spell_fix
 from dadaia_workspace.core.harness_registry import HarnessRecord, HookFormat
+from dadaia_workspace.core.skill_owner import load_owner
 
 #: The SessionStart lane: the one reaper, run as a CLI process at every
 #: session start — never a hook module. ``--quiet`` prints only what it deleted, so
@@ -272,9 +273,7 @@ VENV_PYTHON = (
 #: What every ctx-inject firing tells the agent until the venv is fixed.
 VENV_MISSING = (
     "dadaia: no workspace venv at $ROOT/.dadaia/.venv — the gate is off.\n"
-    + spell_fix(
-        "Agent action: run `uvx dadaia-workspace init` with the workspace directory as its first argument"
-    )
+    + spell_fix(load_owner("dd-bug-resolution", "_jsonl").REINSTALL_ACT)
     + "\n"
 )
 
@@ -284,7 +283,10 @@ def _tell(lane: HookLane) -> str:
     if lane.argv != _CTX.argv:
         return ""
     slot = "'\"$ESC\"'" if lane.speaks else "'\"$ROOT\"'"
-    return f"  printf '%s' '{slot.join(envelope(dict(lane.env), VENV_MISSING).split('$ROOT'))}'\n"
+    text = envelope(dict(lane.env), VENV_MISSING).replace(
+        "'", "'\\''"
+    )  # for a single-quoted sh word
+    return f"  printf '%s' '{slot.join(text.split('$ROOT'))}'\n"
 
 
 def hook_wrapper_contents(record: HarnessRecord) -> dict[str, str]:
