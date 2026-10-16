@@ -50,29 +50,28 @@ def venv_line(root: PurePath | None, tool: str, *argv: str) -> str:
     """``<absolute venv tool> argv…`` for *tool* (``dadaia``, ``pip``, ``python``) of the
     workspace venv; no workspace (*root* ``None``: CI) names the venv running now."""
     venv = platform.venv_dir(root) if root is not None else Path(sys.prefix)
-    return shell_line(str(platform.venv_tool(venv, tool)), *argv)
+    return platform.command(str(platform.venv_tool(venv, tool)), *argv)
 
 
 def git_line(repo: str | PurePath, *argv: str) -> str:
     """``git -C <repo> argv…`` — every git fix names its repo, so it runs from any cwd."""
-    return shell_line("git", "-C", str(repo), *argv)
+    return platform.command("git", "-C", str(repo), *argv)
 
 
 def shell_line(*parts: str) -> str:
-    """*parts* joined into one command line quoted for the host shell."""
-    first, *rest = parts
-    return " ".join((platform.head(first), *map(platform.quote, rest)))
+    """*parts* as one finished command line for the host shell: the kernel's ``command``."""
+    return platform.command(*parts)
 
 
 def mkdir_line(directory: PurePath) -> str:
     """Create *directory* and its parents, idempotent — one interpreter line that runs
     unchanged under sh, bash, cmd and PowerShell (no shell builtin differs per OS)."""
     code = f"import pathlib; pathlib.Path(r'{directory}').mkdir(parents=True, exist_ok=True)"
-    return shell_line(sys.executable, "-c", code)
+    return platform.command(sys.executable, "-c", code)
 
 
 def materialize_line(link: PurePath, target: PurePath) -> str:
     """Replace the symlink *link* by a regular copy of *target* (``os.remove`` drops the
     link, never its target) — the same interpreter line on every OS."""
     code = f"import os, shutil; os.remove(r'{link}'); shutil.copyfile(r'{target}', r'{link}')"
-    return shell_line(sys.executable, "-c", code)
+    return platform.command(sys.executable, "-c", code)
