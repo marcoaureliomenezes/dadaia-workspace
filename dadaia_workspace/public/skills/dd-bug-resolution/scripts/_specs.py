@@ -10,7 +10,7 @@ import sys
 from pathlib import Path
 
 from _ledger import parse as parse
-from _platform import cli_path, head, quote
+from _platform import cli_argv, cli_path, command, head, quote, venv_dir
 from _refusal import Refusal, report
 from _root import workspace_of as workspace_of
 
@@ -66,10 +66,10 @@ def _bound_fix(here: Path, rerun: str, ledger: str | None) -> tuple[str, str]:
     except Refusal as refusal:
         return refusal.fix, ""
     except (ValueError, LookupError, TypeError):
-        return f"{head(str(cli_path(root)))} context list", ""
+        return command(*cli_argv(venv_dir(root)), "context", "list"), ""
     if ledger is None or ledger.startswith("specs/audits/"):
         return with_specs(rerun, root / "repos" / repo / "specs"), ""
-    return f"{head(str(cli_path(root)))} worktree list", ""
+    return command(*cli_argv(venv_dir(root)), "worktree", "list"), ""
 
 
 def script(path: Path) -> str:

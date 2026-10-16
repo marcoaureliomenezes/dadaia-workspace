@@ -599,7 +599,7 @@ _SOURCE_CLI = ".venv/bin/dadaia"
 
 def render_workspace_cli(text: str) -> str:
     """Render the workspace CLI source for this host."""
-    return text.replace(_SOURCE_CLI, str(platform.venv_tool(PurePosixPath(".venv"), "dadaia")))
+    return text.replace(_SOURCE_CLI, " ".join(platform.cli_argv(PurePosixPath(".venv"))))
 
 
 def render_registry_tables(text: str) -> str:

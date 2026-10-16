@@ -49,6 +49,11 @@ def venv_tool[P: PurePath](venv: P, tool: str) -> P:
     return path
 
 
+def cli_argv(venv: PurePath) -> list[str]:
+    """The words that run *venv*'s CLI in a shell line, by the kernel's rule fed the current ``PLATFORM``."""
+    return list(_owner.cli_argv(venv, _caps()))
+
+
 def workspace_cli_path[P: PurePath](root: P) -> P:
     """Where the workspace CLI lives under *root*, by the kernel's rule fed the current ``PLATFORM``."""
     path: P = _owner.cli_path(root, _caps())

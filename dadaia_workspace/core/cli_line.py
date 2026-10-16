@@ -32,7 +32,8 @@ def reinstall_fix(start: Path) -> str:
 
 def fix_line(root: PurePath | None, *argv: str) -> str:
     """``<absolute CLI> argv…`` quoted for the host shell (:func:`venv_line` for the CLI)."""
-    return venv_line(root, "dadaia", *argv)
+    venv = platform.venv_dir(root) if root is not None else Path(sys.prefix)
+    return platform.command(*platform.cli_argv(venv), *argv)
 
 
 #: The skills this package ships — present wherever the running CLI is installed.

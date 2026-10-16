@@ -14,8 +14,8 @@ from pathlib import Path
 
 from _git import git as git, parse_worktrees, scrubbed_env as scrubbed_env  # isort: skip
 from _grammar import SEMVER_RE, TAG_RE, sole_live
+from _platform import cli_argv, command, venv_dir
 from _platform import git_line as git_line
-from _platform import head
 from _platform import quote as quote  # (`as`: re-exported to the worktree verbs)
 from _specs import run_cli, workspace_cli
 from _specs import script as script
@@ -45,7 +45,8 @@ def cli(root: Path, *args: str, tree: Path | None = None) -> subprocess.Complete
 
 def cli_line(root: Path, *args: str) -> str:
     """The fix line running :func:`cli` with *args*, quoted for the host shell."""
-    return " ".join((head(str(workspace_cli(root))), *map(quote, args)))
+    workspace_cli(root)
+    return command(*cli_argv(venv_dir(root)), *args)
 
 
 def gitflows(root: Path) -> dict[str, dict[str, str]]:

@@ -62,6 +62,15 @@ def cli_path[P: PurePath](root: P, caps: Caps | None = None) -> P:
     return venv_tool(venv_dir(root), "dadaia", caps)
 
 
+def cli_argv(venv: PurePath, caps: Caps | None = None) -> list[str]:
+    """The words that run the CLI of *venv* in a shell line: its console script, but on Windows its
+    interpreter running the module, as a pip launcher at the head of a line garbles a quoted path."""
+    caps = caps or detect()
+    if caps.windows:
+        return [str(python_in(venv, caps)), "-m", "dadaia_workspace"]
+    return [str(venv_tool(venv, "dadaia", caps))]
+
+
 def norm_sep(path: str) -> str:
     """*path* spelled with forward slashes, whatever host wrote it."""
     return path.replace("\\", "/")
@@ -78,7 +87,7 @@ def is_fully_qualified(candidate: str, caps: Caps | None = None) -> bool:
 def canonical_cli(text: str, caps: Caps | None = None) -> str:
     """*text* with this host's spelling of the venv CLI replaced by the source form, so a digest of
     it is one value on every host."""
-    host = venv_tool(PurePosixPath(".venv"), "dadaia", caps).as_posix()
+    host = " ".join(cli_argv(PurePosixPath(".venv"), caps))
     return text.replace(host, ".venv/bin/dadaia")
 
 
