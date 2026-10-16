@@ -17,6 +17,7 @@ from pathlib import Path
 
 import pytest
 
+from dadaia_workspace.core.cli_line import git_line, shell_line
 from tests.helpers.skill_scripts import stage_skill_scripts
 
 pytestmark = pytest.mark.slow(reason="runs git over a tmp repository")
@@ -212,7 +213,9 @@ def test_a_bound_head_does_not_reach_refuses_as_a_clean_clone_would(
     assert message == (
         f"{orphan} is not an ancestor of HEAD — a clone of this branch lacks it (a rebase rewrote it)"
     )
-    assert fix == _fix(script, f"{sys.executable} {script} drift --since {base}", repo / "specs")
+    assert fix == _fix(
+        script, shell_line(sys.executable, str(script), "drift", "--since", base), repo / "specs"
+    )
     followed = subprocess.run(shlex.split(fix), capture_output=True, text=True, cwd=repo)
     assert followed.returncode == 1 and followed.stdout.startswith(f"[drift] since {base}\n")
 
@@ -232,7 +235,9 @@ def test_a_bound_sharing_no_history_with_head_is_refused_with_a_since_from_heads
     assert message == (
         f"{stranger} is not an ancestor of HEAD — a clone of this branch lacks it (a rebase rewrote it)"
     )
-    assert fix == _fix(script, f"{sys.executable} {script} drift --since {root}", repo / "specs")
+    assert fix == _fix(
+        script, shell_line(sys.executable, str(script), "drift", "--since", root), repo / "specs"
+    )
 
 
 def test_a_bound_a_shallow_clone_holds_beyond_its_cut_names_the_cut_not_a_rebase(
@@ -254,7 +259,7 @@ def test_a_bound_a_shallow_clone_holds_beyond_its_cut_names_the_cut_not_a_rebase
 
     assert shown == [
         f"{older} is out of reach: a shallow clone lacks the window's history",
-        f"git -C {clone.as_posix()} fetch --unshallow",
+        git_line(clone, "fetch", "--unshallow"),
     ]
 
 
@@ -279,7 +284,7 @@ def test_an_absent_bound_is_named_not_in_this_clone_with_the_fetch_that_brings_i
 
     assert shown == [
         f"{absent} is not in this clone",
-        f"git -C {repo.as_posix()} fetch origin {absent}",
+        git_line(repo, "fetch", "origin", absent),
     ]
 
 
@@ -306,10 +311,14 @@ def test_the_absent_bound_fix_line_fetches_the_object_and_moves_the_refusal_on(
     subprocess.run(shlex.split(before[1]), check=True, capture_output=True)
     after = _refusal(script, call)
 
-    assert before[1] == f"git -C {clone.as_posix()} fetch origin {side}"
+    assert before[1] == git_line(clone, "fetch", "origin", side)
     assert after == [
         f"{side} is not an ancestor of HEAD — a clone of this branch lacks it (a rebase rewrote it)",
-        _fix(script, f"{sys.executable} {script} drift --since {head}", clone / "specs"),
+        _fix(
+            script,
+            shell_line(sys.executable, str(script), "drift", "--since", head),
+            clone / "specs",
+        ),
     ]
 
 
@@ -330,7 +339,7 @@ def test_a_git_read_that_fails_in_a_shallow_clone_names_the_cut(
 
     assert shown == [
         f"git rev-parse --verify -q nope failed in {clone}: a shallow clone lacks the window's history",
-        f"git -C {clone.as_posix()} fetch --unshallow",
+        git_line(clone, "fetch", "--unshallow"),
     ]
 
 
@@ -447,4 +456,4 @@ def test_a_git_read_that_fails_outside_a_cut_reruns_that_read_for_its_diagnosis(
     )
 
     assert shown[0].startswith("git rev-parse HEAD: ")
-    assert shown[-1] == f"git -C {empty.as_posix()} rev-parse HEAD"
+    assert shown[-1] == git_line(empty, "rev-parse", "HEAD")

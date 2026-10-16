@@ -10,6 +10,7 @@ from types import ModuleType
 
 import pytest
 
+from dadaia_workspace.core.cli_line import shell_line
 from dadaia_workspace.core.skill_owner import load_owner
 
 _SOURCE = Path(load_owner("dd-bug-resolution", "_privacy").__file__ or "")
@@ -73,4 +74,6 @@ def test_a_baseline_inside_a_workspace_is_reinstalled_by_init_of_that_workspace(
     module = _baseline_at(inside, b"\xff\xfe")
     with pytest.raises(load_owner("dd-bug-resolution", "_refusal").Refusal) as caught:
         module.load_baseline()
-    assert caught.value.fix == f"uvx dadaia-workspace init {tmp_path.resolve()}"
+    assert caught.value.fix == shell_line(
+        "uvx", "dadaia-workspace", "init", str(tmp_path.resolve())
+    )

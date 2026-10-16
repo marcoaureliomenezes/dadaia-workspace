@@ -102,7 +102,7 @@ def test_a_verb_that_reads_a_file_that_is_not_utf8_refuses_with_one_fix(
     )  # fmt: skip
 
     assert done.returncode == 1 and "Traceback" not in done.stderr
-    assert relative in done.stderr
+    assert str(Path(relative)) in done.stderr
     assert [ln for ln in done.stderr.splitlines() if ln.startswith("fix: ")] == [
         f"fix: {_reencode((specs / relative).resolve())}"
     ]

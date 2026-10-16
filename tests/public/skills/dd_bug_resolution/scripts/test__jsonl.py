@@ -10,6 +10,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from dadaia_workspace.core.cli_line import shell_line
+
 _KERNEL = (
     Path(__file__).resolve().parents[5] / "dadaia_workspace/public/skills/dd-bug-resolution/scripts"
 )
@@ -54,7 +56,9 @@ def test_a_schema_of_the_installed_package_is_reinstalled_by_init(tmp_path: Path
     done = _run(tmp_path, body, damage="schemas/bug-record-v1.schema.json",
                 home=".dadaia/.venv/lib/site-packages/dadaia_workspace/public/skills")  # fmt: skip
 
-    assert done.stdout == f"uvx dadaia-workspace init {tmp_path.resolve()}\n"
+    assert (
+        done.stdout == shell_line("uvx", "dadaia-workspace", "init", str(tmp_path.resolve())) + "\n"
+    )
 
 
 def test_a_denylist_that_is_not_utf8_is_the_operators_to_rewrite(tmp_path: Path) -> None:

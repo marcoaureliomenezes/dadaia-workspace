@@ -112,7 +112,7 @@ def _protected_paths(fix: str, root: Path) -> list[str]:
     cannot write."""
     projected, protected = sdd_gate.law_set(root)
     found: list[str] = []
-    for word in re.findall(r"/[^\s`'\"]+", fix):
+    for word in re.findall(r"(?:[A-Za-z]:)?[\\/][^\s`'\"]+", fix):
         try:
             rel = Path(word).resolve().relative_to(root.resolve()).as_posix()
         except ValueError:

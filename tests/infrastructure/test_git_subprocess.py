@@ -159,7 +159,7 @@ def test_the_worktree_list_parse_is_the_kernels(tmp_path: Path) -> None:
     """The linked trees `unrecoverable` removes are `_git.parse_worktrees` of the porcelain."""
     parse_worktrees = load_owner("dd-bug-resolution", "_git").parse_worktrees
     assert parse_worktrees("worktree /m\nHEAD a\n\nworktree /l\nHEAD b\nbranch refs/heads/x\n") == [
-        {"worktree": "/l", "HEAD": "b", "branch": "refs/heads/x"}
+        {"worktree": str(Path("/l")), "HEAD": "b", "branch": "refs/heads/x"}
     ]
     repo = _repo(tmp_path / "r")
     _git(repo, "remote", "add", "origin", str(tmp_path / "nowhere"))

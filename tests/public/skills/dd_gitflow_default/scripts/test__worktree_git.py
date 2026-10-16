@@ -11,6 +11,7 @@ from typing import Any
 
 import pytest
 
+from dadaia_workspace.core.platform import quote
 from tests.helpers.worktree_ws import commit, fixes, git, make_workspace, run
 
 RC = "0.5.0/rc-1/wt-rc"
@@ -92,7 +93,7 @@ def test_an_orphan_wt_branch_at_any_depth_is_one_row_with_the_merge_as_its_fix(r
     [orphan] = [r for r in _rows(root) if r["state"] == "orphan"]
 
     assert orphan["path"] == str(root / "worktrees/r" / TASK)
-    assert orphan["fix"].endswith(f"worktree.py merge {orphan['path']}")
+    assert orphan["fix"].endswith(f"worktree.py merge {quote(orphan['path'])}")
 
 
 @pytest.mark.parametrize("filled", [True, False], ids=["non-empty", "empty"])

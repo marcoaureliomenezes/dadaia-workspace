@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.core.cli_line import fix_line
+from dadaia_workspace.core.cli_line import fix_line, shell_line
 from tests.helpers.worktree_ws import (
     NEW_JOB,
     NEW_TASK,
@@ -164,7 +164,7 @@ def test_after_a_lane_lands_sync_lets_the_release_tree_merge(root: Path) -> None
     assert moved.returncode == 1 and "moved past" in moved.stderr
     assert fixes(moved) == [f"fix: {fix_line(root, 'worktree', 'sync', str(rc))}"]
     launcher, worktree, *verb = shlex.split(fixes(moved)[0].removeprefix("fix: "))
-    assert [launcher, worktree] == [str(cli_path(root)), "worktree"]
+    assert [launcher, worktree] == shlex.split(shell_line(str(cli_path(root)), "worktree"))
     assert run(root, *verb).returncode == 0
     landed = run(root, "merge", str(rc))
     assert landed.returncode == 0, landed.stderr

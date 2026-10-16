@@ -64,9 +64,8 @@ def test_the_kernel_spells_the_fix_line_and_the_reinstall_act(tmp_path: Path) ->
     )
     (tmp_path / ".dadaia" / "states").mkdir(parents=True)
     (tmp_path / ".dadaia" / "states" / "spec_contexts.json").write_text("{}", encoding="utf-8")
-    assert (
-        cli_line.reinstall_fix(tmp_path / "specs")
-        == f"uvx dadaia-workspace init {tmp_path.resolve()}"
+    assert cli_line.reinstall_fix(tmp_path / "specs") == cli_line.shell_line(
+        "uvx", "dadaia-workspace", "init", str(tmp_path.resolve())
     )
 
 

@@ -64,7 +64,7 @@ def leaked(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[Path, Path]
 def test_git_answers_for_its_repo_not_the_callers_git_env(leaked: tuple[Path, Path]) -> None:
     a, _ = leaked
     git = load_owner("dd-bug-resolution", "_git").git
-    assert git(a, "rev-parse", "--show-toplevel").strip() == str(a.resolve())
+    assert Path(git(a, "rev-parse", "--show-toplevel").strip()) == a.resolve()
 
 
 def test_the_scrub_drops_repo_selectors_and_keeps_the_callers_identity_and_config(
@@ -150,8 +150,8 @@ def test_git_failure_raises_and_check_false_returns_stdout(tmp_path: Path) -> No
 def test_parse_worktrees_returns_the_linked_rows() -> None:
     parse = load_owner("dd-bug-resolution", "_git").parse_worktrees
     assert parse(_PORCELAIN) == [
-        {"worktree": "/w/worktrees/repo/a", "HEAD": "2" * 40, "branch": "refs/heads/wt/a", "locked": ""},
-        {"worktree": "/w/worktrees/repo/b", "HEAD": "3" * 40, "detached": "", "locked": "reason text"},
+        {"worktree": str(Path("/w/worktrees/repo/a")), "HEAD": "2" * 40, "branch": "refs/heads/wt/a", "locked": ""},
+        {"worktree": str(Path("/w/worktrees/repo/b")), "HEAD": "3" * 40, "detached": "", "locked": "reason text"},
     ]  # fmt: skip
     assert parse("worktree /w/repo\nHEAD " + "1" * 40 + "\n") == []
 

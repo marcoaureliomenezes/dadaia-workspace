@@ -9,6 +9,7 @@ from collections.abc import Collection
 from pathlib import Path
 from typing import Any
 
+from dadaia_workspace.core.cli_line import git_line
 from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
 from dadaia_workspace.features.spec_context.doctor import DoctorService
 from dadaia_workspace.hooks import ctx_inject
@@ -117,7 +118,7 @@ def test_the_fix_line_of_an_unregistered_tree_that_was_never_locked_removes_it(
     [finding] = [f for f in doctor.check_worktrees("c") if f.message.startswith("unregistered")]
 
     command = finding.fix.split("`")[1]
-    assert command == f"git -C {gone} worktree remove --force --force {tree}"
+    assert command == git_line(gone, "worktree", "remove", "--force", "--force", str(tree))
     subprocess.run(shlex.split(command), check=True, capture_output=True)
 
     assert not [f for f in doctor.check_worktrees("c") if f.message.startswith("unregistered")]

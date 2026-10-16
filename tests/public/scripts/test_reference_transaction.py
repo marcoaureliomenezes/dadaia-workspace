@@ -87,7 +87,7 @@ def test_raw_worktree_add_is_refused_with_one_runnable_fix(repo: _Repo, name: st
     fixes = [ln for ln in done.stderr.splitlines() if "fix:" in ln]
     assert len(fixes) == 1, done.stderr
     argv = shlex.split(fixes[0].split("fix:", 1)[1])
-    assert argv == [str(repo.stub), "worktree", "new", "repo", name]
+    assert [Path(argv[0]), *argv[1:]] == [repo.stub, "worktree", "new", "repo", name]
     assert subprocess.run(argv, check=False).returncode == 0
     assert repo.calls_made() == f"worktree new repo {name}\n"
     assert (

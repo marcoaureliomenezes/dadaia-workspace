@@ -9,6 +9,7 @@ from pathlib import Path
 
 import pytest
 
+from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.model_registry import (
     AgentModelPolicyOverlay,
     AgentModelPolicyStoreError,
@@ -70,21 +71,15 @@ def test_load_rejection_matrix(tmp_path: Path, doc: object, match: str) -> None:
 
 
 @pytest.mark.parametrize(
-    ("applied_template", "command"),
+    ("applied_template", "template"),
     [
-        pytest.param(
-            "max-quality",
-            "dadaia public install --template max-quality",
-            id="valid-template-kept",
-        ),
-        pytest.param(
-            "turbo-mode", "dadaia public install --template balanced", id="invalid-template-default"
-        ),
-        pytest.param(None, "dadaia public install --template balanced", id="no-template-default"),
+        pytest.param("max-quality", "max-quality", id="valid-template-kept"),
+        pytest.param("turbo-mode", "balanced", id="invalid-template-default"),
+        pytest.param(None, "balanced", id="no-template-default"),
     ],
 )
 def test_overrides_refused_with_runnable_fix(
-    tmp_path: Path, applied_template: str | None, command: str
+    tmp_path: Path, applied_template: str | None, template: str
 ) -> None:
     store = _store(tmp_path)
     store.path.parent.mkdir(parents=True)
@@ -96,7 +91,7 @@ def test_overrides_refused_with_runnable_fix(
     store.path.write_text(json.dumps(doc), encoding="utf-8")
     with pytest.raises(AgentModelPolicyStoreError, match="overrides") as raised:
         store.load()
-    assert command in raised.value.fix  # type: ignore[attr-defined]
+    assert fix_line(tmp_path, "public", "install", "--template", template) in raised.value.fix  # type: ignore[attr-defined]
 
 
 def test_applied_template_only_round_trip(tmp_path: Path) -> None:

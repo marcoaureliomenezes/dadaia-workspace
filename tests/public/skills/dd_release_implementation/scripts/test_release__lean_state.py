@@ -468,7 +468,7 @@ def test_new_on_a_milestone_less_closure_state_creates_the_next_candidate(
     closed = spec.read_bytes()
     born = _run(script, "new", "0.5.0", "--specs", str(specs))
     assert born.returncode == 0, born.stderr
-    assert f"{release}/rc-2/SPEC.md" in born.stdout
+    assert str(release / "rc-2" / "SPEC.md") in born.stdout
     assert release.joinpath("rc-2/SPEC.md").is_file()
     assert spec.read_bytes() == closed
 

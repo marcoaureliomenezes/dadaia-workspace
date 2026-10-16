@@ -68,12 +68,10 @@ def _refusal(root: Path, result: subprocess.CompletedProcess[str], kind: str, he
     """The merge refused with exactly the one `fix:` line of *kind*, and nothing landed."""
     dispatch = (f"fix: Agent action: dispatch dd-code-reviewer on {root / TREE} at HEAD {head};"
                 " its verdict.py run writes the verdict")  # fmt: skip
-    validate = [str(cli_path(root)), "reports", "validate", "--all"]
+    validate = shlex.split(shell_line(str(cli_path(root)), "reports", "validate", "--all"))
     got = fixes(result)
     if kind == VALIDATE_ALL:  # the one line, split as the shell will
-        got = [
-            [str(Path(w)) if Path(w).is_absolute() else w for w in shlex.split(g[5:])] for g in got
-        ]
+        got = [shlex.split(g[5:]) for g in got]
     want = [validate] if kind == VALIDATE_ALL else [dispatch]
     assert result.returncode == 1 and got == want, result.stderr
     assert git(root / "repos/r", "rev-parse", f"wt/{RC}").strip() != head
