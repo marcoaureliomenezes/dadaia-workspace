@@ -4,6 +4,7 @@ A mismatched upstream pushes by explicit refspec; commit_paths ignores pre-stage
 the identity is the operator's own, never a fallback; a failed step carries git's stdout.
 """
 
+import re
 import subprocess
 from pathlib import Path
 
@@ -212,3 +213,34 @@ def test_work_version_refuses_when_several_work_branches_exist(tmp_path: Path) -
         load_owner("dd-bug-resolution", "_refusal").Refusal, match="2 work branches"
     ):
         GitSubprocessClient().work_version(repo)
+
+
+@pytest.mark.parametrize("merged", [True, False])
+@pytest.mark.parametrize("checked_out", ["feature/0.1.0", "feature/0.2.0", "third"])
+def test_the_several_work_branches_fix_runs_and_clears_the_refusal(
+    tmp_path: Path, checked_out: str, merged: bool
+) -> None:
+    """The printed fix removes the lower branch from whichever branch the checkout is on."""
+    repo = _scaffolded(tmp_path / "r")
+    _git(repo, "switch", "-qc", "third")
+    _git(repo, "switch", "-qc", "feature/0.1.0")
+    if not merged:
+        _git(repo, "branch", "feature/0.2.0")
+    (repo / "low.txt").write_text("low")
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-qm", "low only")
+    if merged:
+        _git(repo, "branch", "feature/0.2.0")
+    _git(repo, "switch", "-q", checked_out)
+    client = GitSubprocessClient()
+
+    with pytest.raises(load_owner("dd-bug-resolution", "_refusal").Refusal) as caught:
+        client.work_version(repo)
+
+    steps = re.findall(r"git -C [^\s`]+ (?:switch|branch -d) [^\s`]+", caught.value.fix)
+    for step in steps:
+        if not merged and step.startswith(git_line(repo, "branch", "-d")):
+            _git(repo, "merge", "-q", "feature/0.1.0")  # the agent's merge act
+        done = subprocess.run(step, shell=True, capture_output=True, text=True)  # noqa: S602
+        assert done.returncode == 0, done.stderr
+    assert client.work_version(repo) == "0.2.0"

@@ -152,10 +152,13 @@ def test_the_text_names_the_kind_and_carries_one_fix_line(tmp_path: Path) -> Non
 @pytest.mark.parametrize(
     ("fix", "first"),
     [
-        ("git -C /r branch -d feature/0.1.0", "run git -C /r branch -d feature/0.1.0"),
         (
-            "Agent action: merge feature/0.1.0 into feature/0.2.0, then run git -C /r branch -d feature/0.1.0",
-            "merge feature/0.1.0 into feature/0.2.0, then run git -C /r branch -d feature/0.1.0",
+            "Agent action: run `git -C /r switch feature/0.2.0`, then run `git -C /r branch -d feature/0.1.0`",
+            "run `git -C /r switch feature/0.2.0`, then run `git -C /r branch -d feature/0.1.0`",
+        ),
+        (
+            "Agent action: run `git -C /r switch feature/0.2.0`, then merge feature/0.1.0 into feature/0.2.0, then run `git -C /r branch -d feature/0.1.0`",
+            "run `git -C /r switch feature/0.2.0`, then merge feature/0.1.0 into feature/0.2.0, then run `git -C /r branch -d feature/0.1.0`",
         ),
     ],
 )
