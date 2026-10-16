@@ -9,7 +9,7 @@ description: >
 
 # dd-release-implementation
 
-> Not hook-enforced. No engine advances gates or drives closure — implementers, the reviewer, `dd-product-engineer` and the main thread uphold it directly.
+> No engine advances gates or drives closure — implementers, the reviewer, `dd-product-engineer` and the main thread uphold it directly.
 
 ## 1. When
 
@@ -36,7 +36,7 @@ description: >
 ## 2a. Push green
 
 - Pre-push: `.dadaia/AGENTS.md` §3.
-- Commits flow freely; a full scan lives only in the audit lane.
+- Commits flow freely; a full scan lives only in the audit (`dd-audit-project`).
 - Fix a red `verify:` line at its cause, since a rerun hides the defect it reports.
 - A flaky test is quarantined by the repo's own mechanism, bug-gated; an unregistered pass-on-retry is a failure.
 

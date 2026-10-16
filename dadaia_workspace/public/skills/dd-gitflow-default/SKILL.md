@@ -57,9 +57,9 @@ The branch contract by role; the names are `specs/constitution.md`'s `gitflow:` 
 | 2 | `wt-backlog-<slug>`, `wt-rc` (define) | ADR proposal: `specs/ADRs/decisions.jsonl` | `docs(adr): propose <slug>` |
 | 2 | `wt-backlog-<slug>`, `wt-rc` (define, reconcile) | In-place `measured_by` repair: `specs/ADRs/decisions.jsonl` | `chore(adrs): repair …` |
 | 2 | `wt-rc` (define, reconcile) | ADR acceptance: `specs/ADRs/decisions.jsonl`, `specs/memory/*` | `docs(adr): accept <slug>` |
-| 3 | a `wt-main` or `wt-hotfix` tree | Bug fix or REBUILD: `<code>`, red loop in the body, a hotfix's naming `block: <item>`; the regression test lands first as a `test(` commit (a task's shape 6, or the hotfix lane's) | `fix(bugs): <id> — <cause>`; a REBUILD `refactor(bugs): <id> — REBUILD <unit>: …`; a group names its N ids |
+| 3 | a `wt-task-<kkk>` or `wt-hotfix` tree | Bug fix or REBUILD: `<code>`, red loop in the body, a hotfix's naming `block: <item>`; the regression test lands first as a `test(` commit (a task's shape 6, or the hotfix lane's) | `fix(bugs): <id> — <cause>`; a REBUILD `refactor(bugs): <id> — REBUILD <unit>: …`; a group names its N ids |
 | 4 | a `wt-main` or `wt-hotfix` tree | Terminal transition without code (`resolve` after its named shape-3 fix commit, `supersede`, `reject`): `specs/bugs/BUGS.jsonl` | `chore(bugs): <verb> <id> — <reason, by task-id, or fix sha>`; per class `chore(bugs): <verb> class <class> — <reason>`, one id per body line |
-| 4 | a `wt-main` or `wt-hotfix` tree | Archive terminal bugs: `specs/bugs/BUGS.jsonl`, `specs/bugs/_archive/bugs_histo.jsonl` | `chore(bugs): archive <ids>` |
+| 4 | `wt-rc` (reconcile) | Archive terminal bugs: `specs/bugs/BUGS.jsonl`, `specs/bugs/_archive/bugs_histo.jsonl` | `chore(bugs): archive <ids>` |
 | 5 | `wt-rc` (define) | Release definition, and a candidate's birth (`release.py new` writes `_RELEASE.json` and the SPEC stub in one transaction): `specs/releases/<v>/rc-<N>/*`, `specs/releases/<v>/_RELEASE.json` | `feat(specs): define candidate …` |
 | 6 | a task tree | Task: its `W:` | `conventional-commit(<id>): description`, a REBUILD `refactor(<id>): REBUILD <unit> — …` |
 | 7 | `wt-hotfix-<bug-id>` | Specs revert, no code: the `specs/` paths of the culprit commit, put back | `Revert "<subject>"`; body `This reverts commit <sha>.` and `block: <item>` |
@@ -75,7 +75,7 @@ The branch contract by role; the names are `specs/constitution.md`'s `gitflow:` 
 
 ## 4. Done when
 
-- Current branches match §2a, and every commit since the work branch's cut matches one §3a row.
+- Current branches match §2a, and every commit since the work branch's cut, `specs/audits/**` commits aside, matches one §3a row.
 - After a work → integration PR: the repo's `verify:` line passed, the reviewer's `APPROVED` verdict names the PR head, and the PR merged.
 - After promotion: the `archive/<work-name>` tag resolves to the former work tip, once the next release is named the work branch carries its name and its first merge records the principal merge as `shipped` in the archived state.
 

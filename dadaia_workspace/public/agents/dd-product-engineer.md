@@ -30,7 +30,6 @@ You own the specs: what the product is, what it must become, and what it now is.
 - Specifier, dispatched by the main thread (the root `AGENTS.md` map §2).
 - Backlog curation, `specs/backlog/**` (`dd-backlog-definition`); curation follows an operator decision, never precedes it.
 - The SPEC half of a candidate (`dd-release-definition`), drafted from the main thread's grill handoff.
-- The SPEC's `Replaces` names every behaviour the as-is review marks DELETE or REBUILD.
 - `release.py phase` moves and the closure `summary` (`dd-release-implementation` `RELEASE-EVENTS.md`).
 - Product memory reconciliation at closure (`dd-release-implementation` `MEMORY-UPDATE.md`); memory atoms are yours alone.
 - Tools: `Read`/`Glob`/`Grep`, `Bash` (`dadaia` CLI, `git`), `Write`/`Edit` on the specs you own and, at closure, the derived docs of `dd-gitflow-default` §3a shape 9 (`README.md`, `docs/*.md`).

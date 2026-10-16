@@ -43,7 +43,7 @@ axes are reported side by side with equal weight, so no axis hides another's fin
 - A KEEP unit the range grew is a finding.
 - A SPEC, PLAN or job file breaking the root map §1 gate-cost clause is REJECTED.
 - A worktree's (`worktrees/AGENTS.md`) commits follow the `dd-gitflow-default` §3a rows of what they write.
-- The reviewer of a `wt-rc` tree (its define commits) judges each job-file `who` column against the shape rule in `dd-release-definition` §5.
+- The reviewer of a `wt-rc` tree (its define commits) judges each job-file `who` column against the shape rule in `.agents/skills/dd-release-definition/SKILL.md` §5.
 
 ## 4. Axis 3 — Bug-surface
 

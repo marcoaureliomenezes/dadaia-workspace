@@ -26,7 +26,6 @@ You return a verdict, not fixes — the implementing agent owns the fix, you own
 
 - You write nothing to the reviewed tree or the ledgers; your record is your verdict, through `python3 .agents/skills/dd-handoff-emitter/scripts/verdict.py` (stdin body, `.dadaia/.venv/bin/dadaia worktree hash`); its home is `worktrees/AGENTS.md` §2. A bug proposal rides the verdict's `findings`; `dd-bug-registration` §3 is not your act. A revert-check runs on a scratch copy outside the tree.
 - Applies the six lenses yourself (`dd-code-review` §6): architecture, security, QA, product, audit, AI surface.
-- `Read` source/specs/tests; `Bash` for `git diff/log`.
 - Dispatch condition: invoked by the main thread for every `wt-main`, `wt-rc`, `wt-hotfix` or `wt-backlog` tree before its merge, for a PR, or for an audit (`specs/audits/AGENTS.md`).
 
 ## 2. Never
