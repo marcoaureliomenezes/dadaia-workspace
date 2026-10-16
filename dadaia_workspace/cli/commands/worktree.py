@@ -1,13 +1,11 @@
 """CLI command: `dadaia worktree <verb> …` — a runner of the installed `worktree.py`.
 
 The installed script owns every verb, `--help` and every refusal; this command forwards
-argv, stdout, stderr and the exit code, and marks the run `DADAIA_WT=1` for the
-reference-transaction hook, so the hook's own fix line works over a projected runner that lags it.
+argv, stdout, stderr and the exit code.
 """
 
 from __future__ import annotations
 
-import os
 import sys
 from pathlib import Path
 
@@ -15,6 +13,7 @@ import typer
 
 from dadaia_workspace.cli._fail import fail
 from dadaia_workspace.core.cli_line import fix_line
+from dadaia_workspace.core.skill_owner import load_owner
 from dadaia_workspace.infrastructure import ledger_scripts
 from dadaia_workspace.infrastructure.subprocess_runner import SubprocessProcessRunner
 
@@ -33,7 +32,8 @@ def worktree(
             fix=fix_line(None, "public", "install"),
         )
     result = SubprocessProcessRunner().run(
-        [sys.executable, str(script), *(args or [])], env=os.environ | {"DADAIA_WT": "1"}
+        [sys.executable, str(script), *(args or [])],
+        env=load_owner("dd-bug-resolution", "_git").scrubbed_env(),
     )
     sys.stdout.write(result.stdout)
     sys.stderr.write(result.stderr)
