@@ -201,6 +201,18 @@ def test_a_code_file_renamed_into_audits_on_the_work_branch_is_refused(repo: _Re
     _assert_refused(repo, repo.git("commit", "-q", "-m", "audit"), before)
 
 
+def test_a_move_to_a_non_descendant_whose_diff_is_only_audits_is_refused(repo: _Repo) -> None:
+    before = repo.ok("rev-parse", "HEAD")
+    repo.ok("checkout", "-q", "-b", "other")
+    (repo.root / "specs" / "audits").mkdir(parents=True)
+    (repo.root / "specs" / "audits" / "f.md").write_text("finding\n", encoding="utf-8")
+    repo.ok("add", "-A")
+    repo.ok("commit", "-q", "-m", "audit")
+    orphan = repo.ok("commit-tree", repo.ok("rev-parse", "other^{tree}"), "-m", "orphan")
+    repo.ok("checkout", "-q", _WORK)
+    _assert_refused(repo, repo.git("update-ref", f"refs/heads/{_WORK}", orphan), before)
+
+
 @pytest.mark.parametrize("code", [1, 2])
 def test_a_runner_fault_warns_and_lets_the_commit_through(repo: _Repo, code: int) -> None:
     repo.install_runner(f"#!/bin/sh\necho boom >&2\nexit {code}\n")
