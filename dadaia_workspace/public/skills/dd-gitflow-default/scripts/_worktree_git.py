@@ -40,9 +40,7 @@ def cli(root: Path, *args: str, tree: Path | None = None) -> subprocess.Complete
     """One read-only run of the workspace CLI — the owner of every package grammar. With *tree*
     the run acts on that tree alone: its cwd, every root above it fenced."""
     fence = (
-        {"DADAIA_FENCED_ROOTS": os.pathsep.join(str(p) for p in tree.resolve().parents)}
-        if tree
-        else {}
+        {"DADAIA_FENCED_ROOTS": os.pathsep.join(map(str, tree.resolve().parents))} if tree else {}
     )
     return run_cli(root, *args, cwd=tree or root, env=scrubbed_env() | fence, stdin=subprocess.DEVNULL)  # fmt: skip
 
