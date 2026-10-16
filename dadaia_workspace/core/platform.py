@@ -70,4 +70,4 @@ def use_utf8_stdio() -> None:
     """Make stdout and stderr UTF-8 whatever the host pipe defaults to (cp1252 on Windows)."""
     for stream in (sys.stdout, sys.stderr):
         if reconfigure := getattr(stream, "reconfigure", None):
-            reconfigure(encoding="utf-8")
+            reconfigure(encoding="utf-8", errors=stream.errors)
