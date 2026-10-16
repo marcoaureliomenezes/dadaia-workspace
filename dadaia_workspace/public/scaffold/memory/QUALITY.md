@@ -22,7 +22,7 @@ a subprocess or real git; LARGE = `tests/e2e`. Test basics: the root `AGENTS.md`
 
 ## Gates
 
-The repo's tracked `verify:` line runs before every push and once at a job or plain-change merge.
+The repo's tracked `verify:` line runs once, at the merge; nothing reruns it before a push.
 
 <!-- dadaia:fixed slop-tests -->
 <!-- /dadaia:fixed slop-tests -->
