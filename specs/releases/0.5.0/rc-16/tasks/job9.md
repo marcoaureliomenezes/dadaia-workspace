@@ -10,7 +10,7 @@ Wave 5, waits on Jobs 1–8. Paths are repository-relative to `repos/dadaia-work
   - the test (T3) scans the string literals of `dadaia_workspace/**/*.py` that begin `fix:` or are passed to `fix_line`/`spell_fix` and finds none naming `worktree.py`;
   - `grep -rn 'worktree\.py' dadaia_workspace .github scripts` leaves only the resolve constants (`_worktree_names.SCRIPT`, `ledger_scripts.WORKTREE_SCRIPT`, `gate_policy._WORKTREE_SCRIPT`, `verdict.py:27`, `_release_phase.py:63-64`) and docstrings of the script's own verbs; the 6 `.md` hits are Job 6's and are zero by then;
   - a red sweep is a finding returned to the main thread (a PLAN amendment), never a write outside `W:`.
-- Net production lines ≈ +29 (one row, +14 exemption in T5 deleted by T6, +28 remedy by T6), tests ≈ +60.
+- Net production lines measured +112 against `af6b055e6` (the row, the exemption deleted by T6, and the privacy remedy as a gated verb), tests ≈ +60.
 
 Tasks: 7 (1 jr, 6 sr, 0 pe). `who` names the dispatched role (`dd-release-definition` §5). Parallelism: {T1→T2} and {T3} are independent and start together (disjoint `W:`).
 
