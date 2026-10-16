@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import subprocess
 import sys
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from dataclasses import replace
 from pathlib import Path
 
@@ -22,8 +22,10 @@ from dadaia_workspace.core.gitflow import Gitflow, work_branch
 from dadaia_workspace.core.skill_owner import load_owner
 from dadaia_workspace.features.chokepoints.branch_policy import (
     HEADS_PREFIX,
+    Decision,
     GateFixes,
     check_ref_policy,
+    parse_push_stdin,
 )
 from dadaia_workspace.features.spec_context.service import install_git_hooks
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
@@ -88,20 +90,54 @@ def _gate_inputs(repo_root: Path, head: str) -> tuple[Gitflow, GateFixes]:
 
 def _rewrite_unpublished(repo: Path, oldest: str, message: str | None) -> None:
     """Re-commit the unpublished range of HEAD, from *oldest*, as one commit holding the
-    tracked working tree (*oldest*'s message, or *message*); refuse a commit origin holds.
-    The git calls carry the sanctioned-tool marker (``git_subprocess``): the ref gate passes them."""
+    tracked working tree. Runs only when the push gate refuses that range on a denylist hit
+    or a canon violation, and only over edits or deletions of the paths the gate lists;
+    *message* replaces the message only when the gate lists a commit message. The git calls
+    carry the sanctioned-tool marker (``git_subprocess``): the ref gate passes them."""
     from dadaia_workspace.container import build_git_client, build_git_object_reader
+    from dadaia_workspace.core.models.git_scan import ZERO_SHA
+    from dadaia_workspace.features.chokepoints.push_gate import GateDecision
 
     git = build_git_client()
+    tip = git.git(repo, "rev-parse", "HEAD")
     try:
         sha = git.git(repo, "rev-parse", "--verify", f"{oldest}^{{commit}}")
     except GitSyncError:
         sha = oldest
-    if sha not in build_git_object_reader().unpublished(repo, git.git(repo, "rev-parse", "HEAD")):
-        fail(
+    branch = git.current_branch(repo) or "HEAD"
+    held = git.git(repo, "for-each-ref", "--format=%(objectname)", f"refs/remotes/origin/{branch}")
+    line = f"refs/heads/{branch} {tip} refs/heads/{branch} {held or ZERO_SHA}"
+    decision = _gate_decision(repo, lambda: line)
+    listed = decision.listed if isinstance(decision, GateDecision) else frozenset()
+    changed = git.git(repo, "diff", "--name-status", "--no-renames", "-z", tip).split("\0")
+    stray = sorted(
+        p
+        for st, p in zip(changed[::2], changed[1::2], strict=False)
+        if st not in ("M", "D") or p not in listed
+    )
+    refusal = None
+    if sha not in build_git_object_reader().unpublished(repo, tip):
+        refusal = (
             f"cannot rewrite {oldest}: origin already holds it, or it is not in HEAD's history",
             "Agent action: pass the oldest commit origin does not hold, as the push gate's fix line names it",
         )
+    elif not listed:
+        refusal = (
+            "the push gate lists no denylist or canon finding in HEAD's unpublished range",
+            "Agent action: land the change through a worktree; this remedy answers a push gate refusal only",
+        )
+    elif stray:
+        refusal = (
+            f"the working tree changes paths the gate did not list: {', '.join(stray)}",
+            "Agent action: revert or unstage every path the gate did not list, and add no path",
+        )
+    elif message and not (isinstance(decision, GateDecision) and decision.message_listed):
+        refusal = (
+            "the push gate lists no commit message, so the message stays",
+            "Agent action: run the remedy again without the message option",
+        )
+    if refusal:
+        fail(*refusal)
     git.git(repo, "reset", "--soft", sha)
     git.git(
         repo,
@@ -113,30 +149,9 @@ def _rewrite_unpublished(repo: Path, oldest: str, message: str | None) -> None:
     )
 
 
-@app.command("push-gate-check")
-def push_gate_check(
-    rewrite_from: str | None = typer.Option(
-        None, "--rewrite-from", help="Remedy: re-commit the unpublished range from this commit."
-    ),
-    repo: Path | None = typer.Option(None, "--repo", help="Remedy target. Default: cwd's repo."),
-    message: str | None = typer.Option(None, "--message", help="Remedy: the one commit's message."),
-) -> None:
-    """Pre-push gate: branch policy by the project gitflow + the range-scoped denylist scan.
-
-    Branch model: the constitution's gitflow block (`dd-gitflow-default`).
-
-    Reads the pre-push ref lines from stdin (``<local-ref> <local-sha> <remote-ref>
-    <remote-sha>``). Every non-deletion ref (tags included) is scanned for new objects
-    carrying a denylisted term — a work-branch push is the first publication to ``origin``.
-    Branch deletions are never scanned; tag pushes are scanned but never gated on branch
-    policy.
-
-    The object source, denylist terms and baseline patterns are all built here and
-    injected; a call site that fails to wire the object reader is a defect, never a
-    bypass. No repo or context name is a term source.
-
-    With ``--rewrite-from`` it runs the gate's own remedy instead (``_rewrite_unpublished``).
-    """
+def _gate_decision(repo_root: Path, read_refs: Callable[[], str]) -> Decision:
+    """The push gate's decision over the pre-push ref lines *read_refs* returns, from the
+    repo's gitflow, denylist and canon."""
     from dadaia_workspace.container import (
         build_git_client,
         build_git_object_reader,
@@ -145,12 +160,8 @@ def push_gate_check(
     )
     from dadaia_workspace.core.specs_version import state
     from dadaia_workspace.features.chokepoints import push_gate_decision
-    from dadaia_workspace.features.chokepoints.branch_policy import parse_push_stdin
     from dadaia_workspace.features.specs.canon import canon_violations
 
-    if rewrite_from is not None:
-        return _rewrite_unpublished(repo or _repo_root(), rewrite_from, message)
-    repo_root = _repo_root()
     denylist_terms = load_denylist_terms()
     baseline_patterns = load_denylist_baseline_patterns()
 
@@ -162,8 +173,7 @@ def push_gate_check(
     )
     typer.echo(f"[pre-push] denylist scan mode: {mode}", err=True)
 
-    stdin_text = sys.stdin.read() if not sys.stdin.isatty() else ""
-    refs, malformed = parse_push_stdin(stdin_text)
+    refs, malformed = parse_push_stdin(read_refs())
     # `git push origin HEAD` names its source "HEAD": the branch checked out IS that ref.
     git = build_git_client()
     branch = git.current_branch(repo_root)
@@ -196,7 +206,36 @@ def push_gate_check(
     )
     if decision.warn:
         typer.echo(decision.warn, err=True)
+    return decision
 
+
+@app.command("push-gate-check")
+def push_gate_check(
+    rewrite_from: str | None = typer.Option(
+        None, "--rewrite-from", help="Remedy: re-commit the unpublished range from this commit."
+    ),
+    repo: Path | None = typer.Option(None, "--repo", help="Remedy target. Default: cwd's repo."),
+    message: str | None = typer.Option(None, "--message", help="Remedy: the one commit's message."),
+) -> None:
+    """Pre-push gate: branch policy by the project gitflow + the range-scoped denylist scan.
+
+    Branch model: the constitution's gitflow block (`dd-gitflow-default`).
+
+    Reads the pre-push ref lines from stdin (``<local-ref> <local-sha> <remote-ref>
+    <remote-sha>``). Every non-deletion ref (tags included) is scanned for new objects
+    carrying a denylisted term — a work-branch push is the first publication to ``origin``.
+    Branch deletions are never scanned; tag pushes are scanned but never gated on branch
+    policy.
+
+    The object source, denylist terms and baseline patterns are all built here and
+    injected; a call site that fails to wire the object reader is a defect, never a
+    bypass. No repo or context name is a term source.
+
+    With ``--rewrite-from`` it runs the gate's own remedy instead (``_rewrite_unpublished``).
+    """
+    if rewrite_from is not None:
+        return _rewrite_unpublished(repo or _repo_root(), rewrite_from, message)
+    decision = _gate_decision(_repo_root(), lambda: "" if sys.stdin.isatty() else sys.stdin.read())
     if not decision.allowed:
         fail(decision.message)
 
