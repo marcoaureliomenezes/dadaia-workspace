@@ -15,6 +15,7 @@ import pytest
 from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app
+from dadaia_workspace.core.cli_line import shell_line
 from dadaia_workspace.infrastructure import python_env as pe
 
 _runner = CliRunner()
@@ -98,6 +99,24 @@ def test_init_refuses_meta_and_unknown_harness_values(
         assert _the_fix(result.output).replace("\\", "/").startswith(expected)
     if setup is _foreign:
         assert (tmp_path / "demo" / "somebody-elses-file.txt").read_text(encoding="utf-8") == "keep me"
+
+
+def test_init_sibling_fix_line_is_spelled_by_the_kernel_for_a_path_with_a_blank(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The printed sibling command is the kernel's spelling, so a blank in the path stays one argument."""
+    proj = tmp_path / "my dir" / "proj"
+    proj.mkdir(parents=True)
+    (proj / "README.md").write_text("mine", encoding="utf-8")
+    monkeypatch.chdir(proj)
+
+    result = _runner.invoke(app, ["init", ".", "--harness", "claude", "--repo", "https://h/a b.git"])
+
+    assert result.exit_code == 1, result.output
+    sibling = str(proj.resolve().parent / "proj-workspace")
+    assert _the_fix(result.output) == shell_line(
+        "uvx", "dadaia-workspace", "init", sibling, "--harness", "claude", "--repo", "https://h/a b.git"
+    )
 
 
 def test_init_creates_the_named_dir_and_is_idempotent(tmp_path: Path, monkeypatch) -> None:
