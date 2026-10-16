@@ -116,23 +116,23 @@ Sweep counts (ASIS §2): 18 production `.py` files, 29 law/skill/agent/template 
 | Job 7 | Job 4 | 3 | `tests/public/skills/dd_gitflow_default/scripts/test__worktree_sync.py`, `tests/public/skills/dd_gitflow_default/scripts/test__worktree_end.py`, `dadaia_workspace/public/skills/dd-gitflow-default/scripts/_worktree_sync.py`, `dadaia_workspace/public/skills/dd-gitflow-default/scripts/worktree.py`, `dadaia_workspace/public/skills/dd-gitflow-default/scripts/_worktree_end.py`, `tests/public/skills/dd_gitflow_default/scripts/test__worktree_new.py`, `tests/public/skills/dd_gitflow_default/scripts/test__worktree_end__removal.py`, `dadaia_workspace/public/skills/dd-gitflow-default/scripts/_worktree_new.py`, `scripts/guards/slop.py`, `dadaia_workspace/public/skills/dd-gitflow-default/scripts/levels/version.md`, `dadaia_workspace/public/skills/dd-gitflow-default/scripts/levels/rc.md`, `dadaia_workspace/public/skills/dd-gitflow-default/scripts/levels/job.md`, `tests/cli/commands/test_init__characterization.py`, `tests/cli/commands/test_public__characterization.py`, `tests/public/skills/dd_gitflow_default/scripts/test__worktree_end__preflight.py`, `tests/public/skills/dd_gitflow_default/scripts/test__worktree_end__worktree_ledger_conflict.py` |
 | Job 8 | Job 4 | 3 | `tests/cli/commands/test_specs.py`, `dadaia_workspace/cli/commands/specs.py`, `tests/features/spec_context/test_service__context_baseline.py`, `dadaia_workspace/features/spec_context/service.py`, `tests/features/workspace/test_onboarding__onboarding_steps.py`, `tests/features/workspace/test_onboarding.py`, `dadaia_workspace/features/workspace/onboarding.py`, `dadaia_workspace/cli/commands/ci.py`, `dadaia_workspace/core/gitflow.py`, `dadaia_workspace/infrastructure/git_subprocess.py`, `docs/cli.md`, `evals/tasks/t2-block-list-bug/environment/project.sh`, `tests/core/test_gitflow.py`, `tests/e2e/test_onboarding_journey.py`, `tests/infrastructure/test_git_subprocess.py` |
 | Job 9 | Jobs 1–8 | 5 | `tests/features/spec_context/test_doctor__hooks_drift.py`, `tests/features/spec_context/test_service__hook_refresh.py`, `dadaia_workspace/core/workspace_layout.py`, `dadaia_workspace/public/templates/shipped-hashes.json`, `tests/core/test_cli_line__fix_line_contract.py`, `tests/core/test_cli_line__refusal_fix_lines_clear_their_refusal.py`, `tests/public/scripts/test_reference_transaction__work_branch.py`, `dadaia_workspace/cli/commands/ci.py`, `dadaia_workspace/features/chokepoints/push_gate.py`, `tests/features/chokepoints/test_push_gate.py`, `dadaia_workspace/cli/commands/worktree.py`, `dadaia_workspace/infrastructure/ledger_scripts.py`, `dadaia_workspace/public/schemas/handoff-v1.schema.json` |
-| Job 10 | Job 9 | 6 | `docs/index.md`, `docs/quickstart.md`, `docs/getting-started.md`, `docs/positioning.md`, `CONTEXT.md`, `README.md`, `tests/fixtures/quickstart.md`, `specs/backlog/BACKLOG.json`, `specs/backlog/_archive/backlog_histo.jsonl`, `specs/bugs/BUGS.jsonl`, `specs/bugs/_archive/bugs_histo.jsonl`, `specs/releases/0.5.0/_RELEASE.json`, `specs/releases/0.5.0/rc-16/tasks/job1.md`, `specs/releases/0.5.0/rc-16/tasks/job2.md`, `specs/releases/0.5.0/rc-16/tasks/job3.md`, `specs/releases/0.5.0/rc-16/tasks/job4.md`, `specs/releases/0.5.0/rc-16/tasks/job5.md`, `specs/releases/0.5.0/rc-16/tasks/job6.md`, `specs/releases/0.5.0/rc-16/tasks/job7.md`, `specs/releases/0.5.0/rc-16/tasks/job8.md`, `specs/releases/0.5.0/rc-16/tasks/job9.md`, `specs/releases/0.5.0/rc-16/tasks/job10.md`, `specs/releases/0.5.0/rc-16/PLAN.md`, `dadaia_workspace/public/skills/dd-gitflow-default/scripts/_worktree_end.py`, `dadaia_workspace/public/skills/dd-gitflow-default/SKILL.md`, `dadaia_workspace/public/skills/dd-release-implementation/SKILL.md`, `dadaia_workspace/public/agents/dd-code-reviewer.md`, `dadaia_workspace/public/data/AGENTS.md` |
+| Job 10 | Job 9 | 6 | `docs/index.md`, `docs/quickstart.md`, `docs/getting-started.md`, `docs/positioning.md`, `CONTEXT.md`, `README.md`, `tests/fixtures/quickstart.md`, `specs/backlog/BACKLOG.json`, `specs/backlog/_archive/backlog_histo.jsonl`, `specs/bugs/BUGS.jsonl`, `specs/bugs/_archive/bugs_histo.jsonl`, `specs/releases/0.5.0/_RELEASE.json`, `specs/releases/0.5.0/rc-16/tasks/job1.md`, `specs/releases/0.5.0/rc-16/tasks/job2.md`, `specs/releases/0.5.0/rc-16/tasks/job3.md`, `specs/releases/0.5.0/rc-16/tasks/job4.md`, `specs/releases/0.5.0/rc-16/tasks/job5.md`, `specs/releases/0.5.0/rc-16/tasks/job6.md`, `specs/releases/0.5.0/rc-16/tasks/job7.md`, `specs/releases/0.5.0/rc-16/tasks/job8.md`, `specs/releases/0.5.0/rc-16/tasks/job9.md`, `specs/releases/0.5.0/rc-16/tasks/job10.md`, `specs/releases/0.5.0/rc-16/PLAN.md`, `dadaia_workspace/public/skills/dd-gitflow-default/scripts/_worktree_end.py`, `dadaia_workspace/public/skills/dd-gitflow-default/SKILL.md`, `dadaia_workspace/public/skills/dd-release-implementation/SKILL.md`, `dadaia_workspace/public/agents/dd-code-reviewer.md`, `dadaia_workspace/public/data/AGENTS.md`, `docs/getting-started.md` |
 
 ### Tasks per job
 
 | job | tasks | sr | jr | pe |
 |---|---:|---:|---:|---:|
-| Job 1 | 6 | 4 | 2 | 0 |
+| Job 1 | 7 | 5 | 2 | 0 |
 | Job 2 | 8 | 4 | 4 | 0 |
-| Job 3 | 10 | 6 | 4 | 0 |
+| Job 3 | 13 | 8 | 5 | 0 |
 | Job 4 | 20 | 8 | 12 | 0 |
-| Job 5 | 6 | 3 | 3 | 0 |
-| Job 6 | 4 | 1 | 3 | 0 |
-| Job 7 | 4 | 2 | 2 | 0 |
-| Job 8 | 6 | 5 | 1 | 0 |
+| Job 5 | 10 | 6 | 4 | 0 |
+| Job 6 | 8 | 4 | 4 | 0 |
+| Job 7 | 6 | 4 | 2 | 0 |
+| Job 8 | 9 | 8 | 1 | 0 |
 | Job 9 | 7 | 6 | 1 | 0 |
-| Job 10 | 2 | 1 | 0 | 1 |
-| total | 73 | 40 | 32 | 1 |
+| Job 10 | 4 | 2 | 1 | 1 |
+| total | 92 | 55 | 36 | 1 |
 
 ## 2. Notes for the main thread
 
@@ -195,6 +195,5 @@ Estimates from the units' present sizes; the reviewer measures the real diff.
 | 8 | ≈ +21 | 0 | |
 | 9 | +1 | 0 | tests ≈ +60 |
 | 10 | 0 | 0 | |
-| total | 67 | 35 | 31 | 1 |
 
 Not ≤ 0. Stated reason (pre-review #5): the demand ADDS capabilities no unit can carry (hook ≈ 40 shell + ≈ 32 python, CLI runner 24, `sync` 50, level writer 20, onboarding cut 21) and DELETEs ≈ 160 python lines (plain, recorded base, kind if-chain, define exception, the placeholder unlink, `_absent_tree`). Cheaper options tried: the hook deciding `feature/` by name (rejected: names are the constitution's); `sync` as a flag of `merge` (rejected: a second path inside the gate).
