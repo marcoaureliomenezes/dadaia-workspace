@@ -11,7 +11,7 @@ from dadaia_workspace import container
 from dadaia_workspace.cli._fail import fail
 from dadaia_workspace.cli.commands.context import create_fix, print_next_step
 from dadaia_workspace.core import harness_registry
-from dadaia_workspace.core.cli_line import fix_line
+from dadaia_workspace.core.cli_line import fix_line, shell_line
 from dadaia_workspace.core.exceptions import (
     ContextAlreadyExistsError,
     DadaiaError,
@@ -28,7 +28,7 @@ _LAW_NOTE = "Sessions launch at the workspace root."
 
 #: How ``init`` is invoked before any workspace (and so any ``.dadaia/.venv``) exists —
 #: every ``fix:`` line init prints starts here, so each one runs as printed.
-_INIT = "uvx dadaia-workspace init"
+_INIT = ("uvx", "dadaia-workspace", "init")
 reconcile_workspace = container.reconcile_workspace
 
 
@@ -44,10 +44,10 @@ class InitPlan:
     def command(self, directory: object = None) -> str:
         """The ``init`` invocation that runs this plan — every flag it carries, so a
         ``fix:`` line built from it never drops a level (*directory* overrides DIR)."""
-        repos = [f"--repo {self.repo}"] if self.repo else []
-        repos += [f"--associated-repo {url}" for url in self.associated]
-        target = self.directory if directory is None else directory
-        return " ".join(filter(None, [_INIT, str(target), "--harness", self.harness, *repos]))
+        target = str(self.directory if directory is None else directory)
+        flags = [("--repo", self.repo)] if self.repo else []
+        flags += [("--associated-repo", url) for url in self.associated]
+        return shell_line(*_INIT, *filter(None, [target]), "--harness", self.harness, *sum(flags, ()))
 
 
 def _interactive() -> bool:
