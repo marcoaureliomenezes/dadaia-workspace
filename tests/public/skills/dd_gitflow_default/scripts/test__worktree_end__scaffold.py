@@ -1,5 +1,5 @@
 """A job or hotfix tree whose HEAD tracks files under `tests/tmp/<job>/` is refused by
-`worktree.py merge` and reported by `preflight`, one `[error]` line and one `fix:` line; only tracked
+`worktree.py merge`, one `[error]` line and one `fix:` line; only tracked
 paths count, and every other tree kind is unaffected.
 Size: MEDIUM (real git, a tmp workspace, a stub CLI).
 """
@@ -60,7 +60,7 @@ def _lines(root: Path, verb: str, tree: Path) -> tuple[int, list[str]]:
     kept = [
         ln
         for ln in (done.stdout + done.stderr).splitlines()
-        if ln.startswith(("PREFLIGHT ", "[error] ", "fix: "))
+        if ln.startswith(("[error] ", "fix: "))
     ]
     return done.returncode, kept
 
@@ -69,14 +69,11 @@ def _refused(root: Path, tree: Path, job: str) -> None:
     folder = tree / "tests" / "tmp" / job
     error = f"[error] {folder} exists: promote each test in it into its contract's home, or the operator orders its delete, before the job lands"  # fmt: skip
     fix = f"fix: Agent action: promote each test in {folder} into its contract's home (a delete needs the operator's order), then commit the removal"  # fmt: skip
-    head = git(tree, "rev-parse", "HEAD").strip()
-    assert _lines(root, "preflight", tree) == (1, [f"PREFLIGHT FAIL {tree} {head}", error, fix])
     assert _lines(root, "merge", tree) == (1, [error, fix])
 
 
 def _clears(root: Path, tree: Path) -> None:
     head = git(tree, "rev-parse", "HEAD").strip()
-    assert _lines(root, "preflight", tree) == (0, [f"PREFLIGHT PASS {tree} {head}"])
     approve(root, head, name=NEW_JOB)
     done = run(root, "merge", str(tree))
     assert done.returncode == 0, done.stderr
@@ -140,5 +137,4 @@ def test_a_backlog_or_rc_tree_over_a_tracked_folder_of_its_name_passes(
 ) -> None:
     commit(root / "repos/r", f"tests/tmp/{name.rsplit('/')[-1]}/test_x.py", TEST)
     tree = _tree(root, name)
-    head = git(tree, "rev-parse", "HEAD").strip()
-    assert _lines(root, "preflight", tree) == (0, [f"PREFLIGHT PASS {tree} {head}"])
+    assert not any("tests/tmp" in ln for ln in _lines(root, "merge", tree)[1])  # refused unapproved, never for the folder

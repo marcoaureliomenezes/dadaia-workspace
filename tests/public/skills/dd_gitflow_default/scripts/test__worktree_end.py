@@ -133,14 +133,13 @@ def test_merge_fast_forwards_removes_and_reruns(root: Path) -> None:
     assert git(repo, "branch", "--list", f"wt/{NEW_JOB}").strip()  # never -D
 
 
-@pytest.mark.parametrize("verb", ["merge", "preflight"])
 def test_a_task_whose_job_tree_is_gone_refuses_with_the_fix_that_restores_it(
-    root: Path, verb: str
+    root: Path,
 ) -> None:
     task = open_tree(root, NEW_TASK)
     commit(task, "src/a.py")
     shutil.rmtree(root / TREE)  # removed by hand: git's registry still holds it, locked
-    refused = run(root, verb, str(task))
+    refused = run(root, "merge", str(task))
     assert refused.returncode == 1 and "Traceback" not in refused.stderr
     assert "[error]" in refused.stderr
     _fix(root, refused)
@@ -148,7 +147,7 @@ def test_a_task_whose_job_tree_is_gone_refuses_with_the_fix_that_restores_it(
     assert run(root, "merge", str(task)).returncode == 0
 
 
-@pytest.mark.parametrize("verb", ["merge", "preflight", "clean"])
+@pytest.mark.parametrize("verb", ["merge", "clean"])
 def test_a_git_failure_no_check_named_ends_as_one_refusal(root: Path, verb: str) -> None:
     (root / TREE / ".git").unlink()  # a tree git no longer recognizes
     refused = run(root, verb, TREE)
@@ -747,9 +746,8 @@ def _plain_tree(root: Path, name: str) -> Path:
 
 @pytest.mark.parametrize("name", ["maintenance", "0.5.0-rc1/j1", "0.5.0-rc1/define"])
 @pytest.mark.parametrize("declared_verify", [True, False], ids=["verify-once", "no-verify"])
-@pytest.mark.parametrize("verb", ["merge", "preflight"])
-def test_a_plain_tree_is_refused_by_merge_and_preflight_with_the_list_fix(
-    tmp_path: Path, declared_verify: bool, verb: str, name: str
+def test_a_plain_tree_is_refused_by_merge_with_the_list_fix(
+    tmp_path: Path, declared_verify: bool, name: str
 ) -> None:
     root = make_workspace(tmp_path)
     repo = root / "repos/r"
@@ -760,7 +758,7 @@ def test_a_plain_tree_is_refused_by_merge_and_preflight_with_the_list_fix(
     head = commit(tree, "src/a.py")
     approve(root, head)
 
-    refused = run(root, verb, str(tree))
+    refused = run(root, "merge", str(tree))
 
     assert refused.returncode == 1
     assert "not a worktree name" in refused.stderr

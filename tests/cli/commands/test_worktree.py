@@ -66,7 +66,7 @@ def test_help_lists_the_verbs(
     )
     assert result.exit_code == 0
     words = set(re.findall(r"\w+", result.output))
-    assert {"new", "merge", "clean", "list", "preflight", "hash"} <= words
+    assert {"new", "merge", "clean", "list", "hash"} <= words
 
 
 def test_no_installed_script_refuses_with_the_install_fix(workspace: Path) -> None:
