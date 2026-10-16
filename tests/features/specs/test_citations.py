@@ -17,6 +17,7 @@ import pytest
 
 from dadaia_workspace.features.specs.citations import (
     dead_path_citations,
+    dead_verb_citations,
     memory_citation_violations,
 )
 from dadaia_workspace.features.specs.doctor_memory import MemoryValidator
@@ -125,3 +126,36 @@ def test_a_dead_token_inside_a_fixed_section_is_not_judged(tmp_path: Path) -> No
     violations = memory_citation_violations(memory, repo_root=tmp_path, command_paths=_TREE)
 
     assert [v.split(" `")[0] for _, v in violations] == ["specs/memory/thing.md:7: dead verb"]
+
+
+@pytest.mark.parametrize(
+    ("citation", "dead"),
+    [
+        pytest.param("dadaia doctor extra", False, id="leaf-plus-argument"),
+        pytest.param("dadaia doctor", False, id="leaf"),
+        pytest.param("dadaia nosuchverb", True, id="unknown-top-level"),
+        pytest.param("dadaia nosuchverb extra", True, id="unknown-top-level-plus-word"),
+        pytest.param("dadaia context bogus", True, id="group-unknown-sub"),
+        pytest.param("dadaia context bind", False, id="two-level-live"),
+    ],
+)
+def test_a_word_after_a_leaf_command_is_its_argument(citation: str, dead: bool) -> None:
+    found = dead_verb_citations(f"`{citation}`", rel="x.md", command_paths=set(_TREE))
+
+    assert bool(found) is dead
+
+
+@pytest.mark.parametrize(
+    ("citation", "dead"),
+    [
+        ("dadaia worktree merge", False),
+        ("dadaia worktree bogus", False),
+        ("dadaia nosuchverb", True),
+    ],
+)
+def test_the_live_tree_as_a_plain_set(citation: str, dead: bool) -> None:
+    from dadaia_workspace.cli.help_digest import command_paths
+
+    found = dead_verb_citations(f"`{citation}`", rel="x.md", command_paths=set(command_paths()))
+
+    assert bool(found) is dead
