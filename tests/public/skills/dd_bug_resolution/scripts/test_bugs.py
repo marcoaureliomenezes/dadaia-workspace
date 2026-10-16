@@ -23,6 +23,7 @@ from dadaia_workspace.core.cli_line import shell_line
 from dadaia_workspace.core.platform import quote
 from dadaia_workspace.infrastructure.ledger_scripts import load_owner
 from tests.helpers.skill_scripts import stage_skill_scripts
+from tests.helpers.worktree_ws import associate, commit, git, make_workspace
 
 _read = load_owner("dd-bug-resolution", "_ledger").records
 
@@ -87,9 +88,12 @@ def _ledger(root: Path, *records: dict[str, object]) -> Path:
     return specs
 
 
-def _run(script: Path, *argv: str, cwd: Path | None = None) -> subprocess.CompletedProcess[str]:
+def _run(
+    script: Path, *argv: str, cwd: Path | None = None, env: dict[str, str] | None = None
+) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         [sys.executable, str(script), *argv],
+        env=env,
         capture_output=True,
         text=True,
         check=False,
@@ -249,6 +253,24 @@ def test_a_shallow_clone_whose_history_holds_every_fix_sha_is_clean(
     subprocess.run(["git", "clone", "-q", "--depth", "2", origin.as_uri(), str(clone)], check=True)
     done = _run(script, "check", "--specs", str(clone / specs.relative_to(origin)))
     assert done.returncode == 0, done.stdout
+
+
+def test_a_fix_sha_any_repo_of_the_context_reaches_is_clean(script: Path, tmp_path: Path) -> None:
+    """Under the merge gate's fence, the ledger lives in the main repo, the fix may land in an associated one; a sha no repo holds is still refused."""
+    (tmp_path / "ws").mkdir()
+    root = make_workspace(tmp_path / "ws")
+    associate(root, "Approved", ("a", "b"))
+    sha = commit(root / "repos" / "b", "fix.py")
+    resolved = {**_OPEN_RECORD, "status": "resolved", "closed_at": "2026-09-21T10:00:00Z",
+                "cause": "c", "solution": "s", "caused_by": "none", "fix_sha": sha}  # fmt: skip
+    specs = _ledger(root / "repos" / "r", resolved)
+    fenced = os.environ | {
+        "DADAIA_FENCED_ROOTS": os.pathsep.join(map(str, specs.resolve().parents))
+    }
+    assert _run(script, "check", "--specs", str(specs), env=fenced).returncode == 0
+    git(root / "repos" / "b", "commit", "-q", "--amend", "-m", "rebased")
+    done = _run(script, "check", "--specs", str(specs), env=fenced)
+    assert done.returncode == 1 and sha in done.stdout, done.stdout
 
 
 def test_the_unreached_fix_line_survives_a_percent_in_the_script_path(tmp_path: Path) -> None:

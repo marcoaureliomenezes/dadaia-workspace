@@ -133,13 +133,17 @@ def make_workspace(root: Path) -> Path:
     return root
 
 
-def associate(root: Path, spec: str) -> None:
-    """Repo `a` joins `r`'s context with `feature/0.5.0` and no specs; `r`'s SPEC is *spec*."""
-    _stub_cli(root, {"main_repo": "r", "associated_repos": [{"slug": "a"}], "gitflow": FLOW})
-    (repo := root / "repos/a").mkdir()
-    git(repo, "init", "-q")
-    git(repo, "commit", "-q", "--allow-empty", "-m", "init")
-    git(repo, "branch", "feature/0.5.0")
+def associate(root: Path, spec: str, slugs: tuple[str, ...] = ("a",)) -> None:
+    """Repos *slugs* join `r`'s context with `feature/0.5.0` and no specs; `r`'s SPEC is *spec*."""
+    _stub_cli(root, {"main_repo": "r", "associated_repos": [{"slug": s} for s in slugs],
+                     "gitflow": FLOW})  # fmt: skip
+    (root / ".dadaia/states/spec_contexts.json").write_text(json.dumps({"contexts": [
+        {"repo_slug": "r", "associated_repos": [{"slug": s} for s in slugs]}]}))  # fmt: skip
+    for slug in slugs:
+        (repo := root / "repos" / slug).mkdir()
+        git(repo, "init", "-q")
+        git(repo, "commit", "-q", "--allow-empty", "-m", "init")
+        git(repo, "branch", "feature/0.5.0")
     spec_md = root / "repos/r/specs/releases/0.5.0/rc-1/SPEC.md"
     spec_md.write_text(f"**Status:** {spec}\n")
     git(root / "repos/r", "commit", "-qam", "spec")
