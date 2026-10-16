@@ -6,6 +6,7 @@ The planted repo has a base commit and a head commit; ``mutate.py`` is copied in
 
 from __future__ import annotations
 
+import json
 import os
 import shutil
 import subprocess
@@ -14,6 +15,7 @@ from pathlib import Path
 
 import pytest
 
+from scripts import mutate
 from tests.fixtures.harness_env import suite_env
 
 pytestmark = pytest.mark.slow(reason="each case spawns git, scripts/mutate.py and pytest")
@@ -95,6 +97,20 @@ def test_a_diff_is_mutated_line_by_line_and_reports_survivors_kills_and_coverage
     ]
     assert done.returncode == 0
     assert (root / "pkg/m.py").read_text("utf-8") == _HEAD_M
+
+
+def test_a_coverage_key_with_backslashes_is_the_changed_file(monkeypatch: pytest.MonkeyPatch) -> None:
+    def fake_run(*args: str, **_: object) -> None:
+        report = next(a for a in args if a.startswith("--cov-report=json:")).split(":", 1)[1]
+        files = {"pkg\\m.py": {"executed_lines": [5, 6], "missing_lines": [7]}}
+        Path(report).write_text(json.dumps({"files": files}), "utf-8")
+
+    monkeypatch.setattr(mutate, "_run", fake_run)
+
+    assert mutate._coverage({"pkg/m.py": {5, 6}}, {}) == [
+        "diff line coverage 2/2",
+        "diff branch coverage 0/0",
+    ]
 
 
 _HOME = ["--module", "pkg/m.py", "--home", "tests/test_m.py::test_below_the_limit"]
