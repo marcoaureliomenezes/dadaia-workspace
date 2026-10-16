@@ -15,6 +15,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]
                        / "dadaia_workspace/public/skills/dd-bug-resolution/scripts"))  # fmt: skip
 import _grammar  # noqa: E402
 
+from tests.helpers.oslib import write_text
+
 _DOC = '{"schema": "release-state-v1", "release": "1.0.0", "phase": "IMPLEMENTATION"}'
 
 
@@ -25,16 +27,16 @@ def test_canonical_filename_is_underscore_release_json() -> None:
 def test_a_legacy_state_file_makes_no_release_live(tmp_path: Path) -> None:
     """The ONE live reader, the doctor and `live_ids` agree; two live dirs are an error."""
     (tmp_path / "releases" / "1.0.0").mkdir(parents=True)
-    (tmp_path / "releases" / "1.0.0" / "RELEASE.json").write_text(_DOC, encoding="utf-8")
+    write_text(tmp_path / "releases" / "1.0.0" / "RELEASE.json", _DOC)
     assert (resolve_active_release(tmp_path), _grammar.live_ids(tmp_path)) == (
         (None, None),
         [],
     )
-    (tmp_path / "releases" / "1.0.0" / "_RELEASE.json").write_text(_DOC, encoding="utf-8")
+    write_text(tmp_path / "releases" / "1.0.0" / "_RELEASE.json", _DOC)
     assert (resolve_active_release(tmp_path), _grammar.live_ids(tmp_path)) == (
         ("1.0.0", "IMPLEMENTATION"),
         ["1.0.0"],
     )
     (tmp_path / "releases" / "3.0.0").mkdir()
-    (tmp_path / "releases" / "3.0.0" / "_RELEASE.json").write_text(_DOC, encoding="utf-8")
+    write_text(tmp_path / "releases" / "3.0.0" / "_RELEASE.json", _DOC)
     assert (live_release_id(tmp_path), len(_grammar.live_ids(tmp_path))) == (None, 2)

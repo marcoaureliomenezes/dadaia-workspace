@@ -10,6 +10,7 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
+from tests.helpers.oslib import read_text
 from tests.helpers.scan_population import assert_populated
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -89,7 +90,7 @@ def _temp_then_replace_writer_defs(package_root: Path) -> list[str]:
         if "__pycache__" in path.parts:
             continue
         try:
-            tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+            tree = ast.parse(read_text(path), filename=str(path))
         except SyntaxError:
             continue
         for node in ast.walk(tree):

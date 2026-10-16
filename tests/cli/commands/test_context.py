@@ -1,5 +1,4 @@
 import json
-import subprocess
 from pathlib import Path
 
 import pytest
@@ -13,6 +12,8 @@ from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
 from tests.fakes import NoWorktreeContainer, seed_dead_context
+from tests.helpers.oslib import make_executable, run, write_text
+from tests.helpers.oslib import run as os_run
 
 _runner = CliRunner()
 
@@ -40,7 +41,8 @@ def _register_alive_ctx(workspace: Path, name: str = "myctx") -> None:
     """An ALIVE v2 context written straight into the state file — no real clone."""
     states = workspace / ".dadaia" / "states"
     states.mkdir(parents=True, exist_ok=True)
-    (states / "spec_contexts.json").write_text(
+    write_text(
+        states / "spec_contexts.json",
         json.dumps(
             {
                 "schema_version": "2",
@@ -57,7 +59,7 @@ def _register_alive_ctx(workspace: Path, name: str = "myctx") -> None:
                     }
                 ],
             }
-        )
+        ),
     )
 
 
@@ -238,46 +240,21 @@ def test_push_uses_set_upstream_when_no_tracking(tmp_path: Path) -> None:
     # Create a bare remote
     bare = tmp_path / "bare.git"
     bare.mkdir()
-    subprocess.run(["git", "init", "--bare", str(bare)], capture_output=True, check=True)
+    os_run(["git", "init", "--bare", str(bare)], check=True)
 
     # Create a local repo with at least one commit
     local = tmp_path / "local"
     local.mkdir()
-    subprocess.run(["git", "init", str(local)], capture_output=True, check=True)
-    subprocess.run(
-        ["git", "config", "user.email", "test@example.com"],
-        cwd=local,
-        capture_output=True,
-        check=True,
-    )
-    subprocess.run(
-        ["git", "config", "user.name", "Test"],
-        cwd=local,
-        capture_output=True,
-        check=True,
-    )
-    (local / "README.md").write_text("hello")
-    subprocess.run(["git", "add", "README.md"], cwd=local, capture_output=True, check=True)
-    subprocess.run(
-        ["git", "commit", "-m", "init"],
-        cwd=local,
-        capture_output=True,
-        check=True,
-    )
-    subprocess.run(
-        ["git", "remote", "add", "origin", str(bare)],
-        cwd=local,
-        capture_output=True,
-        check=True,
-    )
+    os_run(["git", "init", str(local)], check=True)
+    os_run(["git", "config", "user.email", "test@example.com"], cwd=local, check=True)
+    os_run(["git", "config", "user.name", "Test"], cwd=local, check=True)
+    write_text(local / "README.md", "hello")
+    os_run(["git", "add", "README.md"], cwd=local, check=True)
+    os_run(["git", "commit", "-m", "init"], cwd=local, check=True)
+    os_run(["git", "remote", "add", "origin", str(bare)], cwd=local, check=True)
 
     # Pre-condition: no upstream tracking branch
-    no_upstream = subprocess.run(
-        ["git", "rev-parse", "--abbrev-ref", "@{u}"],
-        cwd=local,
-        capture_output=True,
-        text=True,
-    )
+    no_upstream = run(["git", "rev-parse", "--abbrev-ref", "@{u}"], cwd=local)
     assert no_upstream.returncode != 0, "pre-condition: upstream must NOT be set"
 
     # Exercise the fix
@@ -285,12 +262,7 @@ def test_push_uses_set_upstream_when_no_tracking(tmp_path: Path) -> None:
     client.push(local)  # must not raise
 
     # Post-condition: upstream tracking branch is now set
-    has_upstream = subprocess.run(
-        ["git", "rev-parse", "--abbrev-ref", "@{u}"],
-        cwd=local,
-        capture_output=True,
-        text=True,
-    )
+    has_upstream = run(["git", "rev-parse", "--abbrev-ref", "@{u}"], cwd=local)
     assert has_upstream.returncode == 0, (
         "upstream tracking must be set after git push -u; "
         f"got stderr: {has_upstream.stderr.strip()!r}"
@@ -298,23 +270,20 @@ def test_push_uses_set_upstream_when_no_tracking(tmp_path: Path) -> None:
 
 
 def _remote_heads(bare: Path) -> dict[str, str]:
-    out = subprocess.run(["git", "-C", str(bare), "for-each-ref", "--format=%(refname) %(objectname)"],
-                         capture_output=True, text=True, check=True).stdout  # fmt: skip
+    out = run(["git", "-C", str(bare), "for-each-ref", "--format=%(refname) %(objectname)"], check=True).stdout  # fmt: skip
     return dict(line.split() for line in out.splitlines())
 
 
 def test_context_baseline_is_consent_by_invocation(workspace: Path, tmp_path: Path) -> None:
     """No --yes/--push; one invocation publishes, a re-run is a no-op."""
     bare = tmp_path / "baseline.git"
-    subprocess.run(["git", "init", "--bare", str(bare)], capture_output=True, check=True)
+    os_run(["git", "init", "--bare", str(bare)], check=True)
     repo = workspace / "repos" / "baseline"
-    subprocess.run(["git", "clone", str(bare), str(repo)], capture_output=True, check=True)
+    os_run(["git", "clone", str(bare), str(repo)], check=True)
     for key, value in (("user.email", "t@example.com"), ("user.name", "T")):
-        subprocess.run(["git", "config", key, value], cwd=repo, check=True)
+        os_run(["git", "config", key, value], cwd=repo, check=True)
     (repo / "specs").mkdir()
-    (repo / "specs" / "constitution.md").write_text(
-        "---\nspecs_pattern_version: 6\n---\n", encoding="utf-8"
-    )
+    write_text(repo / "specs" / "constitution.md", "---\nspecs_pattern_version: 6\n---\n")
     _register_alive_ctx(workspace, "baseline")
 
     assert _runner.invoke(app, ["context", "baseline", "baseline", "--yes"]).exit_code != 0
@@ -332,18 +301,18 @@ def test_context_dead_surfaces_the_refused_push_with_its_fix_line(
     """A push the pre-push hook refuses reaches the operator verbatim — its
     one ``fix:`` line included — instead of a bare "resolve the issue and retry"."""
     bare = tmp_path / "refused.git"
-    subprocess.run(["git", "init", "--bare", str(bare)], capture_output=True, check=True)
+    os_run(["git", "init", "--bare", str(bare)], check=True)
     repo = workspace / "repos" / "refused"
-    subprocess.run(["git", "clone", str(bare), str(repo)], capture_output=True, check=True)
+    os_run(["git", "clone", str(bare), str(repo)], check=True)
     for key, value in (("user.email", "t@example.com"), ("user.name", "T")):
-        subprocess.run(["git", "config", key, value], cwd=repo, check=True)
-    (repo / "README.md").write_text("x\n", encoding="utf-8")
-    subprocess.run(["git", "add", "README.md"], cwd=repo, check=True)
-    subprocess.run(["git", "commit", "-qm", "init"], cwd=repo, check=True)
-    subprocess.run(["git", "checkout", "-qb", "feature/0.1.0"], cwd=repo, check=True)
+        os_run(["git", "config", key, value], cwd=repo, check=True)
+    write_text(repo / "README.md", "x\n")
+    os_run(["git", "add", "README.md"], cwd=repo, check=True)
+    os_run(["git", "commit", "-qm", "init"], cwd=repo, check=True)
+    os_run(["git", "checkout", "-qb", "feature/0.1.0"], cwd=repo, check=True)
     hook = repo / ".git" / "hooks" / "pre-push"
-    hook.write_text("#!/bin/sh\necho 'fix: git checkout -b feature/0.1.0' >&2\nexit 1\n")
-    hook.chmod(0o755)
+    write_text(hook, "#!/bin/sh\necho 'fix: git checkout -b feature/0.1.0' >&2\nexit 1\n")
+    make_executable(hook)
     _register_alive_ctx(workspace, "refused")
     monkeypatch.setattr(context_cmd, "container", NoWorktreeContainer())
 

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import subprocess
 from pathlib import Path
 
 import pytest
@@ -12,6 +11,8 @@ from dadaia_workspace.cli.commands import ci
 from dadaia_workspace.cli.main import app
 from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.platform import quote
+from tests.helpers.oslib import read_text, run, write_text
+from tests.helpers.oslib import run as os_run
 
 _runner = CliRunner()
 
@@ -21,8 +22,8 @@ def test_install_hook_writes_and_refuses_overwrite_without_force(
 ) -> None:
     """Under core.hooksPath the gate lands
     where git runs hooks; a hook already there is refused non-zero with a fix: line."""
-    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
-    subprocess.run(["git", "-C", str(tmp_path), "config", "core.hooksPath", ".husky"], check=True)
+    os_run(["git", "init", "-q", str(tmp_path)], check=True)
+    os_run(["git", "-C", str(tmp_path), "config", "core.hooksPath", ".husky"], check=True)
     monkeypatch.setattr(ci, "_repo_root", lambda: tmp_path)
 
     result = _runner.invoke(app, ["ci", "install-hook"])
@@ -31,7 +32,7 @@ def test_install_hook_writes_and_refuses_overwrite_without_force(
     assert not (tmp_path / ".git" / "hooks" / "pre-push").exists()
     pre_push = tmp_path / ".husky" / "pre-push"
     assert pre_push.exists()
-    pre_push_text = pre_push.read_text()
+    pre_push_text = read_text(pre_push)
     assert "ci push-gate-check" in pre_push_text
 
     # second call without --force is refused (pre-push already present).
@@ -48,9 +49,7 @@ _WORK_REF = f"refs/heads/{_WORK}"
 
 
 def _git(repo: Path, *argv: str) -> str:
-    done = subprocess.run(
-        ["git", "-C", str(repo), *argv], capture_output=True, text=True, check=True
-    )
+    done = run(["git", "-C", str(repo), *argv], check=True)
     return done.stdout.strip()
 
 
@@ -58,7 +57,7 @@ def _commit(repo: Path, **files: str) -> str:
     for name, text in files.items():
         target = repo / name.replace("__", "/")
         target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(text, encoding="utf-8")
+        write_text(target, text)
     _git(repo, "add", "-A")
     _git(repo, "commit", "-q", "-m", "c")
     return _git(repo, "rev-parse", "HEAD")
@@ -67,10 +66,10 @@ def _commit(repo: Path, **files: str) -> str:
 def _work_repo(tmp_path: Path) -> tuple[Path, str]:
     """A repo on the work branch whose origin holds the first commit; returns (repo, that sha)."""
     origin = tmp_path / "origin.git"
-    subprocess.run(["git", "init", "-q", "--bare", str(origin)], check=True)
+    os_run(["git", "init", "-q", "--bare", str(origin)], check=True)
     repo = tmp_path / "repo"
     repo.mkdir()
-    subprocess.run(["git", "init", "-q", "-b", _WORK, str(repo)], check=True)
+    os_run(["git", "init", "-q", "-b", _WORK, str(repo)], check=True)
     _git(repo, "config", "user.email", "t@example.com")
     _git(repo, "config", "user.name", "T")
     base = _commit(repo, **{"seed.txt": "seed\n"})

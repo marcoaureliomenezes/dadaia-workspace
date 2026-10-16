@@ -7,7 +7,7 @@ it used to explode on is gone, but the refusal it left
 behind is the same promise: actionable, never a traceback.)
 
 The conftest anti-disk-exhaustion backstop fakes ensure_workspace_venv globally, so the
-seam is exercised directly (subprocess.run mocked, pre-existing bare venv so
+seam is exercised directly (the child runner mocked, pre-existing bare venv so
 interpreter resolution / creation are not in scope here) plus the CLI mapping.
 """
 
@@ -19,6 +19,7 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.infrastructure import python_env as pe
+from tests.helpers.oslib import write_text
 
 # Captured at import (collection) time, BEFORE the autouse conftest backstop replaces
 # the method — this is the real seam under test.
@@ -38,7 +39,7 @@ def test_ensure_workspace_venv_raises_actionable_error(tmp_path: Path, monkeypat
     # back to any more, so the refusal itself must name the escape hatch.
     site = tmp_path / "site-packages" / "dadaia_workspace"
     site.mkdir(parents=True)
-    (site / "__init__.py").write_text("")
+    write_text(site / "__init__.py", "")
     monkeypatch.setattr(pe.dadaia_workspace, "__file__", str(site / "__init__.py"))
     monkeypatch.setattr(pe.metadata, "version", lambda name: "9.9.9")
     monkeypatch.setattr(pe, "repack_installed_wheel", lambda dest_dir, dist=None: None)

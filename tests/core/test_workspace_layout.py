@@ -40,6 +40,7 @@ from dadaia_workspace.core.workspace_layout import (
     ROOT_ALLOWED_FILES,
     STATES_CANON,
     Creator,
+    operator_globs,
     root_entries_display,
     specs_canon_table_rows,
     zone_names,
@@ -49,6 +50,7 @@ from dadaia_workspace.infrastructure.public_assets import (
     FileSystemPublicAssetManager,
     render_registry_tables,
 )
+from tests.helpers.oslib import read_text, write_text
 from tests.helpers.scan_population import assert_populated
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -93,16 +95,14 @@ _CANONICAL_SETS: dict[str, frozenset[str]] = {
     "specs-canon": CANON_ROOT_MEMBERS,
     "phase": frozenset(
         json.loads(
-            (
+            read_text(
                 _SKILLS / "dd-release-implementation/scripts/schemas/release-state-v1.schema.json"
-            ).read_text("utf-8")
+            )
         )["properties"]["phase"]["enum"]
     ),
     "ledger-disposition": frozenset(
         json.loads(
-            (
-                _SKILLS / "dd-backlog-definition/scripts/schemas/histo-record-v1.schema.json"
-            ).read_text("utf-8")
+            read_text(_SKILLS / "dd-backlog-definition/scripts/schemas/histo-record-v1.schema.json")
         )["properties"]["disposition"]["enum"]
     ),
     "trio": frozenset(RELEASE_ARTIFACTS),
@@ -238,7 +238,7 @@ def test_dadaia_agents_table_equals_zone_registry(staged_data: Path) -> None:
     ``states/AGENTS.md`` canon table is ``STATES_CANON`` — documented == allowed."""
     zone_tables = [
         t
-        for t in _markdown_tables((staged_data / "dadaia-AGENTS.md").read_text("utf-8"))
+        for t in _markdown_tables(read_text(staged_data / "dadaia-AGENTS.md"))
         if t and {"class", "ttl", "creator"} <= set(t[0])
     ]
     assert len(zone_tables) == 1, "exactly one rendered zone table"
@@ -259,7 +259,7 @@ def test_dadaia_agents_table_equals_zone_registry(staged_data: Path) -> None:
 
     canon_tables = [
         {_bare(next(iter(row.values()))) for row in t}
-        for t in _markdown_tables((staged_data / "states-AGENTS.md").read_text("utf-8"))
+        for t in _markdown_tables(read_text(staged_data / "states-AGENTS.md"))
         if t
     ]
     assert STATES_CANON in canon_tables, "states-AGENTS.md carries the closed canon table"
@@ -277,7 +277,7 @@ def test_zone_registry_is_the_only_dadaia_name_list() -> None:
         if rel.endswith("core/workspace_layout.py"):
             continue
         home = frozenset(label for label, module in _SET_HOME.items() if module == rel)
-        hits = _second_list_hits(ast.parse(path.read_text("utf-8")), names, home)
+        hits = _second_list_hits(ast.parse(read_text(path)), names, home)
         if hits and rel in _SECOND_LIST_ALLOWANCE:
             widened.add(rel)
             continue
@@ -312,7 +312,7 @@ def _restating_law_files() -> set[str]:
     for path in sorted(public.rglob("*.md")):
         if "_archive" in path.parts:
             continue
-        for hit in _restated_law_lines(path.read_text("utf-8")):
+        for hit in _restated_law_lines(read_text(path)):
             label = hit.split("the ", 1)[1].split(" set ", 1)[0]
             hits.add(f"{path.relative_to(public).as_posix()}:{label}")
     return hits
@@ -335,12 +335,12 @@ def test_staged_law_canon_tables_equal_the_registry(staged_data: Path) -> None:
     """The staged ``specs-AGENTS.md`` canon table IS ``specs_canon_table_rows()``, row for
     row; the staged law's root line and ``repo-AGENTS.md``'s exclusion line ARE the rendered
     registry lists — documented == allowed, wherever the rule now lives."""
-    text = (staged_data / "AGENTS.md").read_text("utf-8")
+    text = read_text(staged_data / "AGENTS.md")
     # The scoped templates are not staged (no reader of .dadaia/agentic/templates); they are
     # rendered by the same one renderer.
     scoped = Path(__file__).resolve().parents[2] / "dadaia_workspace" / "public" / "templates"
-    specs_law = render_registry_tables((scoped / "specs-AGENTS.md").read_text("utf-8"))
-    repo_law = render_registry_tables((scoped / "repo-AGENTS.md").read_text("utf-8"))
+    specs_law = render_registry_tables(read_text(scoped / "specs-AGENTS.md"))
+    repo_law = render_registry_tables(read_text(scoped / "repo-AGENTS.md"))
     canon_tables = [
         t for t in _markdown_tables(specs_law) if t and {"area", "members"} <= set(t[0])
     ]
@@ -377,7 +377,7 @@ def test_law_staged_under_win32_names_the_scripts_cli(
     it is ``.dadaia/.venv/Scripts/dadaia.exe`` and the POSIX path appears nowhere."""
     monkeypatch.setattr("dadaia_workspace.core.platform.PLATFORM", Capabilities.detect("win32"))
     FileSystemPublicAssetManager().stage(tmp_path)
-    text = (tmp_path / ".dadaia" / "agentic" / "data" / "AGENTS.md").read_text("utf-8")
+    text = read_text(tmp_path / ".dadaia" / "agentic" / "data" / "AGENTS.md")
     assert ".dadaia/.venv/Scripts/dadaia.exe" in text
     assert ".venv/bin/dadaia" not in text
 
@@ -388,10 +388,17 @@ def test_shipped_history_reads_the_forward_rendered_windows_law(
     monkeypatch.setattr("dadaia_workspace.core.platform.PLATFORM", Capabilities.detect("win32"))
     source = "run `.dadaia/.venv/bin/dadaia doctor`"
     rendered = "run `.dadaia/.venv/Scripts/dadaia.exe doctor`"
-    (tmp_path / "shipped-hashes.json").write_text(
-        json.dumps({"law.md": [hashlib.sha256(rendered.encode()).hexdigest()]}), encoding="utf-8"
+    write_text(
+        tmp_path / "shipped-hashes.json",
+        json.dumps({"law.md": [hashlib.sha256(rendered.encode()).hexdigest()]}),
     )
 
     assert render_registry_tables(source) == render_registry_tables(rendered) == rendered
     assert was_shipped(rendered, "law.md", tmp_path)
     assert not was_shipped(rendered + " --edited", "law.md", tmp_path)
+
+
+def test_operator_globs_reads_a_non_utf8_ignore_file_as_no_pattern(tmp_path: Path) -> None:
+    """Unreadable is no pattern, whatever the reason."""
+    (tmp_path / ".dadaiaignore").write_bytes(b"caf\xe9\n")
+    assert operator_globs(tmp_path) == ((), (), ())

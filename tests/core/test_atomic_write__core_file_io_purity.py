@@ -12,7 +12,6 @@ import ast
 import json
 import os
 import re
-import subprocess
 import sys
 from collections.abc import Callable, Iterator
 from pathlib import Path
@@ -22,6 +21,7 @@ import pytest
 from dadaia_workspace.core.harness_registry import HARNESS_RECORDS
 from dadaia_workspace.infrastructure.runtime_config import codex_config, merge_claude_settings
 from tests.fixtures.harness_env import suite_env
+from tests.helpers.oslib import read_text, run, write_text
 from tests.helpers.scan_population import assert_populated
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -37,7 +37,7 @@ def _trees(glob: str = "**/*.py") -> Iterator[tuple[Path, ast.Module]]:
     paths = sorted(p for p in _PKG.glob(glob) if "__pycache__" not in p.parts)
     assert_populated(paths, sentinel=paths[0] if paths else _PKG / "missing")
     for path in paths:
-        yield path, ast.parse(path.read_text(encoding="utf-8"))
+        yield path, ast.parse(read_text(path))
 
 
 def _called(node: ast.Call) -> str:
@@ -92,7 +92,7 @@ def _session_paths() -> list[str]:
     record = ('"sessions" / f"{', '".dadaia" / "sessions"')
     hits = []
     for path in sorted(_PKG.rglob("*.py")):
-        text = path.read_text(encoding="utf-8")
+        text = read_text(path)
         idioms = pointer + (() if _rel(path) == "core/session_store.py" else record)
         hits += [f"{_rel(path)}: {i}" for i in idioms if i in text]
     return hits
@@ -101,14 +101,10 @@ def _session_paths() -> list[str]:
 def _orphan_factories() -> list[str]:
     """Every container.py def/class is used by production code outside it, or by another
     container definition — a test-only consumer does not count."""
-    source = (_PKG / "container.py").read_text(encoding="utf-8")
+    source = read_text(_PKG / "container.py")
     defs = re.findall(r"^(?:def|class) ([A-Za-z_][A-Za-z0-9_]*)", source, re.M)
     assert defs, "container.py defines nothing? the scan is broken"
-    others = "\n".join(
-        p.read_text(encoding="utf-8")
-        for p in sorted(_PKG.rglob("*.py"))
-        if p.name != "container.py"
-    )
+    others = "\n".join(read_text(p) for p in sorted(_PKG.rglob("*.py")) if p.name != "container.py")
 
     def used(text: str, name: str) -> bool:
         return re.search(rf"(?<![A-Za-z0-9_]){re.escape(name)}(?![A-Za-z0-9_])", text) is not None
@@ -187,7 +183,7 @@ def _path_class_produced_elsewhere() -> list[str]:
 def _release_state_writes() -> list[str]:
     """core/release_state.py parses and serializes a supplied document; it never reads or
     writes disk (the CAS write stays in features/infrastructure)."""
-    source = (_PKG / "core" / "release_state.py").read_text(encoding="utf-8")
+    source = read_text(_PKG / "core" / "release_state.py")
     writers = {"write_text", "write_bytes", "mkdir", "unlink", "rmdir", "atomic_write", "open"}
     hits = [
         f"release_state.py:{n.lineno}:{_called(n)}"
@@ -254,7 +250,7 @@ def _reaped_zone_deleters() -> list[str]:
 
 
 def _layout_sets_read_by(module: str) -> list[str]:
-    tree = ast.parse((_PKG / module).read_text(encoding="utf-8"))
+    tree = ast.parse(read_text(_PKG / module))
     attrs = {n.attr for n in ast.walk(tree) if isinstance(n, ast.Attribute)}
     names = {n.id for n in ast.walk(tree) if isinstance(n, ast.Name)}
     sets = {
@@ -299,9 +295,7 @@ def test_each_question_has_one_owner(rule: str) -> None:
 def test_importing_a_hook_never_imports_the_container(module: str) -> None:
     """A hook is a one-shot process per write; the container costs ~2s to import."""
     code = f"import dadaia_workspace.hooks.{module}, sys; assert 'dadaia_workspace.container' not in sys.modules"
-    result = subprocess.run(
-        [sys.executable, "-c", code], capture_output=True, text=True, timeout=120
-    )
+    result = run([sys.executable, "-c", code], timeout=120)
     assert result.returncode == 0, result.stderr
 
 
@@ -311,8 +305,9 @@ def test_gate_resolution_path_never_imports_the_container(tmp_path: Path) -> Non
     the child carries the conftest pin, so it judges THIS checkout."""
     ws = tmp_path / "ws"
     (ws / ".dadaia" / "states").mkdir(parents=True)
-    (ws / ".dadaia" / "states" / "spec_contexts.json").write_text(
-        json.dumps({"schema_version": "2", "contexts": []}), encoding="utf-8"
+    write_text(
+        ws / ".dadaia" / "states" / "spec_contexts.json",
+        json.dumps({"schema_version": "2", "contexts": []}),
     )
     (ws / "repos" / "demo").mkdir(parents=True)
     payload = {
@@ -328,9 +323,7 @@ def test_gate_resolution_path_never_imports_the_container(tmp_path: Path) -> Non
         k: os.environ[k] for k in ("PYTHONPATH", "DADAIA_FENCED_ROOTS")
     }
     env["PATH"] = "/usr/bin:/bin"
-    result = subprocess.run(
-        [sys.executable, "-c", code], capture_output=True, text=True, timeout=120, cwd=ws, env=env
-    )
+    result = run([sys.executable, "-c", code], timeout=120, cwd=ws, env=env)
     assert result.returncode == 0, result.stderr
 
 
@@ -356,7 +349,7 @@ def test_gate_additive_prefixes_are_the_registry_view() -> None:
 
 
 def _gaps(behavior_id: str) -> dict[str, str]:
-    behaviors = json.loads(_REGISTRY.read_text(encoding="utf-8"))["behaviors"]
+    behaviors = json.loads(read_text(_REGISTRY))["behaviors"]
     return next(b.get("gaps", {}) for b in behaviors if b["id"] == behavior_id)  # type: ignore[no-any-return]
 
 

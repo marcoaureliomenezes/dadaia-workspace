@@ -5,14 +5,13 @@ classifying the link's own name would ALLOW. Real `sdd_gate` subprocess; POSIX s
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 
 import pytest
 
 from tests.fixtures.harness_env import claude_hook_env, run_hook_subprocess
-
-pytestmark = pytest.mark.skipif(os.name == "nt", reason="POSIX symlinks")
+from tests.helpers.oslib import link as os_link
+from tests.helpers.oslib import write_text
 
 
 @pytest.mark.parametrize("kind", ["file", "directory"])
@@ -20,12 +19,17 @@ pytestmark = pytest.mark.skipif(os.name == "nt", reason="POSIX symlinks")
 def test_a_symlink_into_protected_sessions_classifies_protected(tmp_path: Path, kind: str) -> None:
     (tmp_path / "repos" / "app" / "specs").mkdir(parents=True)
     (tmp_path / ".dadaia" / "states").mkdir(parents=True)
-    (tmp_path / ".dadaia" / "states" / "spec_contexts.json").write_text("{}", encoding="utf-8")
+    write_text(tmp_path / ".dadaia" / "states" / "spec_contexts.json", "{}")
     sessions = tmp_path / ".dadaia" / "sessions"
     sessions.mkdir()
-    (sessions / "claude-sess.json").write_text("{}\n", encoding="utf-8")
+    write_text(sessions / "claude-sess.json", "{}\n")
     link = tmp_path / "repos" / "app" / ("notes.md" if kind == "file" else "shortcut")
-    link.symlink_to(sessions / "claude-sess.json" if kind == "file" else sessions)
+    if not os_link(
+        str(sessions / "claude-sess.json" if kind == "file" else sessions),
+        link,
+        is_dir=kind == "directory",
+    ):
+        pytest.skip("this host refuses symlinks")
     target = link if kind == "file" else link / "other.json"
     payload = {"tool_name": "Write", "tool_input": {"file_path": str(target)}, "session_id": "s"}
 

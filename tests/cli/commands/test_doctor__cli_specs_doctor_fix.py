@@ -18,6 +18,7 @@ from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app
 from dadaia_workspace.features.specs.canon import scaffold
+from tests.helpers.oslib import read_text, write_text
 
 _runner = CliRunner()
 
@@ -106,13 +107,13 @@ def test_tree8_stray_root_folder_errors_and_fix_keeps_it(tmp_path: Path) -> None
 
     stray = specs / "features"
     stray.mkdir()
-    (stray / "login.md").write_text("# Login\n", encoding="utf-8")
+    write_text(stray / "login.md", "# Login\n")
 
     fix_result = _runner.invoke(
         app,
         ["doctor", "--json", "--fix", "--specs-dir", str(specs), "--public-dir", str(_PUBLIC_DIR)],
     )
-    assert (stray / "login.md").read_text(encoding="utf-8") == "# Login\n", fix_result.output
+    assert read_text(stray / "login.md") == "# Login\n", fix_result.output
     codes = [f["code"] for f in _specs_findings(fix_result.output)]
     assert "TREE-8" in codes, f"TREE-8 must still be reported after --fix; got {codes}"
     assert fix_result.exit_code != 0, fix_result.output

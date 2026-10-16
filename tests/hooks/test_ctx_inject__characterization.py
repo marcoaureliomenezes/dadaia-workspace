@@ -9,6 +9,7 @@ import pytest
 
 from dadaia_workspace.core.platform import PLATFORM, head
 from tests.fixtures.harness_env import claude_hook_env, run_hook_subprocess
+from tests.helpers.oslib import write_text
 
 
 @pytest.mark.medium
@@ -17,9 +18,7 @@ def test_unbound_session_emits_preflight_once_and_stamps_exact_sentinel(tmp_path
     workspace = tmp_path / "a b"
     states = workspace / ".dadaia" / "states"
     states.mkdir(parents=True)
-    (states / "spec_contexts.json").write_text(
-        json.dumps({"schema_version": "2", "contexts": []}), encoding="utf-8"
-    )
+    write_text(states / "spec_contexts.json", json.dumps({"schema_version": "2", "contexts": []}))
     env = claude_hook_env(workspace, session_id="characterization-session")
 
     result = run_hook_subprocess("ctx_inject", {"session_id": "ignored-payload-id"}, env)

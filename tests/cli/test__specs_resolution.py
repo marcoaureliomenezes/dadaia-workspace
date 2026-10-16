@@ -14,12 +14,14 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.cli._specs_resolution import resolve_context_for_cli
+from tests.helpers.oslib import write_text
 
 
 def _mk_workspace(root: Path, contexts: list[str]) -> None:
     states = root / ".dadaia" / "states"
     states.mkdir(parents=True)
-    (states / "spec_contexts.json").write_text(
+    write_text(
+        states / "spec_contexts.json",
         json.dumps(
             {
                 "schema_version": "2",
@@ -37,7 +39,6 @@ def _mk_workspace(root: Path, contexts: list[str]) -> None:
                 ],
             }
         ),
-        encoding="utf-8",
     )
 
 

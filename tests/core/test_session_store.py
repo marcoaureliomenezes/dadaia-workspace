@@ -9,6 +9,8 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.core import session_store as si
+from tests.helpers.oslib import read_text, write_text
+from tests.helpers.oslib import write_text as os_write_text
 
 SID = "my-session-id"
 
@@ -30,8 +32,8 @@ def test_record_roundtrip_atomicity_and_fail_soft(tmp_path: Path) -> None:
     si.write_session(tmp_path, SID, record)
     assert si.read_session(tmp_path, SID) == record
     assert [p.name for p in si.sessions_dir(tmp_path).iterdir()] == [f"{SID}.json"]
-    si.session_record_path(tmp_path, "corrupt", create=True).write_text("{not json", "utf-8")
-    si.session_record_path(tmp_path, "nondict", create=True).write_text("[1, 2, 3]", "utf-8")
+    os_write_text(si.session_record_path(tmp_path, "corrupt", create=True), "{not json")
+    os_write_text(si.session_record_path(tmp_path, "nondict", create=True), "[1, 2, 3]")
     for name in ("corrupt", "nondict", "../bad"):
         assert si.read_session(tmp_path, name) is None
 
@@ -94,7 +96,7 @@ def test_live_session_and_stale_records_select_by_the_same_rule(tmp_path: Path) 
     )
     si.write_session(tmp_path, "live-1", fresh)
     si.write_session(tmp_path, "dead-1", {**fresh, "last_seen_at": "2000-01-01T00:00:00+00:00"})
-    (si.sessions_dir(tmp_path) / "not-a-record.txt").write_text("", encoding="utf-8")
+    write_text(si.sessions_dir(tmp_path) / "not-a-record.txt", "")
     assert si.live_session(tmp_path, "live-1") == fresh
     assert si.live_session(tmp_path, "dead-1") is None
     assert si.live_session(tmp_path, "absent") is None
@@ -106,7 +108,7 @@ def test_gc_check_assembly_has_one_home() -> None:
     import dadaia_workspace
 
     pkg_root = Path(dadaia_workspace.__file__).parent
-    offenders = [p for p in pkg_root.rglob("*.py") if "gc_check" in p.read_text(encoding="utf-8")]
+    offenders = [p for p in pkg_root.rglob("*.py") if "gc_check" in read_text(p)]
     assert offenders == []
 
 

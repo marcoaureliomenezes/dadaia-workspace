@@ -12,6 +12,7 @@ from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES
 from dadaia_workspace.features.workspace.service import WorkspaceService
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
+from tests.helpers.oslib import make_executable, read_text, write_text
 
 _runner = CliRunner()
 
@@ -31,8 +32,8 @@ def workspace(tmp_path: Path, monkeypatch) -> Path:
     venv_bin = tmp_path / ".dadaia" / ".venv" / PLATFORM.venv_scripts_dir
     venv_bin.mkdir(parents=True, exist_ok=True)
     entry = venv_bin / f"dadaia{PLATFORM.venv_exe_suffix}"
-    entry.write_text("#!/bin/sh\n")
-    entry.chmod(0o755)
+    write_text(entry, "#!/bin/sh\n")
+    make_executable(entry)
     monkeypatch.chdir(tmp_path)
     return tmp_path
 
@@ -56,10 +57,10 @@ def test_doctor_detects_and_holds_a_dead_contexts_stale_repo(workspace: Path) ->
             }
         ],
     }
-    (states / "spec_contexts.json").write_text(json.dumps(ctx_data))
+    write_text(states / "spec_contexts.json", json.dumps(ctx_data))
     stale_repo = workspace / "repos" / "stale-ctx"
     stale_repo.mkdir(parents=True)
-    (stale_repo / "work.txt").write_text("keep\n")
+    write_text(stale_repo / "work.txt", "keep\n")
 
     detect_result = _runner.invoke(app, ["doctor"])
     # Issues found => non-zero.
@@ -73,7 +74,7 @@ def test_doctor_detects_and_holds_a_dead_contexts_stale_repo(workspace: Path) ->
     assert fix_result.exit_code == 0, fix_result.output
     assert not stale_repo.exists()
     held = list(workspace.glob(".dadaia/reaped/*/repos/stale-ctx/work.txt"))
-    assert [p.read_text() for p in held] == ["keep\n"]
+    assert [read_text(p) for p in held] == ["keep\n"]
 
 
 @pytest.mark.parametrize("disarmed", [".claude/settings.json", ".dadaia/hooks/claude-pre-gate"])

@@ -12,6 +12,7 @@ import sys
 from pathlib import Path
 
 import dadaia_workspace
+from tests.helpers.oslib import run, write_text
 
 _PKG = Path(dadaia_workspace.__file__).resolve().parent
 _ROOT = _PKG.parent
@@ -25,11 +26,9 @@ def _run(
     -I ignores PYTHONDONTWRITEBYTECODE, so -B is passed here: a child imports from the checkout.
     """
     prologue = f"import sys; sys.path[1:] = [p for p in sys.path if p.startswith(sys.base_prefix)]; sys.path.append({path!r})\n"
-    return subprocess.run(
+    return run(
         [sys.executable, "-I", *([] if bytecode else ["-B"]), "-c", prologue + code],
         cwd=cwd,
-        capture_output=True,
-        text=True,
         timeout=60,
     )
 
@@ -61,7 +60,7 @@ def test_loads_with_cwd_elsewhere_and_only_stdlib_on_sys_path(tmp_path):
 
 
 def test_a_ledger_py_planted_in_the_cwd_is_never_loaded(tmp_path):
-    (tmp_path / "_ledger.py").write_text("PLANTED = True\n", encoding="utf-8")
+    write_text(tmp_path / "_ledger.py", "PLANTED = True\n")
     done = _run(
         "sys.path.insert(0, '')\n"
         "from dadaia_workspace.core.skill_owner import load_owner\n"

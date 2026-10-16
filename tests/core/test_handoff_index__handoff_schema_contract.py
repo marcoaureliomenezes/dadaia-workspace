@@ -15,6 +15,8 @@ from typing import Any
 import pytest
 from jsonschema import Draft202012Validator
 
+from tests.helpers.oslib import read_text
+
 _SCHEMAS = Path(__file__).resolve().parents[2] / "dadaia_workspace" / "public" / "schemas"
 _SKILLS = _SCHEMAS.parent / "skills"
 _PATHS = {
@@ -27,7 +29,7 @@ _PATHS = {
 
 
 def _schema(kind: str) -> dict[str, Any]:
-    return json.loads(_PATHS[kind].read_text(encoding="utf-8"))  # type: ignore[no-any-return]
+    return json.loads(read_text(_PATHS[kind]))  # type: ignore[no-any-return]
 
 
 _TS = "2026-08-27T10:31:16Z"
@@ -250,7 +252,7 @@ def test_the_bug_law_points_at_x_mutability_and_lists_no_fields() -> None:
     """The scaffold bugs law names the schema's
     x-mutability and restates no field list (no line naming three or more properties)."""
     properties = set(_schema("bug")["properties"])
-    law = (_SCHEMAS.parent / "scaffold" / "bugs" / "AGENTS.md").read_text(encoding="utf-8")
+    law = read_text(_SCHEMAS.parent / "scaffold" / "bugs" / "AGENTS.md")
     assert "x-mutability" in law
     assert not [ln for ln in law.splitlines() if len(properties & set(ln.split("`"))) >= 3]
 

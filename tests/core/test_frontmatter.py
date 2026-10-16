@@ -13,6 +13,7 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.core.frontmatter import Frontmatter, FrontmatterError, parse
+from tests.helpers.oslib import read_text, write_text
 
 
 def test_valid_frontmatter_returns_data_and_body() -> None:
@@ -105,13 +106,11 @@ def test_merging_into_a_bom_constitution_edits_its_block_instead_of_prepending_a
 ) -> None:
     from dadaia_workspace.core.gitflow import merge_frontmatter
 
-    (tmp_path / "constitution.md").write_text(
-        "﻿---\nspecs_pattern_version: 6\n---\n\n# Law\n", encoding="utf-8"
-    )
+    write_text(tmp_path / "constitution.md", "﻿---\nspecs_pattern_version: 6\n---\n\n# Law\n")
 
     merge_frontmatter(tmp_path, specs_pattern_version=7)
 
-    assert (tmp_path / "constitution.md").read_text(encoding="utf-8") == (
+    assert read_text(tmp_path / "constitution.md") == (
         "---\nspecs_pattern_version: 7\n---\n\n# Law\n"
     )
 

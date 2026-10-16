@@ -51,12 +51,11 @@ from dadaia_workspace.features.spec_context.service import git_hooks_dir, instal
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
 from tests.conftest import GIT_QUIET_INCLUDE
 from tests.fixtures.fix_census import fix_sites
+from tests.helpers.oslib import link, python_in, read_text, stub_cli, write_text
+from tests.helpers.oslib import run as os_run
 from tests.helpers.privacy_fixtures import aws_key_shape
 
-pytestmark = [
-    pytest.mark.slow(reason="real git remotes and CLI child processes per case"),
-    pytest.mark.skipif(sys.platform == "win32", reason="the shipped pre-push hook is bash"),
-]
+pytestmark = pytest.mark.slow(reason="real git remotes and CLI child processes per case")
 
 _PKG = Path(__file__).resolve().parents[2] / "dadaia_workspace"
 _TERM = "zorblaxquux"
@@ -134,17 +133,17 @@ class World:
         self.elsewhere.mkdir(parents=True)
         (self.ws / "repos").mkdir(parents=True)
         (self.ws / ".dadaia" / "states").mkdir(parents=True)
-        (self.ws / ".dadaia" / "states" / "spec_contexts.json").write_text('{"contexts": []}')
+        write_text(self.ws / ".dadaia" / "states" / "spec_contexts.json", '{"contexts": []}')
         self.env = {k: v for k, v in os.environ.items() if k not in _UNSET}
         self.env.update(
             GIT_CONFIG_GLOBAL=str(tmp / "gitconfig"),
             GIT_CONFIG_NOSYSTEM="1",
             TERM="dumb",
         )
-        (tmp / "gitconfig").write_text(
+        write_text(
+            tmp / "gitconfig",
             f"{GIT_QUIET_INCLUDE}[user]\n\tname = T\n\temail = t@example.invalid\n\tuseConfigOnly = true\n"
             "[init]\n\tdefaultBranch = main\n",
-            encoding="utf-8",
         )
         # The workspace CLI, as `fix_line` spells it: a venv layout (pyvenv.cfg + the base
         # interpreter, no pip, nothing installed) so the CLI owns THIS workspace from any
@@ -153,10 +152,12 @@ class World:
         venv = cli.parent.parent
         cli.parent.mkdir(parents=True)
         base = Path(sys._base_executable)
-        (venv / "pyvenv.cfg").write_text(f"home = {base.parent}\n", encoding="utf-8")
-        (cli.parent / "python").symlink_to(base)
-        cli.write_text(f'#!/bin/sh\nexec "{cli.parent / "python"}" -m dadaia_workspace "$@"\n')
-        cli.chmod(0o755)
+        write_text(venv / "pyvenv.cfg", f"home = {base.parent}\n")
+        interpreter = python_in(venv)
+        if not link(str(base), interpreter, is_dir=False):
+            pytest.skip("this host refuses symlinks")
+        main = "#!python\nimport runpy\nrunpy.run_module('dadaia_workspace', run_name='__main__')\n"
+        stub_cli(cli.parent, "dadaia", main, python=interpreter)
         self.env["PYTHONPATH"] = os.pathsep.join(
             [self.env.get("PYTHONPATH", ""), sysconfig.get_paths()["purelib"]]
         )
@@ -187,10 +188,7 @@ class World:
     ) -> subprocess.CompletedProcess[str]:
         shell = isinstance(argv, str)
         env = self.env | {"DADAIA_WT": "1"} if setup else self.env
-        return subprocess.run(  # noqa: S603
-            ["sh", "-c", argv] if shell else argv,
-            cwd=cwd, env=env, input=stdin, capture_output=True, text=True, timeout=50,
-        )  # fmt: skip
+        return os_run(["sh", "-c", argv] if shell else argv, cwd=cwd, env=env, input=stdin, timeout=50)  # fmt: skip
 
     def git(self, cwd: Path, *args: str) -> str:
         done = self.run(["git", *args], cwd, setup=True)
@@ -206,13 +204,13 @@ class World:
         *live* release's ``_RELEASE.json``."""
         src = self.tmp / "seed"
         self.git(self.tmp, "init", "-q", str(src))
-        (src / "README.md").write_text("r\n", encoding="utf-8")
+        write_text(src / "README.md", "r\n")
         if constitution is not None:
             (src / "specs").mkdir()
-            (src / "specs" / "constitution.md").write_text(constitution, encoding="utf-8")
+            write_text(src / "specs" / "constitution.md", constitution)
         if live:
             (src / "specs" / "releases" / live).mkdir(parents=True)
-            (src / "specs" / "releases" / live / "_RELEASE.json").write_text("{}\n")
+            write_text(src / "specs" / "releases" / live / "_RELEASE.json", "{}\n")
         self.git(src, "add", "-A")
         self.git(src, "commit", "-qm", "seed")
         for branch in branches or ("main", "develop"):
@@ -228,16 +226,14 @@ class World:
             self.git(self.repo, "checkout", "-q", "-b", branch)
         path = self.repo / rel
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(text, encoding="utf-8")
+        write_text(path, text)
         self.git(self.repo, "add", rel)
         self.git(self.repo, "commit", "-qm", f"add {rel}")
 
     def onboard(self, constitution: str | None = None) -> None:
         (self.repo / "specs").mkdir(exist_ok=True)
-        (self.repo / "specs" / "constitution.md").write_text(
-            constitution or _constitution(), encoding="utf-8"
-        )
-        (self.repo / "AGENTS.md").write_text("# law\n", encoding="utf-8")
+        write_text(self.repo / "specs" / "constitution.md", constitution or _constitution())
+        write_text(self.repo / "AGENTS.md", "# law\n")
 
     def remote_heads(self) -> dict[str, str]:
         out = self.git(self.bare, "for-each-ref", "--format=%(refname:lstrip=2) %(objectname)")
@@ -245,7 +241,7 @@ class World:
 
     def deny(self) -> None:
         denylist = self.ws / ".dadaia" / "states" / "privacy_denylist.json"
-        denylist.write_text(f'{{"{_TERM}": "t"}}', encoding="utf-8")
+        write_text(denylist, f'{{"{_TERM}": "t"}}')
         self.env["DADAIA_PRIVACY_DENYLIST"] = str(denylist)  # the fix runs from any cwd
 
 
@@ -293,14 +289,14 @@ def _gate(world: World, push: str) -> subprocess.CompletedProcess[str]:
     hooks = git_hooks_dir(world.repo)
     assert hooks is not None
     shipped = (hooks / "pre-push").read_bytes()
-    (hooks / "pre-push").write_text(f'#!/bin/sh\npwd > "{cwd}"\ncat > "{refs}"\nexit 1\n')
+    write_text(hooks / "pre-push", f'#!/bin/sh\npwd > "{cwd}"\ncat > "{refs}"\nexit 1\n')
     try:
         world.run(push, world.repo)
     finally:
         (hooks / "pre-push").write_bytes(shipped)
     env: dict[str, str | None] = {**world.env, **dict.fromkeys(_UNSET), "COLUMNS": "80"}
-    with contextlib.chdir(cwd.read_text().strip()):
-        ran = CliRunner().invoke(app, ["ci", "push-gate-check"], input=refs.read_text(), env=env)
+    with contextlib.chdir(read_text(cwd).strip()):
+        ran = CliRunner().invoke(app, ["ci", "push-gate-check"], input=read_text(refs), env=env)
     return subprocess.CompletedProcess(push, ran.exit_code, ran.output, "")
 
 
@@ -439,7 +435,7 @@ def _denylisted(world: World) -> str:
 
 
 def _drop_term(world: World) -> None:
-    (world.repo / "notes.md").write_text("a b\n", encoding="utf-8")
+    write_text(world.repo / "notes.md", "a b\n")
 
 
 #: The refusal's documented step after its fix, the rewrite verb: push it again.
@@ -475,7 +471,7 @@ def _denylisted_advanced_integration(world: World) -> str:
     world.git(world.repo, "push", "-q", "-u", "origin", "feature/1.0.0")
     other = world.tmp / "other"
     world.git(world.tmp, "clone", "-q", "-b", "develop", world.bare.as_uri(), str(other))
-    (other / "dep.txt").write_text("dependabot\n", encoding="utf-8")
+    write_text(other / "dep.txt", "dependabot\n")
     world.git(other, "add", "dep.txt")
     world.git(other, "commit", "-qm", "dep")
     world.git(other, "push", "-q", "--no-verify", "origin", "develop")
@@ -515,14 +511,14 @@ def _denylisted_in_a_worktree(world: World) -> str:
     world.deny()
     wt = world.repo / ".claude" / "worktrees" / "agent-x"
     world.git(world.repo, "worktree", "add", "-q", "-b", "feature/1.0.0", str(wt), "origin/develop")
-    (wt / "notes.md").write_text(f"a {_TERM} b\n", encoding="utf-8")
+    write_text(wt / "notes.md", f"a {_TERM} b\n")
     world.git(wt, "add", "notes.md")
     world.git(wt, "commit", "-qm", "n")
     return git_line(wt, "push", "-q", "origin", "feature/1.0.0")
 
 
 def _drop_worktree_term(world: World) -> None:
-    (world.repo / ".claude" / "worktrees" / "agent-x" / "notes.md").write_text("a b\n")
+    write_text(world.repo / ".claude" / "worktrees" / "agent-x" / "notes.md", "a b\n")
 
 
 def _worktree_clean(world: World) -> None:
@@ -545,21 +541,19 @@ def _denylisted_no_context(world: World) -> str:
 def _no_identity(world: World) -> list[str]:
     world.clone()
     world.onboard()
-    (world.tmp / "gitconfig").write_text(
-        f"{GIT_QUIET_INCLUDE}[user]\n\tuseConfigOnly = true\n", encoding="utf-8"
-    )
+    write_text(world.tmp / "gitconfig", f"{GIT_QUIET_INCLUDE}[user]\n\tuseConfigOnly = true\n")
     return ["context", "baseline", "proj"]
 
 
 def _secret_draft(world: World) -> list[str]:
     world.clone()
     world.onboard()
-    (world.repo / "AGENTS.md").write_text(f"key {aws_key_shape()}\n", encoding="utf-8")
+    write_text(world.repo / "AGENTS.md", f"key {aws_key_shape()}\n")
     return ["context", "baseline", "proj"]
 
 
 def _drop_secret(world: World) -> None:
-    (world.repo / "AGENTS.md").write_text("key\n", encoding="utf-8")
+    write_text(world.repo / "AGENTS.md", "key\n")
 
 
 def _remote_back(world: World) -> None:
@@ -570,7 +564,7 @@ def _baseline_denylisted(world: World) -> list[str]:
     world.clone()
     world.onboard()
     world.deny()
-    (world.repo / "AGENTS.md").write_text(f"a {_TERM}\n", encoding="utf-8")
+    write_text(world.repo / "AGENTS.md", f"a {_TERM}\n")
     # Committed before the publish, so only the gate sees it: the in-process preflight
     # refuses an untracked onboarding file first.
     world.git(world.repo, "add", "AGENTS.md")
@@ -579,7 +573,7 @@ def _baseline_denylisted(world: World) -> list[str]:
 
 
 def _drop_draft_term(world: World) -> None:
-    (world.repo / "AGENTS.md").write_text("a\n", encoding="utf-8")
+    write_text(world.repo / "AGENTS.md", "a\n")
 
 
 #: The refusal's documented step after its fix, the rewrite verb: the publish again.
@@ -621,7 +615,7 @@ def _cloned(world: World) -> None:
 def _advance_origin_work(world: World) -> None:
     other = world.tmp / "other"
     world.git(world.tmp, "clone", "-q", "-b", "feature/1.0.0", world.bare.as_uri(), str(other))
-    (other / "x.md").write_text("x\n", encoding="utf-8")
+    write_text(other / "x.md", "x\n")
     world.git(other, "add", "x.md")
     world.git(other, "commit", "-qm", "x")
     world.git(other, "push", "-q", "origin", "feature/1.0.0")
@@ -681,7 +675,7 @@ def _on_work(world: World) -> None:
 
 def _untracked(world: World) -> list[str]:
     _on_work(world)
-    (world.repo / "notes.md").write_text("n\n", encoding="utf-8")
+    write_text(world.repo / "notes.md", "n\n")
     return ["context", "dead", "proj"]
 
 
@@ -691,7 +685,7 @@ def _discard_notes(world: World) -> None:
 
 def _two_untracked(world: World) -> list[str]:
     _untracked(world)
-    (world.repo / "b.md").write_text("b\n", encoding="utf-8")
+    write_text(world.repo / "b.md", "b\n")
     return ["context", "dead", "proj"]
 
 
@@ -716,7 +710,7 @@ def _no_origin(world: World) -> list[str]:
 
 def _unborn_dirty(world: World) -> list[str]:
     world.clone()
-    (world.repo / "notes.txt").write_text("n\n", encoding="utf-8")
+    write_text(world.repo / "notes.txt", "n\n")
     return ["context", "dead", "proj"]
 
 
@@ -749,13 +743,13 @@ def _associated_on_integration(world: World) -> list[str]:
     lib, lib_bare = world.ws / "repos" / "lib", world.tmp / "lib.git"
     world.git(world.tmp, "init", "-q", "--bare", "-b", "main", str(lib_bare))
     world.git(world.tmp, "clone", "-q", lib_bare.as_uri(), str(lib))
-    (lib / "README.md").write_text("r\n", encoding="utf-8")  # no specs/ of its own
+    write_text(lib / "README.md", "r\n")  # no specs/ of its own
     world.git(lib, "add", "README.md")
     world.git(lib, "commit", "-qm", "r")
     world.git(lib, "push", "-q", "origin", "HEAD:main", "HEAD:develop")
     world.git(lib, "checkout", "-q", "-b", "develop", "--track", "origin/develop")
     install_git_hooks(lib)
-    (lib / "README.md").write_text("edited\n", encoding="utf-8")
+    write_text(lib / "README.md", "edited\n")
     world.git(lib, "commit", "-qam", "edited")
     store = JsonContextStore(world.ws / ".dadaia" / "states")
     ctx = store.get("proj")
@@ -805,7 +799,7 @@ def _stashed(world: World) -> list[str]:
     """A stash entry dies with
     the clone."""
     _on_work(world)
-    (world.repo / "README.md").write_text("edited\n", encoding="utf-8")
+    write_text(world.repo / "README.md", "edited\n")
     world.git(world.repo, "stash", "push", "-q", "-m", "wip")
     return ["context", "dead", "proj"]
 
@@ -836,7 +830,7 @@ def _dead_clean_detached(world: World) -> list[str]:
 
 
 def _drop_readme_term(world: World) -> None:
-    (world.repo / "README.md").write_text("a\n", encoding="utf-8")
+    write_text(world.repo / "README.md", "a\n")
 
 
 def _work_ahead_of_origin(world: World) -> str:
@@ -1075,7 +1069,7 @@ def test_dead_on_a_non_fast_forward_carries_gits_own_text_and_removes_nothing(
     push — git's own text stands alone; the checkout stays."""
     _on_work(world)
     _advance_origin_work(world)
-    (world.repo / "README.md").write_text("edited\n", encoding="utf-8")
+    write_text(world.repo / "README.md", "edited\n")
     world.git(world.repo, "commit", "-qam", "edited")
     done = world.cli("context", "dead", "proj")
     output = done.stdout + done.stderr
@@ -1105,10 +1099,10 @@ def test_dead_after_the_operator_pulls_into_a_conflict_publishes_no_markers(
     _on_work(world)
     _advance_origin_work(world)
     other = world.tmp / "other"
-    (other / "README.md").write_text("theirs\n", encoding="utf-8")
+    write_text(other / "README.md", "theirs\n")
     world.git(other, "commit", "-qam", "t")
     world.git(other, "push", "-q", "origin", "feature/1.0.0")
-    (world.repo / "README.md").write_text("mine\n", encoding="utf-8")
+    write_text(world.repo / "README.md", "mine\n")
     world.git(world.repo, "commit", "-qam", "mine")
     world.run("git pull -q --no-rebase --no-edit origin feature/1.0.0", world.repo)
     published = world.remote_heads()["feature/1.0.0"]

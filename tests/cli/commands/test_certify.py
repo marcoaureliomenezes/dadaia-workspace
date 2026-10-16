@@ -10,7 +10,6 @@ from __future__ import annotations
 import ast
 import itertools
 import re
-import subprocess
 import sys
 from pathlib import Path
 from typing import Any
@@ -20,12 +19,11 @@ import typer.main
 
 from dadaia_workspace.cli.main import app
 from dadaia_workspace.features.certification import service
+from tests.helpers.oslib import read_text, run
 
 _SOURCE = Path(service.__file__)
 _PUBLIC = _SOURCE.parents[2] / "public"
-_RECIPE = (_SOURCE.parents[3] / "scripts" / "CONSUMER_VALIDATION_RECIPE.md").read_text(
-    encoding="utf-8"
-)
+_RECIPE = read_text(_SOURCE.parents[3] / "scripts" / "CONSUMER_VALIDATION_RECIPE.md")
 _SPANS = [
     re.sub(r"<[^>]*>", "X", part).split()
     for span in re.findall(r"`([^`]+)`", _RECIPE)
@@ -65,9 +63,7 @@ def test_every_recipe_script_flag_exists(words: list[str]) -> None:
     line's subcommand and flags are in that script's own `--help`."""
     script = _PUBLIC / "skills" / words[1].removeprefix("$S/")
     verb = list(itertools.takewhile(lambda w: w[0] != "-", words[2:]))
-    shown = subprocess.run(
-        [sys.executable, str(script), *verb, "--help"], capture_output=True, text=True, timeout=20
-    )
+    shown = run([sys.executable, str(script), *verb, "--help"], timeout=20)
     assert shown.returncode == 0, shown.stderr
     assert [f for f in words[2:] if f.startswith("--") and f not in shown.stdout] == []
 
@@ -77,7 +73,7 @@ def test_every_recipe_certify_check_is_one_certify_runs() -> None:
     names (e.g. 'context-bind') is in certify's emitted check list."""
     checks = {
         node.args[0].value
-        for node in ast.walk(ast.parse(_SOURCE.read_text(encoding="utf-8")))
+        for node in ast.walk(ast.parse(read_text(_SOURCE)))
         if isinstance(node, ast.Call) and getattr(node.func, "id", None) == "check"
         if isinstance(node.args[0], ast.Constant)
     }

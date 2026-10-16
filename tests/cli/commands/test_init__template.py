@@ -12,6 +12,7 @@ import pytest
 from typer.testing import CliRunner
 
 from dadaia_workspace.core.platform import PLATFORM
+from tests.helpers.oslib import make_executable, read_text, write_text
 
 pytestmark = [pytest.mark.medium, pytest.mark.slow(reason="runs the init and reconcile seams")]
 
@@ -21,7 +22,7 @@ def _overlay(ws: Path) -> Path:
 
 
 def _applied(ws: Path) -> str:
-    return json.loads(_overlay(ws).read_text(encoding="utf-8"))["applied_template"]
+    return json.loads(read_text(_overlay(ws)))["applied_template"]
 
 
 def _others() -> tuple[str, str, str]:
@@ -37,7 +38,7 @@ def _others() -> tuple[str, str, str]:
 
 
 def _persona(ws: Path, agent: str) -> str:
-    return (ws / ".claude" / "agents" / f"{agent}.md").read_text(encoding="utf-8")
+    return read_text(ws / ".claude" / "agents" / f"{agent}.md")
 
 
 def _init(ws: Path, *flags: str) -> None:
@@ -93,8 +94,8 @@ def test_reconcile_keeps_the_saved_template(
     venv_bin = ws / ".dadaia" / ".venv" / PLATFORM.venv_scripts_dir
     venv_bin.mkdir(parents=True, exist_ok=True)
     launcher = venv_bin / f"dadaia{PLATFORM.venv_exe_suffix}"
-    launcher.write_text("", encoding="utf-8")
-    launcher.chmod(0o755)
+    write_text(launcher, "")
+    make_executable(launcher)
     monkeypatch.chdir(ws)
 
     result = CliRunner().invoke(

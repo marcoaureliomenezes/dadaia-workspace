@@ -11,12 +11,13 @@ import yaml
 
 import dadaia_workspace
 from dadaia_workspace.core.model_registry import CORE_AGENTS
+from tests.helpers.oslib import read_text
 
 _PUBLIC = Path(dadaia_workspace.__file__).resolve().parent / "public"
 
 
 def _frontmatter(md: Path) -> dict[str, object]:
-    text = md.read_text(encoding="utf-8")
+    text = read_text(md)
     assert text.startswith("---\n"), f"{md} has no YAML frontmatter"
     end = text.find("\n---\n", 4)
     assert end != -1, f"{md} has an unterminated frontmatter block"

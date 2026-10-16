@@ -11,6 +11,7 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
+from tests.helpers.oslib import read_text, write_text
 
 _PKG = Path(__file__).resolve().parents[2] / "dadaia_workspace"
 
@@ -19,8 +20,8 @@ def _lines(tmp_path: Path, text: str) -> list[str]:
     lib = tmp_path / "lib"
     public_dir = lib / "pkg" / "public"
     (public_dir / "data").mkdir(parents=True)
-    (public_dir / "data" / "AGENTS.md").write_text(text, encoding="utf-8")
-    (lib / "AGENTS.md").write_text(text, encoding="utf-8")
+    write_text(public_dir / "data" / "AGENTS.md", text)
+    write_text(lib / "AGENTS.md", text)
     manager = FileSystemPublicAssetManager()
     manager._public_dir = public_dir  # noqa: SLF001
     ws = tmp_path / "ws"
@@ -35,7 +36,7 @@ def test_an_operator_term_is_shown_first_last(
     and in the library's root AGENTS.md alike."""
     term = "zorb" + "lax"
     denylist = tmp_path / "denylist.json"
-    denylist.write_text(json.dumps({term: "zz fixture term"}), encoding="utf-8")
+    write_text(denylist, json.dumps({term: "zz fixture term"}))
     monkeypatch.setenv("DADAIA_PRIVACY_DENYLIST", str(denylist))
 
     lines = _lines(tmp_path, "made by Zorb" + "lax-Corp\n")
@@ -76,9 +77,7 @@ def test_a_baseline_match_is_shown_first_last(
 def test_one_mask_and_one_redactor_builder() -> None:
     """Exactly one first…last mask definition (_privacy) and one
     ContextRedactor construction site (cli/redact)."""
-    sources = {
-        p.relative_to(_PKG).as_posix(): p.read_text(encoding="utf-8") for p in _PKG.rglob("*.py")
-    }
+    sources = {p.relative_to(_PKG).as_posix(): read_text(p) for p in _PKG.rglob("*.py")}
     masks = sorted(rel for rel, text in sources.items() if "[0]}…{" in text)
     builders = sorted(rel for rel, text in sources.items() if "ContextRedactor(" in text)
     assert masks == ["public/skills/dd-bug-resolution/scripts/_privacy.py"]

@@ -6,13 +6,13 @@ as `stored_branch`; with no repo on disk the snapshot is reported.
 from __future__ import annotations
 
 import json
-import subprocess
 from pathlib import Path
 
 import pytest
 from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app
+from tests.helpers.oslib import run, write_text
 
 _runner = CliRunner()
 _CTX = "live-branch-ctx"
@@ -24,15 +24,16 @@ def _make_workspace_with_repo(root: Path) -> Path:
     states.mkdir(parents=True)
     repo = ws / "repos" / _CTX
     repo.mkdir(parents=True)
-    subprocess.run(["git", "init", "-q", "-b", "main", str(repo)], check=True)
-    subprocess.run(["git", "-C", str(repo), "config", "user.email", "t@t"], check=True)
-    subprocess.run(["git", "-C", str(repo), "config", "user.name", "t"], check=True)
-    (repo / "f.txt").write_text("x", encoding="utf-8")
-    subprocess.run(["git", "-C", str(repo), "add", "."], check=True)
-    subprocess.run(["git", "-C", str(repo), "commit", "-qm", "init"], check=True)
+    run(["git", "init", "-q", "-b", "main", str(repo)], check=True)
+    run(["git", "-C", str(repo), "config", "user.email", "t@t"], check=True)
+    run(["git", "-C", str(repo), "config", "user.name", "t"], check=True)
+    write_text(repo / "f.txt", "x")
+    run(["git", "-C", str(repo), "add", "."], check=True)
+    run(["git", "-C", str(repo), "commit", "-qm", "init"], check=True)
     # The LIVE branch differs from the stored snapshot below.
-    subprocess.run(["git", "-C", str(repo), "checkout", "-qb", "feature/v9.9.9"], check=True)
-    (states / "spec_contexts.json").write_text(
+    run(["git", "-C", str(repo), "checkout", "-qb", "feature/v9.9.9"], check=True)
+    write_text(
+        states / "spec_contexts.json",
         json.dumps(
             {
                 "schema_version": "2",
@@ -50,7 +51,6 @@ def _make_workspace_with_repo(root: Path) -> Path:
                 ],
             }
         ),
-        encoding="utf-8",
     )
     return ws
 

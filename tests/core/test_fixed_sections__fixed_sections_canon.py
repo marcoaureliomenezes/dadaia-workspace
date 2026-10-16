@@ -12,6 +12,7 @@ from dadaia_workspace.core.fixed_sections import extract_fixed_section
 from dadaia_workspace.features.specs.canon import scaffold
 from dadaia_workspace.features.specs.doctor import SpecsDoctor
 from dadaia_workspace.features.specs.memory_canon import FIXED_SECTIONS, read_fixed_fragment
+from tests.helpers.oslib import read_text
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _PUBLIC_DIR = _REPO_ROOT / "dadaia_workspace" / "public"
@@ -40,7 +41,7 @@ _TEMPLATED_SECTIONS = [(rel, sid) for rel, sid in FIXED_SECTIONS if rel != "cons
     "rel, section_id", _TEMPLATED_SECTIONS, ids=[s for _, s in _TEMPLATED_SECTIONS]
 )
 def test_scaffold_template_ends_with_its_empty_marker_pair(rel: str, section_id: str) -> None:
-    template = (_PUBLIC_DIR / "scaffold" / rel).read_text(encoding="utf-8")
+    template = read_text(_PUBLIC_DIR / "scaffold" / rel)
     assert extract_fixed_section(template, section_id) == ""
     assert template.endswith(f"<!-- /dadaia:fixed {section_id} -->\n")
 
@@ -51,7 +52,7 @@ def test_fresh_scaffold_renders_every_block_byte_equal_and_doctor_reports_no_fix
     specs = tmp_path / "specs"
     scaffold(specs, project_name="Proj", public_dir=_PUBLIC_DIR)
     for rel, section_id in FIXED_SECTIONS:
-        text = (specs / rel).read_text(encoding="utf-8")
+        text = read_text(specs / rel)
         assert extract_fixed_section(text, section_id) == read_fixed_fragment(
             _PUBLIC_DIR, section_id
         )
@@ -70,7 +71,7 @@ def test_no_scaffold_or_law_file_restates_a_fragment_bullet() -> None:
         for folder in ("scaffold", "data", "templates")
         for path in sorted((_PUBLIC_DIR / folder).rglob("*.md"))
         if "fixed" not in path.parts
-        for line in path.read_text(encoding="utf-8").splitlines()
+        for line in read_text(path).splitlines()
         if line in bullets
     ]
     assert copies == []

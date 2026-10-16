@@ -11,7 +11,6 @@ import json
 import os
 import shutil
 import stat
-import subprocess
 import sys
 from collections.abc import Callable
 from pathlib import Path
@@ -25,6 +24,7 @@ from dadaia_workspace.core.exceptions import WorkspaceVenvBootstrapError
 from dadaia_workspace.core.platform import PLATFORM
 from dadaia_workspace.features.migrate.upgrade import _RETIRED_PART_HEADING
 from tests.fakes import no_worktree_rows, seed_dead_context
+from tests.helpers.oslib import link, read_text, run, write_text
 
 pytest.importorskip("fcntl")  # POSIX-only: bare git remotes and file:// URLs; Windows skips
 
@@ -39,14 +39,15 @@ Case = tuple[Path, list[str]]
 
 
 def _git(*args: str, cwd: Path | None = None) -> None:
-    subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True)
+    run(["git", *args], cwd=cwd, check=True)
 
 
 def _workspace(tmp: Path, name: str = "ws") -> Path:
     root = tmp / name
     (root / ".dadaia/states").mkdir(parents=True)
-    (root / ".dadaia/states/spec_contexts.json").write_text(
-        json.dumps({"schema_version": 2, "contexts": []})
+    write_text(
+        root / ".dadaia/states/spec_contexts.json",
+        json.dumps({"schema_version": 2, "contexts": []}),
     )
     return root
 
@@ -62,7 +63,7 @@ def _bare_remote(tmp: Path) -> Path:
     _git("init", "-q", "--bare", str(bare))
     seed = tmp / "seed"
     _git("init", "-q", "-b", "main", str(seed))
-    (seed / "README.md").write_text("x")
+    write_text(seed / "README.md", "x")
     _git("add", "-A", cwd=seed)
     _git("commit", "-qm", "i", cwd=seed)
     _git("push", "-q", str(bare), "main", cwd=seed)
@@ -130,7 +131,7 @@ def _dead_remote_gone(tmp: Path, monkeypatch: pytest.MonkeyPatch) -> Case:
     root = _alive_foo(tmp, bare)
     repo = root / "repos/foo"
     _git("checkout", "-q", "-b", "feature/0.1.0", cwd=repo)
-    (repo / "n.txt").write_text("c")
+    write_text(repo / "n.txt", "c")
     _git("add", "-A", cwd=repo)
     _git("commit", "-qm", "c", cwd=repo)
     shutil.move(str(bare), str(bare) + ".moved")
@@ -147,7 +148,7 @@ def _import_file(tmp: Path, text: str | None) -> Case:
     root = _workspace(tmp)
     f = root / "x.json"
     if text is not None:
-        f.write_text(text)
+        write_text(f, text)
     return root, ["import", str(f)]
 
 
@@ -167,15 +168,13 @@ def _two_tier_architecture(tmp: Path) -> Case:
     os.chdir(g)
     assert _run(["specs", "init", "--specs-dir", str(g / "specs")]) == 0
     arch = g / "specs/memory/ARCHITECTURE.md"
-    arch.write_text(
-        arch.read_text(encoding="utf-8") + "\n" + _RETIRED_PART_HEADING + "\n", encoding="utf-8"
-    )
+    write_text(arch, read_text(arch) + "\n" + _RETIRED_PART_HEADING + "\n")
     return g, ["specs", "upgrade", "--specs-dir", str(g / "specs")]
 
 
 def _malformed_constitution(tmp: Path) -> Case:
     (tmp / "specs").mkdir(parents=True)
-    (tmp / "specs/constitution.md").write_text("---\n: [\n---\n")
+    write_text(tmp / "specs/constitution.md", "---\n: [\n---\n")
     return tmp, ["specs", "init", "--specs-dir", str(tmp / "specs")]
 
 
@@ -186,7 +185,7 @@ def _specs_dir_is_not_a_directory(tmp: Path, kind: str) -> Case:
             pytest.skip("a FIFO needs POSIX")
         os.mkfifo(tmp / "specs")
     else:
-        (tmp / "specs").write_text("not a directory\n")
+        write_text(tmp / "specs", "not a directory\n")
     return tmp, ["specs", "init", "--specs-dir", str(tmp / "specs")]
 
 
@@ -194,10 +193,8 @@ def _symlinked_specs_dir(tmp: Path, live: bool) -> Case:
     tmp.mkdir(parents=True)
     if live:
         (tmp / "real").mkdir()
-    try:
-        (tmp / "link").symlink_to(tmp / ("real" if live else "nonexistent"))
-    except OSError:
-        pytest.skip("this host cannot create symlinks")
+    if not link(str(tmp / ("real" if live else "nonexistent")), tmp / "link", is_dir=live):
+        pytest.skip("this host refuses symlinks")
     return tmp, ["specs", "init", "--specs-dir", str(tmp / "link")]
 
 
@@ -289,7 +286,7 @@ def test_specs_init_on_a_non_directory_refuses_with_the_move_aside_fix_and_leave
     if kind == "fifo":
         assert stat.S_ISFIFO((cwd / "specs").lstat().st_mode)
     else:
-        assert (cwd / "specs").read_text() == "not a directory\n"
+        assert read_text(cwd / "specs") == "not a directory\n"
 
 
 def test_context_alive_on_a_non_git_repo_dir_is_one_refusal(
@@ -298,7 +295,7 @@ def test_context_alive_on_a_non_git_repo_dir_is_one_refusal(
     root = _workspace(tmp_path)
     seed_dead_context(root, "foo", "foo", "file:///nonexistent/foo.git")
     (root / "repos/foo").mkdir(parents=True)
-    (root / "repos/foo/README.md").write_text("x")
+    write_text(root / "repos/foo/README.md", "x")
     os.chdir(root)
     capsys.readouterr()
     _assert_one_fix(capsys, _run(["context", "alive", "foo"]))

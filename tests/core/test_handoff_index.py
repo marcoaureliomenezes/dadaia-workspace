@@ -16,11 +16,12 @@ import pytest
 
 from dadaia_workspace.core.exceptions import HandoffSchemaError
 from dadaia_workspace.core.handoff_index import Handoff, HandoffIndex
+from tests.helpers.oslib import read_text, write_text
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _SCHEMA_PATH = _REPO_ROOT / "dadaia_workspace" / "public" / "schemas" / "handoff-v1.schema.json"
 _FIXTURES = Path(__file__).resolve().parents[1] / "fixtures" / "handoffs"
-_SCHEMA = json.loads(_SCHEMA_PATH.read_text(encoding="utf-8"))
+_SCHEMA = json.loads(read_text(_SCHEMA_PATH))
 
 
 # ---------------------------------------------------------------------------
@@ -30,7 +31,7 @@ _SCHEMA = json.loads(_SCHEMA_PATH.read_text(encoding="utf-8"))
 
 def _write(path: Path, doc: dict[str, object]) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(doc, indent=2), encoding="utf-8")
+    write_text(path, json.dumps(doc, indent=2))
     return path
 
 
@@ -41,9 +42,9 @@ _REF = "specs/memory/ARCHITECTURE.md"
 def _atom(root: Path) -> Path:
     """*root* as a workspace: its registry, and the atom the default fixture self-pulls."""
     (root / ".dadaia" / "states").mkdir(parents=True, exist_ok=True)
-    (root / ".dadaia" / "states" / "spec_contexts.json").write_text('{"contexts": []}')
+    write_text(root / ".dadaia" / "states" / "spec_contexts.json", '{"contexts": []}')
     (root / _REF).parent.mkdir(parents=True, exist_ok=True)
-    (root / _REF).write_text("# Architecture\n", encoding="utf-8")
+    write_text(root / _REF, "# Architecture\n")
     return root
 
 
@@ -77,7 +78,7 @@ def _base_doc(**overrides: object) -> dict[str, object]:
 )
 def test_malformed_handoff_classification(tmp_path: Path, name: str, content: str) -> None:
     path = tmp_path / "bad.handoff.json"
-    path.write_text(content, encoding="utf-8")
+    write_text(path, content)
 
     handoff = Handoff.load(path)
 
@@ -145,7 +146,7 @@ def test_real_fixture_v12_deepening_audit_self_pull_refs_and_hash_pass_schema_sh
     path = _FIXTURES / "v1.2-deepening-audit-self-pull.handoff.json"
     handoff = Handoff.load(path)
     (tmp_path / ".dadaia" / "states").mkdir(parents=True)  # an empty workspace: its registry
-    (tmp_path / ".dadaia" / "states" / "spec_contexts.json").write_text('{"contexts": []}')
+    write_text(tmp_path / ".dadaia" / "states" / "spec_contexts.json", '{"contexts": []}')
 
     result = handoff.validate(workspace_root=tmp_path, schema=_SCHEMA)
 
@@ -309,11 +310,12 @@ def test_self_pull_ref_existence_and_missing_ref_named(tmp_path: Path) -> None:
     registered repo — the context NAME (dadaia-workspace) differs from its repo slug."""
     states = tmp_path / ".dadaia" / "states"
     states.mkdir(parents=True)
-    (states / "spec_contexts.json").write_text(
-        json.dumps({"contexts": [{"name": "dadaia-workspace", "repo_slug": "alphamain"}]})
+    write_text(
+        states / "spec_contexts.json",
+        json.dumps({"contexts": [{"name": "dadaia-workspace", "repo_slug": "alphamain"}]}),
     )
     (tmp_path / "repos" / "alphamain" / "specs" / "memory").mkdir(parents=True)
-    (tmp_path / "repos" / "alphamain" / "specs" / "memory" / "TECHSTACK.md").write_text("x")
+    write_text(tmp_path / "repos" / "alphamain" / "specs" / "memory" / "TECHSTACK.md", "x")
 
     handoff = Handoff.load(
         _write(
@@ -336,17 +338,19 @@ def test_self_pull_resolves_against_reviewed_root_before_workspace(tmp_path: Pat
     disk must resolve — reviewed_root wins."""
     workspace = tmp_path / "workspace"
     (workspace / ".dadaia" / "states").mkdir(parents=True)
-    (workspace / ".dadaia" / "states" / "spec_contexts.json").write_text(
-        json.dumps({"contexts": [{"name": "dadaia-workspace", "repo_slug": "dadaia-workspace"}]})
+    write_text(
+        workspace / ".dadaia" / "states" / "spec_contexts.json",
+        json.dumps({"contexts": [{"name": "dadaia-workspace", "repo_slug": "dadaia-workspace"}]}),
     )
     (workspace / "repos" / "dadaia-workspace" / "specs" / "memory").mkdir(parents=True)
-    (workspace / "repos" / "dadaia-workspace" / "specs" / "memory" / "TECHSTACK.md").write_text(
-        "checked-out-branch version"
+    write_text(
+        workspace / "repos" / "dadaia-workspace" / "specs" / "memory" / "TECHSTACK.md",
+        "checked-out-branch version",
     )
 
     reviewed_worktree = tmp_path / "linked-worktree"
     (reviewed_worktree / "specs" / "memory").mkdir(parents=True)
-    (reviewed_worktree / "specs" / "memory" / "QUALITY.md").write_text("only in the reviewed tree")
+    write_text(reviewed_worktree / "specs" / "memory" / "QUALITY.md", "only in the reviewed tree")
 
     handoff = Handoff.load(
         _write(
@@ -372,11 +376,12 @@ def test_self_pull_falls_back_to_workspace_when_reviewed_root_lacks_the_ref(tmp_
     under the ordinary repos/<context>/<ref> candidate still resolves."""
     workspace = tmp_path / "workspace"
     (workspace / ".dadaia" / "states").mkdir(parents=True)
-    (workspace / ".dadaia" / "states" / "spec_contexts.json").write_text(
-        json.dumps({"contexts": [{"name": "dadaia-workspace", "repo_slug": "dadaia-workspace"}]})
+    write_text(
+        workspace / ".dadaia" / "states" / "spec_contexts.json",
+        json.dumps({"contexts": [{"name": "dadaia-workspace", "repo_slug": "dadaia-workspace"}]}),
     )
     (workspace / "repos" / "dadaia-workspace" / "specs" / "memory").mkdir(parents=True)
-    (workspace / "repos" / "dadaia-workspace" / "specs" / "memory" / "TECHSTACK.md").write_text("x")
+    write_text(workspace / "repos" / "dadaia-workspace" / "specs" / "memory" / "TECHSTACK.md", "x")
 
     reviewed_worktree = tmp_path / "linked-worktree"
     reviewed_worktree.mkdir()  # exists, but carries none of the referenced files
@@ -408,3 +413,10 @@ def test_handoff_index_validate_file_raises_handoff_schema_error_when_unstaged(
 
     with pytest.raises(HandoffSchemaError):
         index.validate_file(handoff_path)
+
+
+def test_load_records_a_non_utf8_handoff_instead_of_raising(tmp_path: Path) -> None:
+    """``Handoff.load`` never raises: bytes that are not UTF-8 are a recorded malformation."""
+    path = tmp_path / "h.handoff.json"
+    path.write_bytes(b'{"agent": "caf\xe9"}')
+    assert Handoff.load(path).malformed_error is not None

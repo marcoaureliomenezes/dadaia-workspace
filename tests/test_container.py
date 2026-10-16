@@ -15,12 +15,14 @@ from dadaia_workspace.features.import_.service import ImportService
 from dadaia_workspace.features.public.service import PublicAssetService
 from dadaia_workspace.features.spec_context.doctor import DoctorService
 from dadaia_workspace.features.workspace.service import WorkspaceService
+from tests.helpers.oslib import write_text
+from tests.helpers.oslib import write_text as os_write_text
 
 
 def _init_states(tmp_path: Path) -> Path:
     states = tmp_path / ".dadaia" / "states"
     states.mkdir(parents=True)
-    (states / "spec_contexts.json").write_text(json.dumps({"schema_version": "2", "contexts": []}))
+    write_text(states / "spec_contexts.json", json.dumps({"schema_version": "2", "contexts": []}))
     return states
 
 
@@ -57,7 +59,7 @@ def test_build_doctor_service_reaps_retired_lock_state_whatever_the_holder(
     """Residual lock state is closed-canon slop; fix() removes it without a liveness probe."""
     lock = _init_states(tmp_path) / "ctx_locks" / "ctx.lock.json"
     lock.parent.mkdir()
-    lock.write_text(json.dumps({"context": "ctx", "session_id": "holder", "pid": pid}), "utf-8")
+    os_write_text(lock, json.dumps({"context": "ctx", "session_id": "holder", "pid": pid}))
     doctor = container.build_doctor_service(tmp_path)
     assert any(f.code == "WS-states-slop" for f in doctor.scan())
     assert any("WS-states-slop" in action for action in doctor.fix())

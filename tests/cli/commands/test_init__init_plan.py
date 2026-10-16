@@ -14,6 +14,7 @@ from typer.testing import CliRunner
 from dadaia_workspace.cli.commands import init as init_cmd
 from dadaia_workspace.cli.main import app
 from dadaia_workspace.core.platform import workspace_cli_path
+from tests.helpers.oslib import read_text
 
 _runner = CliRunner()
 
@@ -23,7 +24,7 @@ def _tree(root: Path) -> set[str]:
 
 
 def _contexts(root: Path) -> object:
-    return json.loads((root / ".dadaia" / "states" / "spec_contexts.json").read_text("utf-8"))
+    return json.loads(read_text(root / ".dadaia" / "states" / "spec_contexts.json"))
 
 
 def test_prompts_and_flags_fill_the_same_plan(tmp_path: Path, monkeypatch) -> None:

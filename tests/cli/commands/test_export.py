@@ -3,7 +3,6 @@ CLI receives `--workspace` explicitly so the resolver never walks up from cwd.
 """
 
 import json
-import subprocess
 from pathlib import Path
 
 import pytest
@@ -17,6 +16,7 @@ from dadaia_workspace.features.workspace.service import WorkspaceService
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
+from tests.helpers.oslib import read_text, run
 
 _runner = CliRunner()
 
@@ -56,7 +56,7 @@ def test_export_then_import_restores_unknown_contexts_dead_and_skips_known(
     assert sorted(p.name for p in dist.iterdir()) == ["spec-contexts.json"]
     file = dist / "spec-contexts.json"
     assert str(file) in exported.output
-    payload = json.loads(file.read_text("utf-8"))
+    payload = json.loads(read_text(file))
     assert [c["name"] for c in payload["contexts"]] == ["alpha", "beta"]
 
     target = _workspace(tmp_path / "target")
@@ -97,7 +97,7 @@ def _real_checkout(repo: Path, branch: str) -> None:
         ["commit", "-q", "--allow-empty", "-m", "init"],
         ["checkout", "-q", "-b", branch],
     ):
-        subprocess.run(["git", *args], cwd=repo, capture_output=True, text=True, check=True)
+        run(["git", *args], cwd=repo, check=True)
 
 
 def test_export_refreshes_an_alive_context_branch_from_its_real_checkout(tmp_path: Path) -> None:
@@ -117,7 +117,7 @@ def test_export_refreshes_an_alive_context_branch_from_its_real_checkout(tmp_pat
     assert exported.exit_code == 0, exported.output
 
     file = tmp_path / "source" / ".dadaia" / "dist" / "spec-contexts.json"
-    payload = json.loads(file.read_text("utf-8"))
+    payload = json.loads(read_text(file))
     assert [(c["name"], c["branch"]) for c in payload["contexts"]] == [("alpha", "feature/test")]
     alpha = source.get("alpha")
     assert alpha is not None and alpha.current_branch == "feature/test"
@@ -134,7 +134,7 @@ def test_explicit_workspace_pointing_at_an_uninitialized_dir_is_refused(
     live = tmp_path / "live"
     _workspace(live)
     registry = live / ".dadaia" / "states" / "spec_contexts.json"
-    before = registry.read_text("utf-8")
+    before = read_text(registry)
     nested = live / ".dadaia" / "tmp" / "x"
     nested.mkdir(parents=True)
 
@@ -148,5 +148,5 @@ def test_explicit_workspace_pointing_at_an_uninitialized_dir_is_refused(
 
     assert (result.exit_code, result.exception.__class__) == (1, SystemExit), result.output
     assert "fix: " in result.output
-    assert registry.read_text("utf-8") == before
+    assert read_text(registry) == before
     assert not (live / ".dadaia" / "dist").exists()

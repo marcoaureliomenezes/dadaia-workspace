@@ -14,13 +14,14 @@ import pytest
 from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app
+from tests.helpers.oslib import read_text
 
 # CliRunner takes no mix_stderr kwarg.
 _runner = CliRunner()
 
 
 def _ctx_inject_commands(claude_dir: Path) -> list[str]:
-    settings = json.loads((claude_dir / "settings.json").read_text(encoding="utf-8"))
+    settings = json.loads(read_text(claude_dir / "settings.json"))
     entries = settings["hooks"]["UserPromptSubmit"]
     return [h["command"] for entry in entries for h in entry.get("hooks", [])]
 
@@ -59,7 +60,7 @@ def test_harness_scopes_scaffold(
         commands = _ctx_inject_commands(tmp_path / ".claude")
         wrapper = tmp_path / ".dadaia" / "hooks" / "claude-ctx-inject"
         assert any(c.endswith("/.dadaia/hooks/claude-ctx-inject") for c in commands), commands
-        assert "dadaia_workspace.hooks.ctx_inject" in wrapper.read_text(encoding="utf-8")
+        assert "dadaia_workspace.hooks.ctx_inject" in read_text(wrapper)
     if "codex" in expect_present:
         codex_wrappers = sorted((tmp_path / ".dadaia" / "hooks").glob("codex-*"))
         assert codex_wrappers, "expected .dadaia/hooks/codex-* wrappers for a codex profile"

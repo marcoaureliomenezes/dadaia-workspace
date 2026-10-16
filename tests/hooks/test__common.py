@@ -8,8 +8,12 @@ of that seam, shared by gate/heartbeat/ctx-inject).
 
 from __future__ import annotations
 
+import os
+import sys
+
 from dadaia_workspace.core import invocation
 from dadaia_workspace.hooks import _common
+from tests.helpers.oslib import run
 
 
 def test_target_path_forms() -> None:
@@ -68,3 +72,11 @@ def test_sanitize_session_id_strips_traversal() -> None:
     assert invocation.sanitize_session_id("../../etc/passwd") == "etcpasswd"
     assert invocation.sanitize_session_id("abc-123_XYZ") == "abc-123_XYZ"
     assert invocation.sanitize_session_id(None) == ""
+
+
+def test_stdin_is_read_as_utf8_whatever_codec_the_host_pipe_defaults_to() -> None:
+    """A UTF-8 payload holding a non-ASCII path reads whole, never as ``{}`` (a gate fail-open)."""
+    code = "from dadaia_workspace.hooks import _common; print(ord(_common.read_stdin_json()['p']))"
+    env = {**os.environ, "PYTHONIOENCODING": "cp1252", "PYTHONUTF8": "0"}
+    done = run([sys.executable, "-c", code], input='{"p": "\u00c1"}', env=env)
+    assert (done.returncode, done.stdout.strip()) == (0, "193")

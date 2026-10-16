@@ -7,7 +7,6 @@ Size: MEDIUM (hook and CLI subprocess boundaries over a tmp workspace).
 from __future__ import annotations
 
 import json
-import subprocess
 from pathlib import Path
 
 import pytest
@@ -25,6 +24,7 @@ from tests.fixtures.harness_env import (
     run_hook_subprocess,
 )
 from tests.fixtures.stores import fake_venv
+from tests.helpers.oslib import run, write_text
 
 _NOW = "2999-01-01T00:00:00+00:00"
 _CLAUDE = "CLAUDE_CODE_SESSION_ID"
@@ -37,8 +37,9 @@ def _workspace(root: Path, *names: str, dead: tuple[str, ...] = ()) -> Path:
          "state": "dead" if n in dead else "alive"}
         for n in names
     ]  # fmt: skip
-    (root / ".dadaia" / "states" / "spec_contexts.json").write_text(
-        json.dumps({"schema_version": "2", "contexts": rows})
+    write_text(
+        root / ".dadaia" / "states" / "spec_contexts.json",
+        json.dumps({"schema_version": "2", "contexts": rows}),
     )
     for n in names:
         (root / "repos" / n).mkdir(parents=True)
@@ -170,9 +171,7 @@ def test_a_bound_context_without_specs_gets_its_next_step(tmp_path: Path) -> Non
     fake_venv(ws, cli=True)
     for argv in (["init", "-q"], ["commit", "-q", "--allow-empty", "-m", "x"],
                  ["branch", "wt/0.5.0/wt-hotfix-b"]):  # fmt: skip
-        subprocess.run(
-            ["git", "-C", str(ws / "repos/alpha"), *argv], check=True, capture_output=True
-        )
+        run(["git", "-C", str(ws / "repos/alpha"), *argv], check=True)
     out = run_hook_subprocess(
         "ctx_inject", {"session_id": "s1"}, claude_hook_env(ws, session_id="s1")
     ).stdout

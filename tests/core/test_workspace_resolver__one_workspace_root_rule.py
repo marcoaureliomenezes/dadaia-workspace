@@ -13,6 +13,7 @@ from typer.testing import CliRunner
 from dadaia_workspace.cli.main import app
 from dadaia_workspace.features.specs.memory_lint import main as memory_lint
 from tests.fixtures.harness_env import claude_hook_env, run_hook_subprocess
+from tests.helpers.oslib import read_text, write_text
 
 _PACKAGE = Path(__file__).resolve().parents[2] / "dadaia_workspace"
 
@@ -20,7 +21,7 @@ _PACKAGE = Path(__file__).resolve().parents[2] / "dadaia_workspace"
 def _workspace(root: Path, registry: object = None) -> Path:
     (root / ".dadaia" / "states").mkdir(parents=True)
     body = registry if registry is not None else {"schema_version": "2", "contexts": []}
-    (root / ".dadaia" / "states" / "spec_contexts.json").write_text(json.dumps(body))
+    write_text(root / ".dadaia" / "states" / "spec_contexts.json", json.dumps(body))
     return root
 
 
@@ -29,7 +30,7 @@ def test_no_package_module_reads_workspace_root_from_the_environment() -> None:
     reads = [
         f"{path.relative_to(_PACKAGE)}:{node.lineno}"
         for path in _PACKAGE.rglob("*.py")
-        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8")))
+        for node in ast.walk(ast.parse(read_text(path)))
         if isinstance(node, ast.Constant) and node.value == "WORKSPACE_ROOT"
     ]
     assert reads == []
@@ -63,7 +64,7 @@ def test_migrate_runs_in_the_cli_own_workspace_from_any_cwd(
     result = CliRunner().invoke(app, ["migrate", "--yes"])
 
     assert result.exit_code == 0, result.output
-    registry = json.loads((own / ".dadaia" / "states" / "spec_contexts.json").read_text())
+    registry = json.loads(read_text(own / ".dadaia" / "states" / "spec_contexts.json"))
     assert registry["schema_version"] == "2"
 
 

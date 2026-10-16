@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import json
 import re
-import subprocess
 import sys
 from pathlib import Path
 from typing import Any
@@ -24,6 +23,8 @@ from dadaia_workspace.cli.help_digest import command_paths
 from dadaia_workspace.cli.main import app
 from dadaia_workspace.core.cli_line import git_line
 from dadaia_workspace.core.specs_version import state
+from tests.helpers.oslib import read_text, run, write_text
+from tests.helpers.oslib import write_text as os_write_text
 
 _runner = CliRunner()
 _REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -62,7 +63,7 @@ def _live_release(specs: Path, **over: Any) -> Path:
     release_dir.mkdir(parents=True)
     state = {"schema": "release-state-v1", "release": "0.5.0", "phase": "DEFINITION",
              "defined": None, "implemented": None, "shipped": None, "log": [], **over}  # fmt: skip
-    (release_dir / "_RELEASE.json").write_text(json.dumps(state, indent=2) + "\n", "utf-8")
+    os_write_text(release_dir / "_RELEASE.json", json.dumps(state, indent=2) + "\n")
     return release_dir / "_RELEASE.json"
 
 
@@ -86,7 +87,7 @@ def test_a_mis_cased_phase_is_one_finding_whose_fix_clears_it(tmp_path: Path) ->
     ), named
     log = git_line(state.resolve().parent, "log", "-p", "--", state.name)
     assert f"`{log}`" in named[0]["fix"], named
-    state.write_text(state.read_text("utf-8").replace('"closure"', '"CLOSURE"'), "utf-8")
+    os_write_text(state, read_text(state).replace('"closure"', '"CLOSURE"'))
     assert not [f for f in _release_findings(tmp_path / "specs")[0] if "'closure'" in f["message"]]
 
 
@@ -109,10 +110,9 @@ def test_doctor_release_findings_are_the_scripts(tmp_path: Path, over: dict[str,
     """The doctor's release findings are release.py check's (LEDGER-RELEASE-SCHEMA) alone."""
     _live_release(tmp_path / "specs", **over)
     named, specs_codes = _release_findings(tmp_path / "specs")
-    script = subprocess.run(
-        [sys.executable, str(_REPO_ROOT / "dadaia_workspace/public/skills/dd-release-implementation"
+    script = run([sys.executable, str(_REPO_ROOT / "dadaia_workspace/public/skills/dd-release-implementation"
                              "/scripts/release.py"), "check", "--specs", str(tmp_path / "specs"),
-         "--json"], capture_output=True, text=True, check=False)  # fmt: skip
+         "--json"], check=False)  # fmt: skip
     expected = [f"{f['path']}:{f['line']} {f['message']}" for f in json.loads(script.stdout)]
     assert expected and [f["message"] for f in named] == expected
     assert {f["code"] for f in named} == {"LEDGER-RELEASE-SCHEMA"}
@@ -143,7 +143,7 @@ def test_a_specs_dir_holding_no_tree_is_one_specs_section_finding_carrying_the_s
     names the tree the run resolved."""
     specs = tmp_path / "specs"
     if kind == "file":
-        specs.write_text("", encoding="utf-8")
+        write_text(specs, "")
 
     result = _run("--specs-dir", str(specs), "--json")
 
@@ -161,7 +161,7 @@ def test_fix_over_a_specs_dir_holding_no_tree_writes_nothing_and_reports_the_sam
     finding is the one the plain run reports."""
     specs = tmp_path / "specs"
     if kind == "file":
-        specs.write_text("", encoding="utf-8")
+        write_text(specs, "")
     before = sorted(p.relative_to(tmp_path) for p in tmp_path.rglob("*"))
 
     result = _run("--specs-dir", str(specs), "--fix", "--json")

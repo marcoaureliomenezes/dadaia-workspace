@@ -6,7 +6,6 @@ Size: MEDIUM (real git repos on disk)."""
 
 from __future__ import annotations
 
-import subprocess
 from pathlib import Path
 
 import pytest
@@ -15,17 +14,13 @@ import typer
 from dadaia_workspace.cli.commands import ci
 from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.gitflow import Gitflow
+from tests.helpers.oslib import run, write_text
 
 _CUSTOM = "---\nspecs_pattern_version: 7\ngitflow: {principal: trunk, integration: next, work: work/}\n---\n"
 
 
 def _git(repo: Path, *args: str) -> None:
-    subprocess.run(
-        ["git", "-c", "user.name=t", "-c", "user.email=t@t.invalid", *args],
-        cwd=repo,
-        check=True,
-        capture_output=True,
-    )
+    run(["git", "-c", "user.name=t", "-c", "user.email=t@t.invalid", *args], cwd=repo, check=True)
 
 
 @pytest.fixture
@@ -39,7 +34,7 @@ def repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     _git(repo, "commit", "-q", "--allow-empty", "-m", "birth")
     _git(repo, "branch", "work/0.1.1")
     (repo / "specs").mkdir()
-    (repo / "specs" / "constitution.md").write_text(_CUSTOM, encoding="utf-8")
+    write_text(repo / "specs" / "constitution.md", _CUSTOM)
     _git(repo, "add", "specs")
     _git(repo, "commit", "-q", "-m", "constitution")
     _git(repo, "remote", "add", "origin", str(origin))
@@ -60,7 +55,7 @@ def test_the_gate_names_the_live_release_work_branch(repo: Path) -> None:
     a live 0.5.0 names work/0.5.0."""
     assert ci._gate_inputs(repo, "")[1].work == "work/0.1.1"
     (repo / "specs/releases/0.5.0").mkdir(parents=True)
-    (repo / "specs/releases/0.5.0/_RELEASE.json").write_text("{}", encoding="utf-8")
+    write_text(repo / "specs/releases/0.5.0/_RELEASE.json", "{}")
     assert ci._gate_inputs(repo, "")[1].work == "work/0.1.1"
     _git(repo, "checkout", "-q", "trunk")
     _git(repo, "branch", "-D", "work/0.1.1")
@@ -80,7 +75,7 @@ def test_several_live_releases_block_the_gate_with_the_refusals_own_fix(
     _git(repo, "branch", "-D", "work/0.1.1")
     for release in ("0.5.0", "0.6.0"):
         (repo / "specs/releases" / release).mkdir(parents=True)
-        (repo / "specs/releases" / release / "_RELEASE.json").write_text("{}", encoding="utf-8")
+        write_text(repo / "specs/releases" / release / "_RELEASE.json", "{}")
 
     with pytest.raises(typer.Exit):
         ci._gate_inputs(repo, "foo")
@@ -93,7 +88,7 @@ def test_several_live_releases_block_the_gate_with_the_refusals_own_fix(
 
 def test_heads_constitution_wins_over_the_working_tree(repo: Path) -> None:
     _git(repo, "checkout", "-q", "trunk")
-    (repo / "specs" / "constitution.md").write_text("# an uncommitted edit\n", encoding="utf-8")
+    write_text(repo / "specs" / "constitution.md", "# an uncommitted edit\n")
     assert ci._gate_inputs(repo, "")[0] == Gitflow("trunk", "next", "work/")
 
 
@@ -118,7 +113,7 @@ def test_a_committed_constitution_without_a_block_keeps_the_no_block_warning(
     app = tmp_path / "app"
     _git(tmp_path, "init", "-q", "-b", "trunk", str(app))
     (app / "specs").mkdir()
-    (app / "specs" / "constitution.md").write_text("# no frontmatter\n", encoding="utf-8")
+    write_text(app / "specs" / "constitution.md", "# no frontmatter\n")
     _git(app, "add", "specs")
     _git(app, "commit", "-q", "-m", "constitution")
     ci._gate_inputs(app, "")

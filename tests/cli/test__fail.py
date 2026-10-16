@@ -12,6 +12,7 @@ from pathlib import Path
 from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app
+from tests.helpers.oslib import read_text, write_text
 
 _CLI = Path(__file__).resolve().parents[2] / "dadaia_workspace" / "cli"
 _runner = CliRunner()
@@ -24,7 +25,7 @@ def _printer_bypasses() -> list[str]:
     for path in sorted(_CLI.rglob("*.py")):
         if path.name == "_fail.py":
             continue
-        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+        for node in ast.walk(ast.parse(read_text(path))):
             if not isinstance(node, ast.Call):
                 continue
             name = getattr(node.func, "attr", getattr(node.func, "id", ""))
@@ -72,7 +73,7 @@ def test_s5_specs_upgrade_below_the_floor_is_error_exit_1(tmp_path: Path) -> Non
     `Error:` and exits 1."""
     specs = tmp_path / "specs"
     specs.mkdir()
-    (specs / "constitution.md").write_text("# C\n", encoding="utf-8")
+    write_text(specs / "constitution.md", "# C\n")
 
     result = _runner.invoke(app, ["specs", "upgrade", "--specs-dir", str(specs)])
 

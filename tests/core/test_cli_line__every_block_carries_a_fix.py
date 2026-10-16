@@ -8,7 +8,6 @@ import ast
 import functools
 import importlib.util
 import re
-import subprocess
 import sys
 from collections.abc import Callable
 from pathlib import Path, PurePosixPath
@@ -22,6 +21,7 @@ from dadaia_workspace.core.fixed_sections import authored_text
 from dadaia_workspace.core.gitflow import DEFAULT
 from dadaia_workspace.core.skill_owner import load_owner
 from tests.core.test_cli_line__fix_line_contract import fix_defect as _defect
+from tests.helpers.oslib import read_text, run
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _PKG = _REPO_ROOT / "dadaia_workspace"
@@ -106,8 +106,7 @@ def _cli_command(tokens: list[str]) -> Any:
 def _tracked_dirs() -> frozenset[str]:
     """Every tracked directory — git's answer, never the working tree's, which differs
     between a local checkout and CI's."""
-    listed = subprocess.run(["git", "-C", str(_REPO_ROOT), "ls-files", "-z"],
-                            capture_output=True, text=True, check=True, timeout=60).stdout  # fmt: skip
+    listed = run(["git", "-C", str(_REPO_ROOT), "ls-files", "-z"], check=True, timeout=60).stdout  # fmt: skip
     return frozenset(
         PurePosixPath(*parts[:depth]).as_posix()
         for parts in (PurePosixPath(t).parts for t in listed.split("\0") if t)
@@ -163,8 +162,7 @@ def test_every_doctor_fix_target_resolves_on_disk(codes: str, command: str) -> N
     assert tokens[0] == _VENV_PYTHON and Path(tokens[1]).is_absolute(), command
     assert tokens[1].startswith(_SKILLS) and Path(tokens[1]).is_file(), command
     verb = next(t for t in tokens[2:] if not t.startswith("-"))
-    help_run = subprocess.run([sys.executable, tokens[1], verb, "--help"],
-                              capture_output=True, text=True, timeout=60)  # fmt: skip
+    help_run = run([sys.executable, tokens[1], verb, "--help"], timeout=60)  # fmt: skip
     assert help_run.returncode == 0, f"{codes}: {tokens[1]} rejects {verb!r}: {help_run.stderr}"
 
 
@@ -195,7 +193,7 @@ def test_every_script_fix_line_names_its_folders_entry_script(module: Path) -> N
     constant a `Refusal` fix is built from, names its folder's entry script — never a sibling
     module with no ``__main__`` (an un-runnable fix is a Stall)."""
     entry = _ENTRY_SCRIPTS[module.parts[-3]]
-    text = module.read_text(encoding="utf-8")
+    text = read_text(module)
     for body in _LITERAL_FIX_RE.findall(text):
         assert "__file__" not in body, f"{module.name}: {body!r}"
         assert all(n.endswith(entry) for n in _NAMED_SCRIPT_RE.findall(body)), body
@@ -229,7 +227,7 @@ def _not_prose(site: str) -> bool:
     rel, line = site.rsplit(":", 1)
     if rel not in {r for r, _ in _PROSE}:
         return True
-    text = (_REPO_ROOT / rel).read_text(encoding="utf-8").splitlines()[int(line) - 1].strip()
+    text = read_text(_REPO_ROOT / rel).splitlines()[int(line) - 1].strip()
     return (rel, text) not in _PROSE
 
 
@@ -451,12 +449,11 @@ def test_no_fix_or_shipped_line_bypasses_the_one_renderer() -> None:
     """One walk over every package
     module and `public/skills` script, every doctor rule's `rule_fix`, and every tracked
     law, docs and shipped text file."""
-    listed = subprocess.run(["git", "ls-files", "-z", "--", "dadaia_workspace", "specs/memory",
-                             "CONTEXT.md", "docs"], cwd=_REPO_ROOT, capture_output=True,
-                            text=True, check=True).stdout.split("\0")  # fmt: skip
+    listed = run(["git", "ls-files", "-z", "--", "dadaia_workspace", "specs/memory",
+                             "CONTEXT.md", "docs"], cwd=_REPO_ROOT, check=True).stdout.split("\0")  # fmt: skip
     files = {rel: _REPO_ROOT / rel for rel in listed if rel and "_archive" not in rel}
-    code = {rel: ast.parse(p.read_text(encoding="utf-8")) for rel, p in files.items() if rel.endswith(".py")}  # fmt: skip
-    texts = {rel: p.read_text(encoding="utf-8") for rel, p in files.items()
+    code = {rel: ast.parse(read_text(p)) for rel, p in files.items() if rel.endswith(".py")}  # fmt: skip
+    texts = {rel: read_text(p) for rel, p in files.items()
              if not rel.startswith(("dadaia_workspace/", "docs/")) or rel.startswith("dadaia_workspace/public/") or rel.endswith(".md")}  # fmt: skip
     rendered = [
         f"{codes}: {fix}"

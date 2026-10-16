@@ -29,7 +29,6 @@ import json
 import os
 import re
 import shutil
-import subprocess
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -59,6 +58,9 @@ from tests.features.specs.test_doctor import _make_clean_specs_tree
 from tests.fixtures.harness_env import run_bash, suite_env
 from tests.fixtures.stores import context_store
 from tests.helpers import worktree_ws
+from tests.helpers.oslib import link, read_text, run, write_text
+from tests.helpers.oslib import read_text as os_read_text
+from tests.helpers.oslib import write_text as os_write_text
 
 _RELEASE = "1.2.3"
 
@@ -77,7 +79,7 @@ def _plant_missing_memory_document(root: Path) -> None:
 
 def _plant_headingless_memory_document(root: Path) -> None:
     quality = root / "specs" / "memory" / "QUALITY.md"
-    quality.write_text("---\nslug: quality\n---\n\nno heading here\n", encoding="utf-8")
+    write_text(quality, "---\nslug: quality\n---\n\nno heading here\n")
 
 
 def _plant_nothing(root: Path) -> None:
@@ -86,7 +88,7 @@ def _plant_nothing(root: Path) -> None:
 
 def _plant_placeholder_atom(root: Path) -> None:
     atom = root / "specs" / "memory" / "product" / "testarea" / "raw.md"
-    atom.write_text("---\nslug: SLUG_PLACEHOLDER\n---\n# TITLE_PLACEHOLDER\n", encoding="utf-8")
+    write_text(atom, "---\nslug: SLUG_PLACEHOLDER\n---\n# TITLE_PLACEHOLDER\n")
 
 
 def _plant_missing_root_agents(root: Path) -> None:
@@ -96,30 +98,29 @@ def _plant_missing_root_agents(root: Path) -> None:
 def _plant_fixed_block_gone(root: Path) -> None:
     """A memory document whose fixed law block was deleted by hand."""
     quality = root / "specs" / "memory" / "QUALITY.md"
-    text = quality.read_text(encoding="utf-8")
+    text = read_text(quality)
     head, _, rest = text.partition("<!-- dadaia:fixed slop-tests -->")
-    quality.write_text(head + rest.partition("<!-- /dadaia:fixed slop-tests -->\n")[2])
+    write_text(quality, head + rest.partition("<!-- /dadaia:fixed slop-tests -->\n")[2])
 
 
 def _plant_fixed_block_drifted(root: Path) -> None:
     """A memory document whose fixed law block was edited by hand."""
     quality = root / "specs" / "memory" / "QUALITY.md"
-    text = quality.read_text(encoding="utf-8")
-    quality.write_text(
+    text = read_text(quality)
+    write_text(
+        quality,
         text.replace(
             "<!-- dadaia:fixed slop-tests -->\n", "<!-- dadaia:fixed slop-tests -->\n- edited\n"
         ),
-        encoding="utf-8",
     )
 
 
 def _plant_gitflow_gone(root: Path) -> None:
     """A current dadaia tree whose constitution frontmatter has no gitflow block."""
     constitution = root / "specs" / "constitution.md"
-    constitution.write_text(
-        f"---\nspecs_pattern_version: {CANONICAL_SPECS_VERSION}\n---\n"
-        + constitution.read_text(encoding="utf-8"),
-        encoding="utf-8",
+    write_text(
+        constitution,
+        f"---\nspecs_pattern_version: {CANONICAL_SPECS_VERSION}\n---\n" + read_text(constitution),
     )
 
 
@@ -127,15 +128,13 @@ def _plant_status_line_gone(root: Path) -> None:
     """A 173-line TASKS.md with a lowercase status token on line 3, and a SPEC.md with
     no status line: both fire."""
     release = root / "specs" / "releases" / _RELEASE / "rc-1"
-    (release / "SPEC.md").write_text("# Spec\n\nContent.\n", encoding="utf-8")
-    (release / "TASKS.md").write_text("# Tasks\n\n**Status:** approved\n" + "- t\n" * 170)
+    write_text(release / "SPEC.md", "# Spec\n\nContent.\n")
+    write_text(release / "TASKS.md", "# Tasks\n\n**Status:** approved\n" + "- t\n" * 170)
 
 
 def _plant_changelog_heading(root: Path) -> None:
     atom = root / "specs" / "memory" / "product" / "testarea" / "feature-a.md"
-    atom.write_text(
-        atom.read_text(encoding="utf-8") + "\n## Changelog\n\n- 1.0.0 born\n", encoding="utf-8"
-    )
+    write_text(atom, read_text(atom) + "\n## Changelog\n\n- 1.0.0 born\n")
 
 
 def _plant_dispositioned_audit(root: Path) -> None:
@@ -143,8 +142,9 @@ def _plant_dispositioned_audit(root: Path) -> None:
     audit.mkdir(parents=True)
     (root / "specs" / "audits" / "_archive").mkdir(parents=True, exist_ok=True)
     (root / "specs" / "audits" / "_archive" / "audits_histo.jsonl").touch()
-    (audit / "AUDIT.md").write_text("# Audit\n", encoding="utf-8")
-    (audit / "FINDINGS.jsonl").write_text(
+    write_text(audit / "AUDIT.md", "# Audit\n")
+    write_text(
+        audit / "FINDINGS.jsonl",
         json.dumps(
             {
                 "id": "20260101-lifecycle-F001",
@@ -159,7 +159,6 @@ def _plant_dispositioned_audit(root: Path) -> None:
             }
         )
         + "\n",
-        encoding="utf-8",
     )
 
 
@@ -202,11 +201,10 @@ PLANTS: dict[str, Plant] = {
 
 
 def _git(root: Path, *args: str) -> None:
-    subprocess.run(
+    run(
         ["git", *args],
         cwd=root,
         check=True,
-        capture_output=True,
         env=suite_env(
             {}, root, overrides={"PATH": "/usr/bin:/bin", "GIT_CONFIG_GLOBAL": "/dev/null"}
         ),
@@ -313,11 +311,11 @@ def test_spec_doc_046_never_clobbers_a_canonical_state_file(repo: Path) -> None:
     _plant_legacy_state_name(repo)
     doctor = _doctor(repo)
     [stale] = [i for i in doctor.check() if i.code == "SPEC-DOC-046"]
-    (release / "_RELEASE.json").write_text("{}", encoding="utf-8")
+    write_text(release / "_RELEASE.json", "{}")
     assert [i for i in doctor.check() if i.code == "SPEC-DOC-046"] == []
     doctor.fix([stale])
     assert (release / "RELEASE.json").is_file()
-    assert (release / "_RELEASE.json").read_text(encoding="utf-8") == "{}"
+    assert read_text(release / "_RELEASE.json") == "{}"
 
 
 def _whole(root: Path) -> set[tuple[str, str, bool]]:
@@ -369,11 +367,11 @@ REPORT_ONLY: dict[str, Callable[[Path], None]] = {
 
 def _write(path: Path, text: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(text, encoding="utf-8")
+    write_text(path, text)
 
 
 def _append(path: Path, text: str) -> None:
-    path.write_text(path.read_text(encoding="utf-8") + text, encoding="utf-8")
+    write_text(path, read_text(path) + text)
 
 
 #: error findings no command can repair
@@ -421,7 +419,7 @@ def test_an_untraced_origin_id_is_cleared_by_its_printed_fix(repo: Path) -> None
     _write(specs / "backlog/BACKLOG.json", json.dumps(
         {"schema": "backlog-v1", "active": [_active_entry("pending", "c", "candidate")]}))  # fmt: skip
     spec = specs / "releases" / _RELEASE / "rc-1" / "SPEC.md"
-    spec.write_text(spec.read_text("utf-8").replace("operator-demand", "backlog:pending"), "utf-8")
+    os_write_text(spec, os_read_text(spec).replace("operator-demand", "backlog:pending"))
 
     def origin_errors() -> list[SectionFinding]:
         found = _ledgers_section(None, specs).findings
@@ -437,7 +435,7 @@ def test_an_untraced_origin_id_is_cleared_by_its_printed_fix(repo: Path) -> None
         "kind": "summary",
         "text": "delivered: none; carried: none; backlog exits: none",
     }
-    state.write_text(json.dumps({**json.loads(state.read_text("utf-8")), "log": [sweep]}))
+    write_text(state, json.dumps({**json.loads(os_read_text(state)), "log": [sweep]}))
 
     [before] = origin_errors()
     assert before.message.startswith(f"releases/{_RELEASE}/rc-1/SPEC.md:5 "), before.message
@@ -502,7 +500,7 @@ def test_doctor_fix_renders_a_raw_law_copy_and_clears_its_finding(repo: Path) ->
 
     _doctor_json(specs, "--fix")
 
-    text = law.read_text(encoding="utf-8")
+    text = read_text(law)
     assert _AREA_HEADER in text and _ROOT_ROW in text
     assert not [p for p in _PLACEHOLDERS if p in text]
     assert root_law_findings() == []
@@ -522,24 +520,24 @@ def test_a_worktree_finding_is_cleared_by_its_merge_fix(tmp_path: Path) -> None:
             root, worktree_ws.git(root / "repos/r", "rev-parse", "wt/0.5.0/wt-hotfix-b").strip()
         )
         command = found[0].fix
-        done = subprocess.run(command, shell=True, cwd=root, capture_output=True, text=True)  # noqa: S602
+        done = run_bash(command, cwd=root)
         if done.returncode:
             (refix,) = worktree_ws.fixes(done)
-            subprocess.run(refix.removeprefix("fix: "), shell=True, check=True, capture_output=True)  # noqa: S602
+            run_bash(refix.removeprefix("fix: "), check=True)
     assert doctor.check_worktrees("c") == []
 
 
 def _plant_file(entry: Path, _outside: Path) -> None:
-    entry.write_text("# mine\n", encoding="utf-8")
+    write_text(entry, "# mine\n")
 
 
 def _plant_link(entry: Path, outside: Path) -> None:
-    entry.symlink_to(outside)
+    assert link(str(outside), entry, is_dir=False)
 
 
 def _identity(entry: Path) -> tuple[int, str]:
     """lstat identity: the inode plus the link target or the content — never followed."""
-    body = os.readlink(entry) if entry.is_symlink() else entry.read_text(encoding="utf-8")
+    body = os.readlink(entry) if entry.is_symlink() else read_text(entry)
     return entry.lstat().st_ino, body
 
 
@@ -558,7 +556,7 @@ def test_the_session_lane_re_creates_missing_core_and_rewrites_none(
     entry (`.dadaiaignore`, `prompt.md`, every provisioned zone) and rewrites no present one —
     a dangling link is present, never written through."""
     (tmp_path / ".dadaia" / "states").mkdir(parents=True)
-    (tmp_path / ".dadaia" / "states" / "spec_contexts.json").write_text("{}", encoding="utf-8")
+    write_text(tmp_path / ".dadaia" / "states" / "spec_contexts.json", "{}")
     outside = tmp_path / "outside" / "pwned.md"
     outside.parent.mkdir()
     plant(tmp_path / present, outside)

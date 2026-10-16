@@ -6,7 +6,6 @@ from __future__ import annotations
 
 import json
 import re
-import subprocess
 from pathlib import Path
 
 import pytest
@@ -16,6 +15,7 @@ import dadaia_workspace
 from dadaia_workspace.cli.main import app
 from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.infrastructure import ledger_scripts
+from tests.helpers.oslib import make_executable, run, write_text
 
 _STUB = "import json, sys\nprint(json.dumps(sys.argv[1:]))\nsys.exit(3)\n"
 
@@ -33,7 +33,7 @@ def workspace(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 def _install_stub(workspace: Path) -> None:
     scripts = workspace / ".agents" / "skills" / "dd-gitflow-default" / "scripts"
     scripts.mkdir(parents=True)
-    (scripts / "worktree.py").write_text(_STUB, encoding="utf-8")
+    write_text(scripts / "worktree.py", _STUB)
 
 
 @pytest.mark.medium
@@ -83,7 +83,7 @@ def test_a_runner_that_lags_the_hook_still_creates_a_wt_branch(
     """The BLOCK's fix line is `worktree new`: the forwarder marks the run, whatever the projected runner does."""
     monkeypatch.delenv("DADAIA_WT", raising=False)
     repo = workspace / "repo"
-    git = lambda *a: subprocess.run(["git", "-C", str(repo), *a], check=True, capture_output=True)  # noqa: E731
+    git = lambda *a: run(["git", "-C", str(repo), *a], check=True)  # noqa: E731
     repo.mkdir()
     git("init", "-q", "-b", "main")
     git(
@@ -106,16 +106,13 @@ def test_a_runner_that_lags_the_hook_still_creates_a_wt_branch(
             / "reference-transaction.sh"
         ).read_bytes()
     )
-    hook.chmod(0o755)
+    make_executable(hook)
     scripts = workspace / ".agents" / "skills" / "dd-gitflow-default" / "scripts"
     scripts.mkdir(parents=True)
-    (scripts / "worktree.py").write_text(
-        f"import subprocess, sys\nsys.exit(subprocess.run(['git', '-C', {str(repo)!r}, 'branch', 'wt/x']).returncode)\n",
-        encoding="utf-8",
+    write_text(
+        scripts / "worktree.py",
+        f"import sys\nfrom subprocess import run\nsys.exit(run(['git', '-C', {str(repo)!r}, 'branch', 'wt/x']).returncode)\n",
     )
     result = CliRunner().invoke(app, ["worktree", "new", "repo", "x"])
     assert result.exit_code == 0
-    assert (
-        "wt/x"
-        in subprocess.run(["git", "-C", str(repo), "branch"], capture_output=True, text=True).stdout
-    )
+    assert "wt/x" in run(["git", "-C", str(repo), "branch"]).stdout

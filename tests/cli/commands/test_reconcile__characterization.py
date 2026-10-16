@@ -15,6 +15,7 @@ from dadaia_workspace.features.capabilities import distribution_version
 from dadaia_workspace.features.workspace.service import WorkspaceService
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from tests.fakes import FakePythonEnvironmentManager
+from tests.helpers.oslib import make_executable, write_text
 
 
 def test_reconcile_reports_every_step_and_persists_the_v2_registry(
@@ -27,8 +28,8 @@ def test_reconcile_reports_every_step_and_persists_the_v2_registry(
     venv_bin = tmp_path / ".dadaia" / ".venv" / PLATFORM.venv_scripts_dir
     venv_bin.mkdir(parents=True)
     launcher = venv_bin / f"dadaia{PLATFORM.venv_exe_suffix}"
-    launcher.write_text("", encoding="utf-8")
-    launcher.chmod(0o755)
+    write_text(launcher, "")
+    make_executable(launcher)
     registry = tmp_path / ".dadaia" / "states" / "spec_contexts.json"
     registry.write_bytes(b'{"schema_version":"1","contexts":[]}')
     monkeypatch.chdir(tmp_path)

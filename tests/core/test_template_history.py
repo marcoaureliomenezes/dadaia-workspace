@@ -16,6 +16,7 @@ from dadaia_workspace.core.fixed_sections import (
 from dadaia_workspace.core.platform import Capabilities
 from dadaia_workspace.core.template_history import was_shipped
 from dadaia_workspace.core.workspace_layout import render_registry_tables
+from tests.helpers.oslib import read_text
 
 _PUBLIC = Path(__file__).resolve().parents[2] / "dadaia_workspace" / "public"
 _TEMPLATES = _PUBLIC / "templates"
@@ -24,8 +25,8 @@ _STUBS = {rel: section for rel, section in FIXED_SECTIONS if rel.startswith("mem
 
 @pytest.mark.parametrize("rel", sorted(_STUBS))
 def test_fixed2_rewritten_stub_reads_shipped(rel: str) -> None:
-    stub = (_PUBLIC / "scaffold" / rel).read_text(encoding="utf-8")
-    fragment = (_PUBLIC / "data" / "fixed" / f"{_STUBS[rel]}.md").read_text(encoding="utf-8")
+    stub = read_text(_PUBLIC / "scaffold" / rel)
+    fragment = read_text(_PUBLIC / "data" / "fixed" / f"{_STUBS[rel]}.md")
     rewritten = render_fixed_section(stub, _STUBS[rel], fragment)
     assert rewritten != stub
     assert was_shipped(strip_fixed_sections(rewritten), f"scaffold/{rel}", _TEMPLATES)
@@ -43,7 +44,7 @@ def test_a_law_rendered_for_win32_reads_shipped(monkeypatch: pytest.MonkeyPatch)
     """History holds recorded Windows digests;
     forward-rendering an authored law to `Scripts/dadaia.exe` still identifies it as ours."""
     monkeypatch.setattr("dadaia_workspace.core.platform.PLATFORM", Capabilities.detect("win32"))
-    source = (_PUBLIC / "scaffold" / "memory" / "AGENTS.md").read_text(encoding="utf-8")
+    source = read_text(_PUBLIC / "scaffold" / "memory" / "AGENTS.md")
     rendered = render_registry_tables(source)
     assert rendered != source
     assert was_shipped(rendered, "scaffold/memory/AGENTS.md", _TEMPLATES)

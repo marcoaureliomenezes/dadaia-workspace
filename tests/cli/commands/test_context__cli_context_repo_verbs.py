@@ -24,6 +24,7 @@ from dadaia_workspace.infrastructure.python_env import (  # noqa: E402
     VenvPythonEnvironmentManager,
 )
 from tests.fakes import seed_dead_context
+from tests.helpers.oslib import read_text, write_text
 
 _runner = CliRunner()
 
@@ -41,9 +42,7 @@ def workspace(tmp_path: Path, monkeypatch) -> Path:  # type: ignore[no-untyped-d
 
 
 def _record(workspace: Path, name: str) -> dict:  # type: ignore[type-arg]
-    data = json.loads(
-        (workspace / ".dadaia" / "states" / "spec_contexts.json").read_text(encoding="utf-8")
-    )
+    data = json.loads(read_text(workspace / ".dadaia" / "states" / "spec_contexts.json"))
     contexts = data.get("contexts", data)
     if isinstance(contexts, dict):
         return contexts[name]
@@ -104,7 +103,7 @@ def test_repo_remove_never_deletes_a_checkout_and_says_so(
     on_disk = foo / "repos" / "assoc-a"
     if checkout:
         on_disk.mkdir(parents=True)
-        (on_disk / "marker.txt").write_text("still here\n", encoding="utf-8")
+        write_text(on_disk / "marker.txt", "still here\n")
 
     result = _runner.invoke(app, ["context", "repo", "remove", "foo", "assoc-a"])
 

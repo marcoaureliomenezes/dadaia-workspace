@@ -11,6 +11,8 @@ import pytest
 from dadaia_workspace.core import cli_line
 from dadaia_workspace.core.platform import Capabilities, workspace_cli_path
 from dadaia_workspace.core.skill_owner import load_owner
+from tests.helpers import oslib
+from tests.helpers.oslib import read_text, write_text
 
 
 def test_posix_cli_path_and_fix_line(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -40,8 +42,8 @@ def test_windows_cli_path_and_fix_line(monkeypatch: pytest.MonkeyPatch) -> None:
     )
     monkeypatch.setattr("sys.executable", r"C:\my ws\python.exe")
     assert cli_line.mkdir_line(PureWindowsPath(r"C:\my ws\tmp")) == (
-        'Agent action: run C:\\my ws\\python.exe -c "import pathlib; '
-        "pathlib.Path(r'C:/my ws/tmp').mkdir(parents=True, exist_ok=True)\", "
+        'Agent action: run C:\\my ws\\python.exe -c "import pathlib, sys; '
+        'pathlib.Path(sys.argv[1]).mkdir(parents=True, exist_ok=True)" "C:/my ws/tmp", '
         "quoting C:\\my ws\\python.exe for your shell"
     )
     assert (
@@ -73,6 +75,29 @@ def test_cli_line_renders_every_argv_as_the_kernel_does(
     )
 
 
+_SHELL = ["powershell", "-NoProfile", "-Command"] if oslib.detect().windows else ["sh", "-c"]
+
+
+@pytest.mark.medium
+def test_mkdir_line_runs_for_a_path_holding_a_quote_and_a_blank(tmp_path: Path) -> None:
+    """The path is an argv word of the interpreter line, never text inside its code."""
+    made = tmp_path / "it's here" / "deep"
+    done = oslib.run([*_SHELL, cli_line.mkdir_line(made)])
+    assert (done.returncode, made.is_dir()) == (0, True), done.stderr
+
+
+@pytest.mark.medium
+def test_materialize_line_runs_for_a_path_holding_a_quote_and_a_blank(tmp_path: Path) -> None:
+    target = tmp_path / "it's a target.txt"
+    write_text(target, "kept")
+    link = tmp_path / "it's a link.txt"
+    assert oslib.link(str(target), link, is_dir=False)
+    done = oslib.run([*_SHELL, cli_line.materialize_line(link, target)])
+    assert (done.returncode, oslib.is_link(link), read_text(link)) == (0, False, "kept"), (
+        done.stderr
+    )
+
+
 def test_no_workspace_names_the_cli_of_the_running_venv(monkeypatch: pytest.MonkeyPatch) -> None:
     """CI over a bare checkout runs the CLI from a venv outside any workspace: the fix
     line names THAT executable, never a workspace-relative path that does not exist."""
@@ -89,7 +114,7 @@ def test_the_kernel_spells_the_fix_line_and_the_reinstall_act(tmp_path: Path) ->
         == "Agent action: run `uvx dadaia-workspace init` with the workspace's directory as its first argument"
     )
     (tmp_path / ".dadaia" / "states").mkdir(parents=True)
-    (tmp_path / ".dadaia" / "states" / "spec_contexts.json").write_text("{}", encoding="utf-8")
+    write_text(tmp_path / ".dadaia" / "states" / "spec_contexts.json", "{}")
     assert cli_line.reinstall_fix(tmp_path / "specs") == cli_line.shell_line(
         "uvx", "dadaia-workspace", "init", str(tmp_path.resolve())
     )
@@ -102,7 +127,7 @@ def test_no_string_outside_the_kernel_spells_a_fix_line_by_hand() -> None:
     for path in package.rglob("*.py"):
         if path.name == "_refusal.py":  # the kernel
             continue
-        tree = ast.parse(path.read_text(encoding="utf-8"))
+        tree = ast.parse(read_text(path))
         docs = {id(n.body[0].value) for n in ast.walk(tree)
                 if isinstance(n, ast.Module | ast.FunctionDef | ast.ClassDef) and n.body
                 and isinstance(n.body[0], ast.Expr)}  # fmt: skip

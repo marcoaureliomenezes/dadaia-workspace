@@ -19,6 +19,7 @@ from dadaia_workspace.cli.main import app
 from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES
 from dadaia_workspace.features.capabilities import build_capabilities
+from tests.helpers.oslib import read_text
 
 _PUBLIC = Path(__file__).resolve().parents[3] / "dadaia_workspace" / "public"
 _ENV = {"COLUMNS": "400", "NO_COLOR": "1"}
@@ -68,7 +69,7 @@ def test_the_verb_surface_is_bounded_documented_and_cited() -> None:
     ]
     assert len(one_line) <= 30, one_line
     texts = [
-        p.read_text(encoding="utf-8")
+        read_text(p)
         for p in sorted(_PUBLIC.rglob("*"))
         if p.is_file()
         and not p.is_symlink()
@@ -135,9 +136,7 @@ def test_capabilities_json_matches_service_and_public_schema() -> None:
     assert result.exit_code == 0, result.output
     payload = json.loads(result.stdout)
     assert payload == build_capabilities(command_paths())
-    schema = json.loads(
-        (_PUBLIC / "schemas" / "dadaia-capabilities-v3.schema.json").read_text(encoding="utf-8")
-    )
+    schema = json.loads(read_text(_PUBLIC / "schemas" / "dadaia-capabilities-v3.schema.json"))
     Draft202012Validator(schema).validate(payload)
     assert "workflows" not in payload
     assert payload["contexts"]["selection_contract"] == "explicit-or-caller-owned-bind"

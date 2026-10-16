@@ -10,7 +10,9 @@ import pytest
 from typer.testing import CliRunner
 
 from dadaia_workspace import container
+from dadaia_workspace.cli.commands.public import app as public_app
 from dadaia_workspace.cli.main import app
+from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.platform import PLATFORM
 from dadaia_workspace.features.public.service import PublicAssetService
 from dadaia_workspace.infrastructure.json_agent_model_policy_store import (
@@ -84,3 +86,11 @@ def test_public_projection_lifecycle(tmp_path: Path, monkeypatch: pytest.MonkeyP
     }
     assert (ws / ".dadaia" / "agentic" / "data" / "AGENTS.md").read_bytes() == _FIXTURE_RENDERED
     assert (ws / "AGENTS.md").read_bytes() == _FIXTURE_RENDERED
+
+
+def test_public_install_recipe_is_two_whole_fixes_without_a_chain_operator() -> None:
+    """PowerShell 5.1 has no ``&&``: the recipe lists one runnable line per verb."""
+    install = next(c for c in public_app.registered_commands if c.callback.__name__ == "install")
+    assert install.epilog == (
+        f"Recipe:\n\n{fix_line(None, 'public', 'install')}\n\n{fix_line(None, 'public', 'doctor')}"
+    )

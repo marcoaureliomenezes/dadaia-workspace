@@ -10,8 +10,6 @@ from __future__ import annotations
 import contextlib
 import json
 import os
-import shlex
-import subprocess
 import sys
 from pathlib import Path
 
@@ -21,6 +19,8 @@ from typer.testing import CliRunner
 from dadaia_workspace.cli.main import app
 from dadaia_workspace.core.cli_line import git_line
 from tests.fixtures.harness_env import run_bash, suite_env
+from tests.helpers.oslib import run as os_run
+from tests.helpers.oslib import stub_cli, venv_tool, write_text
 
 _REPO = Path(__file__).resolve().parents[3]
 _UNSET = ("DADAIA_CONTEXT", "DADAIA_SESSION_ID", "CLAUDE_CODE_SESSION_ID")
@@ -37,7 +37,7 @@ _GIT = ["git", "-c", "user.name=t", "-c", "user.email=t@t"]
 def _findings(root: Path, *scope: str) -> list[dict[str, str]]:
     """The real CLI's ``doctor --json`` — the run judging a fix."""
     argv = [sys.executable, "-m", "dadaia_workspace", "doctor", *scope, "--json"]
-    run = subprocess.run(argv, cwd=root, env=_env(), capture_output=True, text=True, check=False)  # noqa: S603
+    run = os_run(argv, cwd=root, env=_env(), check=False)  # noqa: S603
     return _parse(run.stdout, scope)
 
 
@@ -88,14 +88,14 @@ def test_an_invalid_ledger_line_is_one_agent_action(
     """An invalid line is ONE finding whose fix is an `Agent action:` naming the
     file, where in it, and the ledger's law; the commit that introduced it is reverted, an
     uncommitted line deleted by its author — never a discard of the whole file."""
-    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)  # noqa: S603, S607
+    os_run(["git", "init", "-q", str(tmp_path)], check=True)  # noqa: S603, S607
     ledger = tmp_path / rel
     ledger.parent.mkdir(parents=True)
-    (ledger.parent / "AUDIT.md").write_text("# Audit\n") if "audits" in rel else None
-    ledger.write_text(committed)
-    subprocess.run([*_GIT, "-C", str(tmp_path), "add", rel], check=True)  # noqa: S603
-    subprocess.run([*_GIT, "-C", str(tmp_path), "commit", "-qm", "l"], check=True)  # noqa: S603
-    ledger.write_text(bad)
+    write_text(ledger.parent / "AUDIT.md", "# Audit\n") if "audits" in rel else None
+    write_text(ledger, committed)
+    os_run([*_GIT, "-C", str(tmp_path), "add", rel], check=True)  # noqa: S603
+    os_run([*_GIT, "-C", str(tmp_path), "commit", "-qm", "l"], check=True)  # noqa: S603
+    write_text(ledger, bad)
     found = _findings_before(tmp_path, "--specs-dir", "specs")
     (fix,) = [f["fix"] for f in found if f["code"] == code]
     path = ledger.resolve()
@@ -122,10 +122,10 @@ _RECORD = {"id": "a-bug", "ts": "2026-09-20T10:00:00Z", "reported_by": "e", "tit
 
 def _bugs(tmp_path: Path, *records: dict[str, object]) -> str:
     """The doctor's one LEDGER-BUGS-SCHEMA fix over a ledger of *records*."""
-    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)  # noqa: S603, S607
+    os_run(["git", "init", "-q", str(tmp_path)], check=True)  # noqa: S603, S607
     ledger = tmp_path / "specs/bugs/BUGS.jsonl"
     ledger.parent.mkdir(parents=True)
-    ledger.write_text("".join(json.dumps(r) + "\n" for r in records))
+    write_text(ledger, "".join(json.dumps(r) + "\n" for r in records))
     found = _findings_before(tmp_path, "--specs-dir", "specs")
     return next(f["fix"] for f in found if f["code"] == "LEDGER-BUGS-SCHEMA")
 
@@ -156,7 +156,6 @@ def test_a_caused_by_cycle_is_an_agent_decision(tmp_path: Path) -> None:
 def _workspace(tmp_path: Path) -> Path:
     """A real ``init`` in tmp, its venv stubbed onto this interpreter (never a real venv)."""
     from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES
-    from dadaia_workspace.core.platform import PLATFORM
     from dadaia_workspace.features.workspace.service import WorkspaceService
     from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager as A
     from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager as E
@@ -164,17 +163,15 @@ def _workspace(tmp_path: Path) -> Path:
     ws = tmp_path / "ws"
     ws.mkdir()
     WorkspaceService(public_assets=A(), python_env=E()).init(ws, harnesses=L1_ENTRY_HARNESSES[:1])
-    bin_dir = ws / ".dadaia" / ".venv" / PLATFORM.venv_scripts_dir
+    bin_dir = venv_tool(ws / ".dadaia" / ".venv", "dadaia").parent
     bin_dir.mkdir(parents=True, exist_ok=True)
-    (bin_dir / "dadaia").write_text(
-        f'#!/bin/sh\nexec "{sys.executable}" -m dadaia_workspace "$@"\n'
-    )
-    (bin_dir / "dadaia").chmod(0o755)
+    source = "#!python\nimport runpy\nrunpy.run_module('dadaia_workspace', run_name='__main__')\n"
+    stub_cli(bin_dir, "dadaia", source, python=Path(sys.executable))
     return ws
 
 
 def _plant_root_slop(ws: Path) -> str:
-    (ws / "junk.txt").write_text("x\n")
+    write_text(ws / "junk.txt", "x\n")
     return "WS-root-slop"
 
 
@@ -182,14 +179,14 @@ def _plant_drifted_hook(ws: Path) -> str:
     from dadaia_workspace.core import workspace_layout
 
     repo = ws / "repos" / "beta"
-    subprocess.run(["git", "init", "-q", str(repo)], check=True)  # noqa: S603, S607
+    os_run(["git", "init", "-q", str(repo)], check=True)  # noqa: S603, S607
     for target, _ in workspace_layout.INSTALLED_GIT_HOOKS:
-        (repo / ".git" / "hooks" / target).write_text("#!/bin/sh\nexit 0\n")
+        write_text(repo / ".git" / "hooks" / target, "#!/bin/sh\nexit 0\n")
     ctx = {"name": "beta", "state": "alive", "repo_slug": "beta", "repo_url": "file:///x.git",
            "created_at": "2026-01-01T00:00:00Z", "alive_since": "2026-01-01T00:00:00Z",
            "dead_since": None, "current_branch": None}  # fmt: skip
     states = ws / ".dadaia/states/spec_contexts.json"
-    states.write_text(json.dumps({"schema_version": "2", "contexts": [ctx]}))
+    write_text(states, json.dumps({"schema_version": "2", "contexts": [ctx]}))
     return "HOOKS-DRIFT-1"
 
 
@@ -204,7 +201,7 @@ def _plant_long_skill(ws: Path) -> str:
     soft = json.loads(
         (_REPO / "dadaia_workspace/features/spec_context/behavior-map.json").read_bytes()
     )
-    skill.write_text("l\n" * (soft["skill_md_line_soft"] + 1))
+    write_text(skill, "l\n" * (soft["skill_md_line_soft"] + 1))
     return "SKILL-MD-LENGTH"
 
 
@@ -218,7 +215,6 @@ WORKSPACE_PLANTS = {
 }
 
 
-@pytest.mark.skipif(sys.platform == "win32", reason="the stub CLI is a POSIX shell script")
 @pytest.mark.parametrize("plant", [_plant_root_slop, _plant_drifted_hook, _plant_disarmed_gate])
 def test_a_workspace_finding_is_cleared_by_its_printed_fix(tmp_path: Path, plant: object) -> None:
     """In an initialized tmp
@@ -226,11 +222,10 @@ def test_a_workspace_finding_is_cleared_by_its_printed_fix(tmp_path: Path, plant
     ws = _workspace(tmp_path)
     code = plant(ws)  # type: ignore[operator]
     fix = next(f["fix"] for f in _findings_before(ws) if f["code"] == code)
-    _run_from_elsewhere(ws, shlex.join(shlex.split(fix)))
+    _run_from_elsewhere(ws, fix)
     assert code not in {f["code"] for f in _findings(ws)}
 
 
-@pytest.mark.skipif(sys.platform == "win32", reason="the stub CLI is a POSIX shell script")
 def test_a_long_skill_md_is_a_warning_whose_fix_names_who_splits_it(tmp_path: Path) -> None:
     """The real doctor run prints one non-error SKILL-MD-LENGTH: with a repo of the
     workspace holding the source the fix is the agent action of adding the split to a task of
@@ -240,7 +235,7 @@ def test_a_long_skill_md_is_a_warning_whose_fix_names_who_splits_it(tmp_path: Pa
     code = _plant_long_skill(ws)
     source = ws / "repos" / "lib" / "dadaia_workspace/public/skills/long/SKILL.md"
     source.parent.mkdir(parents=True)
-    source.write_text("l\n")
+    write_text(source, "l\n")
     fixes = [
         "Agent action: add the split of long/SKILL.md to a task of the open rc, then run public install",
         "Operator action: split long/SKILL.md at its library source; this workspace holds none and never edits the projection",
@@ -251,11 +246,10 @@ def test_a_long_skill_md_is_a_warning_whose_fix_names_who_splits_it(tmp_path: Pa
         [found] = [f for f in _findings_before(ws) if f["code"] == code]
         assert found["verdict"] == "warning"
         assert found["fix"] == expected
-    (ws / ".agents" / "skills" / "long" / "SKILL.md").write_text("l\n")
+    write_text(ws / ".agents" / "skills" / "long" / "SKILL.md", "l\n")
     assert code not in {f["code"] for f in _findings(ws)}
 
 
-@pytest.mark.skipif(sys.platform == "win32", reason="the stub CLI is a POSIX shell script")
 def test_a_deleted_hook_is_reported_absent_and_its_fix_restores_it(tmp_path: Path) -> None:
     """Delete a projected hook; the finding says absent, and its printed fix, run,
     restores the hook byte for byte and clears the finding."""
@@ -268,7 +262,7 @@ def test_a_deleted_hook_is_reported_absent_and_its_fix_restores_it(tmp_path: Pat
         (hooks / target).unlink()
     found = next(f for f in _findings_before(ws) if f["code"] == "HOOKS-DRIFT-1")
     assert "absent" in found["message"], found["message"]
-    _run_from_elsewhere(ws, shlex.join(shlex.split(found["fix"])))
+    _run_from_elsewhere(ws, found["fix"])
     for target, source in workspace_layout.INSTALLED_GIT_HOOKS:
         assert (hooks / target).read_bytes() == (
             workspace_layout.public_scripts_dir() / source

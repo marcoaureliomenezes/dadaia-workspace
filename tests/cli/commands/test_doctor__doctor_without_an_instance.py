@@ -23,6 +23,7 @@ from dadaia_workspace.core.platform import PLATFORM
 from dadaia_workspace.core.specs_version import state
 from dadaia_workspace.features.specs.canon import scaffold
 from dadaia_workspace.infrastructure.ledger_scripts import script_repairs
+from tests.helpers.oslib import write_text
 
 _runner = CliRunner()
 _REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -78,7 +79,7 @@ def test_a_non_directory_at_the_specs_dir_is_one_finding_and_moving_it_aside_cle
             pytest.skip("a FIFO needs POSIX")
         os.mkfifo(specs)
     else:
-        specs.write_text("", encoding="utf-8")
+        write_text(specs, "")
 
     run = _runner.invoke(app, ["doctor", "--json", "--specs-dir", str(specs)])
 

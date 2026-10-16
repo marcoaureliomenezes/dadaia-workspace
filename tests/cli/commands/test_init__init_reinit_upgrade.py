@@ -18,6 +18,7 @@ from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.platform import PLATFORM, Capabilities, workspace_cli_path
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager, build_digest
 from tests.fixtures.provider_dist import install_fake_dist
+from tests.helpers.oslib import write_text
 
 _runner = CliRunner()
 
@@ -38,7 +39,7 @@ def _bytes(tree: Path) -> dict[Path, bytes]:
 def _versions(monkeypatch: pytest.MonkeyPatch, ws: Path, venv: str, running: str) -> None:
     workspace_cli_path(ws).parent.mkdir(parents=True, exist_ok=True)
     venv_bin = ws / ".dadaia" / ".venv" / PLATFORM.venv_scripts_dir
-    workspace_cli_path(ws).write_text(f"#!{venv_bin / ('python' + PLATFORM.venv_exe_suffix)}")
+    write_text(workspace_cli_path(ws), f"#!{venv_bin / ('python' + PLATFORM.venv_exe_suffix)}")
     built = f"{venv} {build_digest(None)}"
     monkeypatch.setattr(VenvPythonEnvironmentManager, "installed_build", lambda self, ws: built)
     install_fake_dist(monkeypatch, running)  # the running version, at its one boundary
@@ -181,7 +182,7 @@ def test_reinit_sees_an_editable_source_bump(
     0.1.4 -> 0.4.7 — never 'already at'."""
     source = tmp_path / "src"
     source.mkdir()
-    (source / "pyproject.toml").write_text('[tool.poetry]\nversion = "0.4.7"\n')
+    write_text(source / "pyproject.toml", '[tool.poetry]\nversion = "0.4.7"\n')
     _versions(monkeypatch, workspace, "0.1.4", "0.1.4")
     install_fake_dist(monkeypatch, "0.1.4", editable_source=source)
     reconciled: list[str] = []

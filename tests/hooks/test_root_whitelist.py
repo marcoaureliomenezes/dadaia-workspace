@@ -31,6 +31,7 @@ from dadaia_workspace.core.workspace_resolver import FENCE_ENV
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from tests.fixtures.harness_env import claude_hook_env, run_hook_subprocess
 from tests.fixtures.stores import context_store
+from tests.helpers.oslib import write_text
 
 #: Context names differ from their repo slugs: ``repos/`` and ``worktrees/`` admit slugs only.
 REGISTRY = json.dumps({"contexts": [
@@ -41,7 +42,7 @@ REGISTRY = json.dumps({"contexts": [
 
 def _ws(tmp_path: Path, registry: str = REGISTRY) -> Path:
     (tmp_path / ".dadaia" / "states").mkdir(parents=True)
-    (tmp_path / ".dadaia" / "states" / "spec_contexts.json").write_text(registry, encoding="utf-8")
+    write_text(tmp_path / ".dadaia" / "states" / "spec_contexts.json", registry)
     return tmp_path
 
 
@@ -81,7 +82,7 @@ def test_law_declared_root_files_are_canon_for_the_hook_and_the_doctor(
     out, block = _run(tmp_path, {"tool_name": "Write", "tool_input": {"file_path": str(ws / name)}})
     assert (out, block) == ("", None)
 
-    (ws / name).write_text("", encoding="utf-8")
+    write_text(ws / name, "")
     findings = DoctorService(
         context_store(ws / ".dadaia" / "states"), GitSubprocessClient(), ws
     ).scan()
@@ -124,7 +125,7 @@ def test_four_places_table(
     ``repos/<x>/`` blocks. ``repos/`` admits every repo slug of every context (DEAD included),
     ``worktrees/`` those of ALIVE ones, and an unreadable registry admits all."""
     ws = _ws(tmp_path, registry)
-    (ws / DADAIAIGNORE).write_text(ignore, encoding="utf-8")
+    write_text(ws / DADAIAIGNORE, ignore)
     out, block = _run(
         tmp_path, {"tool_name": "Write", "tool_input": {"file_path": str(ws / target)}}
     )
@@ -200,5 +201,5 @@ def test_the_gate_judges_creation_only(
     _out, block = _run(tmp_path, payload)
     assert block is not None and target in block["reason"]
 
-    (ws / entry).mkdir() if entry.endswith("/") else (ws / entry).write_text("", encoding="utf-8")
+    (ws / entry).mkdir() if entry.endswith("/") else write_text(ws / entry, "")
     assert _run(tmp_path, payload) == ("", None)

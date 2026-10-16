@@ -17,14 +17,15 @@ from dadaia_workspace.core.gitflow import (
     work_branch,
 )
 from dadaia_workspace.core.skill_owner import load_owner
+from tests.helpers.oslib import read_text, write_text
 
 
 def test_the_default_names_live_only_in_default_and_work_is_cut_from_integration() -> None:
     """Only DEFAULT spells the principal name; the skill cuts work from integration."""
     pkg = Path(__file__).resolve().parents[2] / "dadaia_workspace"
     literal = re.compile(r'principal: main|"--principal", "main"|else "main"')
-    assert [p.name for p in pkg.rglob("*.py") if literal.search(p.read_text("utf-8"))] == []
-    skill = (pkg / "public/skills/dd-gitflow-default/SKILL.md").read_text("utf-8")
+    assert [p.name for p in pkg.rglob("*.py") if literal.search(read_text(p))] == []
+    skill = read_text(pkg / "public/skills/dd-gitflow-default/SKILL.md")
     work_row = next(r for r in skill.splitlines() if r.startswith("| work `"))
     assert work_row.split("|")[3].strip() == "integration"
 
@@ -33,10 +34,10 @@ def test_one_live_release_reader_and_no_verb_mints_a_version() -> None:
     """One reader of the live id, no tag+1; release-please owns the version.
     No module lists or bumps tags."""
     pkg = Path(__file__).resolve().parents[2] / "dadaia_workspace"
-    src = {p.name: p.read_text("utf-8") for p in pkg.rglob("*.py") if "public" not in p.parts}
+    src = {p.name: read_text(p) for p in pkg.rglob("*.py") if "public" not in p.parts}
     assert [n for n, t in src.items() if "def live_ids" in t] == []
     assert [n for n, t in src.items() if re.search(r'"tag", "--sort|\]\) \+ 1\}', t)] == []
-    assert "release-please owns the version" in (pkg.parent / "AGENTS.md").read_text("utf-8")
+    assert "release-please owns the version" in read_text(pkg.parent / "AGENTS.md")
 
 
 def test_the_sole_live_release_is_the_kernels_and_several_refuse_there(tmp_path: Path) -> None:
@@ -45,7 +46,7 @@ def test_the_sole_live_release_is_the_kernels_and_several_refuse_there(tmp_path:
     assert (grammar.sole_live(tmp_path), live_release_id(tmp_path)) == (None, None)
     for rid in ("0.5.0", "0.6.0"):
         (tmp_path / "releases" / rid).mkdir(parents=True)
-        (tmp_path / "releases" / rid / "_RELEASE.json").write_text("{}")
+        write_text(tmp_path / "releases" / rid / "_RELEASE.json", "{}")
         if rid == "0.5.0":
             assert (grammar.sole_live(tmp_path), live_release_id(tmp_path)) == ("0.5.0",) * 2
     with pytest.raises(refusal.Refusal) as caught:
@@ -107,10 +108,10 @@ def test_from_mapping_refuses_invalid(mapping: object) -> None:
 def test_the_history_rewrite_rule_covers_only_the_branches_that_advance_by_merge_or_pr() -> None:
     """A wt/* branch is rebased by its owner; the rule must not reach it,
     and both of its verbs (rewrite, force-push) take the same scope."""
-    skill = (
+    skill = read_text(
         Path(__file__).resolve().parents[2]
         / "dadaia_workspace/public/skills/dd-gitflow-default/SKILL.md"
-    ).read_text("utf-8")
+    )
     rows = [ln.split("|")[1:5] for ln in skill.splitlines() if re.match(r"\| [a-z]+( `|\s+\|)", ln)]
     covered = {r[0].split()[0] for r in rows if "wt/" not in r[0]}
     assert covered == {"work", "integration", "principal"}
@@ -124,10 +125,10 @@ def test_the_history_rewrite_rule_covers_only_the_branches_that_advance_by_merge
 
 def test_the_history_rewrite_rule_scopes_to_the_branches_that_never_rebase() -> None:
     """A wt/* branch is rebased by its owner."""
-    skill = (
+    skill = read_text(
         Path(__file__).resolve().parents[2]
         / "dadaia_workspace/public/skills/dd-gitflow-default/SKILL.md"
-    ).read_text("utf-8")
+    )
     rule = next(ln for ln in skill.splitlines() if "pushed history" in ln)
     rows = [
         ln.split("|")[1].split()[0]
@@ -159,7 +160,7 @@ def _repo(tmp_path: Path, heads: list[str], live: str | None) -> Path:
         git(repo, "branch", head)
     if live:
         (repo / "specs/releases" / live).mkdir(parents=True)
-        (repo / "specs/releases" / live / "_RELEASE.json").write_text("{}")
+        write_text(repo / "specs/releases" / live / "_RELEASE.json", "{}")
     return repo
 
 

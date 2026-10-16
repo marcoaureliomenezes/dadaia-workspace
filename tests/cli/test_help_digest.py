@@ -6,6 +6,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from dadaia_workspace.cli.help_digest import _MAX_CHARS, render_digest, write_digest
+from tests.helpers.oslib import write_text
 
 
 def test_digest_derives_from_the_live_tree_within_budget() -> None:
@@ -32,5 +33,5 @@ def test_write_digest_skips_an_identical_file(tmp_path: Path) -> None:
 
 def test_write_digest_fails_soft(tmp_path: Path) -> None:
     blocker = tmp_path / ".dadaia"
-    blocker.write_text("not a dir", encoding="utf-8")
+    write_text(blocker, "not a dir")
     assert write_digest(tmp_path) is None

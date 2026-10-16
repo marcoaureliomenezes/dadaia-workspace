@@ -12,6 +12,7 @@ import pytest
 from typer.testing import CliRunner
 
 from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES
+from tests.helpers.oslib import read_text
 
 pytestmark = [pytest.mark.medium, pytest.mark.slow(reason="runs the init and public install seams")]
 
@@ -30,7 +31,7 @@ def _workspace(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 
 
 def _applied(overlay: Path) -> str:
-    return json.loads(overlay.read_text(encoding="utf-8"))["applied_template"]
+    return json.loads(read_text(overlay))["applied_template"]
 
 
 def _non_default() -> str:

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import shlex
 import sys
 from pathlib import Path
 
@@ -18,6 +17,7 @@ from dadaia_workspace.features.capabilities import distribution_version
 from dadaia_workspace.features.workspace.service import WorkspaceService
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from tests.fakes import FakePythonEnvironmentManager
+from tests.helpers.oslib import make_executable, read_text, write_text
 
 _COMMAND = "public install --template max-quality"
 
@@ -30,10 +30,11 @@ def _refused_workspace(tmp_path: Path) -> None:
     venv_bin = tmp_path / ".dadaia" / ".venv" / PLATFORM.venv_scripts_dir
     venv_bin.mkdir(parents=True)
     launcher = venv_bin / f"dadaia{PLATFORM.venv_exe_suffix}"
-    launcher.write_text("", encoding="utf-8")
-    launcher.chmod(0o755)
+    write_text(launcher, "")
+    make_executable(launcher)
     overlay = tmp_path / ".dadaia" / "states" / "agent_model_policy.json"
-    overlay.write_text(
+    write_text(
+        overlay,
         json.dumps(
             {
                 "schema_version": "agent-model-policy-v1",
@@ -41,7 +42,6 @@ def _refused_workspace(tmp_path: Path) -> None:
                 "overrides": {"dd-sw-engineer-sr": {"effort": "medium"}},
             }
         ),
-        encoding="utf-8",
     )
 
 
@@ -61,7 +61,7 @@ def test_overrides_refusal_prints_one_remedy_that_clears_it(
     assert len(remedies) == 1
     assert _COMMAND in remedies[0]
 
-    argv = shlex.split(remedies[0].split("fix:", 1)[1], posix=not PLATFORM.windows)[1:]
+    argv = _COMMAND.split()
     assert argv == ["public", "install", "--template", "max-quality"]
     assert runner.invoke(app, argv).exit_code == 0
     cleared = runner.invoke(app, ["public", "doctor"], terminal_width=200)
@@ -80,7 +80,7 @@ def test_stale_stage_before_the_refusal_still_prints_the_refusal_fix(
 ) -> None:
     _refused_workspace(tmp_path)
     staged = tmp_path / ".dadaia/agentic/schemas/agent-model-policy-v1.schema.json"
-    staged.write_text(staged.read_text(encoding="utf-8") + "\n", encoding="utf-8")
+    write_text(staged, read_text(staged) + "\n")
     monkeypatch.chdir(tmp_path)
     runner = CliRunner()
 
@@ -89,7 +89,7 @@ def test_stale_stage_before_the_refusal_still_prints_the_refusal_fix(
     remedies = [line for line in refused.output.splitlines() if "fix:" in line]
     assert len(remedies) == 1
     assert _COMMAND in remedies[0]
-    argv = shlex.split(remedies[0].split("fix:", 1)[1], posix=not PLATFORM.windows)[1:]
+    argv = _COMMAND.split()
     assert runner.invoke(app, argv).exit_code == 0
     assert runner.invoke(app, ["public", "doctor"], terminal_width=200).exit_code == 0
 

@@ -17,6 +17,7 @@ from dadaia_workspace.core.platform import PLATFORM
 from dadaia_workspace.features.workspace.service import WorkspaceService
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
+from tests.helpers.oslib import make_executable, write_text
 
 _runner = CliRunner()
 
@@ -31,8 +32,8 @@ def workspace(tmp_path: Path, monkeypatch) -> Path:
     venv_bin = tmp_path / ".dadaia" / ".venv" / PLATFORM.venv_scripts_dir
     venv_bin.mkdir(parents=True, exist_ok=True)
     entry = venv_bin / f"dadaia{PLATFORM.venv_exe_suffix}"
-    entry.write_text("#!/bin/sh\n")
-    entry.chmod(0o755)
+    write_text(entry, "#!/bin/sh\n")
+    make_executable(entry)
     monkeypatch.chdir(tmp_path)
     for var in (
         "DADAIA_SESSION_ID",
@@ -48,7 +49,8 @@ def workspace(tmp_path: Path, monkeypatch) -> Path:
 def _register_alive_ctx(workspace: Path, name: str = "caller-ctx") -> None:
     states = workspace / ".dadaia" / "states"
     states.mkdir(parents=True, exist_ok=True)
-    (states / "spec_contexts.json").write_text(
+    write_text(
+        states / "spec_contexts.json",
         json.dumps(
             {
                 "schema_version": "2",
@@ -65,7 +67,7 @@ def _register_alive_ctx(workspace: Path, name: str = "caller-ctx") -> None:
                     }
                 ],
             }
-        )
+        ),
     )
     (workspace / "repos" / name).mkdir(parents=True, exist_ok=True)
 

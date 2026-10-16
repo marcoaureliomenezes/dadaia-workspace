@@ -16,13 +16,14 @@ from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app
 from dadaia_workspace.core.workspace_resolver import FENCE_ENV, resolve_workspace_root
+from tests.helpers.oslib import write_text
 
 _runner = CliRunner()
 
 
 def _workspace(root: Path) -> Path:
     (root / ".dadaia" / "states").mkdir(parents=True)
-    (root / ".dadaia" / "states" / "spec_contexts.json").write_text("{}", encoding="utf-8")
+    write_text(root / ".dadaia" / "states" / "spec_contexts.json", "{}")
     return root
 
 

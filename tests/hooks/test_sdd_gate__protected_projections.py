@@ -11,6 +11,7 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.hooks import sdd_gate
+from tests.helpers.oslib import write_text
 
 _BUG = "agentic-projections-agent-writable"
 _PROTECTED = (".dadaia/agentic/schemas/handoff-v1.schema.json", ".claude/settings.local.json")
@@ -19,7 +20,7 @@ _PROTECTED = (".dadaia/agentic/schemas/handoff-v1.schema.json", ".claude/setting
 def _workspace(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     states = tmp_path / ".dadaia" / "states"
     states.mkdir(parents=True)
-    (states / "spec_contexts.json").write_text(json.dumps({"contexts": []}), encoding="utf-8")
+    write_text(states / "spec_contexts.json", json.dumps({"contexts": []}))
     monkeypatch.chdir(tmp_path)
     monkeypatch.delenv("DADAIA_CONTEXT", raising=False)
     return tmp_path

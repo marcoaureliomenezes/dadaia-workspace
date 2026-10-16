@@ -15,6 +15,7 @@ import pytest
 from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.hooks import pre_gate
 from tests.fixtures.harness_env import claude_hook_env, run_hook_subprocess
+from tests.helpers.oslib import write_text
 
 _PATCH = "*** Begin Patch\n*** Update File: worktrees/a/0.5.0-rc1/j1/README.md\n+ok\n*** Update File: {}\n+x\n*** End Patch"
 
@@ -76,14 +77,12 @@ def test_non_write_and_protected_matrix(
     verdicts (paths are workspace-relative; ``want`` names the block reason)."""
     want = want and want.replace("@wt", fix_line(tmp_path, "worktree", "list"))
     (tmp_path / ".dadaia" / "states").mkdir(parents=True)
-    (tmp_path / ".dadaia" / "states" / "spec_contexts.json").write_text(
-        json.dumps({"contexts": [{"repo_slug": "a", "state": "alive"}]}), encoding="utf-8"
-    )
+    write_text(tmp_path / ".dadaia" / "states" / "spec_contexts.json", json.dumps({"contexts": [{"repo_slug": "a", "state": "alive"}]}))
     (tmp_path / "repos" / "a" / "specs").mkdir(parents=True)
-    (tmp_path / ".dadaiaignore").write_text("[protected]\nsecrets\n", encoding="utf-8")
+    write_text(tmp_path / ".dadaiaignore", "[protected]\nsecrets\n")
     for tree in ("0.5.0-rc1/j1", "scratch", "scratch/any", "x/y/z"):  # a linked worktree's root holds a .git file
         (tmp_path / "worktrees" / "a" / tree).mkdir(parents=True)
-        (tmp_path / "worktrees" / "a" / tree / ".git").write_text("gitdir: elsewhere\n", encoding="utf-8")
+        write_text(tmp_path / "worktrees" / "a" / tree / ".git", "gitdir: elsewhere\n")
     rooted = {k: v if k == "command" else str(tmp_path / v) for k, v in tool_input.items()}
     block = _spawn(tmp_path, {"tool_name": tool, "tool_input": rooted}).block_envelope()
     if want is None:

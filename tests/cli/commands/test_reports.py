@@ -13,6 +13,7 @@ from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES
 from dadaia_workspace.features.workspace.service import WorkspaceService
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
+from tests.helpers.oslib import read_text, write_text
 
 _runner = CliRunner()
 
@@ -37,7 +38,7 @@ def _make_valid_handoff(
 ) -> Path:
     """Create a minimal valid handoff.json file with a companion artifact."""
     artifact_path = base_dir / f"{stem}.html"
-    artifact_path.write_text(f"<html>{stem}</html>", encoding="utf-8")
+    write_text(artifact_path, f"<html>{stem}</html>")
     content_hash = hashlib.sha256(artifact_path.read_bytes()).hexdigest()
 
     doc: dict = {
@@ -59,7 +60,7 @@ def _make_valid_handoff(
         doc["release_id"] = release_id
 
     handoff_path = base_dir / f"{stem}.handoff.json"
-    handoff_path.write_text(json.dumps(doc), encoding="utf-8")
+    write_text(handoff_path, json.dumps(doc))
     return handoff_path
 
 
@@ -85,7 +86,7 @@ def _make_invalid_handoff(base_dir: Path, stem: str = "bad") -> Path:
         },
     }
     handoff_path = base_dir / f"{stem}.handoff.json"
-    handoff_path.write_text(json.dumps(doc), encoding="utf-8")
+    write_text(handoff_path, json.dumps(doc))
     return handoff_path
 
 
@@ -176,7 +177,7 @@ def test_schema_staged_after_install_and_not_in_claude_schemas_dir(
     schema_path = tmp_path / ".dadaia" / "agentic" / "schemas" / "handoff-v1.schema.json"
     assert schema_path.exists(), f"Schema not found at {schema_path}"
 
-    schema_data = json.loads(schema_path.read_text(encoding="utf-8"))
+    schema_data = json.loads(read_text(schema_path))
     assert schema_data.get("$schema") == "https://json-schema.org/draft/2020-12/schema"
 
     handoff_path = _make_valid_handoff(tmp_path)
@@ -252,10 +253,10 @@ def test_a_retired_version_without_self_pull_is_invalid(
     naming schema_version."""
     _init_workspace(tmp_path)
     monkeypatch.chdir(tmp_path)
-    doc = json.loads(_make_valid_handoff(tmp_path).read_text(encoding="utf-8"))
+    doc = json.loads(read_text(_make_valid_handoff(tmp_path)))
     doc.pop("self_pull")
     path = tmp_path / "old.handoff.json"
-    path.write_text(json.dumps(doc | {"schema_version": version}), encoding="utf-8")
+    write_text(path, json.dumps(doc | {"schema_version": version}))
 
     result = _runner.invoke(app, ["reports", "validate", str(path)])
 

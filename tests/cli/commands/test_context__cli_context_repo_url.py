@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import json
 import shutil
-import subprocess
 from pathlib import Path
 
 import pytest
@@ -29,6 +28,7 @@ from dadaia_workspace.infrastructure.python_env import (  # noqa: E402
     VenvPythonEnvironmentManager,
 )
 from tests.fakes import seed_dead_context
+from tests.helpers.oslib import read_text, run, write_text
 
 _runner = CliRunner()
 _HAS_GIT = shutil.which("git") is not None
@@ -45,26 +45,16 @@ def workspace(tmp_path: Path, monkeypatch) -> Path:  # type: ignore[no-untyped-d
 
 
 def _git(args: list[str], cwd: Path) -> None:
-    subprocess.run(
-        ["git", *args],
-        cwd=cwd,
-        check=True,
-        capture_output=True,
-        text=True,
-    )
+    run(["git", *args], cwd=cwd, check=True)
 
 
 def _contexts(workspace: Path) -> list[dict]:  # type: ignore[type-arg]
-    data = json.loads(
-        (workspace / ".dadaia" / "states" / "spec_contexts.json").read_text(encoding="utf-8")
-    )
+    data = json.loads(read_text(workspace / ".dadaia" / "states" / "spec_contexts.json"))
     return list(data["contexts"])
 
 
 def _record(workspace: Path, name: str) -> dict:  # type: ignore[type-arg]
-    data = json.loads(
-        (workspace / ".dadaia" / "states" / "spec_contexts.json").read_text(encoding="utf-8")
-    )
+    data = json.loads(read_text(workspace / ".dadaia" / "states" / "spec_contexts.json"))
     # spec_contexts.json shape: {"version": ..., "contexts": {name: {...}}} or list.
     contexts = data.get("contexts", data)
     if isinstance(contexts, dict):
@@ -114,7 +104,7 @@ def test_empty_url_refusal_ctx_url_1_doctor_flag_and_export_import_clone(
     _git(["init"], cwd=repo_path)
     _git(["checkout", "-b", "main"], cwd=repo_path)
     _git(["remote", "add", "origin", file_url], cwd=repo_path)
-    (repo_path / "README.md").write_text("hi\n", encoding="utf-8")
+    write_text(repo_path / "README.md", "hi\n")
     _git(["add", "-A"], cwd=repo_path)
     _git(["commit", "-m", "init"], cwd=repo_path)
     _git(["push", "-u", "origin", "main"], cwd=repo_path)

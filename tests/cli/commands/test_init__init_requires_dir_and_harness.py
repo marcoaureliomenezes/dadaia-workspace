@@ -17,6 +17,8 @@ from typer.testing import CliRunner
 from dadaia_workspace.cli.main import app
 from dadaia_workspace.core.cli_line import shell_line
 from dadaia_workspace.infrastructure import python_env as pe
+from tests.helpers import oslib
+from tests.helpers.oslib import read_text, write_text
 
 _runner = CliRunner()
 _FIX_LINE_RE = re.compile(r"^fix: (\S.*)$", re.MULTILINE)
@@ -45,13 +47,13 @@ def _tree(root: Path) -> dict[str, str]:
 
 def _foreign(tmp: Path, mp: pytest.MonkeyPatch) -> Path:
     (tmp / "demo").mkdir()
-    (tmp / "demo" / "somebody-elses-file.txt").write_text("keep me", encoding="utf-8")
+    write_text(tmp / "demo" / "somebody-elses-file.txt", "keep me")
     return tmp
 
 
 def _foreign_cwd(tmp: Path, mp: pytest.MonkeyPatch) -> Path:
     (tmp / "proj").mkdir()
-    (tmp / "proj" / "README.md").write_text("mine", encoding="utf-8")
+    write_text(tmp / "proj" / "README.md", "mine")
     return tmp / "proj"
 
 
@@ -98,7 +100,7 @@ def test_init_refuses_meta_and_unknown_harness_values(
         expected = fix.format(tmp=tmp_path.as_posix(), root=Path("/").resolve().as_posix().rstrip("/") + "/")
         assert _the_fix(result.output).replace("\\", "/").startswith(expected)
     if setup is _foreign:
-        assert (tmp_path / "demo" / "somebody-elses-file.txt").read_text(encoding="utf-8") == "keep me"
+        assert read_text(tmp_path / "demo" / "somebody-elses-file.txt") == "keep me"
 
 
 def test_init_sibling_fix_line_is_spelled_by_the_kernel_for_a_path_with_a_blank(
@@ -107,7 +109,7 @@ def test_init_sibling_fix_line_is_spelled_by_the_kernel_for_a_path_with_a_blank(
     """The printed sibling command is the kernel's spelling, so a blank in the path stays one argument."""
     proj = tmp_path / "my dir" / "proj"
     proj.mkdir(parents=True)
-    (proj / "README.md").write_text("mine", encoding="utf-8")
+    write_text(proj / "README.md", "mine")
     monkeypatch.chdir(proj)
 
     result = _runner.invoke(app, ["init", ".", "--harness", "claude", "--repo", "https://h/a b.git"])
@@ -133,3 +135,19 @@ def test_init_creates_the_named_dir_and_is_idempotent(tmp_path: Path, monkeypatc
     assert second.exit_code == 0, second.output
 
     assert _tree(demo) == before, "a re-run of init on the same dir must change nothing"
+
+
+def test_init_bootstrap_failure_fix_reruns_this_init_with_every_flag(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The venv CLI was never created, so the fix is the bootstrap command itself, repo kept."""
+    _bootstrap_fails(tmp_path, monkeypatch)
+    monkeypatch.chdir(tmp_path)
+    url = "https://h/a b.git"
+
+    result = _runner.invoke(app, ["init", "demo", "--harness", "claude", "--repo", url])
+
+    assert result.exit_code == 1, result.output
+    assert _the_fix(result.output) == oslib.command(
+        "uvx", "dadaia-workspace", "init", str((tmp_path / "demo").resolve()), "--harness", "claude", "--repo", url
+    )

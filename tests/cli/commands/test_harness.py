@@ -19,14 +19,13 @@ from typer.testing import CliRunner
 import dadaia_workspace
 from dadaia_workspace.cli.main import app as cli_app
 from dadaia_workspace.infrastructure import public_assets
+from tests.helpers.oslib import link, read_text, write_text
 
 _runner = CliRunner()
 
 
 def _profile(workspace: Path) -> list[str]:
-    data = json.loads(
-        (workspace / ".dadaia" / "states" / "harness_profile.json").read_text(encoding="utf-8")
-    )
+    data = json.loads(read_text(workspace / ".dadaia" / "states" / "harness_profile.json"))
     harnesses = data["harnesses"]
     assert isinstance(harnesses, list)
     return [str(h) for h in harnesses]
@@ -42,7 +41,7 @@ def _claude_only_workspace(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> P
     # The package lives under a `.venv`.
     site = ws / ".dadaia" / ".venv" / "site" / "dadaia_workspace"
     site.parent.mkdir(parents=True)
-    site.symlink_to(Path(dadaia_workspace.__file__).parent, target_is_directory=True)
+    assert link(str(Path(dadaia_workspace.__file__).parent), site, is_dir=True)
     monkeypatch.setattr(public_assets, "__file__", str(site / "infrastructure" / "x.py"))
     return ws
 
@@ -124,11 +123,11 @@ def test_harness_add_copilot_never_touches_the_repository_workflows(
     ws = _claude_only_workspace(tmp_path, monkeypatch)
     workflow = ws / ".github" / "workflows" / "ci.yml"
     workflow.parent.mkdir(parents=True)
-    workflow.write_text("name: ci\n", encoding="utf-8")
+    write_text(workflow, "name: ci\n")
 
     added = _runner.invoke(cli_app, ["harness", "add", "copilot"])
     assert added.exit_code == 0, added.output
-    assert workflow.read_text(encoding="utf-8") == "name: ci\n"
+    assert read_text(workflow) == "name: ci\n"
     assert sorted(p.name for p in (ws / ".github").iterdir()) == [
         "agents",
         "hooks",

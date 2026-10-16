@@ -44,7 +44,7 @@ from dadaia_workspace.core.models.spec_context import (
     ContextState,
     SpecContextProject,
 )
-from dadaia_workspace.core.platform import PLATFORM, command, workspace_cli_path
+from dadaia_workspace.core.platform import command, workspace_cli_path
 from dadaia_workspace.core.skill_owner import load_owner
 from dadaia_workspace.core.specs_version import CANONICAL_SPECS_VERSION
 from dadaia_workspace.features.chokepoints import push_gate_decision
@@ -72,6 +72,8 @@ from tests.fixtures.harness_env import git_bash, run_bash, suite_env
 from tests.fixtures.real_git import PushRepo
 from tests.fixtures.stores import own_venv_python, own_venv_workspace
 from tests.helpers import oslib, worktree_ws
+from tests.helpers.oslib import link, python_in, read_text, stub_cli, venv_tool, write_text
+from tests.helpers.oslib import run as os_run
 from tests.helpers.privacy_fixtures import aws_key_shape
 
 _FIX_LINE_RE = re.compile(r"^fix: (\S.*)$", re.MULTILINE)
@@ -146,15 +148,14 @@ def the_fix(message: str | None, root: Path) -> str:
 
 def _workspace(root: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     (root / ".dadaia" / "states").mkdir(parents=True)
-    (root / ".dadaia" / "states" / "spec_contexts.json").write_text(
-        '{"contexts": [{"repo_slug": "a", "state": "alive"}]}', encoding="utf-8"
+    write_text(
+        root / ".dadaia" / "states" / "spec_contexts.json",
+        '{"contexts": [{"repo_slug": "a", "state": "alive"}]}',
     )
     (root / ".dadaia" / "sessions").mkdir(parents=True)
-    (root / ".dadaiaignore").write_text("[protected]\nsecrets\n", encoding="utf-8")
-    stand_in = shutil.which("whoami" if sys.platform == "win32" else "true")  # a real exe, exit 0
-    assert stand_in, "the host has no stand-in executable"
+    write_text(root / ".dadaiaignore", "[protected]\nsecrets\n")
     workspace_cli_path(root).parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy(stand_in, workspace_cli_path(root))
+    stub_cli(workspace_cli_path(root).parent, "dadaia", "#!python\n")  # a runnable CLI, exit 0
     monkeypatch.chdir(root)
     return root
 
@@ -215,14 +216,11 @@ def _merge_only(ws: Path) -> str:
 
 def _kernel_no_specs_tree(ws: Path) -> str:
     """A ledger write verb run where no specs tree exists, in a workspace whose CLI names its repo."""
-    if sys.platform == "win32":
-        pytest.skip("the fake workspace CLI is a shebang script")
     cli = workspace_cli_path(ws)
-    cli.write_text(f'#!{sys.executable}\nprint(\'{{"main_repo": "a"}}\')\n', encoding="utf-8")
-    cli.chmod(0o755)
+    stub_cli(cli.parent, "dadaia", '#!python\nprint(\'{"main_repo": "a"}\')\n')
     kernel = _PKG / "public" / "skills" / "dd-bug-resolution" / "scripts"
     code = f"import sys; sys.path[:0] = [{str(kernel)!r}]; import _specs; _specs.find_specs(None, ledger='specs/bugs/BUGS.jsonl')"  # fmt: skip
-    return subprocess.run([sys.executable, "-c", code], cwd=ws, capture_output=True, text=True, check=False).stderr  # fmt: skip
+    return os_run([sys.executable, "-c", code], cwd=ws, check=False).stderr  # fmt: skip
 
 
 _FEATURE = "refs/heads/feature/0.0.1 {sha} refs/heads/feature/0.0.1 {zero}"
@@ -287,7 +285,7 @@ def test_an_operator_action_is_only_what_the_law_reserves_to_the_human() -> None
     found = {
         p.relative_to(_PKG).as_posix(): n
         for p in _PKG.rglob("*.py")
-        if (n := p.read_text(encoding="utf-8").count("Operator action"))
+        if (n := read_text(p).count("Operator action"))
     }
     assert found == _HUMAN_ONLY
 
@@ -368,8 +366,6 @@ class World:
         return cls(tmp, Templates(tmp.parent / "fixline-templates"))
 
     def __init__(self, tmp: Path, templates: Templates | None = None) -> None:
-        if sys.platform == "win32":
-            pytest.skip("the shipped pre-push hook is bash")
         self.tmp = tmp
         self.templates = templates
         self.ws = tmp / "ws"
@@ -379,17 +375,17 @@ class World:
         self.elsewhere.mkdir(parents=True)
         (self.ws / "repos").mkdir(parents=True)
         (self.ws / ".dadaia" / "states").mkdir(parents=True)
-        (self.ws / ".dadaia" / "states" / "spec_contexts.json").write_text('{"contexts": []}')
+        write_text(self.ws / ".dadaia" / "states" / "spec_contexts.json", '{"contexts": []}')
         self.env = {k: v for k, v in os.environ.items() if k not in _UNSET}
         self.env.update(
             GIT_CONFIG_GLOBAL=str(tmp / "gitconfig"),
             GIT_CONFIG_NOSYSTEM="1",
             TERM="dumb",
         )
-        (tmp / "gitconfig").write_text(
+        write_text(
+            tmp / "gitconfig",
             f"{GIT_QUIET_INCLUDE}[user]\n\tname = T\n\temail = t@example.invalid\n\tuseConfigOnly = true\n"
             "[init]\n\tdefaultBranch = main\n",
-            encoding="utf-8",
         )
         # The workspace CLI, as `fix_line` spells it: a venv layout (pyvenv.cfg + the base
         # interpreter, no pip, nothing installed) so the CLI owns THIS workspace from any
@@ -398,10 +394,12 @@ class World:
         venv = cli.parent.parent
         cli.parent.mkdir(parents=True)
         base = Path(sys._base_executable)
-        (venv / "pyvenv.cfg").write_text(f"home = {base.parent}\n", encoding="utf-8")
-        (cli.parent / "python").symlink_to(base)
-        cli.write_text(f'#!/bin/sh\nexec "{cli.parent / "python"}" -m dadaia_workspace "$@"\n')
-        cli.chmod(0o755)
+        write_text(venv / "pyvenv.cfg", f"home = {base.parent}\n")
+        interpreter = python_in(venv)
+        if not link(str(base), interpreter, is_dir=False):
+            pytest.skip("this host refuses symlinks")
+        main = "#!python\nimport runpy\nrunpy.run_module('dadaia_workspace', run_name='__main__')\n"
+        stub_cli(cli.parent, "dadaia", main, python=interpreter)
         self.env["PYTHONPATH"] = os.pathsep.join(
             [self.env.get("PYTHONPATH", ""), sysconfig.get_paths()["purelib"]]
         )
@@ -432,10 +430,7 @@ class World:
     ) -> subprocess.CompletedProcess[str]:
         shell = isinstance(argv, str)
         env = self.env | {"DADAIA_WT": "1"} if setup else self.env
-        return subprocess.run(  # noqa: S603
-            ["sh", "-c", argv] if shell else argv,
-            cwd=cwd, env=env, input=stdin, capture_output=True, text=True, timeout=50,
-        )  # fmt: skip
+        return os_run(["sh", "-c", argv] if shell else argv, cwd=cwd, env=env, input=stdin, timeout=50)  # fmt: skip
 
     def git(self, cwd: Path, *args: str) -> str:
         done = self.run(["git", *args], cwd, setup=True)
@@ -451,13 +446,13 @@ class World:
         *live* release's ``_RELEASE.json``."""
         src = self.tmp / "seed"
         self.git(self.tmp, "init", "-q", str(src))
-        (src / "README.md").write_text("r\n", encoding="utf-8")
+        write_text(src / "README.md", "r\n")
         if constitution is not None:
             (src / "specs").mkdir()
-            (src / "specs" / "constitution.md").write_text(constitution, encoding="utf-8")
+            write_text(src / "specs" / "constitution.md", constitution)
         if live:
             (src / "specs" / "releases" / live).mkdir(parents=True)
-            (src / "specs" / "releases" / live / "_RELEASE.json").write_text("{}\n")
+            write_text(src / "specs" / "releases" / live / "_RELEASE.json", "{}\n")
         self.git(src, "add", "-A")
         self.git(src, "commit", "-qm", "seed")
         for branch in branches or ("main", "develop"):
@@ -473,16 +468,14 @@ class World:
             self.git(self.repo, "checkout", "-q", "-b", branch)
         path = self.repo / rel
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(text, encoding="utf-8")
+        write_text(path, text)
         self.git(self.repo, "add", rel)
         self.git(self.repo, "commit", "-qm", f"add {rel}")
 
     def onboard(self, constitution: str | None = None) -> None:
         (self.repo / "specs").mkdir(exist_ok=True)
-        (self.repo / "specs" / "constitution.md").write_text(
-            constitution or _constitution(), encoding="utf-8"
-        )
-        (self.repo / "AGENTS.md").write_text("# law\n", encoding="utf-8")
+        write_text(self.repo / "specs" / "constitution.md", constitution or _constitution())
+        write_text(self.repo / "AGENTS.md", "# law\n")
 
     def remote_heads(self) -> dict[str, str]:
         out = self.git(self.bare, "for-each-ref", "--format=%(refname:lstrip=2) %(objectname)")
@@ -490,7 +483,7 @@ class World:
 
     def deny(self) -> None:
         denylist = self.ws / ".dadaia" / "states" / "privacy_denylist.json"
-        denylist.write_text(f'{{"{_TERM}": "t"}}', encoding="utf-8")
+        write_text(denylist, f'{{"{_TERM}": "t"}}')
         self.env["DADAIA_PRIVACY_DENYLIST"] = str(denylist)  # the fix runs from any cwd
 
 
@@ -535,14 +528,14 @@ def _push_gate(world: World, push: str) -> subprocess.CompletedProcess[str]:
     hooks = git_hooks_dir(world.repo)
     assert hooks is not None
     shipped = (hooks / "pre-push").read_bytes()
-    (hooks / "pre-push").write_text(f'#!/bin/sh\npwd > "{cwd}"\ncat > "{refs}"\nexit 1\n')
+    write_text(hooks / "pre-push", f'#!/bin/sh\npwd > "{cwd}"\ncat > "{refs}"\nexit 1\n')
     try:
         world.run(push, world.repo)
     finally:
         (hooks / "pre-push").write_bytes(shipped)
     env: dict[str, str | None] = {**world.env, **dict.fromkeys(_UNSET), "COLUMNS": "80"}
-    with contextlib.chdir(cwd.read_text().strip()):
-        ran = CliRunner().invoke(app, ["ci", "push-gate-check"], input=refs.read_text(), env=env)
+    with contextlib.chdir(read_text(cwd).strip()):
+        ran = CliRunner().invoke(app, ["ci", "push-gate-check"], input=read_text(refs), env=env)
     return subprocess.CompletedProcess(push, ran.exit_code, ran.output, "")
 
 
@@ -683,7 +676,7 @@ def _denylisted(world: World) -> str:
 
 
 def _drop_term(world: World) -> None:
-    (world.repo / "notes.md").write_text("a b\n", encoding="utf-8")
+    write_text(world.repo / "notes.md", "a b\n")
 
 
 #: The refusal's documented step after its fix, the rewrite verb: push it again.
@@ -719,7 +712,7 @@ def _denylisted_advanced_integration(world: World) -> str:
     world.git(world.repo, "push", "-q", "-u", "origin", "feature/1.0.0")
     other = world.tmp / "other"
     world.git(world.tmp, "clone", "-q", "-b", "develop", world.bare.as_uri(), str(other))
-    (other / "dep.txt").write_text("dependabot\n", encoding="utf-8")
+    write_text(other / "dep.txt", "dependabot\n")
     world.git(other, "add", "dep.txt")
     world.git(other, "commit", "-qm", "dep")
     world.git(other, "push", "-q", "--no-verify", "origin", "develop")
@@ -759,14 +752,14 @@ def _denylisted_in_a_worktree(world: World) -> str:
     world.deny()
     wt = world.repo / ".claude" / "worktrees" / "agent-x"
     world.git(world.repo, "worktree", "add", "-q", "-b", "feature/1.0.0", str(wt), "origin/develop")
-    (wt / "notes.md").write_text(f"a {_TERM} b\n", encoding="utf-8")
+    write_text(wt / "notes.md", f"a {_TERM} b\n")
     world.git(wt, "add", "notes.md")
     world.git(wt, "commit", "-qm", "n")
     return git_line(wt, "push", "-q", "origin", "feature/1.0.0")
 
 
 def _drop_worktree_term(world: World) -> None:
-    (world.repo / ".claude" / "worktrees" / "agent-x" / "notes.md").write_text("a b\n")
+    write_text(world.repo / ".claude" / "worktrees" / "agent-x" / "notes.md", "a b\n")
 
 
 def _worktree_clean(world: World) -> None:
@@ -788,21 +781,19 @@ def _denylisted_no_context(world: World) -> str:
 def _no_identity(world: World) -> list[str]:
     world.clone()
     world.onboard()
-    (world.tmp / "gitconfig").write_text(
-        f"{GIT_QUIET_INCLUDE}[user]\n\tuseConfigOnly = true\n", encoding="utf-8"
-    )
+    write_text(world.tmp / "gitconfig", f"{GIT_QUIET_INCLUDE}[user]\n\tuseConfigOnly = true\n")
     return ["context", "baseline", "proj"]
 
 
 def _secret_draft(world: World) -> list[str]:
     world.clone()
     world.onboard()
-    (world.repo / "AGENTS.md").write_text(f"key {aws_key_shape()}\n", encoding="utf-8")
+    write_text(world.repo / "AGENTS.md", f"key {aws_key_shape()}\n")
     return ["context", "baseline", "proj"]
 
 
 def _drop_secret(world: World) -> None:
-    (world.repo / "AGENTS.md").write_text("key\n", encoding="utf-8")
+    write_text(world.repo / "AGENTS.md", "key\n")
 
 
 def _remote_back(world: World) -> None:
@@ -813,7 +804,7 @@ def _baseline_denylisted(world: World) -> list[str]:
     world.clone()
     world.onboard()
     world.deny()
-    (world.repo / "AGENTS.md").write_text(f"a {_TERM}\n", encoding="utf-8")
+    write_text(world.repo / "AGENTS.md", f"a {_TERM}\n")
     # Committed before the publish, so only the gate sees it: the in-process preflight
     # preflight refuses an untracked onboarding file first.
     world.git(world.repo, "add", "AGENTS.md")
@@ -822,7 +813,7 @@ def _baseline_denylisted(world: World) -> list[str]:
 
 
 def _drop_draft_term(world: World) -> None:
-    (world.repo / "AGENTS.md").write_text("a\n", encoding="utf-8")
+    write_text(world.repo / "AGENTS.md", "a\n")
 
 
 #: The refusal's documented step after its fix, the rewrite verb: the publish again.
@@ -864,7 +855,7 @@ def _cloned(world: World) -> None:
 def _advance_origin_work(world: World) -> None:
     other = world.tmp / "other"
     world.git(world.tmp, "clone", "-q", "-b", "feature/1.0.0", world.bare.as_uri(), str(other))
-    (other / "x.md").write_text("x\n", encoding="utf-8")
+    write_text(other / "x.md", "x\n")
     world.git(other, "add", "x.md")
     world.git(other, "commit", "-qm", "x")
     world.git(other, "push", "-q", "origin", "feature/1.0.0")
@@ -924,7 +915,7 @@ def _on_work(world: World) -> None:
 
 def _untracked(world: World) -> list[str]:
     _on_work(world)
-    (world.repo / "notes.md").write_text("n\n", encoding="utf-8")
+    write_text(world.repo / "notes.md", "n\n")
     return ["context", "dead", "proj"]
 
 
@@ -934,7 +925,7 @@ def _discard_notes(world: World) -> None:
 
 def _two_untracked(world: World) -> list[str]:
     _untracked(world)
-    (world.repo / "b.md").write_text("b\n", encoding="utf-8")
+    write_text(world.repo / "b.md", "b\n")
     return ["context", "dead", "proj"]
 
 
@@ -959,7 +950,7 @@ def _no_origin(world: World) -> list[str]:
 
 def _unborn_dirty(world: World) -> list[str]:
     world.clone()
-    (world.repo / "notes.txt").write_text("n\n", encoding="utf-8")
+    write_text(world.repo / "notes.txt", "n\n")
     return ["context", "dead", "proj"]
 
 
@@ -992,13 +983,13 @@ def _associated_on_integration(world: World) -> list[str]:
     lib, lib_bare = world.ws / "repos" / "lib", world.tmp / "lib.git"
     world.git(world.tmp, "init", "-q", "--bare", "-b", "main", str(lib_bare))
     world.git(world.tmp, "clone", "-q", lib_bare.as_uri(), str(lib))
-    (lib / "README.md").write_text("r\n", encoding="utf-8")  # no specs/ of its own
+    write_text(lib / "README.md", "r\n")  # no specs/ of its own
     world.git(lib, "add", "README.md")
     world.git(lib, "commit", "-qm", "r")
     world.git(lib, "push", "-q", "origin", "HEAD:main", "HEAD:develop")
     world.git(lib, "checkout", "-q", "-b", "develop", "--track", "origin/develop")
     install_git_hooks(lib)
-    (lib / "README.md").write_text("edited\n", encoding="utf-8")
+    write_text(lib / "README.md", "edited\n")
     world.git(lib, "commit", "-qam", "edited")
     store = JsonContextStore(world.ws / ".dadaia" / "states")
     ctx = store.get("proj")
@@ -1045,7 +1036,7 @@ def _unpushed_side_branch(world: World) -> list[str]:
 def _stashed(world: World) -> list[str]:
     """A stash entry dies with the clone."""
     _on_work(world)
-    (world.repo / "README.md").write_text("edited\n", encoding="utf-8")
+    write_text(world.repo / "README.md", "edited\n")
     world.git(world.repo, "stash", "push", "-q", "-m", "wip")
     return ["context", "dead", "proj"]
 
@@ -1076,7 +1067,7 @@ def _dead_clean_detached(world: World) -> list[str]:
 
 
 def _drop_readme_term(world: World) -> None:
-    (world.repo / "README.md").write_text("a\n", encoding="utf-8")
+    write_text(world.repo / "README.md", "a\n")
 
 
 def _work_ahead_of_origin(world: World) -> str:
@@ -1225,11 +1216,11 @@ _RELEASE = "1.2.3"
 
 def _write(path: Path, text: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(text, encoding="utf-8")
+    write_text(path, text)
 
 
 def _append(path: Path, text: str) -> None:
-    path.write_text(path.read_text(encoding="utf-8") + text, encoding="utf-8")
+    write_text(path, read_text(path) + text)
 
 
 def _plant_missing_memory_document(root: Path) -> None:
@@ -1246,7 +1237,7 @@ def _plant_nothing(root: Path) -> None:
 
 def _plant_placeholder_atom(root: Path) -> None:
     atom = root / "specs" / "memory" / "product" / "testarea" / "raw.md"
-    atom.write_text("---\nslug: SLUG_PLACEHOLDER\n---\n# TITLE_PLACEHOLDER\n", encoding="utf-8")
+    write_text(atom, "---\nslug: SLUG_PLACEHOLDER\n---\n# TITLE_PLACEHOLDER\n")
 
 
 def _plant_missing_root_agents(root: Path) -> None:
@@ -1256,38 +1247,35 @@ def _plant_missing_root_agents(root: Path) -> None:
 def _plant_fixed_block_gone(root: Path) -> None:
     """A memory document whose fixed law block was deleted by hand."""
     quality = root / "specs" / "memory" / "QUALITY.md"
-    head, _, rest = quality.read_text(encoding="utf-8").partition(
-        "<!-- dadaia:fixed slop-tests -->"
-    )
-    quality.write_text(head + rest.partition("<!-- /dadaia:fixed slop-tests -->\n")[2])
+    head, _, rest = read_text(quality).partition("<!-- dadaia:fixed slop-tests -->")
+    write_text(quality, head + rest.partition("<!-- /dadaia:fixed slop-tests -->\n")[2])
 
 
 def _plant_fixed_block_drifted(root: Path) -> None:
     """A memory document whose fixed law block was edited by hand."""
     quality = root / "specs" / "memory" / "QUALITY.md"
-    quality.write_text(
-        quality.read_text(encoding="utf-8").replace(
+    write_text(
+        quality,
+        read_text(quality).replace(
             "<!-- dadaia:fixed slop-tests -->\n", "<!-- dadaia:fixed slop-tests -->\n- edited\n"
         ),
-        encoding="utf-8",
     )
 
 
 def _plant_gitflow_gone(root: Path) -> None:
     """A current dadaia tree whose constitution frontmatter has no gitflow block."""
     constitution = root / "specs" / "constitution.md"
-    constitution.write_text(
-        f"---\nspecs_pattern_version: {CANONICAL_SPECS_VERSION}\n---\n"
-        + constitution.read_text(encoding="utf-8"),
-        encoding="utf-8",
+    write_text(
+        constitution,
+        f"---\nspecs_pattern_version: {CANONICAL_SPECS_VERSION}\n---\n" + read_text(constitution),
     )
 
 
 def _plant_status_line_gone(root: Path) -> None:
     """A SPEC.md with no status line and a 173-line TASKS.md with a lowercase token: both fire."""
     release = root / "specs" / "releases" / _RELEASE / "rc-1"
-    (release / "SPEC.md").write_text("# Spec\n\nContent.\n", encoding="utf-8")
-    (release / "TASKS.md").write_text("# Tasks\n\n**Status:** approved\n" + "- t\n" * 170)
+    write_text(release / "SPEC.md", "# Spec\n\nContent.\n")
+    write_text(release / "TASKS.md", "# Tasks\n\n**Status:** approved\n" + "- t\n" * 170)
 
 
 def _plant_changelog_heading(root: Path) -> None:
@@ -1379,11 +1367,10 @@ _PLACEHOLDERS = ("<!-- zones -->", "<!-- canon -->", "<!-- root -->", "<!-- spec
 
 
 def _tree_git(root: Path, *args: str) -> None:
-    subprocess.run(  # noqa: S603
-        ["git", *args],  # noqa: S607
+    os_run(
+        ["git", *args],
         cwd=root,
         check=True,
-        capture_output=True,
         env=suite_env(
             {}, root, overrides={"PATH": "/usr/bin:/bin", "GIT_CONFIG_GLOBAL": "/dev/null"}
         ),
@@ -1462,7 +1449,7 @@ def _agent_action(ws: Path, code: str) -> str:
 
 
 def _law_is_rendered(root: Path) -> None:
-    law = (root / "specs" / "AGENTS.md").read_text(encoding="utf-8")
+    law = read_text(root / "specs" / "AGENTS.md")
     assert _AREA_HEADER in law and _ROOT_ROW in law
     assert not [p for p in _PLACEHOLDERS if p in law]
 
@@ -1483,10 +1470,10 @@ def _worktree(ws: Path) -> str:
         worktree_ws.approve(
             root, worktree_ws.git(root / "repos/r", "rev-parse", "wt/0.5.0/wt-hotfix-b").strip()
         )
-        done = subprocess.run(found[0].fix, shell=True, cwd=root, capture_output=True, text=True)  # noqa: S602
+        done = run_bash(found[0].fix, cwd=root)
         if done.returncode:
             (refix,) = worktree_ws.fixes(done)
-            subprocess.run(refix.removeprefix("fix: "), shell=True, check=True, capture_output=True)  # noqa: S602
+            run_bash(refix.removeprefix("fix: "), check=True)
     assert first and doctor.check_worktrees("c") == []
     return f"fix: {first}"
 
@@ -1540,9 +1527,7 @@ def _doctor(root: Path, *scope: str, real: bool = False) -> list[dict[str, str]]
     """The findings of ``doctor --json`` run in *root*: in process, or as a child with *real*."""
     if real:
         argv = [sys.executable, "-m", "dadaia_workspace", "doctor", *scope, "--json"]
-        out = subprocess.run(
-            argv, cwd=root, env=_ws_env(), capture_output=True, text=True, check=False
-        ).stdout  # noqa: S603
+        out = os_run(argv, cwd=root, env=_ws_env(), check=False).stdout  # noqa: S603
     else:
         with contextlib.chdir(root):
             out = (
@@ -1570,15 +1555,15 @@ def _ledger_tree(ws: Path, rel: str, committed: str, bad: str) -> Path:
     ledger = root / rel
     ledger.parent.mkdir(parents=True)
     if "audits" in rel:
-        (ledger.parent / "AUDIT.md").write_text("# Audit\n")
-    ledger.write_text(committed)
+        write_text(ledger.parent / "AUDIT.md", "# Audit\n")
+    write_text(ledger, committed)
     for args in (
         ["init", "-q"],
         ["add", rel],
         ["-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "l"],
     ):
-        subprocess.run(["git", "-C", str(root), *args], check=True)  # noqa: S603, S607
-    ledger.write_text(bad)
+        os_run(["git", "-C", str(root), *args], check=True)  # noqa: S603, S607
+    write_text(ledger, bad)
     return root
 
 
@@ -1650,35 +1635,34 @@ def test_a_caused_by_cycle_is_an_agent_decision(workspace: Path) -> None:
 
 def _initialized(ws: Path) -> Path:
     """A real ``init`` under *ws*, its venv stubbed onto this interpreter (never a real venv)."""
-    if sys.platform == "win32":
-        pytest.skip("the stub CLI is a POSIX shell script")
     root = ws / "ws"
     root.mkdir()
     WorkspaceService(
         public_assets=FileSystemPublicAssetManager(), python_env=VenvPythonEnvironmentManager()
     ).init(root, harnesses=L1_ENTRY_HARNESSES[:1])
-    stub = root / ".dadaia" / ".venv" / PLATFORM.venv_scripts_dir / "dadaia"
-    stub.parent.mkdir(parents=True, exist_ok=True)
-    stub.write_text(f'#!/bin/sh\nexec "{sys.executable}" -m dadaia_workspace "$@"\n')
-    stub.chmod(0o755)
+    stub_dir = venv_tool(root / ".dadaia" / ".venv", "dadaia").parent
+    stub_dir.mkdir(parents=True, exist_ok=True)
+    main = "#!python\nimport runpy\nrunpy.run_module('dadaia_workspace', run_name='__main__')\n"
+    stub_cli(stub_dir, "dadaia", main, python=Path(sys.executable))
     return root
 
 
 def _plant_root_slop(root: Path) -> str:
-    (root / "junk.txt").write_text("x\n")
+    write_text(root / "junk.txt", "x\n")
     return "WS-root-slop"
 
 
 def _plant_drifted_hook(root: Path) -> str:
     repo = root / "repos" / "beta"
-    subprocess.run(["git", "init", "-q", str(repo)], check=True)  # noqa: S603, S607
+    os_run(["git", "init", "-q", str(repo)], check=True)  # noqa: S603, S607
     for target, _ in workspace_layout.INSTALLED_GIT_HOOKS:
-        (repo / ".git" / "hooks" / target).write_text("#!/bin/sh\nexit 0\n")
+        write_text(repo / ".git" / "hooks" / target, "#!/bin/sh\nexit 0\n")
     ctx = {"name": "beta", "state": "alive", "repo_slug": "beta", "repo_url": "file:///x.git",
            "created_at": "2026-01-01T00:00:00Z", "alive_since": "2026-01-01T00:00:00Z",
            "dead_since": None, "current_branch": None}  # fmt: skip
-    (root / ".dadaia/states/spec_contexts.json").write_text(
-        json.dumps({"schema_version": "2", "contexts": [ctx]})
+    write_text(
+        root / ".dadaia/states/spec_contexts.json",
+        json.dumps({"schema_version": "2", "contexts": [ctx]}),
     )
     return "HOOKS-DRIFT-1"
 
@@ -1692,7 +1676,7 @@ def _plant_long_skill(root: Path) -> str:
     skill = root / ".agents" / "skills" / "long" / "SKILL.md"
     skill.parent.mkdir(parents=True)
     soft = json.loads((_PKG / "features/spec_context/behavior-map.json").read_bytes())
-    skill.write_text("l\n" * (soft["skill_md_line_soft"] + 1))
+    write_text(skill, "l\n" * (soft["skill_md_line_soft"] + 1))
     return "SKILL-MD-LENGTH"
 
 
@@ -1732,7 +1716,7 @@ def _long_skill(ws: Path) -> str:
 
 def _denylist_refusal(ws: Path) -> str:
     """The skill kernel's refusal of a privacy denylist that is not one JSON object."""
-    (ws / ".dadaia" / "states" / "privacy_denylist.json").write_text("[]", encoding="utf-8")
+    write_text(ws / ".dadaia" / "states" / "privacy_denylist.json", "[]")
     err = io.StringIO()
     with contextlib.redirect_stderr(err), pytest.raises(SystemExit):
         load_owner("dd-bug-resolution", "_ledger").terms(ws)
@@ -1792,7 +1776,6 @@ SITES |= {
 }
 
 
-@pytest.mark.skipif(sys.platform == "win32", reason="the stub CLI is a POSIX shell script")
 def test_a_deleted_hook_is_reported_absent_and_its_fix_restores_it(workspace: Path) -> None:
     """A deleted projected hook is reported absent, and its printed fix, run, restores the hook
     byte for byte."""
@@ -1897,7 +1880,7 @@ def _in_shell(shell: str, line: str, cwd: Path) -> subprocess.CompletedProcess[s
     argv = _shell_argv(shell)
     # cmd /s strips the outer quotes of its raw tail; list2cmdline's \" is not cmd syntax.
     command_line = f'{subprocess.list2cmdline(argv)} "{line}"' if shell == "cmd" else [*argv, line]
-    return subprocess.run(command_line, cwd=cwd, capture_output=True, text=True, timeout=120, check=False)  # fmt: skip
+    return os_run(command_line, cwd=cwd, timeout=120, check=False)
 
 
 @pytest.mark.parametrize("shell", oslib.shells_for(oslib.detect()))
@@ -1927,9 +1910,7 @@ def test_a_cli_fix_without_a_blank_runs_the_cli_in_every_host_shell(
 ) -> None:
     """The CLI ran, not a shell echo of its quoted path (PowerShell exits 0 on an expression)."""
     run = _in_shell(shell, fix_line(workspace), workspace)
-    direct = subprocess.run(
-        [workspace_cli_path(workspace)], capture_output=True, text=True, check=True
-    )
+    direct = os_run([workspace_cli_path(workspace)], check=True)
     assert run.returncode == 0, run.stderr
     assert run.stdout.strip() == direct.stdout.strip()
 
@@ -2031,7 +2012,7 @@ def test_dead_on_a_non_fast_forward_carries_gits_own_text_and_removes_nothing(
     push — git's own text stands alone; the checkout stays."""
     _on_work(world)
     _advance_origin_work(world)
-    (world.repo / "README.md").write_text("edited\n", encoding="utf-8")
+    write_text(world.repo / "README.md", "edited\n")
     world.git(world.repo, "commit", "-qam", "edited")
     done = world.cli("context", "dead", "proj")
     output = done.stdout + done.stderr
@@ -2063,10 +2044,10 @@ def test_dead_after_the_operator_pulls_into_a_conflict_publishes_no_markers(
     _on_work(world)
     _advance_origin_work(world)
     other = world.tmp / "other"
-    (other / "README.md").write_text("theirs\n", encoding="utf-8")
+    write_text(other / "README.md", "theirs\n")
     world.git(other, "commit", "-qam", "t")
     world.git(other, "push", "-q", "origin", "feature/1.0.0")
-    (world.repo / "README.md").write_text("mine\n", encoding="utf-8")
+    write_text(world.repo / "README.md", "mine\n")
     world.git(world.repo, "commit", "-qam", "mine")
     world.run("git pull -q --no-rebase --no-edit origin feature/1.0.0", world.repo)
     published = world.remote_heads()["feature/1.0.0"]
@@ -2091,14 +2072,14 @@ def test_the_real_doctor_prints_every_fix_as_one_whole_runnable_line(tmp_path: P
     specs = ws / "repos" / "demo" / "specs"
     canon.scaffold(specs, project_name="demo")
     outside = tmp_path / "outside.md"
-    outside.write_text("# Quality\n", encoding="utf-8")
+    write_text(outside, "# Quality\n")
     (specs / "memory" / "QUALITY.md").unlink()
-    (specs / "memory" / "QUALITY.md").symlink_to(outside)
-    (specs / "backlog" / "BACKLOG.json").write_text("{}\n", encoding="utf-8")
+    assert link(str(outside), specs / "memory" / "QUALITY.md", is_dir=False)
+    write_text(specs / "backlog" / "BACKLOG.json", "{}\n")
     env = {k: v for k, v in os.environ.items() if k != "COLUMNS"}
     env["PYTHONPATH"] = os.pathsep.join([str(_PKG.parent), *site.getsitepackages()])
     argv = [str(own_venv_python(ws)), "-m", "dadaia_workspace", "doctor", "--specs-dir", str(specs)]
-    run = subprocess.run(argv, cwd=ws, env=env, capture_output=True, text=True, timeout=120)  # noqa: S603
+    run = os_run(argv, cwd=ws, env=env, timeout=120)  # noqa: S603
     assert run.returncode == 1, run.stdout + run.stderr
     lines = run.stdout.splitlines()
     assert {"WS-tmp-expired", "FIXED-1", "LEDGER-BACKLOG-SCHEMA"} <= {
@@ -2135,7 +2116,7 @@ def test_no_fix_line_literal_in_the_library_names_the_skill_script() -> None:
 
     hits: list[str] = []
     for path in sorted(_PKG.rglob("*.py")):
-        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+        for node in ast.walk(ast.parse(read_text(path))):
             carried = []
             if isinstance(node, ast.Call) and getattr(node.func, "id", getattr(node.func, "attr", "")) in {"fix_line", "spell_fix"}:  # fmt: skip
                 carried = [*node.args, *(k.value for k in node.keywords)]

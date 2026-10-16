@@ -10,6 +10,7 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.core import workspace_layout as wl
+from tests.helpers.oslib import write_text
 
 C, K = wl.Creator, wl.ZoneClass
 #: (name, class, creator, ttl seconds), in registry order.
@@ -107,7 +108,7 @@ def test_dadaiaignore_invalid_lines_and_segment_scope(tmp_path: Path) -> None:
     assert wl.parse_dadaiaignore(text) == (("*.png",), ("secrets",), invalid)
     tree = tmp_path / "worktrees" / "r" / "x" / "y"
     (tree / "src").mkdir(parents=True)
-    (tree / ".git").write_text("gitdir: elsewhere\n", encoding="utf-8")
+    write_text(tree / ".git", "gitdir: elsewhere\n")
 
     def pg(rel: str, *globs: str) -> str | None:
         return wl.protected_glob(tmp_path, rel, globs or ("secrets",))
@@ -132,8 +133,8 @@ def test_a_planted_git_entry_never_unanchors_a_multi_segment_glob(tmp_path: Path
     """A ``.git`` written below the real tree root adds an anchor and never removes the root."""
     tree = tmp_path / "worktrees" / "r" / "0.5.0-rc1" / "j1"
     (tree / "docs" / "data-master").mkdir(parents=True)
-    (tree / ".git").write_text("gitdir: elsewhere\n", encoding="utf-8")
+    write_text(tree / ".git", "gitdir: elsewhere\n")
     rel, globs = "worktrees/r/0.5.0-rc1/j1/docs/data-master/x.md", ("docs/data-master",)
     assert wl.protected_glob(tmp_path, rel, globs) == "docs/data-master"
-    (tree / "docs" / ".git").write_text("", encoding="utf-8")
+    write_text(tree / "docs" / ".git", "")
     assert wl.protected_glob(tmp_path, rel, globs) == "docs/data-master"

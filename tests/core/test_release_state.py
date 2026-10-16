@@ -7,6 +7,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from dadaia_workspace.core import release_state
+from tests.helpers.oslib import read_text
 
 _PACKAGE = Path(__file__).resolve().parents[2] / "dadaia_workspace"
 
@@ -25,9 +26,6 @@ def test_no_release_validity_decision_lives_outside_the_script() -> None:
         p.relative_to(_PACKAGE).as_posix()
         for p in _PACKAGE.rglob("*.py")
         if "public" not in p.parts
-        and (
-            '"releases/release-state-v1"' in (t := p.read_text("utf-8"))
-            or "parse_release_state" in t
-        )
+        and ('"releases/release-state-v1"' in (t := read_text(p)) or "parse_release_state" in t)
     ]
     assert offenders == []

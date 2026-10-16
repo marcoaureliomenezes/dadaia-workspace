@@ -18,13 +18,14 @@ from dadaia_workspace.core import session_store
 from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.workspace_resolver import FENCE_ENV
 from tests.fixtures.harness_env import claude_hook_env, run_hook_subprocess
+from tests.helpers.oslib import write_text
 
 
 def _mk_workspace(tmp_path: Path, *slugs: str) -> Path:
     (tmp_path / ".dadaia" / "states").mkdir(parents=True)
-    (tmp_path / ".dadaia" / "states" / "spec_contexts.json").write_text(
+    write_text(
+        tmp_path / ".dadaia" / "states" / "spec_contexts.json",
         json.dumps({"contexts": [{"name": s, "repo_slug": s, "state": "alive"} for s in slugs]}),
-        encoding="utf-8",
     )
     for s in slugs:
         (tmp_path / "repos" / s / "specs").mkdir(parents=True, exist_ok=True)
@@ -100,11 +101,12 @@ def test_gate_verdict(tmp_path: Path, target: Any, want: str | None, opts: dict[
         entries = [
             {"relpath": p, "sha256": "0" * 64, "family": "x", "kind": "file"} for p in _LEDGERED
         ]
-        (ws / ".dadaia" / "states" / "install_ledger.json").write_text(
-            json.dumps({"schema_version": "1", "entries": entries}), encoding="utf-8"
+        write_text(
+            ws / ".dadaia" / "states" / "install_ledger.json",
+            json.dumps({"schema_version": "1", "entries": entries}),
         )
     if opts.get("truncated"):
-        (ws / ".dadaia" / "states" / "spec_contexts.json").write_text('{"contexts": [{"na')
+        write_text(ws / ".dadaia" / "states" / "spec_contexts.json", '{"contexts": [{"na')
     now = datetime.now(tz=UTC).isoformat()
     for sid, record in opts.get("records", {}).items():
         session_store.write_session(ws, sid, {"session_id": sid, "last_seen_at": now, **record})
@@ -137,7 +139,7 @@ def test_a_truncated_registry_is_no_context_at_the_gate(tmp_path: Path) -> None:
     DADAIA_CONTEXT naming a context, the real hook neither crashes nor scope-blocks an id-less
     worktree write (no context is registered)."""
     ws = _mk_workspace(tmp_path, "proj", "other")
-    (ws / ".dadaia" / "states" / "spec_contexts.json").write_text('{"contexts": [{"na')
+    write_text(ws / ".dadaia" / "states" / "spec_contexts.json", '{"contexts": [{"na')
     env = claude_hook_env(ws, session_id="s")
     env.pop("CLAUDE_CODE_SESSION_ID", None)
     env["DADAIA_CONTEXT"] = "proj"

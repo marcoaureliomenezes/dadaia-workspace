@@ -10,6 +10,7 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.core.atomic_write import SymlinkRefusedError, atomic_write
+from tests.helpers.oslib import link, make_executable, read_text, write_text
 
 _REAL = {"write_text": Path.write_text, "write_bytes": Path.write_bytes}
 
@@ -33,7 +34,7 @@ def test_write_round_trips_fresh_and_over_an_existing_target(
     for _ in range(2):
         atomic_write(target, content, **kwargs)  # type: ignore[arg-type]
         if expected is None:  # platform translation is allowed; the text must survive
-            assert target.read_text(encoding="utf-8") == content
+            assert read_text(target) == content
         else:
             assert target.read_bytes() == expected
 
@@ -41,8 +42,8 @@ def test_write_round_trips_fresh_and_over_an_existing_target(
 def test_preserve_mode_copies_the_mode_and_a_missing_parent_raises(tmp_path: Path) -> None:
     """preserve_mode keeps the prior mode, not mkstemp's 0600; without ensure_parent nothing is created."""
     target = tmp_path / "a.md"
-    target.write_text("orig\n", encoding="utf-8")
-    os.chmod(target, 0o640)
+    write_text(target, "orig\n")
+    make_executable(target)
     before = stat.S_IMODE(target.stat().st_mode)
     atomic_write(target, "new\n", preserve_mode=True)
     assert stat.S_IMODE(target.stat().st_mode) == before
@@ -54,12 +55,12 @@ def test_preserve_mode_copies_the_mode_and_a_missing_parent_raises(tmp_path: Pat
 def test_hardlink_target_is_rebound_not_written_through(tmp_path: Path) -> None:
     """CWE-59/CWE-367: the target NAME is rebound to a new inode, never written through."""
     outside = tmp_path / "outside.md"
-    outside.write_text("original\n", encoding="utf-8")
+    write_text(outside, "original\n")
     target = tmp_path / "linked.md"
     os.link(outside, target)
     before_ino = target.stat().st_ino
     atomic_write(target, "REBOUND\n")
-    assert outside.read_text(encoding="utf-8") == "original\n"
+    assert read_text(outside) == "original\n"
     assert target.stat().st_ino != before_ino
 
 
@@ -84,8 +85,7 @@ def test_none_refuses_a_symlink_before_restoring_absence(tmp_path: Path) -> None
     outside = tmp_path / "outside.json"
     outside.write_bytes(b"operator state")
     target = tmp_path / "state.json"
-    target.symlink_to(outside)
-
+    assert link(str(outside), target, is_dir=False)
     with pytest.raises(SymlinkRefusedError):
         atomic_write(target, None)  # type: ignore[arg-type]
 
@@ -114,7 +114,7 @@ def test_no_temp_sibling_survives_any_injected_failure(
     byte-identical (or still absent)."""
     target = tmp_path / "atom.md"
     if existing:
-        target.write_text("original\n", encoding="utf-8")
+        write_text(target, "original\n")
     method = "write_bytes" if isinstance(content, bytes) else "write_text"
 
     def boom(self: Path, *args: object, **kwargs: object) -> None:
@@ -132,4 +132,4 @@ def test_no_temp_sibling_survives_any_injected_failure(
 
     assert [p.name for p in tmp_path.iterdir()] == (["atom.md"] if existing else [])
     if existing:
-        assert target.read_text(encoding="utf-8") == "original\n"
+        assert read_text(target) == "original\n"

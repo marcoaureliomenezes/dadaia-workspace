@@ -16,6 +16,8 @@ from dadaia_workspace.features.workspace.service import WorkspaceService
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
 from tests.fixtures.harness_env import claude_hook_env
+from tests.helpers.oslib import run
+from tests.helpers.oslib import run as os_run
 
 _NAME = "meu-projeto"
 _SLUG = "repo-diferente"
@@ -23,12 +25,10 @@ _TIMEOUT = 180
 
 
 def _dadaia(workspace: Path, *args: str) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
+    return run(
         [sys.executable, "-m", "dadaia_workspace.cli.main", *args],
         cwd=workspace,
         env=claude_hook_env(workspace, extra={"DADAIA_CONTEXT": _NAME}),
-        capture_output=True,
-        text=True,
         timeout=_TIMEOUT,
     )
 
@@ -42,7 +42,7 @@ def workspace(tmp_path: Path) -> Path:
         python_env=VenvPythonEnvironmentManager(),
     ).init(root, harnesses=L1_ENTRY_HARNESSES)
     remote = tmp_path / f"{_SLUG}.git"
-    subprocess.run(["git", "init", "-q", "--bare", str(remote)], check=True, timeout=_TIMEOUT)
+    os_run(["git", "init", "-q", "--bare", str(remote)], check=True, timeout=_TIMEOUT)
     created = _dadaia(root, "context", "create", _NAME, "--main-repo", str(remote))
     assert created.returncode == 0, created.stdout + created.stderr
     return root

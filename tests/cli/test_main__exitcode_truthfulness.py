@@ -13,14 +13,16 @@ from typer.testing import CliRunner
 
 from dadaia_workspace import container
 from dadaia_workspace.cli.main import app
+from tests.helpers.oslib import write_text
 
 _runner = CliRunner()
 
 
 def test_doctor_exits_nonzero_when_issues_found(tmp_path: Path, monkeypatch) -> None:
     (tmp_path / ".dadaia" / "states").mkdir(parents=True)
-    (tmp_path / ".dadaia" / "states" / "spec_contexts.json").write_text(
-        '{"schema_version": "2", "contexts": []}'
+    write_text(
+        tmp_path / ".dadaia" / "states" / "spec_contexts.json",
+        '{"schema_version": "2", "contexts": []}',
     )
     (tmp_path / ".dadaia" / "nonsense").mkdir()
     (tmp_path / "repos").mkdir()

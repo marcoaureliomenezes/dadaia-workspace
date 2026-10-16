@@ -24,6 +24,7 @@ from dadaia_workspace.core.workspace_resolver import (
     resolve_cli_workspace_root,
     resolve_workspace_root,
 )
+from tests.helpers.oslib import write_text
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -34,7 +35,7 @@ def _make_full_workspace(tmp_path: Path) -> Path:
     """Create a proper initialized workspace: .dadaia/states/spec_contexts.json."""
     states_dir = tmp_path / ".dadaia" / "states"
     states_dir.mkdir(parents=True)
-    (states_dir / "spec_contexts.json").write_text("{}")
+    write_text(states_dir / "spec_contexts.json", "{}")
     return tmp_path
 
 
