@@ -23,7 +23,7 @@ import pytest
 
 from dadaia_workspace.infrastructure.privacy_check import PORTUGUESE_CONTROL_TERMS
 from tests.fixtures.real_git import git
-from tests.helpers.oslib import read_text, write_text
+from tests.helpers.oslib import Undecodable, read_text, run, write_text
 from tests.helpers.scan_population import assert_populated
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -85,7 +85,7 @@ def _denied_lines(globs: tuple[str, ...], pattern: str, spare: str | None) -> li
     for path in paths:
         try:
             lines = read_text(path).splitlines()
-        except UnicodeDecodeError:
+        except Undecodable:
             continue
         rel = path.relative_to(_PKG).as_posix()
         hits += [
@@ -269,7 +269,7 @@ def test_the_retired_persona_name_stays_out_of_library_and_tests() -> None:
     for path in paths:
         try:
             lines = read_text(path).splitlines()
-        except UnicodeDecodeError:
+        except Undecodable:
             continue
         rel = path.relative_to(_REPO_ROOT).as_posix()
         hits += [f"{rel}:{n}" for n, line in enumerate(lines, 1) if _RETIRED_PERSONA in line]
@@ -307,3 +307,28 @@ def test_a_public_file_that_is_not_utf8_is_skipped_by_the_scan(tmp_path: Path) -
     lines = check_public_privacy(public, lambda d: d.iterdir())
 
     assert [line.status for line in lines] == [DoctorStatus.OK]
+
+
+def test_a_denied_line_scan_skips_a_file_that_is_not_utf8(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (tmp_path / "latin.md").write_bytes(b"secret caf\xe9\n")
+    write_text(tmp_path / "plain.md", "secret\n")
+    monkeypatch.setattr(sys.modules[__name__], "_PKG", tmp_path)
+
+    assert _denied_lines(("*.md",), "secret", None) == ["plain.md:1: secret"]
+
+
+def test_the_retired_persona_scan_skips_a_tracked_file_that_is_not_utf8(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    run(["git", "init", "-q", str(tmp_path)], check=True)
+    (tmp_path / "dadaia_workspace").mkdir()
+    (tmp_path / "dadaia_workspace" / "latin.md").write_bytes(b"caf\xe9\n")
+    write_text(tmp_path / "dadaia_workspace" / "plain.md", "fine\n")
+    run(["git", "-C", str(tmp_path), "add", "."], check=True)
+    module = sys.modules[__name__]
+    monkeypatch.setattr(module, "_REPO_ROOT", tmp_path)
+    monkeypatch.setattr(module, "__file__", str(tmp_path / "dadaia_workspace" / "plain.md"))
+
+    test_the_retired_persona_name_stays_out_of_library_and_tests()

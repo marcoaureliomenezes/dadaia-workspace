@@ -257,3 +257,21 @@ def test_a_host_without_exec_bits_projects_every_file_runnable_and_never_reads_d
 
     assert rule.mode == 0o755
     assert [line.render() for line in doctor_rules([rule])] == ["[ok] s/hook.sh"]
+
+
+def test_clearing_a_junction_unlinks_it_and_never_walks_its_target(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from dadaia_workspace.infrastructure import projection
+    from tests.helpers.oslib import write_text
+
+    dst = tmp_path / "junction"
+    dst.mkdir()
+    write_text(dst / "keep.txt", "target content\n")
+    unlinked: list[Path] = []
+    monkeypatch.setattr(Path, "is_junction", lambda self: self == dst)
+    monkeypatch.setattr(Path, "unlink", lambda self, missing_ok=False: unlinked.append(self))
+
+    projection._clear(dst)
+
+    assert (unlinked, (dst / "keep.txt").exists()) == ([dst], True)

@@ -133,15 +133,15 @@ def test_the_retired_role_scan_survives_an_untracked_scratch_file_deleted_mid_sc
 ) -> None:
     scratch = _PKG.parent / "tests" / "tmp" / f"role-race-{uuid.uuid4().hex[:8]}"
     scratch.mkdir(parents=True)
-    read = Path.read_text
+    read = Path.read_bytes
 
-    def read_after_delete(self: Path, *args: object, **kwargs: object) -> str:
+    def read_after_delete(self: Path) -> bytes:
         shutil.rmtree(scratch, ignore_errors=True)
-        return read(self, *args, **kwargs)  # type: ignore[arg-type]
+        return read(self)
 
     try:
         write_text(scratch / "test_gone.py", "X = 1\n")
-        monkeypatch.setattr(Path, "read_text", read_after_delete)
+        monkeypatch.setattr(Path, "read_bytes", read_after_delete)
         test_no_retired_fixture_role()
     finally:
         monkeypatch.undo()

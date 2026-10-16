@@ -134,3 +134,29 @@ def test_a_persona_that_is_not_utf8_is_undecodable_not_a_codec_error(
             codex_agent_toml_bytes(persona, "a", None)
 
     assert refused.value.path == persona
+
+
+@pytest.mark.parametrize("harness", ["copilot", "codex"])
+def test_a_rule_table_over_a_persona_that_is_not_utf8_is_undecodable(
+    tmp_path: Path, harness: str
+) -> None:
+    agentic = tmp_path / "agentic"
+    (agentic / "agents").mkdir(parents=True)
+    latin = agentic / "agents" / "a.md"
+    latin.write_bytes(b"---\nname: a\n---\ncaf\xe9\n")
+    plan = InstallPlan(
+        workspace_root=tmp_path / "ws",
+        agentic_dir=agentic,
+        harness=harness,
+        force=False,
+        harness_targets=(harness,),
+        active_harnesses=frozenset({harness}),
+        overlay=None,
+        resolved_models={},
+    )
+    record = HARNESS_RECORDS[harness]
+
+    with pytest.raises(Undecodable) as refused:
+        AGENT_RULE_BUILDERS[record.agent_transcode](record, plan)
+
+    assert refused.value.path == latin

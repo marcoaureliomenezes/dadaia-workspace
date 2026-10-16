@@ -66,3 +66,13 @@ def test_a_profile_that_is_not_utf8_is_undecodable_not_a_codec_error(tmp_path: P
         JsonHarnessProfileStore().read(tmp_path)
 
     assert refused.value.path == path
+
+
+def test_writing_over_a_profile_that_is_not_utf8_is_undecodable(tmp_path: Path) -> None:
+    path = JsonHarnessProfileStore.path(tmp_path)
+    path.write_bytes(b'{"harnesses": "caf\xe9"}')
+
+    with pytest.raises(Undecodable) as refused:
+        JsonHarnessProfileStore().write(tmp_path, HarnessProfile.of(()))
+
+    assert refused.value.path == path

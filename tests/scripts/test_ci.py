@@ -180,6 +180,12 @@ def test_pushes_use_linux_and_pull_requests_use_the_full_matrix() -> None:
     }
 
 
+def _words(line: str) -> list[str]:
+    """A documented line's argv: split on blanks, a double quote groups one word (no kernel splitter
+    serves a documented line: the gate's own is private to its script)."""
+    return [w.strip('"') for w in re.findall(r'"[^"]*"|[^\s"]+', line)]
+
+
 @pytest.mark.parametrize("doc", ["tests/README.md", "tests/AGENTS.md"])
 def test_documented_coverage_line_leaves_no_coverage_file_in_the_checkout(
     tmp_path: Path, doc: str
@@ -209,8 +215,14 @@ def test_documented_coverage_line_leaves_no_coverage_file_in_the_checkout(
         unset=("COVERAGE_FILE",),
         overrides={"CI": "true", "TMPDIR": str(tmp)},
     )
-    argv = [sys.executable, *line.replace('"', "").split()[1:]]
+    argv = [sys.executable, *_words(line)[1:]]
     assert run(argv, cwd=checkout, env=env, check=False).returncode == 0
     assert [p.name for p in tmp.iterdir() if p.name.startswith("dadaia-cov-")] == []
     status = run(["git", "status", "--porcelain", "--ignored"], cwd=checkout, check=True).stdout  # fmt: skip
     assert [ln for ln in status.splitlines() if "coverage" in ln] == []
+
+
+def test_a_documented_line_keeps_a_quoted_multi_word_value_as_one_word() -> None:
+    assert _words('python -m pytest -m "not slow" --cov=pkg') == [
+        "python", "-m", "pytest", "-m", "not slow", "--cov=pkg",
+    ]  # fmt: skip

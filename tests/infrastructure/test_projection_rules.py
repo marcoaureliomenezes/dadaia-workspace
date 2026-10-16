@@ -239,3 +239,21 @@ def test_a_settings_file_that_is_not_utf8_raises_no_foreign_hook_warning(tmp_pat
     settings.write_bytes(b'{"hooks": "caf\xe9"}')
 
     assert projection_rules._settings_merge_checks(record, tmp_path) == []
+
+
+def test_the_agents_persona_render_over_a_file_that_is_not_utf8_is_undecodable(
+    tmp_path: Path,
+) -> None:
+    from dadaia_workspace.infrastructure import projection_rules
+    from tests.helpers.oslib import Undecodable
+
+    agentic = tmp_path / "agentic"
+    (agentic / "agents").mkdir(parents=True)
+    latin = agentic / "agents" / "a.md"
+    latin.write_bytes(b"---\nname: a\n---\ncaf\xe9\n")
+
+    (rule,) = projection_rules._agents_agent_rules(agentic, tmp_path / "ws", {})
+
+    with pytest.raises(Undecodable) as refused:
+        rule.render(None)
+    assert refused.value.path == latin

@@ -15,7 +15,7 @@ from dadaia_workspace.cli.main import app
 from dadaia_workspace.features.reconcile.service import reconcile_workspace
 from dadaia_workspace.infrastructure.provider_version import provider_version
 from tests.fixtures.provider_dist import install_fake_dist
-from tests.helpers.oslib import read_text, write_text
+from tests.helpers.oslib import Undecodable, read_text, write_text
 
 _PKG = Path(__file__).resolve().parents[2] / "dadaia_workspace"
 
@@ -82,3 +82,17 @@ def test_the_running_version_is_read_in_one_place() -> None:
             ):
                 readers.append(f"{path.relative_to(_PKG)}:{node.lineno}")
     assert readers == []
+
+
+def test_an_editable_source_whose_pyproject_is_not_utf8_is_undecodable(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = tmp_path / "src"
+    source.mkdir()
+    (source / "pyproject.toml").write_bytes(b'[tool.poetry]\nversion = "0.4.7"\n# caf\xe9\n')
+    install_fake_dist(monkeypatch, "0.1.4", editable_source=source)
+
+    with pytest.raises(Undecodable) as refused:
+        provider_version()
+
+    assert refused.value.path == source / "pyproject.toml"

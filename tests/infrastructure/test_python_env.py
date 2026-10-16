@@ -24,7 +24,15 @@ from dadaia_workspace.infrastructure.python_env import (
     repack_installed_wheel,
 )
 from tests.fixtures.provider_dist import install_fake_dist
-from tests.helpers.oslib import detect, python_in, venv_dir, venv_tool, write_text
+from tests.helpers.oslib import (
+    detect,
+    inline,
+    python_in,
+    quote,
+    venv_dir,
+    venv_tool,
+    write_text,
+)
 
 _REAL_ENSURE = VenvPythonEnvironmentManager.ensure_workspace_venv
 
@@ -716,3 +724,24 @@ def test_a_venv_without_its_python_is_refused_with_the_delete_fix_on_every_run(
         assert exc.value.fix == (
             'Agent action: delete "a b/.dadaia/.venv" and run `uvx dadaia-workspace init "a b"`'
         )
+
+
+def test_the_delete_fix_never_nests_an_agent_action_in_the_init_sentence(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A root a Windows shell cannot spell (`%`) reads as words inside the one sentence: the
+    `uvx` part is `inline`'s text, never `command`'s second `Agent action:`."""
+    caps = detect("win32")
+    monkeypatch.setattr("dadaia_workspace.core.platform.PLATFORM", Capabilities.detect("win32"))
+    monkeypatch.setattr(python_env_module.subprocess, "run", _no_interpreter)
+    root = "a%b"
+
+    with pytest.raises(python_env_module.WorkspaceVenvBootstrapError) as exc:
+        VenvPythonEnvironmentManager()._run_venv(root, "-c", "pass")
+
+    venv = str(venv_dir(Path(root)))
+    assert exc.value.fix == (
+        f"Agent action: delete {quote(venv, caps)} and run "
+        f"`{inline('uvx', 'dadaia-workspace', 'init', root, caps=caps)}`"
+    )
+    assert exc.value.fix.count("Agent action:") == 1

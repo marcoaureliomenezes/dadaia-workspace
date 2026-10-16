@@ -1,7 +1,7 @@
 """The real `ci install-hook` + a real `git push` to a local bare remote. The planted-term
 refuse -> amend -> push journey is the refusal harness Case `denylisted`; the refusal message
 shape (masking) is pinned by the denylist scan's own tests.
-The hook's runner is a `<ws>/.dadaia/.venv/bin/dadaia` stub forwarding to this interpreter's CLI.
+The hook's runner is a `dadaia` console-script stub (`stub_cli`) in the workspace venv, forwarding to this interpreter's CLI.
 Size: LARGE — real git hooks.
 
 Owner: dd-sw-engineer-sr
