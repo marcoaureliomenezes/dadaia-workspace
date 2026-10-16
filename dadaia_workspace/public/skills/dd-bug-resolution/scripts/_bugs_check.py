@@ -162,21 +162,20 @@ def archived_ids(text: str) -> frozenset[str]:
 
 
 def _unreached(specs: Path, text: str, root: Path) -> list[dict[str, Any]]:
-    """The live records whose `fix_sha` is no ancestor of HEAD, one finding each; a shallow
-    clone cannot judge them, so it is one finding for the cut."""
-    repo = specs.parent
+    """The live records whose `fix_sha` is no ancestor of HEAD, one finding each; in a shallow
+    clone a miss cannot be judged, so the misses are one finding for the cut."""
+    repo, update = specs.parent, script(Path(__file__).with_name("bugs.py"))
     shas = [(n, r) for n, r, why in _jsonl.walk(text) if not why and isinstance(r, dict) and r.get("fix_sha")]  # fmt: skip
-    if shas and _git.shallow(repo):
-        return [_findings.finding(CODE, LEDGER, shas[0][0], "the clone is shallow: no fix_sha can be judged", git_line(repo, "fetch", "--unshallow"))]  # fmt: skip
-    update = f"{script(Path(__file__).with_name('bugs.py'))} update %s --set fix_sha=SHA"
+    missed = [(n, r) for n, r in shas if not _git.reaches(repo, r["fix_sha"])]
+    if missed and _git.shallow(repo):
+        return [_findings.finding(CODE, LEDGER, missed[0][0], "the clone is shallow: no fix_sha can be judged", git_line(repo, "fetch", "--unshallow"))]  # fmt: skip
     return [
         _findings.finding(
             CODE, LEDGER, n, f"{r['id']!r} fix_sha {r['fix_sha']} is no ancestor of HEAD",
             "Agent action: find the fix commit's sha in git log and run "
-            f"`{with_specs(update % quote(r['id']), root)}`",
+            f"`{with_specs(f'{update} update {quote(r['id'])} --set fix_sha=SHA', root)}`",
         )
-        for n, r in shas
-        if not _git.reaches(repo, r["fix_sha"])
+        for n, r in missed
     ]  # fmt: skip
 
 
