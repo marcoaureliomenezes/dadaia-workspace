@@ -238,6 +238,28 @@
       "description": "(1) Job 2/3 LOWs: inert verdict-binding cases, a for/if setup loop, the lost dirty-tree case, an inert declared_verify, 13 stale test docstrings, one contract pinned in three files, vacuous asserts at test_entity_doctor.py:487-493. (2) The pinned verify-line test has a second home at tests/scripts/test_ci.py:153. (3) test_onboarding.py:153-162 parametrize copies the fix wording as pass-through input: give it opaque strings. (4) The repo checkout carried untracked tests/tmp/size-43473894/ and tests/tmp/test_t047_51_migration.py after merges: find whether a test writes tests/tmp in the checkout during a merge's verify, and register it on reproduction.",
       "provenance": "rc-16 intake report (main thread, 2026-10-16), filed at the rc-16 closure on the main thread's closure brief: item 17, the gate-hotfix second-home line, the gitflow-literals INFO line and the tests/tmp residue line (J2/J3 and gate reviews; 2026-10-16)",
       "relates": []
+    },
+    {
+      "id": "ref-gate-hardening-follow-ups",
+      "title": "Ref gate: _audit_only fail-open, SHA-1-length-only patterns, the hook header and second decider, the forced-move LOWs",
+      "opened": "2026-10-16",
+      "status": "idea",
+      "description": "ci.py:274: if _audit_only raises, a decided BLOCK becomes the hook's fail-open (reference-transaction.sh:75), so catch it inside the decision (defence in depth). SHA-1-length-only patterns (handoff-v1.schema.json:53 reviewed_sha, bug-record-v1.schema.json:52 fix_sha, _grammar.py:26 SHA_RE, release-state-v1.schema.json:178/183/188, workspace_layout.py:420) may fail to bind a verdict in a SHA-256 repository; not reproduced. reference-transaction.sh:5-7 header says an update of refs/heads/wt/* passes while the law (worktrees-AGENTS.md:6, PLAN:166, AC3.5) refuses every unmarked zero-old wt/* line: correct the comment. reference-transaction.sh:44 makes its own creation decision for wt/* with the zero-old misreading (git branch -f wt/x on an existing wt branch exits 128): a second decider in the shell hook, fails safe. Forced-move hotfix LOWs: the creation row it moved did not need moving (old==new passes both ways), and ci.py:99 imports ZERO_SHA function-locally beside the module-level import. For the operator (dd-grill-me): whether unmarked forced wt/* moves should pass, and that deleting and recreating the work branch at any sha passes by design (SPEC rc-16 AC3.1, test_branch_policy.py:253) even while origin holds the ref.",
+      "provenance": "rc-16 late review findings (main thread intake report, 2026-10-16), filed at the rc-16 closure on the main thread's closure brief: the SHA-256 hotfix review (cafc4003d), the forced-move review and hotfix review (a1fc328ce)",
+      "relates": [
+        "push-gate-remedy-follow-ups"
+      ]
+    },
+    {
+      "id": "several-work-fix-line-follow-ups",
+      "title": "SeveralWork fix line: the verbatim-row test keeps run_fix's one-fix check, and the root map's one-act wording",
+      "opened": "2026-10-16",
+      "status": "idea",
+      "description": "tests/public/skills/dd_gitflow_default/scripts/test__worktree_end.py:213 takes fixes(two)[0], losing run_fix's exactly-one-fix check: use [fix] = fixes(two). Root map section 3 says 'Agent action: <one act>' while the ruled single-path SeveralWork form chains up to three acts: reconcile the wording.",
+      "provenance": "rc-16 late review findings (main thread intake report, 2026-10-16), filed at the rc-16 closure on the main thread's closure brief: the verbatim-row review (8074a594d)",
+      "relates": [
+        "test-quality-loose-ends"
+      ]
     }
   ]
 }
