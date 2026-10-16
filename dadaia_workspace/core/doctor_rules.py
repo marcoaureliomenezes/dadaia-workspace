@@ -13,42 +13,23 @@ Pure module — no I/O; its one internal edge is ``core.cli_line``, the CLI spel
 
 from __future__ import annotations
 
-import sys
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, replace
-from pathlib import Path, PurePath
+from pathlib import PurePath
 
-from dadaia_workspace.core import platform
 from dadaia_workspace.core.cli_line import fix_line, spell_fix
 from dadaia_workspace.core.platform import Undecodable
-from dadaia_workspace.core.skill_owner import load_owner
 
 __all__ = [
     "Rule",
     "SectionFinding",
     "SectionReport",
-    "git_inline",
-    "inline",
-    "inline_cli",
     "merge_sections",
     "render_finding",
     "rule_fix",
     "run_rule",
     "run_section",
 ]
-
-
-_KERNEL = load_owner("dd-bug-resolution", "_platform")
-#: Words as text inside a sentence (the kernel's ``inline``, the door's once it carries it).
-inline = _KERNEL.inline
-git_inline = _KERNEL.git_inline
-
-
-def inline_cli(root: PurePath | None, *argv: str) -> str:
-    """The workspace CLI (the venv running now when *root* is ``None``) and *argv* as text
-    inside a sentence; a finished fix is :func:`~dadaia_workspace.core.cli_line.fix_line`."""
-    venv = platform.venv_dir(root) if root is not None else Path(sys.prefix)
-    return str(inline(str(platform.venv_tool(venv, "dadaia")), *argv))
 
 
 @dataclass(frozen=True)

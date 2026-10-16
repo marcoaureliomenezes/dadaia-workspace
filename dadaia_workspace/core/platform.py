@@ -75,6 +75,16 @@ def command(*argv: str) -> str:
     return str(_owner.command(*argv, caps=_caps()))
 
 
+def inline(*argv: str) -> str:
+    """*argv* as text inside a sentence for the host shell, by the kernel's rule fed the current ``PLATFORM``."""
+    return str(_owner.inline(*argv, caps=_caps()))
+
+
+def git_inline(repo: PurePath | str, *argv: str) -> str:
+    """``git -C <repo> argv…`` as text inside a sentence, by the kernel's rule fed the current ``PLATFORM``."""
+    return str(_owner.git_inline(repo, *argv, caps=_caps()))
+
+
 def python_in[P: PurePath](venv: P) -> P:
     """Where *venv* keeps its interpreter on the current ``PLATFORM``."""
     path: P = _owner.python_in(venv, _caps())

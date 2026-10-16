@@ -10,7 +10,6 @@ from typing import Any
 
 from dadaia_workspace.core import platform
 from dadaia_workspace.core.atomic_write import atomic_write
-from dadaia_workspace.core.doctor_rules import inline
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
 from dadaia_workspace.infrastructure.provider_version import provider_version
 
@@ -128,7 +127,9 @@ def _ownership_preflight(workspace_root: Path) -> str | None:
         if not path.exists():
             return None
         if (owner := platform.file_owner(path)) is not None and owner[0] != uid:
-            repair = inline("sudo", "chown", "-R", str(uid), str(workspace_root / ".dadaia"))
+            repair = platform.inline(
+                "sudo", "chown", "-R", str(uid), str(workspace_root / ".dadaia")
+            )
             return (
                 f"{path} is owned by '{owner[1]}' (uid {owner[0]}), not by the current user "
                 f"(uid {uid}) — reconcile cannot write projections there. "

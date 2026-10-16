@@ -1,13 +1,13 @@
 """`dadaia import` — registers every unknown context of a `spec-contexts.json` as DEAD."""
 
 import json
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
 from dadaia_workspace.core import clock, platform
 from dadaia_workspace.core.cli_line import fix_line
-from dadaia_workspace.core.doctor_rules import inline_cli
 from dadaia_workspace.core.exceptions import (
     AssociatedRepoConflictError,
     ContextAlreadyExistsError,
@@ -50,7 +50,7 @@ def _require(file: Path, record: object, *keys: str) -> None:
 def _read(file: Path) -> list[dict[str, object]]:
     if not file.is_file():
         raise ValueError(
-            f"Export file not found: '{file}'. Generate it with '{inline_cli(None, 'export')}'."
+            f"Export file not found: '{file}'. Generate it with '{platform.inline(*platform.cli_argv(Path(sys.prefix)), 'export')}'."
         )
     try:
         payload = json.loads(platform.read_text(file))
@@ -59,7 +59,7 @@ def _read(file: Path) -> list[dict[str, object]]:
     if not isinstance(payload, dict) or payload.get("schema_version") != EXPORT_SCHEMA_VERSION:
         raise ValueError(
             f"'{file.name}' does not carry schema_version {EXPORT_SCHEMA_VERSION!r}; "
-            f"only '{inline_cli(None, 'export')}' output is supported."
+            f"only '{platform.inline(*platform.cli_argv(Path(sys.prefix)), 'export')}' output is supported."
         )
     contexts = payload.get("contexts")
     if not isinstance(contexts, list) or not all(isinstance(c, dict) for c in contexts):

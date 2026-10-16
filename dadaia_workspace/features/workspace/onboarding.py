@@ -18,7 +18,6 @@ from typing import Literal
 
 from dadaia_workspace.core import platform, workspace_layout
 from dadaia_workspace.core.cli_line import fix_line, spell_fix
-from dadaia_workspace.core.doctor_rules import inline_cli
 from dadaia_workspace.core.fixed_sections import strip_fixed_sections
 from dadaia_workspace.core.gitflow import SeveralWorkBranches, constitution_error
 from dadaia_workspace.core.specs_version import state
@@ -91,7 +90,13 @@ def _first_pass_fix(c: _Ctx) -> str:
         version = GitSubprocessClient().work_version(repo)
     except SeveralWorkBranches as several:
         version, lead = several.keep, several.fix.removeprefix("Agent action: ") + ", then "
-    lane = inline_cli(c.root, "worktree", "new", repo.name, f"{version}/wt-backlog-first-pass")
+    lane = platform.inline(
+        *platform.cli_argv(platform.venv_dir(c.root)),
+        "worktree",
+        "new",
+        repo.name,
+        f"{version}/wt-backlog-first-pass",
+    )
     return (
         f"Agent action: {lead}open the lane {lane}"
         f", then run the dd-audit-project first pass in it — {', '.join(_first_pass(c))}"
@@ -142,7 +147,7 @@ def next_step(
     whether the caller's session is bound (``None``: no identity, so no ``bind`` step)."""
     if not trees:
         create = (
-            f"Agent action: run {inline_cli(root, 'context', 'create')} with a context name "
+            f"Agent action: run {platform.inline(*platform.cli_argv(platform.venv_dir(root)), 'context', 'create')} with a context name "
             "and --main-repo set to the main repo's clone URL"
         )
         return Step("context", "command", "no ALIVE Spec Context — create one", create)
