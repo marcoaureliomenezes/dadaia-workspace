@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import re
 import shutil
+import subprocess
 import uuid
 from pathlib import Path
 
@@ -29,20 +30,29 @@ _DEAD_NAMES = (
 _DEAD_RE = re.compile("|".join(re.escape(name) for name in _DEAD_NAMES))
 
 #: Law and skill text under ``public/`` is outside this contract; it covers code and tests.
-_SCOPES = (_PKG / "core", _PKG / "features", _PKG / "cli", _PKG / "hooks", _TESTS)
+_SCOPES = (_PKG / "core", _PKG / "features", _PKG / "cli", _PKG / "hooks")
+
+
+def _files() -> list[Path]:
+    tests = subprocess.run(
+        ["git", "-C", str(_TESTS.parent), "ls-files", "-z", "--", "tests/*.py"],
+        capture_output=True,
+        check=True,
+    ).stdout.decode()
+    return [
+        *(p for scope in _SCOPES for p in scope.rglob("*.py")),
+        *(_TESTS.parent / t for t in tests.split("\0") if t),
+    ]
 
 
 def _offenders() -> list[str]:
     hits: list[str] = []
-    for scope in _SCOPES:
-        for path in scope.rglob("*.py"):
-            if "__pycache__" in path.parts or path.name == Path(__file__).name:
-                continue
-            for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
-                if _DEAD_RE.search(line):
-                    hits.append(
-                        f"{path.relative_to(_PKG.parent).as_posix()}:{lineno}: {line.strip()}"
-                    )
+    for path in _files():
+        if "__pycache__" in path.parts or path.name == Path(__file__).name:
+            continue
+        for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+            if _DEAD_RE.search(line):
+                hits.append(f"{path.relative_to(_PKG.parent).as_posix()}:{lineno}: {line.strip()}")
     return hits
 
 
