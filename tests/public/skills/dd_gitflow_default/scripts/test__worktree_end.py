@@ -173,7 +173,7 @@ def test_a_dirty_tree_refuses_with_one_fix_that_commits_or_removes(root: Path) -
     assert "uncommitted" in dirty.stderr
     add, then, *remove = fixes(dirty)[0].split("`")[1::2]  # Agent action: commit or remove
     assert [add, then] == [  # the commit takes its own message
-        git_line(tree, "add", "--", gone, "specs/releases/0.5.0/rc-1/SPEC.md", "a b.py", "café.py", "wip/x.py"),
+        git_line(tree, "add", "--", *sorted(["a b.py", "café.py", gone, "specs/releases/0.5.0/rc-1/SPEC.md", "wip/x.py"])),
         git_line(tree, "commit"),
     ]
     for step in remove:
