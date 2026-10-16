@@ -215,12 +215,20 @@ def test_the_liveness_branch_comes_from_the_platform_decision(
     module = _load_module()
     dead = _dead_pid()
     entry = {"expires_at": "2999-01-01T00:00:00+00:00", "pid": dead}
+    probed: list[int] = []
+
+    def kill(pid: int, sig: int) -> None:
+        probed.append(pid)
+        raise ProcessLookupError
+
+    monkeypatch.setattr(os, "kill", kill)
     with monkeypatch.context() as posix:
         posix.setattr(sys, "platform", "linux")
         assert module.pid_alive(dead) is False and module.is_stale(entry) is True
     monkeypatch.setattr(sys, "platform", "win32")
     assert module.pid_alive(dead) is True
     assert module.is_stale(entry) is False
+    assert probed == [dead, dead]
 
 
 def test_register_stamps_through_the_kernel_clock(
