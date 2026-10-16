@@ -35,15 +35,15 @@ def test_windows_cli_path_and_fix_line(monkeypatch: pytest.MonkeyPatch) -> None:
     assert cli_line.fix_line(PureWindowsPath(r"C:\ws"), "doctor", "--fix") == (
         "C:/ws/.dadaia/.venv/Scripts/dadaia.exe doctor --fix"
     )
-    cli = "C:/ws/my ws/.dadaia/.venv/Scripts/dadaia.exe"
+    cli = r"C:\ws\my ws\.dadaia\.venv\Scripts\dadaia.exe"  # the Agent action shows the real value
     assert cli_line.fix_line(root, "doctor", "--fix") == (
         f"Agent action: run {cli} doctor --fix, quoting {cli} for your shell"
     )
     monkeypatch.setattr("sys.executable", r"C:\my ws\python.exe")
     assert cli_line.mkdir_line(PureWindowsPath(r"C:\my ws\tmp")) == (
-        'Agent action: run C:/my ws/python.exe -c "import pathlib; '
+        'Agent action: run C:\\my ws\\python.exe -c "import pathlib; '
         "pathlib.Path(r'C:/my ws/tmp').mkdir(parents=True, exist_ok=True)\", "
-        "quoting C:/my ws/python.exe for your shell"
+        "quoting C:\\my ws\\python.exe for your shell"
     )
     assert (
         cli_line.shell_line("git", "-C", r"C:\ws\repos\app", "status")
