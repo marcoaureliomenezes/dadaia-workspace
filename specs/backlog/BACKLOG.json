@@ -195,6 +195,62 @@
         "task-worktree-cap-removed",
         "reconcile-tree-writes-have-a-commit-shape"
       ]
+    },
+    {
+      "id": "worktree-scripts-loose-ends",
+      "title": "Worktree scripts: one owner for the level-folder rule, the leftover review LOWs and the verdict rebind of back-to-back ledger merges",
+      "opened": "2026-10-16",
+      "status": "idea",
+      "description": "(1) The level-folder rule is decided in three modules (_worktree_new.py:35-39, _worktree_end.py _rmdir, _worktree_git.py:197): one owner beside _worktree_names. (2) _strays level exemption has no depth or name bound; dead max(...,1) floor in _rmdir; sync's dirty cascade untested; flow_for runs twice; raw relative path in the rerun fix; sync's own worktree.py list fix line; levels/*.md hold 4 lines against AC7.2's 5-10. (3) sync --fork-point drops a commit that was once on the parent and later removed from it (reflog). (4) not_a_name hard-codes 0.5.0 in a public refusal (_worktree_git.py not_a_name); extra leaf-grammar readers in _release_phase.py and _worktree_new.py; the closure fallback fix line is untested and wrong for an orphan branch (_release_phase.py). (5) _is_test_path is a sixth guard: REBUILD candidate. (6) An associated repo's new of a job reads the phase from the main repo's wt-rc branch; the refusal misleads; untested. (7) Two shape-1 registrations cannot merge back to back: the second BUGS.jsonl append rebased onto the first changes the patch context, so the verdict's patch-id binding is lost and needs a rebind per registration.",
+      "provenance": "rc-16 intake report (main thread, 2026-10-16), filed at the rc-16 closure on the main thread's closure brief: items 1, 2, 3, 7, 8, 15 and the back-to-back shape-1 registration line (J7 r1/r2, J4, J4.T7 reviews; 2026-10-15)",
+      "relates": [
+        "worktree-hierarchy"
+      ]
+    },
+    {
+      "id": "skill-kernel-loose-ends",
+      "title": "Skill kernel and bug ledger: one spawn refusal for every skill script, DADAIA_WT scope, append --correlates, the unreached-check LOWs",
+      "opened": "2026-10-16",
+      "status": "idea",
+      "description": "(1) Skill-script spawn sites with no OSError refusal: registry.py:230 (ss, catches only FileNotFoundError, PermissionError escapes), _release_phase.py:64, _backlog_exit.py:33; verdict.py and _worktree_git.cli already route through _specs.run_cli; no test covers root-found plus CLI-missing for the three run_cli callers. (2) DADAIA_WT=1 reaches every scrubbed_env child (verify:, ledger checks), so raw git inside verify passes the ref hook (design). (3) bugs.py append: a repeated --correlates keeps only the last and the help is silent on the comma form; correlation candidates filter by surface only. (4) _bugs_check.py:167 local name update holds the script prefix: rename; test_bugs.py:229-249 and :252-263 near-copy :203-226 and :190-200: parametrize; _bugs_check.py:171 cut message 'no fix_sha can be judged' overstates; a third --is-shallow-repository probe at _release_schema.py:114 beside _git.shallow; test name test_the_unreached_fix_sha_fix_line_is_one_act_without_a_placeholder against the pinned 'fix_sha=SHA'.",
+      "provenance": "rc-16 intake report (main thread, 2026-10-16), filed at the rc-16 closure on the main thread's closure brief: items 10, 16, the skill-script spawn line, the registry.py:230 line, the run_cli test line, the fix_sha test-name line and the _unreached hotfix review LOWs (1), (2), (4) (registration, J2, bound_fix and cc76aa03c reviews; 2026-10-15/16)",
+      "relates": []
+    },
+    {
+      "id": "package-loose-ends",
+      "title": "Package loose ends: one several-work-branches class, specs init's cut point and stale texts, a doctor fix naming its file, privacy skip_paths, a planted .git",
+      "opened": "2026-10-16",
+      "status": "idea",
+      "description": "(1) SeveralWorkBranches inherits twice (core/gitflow.py:97, the skill's SeveralWork and DadaiaError): keep the core class only and let ci.py catch it (+22 ms import of core.gitflow). (2) specs init cuts the work branch with git switch -c from HEAD, while the skill's rule cuts from origin/<work>, else the integration branch. (3) specs init's [committed] guard is untested; stale texts in cli/commands/specs.py (the replace-foreign help, the docstring, the '[moved] ... (staged, not committed)' line) and infrastructure/git_subprocess.py work_version's docstring. (4) doctor_memory.py:95 'Agent action: fill or delete the atom' names no file, against the doctor contract that an agent action names the finding's file. (5) infrastructure/privacy_check.py ignores the baseline's skip_paths; the pipeline-name test skips the whole exclude_paths line. (6) core/workspace_layout.py:286-290: a planted .git switches stray detection.",
+      "provenance": "rc-16 intake report (main thread, 2026-10-16), filed at the rc-16 closure on the main thread's closure brief: items 4, 5, 6, 13, 18, 19 (J8 r1/r2, J1, ipv4 hotfix reviews)",
+      "relates": []
+    },
+    {
+      "id": "push-gate-remedy-follow-ups",
+      "title": "Push gate remedy: rule its place under the 30-leaf CLI cap and its accepted residuals",
+      "opened": "2026-10-16",
+      "status": "idea",
+      "description": "(1) push-gate-check, a read-only gate, gained a rewrite path behind --rewrite-from; its own leaf needs the 30-leaf cap of tests/cli/commands/test_help.py ruled, or another leaf retired. (2) The remedy collapses the whole unpublished range to one commit (pre-existing behaviour). (3) Accepted residual: while the gate refuses, the remedy can add content inside a listed file. (4) ci.py's isinstance(GateDecision) checks vanish if Decision carries the listed paths. (5) _audit_only stays in cli/commands/ci.py.",
+      "provenance": "rc-16 intake report (main thread, 2026-10-16), filed at the rc-16 closure on the main thread's closure brief: the two Job 9 review lines (e10cb7234 MEDIUM and INFO; 0e0c391c8 LOW and INFO)",
+      "relates": []
+    },
+    {
+      "id": "law-and-docs-text-loose-ends",
+      "title": "Law, skill and doc text: the bugs update commit row, the ci.py docstring, release-tree duplicates, stale recipe and docs lines, a scratch-only reviewer probe recipe",
+      "opened": "2026-10-16",
+      "status": "idea",
+      "description": "(1) A chore(bugs): update ledger commit (bugs.py update) has no dd-gitflow-default \u00a73a row. (2) scripts/ci.py docstring says no arguments runs every job; it runs the job level (STAGE). (3) _release_tree.py calls closure_summary twice; RELEASE-EVENTS.md:25 none-means-empty; scripts/CONSUMER_VALIDATION_RECIPE.md R-04 stale; docs/cli.md:10 cut; the in-repo venv lookup (CWE-427); duplicated contract helpers. (4) Reviewer probes resolved the live workspace through the venv and doctor --fix reaped live files: dd-code-review needs a scratch-only probe recipe (DADAIA_FENCED_ROOTS). (5) The rule that an agent kills only the PIDs it started could name pkill -f and pgrep -f waiters explicitly.",
+      "provenance": "rc-16 intake report (main thread, 2026-10-16), filed at the rc-16 closure on the main thread's closure brief: items 11, 14, 20, 22 and the pkill -f line (fix_sha, J4.T16, J1/J3 reviews; the 2026-10-15 reviewer-probe and SIGTERM incidents)",
+      "relates": []
+    },
+    {
+      "id": "test-quality-loose-ends",
+      "title": "Test quality: the rc-16 test LOWs, one home per pinned contract, opaque pass-through inputs, the tests/tmp residue of a merge's verify",
+      "opened": "2026-10-16",
+      "status": "idea",
+      "description": "(1) Job 2/3 LOWs: inert verdict-binding cases, a for/if setup loop, the lost dirty-tree case, an inert declared_verify, 13 stale test docstrings, one contract pinned in three files, vacuous asserts at test_entity_doctor.py:487-493. (2) The pinned verify-line test has a second home at tests/scripts/test_ci.py:153. (3) test_onboarding.py:153-162 parametrize copies the fix wording as pass-through input: give it opaque strings. (4) The repo checkout carried untracked tests/tmp/size-43473894/ and tests/tmp/test_t047_51_migration.py after merges: find whether a test writes tests/tmp in the checkout during a merge's verify, and register it on reproduction.",
+      "provenance": "rc-16 intake report (main thread, 2026-10-16), filed at the rc-16 closure on the main thread's closure brief: item 17, the gate-hotfix second-home line, the gitflow-literals INFO line and the tests/tmp residue line (J2/J3 and gate reviews; 2026-10-16)",
+      "relates": []
     }
   ]
 }
