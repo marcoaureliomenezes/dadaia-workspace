@@ -12,7 +12,11 @@ Two failure modes stay closed:
 from __future__ import annotations
 
 import re
+import shutil
+import sys
 import tomllib
+import uuid
+from collections.abc import Collection
 from pathlib import Path
 
 import pytest
@@ -273,3 +277,23 @@ def test_the_retired_persona_name_stays_out_of_library_and_tests() -> None:
         rel = path.relative_to(_REPO_ROOT).as_posix()
         hits += [f"{rel}:{n}" for n, line in enumerate(lines, 1) if _RETIRED_PERSONA in line]
     assert hits == [], "\n".join(hits)
+
+
+def test_the_persona_scan_survives_an_untracked_scratch_file_deleted_mid_scan(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    scratch = _REPO_ROOT / "tests" / "tmp" / f"persona-race-{uuid.uuid4().hex[:8]}"
+    scratch.mkdir(parents=True)
+    try:
+        (scratch / "test_gone.py").write_text("X = 1\n", encoding="utf-8")
+
+        listed = assert_populated
+
+        def populated_then_deleted(population: Collection[Path], sentinel: Path) -> None:
+            listed(population, sentinel)
+            shutil.rmtree(scratch)
+
+        monkeypatch.setattr(sys.modules[__name__], "assert_populated", populated_then_deleted)
+        test_the_retired_persona_name_stays_out_of_library_and_tests()
+    finally:
+        shutil.rmtree(scratch, ignore_errors=True)

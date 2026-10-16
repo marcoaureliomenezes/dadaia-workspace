@@ -3,7 +3,7 @@
 No source or test file names the ``CONSUMED`` token, its ledger module, its record class
 or its consumed histo file.
 
-Size: SMALL (reads the shipped source tree; no subprocess, no fixture, no network).
+Size: MEDIUM (reads the shipped source tree and runs `git ls-files`; no fixture, no network).
 """
 
 from __future__ import annotations
