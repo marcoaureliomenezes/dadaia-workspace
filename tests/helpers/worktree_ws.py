@@ -22,6 +22,7 @@ from dadaia_workspace.features.spec_context.doctor import DoctorService
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from tests.fixtures.harness_env import run_bash, suite_env
 from tests.fixtures.stores import context_store, fake_venv
+from tests.helpers.oslib import run as run_text
 
 SCRIPT = (
     Path(__file__).resolve().parents[2]
@@ -84,10 +85,7 @@ def git(repo: Path, *args: str) -> str:
         overrides={"HOME": str(repo), "PATH": os.environ["PATH"], "GIT_CONFIG_NOSYSTEM": "1"},
     )
     ident = ["-c", "user.name=t", "-c", "user.email=t@t", "-c", "init.defaultBranch=main"]
-    out = subprocess.run(
-        ["git", *ident, "-C", str(repo), *args], env=env, check=True, capture_output=True, text=True
-    )
-    return out.stdout
+    return run_text(["git", *ident, "-C", str(repo), *args], env=env, check=True).stdout
 
 
 def make_workspace(root: Path) -> Path:
@@ -162,14 +160,7 @@ def run(root: Path, *args: str, input: str | None = None) -> subprocess.Complete
             "TZ": "Asia/Tokyo",  # a naive produced_at never orders by the local zone
         },
     )
-    return subprocess.run(
-        [sys.executable, str(SCRIPT), *args],
-        cwd=root,
-        env=env,
-        capture_output=True,
-        text=True,
-        input=input,
-    )
+    return run_text([sys.executable, str(SCRIPT), *args], cwd=root, env=env, input=input)
 
 
 def registered_doctor(root: Path) -> DoctorService:

@@ -453,12 +453,12 @@ def git_bash() -> str:
 
 def run_python(*args: str, **kwargs: Any) -> subprocess.CompletedProcess[str]:
     """Run the interpreter of this suite (``sys.executable``, never a bare ``python``)."""
-    return subprocess.run([sys.executable, *args], capture_output=True, text=True, **kwargs)  # noqa: S603
+    return oslib.run([sys.executable, *args], **kwargs)
 
 
 def run_bash(command: str, **kwargs: Any) -> subprocess.CompletedProcess[str]:
     """Run *command* under :func:`git_bash` ``-c``."""
-    return subprocess.run([git_bash(), "-c", command], capture_output=True, text=True, **kwargs)  # noqa: S603
+    return oslib.run([git_bash(), "-c", command], **kwargs)
 
 
 def retire_tree(tree: Path, into: Path) -> Path:

@@ -1,12 +1,13 @@
 """Real git in tmp_path — the one fixture every git question is asked against."""
 
-import subprocess
 from pathlib import Path
+
+from tests.helpers.oslib import run
 
 
 def git(cwd: Path, *args: str) -> str:
     """One git command in *cwd*; its stripped stdout, raising on a non-zero exit."""
-    done = subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True, check=True)
+    done = run(["git", *args], cwd=cwd, check=True)
     return done.stdout.strip()
 
 
