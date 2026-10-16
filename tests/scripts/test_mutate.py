@@ -99,7 +99,9 @@ def test_a_diff_is_mutated_line_by_line_and_reports_survivors_kills_and_coverage
     assert (root / "pkg/m.py").read_text("utf-8") == _HEAD_M
 
 
-def test_a_coverage_key_with_backslashes_is_the_changed_file(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_a_coverage_key_with_backslashes_is_the_changed_file(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     def fake_run(*args: str, **_: object) -> None:
         report = next(a for a in args if a.startswith("--cov-report=json:")).split(":", 1)[1]
         files = {"pkg\\m.py": {"executed_lines": [5, 6], "missing_lines": [7]}}
