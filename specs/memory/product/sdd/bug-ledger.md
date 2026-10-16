@@ -33,7 +33,7 @@ sources:
 - Bugs sharing a cause are fixed together. Two failed fix attempts on one bug hand it to a fresh session with a written diagnosis.
 - Establish the lowest-level RED behavior first, then fix the owning seam. The fix hardens the contract test in that contract's one home: it tightens an assert or adds the missing partition, never loosens or removes one, and the reviewer confirms the hardened test goes red with the fix reverted; then persist the implementation sha.
 - Two prior fixes on the touched module, or a `caused_by` other than `none`, require a REBUILD that keeps regression coverage.
-- Block-list bugs use hotfix jobs. Other confirmed bugs become explicit candidate scope; ship may carry an open id only through the exact operator authorization enforced by [[release-lifecycle]].
+- Block-list bugs use hotfix lanes. Other confirmed bugs become explicit candidate scope; ship may carry an open id only through the exact operator authorization enforced by [[release-lifecycle]].
 - The next candidate's bug-window review owns KEEP or REBUILD maturity. No runtime balance, source-quality reconstruction or cached candidate placement lives in the ledger.
 
 ## Dependencies

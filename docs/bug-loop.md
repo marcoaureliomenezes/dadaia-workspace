@@ -1,6 +1,6 @@
 # The bug loop
 
-Register → RED → fix → resolve. A confirmed block-list bug uses a hotfix job; other bugs
+Register → RED → fix → resolve. A confirmed block-list bug uses a hotfix lane; other bugs
 enter the approved release scope through its ordinary job structure.
 
 ## 1. Register — ask first
