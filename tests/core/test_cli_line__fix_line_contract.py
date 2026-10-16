@@ -1148,6 +1148,9 @@ _REFUSALS: dict[str, tuple[Case | tuple[Case, ...] | Skip, ...]] = {
     ),
     "ci._repo_root": (Skip("the pre-push hook always runs inside the repo it pushes"),),
     "ci.push_gate_check": (Skip("the gate's refusal: its fix is a branch_policy/push_gate site"),),
+    "ci._rewrite_unpublished": (
+        Skip("refuses a commit origin holds: test_reference_transaction__work_branch.py"),
+    ),
     "service.SpecContextService.show": (Case(_unknown_context, _cloned, before=_create),),
     "service.SpecContextService.alive": (
         Case(_no_url_no_checkout, _cloned, before=_clone),
@@ -2027,7 +2030,7 @@ def test_a_refused_baseline_push_names_the_anchor_and_the_publish_as_the_next_st
     as the step after the rewrite (a hand push would drop origin's merge parent)."""
     done = _hit(world, _baseline_denylisted(world))
     output = done.stdout + done.stderr
-    assert done.returncode != 0 and _fix(done, world.ws).startswith("git -C")
+    assert done.returncode != 0 and "--rewrite-from" in _fix(done, world.ws)
     assert f"onboarding commit {world.git(world.repo, 'rev-parse', 'HEAD')}" in output
     assert fix_line(world.ws, "context", "baseline", "proj") in output.replace("\n", "")
 
