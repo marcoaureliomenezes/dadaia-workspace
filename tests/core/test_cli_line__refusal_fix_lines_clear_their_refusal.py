@@ -949,19 +949,21 @@ SITES: dict[str, tuple[Case | tuple[Case, ...] | Skip, ...]] = {
     ),
     "service.SpecContextService.dead": (
         Case(_dead_twice, _dead_done),
-        Case(
-            _dead_denylisted,
-            _dead_done,
-            before=_drop_readme_term,
-            then="git commit -qa --amend --no-edit && "
-            "../../.dadaia/.venv/bin/dadaia context dead proj",
-        ),
-        Case(
-            _dead_denylisted_two_commits,
-            _dead_done,
-            before=_drop_readme_term,
-            then="git commit -qa --amend --no-edit && "
-            "../../.dadaia/.venv/bin/dadaia context dead proj",
+        (
+            Case(
+                _dead_denylisted,
+                _dead_done,
+                before=_drop_readme_term,
+                then="git commit -qa --amend --no-edit && "
+                "../../.dadaia/.venv/bin/dadaia context dead proj",
+            ),
+            Case(
+                _dead_denylisted_two_commits,
+                _dead_done,
+                before=_drop_readme_term,
+                then="git commit -qa --amend --no-edit && "
+                "../../.dadaia/.venv/bin/dadaia context dead proj",
+            ),
         ),
         Skip("a refused hold (`repos/` outside the workspace): test_context_dead_holds.py"),
     ),
