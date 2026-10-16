@@ -14,6 +14,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from dadaia_workspace.core import platform
 from dadaia_workspace.core.atomic_write import atomic_write
 from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.model_registry import (
@@ -53,7 +54,7 @@ class JsonAgentModelPolicyStore:
         if not self._path.exists():
             return None
         try:
-            raw = json.loads(self._path.read_text(encoding="utf-8"))
+            raw = json.loads(platform.read_text(self._path))
         except json.JSONDecodeError as exc:
             raise AgentModelPolicyStoreError(
                 f"corrupt agent-model-policy overlay; invalid JSON ({exc.msg})",

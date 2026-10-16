@@ -10,6 +10,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+from dadaia_workspace.core import platform
 from dadaia_workspace.core.frontmatter import Frontmatter, parse
 from dadaia_workspace.core.model_registry import TIER_CODEX
 from dadaia_workspace.core.workspace_layout import render_registry_tables
@@ -269,13 +270,13 @@ def _render_agents_config_file_blocks(agents_dir: Path) -> str:
     blocks: list[str] = []
     for md_file in sorted(agents_dir.glob("*.md")):
         try:
-            fm = parse(md_file.read_text(encoding="utf-8"))
+            fm = parse(platform.read_text(md_file))
             name = str(fm.data.get("name", "")) if isinstance(fm, Frontmatter) else ""
             if not name:
                 continue
             key_escaped = name.replace("\\", "\\\\").replace('"', '\\"')
             blocks.append(f'[agents."{key_escaped}"]\n')
             blocks.append(f'config_file = "agents/{name}.toml"\n')
-        except (OSError, ValueError):
+        except (OSError, ValueError, platform.Undecodable):
             continue
     return "".join(blocks)

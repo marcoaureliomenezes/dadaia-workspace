@@ -20,6 +20,7 @@ from typing import Any
 from jsonschema import Draft202012Validator
 from jsonschema.exceptions import best_match
 
+from dadaia_workspace.core import platform
 from dadaia_workspace.core.frontmatter import split
 from dadaia_workspace.core.harness_registry import HARNESS_RECORDS, HarnessRecord
 from dadaia_workspace.core.models.doctor_report import DoctorLine, DoctorStatus
@@ -37,7 +38,7 @@ def check_agent_skill_refs(public_dir: Path) -> list[DoctorLine]:
 
     for md_file in sorted(agents_dir.glob("*.md")):
         try:
-            text = md_file.read_text(encoding="utf-8")
+            text = platform.read_text(md_file)
         except OSError:
             continue
 
@@ -167,7 +168,7 @@ def _persona_content_drift(agent_id: str, agents_dir: Path) -> list[DoctorLine]:
     """
     agent_file = agents_dir / f"{agent_id}.md"
     try:
-        text = agent_file.read_text(encoding="utf-8")
+        text = platform.read_text(agent_file)
     except OSError as exc:
         return [
             DoctorLine(
@@ -247,7 +248,7 @@ def check_entities_derivation(public_dir: Path) -> list[DoctorLine]:
     """
     registry_path = public_dir / "entities" / "registry.json"
     try:
-        raw_registry = json.loads(registry_path.read_text(encoding="utf-8"))
+        raw_registry = json.loads(platform.read_text(registry_path))
     except (OSError, json.JSONDecodeError) as exc:
         return [
             DoctorLine(
@@ -259,7 +260,7 @@ def check_entities_derivation(public_dir: Path) -> list[DoctorLine]:
 
     problem = best_match(Draft202012Validator(_REGISTRY_SCHEMA).iter_errors(raw_registry))
     if problem is not None:
-        where = "/".join(map(str, problem.absolute_path)) or "registry"
+        where = "/".join(str(p) for p in problem.absolute_path) or "registry"
         return [
             DoctorLine(
                 DoctorStatus.ERROR,

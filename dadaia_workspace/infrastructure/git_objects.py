@@ -18,6 +18,7 @@ import subprocess
 from collections.abc import Iterator
 from pathlib import Path
 
+from dadaia_workspace.core import platform
 from dadaia_workspace.core.models.git_scan import (
     SHA_SHAPE_RE,
     ZERO_SHA,
@@ -63,9 +64,10 @@ def _run(
     as a raw ``subprocess`` exception.
     """
     try:
-        return subprocess.run(
-            args, cwd=cwd, input=input_bytes, capture_output=True, timeout=_TIMEOUT_S
+        done: subprocess.CompletedProcess[bytes] = platform.run_bytes(
+            args, cwd=cwd, input=input_bytes, timeout=_TIMEOUT_S
         )
+        return done
     except OSError as exc:  # no git on PATH, or a cwd that is not a directory (WinError 267)
         raise GitRunError(f"git could not run in {cwd}: {exc}") from exc
     except subprocess.TimeoutExpired as exc:
@@ -592,12 +594,7 @@ def _read_oversized_blob_prefix(repo: Path, sha: str) -> bytes:
     pipe early, git dies on SIGPIPE and the tail is never fetched. A short read from a failed
     git (unknown oid, a tree) raises :class:`GitObjectReadError`."""
     try:
-        proc = subprocess.Popen(  # noqa: S603 — fixed argv, no shell
-            ["git", "cat-file", "blob", sha],
-            cwd=repo,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
-        )
+        proc = platform.popen_bytes(["git", "cat-file", "blob", sha], cwd=repo)
     except OSError as exc:  # same conversion as ``_run``
         raise GitObjectReadError(f"git could not run in {repo}: {exc}") from exc
     with proc:

@@ -13,6 +13,7 @@ import os
 from collections.abc import Iterable
 from pathlib import Path
 
+from dadaia_workspace.core import platform
 from dadaia_workspace.core.atomic_write import atomic_write
 from dadaia_workspace.core.exceptions import PublicAssetError
 from dadaia_workspace.core.harness_registry import (
@@ -109,7 +110,7 @@ class FileSystemPublicAssetManager:
         for parent in path.parents:
             if parent == ws:
                 return True
-            if parent.is_symlink():
+            if platform.is_link(parent):
                 return False
         return False
 

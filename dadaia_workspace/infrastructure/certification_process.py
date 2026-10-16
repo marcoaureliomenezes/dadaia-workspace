@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
-import subprocess
 from collections.abc import Mapping, Sequence
 from pathlib import Path
+from subprocess import Popen, TimeoutExpired
 from typing import NamedTuple
+
+from dadaia_workspace.core import platform
 
 
 class CertificationProcessResult(NamedTuple):
@@ -15,7 +17,7 @@ class CertificationProcessResult(NamedTuple):
 
 
 class _RunningProcess:
-    def __init__(self, process: subprocess.Popen[str]) -> None:
+    def __init__(self, process: Popen[str]) -> None:
         self._process = process
 
     def poll(self) -> int | None:
@@ -27,7 +29,7 @@ class _RunningProcess:
     def wait(self, timeout: float) -> int:
         try:
             return self._process.wait(timeout=timeout)
-        except subprocess.TimeoutExpired as exc:
+        except TimeoutExpired as exc:
             raise TimeoutError(f"process did not exit within {timeout}s") from exc
 
     def kill(self) -> None:
@@ -44,18 +46,8 @@ class SubprocessCertificationProcess:
         timeout: float,
     ) -> CertificationProcessResult:
         try:
-            result = subprocess.run(
-                list(argv),
-                cwd=cwd,
-                env=dict(env) if env is not None else None,
-                capture_output=True,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
-                timeout=timeout,
-                check=False,
-            )
-        except subprocess.TimeoutExpired as exc:
+            result = platform.run(argv, cwd=cwd, env=env, timeout=timeout)
+        except TimeoutExpired as exc:
             raise TimeoutError(f"process did not exit within {timeout}s") from exc
         return CertificationProcessResult(
             result.returncode, result.stdout or "", result.stderr or ""
@@ -68,15 +60,4 @@ class SubprocessCertificationProcess:
         cwd: Path,
         env: Mapping[str, str],
     ) -> _RunningProcess:
-        return _RunningProcess(
-            subprocess.Popen(
-                list(argv),
-                cwd=cwd,
-                env=dict(env),
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
-            )
-        )
+        return _RunningProcess(platform.popen(argv, cwd=cwd, env=env))

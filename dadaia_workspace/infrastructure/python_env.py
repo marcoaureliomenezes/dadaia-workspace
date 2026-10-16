@@ -1,14 +1,12 @@
 """Python venv manager — creates .dadaia/.venv/ idempotently.
 
-Executable paths are constructed using ``PLATFORM.venv_scripts_dir`` and
-``PLATFORM.venv_exe_suffix`` so that the paths are correct on both POSIX
+Executable paths come from the platform door, so they are right on both POSIX
 (``bin/python``) and Windows (``Scripts/python.exe``).
 """
 
 import base64
 import hashlib
 import inspect
-import ntpath
 import os
 import re
 import shutil
@@ -23,13 +21,12 @@ from pathlib import Path
 from packaging.version import Version
 
 import dadaia_workspace
-from dadaia_workspace.core.cli_line import shell_line
+from dadaia_workspace.core import platform
 from dadaia_workspace.core.exceptions import (
     BootstrapPackageError,
     WorkspaceVenvBootstrapError,
     WorkspaceVenvNewerError,
 )
-from dadaia_workspace.core.platform import PLATFORM, quote, venv_dir, workspace_cli_path
 from dadaia_workspace.infrastructure.provider_version import provider_version
 
 __all__ = [
@@ -207,13 +204,8 @@ def _interpreter_version(executable: str) -> tuple[int, int, int] | None:
     candidate on an untrusted PATH must not wedge the whole bootstrap.
     """
     try:
-        proc = subprocess.run(
+        proc = platform.run(
             [executable, *_VERSION_ARGS],
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            check=False,
             timeout=_INTERPRETER_PROBE_TIMEOUT_SECONDS,
             stdin=subprocess.DEVNULL,
         )
@@ -245,20 +237,20 @@ def _current_venv_pyvenv_executable() -> str | None:
     CWE-426 (untrusted search path): ``pyvenv.cfg`` is a plain
     text file a caller could hand-edit or a compromised prior bootstrap could have
     written; its ``executable`` value is REJECTED here — before any caller can hand it
-    to :func:`_interpreter_version`/``subprocess.run`` — unless it is an absolute path.
+    to :func:`_interpreter_version` — unless it is an absolute path.
     """
     cfg = Path(sys.prefix) / "pyvenv.cfg"
     if not cfg.is_file():
         return None
     try:
-        text = cfg.read_text(encoding="utf-8", errors="replace")
+        text = platform.decode(cfg.read_bytes())
     except OSError:
         return None
     for line in text.splitlines():
         key, sep, value = line.partition("=")
         if sep and key.strip() == "executable":
             candidate = value.strip()
-            return candidate if os.path.isabs(candidate) else None
+            return candidate if platform.is_fully_qualified(candidate) else None
     return None
 
 
@@ -284,45 +276,22 @@ def _path_candidates(min_minor: int) -> list[str]:
     CWE-426 (untrusted search path): on POSIX, ``shutil.which``
     can return a RELATIVE path when PATH itself carries a relative entry (e.g. a
     leading ``.`` — an untrusted or misconfigured PATH). A relative result is rejected
-    here, before it can reach :func:`_interpreter_version`/``subprocess.run``.
+    here, before it can reach :func:`_interpreter_version`.
     """
     found: list[str] = []
     for minor in (min_minor + 1, min_minor):
         exe = shutil.which(f"python3.{minor}")
-        if exe and os.path.isabs(exe):
+        if exe and platform.is_fully_qualified(exe):
             found.append(exe)
     return found
 
 
-def _is_fully_qualified(candidate: str) -> bool:
-    """True iff *candidate* is unambiguously rooted regardless of the current working
-    directory OR (on Windows) the current drive (CWE-426).
-
-    ``os.path.isabs`` alone is not enough at the probe boundary: on Python 3.12,
-    ``ntpath.isabs`` treats a DRIVE-RELATIVE path — exactly one leading separator, no
-    drive letter, e.g. ``\\tools\\python.exe`` — as absolute, even though it resolves
-    against whatever drive happens to be current, not a fully qualified location.
-    (Python 3.13 tightened ``ntpath.isabs`` to require a drive too; this project pins
-    ``python = \"^3.12\"``, so the probe cannot rely on that yet.)
-
-    Routed through the ``ntpath`` module explicitly — never the host-bound ``os.path``
-    — on a Windows ``PLATFORM``: this makes the Windows-specific check provable on any
-    host OS (``ntpath`` is a pure-Python module, always importable regardless of the
-    running platform), and is exactly what real Windows already does (there,
-    ``os.path`` IS ``ntpath``). POSIX is unaffected — plain
-    ``os.path.isabs`` has no such gap there.
-    """
-    if PLATFORM.windows:
-        return ntpath.isabs(candidate) and ntpath.splitdrive(candidate)[0] != ""
-    return os.path.isabs(candidate)
-
-
 class VenvPythonEnvironmentManager:
     def _venv_path(self, workspace_root: str) -> Path:
-        return venv_dir(Path(workspace_root))
+        return platform.venv_dir(Path(workspace_root))
 
     def _dadaia_entrypoint(self, workspace_root: str) -> Path:
-        return workspace_cli_path(Path(workspace_root))
+        return platform.workspace_cli_path(Path(workspace_root))
 
     def _install_spec(self, scratch_dir: str) -> str:
         """Resolve what to ``pip install`` so the venv mirrors the RUNNING distribution.
@@ -388,14 +357,7 @@ class VenvPythonEnvironmentManager:
             # default (module-function default is copies, not symlinks).
             interpreter = self._resolve_child_venv_interpreter()
             try:
-                subprocess.run(
-                    [interpreter, "-m", "venv", "--copies", str(venv_dir)],
-                    check=True,
-                    capture_output=True,
-                    text=True,
-                    encoding="utf-8",
-                    errors="replace",
-                )
+                platform.run([interpreter, "-m", "venv", "--copies", str(venv_dir)], check=True)
             except OSError as exc:
                 # On a noexec mount the RESOLVED interpreter itself cannot be spawned or
                 # run there. That filesystem limit is legitimate; every OSError surfaces as
@@ -527,20 +489,15 @@ class VenvPythonEnvironmentManager:
             subprocess.CalledProcessError: *check* and a non-zero exit.
         """
         try:
-            return subprocess.run(
-                [self.python_executable(workspace_root), *args],
-                capture_output=True,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
-                check=check,
-                env=env,
+            done: subprocess.CompletedProcess[str] = platform.run(
+                [self.python_executable(workspace_root), *args], check=check, env=env
             )
+            return done
         except OSError as exc:
             raise WorkspaceVenvBootstrapError(
                 f"workspace venv python cannot run: {exc}.",
-                f"Agent action: delete {quote(str(self._venv_path(workspace_root)))} and run "
-                f"`{shell_line('uvx', 'dadaia-workspace', 'init', workspace_root)}`",
+                f"Agent action: delete {platform.quote(str(self._venv_path(workspace_root)))} and run "
+                f"`{platform.inline('uvx', 'dadaia-workspace', 'init', workspace_root)}`",
             ) from exc
 
     def _probe_provider(self, workspace_root: str) -> "subprocess.CompletedProcess[str]":
@@ -591,10 +548,8 @@ class VenvPythonEnvironmentManager:
             seen.add(candidate)
             # Defense in depth (CWE-426): both source functions above already reject a
             # relative candidate, but the probe boundary itself never spawns a
-            # non-fully-qualified path, however the candidate reached ``ordered``. It uses
-            # :func:`_is_fully_qualified`, not bare ``os.path.isabs``, for the Windows
-            # drive-relative case.
-            if not _is_fully_qualified(candidate):
+            # non-fully-qualified path, however the candidate reached ``ordered``.
+            if not platform.is_fully_qualified(candidate):
                 diagnostics.append(f"{candidate}: relative path rejected")
                 continue
             version = _interpreter_version(candidate)
@@ -603,7 +558,7 @@ class VenvPythonEnvironmentManager:
                 continue
             if _version_satisfies(version, required):
                 return candidate
-            diagnostics.append(f"{candidate}: Python {'.'.join(map(str, version))}")
+            diagnostics.append(f"{candidate}: Python {'.'.join(str(n) for n in version)}")
 
         raise WorkspaceVenvBootstrapError(
             "could not resolve a Python interpreter satisfying dadaia-workspace's "
@@ -631,7 +586,7 @@ class VenvPythonEnvironmentManager:
             raise WorkspaceVenvBootstrapError(
                 f"workspace venv interpreter mismatch: the venv at "
                 f"'{self._venv_path(workspace_root)}' carries Python "
-                f"{'.'.join(map(str, version))}, but dadaia-workspace requires Python "
+                f"{'.'.join(str(n) for n in version)}, but dadaia-workspace requires Python "
                 f"{required}. Recreate the venv with an interpreter that satisfies "
                 "this requirement (delete the venv directory and re-run 'uvx "
                 "dadaia-workspace init <dir>', or point DADAIA_BOOTSTRAP_PACKAGE at a matching build) and "
@@ -671,8 +626,4 @@ class VenvPythonEnvironmentManager:
             )
 
     def python_executable(self, workspace_root: str) -> str:
-        return str(
-            self._venv_path(workspace_root)
-            / PLATFORM.venv_scripts_dir
-            / f"python{PLATFORM.venv_exe_suffix}"
-        )
+        return str(platform.python_in(self._venv_path(workspace_root)))

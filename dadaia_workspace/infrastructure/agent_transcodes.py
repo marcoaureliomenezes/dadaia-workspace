@@ -12,6 +12,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from pathlib import Path
 
+from dadaia_workspace.core import platform
 from dadaia_workspace.core.harness_registry import AgentTranscode, HarnessRecord
 from dadaia_workspace.core.model_registry import ResolvedAgentModel
 from dadaia_workspace.infrastructure.install_helpers import (
@@ -113,7 +114,7 @@ _COPILOT_FRONTMATTER_KEYS: frozenset[str] = frozenset({"name", "description", "t
 def copilot_agent_md_bytes(md_path: Path) -> bytes:
     """The authored persona rendered as a Copilot custom agent: its three known
     frontmatter keys (with their block values) plus the body, verbatim."""
-    frontmatter, body = split_persona(md_path.read_text(encoding="utf-8"))
+    frontmatter, body = split_persona(platform.read_text(md_path))
     kept: list[str] = []
     keeping = False
     for line in frontmatter.splitlines():
@@ -133,7 +134,7 @@ def copilot_agent_md_rules(record: HarnessRecord, plan: InstallPlan) -> tuple[Pr
     dst_dir = plan.workspace_root / str(record.directory) / "agents"
     rules: list[ProjectionRule] = []
     for md_file in sorted((plan.agentic_dir / "agents").glob("*.md")):
-        fm = persona_fields(md_file.read_text(encoding="utf-8"))
+        fm = persona_fields(platform.read_text(md_file))
         agent_name = str(fm.get("name", "")) if fm else ""
         if not agent_name:
             continue
@@ -159,7 +160,7 @@ def codex_agent_toml_bytes(
     ``(model, effort)``, render TOML. Shared by install (write) and doctor (compare)
     through the :class:`ProjectionRule` seam.
     """
-    text = md_path.read_text(encoding="utf-8")
+    text = platform.read_text(md_path)
     body = split_persona(text)[1]
     fm = persona_fields(text)
     model, reasoning_effort = resolve_codex_agent_model(
@@ -192,7 +193,7 @@ def toml_transcode_rules(record: HarnessRecord, plan: InstallPlan) -> tuple[Proj
     )
     agents_src = plan.agentic_dir / "agents"
     for md_file in sorted(agents_src.glob("*.md")):
-        fm = persona_fields(md_file.read_text(encoding="utf-8"))
+        fm = persona_fields(platform.read_text(md_file))
         agent_name = str(fm.get("name", "")) if fm else ""
         if not agent_name:
             continue

@@ -21,6 +21,7 @@ import json
 from collections.abc import Callable, Mapping
 from pathlib import Path
 
+from dadaia_workspace.core import platform
 from dadaia_workspace.core.exceptions import PublicAssetError
 from dadaia_workspace.core.harness_registry import (
     HARNESS_RECORDS,
@@ -134,7 +135,7 @@ def _agents_agent_rules(
             _src: Path = src,
             _resolved: ResolvedAgentModel | None = resolved_models.get(src.stem),
         ) -> bytes:
-            text = _src.read_text(encoding="utf-8")
+            text = platform.read_text(_src)
             if _resolved is not None:
                 return render_claude_agent(text, _resolved).encode("utf-8")
             # An authored model renders verbatim; a persona with none is refused.
@@ -193,8 +194,8 @@ def _settings_merge_checks(record: HarnessRecord, workspace_root: Path) -> list[
     if not dst.is_file():
         return []
     try:
-        loaded = json.loads(dst.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
+        loaded = json.loads(platform.read_text(dst))
+    except (OSError, ValueError, platform.Undecodable):
         return []
     if not isinstance(loaded, dict):
         return []

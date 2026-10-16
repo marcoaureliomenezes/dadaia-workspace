@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import hashlib
 import json
-import os
 from collections.abc import Iterable
 from pathlib import Path
 
+from dadaia_workspace.core import platform
 from dadaia_workspace.infrastructure.privacy_check import (
     _PUBLIC_ASSET_IGNORED_DIRS,
     _PUBLIC_ASSET_IGNORED_SUFFIXES,
@@ -39,15 +39,11 @@ def iter_public_files(root: Path) -> Iterable[Path]:
 
 def read_link_target(path: Path) -> str:
     """A symlink's target in POSIX spelling on every OS."""
-    return os.readlink(path).replace(os.sep, "/")
+    return str(platform.norm_sep(str(path.readlink())))
 
 
 def _sha256(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
+    return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 def _entry_digest(path: Path) -> str | None:
@@ -55,7 +51,7 @@ def _entry_digest(path: Path) -> str | None:
 
     A symlink digests its target string, so a link and a copy stay distinguishable.
     """
-    if path.is_symlink():
+    if platform.is_link(path):
         return hashlib.sha256(read_link_target(path).encode("utf-8")).hexdigest()
     if path.is_file():
         return _sha256(path)

@@ -8,7 +8,7 @@ import json
 from pathlib import Path
 from typing import Any, cast
 
-from dadaia_workspace.core import context_registry
+from dadaia_workspace.core import context_registry, platform
 from dadaia_workspace.core.atomic_write import atomic_write
 from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.exceptions import SchemaVersionError
@@ -102,14 +102,14 @@ class JsonContextStore:
         return self._path.exists()
 
     def read_raw(self) -> dict[str, Any]:
-        return cast("dict[str, Any]", json.loads(self._path.read_text(encoding="utf-8")))
+        return cast("dict[str, Any]", json.loads(platform.read_text(self._path)))
 
-    def replace_raw(self, data: dict, *, newline: str | None = "") -> None:  # type: ignore[type-arg]
-        atomic_write(self._path, json.dumps(data, indent=2), newline=newline)
+    def replace_raw(self, data: dict) -> None:  # type: ignore[type-arg]
+        atomic_write(self._path, json.dumps(data, indent=2))
 
     def seed_if_absent(self) -> None:
         if not occupied(self._path):
-            self.replace_raw(_EMPTY_CONTEXTS, newline=None)
+            self.replace_raw(_EMPTY_CONTEXTS)
 
     def snapshot(self) -> bytes | None:
         return self._path.read_bytes() if self._path.is_file() else None

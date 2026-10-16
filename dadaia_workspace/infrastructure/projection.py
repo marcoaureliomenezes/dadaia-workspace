@@ -38,6 +38,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
+from dadaia_workspace.core import platform
 from dadaia_workspace.core.atomic_write import atomic_write
 from dadaia_workspace.core.exceptions import PublicAssetError
 from dadaia_workspace.core.models.doctor_report import DoctorLine, DoctorStatus
@@ -112,7 +113,7 @@ def tree_bytes_rules(
             harness,
             dst_dir / src.relative_to(src_dir),
             src.read_bytes(),
-            mode=mode if mode is not None else (0o755 if os.access(src, os.X_OK) else None),
+            mode=mode if mode is not None else (0o755 if platform.is_executable(src) else None),
         )
         for src in iter_public_files(src_dir)
     )
@@ -194,7 +195,7 @@ def _read_bytes(path: Path) -> bytes | None:
 def _posix_relpath(target: Path, start: Path) -> str:
     """A relative path with ``/`` separators on every OS: the one spelling a link target
     and its ledger digest carry, so Windows and POSIX agree byte for byte."""
-    return os.path.relpath(target, start).replace(os.sep, "/")
+    return str(platform.norm_sep(os.path.relpath(target, start)))
 
 
 def _link_target(rule: ProjectionRule) -> str:
@@ -232,7 +233,7 @@ def _copy_verified(src: Path, dst: Path) -> list[Path]:
 
 
 def _clear(dst: Path) -> None:
-    if dst.is_symlink() or dst.is_file():
+    if platform.is_link(dst) or dst.is_file():
         dst.unlink()
     elif dst.is_dir():
         shutil.rmtree(dst)
@@ -241,15 +242,11 @@ def _clear(dst: Path) -> None:
 def _install_link(rule: ProjectionRule, *, force: bool) -> list[TranscriptLine]:
     assert rule.link_to is not None
     target = _link_target(rule)
-    if not force and rule.dst.is_symlink() and read_link_target(rule.dst) == target:
+    if not force and platform.is_link(rule.dst) and read_link_target(rule.dst) == target:
         return [TranscriptLine("skip", rule.dst, "symlink")]
     rule.dst.parent.mkdir(parents=True, exist_ok=True)
     _clear(rule.dst)
-    try:
-        # The canonical target is POSIX-spelled (ledger, doctor); the OS gets its native
-        # separators only here — Windows cannot resolve a reparse target written with "/".
-        os.symlink(target.replace("/", os.sep), rule.dst, target_is_directory=rule.link_to.is_dir())
-    except (OSError, NotImplementedError):
+    if not platform.link(target, rule.dst, is_dir=rule.link_to.is_dir()):
         return [
             TranscriptLine("ok", path, "copy") for path in _copy_verified(rule.link_to, rule.dst)
         ]
@@ -264,7 +261,7 @@ def link_entry_defect(entry: Path, canonical: Path) -> str | None:
     platform that refused the link — a copy equal to it byte for byte.
     """
     expected = _posix_relpath(canonical, entry.parent)
-    if entry.is_symlink():
+    if platform.is_link(entry):
         actual = read_link_target(entry)
         if actual != expected:
             return f"symlink target {actual!r} is not the canonical {expected!r}"
@@ -284,7 +281,7 @@ def link_entry_defect(entry: Path, canonical: Path) -> str | None:
 
 def _doctor_link(rule: ProjectionRule) -> DoctorLine:
     assert rule.link_to is not None
-    if not rule.dst.is_symlink() and not rule.dst.exists():
+    if not platform.is_link(rule.dst) and not rule.dst.exists():
         return DoctorLine(DoctorStatus.MISSING, rule.label)
     defect = link_entry_defect(rule.dst, rule.link_to)
     if defect is None:
@@ -317,7 +314,7 @@ def install_rules(rules: Sequence[ProjectionRule], *, force: bool) -> Transcript
             rule.dst.parent.mkdir(parents=True, exist_ok=True)
             if current is not None:
                 # A read-only projection (law files are 0o444) must become writable
-                # before os.replace — Windows refuses to replace a read-only target.
+                # before the swap — Windows refuses to replace a read-only target.
                 _apply_mode(rule.dst, 0o644)
             atomic_write(rule.dst, desired)
             lines.append(TranscriptLine("ok", rule.dst))
@@ -352,7 +349,7 @@ def doctor_rules(rules: Sequence[ProjectionRule]) -> list[DoctorLine]:
             continue
         if current != desired:
             out.append(DoctorLine(DoctorStatus.DRIFT, rule.label))
-        elif (rule.mode or 0) & 0o100 and not os.access(rule.dst, os.X_OK):
+        elif (rule.mode or 0) & 0o100 and not platform.is_executable(rule.dst):
             noexec = rule.dst.stat().st_mode & 0o100
             status = DoctorStatus.UNSUPPORTED if noexec else DoctorStatus.DRIFT
             why = "filesystem mounted noexec" if noexec else "not executable"

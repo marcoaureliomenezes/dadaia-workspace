@@ -17,6 +17,7 @@ from __future__ import annotations
 from collections.abc import Callable, Iterable
 from pathlib import Path
 
+from dadaia_workspace.core import platform
 from dadaia_workspace.core.exceptions import DadaiaError
 from dadaia_workspace.core.models.doctor_report import DoctorLine, DoctorStatus
 from dadaia_workspace.core.redaction import (
@@ -167,8 +168,8 @@ def check_public_privacy(
             if path.suffix.lower() not in _PUBLIC_PRIVACY_TEXT_SUFFIXES:
                 continue
             try:
-                text = path.read_text(encoding="utf-8")
-            except (UnicodeDecodeError, OSError):
+                text = platform.read_text(path)
+            except (platform.Undecodable, OSError):
                 continue
             rel = path.relative_to(lib_root) if path.is_relative_to(lib_root) else path
             lowered = text.lower()

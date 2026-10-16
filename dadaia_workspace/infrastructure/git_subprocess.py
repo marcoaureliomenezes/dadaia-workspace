@@ -4,6 +4,7 @@ import subprocess
 from collections.abc import Sequence
 from pathlib import Path
 
+from dadaia_workspace.core import platform
 from dadaia_workspace.core.cli_line import fix_line, fix_of, git_line, without_fix
 from dadaia_workspace.core.exceptions import GitCloneError, GitSyncError
 from dadaia_workspace.core.gitflow import DEFAULT, Gitflow, read_gitflow, work_branch
@@ -26,16 +27,13 @@ def _run(
     stdin: str | None = None,
     env: dict[str, str] | None = None,
 ) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
+    done: subprocess.CompletedProcess[str] = platform.run(
         args,
         cwd=cwd,
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
         input=stdin,
         env={**load_owner("dd-bug-resolution", "_git").scrubbed_env(), **(env or {})},
     )
+    return done
 
 
 def _commit(path: Path, msg: str, pathspec: Sequence[str] | None = None) -> None:
@@ -84,7 +82,7 @@ class GitSubprocessClient:
         """Rename ``repo/src`` to ``repo/dst``, staging the rename of its tracked files —
         never committing. A tree git does not track is renamed on disk alone."""
         if not _run(["git", "ls-files", "--", src], cwd=repo).stdout.strip():
-            (repo / src).rename(repo / dst)
+            platform.replace(repo / src, repo / dst)
             return
         result = _run(["git", "mv", "--", src, dst], cwd=repo)
         if result.returncode != 0:

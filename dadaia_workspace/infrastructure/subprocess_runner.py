@@ -7,6 +7,8 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import NamedTuple
 
+from dadaia_workspace.core import platform
+
 
 class ProcessResult(NamedTuple):
     """Outcome of running an external command."""
@@ -28,16 +30,7 @@ class SubprocessProcessRunner:
         env: Mapping[str, str] | None = None,
     ) -> ProcessResult:
         try:
-            result = subprocess.run(  # noqa: S603
-                list(argv),
-                cwd=cwd,
-                env=None if env is None else dict(env),
-                capture_output=True,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
-                timeout=timeout,
-            )
+            result = platform.run(argv, cwd=cwd, env=env, timeout=timeout)
         except subprocess.TimeoutExpired as exc:
             raise TimeoutError(f"command timed out after {exc.timeout}s: {exc.cmd!r}") from exc
         return ProcessResult(result.returncode, result.stdout or "", result.stderr or "")
