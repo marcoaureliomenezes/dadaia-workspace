@@ -384,7 +384,10 @@ def zone_table_rows() -> tuple[tuple[str, str, str, str, str], ...]:
 
 
 #: The git chokepoints: ``(.git/hooks/<target>, public/scripts/<source>)``.
-INSTALLED_GIT_HOOKS: tuple[tuple[str, str], ...] = (("pre-push", "pre-push-ci-gate.sh"),)
+INSTALLED_GIT_HOOKS: tuple[tuple[str, str], ...] = (
+    ("pre-push", "pre-push-ci-gate.sh"),
+    ("reference-transaction", "reference-transaction.sh"),
+)
 
 
 def public_scripts_dir() -> Path:
