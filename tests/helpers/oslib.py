@@ -7,6 +7,8 @@ Tests read, write, spawn, spell and probe with these names; none calls `Path.rea
 from __future__ import annotations
 
 import os
+import stat
+import subprocess
 import sys
 import tempfile
 from pathlib import Path
@@ -22,6 +24,7 @@ cli_path = _K.cli_path
 command = _K.command
 decode = _K.decode
 detect = _K.detect
+effective_uid = _K.effective_uid
 git_line = _K.git_line
 head = _K.head
 home_env = _K.home_env
@@ -48,6 +51,28 @@ write_text = _K.write_text
 
 #: The line ending a console prints on this host.
 EOL = os.linesep
+
+
+#: Whether file permissions bind this process: a host with owners, and not root.
+PERMISSIONS_ENFORCED = _K.effective_uid() not in (None, 0)
+
+
+def make_readonly(path: Path, *, locked: bool = False) -> None:
+    """Take write permission from *path*, every permission with *locked*; `make_writable` gives
+    the owner's back."""
+    os.chmod(path, 0 if locked else stat.S_IMODE(path.stat().st_mode) & ~0o222)
+
+
+def shells_for(caps: Caps) -> list[str]:
+    """The shells a line spelled for *caps* is judged in: ``sh`` and ``bash`` for POSIX; ``cmd``,
+    ``powershell``, ``pwsh`` and Git Bash for Windows. A PowerShell is never given a POSIX line."""
+    return ["cmd", "powershell", "pwsh", "bash"] if caps.windows else ["sh", "bash"]
+
+
+def run_line(line: str, **kw: object) -> subprocess.CompletedProcess[str]:
+    """Run a finished command line in the host shell: ``sh -c``, PowerShell on Windows."""
+    shell = ["powershell", "-NoProfile", "-Command"] if detect().windows else ["sh", "-c"]
+    return run([*shell, line], **kw)  # type: ignore[arg-type]
 
 
 def stub_cli(directory: Path, name: str, source: str, python: Path | None = None) -> Path:
