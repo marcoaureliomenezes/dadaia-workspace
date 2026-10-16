@@ -23,10 +23,7 @@ import hashlib
 import json
 from pathlib import Path
 
-from dadaia_workspace.core.workspace_layout import (
-    fill_registry_tables,
-    unrender_workspace_cli,
-)
+from dadaia_workspace.core.workspace_layout import render_registry_tables
 
 __all__ = ["SHIPPED_HASHES_FILENAME", "load_shipped_hashes", "was_shipped"]
 
@@ -58,11 +55,6 @@ def load_shipped_hashes(templates_dir: Path) -> dict[str, set[str]]:
 
 
 def was_shipped(text: str, asset_name: str, templates_dir: Path) -> bool:
-    """True when *text*, as written or with the source CLI spelling put back, matches a
-    published version of *asset_name*: one digest per version serves every host."""
-    filled = fill_registry_tables(text)
-    known = load_shipped_hashes(templates_dir).get(asset_name, set())
-    return any(
-        hashlib.sha256(form.encode("utf-8")).hexdigest() in known
-        for form in (filled, unrender_workspace_cli(filled))
-    )
+    """True when forward-rendered *text* matches a published version of *asset_name*."""
+    digest = hashlib.sha256(render_registry_tables(text).encode("utf-8")).hexdigest()
+    return digest in load_shipped_hashes(templates_dir).get(asset_name, set())

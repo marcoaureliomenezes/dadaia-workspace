@@ -602,18 +602,8 @@ def render_workspace_cli(text: str) -> str:
     return text.replace(_SOURCE_CLI, str(platform.venv_tool(PurePosixPath(".venv"), "dadaia")))
 
 
-def unrender_workspace_cli(text: str) -> str:
-    """Put the source CLI spelling back, so one digest serves every host."""
-    return text.replace(render_workspace_cli(_SOURCE_CLI), _SOURCE_CLI)
-
-
-def fill_registry_tables(text: str) -> str:
-    """Fill the registry placeholders."""
-    for placeholder, render in _PLACEHOLDERS.items():
-        text = text.replace(placeholder, render())
-    return text
-
-
 def render_registry_tables(text: str) -> str:
     """Fill registry placeholders and render the workspace CLI source for this host."""
-    return render_workspace_cli(fill_registry_tables(text))
+    for placeholder, render in _PLACEHOLDERS.items():
+        text = text.replace(placeholder, render())
+    return render_workspace_cli(text)
