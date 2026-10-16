@@ -137,5 +137,7 @@ def test_a_backlog_or_rc_tree_over_a_tracked_folder_of_its_name_passes(
 ) -> None:
     commit(root / "repos/r", f"tests/tmp/{name.rsplit('/')[-1]}/test_x.py", TEST)
     tree = _tree(root, name)
-    refused = _lines(root, "merge", tree)[1]  # unapproved, never refused for the folder
-    assert not any("tests/tmp" in ln for ln in refused)
+    head = commit(tree, "specs/notes")
+    approve(root, head, name=name)
+    done = run(root, "merge", str(tree))
+    assert done.returncode == 0, done.stderr

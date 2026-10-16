@@ -303,6 +303,73 @@ def test_merge_lists_ignored_files_and_keeps_them_by_its_fix(root: Path) -> None
     assert (rc / "my notes.scratch").read_text() == "keep me" and not tree.exists()
 
 
+JOB2 = "0.5.0/rc-1/job-2/wt-main"
+
+
+def _kind(root: Path, kind: str) -> tuple[Path, Path]:
+    """A committed, approved tree of *kind* and the checkout its merge lands in."""
+    repo, rc = root / "repos/r", root / RC_TREE
+    if kind == "task":
+        tree, into = open_tree(root, NEW_TASK), root / TREE
+    elif kind == "job":
+        tree, into = root / TREE, rc
+    else:
+        if kind == "hotfix":
+            commit(repo, "specs/bugs/BUGS.jsonl", '{"id": "some-bug", "status": "open"}\n')
+        names = {"job-b": JOB2, "backlog": BACKLOG, "hotfix": HOTFIX}
+        if kind == "rc":  # the release tree lands on the repo, with no open job under it
+            git(repo, "worktree", "remove", "-f", "-f", str(root / TREE))
+        tree = rc if kind == "rc" else open_tree(root, names[kind])
+        into = rc if kind == "job-b" else repo
+    sha = commit(tree, "specs/notes" if kind in ("rc", "backlog") else "src/a.py")
+    approve(
+        root,
+        sha,
+        name=NEW_JOB
+        if kind == "job"
+        else {"job-b": JOB2, "rc": RC, "backlog": BACKLOG, "hotfix": HOTFIX}.get(kind),
+    )
+    return tree, into
+
+
+def _error_lines(done: subprocess.CompletedProcess[str]) -> list[str]:
+    return [ln for ln in done.stderr.splitlines() if ln.startswith("[error] ")]
+
+
+@pytest.mark.parametrize("kind", ["task", "job", "job-b", "rc", "backlog", "hotfix"])
+def test_merge_refuses_an_ignored_file_neither_kept_nor_dropped(root: Path, kind: str) -> None:
+    tree, _ = _kind(root, kind)
+    (tree / "keep.scratch").write_text("x")
+    refused = run(root, "merge", str(tree))
+    assert refused.returncode == 1
+    [error] = _error_lines(refused)
+    assert error.startswith("[error] ignored files would be lost: keep.scratch")
+    assert len(fixes(refused)) == 1
+
+
+@pytest.mark.parametrize("kind", ["task", "job", "job-b", "rc", "backlog", "hotfix"])
+def test_merge_refuses_a_target_checkout_off_the_target_branch(root: Path, kind: str) -> None:
+    tree, into = _kind(root, kind)
+    git(into, "switch", "-q", "-c", "elsewhere")
+    refused = run(root, "merge", str(tree))
+    assert refused.returncode == 1
+    [error] = _error_lines(refused)
+    assert error.startswith(f"[error] {into} is not on ")
+    assert len(fixes(refused)) == 1
+
+
+def test_merge_without_a_verdict_refuses_with_only_the_verdict_message(root: Path) -> None:
+    job = root / TREE
+    head = commit(job, "src/a.py")
+    refused = run(root, "merge", str(job))
+    assert refused.returncode == 1
+    [error] = _error_lines(refused)
+    assert error.startswith(f"[error] the newest dd-code-reviewer handoff naming HEAD {head}")
+    assert len(fixes(refused)) == 1
+    approve(root, head, name=NEW_JOB)
+    assert run(root, "merge", str(job)).returncode == 0
+
+
 def test_clean_removes_only_an_empty_worktree_of_ours(root: Path) -> None:
     repo, tree = root / "repos/r", root / TREE
     commit(tree, "src/a.py")
