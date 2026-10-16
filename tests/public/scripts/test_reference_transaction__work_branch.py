@@ -195,3 +195,29 @@ def test_a_raw_commit_is_still_refused_on_a_work_branch_ahead_of_origin(repo: _R
     _ahead_by_a_marked_merge(repo)
     before = repo.ok("rev-parse", "HEAD")
     _assert_refused(repo, repo.git("commit", "-q", "--allow-empty", "-m", "raw"), before)
+
+
+def _two_unpublished(repo: _Repo) -> None:
+    for name in ("one", "two"):
+        assert repo.git("commit", "-q", "--allow-empty", "-m", name, wt=True).returncode == 0
+
+
+def test_amending_the_unpublished_tip_passes(repo: _Repo) -> None:
+    _ahead_by_a_marked_merge(repo)
+    done = repo.git("commit", "-q", "--allow-empty", "--amend", "-m", "amended")
+    assert done.returncode == 0, done.stderr
+
+
+def test_a_soft_reset_inside_the_unpublished_range_passes(repo: _Repo) -> None:
+    _two_unpublished(repo)
+    first = repo.ok("rev-parse", "HEAD~1")
+    done = repo.git("reset", "--soft", "HEAD~1")
+    assert done.returncode == 0, done.stderr
+    assert repo.ok("rev-parse", f"refs/heads/{_WORK}") == first
+
+
+def test_amending_the_published_tip_is_refused(repo: _Repo) -> None:
+    before = repo.ok("rev-parse", "HEAD")
+    done = repo.git("commit", "-q", "--allow-empty", "--amend", "-m", "rewritten")
+    _assert_refused(repo, done, before)
+

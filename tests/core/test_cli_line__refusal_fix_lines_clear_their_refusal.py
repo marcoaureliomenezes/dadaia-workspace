@@ -280,10 +280,8 @@ class Skip:
 
 def _hit(world: World, command: list[str] | str) -> subprocess.CompletedProcess[str]:
     if isinstance(command, str):
-        return world.run(command, world.repo, setup=True)
-    return (
-        world.cli(*command) if command[0] != "git" else world.run(command, world.repo, setup=True)
-    )
+        return world.run(command, world.repo)
+    return world.cli(*command) if command[0] != "git" else world.run(command, world.repo)
 
 
 def _gate(world: World, push: str) -> subprocess.CompletedProcess[str]:
@@ -781,6 +779,15 @@ def _dead_denylisted(world: World) -> list[str]:
     return ["context", "dead", "proj"]
 
 
+def _dead_denylisted_two_commits(world: World) -> list[str]:
+    """The term sits in the newest of two unpublished commits: the remedy's reset moves the branch."""
+    _on_work(world)
+    world.deny()
+    world.commit("notes.md", "n\n")
+    world.commit("README.md", f"a {_TERM}\n")
+    return ["context", "dead", "proj"]
+
+
 def _unpushed_side_branch(world: World) -> list[str]:
     """A local branch other than HEAD's
     carries a commit origin lacks:
@@ -944,6 +951,13 @@ SITES: dict[str, tuple[Case | tuple[Case, ...] | Skip, ...]] = {
         Case(_dead_twice, _dead_done),
         Case(
             _dead_denylisted,
+            _dead_done,
+            before=_drop_readme_term,
+            then="git commit -qa --amend --no-edit && "
+            "../../.dadaia/.venv/bin/dadaia context dead proj",
+        ),
+        Case(
+            _dead_denylisted_two_commits,
             _dead_done,
             before=_drop_readme_term,
             then="git commit -qa --amend --no-edit && "
