@@ -41,7 +41,7 @@ from tests.fixtures.stores import context_store
 
 @pytest.fixture()
 def workspace_root(tmp_path: Path) -> Path:
-    root = tmp_path / "ws"
+    root = tmp_path / "w s"
     root.mkdir()
     (root / "repos").mkdir()
     return root
@@ -118,12 +118,15 @@ def test_add_repo_refuses_slug_owned_by_another_context_as_main_repo(
 
 
 def test_the_slug_conflict_renders_the_cli_words_inline(
-    service: SpecContextService, seeded: JsonContextStore, sentence: Callable[..., str]
+    service: SpecContextService,
+    seeded: JsonContextStore,
+    workspace_root: Path,
+    sentence: Callable[..., str],
 ) -> None:
     with pytest.raises(AssociatedRepoConflictError) as refused:
         service.add_repo("proj", "other-repo", _URL)
 
-    assert f"'{sentence('context', 'dead', 'proj')}' push " in str(refused.value)
+    assert f"'{sentence(workspace_root, 'context', 'dead', 'proj')}' push " in str(refused.value)
 
 
 def test_add_repo_own_main_slug_is_a_no_op(service: SpecContextService, seeded: JsonContextStore) -> None:

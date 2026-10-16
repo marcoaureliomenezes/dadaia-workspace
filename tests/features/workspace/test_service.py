@@ -162,8 +162,9 @@ def test_a_denylist_that_is_not_utf8_is_left_alone_and_init_goes_on(workspace_ro
 def test_the_ungated_warning_renders_the_cli_words_inline(
     tmp_path: Path, sentence: Callable[..., str]
 ) -> None:
+    root = tmp_path / "a b"
     lines = WorkspaceService(
         public_assets=FakePublicAssetManager(), python_env=FakePythonEnvironmentManager()
-    ).init(tmp_path / "ws", harnesses=("claude",), skip_assets=True)
+    ).init(root, harnesses=("claude",), skip_assets=True)
 
-    assert any(f"until '{sentence('public', 'install')}' runs" in ln for ln in lines), lines
+    assert any(f"until '{sentence(root, 'public', 'install')}' runs" in ln for ln in lines), lines

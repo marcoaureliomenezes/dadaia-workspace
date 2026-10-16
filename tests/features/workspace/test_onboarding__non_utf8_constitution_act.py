@@ -7,6 +7,7 @@ from pathlib import Path
 
 from dadaia_workspace.core.specs_version import state
 from dadaia_workspace.features.workspace.onboarding import next_step
+from tests.helpers.oslib import write_text
 
 
 def _specs(tmp_path: Path) -> tuple[Path, str]:
@@ -40,10 +41,16 @@ def test_the_constitution_step_states_the_yaml_cause_and_names_the_repair_act(
 ) -> None:
     specs = tmp_path / "specs"
     specs.mkdir()
-    (specs / "constitution.md").write_text("---\ngitflow: {principal: main\n---\n# c\n", "utf-8")
+    write_text(specs / "constitution.md", "---\ngitflow: {principal: main\n---\n# c\n")
 
     step = next_step(tmp_path, {"proj": specs}, "proj")
 
     assert step is not None and step.id == "constitution"
-    assert step.reason.startswith(f"{specs / 'constitution.md'}: ")
-    assert step.command == f"Agent action: repair the YAML frontmatter of {step.reason}"
+    reason = (
+        f"{specs / 'constitution.md'}: Frontmatter block is present but its YAML is invalid: "
+        "line 1: unterminated flow collection ('gitflow: {principal: main')"
+    )
+    assert (step.reason, step.command) == (
+        reason,
+        f"Agent action: repair the YAML frontmatter of {reason}",
+    )

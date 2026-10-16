@@ -164,5 +164,5 @@ def test_the_two_tier_refusal_renders_the_cli_words_inline(
     with pytest.raises(DadaiaError) as refused:
         upgrade(specs, remove=lambda _path: None)
 
-    rerun = sentence("specs", "upgrade", "--specs-dir", str(specs))
+    rerun = sentence(None, "specs", "upgrade", "--specs-dir", str(specs))
     assert f"then re-run `{rerun}`." in refused.value.fix  # type: ignore[attr-defined]

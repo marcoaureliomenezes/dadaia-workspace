@@ -228,4 +228,4 @@ def test_the_export_hint_renders_the_cli_words_inline(
     with pytest.raises(ValueError) as refused:
         _importer(tmp_path, context_store(tmp_path / "states")).run(file)
 
-    assert tail.format(export=sentence("export")) in str(refused.value)
+    assert tail.format(export=sentence(None, "export")) in str(refused.value)

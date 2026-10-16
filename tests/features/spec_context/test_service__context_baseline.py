@@ -72,7 +72,7 @@ def _seed(bare: Path, work: Path, *branches: str, tag: str = "") -> None:
 
 @pytest.fixture
 def env(tmp_path: Path) -> tuple[SpecContextService, Path, Path]:
-    root = tmp_path / "ws"
+    root = tmp_path / "w s"
     (root / "repos").mkdir(parents=True)
     bare = tmp_path / "proj.git"
     _git(tmp_path, "init", "-q", "--bare", "-b", "main", str(bare))
@@ -289,7 +289,7 @@ def test_a_scaffold_already_committed_on_the_work_branch_is_published(
         _seed(bare, tmp_path / "seed", *seeded)
     _git(repo.parent, "clone", "-q", bare.as_uri(), str(repo))
     _identity(repo)
-    monkeypatch.chdir(tmp_path / "ws")
+    monkeypatch.chdir(tmp_path / "w s")
     done = CliRunner().invoke(app, ["specs", "init", "--context", "proj"])
     assert done.exit_code == 0, done.output
     assert _git(repo, "rev-parse", "--abbrev-ref", "HEAD") == _WORK
@@ -343,7 +343,7 @@ def test_the_principal_choice_renders_the_cli_words_inline(
     with pytest.raises(ContextStateError) as refused:
         svc.baseline("proj")
 
-    words = sentence("specs", "init", "--context", "proj", "--principal")
+    words = sentence(repo.parents[1], "specs", "init", "--context", "proj", "--principal")
     assert refused.value.fix.endswith(f"and run `{words}` with it")  # type: ignore[attr-defined]
 
 
