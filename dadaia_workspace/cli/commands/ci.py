@@ -17,6 +17,7 @@ from dadaia_workspace.cli._specs_resolution import (
     scope,
 )
 from dadaia_workspace.core.cli_line import fix_line
+from dadaia_workspace.core.exceptions import GitSyncError
 from dadaia_workspace.core.gitflow import Gitflow, work_branch
 from dadaia_workspace.core.skill_owner import load_owner
 from dadaia_workspace.features.chokepoints.branch_policy import (
@@ -85,8 +86,41 @@ def _gate_inputs(repo_root: Path, head: str) -> tuple[Gitflow, GateFixes]:
     return gitflow, fixes
 
 
+def _rewrite_unpublished(repo: Path, oldest: str, message: str | None) -> None:
+    """Re-commit the unpublished range of HEAD, from *oldest*, as one commit holding the
+    tracked working tree (*oldest*'s message, or *message*); refuse a commit origin holds.
+    The git calls carry the sanctioned-tool marker (``git_subprocess``): the ref gate passes them."""
+    from dadaia_workspace.container import build_git_client, build_git_object_reader
+
+    git = build_git_client()
+    try:
+        sha = git.git(repo, "rev-parse", "--verify", f"{oldest}^{{commit}}")
+    except GitSyncError:
+        sha = oldest
+    if sha not in build_git_object_reader().unpublished(repo, git.git(repo, "rev-parse", "HEAD")):
+        fail(
+            f"cannot rewrite {oldest}: origin already holds it, or it is not in HEAD's history",
+            "Agent action: pass the oldest commit origin does not hold, as the push gate's fix line names it",
+        )
+    git.git(repo, "reset", "--soft", sha)
+    git.git(
+        repo,
+        "commit",
+        "-qa",
+        "--amend",
+        "--allow-empty",
+        *(("-m", message) if message else ("--no-edit",)),
+    )
+
+
 @app.command("push-gate-check")
-def push_gate_check() -> None:
+def push_gate_check(
+    rewrite_from: str | None = typer.Option(
+        None, "--rewrite-from", help="Remedy: re-commit the unpublished range from this commit."
+    ),
+    repo: Path | None = typer.Option(None, "--repo", help="Remedy target. Default: cwd's repo."),
+    message: str | None = typer.Option(None, "--message", help="Remedy: the one commit's message."),
+) -> None:
     """Pre-push gate: branch policy by the project gitflow + the range-scoped denylist scan.
 
     Branch model: the constitution's gitflow block (`dd-gitflow-default`).
@@ -100,6 +134,8 @@ def push_gate_check() -> None:
     The object source, denylist terms and baseline patterns are all built here and
     injected; a call site that fails to wire the object reader is a defect, never a
     bypass. No repo or context name is a term source.
+
+    With ``--rewrite-from`` it runs the gate's own remedy instead (``_rewrite_unpublished``).
     """
     from dadaia_workspace.container import (
         build_git_client,
@@ -112,6 +148,8 @@ def push_gate_check() -> None:
     from dadaia_workspace.features.chokepoints.branch_policy import parse_push_stdin
     from dadaia_workspace.features.specs.canon import canon_violations
 
+    if rewrite_from is not None:
+        return _rewrite_unpublished(repo or _repo_root(), rewrite_from, message)
     repo_root = _repo_root()
     denylist_terms = load_denylist_terms()
     baseline_patterns = load_denylist_baseline_patterns()
@@ -172,19 +210,10 @@ def _audit_only(git: GitSubprocessClient, repo_root: Path, old: str, new: str) -
     )
 
 
-def _rewrites_unpublished(
-    git: GitSubprocessClient, repo_root: Path, old: str, new: str, held: str
-) -> bool:
-    """True when ``old -> new`` drops commits and keeps *held* (origin's sha) in ``new``'s history."""
-    gone = git.git(repo_root, "rev-list", "-n1", f"{new}..{old}")
-    return bool(gone) and not git.git(repo_root, "rev-list", "-n1", f"{new}..{held}")
-
-
 @app.command("ref-gate-check")
 def ref_gate_check() -> None:
     """Reference-transaction gate: ``<old> <new> <ref>`` lines on stdin; a work-branch update
-    must land on origin's sha, unless it touches only ``specs/audits/**`` or rewrites only
-    commits origin does not hold (the privacy remedy's reset and amend)."""
+    must land on origin's sha, unless it touches only ``specs/audits/**``."""
     from dadaia_workspace.container import build_git_client
 
     repo_root = _repo_root()
@@ -200,10 +229,7 @@ def ref_gate_check() -> None:
         tracking = f"refs/remotes/origin/{ref.removeprefix(HEADS_PREFIX)}"
         held = git.git(repo_root, "for-each-ref", "--format=%(objectname)", tracking)
         decision = check_ref_policy([f"{old} {new} {ref}"], gitflow, {ref: held}, repo_root.name)
-        if not decision.allowed and not (
-            _audit_only(git, repo_root, old, new)
-            or _rewrites_unpublished(git, repo_root, old, new, held)
-        ):
+        if not decision.allowed and not _audit_only(git, repo_root, old, new):
             fail(decision.message)
 
 

@@ -8,7 +8,7 @@ from collections.abc import Callable, Iterable, Iterator, Sequence
 from pathlib import Path
 from typing import Protocol
 
-from dadaia_workspace.core.cli_line import git_line, spell_fix
+from dadaia_workspace.core.cli_line import fix_line, git_line, spell_fix
 from dadaia_workspace.core.gitflow import Gitflow
 from dadaia_workspace.core.models.git_scan import (
     ZERO_SHA,
@@ -35,10 +35,10 @@ __all__ = ["push_gate_decision"]
 
 _DENYLIST_LAW = ".dadaia/AGENTS.md §3 — pre-push refuses a denylisted secret"
 _MAX_LISTED_HITS = 10
-#: Every range is uncommitted to its oldest unpublished commit and amended.
 _REWRITE = (
-    "Uncommit the unpublished range down to its oldest commit (origin's history is never "
-    "rewritten), remove what is listed, `git commit --amend` and push:"
+    "Uncommit the unpublished range down to its oldest commit and re-commit it as one "
+    "(origin's history is never rewritten). Remove what is listed from the files first; when "
+    "the message carries it, append `--message` and the new text to the fix. Push after the fix:"
 )
 
 
@@ -90,7 +90,7 @@ def _notes(
 
 
 def _rewrite_fix(ref: PushRef, object_source: ObjectSource, repo: Path, fixes: GateFixes) -> str:
-    """The uncommit-amend remedy for the first refused ref (origin is never rewritten)."""
+    """The rewrite-verb remedy for the first refused ref (origin is never rewritten)."""
     branch = ref.local_ref.removeprefix(HEADS_PREFIX)
     if ref.local_ref.startswith("refs/tags/") or not fixes.head:
         fix = "Agent action: a tag or a detached HEAD has no branch to amend; push a branch."
@@ -98,7 +98,9 @@ def _rewrite_fix(ref: PushRef, object_source: ObjectSource, repo: Path, fixes: G
         fix = git_line(fixes.repo, "switch", branch)
     else:
         oldest = object_source.unpublished(repo, ref.local_sha)[-1]
-        fix = git_line(fixes.repo, "reset", "--soft", oldest)
+        fix = fix_line(
+            None, "ci", "push-gate-check", "--repo", fixes.repo, "--rewrite-from", oldest
+        )
     return f"{_REWRITE}\n{spell_fix(fix)}"
 
 
