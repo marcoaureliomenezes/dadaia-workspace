@@ -40,7 +40,7 @@ the rc's integration branch that its jobs' `job-<n>/wt-main` trees merge into:
   virtualenv; every later command runs through the workspace's CLI,
   `.dadaia/.venv/bin/dadaia`, which `init` prints by its absolute path.
 - **Level 2 — project.** `--repo` clones the repo into `repos/<slug>/`, installs the
-  pre-push hook and makes the context (named after the slug) ALIVE; only `context bind`
+  pre-push and reference-transaction hooks and makes the context (named after the slug) ALIVE; only `context bind`
   binds a session (§3).
 - **Level 3 — specs.** 3a `specs init` brings the repo's `specs/` to the canon and, on a
   repo with no work branch, cuts the local one and commits only the scaffold on it; a foreign
@@ -70,7 +70,7 @@ is refused with one `fix:` line.
   `--skip-assets` leaves the workspace ungated until
   `.dadaia/.venv/bin/dadaia public install` runs, and the output says so.
 - with `--repo <url>` (and any repeatable `--associated-repo <url>`), the project
-  cloned and ALIVE, and the pre-push hook installed — never bound.
+  cloned and ALIVE, and the pre-push and reference-transaction hooks installed — never bound.
 
 Without `--repo`, a later project is one step:
 `.dadaia/.venv/bin/dadaia context create --main-repo <url> [--associated-repo <url>]`

@@ -60,7 +60,7 @@ the one writer of every hook wiring. The wheel ships the full public asset tree,
 access. Every later command runs through the workspace's own CLI,
 `.dadaia/.venv/bin/dadaia`. **Project:** `--repo <url>` (plus repeatable
 `--associated-repo <url>`) clones the repo into `repos/<slug>/`, installs the pre-push
-hook and makes the context ALIVE (only `context bind` binds); a later project is
+and reference-transaction hooks and makes the context ALIVE (only `context bind` binds); a later project is
 `.dadaia/.venv/bin/dadaia context create --main-repo <url> [--associated-repo <url>]`.
 **Specs:** `.dadaia/.venv/bin/dadaia specs init --context <slug>` brings the repo's
 `specs/` to the canon, moving a foreign tree to `specs-bkp/` after consent, and on a repo

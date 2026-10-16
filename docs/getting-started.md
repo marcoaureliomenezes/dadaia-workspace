@@ -61,7 +61,7 @@ die with it. Specs, bind, memory, releases and backlog resolve only from the mai
 .dadaia/.venv/bin/dadaia context show <ctx> --json   # the repo set
 ```
 
-`context create` clones (or adopts) every repo, installs the pre-push hook and makes
+`context create` clones (or adopts) every repo, installs the pre-push and reference-transaction hooks and makes
 the context ALIVE — it never binds; on failure nothing is left behind. The name
 defaults to the main repo's slug. `bind` writes exactly one record,
 `.dadaia/sessions/<session-id>.json` (context, runtime, pid, `bound_at`, `bind_id`, `last_seen_at`), and acquires
