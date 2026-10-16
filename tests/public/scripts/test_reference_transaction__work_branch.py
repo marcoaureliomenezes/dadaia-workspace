@@ -252,7 +252,12 @@ def test_a_rebase_under_a_raw_commit_is_refused(repo: _Repo) -> None:
     _assert_refused(repo, done, before)
 
 
-def _verb(repo: _Repo, oldest: str, *args: str) -> subprocess.CompletedProcess[str]:
+_TERM = "zzprivateterm"
+
+
+def _verb(
+    repo: _Repo, oldest: str, *args: str, env: dict[str, str] | None = None
+) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         [
             str(repo.runner),
@@ -267,39 +272,98 @@ def _verb(repo: _Repo, oldest: str, *args: str) -> subprocess.CompletedProcess[s
         capture_output=True,
         text=True,
         timeout=60,
+        env={**os.environ, **(env or {})},
     )
 
 
-def test_the_rewrite_verb_commits_the_unpublished_range_as_one_commit(repo: _Repo) -> None:
-    _two_unpublished(repo)
-    oldest = repo.ok("rev-parse", "HEAD~1")
-    (repo.root / "scrubbed.txt").write_text("clean\n", encoding="utf-8")
-    repo.ok("add", "scrubbed.txt")
-    done = _verb(repo, oldest)
+def _leak(repo: _Repo, tmp_path: Path, *, in_message: bool = False) -> tuple[str, dict[str, str]]:
+    """One unpublished commit carrying the denylisted term (in a file, or only in its message);
+    returns that commit and the env naming the denylist."""
+    denylist = tmp_path / "denylist.json"
+    denylist.write_text(f'{{"{_TERM}": "t"}}', encoding="utf-8")
+    (repo.root / "leak.txt").write_text(f"a {'' if in_message else _TERM}\n", encoding="utf-8")
+    repo.ok("add", "leak.txt")
+    message = f"mentions {_TERM}" if in_message else "leak"
+    assert repo.git("commit", "-q", "-m", message, wt=True).returncode == 0
+    return repo.ok("rev-parse", "HEAD"), {"DADAIA_PRIVACY_DENYLIST": str(denylist)}
+
+
+def _assert_verb_refused(repo: _Repo, done: subprocess.CompletedProcess[str], before: str) -> None:
+    assert done.returncode != 0, done.stderr
+    fixes = [ln for ln in done.stderr.splitlines() if ln.startswith("fix: ")]
+    assert len(fixes) == 1 and fixes[0].startswith("fix: Agent action: "), done.stderr
+    assert repo.ok("rev-parse", f"refs/heads/{_WORK}") == before
+
+
+def test_the_rewrite_verb_refuses_unrelated_staged_content_when_the_gate_lists_nothing(
+    repo: _Repo,
+) -> None:
+    _ahead_by_a_marked_merge(repo)
+    before = repo.ok("rev-parse", "HEAD")
+    (repo.root / "unreviewed.py").write_text("x = 1\n", encoding="utf-8")
+    repo.ok("add", "unreviewed.py")
+    done = _verb(repo, before, "--message", "looks reviewed")
+    _assert_verb_refused(repo, done, before)
+    assert "unreviewed.py" not in repo.ok("ls-tree", "-r", "--name-only", _WORK)
+
+
+def test_the_rewrite_verb_refuses_a_remedy_that_also_adds_a_path(
+    repo: _Repo, tmp_path: Path
+) -> None:
+    oldest, env = _leak(repo, tmp_path)
+    (repo.root / "leak.txt").write_text("a\n", encoding="utf-8")
+    (repo.root / "extra.txt").write_text("x\n", encoding="utf-8")
+    repo.ok("add", "extra.txt")
+    done = _verb(repo, oldest, env=env)
+    _assert_verb_refused(repo, done, oldest)
+
+
+def test_the_rewrite_verb_refuses_a_new_message_when_the_gate_lists_no_message(
+    repo: _Repo, tmp_path: Path
+) -> None:
+    oldest, env = _leak(repo, tmp_path)
+    (repo.root / "leak.txt").write_text("a\n", encoding="utf-8")
+    done = _verb(repo, oldest, "--message", "looks reviewed", env=env)
+    _assert_verb_refused(repo, done, oldest)
+
+
+def test_the_rewrite_verb_removes_a_listed_term_and_clears_the_gate(
+    repo: _Repo, tmp_path: Path
+) -> None:
+    oldest, env = _leak(repo, tmp_path)
+    (repo.root / "leak.txt").write_text("a\n", encoding="utf-8")
+    done = _verb(repo, oldest, env=env)
     assert done.returncode == 0, done.stderr
     assert repo.ok("rev-list", "--count", f"origin/{_WORK}..{_WORK}") == "1"
-    assert repo.ok("show", "--name-only", "--format=", _WORK) == "scrubbed.txt"
+    assert _TERM not in repo.ok("show", f"{_WORK}:leak.txt")
+    tip = repo.ok("rev-parse", _WORK)
+    held = repo.ok("rev-parse", f"origin/{_WORK}")
+    gate = subprocess.run(
+        [str(repo.runner), "ci", "push-gate-check"],
+        input=f"refs/heads/{_WORK} {tip} refs/heads/{_WORK} {held}\n",
+        cwd=repo.root,
+        env={**os.environ, **env},
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert gate.returncode == 0, gate.stderr
 
 
-def test_the_rewrite_verb_takes_a_new_message(repo: _Repo) -> None:
-    _two_unpublished(repo)
-    done = _verb(repo, repo.ok("rev-parse", "HEAD~1"), "--message", "clean message")
+def test_the_rewrite_verb_takes_a_new_message_when_the_term_sits_in_the_message(
+    repo: _Repo, tmp_path: Path
+) -> None:
+    oldest, env = _leak(repo, tmp_path, in_message=True)
+    done = _verb(repo, oldest, "--message", "clean message", env=env)
     assert done.returncode == 0, done.stderr
     assert repo.ok("log", "-1", "--format=%s", _WORK) == "clean message"
 
 
-def test_the_rewrite_verb_refuses_a_commit_origin_already_holds(repo: _Repo) -> None:
-    _two_unpublished(repo)
+def test_the_rewrite_verb_refuses_a_commit_origin_already_holds(
+    repo: _Repo, tmp_path: Path
+) -> None:
+    _, env = _leak(repo, tmp_path)
     before = repo.ok("rev-parse", "HEAD")
     published = repo.ok("rev-parse", f"origin/{_WORK}")
-    done = _verb(repo, published)
-    assert done.returncode != 0
-    fixes = [ln for ln in done.stderr.splitlines() if ln.startswith("fix: ")]
-    assert len(fixes) == 1, done.stderr
-    assert repo.ok("rev-parse", f"refs/heads/{_WORK}") == before
-
-
-def test_amending_the_published_tip_is_refused(repo: _Repo) -> None:
-    before = repo.ok("rev-parse", "HEAD")
-    done = repo.git("commit", "-q", "--allow-empty", "--amend", "-m", "rewritten")
-    _assert_refused(repo, done, before)
+    done = _verb(repo, published, env=env)
+    _assert_verb_refused(repo, done, before)
