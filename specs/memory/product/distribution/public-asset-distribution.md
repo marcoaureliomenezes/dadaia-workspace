@@ -45,16 +45,16 @@ sources:
 
 ## Scaffold and consumer fan-out
 
-- The scaffolded `specs/` tree is the canon — `AGENTS.md`, constitution, canonical and product memory, releases, backlog, bugs, audits and ADRs — stamped at `specs_pattern_version: 12`; QUALITY carries principles, test architecture and gates, with no generated bug-balance section ([[specs-migration]]).
+- The scaffolded `specs/` tree is the canon — `AGENTS.md`, constitution, canonical and product memory, releases, backlog, bugs, audits and ADRs — stamped at `specs_pattern_version: 13`; QUALITY carries principles, test architecture and gates, with no generated bug-balance section ([[specs-migration]]).
 - The scaffold writes only absent files, each through one `O_CREAT|O_NOFOLLOW` open: an existing file or a symlinked destination is skipped, and a path escaping the tree through a symlinked parent is never written.
 - Every scoped scaffold `AGENTS.md` is the system of record of its area; no test or script pins a file's byte or line count, the one exception the library's own `behavior-map.json` `SKILL.md` line limits (`skill_md_line_soft`, a doctor warning, and `skill_md_line_ceiling`), a map that lives beside the doctor and is never staged or projected; `TREE-5` heals each by shipped hash, and operator-owned files are never overwritten ([[workspace-doctor]]).
 - The repo template lands with `dadaia specs init`: `repo-AGENTS.md` becomes the main repo's `AGENTS.md`, names its tracked `verify:` as the sole repository verification authority, and carries no test-path, stage or task-gate declaration. Once written it is operator-owned and never overwritten.
-- A memory atom whose frontmatter still carries a scaffold template token is `MEM-PLACEHOLDER-1` in `dadaia doctor`'s `specs` section; `--fix` removes it only when nothing but template text is in it ([[workspace-doctor]]).
+- A memory atom whose frontmatter still carries a scaffold template token is `MEM-PLACEHOLDER-1` in `dadaia doctor`'s `specs` section, report only and never touched by `--fix` ([[workspace-doctor]]).
 - Consumer-repo `AGENTS.md` fan-out is gated by the canonical banner: absent creates, a stale banner is restored as `[updated]`, a bannerless file is `[foreign]` and never overwritten; a symlinked destination file is `[foreign]`.
 
 ## Shipped scripts
 
-- `pre-push-ci-gate.sh` ships in the package (`dadaia_workspace/public/scripts/`, never staged); it runs the workspace venv's `dadaia` (`.dadaia/.venv/bin/dadaia`, or `.dadaia/.venv/Scripts/dadaia.exe`) found by walking up, else the repo-local `.venv`, with no poetry fallback and no bypass text; the hook installer copies it into each repo's `pre-push` hook under `git rev-parse --git-path hooks` ([[context-management]], [[sdd-gate-v3]]).
+- `pre-push-ci-gate.sh` and `reference-transaction.sh` ship in the package (`dadaia_workspace/public/scripts/`, never staged, each hashed in `shipped-hashes.json`); each runs the workspace venv's `dadaia` (`.dadaia/.venv/bin/dadaia`, or `.dadaia/.venv/Scripts/dadaia.exe`) found by walking up, else the repo-local `.venv`, with no poetry fallback and no bypass text; the hook installer copies them into each repo's `pre-push` and `reference-transaction` hooks under `git rev-parse --git-path hooks` ([[context-management]], [[sdd-gate-v3]]).
 
 ## Dependencies
 

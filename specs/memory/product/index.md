@@ -50,7 +50,7 @@
 | `context-portability` | context-portability | dadaia export writes the workspace's context set to one file; dadaia import registers each unknown context DEAD elsewhere, ready for dadaia context alive. |
 | `cross-platform-portability` | cross-platform-portability | Linux, macOS and Windows through one platform capability seam carrying the venv layout, Python hooks and cross-OS CI legs. |
 | `server-registry` | server-registry | Dev-server port registry with TTL and PID tracking so parallel sessions never collide — one stdlib skill script over one JSON state file; no CLI verb. |
-| `specs-migration` | specs-migration | specs init establishes canon and gitflow; specs upgrade reaches pattern 12; migrate updates the context registry. |
+| `specs-migration` | specs-migration | specs init establishes canon and gitflow; specs upgrade reaches pattern 13; migrate updates the context registry. |
 | `workspace-doctor` | workspace-doctor | dadaia doctor, the one compliance check — workspace, specs, ledgers; one line per finding, exit 1 with a fix line; --fix holds slop, expiry acts by zone class. |
 | `workspace-init` | workspace-init | Level 1 — uvx dadaia-workspace init [DIR] provisions venv, zones, law, one harness; re-init upgrades; --repo adds level 2; next step from one ordered step list. |
 
@@ -62,5 +62,5 @@
 | `backlog-ledger` | backlog-ledger | The operator's demand queue: BACKLOG.json active[] plus one histo record per exit; backlog.py writes it, dadaia doctor judges bound subjects. |
 | `bug-ledger` | bug-ledger | BUGS.jsonl stores one lean current record per confirmed defect; its writer persists registration and resolution facts while git owns derived history. |
 | `release-lifecycle` | release-lifecycle | One live release grows through closed-scope candidates; _RELEASE.json holds current phase, milestones and a lean append-only narrative. |
-| `sdd-gate-v3` | sdd-gate-v3 | No-lock enforcement combines root-entry hygiene and SDD write policy before tools, then applies branch, specs-canon and privacy checks at push. |
+| `sdd-gate-v3` | sdd-gate-v3 | No-lock enforcement — root-entry hygiene and SDD write policy before tools; branch, canon and privacy checks at push; a ref gate on raw ref moves. |
 | `worktrees` | worktrees | Worktrees nest under worktrees/<repo>/<v>/ — wt-rc, wt-main, wt-task and the backlog and hotfix lanes — and each merges into its parent after its gate. |

@@ -1,8 +1,8 @@
 ---
 slug: specs-migration
 title: specs-migration
-tldr: specs init establishes canon and gitflow; specs upgrade reaches pattern 12; migrate updates the context registry.
-summary: "The persisted-state upgrade verbs: specs init scaffolds or upgrades a dadaia tree and preserves a foreign tree in specs-bkp; specs upgrade runs the supported migration and repair set before stamping pattern 12; migrate updates the context registry atomically."
+tldr: specs init establishes canon and gitflow; specs upgrade reaches pattern 13; migrate updates the context registry.
+summary: "The persisted-state upgrade verbs: specs init scaffolds or upgrades a dadaia tree and preserves a foreign tree in specs-bkp; specs upgrade runs the supported migration and repair set before stamping pattern 13; migrate updates the context registry atomically."
 tags: [migration, upgrade, specs, registry, onboarding]
 sources:
   - dadaia_workspace/features/migrate/**
@@ -29,7 +29,7 @@ sources:
 
 ## `dadaia specs upgrade`
 
-- `dadaia specs upgrade [--specs-dir <path>] [--dry-run]` reads the tree's `specs_pattern_version` and stamps only canonical version 12; `CANON_AT` pins the scaffold fingerprint for that stamp, and `--specs-dir` defaults to the bound context.
+- `dadaia specs upgrade [--specs-dir <path>] [--dry-run]` reads the tree's `specs_pattern_version` and stamps only canonical version 13; `CANON_AT` pins the scaffold fingerprint for that stamp, and `--specs-dir` defaults to the bound context.
 - A tree below 6 is refused with no filesystem write, naming the prerequisite: upgrade with an earlier dadaia-workspace line first.
 - A supported older tree folds `memory/TECHSTACK.md` into ARCHITECTURE and moves a flat candidate trio into its next `rc-<N>/` before receiving the current stamp. A failed guarded delete restores the source document, and a closed candidate is never rewritten.
 - Every run also applies the specs doctor's repair set and regenerates the product-memory catalog pair when its owner check is red. Record ledgers are validated by their own scripts and are never reconstructed by upgrade.

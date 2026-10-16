@@ -11,9 +11,10 @@ sources:
 
 ## Record
 
-- `specs/bugs/BUGS.jsonl` holds one `bug-record-v1` object per id. Registration facts are immutable, resolution facts are transition-owned or write-once, and unknown fields are rejected.
+- `specs/bugs/BUGS.jsonl` holds one `bug-record-v1` object per id. Registration facts are immutable; `solution` and `superseded_by` are write-once; `status`, `closed_at`, `cause`, `caused_by` and `fix_sha` are governance fields; unknown fields are rejected.
 - Status is `open | resolved | superseded | rejected`. Terminal records carry `closed_at`; a reopen is a new id.
 - A resolved record persists `cause`, `solution`, `caused_by` and the 40-hex `fix_sha`. Git supplies the diff, numstat and subsequent history.
+- A rebase rewrites the commit `fix_sha` names, so `update --set fix_sha=<sha>` repoints it. `check` refuses each live record whose `fix_sha` is no ancestor of HEAD, its fix an `Agent action:` to find the fix commit in git log and run that `update`; only when a miss exists in a shallow clone are the misses one finding, the clone being shallow, with `git fetch --unshallow` as its fix.
 - `caused_by` names a live or archived bug, a known task id or `none`; a task id is known when a job file or a closed release's `TASKS.md` carries it, in the current grammar or as the head of a historical task line (`T-<n>-<n>`, lettered `J<X>.S<n>.T<n>`); validation rejects dangling links and cycles.
 
 ## Writer and transitions
@@ -24,7 +25,7 @@ sources:
 - `archive` moves named terminal records into the bug history. Open records cannot be archived.
 - Every candidate ledger is validated before atomic replacement, so a refusal leaves both live and archived bytes unchanged.
 - Every timestamp comes from the one clock; no verb takes a timestamp argument.
-- `dd-bug-resolution/scripts` also holds the kernel the other skill scripts and the package load for every shared fact: the refusal with its one printer and the one `fix:` spelling and parser, the git runner with its scrubbed environment (repo-selecting `GIT_*` removed, bytecode writing off, so no child it starts writes `__pycache__`, and `DADAIA_WT=1` marking a sanctioned run), the decode-aware text and JSONL reader, the atomic writer, the context-name grammar, the one live-release decider, the closure worklist decider, the frontmatter parser, the clock, the platform facts, the workspace-root walk and the privacy matcher with its baseline ([[public-asset-distribution]]).
+- `dd-bug-resolution/scripts` also holds the kernel the other skill scripts and the package load for every shared fact: the refusal with its one printer and the one `fix:` spelling and parser, the git runner with its scrubbed environment (repo-selecting `GIT_*` removed, bytecode writing off, so no child it starts writes `__pycache__`, and `DADAIA_WT=1` marking a sanctioned run), the decode-aware text and JSONL reader, the atomic writer, the context-name grammar, the one live-release decider, the closure worklist decider, the frontmatter parser, the clock, the platform facts, the workspace-root walk, the one spawn of the workspace CLI (a missing or unstartable CLI is a refusal carrying the `uvx dadaia-workspace init` fix) and the privacy matcher with its baseline ([[public-asset-distribution]]).
 
 ## Resolution discipline
 

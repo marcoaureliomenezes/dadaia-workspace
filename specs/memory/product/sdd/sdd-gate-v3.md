@@ -1,8 +1,8 @@
 ---
 slug: sdd-gate-v3
 title: sdd-gate-v3
-tldr: No-lock enforcement combines root-entry hygiene and SDD write policy before tools, then applies branch, specs-canon and privacy checks at push.
-summary: The two-policy pre-tool gate, path classes and bind scope, fail-open boundaries, one-fix refusal shape and range-scoped git publication chokepoint.
+tldr: No-lock enforcement — root-entry hygiene and SDD write policy before tools; branch, canon and privacy checks at push; a ref gate on raw ref moves.
+summary: The two-policy pre-tool gate, path classes and bind scope, fail-open boundaries, one-fix refusal shape, range-scoped git publication chokepoint with its remedy verb, and the reference-transaction ref gate.
 tags: [gate, hooks, scope, privacy, git]
 sources:
   - dadaia_workspace/hooks/pre_gate.py
@@ -33,9 +33,11 @@ sources:
 
 - The installed pre-push hook invokes `dadaia ci push-gate-check` and reads git's ref lines before network I/O.
 - First refusal wins: malformed input; branch policy; specs canon over the net pushed tree; privacy scan over newly published objects.
-- Pushable branches are the live work branch and the `wt-rc`, `wt-main` and backlog-lane branches ([[worktrees]]). Principal and integration branches advance by their governed PR paths, apart from empty bootstrap births.
+- Pushable branches are the live work branch and the `wt-rc`, `wt-main` and backlog-lane branches ([[worktrees]]). Principal and integration branches advance by their governed PR paths, apart from empty bootstrap births. With several local work branches the gate warns with that refusal's message and its fix as a hint, and judges the higher, kept one as the work branch.
 - The privacy scan combines the operator denylist with the packaged structural baseline, checks paths and text after control-character normalization, scans tags, and never prints an unmasked secret. A baseline pattern may name file paths whose content it skips, never their path: the IPv4 pattern skips generated lock files, whose four-part versions read as addresses.
 - Already-published bytes can be amnestied only at the same path with a resolvable base. An unreadable range or git-object failure refuses rather than claiming coverage.
+- A denylist or canon refusal's fix is the remedy verb `dadaia ci push-gate-check --repo <repo> --rewrite-from <oldest unpublished commit>`, with `--message <text>` appended when a listed hit sits in a commit message (a tag or detached HEAD gets an `Agent action:` to push a branch; a branch not checked out, its `git switch` first). The verb re-commits HEAD's unpublished range from that commit as one commit holding the tracked working tree, its git calls carrying `DADAIA_WT=1`; it refuses a commit origin holds or HEAD's history lacks, runs only while the push gate lists a denylist or canon finding in that range, only when the working tree differs from HEAD by edits or deletions of listed paths, and takes `--message` only when a commit message is listed. Origin's history is never rewritten.
+- The installed reference-transaction hook judges raw ref moves when git prepares them: a move carrying `DADAIA_WT=1` passes; creating a `wt/*` branch otherwise is refused with the `worktree new` fix of `dadaia worktree`; a `wt/*` update passes; any other branch update to a sha other than origin's goes to `dadaia ci ref-gate-check`, and only its `[ref-gate] BLOCKED` line blocks — an unresolvable or failing runner warns and passes, the pre-push gate staying the fail-closed chokepoint.
 - `dadaia ci ref-gate-check` reads `<old> <new> <ref>` lines on stdin and refuses moving a work-branch ref to a sha other than the one origin holds for it, with `[ref-gate] BLOCKED` and one fix naming the `new` verb of `dadaia worktree`; a creation, a deletion, any other ref, a ref origin does not hold and an update touching only `specs/audits/**` pass.
 - Security review is the reviewer's security lens on each PR head; consumer repositories receive no library CI workflow.
 

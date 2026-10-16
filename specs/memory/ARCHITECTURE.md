@@ -113,7 +113,7 @@ flowchart TB
 - Hooks import `core.invocation` directly and build the `Invocation` once per process (P-12); `sdd_post_gate` touches `last_seen_at` and writes nothing else.
 - The package/skill seam (ADR 0246): every shared fact has one owner, a skill script; the cross-cutting ones (refusal, git runner, JSONL, atomic writer, frontmatter parser, clock, platform facts, workspace-root walk, privacy matcher) live in `public/skills/dd-bug-resolution/scripts/`, the kernel, and each ledger schema in its writer skill's `scripts/schemas/`. `core/skill_owner.load_owner` loads an owner by absolute path as one module object, and no copy is staged or projected.
 - `core/atomic_write.py`, `core/clock.py`, `core/frontmatter.py`, `core/platform.py` and `core/redaction.py` are typed doors over their kernel owners and import only `core.skill_owner` among the package's modules (ADR 0246).
-- `features/migrate` stamps `specs_pattern_version: 12` (`core/specs_version.CANONICAL_SPECS_VERSION`) or refuses; a tree below v6 is foreign, and `specs init --replace-foreign` moves it to `specs-bkp/` before the canon is scaffolded.
+- `features/migrate` stamps `specs_pattern_version: 13` (`core/specs_version.CANONICAL_SPECS_VERSION`) or refuses; a tree below v6 is foreign, and `specs init --replace-foreign` moves it to `specs-bkp/` before the canon is scaffolded.
 
 ### `dadaia_workspace/features` — package map (12 packages)
 

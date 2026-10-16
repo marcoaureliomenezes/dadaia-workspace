@@ -35,7 +35,7 @@ The main thread is the operator's session and the only dispatcher. It owns intak
 - No runtime advances the lifecycle. `_RELEASE.json`, approved definition documents, job files, worktrees, commits and handoffs are the evidence ([[release-lifecycle]]).
 - Only the main thread opens and merges canonical worktrees. A leaf works inside the path it receives and returns a validated handoff.
 - A `wt-main`, `wt-rc`, backlog or hotfix tree lands only after the reviewer's `APPROVED` verdict binds to its exact diff; task merges are unreviewed and enforce git hygiene plus RED/implementation separation.
-- A review is dispatched only for a tree whose `preflight` (`dadaia worktree`) prints `PREFLIGHT PASS`, and the reviewer receives that line instead of rerunning the tree's checks; a red tree goes back unreviewed ([[worktrees]]). A PR has no preflight, so its reviewer runs the repo's `verify:` line.
+- A review is dispatched on the tree as it stands; no check runs before it, and the reviewer never runs `verify:`: its `## Verify` section reports the tests it ran itself (the revert-RED check) and, for a PR, the CI result of the PR head. The merge runs `verify:` once ([[worktrees]]).
 
 ## Questions and decisions
 

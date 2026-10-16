@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-15T23:15:42Z",
+  "generated_at": "2026-10-16T03:55:37Z",
   "features": [
     {
       "rank": 1,
@@ -14,7 +14,7 @@
         "handoff",
         "schema"
       ],
-      "token_estimate": 647,
+      "token_estimate": 671,
       "depends_on": [
         "worktrees",
         "release-lifecycle",
@@ -42,7 +42,7 @@
         "dispatch",
         "sdd"
       ],
-      "token_estimate": 846,
+      "token_estimate": 852,
       "depends_on": [
         "worktrees",
         "release-lifecycle",
@@ -130,7 +130,7 @@
         "projection",
         "privacy"
       ],
-      "token_estimate": 1303,
+      "token_estimate": 1307,
       "depends_on": [
         "agentic-entities",
         "bug-ledger",
@@ -176,7 +176,7 @@
         "release",
         "packaging"
       ],
-      "token_estimate": 1331,
+      "token_estimate": 1322,
       "depends_on": [
         "release-lifecycle",
         "QUALITY",
@@ -377,7 +377,7 @@
         "paradigm",
         "pillars"
       ],
-      "token_estimate": 656,
+      "token_estimate": 691,
       "depends_on": [
         "context-management",
         "worktrees",
@@ -494,7 +494,7 @@
         "session",
         "privacy"
       ],
-      "token_estimate": 3025,
+      "token_estimate": 3033,
       "depends_on": [
         "specs-migration",
         "workspace-doctor",
@@ -601,8 +601,8 @@
       "slug": "specs-migration",
       "title": "specs-migration",
       "area": "platform",
-      "tldr": "specs init establishes canon and gitflow; specs upgrade reaches pattern 12; migrate updates the context registry.",
-      "summary": "The persisted-state upgrade verbs: specs init scaffolds or upgrades a dadaia tree and preserves a foreign tree in specs-bkp; specs upgrade runs the supported migration and repair set before stamping pattern 12; migrate updates the context registry atomically.",
+      "tldr": "specs init establishes canon and gitflow; specs upgrade reaches pattern 13; migrate updates the context registry.",
+      "summary": "The persisted-state upgrade verbs: specs init scaffolds or upgrades a dadaia tree and preserves a foreign tree in specs-bkp; specs upgrade runs the supported migration and repair set before stamping pattern 13; migrate updates the context registry atomically.",
       "path": "specs/memory/product/platform/specs-migration.md",
       "tags": [
         "migration",
@@ -646,7 +646,7 @@
         "compliance",
         "privacy"
       ],
-      "token_estimate": 3576,
+      "token_estimate": 3611,
       "depends_on": [
         "public-asset-distribution",
         "sdd-gate-v3",
@@ -688,7 +688,7 @@
         "upgrade",
         "onboarding"
       ],
-      "token_estimate": 2088,
+      "token_estimate": 2146,
       "depends_on": [
         "context-management",
         "specs-migration",
@@ -782,7 +782,7 @@
         "lineage",
         "resolution"
       ],
-      "token_estimate": 790,
+      "token_estimate": 919,
       "depends_on": [
         "public-asset-distribution",
         "release-lifecycle",
@@ -811,7 +811,7 @@
         "state",
         "closure"
       ],
-      "token_estimate": 1226,
+      "token_estimate": 1234,
       "depends_on": [
         "agent-orchestration",
         "worktrees",
@@ -832,8 +832,8 @@
       "slug": "sdd-gate-v3",
       "title": "sdd-gate-v3",
       "area": "sdd",
-      "tldr": "No-lock enforcement combines root-entry hygiene and SDD write policy before tools, then applies branch, specs-canon and privacy checks at push.",
-      "summary": "The two-policy pre-tool gate, path classes and bind scope, fail-open boundaries, one-fix refusal shape and range-scoped git publication chokepoint.",
+      "tldr": "No-lock enforcement — root-entry hygiene and SDD write policy before tools; branch, canon and privacy checks at push; a ref gate on raw ref moves.",
+      "summary": "The two-policy pre-tool gate, path classes and bind scope, fail-open boundaries, one-fix refusal shape, range-scoped git publication chokepoint with its remedy verb, and the reference-transaction ref gate.",
       "path": "specs/memory/product/sdd/sdd-gate-v3.md",
       "tags": [
         "gate",
@@ -842,7 +842,7 @@
         "privacy",
         "git"
       ],
-      "token_estimate": 786,
+      "token_estimate": 1103,
       "depends_on": [
         "worktrees",
         "context-management",
@@ -867,7 +867,7 @@
       "title": "worktrees",
       "area": "sdd",
       "tldr": "Worktrees nest under worktrees/<repo>/<v>/ — wt-rc, wt-main, wt-task and the backlog and hotfix lanes — and each merges into its parent after its gate.",
-      "summary": "The one path grammar and the base it derives, the per-kind gates (task separation, the reviewed job gate, the rc's ledger checks), preflight, sync, the level AGENTS.md files, merge cleanup, the rows list and closure holds.",
+      "summary": "The one path grammar and the base it derives, the per-kind gates (task separation, the reviewed job gate, the rc's ledger checks), sync, the level AGENTS.md files, merge cleanup, the rows list and closure holds.",
       "path": "specs/memory/product/sdd/worktrees.md",
       "tags": [
         "worktrees",
@@ -876,14 +876,14 @@
         "merge",
         "review"
       ],
-      "token_estimate": 1453,
+      "token_estimate": 1424,
       "depends_on": [
-        "agent-orchestration",
         "release-lifecycle",
         "context-management",
         "sdd-gate-v3",
         "bug-ledger",
-        "workspace-doctor"
+        "workspace-doctor",
+        "agent-orchestration"
       ],
       "sources": [
         "dadaia_workspace/public/skills/dd-gitflow-default/scripts/worktree.py",
