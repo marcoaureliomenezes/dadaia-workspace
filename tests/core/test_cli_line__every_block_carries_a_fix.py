@@ -32,7 +32,7 @@ def test_cli_line_and_the_scripts_render_one_argv_as_one_line(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """One argv through ``core/cli_line`` and the scripts' ``_platform`` and ``_specs``
-    renders one line — a blank, a quote and a ``$`` included, the head's too."""
+    renders one line — a blank, a quote and a ``$`` included."""
     monkeypatch.setattr("sys.executable", str(tmp_path / "py" / "python"))
     loader = importlib.util.spec_from_file_location(
         "_specs_pinned", _PUBLIC_SKILLS / "dd-bug-resolution" / "scripts" / "_specs.py"
@@ -154,8 +154,10 @@ def test_every_doctor_fix_target_resolves_on_disk(codes: str, command: str) -> N
     assert not _defect(command) and "<specs>" not in command, command
     assert _unresolved_paths(command) == [], f"{codes}: {command!r}"
     tokens = command.split()
-    if command.startswith(fix_line(Path())):
-        assert _cli_command(tokens[1:]), f"{codes}: no such verb: {command!r}"
+    if command.startswith(cli := fix_line(Path())):
+        assert _cli_command(command.removeprefix(cli).split()), (
+            f"{codes}: no such verb: {command!r}"
+        )
     if "/scripts/" not in command:
         return
     assert tokens[0] == _VENV_PYTHON and Path(tokens[1]).is_absolute(), command
