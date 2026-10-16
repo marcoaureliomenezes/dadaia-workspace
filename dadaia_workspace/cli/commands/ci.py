@@ -172,10 +172,19 @@ def _audit_only(git: GitSubprocessClient, repo_root: Path, old: str, new: str) -
     )
 
 
+def _rewrites_unpublished(
+    git: GitSubprocessClient, repo_root: Path, old: str, new: str, held: str
+) -> bool:
+    """True when ``old -> new`` drops commits and keeps *held* (origin's sha) in ``new``'s history."""
+    gone = git.git(repo_root, "rev-list", "-n1", f"{new}..{old}")
+    return bool(gone) and not git.git(repo_root, "rev-list", "-n1", f"{new}..{held}")
+
+
 @app.command("ref-gate-check")
 def ref_gate_check() -> None:
     """Reference-transaction gate: ``<old> <new> <ref>`` lines on stdin; a work-branch update
-    must land on origin's sha, unless it touches only ``specs/audits/**``."""
+    must land on origin's sha, unless it touches only ``specs/audits/**`` or rewrites only
+    commits origin does not hold (the privacy remedy's reset and amend)."""
     from dadaia_workspace.container import build_git_client
 
     repo_root = _repo_root()
@@ -191,7 +200,10 @@ def ref_gate_check() -> None:
         tracking = f"refs/remotes/origin/{ref.removeprefix(HEADS_PREFIX)}"
         held = git.git(repo_root, "for-each-ref", "--format=%(objectname)", tracking)
         decision = check_ref_policy([f"{old} {new} {ref}"], gitflow, {ref: held}, repo_root.name)
-        if not decision.allowed and not _audit_only(git, repo_root, old, new):
+        if not decision.allowed and not (
+            _audit_only(git, repo_root, old, new)
+            or _rewrites_unpublished(git, repo_root, old, new, held)
+        ):
             fail(decision.message)
 
 
