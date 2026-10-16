@@ -47,7 +47,9 @@ class InitPlan:
         target = str(self.directory if directory is None else directory)
         flags = [("--repo", self.repo)] if self.repo else []
         flags += [("--associated-repo", url) for url in self.associated]
-        return shell_line(*_INIT, *filter(None, [target]), "--harness", self.harness, *sum(flags, ()))
+        return shell_line(
+            *_INIT, *filter(None, [target]), "--harness", self.harness, *sum(flags, ())
+        )
 
 
 def _interactive() -> bool:
