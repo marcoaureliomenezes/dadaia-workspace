@@ -10,7 +10,7 @@ from __future__ import annotations
 import fnmatch
 import json
 import os
-import shlex
+import re
 import shutil
 import subprocess
 import sys
@@ -20,24 +20,21 @@ from functools import partial
 from pathlib import Path
 
 from _handoffs import REVIEWER, reviewer_records
-from _platform import venv_dir, venv_tool
+from _platform import command, git_inline, git_line, inline, run, venv_dir, venv_tool
 from _refusal import fix_of, without_fix
 from _worktree_git import (
     cli,
-    cli_line,
+    cli_words,
     diff_sha256,
     dirty,
     flow_for,
     git,
-    git_line,
     not_a_name,
     ours,
-    quote,
-    script,
     scrubbed_env,
     workspace_of,
 )
-from _worktree_names import NAME_RE, SCRIPT, Refusal, base_of, branch, kind_of, locate, tree_path
+from _worktree_names import LAUNCH, NAME_RE, Refusal, base_of, branch, kind_of, locate, tree_path
 
 #: The ledger and release checks a `backlog` or `rc` merge runs, in this order.
 _LEDGERS = (("dd-bug-resolution", "bugs.py"), ("dd-backlog-definition", "backlog.py"),
@@ -50,7 +47,7 @@ def _target(root: Path, path: str) -> tuple[Path, Path, str, str]:
     rel = tree.relative_to(root).as_posix() if tree.is_relative_to(root) else ""
     repo_name, name, tail = locate(rel) or ("", None, ())
     if tail or not repo_name:
-        raise Refusal(f"{path} is not a worktrees/<repo>/<name> path", f"{script(SCRIPT)} list")
+        raise Refusal(f"{path} is not a worktrees/<repo>/<name> path", command(*LAUNCH, "list"))
     if name is None or not NAME_RE.match(name):
         raise not_a_name(name or rel.split("/", 2)[-1])
     repo = root / "repos" / repo_name
@@ -61,9 +58,9 @@ def _refuse_dirty(tree: Path) -> None:
     if dirty(tree):
         raise Refusal(
             f"{tree} has uncommitted changes",
-            f"Agent action: stage the paths `{git_line(tree, 'status', '--short')}` lists and commit them"
-            f" in their commit shape (`{git_line(tree, 'commit')}`) or remove them (`{git_line(tree, 'clean', '-fd')}`"
-            f" and `{git_line(tree, 'restore', '-SW', '.')}`) — never a stash every worktree shares",
+            f"Agent action: stage the paths `{git_inline(tree, 'status', '--short')}` lists and commit them"
+            f" in their commit shape (`{git_inline(tree, 'commit')}`) or remove them (`{git_inline(tree, 'clean', '-fd')}`"
+            f" and `{git_inline(tree, 'restore', '-SW', '.')}`) — never a stash every worktree shares",
         )
 
 
@@ -83,7 +80,7 @@ def _kept(tree: Path, verb: str, keep: list[str], drop: bool) -> list[str]:
     if left and not drop:
         raise Refusal(
             f"ignored files would be lost: {', '.join(left)}",
-            f"{script(SCRIPT)} {verb} {quote(str(tree))} --keep {' '.join(map(quote, precious))}",
+            command(*LAUNCH, verb, str(tree), "--keep", *precious),
         )
     return [p for p in precious if p in keep]
 
@@ -132,7 +129,7 @@ def _rmdir(tree: Path, name: str) -> None:
 def _undo(tree: Path, work: str, rel: str) -> str:
     """The one act putting *rel* back to the work branch's version, absent included."""
     return (f"Agent action: revert {rel} to {work} in one commit — "
-            f"`{git_line(tree, 'restore', '-s', work, '-SW', '--', rel)}` and `{git_line(tree, 'commit')}`")  # fmt: skip
+            f"`{git_inline(tree, 'restore', '-s', work, '-SW', '--', rel)}` and `{git_inline(tree, 'commit')}`")  # fmt: skip
 
 
 def _check_specs_only(tree: Path, work: str) -> None:
@@ -149,7 +146,8 @@ def _check_ancestor(root: Path, tree: Path, work: str) -> None:
         git(tree, "merge-base", "--is-ancestor", work, "HEAD")
     except RuntimeError as error:
         raise Refusal(
-            f"{work} moved past this branch's base", cli_line(root, "worktree", "sync", str(tree))
+            f"{work} moved past this branch's base",
+            command(*cli_words(root, "worktree", "sync", str(tree))),
         ) from error
 
 
@@ -161,22 +159,24 @@ def _declared(tree: Path, work: str, key: str) -> str:
     return next((ln.removeprefix(key).strip() for ln in lines if ln.startswith(key)), "")
 
 
+_WORD = re.compile(r"""(?:[^\s"']|"[^"]*"|'[^']*')+""")
+_QUOTED = re.compile(r"""'([^']*)'|"([^"]*)\"""")
+
+
 def _declared_argv(tree: Path, work: str, key: str) -> list[str]:
     """The words of the `<key>` line: split on whitespace, a quote groups a word, a backslash is
     literal, `;` and `$(...)` are plain words; `[]` when absent."""
-    lex = shlex.shlex(_declared(tree, work, key), posix=True)
-    lex.whitespace_split, lex.escape, lex.commenters = True, "", ""
-    try:
-        return list(lex)
-    except ValueError as error:
-        raise Refusal(f"the {key} line of {work} has {error}",
-                      f"Agent action: close the quote in the {key} line of AGENTS.md on {work} and commit it") from error  # fmt: skip
+    line = _declared(tree, work, key)
+    if _WORD.sub("", line).strip():
+        raise Refusal(f"the {key} line of {work} has an unclosed quote",
+                      f"Agent action: close the quote in the {key} line of AGENTS.md on {work} and commit it")  # fmt: skip
+    return [_QUOTED.sub(lambda m: m[1] if m[1] is not None else m[2], w) for w in _WORD.findall(line)]  # fmt: skip
 
 
 def _gate(tree: Path, work: str) -> None:
     """Run *work*'s tracked `verify:` once."""
     key = "verify:"
-    command = _declared_argv(tree, work, key)
+    argv = _declared_argv(tree, work, key)
     root = workspace_of(tree)
     if root is None:
         raise Refusal(
@@ -184,22 +184,21 @@ def _gate(tree: Path, work: str) -> None:
         )
     repo_name = tree.relative_to(tree_path(root, "")).parts[0]
     agents = root / "repos" / repo_name / "AGENTS.md"
-    if not command:
+    if not argv:
         raise Refusal(f"this repo declares no {key} command",
                       f"Agent action: add this repo's job gate as a {key} line to {agents} and commit it on {work}")  # fmt: skip
     env = scrubbed_env()
     env["PATH"] = os.pathsep.join([str(venv_tool(venv_dir(root), "python").parent), env.get("PATH", "")])  # fmt: skip
     try:
-        done = subprocess.run(command, cwd=tree, env=env, stdin=subprocess.DEVNULL,
+        done = subprocess.run(argv, cwd=tree, env=env, stdin=subprocess.DEVNULL,
                               stderr=subprocess.STDOUT)  # fmt: skip
     except OSError as error:
-        raise Refusal(f"{key} {' '.join(command)!r} cannot start: {error}",
+        raise Refusal(f"{key} {' '.join(argv)!r} cannot start: {error}",
                       f"Agent action: make the {key} line of {agents} on {work} one argv list that starts:"
                       " it runs without a shell — no VAR=value prefix, no sh -c") from error  # fmt: skip
     if done.returncode:
-        line = " ".join(map(quote, command))
         raise Refusal(f"{key} exited {done.returncode}",
-                      f"Agent action: make `{line}` exit 0 in {tree} and commit the fix in this worktree")  # fmt: skip
+                      f"Agent action: make `{inline(*argv)}` exit 0 in {tree} and commit the fix in this worktree")  # fmt: skip
 
 
 def _is_test_path(path: str, globs: list[str]) -> bool:
@@ -238,7 +237,7 @@ def _open_children(repo: Path, name: str) -> None:
     for row in ours(repo):
         if row["name"].startswith(folder) and row["name"] != name:
             raise Refusal(f"{kind_of(row['name'])} worktree {row['path']} of {branch(name)} is open",
-                          f"{script(SCRIPT)} merge {quote(row['path'])}")  # fmt: skip
+                          command(*LAUNCH, "merge", row["path"]))  # fmt: skip
 
 
 def _scaffold(tree: Path, name: str) -> None:
@@ -258,10 +257,9 @@ def _checks(root: Path, tree: Path) -> Iterator[tuple[str, subprocess.CompletedP
     check the work branch's gates run — fenced to the tree."""
     skills = Path(__file__).resolve().parents[2]
     for skill, name in _LEDGERS:
-        command = [sys.executable, str(skills / skill / "scripts" / name),
-                   "check", "--specs", str(tree / "specs")]  # fmt: skip
-        yield name, subprocess.run(command, cwd=tree, env=scrubbed_env(), stdin=subprocess.DEVNULL,
-                                   capture_output=True, text=True, encoding="utf-8", errors="replace")  # fmt: skip
+        argv = [sys.executable, str(skills / skill / "scripts" / name),
+                "check", "--specs", str(tree / "specs")]  # fmt: skip
+        yield name, run(argv, cwd=tree, env=scrubbed_env(), stdin=subprocess.DEVNULL)
     yield "dadaia doctor", cli(root, "doctor", "--specs-dir", str(tree / "specs"), tree=tree)
 
 
@@ -338,7 +336,7 @@ def _check_approved(root: Path, tree: Path, work: str, name: str) -> None:
         raise Refusal(
             f"the newest {REVIEWER} handoff naming HEAD {head} or a sha of its patch and message"
             " series is not a valid APPROVED (the file comes from the reviewer's verdict)",
-            cli_line(root, "reports", "validate", *((invalid, "--reviewed-root", str(tree)) if invalid else ("--all",)))
+            command(*cli_words(root, "reports", "validate", *((invalid, "--reviewed-root", str(tree)) if invalid else ("--all",))))
         )  # fmt: skip
     want = diff_sha256(tree, work, head)
     if any(row[3].get("diff_sha256") != want for row in decided):
@@ -419,12 +417,12 @@ def merge(root: Path, path: str, keep: list[str], drop: bool) -> str:
 def clean(root: Path, path: str, keep: list[str], drop: bool) -> str:
     repo, tree, name, onto = _target(root, path)
     if not any(Path(row["path"]).resolve() == tree for row in ours(repo)):
-        raise Refusal(f"{tree} is not a worktree of ours", f"{script(SCRIPT)} list")
+        raise Refusal(f"{tree} is not a worktree of ours", command(*LAUNCH, "list"))
     ahead = int(git(repo, "rev-list", "--count", f"{onto}..{branch(name)}"))
     if ahead:
         raise Refusal(
             f"{branch(name)} holds {ahead} unmerged commit(s)",
-            f"{script(SCRIPT)} merge {quote(str(tree))}",
+            command(*LAUNCH, "merge", str(tree)),
         )
     _refuse_dirty(tree)
     _remove(_into(repo, onto), tree, name, _kept(tree, "clean", keep, drop))

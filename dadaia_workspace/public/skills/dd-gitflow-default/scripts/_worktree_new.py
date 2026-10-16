@@ -9,19 +9,13 @@ from pathlib import Path
 from _bugs_check import OPEN
 from _grammar import STATE
 from _jsonl import Unreadable, parse_object
+from _platform import command, is_link
 from _specs import parse
-from _worktree_git import (
-    flow_for,
-    git,
-    not_a_name,
-    quote,
-    script,
-    work_version,
-)
+from _worktree_git import flow_for, git, not_a_name, work_version
 from _worktree_names import (
+    LAUNCH,
     LOCK,
     NAME_RE,
-    SCRIPT,
     Refusal,
     base_of,
     branch,
@@ -41,8 +35,8 @@ def _level_folders(home: Path, name: str) -> list[tuple[Path, str]]:
 
 def _refuse_symlink(root: Path, repo_name: str) -> None:
     for part in (tree_path(root, ""), tree_path(root, repo_name)):
-        if part.is_symlink():
-            raise Refusal(f"{part} is a symlink", f"rm {part}")
+        if is_link(part):
+            raise Refusal(f"{part} is a symlink", command("rm", str(part)))
 
 
 def _refuse_unopened_bug(main: Path, work: str, bug: str) -> None:
@@ -79,14 +73,14 @@ def new(root: Path, repo_name: str, name: str) -> Path:
         raise not_a_name(name, version)
     start = base_of(name, flow["work"]) or ""
     if not git(repo, "branch", "--list", start).strip():  # a tree is cut from its parent's branch
-        raise Refusal(f"no {start} branch", f"{script(SCRIPT)} new {quote(repo.name)} {start.removeprefix('wt/')}")  # fmt: skip
+        raise Refusal(f"no {start} branch", command(*LAUNCH, "new", repo.name, start.removeprefix("wt/")))  # fmt: skip
     if kind_of(name) == "main":
         _refuse_unready(root / "repos" / flow["main"], version, match["rc"])
     if match["bug"]:
         _refuse_unopened_bug(root / "repos" / flow["main"], start, match["bug"])
     tree = tree_path(root, repo_name, name)
     if git(repo, "branch", "--list", branch(name)).strip():
-        raise Refusal(f"{branch(name)} exists", f"{script(SCRIPT)} list")
+        raise Refusal(f"{branch(name)} exists", command(*LAUNCH, "list"))
     made = [(folder, level) for folder, level in _level_folders(tree_path(root, repo_name), name) if not folder.exists()]  # fmt: skip
     git(repo, "worktree", "add", "-q", "--lock", "--reason", f"{LOCK}{name}", "-b", branch(name),
         str(tree), start)  # fmt: skip

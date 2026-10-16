@@ -5,12 +5,15 @@ its leaf (`wt-rc`, `wt-main`, `wt-task-NNN`, `wt-backlog-<slug>`, `wt-hotfix-<bu
 from __future__ import annotations
 
 import re
+import sys
 from pathlib import Path, PurePosixPath
 
 from _ledger import load_schema
 from _refusal import Refusal as Refusal
 
 SCRIPT = Path(__file__).parent / "worktree.py"
+#: The words that run this script: `command(*LAUNCH, verb, …)` is a finished fix line.
+LAUNCH = (sys.executable, str(SCRIPT.resolve()))
 LOCK = "dadaia:"
 _WORD = load_schema("backlog-v1")["$defs"]["slug"]["pattern"].removeprefix("^").removesuffix("$")
 #: One leaf grammar; a tree's branch is wt/ plus its path.

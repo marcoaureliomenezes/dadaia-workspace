@@ -11,9 +11,6 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import os
-import re
-import subprocess
 import sys
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -22,17 +19,15 @@ from typing import Any
 sys.dont_write_bytecode = True  # the shared _ledger imports without a __pycache__
 sys.path.append(str(Path(__file__).resolve().parents[2] / "dd-bug-resolution" / "scripts"))
 import _clock
-import _jsonl
 import _platform
 from _ledger import replace, workspace_of
+from _platform import read_text
 from _refusal import Refusal, report
 
 DEFAULT_MIN_PORT = 3000
 DEFAULT_MAX_PORT = 3999
 DEFAULT_TTL_HOURS = 8
 PORT_FLOOR = 1024
-_LOCAL_ADDR_RE = re.compile(r"^(?P<bind>.+):(?P<port>\d+)$")
-_USERS_PID_RE = re.compile(r'\("(?P<exe>[^"]+)",pid=(?P<pid>\d+)')
 
 
 def _now() -> datetime:
@@ -62,19 +57,7 @@ def load(path: Path) -> dict[str, Any]:
             "entries": [],
         }
     fix = f"Operator action: delete {_platform.quote(str(path))} — the next registry.py run starts an empty registry"
-    return dict(json.loads(_jsonl.read_text(path, fix)))
-
-
-def pid_alive(pid: int) -> bool:
-    if _platform.detect().windows:
-        return True  # no safe liveness probe without the POSIX signal-0 idiom
-    try:
-        os.kill(pid, 0)
-    except ProcessLookupError:
-        return False
-    except PermissionError:
-        pass
-    return True
+    return dict(json.loads(read_text(path, fix)))
 
 
 def is_stale(entry: dict[str, Any]) -> bool:
@@ -84,7 +67,7 @@ def is_stale(entry: dict[str, Any]) -> bool:
     except (KeyError, ValueError):
         return True
     pid = entry.get("pid")
-    return isinstance(pid, int) and not pid_alive(pid)
+    return isinstance(pid, int) and not _platform.pid_alive(pid)
 
 
 def status_of(entry: dict[str, Any]) -> str:
@@ -223,64 +206,18 @@ def cmd_clean(doc: dict[str, Any], args: argparse.Namespace, path: Path) -> int:
     return 0
 
 
-def _ss_output() -> str | None:
-    if not Path("/proc").is_dir():
-        return None
-    try:
-        result = subprocess.run(
-            ["ss", "-tlnp"], capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=5, check=False
-        )  # fmt: skip
-    except (FileNotFoundError, subprocess.TimeoutExpired):
-        return None
-    return result.stdout if result.returncode == 0 else None
-
-
-def parse_ss_line(line: str) -> tuple[int, str, int | None] | None:
-    if not line or line.startswith("State"):
-        return None
-    parts = line.split()
-    if len(parts) < 4:
-        return None
-    m = _LOCAL_ADDR_RE.match(parts[3])
-    if not m:
-        return None
-    bind = m.group("bind").lstrip("[").rstrip("]")
-    bind = "0.0.0.0" if bind == "*" else bind  # noqa: S104 — parsing, not binding
-    pid = None
-    if len(parts) >= 6:
-        pm = _USERS_PID_RE.search(" ".join(parts[5:]))
-        pid = int(pm.group("pid")) if pm else None
-    return int(m.group("port")), bind, pid
-
-
-def scan(doc: dict[str, Any], raw: str | None) -> list[dict[str, Any]]:
-    if raw is None:
-        return []
+def scan(doc: dict[str, Any], found: list[_platform.Listener] | None) -> list[dict[str, Any]]:
     registered = {e["port"] for e in doc["entries"]}
-    findings: list[dict[str, Any]] = []
-    for line in raw.split("\n"):
-        parsed = parse_ss_line(line)
-        if parsed is None:
-            continue
-        port, bind, pid = parsed
-        if port < PORT_FLOOR or port in registered or pid is None:
-            continue
-        cmdline, cwd = "", ""
-        try:
-            raw_cmd = Path(f"/proc/{pid}/cmdline").read_bytes().replace(b"\0", b" ")
-            cmdline = raw_cmd.decode(errors="replace").strip()[:200]
-            cwd = os.readlink(f"/proc/{pid}/cwd")
-        except OSError:
-            pass
-        lan = bind in {"0.0.0.0", "::"}
-        findings.append(
-            dict(port=port, bind=bind, pid=pid, cmdline=cmdline, cwd=cwd, lan_exposed=lan)
-        )
-    return sorted(findings, key=lambda f: f["port"])
+    return [
+        dict(port=f.port, bind=f.bind, pid=f.pid, cmdline=f.cmdline, cwd=f.cwd,
+             lan_exposed=f.bind in {"0.0.0.0", "::"})  # noqa: S104 — comparing, not binding
+        for f in found or []
+        if f.port >= PORT_FLOOR and f.port not in registered and f.pid is not None
+    ]  # fmt: skip
 
 
 def cmd_scan(doc: dict[str, Any], args: argparse.Namespace, path: Path) -> int:
-    findings = scan(doc, _ss_output())
+    findings = scan(doc, _platform.listeners())
     if args.json:
         print(json.dumps(findings, indent=2))
     elif not findings:

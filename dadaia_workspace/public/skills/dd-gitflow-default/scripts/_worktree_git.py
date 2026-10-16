@@ -14,13 +14,10 @@ from pathlib import Path
 
 from _git import git as git, parse_worktrees, scrubbed_env as scrubbed_env  # isort: skip
 from _grammar import SEMVER_RE, TAG_RE, sole_live
-from _platform import cli_argv, command, venv_dir
-from _platform import git_line as git_line
-from _platform import quote as quote  # (`as`: re-exported to the worktree verbs)
+from _platform import cli_argv, command, git_inline, git_line, inline, is_link, venv_dir
 from _specs import run_cli
-from _specs import script as script
 from _specs import workspace_of as workspace_of
-from _worktree_names import SCRIPT, Refusal, base_of, branch, name_of, tree_path
+from _worktree_names import LAUNCH, Refusal, base_of, branch, name_of, tree_path
 
 
 def diff_sha256(tree: Path, work: str, tip: str) -> str:
@@ -34,18 +31,20 @@ def dirty(tree: Path) -> bool:
     return bool(git(tree, "status", "--porcelain").strip())
 
 
+def cli_words(root: Path, *args: str) -> tuple[str, ...]:
+    """The words that run the workspace CLI with *args*, its head from the kernel's `cli_argv`."""
+    return (*cli_argv(venv_dir(root)), *args)
+
+
 def cli(root: Path, *args: str, tree: Path | None = None) -> subprocess.CompletedProcess[str]:
     """One read-only run of the workspace CLI — the owner of every package grammar. With *tree*
     the run acts on that tree alone: its cwd, every root above it fenced."""
     fence = (
-        {"DADAIA_FENCED_ROOTS": os.pathsep.join(map(str, tree.resolve().parents))} if tree else {}
+        {"DADAIA_FENCED_ROOTS": os.pathsep.join(str(p) for p in tree.resolve().parents)}
+        if tree
+        else {}
     )
     return run_cli(root, *args, cwd=tree or root, env=scrubbed_env() | fence, stdin=subprocess.DEVNULL)  # fmt: skip
-
-
-def cli_line(root: Path, *args: str) -> str:
-    """The fix line running :func:`cli` with *args*, quoted for the host shell."""
-    return command(*cli_argv(venv_dir(root)), *args)
 
 
 def gitflows(root: Path) -> dict[str, dict[str, str]]:
@@ -60,7 +59,7 @@ def gitflows(root: Path) -> dict[str, dict[str, str]]:
     if not isinstance(listed, list):
         raise Refusal(
             f"context list failed: {done.stderr.strip() or done.stdout.strip()}",
-            cli_line(root, "doctor"),
+            command(*cli_words(root, "doctor")),
         )
     return {
         repo: {**row["gitflow"], "main": row["main_repo"]}
@@ -73,7 +72,7 @@ def gitflows(root: Path) -> dict[str, dict[str, str]]:
 def flow_for(root: Path, repo: Path) -> dict[str, str]:
     flow = gitflows(root).get(repo.name)
     if flow is None:
-        raise Refusal(f"no context on disk owns repos/{repo.name}", cli_line(root, "doctor"))
+        raise Refusal(f"no context on disk owns repos/{repo.name}", command(*cli_words(root, "doctor")))  # fmt: skip
     return flow
 
 
@@ -107,10 +106,10 @@ def work_version(repo: Path, flow: dict[str, str]) -> str:
     if versions:
         ordered = sorted(versions, key=lambda v: tuple(map(int, v.split("."))))
         low, high = f"{prefix}{ordered[0]}", f"{prefix}{ordered[-1]}"
-        drop = git_line(repo, "branch", "-d", low)
+        drop = git_inline(repo, "branch", "-d", low)
         merged = git(repo, "branch", "--merged", high, "--list", low).strip()
         then = "run" if merged else f"merge {low} into {high}, then run"
-        fix = f"Agent action: run `{git_line(repo, 'switch', high)}`, then {then} `{drop}`"
+        fix = f"Agent action: run `{git_inline(repo, 'switch', high)}`, then {then} `{drop}`"
         raise SeveralWork(f"{len(versions)} work branches", fix, ordered[-1])
     nxt = next_version(repo, flow)
     remote = git(
@@ -127,7 +126,7 @@ def not_a_name(name: str, live: str = "") -> Refusal:
     shape = live or "0.5.0"
     return Refusal(
         f"not a worktree name: {name!r} (expected {shape}/rc-<N>/wt-rc, {shape}/rc-<N>/job-<n>/wt-main, {shape}/rc-<N>/job-<n>/wt-task-<kkk>, {shape}/wt-backlog-<slug> or {shape}/wt-hotfix-<bug>)",  # fmt: skip
-        f"{script(SCRIPT)} list",
+        command(*LAUNCH, "list"),
     )
 
 
@@ -152,10 +151,12 @@ def _row(repo: Path, path: str, state: str, age: float = 0.0, **facts: object) -
     """One worktree: WARN past a day or off-canon; `fix` shown only when ready or orphan;
     `exit`, the line a hold names — `clean` for an empty tree, else `merge`."""
     verb = "clean" if state == "empty" else "merge"
-    line = f"{script(SCRIPT)} {verb} {quote(path)}"
+    line = command(*LAUNCH, verb, path)
     # merge cannot clear a directory git does not know
     if state == "orphan" and Path(path).exists():
-        line = f"Agent action: remove the directory {path}, then run `{line}`"
+        line = (
+            f"Agent action: remove the directory {path}, then run `{inline(*LAUNCH, verb, path)}`"
+        )
     return {"repo": repo.name, "path": path, "state": state, "age_hours": age, "registered": True,
             **facts, "warn": state not in ("ready", "open", "empty") or age > 24,
             "fix": line if state in ("ready", "orphan") else "",
@@ -185,7 +186,7 @@ def _strays(folder: Path, listed: set[Path], ancestors: set[Path]) -> list[Path]
     out: list[Path] = []
     for child in sorted(folder.glob("*")):
         here = child.resolve()
-        if child.is_dir() and not child.is_symlink() and here not in listed:
+        if child.is_dir() and not is_link(child) and here not in listed:
             sub = _strays(child, listed, ancestors)
             # a level folder holding only its AGENTS.md is layout, not a stray
             layout = [p.name for p in child.iterdir()] == ["AGENTS.md"]
@@ -231,7 +232,7 @@ def _unregistered(repo: Path, trees: list[dict[str, str]]) -> list[dict[str, obj
         _row(repo, t["worktree"], "unregistered", registered=False)
         | {
             "fix": f"Agent action: land the work of {t['worktree']}, then run "
-            f"`{git_line(repo, 'worktree', 'remove', '--force', '--force', t['worktree'])}`"
+            f"`{git_inline(repo, 'worktree', 'remove', '--force', '--force', t['worktree'])}`"
         }  # fmt: skip
         for t in trees
     ]
