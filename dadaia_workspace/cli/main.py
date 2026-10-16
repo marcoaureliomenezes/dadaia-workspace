@@ -27,6 +27,7 @@ from dadaia_workspace.cli.commands import (
 from dadaia_workspace.cli.commands.export import export
 from dadaia_workspace.cli.commands.import_ import import_workspace
 from dadaia_workspace.core.exceptions import DadaiaError
+from dadaia_workspace.core.platform import use_utf8_stdio
 from dadaia_workspace.infrastructure.provider_version import provider_version
 
 app = typer.Typer(
@@ -108,6 +109,7 @@ def _safe_app() -> None:
     failure untouched. ``SystemExit`` and ``KeyboardInterrupt`` derive from
     ``BaseException`` and pass through unchanged.
     """
+    use_utf8_stdio()
     try:
         app()
     except DadaiaError as exc:

@@ -5,6 +5,7 @@ whose facts are the kernel's ``_platform`` (the one host reader); tests swap it:
 
 from __future__ import annotations
 
+import sys
 from dataclasses import dataclass
 from pathlib import PurePath
 from typing import Any
@@ -63,3 +64,10 @@ def quote(word: str) -> str:
 def head(word: str) -> str:
     """A command's first word for the host shell, by the kernel's rule fed the current ``PLATFORM``."""
     return str(_owner.head(word, _caps()))
+
+
+def use_utf8_stdio() -> None:
+    """Make stdout and stderr UTF-8 whatever the host pipe defaults to (cp1252 on Windows)."""
+    for stream in (sys.stdout, sys.stderr):
+        if reconfigure := getattr(stream, "reconfigure", None):
+            reconfigure(encoding="utf-8")
