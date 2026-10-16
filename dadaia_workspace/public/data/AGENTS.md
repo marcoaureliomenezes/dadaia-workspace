@@ -25,7 +25,7 @@
 - A failing old test is a question: outside a fix, an assert is moved or narrowed, or a guard's reach narrowed, only with the main thread's ruling named in a `test(...)` commit, and a product-contract change also needs the operator.
 - Inventory existing gates and tools first; a new gate, lock, repo, layer or review round states what it buys and names the heavier one it deletes.
 - A requirement applied to every task, job or deletion is a gate, states its measured cost per run, and that cost never exceeds one run of the job's `verify:` gate without the operator's ruling.
-- The `verify:` line, the merge checks and the pre-review steps are gates: changing one states its measured cost and needs the operator's ruling; no step reruns a check the merge runs; a heavier gate is never the recommended option.
+- The `verify:` line and the merge checks are gates: changing one states its measured cost and needs the operator's ruling; no step reruns a check the merge runs; a heavier gate is never the recommended option.
 - Non-blocking findings go to the main thread's intake report (`dd-backlog-definition`).
 - The SDD documents (`specs/releases/AGENTS.md`) are the record of progress; numbers, durations and dates are measured or read from a named source, and law text holds no dated snapshot value.
 
