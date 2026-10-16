@@ -1,7 +1,5 @@
-"""`certify` over a real journey: its `dadaia` and `git` children run for real.
-
-Every verb certify shells exists: its check PASSes. Size: MEDIUM — only `init` (a venv build) and
-harness binaries are faked.
+"""`certify` over a real `git` and faked `dadaia` children (size MEDIUM); the full real journey
+is `tests/e2e/features/test_certify_journey.py`.
 
 codex-live-probe boundary — certify() exercises the INSTALLED Codex, not statics.
 
@@ -24,10 +22,6 @@ These tests inject a FAKE process and a fake `PATH` lookup; no real binary is to
 
 from __future__ import annotations
 
-import json
-import os
-import site
-import sys
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 
@@ -48,58 +42,6 @@ from dadaia_workspace.infrastructure.certification_process import (
     CertificationProcessResult,
     SubprocessCertificationProcess,
 )
-from tests.fixtures.harness_env import suite_env
-from tests.fixtures.stores import own_venv_python, own_venv_workspace
-
-
-class _Children(SubprocessCertificationProcess):
-    """`init` lays a workspace plus slop; `dadaia` runs on *python*, `git` for real."""
-
-    def __init__(self, python: Path) -> None:
-        self._python = str(python)
-
-    def run(
-        self,
-        argv: Sequence[str],
-        *,
-        cwd: Path,
-        env: Mapping[str, str] | None = None,
-        timeout: float,
-    ) -> CertificationProcessResult:
-        if argv[0] not in ("git", sys.executable):
-            return CertificationProcessResult(1, "", "not exercised")
-        if list(argv[3:4]) == ["init"]:
-            (own_venv_workspace(Path(argv[4])) / ".dadaia" / "nonsense").mkdir()
-            (Path(argv[4]) / "notes.txt").write_text("operator notes", encoding="utf-8")
-            return CertificationProcessResult(0, "", "")
-        path = os.pathsep.join([str((env or {}).get("PYTHONPATH")), *site.getsitepackages()])
-        argv = [self._python if argv[0] == sys.executable else argv[0], *argv[1:]]
-        child_env = suite_env(
-            os.environ, Path.home(), overrides={**(env or {}), "PYTHONPATH": path}
-        )
-        return super().run(argv, cwd=cwd, env=child_env, timeout=timeout)
-
-
-@pytest.mark.medium
-@pytest.mark.slow(reason="a real certify journey: about a dozen dadaia children")
-def test_certify_fails_naming_the_sandbox_slop(tmp_path: Path) -> None:
-    """A certify sandbox seeded with `.dadaia/nonsense/` and a root `notes.txt` — the workspace
-    section is judged and the result fails naming WS-dadaia-slop and WS-root-slop. Run from a
-    "live" workspace owning the children's venv, every child acts on the sandbox only — the
-    live registry is byte-identical, no session is left."""
-    live = own_venv_workspace(tmp_path / "live")
-    result = certify(live, _Children(own_venv_python(live))).to_dict()
-
-    assert (live / ".dadaia" / "states" / "spec_contexts.json").read_bytes() == b'{"contexts": []}'
-    assert sorted(p.name for p in (live / ".dadaia").iterdir()) == [".venv", "states", "tmp"]
-    checks = {c["name"]: c for c in result["checks"] if not c["name"].endswith("-probe")}
-    failed = {name for name, c in checks.items() if c["status"] != "PASS"}
-    assert result["ok"] is False
-    assert failed == {"specs-scaffold-and-doctor", "context-specs-doctor"}, json.dumps(
-        {n: checks[n]["detail"] for n in failed}, indent=1
-    )
-    for name in failed:
-        assert {"WS-dadaia-slop", "WS-root-slop"} <= set(checks[name]["detail"].split())
 
 
 class _FakeCertificationProcess:
@@ -325,11 +267,11 @@ def test_an_installed_binary_passes_by_answering_and_fails_only_if_it_cannot(
     assert fake.calls == [["/opt/bin/cursor-agent", "--version"]]
 
 
-class _BareConfigSeen(_Children):
-    """Reads the certify bare remote's own config when `context create` is handed it."""
+class _BareConfigSeen(SubprocessCertificationProcess):
+    """Real `git`; the first `dadaia` child past `init` is handed the bare remote, whose config
+    it reads, and every other child fails at once: only the bare remote is under test."""
 
-    def __init__(self, python: Path) -> None:
-        super().__init__(python)
+    def __init__(self) -> None:
         self.bare_config = ""
 
     def run(
@@ -340,20 +282,19 @@ class _BareConfigSeen(_Children):
         env: Mapping[str, str] | None = None,
         timeout: float,
     ) -> CertificationProcessResult:
-        if "--main-repo" in argv:
-            self.bare_config = (Path(argv[argv.index("--main-repo") + 1]) / "config").read_text(
-                encoding="utf-8"
-            )
+        if argv[0] != "git":
+            if "--main-repo" in argv:
+                self.bare_config = (Path(argv[argv.index("--main-repo") + 1]) / "config").read_text(
+                    encoding="utf-8"
+                )
+            return CertificationProcessResult(0 if argv[3:4] == ["init"] else 1, "", "")
         return super().run(argv, cwd=cwd, env=env, timeout=timeout)
 
 
 @pytest.mark.medium
-@pytest.mark.slow(reason="a real certify journey: about a dozen dadaia children")
 def test_certify_bare_remote_writes_long_paths(tmp_path: Path) -> None:
-    """The sandbox's bare remote receives the
-    baseline push, so its own config carries `core.longpaths = true`."""
-    live = own_venv_workspace(tmp_path / "live")
-    seen = _BareConfigSeen(own_venv_python(live))
-    certify(live, seen)
+    """The sandbox's bare remote carries `core.longpaths = true` when `context create` is handed it."""
+    seen = _BareConfigSeen()
+    certify(tmp_path, seen)
 
     assert "longpaths = true" in seen.bare_config
