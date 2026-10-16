@@ -1,0 +1,77 @@
+"""The kernel's one text codec (`_platform`): UTF-8, LF by default, one decode error."""
+
+from __future__ import annotations
+
+import os
+import subprocess
+import sys
+from pathlib import Path
+
+import pytest
+
+from dadaia_workspace.core.skill_owner import load_owner
+
+K = load_owner("dd-bug-resolution", "_platform")
+_KERNEL_DIR = Path(K.__file__).parent
+
+
+def test_read_text_decodes_utf8_and_translates_crlf(tmp_path: Path) -> None:
+    path = tmp_path / "a.md"
+    path.write_bytes("café\r\nx\n".encode())
+    assert K.read_text(path) == "café\nx\n"
+
+
+def test_read_text_of_cp1252_bytes_raises_undecodable_naming_the_path_and_line(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "a.md"
+    path.write_bytes(b"ok\ncaf\xe9\n")
+    with pytest.raises(K.Undecodable) as bad:
+        K.read_text(path)
+    assert (bad.value.path, bad.value.line) == (path, 2)
+    assert str(bad.value) == f"{path} is not valid UTF-8"
+    assert bad.value.fix == (
+        f"Agent action: re-encode line 2 of {path.resolve()} as UTF-8 in place; every other line stays"
+    )
+
+
+def test_read_text_fix_argument_replaces_the_default_fix(tmp_path: Path) -> None:
+    path = tmp_path / "a.md"
+    path.write_bytes(b"\xff")
+    with pytest.raises(K.Undecodable) as bad:
+        K.read_text(path, "Agent action: restore it")
+    assert bad.value.fix == "Agent action: restore it"
+
+
+def test_undecodable_is_the_kernels_refusal() -> None:
+    refusal = load_owner("dd-bug-resolution", "_refusal").Refusal
+    assert issubclass(K.Undecodable, refusal)
+
+
+def test_write_text_writes_utf8_with_lf(tmp_path: Path) -> None:
+    path = tmp_path / "a.md"
+    K.write_text(path, "é\nx\n")
+    assert path.read_bytes() == b"\xc3\xa9\nx\n"
+
+
+def test_write_text_keeps_a_newline_the_caller_names(tmp_path: Path) -> None:
+    path = tmp_path / "a.md"
+    K.write_text(path, "a\nb", newline="\r\n")
+    assert path.read_bytes() == b"a\r\nb"
+
+
+def test_decode_drops_the_bom_and_crlf_and_replaces_bad_bytes() -> None:
+    assert K.decode(b"\xef\xbb\xbfa\r\nb\xff") == "a\nb�"
+
+
+def test_use_utf8_stdio_lets_a_cp1252_pipe_print_a_check_mark() -> None:
+    code = (
+        f"import sys; sys.path.insert(0, {str(_KERNEL_DIR)!r}); import _platform; "
+        "_platform.use_utf8_stdio(); print('\\u2713')"
+    )
+    done = subprocess.run(
+        [sys.executable, "-c", code],
+        capture_output=True,
+        env={**os.environ, "PYTHONIOENCODING": "cp1252"},
+    )
+    assert (done.returncode, done.stdout.strip()) == (0, "✓".encode())

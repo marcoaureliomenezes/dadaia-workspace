@@ -57,6 +57,7 @@ sys.dont_write_bytecode = True
 
 from dadaia_workspace.infrastructure.subprocess_runner import ProcessResult  # noqa: E402
 from tests.fixtures.harness_env import suite_env  # noqa: E402
+from tests.helpers import oslib  # noqa: E402
 
 # Every subprocess a test spawns (`python -m dadaia_workspace...`: CLI verbs, hooks) must
 # import THIS checkout, whatever the venv's install mode or the worktree it runs in.
@@ -212,6 +213,8 @@ _PROCESS_MODULES = frozenset(
         "dadaia_workspace.infrastructure.subprocess_runner",
     }
 )
+#: The OS helper's process starters: a module that holds one of them (by any name) is medium.
+_PROCESS_CALLABLES = (oslib.run, oslib.run_bytes, oslib.popen, oslib.popen_bytes, oslib.stub_cli)
 _SEAM_MODULES = _PROCESS_MODULES | {
     "tests.fixtures.real_git",
     "dadaia_workspace.infrastructure.git_subprocess",
@@ -268,10 +271,13 @@ def _validate_quarantine_markers(items: list[pytest.Item]) -> None:
 
 
 def _reaches(item: pytest.Item, seams: frozenset[str]) -> bool:
-    """True when a name in the test module is, or comes from, one of *seams*."""
+    """True when a name in the test module is, or comes from, one of *seams*, or is one of the
+    OS helper's process starters (under any name)."""
     values = vars(item.module).values() if hasattr(item, "module") else ()
     return any(
-        getattr(v, attr, None) in seams for v in values for attr in ("__module__", "__name__")
+        v in _PROCESS_CALLABLES or getattr(v, attr, None) in seams
+        for v in values
+        for attr in ("__module__", "__name__")
     )
 
 

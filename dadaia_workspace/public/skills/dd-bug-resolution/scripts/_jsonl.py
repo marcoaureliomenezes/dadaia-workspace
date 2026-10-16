@@ -9,7 +9,11 @@ from collections.abc import Iterable, Iterator
 from pathlib import Path
 from typing import Any
 
+from _platform import (
+    Undecodable as Undecodable,
+)  # re-exported until the callers import it from _platform
 from _platform import quote
+from _platform import read_text as read_text
 from _refusal import Refusal
 from _root import workspace_of
 
@@ -20,19 +24,6 @@ class LineError(ValueError):
     def __init__(self, number: int, message: str) -> None:
         super().__init__(message)
         self.number = number
-
-
-class Undecodable(Refusal):
-    """The file *path* is not UTF-8 at *line*: a verb refuses with the act that re-encodes that
-    line in place, a check reports a finding there."""
-
-    def __init__(self, path: Path, fix: str = "", line: int = 1) -> None:
-        super().__init__(
-            f"{path} is not valid UTF-8",
-            fix
-            or f"Agent action: re-encode line {line} of {path.resolve()} as UTF-8 in place; every other line stays",
-        )
-        self.path, self.line = path, line
 
 
 class Unreadable(Refusal):
@@ -46,15 +37,6 @@ def reinstall_fix(start: Path) -> str:
     if root is None:
         return "Agent action: run `uvx dadaia-workspace init` with the workspace's directory as its first argument"
     return f"uvx dadaia-workspace init {quote(str(root))}"
-
-
-def read_text(path: Path, fix: str = "") -> str:
-    """The text of *path*; bytes that are not UTF-8 raise :class:`Undecodable` naming it, with
-    *fix* in place of the git restore a tracked file gets."""
-    try:
-        return path.read_text(encoding="utf-8")
-    except UnicodeDecodeError as exc:
-        raise Undecodable(path, fix, exc.object.count(b"\n", 0, exc.start) + 1) from exc
 
 
 def walk(text: str) -> Iterator[tuple[int, Any, str]]:
