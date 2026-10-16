@@ -19,6 +19,8 @@ from pathlib import Path
 import pytest
 
 import dadaia_workspace
+from dadaia_workspace.core.platform import PLATFORM
+from tests.fixtures.stores import fake_venv, own_venv_python
 
 pytestmark = pytest.mark.medium
 
@@ -30,7 +32,7 @@ class _Repo:
     def __init__(self, root: Path) -> None:
         self.root = root / "ws" / "repo"
         self.calls = root / "stub-calls.log"
-        self.stub = root / "ws" / ".dadaia" / ".venv" / "bin" / "dadaia"
+        self.stub = own_venv_python(root / "ws").with_name(f"dadaia{PLATFORM.venv_exe_suffix}")
 
     def git(
         self, *args: str, cwd: Path | None = None, wt: bool = False
@@ -54,9 +56,8 @@ class _Repo:
 @pytest.fixture
 def repo(tmp_path: Path) -> _Repo:
     r = _Repo(tmp_path)
-    r.stub.parent.mkdir(parents=True)
-    r.stub.write_text(f'#!/bin/sh\necho "$@" >> "{r.calls}"\nexit 0\n', encoding="utf-8")
-    r.stub.chmod(r.stub.stat().st_mode | stat.S_IXUSR)
+    record = f"import sys\nopen({str(r.calls)!r}, 'a', newline='\\n').write(' '.join(sys.argv[1:]) + '\\n')\n"
+    fake_venv(r.root.parent, cli="#!python\n" + record)
     r.root.mkdir()
     for args in (
         ["init", "-q", "-b", "main"],

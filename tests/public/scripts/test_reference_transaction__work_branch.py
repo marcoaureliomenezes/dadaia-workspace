@@ -10,25 +10,28 @@ Owner: dd-sw-engineer-sr
 from __future__ import annotations
 
 import os
-import shlex
 import shutil
 import stat
 import subprocess
-import sys
 from pathlib import Path
 
 import pytest
 
 import dadaia_workspace
 from dadaia_workspace.core.cli_line import fix_line
+from dadaia_workspace.core.platform import PLATFORM
+from tests.fixtures.stores import fake_venv, own_venv_python
 
 pytestmark = pytest.mark.medium
 
 _SCRIPT = Path(dadaia_workspace.__file__).parent / "public" / "scripts" / "reference-transaction.sh"
 _SOURCE = Path(dadaia_workspace.__file__).parent.parent
 _WORK = "feature/0.5.0"
-_REAL = f"""#!/bin/sh
-PYTHONDONTWRITEBYTECODE=1 PYTHONPATH={shlex.quote(str(_SOURCE))} exec {shlex.quote(sys.executable)} -m dadaia_workspace "$@"
+_REAL = f"""#!python
+import runpy, sys
+sys.dont_write_bytecode = True
+sys.path.insert(0, {str(_SOURCE)!r})
+runpy.run_module("dadaia_workspace", run_name="__main__", alter_sys=True)
 """
 
 
@@ -36,12 +39,10 @@ class _Repo:
     def __init__(self, root: Path) -> None:
         self.root = root / "ws" / "repo"
         self.origin = root / "origin.git"
-        self.runner = root / "ws" / ".dadaia" / ".venv" / "bin" / "dadaia"
+        self.runner = own_venv_python(root / "ws").with_name(f"dadaia{PLATFORM.venv_exe_suffix}")
 
-    def install_runner(self, text: str) -> None:
-        self.runner.parent.mkdir(parents=True, exist_ok=True)
-        self.runner.write_text(text, encoding="utf-8")
-        self.runner.chmod(self.runner.stat().st_mode | stat.S_IXUSR)
+    def install_runner(self, source: str) -> None:
+        fake_venv(self.root.parent, cli=source, pth=True)
 
     def git(
         self, *args: str, cwd: Path | None = None, wt: bool = False
@@ -111,7 +112,7 @@ def _assert_refused(r: _Repo, done: subprocess.CompletedProcess[str], before: st
     fixes = [ln for ln in done.stderr.splitlines() if "fix:" in ln]
     assert len(fixes) == 1, done.stderr
     assert fixes[0].startswith("fix: Agent action: "), fixes[0]
-    assert fix_line(None, "worktree", "new", "repo") in fixes[0]
+    assert fix_line(r.root.parent, "worktree", "new", "repo") in fixes[0]
     assert r.ok("rev-parse", f"refs/heads/{_WORK}") == before
 
 
@@ -244,7 +245,7 @@ def test_a_move_to_a_non_descendant_whose_diff_is_only_audits_is_refused(repo: _
 
 @pytest.mark.parametrize("code", [1, 2])
 def test_a_runner_fault_warns_and_lets_the_commit_through(repo: _Repo, code: int) -> None:
-    repo.install_runner(f"#!/bin/sh\necho boom >&2\nexit {code}\n")
+    repo.install_runner(f"#!python\nimport sys\nsys.stderr.write('boom\\n')\nsys.exit({code})\n")
     done = repo.git("commit", "-q", "--allow-empty", "-m", "on the work branch")
     assert done.returncode == 0, done.stderr
     assert "boom" in done.stderr
