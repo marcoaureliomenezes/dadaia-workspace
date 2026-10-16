@@ -28,7 +28,7 @@ description: >
 7. At `RC-FLOW.md` step 4, run `MEMORY-UPDATE.md`'s full protocol before touching any memory atom.
 8. A test enters the suite only under the root map §1 test basics.
 9. Before growing any module, run the deletion test (`dd-code-review` SLOP.md) — a diff that only adds justifies itself against replace-don't-layer.
-10. Implement each task inside its own `wt-task-<kkk>` tree, cut from its job's `wt-main` (`worktrees/AGENTS.md` §1).
+10. Implement each task inside its own `wt-task-<kkk>` tree (`worktrees/AGENTS.md` §1), cut from its job's `wt-main` (`dd-gitflow-default` §2a).
 11. Before claiming a bug, unused code or done, cite file:line or a grep; reproduce from a clean state; done needs user-side evidence.
 12. After any tool error, re-read the real state; report a deferral to the operator as an intake proposal carrying its design, never written into the backlog.
 13. A red not caused by the change is proven at the merge-base before it is called pre-existing; an env-sensitive change is reproduced in a clean environment first.

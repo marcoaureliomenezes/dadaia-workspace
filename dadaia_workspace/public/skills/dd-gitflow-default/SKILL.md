@@ -43,7 +43,7 @@ The branch contract by role; the names are `specs/constitution.md`'s `gitflow:` 
 | task `wt/<M.m.p>/rc-<N>/job-<n>/wt-task-<kkk>` | No | its `wt-main` | its merge into `wt-main` (its task gate) |
 | lane `wt/<M.m.p>/wt-backlog-<slug>` (Yes), `wt/<M.m.p>/wt-hotfix-<bug-id>` (No, local only) | as named | work | its merge into the work branch (`worktrees/AGENTS.md` §2) |
 
-- No `v` prefix or suffix; leaf names and parents: `worktrees/AGENTS.md` §1.
+- No `v` prefix or suffix; leaf names: `worktrees/AGENTS.md` §1.
 - Exactly one live work branch, cut from the integration branch once and renamed at each promote (§2 step 11): named for the live release, or for the next release's `<id>` once a promote named it; every change but an audit reaches it through an rc's `wt-rc` or a lane (`worktrees/AGENTS.md` §1).
 
 ## 3a. Commit shapes — each write in its own shape

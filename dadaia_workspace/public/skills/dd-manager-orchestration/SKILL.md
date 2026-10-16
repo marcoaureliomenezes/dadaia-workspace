@@ -64,7 +64,7 @@ description: >
 | Chain agents only through the main thread | Every hand-off stays traceable |
 | Merge a task only with its validation evidence | Acceptance is checked |
 | Merge a `wt-main`, `wt-rc` or lane tree (`wt-backlog-*`, `wt-hotfix-*`), deploy or close only after the reviewer's `APPROVED` | `worktrees/AGENTS.md` §2 |
-| Edit production files only inside a task's or hotfix lane's worktree | the edit then passes its job's task gate and review |
+| Edit production files only inside a task's or hotfix lane's worktree | The edit then passes its tree's merge checks and review. |
 | Land an edit inside an open job as one of its tasks | Micro-dispatch: the ritual wait it adds outweighs the edit |
 | Keep private/project-specific details out of public assets | Security and portability |
 
