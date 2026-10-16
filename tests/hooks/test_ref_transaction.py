@@ -78,12 +78,12 @@ def test_without_a_cli_the_fix_is_the_reinstall(
 
 
 def test_an_update_of_a_wt_branch_loads_no_kernel(tmp_path: Path) -> None:
-    """The common firing, a commit in a wt tree, pays for the interpreter and nothing else."""
+    """The common firing, a commit in a wt tree, imports neither the kernel nor pathlib."""
     code = (
         "import sys\n"
         "from dadaia_workspace.hooks import ref_transaction\n"
         f"assert ref_transaction.main({_UPDATE!r}) == 0\n"
-        "assert 'dadaia_workspace.core.platform' not in sys.modules\n"
+        "assert not {'dadaia_workspace.core.platform', 'pathlib', 'types'} & set(sys.modules)\n"
     )
     done = run([sys.executable, "-B", "-c", code], env=suite_env(os.environ, tmp_path), timeout=60)
     assert done.returncode == 0, done.stderr

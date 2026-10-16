@@ -49,6 +49,8 @@ def fake_venv(root: Path, cli: bool | str = False, pth: bool = False) -> Path:
     python.parent.mkdir(parents=True, exist_ok=True)
     real = Path(sys._base_executable).resolve()  # sys.executable is the venv redirector on Windows
     shutil.copy2(real, python)
+    for dll in real.parent.glob("*.dll"):  # a copied python.exe finds its runtime beside itself
+        shutil.copy2(dll, python.parent)
     (root / ".dadaia" / ".venv" / "pyvenv.cfg").write_text(f"home = {real.parent}\n")
     name = f"dadaia{PLATFORM.venv_exe_suffix}"
     if isinstance(cli, str):

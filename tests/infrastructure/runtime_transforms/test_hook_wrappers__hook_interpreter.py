@@ -87,7 +87,7 @@ def test_missing_venv_is_loud_and_fails_open_on_every_harness(
     assert all(d.returncode == 0 and ".dadaia/.venv" in d.stderr for d in done), done
     told = (
         f"dadaia: no workspace venv at {_seen(ws)}/.dadaia/.venv — the gate is off.\n"
-        "fix: Agent action: run `uvx dadaia-workspace init` with the workspace directory as its first argument\n"
+        "fix: Agent action: run `uvx dadaia-workspace init` with the workspace's directory as its first argument\n"
     )
     assert [d.stdout for d in done[1:]] == [envelope({"DADAIA_HOOK_OUTPUT": output}, told)] * 2
     assert sorted((ws / ".dadaia").rglob("*")) == before

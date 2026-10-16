@@ -90,8 +90,9 @@ def test_raw_worktree_add_is_refused_with_one_runnable_fix(
     assert len(fixes) == 1, done.stderr
     line = oslib.command(str(repo.stub), "worktree", "new", "repo", name)
     assert fixes[0] == f"fix: {line}"
-    assert oslib.run_line(line).returncode == 0
-    assert repo.calls_made() == f"worktree new repo {name}\n"
+    if not line.startswith("Agent action:"):  # an act is a sentence, not a command to run
+        assert oslib.run_line(line).returncode == 0
+        assert repo.calls_made() == f"worktree new repo {name}\n"
     assert (
         run(
             ["git", "rev-parse", "--verify", "-q", f"refs/heads/wt/{name}"], cwd=repo.root
@@ -196,7 +197,8 @@ def test_with_no_venv_at_all_the_shim_warns_and_passes(repo: _Repo) -> None:
 def test_the_repos_own_venv_is_the_last_resort(repo: _Repo) -> None:
     """No workspace venv above the repo: the hook runs from the repo's own `.venv`."""
     _no_venv(repo)
-    oslib.make_venv(repo.root / ".venv")
+    fake_venv(repo.root.parent / "own")
+    shutil.move(repo.root.parent / "own" / ".dadaia" / ".venv", repo.root / ".venv")
     done = repo.git("worktree", "add", "-q", "-b", "wt/x", str(repo.root.parent / "tree"))
     assert done.returncode != 0
     assert "[ref-gate] BLOCKED refs/heads/wt/x" in done.stderr, done.stderr
