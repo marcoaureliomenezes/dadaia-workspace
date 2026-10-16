@@ -22,7 +22,7 @@ __all__ = [
     "Gitflow",
     "Role",
     "SeveralWorkBranches",
-    "constitution_error",
+    "constitution_problem",
     "constitution_path",
     "constitution_text",
     "from_mapping",
@@ -161,10 +161,17 @@ def _gitflow_block(text: str) -> tuple[Gitflow | None, str | None]:
         return None, str(exc)
 
 
-def constitution_error(specs_dir: Path, text: str | None = None) -> str | None:
-    """Why the constitution's frontmatter (of *text* when given) cannot be trusted."""
-    reason = _gitflow_block(constitution_text(specs_dir) if text is None else text)[1]
-    return reason and f"{constitution_path(specs_dir)}: {reason}"
+def constitution_problem(specs_dir: Path, text: str | None = None) -> tuple[str, str] | None:
+    """``(cause, act)`` when the constitution (of *text* when given) cannot be trusted: the act
+    re-encodes a file that is not UTF-8, else repairs the YAML frontmatter."""
+    try:
+        reason = _gitflow_block(constitution_text(specs_dir) if text is None else text)[1]
+    except platform.Undecodable as bad:
+        return f"{bad.path}: is not valid UTF-8", str(bad.fix)
+    if not reason:
+        return None
+    cause = f"{constitution_path(specs_dir)}: {reason}"
+    return cause, f"Agent action: repair the YAML frontmatter of {cause}"
 
 
 def read_gitflow(specs_dir: Path, text: str | None = None) -> tuple[Gitflow, str | None]:

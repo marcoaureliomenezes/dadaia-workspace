@@ -19,7 +19,7 @@ from typing import Literal
 from dadaia_workspace.core import platform, workspace_layout
 from dadaia_workspace.core.cli_line import cli_words, fix_line, spell_fix
 from dadaia_workspace.core.fixed_sections import strip_fixed_sections
-from dadaia_workspace.core.gitflow import SeveralWorkBranches
+from dadaia_workspace.core.gitflow import SeveralWorkBranches, constitution_problem
 from dadaia_workspace.core.specs_version import state
 from dadaia_workspace.core.template_history import was_shipped
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
@@ -55,8 +55,8 @@ def specs_ready(specs_dir: Path) -> bool:
 
 
 def _constitution_reason(c: _Ctx) -> str | None:
-    kind, act = state(c.specs)
-    return act if kind == "malformed" else None
+    problem = constitution_problem(c.specs)
+    return problem[0] if problem else None
 
 
 def _unbound(c: _Ctx) -> str | None:
