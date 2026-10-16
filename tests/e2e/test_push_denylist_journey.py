@@ -144,15 +144,14 @@ def test_a_record_whose_context_carries_a_published_term_registers_and_pushes(
 
     register("published", env)
     _git(["push", "-q", "origin", f"{_BRANCH}:{_BRANCH}"], repo)  # published before any gate
+    env |= {"DADAIA_PRIVACY_DENYLIST": str(_write_denylist_file(tmp_path))}
+    register("second", env)  # unpublished, committed before any hook is installed
     installed = subprocess.run(
         [sys.executable, "-m", "dadaia_workspace.cli.main", "ci", "install-hook"],
         cwd=repo, capture_output=True, text=True, timeout=_EXIT_DEADLINE,
     )  # fmt: skip
     assert installed.returncode == 0, installed.stdout + installed.stderr
     _write_dadaia_stub(tmp_path, sys.executable)
-    env |= {"DADAIA_PRIVACY_DENYLIST": str(_write_denylist_file(tmp_path))}
-
-    register("second", env)
     pushed = _push(repo, env)
 
     assert pushed.returncode == 0, pushed.stdout + pushed.stderr
