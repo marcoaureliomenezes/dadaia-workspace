@@ -46,7 +46,7 @@ from unittest import mock
 
 import pytest
 
-pytest_plugins = ("pytester",)
+pytest_plugins = ("pytester", "tests.fixtures.cli_sentence")
 
 # Repo-cleanliness law: the test run must never materialize bytecode caches inside
 # the working tree. Import-time compilation happens BEFORE any in-script
