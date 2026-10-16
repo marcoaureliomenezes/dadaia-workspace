@@ -14,6 +14,7 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.core.cli_line import fix_line
+from dadaia_workspace.core.exceptions import GitSyncError
 from dadaia_workspace.core.gitflow import DEFAULT, Gitflow
 from dadaia_workspace.features.chokepoints import Decision, push_gate_decision
 from dadaia_workspace.features.chokepoints.branch_policy import (
@@ -216,11 +217,16 @@ _C1 = "c" * 40
 _WORK_REF = "refs/heads/feature/0.6.0"
 
 
-def _ref_policy(lines: list[str], flow: Gitflow, origin: dict[str, str]) -> Decision:
+def _ref_policy(
+    lines: list[str],
+    flow: Gitflow,
+    origin: dict[str, str],
+    moved: Callable[[str, str], tuple[bool, list[str]]] = lambda old, new: (True, []),
+) -> Decision:
     # imported here so a missing function fails these rows only, not the whole file's collection
     from dadaia_workspace.features.chokepoints.branch_policy import check_ref_policy
 
-    return check_ref_policy(lines, flow, origin, "proj")
+    return check_ref_policy(lines, flow, origin, "proj", moved)
 
 
 def test_a_work_branch_update_to_a_sha_other_than_origins_is_refused_with_one_fix() -> None:
@@ -283,3 +289,44 @@ def test_a_custom_gitflow_work_ref_is_judged_by_its_configured_prefix() -> None:
 def test_one_refused_line_among_passing_lines_refuses() -> None:
     lines = [f"{_A} {_B} refs/heads/develop", f"{_A} {_B} {_WORK_REF}", f"{_ZERO} {_B} refs/heads/wt/x"]
     assert not _ref_policy(lines, DEFAULT, {_WORK_REF: _C1}).allowed
+
+
+_AUDIT = ["specs/audits/20261016-x/AUDIT.md"]
+_LINE = f"{_A} {_B} {_WORK_REF}"
+
+
+def test_a_descendant_move_touching_only_audit_paths_passes() -> None:
+    assert _ref_policy([_LINE], DEFAULT, {_WORK_REF: _C1}, lambda o, n: (True, _AUDIT)).allowed
+
+
+@pytest.mark.parametrize(
+    "facts",
+    [
+        pytest.param((True, ["src/core.py", "specs/audits/core.py"]), id="rename-into-audits"),
+        pytest.param((True, _AUDIT + ["src/core.py"]), id="audit-plus-code"),
+        pytest.param((True, []), id="no-changed-path"),
+        pytest.param((False, _AUDIT), id="non-descendant-audit-only-tree"),
+    ],
+)
+def test_a_move_that_is_not_a_descendant_audit_only_change_is_refused(
+    facts: tuple[bool, list[str]],
+) -> None:
+    decision = _ref_policy([_LINE], DEFAULT, {_WORK_REF: _C1}, lambda o, n: facts)
+    assert not decision.allowed
+    assert decision.message.count("fix: ") == 1
+
+
+def test_a_failed_fact_read_refuses_instead_of_raising() -> None:
+    def unreadable(old: str, new: str) -> tuple[bool, list[str]]:
+        raise GitSyncError("git rev-list failed")
+
+    decision = _ref_policy([_LINE], DEFAULT, {_WORK_REF: _C1}, unreadable)
+    assert not decision.allowed
+    assert decision.message.count("fix: ") == 1
+
+
+def test_the_facts_are_not_read_for_a_move_onto_origins_sha() -> None:
+    def unreadable(old: str, new: str) -> tuple[bool, list[str]]:
+        raise AssertionError("read")
+
+    assert _ref_policy([_LINE], DEFAULT, {_WORK_REF: _B}, unreadable).allowed

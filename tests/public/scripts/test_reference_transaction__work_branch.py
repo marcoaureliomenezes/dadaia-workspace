@@ -191,6 +191,16 @@ def test_an_audit_only_commit_on_the_work_branch_passes(repo: _Repo) -> None:
     assert done.returncode == 0, done.stderr
 
 
+def test_a_code_file_renamed_into_audits_on_the_work_branch_is_refused(repo: _Repo) -> None:
+    (repo.root / "core.py").write_text("x = 1\n", encoding="utf-8")
+    repo.ok("add", "core.py")
+    assert repo.git("commit", "-q", "-m", "code", wt=True).returncode == 0
+    before = repo.ok("rev-parse", "HEAD")
+    (repo.root / "specs" / "audits").mkdir(parents=True)
+    repo.ok("mv", "core.py", "specs/audits/core.py")
+    _assert_refused(repo, repo.git("commit", "-q", "-m", "audit"), before)
+
+
 @pytest.mark.parametrize("code", [1, 2])
 def test_a_runner_fault_warns_and_lets_the_commit_through(repo: _Repo, code: int) -> None:
     repo.install_runner(f"#!/bin/sh\necho boom >&2\nexit {code}\n")
