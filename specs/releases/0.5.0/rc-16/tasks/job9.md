@@ -2,7 +2,7 @@
 
 **Status:** Draft
 
-Wave 4, waits on Jobs 1–8. Paths are repository-relative to `repos/dadaia-workspace/`. Design and evidence: PLAN §1 and the as-is review it points to.
+Wave 5, waits on Jobs 1–8. Paths are repository-relative to `repos/dadaia-workspace/`. Design and evidence: PLAN §1 and the as-is review it points to.
 
 - **Why last.** The `reference-transaction` hook refuses creation of a `wt/*` ref outside `DADAIA_WT=1`. The installer is table-driven (`install_git_hooks`, `service.py:160-183`; `ci install-hook`, `context create`, `context alive`), so the `INSTALLED_GIT_HOOKS` row is the moment the hook becomes installable. Added in Job 3 it would let HOOKS-DRIFT-1 fence every repo against a hook the instance's WT cannot pass yet: a BLOCK whose fix is blocked, a Stall (review HIGH 5). After Jobs 1–8 the tool can pass the hook; the row lands here and nowhere earlier.
 - **Installing is still the rollout's act.** This job adds the row and its hash entry; no repo gets the hook until `ci install-hook --force` runs after `public install` (PLAN §2 rollout).
