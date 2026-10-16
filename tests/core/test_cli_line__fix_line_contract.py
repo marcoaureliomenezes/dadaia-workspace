@@ -35,7 +35,7 @@ from typer.testing import CliRunner
 from dadaia_workspace.cli.help_digest import command_paths
 from dadaia_workspace.cli.main import app
 from dadaia_workspace.core import workspace_layout
-from dadaia_workspace.core.cli_line import fix_line, git_line, shell_line
+from dadaia_workspace.core.cli_line import fix_line, git_line
 from dadaia_workspace.core.doctor_rules import rule_fix
 from dadaia_workspace.core.gitflow import DEFAULT, work_branch
 from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES
@@ -683,8 +683,8 @@ def _drop_term(world: World) -> None:
     (world.repo / "notes.md").write_text("a b\n", encoding="utf-8")
 
 
-#: The refusal's documented steps after its fix: commit the edited work, push it again.
-_COMMIT_PUSH = "git commit -qa --amend --no-edit && git push -q origin feature/1.0.0"
+#: The refusal's documented step after its fix, the rewrite verb: push it again.
+_COMMIT_PUSH = "git push -q origin feature/1.0.0"
 
 
 def _clean_publish(world: World) -> None:
@@ -737,7 +737,7 @@ def _nothing_reverted(world: World) -> None:
 def _non_canon(world: World) -> str:
     _published(world)
     world.commit("specs/junk.md", "j\n", branch="feature/1.0.0")
-    world.commit("notes.md", "n\n")  # real work rides the range: the amend keeps it
+    world.commit("notes.md", "n\n")  # real work rides the range: the rewrite keeps it
     return "git push -q origin feature/1.0.0"
 
 
@@ -822,10 +822,8 @@ def _drop_draft_term(world: World) -> None:
     (world.repo / "AGENTS.md").write_text("a\n", encoding="utf-8")
 
 
-#: The refusal's documented step after its reset — amend — then the publish again.
-_AMEND_BASELINE = (
-    "git commit -qa --amend --no-edit && ../../.dadaia/.venv/bin/dadaia context baseline proj"
-)
+#: The refusal's documented step after its fix, the rewrite verb: the publish again.
+_BASELINE_AGAIN = "../../.dadaia/.venv/bin/dadaia context baseline proj"
 
 
 def _no_url_no_checkout(world: World) -> list[str]:
@@ -1127,15 +1125,14 @@ _REFUSALS: dict[str, tuple[Case | tuple[Case, ...] | Skip, ...]] = {
                 _denylisted_in_a_worktree,
                 _worktree_clean,
                 before=_drop_worktree_term,
-                then="git -C .claude/worktrees/agent-x commit -qa --amend --no-edit && "
-                "git -C .claude/worktrees/agent-x push -q origin feature/1.0.0",
+                then="git -C .claude/worktrees/agent-x push -q origin feature/1.0.0",
             ),
             Case(_denylisted_no_context, _clean_publish, before=_drop_term, then=_COMMIT_PUSH),
             Case(
                 _denylisted_advanced_integration,
                 _nothing_reverted,
                 before=_drop_term,
-                then="git commit -qa --amend --no-edit && git push -q origin feature/1.0.1",
+                then="git push -q origin feature/1.0.1",
             ),
             Case(_non_canon, _no_junk, before=_rm_junk, then=_COMMIT_PUSH),
         ),
@@ -1160,7 +1157,7 @@ _REFUSALS: dict[str, tuple[Case | tuple[Case, ...] | Skip, ...]] = {
         Case(_no_checkout, _cloned),
         Case(_no_identity, _baseline_done, before=_identity),
         Case(_never_onboarded, _baseline_done),
-        Case(_baseline_denylisted, _baseline_done, before=_drop_draft_term, then=_AMEND_BASELINE),
+        Case(_baseline_denylisted, _baseline_done, before=_drop_draft_term, then=_BASELINE_AGAIN),
     ),
     "service.SpecContextService._refuse_principal_absent": (
         Case(_draft_principal_absent, lambda w: _baseline_done(w, "rel/0.1.0", ("main", "stage"))),
@@ -1191,15 +1188,13 @@ _REFUSALS: dict[str, tuple[Case | tuple[Case, ...] | Skip, ...]] = {
                 _dead_denylisted,
                 _dead_done,
                 before=_drop_readme_term,
-                then="git commit -qa --amend --no-edit && "
-                "../../.dadaia/.venv/bin/dadaia context dead proj",
+                then="../../.dadaia/.venv/bin/dadaia context dead proj",
             ),
             Case(
                 _dead_denylisted_two_commits,
                 _dead_done,
                 before=_drop_readme_term,
-                then="git commit -qa --amend --no-edit && "
-                "../../.dadaia/.venv/bin/dadaia context dead proj",
+                then="../../.dadaia/.venv/bin/dadaia context dead proj",
             ),
         ),
         Skip("a refused hold (`repos/` outside the workspace): test_context_dead_holds.py"),
@@ -1979,7 +1974,7 @@ def test_the_gate_is_read_only_and_its_rewrite_fix_uncommits_only_unpublished_wo
     command = _denylisted(world)
     oldest = world.git(world.repo, "rev-parse", "HEAD~1")
     fix = _fix(_hit(world, command), world.ws)
-    assert fix == shell_line("git", "-C", str(world.repo), "reset", "--soft", oldest)
+    assert fix == fix_line(None, "ci", "rewrite-unpublished", "--repo", str(world.repo), oldest)
     assert "--republish" not in world.cli("context", "baseline", "--help").stdout
 
 
@@ -2027,7 +2022,7 @@ def test_a_refused_baseline_push_names_the_anchor_and_the_publish_as_the_next_st
 ) -> None:
     """The gate refuses baseline's push — the refusal keeps the gate's
     one fix (reset to the oldest unpublished commit) and names the anchor and the publish
-    as the step after the amend (a hand push would drop origin's merge parent)."""
+    as the step after the rewrite (a hand push would drop origin's merge parent)."""
     done = _hit(world, _baseline_denylisted(world))
     output = done.stdout + done.stderr
     assert done.returncode != 0 and _fix(done, world.ws).startswith("git -C")

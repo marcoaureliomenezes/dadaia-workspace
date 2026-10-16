@@ -202,18 +202,85 @@ def _two_unpublished(repo: _Repo) -> None:
         assert repo.git("commit", "-q", "--allow-empty", "-m", name, wt=True).returncode == 0
 
 
-def test_amending_the_unpublished_tip_passes(repo: _Repo) -> None:
+def _raw_branch_under_origin(repo: _Repo) -> str:
+    """A branch off origin's tip holding one raw (unmarked, never merged) commit."""
+    repo.ok("checkout", "-q", "-b", "raw", f"origin/{_WORK}")
+    (repo.root / "raw.txt").write_text("raw\n", encoding="utf-8")
+    repo.ok("add", "raw.txt")
+    repo.ok("commit", "-q", "-m", "raw")
+    sha = repo.ok("rev-parse", "HEAD")
+    repo.ok("checkout", "-q", _WORK)
+    return sha
+
+
+def test_amending_the_unpublished_tip_is_refused(repo: _Repo) -> None:
     _ahead_by_a_marked_merge(repo)
+    before = repo.ok("rev-parse", "HEAD")
     done = repo.git("commit", "-q", "--allow-empty", "--amend", "-m", "amended")
-    assert done.returncode == 0, done.stderr
+    _assert_refused(repo, done, before)
 
 
-def test_a_soft_reset_inside_the_unpublished_range_passes(repo: _Repo) -> None:
+def test_an_amend_that_adds_content_is_refused(repo: _Repo) -> None:
+    _ahead_by_a_marked_merge(repo)
+    before = repo.ok("rev-parse", "HEAD")
+    (repo.root / "added.txt").write_text("raw\n", encoding="utf-8")
+    repo.ok("add", "added.txt")
+    done = repo.git("commit", "-q", "--amend", "--no-edit")
+    _assert_refused(repo, done, before)
+
+
+def test_a_soft_reset_inside_the_unpublished_range_is_refused(repo: _Repo) -> None:
     _two_unpublished(repo)
-    first = repo.ok("rev-parse", "HEAD~1")
+    before = repo.ok("rev-parse", "HEAD")
     done = repo.git("reset", "--soft", "HEAD~1")
+    _assert_refused(repo, done, before)
+
+
+def test_a_hard_reset_onto_a_raw_branch_is_refused(repo: _Repo) -> None:
+    _ahead_by_a_marked_merge(repo)
+    before = repo.ok("rev-parse", "HEAD")
+    raw = _raw_branch_under_origin(repo)
+    done = repo.git("reset", "--hard", raw)
+    _assert_refused(repo, done, before)
+
+
+def test_a_rebase_under_a_raw_commit_is_refused(repo: _Repo) -> None:
+    _ahead_by_a_marked_merge(repo)
+    before = repo.ok("rev-parse", "HEAD")
+    raw = _raw_branch_under_origin(repo)
+    done = repo.git("rebase", raw)
+    _assert_refused(repo, done, before)
+
+
+def _verb(repo: _Repo, *args: str) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        [str(repo.runner), "ci", "rewrite-unpublished", "--repo", str(repo.root), *args],
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+
+
+def test_the_rewrite_verb_commits_the_unpublished_range_as_one_commit(repo: _Repo) -> None:
+    _two_unpublished(repo)
+    oldest = repo.ok("rev-parse", "HEAD~1")
+    (repo.root / "scrubbed.txt").write_text("clean\n", encoding="utf-8")
+    repo.ok("add", "scrubbed.txt")
+    done = _verb(repo, oldest)
     assert done.returncode == 0, done.stderr
-    assert repo.ok("rev-parse", f"refs/heads/{_WORK}") == first
+    assert repo.ok("rev-list", "--count", f"origin/{_WORK}..{_WORK}") == "1"
+    assert repo.ok("show", "--name-only", "--format=", _WORK) == "scrubbed.txt"
+
+
+def test_the_rewrite_verb_refuses_a_commit_origin_already_holds(repo: _Repo) -> None:
+    _two_unpublished(repo)
+    before = repo.ok("rev-parse", "HEAD")
+    published = repo.ok("rev-parse", f"origin/{_WORK}")
+    done = _verb(repo, published)
+    assert done.returncode != 0
+    fixes = [ln for ln in done.stderr.splitlines() if ln.startswith("fix: ")]
+    assert len(fixes) == 1, done.stderr
+    assert repo.ok("rev-parse", f"refs/heads/{_WORK}") == before
 
 
 def test_amending_the_published_tip_is_refused(repo: _Repo) -> None:

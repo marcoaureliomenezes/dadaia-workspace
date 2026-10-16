@@ -15,6 +15,7 @@ from typing import Any
 import pytest
 
 from dadaia_workspace.container import load_denylist_terms
+from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.gitflow import DEFAULT
 from dadaia_workspace.core.models.git_scan import GitObjectReadError, GitRunError, ScannedObject
 from dadaia_workspace.features.chokepoints import push_gate_decision
@@ -235,12 +236,12 @@ def test_a_git_read_failure_refuses_with_its_own_fix(
 
 # fmt: off
 @pytest.mark.parametrize(("ref", "head", "end"), [
-    pytest.param(_branch, "feature/0.0.1", "fix: git -C /repo reset --soft {oldest}", id="N3-reset-oldest-unpublished-then-amend"),
+    pytest.param(_branch, "feature/0.0.1", "fix: {verb}", id="N3-rewrite-verb-from-oldest-unpublished"),
     pytest.param(_branch, "main", "fix: git -C /repo switch feature/0.0.1", id="H1-not-checked-out-switch-first"),
     pytest.param(lambda sha: _tag(sha, "v0.0.1"), "feature/0.0.1", None, id="N3-tag-operator-action-no-command"),
 ])
 # fmt: on
-def test_the_rewrite_fix_resets_to_the_oldest_unpublished_commit_and_amends(
+def test_the_rewrite_fix_runs_the_verb_from_the_oldest_unpublished_commit(
     repo: PushRepo, ref: Any, head: str, end: str | None
 ) -> None:
     """One fix line from the refused ref's own unpublished range, never HEAD or a ref deletion."""
@@ -252,8 +253,8 @@ def test_the_rewrite_fix_resets_to_the_oldest_unpublished_commit_and_amends(
     if end is None:
         assert "\nfix: Agent action: " in message and message.count("\nfix: ") == 1
     else:
-        assert message.endswith(end.format(oldest=oldest)) and message.count("\nfix: ") == 1
-        assert "reset" not in end or "commit --amend" in message
+        verb = fix_line(None, "ci", "rewrite-unpublished", "--repo", "/repo", oldest)
+        assert message.endswith(end.format(verb=verb)) and message.count("\nfix: ") == 1
 
 
 def test_a_ledger_verb_outside_the_workspace_loads_the_pre_push_terms(
