@@ -60,7 +60,7 @@ def test_cli_argv_heads_a_windows_line_with_the_venv_python_never_the_launcher()
 
 
 def test_canonical_cli_maps_the_windows_spelling_to_the_source_form() -> None:
-    win = "run .venv/Scripts/python.exe -m dadaia_workspace doctor"
+    win = "run .venv/Scripts/dadaia.exe doctor"
     assert K.canonical_cli(win, WIN) == "run .venv/bin/dadaia doctor"
     assert K.canonical_cli("run .venv/bin/dadaia doctor", POSIX) == "run .venv/bin/dadaia doctor"
 
