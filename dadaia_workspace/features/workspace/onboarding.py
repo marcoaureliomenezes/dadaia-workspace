@@ -19,7 +19,7 @@ from typing import Literal
 from dadaia_workspace.core import workspace_layout
 from dadaia_workspace.core.cli_line import fix_line, spell_fix
 from dadaia_workspace.core.fixed_sections import strip_fixed_sections
-from dadaia_workspace.core.gitflow import constitution_error
+from dadaia_workspace.core.gitflow import SeveralWorkBranches, constitution_error
 from dadaia_workspace.core.specs_version import state
 from dadaia_workspace.core.template_history import was_shipped
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
@@ -76,6 +76,21 @@ def _first_pass(c: _Ctx) -> list[str]:
     return pending if atoms else [*pending, f"{c.specs / 'memory' / 'product'} (no atom)"]
 
 
+def _first_pass_fix(c: _Ctx) -> str:
+    """The first-pass act; with several work branches it leads with the refusal's own fix."""
+    repo, lead = c.specs.parent, ""
+    try:
+        version = GitSubprocessClient().work_version(repo)
+    except SeveralWorkBranches as several:
+        version, act = several.keep, several.fix.removeprefix("Agent action: ")
+        lead = f"{act if act != several.fix else 'run ' + act}, then "
+    lane = fix_line(c.root, "worktree", "new", repo.name, f"{version}/wt-backlog-first-pass")
+    return (
+        f"Agent action: {lead}open the lane {lane}"
+        f", then run the dd-audit-project first pass in it — {', '.join(_first_pass(c))}"
+    )
+
+
 _Pending = Callable[[_Ctx], str | None]
 #: (id, kind, pending -> reason | None, fix). The ``context`` step is derived in
 #: :func:`next_step` — it is the one step with no context to judge.
@@ -97,10 +112,7 @@ STEPS: tuple[tuple[str, Kind, _Pending, Callable[[_Ctx], str]], ...] = (
         "first-pass",
         "agent",
         lambda c: f"'{c.name}' memory holds no audited content" if _first_pass(c) else None,
-        lambda c: (
-            f"Agent action: open the lane {fix_line(c.root, 'worktree', 'new', c.specs.parent.name, f'{GitSubprocessClient().work_version(c.specs.parent)}/wt-backlog-first-pass')}"
-            f", then run the dd-audit-project first pass in it — {', '.join(_first_pass(c))}"
-        ),
+        _first_pass_fix,
     ),
     (
         "publish",
