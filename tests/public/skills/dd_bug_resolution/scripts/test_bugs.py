@@ -249,6 +249,20 @@ def test_a_shallow_clone_whose_history_holds_every_fix_sha_is_clean(
     assert done.returncode == 0, done.stdout
 
 
+def test_the_unreached_fix_line_survives_a_percent_in_the_script_path(tmp_path: Path) -> None:
+    script = stage_skill_scripts("dd-bug-resolution", tmp_path / "a%sb" / "scripts") / "bugs.py"
+    specs = _ledger(tmp_path)
+    git = ["git", "-C", str(tmp_path), "-c", "user.name=t", "-c", "user.email=t@t.test"]
+    resolved = {**_OPEN_RECORD, "status": "resolved", "closed_at": "2026-09-21T10:00:00Z",
+                "cause": "c", "solution": "s", "caused_by": "none", "fix_sha": "a" * 40}  # fmt: skip
+    _ledger(tmp_path, resolved)
+    subprocess.run([*git, "commit", "-q", "--allow-empty", "-m", "base"], check=True)
+    done = _run(script, "check", "--specs", str(specs))
+    assert "Traceback" not in done.stderr, done.stderr
+    assert done.returncode == 1, done.stdout + done.stderr
+    assert "a%sb" in done.stdout.splitlines()[-1], done.stdout + done.stderr
+
+
 @pytest.mark.parametrize(("caused_by", "code"), [
     ("J1.T3", 0),
     ("J1.S2.T3", 0),  # historical task ids stay readable
