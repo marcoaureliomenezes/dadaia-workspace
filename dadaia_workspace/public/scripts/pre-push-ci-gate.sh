@@ -3,7 +3,8 @@
 # whose decision is the one list of refusals (the branch model is the `gitflow:` block of
 # specs/constitution.md); this file only refuses an unresolvable runner, closed, never a silent skip.
 # The runner is the first venv `dadaia` found walking up from the repo root, then the repo's own .venv.
-# --probe-only prints the resolved runner and exits 0.
+# Installed to .git/hooks/pre-push by `dadaia ci install-hook`. --probe-only prints the resolved
+# runner and exits 0.
 
 ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || ROOT=$(pwd)
 
