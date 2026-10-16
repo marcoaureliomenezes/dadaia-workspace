@@ -21,7 +21,7 @@ sys.path.append(str(Path(__file__).resolve().parents[2] / "dd-bug-resolution" / 
 import _clock
 import _platform
 from _ledger import replace, workspace_of
-from _platform import read_text
+from _platform import read_text, use_utf8_stdio
 from _refusal import Refusal, report
 
 DEFAULT_MIN_PORT = 3000
@@ -265,6 +265,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
+    use_utf8_stdio()
     args = build_parser().parse_args(argv)
     path = args.registry or find_registry(Path.cwd())
     verbs = {"list": cmd_list, "next": cmd_next, "register": cmd_register}

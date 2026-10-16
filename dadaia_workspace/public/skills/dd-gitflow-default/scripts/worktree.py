@@ -19,7 +19,7 @@ sys.path[:0] = [
 ]
 
 from _git import GitError
-from _platform import inline
+from _platform import inline, use_utf8_stdio
 from _refusal import report, spell_fix
 from _worktree_end import clean, digest, merge
 from _worktree_git import rows, workspace_of
@@ -31,6 +31,7 @@ __all__ = ["main"]
 
 
 def main(argv: list[str] | None = None) -> int:
+    use_utf8_stdio()
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     verbs = parser.add_subparsers(dest="verb", required=True)
     make = verbs.add_parser("new", help="open an rc, main, task, backlog or hotfix worktree")
