@@ -74,16 +74,24 @@ def test_quote_of_a_word_with_no_safe_spelling_is_the_word_itself() -> None:
     ("word", "posix", "windows"),
     [
         ("/v/bin/dadaia", "/v/bin/dadaia", "/v/bin/dadaia"),
-        ("C:/Program Files/x.exe", "'C:/Program Files/x.exe'", 'C":/Program Files/x.exe"'),
-        ("C:/a=b/x.exe", "C:/a=b/x.exe", 'C":/a=b/x.exe"'),
+        ("C:/Program Files/x.exe", "'C:/Program Files/x.exe'", None),
+        ("C:/a=b/x.exe", "C:/a=b/x.exe", None),
+        ("C:/Program Files (x86)/x.exe", "'C:/Program Files (x86)/x.exe'", None),
         ("C:\\ok\\x.exe", "'C:\\ok\\x.exe'", "C:/ok/x.exe"),
+        (
+            "C:/Users/Shared/João/x.exe",
+            "'C:/Users/Shared/João/x.exe'",
+            "C:/Users/Shared/João/x.exe",
+        ),
     ],
 )
-def test_a_command_head_never_opens_with_a_quote_on_windows(
-    word: str, posix: str, windows: str
+def test_a_windows_head_is_bare_or_has_no_spelling(
+    word: str, posix: str, windows: str | None
 ) -> None:
+    assert K.spell(word, POSIX, head=True) == posix
+    assert K.spell(word, WIN, head=True) == windows
     assert K.head(word, POSIX) == posix
-    assert K.head(word, WIN) == windows
+    assert K.head(word, WIN) == (windows or word)
 
 
 def test_command_joins_the_head_and_the_quoted_words() -> None:
@@ -95,8 +103,11 @@ def test_command_joins_the_head_and_the_quoted_words() -> None:
     )
 
 
-def test_command_keeps_the_head_rule_for_a_head_with_a_blank() -> None:
-    assert K.command("C:/Program Files/x.exe", "a b", caps=WIN) == 'C":/Program Files/x.exe" "a b"'
+def test_a_windows_head_with_a_blank_is_an_agent_action_naming_it() -> None:
+    line = K.command("C:/Program Files/x.exe", "a b", caps=WIN)
+    assert line == (
+        'Agent action: run C:/Program Files/x.exe "a b", quoting C:/Program Files/x.exe for your shell'
+    )
 
 
 def test_command_with_a_word_that_has_no_safe_spelling_is_an_agent_action_with_its_values() -> None:
@@ -182,10 +193,12 @@ def test_every_installed_shell_hands_the_words_back_unchanged(shell: str) -> Non
 
 
 @pytest.mark.parametrize("shell", _AVAILABLE)
-def test_a_command_head_with_a_blank_runs_in_every_installed_shell(
+def test_a_head_with_a_blank_runs_where_the_host_can_spell_it_and_is_an_agent_action_where_not(
     shell: str, tmp_path: Path
 ) -> None:
     (tmp_path / "a b").mkdir()
     stub = oslib.stub_cli(tmp_path / "a b", "echoargs", f"#!python\n{_ECHO}\n")
     line = K.command(str(stub), "x", "y z")
-    assert _through(shell, line) == (0, "['x', 'y z']")
+    assert line.startswith("Agent action: ") is K.detect().windows
+    if not K.detect().windows:
+        assert _through(shell, line) == (0, "['x', 'y z']")
