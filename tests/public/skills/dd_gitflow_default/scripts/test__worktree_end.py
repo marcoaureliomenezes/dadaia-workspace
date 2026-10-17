@@ -573,58 +573,46 @@ def test_a_code_commit_made_on_the_job_branch_lands_once_reviewed(root: Path) ->
     assert (root / RC_TREE / "src/stray.py").is_file()
 
 
-def test_a_job_gate_reads_the_work_branch_verify_line_not_its_own(root: Path) -> None:
-    """A job whose task rewrote `verify:` is still judged by the work branch's
-    line; its unstartable refusal names the work branch, and doing that act lands."""
-    rc, tree, agents = root / RC_TREE, root / TREE, root / "repos/r/AGENTS.md"
-    good = read_text(agents)
-    rest = "".join(ln for ln in good.splitlines(keepends=True) if not ln.startswith("verify:"))
-    commit(rc, "AGENTS.md", "verify: FOO=1 python scripts/ci.py job\n" + rest)
-    git(tree, "merge", "-q", "--ff-only", WORK)
-    land(root, "AGENTS.md", good)  # the job's own line never judges it
-    approve(root, land(root, "src/a.py"), name=NEW_JOB)
-    refused = run(root, "merge", TREE)
+@pytest.mark.parametrize(
+    ("kind", "declared"),
+    [("hotfix", ""), ("job", ""), ("job", "FOO=1 python scripts/ci.py job")],
+    ids=["hotfix-absent", "job-absent", "job-env-assignment"],
+)
+def test_a_verify_line_refusal_clears_by_its_printed_act(root: Path, kind: str, declared: str) -> None:
+    """The work branch's `verify:` line judges a merge: when it is absent or unstartable, the printed
+    act (a backlog lane lands the repo's `AGENTS.md`, then the printed sync of the tree owning the
+    merge base) is performed verbatim, and the same merge then lands."""
+    repo, good = root / "repos/r", read_text(root / "repos/r/AGENTS.md")
+    commit(repo, "AGENTS.md", f"verify: {declared}\n" if declared else "")
+    if kind == "hotfix":
+        flags = ("--bug-id", "some-bug", "--reported-by", "t", "--title", "t", "--severity", "LOW",
+                 "--surface", "scripts", "--component", "c", "--context", "c", "--symptom", "s",
+                 "--repro", "r", "--expected", "e", "--correlates", "none")  # fmt: skip
+        run_python(str(_PACKAGE_SKILLS / "dd-bug-resolution/scripts/bugs.py"), "append",
+                   "--specs", str(repo / "specs"), *flags, check=True)  # fmt: skip
+        git(repo, "add", "-A")
+        git(repo, "commit", "-qm", "bug")
+        tree, name, onto = open_tree(root, HOTFIX), HOTFIX, "feature/0.5.0"
+        owner = tree
+    else:
+        assert run(root, "sync", str(root / RC_TREE)).returncode == 0  # rc and job carry the line
+        tree, name, onto, owner = root / TREE, NEW_JOB, WORK, root / RC_TREE
+        land(root, "src/a.py")
+    head = lambda: git(tree, "rev-parse", "HEAD").strip()  # noqa: E731
+    approve(root, commit(tree, "src/b.py") if kind == "hotfix" else head(), name=name)
+    refused = run(root, "merge", str(tree))
+    act = ("add this repo's job gate as a verify: line of AGENTS.md on " + onto if not declared else
+           f"make the verify: line of AGENTS.md on {onto} one argv list that starts"
+           " (no shell: no VAR=value prefix, no sh -c)")  # fmt: skip
     assert refused.returncode == 1 and "Traceback" not in refused.stderr
-    assert fixes(refused) == [
-        f"fix: Agent action: make the verify: line of AGENTS.md on {WORK} one argv list that"
-        " starts (it runs without a shell: no VAR=value prefix, no sh -c), landed through a"
-        " wt-backlog lane, then `worktree sync` this tree"
-    ]
-    commit(rc, "AGENTS.md", good)
-    git(tree, "rebase", "-q", WORK)
-    approve(root, git(tree, "rev-parse", "HEAD").strip(), at="T11:00:00Z", name=NEW_JOB)
-    landed = run(root, "merge", TREE)
-    assert landed.returncode == 0, landed.stderr
-
-
-def test_a_missing_verify_line_lands_through_a_backlog_lane(root: Path) -> None:
-    """The refusal for an absent `verify:` names an act the gates admit: a backlog lane lands the
-    repo's `AGENTS.md`, runs no `verify:`, and the refused hotfix merges after a sync."""
-    repo = root / "repos/r"
-    good = read_text(repo / "AGENTS.md")
-    commit(repo, "AGENTS.md", "")
-    append = _PACKAGE_SKILLS / "dd-bug-resolution/scripts/bugs.py"
-    flags = ("--bug-id", "some-bug", "--reported-by", "t", "--title", "t", "--severity", "LOW",
-             "--surface", "scripts", "--component", "c", "--context", "c", "--symptom", "s",
-             "--repro", "r", "--expected", "e", "--correlates", "none")  # fmt: skip
-    run_python(str(append), "append", "--specs", str(repo / "specs"), *flags, check=True)
-    git(repo, "add", "-A")
-    git(repo, "commit", "-qm", "bug")
-    hotfix = open_tree(root, HOTFIX)
-    approve(root, commit(hotfix, "src/a.py"), name=HOTFIX)
-    refused = run(root, "merge", str(hotfix))
-    assert fixes(refused) == [
-        "fix: Agent action: add this repo's job gate as a verify: line of AGENTS.md on"
-        " feature/0.5.0, landed through a wt-backlog lane, then `worktree sync` this tree"
-    ]
+    assert fixes(refused) == [f"fix: Agent action: {act} through a wt-backlog lane, then `{_sync_line(root, owner)}`"]  # fmt: skip
     lane = open_tree(root, BACKLOG)
     approve(root, commit(lane, "AGENTS.md", good), name=BACKLOG)
-    landed = run(root, "merge", str(lane))
+    assert run(root, "merge", str(lane)).returncode == 0
+    assert run(root, "sync", str(owner)).returncode == 0
+    approve(root, head(), at="T11:00:00Z", name=name)
+    landed = run(root, "merge", str(tree))
     assert landed.returncode == 0, landed.stderr
-    git(hotfix, "rebase", "-q", "feature/0.5.0")
-    approve(root, git(hotfix, "rev-parse", "HEAD").strip(), at="T11:00:00Z", name=HOTFIX)
-    done = run(root, "merge", str(hotfix))
-    assert done.returncode == 0, done.stderr
 
 
 def test_a_tests_line_after_a_utf8_bom_is_declared(tmp_path: Path) -> None:
