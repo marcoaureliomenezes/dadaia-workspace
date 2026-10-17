@@ -206,8 +206,10 @@ def _gate(tree: Path, work: str) -> None:
                       _land_line(tree, work, f"make the {key} line of AGENTS.md on {work} one argv list that starts"
                                        " (no shell: no VAR=value prefix, no sh -c)")) from error  # fmt: skip
     if done.returncode:
+        name = (locate(tree.relative_to(root).as_posix()) or ("", ""))[1]
+        into = "a task of this job" if kind_of(name or "") == "main" else "this worktree"
         raise Refusal(f"{key} exited {done.returncode}",
-                      f"Agent action: make `{inline(*argv)}` exit 0 in {tree} and commit the fix in this worktree")  # fmt: skip
+                      f"Agent action: make `{inline(*argv)}` exit 0 in {tree} and commit the fix in {into}")  # fmt: skip
 
 
 def _is_test_path(path: str, globs: list[str]) -> bool:
