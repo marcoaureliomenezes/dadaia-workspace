@@ -8,12 +8,12 @@ labelled judgement call with the command that makes it verifiable in the diff.
 
 | # | Signal | Verify in the diff | Severity | Fix direction |
 |---|---|---|---|---|
-| S1 | Comment or skill text narrating the what, the change or an id (the root map §1 docstring sentence) | `git diff -U0 \| grep -E '^\+\s*#.*(FR[0-9]\|T-[0-9]{3}\|ADR\|v[0-9]\.[0-9]\|added\|fixed\|changed)'`; a comment paraphrasing the next line; "renamed from", "formerly", `v0.` in a `SKILL.md` | LOW; MEDIUM above 5 hits | Delete; the why moves to the commit body or the ledger |
+| S1 | Comment or skill text narrating the what, the change or an id (the root map §1 docstring sentence) | `git diff -U0 \| grep -E '^\+\s*#.*(FR[0-9]\|J[0-9]+\.T[0-9]+\|ADR\|v[0-9]\.[0-9]\|added\|fixed\|changed)'`; a comment paraphrasing the next line; "renamed from", "formerly", `v0.` in a `SKILL.md` | LOW; MEDIUM above 5 hits | Delete; the why moves to the commit body or the ledger |
 | S2 | A docstring past the root map §1 docstring sentence | `git diff \| grep -c '"""'`, then read; the words bug, release, resolved, previously | LOW | Reduce to the contract |
 | S3 | Test slop: tautology, own-module mock, tombstone, test smells | §Tests below, one check each | HIGH (b); MEDIUM (c, d, e-h) | Literal from an independent source; mock at the frontier; root map §1 for removal |
 | S4 | Stub, unread parameter, port with one adapter | `grep -nE 'NotImplementedError\|^\s+pass$'`; the linter's unused-argument rule; a Protocol with one implementer | HIGH | Delete until the second caller appears |
 | S5 | Layer over the old path; a second path | `--stat` adds only; `_v2\|_legacy\|_old`; `if legacy`; a swallowing `try/except`; a wrapper that delegates | HIGH (bug-surface) | Replace, don't layer; delete the old path in the same diff |
-| S6 | Codes outside FR/AC/T- | numbered families outside FR/AC/T- in the diff; SPEC/job-file size is a recommendation, never a finding (`specs/releases/AGENTS.md`) | MEDIUM | Rename to glossary terms |
+| S6 | Codes outside FR/AC/`J<n>.T<k>` | numbered families outside FR/AC/`J<n>.T<k>` in the diff; SPEC/job-file size is a recommendation, never a finding (`specs/releases/AGENTS.md`) | MEDIUM | Rename to glossary terms |
 | S7 | Acronym or generic name | a term outside the domain names the repo's specs already use; `Manager\|Helper\|Utils\|data\|result\|temp` in a new name | LOW | A domain name |
 | S8 | File outside the canon | `git diff --name-status \| grep '^A'` against the root whitelist, the specs canon, the `.dadaia/` canon; `*.bak`, `SUMMARY.md`, `NOTES.md`; `find .dadaia/handoff -mtime +1` | HIGH | Delete, or move to its home |
 | S9 | Commit outside the §3a shapes; surviving branch | `git log --stat` against `dd-gitflow-default` §3a; `git branch -r --merged` | MEDIUM | Rewrite the series before the push; tag and delete |

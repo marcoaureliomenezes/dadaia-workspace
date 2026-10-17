@@ -54,7 +54,7 @@ Input: the ratchet modules and the window `from-sha..HEAD`. Output: the "Slop re
 
 1. Run the repo's own ratchet checks; record each count beside its ceiling.
 2. Trend each ratchet over the window: the count at the from-sha against HEAD, read-only: `git archive <from-sha>` under `.dadaia/tmp/<agent>/<YYYYMMDD>/` or `git show <sha>:<path>` — never a worktree or a stash.
-3. Read the density of every SPEC in the window: bytes, words, codes per 1,000 words, numbered families outside FR/AC/T-.
+3. Read the density of every SPEC in the window: bytes, words, codes per 1,000 words, numbered families outside FR/AC/`J<n>.T<k>`.
 4. Read the GC: the findings of `.dadaia/.venv/bin/dadaia doctor --context <ctx>` at HEAD, and `archive/` tags whose branch survives.
 5. Sample the ten commits with the most additions; apply `SLOP.md` S1-S5 to each diff — the audit proves the review worked, it never redoes it.
 6. Fixed hunt, every audit: for each question in the window's PLAN §1.1 tables, search code and law for a second answer — a restated rule, a second symbol; each is an S10 finding, HIGH.

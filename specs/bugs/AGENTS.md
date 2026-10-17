@@ -11,7 +11,7 @@ Scope: this file governs only `specs/bugs/`.
 - A bug is a merged change that reproducibly breaks a documented contract — `--help`, the workspace law, a schema, a promised exit code.
 - The agent proposes and the operator confirms (`dd-bug-registration` §2).
 - `bugs.py append` runs only after that confirmation; with no operator, the proposal is a handoff finding whose `message` starts `bug-proposal:` — never a record.
-- NOT a bug: a failure inside an unmerged worktree (rework), your own mistake, wrong usage, an environment limit, a designed validation (every `fix:` line), a law ambiguity, a missing feature.
+- NOT a bug: a failure inside an unmerged worktree (rework), your own mistake, wrong usage, an environment limit, a designed validation whose `fix:` line runs, a law ambiguity, a missing feature.
 - A law ambiguity goes to `dd-grill-me`; a missing feature goes to the backlog intake.
 - Redact local paths, IPs, hostnames, private names and secrets from every field, and from every command, output and artifact of the arc.
 
