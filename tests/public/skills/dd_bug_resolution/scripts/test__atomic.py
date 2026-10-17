@@ -141,6 +141,18 @@ def test_none_removes_a_file_and_leaves_a_missing_parent_missing(
 
 
 @pytest.mark.parametrize("content", ["new\n", None], ids=["text", "none"])
+def test_a_junction_is_refused_and_untouched_through_every_door(
+    write: _Write, tmp_path: Path, content: str | None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    target = tmp_path / "junction"
+    write_text(target, "keep\n")
+    monkeypatch.setattr(Path, "is_junction", lambda self: self == target)
+    with pytest.raises(SymlinkRefusedError):
+        write(target, content)
+    assert read_text(target) == "keep\n"
+
+
+@pytest.mark.parametrize("content", ["new\n", None], ids=["text", "none"])
 def test_symlinked_path_is_refused_and_untouched_through_every_door(
     write: _Write, tmp_path: Path, content: str | None
 ) -> None:

@@ -35,7 +35,10 @@ def test_platform_singleton_frozen_and_equivalent_construction() -> None:
 
 @pytest.mark.medium
 def test_importing_the_door_loads_no_dataclasses() -> None:
-    code = "import sys, dadaia_workspace.core.platform; print('dataclasses' in sys.modules)"
+    code = (
+        "import sys\nsys.modules.pop('dataclasses', None)\n"
+        "import dadaia_workspace.core.platform\nprint('dataclasses' in sys.modules)"
+    )
     assert oslib.run([sys.executable, "-c", code], check=True).stdout.strip() == "False"
 
 
