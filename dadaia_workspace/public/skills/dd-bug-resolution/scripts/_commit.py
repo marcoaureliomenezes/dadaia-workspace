@@ -12,7 +12,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from _jsonl import read_text
+from _platform import read_text
 from _refusal import Refusal
 
 Records = list[dict[str, Any]]

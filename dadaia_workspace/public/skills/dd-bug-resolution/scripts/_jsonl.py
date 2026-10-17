@@ -9,11 +9,7 @@ from collections.abc import Iterable, Iterator
 from pathlib import Path
 from typing import Any
 
-from _platform import (
-    Undecodable as Undecodable,
-)  # re-exported until the callers import it from _platform
-from _platform import quote
-from _platform import read_text as read_text
+from _platform import command, read_text
 from _refusal import Refusal
 from _root import workspace_of
 
@@ -40,7 +36,7 @@ def reinstall_fix(start: Path) -> str:
     root = workspace_of(start)
     if root is None:
         return REINSTALL_ACT
-    return f"uvx dadaia-workspace init {quote(str(root))}"
+    return command("uvx", "dadaia-workspace", "init", str(root))
 
 
 def walk(text: str) -> Iterator[tuple[int, Any, str]]:

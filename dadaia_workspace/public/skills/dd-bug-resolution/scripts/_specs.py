@@ -9,6 +9,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+from _jsonl import reinstall_fix
 from _ledger import parse as parse
 from _platform import cli_argv, cli_path, command, inline, run, venv_dir
 from _refusal import Refusal, report
@@ -36,7 +37,7 @@ def workspace_cli(root: Path) -> Path:
     """The installed workspace CLI under *root*. Raises `Refusal` carrying the install fix."""
     if (cli := cli_path(root)).exists():
         return cli
-    raise Refusal("no workspace CLI", _install(root))
+    raise Refusal("no workspace CLI", reinstall_fix(root))
 
 
 def run_cli(
@@ -51,11 +52,7 @@ def run_cli(
     try:
         return run([str(workspace_cli(root)), *args], cwd=cwd or root, env=env, stdin=stdin)
     except OSError as error:
-        raise Refusal(f"the workspace CLI cannot start: {error}", _install(root)) from error
-
-
-def _install(root: Path) -> str:
-    return command("uvx", "dadaia-workspace", "init", str(root))
+        raise Refusal(f"the workspace CLI cannot start: {error}", reinstall_fix(root)) from error
 
 
 def _bound_fix(here: Path, rerun: Script, ledger: str | None) -> tuple[str, str]:
@@ -97,9 +94,6 @@ class Script(tuple[str, ...]):
 
     def inline(self, *words: str, specs: Path | str | None = None) -> str:
         return inline(*self._argv(words, specs))
-
-    def __str__(self) -> str:
-        return self.inline()
 
 
 def script(path: Path) -> Script:

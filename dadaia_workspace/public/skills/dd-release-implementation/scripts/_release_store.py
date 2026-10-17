@@ -17,8 +17,9 @@ from typing import Any
 import _commit
 import _git
 from _grammar import SHA_RE, STATE
-from _jsonl import parse_object, read_text
+from _jsonl import parse_object
 from _ledger import records, replace
+from _platform import read_text
 from _refusal import Refusal
 from _release_check import state_findings
 from _release_schema import UnreadableRelease, current_candidate, live_id
