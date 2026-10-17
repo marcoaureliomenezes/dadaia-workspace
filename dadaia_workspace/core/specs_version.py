@@ -29,7 +29,7 @@ OLDEST_UPGRADABLE_VERSION = 6
 
 #: The canon fingerprint each stamp was cut at — re-pinned only together with a stamp bump,
 #: or while the stamp is unpublished (``test_a_canon_change_bumps_the_stamp`` computes it).
-CANON_AT = {13: "8f1f459f2453a498"}
+CANON_AT = {13: "c49a4c606aad10e7"}
 State = Literal["absent", "file", "malformed", "foreign", "upgradable", "canonical"]
 #: The kinds that hold no tree: nothing to read, rule or repair.
 NO_TREE: frozenset[State] = frozenset({"absent", "file"})
