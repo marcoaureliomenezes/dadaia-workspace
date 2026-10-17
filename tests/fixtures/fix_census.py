@@ -6,6 +6,8 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
+from tests.helpers.oslib import read_text
+
 _PKG = Path(__file__).resolve().parents[2] / "dadaia_workspace"
 
 _CHOKEPOINTS = {
@@ -63,7 +65,7 @@ def fix_sites() -> list[str]:
     the verbs reach — one entry per refusal, keyed by its enclosing function."""
     sites: list[str] = []
     for stem, path in _CHOKEPOINTS.items():
-        for name, fn in _scopes(ast.parse(path.read_text(encoding="utf-8"))).items():
+        for name, fn in _scopes(ast.parse(read_text(path))).items():
             hits = [
                 n
                 for n in ast.walk(fn)
@@ -75,7 +77,7 @@ def fix_sites() -> list[str]:
             ]
             sites += [f"{stem}.{name}"] * len(hits)
     for stem, (path, roots) in _VERBS.items():
-        scopes = _scopes(ast.parse(path.read_text(encoding="utf-8")))
+        scopes = _scopes(ast.parse(read_text(path)))
         for name in _reachable(scopes, roots):
             raises = [
                 n

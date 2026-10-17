@@ -10,6 +10,7 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.core.skill_owner import load_owner
+from tests.helpers.oslib import read_text, write_text
 
 K = load_owner("dd-bug-resolution", "_platform")
 POSIX, WIN = K.detect("linux"), K.detect("win32")
@@ -25,7 +26,7 @@ def test_make_executable_adds_the_exec_bits_on_posix(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     script = tmp_path / "run.sh"
-    script.write_text("x", encoding="utf-8")
+    write_text(script, "x")
     script.chmod(0o644)
     mode = stat.S_IMODE(script.stat().st_mode)
     seen = _chmods(monkeypatch)
@@ -37,7 +38,7 @@ def test_make_executable_is_a_no_op_on_windows(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     script = tmp_path / "run.sh"
-    script.write_text("x", encoding="utf-8")
+    write_text(script, "x")
     seen = _chmods(monkeypatch)
     K.make_executable(script, WIN)
     assert seen == []
@@ -45,7 +46,7 @@ def test_make_executable_is_a_no_op_on_windows(
 
 def test_is_executable_is_existence_on_windows(tmp_path: Path) -> None:
     script = tmp_path / "run.sh"
-    script.write_text("x", encoding="utf-8")
+    write_text(script, "x")
     assert K.is_executable(script, WIN) is True
     assert K.is_executable(tmp_path / "absent", WIN) is False
 
@@ -54,7 +55,7 @@ def test_a_file_made_executable_on_this_host_is_executable_and_an_absent_one_is_
     tmp_path: Path,
 ) -> None:
     script = tmp_path / "run.sh"
-    script.write_text("x", encoding="utf-8")
+    write_text(script, "x")
     K.make_executable(script)
     assert K.is_executable(script) is True
     assert K.is_executable(tmp_path / "absent") is False
@@ -63,11 +64,11 @@ def test_a_file_made_executable_on_this_host_is_executable_and_an_absent_one_is_
 def test_replace_swaps_a_file_onto_an_existing_one_and_a_directory_onto_a_free_name(
     tmp_path: Path,
 ) -> None:
-    (tmp_path / "a").write_text("new", encoding="utf-8")
-    (tmp_path / "b").write_text("old", encoding="utf-8")
+    write_text(tmp_path / "a", "new")
+    write_text(tmp_path / "b", "old")
     K.replace(tmp_path / "a", tmp_path / "b")
     assert [p.name for p in sorted(tmp_path.iterdir())] == ["b"]
-    assert (tmp_path / "b").read_text(encoding="utf-8") == "new"
+    assert read_text(tmp_path / "b") == "new"
     (tmp_path / "d").mkdir()
     K.replace(tmp_path / "d", tmp_path / "e")
     assert [p.name for p in sorted(tmp_path.iterdir())] == ["b", "e"]
@@ -87,9 +88,9 @@ def test_replace_retries_a_held_open_destination_then_succeeds(
 
     monkeypatch.setattr(time, "sleep", lambda _s: None)
     monkeypatch.setattr(os, "replace", held)
-    (tmp_path / "a").write_text("x", encoding="utf-8")
+    write_text(tmp_path / "a", "x")
     K.replace(tmp_path / "a", tmp_path / "b")
-    assert (len(calls), (tmp_path / "b").read_text(encoding="utf-8")) == (4, "x")
+    assert (len(calls), read_text(tmp_path / "b")) == (4, "x")
 
 
 def test_replace_raises_after_fifty_attempts_on_a_destination_that_stays_held(
@@ -110,7 +111,7 @@ def test_replace_raises_after_fifty_attempts_on_a_destination_that_stays_held(
 
 def test_link_either_makes_a_link_is_link_sees_or_reports_false(tmp_path: Path) -> None:
     target = tmp_path / "t"
-    target.write_text("x", encoding="utf-8")
+    write_text(target, "x")
     made = K.link("t", tmp_path / "l", is_dir=False)
     assert K.is_link(tmp_path / "l") is made
     assert K.is_link(target) is False
@@ -126,7 +127,7 @@ def test_make_writable_gives_the_owner_write_on_a_file_and_a_directory(tmp_path:
     folder = tmp_path / "d"
     folder.mkdir()
     file = folder / "f"
-    file.write_text("x", encoding="utf-8")
+    write_text(file, "x")
     file.chmod(0o444)
     K.make_writable(file)
     K.make_writable(folder)

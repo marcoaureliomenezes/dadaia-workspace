@@ -9,6 +9,7 @@ import pathlib
 
 import pytest
 
+from tests.helpers.oslib import read_text
 from tests.helpers.worktree_ws import commit, make_workspace
 
 _write_text = pathlib.Path.write_text
@@ -27,7 +28,7 @@ def test_the_plan_fixture_is_utf8_on_a_cp1252_host(
 ) -> None:
     root = make_workspace(tmp_path)
     plan = root / "repos/r/specs/releases/0.5.0/rc-1/PLAN.md"
-    assert "| Job 1 | 1 | — |" in plan.read_text(encoding="utf-8")
+    assert "| Job 1 | 1 | — |" in read_text(plan)
 
 
 def test_commit_writes_its_text_as_utf8_on_a_cp1252_host(
@@ -35,4 +36,4 @@ def test_commit_writes_its_text_as_utf8_on_a_cp1252_host(
 ) -> None:
     root = make_workspace(tmp_path)
     commit(root / "repos/r", "a.md", "a — b\n")
-    assert (root / "repos/r/a.md").read_text(encoding="utf-8") == "a — b\n"
+    assert read_text(root / "repos/r/a.md") == "a — b\n"

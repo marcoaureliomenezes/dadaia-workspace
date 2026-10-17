@@ -11,6 +11,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from tests.helpers.oslib import write_text
+
 #: A PLAN `release.py` admits: a `## DAG` table and a `### Hot files` list.
 PLAN = (
     "## 1. As-is review\n\n## DAG\n\n| job | waits on | why |\n|---|---|---|\n"
@@ -39,4 +41,4 @@ def write_release_phase(specs_dir: Path, release_id: str, phase: str) -> None:
         "shipped": None,
         "log": [],
     }
-    (rdir / "_RELEASE.json").write_text(json.dumps(state, indent=2) + "\n", encoding="utf-8")
+    write_text(rdir / "_RELEASE.json", json.dumps(state, indent=2) + "\n")

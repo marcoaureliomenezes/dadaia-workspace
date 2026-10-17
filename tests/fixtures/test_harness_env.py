@@ -8,6 +8,8 @@ from pathlib import Path, PurePosixPath
 
 import pytest
 
+from tests.helpers.oslib import write_text
+
 _HOME = "/tmp/h"
 
 
@@ -60,8 +62,8 @@ def test_git_bash_on_windows_is_the_one_beside_git(
 
     (tmp_path / "Git" / "cmd").mkdir(parents=True)
     (tmp_path / "Git" / "bin").mkdir()
-    (tmp_path / "Git" / "cmd" / "git.exe").write_text("", "utf-8")
-    (tmp_path / "Git" / "bin" / "bash.exe").write_text("", "utf-8")
+    write_text(tmp_path / "Git" / "cmd" / "git.exe", "")
+    write_text(tmp_path / "Git" / "bin" / "bash.exe", "")
     monkeypatch.setattr("dadaia_workspace.core.platform.PLATFORM", Capabilities.detect("win32"))
     monkeypatch.setattr("shutil.which", lambda _name: str(tmp_path / "Git" / "cmd" / "git.exe"))
     assert git_bash() == str(tmp_path / "Git" / "bin" / "bash.exe")

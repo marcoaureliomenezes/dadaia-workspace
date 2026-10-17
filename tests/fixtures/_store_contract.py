@@ -19,6 +19,8 @@ import json
 from pathlib import Path
 from typing import Any, Protocol
 
+from tests.helpers.oslib import read_text, write_text
+
 
 class LoadParseSaveStore(Protocol):
     """The shared shape of the load/parse/save+last-good stores."""
@@ -45,7 +47,7 @@ def assert_corrupt_json_raises_typed_error(
     store: LoadParseSaveStore, error_type: type[Exception]
 ) -> None:
     store.path.parent.mkdir(parents=True, exist_ok=True)
-    store.path.write_text("{not json", encoding="utf-8")
+    write_text(store.path, "{not json")
     try:
         store.load()
     except error_type:
@@ -63,7 +65,7 @@ def assert_unknown_top_level_field_rejected(
     doc = dict(valid_doc)
     doc[bogus_key] = 1
     store.path.parent.mkdir(parents=True, exist_ok=True)
-    store.path.write_text(json.dumps(doc), encoding="utf-8")
+    write_text(store.path, json.dumps(doc))
     try:
         store.load()
     except error_type as exc:
@@ -81,7 +83,7 @@ def assert_wrong_schema_version_rejected(
     doc = dict(valid_doc)
     doc["schema_version"] = bad_version
     store.path.parent.mkdir(parents=True, exist_ok=True)
-    store.path.write_text(json.dumps(doc), encoding="utf-8")
+    write_text(store.path, json.dumps(doc))
     try:
         store.load()
     except error_type:
@@ -92,7 +94,7 @@ def assert_wrong_schema_version_rejected(
 
 def assert_root_not_object_rejected(store: LoadParseSaveStore, error_type: type[Exception]) -> None:
     store.path.parent.mkdir(parents=True, exist_ok=True)
-    store.path.write_text("[1, 2, 3]", encoding="utf-8")
+    write_text(store.path, "[1, 2, 3]")
     try:
         store.load()
     except error_type:
@@ -155,7 +157,7 @@ def assert_read_write_store_contract(
     assert store.read(states_dir) == first_value
 
     path = states_dir / filename
-    data = json.loads(path.read_text(encoding="utf-8"))
+    data = json.loads(read_text(path))
     assert data == canonical_shape
 
     first_mtime = path.stat().st_mtime_ns

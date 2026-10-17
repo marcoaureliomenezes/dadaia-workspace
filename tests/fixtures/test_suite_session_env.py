@@ -11,6 +11,8 @@ from pathlib import Path
 
 import pytest
 
+from tests.helpers.oslib import write_text
+
 pytestmark = pytest.mark.slow
 
 _CHECKOUT = Path(__file__).resolve().parents[2]
@@ -68,12 +70,12 @@ def test_inner_runs_see_the_temp_home_and_fail_on_a_pycache_or_a_created_root_ca
     monkeypatch.setenv("DADAIA_CONTEXT", "ghost")
     monkeypatch.setenv("HOME", str(foreign))
     monkeypatch.setenv("OUTER_FOREIGN_HOME", str(foreign))
-    (inner / "test_home.py").write_text(_SEES_THE_TEMP_HOME, encoding="utf-8")
-    (inner / "test_pycache.py").write_text(_WRITES_A_PYCACHE, encoding="utf-8")
+    write_text(inner / "test_home.py", _SEES_THE_TEMP_HOME)
+    write_text(inner / "test_pycache.py", _WRITES_A_PYCACHE)
 
     home = pytester.runpytest_subprocess(str(inner / "test_home.py"), "-p", "no:randomly")
     pycache = pytester.runpytest_subprocess(str(inner / "test_pycache.py"), "-p", "no:randomly")
-    (inner / "test_ruff.py").write_text(_CREATES_A_RUFF_CACHE, encoding="utf-8")
+    write_text(inner / "test_ruff.py", _CREATES_A_RUFF_CACHE)
     ruff = (str(inner / "test_ruff.py"), "-p", "no:randomly", f"--rootdir={pytester.path}")
     created = pytester.runpytest_subprocess(*ruff)
     preexisting = pytester.runpytest_subprocess(*ruff)

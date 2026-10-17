@@ -10,6 +10,7 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.core.skill_owner import load_owner
+from tests.helpers.oslib import write_text
 
 K = load_owner("dd-bug-resolution", "_platform")
 POSIX, WIN = K.detect("linux"), K.detect("win32")
@@ -65,7 +66,7 @@ def test_listeners_are_unknown_when_ss_cannot_run(tmp_path: Path) -> None:
 
 def test_the_owner_of_a_file_is_the_effective_user_or_unknown_together(tmp_path: Path) -> None:
     path = tmp_path / "f"
-    path.write_text("x", encoding="utf-8")
+    write_text(path, "x")
     owner, uid = K.file_owner(path), K.effective_uid()
     assert (owner is None) == (uid is None)
     assert owner is None or owner[0] == uid
@@ -73,5 +74,5 @@ def test_the_owner_of_a_file_is_the_effective_user_or_unknown_together(tmp_path:
 
 def test_can_write_a_fresh_file(tmp_path: Path) -> None:
     path = tmp_path / "f"
-    path.write_text("x", encoding="utf-8")
+    write_text(path, "x")
     assert (K.can_write(path), K.can_write(tmp_path / "absent")) == (True, False)
