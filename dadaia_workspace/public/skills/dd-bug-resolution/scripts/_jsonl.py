@@ -9,7 +9,7 @@ from collections.abc import Iterable, Iterator
 from pathlib import Path
 from typing import Any
 
-from _platform import command, read_text
+from _platform import Caps, command, read_text
 from _refusal import Refusal
 from _root import workspace_of
 
@@ -30,13 +30,13 @@ class Unreadable(Refusal):
 REINSTALL_ACT = "Agent action: run `uvx dadaia-workspace init` with the workspace's directory as its first argument"
 
 
-def reinstall_fix(start: Path) -> str:
+def reinstall_fix(start: Path, caps: Caps | None = None) -> str:
     """The command that repairs a shipped file under *start*: `init` of the workspace holding
     it, which answers its harness from its own profile; outside every workspace, the act."""
     root = workspace_of(start)
     if root is None:
         return REINSTALL_ACT
-    return command("uvx", "dadaia-workspace", "init", str(root))
+    return command("uvx", "dadaia-workspace", "init", str(root), caps=caps)
 
 
 def walk(text: str) -> Iterator[tuple[int, Any, str]]:
