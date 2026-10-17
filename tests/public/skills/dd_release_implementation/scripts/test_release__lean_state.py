@@ -258,8 +258,7 @@ def test_ship_requires_each_open_bug_flag_and_its_verbatim_authorization_note(
     [
         pytest.param(
             [_entry("summary", "carried: a-bug; backlog exits: none")],
-            "Operator action: authorize carrying a-bug, then record it in the kind: note verbatim "
-            "authorization and the kind: summary carried field",
+            "Operator action: authorize carrying a-bug",
             id="no-authorization-is-the-operators",
         ),
         pytest.param(

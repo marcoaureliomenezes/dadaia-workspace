@@ -6,6 +6,7 @@ from __future__ import annotations
 import subprocess
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -52,3 +53,20 @@ def test_a_bad_sha_fix_without_git_is_an_act_never_a_shell_substitution(tmp_path
     fix = _refusal_fix(tmp_path / "specs")
     assert "$(" not in fix and fix.startswith("Agent action: run `")
     assert fix.count("Agent action:") == 1
+
+
+def test_a_missing_spec_is_written_by_its_agent_and_a_draft_is_approved_by_the_operator(
+    tmp_path: Path,
+) -> None:
+    live = SimpleNamespace(release_id="1.0.0", release_dir=tmp_path, candidate=tmp_path / "rc-1")
+    (tmp_path / "rc-1").mkdir()
+    with pytest.raises(_PHASE.Refusal) as missing:
+        _PHASE._refuse_unapproved_docs(live)
+    spec = (tmp_path / "rc-1" / "SPEC.md").resolve()
+    assert missing.value.fix == (
+        f"Agent action: write {spec} (its writer per specs/AGENTS.md §4) and put it to the operator for approval"
+    )
+    spec.write_text("**Status:** Draft\n", encoding="utf-8")
+    with pytest.raises(_PHASE.Refusal) as draft:
+        _PHASE._refuse_unapproved_docs(live)
+    assert draft.value.fix == f"Operator action: set '**Status:** Approved' in {spec}"

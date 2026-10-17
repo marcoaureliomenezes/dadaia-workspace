@@ -321,7 +321,7 @@ def test_dead_refuses_a_dirty_checkout_with_one_fix_line_naming_every_file(tmp_p
 
     fixes = [line for line in str(refused.value).splitlines() if line.startswith("fix: ")]
     assert fixes == [
-        f"fix: Operator action: move {lib / 'README.md'}, {lib / 'new.txt'} into a worktree, or discard it",
+        f"fix: Agent action: move {lib / 'README.md'}, {lib / 'new.txt'} into a worktree",
     ]
     assert read_text(lib / "README.md") == "edited\n" and (lib / "new.txt").is_file()
     assert run(["git", "ls-remote", str(tmp_path / "lib.git")], check=True).stdout == origin_before

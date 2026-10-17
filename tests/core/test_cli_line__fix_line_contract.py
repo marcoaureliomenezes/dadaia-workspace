@@ -271,36 +271,42 @@ SITES: dict[str, Callable[[Path], str | None]] = {
 
 _PKG = Path(__file__).resolve().parents[2] / "dadaia_workspace"
 
-#: The files whose refusals name an act only the human may do (the law's reserved set), by how
-#: many times each spells `Operator action`; every other act a refusal names is the agent's.
-_HUMAN_ONLY = {
-    "cli/commands/context.py": 1,
-    "core/context_registry.py": 1,
-    "features/chokepoints/push_gate.py": 1,
-    "features/spec_context/doctor.py": 2,
-    "features/spec_context/gate_policy.py": 1,
-    "features/spec_context/service.py": 1,
-    "features/spec_context/sweep.py": 1,
-    "infrastructure/git_subprocess.py": 1,
-    "infrastructure/json_context_store.py": 3,
-    "public/skills/dd-backlog-definition/scripts/_backlog_exit.py": 1,
-    "public/skills/dd-bug-resolution/scripts/_ledger.py": 1,
-    "public/skills/dd-cli-library/scripts/registry.py": 1,
-    "public/skills/dd-gitflow-default/scripts/_worktree_new.py": 1,
-    "public/skills/dd-release-implementation/scripts/_release_phase.py": 2,
-    "public/skills/dd-release-implementation/scripts/release.py": 2,
-}
+#: Every `Operator action:` line the sources print, by file, with the root map section 3 category
+#: that admits it: `ruling` (a ruling the law names), `protected` (a PROTECTED or `.dadaiaignore`
+#: path, or a secret), `reach` (an act outside the agents' reach). A new line fails until it is
+#: classed here, and an agent act is never a category.
+_OPERATOR_ACTIONS = {
+    ("cli/commands/context.py", "export DADAIA_SESSION_ID"): "reach",
+    ("core/context_registry.py", "rewrite {path} as one {shape} object"): "protected",
+    ("features/chokepoints/push_gate.py", "make git runnable here"): "reach",
+    ("features/spec_context/doctor.py", "split {skill}/SKILL.md at its library source"): "reach",
+    ("features/spec_context/doctor.py", "move {entry.name} out of the workspace"): "protected",
+    ("features/spec_context/gate_policy.py", "relaunch this session with DADAIA_CONTEXT"): "reach",
+    ("features/spec_context/sweep.py", "remove {target}"): "reach",
+    ("infrastructure/git_subprocess.py", "pop or drop the {stashes} stash"): "ruling",
+    ("infrastructure/json_context_store.py", "set it to {_VERSION} in {path}"): "protected",
+    ("infrastructure/json_context_store.py", "add {', '.join(missing)} to that row"): "protected",
+    ("public/skills/dd-backlog-definition/scripts/_backlog_exit.py", "confirm {slug} as a bug"): "ruling",
+    ("public/skills/dd-bug-resolution/scripts/_ledger.py", "rewrite {path} as one JSON object"): "protected",
+    ("public/skills/dd-cli-library/scripts/registry.py", "delete {_platform.quote(str(path))}"): "protected",
+    ("public/skills/dd-gitflow-default/scripts/_worktree_new.py", "confirm {act}"): "ruling",
+    ("public/skills/dd-release-implementation/scripts/_release_phase.py", "set '**Status:** {APPROVED}'"): "ruling",
+    ("public/skills/dd-release-implementation/scripts/release.py", "authorize carrying {', '.join(missing)}"): "ruling",
+    ("public/skills/dd-release-implementation/scripts/release.py", "authorize carrying {bug_id}"): "ruling",
+}  # fmt: skip
 
 
-def test_an_operator_action_is_only_what_the_law_reserves_to_the_human() -> None:
-    """Exactly the reserved files spell `Operator action`, as often as the acts the law reserves
-    there."""
-    found = {
-        p.relative_to(_PKG).as_posix(): n
+def test_an_operator_action_is_one_act_the_law_reserves_to_the_human() -> None:
+    """Each `Operator action:` text the sources print opens with one classed act and hands over no
+    follow-up step, and every classed act is still printed."""
+    found = [
+        (p.relative_to(_PKG).as_posix(), text)
         for p in _PKG.rglob("*.py")
-        if (n := read_text(p).count("Operator action"))
-    }
-    assert found == _HUMAN_ONLY
+        for text in re.findall(r"Operator action: ([^\"\n]*)", read_text(p))
+    ]
+    acts = [next((k for k in _OPERATOR_ACTIONS if k[0] == f and t.startswith(k[1])), (f, t)) for f, t in found]
+    assert sorted(acts) == sorted(_OPERATOR_ACTIONS)
+    assert not [t for _, t in found if " then " in t], "an Operator action line never bundles the agent's steps"
 
 
 @pytest.mark.parametrize(
@@ -1126,7 +1132,7 @@ def test_every_fix_line_prints_on_one_line_without_a_tty(tmp_path: Path) -> None
     world = World(tmp_path / ("d" * 90))
     _unborn_dirty(world)
     fix = _fix(world.cli("context", "dead", "proj"), world.ws)
-    assert fix.endswith("notes.txt into a worktree, or discard it"), fix
+    assert fix.startswith("Agent action: move ") and fix.endswith("notes.txt into a worktree"), fix
     assert re.search(re.escape(str(world.ws)), fix)
 
 
@@ -1218,7 +1224,7 @@ def test_dead_after_the_operator_pulls_into_a_conflict_publishes_no_markers(
     output = done.stdout + done.stderr
     fix = _fix(done, world.ws)
     assert done.returncode != 0 and "README.md" in fix and "x.md" in fix, output
-    assert fix.endswith("into a worktree, or discard it"), output
+    assert fix.startswith("Agent action: move ") and fix.endswith("into a worktree"), output
     assert world.repo.is_dir() and world.remote_heads()["feature/1.0.0"] == published
 
 

@@ -161,7 +161,7 @@ def test_every_fix_line_prints_on_one_line_without_a_tty(tmp_path: Path) -> None
     world = World(tmp_path / ("d" * 90))
     _unborn_dirty(world)
     fix = _single_fix(world.cli("context", "dead", "proj"))
-    assert fix.endswith("notes.txt into a worktree, or discard it"), fix
+    assert fix.startswith("Agent action: move ") and fix.endswith("notes.txt into a worktree"), fix
     assert re.search(re.escape(str(world.ws)), fix)
 
 
@@ -248,5 +248,5 @@ def test_dead_after_the_operator_pulls_into_a_conflict_publishes_no_markers(
     output = done.stdout + done.stderr
     fix = _single_fix(done)
     assert done.returncode != 0 and "README.md" in fix and "x.md" in fix, output
-    assert fix.endswith("into a worktree, or discard it"), output
+    assert fix.startswith("Agent action: move ") and fix.endswith("into a worktree"), output
     assert world.repo.is_dir() and world.remote_heads()["feature/1.0.0"] == published
