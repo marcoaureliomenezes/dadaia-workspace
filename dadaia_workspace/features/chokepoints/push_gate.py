@@ -161,7 +161,7 @@ def _read_failure(exc: GitObjectReadError, masker: PathMasker, repo: Path) -> De
         message=_fail_closed(f"reading the pushed-range git objects failed ({exc}{masked})")
         + "\n"
         + spell_fix(
-            "Operator action: make git runnable here, then push again"  # not corruption: no fsck
+            "Operator action: make git runnable here"  # not corruption: no fsck
             if isinstance(exc, GitRunError)
             else git_line(repo, "fsck")
         ),

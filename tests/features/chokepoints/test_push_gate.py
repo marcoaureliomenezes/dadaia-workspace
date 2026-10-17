@@ -216,7 +216,7 @@ class _Raising:
     pytest.param(GitObjectReadError("stream desynchronised", path=f"{_SEG}/leak.md"),
                  [f"{_MASKED}/leak.md"], "fix: {fsck}", id="A4.2-read-failure-path-masked"),
     pytest.param(GitObjectReadError("stream desynchronised"), [], "fix: {fsck}", id="S5-corruption-names-fsck"),
-    pytest.param(GitRunError("git timed out"), [], "fix: Operator action: make git runnable here, then push again",
+    pytest.param(GitRunError("git timed out"), [], "fix: Operator action: make git runnable here",
                  id="S5-git-cannot-run-no-fsck"),
 ])
 # fmt: on

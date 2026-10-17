@@ -304,9 +304,14 @@ def test_an_operator_action_is_one_act_the_law_reserves_to_the_human() -> None:
         for p in _PKG.rglob("*.py")
         for text in re.findall(r"Operator action: ([^\"\n]*)", read_text(p))
     ]
-    acts = [next((k for k in _OPERATOR_ACTIONS if k[0] == f and t.startswith(k[1])), (f, t)) for f, t in found]
+    acts = [
+        next((k for k in _OPERATOR_ACTIONS if k[0] == f and t.startswith(k[1])), (f, t))
+        for f, t in found
+    ]
     assert sorted(acts) == sorted(_OPERATOR_ACTIONS)
-    assert not [t for _, t in found if " then " in t], "an Operator action line never bundles the agent's steps"
+    assert not [t for _, t in found if " then " in t], (
+        "an Operator action line never bundles the agent's steps"
+    )
 
 
 @pytest.mark.parametrize(

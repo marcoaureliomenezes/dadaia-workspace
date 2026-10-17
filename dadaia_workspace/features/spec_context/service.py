@@ -696,9 +696,9 @@ class SpecContextService:
                 raise DeadReviewRequiredError(
                     f"{lead} has {len(dirty)} uncommitted change(s); dead never "
                     "commits. Nothing was touched.",
-                    fix="Operator action: move "
+                    fix="Agent action: move "
                     + ", ".join(str(path / rel) for rel in dirty)
-                    + " into a worktree, or discard it",
+                    + " into a worktree",
                 )
             held = [r for r in trees if r["repo"] == slug and r["exit"]]  # the owner's exits
             lost = [refix] if failed else [r["exit"] for r in held]

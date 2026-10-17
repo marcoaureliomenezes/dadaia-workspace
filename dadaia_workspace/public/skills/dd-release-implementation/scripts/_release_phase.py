@@ -44,7 +44,7 @@ def _refuse_unapproved_docs(live: Live) -> Path:
         if not document.is_file():
             raise Refusal(
                 f"release {live.release_id} has no {document.relative_to(live.release_dir).as_posix()}",
-                f"Operator action: write {document.resolve()} carrying '**Status:** {APPROVED}'",
+                f"Agent action: write {document.resolve()} (its writer per specs/AGENTS.md §4) and put it to the operator for approval",
             )
         status = extract_status(read_text(document))
         if status != APPROVED:

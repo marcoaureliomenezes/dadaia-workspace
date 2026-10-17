@@ -180,8 +180,7 @@ def _allowed_open_bugs(args: argparse.Namespace, specs: Path) -> list[str]:
         fix = (
             f"Agent action: resolve {', '.join(missing)} before shipping"
             if not allowed
-            else "Operator action: authorize each open bug carry, record the authorization "
-            "verbatim in a kind: note entry, then repeat --allow-open for each id"
+            else f"Operator action: authorize carrying {', '.join(missing)}"
         )
         raise Refusal(
             f"open bug(s) require one --allow-open flag each: {', '.join(missing)}",
@@ -210,8 +209,7 @@ def _refuse_unauthorized(allowed: list[str], state: dict[str, Any]) -> None:
         if not authorized:
             raise Refusal(
                 f"--allow-open {bug_id} has no authorization note",
-                f"Operator action: authorize carrying {bug_id}, then record it in the kind: note "
-                "verbatim authorization and the kind: summary carried field",
+                f"Operator action: authorize carrying {bug_id}",
             )
         if not carried:
             raise Refusal(
