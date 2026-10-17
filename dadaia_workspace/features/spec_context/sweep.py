@@ -95,10 +95,8 @@ def guarded(code: str, label: str, step: Callable[[], str | Skipped | None]) -> 
 
 
 def _owner(path: Path) -> str:
-    try:
-        return path.owner()
-    except (NotImplementedError, KeyError, OSError):  # Windows; a uid with no account
-        return "another account"
+    owner = platform.file_owner(path)
+    return "another account" if owner is None else owner[1]
 
 
 def _inside(workspace_root: Path, target: Path) -> bool:
