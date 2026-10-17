@@ -66,9 +66,14 @@ def _json_dump(data: object) -> str:
     return json.dumps(data, indent=2, sort_keys=True) + "\n"
 
 
+_TOML_CONTROL = {
+    n: f"\\u{n:04x}" for n in [*range(9), *range(11, 32), 127]
+}  # tab and newline stay literal
+
+
 def _toml_escape(value: object) -> str:
     """*value* as a TOML string: multi-line basic when it holds a newline, else basic."""
-    s = str(value)
+    s = str(value).replace("\\", "\\\\").translate(_TOML_CONTROL)
     if "\n" in s:
         return '"""' + s.replace('"""', '\\"\\"\\"') + '"""'
-    return '"' + s.replace("\\", "\\\\").replace('"', '\\"') + '"'
+    return '"' + s.replace('"', '\\"') + '"'
