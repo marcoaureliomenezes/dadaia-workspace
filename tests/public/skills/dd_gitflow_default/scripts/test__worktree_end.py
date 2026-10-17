@@ -578,7 +578,9 @@ def test_a_code_commit_made_on_the_job_branch_lands_once_reviewed(root: Path) ->
     [("hotfix", ""), ("job", ""), ("job", "FOO=1 python scripts/ci.py job")],
     ids=["hotfix-absent", "job-absent", "job-env-assignment"],
 )
-def test_a_verify_line_refusal_clears_by_its_printed_act(root: Path, kind: str, declared: str) -> None:
+def test_a_verify_line_refusal_clears_by_its_printed_act(
+    root: Path, kind: str, declared: str
+) -> None:
     """The work branch's `verify:` line judges a merge: when it is absent or unstartable, the printed
     act (a backlog lane lands the repo's `AGENTS.md`, then the printed sync of the tree owning the
     merge base) is performed verbatim, and the same merge then lands."""
