@@ -5,6 +5,7 @@ Tests pass the platform to ``Capabilities.detect`` so ``PLATFORM`` is not distur
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path, PurePosixPath
 
 import pytest
@@ -12,6 +13,7 @@ import pytest
 from dadaia_workspace.core import platform
 from dadaia_workspace.core.platform import PLATFORM, Capabilities
 from dadaia_workspace.core.skill_owner import load_owner
+from tests.helpers import oslib
 
 
 @pytest.mark.parametrize(
@@ -29,6 +31,12 @@ def test_platform_singleton_frozen_and_equivalent_construction() -> None:
     with pytest.raises((AttributeError, TypeError)):
         PLATFORM.venv_exe_suffix = ""  # type: ignore[misc]
     assert Capabilities.detect() == PLATFORM  # no argument reads sys.platform
+
+
+@pytest.mark.medium
+def test_importing_the_door_loads_no_dataclasses() -> None:
+    code = "import sys, dadaia_workspace.core.platform; print('dataclasses' in sys.modules)"
+    assert oslib.run([sys.executable, "-c", code], check=True).stdout.strip() == "False"
 
 
 _NO_CAPS_NEEDED = [
