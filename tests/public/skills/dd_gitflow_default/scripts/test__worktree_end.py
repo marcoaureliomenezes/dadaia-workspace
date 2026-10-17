@@ -28,7 +28,7 @@ from dadaia_workspace.infrastructure.ledger_scripts import (
     load_owner,
 )
 from tests.fixtures.harness_env import run_bash, run_python, suite_env
-from tests.helpers.oslib import cli_argv, command, read_text, venv_dir, write_text
+from tests.helpers.oslib import cli_argv, command, inline, read_text, venv_dir, write_text
 from tests.helpers.oslib import run as os_run
 from tests.helpers.release_state import write_release_phase
 from tests.helpers.skill_scripts import stage_skill_scripts
@@ -608,7 +608,8 @@ def test_a_verify_line_refusal_clears_by_its_printed_act(
            f"make the verify: line of AGENTS.md on {onto} one argv list that starts"
            " (no shell: no VAR=value prefix, no sh -c)")  # fmt: skip
     assert refused.returncode == 1 and "Traceback" not in refused.stderr
-    assert fixes(refused) == [f"fix: Agent action: {act} through a wt-backlog lane, then `{_sync_line(root, owner)}`"]  # fmt: skip
+    sync = inline(*cli_argv(venv_dir(root)), "worktree", "sync", str(owner))
+    assert fixes(refused) == [f"fix: Agent action: {act} through a wt-backlog lane, then `{sync}`"]  # fmt: skip
     lane = open_tree(root, BACKLOG)
     approve(root, commit(lane, "AGENTS.md", good), name=BACKLOG)
     assert run(root, "merge", str(lane)).returncode == 0
