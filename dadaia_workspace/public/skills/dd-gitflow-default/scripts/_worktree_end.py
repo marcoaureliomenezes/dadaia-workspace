@@ -155,9 +155,11 @@ def _land_line(tree: Path, work: str, act: str) -> str:
     """The one act that lands a repo-law line: a backlog lane carries it onto the work branch (its
     merge still runs the verdict and the ledger checks), then the tree owning *work* syncs."""
     root = workspace_of(tree)
-    repo = root / "repos" / tree.relative_to(tree_path(root, "")).parts[0]
-    owner = _into(repo, work) if work.startswith("wt/") else tree
-    return f"Agent action: {act} through a wt-backlog lane, then `{inline(*cli_words(root, 'worktree', 'sync', str(owner)))}`"  # fmt: skip
+    owner = tree
+    if root and work.startswith("wt/"):
+        owner = _into(root / "repos" / tree.relative_to(tree_path(root, "")).parts[0], work)
+    sync = inline(*cli_words(root, "worktree", "sync", str(owner))) if root else "worktree sync"
+    return f"Agent action: {act} through a wt-backlog lane, then `{sync}`"
 
 
 def _declared(tree: Path, work: str, key: str) -> str:
