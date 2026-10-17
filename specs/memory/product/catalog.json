@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-17T04:29:04Z",
+  "generated_at": "2026-10-17T22:24:08Z",
   "features": [
     {
       "rank": 1,
@@ -238,7 +238,7 @@
         "projection",
         "hooks"
       ],
-      "token_estimate": 401,
+      "token_estimate": 417,
       "depends_on": [
         "agentic-entities",
         "sdd-gate-v3",
@@ -250,6 +250,7 @@
         "dadaia_workspace/infrastructure/codex_doctor.py",
         "dadaia_workspace/infrastructure/agent_transcodes.py",
         "dadaia_workspace/infrastructure/runtime_config.py",
+        "dadaia_workspace/infrastructure/runtime_transforms/codex_assets.py",
         "dadaia_workspace/infrastructure/runtime_transforms/hook_wrappers.py"
       ]
     },
