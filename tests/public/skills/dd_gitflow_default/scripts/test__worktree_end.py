@@ -599,6 +599,7 @@ def test_a_verify_line_refusal_clears_by_its_printed_act(
     else:
         assert run(root, "sync", str(root / RC_TREE)).returncode == 0  # rc and job carry the line
         tree, name, onto, owner = root / TREE, NEW_JOB, WORK, root / RC_TREE
+        land(root, "AGENTS.md", good)  # the job's own good line never judges it
         land(root, "src/a.py")
     head = lambda: git(tree, "rev-parse", "HEAD").strip()  # noqa: E731
     approve(root, commit(tree, "src/b.py") if kind == "hotfix" else head(), name=name)
