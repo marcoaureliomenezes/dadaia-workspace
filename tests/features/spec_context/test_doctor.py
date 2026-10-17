@@ -365,6 +365,7 @@ def test_fix_migrates_the_legacy_exceptions_and_never_touches_operator_files(
     (env,) = [f for f in found if f.path == ".env"]
     assert not invalid.fixable and "!keep" in invalid.detail
     assert not env.fixable and "outside the workspace" in env.detail
+    assert env.fix == "Operator action: move .env out of the workspace"
     _make_doctor(tmp_path).fix()
     assert (tmp_path / DADAIAIGNORE).is_file() and (tmp_path / ".env").is_file()
 
@@ -378,7 +379,7 @@ def test_fix_on_a_root_holding_a_git_dir_moves_nothing(tmp_path: Path) -> None:
     write_text(head, "ref: refs/heads/main\n")
     (git,) = [f for f in _make_doctor(tmp_path).scan() if f.path == ".git"]
     assert git.verdict is FindingVerdict.SLOP and not git.fixable
-    assert git.fix.startswith("Operator action:")
+    assert git.fix == "Operator action: move .git out of the workspace"
     _make_doctor(tmp_path).fix()
     assert read_text(head) == "ref: refs/heads/main\n"
 

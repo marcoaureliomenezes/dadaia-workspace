@@ -271,47 +271,63 @@ SITES: dict[str, Callable[[Path], str | None]] = {
 
 _PKG = Path(__file__).resolve().parents[2] / "dadaia_workspace"
 
-#: Every `Operator action:` line the sources print, by file, with the root map section 3 category
-#: that admits it: `ruling` (a ruling the law names), `protected` (a PROTECTED or `.dadaiaignore`
-#: path, or a secret), `reach` (an act outside the agents' reach). A new line fails until it is
-#: classed here, and an agent act is never a category.
+#: Every `Operator action:` text the sources print, whole, by file, with the root map section 3
+#: category that admits it: `ruling` (a ruling the law names, root map section 4 for uncommitted
+#: work), `protected` (a PROTECTED or `.dadaiaignore` path, or a secret), `reach` (an act outside
+#: the agents' reach). An f-string spells each value as `{source}`. A new or changed text fails
+#: until it is classed here; a text built from a variable stays covered by its exact-line pin.
 _OPERATOR_ACTIONS = {
-    ("cli/commands/context.py", "export DADAIA_SESSION_ID"): "reach",
+    ("cli/commands/context.py", "export DADAIA_SESSION_ID set to a stable id of your choice before opening the session"): "reach",
     ("core/context_registry.py", "rewrite {path} as one {shape} object"): "protected",
     ("features/chokepoints/push_gate.py", "make git runnable here"): "reach",
-    ("features/spec_context/doctor.py", "split {skill}/SKILL.md at its library source"): "reach",
+    ("features/spec_context/doctor.py", "split {skill}/SKILL.md at its library source; this workspace holds none and never edits the projection"): "reach",
     ("features/spec_context/doctor.py", "move {entry.name} out of the workspace"): "protected",
-    ("features/spec_context/gate_policy.py", "relaunch this session with DADAIA_CONTEXT"): "reach",
+    ("features/spec_context/gate_policy.py", "relaunch this session with DADAIA_CONTEXT={owner}"): "reach",
     ("features/spec_context/sweep.py", "remove {target}"): "reach",
-    ("infrastructure/git_subprocess.py", "pop or drop the {stashes} stash"): "ruling",
+    ("infrastructure/git_subprocess.py", "pop or drop the {stashes} stash entry(ies) of {path}"): "ruling",
     ("infrastructure/json_context_store.py", "set it to {_VERSION} in {path}"): "protected",
-    ("infrastructure/json_context_store.py", "add {', '.join(missing)} to that row"): "protected",
-    ("public/skills/dd-backlog-definition/scripts/_backlog_exit.py", "confirm {slug} as a bug"): "ruling",
-    ("public/skills/dd-bug-resolution/scripts/_ledger.py", "rewrite {path} as one JSON object"): "protected",
-    ("public/skills/dd-cli-library/scripts/registry.py", "delete {_platform.quote(str(path))}"): "protected",
-    ("public/skills/dd-gitflow-default/scripts/_worktree_new.py", "confirm {act}"): "ruling",
-    ("public/skills/dd-release-implementation/scripts/_release_phase.py", "set '**Status:** {APPROVED}'"): "ruling",
+    ("infrastructure/json_context_store.py", "add {', '.join(missing)} to that row of {path}"): "protected",
+    ("public/skills/dd-backlog-definition/scripts/_backlog_exit.py", "confirm {slug} as a bug (dd-bug-registration §2)"): "ruling",
+    ("public/skills/dd-bug-resolution/scripts/_ledger.py", "rewrite {path} as one JSON object mapping each term to its reason"): "protected",
+    ("public/skills/dd-cli-library/scripts/registry.py", "delete {_platform.quote(str(path))} — the next registry.py run starts an empty registry"): "protected",
+    ("public/skills/dd-gitflow-default/scripts/_worktree_new.py", "confirm {act} (dd-bug-registration §2)"): "ruling",
+    ("public/skills/dd-release-implementation/scripts/_release_phase.py", "set '**Status:** {APPROVED}' in {document.resolve()}"): "ruling",
     ("public/skills/dd-release-implementation/scripts/release.py", "authorize carrying {', '.join(missing)}"): "ruling",
     ("public/skills/dd-release-implementation/scripts/release.py", "authorize carrying {bug_id}"): "ruling",
 }  # fmt: skip
 
 
+def _operator_action_texts(source: str) -> list[str]:
+    """Every string in *source* that holds `Operator action: `, from the label to its end;
+    adjacent literals are one string and an f-string's values read as `{source}`."""
+    tree, inner, found = ast.parse(source), set(), []
+    for node in ast.walk(tree):
+        if id(node) in inner:
+            continue
+        if isinstance(node, ast.JoinedStr):
+            inner.update(id(n) for n in ast.walk(node) if n is not node)
+            text = "".join(
+                v.value if isinstance(v, ast.Constant) else "{" + ast.unparse(v.value) + "}"
+                for v in node.values
+            )
+        elif isinstance(node, ast.Constant) and isinstance(node.value, str):
+            text = node.value
+        else:
+            continue
+        if "Operator action: " in text:
+            found.append(text.split("Operator action: ", 1)[1])
+    return found
+
+
 def test_an_operator_action_is_one_act_the_law_reserves_to_the_human() -> None:
-    """Each `Operator action:` text the sources print opens with one classed act and hands over no
-    follow-up step, and every classed act is still printed."""
-    found = [
+    """Each `Operator action:` text the sources print is exactly one classed act, whole: a
+    trailing step, a second literal or a changed word fails."""
+    found = sorted(
         (p.relative_to(_PKG).as_posix(), text)
         for p in _PKG.rglob("*.py")
-        for text in re.findall(r"Operator action: ([^\"\n]*)", read_text(p))
-    ]
-    acts = [
-        next((k for k in _OPERATOR_ACTIONS if k[0] == f and t.startswith(k[1])), (f, t))
-        for f, t in found
-    ]
-    assert sorted(acts) == sorted(_OPERATOR_ACTIONS)
-    assert not [t for _, t in found if " then " in t], (
-        "an Operator action line never bundles the agent's steps"
+        for text in _operator_action_texts(read_text(p))
     )
+    assert found == sorted(_OPERATOR_ACTIONS)
 
 
 @pytest.mark.parametrize(
