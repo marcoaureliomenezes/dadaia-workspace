@@ -151,9 +151,13 @@ def _check_ancestor(root: Path, tree: Path, work: str) -> None:
         ) from error
 
 
-def _land_line(act: str) -> str:
-    """The one act that lands a repo-law line: a backlog lane carries it, and no gate waits on it."""
-    return f"Agent action: {act}, landed through a wt-backlog lane, then `worktree sync` this tree"
+def _land_line(tree: Path, work: str, act: str) -> str:
+    """The one act that lands a repo-law line on *work*: a backlog lane carries it (its merge still
+    runs the verdict and the ledger checks), then the tree that owns *work* syncs."""
+    root = workspace_of(tree)
+    owner = tree_path(root, tree.relative_to(tree_path(root, "")).parts[0], work.removeprefix("wt/")) if root and work.startswith("wt/") else tree  # fmt: skip
+    sync = inline(*cli_words(root, "worktree", "sync", str(owner))) if root else "worktree sync"
+    return f"Agent action: {act} through a wt-backlog lane, then `{sync}`"
 
 
 def _declared(tree: Path, work: str, key: str) -> str:
@@ -174,7 +178,7 @@ def _declared_argv(tree: Path, work: str, key: str) -> list[str]:
     line = _declared(tree, work, key)
     if _WORD.sub("", line).strip():
         raise Refusal(f"the {key} line of {work} has an unclosed quote",
-                      _land_line(f"close the quote in the {key} line of AGENTS.md on {work}"))  # fmt: skip
+                      _land_line(tree, work, f"close the quote in the {key} line of AGENTS.md on {work}"))  # fmt: skip
     return [_QUOTED.sub(lambda m: m[1] if m[1] is not None else m[2], w) for w in _WORD.findall(line)]  # fmt: skip
 
 
@@ -189,7 +193,7 @@ def _gate(tree: Path, work: str) -> None:
         )
     if not argv:
         raise Refusal(f"this repo declares no {key} command",
-                      _land_line(f"add this repo's job gate as a {key} line of AGENTS.md on {work}"))  # fmt: skip
+                      _land_line(tree, work, f"add this repo's job gate as a {key} line of AGENTS.md on {work}"))  # fmt: skip
     env = scrubbed_env()
     env["PATH"] = os.pathsep.join([str(venv_tool(venv_dir(root), "python").parent), env.get("PATH", "")])  # fmt: skip
     try:
@@ -197,8 +201,8 @@ def _gate(tree: Path, work: str) -> None:
                               stderr=subprocess.STDOUT)  # fmt: skip
     except OSError as error:
         raise Refusal(f"{key} {' '.join(argv)!r} cannot start: {error}",
-                      _land_line(f"make the {key} line of AGENTS.md on {work} one argv list that starts (it runs"
-                                 " without a shell: no VAR=value prefix, no sh -c)")) from error  # fmt: skip
+                      _land_line(tree, work, f"make the {key} line of AGENTS.md on {work} one argv list that starts"
+                                       " (no shell: no VAR=value prefix, no sh -c)")) from error  # fmt: skip
     if done.returncode:
         raise Refusal(f"{key} exited {done.returncode}",
                       f"Agent action: make `{inline(*argv)}` exit 0 in {tree} and commit the fix in this worktree")  # fmt: skip
