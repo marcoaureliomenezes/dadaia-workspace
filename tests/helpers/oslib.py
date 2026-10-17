@@ -77,6 +77,15 @@ def run_line(line: str, **kw: object) -> subprocess.CompletedProcess[str]:
     return run([*shell, line], **kw)  # type: ignore[arg-type]
 
 
+def run_cmdline(command_line: str, **kw: object) -> subprocess.CompletedProcess[str]:
+    """Run *command_line* as the child's own Windows command line, not re-quoted from an argv
+    (``cmd /s`` reads its raw tail); output decoded by the kernel's `decode`."""
+    done = subprocess.run(command_line, capture_output=True, **kw)  # type: ignore[call-overload]  # noqa: S603 — one finished command line, no shell
+    return subprocess.CompletedProcess(
+        done.args, done.returncode, decode(done.stdout), decode(done.stderr)
+    )
+
+
 def make_venv(path: Path) -> Path:
     """A real ``python -m venv --copies`` at *path* (on Windows its ``python.exe`` is CPython's
     redirector, as in production); returns its interpreter."""

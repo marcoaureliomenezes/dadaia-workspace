@@ -1,5 +1,5 @@
 """The real CLI doctor runs on a tmp tree with one planted finding; the printed ``fix:``
-runs from ``repos/alpha`` and the re-run doctor no longer emits it. The suite fence
+runs from ``worktrees/`` and the re-run doctor no longer emits it. The suite fence
 (``DADAIA_FENCED_ROOTS``, inherited) keeps every child off the live instance.
 
 size: MEDIUM — the CLI and the ledger scripts run as real subprocesses.
@@ -57,8 +57,8 @@ def _parse(stdout: str, scope: tuple[str, ...]) -> list[dict[str, str]]:
 
 
 def _run_from_elsewhere(root: Path, fix: str) -> None:
-    elsewhere = root / "repos" / "alpha"  # a fix runs from any cwd
-    elsewhere.mkdir(parents=True, exist_ok=True)
+    elsewhere = root / "worktrees"  # inside the workspace, never the slop a fix moves: Windows
+    elsewhere.mkdir(exist_ok=True)  # refuses to move a directory a process holds as its cwd
     ran = run_bash(fix, cwd=elsewhere, env=_env())
     assert ran.returncode == 0, ran.stdout + ran.stderr
 
@@ -218,7 +218,7 @@ WORKSPACE_PLANTS = {
 @pytest.mark.parametrize("plant", [_plant_root_slop, _plant_drifted_hook, _plant_disarmed_gate])
 def test_a_workspace_finding_is_cleared_by_its_printed_fix(tmp_path: Path, plant: object) -> None:
     """In an initialized tmp
-    workspace the printed fix, run from repos/alpha, clears the workspace finding."""
+    workspace the printed fix, run from worktrees/, clears the workspace finding."""
     ws = _workspace(tmp_path)
     code = plant(ws)  # type: ignore[operator]
     fix = next(f["fix"] for f in _findings_before(ws) if f["code"] == code)

@@ -214,7 +214,15 @@ _PROCESS_MODULES = frozenset(
     }
 )
 #: The OS helper's process starters: a module that holds one of them (by any name) is medium.
-_PROCESS_CALLABLES = (oslib.run, oslib.run_bytes, oslib.popen, oslib.popen_bytes, oslib.stub_cli)
+_PROCESS_CALLABLES = (
+    oslib.run,
+    oslib.run_bytes,
+    oslib.run_line,
+    oslib.run_cmdline,
+    oslib.popen,
+    oslib.popen_bytes,
+    oslib.stub_cli,
+)
 _SEAM_MODULES = _PROCESS_MODULES | {
     "tests.fixtures.real_git",
     "dadaia_workspace.infrastructure.git_subprocess",
