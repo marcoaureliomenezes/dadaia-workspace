@@ -5,11 +5,12 @@ The hook wiring itself is ``hook_wrappers.HOOK_DIALECTS``; these serialize and m
 
 from __future__ import annotations
 
+import json
 import os
 from collections.abc import Mapping
 from pathlib import Path
 
-from dadaia_workspace.core import workspace_layout
+from dadaia_workspace.core import platform, workspace_layout
 from dadaia_workspace.core.harness_registry import HARNESS_RECORDS
 from dadaia_workspace.infrastructure.runtime_transforms.codex_assets import (
     _render_agents_config_file_blocks,
@@ -164,7 +165,7 @@ def kimi_hooks_block(home: Path) -> str:
 
     The block is self-contained between the :data:`KIMI_BLOCK_BEGIN` /
     :data:`KIMI_BLOCK_END` markers so the installer can replace-or-append it
-    idempotently. Commands point at the shims under ``<home>/hooks/`` (POSIX paths).
+    idempotently. Commands point at the shims under ``<home>/hooks/``, spelled for the host shell.
     """
     record = HARNESS_RECORDS["kimi-code"]
     rules: list[str] = []
@@ -172,7 +173,9 @@ def kimi_hooks_block(home: Path) -> str:
         lines = ["[[hooks]]", f'event = "{event}"']
         if matcher is not None:
             lines.append(f'matcher = "{matcher}"')
-        lines.append(f'command = "{(home / "hooks").as_posix()}/{wrapper_name(record, lane)}"')
+        wrapper = f"{(home / 'hooks').as_posix()}/{wrapper_name(record, lane)}"
+        # Kimi runs `command` as a shell string; a head with no spelling stays the raw path.
+        lines.append(f"command = {json.dumps(platform.head(wrapper), ensure_ascii=False)}")
         lines.append(f"timeout = {HOOK_DIALECTS[record.hooks].timeout(lane)}")
         rules.append("\n".join(lines))
     return f"{KIMI_BLOCK_BEGIN}\n" + "\n\n".join(rules) + f"\n{KIMI_BLOCK_END}\n"
