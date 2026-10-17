@@ -10,10 +10,9 @@ record whose `ts` or `closed_at` falls inside that window.
 - Inspect a fix with `git show <fix_sha> --stat --patch`. Report a missing commit or a
   release-squash trail as coarse evidence instead of inventing attribution.
 - Derive diff direction from the named commit's production numstat. Direction is an
-  audit result, not a ledger field.
+  audit result.
 - Read the prior candidate's `SPEC.md` `## Bug window review` for the maturity verdict.
-  The release summary owns delivered, carried and backlog-exit scope; pillar 1 does not
-  reconstruct that scope from retired bug fields.
+  The release summary owns delivered, carried and backlog-exit scope.
 
 ## Recurrence and fix-induced bugs
 
@@ -55,5 +54,4 @@ Rates are trends, never a gate.
 ## Pillar 1 output
 
 Pillar 1 appends findings with reproducible commands and results. Bug records remain
-product facts; audit coverage is established by the audit record and git history rather
-than a marker copied into every bug.
+product facts; audit coverage is established by the audit record and git history.

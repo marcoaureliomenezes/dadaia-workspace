@@ -57,7 +57,7 @@ Ground yourself first with `dd-spec-navigator` (Phase 2, memory bootstrap), then
 
 - Return these sections for a worktree in `verdict.py`'s stdin body (each finding one `findings[]` item, axis, category and `file:line` in `message`; the other sections in one INFO finding's `detail_md`), as your returned text for a PR (`dd-gitflow-default` §3b).
 - `## Target` — PR/branch/SHA, base ref, files changed.
-- `## Verify` — the tests you ran yourself (the revert-RED check), and for a PR the CI result of its head; you never run `verify:`, the merge does.
+- `## Verify` — the tests you ran yourself (the revert-RED check), and for a PR the `verify:` result `dd-gitflow-default` §3b requires of its head; you never run `verify:`, the merge does.
 - `## Findings` — the `dd-code-review` §5 fields, plus category (`slop` carries the signal id).
 - `## Bug-surface delta` — reduced/increased/unchanged, evidenced per `dd-code-review` §4.
 - `## Summary` — counts by severity.

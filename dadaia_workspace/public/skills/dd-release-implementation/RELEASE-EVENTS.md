@@ -41,6 +41,3 @@ stays open.
 | definition | `release.py phase IMPLEMENTATION --sha <sha>` | `defined: {sha, ts}` plus a `milestone` |
 | implementation | `release.py phase CLOSURE --sha <sha>` | `implemented: {sha, ts}` plus a `milestone` |
 | ship | `release.py ship --sha <sha> [--pr <n>]` | `shipped: {sha, pr, ts}`, then archive |
-
-Historical log
-entries are read, never rewritten to the lean vocabulary.

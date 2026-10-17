@@ -9,8 +9,6 @@ description: >
 
 # dd-release-implementation
 
-> No engine advances gates or drives closure — implementers, the reviewer, `dd-product-engineer` and the main thread uphold it directly.
-
 ## 1. When
 
 - `dd-sw-engineer-sr` working a task inside an `Approved` candidate.
