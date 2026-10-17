@@ -1,12 +1,10 @@
-"""0.4.6 AC1 (FR2: the three ratchets born with the zone registry); 0.5.0 AC6.1
-(the canonical sets widened to ledger vocabularies, phases, trio names, gitflow roles; every
-``public/**/*.md`` law file scanned); size: SMALL.
+"""Three ratchets over the zone registry, the canonical sets (ledger vocabularies, phases,
+trio names, gitflow roles) and every ``public/**/*.md`` law file; size: SMALL.
 
 ``core.workspace_layout.DADAIA_ZONES`` is the one record of what may live in ``.dadaia/``.
-Six ledger bugs (architect G, 2026-07-01..08-26) edited the membership of bare name lists
-in ``doctor.py``, ``legacy_dadaia_dirs.py``, ``hygiene.py`` and ``workspace/service.py``
-without ever changing their shape; each list disagreed with the next. These ratchets make
-the recurrence unrepresentable:
+Bare name lists in ``doctor.py``, ``legacy_dadaia_dirs.py``, ``hygiene.py`` and
+``workspace/service.py`` were edited in membership without their shape changing, so each list
+disagreed with the next. These ratchets make the recurrence unrepresentable:
 
 1. the rendered ``.dadaia/AGENTS.md`` table IS the registry (documented == allowed);
 2. no other literal in the package holds three or more names of ANY canonical set (zones,
@@ -15,8 +13,8 @@ the recurrence unrepresentable:
 3. every ``Creator`` maps to a live module — retiring a feature without deleting its row
    fails the build (the ``test_core_file_io_purity`` "every authorized stem exists" shape).
 
-Ratchet 2 carries a pending-demolition allowance: files outside T-046-24's write set that
-still hold a second list, each keyed to the task that deletes it. The allowance moves
+Ratchet 2 carries a pending-demolition allowance: files outside the retiring task's write set
+that still hold a second list, each keyed to the task that deletes it. The allowance moves
 down only — an entry whose file no longer violates is stale and fails the test.
 """
 
@@ -42,6 +40,7 @@ from dadaia_workspace.core.workspace_layout import (
     ROOT_ALLOWED_FILES,
     STATES_CANON,
     Creator,
+    operator_globs,
     root_entries_display,
     specs_canon_table_rows,
     zone_names,
@@ -51,13 +50,15 @@ from dadaia_workspace.infrastructure.public_assets import (
     FileSystemPublicAssetManager,
     render_registry_tables,
 )
+from tests.helpers.oslib import read_text, write_text
 from tests.helpers.scan_population import assert_populated
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _SCHEMAS = _REPO_ROOT / "dadaia_workspace" / "public" / "schemas"
+_SKILLS = _REPO_ROOT / "dadaia_workspace" / "public" / "skills"
 _PACKAGE = _REPO_ROOT / "dadaia_workspace"
 
-#: Zone names retired by 0.4.6 candidate 4 (SPEC FR1/FR9, architect C). A string literal
+#: Zone names retired from the registry. A string literal
 #: ``.dadaia/<retired>`` anywhere in the package is a path into a directory no record
 #: sanctions.
 _RETIRED_ZONES: frozenset[str] = frozenset(
@@ -85,22 +86,24 @@ def _package_sources() -> list[Path]:
 _PARITY = "parity:tests/public/skills/dd_bug_resolution/scripts/test__ledger.py"
 _TEXT = "sa-text-restates-rules-the-code-contradicts"
 
-#: Every closed set of canonical names the registry owns (0.4.7 FR5 widened ratchet 2
-#: from the zone names to all four): a literal holding three or more names of ONE set,
+#: Every closed set of canonical names the registry owns: a literal holding three or more
+#: names of ONE set,
 #: outside ``core/workspace_layout.py``, is a second list of that set.
 _CANONICAL_SETS: dict[str, frozenset[str]] = {
     "zone": zone_names(),
     "root": ROOT_ALLOWED_DIRS | ROOT_ALLOWED_FILES,
     "specs-canon": CANON_ROOT_MEMBERS,
     "phase": frozenset(
-        json.loads((_SCHEMAS / "releases/release-state-v1.schema.json").read_text("utf-8"))[
-            "properties"
-        ]["phase"]["enum"]
+        json.loads(
+            read_text(
+                _SKILLS / "dd-release-implementation/scripts/schemas/release-state-v1.schema.json"
+            )
+        )["properties"]["phase"]["enum"]
     ),
     "ledger-disposition": frozenset(
-        json.loads((_SCHEMAS / "histo/histo-record-v1.schema.json").read_text("utf-8"))[
-            "properties"
-        ]["disposition"]["enum"]
+        json.loads(
+            read_text(_SKILLS / "dd-backlog-definition/scripts/schemas/histo-record-v1.schema.json")
+        )["properties"]["disposition"]["enum"]
     ),
     "trio": frozenset(RELEASE_ARTIFACTS),
     "gitflow-role": frozenset(typing.get_args(Role)),
@@ -109,14 +112,14 @@ _CANONICAL_SETS: dict[str, frozenset[str]] = {
 #: Each set's own defining module — the one place its names are spelled in bulk.
 _SET_HOME: dict[str, str] = {
     "phase": "dadaia_workspace/public/skills/dd-release-implementation/scripts/_release_schema.py",
-    "ledger-disposition": "dadaia_workspace/public/schemas/histo/histo-record-v1.schema.json",
+    "ledger-disposition": "dadaia_workspace/public/skills/dd-backlog-definition/scripts/schemas/histo-record-v1.schema.json",
     "trio": "dadaia_workspace/features/specs/doctor_common.py",
     "gitflow-role": "dadaia_workspace/core/gitflow.py",
 }
 
-#: AC6.5 allowance for the widened sets (birth keys pinned at T-050-135): each second list,
+#: Allowance for the second lists: each second list,
 #: keyed ``file`` -> ``parity:<test file>``, the test proving its set.
-_SECOND_LIST_BIRTH = frozenset(  # its keys at T-050-135; the allowance only shrinks
+_SECOND_LIST_BIRTH = frozenset(  # the allowance only shrinks
     {
         "dadaia_workspace/public/skills/dd-audit-project/scripts/_audit_check.py",
         "dadaia_workspace/public/skills/dd-backlog-definition/scripts/_backlog_schema.py",
@@ -125,9 +128,7 @@ _SECOND_LIST_BIRTH = frozenset(  # its keys at T-050-135; the allowance only shr
     }
 )
 _SECOND_LIST_ALLOWANCE: dict[str, str] = {
-    "dadaia_workspace/public/skills/dd-audit-project/scripts/_audit_check.py": _PARITY,
     "dadaia_workspace/public/skills/dd-backlog-definition/scripts/_backlog_schema.py": _PARITY,
-    "dadaia_workspace/public/skills/dd-bug-resolution/scripts/_bugs_check.py": _PARITY,
 }
 
 
@@ -237,7 +238,7 @@ def test_dadaia_agents_table_equals_zone_registry(staged_data: Path) -> None:
     ``states/AGENTS.md`` canon table is ``STATES_CANON`` — documented == allowed."""
     zone_tables = [
         t
-        for t in _markdown_tables((staged_data / "dadaia-AGENTS.md").read_text("utf-8"))
+        for t in _markdown_tables(read_text(staged_data / "dadaia-AGENTS.md"))
         if t and {"class", "ttl", "creator"} <= set(t[0])
     ]
     assert len(zone_tables) == 1, "exactly one rendered zone table"
@@ -258,7 +259,7 @@ def test_dadaia_agents_table_equals_zone_registry(staged_data: Path) -> None:
 
     canon_tables = [
         {_bare(next(iter(row.values()))) for row in t}
-        for t in _markdown_tables((staged_data / "states-AGENTS.md").read_text("utf-8"))
+        for t in _markdown_tables(read_text(staged_data / "states-AGENTS.md"))
         if t
     ]
     assert STATES_CANON in canon_tables, "states-AGENTS.md carries the closed canon table"
@@ -276,7 +277,7 @@ def test_zone_registry_is_the_only_dadaia_name_list() -> None:
         if rel.endswith("core/workspace_layout.py"):
             continue
         home = frozenset(label for label, module in _SET_HOME.items() if module == rel)
-        hits = _second_list_hits(ast.parse(path.read_text("utf-8")), names, home)
+        hits = _second_list_hits(ast.parse(read_text(path)), names, home)
         if hits and rel in _SECOND_LIST_ALLOWANCE:
             widened.add(rel)
             continue
@@ -294,7 +295,7 @@ def test_zone_registry_is_the_only_dadaia_name_list() -> None:
 
 
 def test_a_planted_second_list_of_a_widened_set_trips() -> None:
-    """RED fixture (AC6.1): a literal restating the gitflow roles or the trio is a second
+    """A literal restating the gitflow roles or the trio is a second
     list outside its home module, and not inside it."""
     tree = ast.parse(
         "ROLES = ('principal', 'integration', 'work')\nT = ['SPEC.md', 'PLAN.md', 'TASKS.md']\n"
@@ -311,7 +312,7 @@ def _restating_law_files() -> set[str]:
     for path in sorted(public.rglob("*.md")):
         if "_archive" in path.parts:
             continue
-        for hit in _restated_law_lines(path.read_text("utf-8")):
+        for hit in _restated_law_lines(read_text(path)):
             label = hit.split("the ", 1)[1].split(" set ", 1)[0]
             hits.add(f"{path.relative_to(public).as_posix()}:{label}")
     return hits
@@ -320,12 +321,12 @@ def _restating_law_files() -> set[str]:
 def test_the_law_source_never_restates_a_canonical_set() -> None:
     """No law line spells out a canonical set: §5.1 (root), §5.3 (repo exclusions) and
     §6.2 (specs canon) carry placeholders ``public stage`` fills from the registry, and
-    every other ``public/**/*.md`` restatement is gone (AC6.1's allowance drained)."""
+    every other ``public/**/*.md`` restatement is gone."""
     assert _restating_law_files() == set()
 
 
 def test_a_planted_law_line_restating_a_small_set_trips() -> None:
-    """RED fixture (AC6.1): the whole trio on one line is a restatement; two of it is not."""
+    """The whole trio on one line is a restatement; two of it is not."""
     assert _restated_law_lines("- SPEC.md, PLAN.md and TASKS.md are the trio.\n")
     assert not _restated_law_lines("- SPEC.md and PLAN.md only.\n")
 
@@ -334,12 +335,12 @@ def test_staged_law_canon_tables_equal_the_registry(staged_data: Path) -> None:
     """The staged ``specs-AGENTS.md`` canon table IS ``specs_canon_table_rows()``, row for
     row; the staged law's root line and ``repo-AGENTS.md``'s exclusion line ARE the rendered
     registry lists — documented == allowed, wherever the rule now lives."""
-    text = (staged_data / "AGENTS.md").read_text("utf-8")
-    # The scoped templates are not staged (sa-staged-assets-without-consumers#44.2: no
-    # reader of .dadaia/agentic/templates); they are rendered by the same one renderer.
+    text = read_text(staged_data / "AGENTS.md")
+    # The scoped templates are not staged (no reader of .dadaia/agentic/templates); they are
+    # rendered by the same one renderer.
     scoped = Path(__file__).resolve().parents[2] / "dadaia_workspace" / "public" / "templates"
-    specs_law = render_registry_tables((scoped / "specs-AGENTS.md").read_text("utf-8"))
-    repo_law = render_registry_tables((scoped / "repo-AGENTS.md").read_text("utf-8"))
+    specs_law = render_registry_tables(read_text(scoped / "specs-AGENTS.md"))
+    repo_law = render_registry_tables(read_text(scoped / "repo-AGENTS.md"))
     canon_tables = [
         t for t in _markdown_tables(specs_law) if t and {"area", "members"} <= set(t[0])
     ]
@@ -376,7 +377,7 @@ def test_law_staged_under_win32_names_the_scripts_cli(
     it is ``.dadaia/.venv/Scripts/dadaia.exe`` and the POSIX path appears nowhere."""
     monkeypatch.setattr("dadaia_workspace.core.platform.PLATFORM", Capabilities.detect("win32"))
     FileSystemPublicAssetManager().stage(tmp_path)
-    text = (tmp_path / ".dadaia" / "agentic" / "data" / "AGENTS.md").read_text("utf-8")
+    text = read_text(tmp_path / ".dadaia" / "agentic" / "data" / "AGENTS.md")
     assert ".dadaia/.venv/Scripts/dadaia.exe" in text
     assert ".venv/bin/dadaia" not in text
 
@@ -387,10 +388,17 @@ def test_shipped_history_reads_the_forward_rendered_windows_law(
     monkeypatch.setattr("dadaia_workspace.core.platform.PLATFORM", Capabilities.detect("win32"))
     source = "run `.dadaia/.venv/bin/dadaia doctor`"
     rendered = "run `.dadaia/.venv/Scripts/dadaia.exe doctor`"
-    (tmp_path / "shipped-hashes.json").write_text(
-        json.dumps({"law.md": [hashlib.sha256(rendered.encode()).hexdigest()]}), encoding="utf-8"
+    write_text(
+        tmp_path / "shipped-hashes.json",
+        json.dumps({"law.md": [hashlib.sha256(rendered.encode()).hexdigest()]}),
     )
 
     assert render_registry_tables(source) == render_registry_tables(rendered) == rendered
     assert was_shipped(rendered, "law.md", tmp_path)
     assert not was_shipped(rendered + " --edited", "law.md", tmp_path)
+
+
+def test_operator_globs_reads_a_non_utf8_ignore_file_as_no_pattern(tmp_path: Path) -> None:
+    """Unreadable is no pattern, whatever the reason."""
+    (tmp_path / ".dadaiaignore").write_bytes(b"caf\xe9\n")
+    assert operator_globs(tmp_path) == ((), (), ())

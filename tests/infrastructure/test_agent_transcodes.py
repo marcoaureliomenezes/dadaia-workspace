@@ -18,6 +18,7 @@ from dadaia_workspace.infrastructure.agent_transcodes import AGENT_RULE_BUILDERS
 from dadaia_workspace.infrastructure.install_plan import InstallPlan
 from dadaia_workspace.infrastructure.projection import ProjectionRule
 from dadaia_workspace.infrastructure.public_assets_common import iter_public_files
+from tests.helpers.oslib import Undecodable
 
 _PUBLIC = Path(__file__).resolve().parents[2] / "dadaia_workspace" / "public"
 
@@ -93,7 +94,7 @@ def test_the_copilot_transcode_keeps_only_the_frontmatter_copilot_reads(tmp_path
     plan_rules = [
         rule
         for rule in _agent_rules(tmp_path, "copilot")
-        if rule.label.endswith("dd-software-engineer.agent.md")
+        if rule.label.endswith("dd-sw-engineer-sr.agent.md")
     ]
     assert len(plan_rules) == 1
     rule = plan_rules[0]
@@ -112,3 +113,50 @@ def test_each_new_record_is_registered_with_a_directory_and_a_hook_format(harnes
     assert harness in L1_ENTRY_HARNESSES
     assert record.directory is not None
     assert record.hooks.value.endswith("-hooks")
+
+
+@pytest.mark.parametrize("render", ["copilot", "codex"])
+def test_a_persona_that_is_not_utf8_is_undecodable_not_a_codec_error(
+    tmp_path: Path, render: str
+) -> None:
+    from dadaia_workspace.infrastructure.agent_transcodes import (
+        codex_agent_toml_bytes,
+        copilot_agent_md_bytes,
+    )
+
+    persona = tmp_path / "a.md"
+    persona.write_bytes(b"---\nname: a\n---\ncaf\xe9\n")
+
+    with pytest.raises(Undecodable) as refused:
+        if render == "copilot":
+            copilot_agent_md_bytes(persona)
+        else:
+            codex_agent_toml_bytes(persona, "a", None)
+
+    assert refused.value.path == persona
+
+
+@pytest.mark.parametrize("harness", ["copilot", "codex"])
+def test_a_rule_table_over_a_persona_that_is_not_utf8_is_undecodable(
+    tmp_path: Path, harness: str
+) -> None:
+    agentic = tmp_path / "agentic"
+    (agentic / "agents").mkdir(parents=True)
+    latin = agentic / "agents" / "a.md"
+    latin.write_bytes(b"---\nname: a\n---\ncaf\xe9\n")
+    plan = InstallPlan(
+        workspace_root=tmp_path / "ws",
+        agentic_dir=agentic,
+        harness=harness,
+        force=False,
+        harness_targets=(harness,),
+        active_harnesses=frozenset({harness}),
+        overlay=None,
+        resolved_models={},
+    )
+    record = HARNESS_RECORDS[harness]
+
+    with pytest.raises(Undecodable) as refused:
+        AGENT_RULE_BUILDERS[record.agent_transcode](record, plan)
+
+    assert refused.value.path == latin

@@ -11,34 +11,42 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import os
-import re
-import subprocess
 import sys
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
 sys.dont_write_bytecode = True  # the shared _ledger imports without a __pycache__
 sys.path.append(str(Path(__file__).resolve().parents[2] / "dd-bug-resolution" / "scripts"))
-from _ledger import replace, workspace_of  # noqa: E402
+import _clock
+import _platform
+from _ledger import replace, workspace_of
+from _platform import read_text, use_utf8_stdio
+from _refusal import Refusal, report
 
 DEFAULT_MIN_PORT = 3000
 DEFAULT_MAX_PORT = 3999
 DEFAULT_TTL_HOURS = 8
 PORT_FLOOR = 1024
-_LOCAL_ADDR_RE = re.compile(r"^(?P<bind>.+):(?P<port>\d+)$")
-_USERS_PID_RE = re.compile(r'\("(?P<exe>[^"]+)",pid=(?P<pid>\d+)')
 
 
 def _now() -> datetime:
-    return datetime.now(tz=UTC)
+    return datetime.fromisoformat(_clock.now_iso())
+
+
+def _stamp(moment: datetime) -> str:
+    """*moment* in the kernel clock's `...Z` form; `is_stale` reads that and the old `+00:00`."""
+    return moment.isoformat().replace("+00:00", "Z")
 
 
 def find_registry(start: Path) -> Path:
     if root := workspace_of(start):
         return root / ".dadaia" / "states" / "server_registry.json"
-    raise SystemExit("error: no workspace sentinel above the cwd; pass --registry <path>")
+    report(
+        "no workspace sentinel above the cwd",
+        "Agent action: rerun with --registry and a registry file path, or from inside a workspace",
+    )
+    raise SystemExit(1)
 
 
 def load(path: Path) -> dict[str, Any]:
@@ -48,19 +56,8 @@ def load(path: Path) -> dict[str, Any]:
             "range": {"min_port": DEFAULT_MIN_PORT, "max_port": DEFAULT_MAX_PORT},
             "entries": [],
         }
-    return dict(json.loads(path.read_text(encoding="utf-8")))
-
-
-def pid_alive(pid: int) -> bool:
-    if os.name != "posix":
-        return True  # no safe liveness probe without the POSIX signal-0 idiom
-    try:
-        os.kill(pid, 0)
-    except ProcessLookupError:
-        return False
-    except PermissionError:
-        pass
-    return True
+    fix = f"Operator action: delete {_platform.quote(str(path))} — the next registry.py run starts an empty registry"
+    return dict(json.loads(read_text(path, fix)))
 
 
 def is_stale(entry: dict[str, Any]) -> bool:
@@ -70,7 +67,7 @@ def is_stale(entry: dict[str, Any]) -> bool:
     except (KeyError, ValueError):
         return True
     pid = entry.get("pid")
-    return isinstance(pid, int) and not pid_alive(pid)
+    return isinstance(pid, int) and not _platform.pid_alive(pid)
 
 
 def status_of(entry: dict[str, Any]) -> str:
@@ -117,9 +114,9 @@ def cmd_next(doc: dict[str, Any], args: argparse.Namespace, path: Path) -> int:
         else:
             free = [p for p in range(args.min_port, args.max_port + 1) if p not in occupied]
             if not free:
-                print(
-                    f"error: no free ports in [{args.min_port}, {args.max_port}]; run clean",
-                    file=sys.stderr,
+                report(
+                    f"no free ports in [{args.min_port}, {args.max_port}]",
+                    "Agent action: run registry.py clean, then rerun",
                 )
                 return 1
             port, is_base = free[0], False
@@ -139,9 +136,9 @@ def cmd_register(doc: dict[str, Any], args: argparse.Namespace, path: Path) -> i
                 print(f"port {args.port} already registered for '{args.project}' -> {e['url']}")
                 save(path, doc)
                 return 0
-            print(
-                f"error: port {args.port} is registered by project '{e['project']}' ({e['url']})",
-                file=sys.stderr,
+            report(
+                f"port {args.port} is registered by project '{e['project']}' ({e['url']})",
+                "Agent action: pick another port with registry.py next, then rerun",
             )
             return 1
     now = _now()
@@ -151,8 +148,8 @@ def cmd_register(doc: dict[str, Any], args: argparse.Namespace, path: Path) -> i
         "url": args.url or f"http://localhost:{args.port}",
         "status": "active",
         "pid": args.pid,
-        "reserved_at": now.isoformat(),
-        "expires_at": (now + timedelta(hours=args.ttl)).isoformat(),
+        "reserved_at": _stamp(now),
+        "expires_at": _stamp(now + timedelta(hours=args.ttl)),
         "description": args.description,
     }
     doc["entries"].append(entry)
@@ -163,7 +160,10 @@ def cmd_register(doc: dict[str, Any], args: argparse.Namespace, path: Path) -> i
 
 def cmd_release(doc: dict[str, Any], args: argparse.Namespace, path: Path) -> int:
     if args.port is None and args.project is None:
-        print("error: provide --port and/or --project", file=sys.stderr)
+        report(
+            "provide --port and/or --project",
+            "Agent action: pass --port and/or --project, then rerun",
+        )
         return 1
     keep: list[dict[str, Any]] = []
     released: list[dict[str, Any]] = []
@@ -179,7 +179,10 @@ def cmd_release(doc: dict[str, Any], args: argparse.Namespace, path: Path) -> in
             if owner is None
             else f"belongs to project '{owner}', not '{args.project}'"
         )
-        print(f"error: port {args.port} {why}", file=sys.stderr)
+        report(
+            f"port {args.port} {why}",
+            "Agent action: run registry.py list to see the registered ports, then rerun",
+        )
         return 1
     doc["entries"] = keep
     save(path, doc)
@@ -203,64 +206,18 @@ def cmd_clean(doc: dict[str, Any], args: argparse.Namespace, path: Path) -> int:
     return 0
 
 
-def _ss_output() -> str | None:
-    if not Path("/proc").is_dir():
-        return None
-    try:
-        result = subprocess.run(
-            ["ss", "-tlnp"], capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=5, check=False
-        )  # fmt: skip
-    except (FileNotFoundError, subprocess.TimeoutExpired):
-        return None
-    return result.stdout if result.returncode == 0 else None
-
-
-def parse_ss_line(line: str) -> tuple[int, str, int | None] | None:
-    if not line or line.startswith("State"):
-        return None
-    parts = line.split()
-    if len(parts) < 4:
-        return None
-    m = _LOCAL_ADDR_RE.match(parts[3])
-    if not m:
-        return None
-    bind = m.group("bind").lstrip("[").rstrip("]")
-    bind = "0.0.0.0" if bind == "*" else bind  # noqa: S104 — parsing, not binding
-    pid = None
-    if len(parts) >= 6:
-        pm = _USERS_PID_RE.search(" ".join(parts[5:]))
-        pid = int(pm.group("pid")) if pm else None
-    return int(m.group("port")), bind, pid
-
-
-def scan(doc: dict[str, Any], raw: str | None) -> list[dict[str, Any]]:
-    if raw is None:
-        return []
+def scan(doc: dict[str, Any], found: list[_platform.Listener] | None) -> list[dict[str, Any]]:
     registered = {e["port"] for e in doc["entries"]}
-    findings: list[dict[str, Any]] = []
-    for line in raw.split("\n"):
-        parsed = parse_ss_line(line)
-        if parsed is None:
-            continue
-        port, bind, pid = parsed
-        if port < PORT_FLOOR or port in registered or pid is None:
-            continue
-        cmdline, cwd = "", ""
-        try:
-            raw_cmd = Path(f"/proc/{pid}/cmdline").read_bytes().replace(b"\0", b" ")
-            cmdline = raw_cmd.decode(errors="replace").strip()[:200]
-            cwd = os.readlink(f"/proc/{pid}/cwd")
-        except OSError:
-            pass
-        lan = bind in {"0.0.0.0", "::"}
-        findings.append(
-            dict(port=port, bind=bind, pid=pid, cmdline=cmdline, cwd=cwd, lan_exposed=lan)
-        )
-    return sorted(findings, key=lambda f: f["port"])
+    return [
+        dict(port=f.port, bind=f.bind, pid=f.pid, cmdline=f.cmdline, cwd=f.cwd,
+             lan_exposed=f.bind in {"0.0.0.0", "::"})  # noqa: S104 — comparing, not binding
+        for f in found or []
+        if f.port >= PORT_FLOOR and f.port not in registered and f.pid is not None
+    ]  # fmt: skip
 
 
 def cmd_scan(doc: dict[str, Any], args: argparse.Namespace, path: Path) -> int:
-    findings = scan(doc, _ss_output())
+    findings = scan(doc, _platform.listeners())
     if args.json:
         print(json.dumps(findings, indent=2))
     elif not findings:
@@ -308,11 +265,16 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
+    use_utf8_stdio()
     args = build_parser().parse_args(argv)
     path = args.registry or find_registry(Path.cwd())
     verbs = {"list": cmd_list, "next": cmd_next, "register": cmd_register}
     verbs |= {"release": cmd_release, "clean": cmd_clean, "scan": cmd_scan}
-    return verbs[args.verb](load(path), args, path)
+    try:
+        return verbs[args.verb](load(path), args, path)
+    except Refusal as refusal:
+        report(refusal, refusal.fix)
+        return 1
 
 
 if __name__ == "__main__":

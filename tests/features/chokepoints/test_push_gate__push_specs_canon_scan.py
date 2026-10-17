@@ -1,7 +1,6 @@
-"""Wiring the specs/ canon scan into ``push_gate_decision`` (v0.5.0 specs-canon
-closure, operator ruling 2026-08-28).
+"""Wiring the specs/ canon scan into ``push_gate_decision`` .
 
-Every range is a real git range read by the real ``GitSubprocessObjectReader`` (AC9.4).
+Every range is a real git range read by the real ``GitSubprocessObjectReader``.
 Covers: canon paths pass; a stray/non-canon path in the range refuses (naming the fix
 hint); a non-canon path already published never blocks; the scan reaches every
 non-deletion ref (tags included), never a deletion.
@@ -21,6 +20,7 @@ from dadaia_workspace.features.specs.canon import canon_violations
 from dadaia_workspace.infrastructure.git_objects import GitSubprocessObjectReader
 from tests.fakes import gate_fixes
 from tests.fixtures.real_git import ZERO, PushRepo, git
+from tests.helpers.oslib import write_text
 
 
 @pytest.fixture()
@@ -71,8 +71,7 @@ def test_the_canon_scan_refuses_a_non_canon_path_in_the_pushed_range(
     side: dict[str, str] | None,
     files: dict[str, str | None], line: str, refused: str | None
 ) -> None:
-    """Bugs ``pre-push-canon-scan-not-range-scoped``, ``pre-push-canon-scan-judges-paths-the-range-deletes``:
-    only the net tree the range publishes is judged — a None path is added then deleted inside the range;
+    """Only the net tree the range publishes is judged — a None path is added then deleted inside the range;
     *side* is published as develop from the published tip, then merged."""
     remote = ZERO
     if published:
@@ -98,7 +97,7 @@ def test_the_canon_scan_refuses_a_non_canon_path_in_the_pushed_range(
 def test_a_push_allows_an_uncited_law_edit(repo: PushRepo) -> None:
     remote = repo.commit({"AGENTS.md": "# law\n- keep\n- drop\n"})
     repo.publish()
-    (repo.path / "AGENTS.md").write_text("# law\n- keep\n", encoding="utf-8")
+    write_text(repo.path / "AGENTS.md", "# law\n- keep\n")
     sha = repo.commit({}, "chore: simplify law")
 
     decision = _decide(repo, _BRANCH.format(sha=sha, remote=remote))

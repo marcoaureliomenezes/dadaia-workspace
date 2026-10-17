@@ -1,18 +1,19 @@
-"""Expected values come from SPEC §3/§4 (FR1, FR5, FR8) and architect A, never from the
-module under test: the 12 rows in order (ADRs 0147 (1), 0148 (6)), the three TTL zones
+"""Expected values are literals, never read from the module under test: the 12 rows in order, the three TTL zones
 (handoff and tmp a day, reaped seven days), the three closed canons, the creators per zone, and the pure exception-glob parser.
 """
 
 from __future__ import annotations
 
 import dataclasses
+from pathlib import Path
 
 import pytest
 
 from dadaia_workspace.core import workspace_layout as wl
+from tests.helpers.oslib import write_text
 
 C, K = wl.Creator, wl.ZoneClass
-#: SPEC FR1/FR5/FR8 + architect A: (name, class, creator, ttl seconds), in registry order.
+#: (name, class, creator, ttl seconds), in registry order.
 _SPEC_ZONES = [
     ("agentic", K.PROJECTION, C.INSTALL, None),
     ("hooks", K.PROJECTION, C.INSTALL, None),
@@ -40,8 +41,7 @@ _SPEC_STATES_CANON = {
 
 
 def test_registry_holds_the_twelve_spec_zones_in_order() -> None:
-    """sa-tool-caches-land-outside-the-cache-zone#B40-2: no .cache zone (ADR 0080); 0.4.7 FR6b:
-    ``reaped/`` is its own row held 7 days, never a TTL override inside ``tmp``."""
+    """There is no .cache zone; ``reaped/`` is its own row held 7 days, never a TTL override inside ``tmp``."""
     rows = [(z.name, z.cls, z.creator, z.ttl_seconds) for z in wl.DADAIA_ZONES]
     assert rows == _SPEC_ZONES
     assert wl.zone_names() == frozenset(name for name, *_ in _SPEC_ZONES)
@@ -69,10 +69,12 @@ def test_derived_views_follow_the_registry() -> None:
     assert rows["references"][2:] == ("operator", "never", "operator")
     assert frozenset({"AGENTS.md", ".gitignore"}) == wl.DADAIA_ROOT_FILES
     assert wl.DADAIAIGNORE in wl.ROOT_ALLOWED_FILES and "worktrees" in wl.ROOT_ALLOWED_DIRS
-    # ADR 0133 SPEC risk: the floor is what init/install create, plus the CLI's PROTECTED zone
+    # the floor is what init/install create, plus the CLI's PROTECTED zone, or the operator's
+    # own file inside one of those
     zones = [z for z in wl.DADAIA_ZONES if z in wl.provisioned_zones() or z.cls is K.PROTECTED]
     made = {"AGENTS.md", *wl.LEVEL1_SEEDS, *(f".dadaia/{z.name}" for z in zones)}
-    assert set(wl.CORE_FLOOR) <= made
+    canon = {f".dadaia/{z.name}/{n}" for z in zones for n in z.canon or ()}
+    assert set(wl.CORE_FLOOR) <= made | canon
 
 
 @pytest.mark.parametrize(
@@ -98,14 +100,41 @@ def test_parse_dadaiaignore(text: str, expected: tuple[str, ...]) -> None:
     assert wl.parse_dadaiaignore(text) == (expected, (), ())
 
 
-def test_dadaiaignore_invalid_lines_and_segment_scope() -> None:
-    """ADR 0093: ``!``, ``**``, an absolute path or ``..`` is invalid, never a pattern; ``*``
+def test_dadaiaignore_invalid_lines_and_segment_scope(tmp_path: Path) -> None:
+    """``!``, ``**``, an absolute path or ``..`` is invalid, never a pattern; ``*``
     stays inside one segment, so a root pattern admits nothing below the root."""
     text = "!keep\nnotes/**\n/abs\na/../b\n*.png\n[protected]\nsecrets/\n**/k\n"
     invalid = ("!keep", "notes/**", "/abs", "a/../b", "**/k")
     assert wl.parse_dadaiaignore(text) == (("*.png",), ("secrets",), invalid)
-    assert wl.protected_glob(("secrets", "k"), ("secrets",)) == "secrets"
-    assert wl.protected_glob(("a", "secrets"), ("secrets",)) is None  # a prefix of the tail only
+    tree = tmp_path / "worktrees" / "r" / "x" / "y"
+    (tree / "src").mkdir(parents=True)
+    write_text(tree / ".git", "gitdir: elsewhere\n")
+
+    def pg(rel: str, *globs: str) -> str | None:
+        return wl.protected_glob(tmp_path, rel, globs or ("secrets",))
+
+    assert pg("repos/r/secrets/k") == "secrets"
+    assert pg("repos/r/a/secrets") is None
+    assert pg("worktrees/r/x/y/secrets/k") == "secrets"
+    assert pg("worktrees/r/x/y/src/secrets/k") is None  # anchored at the tree root, as under repos/
+    assert pg("worktrees/r/x/y/specs/AGENTS.md", "AGENTS.md") is None
+    assert pg("worktrees/r/x/y/AGENTS.md", "AGENTS.md") == "AGENTS.md"
+    assert pg("worktrees/r/x/y/src/k", "*.md") is None
+    assert pg("worktrees/r/x/y/docs/k", "docs") == "docs"
+    assert pg("worktrees/r/x/y/src/docs/k", "docs") is None
+    assert pg("worktrees/r/stray/z/secrets/k") == "secrets"  # no .git above: fail closed, any depth
+    assert pg("worktrees/r/x/y/z/src/k") is None
     assert wl.verdict("shot.png", False, ("*.png",), (), ()) == "operator"
     assert wl.verdict(".dadaia/shot.png", False, ("*.png",), (), ()) == "slop"
     assert wl.verdict(".dadaia/shot.png", False, (".dadaia/*.png",), (), ()) == "operator"
+
+
+def test_a_planted_git_entry_never_unanchors_a_multi_segment_glob(tmp_path: Path) -> None:
+    """A ``.git`` written below the real tree root adds an anchor and never removes the root."""
+    tree = tmp_path / "worktrees" / "r" / "0.5.0-rc1" / "j1"
+    (tree / "docs" / "data-master").mkdir(parents=True)
+    write_text(tree / ".git", "gitdir: elsewhere\n")
+    rel, globs = "worktrees/r/0.5.0-rc1/j1/docs/data-master/x.md", ("docs/data-master",)
+    assert wl.protected_glob(tmp_path, rel, globs) == "docs/data-master"
+    write_text(tree / "docs" / ".git", "")
+    assert wl.protected_glob(tmp_path, rel, globs) == "docs/data-master"

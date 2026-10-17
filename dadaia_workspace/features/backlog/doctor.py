@@ -13,6 +13,7 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 
+from dadaia_workspace.core import platform
 from dadaia_workspace.core.doctor_rules import Rule, SectionFinding
 from dadaia_workspace.core.models.backlog import INTENTS_EXEMPT_STATUS, Intent
 from dadaia_workspace.features.backlog.subject_registry import BindStatus, Registry, build_registry
@@ -62,13 +63,13 @@ RULES: tuple[LedgerRule, ...] = (
         ("BL-SCHEMA",),
         SECTION,
         _check_schema,
-        fix_help="Operator action: correct the entry this finding names in <specs>/backlog/BACKLOG.json, then commit.",
+        fix_help="Agent action: correct the entry this finding names in <specs>/backlog/BACKLOG.json, then commit.",
     ),
     Rule(
         ("BL-CONFLICT",),
         SECTION,
         _check_conflict,
-        fix_help="Operator action: exit one of the twins this finding names from <specs>/backlog/BACKLOG.json, then commit.",
+        fix_help="Agent action: exit one of the twins this finding names from <specs>/backlog/BACKLOG.json, then commit.",
     ),
 )
 
@@ -82,14 +83,14 @@ def _live_intents(specs_dir: Path) -> dict[str, list[Intent]]:
     owner = load_owner("dd-bug-resolution", "_ledger")
     schema = owner.load_schema("backlog-v1")
     try:
-        active = json.loads((specs_dir / "backlog" / "BACKLOG.json").read_text(encoding="utf-8"))["active"]  # fmt: skip
+        active = json.loads(platform.read_text(specs_dir / "backlog" / "BACKLOG.json"))["active"]  # fmt: skip
         return {
             e["id"]: [Intent.of(i) for i in e.get("intents", [])]
             for e in active
             if not any(owner.validate(e, _ITEM, schema, "entry"))
             and e["status"] != INTENTS_EXEMPT_STATUS
         }
-    except (OSError, ValueError, KeyError, TypeError):
+    except (OSError, ValueError, KeyError, TypeError, platform.Undecodable):
         return {}
 
 

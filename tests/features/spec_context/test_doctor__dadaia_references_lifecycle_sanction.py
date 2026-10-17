@@ -1,20 +1,17 @@
-"""``.dadaia/references/<clone>/`` holds operator-placed reference clones. A10.1: the doctor's
-zone walk never flags one (``references`` is an OPERATOR zone, never walked). A10.2: no
+"""``.dadaia/references/<clone>/`` holds operator-placed reference clones. The doctor's
+zone walk never flags one (``references`` is an OPERATOR zone, never walked). No
 lifecycle verb resolves, binds or GCs one — proven at the shared resolution seam, on the real
-bind/show resolution path, and on the whole ``DoctorService.fix()`` sweep. A10.4: nothing here
+bind/show resolution path, and on the whole ``DoctorService.fix()`` sweep. Nothing here
 writes under ``specs/``.
 """
 
 from __future__ import annotations
 
-# Guard: skip this entire module on platforms where fcntl is not available (e.g. Windows).
+import json
+import os
+from pathlib import Path
+
 import pytest
-
-pytest.importorskip("fcntl")
-
-import json  # noqa: E402
-import os  # noqa: E402
-from pathlib import Path  # noqa: E402
 
 from dadaia_workspace.cli._specs_resolution import (  # noqa: E402
     resolve_context_for_cli,
@@ -24,13 +21,15 @@ from dadaia_workspace.features.spec_context.doctor import DoctorService  # noqa:
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
 from tests.fixtures.stores import context_store
+from tests.helpers.oslib import read_text, write_text
 
 
 def _init_workspace(root: Path) -> None:
     """Minimal initialized-workspace skeleton (registry + repos/ + sessions dir)."""
     (root / ".dadaia" / "states").mkdir(parents=True)
-    (root / ".dadaia" / "states" / "spec_contexts.json").write_text(
-        json.dumps({"schema_version": "2", "contexts": []}), encoding="utf-8"
+    write_text(
+        root / ".dadaia" / "states" / "spec_contexts.json",
+        json.dumps({"schema_version": "2", "contexts": []}),
     )
     (root / ".dadaia" / "sessions").mkdir(parents=True)
     (root / "repos").mkdir(parents=True)
@@ -41,7 +40,7 @@ def _plant_reference_clone(root: Path, clone: str = "mattpocock-skills") -> Path
     ``git clone`` would — the content is what a foreign-tree-acting verb would destroy."""
     clone_dir = root / ".dadaia" / "references" / clone
     (clone_dir / ".git").mkdir(parents=True)
-    (clone_dir / "README.md").write_text("# reference material\n", encoding="utf-8")
+    write_text(clone_dir / "README.md", "# reference material\n")
     return clone_dir
 
 
@@ -54,13 +53,13 @@ def _make_doctor(root: Path, store: JsonContextStore | None = None) -> DoctorSer
 
 
 # ---------------------------------------------------------------------------
-# A10.1 — doctor-clean
+# doctor-clean
 # ---------------------------------------------------------------------------
 
 
 def test_reference_clone_reports_doctor_clean(tmp_path: Path) -> None:
     """``references`` reads canon at the ``.dadaia/`` top level and nothing beneath it is
-    ever an entry of the walk (operator ruling O4; OPERATOR zones are never walked)."""
+    ever an entry of the walk (OPERATOR zones are never walked)."""
     _init_workspace(tmp_path)
     _plant_reference_clone(tmp_path)
 
@@ -71,7 +70,7 @@ def test_reference_clone_reports_doctor_clean(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# A10.2 — outside the context lifecycle, proven at the shared seam AND on real verb paths
+# Outside the context lifecycle, proven at the shared seam AND on real verb paths
 # ---------------------------------------------------------------------------
 
 
@@ -95,17 +94,15 @@ def test_doctor_fix_gc_sweep_never_touches_a_reference_clone(tmp_path: Path) -> 
     Lifecycle verbs acting on foreign trees destroyed work before; GC is no exception."""
     _init_workspace(tmp_path)
     clone_dir = _plant_reference_clone(tmp_path)
-    before = (clone_dir / "README.md").read_text(encoding="utf-8")
+    before = read_text(clone_dir / "README.md")
 
     # Plant genuinely reapable state alongside it (``WS-states-slop``), so fix() has
     # real work to do.
     (tmp_path / ".dadaia" / "states" / "ctx_locks").mkdir(parents=True)
-    (tmp_path / ".dadaia" / "states" / "ctx_locks" / "stale.lock.json").write_text(
-        "{}", encoding="utf-8"
-    )
+    write_text(tmp_path / ".dadaia" / "states" / "ctx_locks" / "stale.lock.json", "{}")
 
     actions = _make_doctor(tmp_path).fix()
 
-    assert (clone_dir / "README.md").read_text(encoding="utf-8") == before
+    assert read_text(clone_dir / "README.md") == before
     assert (clone_dir / ".git").exists()
     assert not any("references" in a.lower() for a in actions), actions

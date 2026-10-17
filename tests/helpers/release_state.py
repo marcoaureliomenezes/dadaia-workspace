@@ -1,15 +1,9 @@
-"""Shared fixture-side ``RELEASE.json`` phase-state writer (v0.5.x, successor to
-``release_jsonl.py`` — RELEASE.jsonl -> RELEASE.json, operator ruling: the release
-record is a mutable state document, never an append-only event stream).
+"""Shared fixture-side ``RELEASE.json`` phase-state writer.
 
-``ACTIVE.md`` is retired -- the live release's phase is read directly off
-``specs/releases/<release_id>/RELEASE.json`` (``core.release_state.parse_release_state``).
-Any fixture that used to seed a synthetic ``ACTIVE.md``, or a one-line
-``RELEASE.jsonl`` ``phase`` record, to put a context into a known phase now seeds one
-``RELEASE.json`` document via this helper instead.
-
-Extracted (S2 QA-close, T-050-22 item 3; renamed at the RELEASE.json migration) so every
-fixture that needs this shares ONE writer instead of drifting into independent copies.
+The live release's phase is read directly off ``specs/releases/<release_id>/RELEASE.json``
+(``core.release_state.parse_release_state``). A fixture that puts a context into a known
+phase seeds one ``RELEASE.json`` document via this helper, so every fixture shares ONE
+writer instead of drifting into independent copies.
 """
 
 from __future__ import annotations
@@ -17,7 +11,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-#: A PLAN `release.py` admits: a `## DAG` table and a `### Hot files` list (AC4.3).
+from tests.helpers.oslib import write_text
+
+#: A PLAN `release.py` admits: a `## DAG` table and a `### Hot files` list.
 PLAN = (
     "## 1. As-is review\n\n## DAG\n\n| job | waits on | why |\n|---|---|---|\n"
     "| Job 1 | — | x |\n\n### Hot files\n\n- none.\n"
@@ -45,4 +41,4 @@ def write_release_phase(specs_dir: Path, release_id: str, phase: str) -> None:
         "shipped": None,
         "log": [],
     }
-    (rdir / "_RELEASE.json").write_text(json.dumps(state, indent=2) + "\n", encoding="utf-8")
+    write_text(rdir / "_RELEASE.json", json.dumps(state, indent=2) + "\n")

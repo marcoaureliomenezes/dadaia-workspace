@@ -1,7 +1,7 @@
 """The ONE source of the Linux CI jobs and repository verification:
 ``python scripts/ci.py [<job>...]`` runs the named ``ci.yml`` jobs (all of them when none is
-given); ``task FILE...`` runs ruff and mypy on the touched files and the touched tests;
-``stage`` and ``job`` run lint, mypy, guards and the small tier. Each step
+given); ``job`` runs lint, mypy, guards and the small tier; ``--changed`` runs the tests
+``scripts/impact.py`` selects. Each step
 prints ``PASS``/``FAIL <step>: <command>``; every step runs; exit 1 if any failed. Standard
 library only: the ``repo-hygiene`` and ``doctor`` jobs install no dev group."""
 
@@ -81,35 +81,24 @@ JOBS: dict[str, list[Step]] = {
 }
 
 
-STAGE = ("lint", "typecheck", "guards", "unit-fast")
-
-
-def _task(files: list[str]) -> list[Step]:
-    """The task level over the touched *files*: format, lint, types, then the touched tests."""
-    py = [f for f in files if f.endswith(".py")]
-    tests = [f for f in py if f.startswith("tests/") and Path(f).name.startswith("test_")]
-    src = [f for f in py if f not in tests and f.startswith(("dadaia_workspace/", "scripts/"))]
-    return [
-        *(
-            [("ruff format", [PY, "-m", "ruff", "format", "--check", "--no-cache", *py], {}),
-             ("ruff check", [PY, "-m", "ruff", "check", "--no-cache", *py], {})]
-            if py else []
-        ),
-        *([("mypy", [PY, "-m", "mypy", "--strict", *src], {})] if src else []),
-        *([("owner tests", [*PYTEST, *tests], {})] if tests else []),
-    ]  # fmt: skip
+STAGE = ("lint", "typecheck", "guards", "unit-fast", "doctor")
 
 
 def plan(argv: list[str]) -> list[tuple[str, Step]]:
     """``(job, step)`` in run order for *argv*: a level, else the named CI jobs, else all."""
-    if argv[:1] == ["task"]:
-        return [("task", step) for step in _task(argv[1:])]
-    jobs = STAGE if argv in ([], ["job"], ["stage"]) else argv
+    jobs = STAGE if argv in ([], ["job"]) else argv
     return [(job, step) for job in jobs for step in JOBS[job]]
 
 
 def main(argv: list[str]) -> int:
-    # The fence (ADR 0088) mirrors the resolver's rungs: the inherited fence, every root above
+    unknown = [a for a in argv if a not in JOBS and a not in ("job", "--changed")]
+    if unknown:
+        print(
+            f"unknown job {', '.join(map(repr, unknown))}; known: job, {', '.join(JOBS)}",
+            file=sys.stderr,
+        )
+        return 2
+    # The fence mirrors the resolver's rungs: the inherited fence, every root above
     # the checkout, and the instance owning this venv (``fenced_env`` omits that last one, and
     # importing it would judge whichever ``dadaia_workspace`` is importable).
     fence = [os.environ.get("DADAIA_FENCED_ROOTS", ""), *map(str, ROOT.parents)]
@@ -120,7 +109,21 @@ def main(argv: list[str]) -> int:
         "PYTHONDONTWRITEBYTECODE": "1",
         "DADAIA_FENCED_ROOTS": os.pathsep.join(p for p in fence if p),
     }
-    for job, (name, cmd, env) in plan(argv):
+    steps = [] if argv == ["--changed"] else plan(argv)
+    if argv == ["--changed"]:
+        out = subprocess.run(
+            [PY, "scripts/impact.py"],
+            cwd=ROOT,
+            env=base,
+            text=True,
+            encoding="utf-8",
+            capture_output=True,
+            check=True,
+        ).stdout
+        print(out, end="", flush=True)
+        tests = [ln[6:] for ln in out.splitlines() if ln.startswith("test: ")]
+        steps = [("changed", ("changed tests", [*PYTEST, *tests], {}))] if tests else []
+    for job, (name, cmd, env) in steps:
         print(f"--- {job}: {name}", flush=True)
         step_env = {**base, **env}
         code = subprocess.run(cmd, cwd=ROOT, env=step_env, check=False).returncode

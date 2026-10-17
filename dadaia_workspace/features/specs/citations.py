@@ -1,9 +1,7 @@
 """Citation finders — dead `specs/` paths, dead `dadaia <verb>`s, dead skill pointers.
 
-Relocated out of ``tests/infrastructure/test_entity_doctor.py`` (0.4.7 FR2): the same three
-finders that keep every ``public/**`` asset honest now measure ``specs/memory/**``
-through the doctor's ``MEM-DRIFT-2`` and the derived documents through FR3 — one
-implementation, three consumers, no test-local copy.
+Three finders keep every ``public/**`` asset honest; they measure ``specs/memory/**``
+through the doctor's ``MEM-DRIFT-2`` and the derived documents: one implementation, three consumers.
 
 Pure over text plus plain data: a command-path set (walked ONCE by
 ``cli.help_digest.command_paths``; ``features`` never imports ``cli``) and the file
@@ -16,6 +14,9 @@ from __future__ import annotations
 import re
 from collections.abc import Collection, Iterable
 from pathlib import Path, PurePath
+
+from dadaia_workspace.core import platform
+from dadaia_workspace.core.fixed_sections import authored_text
 
 __all__ = [
     "CITABLE_PATH_PREFIXES",
@@ -51,8 +52,7 @@ _SCOPED_AGENTS_TOKEN_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]*-AGENTS\.md$")
 
 def posix_relpath(path: PurePath, root: PurePath) -> str:
     """Render *path* relative to *root* in POSIX form — separator-agnostic, so a
-    violation's ``file:line`` citation is byte-identical on Windows and POSIX (bug
-    ``citation-mutation-fixtures-never-turn-red-on-windows``). Pure path arithmetic
+    violation's ``file:line`` citation is byte-identical on Windows and POSIX. Pure path arithmetic
     (no I/O), so it takes any ``PurePath``."""
     return path.relative_to(root).as_posix()
 
@@ -78,7 +78,7 @@ def _resolves_inside(repo_root: Path, token: str) -> bool:
     file INSIDE *repo_root*. A token that escapes the checkout — by traversal or through
     a symlink — is dead by definition, so existence is never probed outside the repo."""
     candidate = repo_root / token
-    if candidate.is_symlink():
+    if platform.is_link(candidate):
         return False
     try:
         resolved = candidate.resolve()
@@ -100,8 +100,7 @@ def dead_path_citations(
     or ``(sibling)``-annotated bare-filename citation in *text* must resolve on disk.
 
     *exempt* holds tokens proven to be projected INSTANCE realities absent from any
-    checkout (bug ``citation-enforcer-resolves-projected-instance-paths-against-the-
-    checkout``) — plain data, decided by the caller, never a second allowlist here.
+    checkout — plain data, decided by the caller, never a second allowlist here.
     Sibling citations resolve next to the document (*sibling_dir*) or anywhere under
     *sibling_roots*; with neither supplied they are not checked.
     """
@@ -152,6 +151,8 @@ def dead_verb_citations(
                     verb_path = (v1,)
                 else:
                     verb_path = (v1, v2)
+                if v2 and not any(p[:1] == (v1,) and p[1:] for p in command_paths):
+                    verb_path = (v1,)  # a leaf's next word is its argument
                 if not verb_path or verb_path in command_paths:
                     continue
                 violations.append(
@@ -179,14 +180,13 @@ def dead_citations(
 def _numbered_headings(skill_md: Path) -> set[str]:
     """The `N` of every `## N.`/`## Na.` heading of *skill_md* — `## 3a.` answers §3."""
     return {
-        m.group(1)
-        for m in re.finditer(r"^## (\d+)[a-z]?\.", skill_md.read_text(encoding="utf-8"), re.M)
+        m.group(1) for m in re.finditer(r"^## (\d+)[a-z]?\.", platform.read_text(skill_md), re.M)
     }
 
 
 def dead_body_pointers(text: str, *, rel: str, public_dir: Path) -> list[str]:
     """Every backticked ``dd-<name>`` token names a skill directory or a persona file
-    under *public_dir* (since 0.4.7 the three personas are ``dd-`` named too);
+    under *public_dir*;
     every `` `dd-x` §N `` pair names a ``## N.`` section of that skill's ``SKILL.md``;
     every backticked ``*-AGENTS.md`` filename resolves to an asset under *public_dir*.
     Returns ``file:line: …`` strings naming what to re-read."""
@@ -217,8 +217,8 @@ def memory_citation_violations(
     repo_root: Path | None,
     command_paths: Collection[tuple[str, ...]] | None,
 ) -> list[tuple[Path, str]]:
-    """`dead_citations` over every ``*.md`` under *memory_dir* — the doctor's
-    MEM-DRIFT-2 input, as ``(atom, violation)`` pairs.
+    """`dead_citations` over every ``*.md`` under *memory_dir*, fixed sections blanked
+    (line numbers kept) — the doctor's MEM-DRIFT-2 input, as ``(atom, violation)`` pairs.
 
     Silent (``[]``) with no command tree, no *repo_root* or no memory tree: a consumer
     whose CLI tree could not be resolved is not a consumer with drift.
@@ -229,7 +229,7 @@ def memory_citation_violations(
         (path, violation)
         for path in _markdown_files(memory_dir)
         for violation in dead_citations(
-            path.read_text(encoding="utf-8"),
+            authored_text(platform.read_text(path)),
             command_paths=command_paths,
             repo_root=repo_root,
             rel=posix_relpath(path, repo_root),
@@ -239,7 +239,7 @@ def memory_citation_violations(
 
 def _markdown_files(root: Path) -> list[Path]:
     """Symlinks are skipped — the walk stays inside the tree it was handed (CWE-22)."""
-    return sorted(p for p in root.glob("**/*.md") if not p.is_symlink())
+    return sorted(p for p in root.glob("**/*.md") if not platform.is_link(p))
 
 
 def dead_path_citations_in_tree(
@@ -249,7 +249,7 @@ def dead_path_citations_in_tree(
     violations: list[str] = []
     for md_path in _markdown_files(public_dir):
         violations += dead_path_citations(
-            md_path.read_text(encoding="utf-8"),
+            platform.read_text(md_path),
             rel=posix_relpath(md_path, repo_root),
             repo_root=repo_root,
             exempt=exempt,
@@ -266,7 +266,7 @@ def dead_verb_citations_in_tree(
     violations: list[str] = []
     for md_path in _markdown_files(public_dir):
         violations += dead_verb_citations(
-            md_path.read_text(encoding="utf-8"),
+            platform.read_text(md_path),
             rel=posix_relpath(md_path, repo_root),
             command_paths=command_paths,
         )
@@ -281,7 +281,7 @@ def dead_body_pointers_in_tree(
     for root in roots:
         for md_path in _markdown_files(root):
             violations += dead_body_pointers(
-                md_path.read_text(encoding="utf-8"),
+                platform.read_text(md_path),
                 rel=posix_relpath(md_path, repo_root),
                 public_dir=public_dir,
             )

@@ -1,6 +1,5 @@
-"""rc-9 AC3.1: the suite's whole env is one pure function — the operator's session out, the
-temp home and the suite keys in (bugs outside-tmp-home-pin-coupled-to-session-hooks,
-operator-env-scrub-row-leaves-stale-pinned-home)."""
+"""The suite's whole env is one pure function — the operator's session out, the temp home
+and the suite keys in."""
 
 from __future__ import annotations
 
@@ -8,6 +7,8 @@ import sys
 from pathlib import Path, PurePosixPath
 
 import pytest
+
+from tests.helpers.oslib import write_text
 
 _HOME = "/tmp/h"
 
@@ -61,8 +62,8 @@ def test_git_bash_on_windows_is_the_one_beside_git(
 
     (tmp_path / "Git" / "cmd").mkdir(parents=True)
     (tmp_path / "Git" / "bin").mkdir()
-    (tmp_path / "Git" / "cmd" / "git.exe").write_text("", "utf-8")
-    (tmp_path / "Git" / "bin" / "bash.exe").write_text("", "utf-8")
+    write_text(tmp_path / "Git" / "cmd" / "git.exe", "")
+    write_text(tmp_path / "Git" / "bin" / "bash.exe", "")
     monkeypatch.setattr("dadaia_workspace.core.platform.PLATFORM", Capabilities.detect("win32"))
     monkeypatch.setattr("shutil.which", lambda _name: str(tmp_path / "Git" / "cmd" / "git.exe"))
     assert git_bash() == str(tmp_path / "Git" / "bin" / "bash.exe")

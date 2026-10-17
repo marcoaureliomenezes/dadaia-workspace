@@ -1,5 +1,4 @@
 import json
-import subprocess
 from pathlib import Path
 
 import pytest
@@ -13,6 +12,8 @@ from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
 from tests.fakes import NoWorktreeContainer, seed_dead_context
+from tests.helpers.oslib import make_executable, run, write_text
+from tests.helpers.oslib import run as os_run
 
 _runner = CliRunner()
 
@@ -40,7 +41,8 @@ def _register_alive_ctx(workspace: Path, name: str = "myctx") -> None:
     """An ALIVE v2 context written straight into the state file — no real clone."""
     states = workspace / ".dadaia" / "states"
     states.mkdir(parents=True, exist_ok=True)
-    (states / "spec_contexts.json").write_text(
+    write_text(
+        states / "spec_contexts.json",
         json.dumps(
             {
                 "schema_version": "2",
@@ -57,7 +59,7 @@ def _register_alive_ctx(workspace: Path, name: str = "myctx") -> None:
                     }
                 ],
             }
-        )
+        ),
     )
 
 
@@ -92,9 +94,8 @@ def test_context_create_show_list_happy_lifecycle(workspace: Path) -> None:
 
     list_json = _runner.invoke(app, ["context", "list", "--json"])
     assert list_json.exit_code == 0, list_json.output
-    # FR18 (T-044-29): `list --json` also carries `stored_branch` (the stored
-    # snapshot, distinct from the live-resolved `current_branch`, A18.1) and
-    # `associated_repos` (full list, A18.4/A18.5).
+    # `list --json` also carries `stored_branch` (the stored snapshot, distinct from
+    # the live-resolved `current_branch`) and `associated_repos` (full list).
     assert json.loads(list_json.stdout) == [
         {
             "alive_since": None,
@@ -136,9 +137,9 @@ def test_context_error_matrix(workspace: Path, invoke_args: list[str]) -> None:
 def test_context_bind_is_one_verb_with_one_argument(
     workspace: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """0.4.7 FR4: `bind <ctx>` exits 0, persists the record, prints a human
+    """`bind <ctx>` exits 0, persists the record, prints a human
     confirmation — never a shell export line. No --mode, no --release, no --force,
-    no --reason, no --print-env (0148 (4)); the record carries neither `mode` nor `release`."""
+    no --reason, no --print-env; the record carries neither `mode` nor `release`."""
     monkeypatch.setenv("DADAIA_SESSION_ID", "sess_t1")
     _register_alive_ctx(workspace)
     result = _runner.invoke(app, ["context", "bind", "myctx"])
@@ -158,12 +159,12 @@ def test_context_bind_is_one_verb_with_one_argument(
 @pytest.mark.parametrize(
     ("env", "session_id"),
     [
-        # bug bind-session-id-divergence: one stable harness-native id, never a minted sess_*
+        # One stable harness-native id, never a minted sess_*
         pytest.param({"CLAUDE_CODE_SESSION_ID": "claude-stable-abc123"}, "claude-stable-abc123", id="claude-native-id"),
         pytest.param({"CODEX_THREAD_ID": "harness-session"}, "harness-session", id="codex-native-id"),
         # the eval-flow contract: an explicit DADAIA_SESSION_ID is reused, never re-minted
         pytest.param({"DADAIA_SESSION_ID": "sess_stable01"}, "sess_stable01", id="dadaia-session-id"),
-        # bug validation-027-f-07: env id AND harness id -> the env id owns the ONE record
+        # env id AND harness id -> the env id owns the ONE record
         pytest.param({"DADAIA_SESSION_ID": "sess_envfixed", "CLAUDE_CODE_SESSION_ID": "claude-native-xyz"}, "sess_envfixed", id="env-id-wins-one-record"),
     ],
 )  # fmt: skip
@@ -211,7 +212,7 @@ def test_bind_records_dadaia_runtime_env(workspace: Path, monkeypatch: pytest.Mo
 
 
 def test_context_show_json_session_null_then_populated_when_bound(workspace: Path) -> None:
-    """AC-T10d-6: show --json has session=null when no session binding, and a
+    """show --json has session=null when no session binding, and a
     populated session sub-object when DADAIA_SESSION_ID is set and the session file
     is fresh."""
     _register_alive_ctx(workspace)
@@ -229,7 +230,7 @@ def test_context_show_json_session_null_then_populated_when_bound(workspace: Pat
     show_result = _runner.invoke(app, ["context", "show", "--json"], env=env)
     assert show_result.exit_code == 0, show_result.output
     data = json.loads(show_result.stdout)
-    # sa-bind-has-two-stores#S8: name and session come from the one Bind.
+    # Name and session come from the one bind.
     assert data["name"] == "myctx" == data["session"]["context"]
     assert data["session"]["session_id"] == session_id
 
@@ -239,46 +240,21 @@ def test_push_uses_set_upstream_when_no_tracking(tmp_path: Path) -> None:
     # Create a bare remote
     bare = tmp_path / "bare.git"
     bare.mkdir()
-    subprocess.run(["git", "init", "--bare", str(bare)], capture_output=True, check=True)
+    os_run(["git", "init", "--bare", str(bare)], check=True)
 
     # Create a local repo with at least one commit
     local = tmp_path / "local"
     local.mkdir()
-    subprocess.run(["git", "init", str(local)], capture_output=True, check=True)
-    subprocess.run(
-        ["git", "config", "user.email", "test@example.com"],
-        cwd=local,
-        capture_output=True,
-        check=True,
-    )
-    subprocess.run(
-        ["git", "config", "user.name", "Test"],
-        cwd=local,
-        capture_output=True,
-        check=True,
-    )
-    (local / "README.md").write_text("hello")
-    subprocess.run(["git", "add", "README.md"], cwd=local, capture_output=True, check=True)
-    subprocess.run(
-        ["git", "commit", "-m", "init"],
-        cwd=local,
-        capture_output=True,
-        check=True,
-    )
-    subprocess.run(
-        ["git", "remote", "add", "origin", str(bare)],
-        cwd=local,
-        capture_output=True,
-        check=True,
-    )
+    os_run(["git", "init", str(local)], check=True)
+    os_run(["git", "config", "user.email", "test@example.com"], cwd=local, check=True)
+    os_run(["git", "config", "user.name", "Test"], cwd=local, check=True)
+    write_text(local / "README.md", "hello")
+    os_run(["git", "add", "README.md"], cwd=local, check=True)
+    os_run(["git", "commit", "-m", "init"], cwd=local, check=True)
+    os_run(["git", "remote", "add", "origin", str(bare)], cwd=local, check=True)
 
     # Pre-condition: no upstream tracking branch
-    no_upstream = subprocess.run(
-        ["git", "rev-parse", "--abbrev-ref", "@{u}"],
-        cwd=local,
-        capture_output=True,
-        text=True,
-    )
+    no_upstream = run(["git", "rev-parse", "--abbrev-ref", "@{u}"], cwd=local)
     assert no_upstream.returncode != 0, "pre-condition: upstream must NOT be set"
 
     # Exercise the fix
@@ -286,12 +262,7 @@ def test_push_uses_set_upstream_when_no_tracking(tmp_path: Path) -> None:
     client.push(local)  # must not raise
 
     # Post-condition: upstream tracking branch is now set
-    has_upstream = subprocess.run(
-        ["git", "rev-parse", "--abbrev-ref", "@{u}"],
-        cwd=local,
-        capture_output=True,
-        text=True,
-    )
+    has_upstream = run(["git", "rev-parse", "--abbrev-ref", "@{u}"], cwd=local)
     assert has_upstream.returncode == 0, (
         "upstream tracking must be set after git push -u; "
         f"got stderr: {has_upstream.stderr.strip()!r}"
@@ -299,23 +270,20 @@ def test_push_uses_set_upstream_when_no_tracking(tmp_path: Path) -> None:
 
 
 def _remote_heads(bare: Path) -> dict[str, str]:
-    out = subprocess.run(["git", "-C", str(bare), "for-each-ref", "--format=%(refname) %(objectname)"],
-                         capture_output=True, text=True, check=True).stdout  # fmt: skip
+    out = run(["git", "-C", str(bare), "for-each-ref", "--format=%(refname) %(objectname)"], check=True).stdout  # fmt: skip
     return dict(line.split() for line in out.splitlines())
 
 
 def test_context_baseline_is_consent_by_invocation(workspace: Path, tmp_path: Path) -> None:
-    """AC4.2/AC4.7: no --yes/--push; one invocation publishes, a re-run is a no-op."""
+    """No --yes/--push; one invocation publishes, a re-run is a no-op."""
     bare = tmp_path / "baseline.git"
-    subprocess.run(["git", "init", "--bare", str(bare)], capture_output=True, check=True)
+    os_run(["git", "init", "--bare", str(bare)], check=True)
     repo = workspace / "repos" / "baseline"
-    subprocess.run(["git", "clone", str(bare), str(repo)], capture_output=True, check=True)
+    os_run(["git", "clone", str(bare), str(repo)], check=True)
     for key, value in (("user.email", "t@example.com"), ("user.name", "T")):
-        subprocess.run(["git", "config", key, value], cwd=repo, check=True)
+        os_run(["git", "config", key, value], cwd=repo, check=True)
     (repo / "specs").mkdir()
-    (repo / "specs" / "constitution.md").write_text(
-        "---\nspecs_pattern_version: 6\n---\n", encoding="utf-8"
-    )
+    write_text(repo / "specs" / "constitution.md", "---\nspecs_pattern_version: 6\n---\n")
     _register_alive_ctx(workspace, "baseline")
 
     assert _runner.invoke(app, ["context", "baseline", "baseline", "--yes"]).exit_code != 0
@@ -330,21 +298,21 @@ def test_context_baseline_is_consent_by_invocation(workspace: Path, tmp_path: Pa
 def test_context_dead_surfaces_the_refused_push_with_its_fix_line(
     workspace: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """T-048-11: a push the pre-push hook refuses reaches the operator verbatim — its
+    """A push the pre-push hook refuses reaches the operator verbatim — its
     one ``fix:`` line included — instead of a bare "resolve the issue and retry"."""
     bare = tmp_path / "refused.git"
-    subprocess.run(["git", "init", "--bare", str(bare)], capture_output=True, check=True)
+    os_run(["git", "init", "--bare", str(bare)], check=True)
     repo = workspace / "repos" / "refused"
-    subprocess.run(["git", "clone", str(bare), str(repo)], capture_output=True, check=True)
+    os_run(["git", "clone", str(bare), str(repo)], check=True)
     for key, value in (("user.email", "t@example.com"), ("user.name", "T")):
-        subprocess.run(["git", "config", key, value], cwd=repo, check=True)
-    (repo / "README.md").write_text("x\n", encoding="utf-8")
-    subprocess.run(["git", "add", "README.md"], cwd=repo, check=True)
-    subprocess.run(["git", "commit", "-qm", "init"], cwd=repo, check=True)
-    subprocess.run(["git", "checkout", "-qb", "feature/0.1.0"], cwd=repo, check=True)
+        os_run(["git", "config", key, value], cwd=repo, check=True)
+    write_text(repo / "README.md", "x\n")
+    os_run(["git", "add", "README.md"], cwd=repo, check=True)
+    os_run(["git", "commit", "-qm", "init"], cwd=repo, check=True)
+    os_run(["git", "checkout", "-qb", "feature/0.1.0"], cwd=repo, check=True)
     hook = repo / ".git" / "hooks" / "pre-push"
-    hook.write_text("#!/bin/sh\necho 'fix: git checkout -b feature/0.1.0' >&2\nexit 1\n")
-    hook.chmod(0o755)
+    write_text(hook, "#!/bin/sh\necho 'fix: git checkout -b feature/0.1.0' >&2\nexit 1\n")
+    make_executable(hook)
     _register_alive_ctx(workspace, "refused")
     monkeypatch.setattr(context_cmd, "container", NoWorktreeContainer())
 
@@ -357,7 +325,7 @@ def test_context_dead_surfaces_the_refused_push_with_its_fix_line(
 
 
 def test_show_unbound_is_calm_in_both_modes(workspace: Path) -> None:
-    """Bug context-show-json-traceback-unbound: with no bind, `show --json` answers
+    """With no bind, `show --json` answers
     {"context": null} and human `show` prints a calm line — both exit 0, no traceback."""
     as_json = _runner.invoke(app, ["context", "show", "--json"])
     human = _runner.invoke(app, ["context", "show"])
@@ -369,9 +337,7 @@ def test_show_unbound_is_calm_in_both_modes(workspace: Path) -> None:
 def test_bind_with_no_live_release_exits_zero_and_the_next_write_is_allowed(
     workspace: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Bug ``context-bind-implementation-requires-release-id-stall-when-none-live``.
-
-    The repro: a workspace with no ``specs/releases/<id>/`` on disk. Bind used to refuse
+    """A workspace with no ``specs/releases/<id>/`` on disk. Bind used to refuse
     (``--release <id> is required``) and the only way to create the release was a
     MUTATING write the refused bind would not grant — a closed loop. `bind` no longer
     knows what a release is, so it exits 0 and the next in-scope MUTATING write ALLOWs.
@@ -385,7 +351,7 @@ def test_bind_with_no_live_release_exits_zero_and_the_next_write_is_allowed(
     result = _runner.invoke(app, ["context", "bind", "myctx"])
     assert result.exit_code == 0, result.output
 
-    # sa-bind-has-two-stores#S4: the record the bind wrote is the bind — no env by hand.
+    # The record the bind wrote is the bind — no env by hand.
     target = workspace / "worktrees/myctx/0.0.1a-release/specs/releases/0.0.1/SPEC.md"
     block = pre_gate.evaluate_payload(
         {"tool_name": "Write", "tool_input": {"file_path": str(target)}}
@@ -394,7 +360,7 @@ def test_bind_with_no_live_release_exits_zero_and_the_next_write_is_allowed(
 
 
 def test_context_show_and_list_json_emit_main_repo_key(workspace: Path) -> None:
-    """AC5.1. `show --json` / `list --json` carry `main_repo`;
+    """`show --json` / `list --json` carry `main_repo`;
     the retired output key `repo_slug` is absent (the state-file schema keeps it)."""
     from dadaia_workspace.core.models.spec_context import AssociatedRepo
 

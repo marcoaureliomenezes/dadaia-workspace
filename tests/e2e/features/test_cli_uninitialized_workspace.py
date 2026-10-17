@@ -1,14 +1,10 @@
 """A CLI verb run outside an initialized workspace must fail CLEANLY.
 
-Bug doctor-uninitialized-workspace-traceback (found by the sample-consumer Consumer
-consumer, recipe F-22): `dadaia doctor`, `dadaia public doctor`, and `dadaia reports
-doctor` raised WorkspaceNotInitializedError (a DadaiaError), which Typer rendered as a
-full Python/Rich TRACEBACK — and two of them even exited 0 despite it. A CLI must
-surface a concise, actionable error and a NON-ZERO exit, never a traceback. server/plugin
-already did this per-command; this pins the whole class via the global entrypoint handler.
+A verb run outside an initialized workspace (`dadaia doctor`, `dadaia public doctor`,
+`dadaia reports doctor`) prints one concise, actionable error and exits NON-ZERO, never a
+traceback; the global entrypoint handler is the one home of that contract.
 
-bug doctor-uninitialized-workspace-traceback
-Owner: dd-software-engineer
+Owner: dd-sw-engineer-sr
 """
 
 from __future__ import annotations
@@ -19,6 +15,8 @@ from pathlib import Path
 
 import pytest
 
+from tests.helpers.oslib import run
+
 _VERBS = [
     ["doctor"],
     ["public", "doctor"],
@@ -26,12 +24,8 @@ _VERBS = [
 
 
 def _cli(cwd: Path, *args: str) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        [sys.executable, "-m", "dadaia_workspace.cli.main", *args],
-        cwd=str(cwd),
-        capture_output=True,
-        text=True,
-        timeout=120.0,
+    return run(
+        [sys.executable, "-m", "dadaia_workspace.cli.main", *args], cwd=str(cwd), timeout=120.0
     )
 
 

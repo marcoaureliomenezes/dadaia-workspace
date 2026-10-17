@@ -30,9 +30,12 @@ def import_workspace(
     """
     try:
         root = resolve_cli_workspace_root(workspace)
+    except DadaiaError as exc:
+        fail(exc)
+    try:
         result = container.build_import_service(root).run(file)
     except (DadaiaError, ValueError) as exc:
-        fail(exc)
+        fail(exc, fix_line(root, "export"))
     for name, reason in result.skipped:
         console.print(f"  [dim]skipped ({escape(reason)})[/dim]   {escape(name)}")
     for name in result.registered:

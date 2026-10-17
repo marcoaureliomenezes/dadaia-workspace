@@ -8,7 +8,7 @@ by EXECUTING each fix line against a tree where the finding was planted, and re-
 the very rule that emitted it.
 
 Every planted finding's description also passes the dead-verb scanner
-(``features.specs.citations``) — bug doctor-messages-cite-dead-verbs.
+(``features.specs.citations``).
 
 Two verdicts, one per rule class:
 
@@ -29,7 +29,6 @@ import json
 import os
 import re
 import shutil
-import subprocess
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -59,6 +58,9 @@ from tests.features.specs.test_doctor import _make_clean_specs_tree
 from tests.fixtures.harness_env import run_bash, suite_env
 from tests.fixtures.stores import context_store
 from tests.helpers import worktree_ws
+from tests.helpers.oslib import link, read_text, run, write_text
+from tests.helpers.oslib import read_text as os_read_text
+from tests.helpers.oslib import write_text as os_write_text
 
 _RELEASE = "1.2.3"
 
@@ -77,7 +79,7 @@ def _plant_missing_memory_document(root: Path) -> None:
 
 def _plant_headingless_memory_document(root: Path) -> None:
     quality = root / "specs" / "memory" / "QUALITY.md"
-    quality.write_text("---\nslug: quality\n---\n\nno heading here\n", encoding="utf-8")
+    write_text(quality, "---\nslug: quality\n---\n\nno heading here\n")
 
 
 def _plant_nothing(root: Path) -> None:
@@ -86,7 +88,7 @@ def _plant_nothing(root: Path) -> None:
 
 def _plant_placeholder_atom(root: Path) -> None:
     atom = root / "specs" / "memory" / "product" / "testarea" / "raw.md"
-    atom.write_text("---\nslug: SLUG_PLACEHOLDER\n---\n# TITLE_PLACEHOLDER\n", encoding="utf-8")
+    write_text(atom, "---\nslug: SLUG_PLACEHOLDER\n---\n# TITLE_PLACEHOLDER\n")
 
 
 def _plant_missing_root_agents(root: Path) -> None:
@@ -96,45 +98,43 @@ def _plant_missing_root_agents(root: Path) -> None:
 def _plant_fixed_block_gone(root: Path) -> None:
     """A memory document whose fixed law block was deleted by hand."""
     quality = root / "specs" / "memory" / "QUALITY.md"
-    text = quality.read_text(encoding="utf-8")
+    text = read_text(quality)
     head, _, rest = text.partition("<!-- dadaia:fixed slop-tests -->")
-    quality.write_text(head + rest.partition("<!-- /dadaia:fixed slop-tests -->\n")[2])
+    write_text(quality, head + rest.partition("<!-- /dadaia:fixed slop-tests -->\n")[2])
 
 
 def _plant_fixed_block_drifted(root: Path) -> None:
     """A memory document whose fixed law block was edited by hand."""
     quality = root / "specs" / "memory" / "QUALITY.md"
-    text = quality.read_text(encoding="utf-8")
-    quality.write_text(
+    text = read_text(quality)
+    write_text(
+        quality,
         text.replace(
             "<!-- dadaia:fixed slop-tests -->\n", "<!-- dadaia:fixed slop-tests -->\n- edited\n"
-        )
+        ),
     )
 
 
 def _plant_gitflow_gone(root: Path) -> None:
     """A current dadaia tree whose constitution frontmatter has no gitflow block."""
     constitution = root / "specs" / "constitution.md"
-    constitution.write_text(
-        f"---\nspecs_pattern_version: {CANONICAL_SPECS_VERSION}\n---\n"
-        + constitution.read_text(encoding="utf-8"),
-        encoding="utf-8",
+    write_text(
+        constitution,
+        f"---\nspecs_pattern_version: {CANONICAL_SPECS_VERSION}\n---\n" + read_text(constitution),
     )
 
 
 def _plant_status_line_gone(root: Path) -> None:
-    """sa-status-line-has-two-parsers#B26-3 a 173-line TASKS.md, lowercase token on line 3;
-    sa-status-line-has-two-parsers#B26-4 a SPEC.md with no status line — both fire."""
+    """A 173-line TASKS.md with a lowercase status token on line 3, and a SPEC.md with
+    no status line: both fire."""
     release = root / "specs" / "releases" / _RELEASE / "rc-1"
-    (release / "SPEC.md").write_text("# Spec\n\nContent.\n", encoding="utf-8")
-    (release / "TASKS.md").write_text("# Tasks\n\n**Status:** approved\n" + "- t\n" * 170)
+    write_text(release / "SPEC.md", "# Spec\n\nContent.\n")
+    write_text(release / "TASKS.md", "# Tasks\n\n**Status:** approved\n" + "- t\n" * 170)
 
 
 def _plant_changelog_heading(root: Path) -> None:
     atom = root / "specs" / "memory" / "product" / "testarea" / "feature-a.md"
-    atom.write_text(
-        atom.read_text(encoding="utf-8") + "\n## Changelog\n\n- 1.0.0 born\n", encoding="utf-8"
-    )
+    write_text(atom, read_text(atom) + "\n## Changelog\n\n- 1.0.0 born\n")
 
 
 def _plant_dispositioned_audit(root: Path) -> None:
@@ -142,8 +142,9 @@ def _plant_dispositioned_audit(root: Path) -> None:
     audit.mkdir(parents=True)
     (root / "specs" / "audits" / "_archive").mkdir(parents=True, exist_ok=True)
     (root / "specs" / "audits" / "_archive" / "audits_histo.jsonl").touch()
-    (audit / "AUDIT.md").write_text("# Audit\n", encoding="utf-8")
-    (audit / "FINDINGS.jsonl").write_text(
+    write_text(audit / "AUDIT.md", "# Audit\n")
+    write_text(
+        audit / "FINDINGS.jsonl",
         json.dumps(
             {
                 "id": "20260101-lifecycle-F001",
@@ -158,47 +159,39 @@ def _plant_dispositioned_audit(root: Path) -> None:
             }
         )
         + "\n",
-        encoding="utf-8",
     )
 
 
 def _plant_legacy_state_name(root: Path) -> None:
-    """ADR 0007: the legacy state-file name, renamed by `doctor --fix`."""
+    """The legacy state-file name, renamed by `doctor --fix`."""
     state = root / "specs" / "releases" / _RELEASE / "_RELEASE.json"
     state.rename(state.with_name("RELEASE.json"))
 
 
 def _plant_stray_dotfile(root: Path) -> None:
     # Untracked and with no canon home — the case a ``git mv`` fix line could not serve
-    # (bug tree8-fix-line-not-runnable-for-every-case).
     (root / "specs" / ".DS_Store").write_bytes(b"\x00")
 
 
 def _plant_orphan_wt(root: Path) -> None:
-    """An unmerged orphan: `wt/0.5.0-rc1/j1` carries a task merge and has no tree."""
-    repo, tree = root / "repos/r", root / "worktrees/r/0.5.0-rc1/j1"
-    task = root / "worktrees/r/0.5.0-rc1/j1--t1"
+    """An unmerged orphan: a lane branch carries a commit and has no tree."""
+    repo, tree = root / "repos/r", root / "worktrees/r/0.5.0/wt-hotfix-b"
     worktree_ws.git(repo, "checkout", "-q", "feature/0.5.0")
-    worktree_ws.git(repo, "worktree", "add", "-q", "-b", "wt/0.5.0-rc1/j1", str(tree))
-    worktree_ws.git(repo, "worktree", "add", "-q", "-b", "wt/0.5.0-rc1/j1--t1", str(task))
-    worktree_ws.commit(task, "src/a.py")
-    worktree_ws.git(tree, "merge", "-q", "--ff-only", "wt/0.5.0-rc1/j1--t1")
-    worktree_ws.git(repo, "worktree", "remove", str(task))
-    worktree_ws.git(repo, "branch", "-q", "-D", "wt/0.5.0-rc1/j1--t1")
+    worktree_ws.git(repo, "worktree", "add", "-q", "-b", "wt/0.5.0/wt-hotfix-b", str(tree))
+    worktree_ws.commit(tree, "src/a.py")
     worktree_ws.git(repo, "worktree", "remove", str(tree))
 
 
-#: code -> how to make it fire. The eight remedies the 0.4.7 candidate-2 review named,
-#: plus the memory-document pair they share a shape with.
+#: code -> how to make it fire: the eight remedies, plus the memory-document pair
+#: they share a shape with.
 PLANTS: dict[str, Plant] = {
-    # sa-unfixable-doctor-findings-say-doctor-fix#S2 — the doctor's own repairs, run as
+    # The doctor's own repairs, run as
     # printed (`doctor --fix --specs-dir <specs>`).
     "TREE-4": Plant(_plant_nothing),
-    # AC1.10: the workspace section's WORKTREE rule, proven by its own test below.
+    # The workspace section's WORKTREE rule, proven by its own test below.
     "WORKTREE": Plant(_plant_orphan_wt),
     "TREE-5": Plant(_plant_missing_root_agents),
     "SPEC-DOC-034": Plant(_plant_nothing),
-    "MEM-PLACEHOLDER-1": Plant(_plant_placeholder_atom),
     "FIXED-1": Plant(_plant_fixed_block_gone),
     "FIXED-2": Plant(_plant_fixed_block_drifted),
     "GITFLOW-1": Plant(_plant_gitflow_gone, {"<specs>": "specs"}),
@@ -208,11 +201,10 @@ PLANTS: dict[str, Plant] = {
 
 
 def _git(root: Path, *args: str) -> None:
-    subprocess.run(
+    run(
         ["git", *args],
         cwd=root,
         check=True,
-        capture_output=True,
         env=suite_env(
             {}, root, overrides={"PATH": "/usr/bin:/bin", "GIT_CONFIG_GLOBAL": "/dev/null"}
         ),
@@ -276,7 +268,7 @@ def test_the_fix_line_clears_the_finding_it_was_stamped_on(
     before = _run_rule(root, rule)
     assert before, f"{code}: the fixture did not make the rule fire"
     whole_before = _whole(root)
-    if code == "TREE-3":  # sa-missing-memory-file-reported-twice: one finding for one fact
+    if code == "TREE-3":  # one finding for one fact
         assert [f[0] for f in whole_before if "memory/QUALITY.md" in f[1]] == ["TREE-3"]
     dead = [
         v
@@ -293,16 +285,16 @@ def test_the_fix_line_clears_the_finding_it_was_stamped_on(
         )
         return
 
-    # sa-unfixable-doctor-findings-say-doctor-fix#S2: run the fix PRINTED on the finding
+    # Run the fix PRINTED on the finding
     # (its own, or the rule's default stamped by the doctor), never the rule default blind.
     # The fixture is no workspace: the fix names the CLI of the venv running this suite.
     (printed, *_) = run_section("specs", [rule], _doctor(root), None, root / "specs").findings
-    # sa-unfixable-doctor-findings-say-doctor-fix#S1: no `<…>` survives into a printed fix.
+    # No `<…>` placeholder survives into a printed fix.
     assert not re.search(r"<[^<>]+>", printed.fix), f"{code}: placeholder in {printed.fix}"
     command = _resolve(printed.fix, plant)
     done = run_bash(command, cwd=root, check=False)
-    # `doctor --fix` exits 1 while the fixture's unrelated findings remain; the judge is
-    # sa-unfixable-doctor-findings-say-doctor-fix#S2: re-run the WHOLE doctor — this
+    # `doctor --fix` exits 1 while the fixture's unrelated findings remain; the judge is:
+    # re-run the WHOLE doctor — this
     # finding (its message) is gone and the fix created no new error elsewhere.
     after = _whole(root)
     assert (code, printed.message, printed.error) not in after, (
@@ -313,17 +305,17 @@ def test_the_fix_line_clears_the_finding_it_was_stamped_on(
 
 
 def test_spec_doc_046_never_clobbers_a_canonical_state_file(repo: Path) -> None:
-    """ADR 0007: with both names on disk SPEC-DOC-046 is silent, and a fix stamped before
+    """With both names on disk SPEC-DOC-046 is silent, and a fix stamped before
     `_RELEASE.json` appeared re-checks and renames nothing."""
     release = repo / "specs" / "releases" / _RELEASE
     _plant_legacy_state_name(repo)
     doctor = _doctor(repo)
     [stale] = [i for i in doctor.check() if i.code == "SPEC-DOC-046"]
-    (release / "_RELEASE.json").write_text("{}", encoding="utf-8")
+    write_text(release / "_RELEASE.json", "{}")
     assert [i for i in doctor.check() if i.code == "SPEC-DOC-046"] == []
     doctor.fix([stale])
     assert (release / "RELEASE.json").is_file()
-    assert (release / "_RELEASE.json").read_text(encoding="utf-8") == "{}"
+    assert read_text(release / "_RELEASE.json") == "{}"
 
 
 def _whole(root: Path) -> set[tuple[str, str, bool]]:
@@ -358,7 +350,7 @@ def test_no_fix_line_deletes_a_record_without_recording_it(codes: str, fix: str 
     )
 
 
-#: sa-unfixable-doctor-findings-say-doctor-fix#S1 — `report-only` codes: WARNING-only by
+#: `report-only` codes: WARNING-only by
 #: construction, and no fix line (their remedy is the operator's judgment).
 REPORT_ONLY: dict[str, Callable[[Path], None]] = {
     "SPEC-DOC-030": lambda r: (r / "specs" / "audits" / "Bad_Name").mkdir(parents=True),
@@ -375,17 +367,18 @@ REPORT_ONLY: dict[str, Callable[[Path], None]] = {
 
 def _write(path: Path, text: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(text, encoding="utf-8")
+    write_text(path, text)
 
 
 def _append(path: Path, text: str) -> None:
-    path.write_text(path.read_text(encoding="utf-8") + text, encoding="utf-8")
+    write_text(path, read_text(path) + text)
 
 
-#: sa-unfixable-doctor-findings-say-doctor-fix#S1 — error findings no command can repair
-#: (the remedy is the operator's content): each carries an `Operator action:` naming its file.
-OPERATOR_ACTION: dict[str, Callable[[Path], None]] = {
+#: error findings no command can repair
+#: (the remedy is the agent's content): each carries an `Agent action:` naming its file.
+AGENT_ACTION: dict[str, Callable[[Path], None]] = {
     "SPEC-DOC-002": _plant_headingless_memory_document,
+    "MEM-PLACEHOLDER-1": _plant_placeholder_atom,
     "SPEC-DOC-004": _plant_status_line_gone,
     "TREE-8": _plant_stray_dotfile,
     "LINT-1": lambda r: _write(r / "specs" / "memory" / "product" / "testarea" / "x.md", "# X\n"),
@@ -405,28 +398,28 @@ OPERATOR_ACTION: dict[str, Callable[[Path], None]] = {
 }  # fmt: skip
 
 
-@pytest.mark.parametrize("code", sorted(OPERATOR_ACTION))
-def test_an_operator_action_names_the_file_to_change(code: str, repo: Path) -> None:
-    """sa-unfixable-doctor-findings-say-doctor-fix#S1: an unfixable error's fix is one
-    `Operator action:` line naming the finding's own file — never a placeholder."""
+@pytest.mark.parametrize("code", sorted(AGENT_ACTION))
+def test_an_agent_action_names_the_file_to_change(code: str, repo: Path) -> None:
+    """An unfixable error's fix is one
+    `Agent action:` line naming the finding's own file — never a placeholder."""
     root = repo
-    OPERATOR_ACTION[code](root)
+    AGENT_ACTION[code](root)
     ledgers = _ledgers_section(None, root / "specs")
     found = [f for f in (*_specs_section(_doctor(root), None).findings, *ledgers.findings) if f.code == code]  # fmt: skip
     assert found, f"{code}: the fixture did not make the rule fire"
     for finding in found:
-        assert finding.fix.startswith("Operator action: "), finding.fix
+        assert finding.fix.startswith("Agent action: "), finding.fix
         assert str(repo) in finding.fix and not re.search(r"<[^<>]+>", finding.fix)
 
 
 def test_an_untraced_origin_id_is_cleared_by_its_printed_fix(repo: Path) -> None:
-    """AC3.2 (review F4; SPEC-DOC-048's row re-homed): after the sweep, a carried entry with
+    """After the sweep, a carried entry with
     no exit is an error on the real Origin line; its printed fix writes the pointer back."""
     specs = repo / "specs"
     _write(specs / "backlog/BACKLOG.json", json.dumps(
-        {"schema": "backlog-v1", "active": [_active_entry("carried", "c", "candidate")]}))  # fmt: skip
+        {"schema": "backlog-v1", "active": [_active_entry("pending", "c", "candidate")]}))  # fmt: skip
     spec = specs / "releases" / _RELEASE / "rc-1" / "SPEC.md"
-    spec.write_text(spec.read_text("utf-8").replace("operator-demand", "backlog:carried"), "utf-8")
+    os_write_text(spec, os_read_text(spec).replace("operator-demand", "backlog:pending"))
 
     def origin_errors() -> list[SectionFinding]:
         found = _ledgers_section(None, specs).findings
@@ -436,8 +429,13 @@ def test_an_untraced_origin_id_is_cleared_by_its_printed_fix(repo: Path) -> None
 
     assert origin_errors() == []  # before the sweep the carried id is only listed
     state = specs / "releases" / _RELEASE / "_RELEASE.json"
-    sweep = {"ts": "2026-01-01T00:00:00Z", "agent": "a", "kind": "dispositions", "text": "t"}
-    state.write_text(json.dumps({**json.loads(state.read_text("utf-8")), "log": [sweep]}))
+    sweep = {
+        "ts": "2026-01-01T00:00:00Z",
+        "agent": "a",
+        "kind": "summary",
+        "text": "delivered: none; carried: none; backlog exits: none",
+    }
+    write_text(state, json.dumps({**json.loads(os_read_text(state)), "log": [sweep]}))
 
     [before] = origin_errors()
     assert before.message.startswith(f"releases/{_RELEASE}/rc-1/SPEC.md:5 "), before.message
@@ -447,10 +445,8 @@ def test_an_untraced_origin_id_is_cleared_by_its_printed_fix(repo: Path) -> None
 
 def test_a_judgment_only_rule_never_makes_the_run_exit_1(repo: Path) -> None:
     """The exit-code half of the contract: every judgment-only rule fires at once and
-    contributes NO error-class finding and NO fix line, so it stalls nobody
-    (sa-unfixable-doctor-findings-say-doctor-fix#S1 — the `report-only` proof).
-    sa-memory-atom-has-two-grammars#B29-6: a history heading planted beside them is
-    reported once, by LINT-1 — CAT-1 and SPEC-DOC-008 do not exist."""
+    contributes NO error-class finding and NO fix line, so it stalls nobody.
+    A history heading planted beside them is reported once, by LINT-1."""
     root = repo
     _plant_changelog_heading(root)
     for plant in REPORT_ONLY.values():
@@ -466,7 +462,7 @@ def test_a_judgment_only_rule_never_makes_the_run_exit_1(repo: Path) -> None:
     assert [(f.code, f.error, f.fix) for f in judged if f.error or f.fix] == []
 
 
-# ── T-050-09: TREE-5 remedies are honest (AC2.3, AC2.4) ─────────────────────────
+# ── TREE-5 remedies are honest ─────────────────────────
 
 
 def _doctor_json(specs: Path, *flags: str) -> list[dict[str, str]]:
@@ -487,7 +483,7 @@ _PLACEHOLDERS = (
 
 
 def test_doctor_fix_renders_a_raw_law_copy_and_clears_its_finding(repo: Path) -> None:
-    """sa-specs-init-writes-unrendered-law#B38-3: a raw specs/AGENTS.md (the template an
+    """A raw specs/AGENTS.md (the template an
     older `specs init` copied) is flagged by `dadaia doctor` as refreshable; `dadaia
     doctor --fix` renders it and the TREE-5 finding is gone."""
     specs = repo / "specs"
@@ -504,14 +500,14 @@ def test_doctor_fix_renders_a_raw_law_copy_and_clears_its_finding(repo: Path) ->
 
     _doctor_json(specs, "--fix")
 
-    text = law.read_text(encoding="utf-8")
+    text = read_text(law)
     assert _AREA_HEADER in text and _ROOT_ROW in text
     assert not [p for p in _PLACEHOLDERS if p in text]
     assert root_law_findings() == []
 
 
 def test_a_worktree_finding_is_cleared_by_its_merge_fix(tmp_path: Path) -> None:
-    """AC1.10: an unmerged orphan wt/* carries the owner's `worktree.py merge`; its chain —
+    """An unmerged orphan wt/* carries the owner's `worktree.py merge`; its chain —
     merge refuses with the re-attach, the re-attached (unlocked) tree is still ours and
     `ready`, the reviewed merge lands — ends with no finding."""
     root = worktree_ws.make_workspace(tmp_path)
@@ -521,27 +517,27 @@ def test_a_worktree_finding_is_cleared_by_its_merge_fix(tmp_path: Path) -> None:
         if not (found := doctor.check_worktrees("c")):
             break
         worktree_ws.approve(
-            root, worktree_ws.git(root / "repos/r", "rev-parse", "wt/0.5.0-rc1/j1").strip()
+            root, worktree_ws.git(root / "repos/r", "rev-parse", "wt/0.5.0/wt-hotfix-b").strip()
         )
         command = found[0].fix
-        done = subprocess.run(command, shell=True, cwd=root, capture_output=True, text=True)  # noqa: S602
+        done = run_bash(command, cwd=root)
         if done.returncode:
             (refix,) = worktree_ws.fixes(done)
-            subprocess.run(refix.removeprefix("fix: "), shell=True, check=True, capture_output=True)  # noqa: S602
+            run_bash(refix.removeprefix("fix: "), check=True)
     assert doctor.check_worktrees("c") == []
 
 
 def _plant_file(entry: Path, _outside: Path) -> None:
-    entry.write_text("# mine\n", encoding="utf-8")
+    write_text(entry, "# mine\n")
 
 
 def _plant_link(entry: Path, outside: Path) -> None:
-    entry.symlink_to(outside)
+    assert link(str(outside), entry, is_dir=False)
 
 
 def _identity(entry: Path) -> tuple[int, str]:
     """lstat identity: the inode plus the link target or the content — never followed."""
-    body = os.readlink(entry) if entry.is_symlink() else entry.read_text(encoding="utf-8")
+    body = os.readlink(entry) if entry.is_symlink() else read_text(entry)
     return entry.lstat().st_ino, body
 
 
@@ -556,11 +552,11 @@ def test_the_session_lane_re_creates_missing_core_and_rewrites_none(
     present: str,
     plant: Callable[[Path, Path], None],
 ) -> None:
-    """AC2.4 (ADR 0096): the SessionStart lane re-creates a missing level-1
+    """The SessionStart lane re-creates a missing level-1
     entry (`.dadaiaignore`, `prompt.md`, every provisioned zone) and rewrites no present one —
     a dangling link is present, never written through."""
     (tmp_path / ".dadaia" / "states").mkdir(parents=True)
-    (tmp_path / ".dadaia" / "states" / "spec_contexts.json").write_text("{}", encoding="utf-8")
+    write_text(tmp_path / ".dadaia" / "states" / "spec_contexts.json", "{}")
     outside = tmp_path / "outside" / "pwned.md"
     outside.parent.mkdir()
     plant(tmp_path / present, outside)

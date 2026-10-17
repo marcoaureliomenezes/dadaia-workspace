@@ -7,7 +7,7 @@ The craft: maximize behavior-change-per-token under a hard context budget, keepi
 
 - Five disciplines, ordered by how often you reach for them: token economy, instruction hierarchy.
 - Disciplines (continued): consistency invariants, tier selection, scope-drift detection.
-- Apply them in that order when authoring; apply them in reverse when reviewing someone else's change (safety first).
+- Apply them in that order when authoring; review someone else's change safety first, in the order set under "Applying this file".
 
 ---
 
@@ -27,7 +27,7 @@ cost(file) = tokens(file) x invocations(file) x unit_price(tier)
 | Skill body | Only when the skill is loaded | Right home for deep protocols and tables |
 | Frontmatter (any) | Parsed by tooling, not re-reasoned | Put machine-enforced hard rules here |
 
-- Corollary: depth belongs in skills, not personas — an inlined 40-line protocol pays every dispatch, a referenced skill only when needed.
+- Corollary: depth belongs in skills, not personas (which surface holds what: `.dadaia/agentic/data/CONTEXT-MAP.md`) — an inlined 40-line protocol pays every dispatch.
 - A table compresses roughly 3-5x versus prose carrying the same machine-readable signal.
 
 | Content shape | Use | Reason |
@@ -79,7 +79,7 @@ Audit protocol — detecting order drift:
 
 ## 3. Persona-Consistency Invariants
 
-Four invariants MUST hold across all personas. Inconsistencies are bugs — file them in a refactor report.
+Four invariants MUST hold across the full personas (reviewer, product engineer, sr); the lighter `dd-researcher` and `dd-sw-engineer-jr` are exempt from I2 and I3, and I4 binds every agent but `dd-researcher`. An inconsistency is an AI-surface lens finding (`dd-code-review` §6).
 
 | # | Invariant | What must match |
 |---|---|---|
@@ -88,7 +88,7 @@ Four invariants MUST hold across all personas. Inconsistencies are bugs — file
 | I3 | `[SCOPE ERROR]` block format | Opener, one-line identity, explicit redirect per foreign domain |
 | I4 | Handoff JSON contract | All agents emit via `dd-handoff-emitter` against the same schema version |
 
-- I1 reference: the shared core is `name`, `description`, `dispatch_band`, `read_only`, `tools`, `skills`, in that order; a role-specific extension such as `input_contract` follows it.
+- I1 reference: the shared core is `name`, `description`, `read_only`, `tools`, `skills`, in that order; a role-specific extension follows it.
 - No persona sets `maxTurns`: a capped subagent stops mid-work and returns no report; the main thread stops a runaway one.
 - Model resolution is a separate policy-overlay mechanism, never asserted in persona frontmatter.
 
@@ -121,18 +121,10 @@ Fix protocol:
 | Volume | Occasional -> high-frequency / bulk |
 
 - The dominant task drives the tier — not the easiest or the rarest.
-- Tier names are derived from `core/model_registry.py` — never hand-maintain a copy that can drift.
-
-| Registry tier | Workload character |
-|---|---|
-| `deep` | Heavy synthesis, recursive analysis, persona/skill authoring, fleet audit, security reasoning |
-| `dispatch` | Orchestration, dispatch authority, review verdicts, broad-context implementation |
-| `standard` | Mid-cost general implementation |
-| `fast` | High-volume mechanical reformatting, bulk renames, deterministic transforms |
-
-- Current per-runtime model ids and Codex reasoning-effort come from `core/model_registry.py`, never hand-copied.
-- On Codex the tiering axis is (model id x model_reasoning_effort); on Claude it is the model id.
-- Quote the registry entry (id + tier) when recommending a move; take the price from the provider's published table, never from memory.
+- Tier aliases are each `TIER_CODEX` key in `core/model_registry.py` — never hand-maintain a copy that can drift.
+- Current model ids come from `core/model_registry.py`, never hand-copied: Codex ids from `TIER_CODEX`; Claude resolves the alias itself. Reasoning effort is the template cell's effort.
+- The tiering axis is (model x effort): on Claude the alias and `effort:`; on Codex the `TIER_CODEX` id and `model_reasoning_effort`.
+- Quote the template cell (alias + effort), and on Codex its `TIER_CODEX` id, when recommending a move; take the price from the provider's published table, never from memory.
 - Move up a tier only when depth/breadth/error-cost are all high; move down only when the task is mechanical and high-volume.
 
 Justify a tier BUMP (down -> up):
@@ -188,6 +180,6 @@ Re-verify topology invariants also when a `[SCOPE ERROR]` redirect set changes.
 ## Applying this file
 
 - Authoring a new persona/skill/rule: walk §1 (cheapest layer) -> §2 (spine) -> §3 (invariants) -> §4 (tier) -> §5 (drift).
-- Reviewing someone else's AI-entity change: walk in reverse — §5 first, then §3, §2, §1, §4.
+- Reviewing someone else's AI-entity change: walk §5 first, then §3, §2, §1, §4.
 - Auditing the fleet (efficiency report): §1 ranks files by lifetime cost, §2/§3 find structural drift.
 - Auditing (continued): §4 recommends tier moves, §5 recommends deduplication.

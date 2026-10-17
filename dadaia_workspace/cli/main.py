@@ -19,6 +19,7 @@ from dadaia_workspace.cli.commands import (
     reconcile,
     reports,
     specs,
+    worktree,
 )
 from dadaia_workspace.cli.commands import (
     help as help_cmd,
@@ -26,16 +27,16 @@ from dadaia_workspace.cli.commands import (
 from dadaia_workspace.cli.commands.export import export
 from dadaia_workspace.cli.commands.import_ import import_workspace
 from dadaia_workspace.core.exceptions import DadaiaError
+from dadaia_workspace.core.platform import use_utf8_stdio
 from dadaia_workspace.infrastructure.provider_version import provider_version
 
 app = typer.Typer(
     name="dadaia",
     help="AI-native workspace management with Spec Context Projects.",
     no_args_is_help=True,
-    # A DadaiaError (e.g. WorkspaceNotInitializedError from a verb run outside an
-    # initialized workspace) is an EXPECTED operator-facing condition, not a crash. Let it
-    # propagate out of app() so _safe_app renders a concise message instead of a Rich
-    # traceback (bug doctor-uninitialized-workspace-traceback). Genuinely unexpected
+    # A DadaiaError (e.g. WorkspaceNotInitializedError from a verb run outside an initialized
+    # workspace) is an EXPECTED operator-facing condition, not a crash. Let it propagate out of
+    # app() so _safe_app renders a concise message instead of a Rich traceback. Genuinely unexpected
     # exceptions still surface their traceback for debugging.
     pretty_exceptions_enable=False,
 )
@@ -80,10 +81,19 @@ app.add_typer(reports.app, name="reports", rich_help_panel="Management")
 app.add_typer(specs.app, name="specs", rich_help_panel="Common")
 app.add_typer(migrate.app, name="migrate", rich_help_panel="Management")
 app.add_typer(help_cmd.app, name="help", rich_help_panel="Common")
+app.command(
+    name="worktree",
+    rich_help_panel="Common",
+    context_settings={
+        "allow_extra_args": True,
+        "ignore_unknown_options": True,
+        "help_option_names": [],
+    },
+)(worktree.worktree)
 
 
 #: Values of ``DADAIA_TRACEBACK`` that do NOT enable the traceback opt-in, so an
-#: exported-but-off variable cannot silently restore the old failure mode.
+#: exported-but-off variable cannot silently enable the traceback.
 _TRACEBACK_OFF = frozenset({"", "0", "false", "no", "off"})
 
 
@@ -92,29 +102,14 @@ def _traceback_requested() -> bool:
 
 
 def _safe_app() -> None:
-    """Console entry point; failures surface without creating a second bug database.
+    """Console entry point: every failure is one concise line, never a raw traceback.
 
-    F-22 — "no CLI verb ever emits a raw traceback" — is enforced here as a **boundary**,
-    not a whitelist. A DadaiaError is a known, operator-facing condition (uninitialized
-    workspace, unknown context, …) and renders as one concise line
-    (bug doctor-uninitialized-workspace-traceback). Anything else is a *defect*, and it
-    renders as one concise line too, naming the exception type so it can be reported.
-
-    Catching only DadaiaError was the earlier design, and it made the contract depend on
-    every raise in the package being inside that hierarchy — ~138 are not. The contract
-    then leaked one verb at a time (WorkspaceVenvBootstrapError, then a dangling
-    DADAIA_BOOTSTRAP_PACKAGE; bug f22-cli-boundary-is-a-whitelist-not-a-boundary), because
-    a whitelist is maintained by discipline. A boundary cannot leak.
-
-    Debuggability is not traded away: ``DADAIA_TRACEBACK=1`` re-raises untouched, and it
-    applies to EVERY failure — including a ``DadaiaError``. Honouring the opt-in only for
-    unexpected exceptions made the escape hatch disappear the moment a specific failure was
-    (correctly) moved into the DadaiaError hierarchy, which is exactly how a developer
-    debugging a misfiring DadaiaError loses the traceback they need
-    (bug r6a-traceback-escape-hatch-suppressed, reported by the consumer-side validator).
-    ``SystemExit`` and ``KeyboardInterrupt`` derive from ``BaseException``, so Click's
-    normal exits and Ctrl-C pass through this handler unchanged.
+    A ``DadaiaError`` prints as an operator-facing line and exits 1. Any other exception
+    is a defect: one line naming its type, exit 1. ``DADAIA_TRACEBACK=1`` re-raises every
+    failure untouched. ``SystemExit`` and ``KeyboardInterrupt`` derive from
+    ``BaseException`` and pass through unchanged.
     """
+    use_utf8_stdio()
     try:
         app()
     except DadaiaError as exc:

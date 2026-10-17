@@ -1,6 +1,6 @@
 """dd-audit-project/scripts/audit.py owns specs/audits/<dir>/
-FINDINGS.jsonl and audits_histo.jsonl (0.4.7 c7 T-047-67: the audit ledger verbs move
-into a stdlib skill script). Size: SMALL.
+FINDINGS.jsonl and audits_histo.jsonl; the audit ledger verbs live in a stdlib skill script.
+Size: SMALL.
 
 The script reads its two schemas from ``scripts/schemas/`` BESIDE itself — copies
 `public stage` makes — so every test stages the folder exactly as stage does.
@@ -16,6 +16,7 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.infrastructure.ledger_scripts import load_owner
+from tests.helpers.oslib import read_text, run, write_text
 from tests.helpers.skill_scripts import stage_skill_scripts
 
 _PUBLIC = Path(__file__).resolve().parents[5] / "dadaia_workspace" / "public"
@@ -51,18 +52,16 @@ def specs(tmp_path: Path) -> Path:
     audit_dir = tree / "audits" / _AUDIT
     audit_dir.mkdir(parents=True)
     (tree / "audits" / "_archive").mkdir()
-    (audit_dir / "AUDIT.md").write_text("# audit\n", encoding="utf-8")
-    (audit_dir / "FINDINGS.jsonl").write_text(
+    write_text(audit_dir / "AUDIT.md", "# audit\n")
+    write_text(
+        audit_dir / "FINDINGS.jsonl",
         "".join(json.dumps(_finding(i), sort_keys=True) + "\n" for i in (1, 2)),
-        encoding="utf-8",
     )
     return tree
 
 
 def _run(script: Path, *argv: str) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        [sys.executable, str(script), *argv], capture_output=True, text=True, check=False
-    )
+    return run([sys.executable, str(script), *argv], check=False)
 
 
 def _histo(specs: Path) -> list[dict[str, object]]:
@@ -91,13 +90,11 @@ def _histo(specs: Path) -> list[dict[str, object]]:
 def test_a_write_verb_refuses_and_leaves_every_byte(
     script: Path, specs: Path, argv: tuple[str, ...], finding: dict[str, object], needle: str
 ) -> None:
-    """sa-audit-close-archives-without-validating#B43-1: a FINDINGS.jsonl failing check
-    makes close exit non-zero, write no histo and keep the directory.
-    sa-audit-close-archives-without-validating#B43-4: an `_archive` id is refused.
-    sa-audit-close-archives-without-validating#B43-6: every write verb runs check over
-    the candidate bytes."""
+    """A FINDINGS.jsonl failing check makes close exit non-zero, write no histo and keep the
+    directory; an `_archive` id is refused; every write verb runs check over the candidate
+    bytes."""
     for directory in (specs / "audits" / _AUDIT, specs / "audits" / "_archive"):
-        (directory / "FINDINGS.jsonl").write_text(json.dumps(finding) + "\n", encoding="utf-8")
+        write_text(directory / "FINDINGS.jsonl", json.dumps(finding) + "\n")
     before = (specs / "audits" / _AUDIT / "FINDINGS.jsonl").read_bytes()
 
     result = _run(script, *argv, "--specs", str(specs))
@@ -119,7 +116,7 @@ def test_disposition_then_close_appends_the_histo_and_removes_the_directory(
         )  # fmt: skip
         assert done.returncode == 0, done.stderr
 
-    # AC3.15 (F052): a histo record without its window-end sha is unrecordable.
+    # A histo record without its window-end sha is unrecordable.
     assert _run(script, "close", _AUDIT, "--specs", str(specs)).returncode == 2
     result = _run(script, "close", _AUDIT, "--sha", "abc1234", "--specs", str(specs))
 
@@ -158,9 +155,7 @@ def test_check_passes_on_a_valid_tree_and_fails_on_a_broken_record(
     assert clean.returncode == 0, clean.stdout + clean.stderr
 
     findings = specs / "audits" / _AUDIT / "FINDINGS.jsonl"
-    findings.write_text(
-        json.dumps(_finding(1, severity="URGENT"), sort_keys=True) + "\n", encoding="utf-8"
-    )
+    write_text(findings, json.dumps(_finding(1, severity="URGENT"), sort_keys=True) + "\n")
     broken = _run(script, "check", "--specs", str(specs))
 
     assert broken.returncode == 1
@@ -178,15 +173,14 @@ def test_check_passes_on_a_valid_tree_and_fails_on_a_broken_record(
 def test_close_without_a_resolved_finding_never_records_resolved(
     script: Path, specs: Path, verdicts: tuple[str, ...], expected: str
 ) -> None:
-    """sa-audit-close-archives-without-validating#B43-3: all rejected gives the
-    histo disposition rejected, never resolved; a clean audit
-    (audit-close-refuses-a-clean-audit) still closes."""
+    """All rejected gives the histo disposition rejected, never resolved; a clean audit
+    still closes."""
     records = [_finding(i + 1, disposition=v, reason="r") for i, v in enumerate(verdicts)]
-    (specs / "audits" / _AUDIT / "FINDINGS.jsonl").write_text(
-        "".join(json.dumps(r) + "\n" for r in records), encoding="utf-8"
+    write_text(
+        specs / "audits" / _AUDIT / "FINDINGS.jsonl", "".join(json.dumps(r) + "\n" for r in records)
     )
 
-    # AC3.15 (F052): a histo record without its window-end sha is unrecordable.
+    # A histo record without its window-end sha is unrecordable.
     assert _run(script, "close", _AUDIT, "--specs", str(specs)).returncode == 2
     result = _run(script, "close", _AUDIT, "--sha", "abc1234", "--specs", str(specs))
 
@@ -198,11 +192,9 @@ def test_close_without_a_resolved_finding_never_records_resolved(
 
 
 def test_the_doctor_neither_folds_findings_nor_recommends_close() -> None:
-    """sa-audit-close-archives-without-validating#B43-2: no doctor rule recommends
-    `audit.py close`. sa-audit-close-archives-without-validating#B43-5: features/specs
-    parses no finding record."""
+    """No doctor rule recommends `audit.py close`; features/specs parses no finding record."""
     from dadaia_workspace.features.specs.rules import RULES
 
     assert not [r.codes for r in RULES if "close" in str(r.fix_help)]
     specs_src = Path(__file__).resolve().parents[5] / "dadaia_workspace" / "features" / "specs"
-    assert not [p for p in specs_src.glob("*.py") if "from_dict" in p.read_text("utf-8")]
+    assert not [p for p in specs_src.glob("*.py") if "from_dict" in read_text(p)]

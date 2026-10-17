@@ -1,7 +1,7 @@
-"""Canonical-subject registry — the linchpin (SPEC §3.2, ADR-A).
+"""Canonical-subject registry.
 
 **Auto-derived, recomputed from live truth on every ``build_registry`` call.** It is derived,
-never a stored file that can itself go stale (the meta-version of the bug we are fixing).
+never a stored file that can itself go stale.
 
 Four anchor kinds, each backed by a real registry of truth in the live tree:
 
@@ -14,7 +14,7 @@ Four anchor kinds, each backed by a real registry of truth in the live tree:
 **Binding contract:** the model *proposes* a subject string; Python *normalizes + binds* it to
 a single registry anchor, and **HALTs (rejects, not silent NEW)** any subject that resolves to
 no known anchor or to an ambiguous set. The HALT message names the unresolved ref so it is
-actionable (acceptance §3.7.1).
+actionable.
 """
 
 from __future__ import annotations
@@ -25,6 +25,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
 
+from dadaia_workspace.core import platform
 from dadaia_workspace.core.models.backlog import SubjectKind
 
 __all__ = [
@@ -77,8 +78,8 @@ def _derive_catalog_anchors(catalog_path: Path) -> set[str]:
     """Derive feature slugs (and product-atom ids) from ``catalog.json``."""
     anchors: set[str] = set()
     try:
-        data = json.loads(catalog_path.read_text(encoding="utf-8"))
-    except (OSError, ValueError, json.JSONDecodeError):
+        data = json.loads(platform.read_text(catalog_path))
+    except (OSError, ValueError, platform.Undecodable):
         return anchors
     if not isinstance(data, dict):
         return anchors
@@ -115,8 +116,8 @@ def _derive_doc_anchors(specs_dir: Path) -> set[str]:
         return anchors
     for md in sorted(memory_dir.rglob("*.md")):
         try:
-            content = md.read_text(encoding="utf-8")
-        except (OSError, ValueError):
+            content = platform.read_text(md)
+        except (OSError, ValueError, platform.Undecodable):
             continue
         for match in _SPECDOC_RE.finditer(content):
             anchors.add(match.group(0))
@@ -133,8 +134,8 @@ def _derive_doc_anchors(specs_dir: Path) -> set[str]:
 def _derive_invariant_anchors(specs_dir: Path) -> set[str]:
     """Derive named ``INV-*`` invariants from the memory docs ONLY.
 
-    ``specs/memory/**`` Markdown is the sole invariant declaration surface
-    (v0.1.49 FR2). Source code and tests are never scanned: docstring examples
+    ``specs/memory/**`` Markdown is the sole invariant declaration surface.
+    Source code and tests are never scanned: docstring examples
     and test-fixture ids must not mint live anchors, or the fail-closed
     classifier can be satisfied by junk.
     """
@@ -146,8 +147,8 @@ def _derive_invariant_anchors(specs_dir: Path) -> set[str]:
         if not path.is_file():
             continue
         try:
-            content = path.read_text(encoding="utf-8")
-        except (OSError, ValueError):
+            content = platform.read_text(path)
+        except (OSError, ValueError, platform.Undecodable):
             continue
         for match in _INVARIANT_RE.finditer(content):
             anchors.add(match.group(0))
@@ -160,7 +161,7 @@ def _derive_invariant_anchors(specs_dir: Path) -> set[str]:
 class Registry:
     """An immutable snapshot of the canonical-subject anchor set over one repo.
 
-    Built by :func:`build_registry`; every call recomputes from live truth (SPEC §3.2). The
+    Built by :func:`build_registry`; every call recomputes from live truth. The
     classifier and doctor consume :meth:`bind` and :meth:`list_anchors`.
     """
 
@@ -215,8 +216,8 @@ class Registry:
         if result.anchor is None or not word:
             return result
         try:
-            text = (self._repo / result.anchor.id).read_text(encoding="utf-8")
-        except (OSError, ValueError):
+            text = platform.read_text(self._repo / result.anchor.id)
+        except (OSError, ValueError, platform.Undecodable):
             text = ""
         if re.search(rf"(?<!\w){re.escape(word)}(?!\w)", text) is None:
             return BindResult(
@@ -227,7 +228,7 @@ class Registry:
 
 
 def build_registry(*, specs_dir: Path, tracked: frozenset[str]) -> Registry:
-    """Build the canonical-subject registry from live truth (SPEC §3.2): ``tracked`` is
+    """Build the canonical-subject registry from live truth: ``tracked`` is
     the repo's tracked paths (``specs_dir.parent``-relative), handed in by the caller."""
     anchors: dict[SubjectKind, set[str]] = {
         SubjectKind.CODE: set(tracked),

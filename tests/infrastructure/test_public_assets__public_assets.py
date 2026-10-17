@@ -1,12 +1,11 @@
 """CRIT public-privacy gate (the repo went public and was reverted for an infra leak once —
 never weaken). Operator terms are private, so every test runs with no operator denylist.
 Hostname, home-path and trailer literals are composed at runtime, never contiguous in this
-tracked blob (push-gate-refuses-its-own-privacy-baseline-fixtures; T-043-23 HIGH CWE-532).
+tracked blob.
 """
 
 from __future__ import annotations
 
-import importlib.resources
 import json
 import re
 from pathlib import Path
@@ -20,6 +19,7 @@ from dadaia_workspace.infrastructure.privacy_check import (
     load_privacy_terms,
 )
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
+from tests.helpers.oslib import read_text, write_text
 
 
 def _host(*labels: str) -> str:
@@ -39,7 +39,7 @@ def no_denylist(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
 
 def _manager(public_dir: Path) -> FileSystemPublicAssetManager:
     manager = FileSystemPublicAssetManager()
-    manager._public_dir = public_dir  # noqa: SLF001
+    manager._public_dir = public_dir
     return manager
 
 
@@ -81,7 +81,7 @@ def test_baseline_pattern_matches_and_carve_out(
 
 @pytest.mark.parametrize("letter", ["n", "t", "r"])
 def test_email_pattern_never_reads_an_escape_letter_as_local_part(letter: str) -> None:
-    """privacy-email-pattern-reads-escape-as-local-part: a source escape then a decorator is no address."""
+    """A source escape then a decorator is no email address."""
     pattern = {p.id: p for p in _load_privacy_baseline()}["email-address"]
     assert (
         pattern.regex.search("'" + chr(92) + letter + "@" + _host("pytest", "mark", "unit") + "'")
@@ -114,12 +114,11 @@ def test_public_privacy_doctor_verdict(
 ) -> None:
     """The baseline alone (no operator denylist) flags leaks and never a false block.
 
-    Portuguese control vocabulary is shown raw: sa-private-match-rendering-has-three-renderers
-    (KEEP, out of #B1/#B2; 0.4.7 FR4/AC4.1).
+    Portuguese control vocabulary is shown raw.
     """
     (tmp_path / "public" / "data").mkdir(parents=True)
-    (tmp_path / "public" / "data" / name).write_text(text, encoding="utf-8")
-    report = [line.render() for line in _manager(tmp_path / "public")._check_public_privacy()]  # noqa: SLF001
+    write_text(tmp_path / "public" / "data" / name, text)
+    report = [line.render() for line in _manager(tmp_path / "public")._check_public_privacy()]
     if flagged is None:
         assert report == ["[ok] public-privacy (baseline structural scan, no operator denylist)"]
     else:
@@ -129,10 +128,10 @@ def test_public_privacy_doctor_verdict(
 
 
 def test_stage_copies_no_bytecode_cache(tmp_path: Path) -> None:
-    """sa-scoped-public-install-prunes-the-gate-wiring#L3: stage copies no __pycache__."""
+    """Stage copies no __pycache__."""
     scripts = tmp_path / "public" / "skills" / "sample" / "scripts"
     (scripts / "__pycache__").mkdir(parents=True)
-    (scripts / "run.py").write_text("print(1)\n", encoding="utf-8")
+    write_text(scripts / "run.py", "print(1)\n")
     (scripts / "__pycache__" / "run.cpython-312.pyc").write_bytes(b"\x00")
     (tmp_path / "ws").mkdir()
     _manager(tmp_path / "public").stage(tmp_path / "ws")
@@ -142,14 +141,14 @@ def test_stage_copies_no_bytecode_cache(tmp_path: Path) -> None:
 
 
 def test_shipped_baseline_header_and_single_line_documented_carve_outs() -> None:
-    """A10.2/A10.4, A12.1/A12.5: version 15, single-line regexes, every carve-out has a rationale."""
+    """The shipped baseline header is versioned; its regexes are single-line; every carve-out has a rationale."""
     raw = json.loads(
-        (
-            importlib.resources.files("dadaia_workspace.infrastructure.data")
-            / "privacy_baseline.json"
-        ).read_text(encoding="utf-8")
+        read_text(
+            Path(__file__).parents[2]
+            / "dadaia_workspace/public/skills/dd-bug-resolution/scripts/privacy_baseline.json"
+        )
     )
-    assert raw["_header"]["version"] == 16
+    assert raw["_header"]["version"] == 17
     excludes = " ".join(raw["_header"]["excludes"])
     assert all(word in excludes for word in ("/root", "Users", "FR12/A12.3", "FR12/A12.4"))
     for pattern in raw["patterns"]:
@@ -169,7 +168,7 @@ def test_shipped_baseline_header_and_single_line_documented_carve_outs() -> None
 
 
 def test_carve_out_without_rationale_is_flagged_by_name() -> None:
-    """A12.1: a carve-out with a missing or blank rationale is flagged; documented or no carve-out is not."""
+    """A carve-out with a missing or blank rationale is flagged; documented or no carve-out is not."""
 
     def pattern(pid: str, exclude: str | None, rationale: str | None) -> _BaselinePattern:
         compiled = re.compile(exclude) if exclude else None
@@ -194,25 +193,31 @@ def test_carve_out_without_rationale_is_flagged_by_name() -> None:
     [("dict_format", {"foo": "reason-a", "bar": "reason-b"}), ("list_of_strings", ["alpha"])],
 )
 def test_load_denylist_source_formats(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, name: str, payload: object
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    name: str,
+    payload: object,
 ) -> None:
-    """sa-denylist-file-has-three-shapes, ADR 0157: the dict is the one grammar; any other
+    """The dict is the one grammar; any other
     shape or an unreadable file is refused naming the file. Missing or absent loads as empty."""
     source = tmp_path / "d.json"
-    source.write_text(json.dumps(payload), encoding="utf-8")
+    write_text(source, json.dumps(payload))
     monkeypatch.setenv("DADAIA_PRIVACY_DENYLIST", str(source))
     if name == "list_of_strings":
         with pytest.raises(SystemExit) as refused:
             load_privacy_terms()
-        assert str(refused.value).splitlines()[-1] == (
+        assert refused.value.code == 1
+        assert capsys.readouterr().err.splitlines() == [
+            f"[error] privacy denylist {source} is not one JSON object",
             f"fix: Operator action: rewrite {source} as one JSON object mapping each term to "
-            "its reason"
-        )
+            "its reason",
+        ]
         return
     assert load_privacy_terms() == (("foo", "reason-a"), ("bar", "reason-b"))
     (tmp_path / "no_workspace").mkdir()
     monkeypatch.chdir(tmp_path / "no_workspace")
-    (tmp_path / "malformed.json").write_text("{not valid json", encoding="utf-8")
+    write_text(tmp_path / "malformed.json", "{not valid json")
     monkeypatch.setenv("DADAIA_PRIVACY_DENYLIST", str(tmp_path / "malformed.json"))
     with pytest.raises(SystemExit):
         load_privacy_terms()
@@ -228,11 +233,9 @@ def test_load_denylist_env_precedence_and_workspace_fallback(
     """The env var wins over <workspace>/.dadaia/states/privacy_denylist.json; the file is the fallback."""
     states = tmp_path / "ws" / ".dadaia" / "states"
     states.mkdir(parents=True)
-    (states / "spec_contexts.json").write_text("{}", encoding="utf-8")
-    (states / "privacy_denylist.json").write_text(
-        json.dumps({"from-file": "file"}), encoding="utf-8"
-    )
-    (tmp_path / "env.json").write_text(json.dumps({"from-env": "env"}), encoding="utf-8")
+    write_text(states / "spec_contexts.json", "{}")
+    write_text(states / "privacy_denylist.json", json.dumps({"from-file": "file"}))
+    write_text(tmp_path / "env.json", json.dumps({"from-env": "env"}))
     monkeypatch.setenv("DADAIA_PRIVACY_DENYLIST", str(tmp_path / "env.json"))
     monkeypatch.chdir(tmp_path / "ws")
     assert load_privacy_terms() == (("from-env", "env"),)

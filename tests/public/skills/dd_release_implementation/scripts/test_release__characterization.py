@@ -1,4 +1,4 @@
-"""Characterization net for the three public ``release.py`` seams owned by CP3."""
+"""Characterization net for the three public ``release.py`` seams."""
 
 from __future__ import annotations
 
@@ -10,8 +10,8 @@ from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.core.platform import PLATFORM
 from tests.fixtures.harness_env import suite_env
+from tests.helpers.oslib import run, write_text
 from tests.helpers.release_state import PLAN
 from tests.helpers.skill_scripts import stage_skill_scripts
 
@@ -30,7 +30,7 @@ def _bytes(document: dict[str, object]) -> bytes:
 
 
 def _git(repo: Path, *args: str) -> str:
-    result = subprocess.run(
+    result = run(
         [
             "git",
             "-c",
@@ -41,8 +41,6 @@ def _git(repo: Path, *args: str) -> str:
         ],
         cwd=repo,
         env=suite_env(os.environ, repo),
-        capture_output=True,
-        text=True,
         check=True,
     )
     return result.stdout.strip()
@@ -61,19 +59,10 @@ def _run(
             "raise SystemExit(release.main(sys.argv[1:]))"
         )
         command = [sys.executable, "-c", bootstrap, str(script.parent), *args]
-    return subprocess.run(
-        command,
-        cwd=repo,
-        env=suite_env(os.environ, repo),
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    return run(command, cwd=repo, env=suite_env(os.environ, repo), check=False)
 
 
 def test_drift_memory_and_ship_pin_outputs_and_release_bytes(tmp_path: Path) -> None:
-    for skill in ("dd-spec-navigator", "dd-gitflow-default", "dd-bug-resolution"):
-        stage_skill_scripts(skill, tmp_path / "skills" / skill / "scripts")
     script = (
         stage_skill_scripts(
             "dd-release-implementation",
@@ -86,25 +75,24 @@ def test_drift_memory_and_ship_pin_outputs_and_release_bytes(tmp_path: Path) -> 
     release_dir = specs / "releases/0.5.0"
     candidate = release_dir / "rc-1"
     candidate.mkdir(parents=True)
-    (candidate / "SPEC.md").write_text(
+    write_text(
+        candidate / "SPEC.md",
         "# SPEC\n\n**Status:** Approved\n\n**Origin:** operator-demand\n\n## Bug window review\n",
-        encoding="utf-8",
     )
-    (candidate / "PLAN.md").write_text(
-        f"# PLAN\n\n**Status:** Approved\n\n{PLAN}", encoding="utf-8"
-    )
+    write_text(candidate / "PLAN.md", f"# PLAN\n\n**Status:** Approved\n\n{PLAN}")
     archive = specs / "releases/_archive"
     archive.mkdir()
     history = archive / "releases_histo.jsonl"
     history.write_bytes(b"")
     atom = specs / "memory/product/platform/alpha.md"
     atom.parent.mkdir(parents=True)
-    atom.write_text(
+    write_text(
+        atom,
         "---\nslug: alpha\ntitle: Alpha\ntldr: Alpha\nsummary: Alpha\n"
         "tags: [alpha]\nsources:\n  - src/alpha/**\n---\n\n# Alpha\n",
-        encoding="utf-8",
     )
-    (specs / "memory/product/catalog.json").write_text(
+    write_text(
+        specs / "memory/product/catalog.json",
         json.dumps(
             {
                 "generated_at": "2026-10-09T09:00:00Z",
@@ -119,11 +107,10 @@ def test_drift_memory_and_ship_pin_outputs_and_release_bytes(tmp_path: Path) -> 
             indent=2,
         )
         + "\n",
-        encoding="utf-8",
     )
     source = repo / "src/alpha/core.py"
     source.parent.mkdir(parents=True)
-    source.write_text("value = 1\n", encoding="utf-8")
+    write_text(source, "value = 1\n")
     _git(repo.parent, "init", "-q", str(repo))
     _git(repo, "add", "-A")
     _git(repo, "commit", "-qm", "fixture")
@@ -203,16 +190,8 @@ def test_drift_memory_and_ship_pin_outputs_and_release_bytes(tmp_path: Path) -> 
     assert not release_dir.exists()
     assert (archived / "_RELEASE.json").read_bytes() == _bytes(shipped)
     expected_history = (
-        (
-            b'{"id": "0.5.0", "ts": "2026-10-09T12:00:00Z", '
-            b'"disposition": "delivered", "release": "0.5.0", "reason": null, '
-            b'"entry": null, "summary": null}\r\n'
-        )
-        if PLATFORM.windows
-        else (
-            b'{"id": "0.5.0", "ts": "2026-10-09T12:00:00Z", '
-            b'"disposition": "delivered", "release": "0.5.0", "reason": null, '
-            b'"entry": null, "summary": null}\n'
-        )
+        b'{"id": "0.5.0", "ts": "2026-10-09T12:00:00Z", '
+        b'"disposition": "delivered", "release": "0.5.0", "reason": null, '
+        b'"entry": null, "summary": null}\n'
     )
     assert history.read_bytes() == expected_history

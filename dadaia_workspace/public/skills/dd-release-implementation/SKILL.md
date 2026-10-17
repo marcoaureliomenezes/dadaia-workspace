@@ -2,18 +2,16 @@
 name: dd-release-implementation
 description: >
   Run an Approved candidate to its PR: job and task worktrees, the RED-test then implementation task pair,
-  the job review and merge, the Reconciliation job (phase CLOSURE, memory pass, disposition sweep, doctor)
+  the job review and merge, the reconcile on the rc's `wt-rc` (phase CLOSURE, memory pass, disposition sweep, doctor)
   and _RELEASE.json entries. Use when working a task or job, closing a candidate, or writing release state.
-  Defining a candidate is dd-release-definition's; PRs, promote and branch cut are dd-gitflow-default's.
+  Defining a candidate is dd-release-definition's; PRs, promote and the next work branch are dd-gitflow-default's.
 ---
 
 # dd-release-implementation
 
-> Not hook-enforced. No engine advances gates or drives closure — implementers, the reviewer, `dd-product-engineer` and the main thread uphold it directly.
-
 ## 1. When
 
-- `dd-software-engineer` working a task inside an `Approved` candidate.
+- `dd-sw-engineer-sr` working a task inside an `Approved` candidate.
 - `dd-product-engineer` at each candidate's closure (memory, `_RELEASE.json`).
 - From the first task through the candidate PR; the gate after it: `dd-gitflow-default` §2 steps 9-12.
 
@@ -27,24 +25,27 @@ description: >
 6. Change `_RELEASE.json` through `release.py` verbs (`phase`, `memory`, `ship`); only `summary` and the authorization `note` are hand-written (`RELEASE-EVENTS.md`).
 7. At `RC-FLOW.md` step 4, run `MEMORY-UPDATE.md`'s full protocol before touching any memory atom.
 8. A test enters the suite only under the root map §1 test basics.
-9. Before growing any module, run the deletion test (delete it: does complexity vanish or reappear across callers?) — a diff that only adds justifies itself against replace-don't-layer.
-10. Implement each task inside its own task worktree, cut from its job's worktree branch per `worktrees/AGENTS.md` §1.
+9. Before growing any module, run the deletion test (`dd-code-review` SLOP.md) — a diff that only adds justifies itself against replace-don't-layer.
+10. Implement each task inside its own `wt-task-<kkk>` tree (`worktrees/AGENTS.md` §1), cut from its job's `wt-main` (`dd-gitflow-default` §2a).
+11. Before claiming a bug, unused code or done, cite file:line or a grep; reproduce from a clean state; done needs user-side evidence.
+12. After any tool error, re-read the real state; report a deferral to the operator as an intake proposal carrying its design, never written into the backlog.
+13. A red not caused by the change is proven at the merge-base before it is called pre-existing; an env-sensitive change is reproduced in a clean environment first.
 
 ## 2a. Push green
 
-- Every work-branch push (`<work>M.m.p`, the constitution's `gitflow:`) runs the repo's `verify:` line first, green.
 - Pre-push: `.dadaia/AGENTS.md` §3.
-- Commits flow freely; a full scan lives only in the audit lane.
+- Commits flow freely; a full scan lives only in the audit (`dd-audit-project`).
 - Fix a red `verify:` line at its cause, since a rerun hides the defect it reports.
 - A flaky test is quarantined by the repo's own mechanism, bug-gated; an unregistered pass-on-retry is a failure.
 
 ## 3. Done when
 
 - Live release resolved (`dd-spec-navigator` Phase 3).
-- Task committed under its id in its task worktree; the main thread runs its `WT merge` (`worktrees/AGENTS.md` §2).
+- Task committed under its id in its `wt-task-<kkk>` tree; the main thread runs its `WT merge` (`worktrees/AGENTS.md` §2).
 - Current step (`RC-FLOW.md`) identified before attempting its unlock action.
-- `verify:` line green before any push; the reviewer's `APPROVED` on the work-branch head before its PR (`dd-gitflow-default` §3b).
-- At candidate closure: the Reconciliation job merged (`RC-FLOW.md` step 4) -> candidate PR -> the promote-or-continue gate.
+- A push relies on the `verify:` of each `wt-rc` and hotfix merge into the work branch, with no rerun; the reviewer's `APPROVED` on the work-branch head before its PR (`dd-gitflow-default` §3b).
+- The hand-back carries evidence per item, extending the engineer's evidence line: the consumer sweep for a changed grammar, format, public name or fix line (other repos as a count, never by name) and evidence for each QA-lens item of `dd-code-review` §6; old asserts follow the root map §1 test line; a bare PASS goes back unreviewed.
+- At candidate closure: the `wt-rc` carrying the reconcile merged (`RC-FLOW.md` step 4) -> candidate PR -> the promote-or-continue gate; the closure summary carries the batch of `dd-manager-orchestration` §2 step 4 and `python3 .agents/skills/dd-handoff-emitter/scripts/verdict.py stats <M.m.p>-rc<N>`.
 
 ## 4. References
 

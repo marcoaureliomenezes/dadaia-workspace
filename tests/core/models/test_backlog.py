@@ -1,4 +1,4 @@
-"""sa-backlog-intents-have-two-grammars: the backlog-v1 schema is the
+"""The backlog-v1 schema is the
 one intents grammar — its kind enum is the model's, and a code ref is repo-relative
 ``path[#word]`` (privacy: no absolute, ``~``, drive or ``..`` path is ever committed).
 """
@@ -12,12 +12,13 @@ import pytest
 from jsonschema import Draft202012Validator
 
 from dadaia_workspace.core.models.backlog import SubjectKind
+from tests.helpers.oslib import read_text
 
 _SCHEMA = json.loads(
-    (
+    read_text(
         Path(__file__).resolve().parents[3]
-        / "dadaia_workspace/public/schemas/backlog/backlog-v1.schema.json"
-    ).read_text(encoding="utf-8")
+        / "dadaia_workspace/public/skills/dd-backlog-definition/scripts/schemas/backlog-v1.schema.json"
+    )
 )
 _INTENT = Draft202012Validator({"$defs": _SCHEMA["$defs"], "$ref": "#/$defs/intent"})
 

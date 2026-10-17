@@ -1,7 +1,4 @@
-"""Pure push-range denylist matcher (SPEC v0.9.0 FR3/FR5/FR6).
-
-v0.9.0 A3.1, A3.4, A5.2, A6.2; v0.11.0 A1.1-A1.4, A4.1, A4.4, A4.6;
-sa-private-match-rendering-has-three-renderers#B3.
+"""Pure push-range denylist matcher.
 
 Synthetic ``zz-`` terms only; baseline positives are composed at run time so this
 module's own blob never carries a value the push-range scan would flag.
@@ -51,12 +48,45 @@ def _binary(**kw: Any) -> ScannedObject:
 ])
 # fmt: on
 def test_baseline_refuses_a_private_value_with_no_operator_terms(value: str, mask: str | None) -> None:
-    """The baseline layer alone refuses; the hit never carries the value (B3)."""
+    """The baseline layer alone refuses; the hit never carries the value."""
     outcome = scan_objects([_obj(f"see {value} now\n")], terms=(), patterns=load_baseline_patterns())
 
     assert [(h.path, h.line) for h in outcome.hits] == [("notes.md", 1)]
     assert value not in outcome.hits[0].masked_term
     assert mask in (None, outcome.hits[0].masked_term)
+
+
+_QUAD = ".".join(("0", "10", "9", "10"))
+_LOCKS = ("poetry.lock", "package-lock.json", "uv.lock", "Cargo.lock", "yarn.lock",
+          "pnpm-lock.yaml", "Pipfile.lock", "composer.lock", "Gemfile.lock", "packages.lock.json")  # fmt: skip
+
+
+def _hits(path: str, text: str) -> int:
+    return len(scan_objects([_obj(text, path=path)], terms=(), patterns=load_baseline_patterns()).hits)
+
+
+@pytest.mark.parametrize("path", [*_LOCKS, "sub/dir/poetry.lock"])
+@pytest.mark.parametrize("text", [f'version = "{_QUAD}"\n', f'py4j = ">={_QUAD},<{_QUAD}"\n'])
+def test_a_generated_lock_file_is_not_refused_for_a_four_part_version(path: str, text: str) -> None:
+    """A lock file's four-part version is not an address."""
+    assert _hits(path, text) == 0
+
+
+def test_a_lock_file_still_loses_only_the_ipv4_pattern() -> None:
+    """Another pattern still refuses inside a lock file."""
+    assert _hits("poetry.lock", "owner = " + "someone" + "@" + "acme-corp.io\n") == 1
+
+
+def test_an_address_as_a_folder_above_a_lock_file_is_refused() -> None:
+    """The lock-file skip covers file content only, never the path."""
+    assert _hits(f"hosts/{_QUAD}/poetry.lock", "x = 1\n") == 1
+
+
+@pytest.mark.parametrize("wrap", ["{}", "<td>{}</td>", "<{}>", ">>{}", "=>{}", "x=={}", "~{}", "^{}", "host>={}"])
+def test_the_same_quad_in_an_ordinary_file_is_refused(wrap: str) -> None:
+    """Outside the lock list the IPv4 pattern refuses in every context."""
+    assert _hits("notes.md", wrap.format(_QUAD) + "\n") == 1
+    assert _hits("poetry.lock.md", wrap.format(_QUAD) + "\n") == 1
 
 
 # fmt: off
@@ -71,7 +101,7 @@ def test_baseline_refuses_a_private_value_with_no_operator_terms(value: str, mas
 ])
 # fmt: on
 def test_baseline_carve_out_never_refuses(text: str) -> None:
-    """A3.4: exclude_regex carve-outs apply (the refused neighbours are rows of the table above)."""
+    """``exclude_regex`` carve-outs apply (the refused neighbours are rows of the table above)."""
     assert scan_objects([_obj(text)], terms=(), patterns=load_baseline_patterns()).hits == ()
 
 
@@ -90,7 +120,7 @@ def test_baseline_carve_out_never_refuses(text: str) -> None:
 def test_amnesty_is_same_path_same_layer_equal_value(
     text: str, prior: str | None, terms: tuple[tuple[str, str], ...] | None, hit_lines: list[int]
 ) -> None:
-    """v0.11.0 FR1: suppressed iff the same layer re-run on the same path's prior text yields an equal value."""
+    """Suppressed iff the same layer re-run on the same path's prior text yields an equal value."""
     patterns = load_baseline_patterns() if terms is None else ()
     outcome = scan_objects([_obj(text, prior)], terms=terms or (), patterns=patterns)
 
@@ -114,6 +144,7 @@ class _CountingPattern:
     id: str = "zz-synthetic"
     reason: str = "synthetic"
     exclude: re.Pattern[str] | None = None
+    skip_paths: re.Pattern[str] | None = None
 
 
 def test_first_match_short_circuits_at_the_first_hit_line() -> None:
@@ -127,7 +158,7 @@ def test_first_match_short_circuits_at_the_first_hit_line() -> None:
 
 
 def test_unmasked_operator_term_absent_from_every_hit_field() -> None:
-    """sa-private-match-rendering-has-three-renderers#B3."""
+    """No hit field carries the unmasked operator term."""
     outcome = scan_objects([_obj(f"the value is {_TERM} here\n", path="secret.md")], terms=_TERMS, patterns=())
 
     hit = outcome.hits[0]

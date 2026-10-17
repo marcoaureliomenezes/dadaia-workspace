@@ -1,8 +1,9 @@
-"""AC8.2: SpecContextService's dead() preflight reads the worktree rows it is handed — a
+"""SpecContextService's dead() preflight reads the worktree rows it is handed — a
 stub callable stands for the owner's reader."""
 
 from __future__ import annotations
 
+from collections.abc import Collection
 from pathlib import Path
 from typing import Any
 
@@ -40,25 +41,25 @@ def _alive(tmp_path: Path, rows: Any) -> SpecContextService:
 def test_dead_refuses_with_the_exit_of_a_row_the_stub_holds(tmp_path: Path) -> None:
     seen: list[Path] = []
 
-    def rows(root: Path) -> tuple[list[dict[str, Any]], str, str]:
+    def rows(root: Path, _repos: Collection[str]) -> tuple[list[dict[str, Any]], str, str]:
         seen.append(root)
-        return [{"repo": "my-repo", "exit": "Operator action: merge /w/a"}], "", ""
+        return [{"repo": "my-repo", "exit": "Agent action: merge /w/a"}], "", ""
 
     service = _alive(tmp_path, rows)
     with pytest.raises(DeadUnpushedCommitsError) as refused:
         service.dead("proj")
 
-    assert str(refused.value).endswith("fix: Operator action: merge /w/a")
+    assert str(refused.value).endswith("fix: Agent action: merge /w/a")
     assert seen == [tmp_path / "ws"]
 
 
 def test_dead_refuses_with_the_readers_fix_when_the_read_failed(tmp_path: Path) -> None:
-    def rows(_root: Path) -> tuple[list[dict[str, Any]], str, str]:
-        return [], "list failed: boom", "Operator action: rerun list"
+    def rows(_root: Path, _repos: Collection[str]) -> tuple[list[dict[str, Any]], str, str]:
+        return [], "list failed: boom", "Agent action: rerun list"
 
     service = _alive(tmp_path, rows)
     with pytest.raises(DeadUnpushedCommitsError) as refused:
         service.dead("proj")
 
     assert "(list failed: boom)" in str(refused.value)
-    assert str(refused.value).endswith("fix: Operator action: rerun list")
+    assert str(refused.value).endswith("fix: Agent action: rerun list")

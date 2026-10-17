@@ -8,7 +8,7 @@ Hand-authored, repo-scoped. Not a projection: nothing here is regenerated.
 - The always-on law is the workspace's root map, two levels up: read `../../AGENTS.md`.
 - Change law or any AI-entity file at its source under `dadaia_workspace/public/`,
   then re-project from the workspace root with `.dadaia/.venv/bin/dadaia` (Windows
-  `.dadaia/.venv/Scripts/dadaia.exe`): `public stage`, `public install`, `public doctor`.
+  `.dadaia/.venv/Scripts/dadaia.exe`): `public install`, `public doctor`.
 - A library change is unfinished until the instance reflects it; never hand-edit a
   projected instance file to fake the result.
 - Any failure of a workspace operation here is a product bug of this library:
@@ -19,7 +19,10 @@ with the workspace venv first on `PATH`:
 
 verify: python scripts/ci.py job
 
+Contract coverage, integration and e2e run in this repository's CI, not in the job gate.
+
 - The developer's pipeline — `.github/`, `scripts/ci.py`, `scripts/guards/`, `tests/`, Dependabot/SAST, mutation and test-audit — is private to this repository and never ships. What ships (`dadaia_workspace/public/**`, the projected law, the skill scripts) requires of a user's repo only its own `verify:` lines and local git: never a remote, CI, `gh`, a PR host or a language toolchain. `test_public_source_hygiene.py`'s `public-law-names-no-private-pipeline` row is the mechanical half.
+- A review of a diff here may carry `python scripts/mutate.py --base <work branch>` (score, survivors, kill matrix) and the diff's branch coverage from that run as optional evidence, never required. Neither is a gate: no test reads either as pass or fail; the script and its `pytest-cov` use stay out of the built wheel.
 
 - Versioning here: release-please owns the version, tag and CHANGELOG; the work branch
   is named for the live release (`_RELEASE.json`).

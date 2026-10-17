@@ -10,10 +10,11 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from dadaia_workspace.core.exceptions import PublicAssetError
-from dadaia_workspace.core.model_registry import REGISTRY
+from dadaia_workspace.core import platform
+from dadaia_workspace.core.frontmatter import Frontmatter, parse
+from dadaia_workspace.core.model_registry import TIER_CODEX
 from dadaia_workspace.core.workspace_layout import render_registry_tables
-from dadaia_workspace.infrastructure.public_assets_common import _toml_escape
+from dadaia_workspace.infrastructure.public_assets_common import toml_escape
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -24,57 +25,28 @@ from dadaia_workspace.infrastructure.public_assets_common import _toml_escape
 # against the shared ``.agents/skills/`` tree Codex reads natively (codex_doctor.py).
 # Each entry must be an exact name or leading-hyphen prefix of a real
 # ``public/skills/<name>/SKILL.md`` SOURCE skill. A name that resolves to nothing is a phantom
-# prefix: it gates nothing real and would let D-CX-7 silently stop protecting the
-# family it was meant to cover (A22.6; a test derives this whole tuple from the
-# on-disk inventory — ``tests/infrastructure/runtime_transforms/test_codex_assets.py``).
+# prefix: it gates nothing real and would silently stop protecting the family it was
+# meant to cover (a test derives this whole tuple from the on-disk inventory —
+# ``tests/infrastructure/runtime_transforms/test_codex_assets.py``).
 _CODEX_SKILL_REF_PREFIXES = ("dd-",)
 
-# Whitelist of agent frontmatter fields that may be emitted to codex config.toml.
-_TOML_SAFE_AGENT_FIELDS: frozenset[str] = frozenset(
-    {"name", "description", "model", "tools", "read_only"}
-)
 
-# Matches a YAML list item under `tools:` (e.g. "  - Read")
-_AGENT_FM_TOOLS_ITEM_RE = re.compile(r"^  - (.+)$", re.MULTILINE)
-# Matches a simple `key: value` line in frontmatter (single-line value)
-_AGENT_FM_SIMPLE_RE = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*): (.+)$", re.MULTILINE)
-# Matches a folded/literal scalar intro: `key: >` or `key: |`
-_AGENT_FM_BLOCK_SCALAR_RE = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*): [>|]$", re.MULTILINE)
-
-#: Claude model id -> Codex model id; a Codex view never carries a ``claude-*`` model.
-_CODEX_MODELS: dict[str, str] = {entry.claude_id: entry.codex_id for entry in REGISTRY}
-_CLAUDE_MODEL_RE = re.compile(
-    "|".join(map(re.escape, sorted(_CODEX_MODELS, key=len, reverse=True)))
-)
-
-
-def transform_for_codex(text: str) -> str:
-    """*text* with known Claude model ids mapped and the Anthropic tier phrase renamed
-    (T-013-12); every other ``claude-*`` token (skill names) is kept."""
-    text = text.replace("Opus / Sonnet / Haiku", "deep / dispatch / fast registry tiers")
-    return _CLAUDE_MODEL_RE.sub(lambda m: _CODEX_MODELS[m.group(0)], text)
-
-
-def codex_model(claude_id: str) -> str:
-    """The Codex model for *claude_id*; ``ValueError`` names an unmapped id."""
-    if claude_id not in _CODEX_MODELS:
-        raise ValueError(f"No Codex mapping for model: {claude_id!r}")
-    return _CODEX_MODELS[claude_id]
+def codex_model(alias: str) -> str:
+    """The Codex model id for the tier *alias*; ``ValueError`` names an unknown alias."""
+    if alias not in TIER_CODEX:
+        raise ValueError(f"No Codex mapping for model alias: {alias!r}")
+    return TIER_CODEX[alias]
 
 
 # ---------------------------------------------------------------------------
-# FR22 / A22.1 — Codex persona compaction (shared-law de-duplication)
+# Codex persona compaction (shared-law de-duplication)
 # ---------------------------------------------------------------------------
 #
 # The canonical law (the root AGENTS.md map) reaches every Codex agent context — the parent
 # session AND any delegated custom agent alike — through Codex's NATIVE
 # per-directory ``AGENTS.md`` discovery (`ai-harness-codex` skill §1), a
 # mechanism that is entirely independent of the SessionStart/UserPromptSubmit
-# hooks (live-verified, codex-cli 0.147.0, T-043-33: a parent `codex exec`
-# session AND a delegated `agent_type="dd-software-engineer"` subagent both
-# quoted the literal opening words of the projected root AGENTS.md from their
-# own context, unprompted by any tool call). Before this compaction, every
-# persona body ALSO restated fragments of that same law inline — the generic
+# hooks. Each persona body ALSO restated fragments of that same law inline — the generic
 # H1 report/protocol pointer blockquotes, the Step-0 memory-bootstrap
 # pointer, the `dd-handoff-emitter` artifact-emission paragraph, the
 # `dd-task-manager` review-gate paragraph, and the generic `dadaia CLI`
@@ -84,8 +56,8 @@ def codex_model(claude_id: str) -> str:
 # inline restatements — pure shared-law / cross-role repetition, already
 # covered by `AGENTS.md` (natively) or by the named skill (loaded on demand,
 # still listed in the agent's `skills:` frontmatter) — so the law loads
-# exactly once (A22.2). Role identity, role-specific decisions, authority and
-# write/refusal boundaries are never touched by these patterns.
+# exactly once. Role identity, role-specific decisions, authority and write/refusal
+# boundaries are never touched by these patterns.
 
 _CODEX_COMPACT_H1_PROTOCOL_POINTER_RE = re.compile(
     r"> This agent follows the shared workspace protocol: `AGENTS\.md` and the "
@@ -114,7 +86,7 @@ _CODEX_COMPACT_REVIEW_GATE_SECTION_RE = re.compile(
 )
 
 # "## dadaia CLI" (never "## dadaia CLI reference", which carries the
-# distinct D-1 shell-less routing content for `dd-product-engineer` and is
+# distinct shell-less routing content for `dd-product-engineer` and is
 # never matched here) — the generic command-reference block duplicated from
 # the `dadaia-cli` skill. Matched up to the next top-level heading (or EOF)
 # so a persona that appends unrelated content after this heading (e.g.
@@ -133,11 +105,9 @@ _CODEX_COMPACT_PATTERNS: tuple[re.Pattern[str], ...] = (
 
 
 def _compact_codex_developer_instructions(body: str) -> str:
-    """Strip shared-law / cross-role boilerplate from a Codex persona body (A22.1).
+    """Strip shared-law / cross-role boilerplate from a Codex persona body.
 
-    *body* is the already Codex-transformed persona body (post
-    :func:`transform_for_codex`,
-    frontmatter already stripped). Every pattern in :data:`_CODEX_COMPACT_PATTERNS`
+    *body* is the persona body, frontmatter already stripped. Every pattern in :data:`_CODEX_COMPACT_PATTERNS`
     targets content that restates law or protocol Codex already delivers
     elsewhere in the effective context — never role identity, role-specific
     decisions, authority, or write/refusal boundaries, which ship untouched.
@@ -175,15 +145,9 @@ def _render_codex_agent_toml(
       ``install_helpers.resolve_codex_agent_model`` (the one effort authority)
     - ``developer_instructions`` — triple-quoted multiline basic string
 
-    The function avoids external TOML serialiser dependencies; it builds the
-    content manually and is safe for all printable Unicode in instructions text.
+    Every string goes through :func:`toml_escape`, the one TOML encoder.
 
-    In a TOML triple-quoted basic string, backslashes are escape characters.
-    All literal backslashes in the body must be doubled (``\\``), and any
-    embedded triple-double-quote sequences must be escaped character-by-character
-    to prevent premature string termination.
-
-    *developer_instructions* is compacted (A22.1, FR22b) before serialization:
+    *developer_instructions* is compacted before serialization:
     :func:`_compact_codex_developer_instructions` strips inline shared-law /
     cross-role boilerplate that Codex already delivers via native ``AGENTS.md``
     discovery or a named skill — see that function's docstring for the full
@@ -191,21 +155,17 @@ def _render_codex_agent_toml(
     write/refusal boundaries pass through unchanged.
     """
     developer_instructions = _compact_codex_developer_instructions(developer_instructions)
-    # Step 1: escape backslashes first (must precede triple-quote escaping).
-    escaped = developer_instructions.replace("\\", "\\\\")
-    # Step 2: escape any embedded triple-double-quote sequences.
-    escaped = escaped.replace('"""', '\\"\\"\\"')
     lines: list[str] = [
-        f"name = {_toml_escape(name)}\n",
+        f"name = {toml_escape(name)}\n",
     ]
     if description:
-        lines.append(f"description = {_toml_escape(description)}\n")
+        lines.append(f"description = {toml_escape(description)}\n")
     lines.extend(
         [
-            f"model = {_toml_escape(model)}\n",
+            f"model = {toml_escape(model)}\n",
             'sandbox_mode = "workspace-write"\n',
-            f"model_reasoning_effort = {_toml_escape(reasoning_effort)}\n",
-            f'developer_instructions = """\n{escaped}\n"""\n',
+            f"model_reasoning_effort = {toml_escape(reasoning_effort)}\n",
+            f"developer_instructions = {toml_escape(developer_instructions + '\n')}\n",
         ]
     )
     return "".join(lines)
@@ -300,116 +260,13 @@ def _render_agents_config_file_blocks(agents_dir: Path) -> str:
     blocks: list[str] = []
     for md_file in sorted(agents_dir.glob("*.md")):
         try:
-            text = md_file.read_text(encoding="utf-8")
-            fm = _parse_agent_frontmatter(text)
-            if not fm:
-                continue
-            name = str(fm.get("name", ""))
+            fm = parse(platform.read_text(md_file))
+            name = str(fm.data.get("name", "")) if isinstance(fm, Frontmatter) else ""
             if not name:
                 continue
             key_escaped = name.replace("\\", "\\\\").replace('"', '\\"')
             blocks.append(f'[agents."{key_escaped}"]\n')
             blocks.append(f'config_file = "agents/{name}.toml"\n')
-        except (OSError, ValueError):
+        except (OSError, ValueError, platform.Undecodable):
             continue
     return "".join(blocks)
-
-
-def _split_frontmatter(text: str) -> tuple[str, str]:
-    """(frontmatter without its fences, body) of a persona file — the one splitter."""
-    end = text.find("\n---\n", 4)
-    if not text.startswith("---\n") or end == -1:
-        raise PublicAssetError("persona has no closed YAML frontmatter block")
-    return text[4 : end + 1], text[end + 5 :]
-
-
-def _parse_agent_frontmatter(text: str) -> dict[str, object]:
-    """Parse YAML frontmatter from an agent .md file using stdlib regex only.
-
-    Extracts the block between the first pair of ``---`` fences. Supports:
-    - Simple ``key: value`` scalar fields (string values).
-    - Folded scalar ``key: >`` — continuation lines are joined with a space.
-    - YAML list under ``tools:`` — items prefixed with ``  - `` (two-space indent).
-
-    Unknown fields (outside ``_TOML_SAFE_AGENT_FIELDS``) are silently dropped.
-    Returns an empty dict if ``name`` is missing or frontmatter is absent.
-    """
-    try:
-        frontmatter = _split_frontmatter(text)[0]
-    except PublicAssetError:
-        return {}
-
-    result: dict[str, object] = {}
-    lines = frontmatter.splitlines()
-    i = 0
-    while i < len(lines):
-        line = lines[i]
-        # Detect block scalar (folded `>` or literal `|`)
-        block_m = _AGENT_FM_BLOCK_SCALAR_RE.match(line)
-        if block_m:
-            key = block_m.group(1)
-            # Collect continuation lines (indented)
-            body_lines: list[str] = []
-            i += 1
-            while i < len(lines) and (lines[i].startswith("  ") or lines[i] == ""):
-                body_lines.append(lines[i].strip())
-                i += 1
-            # Join non-empty continuation lines with a space (folded scalar semantics)
-            value = " ".join(part for part in body_lines if part)
-            if key in _TOML_SAFE_AGENT_FIELDS:
-                result[key] = value
-            continue
-
-        # Detect tools list  (`tools:\n  - item\n  - item`)
-        if line == "tools:":
-            items: list[str] = []
-            i += 1
-            while i < len(lines) and _AGENT_FM_TOOLS_ITEM_RE.match(lines[i]):
-                m = _AGENT_FM_TOOLS_ITEM_RE.match(lines[i])
-                if m:
-                    items.append(m.group(1).strip())
-                i += 1
-            if "tools" in _TOML_SAFE_AGENT_FIELDS:
-                result["tools"] = items
-            continue
-
-        # Simple scalar
-        simple_m = _AGENT_FM_SIMPLE_RE.match(line)
-        if simple_m:
-            key = simple_m.group(1)
-            value_str = simple_m.group(2).split(" #", 1)[0].strip()  # YAML inline comment
-            if key in _TOML_SAFE_AGENT_FIELDS:
-                result[key] = value_str
-        i += 1
-
-    # Require `name` — without it, the block cannot be rendered
-    if "name" not in result:
-        return {}
-    return result
-
-
-def _parse_skills_from_frontmatter(text: str) -> list[str]:
-    """Extract the ``skills:`` list from agent YAML frontmatter.
-
-    Locates the ``skills:`` key inside the opening ``---`` block and collects
-    indented ``  - <name>`` list items, stopping at the next top-level key or
-    end of the frontmatter block.  Returns an empty list when frontmatter is
-    absent or contains no ``skills:`` key.
-    """
-    try:
-        frontmatter = _split_frontmatter(text)[0]
-    except PublicAssetError:
-        return []
-    skills: list[str] = []
-    in_skills = False
-    for line in frontmatter.splitlines():
-        if line.rstrip() == "skills:":
-            in_skills = True
-            continue
-        if in_skills:
-            stripped = line.strip()
-            if stripped.startswith("- "):
-                skills.append(stripped[2:].strip())
-            elif line and not line.startswith(" ") and not line.startswith("\t"):
-                in_skills = False  # next top-level key — skills block ended
-    return skills

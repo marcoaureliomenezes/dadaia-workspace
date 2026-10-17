@@ -1,7 +1,6 @@
-"""T-69-04/T-69-05 (FR2, bug ``lifecycle-diagnostic-commands-missing-context-options``, HIGH).
+"""Only the --context/--specs-dir mutual-exclusion rejection is pinned here.
 
-Kept per plan-integration.md: only the --context/--specs-dir mutual-exclusion rejection
-(AC2.2). The four "accepts --context (exit != 2)" parse-contract greps are deleted —
+The four "accepts --context (exit != 2)" parse-contract greps are deleted —
 deep behavior is proven elsewhere (``test_preflight_real_wiring.py``,
 ``test_specs_doctor_context_self_hosting.py``, and the unit filters in
 ``test_workflow_handoff_doctor.py`` / ``test_lifecycle_status_runs_summary.py``).
@@ -35,7 +34,7 @@ def _norm(text: str) -> str:
 
 
 def test_specs_doctor_context_and_specs_dir_mutually_exclusive_ac22() -> None:
-    # AC2.2: passing both --context and --specs-dir errors clearly. Normalise the Rich
+    # Passing both --context and --specs-dir errors clearly. Normalise the Rich
     # box-wrapped error so the token assertions are platform-invariant (GHA wraps at a
     # different width than a local TTY and can split ``--context`` across lines).
     result = _runner.invoke(

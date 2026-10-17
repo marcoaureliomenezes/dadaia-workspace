@@ -1,4 +1,4 @@
-"""Exit codes must tell the truth (validation-029 F-04/F-12) + certify without a workspace (F-03).
+"""Exit codes must tell the truth, and certify runs without a workspace.
 
 A CLI that finds problems and exits 0 masks failures from every script/agent that
 consumes it — the exact 'cmd | tail masks exit' class the house gotchas document.
@@ -13,14 +13,16 @@ from typer.testing import CliRunner
 
 from dadaia_workspace import container
 from dadaia_workspace.cli.main import app
+from tests.helpers.oslib import write_text
 
 _runner = CliRunner()
 
 
 def test_doctor_exits_nonzero_when_issues_found(tmp_path: Path, monkeypatch) -> None:
     (tmp_path / ".dadaia" / "states").mkdir(parents=True)
-    (tmp_path / ".dadaia" / "states" / "spec_contexts.json").write_text(
-        '{"schema_version": "2", "contexts": []}'
+    write_text(
+        tmp_path / ".dadaia" / "states" / "spec_contexts.json",
+        '{"schema_version": "2", "contexts": []}',
     )
     (tmp_path / ".dadaia" / "nonsense").mkdir()
     (tmp_path / "repos").mkdir()
@@ -31,8 +33,8 @@ def test_doctor_exits_nonzero_when_issues_found(tmp_path: Path, monkeypatch) -> 
 
 
 def test_certify_runs_without_a_workspace_and_prints_pure_json(tmp_path: Path, monkeypatch) -> None:
-    """F-03: certify's contract is a DISPOSABLE workspace — a bare cwd runs it on a fallback root;
-    bug certify-json-stdout-polluted-info-line: diagnostics go to stderr, stdout is the JSON alone."""
+    """Certify's contract is a DISPOSABLE workspace — a bare cwd runs it on a fallback root;
+    Diagnostics go to stderr, stdout is the JSON alone."""
     monkeypatch.chdir(tmp_path)
     seen: list[Path] = []
 

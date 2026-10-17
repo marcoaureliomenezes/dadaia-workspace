@@ -12,6 +12,9 @@ from typing import Any
 
 from jsonschema import Draft202012Validator
 
+from dadaia_workspace.core import platform
+from dadaia_workspace.core.fixed_sections import authored_text
+from dadaia_workspace.core.skill_owner import load_owner
 from dadaia_workspace.features.specs import memory_canon
 from dadaia_workspace.features.specs.schemas import load_schema
 
@@ -69,11 +72,12 @@ def _check_sources(result: AtomResult, fm: dict[str, Any], repo_root: Path) -> N
             result.error(f"'sources' glob '{source}' matches no file under {repo_root}.")
 
 
+_TASK_ID = load_owner("dd-bug-resolution", "_grammar").TASK_ID_RE.pattern
 _NARRATIVE_TOKENS = (
     ("date", re.compile(r"\b\d{4}-\d{2}-\d{2}\b")),
     ("release id", re.compile(r"(?<![\d.=])\d+\.\d+\.\d+(?!\.?\d)")),
     ("candidate id", re.compile(r"\b(?:c|rc-)\d+\b")),
-    ("task id", re.compile(r"\bT-\d+-\d+\b")),
+    ("task id", re.compile(rf"\b{_TASK_ID.removeprefix('^').removesuffix('$')}\b")),
     ("FR id", re.compile(r"\bFR\d+\b")),
 )
 _HISTORY_PHRASE_RE = re.compile(
@@ -81,20 +85,19 @@ _HISTORY_PHRASE_RE = re.compile(
     r"|no longer|formerly|previously)\b",
     re.IGNORECASE,
 )
-_ADR_LINE_RE = re.compile(r"^\s*ADR:\s*\d{4}\b")
 _FENCE_RE = re.compile(r"^\s*(?:```|~~~)")
 
 
 def _check_narrative(result: AtomResult, content: str, body: str, product: bool) -> None:
     """One ERROR per body line carrying a history token (any memory file) or a history
-    phrase (product atoms only); fenced code and a principle's ``ADR:`` line are exempt."""
+    phrase (product atoms only); fenced code is exempt."""
     offset = len(content.splitlines()) - len(body.splitlines())
     fenced = False
     for number, line in enumerate(body.splitlines(), start=offset + 1):
         if _FENCE_RE.match(line):
             fenced = not fenced
             continue
-        if fenced or _ADR_LINE_RE.match(line):
+        if fenced:
             continue
         hits = [(kind, m.group(0)) for kind, rx in _NARRATIVE_TOKENS for m in rx.finditer(line)]
         if product:
@@ -137,12 +140,12 @@ def _is_product_atom(md_path: Path, memory_dir: Path) -> bool:
 def lint_atom(md_path: Path, memory_dir: Path, schema: dict[str, Any]) -> AtomResult:
     result = AtomResult(md_path)
     try:
-        content = md_path.read_text(encoding="utf-8")
+        content = platform.read_text(md_path)
     except OSError as exc:
         result.error(f"Cannot read file: {exc}")
         return result
 
-    fm, body, problem = memory_canon.parse_atom(content)
+    fm, body, problem = memory_canon.parse_atom(authored_text(content))
     if fm is None:
         result.error(f"Frontmatter is outside the atom grammar: {problem}")
         return result

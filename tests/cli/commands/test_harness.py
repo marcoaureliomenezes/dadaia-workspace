@@ -19,14 +19,13 @@ from typer.testing import CliRunner
 import dadaia_workspace
 from dadaia_workspace.cli.main import app as cli_app
 from dadaia_workspace.infrastructure import public_assets
+from tests.helpers.oslib import link, read_text, write_text
 
 _runner = CliRunner()
 
 
 def _profile(workspace: Path) -> list[str]:
-    data = json.loads(
-        (workspace / ".dadaia" / "states" / "harness_profile.json").read_text(encoding="utf-8")
-    )
+    data = json.loads(read_text(workspace / ".dadaia" / "states" / "harness_profile.json"))
     harnesses = data["harnesses"]
     assert isinstance(harnesses, list)
     return [str(h) for h in harnesses]
@@ -39,10 +38,10 @@ def _claude_only_workspace(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> P
     assert result.exit_code == 0, result.output
     assert not (ws / ".codex").exists(), "fixture must start Claude-only"
     monkeypatch.chdir(ws)
-    # harness-add-crashes-staging-shared-skill-scripts: the package lives under a `.venv`.
+    # The package lives under a `.venv`.
     site = ws / ".dadaia" / ".venv" / "site" / "dadaia_workspace"
     site.parent.mkdir(parents=True)
-    site.symlink_to(Path(dadaia_workspace.__file__).parent, target_is_directory=True)
+    assert link(str(Path(dadaia_workspace.__file__).parent), site, is_dir=True)
     monkeypatch.setattr(public_assets, "__file__", str(site / "infrastructure" / "x.py"))
     return ws
 
@@ -50,7 +49,7 @@ def _claude_only_workspace(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> P
 def test_harness_add_projects_the_set_registers_it_and_is_idempotent(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """AC2.1 third clause: `harness add codex` on a Claude-only workspace yields the
+    """`harness add codex` on a Claude-only workspace yields the
     `.codex/` set, `harness list` shows both, `public doctor` exits 0, and a second
     `add` changes nothing."""
     ws = _claude_only_workspace(tmp_path, monkeypatch)
@@ -83,15 +82,15 @@ def test_harness_add_projects_the_set_registers_it_and_is_idempotent(
 @pytest.mark.parametrize(
     ("harness", "projected"),
     [
-        ("cursor", ".cursor/agents/dd-software-engineer.md"),
+        ("cursor", ".cursor/agents/dd-sw-engineer-sr.md"),
         ("devin", None),
-        ("copilot", ".github/agents/dd-software-engineer.agent.md"),
+        ("copilot", ".github/agents/dd-sw-engineer-sr.agent.md"),
     ],
 )
 def test_harness_add_registers_each_newly_recorded_harness(
     harness: str, projected: str | None, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """AC3.1: `harness add cursor|devin|copilot` exits 0 and leaves `public doctor` at 0.
+    """`harness add cursor|devin|copilot` exits 0 and leaves `public doctor` at 0.
 
     `devin` projects no persona view of its own — it reads the shared authored tree —
     so the assertion for it is that the shared set is there and its own directory is
@@ -104,7 +103,7 @@ def test_harness_add_registers_each_newly_recorded_harness(
     assert _profile(ws) == ["claude", harness]
 
     if projected is None:
-        assert (ws / ".agents" / "agents" / "dd-software-engineer.md").exists()
+        assert (ws / ".agents" / "agents" / "dd-sw-engineer-sr.md").exists()
         assert [p.name for p in (ws / ".devin").iterdir()] == ["hooks.v1.json"], (
             "devin reads the authored persona tree natively; its directory carries the "
             "hook registration and nothing else"
@@ -124,11 +123,11 @@ def test_harness_add_copilot_never_touches_the_repository_workflows(
     ws = _claude_only_workspace(tmp_path, monkeypatch)
     workflow = ws / ".github" / "workflows" / "ci.yml"
     workflow.parent.mkdir(parents=True)
-    workflow.write_text("name: ci\n", encoding="utf-8")
+    write_text(workflow, "name: ci\n")
 
     added = _runner.invoke(cli_app, ["harness", "add", "copilot"])
     assert added.exit_code == 0, added.output
-    assert workflow.read_text(encoding="utf-8") == "name: ci\n"
+    assert read_text(workflow) == "name: ci\n"
     assert sorted(p.name for p in (ws / ".github").iterdir()) == [
         "agents",
         "hooks",

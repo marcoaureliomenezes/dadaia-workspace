@@ -60,28 +60,31 @@ the one writer of every hook wiring. The wheel ships the full public asset tree,
 access. Every later command runs through the workspace's own CLI,
 `.dadaia/.venv/bin/dadaia`. **Project:** `--repo <url>` (plus repeatable
 `--associated-repo <url>`) clones the repo into `repos/<slug>/`, installs the pre-push
-hook and makes the context ALIVE (only `context bind` binds); a later project is
+and reference-transaction hooks and makes the context ALIVE (only `context bind` binds); a later project is
 `.dadaia/.venv/bin/dadaia context create --main-repo <url> [--associated-repo <url>]`.
 **Specs:** `.dadaia/.venv/bin/dadaia specs init --context <slug>` brings the repo's
-`specs/` to the canon, moving a foreign tree to `specs-bkp/` after consent; the
-`dd-audit-project` first pass fills memory (done by real content, never a stamp) and
+`specs/` to the canon, moving a foreign tree to `specs-bkp/` after consent, and on a repo
+with no work branch cuts the local one and commits the scaffold on it; the
+`dd-audit-project` first pass fills memory in the `wt-backlog-first-pass` lane (done by real content, never a stamp) and
 `.dadaia/.venv/bin/dadaia context baseline <slug>` publishes it. `doctor` prints each
 next step with its `fix:` line.
 
 **Upgrade:** re-run the `uvx dadaia-workspace init <dir> --harness <name>` line; it
-prints `upgraded A -> B`, or `already at A`; then
+prints `upgraded A -> B`, `repaired -> B` (an unreadable venv build), or `already at A`;
+a venv whose python cannot start is refused with a fix that deletes `.dadaia/.venv` and
+reruns init; then
 `.dadaia/.venv/bin/dadaia specs init --context <ctx>` refreshes each project's specs law.
 `.dadaia/.venv/bin/dadaia harness add <name>` adds a harness later.
 
 `.dadaia/.venv/bin/dadaia context bind <ctx>` writes one session record (context,
-runtime, pid, `bound_at`) under the session id the environment carries and acquires
+runtime, pid, `bound_at`, `bind_id`, `last_seen_at`) under the session id the environment carries and acquires
 nothing. The bind's scope is the context's main repo plus its associated repos, and it
 drives the injection of `constitution.md`, the tech stack and the memory catalog digest
 into the session.
 
 `.dadaia/.venv/bin/dadaia doctor` is the one instance validator. Three sections run in fixed order —
 `workspace`, `specs`, `ledgers` — each finding one `<CODE> <verdict> <message>` line,
-every error-class finding with one fix line (a command, or `Operator action: <one act>`)
+every error-class finding with one fix line (a command, an `Agent action: <one act>`, or an `Operator action: <one act>` for what only the human may do)
 and exit 1; there is no score.
 `--json` mirrors the run; `--fix` is the reaper: it moves slop to `.dadaia/reaped/`;
 a TTL expiry acts by zone class, an OUTPUT entry held, an EPHEMERAL one deleted.
@@ -104,13 +107,13 @@ through the gate asserting ALLOW. No lease, lock or wait path exists; the gate r
 `_RELEASE.json`.
 
 Work runs as candidates inside one live release: a picked set, an as-is review of every
-unit it touches, a grill, SPEC, a PLAN drawing a DAG of jobs and one job file per job; each task runs in its own worktree and
-lands on its job branch after its gate, each job lands only after the reviewer's `APPROVED`, then the
-Reconciliation job closes it — memory reconciliation, disposition sweep — and the work -> integration merge follows (branch names: the constitution's `gitflow:`). The
+unit it touches, a grill, SPEC, a PLAN drawing a DAG of jobs and one job file per job; the candidate lives on its `wt-rc` worktree, each task runs in its own worktree and
+lands on its job's `wt-main` after its gate, each job lands on the `wt-rc` only after the reviewer's `APPROVED`, then the
+Reconciliation closes it — memory reconciliation, disposition sweep — the `wt-rc` lands on the work branch and the work -> integration merge follows; `.dadaia/.venv/bin/dadaia worktree <verb>` runs every worktree verb (branch names: the constitution's `gitflow:`). The
 ledger scripts under `.agents/skills/*/scripts/` (`bugs.py`, `backlog.py`,
 `release.py`, `audit.py`) are each record's one writer. A bug is proposed to the
-operator and registered only after confirmation; a block-list bug is fixed at once as a
-hotfix job with a RED test, while any other bug becomes explicit candidate scope. Ship
+operator and registered only after confirmation; a block-list bug is fixed at once in a
+`wt-hotfix-<bug-id>` lane with a RED test, while any other bug becomes explicit candidate scope. Ship
 may carry an open bug only with the operator's exact recorded authorization. Completed work leaves as a `handoff-v1` record, validated by
 `.dadaia/.venv/bin/dadaia reports validate`.
 

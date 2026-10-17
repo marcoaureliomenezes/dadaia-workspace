@@ -1,10 +1,9 @@
-"""v0.9.0 A4.2, A6.1; v0.11.0 A1.6, A2.3, A10.2: the push-range denylist
+"""The push-range denylist
 scan over a REAL throwaway repo, through the real ``GitSubprocessObjectReader`` wired into
 ``push_gate_decision`` (no CLI layer). Amnesty is bound to the PATH that already published
-a value at the range base (v0.11.0 FR1) — for a tag pushed over a published sha and for
-the first push of a new branch whose past is on origin (bug
-new-branch-push-loses-prior-published-denylist-amnesty); a git failure refuses naming
-its failure (FR6 row 2). Synthetic terms only.
+a value at the range base — for a tag pushed over a published sha and for
+the first push of a new branch whose past is on origin ); a git failure refuses naming
+its failure. Synthetic terms only.
 """
 
 from __future__ import annotations
@@ -20,6 +19,7 @@ from dadaia_workspace.features.chokepoints.branch_policy import Decision, PushRe
 from dadaia_workspace.features.specs.canon import canon_violations
 from dadaia_workspace.infrastructure.git_objects import GitSubprocessObjectReader
 from tests.fakes import gate_fixes
+from tests.helpers.oslib import run, write_text
 
 _T = "zz-frozen-invariant-term"
 _ZERO = "0" * 40
@@ -27,7 +27,7 @@ _ARCHIVED = "specs/releases/_archive/0.4.0/notes.md"
 
 
 def _git(args: list[str], cwd: Path) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True, check=True)
+    return run(["git", *args], cwd=cwd, check=True)
 
 
 def _init_repo(path: Path) -> None:
@@ -72,7 +72,7 @@ def test_the_amnesty_is_bound_to_the_path_that_already_published_the_value(
     _init_repo(repo)
     for rel, text in published.items():
         (repo / rel).parent.mkdir(parents=True, exist_ok=True)
-        (repo / rel).write_text(text)
+        write_text(repo / rel, text)
     base = _commit(repo, "already-published")
     if ref == "branch":
         origin = tmp_path / "origin.git"
@@ -85,7 +85,7 @@ def test_the_amnesty_is_bound_to_the_path_that_already_published_the_value(
         (repo / rel).unlink()
     for rel, text in pushed.items():
         (repo / rel).parent.mkdir(parents=True, exist_ok=True)
-        (repo / rel).write_text(text)
+        write_text(repo / rel, text)
     tip = _commit(repo, "the pushed range")
     push = (
         PushRef("refs/heads/feature/1.0.0", tip, "refs/heads/feature/1.0.0", _ZERO)
@@ -102,15 +102,14 @@ def test_the_amnesty_is_bound_to_the_path_that_already_published_the_value(
 def test_prior_side_lookup_failure_refuses_naming_the_failure_and_no_verify(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """SPEC v0.11.0 A2.3 (integration tier — unit tier already pinned in
-    ``tests/infrastructure/test_git_objects.py``): a forced git failure on
+    """Integration tier: a forced git failure on
     the prior-side lookup refuses, naming the failure, over the
     REAL adapter wired into ``push_gate_decision``."""
     repo = tmp_path / "repo"
     _init_repo(repo)
-    (repo / "notes.md").write_text("published content\n")
+    write_text(repo / "notes.md", "published content\n")
     already_published_sha = _commit(repo, "already-published")
-    (repo / "notes.md").write_text("edited content\n")
+    write_text(repo / "notes.md", "edited content\n")
     tip_sha = _commit(repo, "edit")
 
     from dadaia_workspace.infrastructure import git_objects as git_objects_module
@@ -136,7 +135,7 @@ def test_prior_side_lookup_failure_refuses_naming_the_failure_and_no_verify(
 
 
 def test_real_git_failure_refuses_naming_the_failure(tmp_path: Path) -> None:
-    """FR6 row 2, integration-tier: a genuinely non-git directory wired through the
+    """Integration tier: a genuinely non-git directory wired through the
     REAL adapter refuses, never silently allows an unscannable push."""
     not_a_repo = tmp_path / "not-a-repo"
     not_a_repo.mkdir()

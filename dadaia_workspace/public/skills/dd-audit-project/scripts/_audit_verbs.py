@@ -9,25 +9,22 @@ gone without its record.
 
 from __future__ import annotations
 
-import sys
 from collections import Counter
-from datetime import UTC, datetime
 from pathlib import Path
 from shutil import rmtree
 from typing import Any
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-
-from _audit_check import AUDITS, DISPOSITIONS, FINDINGS, PILLARS, REQUIRED_EVIDENCE  # noqa: E402
-from _audit_store import (  # noqa: E402
+import _clock
+from _audit_check import AUDITS, DISPOSITIONS, FINDINGS, PILLARS, REQUIRED_EVIDENCE
+from _audit_store import (
     SCRIPT,
-    Refusal,
     append_histo,
     audit_dir,
     read_findings,
     write_findings,
 )
-from _specs import choice  # noqa: E402
+from _refusal import Refusal
+from _specs import choice
 
 
 def _live(specs: Path, audit: str) -> Path:
@@ -83,7 +80,7 @@ def close(specs: Path, audit: str, sha: str) -> str:
         raise choice(Refusal(f"audit {audit!r} still carries {len(open_ids)} undispositioned "
                      f"finding(s): {', '.join(open_ids)}. Every finding gets a disposition "
                      "before the audit closes",
-                     f"{SCRIPT} disposition {audit} {open_ids[0]}"),
+                     SCRIPT("disposition", audit, open_ids[0])),
                      "with the --disposition it earned and the evidence that requires")  # fmt: skip
     releases = sorted({str(r["release"]) for r in records if r.get("release")})
     if len(releases) > 1:
@@ -91,14 +88,16 @@ def close(specs: Path, audit: str, sha: str) -> str:
         raise Refusal(
             f"audit {audit!r} names {len(releases)} remediation releases "
             f"({', '.join(releases)}); an audit generates at most one",
-            f"{SCRIPT} disposition {audit} {other} --disposition resolved --release {releases[0]}",
+            SCRIPT(
+                "disposition", audit, other, "--disposition", "resolved", "--release", releases[0]
+            ),
         )
     pillars = Counter(str(record.get("pillar")) for record in records)
     verdicts = Counter(str(record.get("disposition")) for record in records)
     verdict = "resolved" if releases else "rejected"
     append_histo(specs, {
         "id": audit,
-        "ts": datetime.now(tz=UTC).strftime("%Y-%m-%d"),
+        "ts": _clock.today(),
         "disposition": verdict,
         "release": releases[0] if releases else None,
         "reason": None if releases else f"no finding resolved ({dict(verdicts) or 'none'})",

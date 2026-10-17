@@ -1,5 +1,5 @@
-"""Size: SMALL — fakes at the store and git seams; the expected records are the SPEC FR13
-worked example, never derived from the service.
+"""Size: SMALL — fakes at the store and git seams; the expected records are the documented
+example, never derived from the service.
 """
 
 import json
@@ -16,6 +16,7 @@ from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
 from tests.fixtures.real_git import clone, seeded_remote
 from tests.fixtures.stores import context_store
+from tests.helpers.oslib import read_text
 
 _INFRA = AssociatedRepo(slug="infra", url="https://example.com/infra.git")
 
@@ -56,7 +57,7 @@ def test_export_writes_fr13_records_and_refreshes_alive_branches_only(tmp_path: 
     dist_zone = next(zone for zone in zones_with_canon() if zone.name == "dist")
     assert dist_zone.canon == frozenset({result.path.name})
 
-    payload = json.loads(result.path.read_text("utf-8"))
+    payload = json.loads(read_text(result.path))
     exported_at = payload["exported_at"]
     assert payload == {
         "schema_version": "spec-contexts-export-v1",
@@ -104,5 +105,5 @@ def test_export_overwrites_the_single_artifact(tmp_path: Path) -> None:
 
     assert first.path == second.path
     assert sorted(p.name for p in second.path.parent.iterdir()) == ["spec-contexts.json"]
-    names = [c["name"] for c in json.loads(second.path.read_text("utf-8"))["contexts"]]
+    names = [c["name"] for c in json.loads(read_text(second.path))["contexts"]]
     assert names == ["alpha"]

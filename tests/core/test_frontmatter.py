@@ -1,19 +1,19 @@
-"""``core.frontmatter`` — the ONE frontmatter parser (v0.5.1 T-051-16, K10).
+"""``core.frontmatter`` — the ONE frontmatter parser.
 
 Table-driven over :func:`parse`'s outcome shapes: valid, missing delimiter, invalid YAML
-(with the line number), and a present-but-non-dict block. Regression coverage for bug
-``memory-lint-blames-missing-delimiter-for-a-yaml-parse-error`` (kind distinguishes
-"no block" from "block present, invalid YAML").
-
-v0.5.1 A10.2/A10.3.
+(with the line number), and a present-but-non-dict block. The kind distinguishes "no block"
+from "block present, invalid YAML".
 Size: SMALL — pure-function unit tests, no I/O.
 """
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from dadaia_workspace.core.frontmatter import Frontmatter, FrontmatterError, parse
+from tests.helpers.oslib import read_text, write_text
 
 
 def test_valid_frontmatter_returns_data_and_body() -> None:
@@ -47,8 +47,7 @@ def test_missing_delimiter_is_named_as_missing_delimiter_not_invalid_yaml() -> N
 
 
 def test_invalid_yaml_in_a_present_block_names_the_line_never_the_delimiter() -> None:
-    """Bug memory-lint-blames-missing-delimiter-for-a-yaml-parse-error: an unquoted
-    scalar containing ': ' breaks the YAML on line 2 of the block; the block itself
+    """An unquoted scalar containing ': ' breaks the YAML on line 2 of the block; the block itself
     IS present, so the diagnostic must never claim it is missing."""
     text = "---\nslug: x\ntldr: Two-tier memory: 17 principles\n---\n\nBody.\n"
 
@@ -82,3 +81,42 @@ def test_parse_error_kinds_table(text: str, expected_kind: str) -> None:
 
     assert isinstance(result, FrontmatterError)
     assert result.kind == expected_kind
+
+
+@pytest.mark.parametrize("prefix", ["", "﻿"], ids=["crlf", "bom-crlf"])
+def test_a_crlf_or_bom_document_parses_like_its_lf_twin(prefix: str) -> None:
+    text = f'{prefix}---\r\nslug: x\r\ngitflow: {{"work": "feature/"}}\r\n---\r\n\r\nBody.\r\n'
+
+    result = parse(text)
+
+    assert isinstance(result, Frontmatter)
+    assert result.data == {"slug": "x", "gitflow": {"work": "feature/"}}
+    assert result.body == "\nBody.\n"
+
+
+def test_a_block_outside_the_subset_names_its_line() -> None:
+    result = parse("---\nslug: x\nflag: yes\n---\n")
+
+    assert isinstance(result, FrontmatterError)
+    assert (result.kind, result.line) == ("invalid_yaml", 2)
+
+
+def test_merging_into_a_bom_constitution_edits_its_block_instead_of_prepending_a_second(
+    tmp_path: Path,
+) -> None:
+    from dadaia_workspace.core.gitflow import merge_frontmatter
+
+    write_text(tmp_path / "constitution.md", "﻿---\nspecs_pattern_version: 6\n---\n\n# Law\n")
+
+    merge_frontmatter(tmp_path, specs_pattern_version=7)
+
+    assert read_text(tmp_path / "constitution.md") == (
+        "---\nspecs_pattern_version: 7\n---\n\n# Law\n"
+    )
+
+
+def test_a_refusal_message_quotes_the_offending_line() -> None:
+    result = parse("---\ngitflow: {principal: main\n---\n")
+
+    assert isinstance(result, FrontmatterError)
+    assert "gitflow: {principal: main" in result.message

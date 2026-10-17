@@ -1,4 +1,4 @@
-"""FR1 (0.4.7 c9); size: SMALL (repo-pure reads, no subprocess
+"""Size: SMALL (repo-pure reads, no subprocess
 unless `skills-ref` is installed).
 
 The skills the project distributes standalone conform to the Agent Skills spec. The
@@ -11,16 +11,17 @@ from __future__ import annotations
 import json
 import re
 import shutil
-import subprocess
 from pathlib import Path
 
 import pytest
 import yaml
 
+from tests.helpers.oslib import read_text, run
+
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _PUBLIC = _REPO_ROOT / "dadaia_workspace" / "public"
 _SKILLS_DIR = _PUBLIC / "skills"
-_MAP = _PUBLIC / "entities" / "behavior-map.json"
+_MAP = _REPO_ROOT / "dadaia_workspace" / "features" / "spec_context" / "behavior-map.json"
 
 _NAME_RE = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
 _FRONTMATTER_RE = re.compile(r"\A---\n(.*?)\n---\n", re.DOTALL)
@@ -34,18 +35,18 @@ _QUALIFIER = "inside a dadaia workspace"
 
 
 def _standalone_skills() -> list[str]:
-    data = json.loads(_MAP.read_text(encoding="utf-8"))
+    data = json.loads(read_text(_MAP))
     names = data.get("standalone_skills")
     assert isinstance(names, list) and names, (
         "`standalone_skills` is missing or empty in "
-        "dadaia_workspace/public/entities/behavior-map.json — it is the one data "
+        "dadaia_workspace/features/spec_context/behavior-map.json — it is the one data "
         "source for the distributed skill set"
     )
     return [str(name) for name in names]
 
 
 def _frontmatter(path: Path) -> dict[str, object]:
-    match = _FRONTMATTER_RE.match(path.read_text(encoding="utf-8"))
+    match = _FRONTMATTER_RE.match(read_text(path))
     assert match, f"{path.relative_to(_REPO_ROOT)}: no YAML frontmatter block"
     loaded = yaml.safe_load(match.group(1))
     assert isinstance(loaded, dict), f"{path.relative_to(_REPO_ROOT)}: frontmatter is not a mapping"
@@ -53,7 +54,7 @@ def _frontmatter(path: Path) -> dict[str, object]:
 
 
 def _body(path: Path) -> str:
-    text = path.read_text(encoding="utf-8")
+    text = read_text(path)
     match = _FRONTMATTER_RE.match(text)
     return text[match.end() :] if match else text
 
@@ -120,11 +121,5 @@ def test_skills_ref_validates_the_directory(skill_dir: Path) -> None:
     executable = shutil.which("skills-ref")
     if executable is None:
         pytest.skip("skills-ref is not installed")
-    result = subprocess.run(  # noqa: S603
-        [executable, "validate", str(skill_dir)],
-        capture_output=True,
-        text=True,
-        timeout=60,
-        check=False,
-    )
+    result = run([executable, "validate", str(skill_dir)], timeout=60, check=False)
     assert result.returncode == 0, f"{skill_dir.name}: {result.stdout}\n{result.stderr}"

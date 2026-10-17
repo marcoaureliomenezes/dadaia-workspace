@@ -1,7 +1,6 @@
 """Unit tests for state_v2 migration (spec_contexts.json v1 → v2).
 
-Covers AC-T10c-1..6 and AC-T10a-5..6 migration path. CRITICAL v1→v2 state migration:
-transform correctness is kept as a named test.
+Covers the v1→v2 state migration: transform correctness is one named test.
 """
 
 from __future__ import annotations
@@ -14,6 +13,7 @@ import pytest
 
 from dadaia_workspace.features.migrate.state_v2 import execute_migration, plan_migration
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
+from tests.helpers.oslib import write_text
 
 
 def _write_v1(states_dir: Path, contexts: list[dict[str, Any]] | None = None) -> None:
@@ -34,7 +34,7 @@ def _write_v1(states_dir: Path, contexts: list[dict[str, Any]] | None = None) ->
             }
         ],
     }
-    (states_dir / "spec_contexts.json").write_text(json.dumps(data))
+    write_text(states_dir / "spec_contexts.json", json.dumps(data))
 
 
 def _write_v2(states_dir: Path) -> None:
@@ -54,7 +54,7 @@ def _write_v2(states_dir: Path) -> None:
             }
         ],
     }
-    (states_dir / "spec_contexts.json").write_text(json.dumps(data))
+    write_text(states_dir / "spec_contexts.json", json.dumps(data))
 
 
 def _workspace(tmp_path: Path) -> tuple[Path, Path]:
@@ -86,7 +86,7 @@ def test_plan_migration_detection_matrix(tmp_path: Path) -> None:
     assert plan_v2.contexts_to_migrate == []
 
     _, states_none = _workspace(tmp_path / "none")
-    with pytest.raises(ValueError, match="fix: ") as refused:  # sa-seven-workspace-root-rules#S5
+    with pytest.raises(ValueError, match="fix: ") as refused:
         plan_migration(JsonContextStore(states_none))
     assert "No initialized workspace" in str(refused.value)
 
@@ -97,7 +97,7 @@ def test_plan_migration_detection_matrix(tmp_path: Path) -> None:
 
 
 def test_execute_migration_transforms_contexts(tmp_path: Path) -> None:
-    """sa-registry-schema-version-has-three-grammars#B7: the v1 transform contract is
+    """The v1 transform contract is
     unchanged — ativo → alive, inativo → dead; is_primary removed; activated_at →
     alive_since."""
     ws, states = _workspace(tmp_path)
@@ -149,14 +149,13 @@ def test_execute_migration_side_effects_and_v2_noop(tmp_path: Path) -> None:
     ws, states = _workspace(tmp_path)
     _write_v1(states)
     primary = states / "primary_context.json"
-    primary.write_text(json.dumps({"name": "my-ctx", "repo_slug": "my-ctx", "specs_dir": "/x"}))
+    write_text(primary, json.dumps({"name": "my-ctx", "repo_slug": "my-ctx", "specs_dir": "/x"}))
     assert primary.exists()
 
     execute_migration(JsonContextStore(states), ws)
 
-    # AC-T10c-5: primary_context.json removed.
     assert not primary.exists()
-    # Session identity remains; retired lock namespaces and audit logs are not recreated.
+    # Session identity remains; lock namespaces and audit logs are not recreated.
     assert (ws / ".dadaia" / "sessions").is_dir()
     assert not (ws / ".dadaia" / "locks").exists()
     assert not (ws / ".dadaia" / "states" / "ctx_locks").exists()

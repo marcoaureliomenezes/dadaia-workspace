@@ -2,22 +2,10 @@
 
 Disclosed sibling of `SKILL.md`. Every claim becomes one line in
 `specs/audits/<YYYYMMDD>-<slug>/FINDINGS.jsonl`, validated by
-`.dadaia/agentic/schemas/audits/finding-record-v1.schema.json`. The schema owns
+`.agents/skills/dd-audit-project/scripts/schemas/finding-record-v1.schema.json`. The schema owns
 field semantics.
 
-## Fields
-
-| Field | Mutability | Set by |
-|---|---|---|
-| `id` | immutable-core | `<audit-slug>-F<nnn>`, appended once |
-| `pillar` | immutable-core | `bugs` \| `specs` \| `memory` |
-| `severity` | immutable-core | `LOW` \| `MEDIUM` \| `HIGH` \| `CRITICAL` |
-| `refs` | immutable-core | file:line, bug ids, commit shas and/or release ids |
-| `claim` | immutable-core | one sentence stating the finding |
-| `evidence` | immutable-core | reproducible command plus a redacted one-line result |
-| `disposition` | mutable-governance | `open` at append; later moved by `audit.py disposition` |
-| `release` | mutable-governance | remediation release for `resolved` or `superseded` |
-| `reason` | mutable-governance | rationale for `rejected` |
+## Writes
 
 An append authors the immutable core. Every later change uses the disposition verb.
 
@@ -44,4 +32,4 @@ An append authors the immutable core. Every later change uses the disposition ve
    disposition replaces only the finding's governance triple; its immutable fields
    remain unchanged.
 4. `audit.py close <audit> --sha <window-end>` refuses while any finding is `open`, then
-   appends one audit-history record and deletes the live directory atomically.
+   appends one audit-history record and deletes the live directory.

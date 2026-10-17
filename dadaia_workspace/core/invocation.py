@@ -14,8 +14,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
-from dadaia_workspace.core import context_registry, workspace_resolver
+from dadaia_workspace.core import context_registry, platform, workspace_resolver
 from dadaia_workspace.core.cli_line import fix_line
+from dadaia_workspace.core.exceptions import SpecsDirUnresolvedError
 from dadaia_workspace.core.models.spec_context import CONTEXT_NAME_RE
 from dadaia_workspace.core.session_store import live_session
 
@@ -83,7 +84,7 @@ def sanitize_session_id(raw: str | None) -> str:
 def resolve_session_id(env: Mapping[str, str]) -> str:
     """The one session-id rule, sanitized: ``DADAIA_SESSION_ID``, then
     :data:`HARNESS_SESSION_ID_ENV_VARS`, else ``""``. Env only: ``context bind`` sees no
-    hook payload, so a payload id would be an id no bind can ever record (ADR 0116)."""
+    hook payload, so a payload id would be an id no bind can ever record."""
     candidate = env.get("DADAIA_SESSION_ID") or next(
         filter(None, map(env.get, HARNESS_SESSION_ID_ENV_VARS)), ""
     )
@@ -241,10 +242,10 @@ def resolve_specs_dir(specs_dir: str | None) -> Path:
     a ``cwd/specs`` fallback."""
     if specs_dir:
         path = Path(specs_dir)
-        if path.is_symlink():
-            raise ValueError(
-                f"Refusing a symlinked specs root: {path} is a symlink. Point "
-                "--specs-dir at the real directory instead of a link to it."
+        if platform.is_link(path):
+            raise SpecsDirUnresolvedError(
+                f"Refusing a symlinked specs root: {path} is a symlink.",
+                fix=f"Agent action: point --specs-dir at the real directory, not the link {path}",
             )
         return path.resolve()
 
@@ -252,9 +253,10 @@ def resolve_specs_dir(specs_dir: str | None) -> Path:
     if inv.specs_dir is not None:
         return inv.specs_dir
 
-    raise ValueError(
-        "Could not resolve specs_dir. Pass --specs-dir or bind a context with "
-        f"`{fix_line(None, 'context', 'bind', '<name>')}`."
+    raise SpecsDirUnresolvedError(
+        "Could not resolve specs_dir. Pass --specs-dir or bind a context.",
+        fix="Agent action: pass --specs-dir with the specs/ directory, or run "
+        f"`{fix_line(None, 'context', 'bind')}` with a context name",
     )
 
 
@@ -266,7 +268,7 @@ def resolve_context_specs_dir(workspace_root: Path, context: str) -> Path | None
 
 def alive_context_trees(workspace_root: Path) -> dict[str, Path]:
     """Every ALIVE context name -> its ``specs/`` tree, in registry order: one registry read
-    (a hook's cost never grows with the registry, ADR 0118). Names are unique: every store
+    (a hook's cost never grows with the registry). Names are unique: every store
     insert refuses a registered name (``SpecContextService._validate``)."""
     return {
         str(e["name"]): _specs_tree(workspace_root, slug)

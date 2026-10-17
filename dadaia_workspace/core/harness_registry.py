@@ -6,7 +6,7 @@ The **code embodiment** of the agent-runtime roster that ``specs/memory/tech-sta
 (:data:`L1_ENTRY_HARNESSES`, :data:`HARNESS_PROJECTION_DIRS`,
 :data:`PROJECTION_TARGETS`) and every projection rule in
 ``infrastructure/projection_rules.py`` derives from it, so a harness fact is stated
-once and a per-harness ``if`` has nowhere to live (0.4.7 FR2).
+once and a per-harness ``if`` has nowhere to live.
 
 Layering: a pure ``core`` leaf — **stdlib only, no upward import** (import-linter clean).
 Consumed downward by ``infrastructure`` / ``features`` / ``cli``.
@@ -132,8 +132,7 @@ _L1_SET: frozenset[str] = frozenset(L1_ENTRY_HARNESSES)
 def parse_harness_name(value: str) -> str:
     """Parse a ``--harness`` selector into the ONE registered harness name it denotes.
 
-    Exactly one record, always. The ``"all"`` meta-value and the comma-separated subset
-    form were deleted with 0.4.7 FR2: a workspace is born with one harness and
+    Exactly one record, always: a workspace is born with one harness and
     ``dadaia harness add`` is the only way a second one enters.
 
     Args:

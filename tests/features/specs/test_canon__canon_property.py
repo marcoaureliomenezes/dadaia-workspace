@@ -1,24 +1,11 @@
-"""v0.5.1 K4, "one canon table: scaffold is canon rendered, doctor
-is canon checked."
+"""One canon table: scaffold is canon rendered, doctor
+is canon checked.
 
-The property this task exists to hold: for every shape the scaffolder produces,
+The property held here: for every shape the scaffolder produces,
 ``canon.scaffold(t)``
 leaves a tree where ``canon.check_tree(t) == []`` AND the full ``SpecsDoctor`` reports
-ZERO errors. This ONE parametrized test replaces the six historical regression tests
-that each pinned one bug where a fresh scaffold failed its own doctor (all resolved,
-``specs/bugs/BUGS.jsonl``): ``fresh-specs-scaffold-fails-specs-doctor``,
-``specs-init-creates-what-doctor-refuses``, ``scaffold-artifacts-fail-own-workflow
--gates``, ``fresh-release-scaffold-emits-spec-doctor-warnings-042``,
-``default-context-scaffold-fails-specs-doctor``, ``release-new-rejects-semver-but
--doctor-requires-it``. Deleted regression tests replaced by this file:
-
-- ``tests/features/specs/test_doctor.py::
-  test_freshly_opened_release_segment_is_doctor_clean`` (named bug-042 regression) —
-  covered here by the "fresh release segment" case.
-- ``tests/features/specs/test_doctor.py::
-  test_fresh_scaffold_passes_all_tree_invariants`` (generic "scaffold -> 0 TREE errors")
-  — covered here by the "fresh root specs" case, now asserting the FULL doctor (every
-  code, not just TREE-*) is clean, a strictly stronger bar.
+ZERO errors. This ONE parametrized test holds that for the "fresh release segment" and
+"fresh root specs" cases, asserting the FULL doctor (every code, not just TREE-*).
 
 Every OTHER scaffolder/doctor test in the suite stays: they pin distinct facts (exact
 file lists, idempotence, --force overwrite, individual TREE-8/SPEC-DOC-NNN codes on a
@@ -35,6 +22,7 @@ import pytest
 from dadaia_workspace.features.specs import SpecsDoctor
 from dadaia_workspace.features.specs import canon as canon_mod
 from dadaia_workspace.features.specs.canon import scaffold
+from tests.helpers.oslib import write_text
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 _TEMPLATES_DIR = _REPO_ROOT / "dadaia_workspace" / "public" / "templates"
@@ -69,22 +57,19 @@ def _fresh_repo_specs(tmp_path: Path) -> Path:
 
 
 def _fresh_release(tmp_path: Path) -> Path:
-    """Fresh root specs/ plus one freshly-opened release — its trio in `rc-1/` (ADR 0150).
-    Successor of the shape bug
-    ``fresh-release-scaffold-emits-spec-doctor-warnings-042`` regressed on.
+    """Fresh root specs/ plus one freshly-opened release — its trio in the first candidate directory.
 
     The release directory is written here rather than minted: `release new` is the skill
-    script's verb now (0.4.7 T-047-66), and what THIS property asserts is that a canon
+    script's verb, and what THIS property asserts is that a canon
     release directory passes `check_tree`, not who wrote it."""
     specs_dir = _fresh_root_specs(tmp_path)
     release_dir = specs_dir / "releases" / "0.6.0"
     (release_dir / "rc-1").mkdir(parents=True)
     for artifact in ("SPEC.md", "PLAN.md", "TASKS.md"):
         origin = "**Origin:** operator-demand\n" if artifact == "SPEC.md" else ""
-        (release_dir / "rc-1" / artifact).write_text(
-            f"**Status:** Draft\n{origin}", encoding="utf-8"
-        )
-    (release_dir / "_RELEASE.json").write_text(
+        write_text(release_dir / "rc-1" / artifact, f"**Status:** Draft\n{origin}")
+    write_text(
+        release_dir / "_RELEASE.json",
         json.dumps(
             {
                 "schema": "release-state-v1",
@@ -105,7 +90,6 @@ def _fresh_release(tmp_path: Path) -> Path:
             indent=2,
         )
         + "\n",
-        encoding="utf-8",
     )
     return specs_dir
 

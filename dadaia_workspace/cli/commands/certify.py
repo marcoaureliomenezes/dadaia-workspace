@@ -19,15 +19,14 @@ def certify(
 ) -> None:
     """Certify assembled public features in a disposable local workspace."""
     # The whole run happens in a disposable workspace, so an initialized workspace at
-    # the cwd is NOT a prerequisite (validation-029 F-03: bare-dir certify tracebacked).
+    # the cwd is NOT a prerequisite.
     # Prefer the real workspace root (keeps artifacts under its .dadaia/tmp), fall back
     # to the system temp dir when none exists.
     try:
         anchor_root = resolve_workspace_root()
     except WorkspaceNotInitializedError:
         anchor_root = Path(tempfile.mkdtemp(prefix="dadaia-certify-"))
-        # stderr, not stdout: --json consumers parse stdout as one JSON document
-        # (bug certify-json-stdout-polluted-info-line).
+        # stderr, not stdout: --json consumers parse stdout as one JSON document.
         typer.echo(
             f"[info] no initialized workspace here; using disposable anchor {anchor_root}",
             err=True,

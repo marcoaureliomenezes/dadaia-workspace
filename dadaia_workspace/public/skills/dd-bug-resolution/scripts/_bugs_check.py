@@ -3,28 +3,32 @@
 
 Every write in `bugs.py` runs :func:`findings_for` over the bytes it is about to
 commit, so a writer/validator disagreement is unrepresentable. The schema is
-``schemas/bug-record-v1.schema.json`` beside this file, a copy `public stage` makes.
+``schemas/bug-record-v1.schema.json`` beside this file.
 """
 
 from __future__ import annotations
 
 import json
-import sys
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-sys.path.append(str(Path(__file__).resolve().parents[2] / "dd-release-implementation" / "scripts"))
-
-import _ledger  # noqa: E402
-from _release_schema import TASK_ID_RE  # noqa: E402
-from _specs import quote, script, with_specs  # noqa: E402
+import _findings
+import _git
+import _jsonl
+import _ledger
+from _grammar import HISTORICAL_TASK_RE, TASK_ID_RE
+from _platform import git_line, read_text
+from _root import STATES as _STATES
+from _specs import script
 
 CODE = "LEDGER-BUGS-SCHEMA"
 LEDGER = "bugs/BUGS.jsonl"
 HISTO = "bugs/_archive/bugs_histo.jsonl"
-TERMINAL = ("resolved", "superseded", "rejected")
+#: The status words are the schema's enum; the one non-terminal status is listed first.
+OPEN, *TERMINAL = _ledger.load_schema("bug-record-v1")["properties"]["status"]["enum"]
+#: The only place the terminal verbs meet their words.
+STATUS_BY_VERB = {"resolve": "resolved", "supersede": "superseded", "reject": "rejected"}
 _VERBS, _LAW = (
     "`bugs.py append` or `bugs.py update`",
     "specs/bugs/AGENTS.md: never hand-edit BUGS.jsonl",
@@ -67,16 +71,14 @@ def invariant_errors(record: dict[str, Any]) -> Iterator[str]:
 
 
 def tasks(root: Path) -> set[str]:
-    """Every task id under *root*`/releases/`, `_archive/` included: a closed rc's `TASKS.md`
-    carries historical rows, and a job rc's `tasks/job<n>.md` carries current or historical
-    ids. The release schema's parser is the one identity grammar."""
+    """The ids under *root*`/releases/` (`_archive/` included) in every `TASKS.md` and
+    `tasks/*.md`: the id at the head of each checklist item or table cell, in either grammar,
+    plus every table cell that is a current-grammar id."""
     files = [*root.glob("releases/**/TASKS.md"), *root.glob("releases/**/tasks/*.md")]
-    return {
-        cell
-        for file in files
-        for line in file.read_text(encoding="utf-8").splitlines()
-        for cell in (part.strip() for part in line.split("|"))
-        if TASK_ID_RE.fullmatch(cell)
+    lines = [ln for file in files for ln in read_text(file).splitlines()]
+    found = {m[1] for ln in lines if (m := HISTORICAL_TASK_RE.match(ln))}
+    return found | {
+        c for ln in lines for p in ln.split("|") if TASK_ID_RE.fullmatch(c := p.strip())
     }
 
 
@@ -85,7 +87,7 @@ def findings_for(
 ) -> list[dict[str, Any]]:
     """Every finding the ledger *text* carries — the ONE validation path, run both by
     ``check`` over the committed file and by every write over its own candidate bytes.
-    Lineage (AC3.8): a `caused_by` names a record of *text* or *archived*, or a task a
+    Lineage: a `caused_by` names a record of *text* or *archived*, or a task a
     `TASKS.md` under *root*`/releases/` carries, and never loops."""
     schema = load_schema()
     lines: dict[int, list[str]] = {}
@@ -97,13 +99,9 @@ def findings_for(
     def add(line: int, message: str) -> None:
         lines.setdefault(line, []).append(message)
 
-    for number, raw in enumerate(text.split("\n"), start=1):
-        if not raw.strip():
-            continue
-        try:
-            record = json.loads(raw)
-        except json.JSONDecodeError as exc:
-            add(number, f"line is not valid JSON: {exc.msg}")
+    for number, record, why in _jsonl.walk(text):
+        if why:
+            add(number, f"line is not valid JSON: {why}")
             continue
         messages = list(_ledger.validate(_schema_record(record, schema), schema, schema, "record"))
         for message in messages or invariant_errors(record):
@@ -129,62 +127,87 @@ def findings_for(
             add(seen[bug_id], f"{bug_id!r} caused_by {why}")
             bugs = script(Path(__file__).with_name("bugs.py"))
             fixes[seen[bug_id]] = (  # a cycle's wrong link is a judgement; a dangling one is not
-                f"Operator action: decide which of {', '.join(chain)} names the wrong cause and "
-                f"set its caused_by to the real cause's id, or none, through `{bugs} update "
-                f"--specs {quote(str(root))}` ({_LAW})" if at == bug_id
-                else with_specs(f"{bugs} update {quote(bug_id)} --set caused_by=none", root)
+                f"Agent action: decide which of {', '.join(chain)} names the wrong cause and "
+                f"set its caused_by to the real cause's id, or none, through `{bugs.inline('update', specs=root)}` ({_LAW})" if at == bug_id
+                else bugs("update", bug_id, "--set", "caused_by=none", specs=root)
             )  # fmt: skip
     return [
-        _ledger.finding(CODE, rel, n, "; ".join(m),
+        _findings.finding(CODE, rel, n, "; ".join(m),
                         fixes.get(n) or _ledger.unwritten(root / rel, n, _VERBS, _LAW))
         for n, m in sorted(lines.items())
     ]  # fmt: skip
 
 
 def histo_findings(text: str, root: Path = _ledger.SPECS) -> list[dict[str, Any]]:
-    """The archive's bug records plus pre-v6 event lines, which remain readable history."""
+    """The archive's bug records plus the older event lines, which stay readable."""
     schema = load_schema()
-    out: list[dict[str, Any]] = []
-    for number, raw in enumerate(text.split("\n"), start=1):
-        try:
-            record = json.loads(raw) if raw.strip() else None
-        except json.JSONDecodeError as exc:
-            record, messages = None, [f"line is not valid JSON: {exc.msg}"]
-        else:
-            legacy = isinstance(record, dict) and "event" in record
-            messages = (
-                []
-                if record is None or legacy
-                else list(
-                    _ledger.validate(_schema_record(record, schema), schema, schema, "record")
-                )
-            )
-        if messages:
-            fix = _ledger.unwritten(root / HISTO, number, "`bugs.py archive`", _LAW)
-            out.append(_ledger.finding(CODE, HISTO, number, "; ".join(messages), fix))
-    return out
+
+    def problems(record: Any) -> list[str]:
+        if isinstance(record, dict) and "event" in record:
+            return []
+        return list(_ledger.validate(_schema_record(record, schema), schema, schema, "record"))
+
+    return _findings.histo_findings(
+        text, HISTO, CODE, problems,
+        lambda n: _ledger.unwritten(root / HISTO, n, "`bugs.py archive`", _LAW),
+    )  # fmt: skip
 
 
 def archived_ids(text: str) -> frozenset[str]:
     """The record ids of the archive *text*; an unreadable line is `histo_findings`' to name."""
-    out = set()
-    for raw in text.split("\n"):
-        try:
-            record = json.loads(raw) if raw.strip() else None
-        except json.JSONDecodeError:
-            continue
-        if isinstance(record, dict) and "id" in record:
-            out.add(str(record["id"]))
-    return frozenset(out)
+    return frozenset(
+        str(record["id"])
+        for _, record, why in _jsonl.walk(text)
+        if not why and isinstance(record, dict) and "id" in record
+    )
 
 
+def _associated(specs: Path) -> list[Path]:
+    """The checkouts of the associated repos of the context whose main repo holds *specs*. The
+    registry is read at `<root>/.dadaia/states` beside `repos/<main>/.git`, a git fact: the
+    gate's fence blocks a walk to the workspace and its CLI alike. None when it does not answer."""
+    main = Path(_git.git(specs.parent, "rev-parse", "--path-format=absolute", "--git-common-dir", check=False).strip()).parent  # fmt: skip
+    root = main.parent.parent
+    try:
+        rows = json.loads(read_text(root / _STATES / "spec_contexts.json"))["contexts"]
+        slugs = [a["slug"] for r in rows if r.get("repo_slug") == main.name for a in r["associated_repos"]]  # fmt: skip
+    except (OSError, ValueError, LookupError, TypeError):
+        return []
+    return [p for s in slugs if (p := root / "repos" / s).is_dir()]
+
+
+def _unreached(specs: Path, text: str, root: Path) -> list[dict[str, Any]]:
+    """The live records whose `fix_sha` no repo of the context reaches from its HEAD, one
+    finding each; where a repo is a shallow clone a miss cannot be judged, so the misses are
+    one finding for the cut."""
+    repos, update = [specs.parent], script(Path(__file__).with_name("bugs.py"))
+    shas = [(n, r) for n, r, why in _jsonl.walk(text) if not why and isinstance(r, dict) and r.get("fix_sha")]  # fmt: skip
+    missed = [(n, r) for n, r in shas if not _git.reaches(repos[0], r["fix_sha"])]
+    if missed:
+        repos += _associated(specs)
+        missed = [(n, r) for n, r in missed if not any(_git.reaches(p, r["fix_sha"]) for p in repos[1:])]  # fmt: skip
+    if missed and (cut := next((p for p in repos if _git.shallow(p)), None)):
+        return [_findings.finding(CODE, LEDGER, missed[0][0], "the clone is shallow: no fix_sha can be judged", git_line(cut, "fetch", "--unshallow"))]  # fmt: skip
+    return [
+        _findings.finding(
+            CODE, LEDGER, n, f"{r['id']!r} fix_sha {r['fix_sha']} is no ancestor of HEAD of {', '.join(p.name for p in repos)}",
+            "Agent action: find the fix commit's sha in git log and run "
+            f"`{update.inline('update', r['id'], '--set', 'fix_sha=SHA', specs=root)}`",
+        )
+        for n, r in missed
+    ]  # fmt: skip
+
+
+@_findings.decodable(CODE)
 def check(specs: Path) -> list[dict[str, Any]]:
     """Validate the committed ledger and its archive; a young specs tree with neither is
     not a finding. A merge can join two valid writes into a cycle: check re-judges."""
     ledger, histo = specs / LEDGER, specs / HISTO
-    text = ledger.read_text(encoding="utf-8") if ledger.is_file() else ""
-    archived = histo.read_text(encoding="utf-8") if histo.is_file() else ""
+    text = read_text(ledger) if ledger.is_file() else ""
+    archived = read_text(histo) if histo.is_file() else ""
     root = specs.resolve()
-    return findings_for(text, archived=archived_ids(archived), root=root) + histo_findings(
-        archived, root
-    )
+    unreached = _unreached(specs, text, root)
+    return sorted(
+        findings_for(text, archived=archived_ids(archived), root=root) + unreached,
+        key=lambda f: f["line"],
+    ) + histo_findings(archived, root)

@@ -24,3 +24,22 @@ class _BrokenRunner:
             stderr = ""
 
         return _Result()
+
+
+def test_a_script_refusal_forwards_its_own_fix_line(tmp_path: Path) -> None:
+    """A script that refuses with its own `fix:` line has that line on the finding, not
+    `public install`."""
+    specs = tmp_path / "bare" / "specs"
+    specs.mkdir(parents=True)
+    findings = script_findings(specs, runner=_RefusingRunner())
+    assert {f.fix for f in findings} == {"python3 do-the-thing"}
+
+
+class _RefusingRunner:
+    def run(self, argv: object, *, cwd: object = None, timeout: float | None = None) -> object:
+        class _Result:
+            returncode = 1
+            stdout = ""
+            stderr = "no specs tree\nfix: python3 do-the-thing\n"
+
+        return _Result()

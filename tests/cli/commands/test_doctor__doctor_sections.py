@@ -1,8 +1,8 @@
-"""One `dadaia doctor`: three sections over one rule registry (0.4.7 FR5 / T-047-02).
+"""One `dadaia doctor`: three sections over one rule registry.
 
-T-047-02: `dadaia doctor` renders `workspace`, `specs` and
+`dadaia doctor` renders `workspace`, `specs` and
 `ledgers` in that order, one line `<CODE> <verdict> <message>` per finding; a release
-state defect is release.py check's one finding (ADR 0077); and the two commands this one
+state defect is release.py check's one finding; and the two commands this one
 replaces (`specs doctor`, `backlog doctor`) no longer exist.
 Size: SMALL — Typer CliRunner over tmp_path trees plus one in-process run over this
 repo's own specs/; no subprocess, no network.
@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import json
 import re
-import subprocess
 import sys
 from pathlib import Path
 from typing import Any
@@ -22,6 +21,10 @@ from typer.testing import CliRunner
 
 from dadaia_workspace.cli.help_digest import command_paths
 from dadaia_workspace.cli.main import app
+from dadaia_workspace.core.cli_line import git_line
+from dadaia_workspace.core.specs_version import state
+from tests.helpers.oslib import read_text, run, write_text
+from tests.helpers.oslib import write_text as os_write_text
 
 _runner = CliRunner()
 _REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -60,7 +63,7 @@ def _live_release(specs: Path, **over: Any) -> Path:
     release_dir.mkdir(parents=True)
     state = {"schema": "release-state-v1", "release": "0.5.0", "phase": "DEFINITION",
              "defined": None, "implemented": None, "shipped": None, "log": [], **over}  # fmt: skip
-    (release_dir / "_RELEASE.json").write_text(json.dumps(state, indent=2) + "\n", "utf-8")
+    os_write_text(release_dir / "_RELEASE.json", json.dumps(state, indent=2) + "\n")
     return release_dir / "_RELEASE.json"
 
 
@@ -73,17 +76,18 @@ def _release_findings(specs: Path) -> tuple[list[dict[str, Any]], list[str]]:
 
 
 def test_a_mis_cased_phase_is_one_finding_whose_fix_clears_it(tmp_path: Path) -> None:
-    """sa-release-json-validated-three-times#B1: phase 'closure' yields exactly one
-    finding, whose fix is ADR 0158's `Operator action:` naming the file, the keys its message names and the law
-    (AC4.5); the repair clears it."""
+    """Phase 'closure' yields exactly one
+    finding, whose fix is `Agent action:` naming the file, the keys its message names and the law;
+    the repair clears it."""
     state = _live_release(tmp_path / "specs", phase="closure")
     named, _ = _release_findings(tmp_path / "specs")
     assert len(named) == 1 and named[0]["code"] == "LEDGER-RELEASE-SCHEMA", named
     assert named[0]["fix"].startswith(
-        f"Operator action: {state.resolve()} fails at the keys this finding names "
+        f"Agent action: {state.resolve()} fails at the keys this finding names "
     ), named
-    assert f"`git log -p -- {state.resolve()}`" in named[0]["fix"], named
-    state.write_text(state.read_text("utf-8").replace('"closure"', '"CLOSURE"'), "utf-8")
+    log = git_line(state.resolve().parent, "log", "-p", "--", state.name)
+    assert f"`{log}`" in named[0]["fix"], named
+    os_write_text(state, read_text(state).replace('"closure"', '"CLOSURE"'))
     assert not [f for f in _release_findings(tmp_path / "specs")[0] if "'closure'" in f["message"]]
 
 
@@ -103,14 +107,12 @@ def test_a_mis_cased_phase_is_one_finding_whose_fix_clears_it(tmp_path: Path) ->
     ],  # fmt: skip
 )
 def test_doctor_release_findings_are_the_scripts(tmp_path: Path, over: dict[str, Any]) -> None:
-    """sa-release-json-validated-three-times#B2: the doctor's release findings are
-    release.py check's (LEDGER-RELEASE-SCHEMA); no RELEASE-TREE-* or SPEC-DOC-003/009."""
+    """The doctor's release findings are release.py check's (LEDGER-RELEASE-SCHEMA) alone."""
     _live_release(tmp_path / "specs", **over)
     named, specs_codes = _release_findings(tmp_path / "specs")
-    script = subprocess.run(
-        [sys.executable, str(_REPO_ROOT / "dadaia_workspace/public/skills/dd-release-implementation"
+    script = run([sys.executable, str(_REPO_ROOT / "dadaia_workspace/public/skills/dd-release-implementation"
                              "/scripts/release.py"), "check", "--specs", str(tmp_path / "specs"),
-         "--json"], capture_output=True, text=True, check=False)  # fmt: skip
+         "--json"], check=False)  # fmt: skip
     expected = [f"{f['path']}:{f['line']} {f['message']}" for f in json.loads(script.stdout)]
     assert expected and [f["message"] for f in named] == expected
     assert {f["code"] for f in named} == {"LEDGER-RELEASE-SCHEMA"}
@@ -131,3 +133,41 @@ def test_specs_doctor_and_backlog_doctor_commands_are_gone() -> None:
     for group, verb in (("specs", "doctor"), ("backlog", "doctor")):
         result = _runner.invoke(app, [group, verb, "--help"])
         assert result.exit_code != 0, f"`dadaia {group} {verb}` still resolves"
+
+
+@pytest.mark.parametrize("kind", ["absent", "file"])
+def test_a_specs_dir_holding_no_tree_is_one_specs_section_finding_carrying_the_state_fix(
+    kind: str, tmp_path: Path
+) -> None:
+    """The specs section holds the one finding carrying `state()`'s fix, and the payload still
+    names the tree the run resolved."""
+    specs = tmp_path / "specs"
+    if kind == "file":
+        write_text(specs, "")
+
+    result = _run("--specs-dir", str(specs), "--json")
+
+    payload = json.loads(result.stdout)
+    assert [f["fix"] for f in payload["sections"]["specs"]["findings"]] == [state(specs)[1]]
+    assert payload["specs_dir"] == str(specs)
+    assert result.exit_code == 1
+
+
+@pytest.mark.parametrize("kind", ["absent", "file"])
+def test_fix_over_a_specs_dir_holding_no_tree_writes_nothing_and_reports_the_same_finding(
+    kind: str, tmp_path: Path
+) -> None:
+    """`--fix` never builds the tree it was pointed at: the file set stays put and the one
+    finding is the one the plain run reports."""
+    specs = tmp_path / "specs"
+    if kind == "file":
+        write_text(specs, "")
+    before = sorted(p.relative_to(tmp_path) for p in tmp_path.rglob("*"))
+
+    result = _run("--specs-dir", str(specs), "--fix", "--json")
+
+    payload = json.loads(result.stdout)
+    assert sorted(p.relative_to(tmp_path) for p in tmp_path.rglob("*")) == before
+    assert [f["fix"] for f in payload["sections"]["specs"]["findings"]] == [state(specs)[1]]
+    assert payload["fixed"] == []
+    assert result.exit_code == 1

@@ -1,7 +1,7 @@
 """Unit tests for WorkspaceService."""
 
 import json
-import os
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
@@ -9,6 +9,7 @@ import pytest
 from dadaia_workspace.core.workspace_layout import provisioned_zones
 from dadaia_workspace.features.workspace.service import WorkspaceService
 from tests.fakes import FakePublicAssetManager, FakePythonEnvironmentManager
+from tests.helpers.oslib import link, read_text, write_text
 
 
 @pytest.fixture()
@@ -27,10 +28,8 @@ def service() -> WorkspaceService:
 def test_init_creates_only_registry_init_zones_and_canon_seeds(
     service: WorkspaceService, workspace_root: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """0.4.6 AC10 (FR1/FR10).
-
-    ``init`` materialises exactly ``provisioned_zones()`` — the SAME view the doctor
-    reports ``missing`` for (bug WS-hooks-missing), never a second list — so a retired zone (``academy``, ``reports``,
+    """``init`` materialises exactly ``provisioned_zones()`` — the SAME view the doctor
+    reports ``missing`` for, never a second list — so a retired zone (``academy``, ``reports``,
     ``scripts``, an eager ``tmp``) cannot reappear, and no ``academy.json`` is seeded.
     """
     service.init(workspace_root, harnesses=("claude", "codex"), skip_assets=True)
@@ -47,15 +46,10 @@ def test_init_creates_only_registry_init_zones_and_canon_seeds(
     assert not (workspace_root / ".codex").exists()
 
     spec_contexts_path = dadaia / "states" / "spec_contexts.json"
-    assert json.loads(spec_contexts_path.read_text()) == {"schema_version": "2", "contexts": []}
-    expected = (
-        b'{\r\n  "schema_version": "2",\r\n  "contexts": []\r\n}'
-        if os.linesep == "\r\n"
-        else b'{\n  "schema_version": "2",\n  "contexts": []\n}'
-    )
-    assert spec_contexts_path.read_bytes() == expected
+    assert json.loads(read_text(spec_contexts_path)) == {"schema_version": "2", "contexts": []}
+    assert spec_contexts_path.read_bytes() == b'{\n  "schema_version": "2",\n  "contexts": []\n}'
 
-    registry_data = json.loads((dadaia / "states" / "server_registry.json").read_text())
+    registry_data = json.loads(read_text(dadaia / "states" / "server_registry.json"))
     assert registry_data["version"] == "1"
     assert registry_data["entries"] == []
 
@@ -63,7 +57,7 @@ def test_init_creates_only_registry_init_zones_and_canon_seeds(
     occupied_registry = b'{\r\n  "version": "1",\r\n  "contexts": [{"name": "x"}]\r\n}\r\n'
     spec_contexts_path.write_bytes(occupied_registry)
     service.init(workspace_root, harnesses=("claude", "codex"), skip_assets=True)
-    data = json.loads(spec_contexts_path.read_text())
+    data = json.loads(read_text(spec_contexts_path))
     assert data["contexts"] == [{"name": "x"}]
     assert spec_contexts_path.read_bytes() == occupied_registry
 
@@ -84,11 +78,9 @@ def test_init_creates_only_registry_init_zones_and_canon_seeds(
 def test_init_skip_assets_writes_no_settings_and_says_ungated(
     service: WorkspaceService, workspace_root: Path
 ) -> None:
-    """Bug init-skip-assets-writes-gateless-claude-settings: init carried a SECOND
-    ``.claude/settings.json`` writer (``_configure_hook``) that emitted a gateless file
-    (UserPromptSubmit only — no gate, no venv guard, no root whitelist), silently. The
-    canonical writer is ``public install`` (runtime_config); init writes NO settings.
-    Under ``--skip-assets`` the ungated state is loud instead of silently half-wired."""
+    """init writes NO ``.claude/settings.json``: ``public install`` (runtime_config) is the
+    one writer. Under ``--skip-assets`` the ungated state is loud instead of silently
+    half-wired."""
     installed = service.init(workspace_root, harnesses=("claude", "codex"), skip_assets=True)
     assert not (workspace_root / ".claude" / "settings.json").exists()
     from dadaia_workspace.core.platform import PLATFORM
@@ -108,8 +100,7 @@ def test_init_with_assets_never_writes_settings_itself(
 
 
 def test_a_refused_hold_leaves_the_list_form_denylist_in_place(workspace_root: Path) -> None:
-    """rc-9 AC3.3 row 23 (workspace-denylist-migration-reads-a-refused-hold-as-success): a
-    hold the sweep refuses is falsy, so the converted file never replaces the operator's."""
+    """A hold the sweep refuses is falsy, so the converted file never replaces the operator's."""
     from dadaia_workspace.features.spec_context.sweep import Skipped
 
     refused = WorkspaceService(
@@ -119,8 +110,55 @@ def test_a_refused_hold_leaves_the_list_form_denylist_in_place(workspace_root: P
     )
     denylist = workspace_root / ".dadaia" / "states" / "privacy_denylist.json"
     denylist.parent.mkdir(parents=True)
-    denylist.write_text('["zz-term-a"]', encoding="utf-8")
+    write_text(denylist, '["zz-term-a"]')
 
     refused.init(workspace_root, harnesses=("claude",), skip_assets=True)
 
-    assert denylist.read_text(encoding="utf-8") == '["zz-term-a"]'
+    assert read_text(denylist) == '["zz-term-a"]'
+
+
+def test_a_symlinked_list_form_denylist_is_refused_and_left_untouched(workspace_root: Path) -> None:
+    """The migration lands content on the denylist, so the one writer's symlink rule
+    applies: the operator's link is neither moved aside nor replaced by a regular file."""
+    from dadaia_workspace.features.spec_context.sweep import hold
+
+    migrating = WorkspaceService(
+        public_assets=FakePublicAssetManager(),
+        python_env=FakePythonEnvironmentManager(),
+        hold=hold,
+    )
+    states = workspace_root / ".dadaia" / "states"
+    states.mkdir(parents=True)
+    target = workspace_root / "elsewhere.json"
+    write_text(target, '["zz-term-a"]')
+    denylist = states / "privacy_denylist.json"
+    assert link(str(target), denylist, is_dir=False)
+
+    migrating.init(workspace_root, harnesses=("claude",), skip_assets=True)
+
+    assert (denylist.is_symlink(), read_text(target)) == (True, '["zz-term-a"]')
+
+
+def test_a_denylist_that_is_not_utf8_is_left_alone_and_init_goes_on(workspace_root: Path) -> None:
+    """The legacy-form migration reads it to convert it; what it cannot read it leaves, as it
+    leaves every other file it cannot convert."""
+    denylist = workspace_root / ".dadaia" / "states" / "privacy_denylist.json"
+    denylist.parent.mkdir(parents=True)
+    denylist.write_bytes('["zz-term-é"]'.encode("cp1252"))
+
+    WorkspaceService(
+        public_assets=FakePublicAssetManager(), python_env=FakePythonEnvironmentManager()
+    ).init(workspace_root, harnesses=("claude",), skip_assets=True)
+
+    assert denylist.read_bytes() == '["zz-term-é"]'.encode("cp1252")
+
+
+def test_the_ungated_warning_renders_the_cli_words_inline(
+    tmp_path: Path, sentence: Callable[..., str]
+) -> None:
+    root = tmp_path / "a b"
+    lines = WorkspaceService(
+        public_assets=FakePublicAssetManager(), python_env=FakePythonEnvironmentManager()
+    ).init(root, harnesses=("claude",), skip_assets=True)
+
+    assert any(f"until '{sentence(root, 'public', 'install')}' runs" in ln for ln in lines), lines

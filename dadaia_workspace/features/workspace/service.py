@@ -1,12 +1,12 @@
 """WorkspaceService — bootstrap and management of the .dadaia/ template."""
 
 import json
-import os
 from collections.abc import Callable
 from pathlib import Path
 
-from dadaia_workspace.core.atomic_write import atomic_write
-from dadaia_workspace.core.cli_line import fix_line
+from dadaia_workspace.core import platform
+from dadaia_workspace.core.atomic_write import atomic_write, refuse_symlink
+from dadaia_workspace.core.cli_line import cli_words
 from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES
 from dadaia_workspace.core.models.harness_profile import HarnessProfile
 from dadaia_workspace.core.workspace_layout import LEVEL1_SEEDS, occupied, provisioned_zones
@@ -38,6 +38,7 @@ class WorkspaceService:
         workspace_root: Path,
         harnesses: tuple[str, ...],
         skip_assets: bool = False,
+        template: str | None = None,
     ) -> list[str]:
         """Bootstrap ``.dadaia/`` and return installed assets.
 
@@ -49,18 +50,16 @@ class WorkspaceService:
         self._python_env.ensure_workspace_venv(str(workspace_root))
         for zone in provisioned_zones():
             (workspace_root / ".dadaia" / zone.name).mkdir(parents=True, exist_ok=True)
-        for name, seed in LEVEL1_SEEDS.items():  # the operator's from then on (ADR 0095)
+        for name, seed in LEVEL1_SEEDS.items():  # written once; the operator owns it after
             if not occupied(target := workspace_root / name):
-                target.write_text(seed(workspace_root), encoding="utf-8")
+                platform.write_text(target, seed(workspace_root))
         # Harness directories come from projections; only the shared skills root is eager.
         (workspace_root / ".agents" / "skills").mkdir(parents=True, exist_ok=True)
 
         JsonContextStore(states_dir).seed_if_absent()
         server_registry = states_dir / "server_registry.json"
         if not occupied(server_registry):
-            server_registry.write_text(
-                json.dumps(_EMPTY_SERVER_REGISTRY, indent=2), encoding="utf-8"
-            )
+            platform.write_text(server_registry, json.dumps(_EMPTY_SERVER_REGISTRY, indent=2))
         self._migrate_denylist(workspace_root, states_dir / "privacy_denylist.json")
 
         store = JsonHarnessProfileStore()
@@ -73,10 +72,10 @@ class WorkspaceService:
 
         # Public install owns every hook setting; skipping it must report an ungated workspace.
         if not skip_assets:
-            return self._public_assets.install(workspace_root)
+            return self._public_assets.install(workspace_root, template=template)
         return [
             "[warn] assets skipped — no hooks configured; the workspace is ungated "
-            f"until '{fix_line(workspace_root, 'public', 'install')}' runs"
+            f"until '{platform.inline(*cli_words(workspace_root, 'public', 'install'))}' runs"
         ]
 
     def venv_change(self, workspace_root: Path) -> tuple[str | None, str | None, str]:
@@ -94,7 +93,8 @@ class WorkspaceService:
         Stage before holding the original so failure never leaves the terms unreadable."""
         staged = path.with_name(f"{path.name}.migrating")
         try:
-            raw = json.loads(path.read_text(encoding="utf-8"))
+            refuse_symlink(path)
+            raw = json.loads(platform.read_text(path))
             pairs = [[e, ""] if isinstance(e, str) else e for e in raw]
             if not isinstance(raw, list) or not all(
                 isinstance(p, list) and len(p) == 2 and all(isinstance(x, str) for x in p)
@@ -103,6 +103,6 @@ class WorkspaceService:
                 return
             atomic_write(staged, json.dumps(dict(pairs), indent=2))
             if self._hold(workspace_root, path, path.name):
-                os.replace(staged, path)
-        except (OSError, ValueError, TypeError):
+                platform.replace(staged, path)
+        except (OSError, ValueError, TypeError, platform.Undecodable):
             return

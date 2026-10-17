@@ -8,6 +8,8 @@ from importlib import metadata
 from pathlib import Path
 from urllib.request import url2pathname
 
+from dadaia_workspace.core import platform
+
 
 def provider_version() -> str | None:
     """The dist-info version; an editable install reads its ``pyproject.toml`` (dist-info freezes)."""
@@ -22,7 +24,7 @@ def provider_version() -> str | None:
     url = str(direct.get("url", ""))
     if (direct.get("dir_info") or {}).get("editable") and url.startswith("file://"):
         pyproject = Path(url2pathname(url.removeprefix("file://"))) / "pyproject.toml"
-        text = pyproject.read_text("utf-8") if pyproject.is_file() else ""
+        text = platform.read_text(pyproject) if pyproject.is_file() else ""
         if found := re.search(r'^version\s*=\s*"([^"]+)"', text, re.M):
             return found.group(1)
     return dist.version

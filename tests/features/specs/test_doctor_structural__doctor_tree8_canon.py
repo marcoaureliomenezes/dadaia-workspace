@@ -1,12 +1,11 @@
-"""TREE-8: the v6 canon root — nothing beyond canon (T-050-05, FR1, A1.2).
+"""TREE-8: the v6 canon root — nothing beyond canon.
 
-v0.5.0 specs-canon closure: TREE-8 tightens from WARN-only/dotfile-exempt to
+TREE-8 tightens from WARN-only/dotfile-exempt to
 ERROR, and its dotfile sweep now reaches the WHOLE specs/ tree, not
 just the root — a directory is kept by its AGENTS.md, never a placeholder file
-(the retired .gitkeep landing-zone mechanism). TREE-8 alone judges placement
-(sa-placement-rules-contradict-tree8): one finding per stray path, no second rule.
+(the retired .gitkeep landing-zone mechanism). TREE-8 alone judges placement: one finding per stray path, no second rule.
 
-TREE-8 is never auto-fixed: ``doctor --fix`` deletes nothing (operator decision D8).
+TREE-8 is never auto-fixed: ``doctor --fix`` deletes nothing (operator decision).
 """
 
 from __future__ import annotations
@@ -18,6 +17,7 @@ import pytest
 from dadaia_workspace.features.specs import SpecsDoctor
 from dadaia_workspace.features.specs.canon import scaffold
 from dadaia_workspace.features.specs.doctor_types import finding_path
+from tests.helpers.oslib import read_text, write_text
 
 _REPO_ROOT = Path(__file__).parent.parent.parent.parent
 _TEMPLATES_DIR = _REPO_ROOT / "dadaia_workspace" / "public" / "templates"
@@ -62,18 +62,13 @@ def test_tree8_is_silent_on_a_conformant_v6_tree(tmp_path: Path) -> None:
     ],
 )
 def test_tree8_reports_a_non_canon_path_and_fix_never_deletes_it(tmp_path: Path, rel: str) -> None:
-    """sa-placement-rules-contradict-tree8#B1 sa-placement-rules-contradict-tree8#B2
-    sa-placement-rules-contradict-tree8#B3 sa-placement-rules-contradict-tree8#B4
-    sa-placement-rules-contradict-tree8#B6
-    sa-release-dir-placement-judged-by-tree8-and-spec-doc-027, ADR 0151 M5 (a flat trio
-    file): a non-canon path yields
-    exactly one finding, TREE-8 (ERROR, never auto-fixed — bug
-    doctor-fix-tree8-deletes-operator-content, decision D8); `doctor --fix` leaves it
+    """A non-canon path (a flat trio file included) yields
+    exactly one finding, TREE-8 (ERROR, never auto-fixed); `doctor --fix` leaves it
     on disk; moving it out of specs/ as the fix says leaves the doctor clean."""
     specs_dir = _make_v6_tree(tmp_path)
     stray = specs_dir / rel
     stray.parent.mkdir(parents=True, exist_ok=True)
-    stray.write_text("operator content\n", encoding="utf-8")
+    write_text(stray, "operator content\n")
     flagged = (
         specs_dir / rel.split("/")[0] if rel.split("/")[0] in ("features", "foundation") else stray
     )
@@ -85,7 +80,7 @@ def test_tree8_reports_a_non_canon_path_and_fix_never_deletes_it(tmp_path: Path,
     ]
 
     doctor.fix(issues)
-    assert stray.read_text(encoding="utf-8") == "operator content\n"
+    assert read_text(stray) == "operator content\n"
     assert [i.code for i in doctor.check()] == ["TREE-8"]
 
     flagged.rename(tmp_path / "moved-out")

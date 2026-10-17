@@ -4,15 +4,16 @@
 
 ## dadaia certify — Certify assembled public features in a disposable local workspace.
 
-## dadaia ci — Git-hook chokepoints: the pre-push gate and its installer.
-- ci install-hook — Install the pre-push CI/security gate.
+## dadaia ci — Git-hook chokepoints: the pre-push and ref gates and their installer.
+- ci install-hook — Install the pre-push and reference-transaction gates.
 - ci push-gate-check — Pre-push gate: branch policy by the project gitflow + the range-scoped denylist scan.
+- ci ref-gate-check — Reference-transaction gate: ``<old> <new> <ref>`` lines on stdin; a work-branch update
 
 ## dadaia context — Manage Spec Context Projects.
 - context alive — Transition a context to ALIVE; clone repo if absent. Idempotent if already ALIVE.
 - context baseline — Publish the project's main repo, append-only: adopt what origin holds, or give an
 - context bind — Bind this shell session to a context.
-- context create — Clone (or adopt) every repo, install the pre-push hook, make the context ALIVE —
+- context create — Clone (or adopt) every repo, install the pre-push and reference-transaction hooks, make the context ALIVE —
 - context dead — Transition a context to DEAD: push what is committed, hold each repo in reaped/.
 - context delete — Delete a context. Context must be dead.
 - context list — List all Spec Context Projects.
@@ -39,7 +40,6 @@
 ## dadaia public — Manage distributed public agent assets.
 - public doctor — Diagnose drift between package source, staging, and runtime projections.
 - public install — Stage the packaged public assets, then install them into runtime projections.
-- public stage — Stage packaged public assets into .dadaia/agentic/.
 
 ## dadaia reconcile — Reconcile state and projections after installing an exact candidate wheel.
 
@@ -47,5 +47,7 @@
 - reports validate — Validate one or more agent handoff JSON files.
 
 ## dadaia specs — SDD release-lifecycle structural checks and helpers.
-- specs init — Bring a repo's specs/ to the canon, never committing.
+- specs init — Bring a repo's specs/ to the canon, committing only the scaffold on a new work branch.
 - specs upgrade — Upgrade a specs/ tree to the canonical pattern version.
+
+## dadaia worktree — Run a worktree verb of the installed dd-gitflow-default `worktree.py`.

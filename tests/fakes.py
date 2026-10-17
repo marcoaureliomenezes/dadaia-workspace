@@ -1,5 +1,6 @@
 """In-memory fakes for the container-built collaborators — unit tests without I/O."""
 
+from collections.abc import Collection
 from pathlib import Path
 from typing import Any
 
@@ -24,6 +25,7 @@ class FakePublicAssetManager:
         harness: str | None = None,
         force: bool = False,
         scope: str = "all",
+        template: str | None = None,
     ) -> list[str]:
         self.installed.append((workspace_root, harness, force))
         return [str(workspace_root / ".agents" / "skills" / "fake-skill" / "SKILL.md")]
@@ -107,7 +109,7 @@ def gate_fixes() -> Any:
     return GateFixes(repo="/repo")
 
 
-def no_worktree_rows(_root: Path) -> tuple[list[dict[str, Any]], str, str]:
+def no_worktree_rows(_root: Path, _repos: Collection[str]) -> tuple[list[dict[str, Any]], str, str]:
     """The owner's rows with no open worktree: no process is spawned to read them."""
     return [], "", ""
 

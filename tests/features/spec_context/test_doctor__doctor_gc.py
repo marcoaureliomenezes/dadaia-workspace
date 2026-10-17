@@ -1,6 +1,6 @@
 """Doctor cleanup: retired concurrency state, caller-owned sessions and the one expiry table.
 
-Re-classification note (T-011-04 / FR-W1-04, ADR-8 amended): SESSION-record (bind) GC TTL
+SESSION-record (bind) GC TTL
 semantics measure against the heartbeat-renewed ``last_seen_at`` (``session_store.is_live``);
 the bind-CLI pid is never consulted (dead by construction).
 
@@ -25,15 +25,15 @@ from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
 from dadaia_workspace.infrastructure.json_harness_profile_store import JsonHarnessProfileStore
 from tests.fixtures.harness_env import claude_hook_env, run_hook_subprocess
 from tests.fixtures.stores import context_store
+from tests.helpers.oslib import link, read_text, write_text
+from tests.helpers.oslib import write_text as os_write_text
 
 
 def _make_workspace(tmp_path: Path) -> Path:
     ws = tmp_path / "ws"
     ws.mkdir()
     (ws / ".dadaia" / "states").mkdir(parents=True)
-    (ws / ".dadaia" / "states" / "spec_contexts.json").write_text(
-        '{"contexts": []}', encoding="utf-8"
-    )
+    write_text(ws / ".dadaia" / "states" / "spec_contexts.json", '{"contexts": []}')
     (ws / ".dadaia" / "sessions").mkdir(parents=True)
     (ws / "repos").mkdir()
     return ws
@@ -73,12 +73,10 @@ def test_gc_deletion_matrix(tmp_path: Path) -> None:
     ws = _make_workspace(tmp_path)
     locks = ws / ".dadaia" / "states" / "ctx_locks"
     locks.mkdir(parents=True)
-    (locks / "myctx.lock.json").write_text(
-        json.dumps({"context": "myctx", "heartbeat": _stale()}), encoding="utf-8"
-    )
-    (locks / "myctx.lock.sentinel").write_text("", encoding="utf-8")
-    (locks / "badctx.lock.json").write_text("NOT JSON {{{", encoding="utf-8")
-    (locks / "incompletectx.lock.json").write_text('{"context": "x"}', encoding="utf-8")
+    write_text(locks / "myctx.lock.json", json.dumps({"context": "myctx", "heartbeat": _stale()}))
+    write_text(locks / "myctx.lock.sentinel", "")
+    write_text(locks / "badctx.lock.json", "NOT JSON {{{")
+    write_text(locks / "incompletectx.lock.json", '{"context": "x"}')
     expired = _bind(ws, "old-sess-001", _stale())
 
     actions = _make_doctor(ws).fix()
@@ -109,7 +107,7 @@ def _post_gate_heartbeat(ws: Path, sess_id: str) -> None:
 def test_no_stale_records(
     tmp_path: Path, idle: int | None, renew: bool, sessions_outside: bool, survives: bool
 ) -> None:
-    """T-011-04, bind-lost-silently-after-five-idle-minutes: another session's
+    """Another session's
     SessionStart lane collects a bind only past a dead session's TTL (a day), measured against
     ``last_seen_at`` renewed through the REAL PostToolUse path; idle minutes never unbind. A
     sessions dir resolving outside the workspace is refused, never reported deleted."""
@@ -119,10 +117,10 @@ def test_no_stale_records(
     sid = "sess_01"
     if sessions_outside:
         (ws / ".dadaia" / "sessions").rename(tmp_path / "elsewhere")
-        (ws / ".dadaia" / "sessions").symlink_to(tmp_path / "elsewhere")
+        assert link(str(tmp_path / "elsewhere"), ws / ".dadaia" / "sessions", is_dir=False)
     record = _bind(ws, sid, _stale() if idle is None else _ago(idle))
     if renew:
-        # post-gate-runs-the-reaper-on-the-tool-hot-path: the heartbeat never reaps.
+        # the heartbeat never reaps.
         expired = ws / ".dadaia" / "tmp" / "expired.txt"
         expired.parent.mkdir(parents=True, exist_ok=True)
         expired.touch()
@@ -154,24 +152,22 @@ def test_no_stale_records(
 def test_a_ttl_expiry_is_its_zone_class_act(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, lane: str, rel: str, past_ttl: int, after: str
 ) -> None:
-    """AC2.10, AC2.12 (the one expiry table; bugs
-    bug-proposal-handoff-reaped-without-a-hold, reaper-judges-ttl-by-walking-every-file,
-    doctor-scan-raises-when-a-ttl-entry-vanishes-mid-walk finding 2): an expired entry is one
+    """The one expiry table: an expired entry is one
     finding; both lanes take it by its zone class — EPHEMERAL deleted, OUTPUT held in reaped/
     and named by one REAPED finding; a live entry or a zone law yields none; a link is acted on,
     its target never; a failing seed never stops the pass."""
     ws = _make_workspace(tmp_path)
     victim = tmp_path / "outside" / "keep.txt"
     victim.parent.mkdir()
-    victim.write_text("keep", encoding="utf-8")
+    write_text(victim, "keep")
     entry = ws / ".dadaia" / rel
     entry.parent.mkdir(parents=True, exist_ok=True)
     if rel.endswith("link"):
         if os.utime not in os.supports_follow_symlinks:
             pytest.skip("ageing a link itself needs utime(follow_symlinks=False)")
-        entry.symlink_to(victim.parent, target_is_directory=True)
+        assert link(str(victim.parent), entry, is_dir=True)
     else:
-        entry.write_text('{"findings": [{"message": "bug-proposal: x"}]}', encoding="utf-8")
+        write_text(entry, '{"findings": [{"message": "bug-proposal: x"}]}')
     zone = next(z for z in DADAIA_ZONES if z.name == rel.split("/")[0])
     stamp = time.time() - (zone.ttl_seconds or 0) - past_ttl
     os.utime(entry, (stamp, stamp), **({"follow_symlinks": False} if entry.is_symlink() else {}))
@@ -186,7 +182,7 @@ def test_a_ttl_expiry_is_its_zone_class_act(
     assert (entry.is_symlink() or entry.exists(), bool(held)) == (after == "kept", after == "held")
     remaining = [f.verdict for f in doctor.scan_ttl()]
     assert remaining == ([FindingVerdict.REAPED] if after == "held" else [])
-    assert victim.read_text(encoding="utf-8") == "keep"
+    assert read_text(victim) == "keep"
     assert any("skipped 'states/harness_profile.json' (errno 13" in a for a in actions), actions
     # The rows cover exactly these two classes; a new TTL class needs a row here.
     assert {z.cls for z in zones_with_ttl()} <= {ZoneClass.OUTPUT, ZoneClass.EPHEMERAL}
@@ -199,14 +195,13 @@ def _denied(*_: object, **__: object) -> None:
 def test_the_expire_lane_walks_each_expired_entry_once(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """rc-9 AC3.6 row 25 (ttl-expire-lane-walks-each-expired-entry-content-twice): the
-    linked-worktree question is asked once per expired entry, at the filesystem seam."""
+    """The linked-worktree question is asked once per expired entry, at the filesystem seam."""
     from dadaia_workspace.features.spec_context import sweep
 
     ws = _make_workspace(tmp_path)
     entry = ws / ".dadaia" / "tmp" / "agent" / "20200101"
     (entry / "deep").mkdir(parents=True)
-    (entry / "deep" / "f.txt").write_text("x", encoding="utf-8")
+    write_text(entry / "deep" / "f.txt", "x")
     for path in (entry / "deep" / "f.txt", entry / "deep", entry):
         os.utime(path, (0, 0))
     walked: list[Path] = []
@@ -225,14 +220,14 @@ def test_the_expire_lane_walks_each_expired_entry_once(
 
 
 def test_scan_leaves_an_expired_worktree_holder_to_its_worktree_row(tmp_path: Path) -> None:
-    """rc-9 AC3.6 (doctor `_scan_ttl_zone`): an expired tmp entry holding a linked worktree
+    """An expired tmp entry holding a linked worktree
     yields no TTL finding (its WORKTREE `foreign` row reports it); a plain expired sibling
     is one EXPIRED finding whose detail states its age against the one-day TTL."""
     ws = _make_workspace(tmp_path)
     tmp = ws / ".dadaia" / "tmp"
     holder, plain = tmp / "a" / "20200101", tmp / "b" / "20200101"
     (holder / "wt").mkdir(parents=True)
-    (holder / "wt" / ".git").write_text("gitdir: /elsewhere/.git/worktrees/wt\n", "utf-8")
+    os_write_text(holder / "wt" / ".git", "gitdir: /elsewhere/.git/worktrees/wt\n")
     plain.mkdir(parents=True)
     stamp = time.time() - 3 * 86_400 - 60
     for path in (holder / "wt" / ".git", holder / "wt", holder, holder.parent, plain, plain.parent):

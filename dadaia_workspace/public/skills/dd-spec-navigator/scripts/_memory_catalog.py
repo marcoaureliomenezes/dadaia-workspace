@@ -16,26 +16,16 @@ regenerating an unchanged catalog is idempotent to the byte and a clean tree sta
 from __future__ import annotations
 
 import json
-import sys
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-sys.path.append(str(Path(__file__).resolve().parents[2] / "dd-bug-resolution" / "scripts"))
-
-from _memory_schema import CATALOG, INDEX, PRODUCT, WIKILINK_RE, parse  # noqa: E402
-from _specs import script  # noqa: E402
+import _clock
+from _memory_schema import INDEX, PRODUCT, WIKILINK_RE, parse
+from _platform import read_text
+from _refusal import Refusal
+from _specs import CATALOG, script
 
 Catalog = dict[str, Any]
-
-
-class Refusal(Exception):
-    """A write this script refuses, carrying the one `fix:` line that unblocks it."""
-
-    def __init__(self, message: str, fix: str = "") -> None:
-        super().__init__(message)
-        self.fix = fix
 
 
 def atoms(specs: Path) -> list[Path]:
@@ -56,9 +46,9 @@ def _depends_on(body: str) -> list[str]:
 
 def feature(path: Path, specs: Path, rank: int) -> dict[str, Any]:
     """One catalog entry built from *path*'s frontmatter and body."""
-    data, body, error = parse(path.read_text(encoding="utf-8"))
+    data, body, error = parse(read_text(path))
     if error is not None or data is None:
-        fix = f"{script(Path(__file__).with_name('memory.py'))} check"
+        fix = script(Path(__file__).with_name("memory.py"))("check")
         raise Refusal(f"{path}: {error}", fix)
     sources = [str(item) for item in data.get("sources") or []]
     return {
@@ -85,15 +75,15 @@ def generate(specs: Path) -> Catalog:
 
 def _stamp(specs: Path, features: list[dict[str, Any]]) -> str:
     try:
-        previous = json.loads((specs / CATALOG).read_text(encoding="utf-8"))
+        previous = json.loads(read_text(specs / CATALOG))
     except (OSError, json.JSONDecodeError):
         previous = {}
     if previous.get("features") == features and isinstance(previous.get("generated_at"), str):
         return str(previous["generated_at"])
-    return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return _clock.now_iso()
 
 
-def serialize(catalog: Catalog) -> str:
+def catalog_text(catalog: Catalog) -> str:
     return json.dumps(catalog, ensure_ascii=False, indent=2) + "\n"
 
 
@@ -135,7 +125,7 @@ def render(specs: Path, catalog: Catalog) -> str:
     either branch: they once differed by a blank line at EOF, and `generate` over a file it
     had just written disagreed with `check` forever."""
     path = specs / INDEX
-    existing = path.read_text(encoding="utf-8") if path.is_file() else None
+    existing = read_text(path) if path.is_file() else None
     rendered = _tables(catalog)
     if existing and HEADING in existing:
         lines = existing.splitlines(keepends=True)

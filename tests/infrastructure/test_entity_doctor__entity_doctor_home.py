@@ -1,14 +1,12 @@
-"""F014 (20260830-design-bug-surface-audit): modules split by seam, not line-count.
-
-The harness-independent public-asset coherence checks live in an honestly named home
-(``infrastructure.entity_doctor``), not a codex-named one; ``public_assets`` no longer
-re-exports ~25 underscore names as a test-only interface; ``_compare_content`` (zero
-callers) is deleted.
-"""
+"""The harness-independent public-asset coherence checks live in
+``infrastructure.entity_doctor``, not a codex-named home; ``public_assets`` re-exports no
+underscore name as a test-only interface."""
 
 from __future__ import annotations
 
 from pathlib import Path
+
+from tests.helpers.oslib import read_text
 
 
 def test_harness_independent_checks_live_in_entity_doctor() -> None:
@@ -32,5 +30,5 @@ def test_compare_content_dead_code_is_gone() -> None:
 def test_public_assets_carries_no_underscore_reexport_shim() -> None:
     from dadaia_workspace.infrastructure import public_assets
 
-    src = Path(public_assets.__file__).read_text(encoding="utf-8")
+    src = read_text(Path(public_assets.__file__))
     assert "noqa: F401" not in src

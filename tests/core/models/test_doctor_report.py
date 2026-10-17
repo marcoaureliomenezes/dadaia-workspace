@@ -14,7 +14,7 @@ from dadaia_workspace.core.models.doctor_report import (
     attest,
 )
 
-#: The frozen verdict table. FOREIGN is non-blocking by Ruling 16 (hand-authored
+#: The frozen verdict table. FOREIGN is non-blocking (hand-authored
 #: consumer guardrail pairs are legitimate); EXTRA blocks (residue on a managed
 #: surface is drift). Changing ANY entry is a policy decision — update this test
 #: deliberately, in its own reviewed diff.
@@ -70,7 +70,7 @@ def test_report_verdict_is_any_blocking_line() -> None:
 
 
 class TestControlCharacterEscaping:
-    """FR3 item 2 (CWE-117): a producer's ``text`` must never be able to forge a second
+    """CWE-117: a producer's ``text`` must never be able to forge a second
     physical line through an embedded control character. Fixed at the ONE rendering
     authority, ``DoctorLine.render()`` — through which ``DoctorReport.rendered()`` and
     every golden already pass.

@@ -1,7 +1,8 @@
 """The `specs/ADRs/decisions.jsonl` reader — the ONE module that opens the ADR ledger.
 
-Two rules live here because both read that one file: ADR-SUPERSEDED-CITATION over the
-tree that cites decisions, and LEDGER-ADR-SCHEMA over the records and their numbering.
+It owns the ledger's rules (ADR-SUPERSEDED-CITATION over the tree that cites decisions,
+LEDGER-ADR-SCHEMA over the records and their numbering), the resolver of an accepted
+record's ``measured_by`` and the renderer of the ``adr-list`` block.
 
 ADR-SUPERSEDED-CITATION: a memory atom, rule file or skill that cites
 an ADR id whose record is ``superseded`` — ERROR. A rule pointing at a dead decision is
@@ -12,48 +13,55 @@ from __future__ import annotations
 
 import re
 from contextlib import suppress
+from functools import cache
 from pathlib import Path
 from types import ModuleType
 
+from dadaia_workspace.core import platform
+from dadaia_workspace.core.cli_line import reinstall_fix
 from dadaia_workspace.core.doctor_rules import Rule, SectionFinding
+from dadaia_workspace.core.fixed_sections import authored_text
 from dadaia_workspace.features.specs.doctor_types import Severity, specs_finding
+from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from dadaia_workspace.infrastructure.ledger_scripts import load_owner
 
 #: The ADR ledger, relative to a specs tree.
 LEDGER = "ADRs/decisions.jsonl"
 
-#: An ADR id as memory atoms, skills and rules cite it: `ADR: 0007`, `ADR 0007`, `ADR-0007`.
-_ADR_CITATION_RE = re.compile(r"\bADR[:\s-]+(\d{4})\b")
+#: The citation shapes of an ADR id in memory atoms, skills and rules: "ADR", a colon, space or
+#: hyphen, four digits; a line break may join "ADR" to its number, a blank or whitespace-only line never does.
+_ADR_CITATION_RE = re.compile(r"\bADR(?:[: \t-]|\n(?![ \t]*\n))+(\d{4})\b")
 
 
-def _ids(text: str, status: str) -> set[str]:
+def _records(text: str, status: str) -> list[dict[str, object]]:
     """An unreadable line names nothing here; it is `adr_record_issues`' finding."""
     owner = load_owner("dd-bug-resolution", "_ledger")
-    ids: set[str] = set()
+    records: list[dict[str, object]] = []
     for raw in text.split("\n"):
         with suppress(owner.LineError):
-            ids |= {str(r.get("id")) for r in owner.parse(raw) if r.get("status") == status}
-    return ids
+            records += [r for r in owner.parse(raw) if r.get("status") == status]
+    return records
 
 
 def superseded_adr_citations(specs_dir: Path, public_dir: Path | None) -> list[SectionFinding]:
     """Every ``*.md`` under ``specs/memory`` and the library's skills, data and scaffold
-    that cites a superseded decision id — one issue per (file, id)."""
+    that cites a superseded decision id outside its fixed sections — one issue per (file, id)."""
     ledger = specs_dir / "ADRs" / "decisions.jsonl"
     if not ledger.is_file():
         return []
-    superseded = _ids(ledger.read_text(encoding="utf-8"), "superseded")
+    superseded = {str(r.get("id")) for r in _records(platform.read_text(ledger), "superseded")}
     if not superseded:
         return []
-    roots = [specs_dir / "memory"]
+    roots = [(specs_dir / "memory", "")]
     if public_dir is not None:
-        roots.extend([public_dir / "skills", public_dir / "data", public_dir / "scaffold"])
+        library = reinstall_fix(public_dir)
+        roots += [(public_dir / d, library) for d in ("skills", "data", "scaffold")]
     issues: list[SectionFinding] = []
-    for root in roots:
+    for root, fix in roots:
         if not root.is_dir():
             continue
         for path in sorted(root.rglob("*.md")):
-            cited = set(_ADR_CITATION_RE.findall(path.read_text(encoding="utf-8")))
+            cited = set(_ADR_CITATION_RE.findall(authored_text(platform.read_text(path, fix))))
             for adr_id in sorted(cited & superseded):
                 issues.append(
                     specs_finding(
@@ -69,6 +77,71 @@ def superseded_adr_citations(specs_dir: Path, public_dir: Path | None) -> list[S
     return issues
 
 
+_TOKEN_RE = re.compile(r"[\w./:-]+")
+_CODE_RE = re.compile(r"""["']([A-Z][A-Z0-9]*(?:-[A-Z0-9]+)+)(?=[\s"':])""")
+
+
+@cache
+def _doctor_codes() -> frozenset[str]:
+    """The rule codes the installed package's own source names."""
+    package = Path(__file__).parents[2]
+    return frozenset(
+        code
+        for path in package.rglob("*.py")
+        for code in _CODE_RE.findall(platform.decode(path.read_bytes()))
+    )
+
+
+def _accepted(specs_dir: Path) -> list[dict[str, object]]:
+    ledger = specs_dir / LEDGER
+    return _records(platform.read_text(ledger), "accepted") if ledger.is_file() else []
+
+
+def unresolved_measured_by(specs_dir: Path) -> list[tuple[str, str]]:
+    """``(id, measured_by)`` of every accepted record whose text holds no token that is a
+    path of the specs repo's ``git ls-files`` set (tracked, or untracked and not ignored), a
+    ``path::name`` node id of such a file naming its last segment (a test or a workflow job),
+    or a rule code of the installed doctor."""
+    root = specs_dir.parent
+    tracked = GitSubprocessClient().tracked(root)
+
+    def resolves(text: str) -> bool:
+        for token in (t.rstrip(".:,") for t in _TOKEN_RE.findall(text)):
+            path, *nodes = token.split("::")
+            if path in tracked and (
+                not nodes or nodes[-1] in platform.decode((root / path).read_bytes())
+            ):
+                return True
+            if not nodes and token in _doctor_codes():
+                return True
+        return False
+
+    return [
+        (str(r["id"]), str(r.get("measured_by")))
+        for r in _accepted(specs_dir)
+        if not resolves(str(r.get("measured_by")))
+    ]
+
+
+def adr_list_block(specs_dir: Path) -> str:
+    """The ``adr-list`` fragment: ``- <id> — <title>`` per accepted record, in id order;
+    empty without a ledger.
+
+    Raises ValueError, whose text is the one fix line, while an accepted record's
+    ``measured_by`` resolves to nothing."""
+    if unresolved := unresolved_measured_by(specs_dir):
+        raise ValueError(
+            "Agent action: set the measured_by of ADR "
+            + ", ".join(i for i, _ in unresolved)
+            + " to a tracked path, a path::name test or workflow-job id, or a rule code"
+            " (an in-place `chore(adrs): repair` commit)."
+        )
+    return "".join(
+        f"- {r['id']} — {r['title']}\n"
+        for r in sorted(_accepted(specs_dir), key=lambda r: str(r["id"]))
+    )
+
+
 def adr_record_issues(specs_dir: Path) -> list[SectionFinding]:
     """Every record failing its schema, and the first id breaking 0001..N (file order).
 
@@ -82,7 +155,7 @@ def adr_record_issues(specs_dir: Path) -> list[SectionFinding]:
     records: list[tuple[int, dict[str, object]]] = []
     owner = load_owner("dd-bug-resolution", "_ledger")
     schema = owner.load_schema("decision-record-v1")
-    for number, raw in enumerate(ledger.read_text(encoding="utf-8").split("\n"), start=1):
+    for number, raw in enumerate(platform.read_text(ledger).split("\n"), start=1):
         try:
             parsed = owner.parse(raw)
         except owner.LineError as exc:
@@ -103,7 +176,7 @@ def adr_record_issues(specs_dir: Path) -> list[SectionFinding]:
             )
             break
     accepted = {str(r.get("id")) for _, r in records if r.get("status") == "accepted"}
-    for number, r in records:  # M2 (ADR 0151): only a ruled record changes a ruled one
+    for number, r in records:  # only a ruled record changes a ruled one
         named = f"{r.get('supersedes') or ''},{r.get('amends') or ''}".split(",")
         ruled = r.get("status") in ("accepted", "superseded") and "ruling" in r
         if r.get("status") != "rejected" and not ruled and (hit := sorted(accepted & set(named))):

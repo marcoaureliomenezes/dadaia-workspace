@@ -1,11 +1,10 @@
 """One table of ROOT ENTRIES through the gate and the doctor: the gate ALLOWs a write that
-creates an entry at a judged level (the root, ``.dadaia/``, ``repos/<r>``, ``worktrees/<r>``,
-ADR 0132) iff the doctor does not judge that entry SLOP. Scope inside a registered repo is
+creates an entry at a judged level (the root, ``.dadaia/``, ``repos/<r>``, ``worktrees/<r>``)
+iff the doctor does not judge that entry SLOP. Scope inside a registered repo is
 test_sdd_gate's, not this table's.
 
-sa-gate-allows-root-entries-the-reaper-moves#E6 (every row), #E1
-(notes/ without a glob), #E2 (with one), sa-gate-allows-root-entries-the-reaper-moves#E3 (wrong type), #E4 (.dadaia non-zone and
-non-canon states), #E5 (root specs/), #E8 (law files) — ADR 0058.
+Rows cover notes/ without a glob and with one, a wrong type, a .dadaia non-zone and
+non-canon states, a root specs/ and the law files.
 Size: MEDIUM (integration: the real ``pre_gate`` subprocess, then ``DoctorService.scan``).
 
 Structural cause pinned: the gate (``root_whitelist``: type-blind names, "an existing
@@ -16,7 +15,6 @@ ALLOWed entries the reaper then moved.
 
 from __future__ import annotations
 
-import shlex
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
@@ -28,6 +26,7 @@ from dadaia_workspace.features.spec_context.doctor import DoctorService, Finding
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from tests.fixtures.harness_env import claude_hook_env, run_hook_subprocess
 from tests.fixtures.stores import context_store
+from tests.helpers.oslib import command, write_text
 
 # (target, pre-existing dir or None, exception glob or None, gate allows)
 _TABLE = [
@@ -40,7 +39,7 @@ _TABLE = [
     ("prompt.md", None, None, True),
     ("specs/bugs/x.md", None, None, False),
     (".dadaia/newzone/x.txt", None, None, False),
-    ("worktrees/x/0.5.0-rc1/j1/f.py", None, None, False),  # x: no registered slug (ADR 0132)
+    ("worktrees/x/0.5.0-rc1/j1/f.py", None, None, False),  # x: no registered slug
     (".dadaia/tmp/agent/20260927/x.txt", None, None, True),
 ]
 
@@ -51,13 +50,11 @@ def test_gate_allows_iff_the_doctor_keeps_the_entry(
 ) -> None:
     for zone in ("tmp", "states", "sessions", "reaped"):
         (tmp_path / ".dadaia" / zone).mkdir(parents=True, exist_ok=True)
-    (tmp_path / ".dadaia" / "states" / "spec_contexts.json").write_text(
-        '{"contexts": []}', encoding="utf-8"
-    )
+    write_text(tmp_path / ".dadaia" / "states" / "spec_contexts.json", '{"contexts": []}')
     if existing is not None:
         (tmp_path / existing).mkdir()
     if glob is not None:
-        (tmp_path / DADAIAIGNORE).write_text(f"{glob}\n", encoding="utf-8")
+        write_text(tmp_path / DADAIAIGNORE, f"{glob}\n")
     path = tmp_path / target
     payload = {"tool_name": "Write", "tool_input": {"file_path": str(path), "content": "x"}}
 
@@ -67,24 +64,25 @@ def test_gate_allows_iff_the_doctor_keeps_the_entry(
 
     block = gate.block_envelope()
     assert (block is None) is allows, gate.stdout
-    if block is not None:  # #E1, #E4: the one fix names the owning zone, never the globs
+    if block is not None:  # The one fix names the owning zone, never the globs
         (fix,) = [ln for ln in block["reason"].splitlines() if ln.startswith("fix: ")]
         tmp = tmp_path.resolve() / ".dadaia" / "tmp" / "main-thread"  # the agent's own day dir
-        assert shlex.split(fix[len("fix: ") :]) in [
-            [
-                Path(sys.executable).as_posix(),
+        assert fix[len("fix: ") :] in [
+            command(
+                sys.executable,
                 "-c",
-                f"import pathlib; pathlib.Path(r'{(tmp / day).as_posix()}').mkdir(parents=True, exist_ok=True)",
-            ]
+                "import pathlib, sys; pathlib.Path(sys.argv[1]).mkdir(parents=True, exist_ok=True)",
+                str(tmp / day),
+            )
             for day in days
         ]
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text("x", encoding="utf-8")
+    write_text(path, "x")
     findings = DoctorService(
         context_store(tmp_path / ".dadaia" / "states"), GitSubprocessClient(), tmp_path
     ).scan()
     slop = [f.path for f in findings if f.verdict is FindingVerdict.SLOP]
     assert (slop == []) is allows, slop
-    if glob is not None:  # #E2
+    if glob is not None:
         verdicts = {f.path: f.verdict for f in findings}
         assert verdicts[glob] is FindingVerdict.OPERATOR

@@ -1,13 +1,11 @@
 """`dadaia doctor` reports the derived onboarding step and refuses a ghost context.
 
-0.4.8 FR6 AC6.1, AC6.3, AC3.1 doctor half (T-048-07); 0.5.0 AC4.4. Size: MEDIUM
-(integration: a real initialized workspace, a real git checkout as the level-2 repo).
+Size: MEDIUM (integration: a real initialized workspace, a real git checkout as the level-2 repo).
 """
 
 from __future__ import annotations
 
 import json
-import subprocess
 from pathlib import Path
 
 import pytest
@@ -21,6 +19,7 @@ from dadaia_workspace.core.platform import PLATFORM
 from dadaia_workspace.features.workspace.service import WorkspaceService
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
+from tests.helpers.oslib import make_executable, run, write_text
 
 _runner = CliRunner()
 
@@ -34,8 +33,8 @@ def workspace(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     venv_bin = tmp_path / ".dadaia" / ".venv" / PLATFORM.venv_scripts_dir
     venv_bin.mkdir(parents=True, exist_ok=True)
     entry = venv_bin / f"dadaia{PLATFORM.venv_exe_suffix}"
-    entry.write_text("#!/bin/sh\n")
-    entry.chmod(0o755)
+    write_text(entry, "#!/bin/sh\n")
+    make_executable(entry)
     monkeypatch.chdir(tmp_path)
     for var in ("DADAIA_CONTEXT", "DADAIA_SESSION_ID", "CLAUDE_CODE_SESSION_ID"):
         monkeypatch.delenv(var, raising=False)
@@ -47,7 +46,7 @@ def _register_specless_context(root: Path, *names: str) -> None:
     for name in names:
         repo = root / "repos" / name
         repo.mkdir(parents=True)
-        subprocess.run(["git", "init", "-q", str(repo)], check=True)  # noqa: S603, S607
+        run(["git", "init", "-q", str(repo)], check=True)
         for target, source in workspace_layout.INSTALLED_GIT_HOOKS:  # what `create` installs
             shipped = (workspace_layout.public_scripts_dir() / source).read_bytes()
             (repo / ".git" / "hooks" / target).write_bytes(shipped)
@@ -63,8 +62,9 @@ def _register_specless_context(root: Path, *names: str) -> None:
                 "current_branch": None,
             }
         )
-    (root / ".dadaia" / "states" / "spec_contexts.json").write_text(
-        json.dumps({"schema_version": "2", "contexts": contexts}), encoding="utf-8"
+    write_text(
+        root / ".dadaia" / "states" / "spec_contexts.json",
+        json.dumps({"schema_version": "2", "contexts": contexts}),
     )
 
 
@@ -81,7 +81,7 @@ def _register_specless_context(root: Path, *names: str) -> None:
 def test_doctor_names_the_onboarding_step_of_the_context_it_judges(
     workspace: Path, contexts: tuple[str, ...], argv: list[str], text: str, code: int | None
 ) -> None:
-    """The next step is one finding whose fix names the workspace CLI (ADR 0047); a
+    """The next step is one finding whose fix names the workspace CLI; a
     ghost context never falls back to a specs tree."""
     if contexts:
         _register_specless_context(workspace, *contexts)

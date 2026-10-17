@@ -1,4 +1,4 @@
-"""Shared JSON-store contract assertions (T-2, v0.1.75 FR1).
+"""Shared JSON-store contract assertions.
 
 Five workspace-state JSON stores repeat the same templated contract:
 missing→None/(), corrupt→typed error, unknown-top-level-field→typed error, wrong
@@ -6,7 +6,7 @@ schema_version→typed error, atomic write (no .tmp leftover), and a last-good
 snapshot of the PRIOR valid file on the second save. This module holds the ONE
 shared assertion body for that template; each per-store test file calls the
 matching helper with its own store factory / valid document / exception type so
-per-store files keep only their own store-specific logic (D-7, L8 secrets,
+per-store files keep only their own store-specific logic (secrets,
 extends graph, resilience, etc.) — never a re-implementation of the template.
 
 Not a test module itself (no ``test_*`` functions) — it is a helper imported by
@@ -18,6 +18,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 from typing import Any, Protocol
+
+from tests.helpers.oslib import read_text, write_text
 
 
 class LoadParseSaveStore(Protocol):
@@ -45,7 +47,7 @@ def assert_corrupt_json_raises_typed_error(
     store: LoadParseSaveStore, error_type: type[Exception]
 ) -> None:
     store.path.parent.mkdir(parents=True, exist_ok=True)
-    store.path.write_text("{not json", encoding="utf-8")
+    write_text(store.path, "{not json")
     try:
         store.load()
     except error_type:
@@ -63,7 +65,7 @@ def assert_unknown_top_level_field_rejected(
     doc = dict(valid_doc)
     doc[bogus_key] = 1
     store.path.parent.mkdir(parents=True, exist_ok=True)
-    store.path.write_text(json.dumps(doc), encoding="utf-8")
+    write_text(store.path, json.dumps(doc))
     try:
         store.load()
     except error_type as exc:
@@ -81,7 +83,7 @@ def assert_wrong_schema_version_rejected(
     doc = dict(valid_doc)
     doc["schema_version"] = bad_version
     store.path.parent.mkdir(parents=True, exist_ok=True)
-    store.path.write_text(json.dumps(doc), encoding="utf-8")
+    write_text(store.path, json.dumps(doc))
     try:
         store.load()
     except error_type:
@@ -92,7 +94,7 @@ def assert_wrong_schema_version_rejected(
 
 def assert_root_not_object_rejected(store: LoadParseSaveStore, error_type: type[Exception]) -> None:
     store.path.parent.mkdir(parents=True, exist_ok=True)
-    store.path.write_text("[1, 2, 3]", encoding="utf-8")
+    write_text(store.path, "[1, 2, 3]")
     try:
         store.load()
     except error_type:
@@ -155,7 +157,7 @@ def assert_read_write_store_contract(
     assert store.read(states_dir) == first_value
 
     path = states_dir / filename
-    data = json.loads(path.read_text(encoding="utf-8"))
+    data = json.loads(read_text(path))
     assert data == canonical_shape
 
     first_mtime = path.stat().st_mtime_ns

@@ -1,6 +1,5 @@
-"""FR16 (v0.4.4, T-044-27) — associated_repos survives every reconstruction site.
+"""associated_repos survives every reconstruction site.
 
-A16.1 (N=0 regression) plus the T-044-26 report's flagged gap:
 ``alive()`` and ``dead()`` each rebuild a ``SpecContextProject`` by
 hand; before this task none of the three forwarded ``associated_repos``, so a context
 that had gained associated repos would silently lose them on its very next alive()/
@@ -15,8 +14,6 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-
-pytest.importorskip("fcntl")
 
 from dadaia_workspace.container import scan_publish_candidates
 from dadaia_workspace.core.models.spec_context import (  # noqa: E402

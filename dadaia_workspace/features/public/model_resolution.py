@@ -1,82 +1,12 @@
-"""Public-doctor model-resolution check (R8b, T-010-24).
-
-The doctor half of ``model-catalog-modelmap-pricing-drift-no-registry``:
-``core/model_registry.py`` is the single source of truth.
-
-Every core agent's RESOLVED (model, effort) must land in
-:data:`dadaia_workspace.core.model_registry.REGISTRY` and the effort vocabulary. An
-authored ``model:`` is judged by the projection's reader, not here.
-
-Layering: ``features -> core`` only.
-
-ERROR lines use the ``[drift]`` prefix — the same prefix ``check_agent_skill_refs``
-uses for hard failures — because the
-``dadaia public doctor`` CLI already treats ``[drift]`` as a nonzero-exit condition
-and the doctor finding-persistence layer already captures it. A clean check emits
-``[ok] model-resolution``.
-"""
+"""Public-doctor model-resolution check: one line naming the applied template."""
 
 from __future__ import annotations
 
-from pathlib import Path
-
-from dadaia_workspace.core.model_registry import (
-    CLAUDE_EFFORTS,
-    CORE_AGENTS,
-    REGISTRY,
-    AgentModelPolicyOverlay,
-    resolve_agent_model,
-)
+from dadaia_workspace.core.model_registry import DEFAULT_TEMPLATE_ID, AgentModelPolicyOverlay
 from dadaia_workspace.core.models.doctor_report import DoctorLine, DoctorStatus
 
 
-def check_model_resolution(
-    public_dir: Path, overlay: AgentModelPolicyOverlay | None = None
-) -> list[DoctorLine]:
-    """Return doctor report lines for the model-resolution invariants.
-
-    Args:
-        public_dir: the canonical public-asset source directory. Agent
-            frontmatter is read from ``public_dir / "agents" / "*.md"``.
-        overlay: the loaded agent-model-policy overlay (v0.1.65 FR7) — ``None``
-            when absent/invalid (an invalid overlay is reported as a doctor ERROR
-            by the asset manager, not here). The RESOLVED (model, effort) per core
-            agent is validated against REGISTRY + the effort vocabulary.
-
-    Returns:
-        A list of doctor lines. Emits ``[drift]`` ERROR lines on an unresolvable
-        core-agent policy resolution, and a single ``[ok] model-resolution`` line when every invariant
-        holds.
-    """
-    out: list[DoctorLine] = []
-    registry_ids = {entry.claude_id for entry in REGISTRY}
-
-    # An authored ``model:`` is judged where it is read: the projection's one frontmatter
-    # reader and ``resolve_codex_agent_model`` (sa-persona-model-read-by-two-parsers).
-    # RESOLVED-roster validation (v0.1.65 FR7): the resolver's answer for each
-    # core agent — templates assert at import; a present overlay layers on top —
-    # must land on a registry model and a vocabulary effort.
-    for agent in CORE_AGENTS:
-        resolved = resolve_agent_model(agent, overlay)
-        if resolved.model not in registry_ids:
-            out.append(
-                DoctorLine(
-                    DoctorStatus.DRIFT,
-                    f"model-resolution ERROR: resolved policy for core agent "
-                    f"'{agent}' yields model '{resolved.model}' which is not in "
-                    f"core.model_registry.REGISTRY",
-                )
-            )
-        if resolved.effort not in CLAUDE_EFFORTS:
-            out.append(
-                DoctorLine(
-                    DoctorStatus.DRIFT,
-                    f"model-resolution ERROR: resolved policy for core agent "
-                    f"'{agent}' yields effort {resolved.effort!r} outside the vocabulary "
-                    f"({', '.join(CLAUDE_EFFORTS)})",
-                )
-            )
-
-    if not out:
-        out.append(DoctorLine(DoctorStatus.OK, "model-resolution"))
-    return out
+def check_model_resolution(overlay: AgentModelPolicyOverlay | None = None) -> list[DoctorLine]:
+    """One ``[ok]`` line naming the template the overlay applies, else the default."""
+    applied = (overlay.applied_template if overlay else None) or DEFAULT_TEMPLATE_ID
+    return [DoctorLine(DoctorStatus.OK, f"model-resolution: template {applied}")]

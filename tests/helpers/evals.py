@@ -10,11 +10,11 @@ from __future__ import annotations
 import atexit
 import functools
 import shutil
-import subprocess
 import tempfile
 from pathlib import Path
 
 from tests.e2e.test_one_line_bootstrap import _build_wheel
+from tests.helpers.oslib import run, write_text
 
 ROOT = Path(__file__).resolve().parents[2]
 BASELINE = "0.4.7"
@@ -32,7 +32,7 @@ HAND = {
 
 def sh(*cmd: str) -> str:
     assert shutil.which(cmd[0]), f"{cmd[0]} is required: a missing tool fails the row"
-    p = subprocess.run(cmd, capture_output=True, text=True, check=False)  # noqa: S603
+    p = run(cmd)
     assert p.returncode == 0, f"{cmd}: exit {p.returncode}\n{p.stderr[-3000:]}"
     return p.stdout
 
@@ -63,7 +63,7 @@ def image(task: str, version: str) -> str:
             req = f"/lib/{wheel().name}"
         else:
             req = f"dadaia-workspace=={version}"
-        (ctx / "lib" / "requirements.txt").write_text(req + "\n", encoding="utf-8")
+        write_text(ctx / "lib" / "requirements.txt", req + "\n")
         tag = f"dadaia-evals-{task}:{version}"
         sh("docker", "build", "-q", "-t", tag, str(ctx))
     return tag

@@ -1,9 +1,8 @@
-"""0.4.6 AC5 (FR4/D13: the SessionStart lane is the one reaper);
-sa-hook-files-written-by-table-and-by-hand (HOOK_DIALECTS is the one authority for every
-harness's hook wiring); projected-hooks-carry-no-timeout; size: SMALL.
+"""The SessionStart lane is the one reaper; HOOK_DIALECTS is the one authority for every
+harness's hook wiring; size: SMALL.
 
 Every harness renders, from its ``HOOK_DIALECTS`` row, exactly one session-start command
-that deletes — ``dadaia doctor --fix --expired-only --quiet`` as a CLI process (P-12), never
+that deletes — ``dadaia doctor --fix --expired-only --quiet`` as a CLI process, never
 a ``dadaia_workspace.hooks.*`` module; the settings merge replaces it instead of stacking.
 Every rendered row is bounded: 10 s on the tool-call events, 30 s on the others.
 """

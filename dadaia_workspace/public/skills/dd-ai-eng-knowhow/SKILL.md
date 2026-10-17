@@ -2,7 +2,7 @@
 name: dd-ai-eng-knowhow
 description: >
   Use before reading or changing any persona, skill, rule, hook, AGENTS.md or MCP config: harness literacy, Claude Code/Codex deltas, the AUTHORING contract.
-compatibility: Standalone Agent Skill. Inside a dadaia-workspace (pip install dadaia-workspace) it also drives the SDD lifecycle — specs, backlog, bugs, releases.
+compatibility: Standalone Agent Skill; the full lifecycle lives in a dadaia-workspace.
 ---
 
 # dd-ai-eng-knowhow — Harness Literacy for Everyone, Depth on Demand
@@ -18,7 +18,7 @@ compatibility: Standalone Agent Skill. Inside a dadaia-workspace (pip install da
 ## 2. The working model
 
 - Name the primitive before reasoning about it: agent persona
-  (`public/agents/*.md`), subagent dispatch, skill, rule, hook, AGENTS.md, MCP.
+  (`.agents/agents/*.md`), subagent dispatch, skill, rule, hook, AGENTS.md, MCP.
 - Context vs enforcement: persona/skill/rule/AGENTS.md inform; hooks, Codex
   `.rules`, and the SDD gate enforce.
 - A Claude Code hook/rule config never transplants verbatim to Codex — the
@@ -28,18 +28,19 @@ compatibility: Standalone Agent Skill. Inside a dadaia-workspace (pip install da
 
 ## 3. Editing an AI-entity file
 
-1. Trace the harness file to its source: the matching `assets[].path` in `.dadaia/agentic/manifest.json` is `dadaia_workspace/public/<path>` —
-   every authoring target is the source, never a `.claude/`, `.agents/`, `.codex/`
-   projection.
+1. Trace the harness file to its source: the matching `assets[].path` in `.dadaia/agentic/manifest.json` locates it in the library repo that the repo's own `AGENTS.md` names.
+   An AI-entity file is a projection: change its source there, never a `.claude/`, `.agents/`, `.codex/` copy.
 2. Reproject per `.dadaia/AGENTS.md` §4.
 3. Author against [`AUTHORING.md`](AUTHORING.md) — the 15-rule
    writing-for-agents contract — and opens the relevant disclosed sibling instead of
    re-deriving harness behavior; then `.dadaia/.venv/bin/dadaia public doctor` must print `[ok] public-privacy` (its scan covers hostnames, IPs, home paths, emails and secrets).
 
+- A claim about a binary, a CLI flag, a model id or sandbox behaviour is checked against the live binary before it is written.
+
 ## 4. Done when
 
 - Your output names the primitive and its harness serialization.
-- Any AI-entity edit landed in `public/` source and was re-projected and
+- Any AI-entity edit landed at its source and was re-projected and
   doctor-verified.
 
 ## 5. Disclosed siblings (authoring depth)

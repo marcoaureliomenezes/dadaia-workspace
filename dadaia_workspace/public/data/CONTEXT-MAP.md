@@ -1,14 +1,13 @@
 # CONTEXT-MAP — the context balance of a dadaia-workspace
 
-Library document. Projected nowhere: `public stage` copies it into `.dadaia/agentic/data/`
+Library document. Projected nowhere: `public install` copies it into `.dadaia/agentic/data/`
 with the rest of `data/`, and no projection rule installs it into a runtime tree.
 
 One row per surface: what it is for and what belongs in it. A surface's size is a soft
-review signal (one purpose, no restated rule), never a build failure (ADR 0143); a SKILL.md's
-line limits are `behavior-map.json`'s (ADR 0170).
+review signal (one purpose, no restated rule), never a build failure; a SKILL.md's
+line limit is a doctor warning (`SKILL-MD-LENGTH`).
 
-Every surface is sourced under `dadaia_workspace/public/`; the `Surface` column names the
-path or entity as it appears in an installed workspace.
+The `Surface` column names the path or entity as it appears in an installed workspace.
 
 ## 1. Load triggers, per harness
 
@@ -38,8 +37,8 @@ path or entity as it appears in an installed workspace.
 | Surface | Purpose | Belongs |
 |---|---|---|
 | `AGENTS.md` | the root map: the flow, the roles, the gate invariants, the root, credentials, and one line per scoped file | statements; the index of every other surface |
-| `specs/AGENTS.md` | the canon of a specs tree and its status tokens | canon table, status tokens, doctor codes |
-| `specs/releases/AGENTS.md` | candidates, phases, task markers, promote | release procedure and commit shapes |
+| `specs/AGENTS.md` | the canon of a specs tree and its status tokens | canon table, status tokens, load order |
+| `specs/releases/AGENTS.md` | candidates, phases, promote | release procedure |
 | `specs/backlog/AGENTS.md` | the operator's demand queue and its exits | `BACKLOG.json` shape, intake gate, dispositions |
 | `specs/bugs/AGENTS.md` | what a bug is and how it is proposed, recorded, resolved | bug procedure and the redaction rule |
 | `specs/memory/AGENTS.md` | current product truth and who writes it | atoms, ownership |
@@ -49,8 +48,8 @@ path or entity as it appears in an installed workspace.
 | `.dadaia/handoff/AGENTS.md` | the handoff lane | emission, schema, ack-on-consume |
 | `.dadaia/tmp/AGENTS.md` | the TTL scratch lane | what may be written there and for how long |
 | `.dadaia/states/AGENTS.md` | CLI-owned state files | who writes them and by which verb |
-| `worktrees/AGENTS.md` | the canonical worktrees | plain changes plus release jobs/tasks, two gates, one review, one venv, hygiene |
-| `repos/<slug>/AGENTS.md` | a repo working tree | clean-tree rule, cache redirection |
+| `worktrees/AGENTS.md` | the canonical worktrees | the rc hierarchy and lanes, two gates, one review, one venv, hygiene |
+| `repos/<slug>/AGENTS.md` | a repo working tree | clean-tree rule, cache redirection, the `verify:` and `tests:` lines |
 
 ## 3. Skills — `.agents/skills/dd-*/SKILL.md`
 
@@ -69,18 +68,20 @@ One procedure each; a skill that touches a governed area opens its scoped law as
 | `dd-grill-me` | the operator grill that precedes a candidate | — |
 | `dd-handoff-emitter` | handoff-first emission and ack-on-consume | `.dadaia/handoff/AGENTS.md` |
 | `dd-manager-orchestration` | intake, dispatch and the closure pass | — |
-| `dd-release-definition` | picking the set and authoring the trio | `specs/releases/AGENTS.md` |
+| `dd-release-definition` | picking the set and authoring the SPEC, PLAN and job files | `specs/releases/AGENTS.md` |
 | `dd-release-implementation` | the candidate arc from the first task to the gate | `specs/releases/AGENTS.md` |
 | `dd-spec-navigator` | the three-phase session grounding protocol | `specs/AGENTS.md` |
 
 ## 4. Personas — `.agents/agents/*.md`
 
-Three roles, no fourth; every retired role is a lens the reviewer applies.
+Five roles, no sixth.
 
 | Surface | Purpose | Belongs |
 |---|---|---|
 | `dd-product-engineer` | backlog, SPEC, the product-memory pass at closure | role, read_only, model policy |
-| `dd-software-engineer` | PLAN/TASKS, production code and its tests | role, read_only, model policy |
+| `dd-sw-engineer-sr` | as-is review, PLAN, job files, new behaviour and its tests | role, read_only, model policy |
+| `dd-sw-engineer-jr` | tasks whose AC and `W:` fully state the outcome | role, read_only, model policy |
+| `dd-researcher` | read-only research, findings as `path:line` or URL | role, read_only, model policy |
 | `dd-code-reviewer` | the three-axis review and its six lenses | role, read_only, model policy |
 
 - A statement belongs to exactly one surface: the map indexes, the scoped file rules, the

@@ -1,13 +1,9 @@
-"""CLI command: ``dadaia doctor`` — the ONE compliance surface (0.4.7 FR5, T-047-02).
+"""CLI command: ``dadaia doctor``, the one compliance surface.
 
 Three sections in fixed order — ``workspace`` (zones, root, harness dirs), ``specs``
 (the SPEC-DOC rules), ``ledgers`` (BL-SCHEMA/CONFLICT/STALE) — collected
 from one rule registry (:mod:`dadaia_workspace.core.doctor_rules`), rendered by one
-grammar, exited by one rule. ``dadaia specs doctor`` and
-``dadaia backlog doctor`` are DELETED, not aliased: three commands with three finding
-types, three renderings and three exit rules were the structural cause of a doctor bug
-family in which each doctor could independently report health over a tree the other two
-never read.
+grammar, exited by one rule.
 
 This module is the ONE place the three sections meet — the features stay mutually
 independent (each contributes rules over its own context and its own issue type, with
@@ -45,6 +41,7 @@ from dadaia_workspace.core.exceptions import (
     SchemaVersionError,
     WorkspaceNotInitializedError,
 )
+from dadaia_workspace.core.specs_version import NO_TREE, state
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.backlog import doctor as backlog_doctor
 from dadaia_workspace.features.spec_context.doctor import DoctorService, workspace_rules
@@ -64,7 +61,12 @@ _TEMPLATES_DIR = Path(__file__).parent.parent.parent / "public" / "templates"
 
 
 def _workspace_section(
-    service: DoctorService | None, root: Path | None, scope: str | None, *, expired_only: bool
+    service: DoctorService | None,
+    root: Path | None,
+    scope: str | None,
+    *,
+    expired_only: bool,
+    seen: set[str] | None = None,
 ) -> SectionReport:
     """`workspace`: the instance walk. Its findings already ARE the normalized record —
     the feature owns the translation of its own verdict vocabulary, so the adapter here
@@ -77,6 +79,7 @@ def _workspace_section(
         workspace_rules(expired_only=expired_only, context=scope),
         service,
         root,
+        seen=seen,
     )
 
 
@@ -85,45 +88,52 @@ def _empty_section(name: str) -> SectionReport:
     return SectionReport(name=name, findings=())
 
 
-def _specs_section(doctor: SpecsDoctor | None, root: Path | None) -> SectionReport:
-    if doctor is None:
-        return _empty_section("specs")
+def _specs_section(
+    doctor: SpecsDoctor | None,
+    root: Path | None,
+    specs_dir: Path | None = None,
+    seen: set[str] | None = None,
+) -> SectionReport:
+    if doctor is None:  # no rule can judge a tree that is not there: one finding
+        if specs_dir is None:
+            return _empty_section("specs")
+        msg = f"no specs tree at {specs_dir}"
+        fix = state(specs_dir)[1] or ""
+        finding = SectionFinding("SPECS-ABSENT", "error", msg, canonical=False, error=True, fix=fix)
+        return SectionReport(name="specs", findings=(finding,))
     return run_section(
         "specs",
         SPECS_RULES,
         doctor,
         root,
         doctor.specs_dir,
+        seen,
     )
 
 
 def _ledgers_section(
     root: Path | None,
     specs_dir: Path | None,
+    seen: set[str] | None = None,
 ) -> SectionReport:
     """The `ledgers` section — three contributors, one name.
 
-    The backlog document's BL-* rules, the ADR ledger's own reader, and the five ledger
+    The backlog document's BL-* rules, the ADR ledger's own reader, and the four ledger
     SCRIPTS: each ledger with a writer script is validated by THAT script's
     `check`, run as a subprocess here. The doctor holds no second implementation of any
     ledger schema — this is the one delegation point.
     """
     from dadaia_workspace.infrastructure.ledger_scripts import script_findings
 
-    if specs_dir is None:
+    if specs_dir is None or state(specs_dir)[0] in NO_TREE:
         return _empty_section("ledgers")
 
     tracked = container.build_git_client().tracked(specs_dir.parent)
     context = backlog_doctor.build_context(specs_dir, tracked)
     return merge_sections(
         [
-            run_section("ledgers", backlog_doctor.RULES, context, root, specs_dir),
-            run_section(
-                "ledgers",
-                doctor_adr.LEDGER_RULES,
-                specs_dir,
-                root,
-            ),
+            run_section("ledgers", backlog_doctor.RULES, context, root, specs_dir, seen),
+            run_section("ledgers", doctor_adr.LEDGER_RULES, specs_dir, root, seen=seen),
             SectionReport(name="ledgers", findings=tuple(script_findings(specs_dir))),
         ]
     )
@@ -133,8 +143,8 @@ def _ledgers_section(
 
 
 def _build_specs_doctor(specs_dir: Path | None, public_dir: str | None) -> SpecsDoctor | None:
-    """``None`` in, ``None`` out: a workspace with no specs tree has no specs doctor."""
-    if specs_dir is None:
+    """A workspace with no specs tree has no specs doctor."""
+    if specs_dir is None or state(specs_dir)[0] in NO_TREE:
         return None
     resolved_public = Path(public_dir).resolve() if public_dir else _detect_public_dir(specs_dir)
     return SpecsDoctor(
@@ -143,7 +153,7 @@ def _build_specs_doctor(specs_dir: Path | None, public_dir: str | None) -> Specs
         templates_dir=_TEMPLATES_DIR,
         # repo_root: specs/ sits directly at the repo root; feeds MEM-DRIFT-2.
         repo_root=specs_dir.parent,
-        # The ONE Typer walk (0.4.7 FR2), done here and handed in as plain data;
+        # The Typer walk, done here and handed in as plain data;
         # `features` never imports `cli`.
         command_paths=command_paths(),
     )
@@ -187,7 +197,7 @@ def _resolve_run(
         raise typer.Exit(1) from None
     target = resolve_context_specs_dir_for_cli(workspace_root, name)
     # The ONE place a context's tree is resolved: a tree `specs init` has not stamped yet
-    # is onboarding level 2 — nothing for the specs/ledgers sections to judge (AC3.1).
+    # is onboarding level 2 — nothing for the specs/ledgers sections to judge.
     return (
         workspace_root,
         service,
@@ -206,7 +216,7 @@ def _bound_context() -> str | None:
 def _onboarding_section(
     workspace_root: Path | None, scope: str | None, *, expired_only: bool
 ) -> SectionReport:
-    """The derived next step (FR6 AC6.1) as one info finding — never an error."""
+    """The derived next step as one info finding, never an error."""
     if workspace_root is None or expired_only:
         return _empty_section("workspace")
     try:
@@ -302,15 +312,18 @@ def doctor(
         for action in fixed:
             typer.echo(render(action))
         return
+    seen: set[str] = set()
     reports = [
         merge_sections(
             [
-                _workspace_section(service, workspace_root, scope, expired_only=expired_only),
+                _workspace_section(
+                    service, workspace_root, scope, expired_only=expired_only, seen=seen
+                ),
                 _onboarding_section(workspace_root, scope, expired_only=expired_only),
             ]
         ),
-        _specs_section(specs_doctor, workspace_root),
-        _ledgers_section(workspace_root, target),
+        _specs_section(specs_doctor, workspace_root, target, seen),
+        _ledgers_section(workspace_root, target, seen),
     ]
     # Render boundary ONLY: no doctor ever sees the redactor; every finding and fix action
     # keeps carrying true names inside the sections themselves.

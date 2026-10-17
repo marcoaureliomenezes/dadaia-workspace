@@ -1,7 +1,6 @@
-"""T-048-05 (SPEC 0.4.8 AC4.3, R6): ``specs upgrade`` on a v6 tree ends
-stamped canonical WITH its fixed law sections, so the specs doctor reports 0 errors — the S3 dead
-end (upgrade said "no-op", doctor said FIXED-1) is gone. 0.5.0 WP-14: the repair is the
-doctor's one writer, so the seam is the `specs upgrade` verb. Size: SMALL (CliRunner)."""
+"""``specs upgrade`` on a v6 tree ends stamped canonical WITH its fixed law sections, so the specs
+doctor reports 0 errors. The repair is the doctor's one writer, so the seam is the `specs upgrade`
+verb. Size: SMALL (CliRunner)."""
 
 from __future__ import annotations
 
@@ -16,6 +15,7 @@ from dadaia_workspace.core import specs_version
 from dadaia_workspace.core.fixed_sections import FIXED_SECTIONS
 from dadaia_workspace.core.gitflow import merge_frontmatter
 from dadaia_workspace.features.specs import SpecsDoctor, canon
+from tests.helpers.oslib import read_text, write_text
 
 _PUBLIC = Path(__file__).resolve().parents[3] / "dadaia_workspace" / "public"
 #: specs/bugs/AGENTS.md as published at 570af642 (its sha256 is in shipped-hashes.json).
@@ -31,14 +31,14 @@ def _v6_tree(tmp_path: Path) -> Path:
     canon.scaffold(specs, project_name="v6")
     for rel, _ in FIXED_SECTIONS:
         path = specs / rel
-        path.write_text(_FIXED_BLOCK.sub("\n", path.read_text(encoding="utf-8")), encoding="utf-8")
+        write_text(path, _FIXED_BLOCK.sub("\n", read_text(path)))
     merge_frontmatter(specs, specs_pattern_version=6)
     return specs
 
 
 @pytest.mark.medium
 def test_a_v6_tree_ends_canonical_with_fixed_sections_and_a_clean_doctor(tmp_path: Path) -> None:
-    """sa-specs-upgrade-writes-through-symlinks#B3, sa-specs-upgrade-writes-through-symlinks#B4: the hop, then the doctor's repair set — a superseded shipped scoped
+    """The hop, then the doctor's repair set — a superseded shipped scoped
     law (a real published specs/bugs/AGENTS.md) is refreshed too: no TREE-5, no FIXED."""
     specs = _v6_tree(tmp_path)
     (specs / "bugs" / "AGENTS.md").write_bytes(_SHIPPED_BUGS_LAW.read_bytes())

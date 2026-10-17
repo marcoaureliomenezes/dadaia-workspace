@@ -1,20 +1,18 @@
 """Over random real-state starts (remote unborn / principal only / both, a tag or not, a
 session identity or not), the loop takes the printed step, executes its fix line (the
-``context`` step's operator action is played with a name and the bare remote's URL; the
-``agent`` step runs a scripted stand-in that fills memory) and asserts I3 — the step is no longer
-pending — and I4 — the printed step's index strictly increases, so the loop ends within
+``context`` step's agent action is played with a name and the bare remote's URL; the
+``agent`` step runs a scripted stand-in that fills memory) and asserts the step is no longer
+pending and the printed step's index strictly increases, so the loop ends within
 ``len(STEP_IDS)`` iterations.
 
 MEDIUM: real git over ``file://`` bare remotes; the workspace pre-push hook is pointed
-at an empty hooks dir (the chokepoint is T-050-14's contract, not this one's).
+at an empty hooks dir (the chokepoint is another contract's, not this one's).
 """
 
 from __future__ import annotations
 
 import json
 import os
-import shlex
-import subprocess
 import tempfile
 from pathlib import Path
 
@@ -31,14 +29,19 @@ from dadaia_workspace.features.workspace.service import WorkspaceService
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
 from tests.conftest import GIT_QUIET_INCLUDE
-
-pytest.importorskip("fcntl")
+from tests.helpers.oslib import cli_path, command, make_executable, run, write_text
 
 _runner = CliRunner()
+#: The words each command step prints as its fix.
+_WORDS = {
+    "bind": ("context", "bind", "proj"),
+    "specs": ("specs", "init", "--context", "proj"),
+    "publish": ("context", "baseline", "proj"),
+}
 
 
 def _git(cwd: Path, *args: str) -> None:
-    subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True)
+    run(["git", *args], cwd=cwd, check=True)
 
 
 def _remote(parent: Path, branches: tuple[str, ...], tag: bool) -> Path:
@@ -47,7 +50,7 @@ def _remote(parent: Path, branches: tuple[str, ...], tag: bool) -> Path:
     if branches:
         seed = parent / "seed"
         _git(parent, "init", "-q", "-b", branches[0], str(seed))
-        (seed / "README.md").write_text("seed\n", encoding="utf-8")
+        write_text(seed / "README.md", "seed\n")
         _git(seed, "add", "README.md")
         _git(seed, "commit", "-qm", "seed")
         for branch in branches[1:]:
@@ -62,10 +65,10 @@ def _fill_memory(root: Path) -> None:
     """The scripted stand-in for the ``agent`` step: an audit that writes real memory."""
     for specs in alive_context_trees(root).values():
         for stub in ("ARCHITECTURE.md", "QUALITY.md"):
-            (specs / "memory" / stub).write_text(f"# {stub}\n\naudited\n", encoding="utf-8")
+            write_text(specs / "memory" / stub, f"# {stub}\n\naudited\n")
         catalog = specs / "memory" / "product" / "catalog.json"
         catalog.parent.mkdir(parents=True, exist_ok=True)
-        catalog.write_text(json.dumps({"features": [{"slug": "core"}]}), encoding="utf-8")
+        write_text(catalog, json.dumps({"features": [{"slug": "core"}]}))
 
 
 def _run_fix(step: Step, root: Path, bare: Path) -> None:
@@ -75,9 +78,8 @@ def _run_fix(step: Step, root: Path, bare: Path) -> None:
     if step.id == "context":  # the operator's act: a context name and the clone URL
         argv = ["context", "create", "proj", "--main-repo", bare.as_uri()]
     else:
-        argv = shlex.split(step.command)
-        assert Path(argv[0]).name.startswith("dadaia"), step.command
-        argv = argv[1:]
+        argv = list(_WORDS[step.id])
+        assert step.command == command(str(cli_path(root)), *argv), step.command
     done = _runner.invoke(app, argv)
     assert done.exit_code == 0, f"{step.command}\n{done.output}"
 
@@ -88,12 +90,12 @@ def _git_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     # its runner is stubbed out — the gate itself is proven by the push journeys.
     hooks = tmp_path / "hooks"
     hooks.mkdir()
-    runner = tmp_path / ".dadaia" / ".venv" / "bin" / "dadaia"  # the hook's venv walk
+    runner = cli_path(tmp_path)  # the hook's venv walk
     runner.parent.mkdir(parents=True)
-    runner.write_text("#!/bin/sh\ncat >/dev/null\n", encoding="utf-8")
-    runner.chmod(0o755)
+    write_text(runner, "#!/bin/sh\ncat >/dev/null\n")
+    make_executable(runner)
     pairs = {"core.hooksPath": str(hooks), "user.name": "T", "user.email": "t@example.invalid"}
-    (tmp_path / "gitconfig").write_text(GIT_QUIET_INCLUDE, encoding="utf-8")
+    write_text(tmp_path / "gitconfig", GIT_QUIET_INCLUDE)
     monkeypatch.setenv("GIT_CONFIG_GLOBAL", str(tmp_path / "gitconfig"))
     monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
     base = int(os.environ.get("GIT_CONFIG_COUNT", "0"))
@@ -106,7 +108,7 @@ def _git_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
 
 
 def _bound(root: Path, session: str | None) -> bool | None:
-    """The caller's Bind as the CLI reads it (sa-bind-has-two-stores#S1)."""
+    """The caller's Bind as the CLI reads it."""
     return (
         None
         if session is None
@@ -153,7 +155,7 @@ def test_every_command_fix_clears_its_step_and_the_loop_advances(
                 assert after is None or after.id != step.id, f"I3: {step.id} still pending"
             else:
                 pytest.fail(f"I4: the loop did not end within {len(STEP_IDS)} steps")
-            assert ("bind" in [STEP_IDS[i] for i in seen]) == (session is not None)  # AC7.3
+            assert ("bind" in [STEP_IDS[i] for i in seen]) == (session is not None)
             assert STEP_IDS[seen[-1]] == "publish"
         finally:
             os.chdir(cwd)

@@ -40,7 +40,7 @@ def test_well_formed_relpath_constructs(relpath: str) -> None:
     ],
 )  # fmt: skip
 def test_rejected_shape_is_refused_by_construction_and_from_dict(relpath: str, match: str) -> None:
-    """Every shape FR3 item 1 names is refused by name, and a persisted ledger carrying it
+    """Every rejected shape is refused by name, and a persisted ledger carrying it
     fails ``from_dict`` (the store bootstraps to None)."""
     with pytest.raises(ValueError, match=match):
         LedgerEntry(relpath=relpath, sha256="a" * 64, family="law")

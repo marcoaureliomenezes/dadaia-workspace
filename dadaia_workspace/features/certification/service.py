@@ -14,8 +14,10 @@ from functools import partial
 from pathlib import Path
 from typing import Any
 
+from dadaia_workspace.core import platform
 from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES
 from dadaia_workspace.core.redaction import Redactor
+from dadaia_workspace.core.skill_owner import load_owner
 from dadaia_workspace.core.workspace_resolver import fenced_env
 from dadaia_workspace.infrastructure.certification_process import SubprocessCertificationProcess
 
@@ -49,7 +51,7 @@ def _git(process: SubprocessCertificationProcess, cwd: Path, *args: str) -> None
 
 
 class _CertificationSkip(Exception):
-    """An honest, non-failing degrade for one certification check (A22.4).
+    """An honest, non-failing degrade for one certification check.
 
     Raised when the runtime dependency a check would exercise is genuinely
     unavailable in this environment — absent entirely (e.g. no Codex CLI on PATH), or
@@ -64,9 +66,9 @@ class _CertificationSkip(Exception):
 _LiveProbe = Callable[[SubprocessCertificationProcess, Path, str, str], str]
 
 
-# A22.4 — codex-live-probe: exercises the INSTALLED Codex CLI with a real `codex exec`
-# call, bounded and read-only. Static Codex projection tests (TOML shape, frontmatter
-# parsing) never attest this — they cannot prove a live session actually answers.
+# Live probe of the installed Codex CLI: a real `codex exec`, bounded and read-only. Static Codex
+# projection tests (TOML shape, frontmatter parsing) never attest this — they cannot prove a
+# live session actually answers.
 _CODEX_LIVE_PROBE_PROMPT = (
     "Reply with exactly the single line: DADAIA-LIVE-PROBE-OK. No tool calls, no other text."
 )
@@ -179,7 +181,7 @@ def _version_probe_detail(
 def _codex_live_probe_detail(
     process: SubprocessCertificationProcess, cwd: Path, harness: str, binary: str
 ) -> str:
-    """A22.4: prove the installed Codex CLI actually answers, not just that its files exist.
+    """Prove the installed Codex CLI actually answers, not just that its files exist.
 
     Runs ``codex --version`` then a bounded, read-only, non-interactive ``codex exec``
     that must echo back a fixed marker. Raises :class:`_CertificationSkip` (never
@@ -226,7 +228,7 @@ _DEEP_LIVE_PROBES["codex"] = _codex_live_probe_detail
 
 
 def _all_checks_ok(checks: Iterable[CertificationCheck]) -> bool:
-    """PASS and SKIP are both acceptable certification outcomes (A22.4).
+    """PASS and SKIP are both acceptable certification outcomes.
 
     An honest degrade for an absent OPTIONAL runtime dependency (e.g. no installed
     Codex CLI on this host) must never turn a certification run RED — only a genuine
@@ -253,11 +255,10 @@ def certify(
     pythonpath = os.pathsep.join(
         [*source_pythonpath, *([inherited_pythonpath] if inherited_pythonpath else [])]
     )
-    env = {  # every child acts on the sandbox only (ADR 0088)
-        **fenced_env(target),
-        "HOME": str(home),
-        "PYTHONDONTWRITEBYTECODE": "1",
-    }
+    # every child acts on the sandbox only
+    env = load_owner("dd-bug-resolution", "_git").scrubbed_env(
+        fenced_env(target)
+    ) | platform.home_env(home)
     if pythonpath:
         env["PYTHONPATH"] = pythonpath
     else:
@@ -383,7 +384,8 @@ def certify(
     def handoff_validation() -> str:
         path = target / ".dadaia" / "handoff" / "certified-consumer" / "cert.handoff.json"
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(
+        platform.write_text(
+            path,
             json.dumps(
                 {
                     "schema_version": "handoff-v1.2",
@@ -397,7 +399,6 @@ def certify(
                 }
             )
             + "\n",
-            encoding="utf-8",
         )
         cli("reports", "validate", str(path), "--json")
         return "reports validate accepted a handoff-v1.2 record"

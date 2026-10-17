@@ -1,4 +1,4 @@
-"""T-12 — Skill-reference integrity test (AC C1).
+"""Skill-reference integrity test.
 
 Asserts that every skill name listed in the ``skills:`` frontmatter of each
 agent Markdown file has a corresponding
@@ -15,6 +15,8 @@ import pathlib
 from typing import Any
 
 import yaml
+
+from tests.helpers.oslib import read_text
 
 # ---------------------------------------------------------------------------
 # Repository root — two levels up from this file's package root
@@ -36,7 +38,7 @@ def _parse_frontmatter(path: pathlib.Path) -> dict[str, Any]:
     Returns an empty dict if the file has no frontmatter or the fences are
     malformed — callers must handle missing keys gracefully.
     """
-    text = path.read_text(encoding="utf-8")
+    text = read_text(path)
     if not text.startswith("---\n"):
         return {}
     end = text.find("\n---\n", 4)
@@ -59,7 +61,7 @@ def test_agent_skill_references_exist_and_problematic_skill_files_have_frontmatt
     Failure message lists every (agent, missing_skill_path) pair so the fix is
     unambiguous.
 
-    Also (relocated from tests/infrastructure/test_public_assets.py, T-7, v0.1.75): a
+    Also (relocated from tests/infrastructure/test_public_assets.py): a
     static frontmatter-shape lint over the runtime-adapter SKILL.md files that
     currently require it — no fs mutation, no install/stage, pure file-read + string
     check. The set of checked skills is scoped to files that actually exist in the
@@ -87,7 +89,7 @@ def test_agent_skill_references_exist_and_problematic_skill_files_have_frontmatt
     )
 
     public_dir = _REPO_ROOT / "dadaia_workspace" / "public"
-    # Only skills that survived the agent-surface-reduction (v0.2.0) are checked.
+    # Only skills that survived the agent-surface-reduction are checked.
     # frontend/design skills (ux-ui-review, design-report-quality-gate, etc.) were
     # removed from the core install; codex runtime adapters (design-ctx, frontend-ctx)
     # remain and are checked here.
@@ -98,7 +100,7 @@ def test_agent_skill_references_exist_and_problematic_skill_files_have_frontmatt
     skill_paths = [p for p in candidate_paths if p.exists()]
 
     for skill_path in skill_paths:
-        text = skill_path.read_text(encoding="utf-8")
+        text = read_text(skill_path)
         assert text.startswith("---\n"), f"{skill_path} must start with YAML frontmatter"
         assert "\n---\n" in text[4:], f"{skill_path} must close YAML frontmatter"
         frontmatter = text.split("\n---\n", 1)[0]

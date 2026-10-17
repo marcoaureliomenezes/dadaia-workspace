@@ -11,8 +11,8 @@
 | slug | title | tldr |
 |------|-------|------|
 | `agent-comms` | agent-comms | The handoff-v1 JSON contract agents emit, its validator behind `dadaia reports validate`, and ack-on-consume deletion with a one-day TTL. |
-| `agent-orchestration` | agent-orchestration | Three dd- personas are leaf workers dispatched by the main thread; SDD documents, worktrees and handoffs carry the work, never an orchestration runtime. |
-| `agentic-entities` | agentic-entities | One registry names three personas, five deterministic behaviors and two abstract rules; a behavior map assigns each shipped skill and scoped law to an owner. |
+| `agent-orchestration` | agent-orchestration | Five dd- personas are leaf workers dispatched by the main thread; SDD documents, worktrees and handoffs carry the work, never an orchestration runtime. |
+| `agentic-entities` | agentic-entities | One registry names five personas, five deterministic behaviors and two abstract rules; a behavior map assigns each shipped skill and scoped law to an owner. |
 
 ### distribution
 
@@ -48,9 +48,9 @@
 | `consumer-agent-support` | Consumer validation gate | A consumer-side agent running the developer's recipe on a real workspace is the release gate; no wheel publishes until every statement reports PASS. |
 | `context-management` | context-management | ALIVE/DEAD registry of a main repo plus associated repos; create clones, hooks and ALIVEs; only context bind binds, by env session id, naming the scope. |
 | `context-portability` | context-portability | dadaia export writes the workspace's context set to one file; dadaia import registers each unknown context DEAD elsewhere, ready for dadaia context alive. |
-| `cross-platform-portability` | cross-platform-portability | Linux, macOS and Windows through one platform capability seam carrying the venv layout, Python hooks and cross-OS CI legs. |
+| `cross-platform-portability` | cross-platform-portability | Linux, macOS and Windows through one OS boundary, the kernel's _platform.py, deciding every host fact; core/platform.py is the package's door to it. |
 | `server-registry` | server-registry | Dev-server port registry with TTL and PID tracking so parallel sessions never collide — one stdlib skill script over one JSON state file; no CLI verb. |
-| `specs-migration` | specs-migration | specs init establishes canon and gitflow; specs upgrade reaches pattern 12; migrate updates the context registry. |
+| `specs-migration` | specs-migration | specs init establishes canon and gitflow; specs upgrade reaches pattern 13; migrate updates the context registry. |
 | `workspace-doctor` | workspace-doctor | dadaia doctor, the one compliance check — workspace, specs, ledgers; one line per finding, exit 1 with a fix line; --fix holds slop, expiry acts by zone class. |
 | `workspace-init` | workspace-init | Level 1 — uvx dadaia-workspace init [DIR] provisions venv, zones, law, one harness; re-init upgrades; --repo adds level 2; next step from one ordered step list. |
 
@@ -62,5 +62,5 @@
 | `backlog-ledger` | backlog-ledger | The operator's demand queue: BACKLOG.json active[] plus one histo record per exit; backlog.py writes it, dadaia doctor judges bound subjects. |
 | `bug-ledger` | bug-ledger | BUGS.jsonl stores one lean current record per confirmed defect; its writer persists registration and resolution facts while git owns derived history. |
 | `release-lifecycle` | release-lifecycle | One live release grows through closed-scope candidates; _RELEASE.json holds current phase, milestones and a lean append-only narrative. |
-| `sdd-gate-v3` | sdd-gate-v3 | No-lock enforcement combines root-entry hygiene and SDD write policy before tools, then applies branch, specs-canon and privacy checks at push. |
-| `worktrees` | worktrees | Repository changes are isolated in canonical plain, release, task, backlog or hotfix worktrees and land by worktree.py merge after the gate for that tree shape. |
+| `sdd-gate-v3` | sdd-gate-v3 | No-lock enforcement — root-entry hygiene and SDD write policy before tools; branch, canon and privacy checks at push; a ref gate on raw ref moves. |
+| `worktrees` | worktrees | Worktrees nest under worktrees/<repo>/<v>/ — wt-rc, wt-main, wt-task and the backlog and hotfix lanes — and each merges into its parent after its gate. |

@@ -5,13 +5,15 @@ from __future__ import annotations
 
 import json
 import re
-from collections.abc import Iterable, Mapping
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
-from dadaia_workspace.core.frontmatter import FRONTMATTER_RE, FrontmatterError, parse
-from dadaia_workspace.core.release_state import CANDIDATE_RE, RELEASE_ID_RE, RELEASE_STATE_FILENAME
+from dadaia_workspace.core import platform
+from dadaia_workspace.core.exceptions import DadaiaError
+from dadaia_workspace.core.frontmatter import FrontmatterError, parse, split
+from dadaia_workspace.core.skill_owner import load_owner
 
 __all__ = [
     "DEFAULT",
@@ -19,21 +21,25 @@ __all__ = [
     "candidate_number",
     "Gitflow",
     "Role",
-    "constitution_error",
+    "SeveralWorkBranches",
+    "constitution_problem",
     "constitution_path",
     "constitution_text",
     "from_mapping",
     "merge_frontmatter",
+    "live_release_id",
     "next_candidate",
     "read_gitflow",
     "resolve_live_candidate",
-    "resolve_live_release_id",
     "work_branch",
 ]
 
 Role = Literal["principal", "integration", "work"]
 
-_VERSION_RE = re.compile(r"\d+\.\d+\.\d+")
+_grammar = load_owner("dd-bug-resolution", "_grammar")
+_VERSION_RE = _grammar.SEMVER_RE
+candidate_number = _grammar.candidate_number
+candidate_dir = _grammar.candidate_dir
 # git check-ref-format's refusals, for one branch name (a prefix may end in "/").
 _BAD_REF_RE = re.compile(r"[\x00-\x20\x7f~^:?*\[\\]|\.\.|//|@\{|^[/.]|\.$|\.lock(/|$)|/\.|^@$")
 
@@ -63,44 +69,51 @@ class Gitflow:
 DEFAULT = Gitflow(principal="main", integration="develop", work_prefix="feature/")
 
 
-def resolve_live_release_id(specs_dir: Path) -> str | None:
-    """The one bare ``releases/<M.m.p>/`` holding ``_RELEASE.json`` — `release.py`'s `live_ids`
-    rule; none or several is ``None`` (`release.py check` reports several)."""
-    root = specs_dir / "releases"
-    live = [d.name for d in root.iterdir() if RELEASE_ID_RE.match(d.name)
-            and (d / RELEASE_STATE_FILENAME).is_file()] if root.is_dir() else []  # fmt: skip
-    return live[0] if len(live) == 1 else None
-
-
-def candidate_number(names: Iterable[str]) -> int:
-    """The highest ``rc-<N>`` among *names*, 0 when none — `_release_schema`'s twin."""
-    return max((int(m.group(1)) for n in names if (m := CANDIDATE_RE.match(n))), default=0)
-
-
-def candidate_dir(release_dir: Path) -> Path | None:
-    """The highest-numbered ``rc-<N>/`` under *release_dir* (ADR 0150), ``None`` when none."""
-    n = candidate_number(d.name for d in release_dir.iterdir() if d.is_dir())
-    return release_dir / f"rc-{n}" if n else None
-
-
 def next_candidate(release_dir: Path) -> Path:
-    """The ``rc-<N+1>/`` a new candidate is born in — past every ``rc-<N>`` entry, a stray
-    file included, so the birth never lands on an existing path."""
-    names = [p.name for p in release_dir.iterdir()] if release_dir.is_dir() else []
-    return release_dir / f"rc-{candidate_number(names) + 1}"
+    """The ``rc-<N+1>/`` a new candidate is born in — `_release_schema`'s rule."""
+    schema = load_owner("dd-release-implementation", "_release_schema")
+    return Path(schema.next_candidate(release_dir, None))
+
+
+def live_release_id(specs_dir: Path) -> str | None:
+    """The id of the ONE live release, ``None`` with none or several."""
+    live: str | None
+    try:
+        live = _grammar.sole_live(specs_dir)
+    except load_owner("dd-bug-resolution", "_refusal").Refusal:
+        live = None
+    return live
 
 
 def resolve_live_candidate(specs_dir: Path) -> Path | None:
-    """The live release's highest-numbered ``rc-<N>/`` (ADR 0150) — `_release_store`'s
+    """The live release's highest-numbered ``rc-<N>/`` — `_release_store`'s
     `candidate_dir` rule; ``None`` with no live release or no candidate folder."""
-    if (release_id := resolve_live_release_id(specs_dir)) is None:
-        return None
-    return candidate_dir(specs_dir / "releases" / release_id)
+    release_id = live_release_id(specs_dir)
+    return candidate_dir(specs_dir / "releases" / release_id) if release_id else None
 
 
-def work_branch(specs_dir: Path, flow: Gitflow) -> str:
-    """``<work><live release id>``, else ``<work>0.1.0``."""
-    return f"{flow.work_prefix}{resolve_live_release_id(specs_dir) or '0.1.0'}"
+_git = load_owner("dd-gitflow-default", "_worktree_git")
+
+
+class SeveralWorkBranches(_git.SeveralWork, DadaiaError):  # type: ignore[misc,name-defined]
+    """The skill's several-work-branches refusal as a ``DadaiaError``, so the CLI renders its fix."""
+
+    def __init__(self, several: Any) -> None:
+        DadaiaError.__init__(self, several.args[0], several.fix)
+        self.keep = several.keep
+
+
+def work_branch(repo: Path, flow: Gitflow, main: str) -> str:
+    """The repo's work branch by the skill's one rule (``work_version``); with none, the name to
+    create (``next_version``); several raise ``SeveralWorkBranches``, which carries the skill's
+    fix. *main* is the main repo's slug."""
+    rule = {"work": flow.work_prefix, "integration": flow.integration, "main": main}
+    if _git.work_versions(repo, rule):
+        try:
+            return str(flow.work_prefix + _git.work_version(repo, rule))
+        except _git.SeveralWork as several:
+            raise SeveralWorkBranches(several) from several
+    return str(flow.work_prefix + _git.next_version(repo, rule))
 
 
 def from_mapping(block: object) -> Gitflow:
@@ -124,13 +137,14 @@ def constitution_path(specs_dir: Path) -> Path:
     return specs_dir / "constitution.md"
 
 
-def specs_tree_exists(specs_dir: Path) -> bool:
-    return specs_dir.exists()
+def specs_path_kind(specs_dir: Path) -> Literal["tree", "file", "absent"]:
+    """What the path is: a directory, anything else that exists, or nothing (a dangling symlink)."""
+    return "tree" if specs_dir.is_dir() else "file" if specs_dir.exists() else "absent"
 
 
 def constitution_text(specs_dir: Path) -> str:
     constitution = constitution_path(specs_dir)
-    return constitution.read_text(encoding="utf-8") if constitution.is_file() else ""
+    return platform.read_text(constitution) if constitution.is_file() else ""
 
 
 def _gitflow_block(text: str) -> tuple[Gitflow | None, str | None]:
@@ -147,10 +161,17 @@ def _gitflow_block(text: str) -> tuple[Gitflow | None, str | None]:
         return None, str(exc)
 
 
-def constitution_error(specs_dir: Path, text: str | None = None) -> str | None:
-    """Why the constitution's frontmatter (of *text* when given) cannot be trusted."""
-    reason = _gitflow_block(constitution_text(specs_dir) if text is None else text)[1]
-    return reason and f"{constitution_path(specs_dir)}: {reason}"
+def constitution_problem(specs_dir: Path, text: str | None = None) -> tuple[str, str] | None:
+    """``(cause, act)`` when the constitution (of *text* when given) cannot be trusted: the act
+    re-encodes a file that is not UTF-8, else repairs the YAML frontmatter."""
+    try:
+        reason = _gitflow_block(constitution_text(specs_dir) if text is None else text)[1]
+    except platform.Undecodable as bad:
+        return f"{bad.path}: is not valid UTF-8", str(bad.fix)
+    if not reason:
+        return None
+    cause = f"{constitution_path(specs_dir)}: {reason}"
+    return cause, f"Agent action: repair the YAML frontmatter of {cause}"
 
 
 def read_gitflow(specs_dir: Path, text: str | None = None) -> tuple[Gitflow, str | None]:
@@ -173,7 +194,7 @@ def merge_frontmatter(
     gitflow: Gitflow | None = None,
 ) -> None:
     """Write the given keys into the constitution frontmatter (replaced in place, else
-    appended; no block ⇒ one prepended); every other byte stays identical."""
+    appended; no block ⇒ one prepended); every other line stays identical."""
     names = gitflow and (gitflow.principal, gitflow.integration, gitflow.work_prefix)
     values = {
         "specs_pattern_version": specs_pattern_version,
@@ -181,9 +202,9 @@ def merge_frontmatter(
     }
     updates = {k: json.dumps(v) for k, v in values.items() if v is not None}  # JSON is YAML
     constitution = constitution_path(specs_dir)
-    text = constitution.read_text(encoding="utf-8") if constitution.exists() else ""
-    match = FRONTMATTER_RE.match(text)
-    lines = match.group(1).split("\n") if match else []
+    text = platform.read_text(constitution) if constitution.exists() else ""
+    parts = split(text)
+    lines = parts[0].split("\n") if parts else []
     kept: list[str] = []
     skipping = False
     for line in lines:
@@ -193,6 +214,6 @@ def merge_frontmatter(
         skipping = ":" in line and key in updates
         kept.append(f"{key}: {updates.pop(key)}" if skipping else line)
     kept.extend(f"{key}: {value}" for key, value in updates.items())
-    body = text[match.end() :] if match else text
-    closing = text[match.start(0) : match.end()].rsplit("\n---", 1)[1] if match else "\n"
-    constitution.write_text("---\n" + "\n".join(kept) + "\n---" + closing + body, encoding="utf-8")
+    platform.write_text(
+        constitution, "---\n" + "\n".join(kept) + "\n---\n" + (parts[1] if parts else text)
+    )

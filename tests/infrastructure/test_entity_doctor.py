@@ -1,13 +1,12 @@
-"""One enforcer for the behavior map (T-050-19).
+"""One enforcer for the behavior map.
 
-- One map (`public/entities/behavior-map.json`), one schema, this one enforcer; every member (a
-  skill, or a scoped `AGENTS.md` SOURCE under `public/{data,scaffold,templates}/`) maps to exactly
-  one row and every root-map section has an owner (A10.1).
-- `scoped_agents_md` names SOURCE paths, never the projected instance path — bug
-  `citation-enforcer-resolves-projected-instance-paths-against-the-checkout`.
+- One map, one schema, this one enforcer; every member (a skill, or a scoped `AGENTS.md` SOURCE
+  under `public/{data,scaffold,templates}/`) maps to exactly one row and every root-map section
+  has an owner.
+- `scoped_agents_md` names SOURCE paths, never the projected instance path.
 - Every violation is built from POSIX-relative paths and every planted fixture is in-memory or
-  under `tmp_path` — bug `citation-mutation-fixtures-never-turn-red-on-windows`.
-- Each check has a planted violation that turns it red (A10.2).
+  under `tmp_path`.
+- Each check has a planted violation that turns it red.
 """
 
 from __future__ import annotations
@@ -29,6 +28,12 @@ import pytest
 
 from dadaia_workspace.cli.help_digest import command_paths
 from dadaia_workspace.features.spec_context.doctor import DoctorService
+from dadaia_workspace.features.spec_context.gate_policy import (
+    Decision,
+    PathClass,
+    classify_path,
+    evaluate,
+)
 from dadaia_workspace.features.specs.citations import (
     dead_body_pointers_in_tree,
     dead_path_citations_in_tree,
@@ -37,12 +42,13 @@ from dadaia_workspace.features.specs.citations import (
 )
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from tests.fixtures.stores import context_store
+from tests.helpers.oslib import Undecodable, read_text, write_text
 from tests.helpers.scan_population import assert_populated
 
 _PKG_ROOT = Path(__file__).resolve().parents[2] / "dadaia_workspace"
 _PUBLIC = _PKG_ROOT / "public"
-_MAP_PATH = _PUBLIC / "entities" / "behavior-map.json"
-_SCHEMA_PATH = _PUBLIC / "schemas" / "behavior-map-v1.schema.json"
+_MAP_PATH = _PKG_ROOT / "features" / "spec_context" / "behavior-map.json"
+_SCHEMA_PATH = _MAP_PATH.with_name("behavior-map-v1.schema.json")
 _LAW_PATH = _PUBLIC / "data" / "AGENTS.md"
 _SKILLS_DIR = _PUBLIC / "skills"
 _AGENTS_DIR = _PUBLIC / "agents"
@@ -68,7 +74,7 @@ _LAW_SOURCE_RELPATH = "dadaia_workspace/public/data/AGENTS.md"
 
 
 def _load_json(path: Path) -> dict[str, Any]:
-    result: dict[str, Any] = json.loads(path.read_text(encoding="utf-8"))
+    result: dict[str, Any] = json.loads(read_text(path))
     return result
 
 
@@ -77,7 +83,7 @@ def _real_map() -> dict[str, Any]:
 
 
 def _law_section_titles(law_path: Path = _LAW_PATH) -> set[str]:
-    return {m.group(1).strip() for m in _HEADING_RE.finditer(law_path.read_text(encoding="utf-8"))}
+    return {m.group(1).strip() for m in _HEADING_RE.finditer(read_text(law_path))}
 
 
 def _section_title(section_field: str) -> str:
@@ -142,7 +148,7 @@ def _find_dangling_member_references(
 
 
 def _find_members_mapped_to_two_sections(map_data: dict[str, Any]) -> list[str]:
-    """A10.1: the row is the ownership unit — a member in two rows is ambiguous, same section or not."""
+    """The row is the ownership unit — a member in two rows is ambiguous, same section or not."""
     skills, scoped = _members(map_data)
     return [f"skill:{k}" for k, v in sorted(Counter(skills).items()) if v > 1] + [
         f"scoped_agents_md:{k}" for k, v in sorted(Counter(scoped).items()) if v > 1
@@ -158,7 +164,7 @@ def _find_ceiling_violations(map_data: dict[str, Any], skills_dir: Path) -> list
     return [
         f"{md.parent.name}: {n} lines > ceiling {ceiling}"
         for md in sorted(skills_dir.glob("*/SKILL.md"))
-        if (n := len(md.read_text(encoding="utf-8").splitlines())) > ceiling
+        if (n := len(read_text(md).splitlines())) > ceiling
     ]
 
 
@@ -182,7 +188,7 @@ def _globs_overlap(glob_a: str, glob_b: str) -> bool:
 
 
 def _frontmatter(md_path: Path) -> str:
-    fm = _FRONTMATTER_RE.match(md_path.read_text(encoding="utf-8"))
+    fm = _FRONTMATTER_RE.match(read_text(md_path))
     return fm.group(1) if fm else ""
 
 
@@ -219,7 +225,7 @@ def _find_undeclared_activation_overlaps(
 
 
 def _granted_to_any_model(agents_dir: Path, skills_dir: Path) -> set[str]:
-    """A28.1: every persona's `skills:` allowlist plus the universal-grant skills — derived."""
+    """Every persona's `skills:` allowlist plus the universal-grant skills — derived."""
     granted = {
         line.strip()[2:].strip()
         for agent_md in sorted(agents_dir.glob("*.md"))
@@ -286,8 +292,7 @@ _REAL_CHECKS: dict[str, Callable[[], list[Any]]] = {
 
 @pytest.mark.parametrize("check", list(_REAL_CHECKS))
 def test_the_real_tree_passes_every_check(check: str) -> None:
-    """A10.1-A10.4, FR27/FR28 over the shipped tree; `every-cited-path-exists` is
-    sa-text-restates-rules-the-code-contradicts#49.6. Each check's planted red is below."""
+    """Every check passes over the shipped tree; each check's planted red is below."""
     violations = _REAL_CHECKS[check]()
     assert violations == [], f"{check}:\n" + "\n".join(map(str, violations))
 
@@ -389,7 +394,7 @@ _PLANTED: dict[str, tuple[Callable[[], list[Any]], Callable[[list[Any]], bool]]]
 
 @pytest.mark.parametrize("case", list(_PLANTED))
 def test_a_planted_map_violation_turns_red(case: str) -> None:
-    """A10.2: each in-memory planted violation is flagged with its exact message."""
+    """Each in-memory planted violation is flagged with its exact message."""
     run, expected = _PLANTED[case]
     violations = run()
     assert expected(violations), violations
@@ -397,11 +402,11 @@ def test_a_planted_map_violation_turns_red(case: str) -> None:
 
 def _write_skill(skills_dir: Path, name: str, text: str) -> None:
     (skills_dir / name).mkdir(parents=True)
-    (skills_dir / name / "SKILL.md").write_text(text, encoding="utf-8")
+    write_text(skills_dir / name / "SKILL.md", text)
 
 
 def test_an_oversized_skill_md_and_an_undeclared_overlap_turn_red(tmp_path: Path) -> None:
-    """A10.2 mutation fixtures 5 and 6, planted under tmp_path."""
+    """An oversized SKILL.md and an undeclared overlap, planted under tmp_path."""
     ceiling = _real_map()["skill_md_line_ceiling"]
     _write_skill(tmp_path / "big", "fixture-oversized-skill", "\n".join(["l"] * (ceiling + 20)))
     for name in ("fixture-skill-one", "fixture-skill-two"):
@@ -425,8 +430,8 @@ def test_an_oversized_skill_md_and_an_undeclared_overlap_turn_red(tmp_path: Path
     ],
 )
 def test_skill_md_over_the_soft_limit_warns(tmp_path: Path, line: bytes) -> None:
-    """ADR 0170: a projected SKILL.md of soft + 1 lines is one workspace warning naming the
-    skill, its line count and its split; soft lines stay silent."""
+    """A projected SKILL.md of soft + 1 lines is one workspace warning naming the skill, its
+    line count and its split; soft lines stay silent."""
     soft = _real_map()["skill_md_line_soft"]
     skills = tmp_path / ".agents" / "skills"
     for name, n in (("fixture-long", soft), ("fixture-longer", soft + 1)):
@@ -438,22 +443,63 @@ def test_skill_md_over_the_soft_limit_warns(tmp_path: Path, line: bytes) -> None
 
     [found] = service.check_skill_md_length()
 
-    skill_md = skills / "fixture-longer" / "SKILL.md"
     assert (found.code, found.verdict, found.canonical, found.error, found.message, found.fix) == (
         "SKILL-MD-LENGTH",
         "warning",
         False,
         False,
         f"fixture-longer/SKILL.md has {soft + 1} lines > soft limit {soft}",
-        f"Operator action: split {skill_md} into its references/*.md and/or scripts/",
+        "Operator action: split fixture-longer/SKILL.md at its library source; "
+        "this workspace holds none and never edits the projection",
     )
+
+
+def test_a_long_skill_md_with_its_source_in_a_repo_is_split_there_in_a_tree(tmp_path: Path) -> None:
+    """The fix names the split as a task of the open rc, then the reprojection; the source
+    is no PROTECTED path and the gate lets an agent edit it in a worktree."""
+    soft = _real_map()["skill_md_line_soft"]
+    projected = tmp_path / ".agents" / "skills" / "fixture-long" / "SKILL.md"
+    source = (
+        tmp_path
+        / "repos"
+        / "lib"
+        / "dadaia_workspace"
+        / "public"
+        / "skills"
+        / "fixture-long"
+        / "SKILL.md"
+    )
+    for path in (projected, source):
+        path.parent.mkdir(parents=True)
+        path.write_bytes(b"l\n" * (soft + 1))
+    service = DoctorService(
+        context_store(tmp_path / ".dadaia" / "states"), GitSubprocessClient(), tmp_path
+    )
+
+    [found] = service.check_skill_md_length()
+
+    assert found.fix == (
+        "Agent action: add the split of fixture-long/SKILL.md to a task of the open rc, "
+        "then run public install"
+    )
+    edited = (
+        tmp_path / "worktrees" / "lib" / "task" / source.relative_to(tmp_path / "repos" / "lib")
+    )
+    assert (
+        classify_path(source.relative_to(tmp_path).as_posix(), root=tmp_path)[0]
+        is not PathClass.PROTECTED
+    )
+    rel = edited.relative_to(tmp_path).as_posix()
+    assert classify_path(rel, root=tmp_path)[0] is not PathClass.PROTECTED
+    assert evaluate(rel, root=tmp_path, zone="worktree", repo="lib", owner="lib", context="lib",
+                    repos=frozenset({"lib"}))[0] is Decision.ALLOW  # fmt: skip
 
 
 @functools.cache
 def _projected_specs_agents_relpath(repo_root: Path) -> str | None:
     """`specs/AGENTS.md` is a projected INSTANCE path, proven by running the real `scaffold()`
-    into a scratch dir and diffing it against its generating template — never by checkout
-    presence (bug citation-enforcer-resolves-projected-instance-paths-against-the-checkout)."""
+    into a scratch dir and diffing it against its generating template, never by checkout
+    presence."""
     templates_dir = repo_root / "dadaia_workspace" / "public" / "templates"
     source = templates_dir / "specs-AGENTS.md"
     if not source.exists():
@@ -471,8 +517,8 @@ def _projected_specs_agents_relpath(repo_root: Path) -> str | None:
             public_dir=templates_dir.parent,
         )
         target = specs_dir / "AGENTS.md"
-        rendered = render_registry_tables(source.read_text(encoding="utf-8"))  # WP-38
-        if target not in created or target.read_text(encoding="utf-8") != rendered:
+        rendered = render_registry_tables(read_text(source))
+        if target not in created or read_text(target) != rendered:
             return None
     return "AGENTS.md"
 
@@ -484,8 +530,8 @@ def _real_dead_path_citations(repo_root: Path = _REPO_ROOT) -> list[str]:
 
 
 def test_projected_specs_agents_md_citation_survives_bare_checkout() -> None:
-    """Bug citation-enforcer-resolves-projected-instance-paths-against-the-checkout: with the
-    local `specs/AGENTS.md` leftover hidden (as in a bare CI clone), no citation of it is dead."""
+    """With the local `specs/AGENTS.md` leftover hidden (as in a bare clone), no citation of it
+    is dead."""
     real_path = _REPO_ROOT / "specs" / "AGENTS.md"
     hidden_path = real_path.with_name("AGENTS.md.hidden-for-bare-checkout-test")
     moved = real_path.exists()
@@ -502,7 +548,7 @@ def test_projected_specs_agents_md_citation_survives_bare_checkout() -> None:
 def _fixture_skill(tmp_path: Path, body: str) -> Path:
     skill = tmp_path / "fixture-repo" / "dadaia_workspace" / "public" / "skills" / "fixture-skill"
     skill.mkdir(parents=True)
-    (skill / "SKILL.md").write_text(body, encoding="utf-8")
+    write_text(skill / "SKILL.md", body)
     return tmp_path / "fixture-repo"
 
 
@@ -516,7 +562,7 @@ def _fixture_skill(tmp_path: Path, body: str) -> Path:
     ],
 )  # fmt: skip
 def test_a_planted_dead_citation_turns_red(tmp_path: Path, body: str, token: str) -> None:
-    """A27.20 mutation fixtures 9-11: one located violation per planted dead citation."""
+    """One located violation per planted dead citation."""
     repo = _fixture_skill(tmp_path, body)
     public = repo / "dadaia_workspace" / "public"
     violations = dead_path_citations_in_tree(public, repo) + dead_verb_citations_in_tree(
@@ -527,8 +573,7 @@ def test_a_planted_dead_citation_turns_red(tmp_path: Path, body: str, token: str
 
 
 def test_posix_relpath_is_separator_agnostic_under_windows_path_semantics() -> None:
-    """Bug citation-mutation-fixtures-never-turn-red-on-windows: a `file:line` prefix built from
-    Windows path semantics renders POSIX."""
+    """A `file:line` prefix built from Windows path semantics renders POSIX."""
     root = PureWindowsPath(r"D:\pytest-fixture-repo")
     md = root / "dadaia_workspace" / "public" / "skills" / "fixture-skill" / "SKILL.md"
     assert posix_relpath(md, root) == "dadaia_workspace/public/skills/fixture-skill/SKILL.md"
@@ -538,10 +583,10 @@ def test_mutation_fixture_12_dead_body_pointer_turns_red(tmp_path: Path) -> None
     """A dead skill pointer, a dead section pointer and a dead scoped-rule pointer are each flagged."""
     public = tmp_path / "fixture-repo" / "dadaia_workspace" / "public"
     (public / "skills" / "dd-real").mkdir(parents=True)
-    (public / "skills" / "dd-real" / "SKILL.md").write_text("## 1. When\n", encoding="utf-8")
-    (public / "skills" / "dd-real" / "NOTES.md").write_text(
+    write_text(public / "skills" / "dd-real" / "SKILL.md", "## 1. When\n")
+    write_text(
+        public / "skills" / "dd-real" / "NOTES.md",
         "See `dd-gone`.\nSee `dd-real` §9.\nSee `nowhere-AGENTS.md`.\nSee `dd-real` §1.\n",
-        encoding="utf-8",
     )
 
     violations = dead_body_pointers_in_tree((public / "skills",), public, tmp_path / "fixture-repo")
@@ -560,8 +605,8 @@ _CITED_INVOCATION_RE = re.compile(
 
 
 def test_every_cited_dadaia_invocation_names_a_real_verb_and_option() -> None:
-    """repo-law-prescribes-a-removed-install-option: every `dadaia <verb…> --option` the law
-    cites resolves in the live Click tree, each `--option` among that command's parameters."""
+    """Every `dadaia <verb…> --option` the law cites resolves in the live Click tree, each
+    `--option` among that command's parameters."""
     from typer.main import get_command
 
     from dadaia_workspace.cli.main import app
@@ -574,7 +619,7 @@ def test_every_cited_dadaia_invocation_names_a_real_verb_and_option() -> None:
         (f"{posix_relpath(md, _REPO_ROOT)}:{number}", token)
         for md in files
         if md.is_file() and not md.is_symlink()
-        for number, line in enumerate(md.read_text(encoding="utf-8").splitlines(), start=1)
+        for number, line in enumerate(read_text(md).splitlines(), start=1)
         for token in re.findall(r"`([^`\n]+)`", line)
     ]
     violations: list[str] = []
@@ -614,7 +659,7 @@ def _self_invoked_verb_paths() -> list[tuple[str, tuple[str, ...]]]:
         if path.is_symlink():
             continue
         rel = path.relative_to(_REPO_ROOT).as_posix()
-        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+        for node in ast.walk(ast.parse(read_text(path))):
             argvs: list[list[ast.expr]] = []
             if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
                 if node.func.id in {"cli", "doctor_clean"}:
@@ -630,8 +675,7 @@ def _self_invoked_verb_paths() -> list[tuple[str, tuple[str, ...]]]:
 
 
 def test_every_self_invoked_dadaia_verb_exists() -> None:
-    """0.4.7 FR5 (T-047-78), bug `certify-invokes-a-retired-verb`: the
-    longest literal prefix of every argv the package runs resolves to a LEAF verb."""
+    """The longest literal prefix of every argv the package runs resolves to a LEAF verb."""
     paths = set(command_paths())
     leaves = {p for p in paths if not any(q[: len(p)] == p and len(q) > len(p) for q in paths)}
     invocations = _self_invoked_verb_paths()
@@ -650,20 +694,20 @@ _ADD_PARSER_RE = re.compile(r"add_parser\(\s*\"([a-z][a-z-]*)\"")
 
 
 def test_every_cited_skill_script_verb_exists() -> None:
-    """bug `spec-navigator-cites-dead-memory-verb-and-false-binding-claim`:
-    a verb cited after `<script>.py` — inline (`memory.py drift`) or as the backticked list that
-    follows (`memory.py` — `catalog generate`, …) — is one of that script's `add_parser` names."""
+    """A verb cited after `<script>.py`, inline (`memory.py drift`) or as the backticked list
+    that follows (`memory.py` — `catalog generate`, …), is one of that script's `add_parser`
+    names."""
     verbs: dict[str, set[str]] = {}
     for script in sorted(_PUBLIC.glob("skills/*/scripts/[a-z]*.py")):
         found = verbs.setdefault(script.stem, set())
         for source in [script, *script.parent.glob(f"_{script.stem}*.py")]:
-            found.update(_ADD_PARSER_RE.findall(source.read_text(encoding="utf-8")))
+            found.update(_ADD_PARSER_RE.findall(read_text(source)))
     verbs = {name: found for name, found in verbs.items() if found}
     assert "catalog" in verbs.get("memory", set()), "script verb scan mis-rooted"
     violations: list[str] = []
     for md_path in sorted(_PUBLIC.rglob("*.md")):
         rel = md_path.relative_to(_REPO_ROOT).as_posix()
-        for number, line in enumerate(md_path.read_text(encoding="utf-8").splitlines(), 1):
+        for number, line in enumerate(read_text(md_path).splitlines(), 1):
             cited = [(m.group(1), m.group(2)) for m in _INLINE_VERB_RE.finditer(line)]
             for listed in _LISTED_VERBS_RE.finditer(line):
                 cited += [
@@ -676,3 +720,28 @@ def test_every_cited_skill_script_verb_exists() -> None:
                 if script in verbs and verb not in verbs[script]
             ]
     assert violations == [], "\n".join(violations)
+
+
+@pytest.mark.parametrize("check", ["skill-refs", "persona-content", "registry"])
+def test_an_authored_file_that_is_not_utf8_is_undecodable_not_a_codec_error(
+    tmp_path: Path, check: str
+) -> None:
+    from dadaia_workspace.infrastructure import entity_doctor
+
+    latin = tmp_path / "agents" / "a.md"
+    latin.parent.mkdir()
+    latin.write_bytes(b"---\nname: a\n---\ncaf\xe9\n")
+    registry = tmp_path / "entities" / "registry.json"
+    registry.parent.mkdir()
+    registry.write_bytes(b'{"x": "caf\xe9"}')
+    calls = {
+        "skill-refs": (entity_doctor.check_agent_skill_refs, (tmp_path,), latin),
+        "persona-content": (entity_doctor._persona_content_drift, ("a", latin.parent), latin),
+        "registry": (entity_doctor.check_entities_derivation, (tmp_path,), registry),
+    }
+    call, args, bad = calls[check]
+
+    with pytest.raises(Undecodable) as refused:
+        call(*args)
+
+    assert refused.value.path == bad

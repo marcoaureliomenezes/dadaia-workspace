@@ -1,6 +1,6 @@
 """`specs upgrade` rewrites the retired Portuguese status tokens in the
-live candidate's trio (0.4.7 FR4 / T-047-58), never in a closed rc-<N>/ or published
-history (ADR 0150 (1)); only the owner's anchored line is a declaration (T-050-143). Size: SMALL."""
+live candidate's trio never in a closed candidate directory or published
+history; only the owner's anchored line is a declaration. Size: SMALL."""
 
 from __future__ import annotations
 
@@ -18,15 +18,16 @@ from dadaia_workspace.features.migrate.upgrade import (
 )
 from dadaia_workspace.features.specs import canon
 from dadaia_workspace.features.specs.doctor import SpecsDoctor
+from tests.helpers.oslib import read_text, write_text
 
 _QUOTED = "a quoted `**Status:** Rascunho` is no declaration\n"
 
 
 def _trio(root: Path, status: str) -> None:
     root.mkdir(parents=True, exist_ok=True)
-    (root.parent / "_RELEASE.json").write_text("{}", encoding="utf-8")
+    write_text(root.parent / "_RELEASE.json", "{}")
     for name in ("SPEC.md", "PLAN.md", "TASKS.md"):
-        (root / name).write_text(f"# doc\n\n**Status:** {status}\n{_QUOTED}", encoding="utf-8")
+        write_text(root / name, f"# doc\n\n**Status:** {status}\n{_QUOTED}")
 
 
 # fmt: off
@@ -46,15 +47,15 @@ def test_upgrade_rewrites_retired_status_tokens_only_in_the_live_trio(tmp_path: 
     assert set(plan_status_token_rewrites(tmp_path)) == touched
     assert set(rewrite_status_tokens(tmp_path)) == touched
     for rel, status in dirs.items():
-        text = (tmp_path / "releases" / rel / "PLAN.md").read_text(encoding="utf-8")
+        text = read_text(tmp_path / "releases" / rel / "PLAN.md")
         assert text.splitlines()[2:] == [f"**Status:** {expected.get(rel, status)}", _QUOTED.strip()]
 
 
 @pytest.mark.medium
 def test_one_upgrade_run_folds_a_legacy_flat_tree_clean(tmp_path: Path) -> None:
-    """ADR 0150, 0151 M5, 0152 (4): a stamp-6 tree whose release carries the legacy
-    `RELEASE.json`, a closed `rc-1/` and a flat trio is clean after ONE `specs upgrade`:
-    the trio lands in `rc-2/`, the dry run plans the same destinations, `rc-1/` is kept."""
+    """A stamp-6 tree whose release carries the legacy
+    `RELEASE.json`, a closed first candidate and a flat trio is clean after ONE `specs upgrade`:
+    the trio lands in the second candidate, the dry run plans the same destinations, the first is kept."""
     specs = tmp_path / "specs"
     canon.scaffold(specs, project_name="p")
     merge_frontmatter(specs, specs_pattern_version=6)
@@ -62,10 +63,10 @@ def test_one_upgrade_run_folds_a_legacy_flat_tree_clean(tmp_path: Path) -> None:
     _trio(release / "rc-1", "Aprovado")
     state = {"schema": "release-state-v1", "release": "0.7.0", "phase": "DEFINITION",
              "defined": None, "implemented": None, "shipped": None, "log": []}  # fmt: skip
-    (release / "RELEASE.json").write_text(json.dumps(state), encoding="utf-8")
+    write_text(release / "RELEASE.json", json.dumps(state))
     (release / "_RELEASE.json").unlink()
     for name in ("SPEC.md", "PLAN.md", "TASKS.md"):
-        (release / name).write_text("**Status:** Rascunho\n**Origin:** operator-demand\n")
+        write_text(release / name, "**Status:** Rascunho\n**Origin:** operator-demand\n")
     argv = ["specs", "upgrade", "--specs-dir", str(specs)]
 
     dry = CliRunner().invoke(app, [*argv, "--dry-run"])
@@ -74,6 +75,28 @@ def test_one_upgrade_run_folds_a_legacy_flat_tree_clean(tmp_path: Path) -> None:
     done = CliRunner().invoke(app, argv)
     assert done.exit_code == 0, done.output
     assert sorted(p.name for p in release.iterdir()) == ["_RELEASE.json", "rc-1", "rc-2"]
-    assert "Draft" in (release / "rc-2" / "PLAN.md").read_text(encoding="utf-8")
-    assert "Aprovado" in (release / "rc-1" / "PLAN.md").read_text(encoding="utf-8")
+    assert "Draft" in read_text(release / "rc-2" / "PLAN.md")
+    assert "Aprovado" in read_text(release / "rc-1" / "PLAN.md")
     assert [i.code for i in SpecsDoctor(specs).check() if i.error] == []
+
+
+@pytest.mark.medium
+def test_one_upgrade_run_folds_a_flat_only_tree_into_rc_1(tmp_path: Path) -> None:
+    """A stamp-6 release holding only a flat trio, with no candidate directory, lands in the first:
+    the trio is the candidate being folded, never one already counted."""
+    specs = tmp_path / "specs"
+    canon.scaffold(specs, project_name="p")
+    merge_frontmatter(specs, specs_pattern_version=6)
+    release = specs / "releases" / "0.7.0"
+    release.mkdir(parents=True, exist_ok=True)
+    state = {"schema": "release-state-v1", "release": "0.7.0", "phase": "DEFINITION",
+             "defined": None, "implemented": None, "shipped": None, "log": []}  # fmt: skip
+    write_text(release / "RELEASE.json", json.dumps(state))
+    (release / "_RELEASE.json").unlink(missing_ok=True)
+    for name in ("SPEC.md", "PLAN.md", "TASKS.md"):
+        write_text(release / name, "**Status:** Rascunho\n**Origin:** operator-demand\n")
+
+    done = CliRunner().invoke(app, ["specs", "upgrade", "--specs-dir", str(specs)])
+    assert done.exit_code == 0, done.output
+    assert sorted(p.name for p in release.iterdir()) == ["_RELEASE.json", "rc-1"]
+    assert "Draft" in read_text(release / "rc-1" / "PLAN.md")

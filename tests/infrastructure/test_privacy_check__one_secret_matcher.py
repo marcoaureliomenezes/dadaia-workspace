@@ -1,8 +1,7 @@
 """One secret matcher: the pre-push scan and the baseline publish preflight
 give the same verdict on every fixture, because both run ONE engine over ONE registry.
 
-AC5.6 / sa-pre-push-and-publish-scan-disagree-on-secret-shapes;
-sa-privacy-match-has-two-matchers: the public doctor's text scan says the same, because it
+The public doctor's text scan says the same, because it
 calls the pre-push matcher (``core.redaction.privacy_matches``).
 
 Every secret-shaped value is composed at run time (``tests/helpers/privacy_fixtures``
@@ -28,20 +27,21 @@ from dadaia_workspace.infrastructure.privacy_check import (
     _PUBLIC_PRIVACY_TEXT_SUFFIXES,  # allow-private-import: which suffixes the doctor reads
     check_public_privacy,
 )
+from tests.helpers.oslib import write_text
 
 _DASHES = "-" * 5
 _TERM = "zz" + "fixtureterm"
 _V = "hunter2" + "Xq9zL"
 
 #: (case, file name, content, expected verdict: True = refused). The expectation is
-#: the SPEC's (AC5.6 and the bug's expected line), never either engine's output.
+#: the spec's expectation, never either engine's output.
 _MATRIX: list[tuple[str, str, str | bytes, bool]] = [
     ("pem-block", "k.txt", _DASHES + "BEGIN RSA " + "PRIVATE KEY" + _DASHES + "\n", True),
     ("key-file-suffix", "server.p12", b"\x00opaque\xff", True),
     ("asia", "a.txt", "id=" + "AS" + "IA" + "Z" * 16 + "\n", True),
     ("ghs", "g.txt", "t=" + "gh" + "s_" + "a" * 36 + "\n", True),
     ("ghp-odd-length", "g2.txt", "t=" + "gh" + "p_" + "b" * 30 + "\n", True),
-    # secret-scan-misses-github-pat-and-anthropic-keys: outside any *_key= assignment.
+    # Outside any *_key= assignment.
     ("github-pat-env", ".env", "GH_TOKEN=" + "github" + "_pat_" + "A" * 40 + "\n", True),
     (
         "github-pat-header",
@@ -60,7 +60,7 @@ _MATRIX: list[tuple[str, str, str | bytes, bool]] = [
     ("control-char-term", "c.txt", _TERM[:5] + "\x1b" + _TERM[5:] + "\n", True),
     ("clean", "n.txt", "nothing to see here\n", False),
     ("quoted-literal", "q.txt", "pass" + "word = '" + "g" * 8 + "'\n", True),
-    # Review 7 R8-2: ordinary code names a secret without holding one — never refused.
+    # Ordinary code names a secret without holding one — never refused.
     ("kwarg-passthrough", "db.py", "driver.connect(user=user, pass" + "word=password)\n", False),
     ("annotation", "cfg.py", "api" + "_key: Optional[str] = None\n", False),
     ("call", "c1.py", "pass" + "word = get_password()\n", False),
@@ -69,7 +69,7 @@ _MATRIX: list[tuple[str, str, str | bytes, bool]] = [
     ("subscript", "c4.py", "access" + '_token = response.json()["t"]\n', False),
     ("aws-runtime", "c5.py", "aws_secret" + '_access_key=runtime_value("x")\n', False),
     ("terraform-attr", "m.tf", "CLIENT_" + "SECRET = some_resource.attr\n", False),
-    # Review 8 R9-1: prefixed names, env/compose, base64, dotted and commented values.
+    # Prefixed names, env/compose, base64, dotted and commented values.
     ("env-prefixed", ".env", "DB_PASS" + "WORD=" + _V + "\n", True),
     ("jwt-secret", ".env", "JWT_SEC" + "RET=" + _V + "\n", True),
     ("openai-key", ".env", "OPENAI_API" + "_KEY=" + _V + "\n", True),
@@ -88,7 +88,7 @@ _MATRIX: list[tuple[str, str, str | bytes, bool]] = [
     ("secret-name", "t5.py", "secret" + '_name = "database-credentials"\n', False),
     ("json-template", "t6.json", '{"pass' + 'word": "${DB_PASSWORD}"}\n', False),
     ("dict-variable", "t7.py", "cfg = {'pass" + "word': password}\n", False),
-    # secret-token-value-classes-miss-literals-and-refuse-code: a literal is a run free
+    # A literal is a run free
     # of code syntax whatever the key's case style; a comparison or a name is not one.
     ("camel-case-key", "c.js", "const dbPass" + 'word = "' + _V + '"\n', True),
     ("bare-specials", ".env", "DB_PASS" + "WORD=" + _V + "!@%\n", True),
@@ -97,7 +97,7 @@ _MATRIX: list[tuple[str, str, str | bytes, bool]] = [
     ("unspaced-eq-return", "t9.py", "return pass" + "word==stored_password\n", False),
     ("kebab-secret-name", "m.py", "SECRET" + '_KEY = "infura-api-key"\n', False),
     ("masked-value", "m.env", "API" + "_KEY=********\n", False),
-    # Behavior (retro 2026-09-27 item 1): private-key containers are refused on
+    # Private-key containers are refused on
     # presence (.pem .key .p12 .pfx .jks .keystore .der); public certs (.crt .cer) pass.
     ("der-private-key", "k.der", b"\x30\x82key\xff", True),
     ("pem-private-key", "k.pem", b"\x00opaque\xff", True),
@@ -113,7 +113,7 @@ _MATRIX: list[tuple[str, str, str | bytes, bool]] = [
 @pytest.fixture(autouse=True)
 def _operator_term(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     denylist = tmp_path / "denylist.json"
-    denylist.write_text(json.dumps({_TERM: "fixture term"}))
+    write_text(denylist, json.dumps({_TERM: "fixture term"}))
     monkeypatch.setenv("DADAIA_PRIVACY_DENYLIST", str(denylist))
 
 
@@ -131,7 +131,7 @@ def _publish_refuses(root: Path, name: str, content: str | bytes) -> bool:
     """The publish side: the in-process matcher ``context baseline`` runs over the same
     file, untracked in its repo."""
     target = root / name
-    target.write_bytes(content) if isinstance(content, bytes) else target.write_text(content)
+    target.write_bytes(content) if isinstance(content, bytes) else write_text(target, content)
     return bool(scan_publish_candidates(root, [name]))
 
 
@@ -146,6 +146,6 @@ def test_pre_push_and_publish_preflight_agree(
     if isinstance(content, str) and Path(name).suffix in _PUBLIC_PRIVACY_TEXT_SUFFIXES:
         public = tmp_path / "lib" / "dadaia_workspace" / "public"
         public.mkdir(parents=True)
-        (public / name).write_text(content)
+        write_text(public / name, content)
         lines = check_public_privacy(public, lambda d: d.iterdir())
         assert any(line.status is DoctorStatus.ERROR for line in lines) is refused, case

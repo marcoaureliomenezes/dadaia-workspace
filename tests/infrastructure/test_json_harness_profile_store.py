@@ -1,9 +1,9 @@
-"""Unit tests for the simple read/write JSON adapters — JsonHarnessProfileStore
-(v0.1.58 FR2, A1). Merged file (T-8, v0.1.75
-FR3 squeeze): both adapters share the identical stateless read/write-store contract
-(absent->None/roundtrip/canonical-shape/idempotent-mtime/overwrite), asserted once via
-the shared ``_store_contract.assert_read_write_store_contract`` helper through one
-parametrized sweep across both stores.
+"""Unit tests for the simple read/write JSON adapters, JsonHarnessProfileStore included.
+
+Both adapters share one stateless read/write-store contract (absent->None/roundtrip/
+canonical-shape/idempotent-mtime/overwrite), asserted once via the shared
+``_store_contract.assert_read_write_store_contract`` helper through one parametrized sweep
+across both stores.
 
 That is the discriminating proof the adapter genuinely persists the ledger shape.
 """
@@ -18,6 +18,7 @@ import pytest
 from dadaia_workspace.core.models.harness_profile import HarnessProfile
 from dadaia_workspace.infrastructure.json_harness_profile_store import JsonHarnessProfileStore
 from tests.fixtures._store_contract import assert_read_write_store_contract
+from tests.helpers.oslib import Undecodable
 
 
 def _states(tmp_path: Path) -> Path:
@@ -55,3 +56,23 @@ def test_readwrite_store_contract(
         second_value=second_value,
         canonical_shape=canonical_shape,
     )
+
+
+def test_a_profile_that_is_not_utf8_is_undecodable_not_a_codec_error(tmp_path: Path) -> None:
+    path = JsonHarnessProfileStore.path(tmp_path)
+    path.write_bytes(b'{"harnesses": "caf\xe9"}')
+
+    with pytest.raises(Undecodable) as refused:
+        JsonHarnessProfileStore().read(tmp_path)
+
+    assert refused.value.path == path
+
+
+def test_writing_over_a_profile_that_is_not_utf8_is_undecodable(tmp_path: Path) -> None:
+    path = JsonHarnessProfileStore.path(tmp_path)
+    path.write_bytes(b'{"harnesses": "caf\xe9"}')
+
+    with pytest.raises(Undecodable) as refused:
+        JsonHarnessProfileStore().write(tmp_path, HarnessProfile.of(()))
+
+    assert refused.value.path == path

@@ -1,4 +1,4 @@
-"""bug cli-missing-version-flag (dadaia --version / -V), expected
+"""`dadaia --version` and `-V` report an expected
 value from an independent source: the fake dist-info, never the code's own reader
 (REWRITE; the -V twin is DELETE-DUP)."""
 

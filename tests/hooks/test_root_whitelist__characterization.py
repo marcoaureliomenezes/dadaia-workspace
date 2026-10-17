@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 from tests.fixtures.harness_env import claude_hook_env, run_hook_subprocess
+from tests.helpers.oslib import write_text
 
 
 @pytest.mark.medium
@@ -15,9 +16,7 @@ from tests.fixtures.harness_env import claude_hook_env, run_hook_subprocess
 def test_existing_root_entry_is_allowed_without_mutating_it(tmp_path: Path) -> None:
     states = tmp_path / ".dadaia" / "states"
     states.mkdir(parents=True)
-    (states / "spec_contexts.json").write_text(
-        json.dumps({"schema_version": "2", "contexts": []}), encoding="utf-8"
-    )
+    write_text(states / "spec_contexts.json", json.dumps({"schema_version": "2", "contexts": []}))
     target = tmp_path / "operator-note.txt"
     target.write_bytes(b"operator-owned\n")
 

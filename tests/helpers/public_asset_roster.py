@@ -1,9 +1,8 @@
-"""Derived inventory of ``dadaia_workspace/public/**`` (v0.4.5 FR3,
-``byte-golden-test-inventory-roster-split``).
+"""Derived inventory of ``dadaia_workspace/public/**``.
 
 The single, DERIVED source of the public-asset inventory dimension: it scans
 ``dadaia_workspace/public/**`` at test time so no test hand-pins a per-file roster that
-drifts whenever a skill/agent/rule file is added or removed (v0.4.4 AR-1).
+drifts whenever a skill/agent/rule file is added or removed.
 
 It reuses ``iter_public_files`` (the real ignore rules) rather than reimplementing the
 include/exclude rules by hand — that walk is the EXACT enumeration ``install()``,
@@ -22,7 +21,7 @@ from dadaia_workspace.infrastructure.public_assets_common import iter_public_fil
 def default_public_dir() -> Path:
     """The package's real ``dadaia_workspace/public/`` tree — the same root
     ``install()``/``doctor()``/``stage()`` read from by default."""
-    return FileSystemPublicAssetManager()._public_dir  # noqa: SLF001
+    return FileSystemPublicAssetManager()._public_dir
 
 
 def scan(public_dir: Path | None = None) -> list[str]:

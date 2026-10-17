@@ -7,14 +7,14 @@ from __future__ import annotations
 
 import fnmatch
 import re
-from collections.abc import Callable, Collection, Sequence
+from collections.abc import Callable, Collection
 from dataclasses import dataclass
 from enum import StrEnum
 from functools import cached_property
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Literal
 
-from dadaia_workspace.core import platform
+from dadaia_workspace.core import invocation, platform
 from dadaia_workspace.core.harness_registry import HARNESS_PROJECTION_DIRS
 from dadaia_workspace.core.release_state import CANDIDATE_RE, RELEASE_ID_RE
 
@@ -73,15 +73,15 @@ AUDIT_DIR_NAME_PATTERN: str = r"\d{8}-[a-z0-9][a-z0-9-]*"
 AUDIT_DIR_NAME_RE: re.Pattern[str] = re.compile(f"^{AUDIT_DIR_NAME_PATTERN}$")
 
 
-#: The operator's file of legitimate workspace paths, at the root (ADRs 0092, 0145).
+#: The operator's file of legitimate workspace paths, at the root.
 DADAIAIGNORE: str = ".dadaiaignore"
 
 #: Files the workspace root may contain: the root map, the operator prompt, the operator's own
-#: globs — credentials live outside the workspace (ADR 0146); the root is never a repository,
-#: so neither a ``.gitignore`` nor a ``.git/`` is canon there (ADR 0092: ``.dadaiaignore``).
+#: globs. Credentials live outside the workspace; the root is never a repository, so neither
+#: a ``.gitignore`` nor a ``.git/`` is canon there (``.dadaiaignore`` is the root's file).
 ROOT_ALLOWED_FILES: frozenset[str] = frozenset({"AGENTS.md", "prompt.md", DADAIAIGNORE})
 
-#: Entries the doctor reports and never moves: a credential file (ADR 0146) and a repository's
+#: Entries the doctor reports and never moves: a credential file and a repository's
 #: history — the operator moves them out or names them in ``.dadaiaignore``.
 NEVER_MOVED: frozenset[str] = frozenset({".env", ".git"})
 
@@ -90,13 +90,14 @@ class FloorRefusal(StrEnum):
     """Why a PROTECTED write is refused; its message is ``REFUSALS[refusal]``."""
 
     LAW = "law"
+    STATE = "state"
     OPERATOR = "operator"
     GLOB = "glob"
     SESSION = "session"
 
 
-_OPERATOR = (  # ADR 0092: the operator's file, or a path under an operator glob
-    "[GATE] '{path}' is the operator's ({why}; ADRs 0092, 0133): only the operator edits it "
+_OPERATOR = (  # the operator's file, or a path under an operator glob
+    "[GATE] '{path}' is the operator's ({why}): only the operator edits it "
     "by hand. Draft your change under .dadaia/tmp/<agent>/<YYYYMMDD>/ and hand it over.\n"
 )
 #: Each refusal's message, formatted with ``path`` and ``match``; the gate appends its ``fix:``.
@@ -107,6 +108,10 @@ REFUSALS: dict[FloorRefusal, str] = {
         "an agent changes the law at its source and re-projects.\n"
         "The source is dadaia_workspace/public/; this re-projects it:\n"
     ),
+    FloorRefusal.STATE: (
+        "[GATE] '{path}' is CLI-owned workspace state: a file tool never writes it, "
+        "the verb or skill script that owns it does.\n"
+    ),
     FloorRefusal.OPERATOR: _OPERATOR.replace("{why}", "its own file"),
     FloorRefusal.GLOB: _OPERATOR.replace("{why}", "protected glob '{match}'"),
     FloorRefusal.SESSION: (
@@ -116,12 +121,13 @@ REFUSALS: dict[FloorRefusal, str] = {
     ),
 }
 
-#: PROTECTED without any install ledger (ADR 0133): the root map, the operator's globs, and
+#: PROTECTED without any install ledger: the root map, the operator's globs, and
 #: the CLI-owned ``.dadaia/`` zones, each with its refusal; the ledger adds every projected path on top.
 CORE_FLOOR: dict[str, FloorRefusal] = {
     "AGENTS.md": FloorRefusal.LAW,
     DADAIAIGNORE: FloorRefusal.OPERATOR,
-    ".dadaia/states": FloorRefusal.LAW,
+    ".dadaia/states/privacy_denylist.json": FloorRefusal.OPERATOR,  # before its folder
+    ".dadaia/states": FloorRefusal.STATE,
     ".dadaia/hooks": FloorRefusal.LAW,
     ".dadaia/agentic": FloorRefusal.LAW,
     ".dadaia/sessions": FloorRefusal.SESSION,
@@ -206,7 +212,7 @@ MARKER_DIR: Path = Path(".dadaia") / "tmp" / "hooks"
 
 
 def parse_dadaiaignore(text: str) -> tuple[tuple[str, ...], tuple[str, ...], tuple[str, ...]]:
-    """(patterns, protected, invalid lines) of a ``.dadaiaignore`` (ADRs 0093, 0133): one
+    """(patterns, protected, invalid lines) of a ``.dadaiaignore``: one
     pattern per line, ``#`` comments, ``*`` within one segment, a trailing ``/`` for a
     directory (dropped); ``!``, ``**``, an absolute path or ``..`` is invalid. Lines after a
     ``[protected]`` header are repo-relative protected globs. Deduplicated, order kept."""
@@ -230,8 +236,8 @@ def operator_globs(workspace: Path) -> tuple[tuple[str, ...], tuple[str, ...], t
     """The one reader of ``<workspace>/.dadaiaignore``, for the gate and the doctor; absent
     or unreadable is no pattern."""
     try:
-        text = (workspace / DADAIAIGNORE).read_text(encoding="utf-8")
-    except OSError:
+        text = platform.read_text(workspace / DADAIAIGNORE)
+    except (OSError, platform.Undecodable):
         return (), (), ()
     return parse_dadaiaignore(text)
 
@@ -240,16 +246,16 @@ def dadaiaignore_seed(workspace: Path) -> str:
     """What a new ``.dadaiaignore`` starts with — ``init`` and ``doctor --fix`` alike: the
     legacy ``states/instance_exceptions.txt`` 1:1 (then held as slop), else the template."""
     try:
-        return (workspace / ".dadaia" / "states" / "instance_exceptions.txt").read_text("utf-8")
+        return platform.read_text(workspace / ".dadaia" / "states" / "instance_exceptions.txt")
     except OSError:
         return (
-            "# Operator-only (ADR 0093): root-relative patterns, * within a segment, / = dir,\n"
-            "# no ! and no **; under a [protected] line, repo-relative protected globs (ADR 0133).\n"
+            "# Operator-only: root-relative patterns, * within a segment, / = dir,\n"
+            "# no ! and no **; under a [protected] line, repo-relative protected globs.\n"
         )
 
 
 #: The level-1 root files a workspace is born with and the SessionStart lane re-creates,
-#: never rewrites (ADRs 0095, 0096): name -> its first content. ``AGENTS.md`` is projected.
+#: never rewrites: name -> its first content. ``AGENTS.md`` is projected.
 LEVEL1_SEEDS: dict[str, Callable[[Path], str]] = {
     DADAIAIGNORE: dadaiaignore_seed,
     "prompt.md": lambda _: "",
@@ -258,7 +264,7 @@ LEVEL1_SEEDS: dict[str, Callable[[Path], str]] = {
 
 def occupied(entry: Path) -> bool:
     """An entry is present when it is on disk, a dangling link included — never followed."""
-    return entry.is_symlink() or entry.exists()
+    return platform.is_link(entry) or entry.exists()
 
 
 def _matches(sub: str, pattern: str) -> bool:
@@ -267,11 +273,23 @@ def _matches(sub: str, pattern: str) -> bool:
     return len(parts) == len(globs) and all(map(fnmatch.fnmatch, parts, globs))
 
 
-def protected_glob(tail: Sequence[str], protected: tuple[str, ...]) -> str | None:
-    """The protected glob a prefix of a repo-relative *tail* matches (the worktree grammar's
-    ``locate`` reads it), else ``None``."""
-    prefixes = ["/".join(tail[: n + 1]) for n in range(len(tail))]
-    return next((g for g in protected for sub in prefixes if _matches(sub, g)), None)
+def protected_glob(root: Path, rel: str, protected: tuple[str, ...]) -> str | None:
+    """The protected glob a prefix of the repo-relative part of *rel* (workspace-relative, under
+    *root*) matches, else ``None``. Under ``repos/<r>/`` the root is the repo; under
+    ``worktrees/<r>/`` every ancestor of *rel* below ``<r>`` holding a ``.git`` entry is a root,
+    so a planted entry only adds one. Fails closed: with none, it matches at every depth."""
+    parts = rel.replace("\\", "/").split("/")
+    zone = invocation.scope(root, root.joinpath(*parts))[1]
+    if zone == "root":
+        return None
+    tail = parts[2:]
+    anchors = [0]
+    if zone == "worktree":
+        anchors = [
+            k - 2 for k in range(3, len(parts)) if root.joinpath(*parts[:k], ".git").exists()
+        ] or list(range(len(tail)))
+    subs = ("/".join(tail[i : j + 1]) for i in anchors for j in range(i, len(tail)))
+    return next((g for sub in subs for g in protected if _matches(sub, g)), None)
 
 
 def verdict(
@@ -366,7 +384,10 @@ def zone_table_rows() -> tuple[tuple[str, str, str, str, str], ...]:
 
 
 #: The git chokepoints: ``(.git/hooks/<target>, public/scripts/<source>)``.
-INSTALLED_GIT_HOOKS: tuple[tuple[str, str], ...] = (("pre-push", "pre-push-ci-gate.sh"),)
+INSTALLED_GIT_HOOKS: tuple[tuple[str, str], ...] = (
+    ("pre-push", "pre-push-ci-gate.sh"),
+    ("reference-transaction", "reference-transaction.sh"),
+)
 
 
 def public_scripts_dir() -> Path:
@@ -445,8 +466,7 @@ SPECS_CANON: tuple[CanonEntry, ...] = (
     CanonEntry("releases/_archive/releases_histo.jsonl", "releases", True),
     CanonEntry("releases/_archive/<M.m.p>/**", "releases"),
     CanonEntry("releases/<M.m.p>/_RELEASE.json", "releases"),
-    # Legacy state-file name — admitted ONLY as the rename-lane input: SPEC-DOC-046
-    # offers the doctor-fixable rename to _RELEASE.json (ADR 0007).
+    # Legacy state-file name, admitted only as the input of the doctor's rename to _RELEASE.json.
     CanonEntry("releases/<M.m.p>/RELEASE.json", "releases"),
     CanonEntry("releases/<M.m.p>/rc-<N>/SPEC.md", "releases"),
     CanonEntry("releases/<M.m.p>/rc-<N>/PLAN.md", "releases"),
@@ -466,7 +486,7 @@ SPECS_CANON: tuple[CanonEntry, ...] = (
     CanonEntry("ADRs/decisions.jsonl", "ADRs", True),
 )
 
-#: One candidate's documents (ADR 0150), read off the canon rows.
+#: One candidate's documents, read off the canon rows.
 CANDIDATE_DOCUMENTS: tuple[str, ...] = tuple(
     e.shape.rsplit("/", 1)[1]
     for e in SPECS_CANON
@@ -476,7 +496,7 @@ CANDIDATE_DOCUMENTS: tuple[str, ...] = tuple(
 #: Every entry permitted directly under ``specs/``.
 CANON_ROOT_MEMBERS: frozenset[str] = frozenset(entry.area for entry in SPECS_CANON)
 
-#: TREE-4's required directories: every area whose ``_archive/`` histo is born with the tree.
+#: Directories the tree requires: every area whose ``_archive/`` histo is born with the tree.
 REQUIRED_ROOT_DIRS: tuple[str, ...] = tuple(
     sorted(
         {
@@ -489,7 +509,7 @@ REQUIRED_ROOT_DIRS: tuple[str, ...] = tuple(
     )
 )
 
-#: The areas carrying a scaffolded ``AGENTS.md`` (TREE-5 scoped-law coverage).
+#: The areas carrying a scaffolded ``AGENTS.md``.
 SCOPED_LAW_AREAS: tuple[str, ...] = tuple(
     entry.dest.removesuffix("/AGENTS.md")
     for entry in SPECS_CANON
@@ -498,7 +518,7 @@ SCOPED_LAW_AREAS: tuple[str, ...] = tuple(
 
 
 def root_entries_display() -> str:
-    """§5.1's one line: every root directory (trailing ``/``) then every root file."""
+    """The root listing: every root directory (trailing ``/``) then every root file."""
     return " ".join(
         [*(f"{name}/" for name in sorted(ROOT_ALLOWED_DIRS)), *sorted(ROOT_ALLOWED_FILES)]
     )
@@ -574,13 +594,10 @@ _PLACEHOLDERS: dict[str, Callable[[], str]] = {
 }
 
 
-_SOURCE_CLI = ".venv/bin/dadaia"
-
-
 def render_workspace_cli(text: str) -> str:
     """Render the workspace CLI source for this host."""
-    caps = platform.PLATFORM
-    return text.replace(_SOURCE_CLI, f".venv/{caps.venv_scripts_dir}/dadaia{caps.venv_exe_suffix}")
+    host = platform.venv_tool(PurePosixPath(".venv"), "dadaia").as_posix()
+    return text.replace(platform.canonical_cli(host), host)
 
 
 def render_registry_tables(text: str) -> str:

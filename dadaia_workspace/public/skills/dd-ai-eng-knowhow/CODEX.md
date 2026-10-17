@@ -36,7 +36,7 @@ Current-doc corrections to keep active:
 - Keep the root file a global contract, not an encyclopedia — push specifics to the owning directory.
 - When the same mistake recurs twice, update the correctly-scoped AGENTS.md, not a one-off prompt.
 - Root `AGENTS.md` and `worktrees/AGENTS.md` are projections; `repos/<slug>/AGENTS.md` and `specs/AGENTS.md` are the project's own.
-- Author the source in `public/`; reproject per `.dadaia/AGENTS.md` §4.
+- Change an AI-entity file at its source in the library repo its own `AGENTS.md` names; reproject per `.dadaia/AGENTS.md` §4.
 - Never put long repeatable workflow into AGENTS.md — that is a skill's job.
 
 ---
@@ -114,7 +114,7 @@ prefix_rule(
 | `applyTo` | ignored (`paths:` is native) | not a Codex primitive | safe to include; Codex ignores it gracefully |
 | richer CC-only keys | may exist | unknown keys ignored | never depend on a CC-only key for correctness |
 
-- dadaia projects one canonical `public/skills/<name>/SKILL.md` into both `.claude/` and `.codex`/`.agents`.
+- dadaia projects one canonical `SKILL.md` per skill into both `.claude/` and `.codex`/`.agents`.
 - A skill must remain correct when read by either harness.
 - Never write a step that only works because a Claude-Code-only frontmatter key was honored.
 - Body content is shared; never hardcode harness-specific file paths or tool names as load-bearing instructions.
@@ -177,7 +177,7 @@ prefix_rule(
 - Those keys redirect credentials, host-owned behavior, or telemetry — operator/admin only.
 - `approved_commands` is NOT a config key — unknown field under `--strict-config`, silently ignored otherwise.
 - Command approval is owned by Rules (`.rules`) and `approval_policy`/`[tools]` keys, not a flat allow-list.
-- Provider/auth/telemetry stay user/admin-global — never emit into any `public/`-projected `.codex/` config.
+- Provider/auth/telemetry stay user/admin-global — never emit into any projected `.codex/` config.
 - A trusted-project escalation must never be the path by which a repo silently rewrites credentials.
 - No runtime projections committed inside the source repo — `.codex/` belongs at the workspace runtime root.
 - No absolute paths or local-projection leakage into public packages — hooks/configs use portable paths only.
@@ -203,8 +203,8 @@ prefix_rule(
 - Consult the live probe (`.dadaia/.venv/bin/dadaia certify --json`'s `codex-live-probe` check) instead of assuming.
 - Rerun the live contract after any Codex CLI upgrade.
 - The git chokepoints remain independent regardless of hook enforcement (pre-push).
-- Inject full context once per session on `SessionStart` (matcher `startup|resume`), keyed on `session_id`.
-- The bootstrap must stay a silent no-op after the first injection (session-keyed sentinel).
+- Inject full context on `SessionStart` (matcher `startup|resume`), keyed on `session_id`.
+- The bootstrap must stay a silent no-op after the first injection (session-keyed sentinel), until the session's bind changes or it compacts.
 - Re-injecting the whole bootstrap per prompt is token waste and drift.
 
 | Property | Consequence for authoring |

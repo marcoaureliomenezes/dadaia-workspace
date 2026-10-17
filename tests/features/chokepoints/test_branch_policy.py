@@ -1,18 +1,19 @@
-"""The branch contract, read from the project gitflow (ADRs 0036, 0037, 0046; SPEC 0.5.0 AC6.5,
-AC8.1): work branches ``<prefix><M.m.p>`` are pushable; the principal and integration
-branches are PR-only; every refusal and its fix line name the CONFIGURED branches.
+"""The branch contract, read from the project gitflow: work branches ``<prefix><M.m.p>`` are
+pushable; the principal and integration branches are PR-only; every refusal and its fix line
+name the CONFIGURED branches.
 Every row runs under the default gitflow or a custom one (``trunk``/``next``/``work/``).
 """
 
 from __future__ import annotations
 
-import shlex
 from collections.abc import Callable
 from dataclasses import replace
 from pathlib import Path
 
 import pytest
 
+from dadaia_workspace.core.cli_line import fix_line
+from dadaia_workspace.core.exceptions import GitSyncError
 from dadaia_workspace.core.gitflow import DEFAULT, Gitflow
 from dadaia_workspace.features.chokepoints import Decision, push_gate_decision
 from dadaia_workspace.features.chokepoints.branch_policy import (
@@ -23,6 +24,7 @@ from dadaia_workspace.features.specs.canon import canon_violations
 from dadaia_workspace.infrastructure.git_objects import GitSubprocessObjectReader
 from tests.fakes import gate_fixes
 from tests.fixtures.real_git import PushRepo
+from tests.helpers.oslib import command
 
 _A = "a" * 40
 _B = "b" * 40
@@ -48,8 +50,8 @@ def _line(local: str, remote: str | None = None, remote_sha: str = _ZERO, sha: s
     return f"refs/heads/{local} {sha} refs/heads/{remote or local} {remote_sha}"
 
 
-def _fix(decision: Decision) -> list[str]:
-    return shlex.split(decision.message.rsplit("fix: ", 1)[1])
+def _fix(decision: Decision) -> str:
+    return decision.message.rsplit("fix: ", 1)[1]
 
 
 def _birth(role: str) -> Scenario:
@@ -77,7 +79,7 @@ def _existing_principal(repo: PushRepo, flow: Gitflow) -> str:
 
 
 def _birth_from_any_source(repo: PushRepo, flow: Gitflow) -> str:
-    """Review H4: judged by the remote branch it creates and what it publishes, never the local name."""
+    """Judged by the remote branch it creates and what it publishes, never the local name."""
     repo.commit({"a.md": "a\n"})
     sha = repo.publish()
     return f"{_line('main', 'develop', sha=sha)}\n{sha} {sha} refs/heads/develop {_ZERO}"
@@ -116,9 +118,8 @@ def test_the_gate_allows(repo: PushRepo, flow: Gitflow, scenario: Scenario) -> N
     assert decision.allowed, decision.message
 
 
-_WORK = "{prefix}0.6.0"  # the live work branch, never the <M.m.p> pattern (fix-lines-are-not-one-runnable-command)
-_PR_TO_INTEGRATION = ["Operator", "action:", "open", "a", "PR/MR", "from", _WORK, "into", "{integration}", "on", "your", "git", "host"]
-_PR_TO_PRINCIPAL = ["Operator", "action:", "open", "a", "PR/MR", "from", "{integration}", "into", "{principal}", "on", "your", "git", "host"]
+_PR_TO_INTEGRATION = "Agent action: open a PR/MR from '{prefix}0.6.0' into '{integration}' on your git host"
+_PR_TO_PRINCIPAL = "Agent action: open a PR/MR from '{integration}' into '{principal}' on your git host"
 
 
 def _birth_fix(tip: str, role: str) -> list[str]:
@@ -146,14 +147,17 @@ def _birth_fix(tip: str, role: str) -> list[str]:
 ])
 # fmt: on
 def test_the_gate_refuses_with_the_configured_fix(
-    repo: PushRepo, flow: Gitflow, scenario: Scenario, named: str, fix: list[str] | None
+    repo: PushRepo, flow: Gitflow, scenario: Scenario, named: str, fix: list[str] | str | None
 ) -> None:
     """Each refusal names the configured branches; its fix is one command, no `&&` (PowerShell 5.1 has none)."""
     names = {"principal": flow.principal, "integration": flow.integration, "prefix": flow.work_prefix}
     decision = _decide(scenario(repo, flow), repo, flow)
     assert not decision.allowed
     assert named.format(**names) in decision.message
-    assert fix is None or _fix(decision) == [part.format(**names) for part in fix]
+    if isinstance(fix, str):
+        assert _fix(decision) == fix.format(**names)
+    else:
+        assert fix is None or _fix(decision) == command(*[part.format(**names) for part in fix])
 
 
 # fmt: off
@@ -168,40 +172,180 @@ def test_the_gate_refuses_with_the_configured_fix(
 def test_a_branch_outside_the_gitflow_is_refused_naming_the_work_branch(
     repo: PushRepo, flow: Gitflow, branch: str
 ) -> None:
-    """AC6.1/AC6.5: a name that is not exactly the principal, the integration or prefix + M.m.p has no role.
+    """A name that is not exactly the principal, the integration or prefix + M.m.p has no role.
 
-    The fix is one command from any cwd carrying the refused commit (review H-C).
+    The fix is one command from any cwd carrying the refused commit.
     """
     decision = _decide(_line(branch), repo, flow)
     assert not decision.allowed
     assert "outside the gitflow" in decision.message
     assert all(word in decision.message for word in (branch, flow.principal, flow.integration, flow.work_prefix))
-    assert _fix(decision) == ["git", "-C", "/repo", "switch", "-c", f"{flow.work_prefix}0.6.0", _A]
+    assert _fix(decision) == command("git", "-C", "/repo", "switch", "-c", f"{flow.work_prefix}0.6.0", _A)
 
 
 def test_an_outside_ref_is_carried_onto_the_live_work_branch() -> None:
-    """Review 5 M2: the live work branch may have diverged — switch to it and merge (append-only, never a rebase)."""
+    """The live work branch may have diverged — switch to it and merge (append-only, never a
+    rebase)."""
     refs = parse_push_stdin(_line("topic"))[0]
     decision = check_branch_policy(refs, _CUSTOM, replace(gate_fixes(), work="work/1.2.3", cut=True))
     assert decision is not None and "'work/1.2.3'" in decision.message
     assert f"merge {_A}" in decision.message
-    assert _fix(decision) == ["git", "-C", "/repo", "switch", "work/1.2.3"]
+    assert _fix(decision) == command("git", "-C", "/repo", "switch", "work/1.2.3")
 
 
 @pytest.mark.parametrize(
     ("branch", "allowed"),
     [
-        pytest.param("wt/0.5.0-rc9/job2", True),
+        pytest.param("wt/0.5.0-rc9/job2", False, id="old-job-grammar-refused"),
+        pytest.param("wt/0.5.0/rc-9/job-2/wt-main", True, id="new-main-pushable"),
+        pytest.param("wt/0.5.0/rc-9/wt-rc", True, id="new-rc-pushable"),
+        pytest.param("wt/0.5.0/rc-9/job-2/wt-task-001", False, id="new-task-local"),
+        pytest.param("wt/backlog/an-idea", False, id="old-backlog-grammar-refused"),
+        pytest.param("wt/0.5.0/wt-backlog-an-idea", True, id="new-backlog-pushable"),
         ("wt/0.5.0-rc9/define", False),
-        ("wt/backlog/an-idea", True),
         ("wt/maintenance", False),
         ("wt/0.5.0-rc9/job2--T-1", False),
         ("wt/0.5.0a-impl", False),
     ],
 )
-def test_only_a_job_branch_of_wt_is_pushable(branch: str, allowed: bool) -> None:
-    """AC1.2 (ADR 0190): pre-push accepts a job branch `wt/<M.m.p>-rc<N>/<job>` and a
-    `wt/backlog/<slug>` branch, no other `wt/` branch."""
+def test_only_a_wt_leaf_of_rc_main_or_backlog_is_pushable(branch: str, allowed: bool) -> None:
+    """Pre-push accepts the `wt/` rc, main and backlog leaves of the hierarchy, no other `wt/` branch."""
     refs, _ = parse_push_stdin(_line(branch))
     decision = check_branch_policy(refs, DEFAULT, replace(gate_fixes(), work="feature/0.5.0"))
     assert (decision is None) is allowed
+
+
+_C1 = "c" * 40
+_WORK_REF = "refs/heads/feature/0.6.0"
+
+
+def _ref_policy(
+    lines: list[str],
+    flow: Gitflow,
+    origin: dict[str, str],
+    moved: Callable[[str, str], tuple[bool, list[str]]] = lambda old, new: (True, []),
+) -> Decision:
+    # imported here so a missing function fails these rows only, not the whole file's collection
+    from dadaia_workspace.features.chokepoints.branch_policy import check_ref_policy
+
+    return check_ref_policy(lines, flow, origin, "proj", moved)
+
+
+def test_a_work_branch_update_to_a_sha_other_than_origins_is_refused_with_one_fix() -> None:
+    decision = _ref_policy([f"{_A} {_B} {_WORK_REF}"], DEFAULT, {_WORK_REF: _C1})
+    assert not decision.allowed
+    assert "feature/0.6.0" in decision.message
+    assert decision.message.count("fix: ") == 1
+    fix = decision.message.rsplit("fix: ", 1)[1]
+    assert fix.startswith("Agent action: ")
+    assert fix_line(None, "worktree", "new", "proj") in fix
+    assert "proj change" not in fix
+
+
+def test_the_open_a_tree_fix_renders_the_cli_words_inline(sentence: Callable[..., str]) -> None:
+    decision = _ref_policy([f"{_A} {_B} {_WORK_REF}"], DEFAULT, {_WORK_REF: _C1})
+
+    assert f"open a tree for this change with {sentence(None, 'worktree', 'new', 'proj')} and the name" in (
+        decision.message
+    )
+
+
+def test_a_work_branch_no_op_update_passes() -> None:
+    assert _ref_policy([f"{_B} {_B} {_WORK_REF}"], DEFAULT, {_WORK_REF: _C1}).allowed
+
+
+def test_a_work_branch_with_no_origin_is_ungated() -> None:
+    assert _ref_policy([f"{_A} {_B} {_WORK_REF}"], DEFAULT, {}).allowed
+    assert _ref_policy([f"{_A} {_B} {_WORK_REF}"], DEFAULT, {_WORK_REF: ""}).allowed
+
+
+def test_a_work_branch_update_to_origins_sha_passes() -> None:
+    assert _ref_policy([f"{_A} {_B} {_WORK_REF}"], DEFAULT, {_WORK_REF: _B}).allowed
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        pytest.param(f"{_A} {_ZERO} {_WORK_REF}", id="deletion"),
+        pytest.param(f"{_ZERO} {_ZERO} {_WORK_REF}", id="deletion-prepared-zero-zero"),
+    ],
+)
+def test_a_work_branch_deletion_passes(line: str) -> None:
+    assert _ref_policy([line], DEFAULT, {_WORK_REF: _C1}).allowed
+
+
+def test_a_work_branch_creation_is_judged_as_a_move_from_origins_sha() -> None:
+    creation = f"{_ZERO} {_B} {_WORK_REF}"
+    assert _ref_policy([creation], DEFAULT, {_WORK_REF: _B}).allowed
+    assert _ref_policy([creation], DEFAULT, {}).allowed
+    assert _ref_policy([creation], DEFAULT, {_WORK_REF: ""}).allowed
+    refused = _ref_policy([creation], DEFAULT, {_WORK_REF: _C1})
+    assert not refused.allowed
+    assert refused.message.count("fix: ") == 1
+
+
+@pytest.mark.parametrize(
+    "ref",
+    [
+        pytest.param("refs/heads/develop", id="integration"),
+        pytest.param("refs/heads/main", id="principal"),
+        pytest.param("refs/heads/wt/0.6.0/rc-1/job-1/wt-main", id="wt-branch"),
+        pytest.param("refs/heads/topic", id="outside-the-gitflow"),
+        pytest.param("refs/tags/archive/wt/x", id="archive-tag"),
+        pytest.param("refs/tags/v1", id="tag"),
+    ],
+)
+def test_a_non_work_ref_passes_whatever_its_sha(ref: str) -> None:
+    assert _ref_policy([f"{_A} {_B} {ref}"], DEFAULT, {ref: _C1}).allowed
+
+
+def test_a_custom_gitflow_work_ref_is_judged_by_its_configured_prefix() -> None:
+    refs = {"refs/heads/work/0.6.0": _C1, "refs/heads/feature/0.6.0": _C1}
+    assert not _ref_policy([f"{_A} {_B} refs/heads/work/0.6.0"], _CUSTOM, refs).allowed
+    assert _ref_policy([f"{_A} {_B} refs/heads/feature/0.6.0"], _CUSTOM, refs).allowed
+
+
+def test_one_refused_line_among_passing_lines_refuses() -> None:
+    lines = [f"{_A} {_B} refs/heads/develop", f"{_A} {_B} {_WORK_REF}", f"{_ZERO} {_B} refs/heads/wt/x"]
+    assert not _ref_policy(lines, DEFAULT, {_WORK_REF: _C1}).allowed
+
+
+_AUDIT = ["audit"]
+_LINE = f"{_A} {_B} {_WORK_REF}"
+
+
+def test_a_descendant_move_touching_only_audit_paths_passes() -> None:
+    assert _ref_policy([_LINE], DEFAULT, {_WORK_REF: _C1}, lambda o, n: (True, _AUDIT)).allowed
+
+
+@pytest.mark.parametrize(
+    "facts",
+    [
+        pytest.param((True, ["repo", "audit"]), id="rename-into-audits"),
+        pytest.param((True, ["audit", "repo"]), id="audit-plus-code"),
+        pytest.param((True, []), id="no-changed-path"),
+        pytest.param((False, _AUDIT), id="non-descendant-audit-only-tree"),
+    ],
+)
+def test_a_move_that_is_not_a_descendant_audit_only_change_is_refused(
+    facts: tuple[bool, list[str]],
+) -> None:
+    decision = _ref_policy([_LINE], DEFAULT, {_WORK_REF: _C1}, lambda o, n: facts)
+    assert not decision.allowed
+    assert decision.message.count("fix: ") == 1
+
+
+def test_a_failed_fact_read_refuses_instead_of_raising() -> None:
+    def unreadable(old: str, new: str) -> tuple[bool, list[str]]:
+        raise GitSyncError("git rev-list failed")
+
+    decision = _ref_policy([_LINE], DEFAULT, {_WORK_REF: _C1}, unreadable)
+    assert not decision.allowed
+    assert decision.message.count("fix: ") == 1
+
+
+def test_the_facts_are_not_read_for_a_move_onto_origins_sha() -> None:
+    def unreadable(old: str, new: str) -> tuple[bool, list[str]]:
+        raise AssertionError("read")
+
+    assert _ref_policy([_LINE], DEFAULT, {_WORK_REF: _B}, unreadable).allowed

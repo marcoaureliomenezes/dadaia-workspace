@@ -1,9 +1,7 @@
 """The merged PreToolUse entrypoint ``pre_gate``: first-block-wins over its policies, and
 the one envelope every harness parses.
 
-T-014-03 (parity with sdd_gate + root_whitelist through one spawn),
-pre-gate-allow-envelope-fails-claude-schema, claude-pre-gate-envelope-contract (the
-kimi shim's two raw anchors).
+Parity with sdd_gate and root_whitelist through one spawn; the kimi shim's two raw anchors.
 """
 
 from __future__ import annotations
@@ -14,8 +12,10 @@ from typing import Any
 
 import pytest
 
+from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.hooks import pre_gate
 from tests.fixtures.harness_env import claude_hook_env, run_hook_subprocess
+from tests.helpers.oslib import write_text
 
 _PATCH = "*** Begin Patch\n*** Update File: worktrees/a/0.5.0-rc1/j1/README.md\n+ok\n*** Update File: {}\n+x\n*** End Patch"
 
@@ -33,7 +33,7 @@ def _spawn(ws: Path, payload: dict[str, Any]) -> Any:
 @pytest.mark.parametrize(
     ("tool", "tool_input", "want"),
     [
-        ("Write", {"file_path": "repos/a/src/thing.py"}, "worktree.py list"),
+        ("Write", {"file_path": "repos/a/src/thing.py"}, "@wt"),
         ("NotebookEdit", {"notebook_path": "junk.ipynb"}, None),
         ("Read", {"file_path": "x"}, None),
         ("Write", {"file_path": ".dadaia/sessions/a.json"}, "SEC-01"),
@@ -44,6 +44,11 @@ def _spawn(ws: Path, payload: dict[str, Any]) -> Any:
         ("apply_patch", {"command": _PATCH.format("worktrees/a/0.5.0-rc1/j1/secrets/k")}, "protected glob 'secrets'"),
         ("Write", {"file_path": "worktrees/a/0.5.0-rc1/j1/src/ok.py"}, None),
         ("Write", {"file_path": "worktrees/a/scratch/any/secrets/k"}, "protected glob 'secrets'"),  # any tree name
+        ("Write", {"file_path": "worktrees/a/scratch/secrets"}, "protected glob 'secrets'"),
+        ("Write", {"file_path": "worktrees/a/scratch/secrets/k"}, "protected glob 'secrets'"),
+        ("Write", {"file_path": "worktrees/a/x/y/z/secrets/k"}, "protected glob 'secrets'"),
+        ("Write", {"file_path": "worktrees/a/0.5.0-rc1/j1/src/secrets/k"}, None),  # anchored at the tree root
+        ("Write", {"file_path": "worktrees/a/x/y/src/ok.py"}, None),
     ],
     ids=[
         "in-repo-write-is-merge-only",
@@ -57,6 +62,11 @@ def _spawn(ws: Path, payload: dict[str, Any]) -> Any:
         "AC2.5-protected-glob-in-worktree-codex-dialect",
         "AC2.5-unprotected-sibling-allowed",
         "AC1.3-protected-glob-in-any-tree-name",
+        "protected-glob-plain-tree-depth-1",
+        "protected-glob-plain-tree-depth-2",
+        "protected-glob-non-canonical-depth",
+        "protected-glob-below-the-tree-root-allowed",
+        "unprotected-non-canonical-depth-allowed",
     ],
 )
 # fmt: on
@@ -65,12 +75,14 @@ def test_non_write_and_protected_matrix(
 ) -> None:
     """Through one spawn, pre_gate reproduces the standalone sdd_gate and root_whitelist
     verdicts (paths are workspace-relative; ``want`` names the block reason)."""
+    want = want and want.replace("@wt", fix_line(tmp_path, "worktree", "list"))
     (tmp_path / ".dadaia" / "states").mkdir(parents=True)
-    (tmp_path / ".dadaia" / "states" / "spec_contexts.json").write_text(
-        json.dumps({"contexts": [{"repo_slug": "a", "state": "alive"}]}), encoding="utf-8"
-    )
+    write_text(tmp_path / ".dadaia" / "states" / "spec_contexts.json", json.dumps({"contexts": [{"repo_slug": "a", "state": "alive"}]}))
     (tmp_path / "repos" / "a" / "specs").mkdir(parents=True)
-    (tmp_path / ".dadaiaignore").write_text("[protected]\nsecrets\n", encoding="utf-8")
+    write_text(tmp_path / ".dadaiaignore", "[protected]\nsecrets\n")
+    for tree in ("0.5.0-rc1/j1", "scratch", "scratch/any", "x/y/z"):  # a linked worktree's root holds a .git file
+        (tmp_path / "worktrees" / "a" / tree).mkdir(parents=True)
+        write_text(tmp_path / "worktrees" / "a" / tree / ".git", "gitdir: elsewhere\n")
     rooted = {k: v if k == "command" else str(tmp_path / v) for k, v in tool_input.items()}
     block = _spawn(tmp_path, {"tool_name": tool, "tool_input": rooted}).block_envelope()
     if want is None:

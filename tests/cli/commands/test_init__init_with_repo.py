@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 import json
-import os
-import subprocess
 from pathlib import Path
 
 import pytest
@@ -12,6 +10,7 @@ from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app
 from dadaia_workspace.core.cli_line import fix_line
+from tests.helpers.oslib import decode, is_executable, read_text, run, write_text
 
 _runner = CliRunner()
 
@@ -19,7 +18,7 @@ _LAW = "Sessions launch at the workspace root."
 
 
 def _git(*args: str, cwd: Path) -> None:
-    subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True, text=True)
+    run(["git", *args], cwd=cwd, check=True)
 
 
 def _seed(bare: Path, text: str) -> Path:
@@ -28,7 +27,7 @@ def _seed(bare: Path, text: str) -> Path:
     work = bare.parent / f"seed-{bare.name}"
     work.mkdir()
     _git("init", "--initial-branch=main", cwd=work)
-    (work / "README.md").write_text(text, encoding="utf-8")
+    write_text(work / "README.md", text)
     _git("add", "README.md", cwd=work)
     _git("commit", "-m", "seed", cwd=work)
     _git("remote", "add", "origin", str(bare), cwd=work)
@@ -47,7 +46,7 @@ def _init(workspace: Path, url: Path) -> list[str]:
 
 def _contexts(workspace: Path) -> list[dict[str, str]]:
     path = workspace / ".dadaia" / "states" / "spec_contexts.json"
-    return list(json.loads(path.read_text(encoding="utf-8"))["contexts"])
+    return list(json.loads(read_text(path))["contexts"])
 
 
 def test_init_with_repo_clones_creates_alives_binds_and_installs_the_hook(
@@ -60,16 +59,16 @@ def test_init_with_repo_clones_creates_alives_binds_and_installs_the_hook(
 
     assert result.exit_code == 0, result.stdout
     repo = workspace / "repos" / "demo-project"
-    assert (repo / "README.md").read_text(encoding="utf-8") == "seed\n"
+    assert read_text(repo / "README.md") == "seed\n"
     [ctx] = _contexts(workspace)
     assert (ctx["name"], ctx["repo_slug"], ctx["state"]) == (
         "demo-project",
         "demo-project",
         "alive",
     )
-    assert not list((workspace / ".dadaia" / "sessions").glob("*.json"))  # AC7.1
+    assert not list((workspace / ".dadaia" / "sessions").glob("*.json"))
     hook = repo / ".git" / "hooks" / "pre-push"
-    assert hook.is_file() and os.access(hook, os.X_OK)
+    assert hook.is_file() and is_executable(hook)
     assert "export DADAIA_" not in result.stdout and "bound" not in result.stdout
     for verb in ("context alive", "context bind", "context dead", "context show"):
         assert verb not in result.stdout
@@ -88,7 +87,7 @@ def test_the_printed_fix_line_succeeds_once_the_url_is_reachable(
     fixes = [ln for ln in failed.output.splitlines() if ln.startswith("fix: ")]
     create = fix_line(workspace, "context", "create", "--main-repo", str(bare))
     assert fixes == [
-        f"fix: Operator action: run `{create}` with a reachable clone URL in place of {bare}"
+        f"fix: Agent action: run `{create}` with a reachable clone URL in place of {bare}"
     ]
     assert not (workspace / "repos" / "app").exists()
 
@@ -97,7 +96,7 @@ def test_the_printed_fix_line_succeeds_once_the_url_is_reachable(
     retry = _runner.invoke(app, ["context", "create", "--main-repo", str(bare)])
 
     assert retry.exit_code == 0, retry.output
-    assert (workspace / "repos" / "app" / "README.md").read_text(encoding="utf-8") == "app\n"
+    assert read_text(workspace / "repos" / "app" / "README.md") == "app\n"
     assert [c["state"] for c in _contexts(workspace) if c["name"] == "app"] == ["alive"]
 
 
@@ -110,8 +109,8 @@ def test_init_without_repo_closes_with_the_law_and_the_next_step(tmp_path: Path)
     lines = [line for line in result.stdout.splitlines() if line.strip()]
     closing = lines[-3:]
     assert closing[0] == _LAW
-    assert closing[1].startswith("Next (")  # AC6.2
-    assert closing[2].startswith(f"fix: Operator action: run {fix_line(ws, 'context', 'create')}")
+    assert closing[1].startswith("Next (")
+    assert closing[2].startswith(f"fix: Agent action: run {fix_line(ws, 'context', 'create')}")
     assert _LAW not in "\n".join(lines[:-3])
 
 
@@ -124,7 +123,7 @@ def test_re_init_is_idempotent_and_another_url_under_the_slug_refuses(
 
     def _snapshot() -> dict[str, str]:
         return {
-            str(path.relative_to(workspace)): path.read_text(encoding="utf-8", errors="replace")
+            str(path.relative_to(workspace)): decode(path.read_bytes())
             for path in sorted(workspace.rglob("*"))
             if path.is_file() and ".dadaia/sessions" not in path.as_posix()
         }

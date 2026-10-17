@@ -1,5 +1,5 @@
 ---
-specs_pattern_version: 12
+specs_pattern_version: 13
 constitution_version: 7.0.0
 gitflow: {"principal": "main", "integration": "develop", "work": "feature/"}
 ---
@@ -67,7 +67,7 @@ Cada passo do processo existe pelo que garante; cada garantia é verdade por mec
 3. **Código é escrito para humanos.** Script e módulo entregues leem como arquitetura limpa: um kernel por preocupação, zero cópia, zero ciclo de import, toda função com complexidade grau C ou melhor. Medida: critério "scripts" do scorecard ≥ 9.
 4. **Peso compra confiança ou sai.** Passo de cerimônia que não produz evidência checada por um gate é apagado.
 
-Medido pelo scorecard da versão: toda célula ≥ 9, pontuada por dois juízes independentes ao menos a cada 2 dias e sempre antes de evals, promote ou publicação.
+Medido pelo scorecard da versão: toda célula ≥ 9, pontuada por dois juízes independentes antes de evals, promote ou publicação.
 
 ## 6. Features × Futures
 

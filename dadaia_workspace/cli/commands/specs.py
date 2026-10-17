@@ -19,13 +19,14 @@ from dadaia_workspace.cli._specs_resolution import (
 )
 from dadaia_workspace.core import gitflow, specs_version
 from dadaia_workspace.core.atomic_write import SymlinkRefusedError
-from dadaia_workspace.core.cli_line import fix_line, materialize_line
+from dadaia_workspace.core.cli_line import fix_line, materialize_line, spell_fix
 from dadaia_workspace.core.doctor_rules import SectionFinding
-from dadaia_workspace.core.gitflow import DEFAULT, Gitflow, from_mapping
+from dadaia_workspace.core.gitflow import DEFAULT, Gitflow, from_mapping, work_branch
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.migrate import upgrade as upgrade_feature
 from dadaia_workspace.features.migrate.upgrade import UpgradeRefused, UpgradeResult
 from dadaia_workspace.features.spec_context import sweep
+from dadaia_workspace.features.spec_context.service import ONBOARDING
 from dadaia_workspace.features.specs import SpecsDoctor, canon
 from dadaia_workspace.features.specs.doctor_types import finding_path
 from dadaia_workspace.infrastructure.ledger_scripts import script_repairs
@@ -60,7 +61,7 @@ def upgrade(
 
 
 def _refuse_symlink(exc: SymlinkRefusedError) -> NoReturn:
-    fail(f"{exc}\nfix: {materialize_line(exc.path, exc.path.resolve())}")
+    fail(exc, materialize_line(exc.path, exc.path.resolve()))
 
 
 def _repair(specs: Path, *, dry_run: bool) -> tuple[list[SectionFinding], list[SectionFinding]]:
@@ -91,7 +92,7 @@ def _echo_upgrade(specs: Path, result: UpgradeResult) -> bool:
         typer.echo(f"[repair] {will}fix {issue.code} {finding_path(issue)}")
     for issue in refused:
         typer.echo(
-            f"[refused] {issue.code} {finding_path(issue)}: {issue.message}\nfix: {issue.fix}"
+            f"[refused] {issue.code} {finding_path(issue)}: {issue.message}\n{spell_fix(issue.fix)}"
         )
     for action in [] if result.dry_run else script_repairs(specs):
         typer.echo(f"[repair] {action}")
@@ -103,8 +104,8 @@ def _echo_upgrade(specs: Path, result: UpgradeResult) -> bool:
 
 
 def _init_fix(*argv: str) -> str:
-    """``fix:`` re-running ``specs init`` with the running CLI (it resolves its own root)."""
-    return f"fix: {fix_line(None, 'specs', 'init', *argv)}"
+    """The fix re-running ``specs init`` with the running CLI (it resolves its own root)."""
+    return fix_line(None, "specs", "init", *argv)
 
 
 _BACKUP = "specs-bkp"
@@ -138,7 +139,7 @@ def init(
         help="Work-branch prefix before <M.m.p>. Default: kept, else feature/.",
     ),
 ) -> None:
-    """Bring a repo's specs/ to the canon, never committing.
+    """Bring a repo's specs/ to the canon, committing only the scaffold on a new work branch.
 
     Absent: scaffold. Upgradable or canonical: upgrade, then fill missing files. Foreign:
     after consent, `git mv specs specs-bkp` (staged) and scaffold.
@@ -149,18 +150,16 @@ def init(
             ctx = resolve_context_for_cli(context)
         except ValueError as exc:
             init = fix_line(None, "specs", "init", "--context")
-            fail(
-                f"{exc}\nfix: Operator action: choose a registered context and run `{init}` with it"
-            )
+            fail(exc, f"Agent action: choose a registered context and run `{init}` with it")
         tree = resolve_context_specs_dir_for_cli(workspace := resolve_workspace_root(), ctx)
         if tree is None:  # a name the registry does not know owns no tree to write
-            fail(f"no registered context {ctx!r}\nfix: {fix_line(workspace, 'context', 'list')}")
+            fail(f"no registered context {ctx!r}", fix_line(workspace, "context", "list"))
         specs_dir = str(tree)
         rerun = ("--context", ctx)
     target = resolve_specs_dir_for_cli(specs_dir)
     kind, fix = specs_version.state(target)
-    if kind == "malformed":
-        fail(f"nothing written\n{fix}")
+    if kind in ("malformed", "file"):
+        fail("nothing written", fix or "")
     flow = _gitflow(target, principal, integration, work_prefix, rerun)
     refused = False  # an unrelated error the repair left never blocks the gitflow write
     if kind == "foreign":
@@ -187,8 +186,25 @@ def init(
     )
     if refused:
         raise typer.Exit(1)
+    _commit_on_work_branch(target.parent, flow)
     if kind in ("absent", "foreign"):
         typer.echo(f"[ok] {target} at pattern version {specs_version.CANONICAL_SPECS_VERSION}")
+
+
+def _commit_on_work_branch(repo: Path, flow: Gitflow) -> None:
+    """Cut the local work branch when absent and commit only the scaffold on it, leaving it
+    checked out; with the branch present, or outside a git root, nothing happens."""
+    git = container.build_git_client()
+    if not git.is_git_root(repo):
+        return
+    work = work_branch(repo, flow, repo.name)
+    if git.git(repo, "for-each-ref", f"refs/heads/{work}"):
+        return
+    git.git(repo, "switch", "-c", work)
+    paths = [p for p in ONBOARDING if (repo / p).exists()]
+    if git.git(repo, "status", "--porcelain", "--", *paths):
+        git.commit_paths(repo, "chore: scaffold the dadaia specs", paths)
+        typer.echo(f"[committed] {work}")
 
 
 def _gitflow(
@@ -213,7 +229,7 @@ def _gitflow(
         )
     except ValueError as exc:
         fixed = ("--principal", kept.principal, "--integration", kept.integration)
-        fail(f"{exc}\n{_init_fix(*rerun, *fixed, '--work-prefix', kept.work_prefix)}")
+        fail(exc, _init_fix(*rerun, *fixed, "--work-prefix", kept.work_prefix))
 
 
 def _move_foreign(target: Path, rerun: tuple[str, ...], replace_foreign: bool) -> None:
@@ -222,8 +238,8 @@ def _move_foreign(target: Path, rerun: tuple[str, ...], replace_foreign: bool) -
     refusal, writing nothing."""
     if not replace_foreign:
         fail(
-            f"{target} is a foreign specs tree; nothing written.\n"
-            f"{_init_fix(*rerun, '--replace-foreign')}"
+            f"{target} is a foreign specs tree; nothing written.",
+            _init_fix(*rerun, "--replace-foreign"),
         )
     backup = target.parent / _BACKUP
     if backup.exists():

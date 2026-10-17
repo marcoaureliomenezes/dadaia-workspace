@@ -1,23 +1,10 @@
-"""The v6 specs/ canon table — ONE source for "what a specs/ tree contains" (v0.5.1
-candidate K4, "one canon table: scaffold is canon rendered, doctor is canon checked").
+"""The specs/ canon table — ONE source for "what a specs/ tree contains".
 
-Six bugs in six weeks shared one property violation: a fresh scaffold failed its own
-doctor (``fresh-specs-scaffold-fails-specs-doctor``, ``specs-init-creates-what-doctor
--refuses``, ``scaffold-artifacts-fail-own-workflow-gates``, ``fresh-release-scaffold
--emits-spec-doctor-warnings-042``, ``default-context-scaffold-fails-specs-doctor``,
-``release-new-rejects-semver-but-doctor-requires-it`` — all resolved, all in
-``specs/bugs/BUGS.jsonl``). The root cause: "what a specs tree contains" was hand-kept
-in three-to-four independent places (``specs_canon._CANON_FILE_PATTERNS``,
-``scaffolder.py``'s numbered ``_write`` blocks, ``doctor_structural.py``'s TREE-4/TREE-8
-required sets, ``doctor_closure_audit.py``'s ``check_archive_dirs_exist``) that could
-each drift from the others independently.
-
-This module is the fold target for all four: :data:`CANON` is the ONE declarative table;
-:func:`scaffold` renders every ``required_at_birth`` entry (scaffold is canon rendered);
+Scaffold and doctor read one table, :data:`CANON`, the ONE declarative table:
+:func:`scaffold` renders every ``required_at_birth`` entry;
 :func:`check_tree`/:func:`is_canon_path`/:func:`canon_violations` check a real tree
-against the SAME table (doctor is canon checked). The property this module exists to
-hold: ``scaffold(t); check_tree(t) == []`` — proved by
-``tests/features/specs/test_canon__canon_property.py``.
+against the SAME table. The property this module holds:
+``scaffold(t); check_tree(t) == []``.
 
 Pure module for its CHECKING half (:func:`is_canon_path`, :func:`canon_violations`): plain data in, plain data out, never touches a filesystem.
 Its RENDERING half (:func:`scaffold`, :func:`scaffold_entry`) does
@@ -30,11 +17,11 @@ copy (the drift class this module closes):
 * ``doctor_structural.StructuralValidator.check_tree8_canon_root`` — the doctor's
   full-tree conformance sweep.
 * ``features.chokepoints.push_gate.push_gate_decision`` — the pre-push specs-canon gate
-  (SPEC v0.5.0): every path a push would newly publish under ``specs/`` is checked
+  every path a push would newly publish under ``specs/`` is checked
   against the SAME predicate, through the injected git object reader
   (``list_tree_paths``) — never a second, hand-kept member list.
 
-The canon (operator, 2026-08-28) — the ONLY members permitted under ``specs/``:
+The canon — the ONLY members permitted under ``specs/``:
 
     AGENTS.md constitution.md memory/ releases/ backlog/ bugs/ audits/ ADRs/
 
@@ -50,7 +37,7 @@ The canon (operator, 2026-08-28) — the ONLY members permitted under ``specs/``
 
 Nothing else — no ``.gitkeep``, no dotfiles, no ``remote-bugs/``, no ``reviews/``, no
 ``.md`` ADRs. Every path checked is POSIX-relative to ``specs/`` (e.g.
-``"releases/0.5.0/rc-1/SPEC.md"``, never an absolute filesystem path or a
+``"releases/<M.m.p>/rc-<N>/SPEC.md"``, never an absolute filesystem path or a
 backslash-separated one) — the same shape both a filesystem walk (``Path.as_posix()``)
 and a git tree listing (``git ls-tree``'s own native output) already produce.
 """
@@ -59,11 +46,11 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterable
 from dataclasses import astuple, dataclass
-from datetime import UTC, datetime
 from functools import partial
 from pathlib import Path
 from typing import Literal
 
+from dadaia_workspace.core import clock, platform
 from dadaia_workspace.core.atomic_write import SymlinkRefusedError, atomic_write
 from dadaia_workspace.core.gitflow import DEFAULT
 from dadaia_workspace.core.specs_version import CANONICAL_SPECS_VERSION
@@ -82,7 +69,7 @@ from dadaia_workspace.features.specs.memory_canon import (
     render_fixed_section,
 )
 
-#: The canon rows live in ``core.workspace_layout`` (0.4.7 FR5: ONE registry of
+#: The canon rows live in ``core.workspace_layout`` (ONE registry of
 #: canonical names, shared with the root law, the zone table and the projected
 #: ``specs/AGENTS.md`` canon table). This module is their renderer and checker.
 CANON: tuple[CanonEntry, ...] = SPECS_CANON
@@ -162,7 +149,7 @@ TEMPLATES: dict[str, tuple[Kind, str]] = {
 
 
 def is_canon_path(rel_posix: str) -> bool:
-    """True iff *rel_posix* (POSIX-relative to ``specs/``) is a v6-canon-conformant
+    """True iff *rel_posix* (POSIX-relative to ``specs/``) is a canon-conformant
     file path — structural shape only, never sha-specific."""
     return any(entry.pattern.match(rel_posix) for entry in CANON)
 
@@ -217,14 +204,10 @@ def default_public_dir() -> Path:
     return Path(__file__).resolve().parent.parent.parent / "public"
 
 
-def _today() -> str:
-    return datetime.now(tz=UTC).strftime("%Y-%m-%d")
-
-
 def _render(entry: CanonEntry, *, public_dir: Path, context: dict[str, str]) -> str:
     kind, template = TEMPLATES[entry.shape]
     if kind == "copy":
-        text = render_registry_tables((public_dir / template).read_text(encoding="utf-8"))
+        text = render_registry_tables(platform.read_text(public_dir / template))
     elif kind == "static":
         text = template
     else:
@@ -251,7 +234,7 @@ def scaffold(
     """
     resolved_public = public_dir if public_dir is not None else default_public_dir()
     context = {
-        "today": _today(),
+        "today": clock.today(),
         "project_name": project_name,
         "specs_pattern_version": str(CANONICAL_SPECS_VERSION),
         "gitflow": "{{principal: {}, integration: {}, work: {}}}".format(*astuple(DEFAULT)),
@@ -291,9 +274,7 @@ def scaffold_repo_law(
 
 
 def _fill_repo_name(template: Path, project_name: str) -> str:
-    return render_registry_tables(template.read_text(encoding="utf-8")).replace(
-        "<repo-name>", project_name
-    )
+    return render_registry_tables(platform.read_text(template)).replace("<repo-name>", project_name)
 
 
 def _write_absent(root: Path, writes: list[tuple[Path, Callable[[], str], bool]]) -> list[Path]:
@@ -304,7 +285,7 @@ def _write_absent(root: Path, writes: list[tuple[Path, Callable[[], str], bool]]
     created: list[Path] = []
     for target, render, overwrite in writes:
         anchor = next(p for p in (target.parent, *target.parent.parents) if p.exists() or p == root)
-        if root.is_symlink() or anchor.resolve() != root.resolve() / anchor.relative_to(root):
+        if platform.is_link(root) or anchor.resolve() != root.resolve() / anchor.relative_to(root):
             continue
         if target.exists() and not overwrite:
             continue
@@ -320,7 +301,7 @@ def _write_absent(root: Path, writes: list[tuple[Path, Callable[[], str], bool]]
 def scaffold_entry(specs_dir: Path, rel_path: str, /, **context: str) -> Path:
     """Render and write ONE canon-conformant, on-demand entry — the generic sibling of
     :func:`scaffold`'s birth-time fold (e.g. ``scaffold_entry(specs_dir,
-    "releases/0.6.0/rc-1/SPEC.md", release_id="0.6.0")``).
+    "releases/<id>/rc-<N>/SPEC.md", release_id="<id>")``).
 
     File-level no-clobber: refuses (``FileExistsError``) when *rel_path* already
     exists. Raises ``ValueError`` when *rel_path* matches no :data:`CANON` entry, or
@@ -338,7 +319,7 @@ def scaffold_entry(specs_dir: Path, rel_path: str, /, **context: str) -> Path:
     rendered = _render(
         entry,
         public_dir=default_public_dir(),
-        context={"today": _today(), **context},
+        context={"today": clock.today(), **context},
     )
     atomic_write(target, rendered, ensure_parent=True)
     return target

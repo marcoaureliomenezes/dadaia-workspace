@@ -11,6 +11,7 @@ import pytest
 
 from dadaia_workspace.core.models.install_ledger import InstallLedger, LedgerEntry
 from dadaia_workspace.infrastructure.json_install_ledger_store import JsonInstallLedgerStore
+from tests.helpers.oslib import Undecodable, write_text
 
 
 def _entry(rel: str = ".codex/AGENTS.md") -> LedgerEntry:
@@ -45,5 +46,17 @@ def _ledger_with(relpath: str) -> str:
 )
 def test_an_unreadable_ledger_reads_as_none(tmp_path: Path, payload: str | None) -> None:
     if payload is not None:
-        (tmp_path / "install_ledger.json").write_text(payload, encoding="utf-8")
+        write_text(tmp_path / "install_ledger.json", payload)
     assert JsonInstallLedgerStore().read(tmp_path) is None
+
+
+def test_a_ledger_that_is_not_utf8_reads_as_none_and_refuses_the_compare_on_write(
+    tmp_path: Path,
+) -> None:
+    path = JsonInstallLedgerStore.path(tmp_path)
+    path.write_bytes(b'{"entries": "caf\xe9"}')
+
+    assert JsonInstallLedgerStore().read(tmp_path) is None
+    with pytest.raises(Undecodable) as refused:
+        JsonInstallLedgerStore().write(tmp_path, InstallLedger.of([]))
+    assert refused.value.path == path

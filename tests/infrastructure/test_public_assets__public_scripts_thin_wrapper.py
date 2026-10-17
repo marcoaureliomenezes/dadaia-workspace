@@ -1,37 +1,33 @@
-"""0.4.7 FR1 (ADR 0018 measured_by): skill owner scripts; AC3.1 (ADR 0135):
-one loader, one owner per grammar. Size: SMALL.
+"""Skill owner scripts: one loader, one owner per grammar. Size: SMALL.
 
 A ``public/skills/*/scripts/`` script OWNS its logic, so it must be self-contained:
 stdlib imports only, exec bit set, and ``--help`` exits 0. Size is never capped: class and
-method size and responsibility are review signals (ADR 0143).
+method size and responsibility are review signals.
 """
 
 from __future__ import annotations
 
 import ast
-import os
-import subprocess
+import re
 import sys
 from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.infrastructure.public_assets import (
-    _SKILL_SCRIPT_SHARED,  # allow-private-import: the staged siblings of a ledger script
-)
+from tests.helpers.oslib import is_executable, read_text, run, write_text
 from tests.helpers.scan_population import assert_populated
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _SKILLS_DIR = _REPO_ROOT / "dadaia_workspace" / "public" / "skills"
 
-#: Owner scripts whose verb set includes `check` (the ledger scripts of FR2). A
+#: Owner scripts whose verb set includes `check` (the ledger scripts). A
 #: script listed here must expose `check`; `registry.py` owns ports, not a ledger.
 _LEDGER_OWNER_SCRIPTS: frozenset[str] = frozenset(
     {"bugs.py", "backlog.py", "release.py", "audit.py", "memory.py"}
 )
 
 
-# --- Owner scripts: public/skills/*/scripts/*.py (0.4.7 FR1) ------------------------
+# --- Owner scripts: public/skills/*/scripts/*.py ------------------------
 
 
 def _owner_scripts() -> list[Path]:
@@ -39,7 +35,7 @@ def _owner_scripts() -> list[Path]:
 
 
 def _imported_roots(path: Path) -> set[str]:
-    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    tree = ast.parse(read_text(path), filename=str(path))
     roots: set[str] = set()
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
@@ -49,48 +45,83 @@ def _imported_roots(path: Path) -> set[str]:
     return roots
 
 
-#: The cross-skill import edges, each a read-only use of the grammar's one owner (ADR
-#: 0135): the release skill reads the navigator's drift decider and, at closure, the
-#: worktrees' rows; the worktree script reads the release skill's trio status parser and
-#: the backlog exit its Origin parser (ADR 0161) and the bug reader (ADR 0137); `_specs`
-#: reads the worktree name grammar (``NAME_RE``). No module imports back along its own edge.
-_CROSS_SKILL_EDGES = {
-    "dd-release-implementation": {"_memory_drift", "_worktree_git", "_worktree_names"},
-    "dd-gitflow-default": {"_release_schema", "_specs"},  # `_specs`: the fix-line quote
-    "dd-backlog-definition": {"_release_schema", "_bugs_store"},
-    "dd-bug-resolution": {"_release_schema", "_worktree_names"},
-}
+_KERNEL = _SKILLS_DIR / "dd-bug-resolution" / "scripts"
+_KERNEL_MODULES = {module.stem for module in _KERNEL.glob("*.py")}
+
+
+def _path_statements(script: Path) -> list[str]:
+    """The source of every statement that edits `sys.path`."""
+    text = read_text(script)
+    return [
+        ast.get_source_segment(text, node) or ""
+        for node in ast.walk(ast.parse(text))
+        if isinstance(node, ast.Expr | ast.Assign | ast.AugAssign)
+        and "sys.path" in (ast.get_source_segment(text, node) or "")
+    ]
+
+
+def _foreign_imports(script: Path) -> set[str]:
+    """The imports of *script* outside the stdlib, its own folder and the kernel; a kernel
+    module may import only the stdlib and its own folder."""
+    allowed = {module.stem for module in script.parent.glob("*.py")}
+    if script.parent.parent.name != _KERNEL.parent.name:
+        allowed |= _KERNEL_MODULES
+    return _imported_roots(script) - set(sys.stdlib_module_names) - allowed
+
+
+def _path_violations(script: Path) -> list[str]:
+    """The `sys.path` statements *script* may not hold: any in a module; in an entry point
+    more than one, or one naming a skill other than the kernel's."""
+    lines = _path_statements(script)
+    if script.name.startswith("_"):
+        return lines
+    return lines[1:] + [
+        ln for ln in lines if set(re.findall(r"\"(dd-[a-z-]+)\"", ln)) - {_KERNEL.parent.name}
+    ]
 
 
 @pytest.mark.parametrize("script", _owner_scripts(), ids=lambda p: f"{p.parents[1].name}/{p.name}")
 def test_skill_owner_script_meets_the_contract(script: Path) -> None:
-    """FR1: every skill script is a self-contained stdlib owner — no import into
+    """Every skill script is a self-contained stdlib owner — no import into
     the library, executable, and (for an entry point) `--help` exits 0.
 
     A script may split its verbs into `_`-prefixed sibling modules in the same folder, imported through the script's own directory on
     `sys.path`. A sibling is a module, not an entry point, so only the non-`_` scripts
     answer `--help`; everything else applies to every file under `scripts/`.
     """
-    siblings = {module.stem for module in script.parent.glob("*.py")}
-    skill = script.parent.parent.name
-    siblings |= {Path(d).stem for _, d in _SKILL_SCRIPT_SHARED if d.startswith(f"skills/{skill}/")}
-    siblings |= _CROSS_SKILL_EDGES.get(skill, set())
-    foreign = _imported_roots(script) - set(sys.stdlib_module_names) - siblings
+    foreign = _foreign_imports(script)
     assert foreign == set(), (
         f"{script.name} imports non-stdlib module(s) {sorted(foreign)} — a skill script "
         "runs from a projected skill folder with no library on sys.path (FR1)."
     )
-    assert script.read_text(encoding="utf-8").startswith("#!/usr/bin/env python3\n"), (
+    assert read_text(script).startswith("#!/usr/bin/env python3\n"), (
         f"{script.name} is missing the `#!/usr/bin/env python3` shebang."
     )
-    assert os.access(script, os.X_OK), f"{script.name} is not executable (exec bit unset)."
+    assert is_executable(script), f"{script.name} is not executable (exec bit unset)."
     if script.name.startswith("_"):
         return  # a sibling module, imported by its entry point — it has no argv surface
 
-    done = subprocess.run(
-        [sys.executable, str(script), "--help"], capture_output=True, text=True, check=False
-    )
+    done = run([sys.executable, str(script), "--help"], check=False)
     assert done.returncode == 0, f"{script.name} --help exited {done.returncode}: {done.stderr}"
+
+
+@pytest.mark.parametrize("script", _owner_scripts(), ids=lambda p: f"{p.parents[1].name}/{p.name}")
+def test_one_bootstrap_line_names_only_the_own_folder_and_the_kernel(script: Path) -> None:
+    """Rule 2: an entry point edits `sys.path` once, naming its folder and the kernel's; a
+    module never edits it."""
+    assert _path_violations(script) == []
+
+
+def test_a_planted_cross_skill_import_or_path_line_bites(tmp_path: Path) -> None:
+    folder = tmp_path / "dd-release-implementation" / "scripts"
+    folder.mkdir(parents=True)
+    plant = folder / "_plant.py"
+    write_text(plant, "import _memory_catalog\n")
+    assert _foreign_imports(plant) == {"_memory_catalog"}
+    write_text(
+        plant, 'import sys\nsys.path.insert(0, str(HERE.parent.parent / "dd-spec-navigator"))\n'
+    )
+    assert len(_path_violations(plant)) == 1
 
 
 def test_ledger_owner_scripts_expose_check() -> None:
@@ -102,26 +133,21 @@ def test_ledger_owner_scripts_expose_check() -> None:
     for script in _owner_scripts():
         if script.name not in _LEDGER_OWNER_SCRIPTS:
             continue
-        done = subprocess.run(
-            [sys.executable, str(script), "check", "--help"],
-            capture_output=True,
-            text=True,
-            check=False,
-        )
+        done = run([sys.executable, str(script), "check", "--help"], check=False)
         assert done.returncode == 0, f"{script.name} has no `check` subcommand: {done.stderr}"
 
 
-# --- The 0135 contract: one loader, one owner per grammar (AC3.1, PLAN §1.1) --------
+# --- One loader, one owner per grammar --------
 
 _PACKAGE = _REPO_ROOT / "dadaia_workspace"
-_LOADER = "infrastructure/ledger_scripts.py"
+_LOADER = "core/skill_owner.py"
 _RE_CALLS = {"compile", "search", "match", "fullmatch", "finditer", "findall", "sub", "split"}
 #: A grammar's head, as a package regex would spell it; only its owner and pinned twin hold it.
 _GRAMMAR_HEADS = {r"\*\*Origin:\*\*": set(), r"\*\*Status:\*\*": {"core/spec_status.py"}}
-#: Each §1.1 owner's pinned file and top-level names (the Status pair: `test_spec_status.py`).
+#: Each owner's pinned file and top-level names (the Status pair: `test_spec_status.py`).
 _SCHEMA = "public/skills/dd-release-implementation/scripts/_release_schema.py"
 _OWNERS = {
-    _SCHEMA: {"origin", "MARK_RE", "MARKS", "writes"},
+    _SCHEMA: {"origin", "writes"},
     "public/skills/dd-bug-resolution/scripts/_ledger.py": {"records", "validate", "terms"},
     _LOADER: {"load_owner"},
     "core/context_registry.py": {"entries"},
@@ -160,13 +186,11 @@ def _package_modules() -> list[Path]:
 
 
 def test_no_package_module_loads_a_script_or_parses_a_grammar_but_its_owner() -> None:
-    """AC3.1: only the loader execs a `public/skills` script; no second grammar parser."""
+    """Only the loader execs a `public/skills` script; no second grammar parser."""
     modules = _package_modules()
     assert_populated({p.name for p in modules}, sentinel="ledger_scripts.py")
     found = [
-        v
-        for p in modules
-        for v in _violations(p.read_text("utf-8"), p.relative_to(_PACKAGE).as_posix())
+        v for p in modules for v in _violations(read_text(p), p.relative_to(_PACKAGE).as_posix())
     ]
     assert found == []
 
@@ -186,7 +210,7 @@ def test_a_planted_second_loader_or_parser_bites(planted: str) -> None:
 
 @pytest.mark.parametrize("rel", _OWNERS)
 def test_each_owner_sits_at_its_pinned_location(rel: str) -> None:
-    tree = ast.parse((_PACKAGE / rel).read_text("utf-8"))
+    tree = ast.parse(read_text(_PACKAGE / rel))
     defined = {
         t.id if isinstance(t, ast.Name) else getattr(t, "name", None)
         for node in tree.body

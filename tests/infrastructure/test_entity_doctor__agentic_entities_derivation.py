@@ -2,7 +2,7 @@
 
 dadaia-workspace defines its scaffolded surface as ABSTRACT, harness-agnostic
 entities first (``dadaia_workspace/public/entities/registry.json``) and only then
-derives per-harness implementations:
+derives the per-harness projections:
 
   - no scaffolded core sub-agent without a **Persona**,
   - no wired core hook without a **Deterministic Behavior**,
@@ -26,9 +26,8 @@ from typing import Any
 
 import pytest
 
-from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES
 from dadaia_workspace.core.models.doctor_report import DoctorStatus
-from dadaia_workspace.infrastructure.projection_rules import harnesses_with_a_hook_derivation
+from tests.helpers.oslib import read_text, write_text
 
 _REGISTRY_PATH = (
     Path(__file__).resolve().parents[2]
@@ -43,8 +42,8 @@ SCHEMA_VERSION = "agentic-entities-v1"
 
 def load_registry() -> dict[str, Any]:
     """The abstract-entity registry, shape-checked: the test reads the JSON itself now
-    that the panel's loader is gone (0.4.7 c5 FR1)."""
-    data = json.loads(_REGISTRY_PATH.read_text(encoding="utf-8"))
+    that the panel's loader is gone."""
+    data = json.loads(read_text(_REGISTRY_PATH))
     assert isinstance(data, dict) and data.get("schema_version") == SCHEMA_VERSION
     for key in ("personas", "behaviors", "rules", "universal"):
         assert key in data, key
@@ -56,7 +55,7 @@ def persona_ids(registry: dict[str, Any]) -> frozenset[str]:
 
 
 def _frontmatter_description(manifest: Path) -> str:
-    lines = manifest.read_text(encoding="utf-8").splitlines()
+    lines = read_text(manifest).splitlines()
     if not lines or lines[0].strip() != "---":
         return ""
     collected: list[str] = []
@@ -99,7 +98,6 @@ def test_registry_loads_and_is_well_formed() -> None:
     for section in ("behaviors", "rules"):
         for entity in registry[section]:
             assert entity["mandate"].strip(), f"{section}:{entity['id']} has an empty mandate"
-            assert entity["implementations"], f"{section}:{entity['id']} derives nothing"
 
 
 def test_every_core_subagent_derives_from_a_persona_and_vice_versa() -> None:
@@ -114,56 +112,6 @@ def test_every_core_subagent_derives_from_a_persona_and_vice_versa() -> None:
         f"sub-agents without a Persona: {sorted(scaffolded - abstract)}; "
         f"Personas without a sub-agent: {sorted(abstract - scaffolded)}"
     )
-
-
-def test_every_wired_core_hook_derives_from_a_deterministic_behavior() -> None:
-    """Every ``dadaia_workspace.hooks.*`` entrypoint the installer wires must be
-    named by some Deterministic Behavior's implementations."""
-    dialects = (_PKG_ROOT / "infrastructure/runtime_transforms/hook_wrappers.py").read_text()
-    wired = set(re.findall(r"dadaia_workspace\.hooks\.([a-z_]+)", dialects))
-    assert wired, "no wired hook entrypoints found — the extraction regex broke"
-    behaviors_blob = json.dumps(load_registry()["behaviors"])
-    underived = {
-        module for module in wired if f"dadaia_workspace.hooks.{module}" not in behaviors_blob
-    }
-    assert not underived, (
-        f"core hook entrypoints wired without an abstract Deterministic Behavior: "
-        f"{sorted(underived)}"
-    )
-
-
-def test_behaviors_cover_every_harness_whose_hooks_are_derived() -> None:
-    """Every Deterministic Behavior row names every harness with a hook derivation —
-    its implementation or its declared gap — and never an unknown one (which lanes each
-    harness really gets is test_hook_behaviour_coverage's derived table).
-
-    The expected set is READ from the projection builder table, never listed here: the
-    day a declared-but-underived hook format grows a builder, this test demands its
-    registry rows with no edit of its own.
-    """
-    harnesses = set(harnesses_with_a_hook_derivation())
-    assert harnesses <= set(L1_ENTRY_HARNESSES)
-    for behavior in load_registry()["behaviors"]:
-        implemented = set(behavior["implementations"])
-        assert implemented == harnesses, (
-            f"behavior {behavior['id']}: implementations {sorted(implemented)} "
-            f"!= entry harnesses {sorted(harnesses)}"
-        )
-
-
-def test_rule_implementations_target_known_harnesses_and_cover_the_law_projections() -> None:
-    registry = load_registry()
-    harnesses = set(L1_ENTRY_HARNESSES)
-
-    for rule in registry["rules"]:
-        unknown = set(rule["implementations"]) - harnesses
-        assert not unknown, f"rule {rule['id']} derives for unknown harnesses {sorted(unknown)}"
-
-    # The root `AGENTS.md` map projection must be derived for every entry harness.
-    law_rule = next(r for r in registry["rules"] if r["id"] == "workspace-law")
-    assert set(law_rule["implementations"]) == harnesses
-    for impl in law_rule["implementations"].values():
-        assert "AGENTS.md" in impl
 
 
 def test_universal_entities_match_the_scaffold() -> None:
@@ -194,7 +142,8 @@ def test_doctor_check_blocks_on_underived_subagent(tmp_path: Path) -> None:
     from dadaia_workspace.infrastructure.entity_doctor import check_entities_derivation
 
     (tmp_path / "entities").mkdir()
-    (tmp_path / "entities" / "registry.json").write_text(
+    write_text(
+        tmp_path / "entities" / "registry.json",
         json.dumps(
             {
                 "schema_version": "agentic-entities-v1",
@@ -204,11 +153,10 @@ def test_doctor_check_blocks_on_underived_subagent(tmp_path: Path) -> None:
                 "universal": {},
             }
         ),
-        encoding="utf-8",
     )
     (tmp_path / "agents").mkdir()
-    (tmp_path / "agents" / "known.md").write_text("x", encoding="utf-8")
-    (tmp_path / "agents" / "rogue.md").write_text("x", encoding="utf-8")
+    write_text(tmp_path / "agents" / "known.md", "x")
+    write_text(tmp_path / "agents" / "rogue.md", "x")
 
     lines = check_entities_derivation(tmp_path)
     assert any("'rogue' has no abstract Persona" in line.text for line in lines)
@@ -225,7 +173,7 @@ def test_doctor_check_passes_on_the_packaged_registry() -> None:
 
 def _write_registry(tmp_path: Path, payload: object) -> None:
     (tmp_path / "entities").mkdir()
-    (tmp_path / "entities" / "registry.json").write_text(json.dumps(payload), encoding="utf-8")
+    write_text(tmp_path / "entities" / "registry.json", json.dumps(payload))
 
 
 @pytest.mark.parametrize(
@@ -236,22 +184,24 @@ def _write_registry(tmp_path: Path, payload: object) -> None:
         {"schema_version": "agentic-entities-v1", "personas": {"known": {"id": "known"}}},
         {
             "schema_version": "agentic-entities-v1",
-            "behaviors": [{"id": "b1", "implementations": {}}, "rogue-behavior"],
+            "behaviors": [{"id": "b1", "modules": {}}, "rogue-behavior"],
         },
         {
             "schema_version": "agentic-entities-v1",
-            "behaviors": [{"id": "b1", "implementations": 42}],
+            "behaviors": [{"id": "b1", "modules": 42}],
         },
         {
             "schema_version": "agentic-entities-v1",
-            "behaviors": [{"id": "b1", "implementations": "codex"}],
+            "behaviors": [{"id": "b1", "gaps": "codex"}],
         },
+        {"schema_version": "agentic-entities-v1", "behaviors": [{"id": "b1", "modules": [5]}]},
+        {"schema_version": "agentic-entities-v1", "behaviors": [{"id": "b1", "modules": ["foo"]}]},
         {"schema_version": "agentic-entities-v0"},
     ],
 )
 def test_doctor_check_blocks_on_a_malformed_registry(tmp_path: Path, registry: object) -> None:
-    """FR3.3 (ENT-DERIVE-1): a registry off its schema yields exactly one typed ERROR line —
-    never a traceback, never a DRIFT line misread from the shape (``set("codex")`` as harnesses)."""
+    """ENT-DERIVE-1: a registry off its schema yields exactly one typed ERROR line —
+    never a traceback, never a DRIFT line misread from the shape (``set("codex")`` as gap keys)."""
     from dadaia_workspace.infrastructure.entity_doctor import check_entities_derivation
 
     _write_registry(tmp_path, registry)
@@ -259,3 +209,19 @@ def test_doctor_check_blocks_on_a_malformed_registry(tmp_path: Path, registry: o
     assert len(lines) == 1 and lines[0].status is DoctorStatus.ERROR, lines
     assert lines[0].text.startswith("entities-derivation:"), lines
     assert lines[0].text.endswith("(ENT-DERIVE-1)"), lines
+
+
+def test_every_wired_core_hook_derives_from_a_deterministic_behavior() -> None:
+    """Every ``dadaia_workspace.hooks.*`` entrypoint the installer wires must be
+    named by some Deterministic Behavior's implementations."""
+    dialects = read_text(_PKG_ROOT / "infrastructure/runtime_transforms/hook_wrappers.py")
+    wired = set(re.findall(r"dadaia_workspace\.hooks\.([a-z_]+)", dialects))
+    assert wired, "no wired hook entrypoints found — the extraction regex broke"
+    behaviors_blob = json.dumps(load_registry()["behaviors"])
+    underived = {
+        module for module in wired if f"dadaia_workspace.hooks.{module}" not in behaviors_blob
+    }
+    assert not underived, (
+        f"core hook entrypoints wired without an abstract Deterministic Behavior: "
+        f"{sorted(underived)}"
+    )

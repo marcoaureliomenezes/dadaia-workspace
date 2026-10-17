@@ -32,7 +32,7 @@
     },
     "agent": {
       "type": "string",
-      "description": "Name of the agent that produced this handoff (e.g. 'dd-software-engineer')."
+      "description": "Name of the agent that produced this handoff (e.g. 'dd-sw-engineer-sr')."
     },
     "context": {
       "type": "string",
@@ -56,7 +56,7 @@
     "diff_sha256": {
       "type": "string",
       "pattern": "^[0-9a-f]{64}$",
-      "description": "The hash of the diff a verdict judged, from worktree.py hash; written only by verdict.py."
+      "description": "The hash of the diff a verdict judged, from `.dadaia/.venv/bin/dadaia worktree hash`; written only by verdict.py."
     },
     "metrics": {
       "type": "object",
@@ -148,7 +148,7 @@
     "verdict": {
       "type": "string",
       "enum": ["APPROVED", "REJECTED"],
-      "description": "Optional approval verdict emitted by dd-code-reviewer. When present, must be APPROVED or REJECTED. Enables machine-checkable dual-approval gate at release CLOSURE."
+      "description": "Optional approval verdict emitted by dd-code-reviewer. When present, must be APPROVED or REJECTED. Read by `.dadaia/.venv/bin/dadaia worktree merge` (worktrees/AGENTS.md §2)."
     },
     "verdict_reason": {
       "type": "string",

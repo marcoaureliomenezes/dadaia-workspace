@@ -1,4 +1,4 @@
-"""Characterization of public stage/install/doctor at the public CLI."""
+"""Characterization of public install/doctor at the public CLI."""
 
 from __future__ import annotations
 
@@ -10,7 +10,9 @@ import pytest
 from typer.testing import CliRunner
 
 from dadaia_workspace import container
+from dadaia_workspace.cli.commands.public import app as public_app
 from dadaia_workspace.cli.main import app
+from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.platform import PLATFORM
 from dadaia_workspace.features.public.service import PublicAssetService
 from dadaia_workspace.infrastructure.json_agent_model_policy_store import (
@@ -45,36 +47,25 @@ def test_public_projection_lifecycle(tmp_path: Path, monkeypatch: pytest.MonkeyP
     source_public = public_asset_roster.default_public_dir()
     public_dir = shutil.copytree(source_public, package_dir / "public")
     shutil.copytree(source_public.parent / "hooks", package_dir / "hooks")
-    (package_dir / "core").mkdir()
-    shutil.copy2(source_public.parent / "core" / "redaction.py", package_dir / "core")
-    (package_dir / "infrastructure" / "data").mkdir(parents=True)
-    shutil.copy2(
-        source_public.parent / "infrastructure" / "data" / "privacy_baseline.json",
-        package_dir / "infrastructure" / "data",
-    )
     (public_dir / "data" / "AGENTS.md").write_bytes(_FIXTURE_SOURCE)
     manager = FileSystemPublicAssetManager()
-    manager._public_dir = public_dir  # noqa: SLF001 — package asset-provider boundary
+    manager._public_dir = public_dir
     service = PublicAssetService(
         manager, agent_policy_loader=lambda root: JsonAgentModelPolicyStore(root).load()
     )
     monkeypatch.setattr(container, "build_public_service", lambda: service)
     monkeypatch.chdir(ws)
 
-    stage = CliRunner().invoke(app, ["public", "stage"])
+    staged = service.stage(ws)
     install = CliRunner().invoke(app, ["public", "install"])
     doctor = CliRunner().invoke(app, ["public", "doctor"])
 
-    assert (stage.exit_code, install.exit_code, doctor.exit_code) == (0, 0, 0), doctor.output
-    expected_stage = (
-        "✓ 54 asset group(s) staged:" if PLATFORM.windows else "✓ 37 asset group(s) staged:"
-    )
+    assert (install.exit_code, doctor.exit_code) == (0, 0), doctor.output
+    assert len(staged) == (31 if PLATFORM.windows else 8)
     expected_install = (
-        "✓ 181 asset(s) processed:" if PLATFORM.windows else "✓ 164 asset(s) processed:"
+        "✓ 160 asset(s) processed:" if PLATFORM.windows else "✓ 137 asset(s) processed:"
     )
-    assert stage.output.splitlines()[0] == expected_stage
     assert install.output.splitlines()[0] == expected_install
-    assert "fix:" not in stage.output
     assert "fix:" not in install.output
     assert "fix:" not in doctor.output
     doctor_lines = doctor.output.splitlines()
@@ -82,9 +73,9 @@ def test_public_projection_lifecycle(tmp_path: Path, monkeypatch: pytest.MonkeyP
     assert "[ok] root:AGENTS.md" in doctor_lines
     assert doctor_lines[-3:] == [
         "[ok] public-privacy (baseline structural scan, no operator denylist)",
-        "[ok] entities-derivation: 3 Personas ↔ 3 core sub-agents; 5 Deterministic Behaviors "
+        "[ok] entities-derivation: 5 Personas ↔ 5 core sub-agents; 5 Deterministic Behaviors "
         "derived for every harness with a hook derivation (ENT-DERIVE-1)",
-        "[ok] model-resolution",
+        "[ok] model-resolution: template balanced",
     ]
 
     manifest = json.loads((ws / ".dadaia" / "agentic" / "manifest.json").read_bytes())
@@ -95,3 +86,11 @@ def test_public_projection_lifecycle(tmp_path: Path, monkeypatch: pytest.MonkeyP
     }
     assert (ws / ".dadaia" / "agentic" / "data" / "AGENTS.md").read_bytes() == _FIXTURE_RENDERED
     assert (ws / "AGENTS.md").read_bytes() == _FIXTURE_RENDERED
+
+
+def test_public_install_recipe_is_two_whole_fixes_without_a_chain_operator() -> None:
+    """PowerShell 5.1 has no ``&&``: the recipe lists one runnable line per verb."""
+    install = next(c for c in public_app.registered_commands if c.callback.__name__ == "install")
+    assert install.epilog == (
+        f"Recipe:\n\n{fix_line(None, 'public', 'install')}\n\n{fix_line(None, 'public', 'doctor')}"
+    )

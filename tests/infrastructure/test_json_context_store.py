@@ -1,12 +1,8 @@
 """Unit tests for JsonContextStore (v3 schema: ALIVE/DEAD + associated_repos).
 
-A15.2, A15.3 (registry-schema half; the model half lives in
-tests/core/models/test_spec_context.py). v2→v3 is purely additive
-(``associated_repos``), so — unlike the v1→v2 state-string rename — the store tolerates
-a v2 file on read rather than hard-refusing it: a hard version gate with no repair path
-reachable from every phase is exactly the bug class of
-``memory-agent-tier-migration-deadlock`` (CRITICAL, v0.1.72), and the CLI wiring that
-would supply that repair path is out of this task's write set.
+Associated repos round-trip through the registry schema. v2→v3 is purely additive
+(``associated_repos``), so the store tolerates a v2 file on read rather than hard-refusing it:
+a hard version gate with no repair path reachable from every phase deadlocks migration.
 """
 
 import json
@@ -23,6 +19,7 @@ from dadaia_workspace.core.models.spec_context import (
 )
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
 from tests.fixtures.stores import context_store
+from tests.helpers.oslib import Undecodable, read_text, write_text
 
 
 def _make_ctx(
@@ -88,7 +85,7 @@ def test_crud_round_trips(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# FR15/A15.3: associated_repos round-trips through the one registry schema.
+# associated_repos round-trips through the one registry schema.
 # ---------------------------------------------------------------------------
 
 
@@ -111,7 +108,7 @@ def test_associated_repos_round_trip_through_store(tmp_path: Path) -> None:
     assert fetched is not None
     assert fetched.associated_repos == ctx.associated_repos
 
-    raw = json.loads((tmp_path / "spec_contexts.json").read_text())
+    raw = json.loads(read_text(tmp_path / "spec_contexts.json"))
     row = raw["contexts"][0]
     assert row["associated_repos"] == [
         {"slug": "assoc-a", "url": "https://github.com/org/assoc-a"},
@@ -120,7 +117,7 @@ def test_associated_repos_round_trip_through_store(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# FR15/A15.2: a v2 registry (no associated_repos key) reads as behaviourally
+# A v2 registry (no associated_repos key) reads as behaviourally
 # identical to a v3 registry with zero associated repos — no migration required
 # to keep reading. See module docstring for why: the CLI repair path is out of
 # scope here, so hard-gating v2 on read would reproduce a known deadlock class.
@@ -140,11 +137,11 @@ def test_v2_registry_loads_with_empty_associated_repos(tmp_path: Path) -> None:
                 "alive_since": "2026-01-02T00:00:00Z",
                 "dead_since": None,
                 "current_branch": "main",
-                # no "associated_repos" key — the real shape of a pre-FR15 file.
+                # no "associated_repos" key: the real shape of an older file.
             }
         ],
     }
-    (tmp_path / "spec_contexts.json").write_text(json.dumps(v2_payload), encoding="utf-8")
+    write_text(tmp_path / "spec_contexts.json", json.dumps(v2_payload))
     store = JsonContextStore(tmp_path)
 
     fetched = store.get("legacy-ctx")
@@ -159,7 +156,7 @@ def test_v2_registry_loads_with_empty_associated_repos(tmp_path: Path) -> None:
 
 
 def test_a_fresh_store_writes_v3_rows_without_legacy_fields(tmp_path: Path) -> None:
-    """AC-T10a-7: spec_contexts.json written by the store has no legacy fields —
+    """spec_contexts.json written by the store has no legacy fields —
     is_primary / activated_at never round-trip."""
     fresh_ws = tmp_path
     fresh_store = context_store(fresh_ws)
@@ -175,7 +172,7 @@ def test_a_fresh_store_writes_v3_rows_without_legacy_fields(tmp_path: Path) -> N
     )
     fresh_store.save(ctx)
     fresh_ctx_file = fresh_ws / "spec_contexts.json"
-    data = json.loads(fresh_ctx_file.read_text())
+    data = json.loads(read_text(fresh_ctx_file))
     row = data["contexts"][0]
     assert "is_primary" not in row
     assert "activated_at" not in row
@@ -197,25 +194,34 @@ def test_a_fresh_store_writes_v3_rows_without_legacy_fields(tmp_path: Path) -> N
 def test_a_row_missing_name_is_unreadable_at_every_method(
     tmp_path: Path, call: Callable[[JsonContextStore], object]
 ) -> None:
-    """J2.S6.T2 (review F3): a row without ``name`` is a SchemaVersionError at every store
+    """A row without ``name`` is a SchemaVersionError at every store
     method, never a KeyError; the registry file is left as it was."""
     path = tmp_path / "spec_contexts.json"
     body = json.dumps({"schema_version": 3, "contexts": [{"state": "alive"}]})
-    path.write_text(body, encoding="utf-8")
+    write_text(path, body)
     with pytest.raises(
         SchemaVersionError, match="has no name, repo_slug, repo_url, created_at"
     ) as refused:
         call(JsonContextStore(tmp_path))
     keys = "name, repo_slug, repo_url, created_at"
     assert refused.value.fix == f"Operator action: add {keys} to that row of {path}"
-    assert path.read_text(encoding="utf-8") == body
+    assert read_text(path) == body
 
 
 def test_a_refused_row_is_named_by_its_name(tmp_path: Path) -> None:
-    """J2.S6.T6: the refusal names the row to repair; a row keeping its name is named."""
+    """The refusal names the row to repair; a row keeping its name is named."""
     path = tmp_path / "spec_contexts.json"
     row = {"name": "beta", "state": "alive", "repo_slug": "beta", "repo_url": "u"}
-    path.write_text(json.dumps({"schema_version": 3, "contexts": [row]}), encoding="utf-8")
+    write_text(path, json.dumps({"schema_version": 3, "contexts": [row]}))
     with pytest.raises(SchemaVersionError) as refused:
         JsonContextStore(tmp_path).list_all()
-    assert refused.value.problem == f"{path}: context row 'beta' has no created_at."
+    assert refused.value.message == f"{path}: context row 'beta' has no created_at."
+
+
+def test_a_registry_that_is_not_utf8_is_undecodable_not_a_codec_error(tmp_path: Path) -> None:
+    (tmp_path / "spec_contexts.json").write_bytes(b'{"contexts": "caf\xe9"}')
+
+    with pytest.raises(Undecodable) as refused:
+        JsonContextStore(tmp_path).read_raw()
+
+    assert refused.value.path == tmp_path / "spec_contexts.json"

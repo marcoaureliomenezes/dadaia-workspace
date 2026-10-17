@@ -9,13 +9,17 @@ from typing import NoReturn
 
 import typer
 
+from dadaia_workspace.core.cli_line import spell_fix
+
 
 def print_error(error: object) -> None:
     """``Error: <error>`` on stderr — the one rendering of a refusal."""
     print(f"Error: {error}", file=sys.stderr)
 
 
-def fail(error: object) -> NoReturn:
-    """Print the refusal (:func:`print_error`) and exit 1."""
+def fail(error: object, fix: str = "") -> NoReturn:
+    """Print the refusal and exit 1: ``fix:`` is the error's own fix, else the caller's, else none."""
     print_error(error)
+    if not getattr(error, "fix", "") and fix:
+        print(spell_fix(fix), file=sys.stderr)
     raise typer.Exit(1) from None

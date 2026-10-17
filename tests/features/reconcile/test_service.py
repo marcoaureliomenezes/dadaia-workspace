@@ -5,6 +5,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
+from dadaia_workspace.core import platform
 from dadaia_workspace.core.models.doctor_report import (
     DoctorLine,
     DoctorReport,
@@ -17,6 +20,7 @@ from dadaia_workspace.features.spec_context.doctor import DoctorService
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
 from tests.fixtures.stores import context_store
+from tests.helpers.oslib import effective_uid, make_executable, write_text
 
 
 class _Doctor:
@@ -46,9 +50,7 @@ class _Public:
 def _v1_workspace(root: Path) -> Path:
     states = root / ".dadaia" / "states"
     states.mkdir(parents=True)
-    (states / "spec_contexts.json").write_text(
-        json.dumps({"schema_version": "1", "contexts": []}), encoding="utf-8"
-    )
+    write_text(states / "spec_contexts.json", json.dumps({"schema_version": "1", "contexts": []}))
     return root
 
 
@@ -121,16 +123,16 @@ def test_failure_restores_the_primary_context_file_the_migration_deleted(tmp_pat
 
 
 def test_reconcile_ignores_operator_slop_and_names_context_invariants(tmp_path: Path) -> None:
-    """sa-reconcile-certify-skip-the-workspace-walk#B2: with `.dadaia/nonsense/` and a root
+    """With `.dadaia/nonsense/` and a root
     `notes.txt` seeded, reconcile succeeds (operator slop never blocks an upgrade) and its
     doctor step is reported as 'context-invariants' — run against the real doctor service."""
     workspace = _v1_workspace(tmp_path)
     venv_bin = workspace / ".dadaia" / ".venv" / PLATFORM.venv_scripts_dir
     venv_bin.mkdir(parents=True)
-    (venv_bin / f"dadaia{PLATFORM.venv_exe_suffix}").write_text("", encoding="utf-8")
-    (venv_bin / f"dadaia{PLATFORM.venv_exe_suffix}").chmod(0o755)
+    write_text(venv_bin / f"dadaia{PLATFORM.venv_exe_suffix}", "")
+    make_executable(venv_bin / f"dadaia{PLATFORM.venv_exe_suffix}")
     (workspace / ".dadaia" / "nonsense").mkdir()
-    (workspace / "notes.txt").write_text("operator notes", encoding="utf-8")
+    write_text(workspace / "notes.txt", "operator notes")
     doctor = DoctorService(
         context_store(workspace / ".dadaia" / "states"), GitSubprocessClient(), workspace
     )
@@ -153,3 +155,26 @@ def test_reconcile_ignores_operator_slop_and_names_context_invariants(tmp_path: 
         "context-invariants",
         "capability-canary",
     )
+
+
+def test_the_ownership_repair_quotes_a_path_holding_a_blank(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    uid = effective_uid()
+    if uid is None:
+        pytest.skip("this host has no ownership semantics")
+    root = tmp_path / "a b"
+    (root / ".dadaia" / "agentic").mkdir(parents=True)
+    monkeypatch.setattr(platform, "file_owner", lambda _path: (uid + 1, "other"))
+
+    message = _reconcile(
+        root,
+        expected_version="1.2.3",
+        actual_version="1.2.3",
+        public_service=object(),
+        doctor_service=object(),
+    ).error
+
+    repair = platform.inline("sudo", "chown", "-R", str(uid), str(root / ".dadaia"))
+    assert message is not None and f"Repair with: {repair} (or fix" in message
+    assert str(root / ".dadaia") in repair and f"'{root / '.dadaia'}'" in repair

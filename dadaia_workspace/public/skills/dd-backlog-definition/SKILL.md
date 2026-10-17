@@ -11,7 +11,8 @@ description: >
 ## The document
 
 1. Open `specs/backlog/AGENTS.md` (the area's scoped law) and follow it.
-2. Write in a `backlog` worktree (`worktrees/AGENTS.md`). Append via `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py new <slug> --title "…" --description "…" --provenance "<operator words or intake item + date>" --relates <slugs>|none`; validate via `.dadaia/.venv/bin/dadaia doctor` (`ledgers`
+2. Before `backlog.py new`, read the main thread's `dd-grill-me` backlog-stage handoff (`dd-grill-me`'s `references/backlog.md`).
+3. Write inside the `wt-backlog-<slug>` lane the main thread opened (`worktrees/AGENTS.md` §1). Append via `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py new <slug> --title "…" --description "…" --provenance "<operator words or intake item + date>" --relates <slugs>|none`; validate via `.dadaia/.venv/bin/dadaia doctor` (`ledgers`
    section).
 
 ## Continuous curation
@@ -20,6 +21,7 @@ description: >
 - Dedup: compare a new entry's title+description against every ACTIVE item for the
   same subject — by domain concept, not by the request's
   wording; exit a near-duplicate as `rejected`, its `--reason` `absorbed by <existing slug>`.
+- Before any staleness or cut judgement, read the entry's `provenance` and the operator's verbatim words; an operator-designed requirement is cut only after the operator sees and answers.
 - Staleness: an ACTIVE item untouched since the last closure is a
   sanitize candidate; a confirmed-invalid item exits as `rejected` with a one-line
   `reason`; a merely-postponed one stays `active[]`.
@@ -34,8 +36,7 @@ description: >
 
 ## Pick and dispositions
 
-- The pick is the SPEC's `**Origin:** backlog:<ids>` line; the entry keeps its status.
-- It exits exactly once, at closure, by `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py exit <slug> --disposition
+- Pick and exit: `specs/backlog/AGENTS.md` §5. The exit command: `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py exit <slug> --disposition
   <disposition> [--release <id>] [--reason <text>]` — one histo
   record, refused on a second exit (`dd-release-implementation` RC-FLOW step 4).
 
@@ -43,9 +44,9 @@ description: >
 
 - `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py check --specs <specs-dir>` exits 0 and `.dadaia/.venv/bin/dadaia doctor` prints no `BL-` finding.
 - Every entry added this session names its intake item or operator words in `provenance`.
-- Human review has compared every pair of active entries by domain subject: no semantic
+- Every pair of active entries was compared by domain subject: no semantic
   duplicate remains active, and each absorbed duplicate has a `rejected` history record naming the retained slug.
-- Human review has classified every staleness candidate: a postponed item remains active;
+- Every staleness candidate is classified: a postponed item remains active;
   an invalid item has a `rejected` history record with its one-line reason.
 
 ## References

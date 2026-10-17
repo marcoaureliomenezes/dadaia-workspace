@@ -1,26 +1,25 @@
 """ctx_inject driven as a real harness does: a subprocess, the session id on stdin.
 
-bind-driven injection (FR-W2-01/02, T-50-03), compaction re-entry
-(claude-compact-reinjection-missing, kimi-postcompact-omits-bound-context-bootstrap),
-the catalog digest (AC-W4-03), A19.1 (associated repos inject nothing), A30.1,
-bind-lost-silently-after-five-idle-minutes (a lost bind is told once); AC1.2 Cursor/Copilot
-envelopes and new-session injection.
+Covers bind-driven injection, compaction re-entry, the catalog digest, associated repos
+injecting nothing, a lost bind told once, and the Cursor/Copilot envelopes and
+new-session injection.
 """
 
 from __future__ import annotations
 
 import json
 import os
-import subprocess
 import sys
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 import pytest
 
-from dadaia_workspace.core import session_store
+from dadaia_workspace.core import clock, session_store
 from tests.fixtures.harness_env import claude_hook_env, kimi_hook_env, run_hook_subprocess
+from tests.helpers.oslib import read_text, run, write_text
+from tests.helpers.oslib import run as os_run
+from tests.helpers.oslib import write_text as os_write_text
 
 
 def _ws(root: Path, *contexts: dict[str, Any]) -> Path:
@@ -35,35 +34,38 @@ def _ws(root: Path, *contexts: dict[str, Any]) -> Path:
                  "repo_url": "", "created_at": "2026-09-30T00:00:00+00:00"}  # fmt: skip
         product = root / "repos" / slug / "specs" / "memory" / "product"
         product.mkdir(parents=True)
-        (product.parent / "ARCHITECTURE.md").write_text(
+        write_text(
+            product.parent / "ARCHITECTURE.md",
             f"# Architecture\n\n## Tech Stack\n\n{c.get('stack', 'Python 3.12')}\n",
-            encoding="utf-8",
         )
         if "index" in c:
-            (product / "index.md").write_text(c["index"], encoding="utf-8")
+            write_text(product / "index.md", c["index"])
         else:
-            (product / "catalog.json").write_text(
-                c.get("catalog", '{"features": []}'), encoding="utf-8"
-            )
+            write_text(product / "catalog.json", c.get("catalog", '{"features": []}'))
         if "assoc" in c:  # an associated repo carrying its OWN memory tree
             entry["associated_repos"] = [{"slug": "assoc", "url": "https://example.invalid/a.git"}]
             assoc = root / "repos" / "assoc" / "specs" / "memory"
             assoc.mkdir(parents=True)
-            (assoc / "ARCHITECTURE.md").write_text(
-                f"# A\n\n## Tech Stack\n\n{c['assoc']}\n", encoding="utf-8"
-            )
+            write_text(assoc / "ARCHITECTURE.md", f"# A\n\n## Tech Stack\n\n{c['assoc']}\n")
         entries.append(entry)
-    (states / "spec_contexts.json").write_text(
-        json.dumps({"schema_version": "2", "contexts": entries}), "utf-8"
+    os_write_text(
+        states / "spec_contexts.json", json.dumps({"schema_version": "2", "contexts": entries})
     )
     return root
 
 
 def _bind(root: Path, sid: str, context: str) -> None:
-    """What ``dadaia context bind`` persists: the self-keyed record with a fresh ``bound_at``."""
-    now = datetime.now(tz=UTC).isoformat()
+    """What ``dadaia context bind`` persists: the record author's output stamped by the clock."""
     session_store.write_session(
-        root, sid, {"session_id": sid, "context": context, "bound_at": now, "last_seen_at": now}
+        root,
+        sid,
+        session_store.new_binding_record(
+            session_id=sid,
+            context=context,
+            runtime="claude-code",
+            pid=os.getpid(),
+            now=clock.now_iso(),
+        ),
     )
 
 
@@ -75,7 +77,7 @@ def _run(
     source: str | None = None,
     extra: dict[str, str] | None = None,
 ) -> str:
-    env = claude_hook_env(  # the env id is the one id channel: bind sees no stdin (review F1)
+    env = claude_hook_env(  # the env id is the one id channel: bind sees no stdin
         root,
         session_id=sid,
         extra={**(extra or {}), **({"DADAIA_HOOK_EVENT": event} if event else {})},
@@ -296,14 +298,23 @@ def test_first_emission(
 
 
 def test_env_override_injects_context_memory(tmp_path: Path) -> None:
-    """sa-bind-has-two-stores#S2: a session with no id (a Kimi shell, no payload id) is
-    bound by DADAIA_CONTEXT."""
+    """A session with no id (a Kimi shell, no payload id) is bound by DADAIA_CONTEXT."""
     _ws(tmp_path, {"name": "ctx"})
     env = kimi_hook_env(tmp_path, extra={"DADAIA_CONTEXT": "ctx"})
     result = run_hook_subprocess("ctx_inject", {}, env)
     assert result.returncode == 0, result.stderr
     assert result.stdout.startswith("[ctx]")
     assert "Python 3.12" in result.stdout
+
+
+def test_memory_text_reaches_a_cp1252_pipe_as_utf8(tmp_path: Path) -> None:
+    """The injected memory is UTF-8 whatever codec the host pipe defaults to."""
+    _ws(tmp_path, {"name": "ctx", "stack": "checks \u2713"})
+    env = kimi_hook_env(
+        tmp_path, extra={"DADAIA_CONTEXT": "ctx", "PYTHONIOENCODING": "cp1252", "PYTHONUTF8": "0"}
+    )
+    result = run_hook_subprocess("ctx_inject", {}, env)
+    assert (result.returncode, "checks \u2713" in result.stdout) == (0, True), result.stderr
 
 
 @pytest.mark.parametrize(
@@ -329,17 +340,15 @@ def test_output_contract_envelopes(
 
 
 def test_emissions_attach_the_derived_help_digest(tmp_path: Path) -> None:
-    """T-053-24: the digest rides every emission, read from .dadaia/agentic/help-digest.md."""
+    """The digest rides every emission, read from .dadaia/agentic/help-digest.md."""
     _ws(tmp_path)
     (tmp_path / ".dadaia" / "agentic").mkdir()
-    (tmp_path / ".dadaia" / "agentic" / "help-digest.md").write_text(
-        "# dadaia CLI digest (vX)\n", encoding="utf-8"
-    )
+    write_text(tmp_path / ".dadaia" / "agentic" / "help-digest.md", "# dadaia CLI digest (vX)\n")
     assert "# dadaia CLI digest (vX)" in _run(tmp_path, "s")
 
 
 def test_injected_catalog_is_tldr_digest_and_measurably_smaller(tmp_path: Path) -> None:
-    """AC-W4-03 / F-77: the injected catalog keeps slug/title/tldr/path only (never the heavy
+    """The injected catalog keeps slug/title/tldr/path only (never the heavy
     ``summary`` nor ``rank``), is under half the raw bytes, and the file on disk is untouched."""
     feature = {
         "rank": 1,
@@ -362,7 +371,7 @@ def test_injected_catalog_is_tldr_digest_and_measurably_smaller(tmp_path: Path) 
         "path": "specs/memory/product/agents/agent-comms.md",
     }
     assert len(block) < len(raw) * 0.5
-    assert (tmp_path / "repos/ctx/specs/memory/product/catalog.json").read_text("utf-8") == raw
+    assert read_text(tmp_path / "repos/ctx/specs/memory/product/catalog.json") == raw
 
 
 # The hook under ``runpy``, with an audit hook counting filesystem and subprocess operations
@@ -387,11 +396,9 @@ def _ops(root: Path, hook: str, bound: bool) -> int:
         _bind(root, "s", "c0")
     env = {**claude_hook_env(root, session_id="s"), "PYTHONPATH": os.environ.get("PYTHONPATH", "")}
     env.pop("DADAIA_CONTEXT", None)
-    done = subprocess.run(
-        [sys.executable, "-c", _COUNTING_DRIVER.format(hook=hook)],
-        input=json.dumps({"session_id": "s"}), env=env, cwd=root,
-        capture_output=True, text=True, check=True, timeout=30,
-    )  # fmt: skip
+    # A cold, never-written cache: import opens are then the same on every run and machine.
+    env |= {"PYTHONPYCACHEPREFIX": str(root / "cold-pyc"), "PYTHONDONTWRITEBYTECODE": "1"}
+    done = run([sys.executable, "-c", _COUNTING_DRIVER.format(hook=hook)], input=json.dumps({"session_id": "s"}), env=env, cwd=root, check=True, timeout=30)  # fmt: skip
     return int(done.stderr.rsplit("OPS=", 1)[1])
 
 
@@ -414,10 +421,60 @@ def _ops(root: Path, hook: str, bound: bool) -> int:
 def test_hook_lane_cost_does_not_grow_with_the_registry(
     tmp_path: Path, hook: str, bound: bool
 ) -> None:
-    """AC2.2 (0118): a hook lane's filesystem and subprocess operations are the same at 2 and
-    at 20 registered contexts."""
+    """A hook lane's filesystem and subprocess operations are the same at 2 and at 20 contexts."""
     two, twenty = (
         _ops(_ws(tmp_path / str(n), *({"name": f"c{i}"} for i in range(n))), hook, bound)
         for n in (2, 20)
     )
     assert twenty == two
+
+
+def test_hook_lane_cost_is_the_same_whatever_bytecode_cache_the_parent_holds(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The count does not depend on whether the parent env's bytecode cache is cold or warm."""
+    warm = tmp_path / "warm"
+    pkg = Path(__file__).parents[2] / "dadaia_workspace"
+    os_run([sys.executable, "-m", "compileall", "-q", str(pkg)], env={**os.environ, "PYTHONPYCACHEPREFIX": str(warm), "PYTHONDONTWRITEBYTECODE": ""}, check=True)  # fmt: skip
+    counts = []
+    for n, prefix in enumerate((tmp_path / "cold", warm)):
+        monkeypatch.setenv("PYTHONPYCACHEPREFIX", str(prefix))
+        counts.append(_ops(_ws(tmp_path / str(n), {"name": "c0"}), "ctx_inject", True))
+    assert counts[0] == counts[1]
+
+
+def test_two_same_second_binds_each_reinject_once(tmp_path: Path) -> None:
+    """Two binds the real record author writes in one wall second carry the same ``bound_at``;
+    each still injects, and a prompt with no new bind after it is silent."""
+    _ws(tmp_path, {"name": "alpha"})
+    now = clock.now_iso()
+    for _ in range(2):
+        session_store.write_session(
+            tmp_path,
+            "s",
+            session_store.new_binding_record(
+                session_id="s", context="alpha", runtime="r", pid=1, now=now
+            ),
+        )
+        assert _A in _run(tmp_path, "s")
+        assert _run(tmp_path, "s") == ""
+
+
+def test_naive_bound_at_reads_as_utc_in_any_zone(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A ``bound_at`` without an offset is UTC, as ``session_store.is_live`` reads it."""
+    import time
+
+    from dadaia_workspace.hooks import ctx_inject
+
+    if not hasattr(time, "tzset"):
+        pytest.skip("time.tzset is absent on Windows; the zone cannot be pinned")
+    monkeypatch.setenv("TZ", "America/Sao_Paulo")
+    time.tzset()
+    try:
+        session_store.write_session(tmp_path, "s1", {"bound_at": "2026-10-11T04:00:00"})
+        assert ctx_inject._session_bound_at(tmp_path, "s1") == 1791691200.0
+    finally:
+        monkeypatch.undo()
+        time.tzset()

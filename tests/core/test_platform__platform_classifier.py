@@ -1,7 +1,7 @@
-"""Contract test: pyproject.toml declares the correct OS classifiers (T-018-08 / T-018-30).
+"""Contract test: pyproject.toml declares the correct OS classifiers.
 
-After the 0.1.8 rc-2 Windows graduation (the cross-platform unit + contract CI legs
-are green and hard-gated on Linux, macOS, and Windows), pyproject.toml advertises all
+The cross-platform unit and contract CI legs are hard-gated on Linux, macOS, and
+Windows; pyproject.toml advertises all
 three supported operating systems via explicit per-OS classifiers — NOT the over-broad
 ``OS Independent`` (which would dishonestly imply every OS works without evidence).
 
@@ -14,7 +14,7 @@ from __future__ import annotations
 import tomllib
 from pathlib import Path
 
-# The three OSes whose unit + contract CI legs are hard-gated green (T-018-30).
+# The three OSes whose unit + contract CI legs are hard-gated green.
 _REQUIRED_OS_CLASSIFIERS = (
     "Operating System :: POSIX :: Linux",
     "Operating System :: MacOS",
@@ -42,7 +42,7 @@ def _classifiers() -> list[str]:
 
 def test_os_classifiers_cover_linux_macos_windows_and_exclude_os_independent() -> None:
     """pyproject.toml must declare the three supported OS classifiers (matching the
-    hard-gated CI matrix after 0.1.8 rc-2 graduation) and must NOT carry the
+    hard-gated CI matrix) and must NOT carry the
     over-broad ``OS Independent`` classifier (which would dishonestly imply every OS
     works without evidence)."""
     classifiers = _classifiers()

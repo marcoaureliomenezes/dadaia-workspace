@@ -1,8 +1,7 @@
 """Derived CLI help digest — generated from the live command tree, never transcribed.
 
-Backlog `cli-help-architecture-and-session-injection` (operator request 2026-08-23,
-docker/cobra model): the hand-written CLI skill was structurally condemned to rot
-(ghost verbs, 53% coverage). The digest is introspected from the Typer/Click tree —
+A hand-written CLI skill rots (ghost verbs, stale coverage). The digest is introspected
+from the Typer/Click tree —
 ONE source — written under ``.dadaia/agentic/`` by ``public install``
 and ``reconcile`` (NEVER at hook fire: hooks read the file, they never build it), and
 attached to every ctx-inject emission bind-independent.
@@ -12,6 +11,8 @@ from __future__ import annotations
 
 import functools
 from pathlib import Path
+
+from dadaia_workspace.core import platform
 
 __all__ = ["DIGEST_REL", "command_paths", "digest_path", "render_digest", "write_digest"]
 
@@ -43,7 +44,7 @@ def _root_command() -> object:
 @functools.lru_cache(maxsize=1)
 def command_paths() -> frozenset[tuple[str, ...]]:
     """Every command path of the live tree, root ``()`` included — walked ONCE per
-    process (0.4.7 FR2: the digest, the citation contract tests and the doctor's
+    process (the digest, the citation contract tests and the doctor's
     ``MEM-DRIFT-2`` share this one walk).
 
     Walked by duck-typing (``hasattr(cmd, "commands")``), never ``isinstance(cmd,
@@ -116,10 +117,10 @@ def write_digest(workspace_root: Path) -> Path | None:
     try:
         path = digest_path(workspace_root)
         text = render_digest()
-        if path.is_file() and path.read_text(encoding="utf-8") == text:
+        if path.is_file() and platform.read_text(path) == text:
             return path
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(text, encoding="utf-8")
+        platform.write_text(path, text)
         return path
     except Exception:  # noqa: BLE001 — advisory artifact only
         return None

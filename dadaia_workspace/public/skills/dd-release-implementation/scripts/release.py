@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""The release ledger's ONE writer and validator — `_RELEASE.json`, the candidate trio and
-the ship ledger, stdlib only. Every write is validated by `check` before an atomic
-replace; `ship` records the merged promote PR and moves the release to `_archive/<v>/`.
+"""Validate and write a release's `_RELEASE.json` and SPEC stub, stdlib only.
+
+Also validates the candidate's SPEC/PLAN/job files and the ship ledger. Every write is validated by `check`
+before an atomic replace; `ship` records the merged promote PR and moves the release to `_archive/<v>/`.
 """
 
 from __future__ import annotations
@@ -11,34 +12,52 @@ import json
 import re
 import sys
 from pathlib import Path
+from typing import Any
 
-# No `__pycache__` beside a projected skill; `_ledger.py` is staged beside this script
-# (the source tree keeps it in dd-bug-resolution).
+# No `__pycache__` beside a projected skill.
 sys.dont_write_bytecode = True
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-sys.path.append(str(Path(__file__).resolve().parents[2] / "dd-bug-resolution" / "scripts"))
+#: One bootstrap statement: this folder and the kernel, at the front.
+sys.path[:0] = [
+    str(Path(__file__).resolve().parent),
+    str(Path(__file__).resolve().parents[2] / "dd-bug-resolution" / "scripts"),
+]
 
-from _release_check import histo_findings  # noqa: E402
-from _release_new import new_release  # noqa: E402
-from _release_phase import SHIP_PR, set_phase  # noqa: E402
-from _release_schema import _ORIGIN_GRAMMAR, CODE, HISTO, SHA_RE, STATE, utc_now  # noqa: E402
-from _release_store import (  # noqa: E402
+import _findings
+import _ledger
+from _clock import now_iso as utc_now
+from _grammar import SHA_RE, STATE
+from _platform import Undecodable, read_text, use_utf8_stdio
+from _platform import replace as move
+from _refusal import Refusal, report
+from _release_check import ship_histo_findings
+from _release_new import new_release
+from _release_phase import SHIP_PR, set_phase
+from _release_schema import (
+    _ORIGIN_GRAMMAR,
+    HISTO,
+    ORIGIN_KINDS,
+    closure_summary,
+    origin,
+)
+from _release_store import (
     SCRIPT,
-    Refusal,
+    Live,
+    at_head,
     commit,
     live_release,
     open_bug_ids,
     window_start,
 )
-from _release_tree import check, drift, memory_errors, ship_findings  # noqa: E402
-from _specs import choice, find_specs, refuse  # noqa: E402
+from _release_tree import check, drift, memory_errors, ship_findings
+from _specs import choice, find_specs, refuse
 
 _HELP = {
     "new": "open the next candidate: its rc-<N+1>/SPEC.md stub and _RELEASE.json, in one act",
     "phase": "move the live release to IMPLEMENTATION or CLOSURE, stamping its milestone",
     "drift": "the closure worklist over the live release's memory window (memory.py drift)",
-    "memory": "append the closure's one structured `kind: memory` entry to the live log",
+    "memory": "append a structured `kind: memory` entry to the live log",
     "ship": "record the merged promote PR: shipped, a delivered histo line, the dir archived",
+    "origin": "print the ids a SPEC's **Origin:** line carries, one `<kind> <id>` per line",
     "check": "validate every _RELEASE.json under releases/ and the ship ledger",
 }
 
@@ -53,6 +72,9 @@ def _parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="verb", required=True)
     for verb, help_text in _HELP.items():
         command = sub.add_parser(verb, help=help_text)
+        if verb == "origin":
+            command.add_argument("spec", type=Path, help="the SPEC.md to read")
+            continue
         command.add_argument("--specs", type=Path, default=None, help="path to the specs/ tree")
         if verb == "new":
             command.add_argument("release_id", help="the new release's bare SemVer id")
@@ -84,6 +106,28 @@ def _new(args: argparse.Namespace, specs: Path) -> int:
     return 0
 
 
+def _origin(spec: Path) -> int:
+    try:
+        carried = origin(read_text(spec))
+    except Undecodable as bad:
+        report(bad, bad.fix)
+        return 1
+    except (OSError, ValueError) as error:
+        act = (
+            "pass the path of an existing SPEC.md"
+            if isinstance(error, OSError)
+            else "edit its `**Origin:**` line"
+        )
+        report(f"{spec} {error}", f"Agent action: {act}")
+        return 1
+    print(
+        *(f"{kind} {i}" for kind in ORIGIN_KINDS for i in carried.get(kind, [])),
+        sep="\n",
+        end="\n" if carried else "",
+    )
+    return 0
+
+
 def _phase(args: argparse.Namespace, specs: Path) -> int:
     release_id, ts = set_phase(specs, args.phase.upper(), args.sha)
     print(f"[ok] release {release_id} -> phase {args.phase.upper()} ({ts})")
@@ -91,8 +135,8 @@ def _phase(args: argparse.Namespace, specs: Path) -> int:
 
 
 def _drift(args: argparse.Namespace, specs: Path) -> int:
-    """The worklist over the window `memory` records: last memory entry's until, else defined.sha."""
-    report = drift.report(specs, window_start(live_release(specs).state))
+    """The worklist over the window `memory` records: from the newest recorded bound HEAD reaches, else the root commit."""
+    report = drift.report(specs, drift.reach(specs.parent, window_start(live_release(specs).state)))
     print(json.dumps(report, indent=2) if args.json else drift.render(report))
     return 1 if report["atoms"] or report["uncovered"] else 0
 
@@ -100,7 +144,7 @@ def _drift(args: argparse.Namespace, specs: Path) -> int:
 def _memory(args: argparse.Namespace, specs: Path) -> int:
     """Append the record over the ledger-derived window, refused unless its worklist was worked."""
     live, ts = live_release(specs), utc_now()
-    since = window_start(live.state)
+    since = drift.reach(specs.parent, window_start(live.state))
     lists = [[s for s in getattr(args, n).split(",") if s] for n in ("reviewed", "changed")]
     try:
         until = drift.git(specs.parent, "rev-parse", "HEAD")[0]
@@ -116,36 +160,27 @@ def _memory(args: argparse.Namespace, specs: Path) -> int:
     except drift.Refusal as refusal:
         raise Refusal(str(refusal), refusal.fix) from refusal
     if errors:
-        raise Refusal(errors[0], f"{SCRIPT} memory --help")
+        raise Refusal(errors[0], SCRIPT("memory", "--help"))
     commit(live.release_dir / STATE, f"releases/{live.release_id}/{STATE}",
            lambda state: {**state, "log": [*(state.get("log") or []), entry]})  # fmt: skip
     print(f"[ok] release {live.release_id} log <- kind memory {since}..{until[:12]} ({ts})")
     return 0
 
 
-def _ship(args: argparse.Namespace, specs: Path) -> int:
-    """CLOSURE -> shipped {sha, pr, ts}, one `delivered` histo line, the whole directory
-    moved to `_archive/<v>/`, never deleted (ADR 0152 (1)); refused on any `ship_findings`."""
-    live, ts = live_release(specs), utc_now()
-    if not (SHA_RE.match(args.sha) and (args.pr is None or args.pr.isdigit() and int(args.pr) > 0)):
-        sha = args.sha if SHA_RE.match(args.sha) else "$(git rev-parse --short HEAD)"
-        raise choice(Refusal(f"--sha {args.sha!r} / --pr {args.pr!r}: a hex sha and, if given, a PR number",
-                             f"{SCRIPT} ship --sha {sha}"), SHIP_PR)  # fmt: skip
-    if found := ship_findings(specs):
-        raise Refusal(found[0]["message"], found[0]["fix"])
+def _allowed_open_bugs(args: argparse.Namespace, specs: Path) -> list[str]:
+    """The `--allow-open` ids, once each, matching the open bugs exactly; refuses otherwise."""
     open_ids = open_bug_ids(specs)
     allowed = sorted(set(args.allow_open))
     if len(allowed) != len(args.allow_open):
         raise Refusal(
             "--allow-open repeats an id — supply exactly one flag per open bug",
-            "Operator action: remove the duplicate --allow-open flag",
+            "Agent action: remove the duplicate --allow-open flag",
         )
     if missing := sorted(set(open_ids) - set(allowed)):
         fix = (
-            f"Operator action: resolve {', '.join(missing)} before shipping"
+            f"Agent action: resolve {', '.join(missing)} before shipping"
             if not allowed
-            else "Operator action: authorize each open bug carry, record the authorization "
-            "verbatim in a kind: note entry, then repeat --allow-open for each id"
+            else f"Operator action: authorize carrying {', '.join(missing)}"
         )
         raise Refusal(
             f"open bug(s) require one --allow-open flag each: {', '.join(missing)}",
@@ -154,10 +189,15 @@ def _ship(args: argparse.Namespace, specs: Path) -> int:
     if extra := sorted(set(allowed) - set(open_ids)):
         raise Refusal(
             f"--allow-open names bug(s) not open: {', '.join(extra)}",
-            f"Operator action: remove --allow-open for {', '.join(extra)}",
+            f"Agent action: remove --allow-open for {', '.join(extra)}",
         )
-    log = [entry for entry in live.state.get("log") or [] if isinstance(entry, dict)]
-    summaries = [str(entry.get("text", "")) for entry in log if entry.get("kind") == "summary"]
+    return allowed
+
+
+def _refuse_unauthorized(allowed: list[str], state: dict[str, Any]) -> None:
+    """Each carried open bug needs a verbatim authorization note and a closure-summary carry."""
+    log = [entry for entry in state.get("log") or [] if isinstance(entry, dict)]
+    summary = closure_summary(state).get("carried", "")
     for bug_id in allowed:
         authorized = any(
             entry.get("kind") == "note"
@@ -165,29 +205,46 @@ def _ship(args: argparse.Namespace, specs: Path) -> int:
             and _mentions(str(entry.get("text", "")), bug_id)
             for entry in log
         )
-        carried = any(
-            _mentions(text.partition("carried:")[2].partition("; backlog exits:")[0], bug_id)
-            for text in summaries
-        )
-        if not authorized or not carried:
-            need = "authorization note" if not authorized else "closure summary carry"
+        carried = _mentions(summary, bug_id)
+        if not authorized:
             raise Refusal(
-                f"--allow-open {bug_id} has no {need}",
-                f"Operator action: add {bug_id} to the kind: note verbatim authorization "
-                "and the kind: summary carried field",
+                f"--allow-open {bug_id} has no authorization note",
+                f"Operator action: authorize carrying {bug_id}",
             )
+        if not carried:
+            raise Refusal(
+                f"--allow-open {bug_id} has no closure summary carry",
+                f"Agent action: add {bug_id} to the carried field of the kind: summary entry",
+            )
+
+
+def _record_ship(args: argparse.Namespace, specs: Path, live: Live, ts: str) -> None:
+    """Write `shipped`, the `delivered` histo line and move the directory to `_archive/<v>/`."""
     line = json.dumps({"id": live.release_id, "ts": ts, "disposition": "delivered",
                        "release": live.release_id, "reason": None, "entry": None,
                        "summary": None}) + "\n"  # fmt: skip
     histo = specs / HISTO
-    if errors := histo_findings((histo.read_text("utf-8") if histo.is_file() else "") + line):
+    kept = read_text(histo) if histo.is_file() else ""
+    if errors := ship_histo_findings(kept + line):
         raise Refusal(f"the ship ledger would not pass check: {errors[-1]['message']}",
-                      f"{SCRIPT} check")  # fmt: skip
+                      SCRIPT("check"))  # fmt: skip
     commit(live.release_dir / STATE, f"releases/{live.release_id}/{STATE}",
            lambda s: {**s, "shipped": {"sha": args.sha, "pr": int(args.pr) if args.pr else None, "ts": ts}})  # fmt: skip
-    with histo.open("a", encoding="utf-8") as ledger:
-        ledger.write(line)
-    live.release_dir.rename(specs / "releases" / "_archive" / live.release_id)
+    _ledger.replace(histo, kept + line)
+    move(live.release_dir, specs / "releases" / "_archive" / live.release_id)
+
+
+def _ship(args: argparse.Namespace, specs: Path) -> int:
+    """CLOSURE -> shipped {sha, pr, ts}, one `delivered` histo line, the whole directory
+    moved to `_archive/<v>/`, never deleted; refused on any `ship_findings`."""
+    live, ts = live_release(specs), utc_now()
+    if not (SHA_RE.match(args.sha) and (args.pr is None or args.pr.isdigit() and int(args.pr) > 0)):
+        raise choice(Refusal(f"--sha {args.sha!r} / --pr {args.pr!r}: a hex sha and, if given, a PR number",
+                             SCRIPT("ship", "--sha", args.sha) if SHA_RE.match(args.sha) else at_head(specs, "ship")), SHIP_PR)  # fmt: skip
+    if found := ship_findings(specs):
+        raise Refusal(found[0]["message"], found[0]["fix"])
+    _refuse_unauthorized(_allowed_open_bugs(args, specs), live.state)
+    _record_ship(args, specs, live, ts)
     print(
         f"[ok] release {live.release_id} shipped at {args.sha}"
         + (f" (PR #{args.pr})" if args.pr else "")
@@ -199,7 +256,10 @@ _VERBS = {"new": _new, "phase": _phase, "drift": _drift, "memory": _memory, "shi
 
 
 def main(argv: list[str] | None = None) -> int:
+    use_utf8_stdio()
     args = _parser().parse_args(argv)
+    if args.verb == "origin":
+        return _origin(args.spec)
     reads = args.verb in ("check", "drift")
     specs = find_specs(args.specs, ledger=None if reads else f"specs/releases/{STATE}")
     if args.verb == "check":
@@ -215,14 +275,12 @@ def main(argv: list[str] | None = None) -> int:
             if f["verdict"] == "error" or (publish_origin and f["message"].startswith("Origin "))
         ]
         # JSON adds Origin trace information; only errors control the exit status.
-        print(json.dumps(json_findings, indent=2)) if args.json else [
-            print(f"{CODE} {f['verdict']} {f['path']}:{f['line']} {f['message']}") for f in findings
-        ]
+        print(json.dumps(json_findings, indent=2)) if args.json else _findings.print_text(findings)
         return 1 if errors else 0
     try:
         return _VERBS[args.verb](args, specs)
     except (Refusal, drift.Refusal) as refusal:
-        return int(refuse(refusal, specs))
+        return refuse(refusal, specs)
 
 
 if __name__ == "__main__":

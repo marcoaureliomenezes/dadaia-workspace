@@ -7,7 +7,7 @@ description: >
 
 # dd-bug-registration
 
-> Any agent runs this; the propose/confirm rule lives in `specs/bugs/AGENTS.md` §1. Fixing a registered bug is dd-bug-resolution's.
+> `dd-product-engineer` and `dd-sw-engineer-sr` register; every other agent, the reviewer included (in its verdict's `findings`), returns the proposal to the main thread; the propose/confirm rule lives in `specs/bugs/AGENTS.md` §1. Fixing a registered bug is dd-bug-resolution's.
 
 ## 1. When
 
@@ -18,13 +18,13 @@ description: >
 ## 2. Propose
 
 1. Open `specs/bugs/AGENTS.md` (the area's scoped law) and follow it.
-2. Name the contract line violated: file and line, `--help` text, or schema key.
+2. Name the contract line violated: file and line, `--help` text, or schema key; check each premise of a record against the code before the record is kept, amended or overwritten.
 3. Give ONE command that reproduces it, already run, with its exit code and output.
 4. Name which `specs/bugs/AGENTS.md` §1 NOT-a-bug cases you ruled out and the work-branch sha that reproduces it, so the operator can confirm the tool is at fault.
 5. Severity: CRITICAL a stall or data loss; HIGH a contract broken on the default
    path; MEDIUM off the default path or with a documented workaround; LOW a message
    or cosmetic defect.
-6. A subagent returns the proposal as a `bug-proposal:` finding (the reviewer: in its verdict's `findings`); the main thread puts it to the operator.
+6. A subagent returns the proposal as a `bug-proposal:` finding (the reviewer: in its verdict's `findings`); the main thread puts it to the operator (after launch: the closure summary, `dd-manager-orchestration` §2 step 4).
 
 ## 3. Register — after the operator confirms
 
@@ -36,7 +36,7 @@ description: >
      --surface … --component … --context … --symptom … --repro … --expected … --correlates <ids>\|none
    ```
 2. The surface is the name of a directory tracked in the repo.
-3. In a job or `backlog/<slug>` worktree (`worktrees/AGENTS.md`), stage `BUGS.jsonl`; commit `chore(bugs): report <id>` — shape 1 of `dd-gitflow-default` §3a.
+3. In a `wt-main` or `wt-backlog-<slug>` tree (`worktrees/AGENTS.md` §1), stage `BUGS.jsonl`; commit `chore(bugs): report <id>` — shape 1 of `dd-gitflow-default` §3a.
 4. A bug belongs to the context whose tooling broke: its own `specs/bugs/`, plus an
    upstream report when the broken tool is someone else's.
 5. Hand the fix to `dd-bug-resolution` once the record exists.

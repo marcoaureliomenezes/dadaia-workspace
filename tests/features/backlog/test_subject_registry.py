@@ -1,4 +1,4 @@
-"""Unit tests for the canonical-subject registry (T-25-02, SPEC §3.2, ADR-A; T-050-154).
+"""Unit tests for the canonical-subject registry.
 
 Every test runs against a fixed ``tmp_path`` repo built from inline ``MINIMAL_*`` constants,
 the tracked paths handed in — never the live repo, never cwd.
@@ -9,7 +9,6 @@ UNRESOLVED-halts rows are preserved per kind (fail-closed binding).
 from __future__ import annotations
 
 import json
-import subprocess
 from pathlib import Path
 
 import pytest
@@ -22,6 +21,8 @@ from dadaia_workspace.features.backlog.subject_registry import (
     build_registry,
 )
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
+from tests.helpers.oslib import run, write_text
+from tests.helpers.oslib import write_text as os_write_text
 
 MINIMAL_GO = """package widget
 
@@ -48,12 +49,12 @@ TRACKED = frozenset({"pkg/widget.go", "pkg/api/handlers.go"})
 def repo(tmp_path: Path) -> Path:
     """A repo root holding a Go source and a specs tree; nothing parses Go."""
     (tmp_path / "pkg" / "api").mkdir(parents=True)
-    (tmp_path / "pkg" / "widget.go").write_text(MINIMAL_GO, encoding="utf-8")
-    (tmp_path / "pkg" / "api" / "handlers.go").write_text("package api\n", encoding="utf-8")
+    write_text(tmp_path / "pkg" / "widget.go", MINIMAL_GO)
+    write_text(tmp_path / "pkg" / "api" / "handlers.go", "package api\n")
     product = tmp_path / "specs" / "memory" / "product"
     product.mkdir(parents=True)
-    (product / "catalog.json").write_text(json.dumps(MINIMAL_CATALOG), encoding="utf-8")
-    (tmp_path / "specs" / "memory" / "architecture.md").write_text(MINIMAL_ARCH_DOC, "utf-8")
+    write_text(product / "catalog.json", json.dumps(MINIMAL_CATALOG))
+    os_write_text(tmp_path / "specs" / "memory" / "architecture.md", MINIMAL_ARCH_DOC)
     return tmp_path
 
 
@@ -85,8 +86,8 @@ def test_a_code_ref_is_any_tracked_path_its_word_optional(
 
 
 def test_a_code_word_is_read_from_the_live_file(repo: Path) -> None:
-    """SPEC §3.7.5: no stored registry — editing the file changes the verdict."""
-    (repo / "pkg" / "widget.go").write_text("package widget\n", encoding="utf-8")
+    """No stored registry — editing the file changes the verdict."""
+    write_text(repo / "pkg" / "widget.go", "package widget\n")
     assert _build(repo).bind("pkg/widget.go#MakeWidget", SubjectKind.CODE).status is (
         BindStatus.UNRESOLVED
     )
@@ -95,10 +96,10 @@ def test_a_code_word_is_read_from_the_live_file(repo: Path) -> None:
 def test_a_gitignored_path_does_not_bind_an_untracked_one_does(repo: Path) -> None:
     """The adapter's set: tracked plus untracked-unignored; an ignored file never binds."""
     for args in (["init", "-q"], ["add", "pkg/api/handlers.go"]):
-        subprocess.run(["git", *args], cwd=repo, check=True, capture_output=True)  # noqa: S603, S607
-    (repo / ".gitignore").write_text("build/\n", encoding="utf-8")
+        run(["git", *args], cwd=repo, check=True)
+    write_text(repo / ".gitignore", "build/\n")
     (repo / "build").mkdir()
-    (repo / "build" / "out.go").write_text("package out\n", encoding="utf-8")
+    write_text(repo / "build" / "out.go", "package out\n")
     reg = _build(repo, GitSubprocessClient().tracked(repo))
     assert reg.bind("build/out.go", SubjectKind.CODE).status is BindStatus.UNRESOLVED
     assert reg.bind("pkg/widget.go", SubjectKind.CODE).status is BindStatus.RESOLVED
@@ -118,8 +119,8 @@ def test_catalog_doc_and_invariant_resolve_and_unknown_halts(repo: Path) -> None
 
 
 def test_an_invariant_is_never_minted_from_source(repo: Path) -> None:
-    """FR2 (v0.1.49): only specs/memory declares invariants; a source file never does."""
-    (repo / "pkg" / "leak.go").write_text("// INV-source-leak\n", encoding="utf-8")
+    """Only specs/memory declares invariants; a source file never does."""
+    write_text(repo / "pkg" / "leak.go", "// INV-source-leak\n")
     reg = _build(repo, TRACKED | {"pkg/leak.go"})
     assert reg.bind("INV-source-leak", SubjectKind.INVARIANT).status is BindStatus.UNRESOLVED
 

@@ -1,5 +1,5 @@
-"""sa-release-json-validated-three-times: `release.py check` is the ONE
-release validator (ADR 0077); the doctor delegates to it. Size: SMALL (script subprocess
+"""`release.py check` is the ONE
+release validator; the doctor delegates to it. Size: SMALL (script subprocess
 over tmp trees; the repo's own tree once).
 """
 
@@ -13,9 +13,12 @@ from typing import Any
 
 import pytest
 
+from dadaia_workspace.core.cli_line import shell_line
 from dadaia_workspace.features.specs.doctor import SpecsDoctor
 from dadaia_workspace.features.specs.doctor_common import resolve_active_release
 from dadaia_workspace.features.specs.doctor_release import ReleaseValidator
+from tests.helpers.oslib import run as os_run
+from tests.helpers.oslib import write_text
 from tests.helpers.release_state import PLAN
 
 _REPO = Path(__file__).resolve().parents[3]
@@ -24,8 +27,7 @@ _IMPLEMENTED = "2026-09-22T10:00:00Z"
 
 
 def _run(*argv: str) -> subprocess.CompletedProcess[str]:
-    return subprocess.run([sys.executable, str(_SCRIPT), *argv], capture_output=True,
-                          text=True, check=False)  # fmt: skip
+    return os_run([sys.executable, str(_SCRIPT), *argv], check=False)  # fmt: skip
 
 
 def _check(specs: Path) -> list[dict[str, Any]]:
@@ -44,15 +46,15 @@ def _specs(
     release_dir = specs / "releases" / rid
     (release_dir / "rc-1").mkdir(parents=True, exist_ok=True)
     for name in ("SPEC.md", "PLAN.md", "TASKS.md") if trio else ():
-        (release_dir / "rc-1" / name).write_text(
+        write_text(
+            release_dir / "rc-1" / name,
             f"# x\n\n**Status:** Approved\n\n{PLAN if name == 'PLAN.md' else ''}",
-            encoding="utf-8",
         )
-    (release_dir / "_RELEASE.json").write_text(json.dumps({
+    write_text(release_dir / "_RELEASE.json", json.dumps({
         "schema": "release-state-v1", "release": rid, "phase": phase,
         "defined": {"sha": "0000001", "ts": "2026-09-20T10:00:00Z"},
         "implemented": {"sha": "0000002", "ts": _IMPLEMENTED}, "shipped": None, "log": log,
-    }), encoding="utf-8")  # fmt: skip
+    }))  # fmt: skip
     return specs
 
 
@@ -74,15 +76,21 @@ def test_closure_memory_record_is_judged_by_the_script(
     tmp_path: Path, phase: str, log: list[Any], expected: str | None
 ) -> None:
     """A memory entry stamped at or after implemented.ts exists; its fix names the real
-    script and --specs, and no placeholder (ADR 0158)."""
+    script and --specs, and no placeholder."""
     specs = _specs(tmp_path, phase, log)
     record = [f for f in _check(specs) if "`kind: memory`" in f["message"]]
-    fix = f"Operator action: run `{sys.executable} {_SCRIPT} memory --specs {specs.resolve()}` "
+    run = (sys.executable, str(_SCRIPT))
+    where = ("--specs", str(specs.resolve()))
+    fix = (
+        f"Agent action: run `{shell_line(*run, 'drift', *where)}`, judge its worklist, then run "
+        f"`{shell_line(*run, 'memory', *where)}` with the atom slugs the memory pass reviewed as "
+        "--reviewed and changed as --changed"
+    )
     if expected is None:
         assert record == []
     else:
         assert len(record) == 1 and expected in record[0]["message"], record
-        assert record[0]["fix"].replace("\\", "/").startswith(fix.replace("\\", "/")), record
+        assert record[0]["fix"] == fix, record
 
 
 def test_a_live_release_in_implementation_missing_its_trio_is_one_finding(tmp_path: Path) -> None:
@@ -95,13 +103,14 @@ def test_release_doctor_judges_status_only_on_the_two_candidate_documents(
 ) -> None:
     specs = _specs(tmp_path, "IMPLEMENTATION", [])
     candidate = specs / "releases/0.5.0/rc-1"
-    candidate.joinpath("SPEC.md").write_text(
+    write_text(
+        candidate.joinpath("SPEC.md"),
         "# S\n\n**Status:** Approved\n**Origin:** customer-conversation\n\n"
         "## Bug window review\n\n## User-added section\n",
-        encoding="utf-8",
     )
-    candidate.joinpath("TASKS.md").write_text(
-        "# historical task index\n\n**Status:** Not a candidate status\n", encoding="utf-8"
+    write_text(
+        candidate.joinpath("TASKS.md"),
+        "# historical task index\n\n**Status:** Not a candidate status\n",
     )
 
     validator = ReleaseValidator(specs)
@@ -114,14 +123,14 @@ def test_the_repos_own_release_tree_checks_clean() -> None:
 
 
 def test_a_legacy_next_dir_is_not_live_and_new_refuses(tmp_path: Path) -> None:
-    """sa-release-json-validated-three-times#B3: `next/` is not live; `new` refuses while
-    `check` is red (ADR 0077), and doctor and script name the same non-canon `next`."""
+    """`next/` is not live; `new` refuses while
+    `check` is red, and doctor and script name the same non-canon `next`."""
     specs = _specs(tmp_path, "DEFINITION", [], rid="next")
     result = _run("new", "0.6.0", "--specs", str(specs))
     assert result.returncode == 1 and "next" in result.stderr
     assert not (specs / "releases" / "0.6.0").exists()
     [fix] = [f["fix"] for f in _check(specs) if f["path"] == "releases/next"]  # tree8-and-027
     move = f"{(specs / 'releases/next').resolve()} into its canon shape (a bare M.m.p id)"
-    assert fix == f"Operator action: move {move}, or out of specs/"
+    assert fix == f"Agent action: move {move}, or out of specs/"
     assert resolve_active_release(specs) == (None, None)
     assert any("/next/" in i.message for i in SpecsDoctor(specs).check() if i.code == "TREE-8")

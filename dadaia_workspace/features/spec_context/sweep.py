@@ -1,4 +1,4 @@
-"""The ONE traversal primitive of the workspace reaper (0.4.7 FR6a).
+"""The ONE traversal primitive of the workspace reaper.
 
 ``walk`` reads a directory, ``lstat`` reads one entry, ``move`` relocates an
 entry, ``remove`` deletes it — all four behind ONE guard:
@@ -17,12 +17,8 @@ entry, ``remove`` deletes it — all four behind ONE guard:
 * a read-only entry is made owner-writable and retried — the reaper owns what it
   reaps (a Go module cache is ``dr-xr-xr-x`` all the way down; loose VCS objects are 0444).
 
-Bug class this replaces: ``doctor.py`` carried five per-call-site guards
-(``_entries``/``_mtime``/``_remove``/``_guarded``/``_remove_dead_repo``), each
-re-deriving "may I touch this?" from its own premises. The CRITICAL
-``doctor-ptr-gc-deletes-valid-lock-free-bind`` is that shape's worst case: a call site
-deleted live state directly because its own local rule said the state looked dead.
-One guard, one home, and deletion reserved to TTL expiry (FR6b).
+All four actions run behind ONE guard, and deletion is reserved to TTL expiry: no scan
+verdict deletes anything directly.
 """
 
 from __future__ import annotations
@@ -30,12 +26,12 @@ from __future__ import annotations
 import contextlib
 import os
 import shutil
-import stat
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path, PurePath
 
+from dadaia_workspace.core import platform
 from dadaia_workspace.core.workspace_layout import occupied
 
 __all__ = [
@@ -70,7 +66,7 @@ def walk(directory: Path) -> list[Path]:
     """The sorted entries of *directory*; empty for a missing, unreadable or SYMLINKED
     root. A symlinked root is refused because ``iterdir`` would follow it and every
     entry of the destination would then present a parent inside the workspace."""
-    if directory.is_symlink():
+    if platform.is_link(directory):
         return []
     try:
         return sorted(directory.iterdir())
@@ -99,10 +95,8 @@ def guarded(code: str, label: str, step: Callable[[], str | Skipped | None]) -> 
 
 
 def _owner(path: Path) -> str:
-    try:
-        return path.owner()
-    except (NotImplementedError, KeyError, OSError):  # Windows; a uid with no account
-        return "another account"
+    owner = platform.file_owner(path)
+    return "another account" if owner is None else owner[1]
 
 
 def _inside(workspace_root: Path, target: Path) -> bool:
@@ -118,11 +112,11 @@ def _inside(workspace_root: Path, target: Path) -> bool:
 
 def _is_gitfile(entry: Path) -> bool:
     """A linked worktree's ``.git`` file: its gitdir sits in ``<common>/worktrees/``."""
-    if not entry.is_file() or entry.is_symlink():
+    if not entry.is_file() or platform.is_link(entry):
         return False
     try:
-        gitdir = entry.read_text(encoding="utf-8").removeprefix("gitdir:").strip()
-    except (OSError, UnicodeDecodeError):
+        gitdir = platform.read_text(entry).removeprefix("gitdir:").strip()
+    except (OSError, platform.Undecodable):
         return False
     return PurePath(gitdir).parent.name == "worktrees"
 
@@ -137,7 +131,7 @@ def linked_worktree(workspace_root: Path, target: Path) -> Path | None:
             break
         if _is_gitfile(ancestor / ".git"):
             return ancestor
-    if target.is_symlink() or not target.is_dir():
+    if platform.is_link(target) or not target.is_dir():
         return None
     trees = (Path(d) for d, _, files in os.walk(target) if ".git" in files)
     return next((d for d in trees if _is_gitfile(d / ".git")), None)
@@ -152,9 +146,9 @@ def rmtree(target: Path) -> OSError | None:
 
     def retry(func: Callable[[str], object], path: str, exc: BaseException) -> None:
         entry = Path(path)
-        for each in (entry.parent, *(() if entry.is_symlink() else (entry,))):
+        for each in (entry.parent, *(() if platform.is_link(entry) else (entry,))):
             with contextlib.suppress(OSError):
-                os.chmod(each, each.stat().st_mode | stat.S_IWUSR | stat.S_IRUSR | stat.S_IXUSR)
+                platform.make_writable(each)
         try:
             if func not in (os.unlink, os.rmdir):  # the walk names it relative to its dirfd
                 raise OSError(*exc.args[:2], path)
@@ -162,7 +156,7 @@ def rmtree(target: Path) -> OSError | None:
         except OSError as error:
             failed.append(error)
 
-    if target.is_symlink() or not target.is_dir():
+    if platform.is_link(target) or not target.is_dir():
         try:
             target.unlink()
         except OSError as exc:
@@ -198,8 +192,7 @@ def remove(workspace_root: Path, target: Path, label: str) -> str | Skipped | No
 
 
 #: The zone the reaper HOLDS what it takes off the working tree. Deletion is reserved to
-#: TTL expiry of this zone, so no scan verdict ever deletes anything directly — the shape
-#: behind the CRITICAL doctor-ptr-gc-deletes-valid-lock-free-bind.
+#: TTL expiry of this zone, so no scan verdict ever deletes anything directly.
 REAPED_ZONE = "reaped"
 
 
@@ -221,16 +214,16 @@ def move(
     """Relocate *target* to *destination*, creating its parents. Both ends must sit
     inside the workspace. *destination* itself is stamped: a hold counts from the move.
 
-    N moves make N holds (ADR 0074): an occupied destination yields the first free
+    N moves make N holds: an occupied destination yields the first free
     ``<name>-N`` beside it, so no hold dies before its own TTL.
 
-    A cross-device ``os.replace`` (EXDEV) falls back to copy + remove here — the one
+    A cross-device move (EXDEV) falls back to copy + remove here — the one
     place — and the copy lands before the origin is unlinked, so a failure leaves the
     origin intact rather than a partial delete. Any other failure is a refusal, never raised.
 
     ONE message shape for every mover: ``moved '<label>'<note> -> '<destination>'``.
     *note* is the one extra field a caller may add when the label alone does not say
-    whose entry it was (INV-5 names the context that owned the repo)."""
+    whose entry it was (for example, the context that owned the repo)."""
     if not occupied(target):
         return None
     if not _inside(workspace_root, target) or not _inside(workspace_root, destination):
@@ -244,21 +237,19 @@ def move(
     try:
         destination.parent.mkdir(parents=True, exist_ok=True)
         try:
-            os.replace(target, destination)
+            platform.replace(target, destination)
         except OSError as exc:
             if exc.errno != 18:  # EXDEV — every other errno is this act's refusal
                 raise
-            if target.is_symlink():
-                destination.symlink_to(os.readlink(target))
-            elif target.is_dir():
+            if target.is_dir() and not platform.is_link(target):
                 shutil.copytree(target, destination, symlinks=True)
             else:
-                shutil.copy2(target, destination)
+                shutil.copy2(target, destination, follow_symlinks=False)
             if isinstance(kept := remove(workspace_root, target, label), Skipped):
                 return kept
         if os.utime in os.supports_follow_symlinks:  # a link's own clock, never its target's
             os.utime(destination, follow_symlinks=False)
-        elif not destination.is_symlink():  # never followed to its target
+        elif not platform.is_link(destination):  # never followed to its target
             os.utime(destination)
     except OSError as exc:
         return Skipped(f"skipped '{label}' (errno {exc.errno}: {exc.strerror})")

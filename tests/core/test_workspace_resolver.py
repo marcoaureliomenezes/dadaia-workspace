@@ -10,8 +10,7 @@ Covers:
     6. Returns absolute path (not relative)
 
   resolve_cli_workspace_root —
-    9. explicit --workspace is authoritative and must hold .dadaia/ (bug
-       import-export-workspace-flag-re-resolves-through-ancestor-walk)
+    9. explicit --workspace is authoritative and must hold .dadaia/
 """
 
 from __future__ import annotations
@@ -25,6 +24,7 @@ from dadaia_workspace.core.workspace_resolver import (
     resolve_cli_workspace_root,
     resolve_workspace_root,
 )
+from tests.helpers.oslib import write_text
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -35,7 +35,7 @@ def _make_full_workspace(tmp_path: Path) -> Path:
     """Create a proper initialized workspace: .dadaia/states/spec_contexts.json."""
     states_dir = tmp_path / ".dadaia" / "states"
     states_dir.mkdir(parents=True)
-    (states_dir / "spec_contexts.json").write_text("{}")
+    write_text(states_dir / "spec_contexts.json", "{}")
     return tmp_path
 
 
@@ -114,15 +114,11 @@ def test_resolve_workspace_root_failure_table(tmp_path: Path) -> None:
 
 # ---------------------------------------------------------------------------
 # resolve_cli_workspace_root: an explicit --workspace is authoritative for EVERY verb
-# (bugs: init-ignores-workspace-flag, import-export-workspace-flag-re-resolves-through-ancestor-walk)
 # ---------------------------------------------------------------------------
 
 
 def test_explicit_workspace_is_authoritative_and_must_be_initialized(tmp_path: Path) -> None:
-    """bug import-export-workspace-flag-re-resolves-through-ancestor-walk;
-    sa-seven-workspace-root-rules#S7.
-
-    Size: SMALL — filesystem only."""
+    """Size: SMALL — filesystem only."""
     existing_ws = _make_full_workspace(tmp_path / "existing_ws")
 
     # An uninitialized directory nested inside a live workspace is REFUSED, never
@@ -138,7 +134,7 @@ def test_explicit_workspace_is_authoritative_and_must_be_initialized(tmp_path: P
     other = _make_full_workspace(tmp_path / "other_ws")
     assert resolve_cli_workspace_root(other) == other.resolve()
 
-    # A partial .dadaia/ (sub-repo shape, no sentinel) is refused naming the dir (#S7).
+    # A partial .dadaia/ (sub-repo shape, no sentinel) is refused naming the dir.
     sub_repo = _make_partial_dadaia(existing_ws / "repos", "my-service")
     with pytest.raises(WorkspaceNotInitializedError) as partial:
         resolve_cli_workspace_root(sub_repo)

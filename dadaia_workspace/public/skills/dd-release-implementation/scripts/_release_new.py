@@ -6,16 +6,16 @@
 from __future__ import annotations
 
 import shutil
-import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-sys.path.append(str(Path(__file__).resolve().parents[2] / "dd-bug-resolution" / "scripts"))
-
-from _ledger import records, replace  # noqa: E402
-from _release_schema import SEMVER_RE, STATE, next_candidate, utc_now  # noqa: E402
-from _release_store import SCRIPT, Refusal, State, live_ids, read_state, validated  # noqa: E402
-from _release_tree import BUG_WINDOW, tree_findings  # noqa: E402
+import _clock
+from _grammar import SEMVER_RE, STATE, live_ids
+from _ledger import records, replace
+from _platform import is_link, quote, write_text
+from _refusal import Refusal
+from _release_schema import next_candidate
+from _release_store import SCRIPT, State, at_head, read_state, validated
+from _release_tree import BUG_WINDOW, tree_findings
 
 SPEC_STUB = """\
 # SPEC — Release: {release_id}
@@ -83,7 +83,9 @@ def candidate_state(release_id: str, prior: State | None) -> State:
     stacked = f"Candidate born on {release_id} (prior candidate closed at {closed})"
     note = stacked if prior else f"Release {release_id} born"
     state["phase"] = "DEFINITION"
-    state["log"].append({"ts": utc_now(), "agent": "release.py new", "kind": "note", "text": note})
+    state["log"].append(
+        {"ts": _clock.now_iso(), "agent": "release.py new", "kind": "note", "text": note}
+    )
     return state
 
 
@@ -95,25 +97,25 @@ def refuse_unfree(specs: Path, release_id: str) -> State | None:
     if not SEMVER_RE.match(release_id):
         raise Refusal(
             f"{release_id!r} is not a bare SemVer release id (M.m.p)",
-            f"{SCRIPT} new 0.1.23",
+            SCRIPT("new", "0.1.23"),
         )
     releases, live = specs / "releases", live_ids(specs)
     release_dir = releases / release_id
     for path in (releases, release_dir, release_dir / STATE):
-        if path.is_symlink():
+        if is_link(path):
             raise Refusal(
                 f"{path.name} resolves through a symlink — refusing to mint through one",
-                f"ls -l {releases}",
+                f"Agent action: replace the symlink {quote(str(path))} with a real directory or file",
             )
     if findings := tree_findings(specs):
         first = f"{findings[0]['path']} {findings[0]['message']}"
-        raise Refusal(f"a release opens only on a clean tree: {first}", f"{SCRIPT} check")
+        raise Refusal(f"a release opens only on a clean tree: {first}", SCRIPT("check"))
     others = [other for other in live if other != release_id]
     if others:
         raise Refusal(
             f"a live release already exists ({', '.join(others)}) — exactly one is allowed: "
             f"stack the next candidate on it, or ship {others[0]} first",
-            f"{SCRIPT} check",
+            SCRIPT("check"),
         )
     if release_id not in live:
         return None
@@ -122,31 +124,32 @@ def refuse_unfree(specs: Path, release_id: str) -> State | None:
         raise Refusal(
             f"release {release_id} is live in phase {prior.get('phase')!r} — the next "
             "candidate is stacked only on a closed one",
-            f"{SCRIPT} phase CLOSURE --sha $(git rev-parse --short HEAD)",
+            at_head(specs, "phase", "CLOSURE"),
         )
     return prior
 
 
 def new_release(specs: Path, release_id: str, today: str, origin: str) -> Path:
-    """Open ``releases/<id>/rc-<N+1>/`` on a fresh SPEC stub and reopen the state document,
-    all or nothing (ADR 0150): a closed ``rc-<N>/`` is never touched. Returns the candidate."""
+    """Open ``releases/<id>/rc-<N+1>/`` and reopen the state document, all or nothing: a
+    drafted ``SPEC.md`` there is adopted untouched, a closed ``rc-<N>/`` is never touched,
+    and a failure removes only what this call created. Returns the candidate."""
     prior = refuse_unfree(specs, release_id)
     release_dir = specs / "releases" / release_id
     text = validated(candidate_state(release_id, prior), f"releases/{release_id}/{STATE}")
-    stub = SPEC_STUB.format(
-        release_id=release_id,
-        today=today,
-        origin=origin,
-        scope=seeded_scope(specs, origin),
-        bug_window=BUG_WINDOW,
-    )
-    candidate = next_candidate(release_dir)
-    made = candidate if release_dir.exists() else release_dir
-    candidate.mkdir(parents=True)
+    candidate = next_candidate(release_dir, prior)
+    spec = candidate / "SPEC.md"
+    drafted = spec.exists()
+    made = next((d for d in (release_dir, candidate, spec) if not d.exists()), None)
+    candidate.mkdir(parents=True, exist_ok=True)
     try:
-        (candidate / "SPEC.md").write_text(stub, encoding="utf-8")
+        if not drafted:
+            write_text(spec, SPEC_STUB.format(release_id=release_id, today=today, origin=origin,
+                scope=seeded_scope(specs, origin), bug_window=BUG_WINDOW))  # fmt: skip
         replace(release_dir / STATE, text)
     except BaseException:
-        shutil.rmtree(made, ignore_errors=True)
+        if made:
+            shutil.rmtree(made, ignore_errors=True) if made.is_dir() else made.unlink(
+                missing_ok=True
+            )
         raise
     return candidate

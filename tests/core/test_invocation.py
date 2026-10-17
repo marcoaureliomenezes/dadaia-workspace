@@ -1,8 +1,7 @@
 """``core.invocation`` — the single session/context/root/Bind resolution authority.
 
-0.5.1 K1 ("One Invocation"): the rung table asserts observable outcomes
-through :func:`invocation.resolve`, never internal ladder state. Also covers
-``sdd-gate-memory-phase-resolves-empty-when-cwd-is-a-linked-worktree-outside-repos``: a nested
+The rung table ("One Invocation") asserts observable outcomes
+through :func:`invocation.resolve`, never internal ladder state. Also covers a nested
 sentinel-bearing sandbox under cwd never shadows the workspace that owns the write target.
 """
 
@@ -18,6 +17,8 @@ import pytest
 from dadaia_workspace.core import invocation
 from dadaia_workspace.core.exceptions import SchemaVersionError
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
+from tests.helpers.oslib import link, read_text, write_text
+from tests.helpers.oslib import write_text as os_write_text
 
 
 def _mk_ws(tmp_path: Path, *contexts: tuple[str, str, tuple[str, ...]]) -> Path:
@@ -32,8 +33,9 @@ def _mk_ws(tmp_path: Path, *contexts: tuple[str, str, tuple[str, ...]]) -> Path:
         entry = {"name": name, "repo_slug": slug, "state": "alive"}
         entries.append({**entry, "associated_repos": [{"slug": s} for s in associated]})
     (ws / ".dadaia" / "states").mkdir(parents=True)
-    (ws / ".dadaia" / "states" / "spec_contexts.json").write_text(
-        json.dumps({"schema_version": "2", "contexts": entries}), encoding="utf-8"
+    write_text(
+        ws / ".dadaia" / "states" / "spec_contexts.json",
+        json.dumps({"schema_version": "2", "contexts": entries}),
     )
     return ws
 
@@ -79,13 +81,13 @@ def test_resolve_scenarios(tmp_path: Path, given: dict[str, Any], then: dict[str
             "mode": "READ",
             "last_seen_at": seen,
         }
-        (ws / ".dadaia" / "sessions" / "sid.json").write_text(json.dumps(record), encoding="utf-8")
+        write_text(ws / ".dadaia" / "sessions" / "sid.json", json.dumps(record))
         env["CLAUDE_CODE_SESSION_ID"] = "sid"
     cwd = ws / given.get("cwd", "") if given.get("cwd", "") is not None else tmp_path
     if nested := given.get("nested"):
         cwd = ws / nested
         (cwd / ".dadaia" / "states").mkdir(parents=True)
-        (cwd / ".dadaia" / "states" / "spec_contexts.json").write_text('{"contexts": []}', "utf-8")
+        os_write_text(cwd / ".dadaia" / "states" / "spec_contexts.json", '{"contexts": []}')
         assert resolve_workspace_root(cwd) == cwd.resolve()  # the trap is real for a cwd walk
     target = ws / given["target"] if "target" in given else None
     inv = invocation.resolve(explicit=given.get("explicit"), target_path=target, env=env, cwd=cwd)
@@ -108,27 +110,26 @@ def test_resolve_scenarios(tmp_path: Path, given: dict[str, Any], then: dict[str
     ],
 )  # fmt: skip
 def test_resolve_session_id_precedence(env: dict[str, str], expected: str) -> None:
-    """DADAIA_SESSION_ID > harness env > ""; env only — bind sees no payload (review F1)."""
+    """DADAIA_SESSION_ID > harness env > ""; env only — bind sees no payload."""
     assert invocation.resolve_session_id(env) == expected
 
 
 def test_context_name_for_repo_slug_maps_main_associated_and_legacy_repo_field(
     tmp_path: Path,
 ) -> None:
-    """A16.4: a main slug maps to its context name, an associated slug to its OWNING context;
+    """A main slug maps to its context name, an associated slug to its OWNING context;
     a legacy ``repo`` field still maps."""
     ws = _mk_ws(tmp_path, _ctx("beta-repo", "alpha-context"), _ctx("other", None, "assoc-repo"))
     assert invocation.context_name_for_repo_slug(ws, "beta-repo") == "alpha-context"
     assert invocation.context_name_for_repo_slug(ws, "assoc-repo") == "other"
     legacy = {"schema_version": "2", "contexts": [{"name": "alpha-context", "repo": "beta-repo"}]}
-    (ws / ".dadaia" / "states" / "spec_contexts.json").write_text(json.dumps(legacy), "utf-8")
+    os_write_text(ws / ".dadaia" / "states" / "spec_contexts.json", json.dumps(legacy))
     assert invocation.context_name_for_repo_slug(ws, "beta-repo") == "alpha-context"
 
 
 def test_an_unowned_repo_resolves_no_context(tmp_path: Path) -> None:
-    """sa-context-repo-mapping-falls-back-to-the-name#B1: repos/foo on disk, owned by no
-    registered context: the mapping answers None and resolve() from repos/foo binds no
-    context named after the directory (DELETE-LOSER: the three name-fallback tests)."""
+    """repos/foo on disk, owned by no registered context: the mapping answers None and
+    resolve() from repos/foo binds no context named after the directory."""
     ws = _mk_ws(tmp_path)
     (ws / "repos" / "foo").mkdir()
     assert invocation.context_name_for_repo_slug(ws, "foo") is None
@@ -143,11 +144,10 @@ def test_an_unowned_repo_resolves_no_context(tmp_path: Path) -> None:
     ids=["truncated", "empty-object", "deep-nesting"],
 )
 def test_an_unreadable_registry_refuses_never_answers_no_context(tmp_path: Path, body: str) -> None:
-    """AC3.9 (rewrites sa-context-repo-mapping-falls-back-to-the-name#B4's fail-soft leg):
-    the name list, the slug mapping and the bind each raise REG-SCHEMA's refusal; the gate
+    """The name list, the slug mapping and the bind each raise REG-SCHEMA's refusal; the gate
     maps it to no bind (test_sdd_gate)."""
     ws = _mk_ws(tmp_path)
-    (ws / ".dadaia" / "states" / "spec_contexts.json").write_text(body, "utf-8")
+    os_write_text(ws / ".dadaia" / "states" / "spec_contexts.json", body)
     for read in (
         lambda: invocation.alive_context_names(ws),
         lambda: invocation.context_name_for_repo_slug(ws, "proj"),
@@ -174,13 +174,13 @@ def test_resolve_specs_dir_explicit_wins_else_cwd_inside_a_repo(
 def test_resolve_specs_dir_refuses_a_symlinked_explicit_root(tmp_path: Path) -> None:
     """A symlinked explicit specs root is refused, never followed."""
     (tmp_path / "real-specs").mkdir()
-    (tmp_path / "linked-specs").symlink_to(tmp_path / "real-specs", target_is_directory=True)
+    assert link(str(tmp_path / "real-specs"), (tmp_path / "linked-specs"), is_dir=True)
     with pytest.raises(ValueError, match="symlink"):
         invocation.resolve_specs_dir(str(tmp_path / "linked-specs"))
 
 
 class TestAliveContextNames:
-    """F008 (20260830 audit): the registry read family has ONE home — invocation."""
+    """The registry read family has ONE home — invocation."""
 
     def test_alive_filter_yields_context_names(self, tmp_path: Path) -> None:
         """Only ALIVE entries (case-insensitive) yield their name."""
@@ -191,19 +191,19 @@ class TestAliveContextNames:
             {"name": "gone", "repo_slug": "gone-dir", "state": "dead"},
             {"name": "bare", "state": "ALIVE"},
         ]
-        (states / "spec_contexts.json").write_text(json.dumps({"contexts": contexts}), "utf-8")
+        os_write_text(states / "spec_contexts.json", json.dumps({"contexts": contexts}))
         assert invocation.alive_context_names(tmp_path) == ["pretty", "bare"]
 
 
 def test_a_row_without_a_main_slug_has_no_specs_tree(tmp_path: Path) -> None:
-    """J2.S6.T5 (review F7): a hand-edited ALIVE row whose main slug is empty or absent maps
+    """A hand-edited ALIVE row whose main slug is empty or absent maps
     to no ``repos/<slug>/specs`` tree; the other ALIVE contexts still do."""
     ws = _mk_ws(tmp_path)
     path = ws / ".dadaia" / "states" / "spec_contexts.json"
-    data = json.loads(path.read_text(encoding="utf-8"))
+    data = json.loads(read_text(path))
     data["contexts"] += [{"name": "blank", "repo_slug": "", "state": "alive"},
                          {"name": "bare", "state": "alive"}]  # fmt: skip
-    path.write_text(json.dumps(data), encoding="utf-8")
+    write_text(path, json.dumps(data))
 
     assert invocation.alive_context_trees(ws) == {"proj": ws / "repos" / "proj" / "specs"}
     assert invocation.repo_slug_for_context(ws, "blank") is None

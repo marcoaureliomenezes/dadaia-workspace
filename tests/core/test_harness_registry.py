@@ -1,5 +1,5 @@
-"""AC-2 (v0.1.58 T-58-11): the typed core harness registry is the single
-roster source; ``parse_harness_name`` accepts exactly one registered name (0.4.7 T-047-73)."""
+"""The typed core harness registry is the single
+roster source; ``parse_harness_name`` accepts exactly one registered name."""
 
 from __future__ import annotations
 

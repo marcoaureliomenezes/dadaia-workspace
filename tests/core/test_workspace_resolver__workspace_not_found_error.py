@@ -1,5 +1,5 @@
-"""A verb run outside any workspace runs in the CLI's own workspace (review M1: fix lines
-run from any cwd); with none, it names the searched directory and prints ONE runnable
+"""A verb run outside any workspace runs in the CLI's own workspace (fix lines run
+from any cwd); with none, it names the searched directory and prints ONE runnable
 ``fix:`` line — the uvx bootstrap.
 
 The CLI's own workspace is derived from ``sys.prefix`` (the venv lives at
@@ -16,13 +16,14 @@ from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app
 from dadaia_workspace.core.workspace_resolver import FENCE_ENV, resolve_workspace_root
+from tests.helpers.oslib import write_text
 
 _runner = CliRunner()
 
 
 def _workspace(root: Path) -> Path:
     (root / ".dadaia" / "states").mkdir(parents=True)
-    (root / ".dadaia" / "states" / "spec_contexts.json").write_text("{}", encoding="utf-8")
+    write_text(root / ".dadaia" / "states" / "spec_contexts.json", "{}")
     return root
 
 
@@ -36,8 +37,8 @@ def _workspace(root: Path) -> Path:
 def test_the_cli_resolves_its_own_workspace_unless_fenced(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, fenced: bool
 ) -> None:
-    """sa-seven-workspace-root-rules#S1: the CLI's own workspace wins over the cwd;
-    #S11: a fenced root is never the CLI's own workspace; an explicit start always walks."""
+    """The CLI's own workspace wins over the cwd;
+    a fenced root is never the CLI's own workspace; an explicit start always walks."""
     own, other = _workspace(tmp_path / "a"), _workspace(tmp_path / "b")
     monkeypatch.setattr(sys, "prefix", str(own / ".dadaia" / ".venv"))
     if fenced:
@@ -57,5 +58,5 @@ def test_fix_bootstraps_when_the_cli_has_no_workspace(
 
     fixes = [line for line in result.output.splitlines() if line.startswith("fix: ")]
     assert fixes == [
-        "fix: Operator action: run `uvx dadaia-workspace init` with the new workspace's directory"
+        "fix: Agent action: run `uvx dadaia-workspace init` with the new workspace's directory"
     ], result.output

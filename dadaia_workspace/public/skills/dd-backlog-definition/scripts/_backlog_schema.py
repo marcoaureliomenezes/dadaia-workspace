@@ -3,7 +3,7 @@
 documents are read with — `backlog.py`'s one validation primitive.
 
 The schemas are ``schemas/backlog-v1.schema.json`` and
-``schemas/histo-record-v1.schema.json`` beside this file, copies `public stage` makes.
+``schemas/histo-record-v1.schema.json`` beside this file.
 """
 
 from __future__ import annotations
@@ -15,5 +15,5 @@ HISTO = "backlog/_archive/backlog_histo.jsonl"
 DISPOSITIONS = ("delivered", "superseded", "rejected", "to-bug")
 #: The terminal words no LIVE active[] entry carries; a postponed item keeps any other status.
 TERMINAL = (*DISPOSITIONS, "resolved")
-#: The one status exempt from the typed-intents requirement (dd-backlog-definition §2).
+#: The one status exempt from the typed-intents requirement (`specs/backlog/AGENTS.md` §4).
 IDEA = "idea"

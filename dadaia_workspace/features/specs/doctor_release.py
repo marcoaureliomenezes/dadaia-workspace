@@ -1,9 +1,8 @@
 """Release validator: the active release, its artifacts, SemVer + ledger invariants.
 
-Single-responsibility sibling of the SpecsDoctor coordinator. Owns the active-release
-lifecycle check (SPEC-DOC-004), the release ledger invariant (unique ids SPEC-DOC-026), plus the family-local status extractor.
-A release dir's name and placement are TREE-8's alone.
-Leaf-only: imports the shared leaves + core, never a sibling validator.
+Owns the active-release lifecycle check, the release ledger invariant (unique release ids),
+and the family-local status extractor. A release dir's name and placement belong to the
+tree validator alone. Imports the shared leaves and core only, never a sibling validator.
 
 The active release and its phase are read by :func:`resolve_active_release`; whether the
 state document is valid is `release.py check`'s answer (LEDGER-RELEASE-SCHEMA).
@@ -13,12 +12,14 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from dadaia_workspace.core import platform
 from dadaia_workspace.core.doctor_rules import SectionFinding
 from dadaia_workspace.core.release_state import (
     LEGACY_RELEASE_STATE_FILENAME,
     RELEASE_ID_RE,
     RELEASE_STATE_FILENAME,
 )
+from dadaia_workspace.core.skill_owner import load_owner
 from dadaia_workspace.core.spec_status import APPROVED, extract_status
 from dadaia_workspace.core.spec_status import CANONICAL_STATUS as _CANONICAL_STATUS
 from dadaia_workspace.features.specs.doctor_common import iter_all_release_dirs
@@ -28,13 +29,17 @@ from dadaia_workspace.features.specs.specs_tree import SpecsTree
 # Vocabulary + parser live in core.spec_status (single definition); re-exported here
 # because doctor_release has been the documented import site for both.
 CANONICAL_STATUS = _CANONICAL_STATUS
+#: The lifecycle phases in order, from the moved schema; all but the first are implementation-bound.
+_PHASES = load_owner("dd-bug-resolution", "_ledger").load_schema("release-state-v1")["properties"][
+    "phase"
+]["enum"]
 
 
 def _extract_status(md_path: Path) -> str | None:
     """Read a release artifact's declared status. Parsing itself is core.spec_status."""
     if not md_path.exists():
         return None
-    return extract_status(md_path.read_text(encoding="utf-8"))
+    return extract_status(platform.read_text(md_path))
 
 
 class ReleaseValidator:
@@ -42,7 +47,7 @@ class ReleaseValidator:
 
     def __init__(self, specs_dir: Path) -> None:
         self.specs_dir = specs_dir
-        #: Fresh per check() run (assigned by the coordinator, F010) — the parsed
+        #: Fresh per check() run (assigned by the coordinator) — the parsed
         #: snapshot every active-release read goes through; never survives a fix pass.
         self.tree: SpecsTree = SpecsTree(specs_dir)
 
@@ -67,7 +72,7 @@ class ReleaseValidator:
                         severity=Severity.ERROR,
                         description=f"{fname} has no `**Status:**` line",
                         path=str(fpath),
-                        fix=f"Operator action: add the `**Status:**` line to {fpath}",
+                        fix=f"Agent action: add the `**Status:**` line to {fpath}",
                     )
                 )
             elif status not in CANONICAL_STATUS:
@@ -80,14 +85,12 @@ class ReleaseValidator:
                             f"Valid: {sorted(CANONICAL_STATUS)}"
                         ),
                         path=str(fpath),
-                        fix=f"Operator action: set a canonical `**Status:**` in {fpath}",
+                        fix=f"Agent action: set a canonical `**Status:**` in {fpath}",
                     )
                 )
-            elif status != APPROVED and active.phase in ("IMPLEMENTATION", "CLOSURE"):
-                # Bug fresh-release-scaffold-emits-spec-doctor-warnings-042: Draft/In
-                # review IS the legitimate state of a DEFINITION-phase release — the
-                # scaffolder emits exactly that. Only implementation-bound phases
-                # expect approved artifacts.
+            elif status != APPROVED and active.phase in _PHASES[1:]:
+                # Draft and in-review artifacts are the legitimate state of a
+                # DEFINITION-phase release. Only implementation-bound phases expect approved.
                 issues.append(
                     specs_finding(
                         code="SPEC-DOC-004",
@@ -103,7 +106,7 @@ class ReleaseValidator:
         return issues
 
     def check_unique_release_ids(self) -> list[SectionFinding]:
-        """SPEC-DOC-026: release ids (dir basenames) must be unique across
+        """Release ids (dir basenames) must be unique across
         ``releases/`` ∪ ``releases/_archive/`` (recursive). A collision is an ERROR.
         """
         issues: list[SectionFinding] = []
@@ -129,14 +132,14 @@ class ReleaseValidator:
         return issues
 
     def check_release_state_filename(self) -> list[SectionFinding]:
-        """SPEC-DOC-046 (ADR 0007, restored by ADR 0152 (4)): a release directory holds
-        the legacy ``RELEASE.json`` and no ``_RELEASE.json`` — `doctor --fix` renames it."""
+        """WARN on a release directory holding the legacy ``RELEASE.json`` and no
+        ``_RELEASE.json``; `doctor --fix` renames it."""
         return [
             specs_finding(
                 "SPEC-DOC-046",
                 Severity.WARNING,
                 f"{legacy.relative_to(self.specs_dir).as_posix()} carries the legacy state-file name — "
-                f"canonical is {RELEASE_STATE_FILENAME} (ADR 0007)",
+                f"canonical is {RELEASE_STATE_FILENAME}",
                 str(legacy),
                 fixable=True,
             )
@@ -146,8 +149,8 @@ class ReleaseValidator:
         ]
 
     def fix_release_state_filename(self, issue: SectionFinding) -> None:
-        """Rename the legacy state file (SPEC-DOC-046) — re-verified before the rename."""
+        """Rename the legacy state file, re-verified before the rename."""
         if (named := finding_path(issue)) and Path(named).name == LEGACY_RELEASE_STATE_FILENAME:
             legacy = Path(named)
             if legacy.is_file() and not legacy.with_name(RELEASE_STATE_FILENAME).exists():
-                legacy.rename(legacy.with_name(RELEASE_STATE_FILENAME))
+                platform.replace(legacy, legacy.with_name(RELEASE_STATE_FILENAME))

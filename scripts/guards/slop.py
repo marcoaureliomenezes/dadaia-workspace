@@ -1,10 +1,10 @@
-"""Slop checks: the package's slop ratchets (V32, V33, V37-V41), the doctor section subset,
-the suppressed layering-edge cap (ARCHITECTURE P-10) and no file-size pin (ADR 0143).
+"""Slop checks: the package's slop checks (``v32``, ``v37`` to ``v41``), the doctor section
+subset, the suppressed layering-edge cap and no file-size pin.
 
-``ALLOWANCES`` (V37-V39) is data each check reads from the tree's own copy of this file, so
-a plant edits it like any tracked file. A row is ``<check>[*] <key> <value>``: ``*`` marks a
-key there at birth (the allowance only shrinks); a value is ``parity:<test file>``, an open
-bug id, ``report-only`` (v39) or ``-`` (a birth key no longer allowed).
+``ALLOWANCES`` (``v38``, ``v39``) is data each check reads from the tree's own copy of this
+file, so a plant edits it like any tracked file. A row is ``<check>[*] <key> <value>``: ``*``
+marks a key there at birth (the allowance only shrinks); a value is ``parity:<test file>``, an
+open bug id, ``report-only`` (v39) or ``-`` (a birth key no longer allowed).
 """
 
 from __future__ import annotations
@@ -16,7 +16,6 @@ import re
 import shutil
 import sys
 import tokenize
-import warnings
 from collections import defaultdict
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -33,29 +32,17 @@ if TYPE_CHECKING:
 
 SELF, PKG, SWEEP = "scripts/guards/slop.py", "dadaia_workspace", "features/spec_context/sweep.py"
 _LEDGER = load_owner("dd-bug-resolution", "_ledger")
+_BACKLOG = load_owner("dd-backlog-definition", "_backlog_store")
 
-# Ceilings measured on this tree; ratchet DOWN ONLY, target 0: lower one in the commit that
-# removes a hit, never raise one.
-V32_COMMENTS, V32_DOCSTRINGS, V33_ORPHANS, IGNORE_EDGES = 109, 215, 31, 0
+IGNORE_EDGES = 0
 
-# v37: the candidate-folder pair (ADR 0150): the stdlib scripts cannot import the package, so
-# each side keeps its twin and one test pins them equal. v38: each deleter outside sweep,
+# v38: each deleter outside sweep,
 # keyed to the test pinning its delete (a stdlib skill script cannot import the sweep, so its
 # row is unstarred when its value is parity:<test>). v39: a doctor code with no fix-clears plant.
 ALLOWANCES = """
-v37* core/gitflow.py:candidate_dir parity:tests/public/skills/dd_release_implementation/scripts/test_release__release_script.py
-v37* core/gitflow.py:candidate_number parity:tests/public/skills/dd_release_implementation/scripts/test_release__release_script.py
-v37* core/gitflow.py:next_candidate parity:tests/public/skills/dd_release_implementation/scripts/test_release__release_script.py
-v37* core/release_state.py:CANDIDATE_RE parity:tests/public/skills/dd_release_implementation/scripts/test_release__release_script.py
-v37* public/skills/dd-release-implementation/scripts/_release_schema.py:CANDIDATE_RE parity:tests/public/skills/dd_release_implementation/scripts/test_release__release_script.py
-v37* public/skills/dd-release-implementation/scripts/_release_schema.py:candidate_dir parity:tests/public/skills/dd_release_implementation/scripts/test_release__release_script.py
-v37* public/skills/dd-release-implementation/scripts/_release_schema.py:candidate_number parity:tests/public/skills/dd_release_implementation/scripts/test_release__release_script.py
-v37* public/skills/dd-release-implementation/scripts/_release_schema.py:next_candidate parity:tests/public/skills/dd_release_implementation/scripts/test_release__release_script.py
-v38* core/atomic_write.py:atomic_write parity:tests/core/test_atomic_write.py
-v38* public/skills/dd-bug-resolution/scripts/_ledger.py:replace parity:tests/public/skills/dd_bug_resolution/scripts/test__ledger.py
+v38 public/skills/dd-bug-resolution/scripts/_atomic.py:atomic_write parity:tests/public/skills/dd_bug_resolution/scripts/test__atomic.py
 v38* features/certification/service.py:certify parity:tests/features/certification/test_service.py
 v38* features/migrate/state_v2.py:execute_migration parity:tests/features/migrate/test_state_v2.py
-v38* features/specs/doctor_memory.py:fix_placeholder_atom parity:tests/features/specs/test_canon__scaffold_placeholder_repair.py
 v38* infrastructure/projection.py:_clear parity:tests/infrastructure/test_public_assets__install_ledger_reconciliation.py
 v38* infrastructure/public_assets.py:_prune_empty_dirs parity:tests/infrastructure/test_public_assets__install_ledger_reconciliation.py
 v38* infrastructure/public_assets.py:_reconcile_install_ledger parity:tests/infrastructure/test_public_assets__install_ledger_reconciliation.py
@@ -84,12 +71,16 @@ def test_guard_doctor_codes(record_property):
     from dadaia_workspace.features.specs.rules import RULES as SPECS
     from dadaia_workspace.features.workspace import onboarding
     from dadaia_workspace.infrastructure.ledger_scripts import LEDGER_SCRIPTS
-    from tests.cli.commands.test_doctor import OPERATOR_ACTION, PLANTS, REPORT_ONLY
-    from tests.cli.commands.test_doctor__workspace_fix_lines_clear_their_finding import WORKSPACE_PLANTS
+    from tests.core.test_cli_line__fix_line_contract import (
+        AGENT_ACTION,
+        PLANTS,
+        REPORT_ONLY,
+        WORKSPACE_PLANTS,
+    )
 
     rules = [*SPECS, *BACKLOG, *workspace_rules(expired_only=False, context=None)]
     codes = {c for r in rules for c in r.codes} | {s.code for s in LEDGER_SCRIPTS} | {onboarding.CODE}
-    covered = {*PLANTS, *REPORT_ONLY, *OPERATOR_ACTION, *WORKSPACE_PLANTS}
+    covered = {*PLANTS, *REPORT_ONLY, *AGENT_ACTION, *WORKSPACE_PLANTS}
     record_property("doctor", {"codes": sorted(codes), "covered": sorted(covered)})
 """
 
@@ -138,83 +129,74 @@ def _allowance(tree: Tree, hits: dict[str, str], check: str, also: str = "") -> 
     return out + [f"absent-at-birth: {k} (only shrinks)" for k in sorted(allow.keys() - born)]
 
 
-_GOV_ID = re.compile(r"\b(FR[0-9]+|T-[0-9]{2,3}(-[0-9]+)?|ADR[ -]?[0-9]+|v0\.[0-9]+(\.[0-9]+)?)\b")
+#: One pattern, one named group per id kind; the group that matched names the sub-rule.
+_GRAMMAR = re.compile(
+    r"\b(?:(?P<core>(?:N?FR|AC|WP)(?:[0-9]+|-[A-Z]{0,3}[0-9]+)[a-z]?(?:[.-][A-Z]?[0-9]+[a-z]?)*"
+    r"|ADRs?[ -]?[0-9]+|T-[0-9]{2,3}(?:-[0-9]+)?|TR?-[A-Z]+-[A-Z]?[0-9]+(?:-[0-9]+)?"
+    r"|J[0-9]+\.T[0-9]+|rc-?[0-9]+|v0\.[0-9]+(?:\.[0-9]+)?|[Rr]ound [0-9]+|re-review)"
+    r"|(?P<staged_task_id>J[0-9]+\.S[0-9]+\.T[0-9]+)"
+    r"|(?P<section_label_id>SA-H[0-9]+-[0-9]+)"
+    r"|(?P<audit_finding_id>[0-9]{8}(?:-[a-z0-9-]+-(?:F[0-9]{3}|audit)| audit))"
+    r"|(?P<review_label_id>[Rr]eview (?:finding [0-9]+|(?:[0-9]+ )?[FMN][0-9]+))"
+    r"|(?P<plan_label_id>PLAN [A-Z]?[0-9]+(?:\.[0-9]+)*)"
+    r"|(?P<grill_label_id>Grill Q[0-9]+|Q[0-9]+ ruling|[Rr]uling [A-Z][0-9]+)"
+    r"|(?P<ruling_label_id>Ruling [0-9]+)"
+    r"|(?P<bug_number_id>[Bb]ugs? [0-9]{3}))\b"
+)
+_TOKEN = re.compile(r"\w(?:[\w.-]*\w)?")
 _DOC_OWNERS = (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)
+_LEDGERS = (
+    ("exact-bug-id", "specs/bugs/BUGS.jsonl"),
+    ("archived-bug-id", "specs/bugs/_archive/bugs_histo.jsonl"),
+    ("archived-backlog-id", "specs/backlog/_archive/backlog_histo.jsonl"),
+)
+
+
+def _exact_ids(tree: Tree) -> dict[str, str]:
+    """Every bug and backlog id of the tree, archives included, -> its sub-rule; the skill
+    folder and persona names an id can equal are dropped."""
+    ids = {}
+    for rule, rel in _LEDGERS:
+        for r in _LEDGER.records(tree.root / rel):
+            ids[r.get("id") or r.get("data", {}).get("id")] = rule
+    if tree.tracked("specs/backlog/BACKLOG.json"):
+        active = _BACKLOG.read_active(tree.root / "specs/backlog/BACKLOG.json")
+        ids |= {e.get("id"): "exact-backlog-id" for e in active}
+    shipped = {p.split("/")[3] for p in tree.tracked(f"{PKG}/public/skills") if p.count("/") > 3}
+    shipped |= {Path(p).stem for p in tree.tracked(f"{PKG}/public/agents")}
+    return {i: rule for i, rule in ids.items() if i and i not in shipped}
+
+
+def v32_hits(tree: Tree) -> list[tuple[str, str, str, str]]:
+    """``(kind, sub-rule, path:line, match)`` per comment token and docstring line of the
+    package, tests and scripts citing a grammar id or an exact ledger id."""
+    exact, out = _exact_ids(tree), []
+
+    def judge(kind: str, rel: str, line: int, text: str) -> None:
+        scope = "package" if rel.startswith(PKG) else rel.split("/")[0]
+        if m := _GRAMMAR.search(text):
+            form = str(m.lastgroup)
+            rule = f"{scope}-{kind}-ids" if form == "core" else form.replace("_", "-")
+            out.append((kind, rule, f"{rel}:{line}", m.group()))
+        elif found := next((t for t in _TOKEN.findall(text) if t in exact), ""):
+            out.append((kind, exact[found], f"{rel}:{line}", found))
+
+    for rel, text in _files(tree, PKG, "tests", "scripts", py=True).items():
+        for t in tokenize.generate_tokens(io.StringIO(text).readline):
+            if t.type == tokenize.COMMENT:
+                judge("comment", rel, t.start[0], t.string)
+        for node in ast.walk(ast.parse(text)):
+            if isinstance(node, _DOC_OWNERS) and (doc := ast.get_docstring(node, clean=False)):
+                first = node.body[0].lineno
+                for n, line in enumerate(doc.splitlines()):
+                    judge("docstring", rel, first + n, line)
+    return sorted(out, key=lambda h: h[2])
 
 
 def v32(tree: Tree) -> list[str]:
-    """Governance ids in package comment tokens and docstring lines (tests excluded)."""
-    comments = docs = 0
-    for text in _files(tree, PKG, py=True).values():
-        for t in tokenize.generate_tokens(io.StringIO(text).readline):
-            comments += t.type == tokenize.COMMENT and bool(_GOV_ID.search(t.string))
-        for node in ast.walk(ast.parse(text)):
-            if isinstance(node, _DOC_OWNERS):
-                doc = ast.get_docstring(node, clean=False) or ""
-                docs += sum(bool(_GOV_ID.search(line)) for line in doc.splitlines())
-    out = [f"comment-ids: {comments} comments > {V32_COMMENTS}"] if comments > V32_COMMENTS else []
-    return out + (
-        [f"docstring-ids: {docs} lines > {V32_DOCSTRINGS}"] if docs > V32_DOCSTRINGS else []
-    )
-
-
-_FAMILY, _UPPER = re.compile(r"\b[A-Z]{1,4}-?[0-9]{2,3}\b"), re.compile(r"[A-Z]+")
-_WORD = frozenset("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-")
-
-
-def _joined(text: str, i: int) -> bool:
-    """``text[i]`` is a witness char: a `_WORD` char, or a `.` between two (a dotted id)."""
-    return text[i] in _WORD or (
-        text[i] == "." and 0 < i < len(text) - 1 and {text[i - 1], text[i + 1]} <= _WORD
-    )
-
-
-def _constants(source: str) -> list[str]:
-    """Every non-empty string constant of *source* that is not a bare docstring statement."""
-    nodes = list(ast.walk(ast.parse(source)))
-    bare = {id(n.value) for n in nodes if isinstance(n, ast.Expr)}
-    strs = [n for n in nodes if isinstance(n, ast.Constant) and isinstance(n.value, str)]
-    return [str(n.value) for n in strs if n.value and id(n) not in bare]
-
-
-def _reads(constant: str, prefix: str, witnesses: set[tuple[str, int]]) -> bool:
-    """*constant* (a regex, else a literal) matches a witness through its prefix and beyond."""
-    try:
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", FutureWarning)
-            pattern = re.compile(constant)
-    except re.error:
-        pattern = re.compile(re.escape(constant))
-    return any(
-        (m := pattern.search(word)) is not None and m.start() <= at and m.end() > at + len(prefix)
-        for word, at in witnesses
-    )
-
-
-def v33(tree: Tree) -> list[str]:
-    """PREFIX-NN families in specs/, the package and tests/ that no string constant reads."""
-    families: dict[str, set[tuple[str, int]]] = defaultdict(set)
-    for text in _files(tree, "specs", PKG, "tests").values():
-        for m in _FAMILY.finditer(text):
-            left, right = m.start(), m.end()
-            while left > 0 and _joined(text, left - 1):
-                left -= 1
-            while right < len(text) and _joined(text, right):
-                right += 1
-            prefix = _UPPER.match(m.group(0)).group(0)  # type: ignore[union-attr]
-            families[prefix].add((text[left:right], m.start() - left))
-    readers: dict[str, list[str]] = defaultdict(list)
-    for source in _files(tree, PKG, "tests", py=True).values():
-        for constant in _constants(source):
-            for run in set(_UPPER.findall(constant)):
-                readers[run].append(constant)
-    unread = [
-        p for p, w in sorted(families.items()) if not any(_reads(c, p, w) for c in readers[p])
-    ]
-    orphans = [p for p in unread if p not in {"FR", "AC", "T"}]
-    if len(orphans) > V33_ORPHANS:
-        return [f"orphan-families: {len(orphans)} > {V33_ORPHANS}: {orphans}"]
-    return []
+    """Governance and ledger ids in comment tokens and docstring lines of the package, tests
+    and scripts: one line per hit."""
+    return [f"{rule}: {where} cites {match}" for _, rule, where, match in v32_hits(tree)]
 
 
 def _definition(node: ast.stmt) -> tuple[str, str, str] | None:
@@ -241,7 +223,7 @@ def v37(tree: Tree) -> list[str]:
             if (found := _definition(node)) is not None:
                 homes[found].add(rel[len(PKG) + 1 :])
     hits = {f"{rel}:{d[0]}": d[2] for d, rels in homes.items() if len(rels) > 1 for rel in rels}
-    return _allowance(tree, hits, "v37")
+    return sorted(f"{rule}: {key}" for key, rule in hits.items())
 
 
 _DELETES, _OS_DELETES = {"rmtree", "unlink", "rmdir", "removedirs"}, {"remove", "move"}
@@ -365,7 +347,7 @@ def _edges(text: str) -> list[tuple[str, str]]:
 
 
 def ignore_cap(tree: Tree) -> list[str]:
-    """P-10: the suppressed edges equal the cap, under the cross-feature contract, from features."""
+    """The suppressed edges equal the cap, under the cross-feature contract, from features."""
     edges = _edges(tree.read("setup.cfg"))
     out = (
         [f"edge-cap: {len(edges)} ignored edges != {IGNORE_EDGES}"]
@@ -379,7 +361,7 @@ def ignore_cap(tree: Tree) -> list[str]:
 
 
 _READS = {"read_text", "read_bytes", "read", "readlines"}
-_EXEMPT = {"skill_md_line_soft", "skill_md_line_ceiling"}  # ADR 0170's two keys
+_EXEMPT = {"skill_md_line_soft", "skill_md_line_ceiling"}
 
 
 def _callee(n: ast.AST | None) -> str:
@@ -427,7 +409,7 @@ def _bound(e: ast.expr, names: dict[str, ast.expr]) -> str | None:
 
 
 def no_size_pin(tree: Tree) -> list[str]:
-    """ADR 0143: no test or script compares a file's line or byte count against a constant."""
+    """No test or script compares a file's line or byte count against a constant."""
     out = []
     for rel, text in _files(tree, py=True).items():
         module, names = ast.parse(text), {}
@@ -454,16 +436,6 @@ def _write(root: Path, rel: str, text: str) -> None:
     (root / rel).parent.mkdir(parents=True, exist_ok=True)
     with (root / rel).open("a", encoding="utf-8") as f:
         f.write(text)
-
-
-def _ids(comments: int, docs: int) -> str:
-    """A module with *comments* id comments and *docs* id docstring lines over all four owners."""
-    q, r = divmod(docs, 4)
-    doc = ['"""' + "\n".join(["FR1"] * n) + '"""' for n in (q + r, q)]
-    body = "".join(
-        f"x = 1  {('# FR1', '# T-050', '# ADR 1', '# v0.5.1')[i % 4]}\n" for i in range(comments)
-    )
-    return f"{doc[0]}\n{body}class C:\n    {doc[1]}\ndef f():\n    {doc[1]}\nasync def g():\n    {doc[1]}\n"
 
 
 _NEAR = '''"""A near miss for every matcher; no governance id here."""
@@ -493,20 +465,14 @@ _DELETERS = [
 
 
 def CONTROL(root: Path) -> Session:
-    """Every check green: synthetic twins and deleters for each allowance key, the ceilings
-    met exactly, a near miss per matcher; violations only in an untracked, gitignored dir."""
+    """Every check green: synthetic twins and deleters for each allowance key, a near miss per
+    matcher; violations only in an untracked, gitignored dir."""
     (root / SELF).parent.mkdir(parents=True)
     shutil.copyfile(ROOT / SELF, root / SELF)
     shutil.copyfile(ROOT / "setup.cfg", root / "setup.cfg")
     rows = _table((ROOT / SELF).read_text("utf-8"))
     for i, (check, key, value) in enumerate(rows):
         rel, _, sym = key.partition(":")
-        if check == "v37*":
-            _write(
-                root,
-                f"{PKG}/{rel}",
-                f"{sym} = compile('x')\n" if sym.isupper() else f"def {sym}(p):\n    return p\n",
-            )
         if check.rstrip("*") == "v38":
             _write(root, f"{PKG}/{rel}", f"def {sym}(p, q):\n    {_DELETERS[i % 6]}\n")
         if value.startswith("parity:"):
@@ -519,22 +485,34 @@ def CONTROL(root: Path) -> Session:
         '{"id": "zz-open-bug", "status": "open"}\n{"id": "zz-shut", "status": "resolved"}\n',
     )
     _write(root, f"{PKG}/{SWEEP}", "def sweep(p):\n    p.unlink()\n")
-    _write(root, f"{PKG}/ids.py", _ids(V32_COMMENTS, V32_DOCSTRINGS) + 'x = "FR1 ADR 1"\n')
+    _write(root, f"{PKG}/ids.py", 'x = "FR1 ADR 1"\n')
     _write(root, f"{PKG}/zz/near.py", _NEAR)
+    _write(root, "tests/unit/test_ok.py", '"""Loads x."""\n# a why\nS = "AC1.2 zz-open-bug"\n')
+    _write(
+        root,
+        "tests/unit/test_doctor.py",
+        '"""Fixes TREE-5, WS-1, LINT-1, DRIFT-2, CWE-22, DOC-034, CX-7, INV-5, URL-1, RFC-2606.\n'
+        "Reads ISO-8601 at section 4, a bug in the parser, a review of the diff, a wave of\n"
+        "work, a grill of the plan, a ruling on Q and python 3.12 on v1.2. A bug end-to-end\n"
+        "test, Bug: off-by-one in a cursor, ISO week 2026-W41-1, the W1-4 range, fixed 2 bugs\n"
+        "3 times, python bug 12345, review h2 heading, review H2 sections, ruling 3 times,\n"
+        "SHA256, UTF8, SHA-256, UTF-8, an H1 heading, IPv4, E402 and S603 lint codes, T-1,\n"
+        "TR-808, CP1252, NIST P-256, FRAME 3, ACK 2, a WPA2 key, 12345678-abcd-1234, 20261013-x,\n"
+        "the #C0FFEE color, the 20261013T040740Z stamp, T1: cold onboarding, #: C0, C1, L1, L2\n"
+        "caches, S3: the bucket, object storage (S3), a (C1 range), a (Q3) quarter, (P0) and a\n"
+        "(H1) heading.\n"
+        "F-16 jet, F-35, F012 field, P-51 Mustang, section A4.1 and UK-A1-2.\n"
+        '"""\n',
+    )
+    _write(root, "scripts/guards/ok.py", '"""Judges x."""\n')
+    _write(root, "specs/backlog/_archive/backlog_histo.jsonl", '{"id": "dd-code-review"}\n')
+    _write(root, f"{PKG}/public/skills/dd-code-review/SKILL.md", "x\n")
+    _write(root, "tests/unit/test_skill.py", '"""Names dd-code-review."""\n')
     _write(
         root,
         f"{PKG}/zz/near2.py",
         'SECTION = "ledgers"\nKIND = "a"\ndef load(p):\n    """Load."""\n    return 1\n',
     )
-    orphans = " ".join(f"Q{chr(65 + i // 26)}{chr(65 + i % 26)}-01" for i in range(V33_ORPHANS - 3))
-    _write(
-        root, "specs/x.md", f"{orphans} OFF-11 DIG-22 RDA-12 RDB-12 EF-12-XY FR-12 AC-03 T-050\n"
-    )
-    _write(root, "specs/y.md", "XB-CD-12\n")
-    readers = '"OFF", "(?<=DIG)-22", r"RDA-\\d+", r"RDB-\\d+", r"^XB-CD-\\d+$", r"^EF-\\d+-XY$"'
-    _write(root, "tests/unit/test_r.py", f'"""DOC-11"""\nreaders = ({readers})\n')
-    _write(root, "specs/_archive/x.md", "ARC-01\n")
-    (root / "specs/bin.dat").write_bytes(b"\xff ZZZ-01\n")
     _write(root, ".gitignore", f"{PKG}/zz_ignored/\n")
     _write(
         root,
@@ -569,6 +547,14 @@ def _add(rel: str, text: str | Callable[[], str]) -> Plant:
     return _plant(lambda root: _write(root, rel, text if isinstance(text, str) else text()))
 
 
+def _twins(text: str) -> Plant:
+    def write(root: Path) -> None:
+        for n in "12":
+            _write(root, f"{PKG}/zz/twin{n}.py", text)
+
+    return _plant(write)
+
+
 def _rows(check: str, bad: str) -> dict[str, Plant]:
     """One plant per allowance sub-rule, each editing the first allowed row of *check*."""
     rules: dict[str, Callable[[list[str]], str]] = {
@@ -587,12 +573,6 @@ def _rows(check: str, bad: str) -> dict[str, Plant]:
 def _born_package_row(root: Path) -> None:
     _write(root, f"{PKG}/zz/tidy.py", "def tidy(p):\n    p.unlink()\n")
     _edit_row(root, "v38", lambda r: f"{' '.join(r)}\nv38 zz/tidy.py:tidy {r[2]}")
-
-
-def _first(constant: bool) -> str:
-    """The first v37 key's symbol of the real table that is (or is not) a constant."""
-    syms = [r[1].split(":")[1] for r in _table((ROOT / SELF).read_text("utf-8")) if r[0] == "v37*"]
-    return min(s for s in syms if s.isupper() == constant)
 
 
 def _doctor(codes: list[str], covered: list[str]) -> Plant:
@@ -621,13 +601,18 @@ def _cfg(edit: Callable[[str, str], str]) -> Plant:
     return _plant(rewrite)
 
 
-def _ids_plant(comments: int, docs: int) -> Plant:
-    return _plant(lambda root: (root / PKG / "ids.py").write_text(_ids(comments, docs), "utf-8"))
+def _ledger_plant(ledger: str, line: str, where: str, text: str) -> Plant:
+    """One ledger *line* in *ledger* and *text* at *where*: the id must turn v32 red."""
+
+    def write(root: Path) -> None:
+        _write(root, ledger, line)
+        _write(root, where, text)
+
+    return _plant(write)
 
 
 # Plants appending one text under CONTROL: `<check> <row> <path> <text>`, the text's `\n` escaped.
 _APPENDS = r"""
-v33 orphan-families specs/x.md  NEW-01\n
 v38 path-delete dadaia_workspace/zz/tidy.py def tidy(p):\n    p.unlink()\n
 v38 os-delete dadaia_workspace/zz/tidy.py def outer():\n    def tidy(p):\n        os.remove(p)\n
 v40 comprehension tests/unit/test_j.py rows = [json.loads(x) for x in t.splitlines()]\n
@@ -648,17 +633,51 @@ no-size-pin read_text tests/unit/test_pin.py ok = len(p.read_text()) > 4096\n
 no-size-pin readlines tests/unit/test_pin.py ok = len(f.readlines()) < 9\n
 no-size-pin read tests/unit/test_pin.py ok = len(f.read()) >= 9\n
 """
-_TWIN, _EDGE = f"{PKG}/zz/twin.py", f"{PKG}.features.zz -> {PKG}.features.yy"
+_EDGE = f"{PKG}.features.zz -> {PKG}.features.yy"
 _PLANTS: dict[str, dict[str, Plant]] = {
     "v32": {
-        "comment-ids": _ids_plant(V32_COMMENTS + 1, V32_DOCSTRINGS),
-        "docstring-ids": _ids_plant(V32_COMMENTS, V32_DOCSTRINGS + 1),
+        "package-comment-ids": _add(f"{PKG}/zz/ac.py", "x = 1  # FR1\n"),
+        "tests-comment-ids": _add("tests/unit/test_p.py", "# T-PROP-01\n"),
+        "tests-docstring-ids": _add("tests/unit/test_p.py", '"""AC19.3 hardens x."""\n'),
+        "scripts-comment-ids": _add("scripts/guards/x.py", "# FR-W4-01\n"),
+        "package-docstring-ids": _add(f"{PKG}/zz/ac.py", '"""AC1.2 states x."""\n'),
+        "staged-task-id": _add("tests/unit/test_p.py", "# J2.S6.T5 pins x\n"),
+        "audit-finding-id": _add("tests/unit/test_p.py", "# 20260830-canon-v6-first-F014 pins x\n"),
+        "review-label-id": _add("tests/unit/test_p.py", '"""Review finding 8 pins x."""\n'),
+        "plan-label-id": _add("tests/unit/test_p.py", "# PLAN D8 pins x\n"),
+        "grill-label-id": _add("tests/unit/test_p.py", "# Grill Q14 ordered x\n"),
+        "bug-number-id": _add("tests/unit/test_p.py", "# bugs 465, 467 pin x\n"),
+        "section-label-id": _add("tests/unit/test_p.py", "# SA-H3-1 pins x\n"),
+        "scripts-docstring-ids": _add("scripts/guards/x.py", '"""T-050-190 pins x."""\n'),
+        "ruling-label-id": _add("tests/unit/test_p.py", "# Ruling 16 holds\n"),
+        "exact-bug-id": _ledger_plant(
+            "specs/bugs/BUGS.jsonl",
+            '{"id": "zz-planted-bug"}\n',
+            "scripts/guards/x.py",
+            "# see zz-planted-bug\n",
+        ),
+        "archived-bug-id": _ledger_plant(
+            "specs/bugs/_archive/bugs_histo.jsonl",
+            '{"event": "archived", "data": {"id": "zz-archived-bug"}}\n',
+            "tests/unit/test_p.py",
+            '"""zz-archived-bug."""\n',
+        ),
+        "exact-backlog-id": _ledger_plant(
+            "specs/backlog/BACKLOG.json",
+            '{"active": [{"id": "zz-planted-entry"}]}\n',
+            f"{PKG}/zz/b.py",
+            '"""Fixes zz-planted-entry."""\n',
+        ),
+        "archived-backlog-id": _ledger_plant(
+            "specs/backlog/_archive/backlog_histo.jsonl",
+            '{"id": "zz-archived-entry"}\n',
+            "tests/unit/test_p.py",
+            '"""zz-archived-entry."""\n',
+        ),
     },
-    "v33": {},
     "v37": {
-        "function-twin": _add(_TWIN, lambda: f"def {_first(False)}(p):\n    return p\n"),
-        "constant-twin": _add(_TWIN, lambda: f"{_first(True)}: object = compile('x')\n"),
-        **_rows("v37", "report-only"),
+        "function-twin": _twins("def twin(p):\n    return p\n"),
+        "constant-twin": _twins("TWIN: object = compile('x')\n"),
     },
     "v38": {
         **_rows("v38", "zz-shut"),

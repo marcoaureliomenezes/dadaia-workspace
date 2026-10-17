@@ -1,25 +1,27 @@
 """GitSubprocessClient against real git.
 
-Bug 4 (first push sets
-upstream, a mismatched upstream pushes by explicit refspec, v0.1.50 FR3); v0.4.3 A10.2
-(commit_paths ignores pre-staged content); SA-H3-2 (the operator's own identity, never a
-fallback); review 6 N2 (a failed step carries git's stdout).
+A mismatched upstream pushes by explicit refspec; commit_paths ignores pre-staged content;
+the identity is the operator's own, never a fallback; a failed step carries git's stdout.
 """
 
+import re
 import subprocess
 from pathlib import Path
 
 import pytest
 
+from dadaia_workspace.core.cli_line import git_line
 from dadaia_workspace.core.exceptions import GitCloneError, GitSyncError
+from dadaia_workspace.core.skill_owner import load_owner
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from tests.conftest import _GIT_QUIET
+from tests.helpers.oslib import run, run_line, write_text
 
 pytestmark = pytest.mark.slow
 
 
 def _git(cwd: Path, *args: str) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True)
+    return run(["git", *args], cwd=cwd)
 
 
 def _repo(path: Path) -> Path:
@@ -27,7 +29,7 @@ def _repo(path: Path) -> Path:
     _git(path, "init", "-q")
     _git(path, "config", "user.email", "op@example.com")
     _git(path, "config", "user.name", "Operator")
-    (path / "README.md").write_text("init")
+    write_text(path / "README.md", "init")
     _git(path, "add", "-A")
     _git(path, "commit", "-qm", "init")
     return path
@@ -46,7 +48,7 @@ def test_repo_lifecycle_clone_dirty_commit_remote_branch_checkout_and_error_path
     client.clone(str(src), dest)
 
     assert client.dirty_paths(dest) == []
-    (dest / "new.txt").write_text("hello")
+    write_text(dest / "new.txt", "hello")
     _git(dest, "mv", "README.md", "R.md")
     assert client.dirty_paths(dest) == ["R.md", "new.txt"]
     _git(dest, "reset", "-q", "--hard")
@@ -67,14 +69,14 @@ def test_repo_lifecycle_clone_dirty_commit_remote_branch_checkout_and_error_path
 
 
 def test_a_failed_git_step_carries_gits_full_output(tmp_path: Path) -> None:
-    """Review 6 N2: git writes CONFLICT to stdout — the error carries it."""
+    """Git writes CONFLICT to stdout — the error carries it."""
     repo = _repo(tmp_path / "r")
     client = GitSubprocessClient()
     client.git(repo, "checkout", "-q", "-b", "b")
-    (repo / "README.md").write_text("b")
+    write_text(repo / "README.md", "b")
     client.git(repo, "commit", "-qam", "b")
     client.git(repo, "checkout", "-q", "-")
-    (repo / "README.md").write_text("c")
+    write_text(repo / "README.md", "c")
     client.git(repo, "commit", "-qam", "c")
     with pytest.raises(GitSyncError, match="CONFLICT"):
         client.git(repo, "merge", "b")
@@ -83,10 +85,10 @@ def test_a_failed_git_step_carries_gits_full_output(tmp_path: Path) -> None:
 def test_push_first_push_sets_upstream_and_mismatched_branch_uses_explicit_refspec(
     tmp_path: Path,
 ) -> None:
-    """Bug 4 / v0.1.50 FR3: plain ``git push`` fails under push.default=simple when the
-    upstream name differs; the client pushes HEAD:<upstream branch> instead."""
+    """Plain ``git push`` fails under push.default=simple when the upstream name differs; the
+    client pushes HEAD:<upstream branch> instead."""
     bare = tmp_path / "bare.git"
-    subprocess.run(["git", "init", "-q", "--bare", str(bare)], check=True)
+    run(["git", "init", "-q", "--bare", str(bare)], check=True)
     local = _repo(tmp_path / "local")
     _git(local, "remote", "add", "origin", str(bare))
     client = GitSubprocessClient()
@@ -105,11 +107,11 @@ def test_push_first_push_sets_upstream_and_mismatched_branch_uses_explicit_refsp
 
 
 def test_commit_paths_ignores_operator_pre_staged_unrelated_content(tmp_path: Path) -> None:
-    """A10.2: the commit is path-scoped; the operator's staged file stays staged."""
+    """The commit is path-scoped; the operator's staged file stays staged."""
     repo = _repo(tmp_path / "repo")
-    (repo / "operator-staged.txt").write_text("operator content")
+    write_text(repo / "operator-staged.txt", "operator content")
     _git(repo, "add", "operator-staged.txt")
-    (repo / "tool-written.txt").write_text("tool content")
+    write_text(repo / "tool-written.txt", "tool content")
 
     GitSubprocessClient().commit_paths(repo, "chore(scaffold): tool write", ["tool-written.txt"])
 
@@ -127,3 +129,119 @@ def test_clone_writes_longpaths_into_the_clone_config(
     GitSubprocessClient().clone(str(_repo(tmp_path / "src")), dest)
 
     assert _git(dest, "config", "--get", "core.longpaths").stdout.strip() == "true"
+
+
+def _commit_file(repo: Path, name: str) -> str:
+    write_text(repo / name, name)
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-qm", name)
+    return _git(repo, "rev-parse", "HEAD").stdout.strip()
+
+
+def test_a_caller_git_env_never_redirects_the_client_to_another_repo(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """With GIT_DIR/GIT_WORK_TREE naming repo B, every answer is repo A's."""
+    repo_a, repo_b = _repo(tmp_path / "a"), _repo(tmp_path / "b")
+    head_a = _commit_file(repo_a, "only-a.txt")
+    _commit_file(repo_b, "only-b.txt")
+    branch_a = _git(repo_a, "branch", "--show-current").stdout.strip()
+    monkeypatch.setenv("GIT_DIR", str(repo_b / ".git"))
+    monkeypatch.setenv("GIT_WORK_TREE", str(repo_b))
+    client = GitSubprocessClient()
+
+    assert client.is_git_root(repo_a)
+    assert client.git(repo_a, "rev-parse", "HEAD") == head_a
+    assert client.dirty_paths(repo_a) == []
+    assert client.current_branch(repo_a) == branch_a
+
+
+def test_the_worktree_list_parse_is_the_kernels(tmp_path: Path) -> None:
+    """The linked trees `unrecoverable` removes are `_git.parse_worktrees` of the porcelain."""
+    parse_worktrees = load_owner("dd-bug-resolution", "_git").parse_worktrees
+    assert parse_worktrees("worktree /m\nHEAD a\n\nworktree /l\nHEAD b\nbranch refs/heads/x\n") == [
+        {"worktree": str(Path("/l")), "HEAD": "b", "branch": "refs/heads/x"}
+    ]
+    repo = _repo(tmp_path / "r")
+    _git(repo, "remote", "add", "origin", str(tmp_path / "nowhere"))
+    for name in ("one", "two"):
+        _git(repo, "worktree", "add", "-q", str(tmp_path / name), "-b", name)
+    porcelain = _git(repo, "worktree", "list", "--porcelain").stdout
+
+    expected = [
+        git_line(repo, "worktree", "remove", t["worktree"]) for t in parse_worktrees(porcelain)
+    ]
+    assert len(expected) == 2
+    assert GitSubprocessClient().unrecoverable(repo) == expected
+
+
+def _scaffolded(path: Path) -> Path:
+    """A repo with the scaffold committed as `specs init` leaves it (default gitflow)."""
+    repo = _repo(path)
+    (repo / "specs").mkdir()
+    write_text(repo / "specs" / "constitution.md", "# Constitution\n")
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-qm", "scaffold")
+    return repo
+
+
+@pytest.mark.parametrize(
+    ("branches", "tags", "expected"),
+    [
+        (["feature/0.3.2"], [], "0.3.2"),
+        ([], [], "0.1.0"),
+        ([], ["v1.2.3"], "1.2.4"),
+    ],
+)
+def test_work_version_is_the_live_work_branch_else_the_next_one(
+    tmp_path: Path, branches: list[str], tags: list[str], expected: str
+) -> None:
+    repo = _scaffolded(tmp_path / "r")
+    for branch in branches:
+        _git(repo, "branch", branch)
+    for tag in tags:
+        _git(repo, "tag", tag)
+
+    assert GitSubprocessClient().work_version(repo) == expected
+
+
+def test_work_version_refuses_when_several_work_branches_exist(tmp_path: Path) -> None:
+    repo = _scaffolded(tmp_path / "r")
+    for branch in ("feature/0.1.0", "feature/0.2.0"):
+        _git(repo, "branch", branch)
+
+    with pytest.raises(
+        load_owner("dd-bug-resolution", "_refusal").Refusal, match="2 work branches"
+    ):
+        GitSubprocessClient().work_version(repo)
+
+
+@pytest.mark.parametrize("merged", [True, False])
+@pytest.mark.parametrize("checked_out", ["feature/0.1.0", "feature/0.2.0", "third"])
+def test_the_several_work_branches_fix_runs_and_clears_the_refusal(
+    tmp_path: Path, checked_out: str, merged: bool
+) -> None:
+    """The printed fix removes the lower branch from whichever branch the checkout is on."""
+    repo = _scaffolded(tmp_path / "r")
+    _git(repo, "switch", "-qc", "third")
+    _git(repo, "switch", "-qc", "feature/0.1.0")
+    if not merged:
+        _git(repo, "branch", "feature/0.2.0")
+    write_text(repo / "low.txt", "low")
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-qm", "low only")
+    if merged:
+        _git(repo, "branch", "feature/0.2.0")
+    _git(repo, "switch", "-q", checked_out)
+    client = GitSubprocessClient()
+
+    with pytest.raises(load_owner("dd-bug-resolution", "_refusal").Refusal) as caught:
+        client.work_version(repo)
+
+    steps = re.findall(r"git -C [^\s`]+ (?:switch|branch -d) [^\s`]+", caught.value.fix)
+    for step in steps:
+        if not merged and step.startswith(git_line(repo, "branch", "-d")):
+            _git(repo, "merge", "-q", "feature/0.1.0")  # the agent's merge act
+        done = run_line(step)
+        assert done.returncode == 0, done.stderr
+    assert client.work_version(repo) == "0.2.0"

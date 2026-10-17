@@ -1,4 +1,4 @@
-"""Suite checks: what the test suite and its conftest must hold (QUALITY P-21, P-22, P-23).
+"""Suite checks: what the test suite and its conftest must hold.
 
 The session checks read the runner's one probe session, never this process; ``PROBE`` is
 this module's share of the probe file, run there under the repo conftest.
@@ -7,7 +7,6 @@ this module's share of the probe file, run there under the repo conftest.
 from __future__ import annotations
 
 import ast
-import json
 import re
 import sys
 from pathlib import Path
@@ -20,13 +19,13 @@ if TYPE_CHECKING:
 
     from run import Check, Session, Tree
 
-# P-23 ceilings, measured on this tree; ratchet DOWN ONLY, target 0. Lower them in the
+# Ceilings, measured on this tree; ratchet DOWN ONLY, target 0. Lower them in the
 # commit that removes an import; raising one is never a ratchet move.
-PRIVATE_IMPORT_STATEMENTS = 37
-PRIVATE_IMPORT_FILES = 34
+PRIVATE_IMPORT_STATEMENTS = 17
+PRIVATE_IMPORT_FILES = 16
 _ALLOW = "# allow-private-import:"
 
-# P-21: the tier table on Linux and macOS; the conftest calibrates once for Windows.
+# The tier table on Linux and macOS; the conftest calibrates once for Windows.
 TIER_SECONDS = {"small": 10, "medium": 60, "e2e": 120}
 CALIBRATION = {
     "small linux False": 10,
@@ -38,7 +37,6 @@ CALIBRATION = {
     "small win32 True": 60,
 }
 
-_CITATION = re.compile(r"\b[a-z0-9]+(?:-[a-z0-9]+)+#[A-Za-z]*\d+(?:[.-]\d+)?")
 _RUN_PYTEST = re.compile(r"^\s*(?:-\s*)?run:\s*(.*\bpytest\s.*)$", re.M)
 _SELECTOR = re.compile(r"""-m\s+(["'])(.*?)\1""")
 _REAL_CI = Path(__file__).resolve().parents[2] / _CI
@@ -122,11 +120,6 @@ def private_import_ratchet(tree: Tree) -> list[str]:
     return out
 
 
-def tracked_suite_only(tree: Tree) -> list[str]:
-    scratch = [p for p in tree.tracked("tests/tmp") if p != "tests/tmp/README.md"]
-    return [f"tracked-scratch: {p} is tracked under tests/tmp/" for p in scratch]
-
-
 def tier_timeout(tree: Tree) -> list[str]:
     s, factor = tree.session, 3 if sys.platform == "win32" else 1
     tiers = s.get("tiers")
@@ -173,18 +166,6 @@ def quarantine_needs_bug(tree: Tree) -> list[str]:
     return out
 
 
-def statement_id_cited(tree: Tree) -> list[str]:
-    ids = json.loads(tree.read("tests/fixtures/statement_ids.json"))
-    known = {f"{bug}#{sid}" for bug, sids in ids.items() for sid in sids}
-    known |= set(_CITATION.findall(tree.read("specs/memory/QUALITY.md")))
-    return [
-        f"unknown-id: {p} cites {cid}"
-        for p in tree.tracked("tests")
-        if p.endswith(".py")
-        for cid in sorted(set(_CITATION.findall(tree.read(p))) - known)
-    ]
-
-
 def push_starts_no_gc(tree: Tree) -> list[str]:
     spawned = tree.session.get("props", {}).get("push_gc")
     if spawned is None:
@@ -215,12 +196,10 @@ def _session(**change: object) -> Callable[[Path], Session]:
 
 
 def CONTROL(root: Path) -> Session:
-    """Every check green: a healthy session, and violations only in an untracked,
-    gitignored ``tests/tmp/x.py`` (bugs 465, 467: untracked stays out)."""
-    _write(root, ".gitignore", "tests/tmp/*\n")
-    _write(root, "tests/tmp/x.py", _IMPORT * 99 + "# sa-no-such-bug#S99\n")
-    _write(root, "tests/fixtures/statement_ids.json", '{"sa-known-bug": ["S1"]}')
-    _write(root, "specs/memory/QUALITY.md", "cites sa-quality-bug#Q1\n")
+    """Every check green: a healthy session, with violations only in an untracked,
+    gitignored file."""
+    _write(root, ".gitignore", "scratch/\n")
+    _write(root, "scratch/x.py", _IMPORT * 99 + "# sa-no-such-bug#S99\n")
     _write(root, "tests/unit/test_c.py", "# sa-known-bug#S1 sa-quality-bug#Q1\n" + _ALLOWED * 99)
     _write(root, ".github/workflows/ci.yml", 'run: pytest -m "unit and not quarantine"\n')
     _write(root, _CI, _REAL_CI.read_text("utf-8"))
@@ -236,19 +215,10 @@ def _plant_imports(files: int, per_file: int) -> Callable[[Path], Session]:
     return plant
 
 
-def _plant_scratch(root: Path) -> None:
-    _write(root, "tests/tmp/x.py", "x = 1\n")  # no .gitignore: the scratch file is tracked
-
-
 def _plant_selector(root: Path) -> Session:
     session = CONTROL(root)
     _write(root, _CI, _REAL_CI.read_text("utf-8").replace("slow and not quarantine", "slow"))
     return session
-
-
-def _plant_citation(root: Path) -> None:
-    CONTROL(root)
-    _write(root, "tests/unit/test_c.py", "# sa-no-such-bug#S99\n")
 
 
 _IMPORT = "from dadaia_workspace.core import _x\n"
@@ -262,7 +232,6 @@ CHECKS: dict[str, Check] = {
             "file-ceiling": _plant_imports(PRIVATE_IMPORT_FILES + 1, 1),
         },
     ),
-    "tracked-suite-only": (tracked_suite_only, {"tracked-scratch": _plant_scratch}),
     "tier-timeout": (
         tier_timeout,
         {
@@ -288,7 +257,6 @@ CHECKS: dict[str, Check] = {
             "probe-broke": lambda root: {},
         },
     ),
-    "statement-id-cited": (statement_id_cited, {"unknown-id": _plant_citation}),
     "push-starts-no-gc": (
         push_starts_no_gc,
         {

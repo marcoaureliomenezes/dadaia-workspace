@@ -1,7 +1,6 @@
-"""rc-9 AC3.1: the root conftest applies the suite env once per process and its tripwire
-fails a session that writes outside tmp — each judged by a real inner session (pytester),
-never by re-executing the conftest. Bugs outside-tmp-home-pin-coupled-to-session-hooks,
-heartbeat-test-drives-hook-in-process, operator-env-scrub-row-leaves-stale-pinned-home."""
+"""The root conftest applies the suite env once per process and its tripwire fails a session
+that writes outside tmp — each judged by a real inner session (pytester), never by
+re-executing the conftest."""
 
 from __future__ import annotations
 
@@ -11,6 +10,8 @@ from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
+
+from tests.helpers.oslib import write_text
 
 pytestmark = pytest.mark.slow
 
@@ -48,7 +49,7 @@ def test_inner():
 
 @pytest.fixture()
 def inner(request: pytest.FixtureRequest) -> Iterator[Path]:
-    """A gitignored dir under the checkout's ``tests/tmp/`` (the root conftest only judges
+    """An untracked dir under the checkout's ``tests/tmp/`` (the root conftest only judges
     items inside the checkout); removed after the run."""
     where = _CHECKOUT / "tests" / "tmp" / f"inner-{uuid.uuid4().hex[:8]}"
     where.mkdir(parents=True)
@@ -61,7 +62,7 @@ def test_inner_runs_see_the_temp_home_and_fail_on_a_pycache_or_a_created_root_ca
 ) -> None:
     """One test, inner runs in order: each one's watched write would fail any inner session
     running beside it (the tripwires watch the ``tests/`` tree and the checkout).
-    The last two pin T-010-25 / AC-R8-02 against the inner session's own rootdir (the
+    The last two pin the inner session's own rootdir (the
     pytester dir): a root cache dir the session creates fails it; one present before is
     ignored."""
     foreign = tmp_path / "foreign"
@@ -69,12 +70,12 @@ def test_inner_runs_see_the_temp_home_and_fail_on_a_pycache_or_a_created_root_ca
     monkeypatch.setenv("DADAIA_CONTEXT", "ghost")
     monkeypatch.setenv("HOME", str(foreign))
     monkeypatch.setenv("OUTER_FOREIGN_HOME", str(foreign))
-    (inner / "test_home.py").write_text(_SEES_THE_TEMP_HOME, encoding="utf-8")
-    (inner / "test_pycache.py").write_text(_WRITES_A_PYCACHE, encoding="utf-8")
+    write_text(inner / "test_home.py", _SEES_THE_TEMP_HOME)
+    write_text(inner / "test_pycache.py", _WRITES_A_PYCACHE)
 
     home = pytester.runpytest_subprocess(str(inner / "test_home.py"), "-p", "no:randomly")
     pycache = pytester.runpytest_subprocess(str(inner / "test_pycache.py"), "-p", "no:randomly")
-    (inner / "test_ruff.py").write_text(_CREATES_A_RUFF_CACHE, encoding="utf-8")
+    write_text(inner / "test_ruff.py", _CREATES_A_RUFF_CACHE)
     ruff = (str(inner / "test_ruff.py"), "-p", "no:randomly", f"--rootdir={pytester.path}")
     created = pytester.runpytest_subprocess(*ruff)
     preexisting = pytester.runpytest_subprocess(*ruff)

@@ -7,7 +7,9 @@ import tomllib
 from pathlib import Path
 
 from dadaia_workspace.cli.help_digest import command_paths, render_digest
+from dadaia_workspace.core.fixed_sections import authored_text
 from dadaia_workspace.features.specs.citations import dead_citations
+from tests.helpers.oslib import read_text
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _MEMORY_DIR = _REPO_ROOT / "specs" / "memory"
@@ -49,7 +51,7 @@ _DOCS_URL = "https://github.com/marcoaureliomenezes/dadaia-workspace/tree/main/d
 def test_the_agent_index_lists_every_page_of_the_site() -> None:
     """`llms.txt` is the agent's map of the human site: a page it does not name is a page
     no agent finds, so the list is the `docs/` glob and nothing narrower."""
-    index = (_REPO_ROOT / "llms.txt").read_text("utf-8")
+    index = read_text(_REPO_ROOT / "llms.txt")
     missing = sorted(
         p.relative_to(_REPO_ROOT).as_posix()
         for p in _DOCS_DIR.glob("*.md")
@@ -60,9 +62,9 @@ def test_the_agent_index_lists_every_page_of_the_site() -> None:
 
 
 def test_the_readme_sends_a_reader_to_the_docs_folder() -> None:
-    """docs-url-dead-and-readme-links-break-on-pypi. No Pages site
-    exists: the Documentation URL and the README both name the repository's docs folder."""
-    readme = (_REPO_ROOT / "README.md").read_text("utf-8")
+    """The Documentation URL and the README both name the repository's docs folder; no Pages
+    site exists."""
+    readme = read_text(_REPO_ROOT / "README.md")
 
     assert _DOCS_URL in readme
     assert _pyproject_poetry()["urls"]["Documentation"] == _DOCS_URL  # type: ignore[index]
@@ -70,9 +72,9 @@ def test_the_readme_sends_a_reader_to_the_docs_folder() -> None:
 
 
 def test_every_readme_link_is_absolute() -> None:
-    """docs-url-dead-and-readme-links-break-on-pypi. PyPI renders the
-    README outside the checkout, where a relative link or image target is a dead end."""
-    readme = (_REPO_ROOT / "README.md").read_text("utf-8")
+    """PyPI renders the README outside the checkout, where a relative link or image target is a dead
+    end."""
+    readme = read_text(_REPO_ROOT / "README.md")
     targets = re.findall(r"\]\(([^)\s]+)", readme) + re.findall(r'(?:src|href)="([^"]+)"', readme)
     relative = [t for t in targets if not re.match(r"(?:https?:|mailto:|#)", t)]
     assert relative == []
@@ -81,7 +83,7 @@ def test_every_readme_link_is_absolute() -> None:
 def test_the_cli_reference_is_the_committed_output_of_the_generator() -> None:
     """`docs/cli.md` carries no atom marker — it IS `render_digest()`'s output, header
     line included; regenerate with `dadaia help tree > docs/cli.md`."""
-    committed = (_DOCS_DIR / "cli.md").read_text("utf-8")
+    committed = read_text(_DOCS_DIR / "cli.md")
 
     assert committed == render_digest(), (
         "docs/cli.md drifted from the live command tree — "
@@ -99,7 +101,7 @@ def test_no_derived_document_cites_a_dead_verb_or_path() -> None:
         for doc in [*_derived_docs(), _DOCS_DIR / "cli.md"]
         if doc.is_file()
         for v in dead_citations(
-            doc.read_text("utf-8"),
+            read_text(doc),
             command_paths=paths,
             repo_root=_REPO_ROOT,
             rel=doc.relative_to(_REPO_ROOT).as_posix(),
@@ -111,7 +113,7 @@ def test_no_derived_document_cites_a_dead_verb_or_path() -> None:
 
 def _readme_tagline() -> str:
     """The README's first non-badge paragraph — PyPI's summary line, in prose."""
-    for block in (_REPO_ROOT / "README.md").read_text("utf-8").split("\n\n"):
+    for block in read_text(_REPO_ROOT / "README.md").split("\n\n"):
         line = block.strip()
         if not line or line.startswith(("#", "[![", "<!--")):
             continue
@@ -120,7 +122,7 @@ def _readme_tagline() -> str:
 
 
 def _llms_tagline() -> str:
-    for line in (_REPO_ROOT / "llms.txt").read_text("utf-8").splitlines():
+    for line in read_text(_REPO_ROOT / "llms.txt").splitlines():
         if line.startswith("> "):
             return " ".join(line[2:].split())
     raise AssertionError("llms.txt carries no `> ` tagline line")
@@ -133,7 +135,7 @@ def _pyproject_poetry() -> dict[str, object]:
 
 def test_one_tagline_across_the_readme_pyproject_and_the_agent_index() -> None:
     """The three discovery surfaces say one thing: PyPI's `description`, the README's
-    first paragraph and `llms.txt`'s `> ` line are the same sentence (SPEC 0.4.7 FR4)."""
+    first paragraph and `llms.txt`'s `> ` line are the same sentence."""
     readme = _readme_tagline()
 
     assert _pyproject_poetry()["description"] == readme
@@ -161,27 +163,58 @@ def _onboarding_texts() -> list[Path]:
     return [*_derived_docs(), *sorted(_MEMORY_DIR.rglob("*.md")), *skills]
 
 
-def test_no_onboarding_text_claims_offline_operation() -> None:
-    """bug `onboarding-docs-contradict-the-cli`, AC2.4. `init`
-    resolves its dependencies from PyPI, so no surface may call it offline."""
-    violations = [
-        f"{path.relative_to(_REPO_ROOT).as_posix()}:{number}: claims offline operation"
-        for path in _onboarding_texts()
-        for number, line in enumerate(path.read_text("utf-8").splitlines(), start=1)
+def _onboarding_corpus() -> dict[str, str]:
+    return {
+        path.relative_to(_REPO_ROOT).as_posix(): read_text(path) for path in _onboarding_texts()
+    }
+
+
+def _lines(text: str) -> list[tuple[int, str]]:
+    """The numbered lines an operator wrote; a generated section is the doctor's to judge."""
+    return list(enumerate(authored_text(text).splitlines(), start=1))
+
+
+def _offline_sites(texts: dict[str, str]) -> list[str]:
+    return [
+        f"{rel}:{number}: claims offline operation"
+        for rel, text in texts.items()
+        for number, line in _lines(text)
         if re.search(r"\boffline\b", line, re.IGNORECASE)
     ]
-    assert violations == [], "\n".join(violations)
 
 
-def test_no_onboarding_text_cites_a_retired_create_flag() -> None:
-    """AC3.8, bug `onboarding-docs-contradict-the-cli`. `context
-    create` takes `--main-repo <url>` and repeatable `--associated-repo <url>`; a cited
-    `--url` or `--associated-repos` exits 2."""
-    violations = [
-        f"{path.relative_to(_REPO_ROOT).as_posix()}:{number}: `{match.group(0).strip()}`"
-        for path in _onboarding_texts()
-        for number, line in enumerate(path.read_text("utf-8").splitlines(), start=1)
+def _retired_flag_sites(texts: dict[str, str]) -> list[str]:
+    return [
+        f"{rel}:{number}: `{match.group(0).strip()}`"
+        for rel, text in texts.items()
+        for number, line in _lines(text)
         for match in _CONTEXT_CREATE_RE.finditer(line)
         if re.search(r"--url\b|--associated-repos\b", match.group(0))
     ]
-    assert violations == [], "\n".join(violations)
+
+
+def test_no_onboarding_text_claims_offline_operation() -> None:
+    """`init` resolves its dependencies from PyPI, so no surface may call it offline."""
+    assert _offline_sites(_onboarding_corpus()) == []
+
+
+def test_no_onboarding_text_cites_a_retired_create_flag() -> None:
+    """`context create` takes `--main-repo <url>` and repeatable `--associated-repo <url>`; a cited
+    `--url` or `--associated-repos` exits 2."""
+    assert _retired_flag_sites(_onboarding_corpus()) == []
+
+
+def test_the_onboarding_scans_judge_operator_text_only() -> None:
+    """A line the doctor renders into a fixed section is the ledger's, not the operator's: the
+    same words as operator prose are named at their true line."""
+    offline = "- 0901 — init is never offline: it resolves from PyPI\n"
+    flag = "- 0902 — `dadaia context create --url` retires for --main-repo\n"
+    inside = f"<!-- dadaia:fixed adr-list -->\n{offline}{flag}<!-- /dadaia:fixed adr-list -->\n"
+    assert _offline_sites({"a.md": f"# A\n{inside}"}) == []
+    assert _retired_flag_sites({"a.md": f"# A\n{inside}"}) == []
+    assert _offline_sites({"a.md": f"# A\n{inside}{offline}"}) == [
+        "a.md:6: claims offline operation"
+    ]
+    assert _retired_flag_sites({"a.md": f"# A\n{inside}{flag}"}) == [
+        "a.md:6: `dadaia context create --url`"
+    ]

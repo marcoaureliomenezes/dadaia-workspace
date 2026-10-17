@@ -11,6 +11,7 @@ from typing import Any
 import typer
 
 from dadaia_workspace.cli.main import app
+from tests.helpers.oslib import read_text
 from tests.helpers.scan_population import assert_populated
 
 _CLI_COMMANDS = Path(__file__).resolve().parents[2] / "dadaia_workspace" / "cli" / "commands"
@@ -72,7 +73,7 @@ def _callee(call: ast.Call) -> str | None:
 
 def _reaches_seam(module: Path, func_name: str, param: str) -> bool:
     """*param* of *func_name* flows by name into a seam call, directly or via module-local helpers."""
-    tree = ast.parse(module.read_text(encoding="utf-8"))
+    tree = ast.parse(read_text(module))
     defs = {n.name: n for n in tree.body if isinstance(n, ast.FunctionDef)}
     seen: set[tuple[str, str]] = set()
 

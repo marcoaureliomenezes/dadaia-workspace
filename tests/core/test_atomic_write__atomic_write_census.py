@@ -1,6 +1,7 @@
 """The census of every atomic write in the package is DERIVED by scan, never a hand-kept list:
 a function that writes content to a local name (``.write_text``/``.write_bytes``) and then
-swaps that same name into place (``os.replace``/``Path.replace``). Plain renames of an
+swaps that same name into place (``os.replace``/``Path.replace``, or the OS boundary's
+``write_text``/``replace``). Plain renames of an
 existing file (log rotation, DB quarantine) never write first, so they never match.
 """
 
@@ -9,16 +10,16 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
+from tests.helpers.oslib import read_text
 from tests.helpers.scan_population import assert_populated
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _PACKAGE_ROOT = _REPO_ROOT / "dadaia_workspace"
 
-#: The two homes, proven by scan: the package's writer, and the stdlib ledger scripts'
-#: one writer, staged beside each script (a skill script cannot import the package).
+#: The homes, proven by scan: the bug skill's one writer (``core/atomic_write.py`` is a shim
+#: over it).
 _EXPECTED_DEFINITIONS = [
-    "dadaia_workspace/core/atomic_write.py:atomic_write",
-    "dadaia_workspace/public/skills/dd-bug-resolution/scripts/_ledger.py:replace",
+    "dadaia_workspace/public/skills/dd-bug-resolution/scripts/_atomic.py:atomic_write",
 ]
 
 
@@ -35,11 +36,30 @@ def _writes_then_replaces(func: ast.FunctionDef | ast.AsyncFunctionDef) -> bool:
             and isinstance(node.func.value, ast.Name)
         ):
             written_names.add(node.func.value.id)
+        # the boundary's writer: write_text(path, text)
+        if (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "write_text"
+            and node.args
+            and isinstance(node.args[0], ast.Name)
+        ):
+            written_names.add(node.args[0].id)
 
     if not written_names:
         return False
 
     for node in ast.walk(func):
+        # the boundary's swap: replace(src, dst)
+        if (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "replace"
+            and node.args
+            and isinstance(node.args[0], ast.Name)
+            and node.args[0].id in written_names
+        ):
+            return True
         if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)):
             continue
         if node.func.attr != "replace":
@@ -70,7 +90,7 @@ def _temp_then_replace_writer_defs(package_root: Path) -> list[str]:
         if "__pycache__" in path.parts:
             continue
         try:
-            tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+            tree = ast.parse(read_text(path), filename=str(path))
         except SyntaxError:
             continue
         for node in ast.walk(tree):
@@ -83,14 +103,13 @@ def _temp_then_replace_writer_defs(package_root: Path) -> list[str]:
 
 
 def test_only_core_atomic_write_defines_the_temp_then_replace_idiom() -> None:
-    """A2.2: the census is DERIVED by scan. The next accidental reintroduction of a raw
-    tmp-write-then-swap idiom anywhere under ``dadaia_workspace/`` — named anything —
-    fails this test loudly instead of silently escaping a hand-kept list.
-    sa-ledger-vocabulary-and-atomic-write-duplicated-in-scripts#48.6: the ledger scripts
-    carry no `_replace` copy of their own; one staged source is the scripts' writer."""
+    """The census is DERIVED by scan. The next accidental reintroduction of a raw
+    tmp-write-then-swap idiom anywhere under ``dadaia_workspace/`` — named anything — fails this
+    test loudly instead of silently escaping a hand-kept list. The ledger scripts carry no
+    `_replace` copy of their own; one staged source is the scripts' writer."""
     hits = _temp_then_replace_writer_defs(_PACKAGE_ROOT)
 
     assert hits == _EXPECTED_DEFINITIONS, (
-        "a temp-then-replace content writer exists outside core/atomic_write.py — "
+        "a temp-then-replace content writer exists outside _atomic.py — "
         f"route it through core.atomic_write.atomic_write instead (A2.2): {hits}"
     )

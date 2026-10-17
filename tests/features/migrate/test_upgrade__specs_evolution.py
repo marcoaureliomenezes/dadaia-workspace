@@ -1,4 +1,4 @@
-"""Unit tests for the specs stamp writer and ``upgrade`` orchestration (FR-S02, FR-S05)."""
+"""Unit tests for the specs stamp writer and ``upgrade`` orchestration."""
 
 from __future__ import annotations
 
@@ -10,12 +10,13 @@ from dadaia_workspace.core import specs_version as _version
 from dadaia_workspace.core.gitflow import merge_frontmatter
 from dadaia_workspace.features.migrate import upgrade as _upgrade
 from dadaia_workspace.features.spec_context import sweep
+from tests.helpers.oslib import read_text, write_text
 
 
 def _write_constitution(specs_dir: Path, body: str) -> Path:
     specs_dir.mkdir(parents=True, exist_ok=True)
     path = specs_dir / "constitution.md"
-    path.write_text(body, encoding="utf-8")
+    write_text(path, body)
     return path
 
 
@@ -24,23 +25,23 @@ def test_write_version_creates_and_updates_stamp(tmp_path: Path) -> None:
     specs = tmp_path / "specs"
     _write_constitution(specs, "# Constitution\n\nbody\n")
     merge_frontmatter(specs, specs_pattern_version=1)
-    assert "specs_pattern_version: 1\n" in (specs / "constitution.md").read_text(encoding="utf-8")
-    assert "# Constitution" in (specs / "constitution.md").read_text(encoding="utf-8")
+    assert "specs_pattern_version: 1\n" in read_text(specs / "constitution.md")
+    assert "# Constitution" in read_text(specs / "constitution.md")
 
     # Updates an existing stamp, preserving sibling frontmatter keys.
     specs2 = tmp_path / "specs2"
     _write_constitution(specs2, "---\nspecs_pattern_version: 0\nother: keep\n---\n# C\n")
     merge_frontmatter(specs2, specs_pattern_version=1)
-    text = (specs2 / "constitution.md").read_text(encoding="utf-8")
+    text = read_text(specs2 / "constitution.md")
     assert "specs_pattern_version: 1\n" in text
     assert "other: keep" in text
 
 
-# ───────────────────────────── upgrade (FR-S05) ────────────────────────────────
+# ───────────────────────────── upgrade ────────────────────────────────
 
 
 def test_upgrade_refuses_below_floor_without_any_write(tmp_path: Path) -> None:
-    """A-10.1: refusing a below-floor tree never touches the filesystem — no
+    """Refusing a below-floor tree never touches the filesystem — no
     backup, no re-stamp, no migrated content."""
     specs = tmp_path / "specs"
     _write_constitution(specs, "# C\n")  # version 0, below the canonical floor

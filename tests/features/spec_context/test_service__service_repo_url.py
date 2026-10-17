@@ -1,22 +1,20 @@
-"""Unit tests for the repo_url lifecycle (T-011-08 / FR-W2-03, ADR-7).
+"""Unit tests for the repo_url lifecycle.
 
 Covers:
 - ``create`` persists an explicit repo_url and refuses an empty one with no checkout.
 - ``alive``/``dead`` back-fill repo_url from ``git remote get-url origin`` when the record
   URL is empty and the repo is on disk — exercised against a REAL ``GitSubprocessClient``
-  with a local ``file://`` fixture remote as origin (per AC-W2-03).
+  with a local ``file://`` fixture remote as origin.
 
-CRITICAL last-chance capture: alive()/dead() back-filling repo_url — dead() specifically
+Last-chance capture: alive()/dead() back-filling repo_url — dead() specifically
 BEFORE rmtree — are the data-loss guards this file exists to keep.
 """
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
-
-pytest.importorskip("fcntl")
-
-from pathlib import Path  # noqa: E402
 
 from dadaia_workspace.container import scan_publish_candidates
 from dadaia_workspace.core.exceptions import RepoUrlMissingError  # noqa: E402
@@ -65,7 +63,7 @@ def fake_service(store: JsonContextStore, workspace_root: Path) -> SpecContextSe
 def test_create_persists_a_url_and_admits_an_empty_one_only_over_a_checkout(
     fake_service: SpecContextService, store: JsonContextStore, workspace_root: Path
 ) -> None:
-    """Bug context-create-admits-uncloneable-empty-url: a repo with no URL and no
+    """A repo with no URL and no
     ``repos/<slug>`` checkout is refused before any write — ``alive`` could only run
     ``git clone ''``; over an existing checkout the empty URL stays (alive back-fills)."""
     ctx = register_dead(fake_service, "foo", "foo", "https://example.test/foo.git")
@@ -87,7 +85,7 @@ def test_create_persists_a_url_and_admits_an_empty_one_only_over_a_checkout(
 def test_alive_and_dead_backfill_an_empty_repo_url_from_origin(
     fake_service: SpecContextService, store: JsonContextStore, workspace_root: Path, verb: str
 ) -> None:
-    """CRITICAL last-chance capture (ADR-7, AC-W2-03): an empty record URL is back-filled from the
+    """Last-chance capture: an empty record URL is back-filled from the
     on-disk ``origin`` — dead() BEFORE its hold removes the checkout — over a real ``file://`` remote."""
     remote = seeded_remote(workspace_root.parent, "foo")
     repo = clone(remote, workspace_root / "repos" / "foo")
@@ -101,5 +99,5 @@ def test_alive_and_dead_backfill_an_empty_repo_url_from_origin(
     ctx = getattr(fake_service, verb)("foo")
 
     assert ctx.state == (ContextState.ALIVE if verb == "alive" else ContextState.DEAD)
-    assert ctx.repo_url == store.get("foo").repo_url == str(remote)  # type: ignore[union-attr]
+    assert ctx.repo_url == store.get("foo").repo_url == remote.as_uri()  # type: ignore[union-attr]
     assert repo.exists() is (verb == "alive")

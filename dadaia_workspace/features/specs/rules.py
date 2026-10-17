@@ -1,10 +1,7 @@
-"""The doctor rule registry — ONE ordered table (F012, 20260830 audit).
+"""The doctor rule registry: one ordered table.
 
-Check order, fix dispatch and the ``--fix`` CLI help all derive from :data:`RULES`.
-Before this table, ``SpecsDoctor.check()`` was a hand-wired 40-line call list,
-``fix()`` a hand-kept if/elif over seven code literals, and the CLI help text a third
-hand-written copy that was wrong at HEAD (it claimed TREE-3 fixable — it is not — and
-omitted six codes that are). One registry; the three projections cannot drift again.
+Check order, fix dispatch and the ``--fix`` CLI help all derive from :data:`RULES`, so the
+three projections cannot drift apart.
 """
 
 from __future__ import annotations
@@ -41,7 +38,7 @@ RULES: tuple[SpecsRule, ...] = (
     _rule(
         ("SPEC-DOC-001",),
         lambda d: d._coherence.check_constitution(),
-        fix_help="Operator action: restore <specs>/constitution.md, then commit.",
+        fix_help="Agent action: restore <specs>/constitution.md, then commit.",
     ),
     _rule(
         ("SPEC-DOC-002",),
@@ -50,8 +47,6 @@ RULES: tuple[SpecsRule, ...] = (
     _rule(
         ("MEM-PLACEHOLDER-1",),
         lambda d: d._memory.check_placeholder_atoms(),
-        fix=lambda d, i: d._memory.fix_placeholder_atom(i),
-        fix_help=("doctor", "--fix"),
     ),
     _rule(
         ("SPEC-DOC-004",),
@@ -90,7 +85,7 @@ RULES: tuple[SpecsRule, ...] = (
     _rule(
         ("ADR-SUPERSEDED-CITATION",),
         lambda d: doctor_adr.superseded_adr_citations(d.specs_dir, d.public_dir),
-        fix_help="Operator action: cite the successor recorded in <specs>/ADRs/decisions.jsonl instead, then commit.",
+        fix_help="Agent action: cite the successor recorded in <specs>/ADRs/decisions.jsonl instead, then commit.",
     ),
     _rule(
         ("MEM-DRIFT-2",),
@@ -113,7 +108,7 @@ RULES: tuple[SpecsRule, ...] = (
     _rule(
         ("SPEC-DOC-026",),
         lambda d: d._release.check_unique_release_ids(),
-        fix_help="Operator action: rename one of the duplicated dirs under <specs>/releases, then commit.",
+        fix_help="Agent action: rename one of the duplicated dirs under <specs>/releases, then commit.",
     ),
     _rule(
         ("SPEC-DOC-046",),
@@ -142,8 +137,8 @@ FIX_BY_CODE: dict[str, SpecsRule] = {
 def render_fix_help() -> str:
     """The ``--fix`` CLI help, derived from the registry (never hand-kept again).
 
-    The CODES only: ``fix_help`` is the ONE executable remediation command (0.4.7 FR2),
-    not a description, and every auto-fixable rule's command is this very flag."""
+    The CODES only: ``fix_help`` is the one executable remediation command, not a
+    description; every auto-fixable rule's command is this very flag."""
     parts = ", ".join("/".join(r.codes) for r in RULES if r.fix is not None)
     return (
         f"Apply auto-fixes for fixable issues ({parts}). "

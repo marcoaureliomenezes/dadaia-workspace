@@ -1,89 +1,40 @@
-#!/usr/bin/env bash
-# Mandatory pre-push gate — dadaia-workspace (de-slopped to the publication boundary:
-# v0.5.0 FR9/D9).
-#
-# Branch model: this file states it nowhere — the project gitflow lives in the
-# `gitflow:` block of specs/constitution.md (`dd-gitflow-default`).
-#
-# What THIS script does — the publication boundary, and NOTHING else: it forwards the
-# pre-push ref lines git feeds on STDIN to `ci push-gate-check`, whose decision
-# (`push_gate_decision`'s docstring) is the one list of refusals; this script itself only
-# refuses an unresolvable runner (below).
-#
-# Installed to .git/hooks/pre-push by `dadaia ci install-hook`.
-#
-# Runner resolution (v0.1.10, T-010-26, bug pre-push-gate-cannot-locate-workspace-venv):
-#   1. walk UP from repo root to the workspace root, probe
-#      "<dir>/.dadaia/.venv/bin/dadaia"  (canonical self-hosting layout: the repo
-#      lives at <ws>/repos/<slug> and the venv at <ws>/.dadaia/.venv)
-#   2. repo-local ".venv/bin/dadaia"
-#   None found → fail CLOSED with a clear error (never silently skip the gate).
-#
-# --probe-only: print the resolved runner and exit 0 without running the push gate
-#               (cheap smoke for CLOSURE evidence).
-set -euo pipefail
+#!/bin/sh
+# Mandatory pre-push gate shim: git's pre-push ref lines (STDIN) go to `dadaia ci push-gate-check`,
+# whose decision is the one list of refusals (the branch model is the `gitflow:` block of
+# specs/constitution.md); this file only refuses an unresolvable runner, closed, never a silent skip.
+# The runner is the first venv `dadaia` found walking up from the repo root, then the repo's own .venv.
+# Installed to .git/hooks/pre-push by `dadaia ci install-hook`. --probe-only prints the resolved
+# runner and exits 0.
 
-PROBE_ONLY=0
-if [ "${1:-}" = "--probe-only" ]; then
-    PROBE_ONLY=1
-fi
+ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || ROOT=$(pwd)
 
-ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
-cd "$ROOT"
-
-# git feeds the pre-push ref lines on STDIN exactly once. Capture them now so
-# `ci push-gate-check` can be fed the same lines.
-PUSH_REFS=""
-if [ "$PROBE_ONLY" -eq 0 ] && [ ! -t 0 ]; then
-    PUSH_REFS="$(cat)"
-fi
-
-# Resolve the dadaia runner. Echoes a human-readable label to stderr and sets
-# RUNNER_BIN to a parallel array that, when expanded with a verb, runs `<...> ci <verb>`.
-RUNNER_BIN=()
-RUNNER_LABEL=""
-
-resolve_runner() {
-    # 1. Walk up from repo root looking for the workspace-level venv.
-    local dir="$ROOT"
-    while :; do
-        local candidate
-        for candidate in "$dir/.dadaia/.venv/bin/dadaia" "$dir/.dadaia/.venv/Scripts/dadaia.exe"; do
-            if [ -x "$candidate" ]; then
-                RUNNER_BIN=("$candidate")
-                RUNNER_LABEL="workspace-venv $candidate"
-                return 0
-            fi
-        done
-        local parent
-        parent="$(dirname "$dir")"
-        if [ "$parent" = "$dir" ]; then
-            break
-        fi
-        dir="$parent"
+probe() {
+    for RUNNER in "$1/bin/dadaia" "$1/Scripts/dadaia.exe"; do
+        [ -x "$RUNNER" ] && return 0
     done
-
-    # 2. Repo-local venv.
-    if [ -x ".venv/bin/dadaia" ]; then
-        RUNNER_BIN=(.venv/bin/dadaia)
-        RUNNER_LABEL="repo-venv .venv/bin/dadaia"
-        return 0
-    fi
-
     return 1
 }
 
-if ! resolve_runner; then
+resolve() {
+    dir=$ROOT
+    while :; do
+        probe "$dir/.dadaia/.venv" && LABEL=workspace-venv && return 0
+        parent=$(dirname "$dir")
+        [ "$parent" = "$dir" ] && break
+        dir=$parent
+    done
+    probe "$ROOT/.venv" && LABEL=repo-venv
+}
+
+if ! resolve; then
     echo "[pre-push] ERROR: could not locate the dadaia runner to run the push gate." >&2
-    echo "[pre-push]   tried: .dadaia/.venv/bin/dadaia walking up from $ROOT, .venv/bin/dadaia" >&2
-    echo "[pre-push]   fix: Operator action: install the workspace venv (re-run \`uvx dadaia-workspace init\` at the workspace root)." >&2
+    echo "[pre-push]   tried: the workspace venv walking up from $ROOT, then $ROOT/.venv" >&2
+    echo "[pre-push]   fix: Agent action: install the workspace venv (re-run \`uvx dadaia-workspace init\` at the workspace root)." >&2
     exit 1
 fi
-
-if [ "$PROBE_ONLY" -eq 1 ]; then
-    echo "[pre-push] runner resolved: $RUNNER_LABEL"
+if [ "${1:-}" = "--probe-only" ]; then
+    echo "[pre-push] runner resolved: $LABEL $RUNNER"
     exit 0
 fi
-
 echo "[pre-push] push gate (gitflow: specs/constitution.md)…"
-printf '%s' "$PUSH_REFS" | "${RUNNER_BIN[@]}" ci push-gate-check
+exec "$RUNNER" ci push-gate-check

@@ -1,6 +1,6 @@
 """Root conftest.py — workspace-level pytest fixtures.
 
-TR-3 (T-GOS-A4): repo-root write-backstop guard.
+Repo-root write-backstop guard.
 
 This fixture captures the set of entries present in specific protected directories
 at the lib repo root BEFORE each test and asserts that no NEW entries have appeared
@@ -9,8 +9,7 @@ in those directories AFTER the test completes.
 The guard is intentionally scope=``function`` and autouse=True so it fires around
 every test in the suite.  Every test also STARTS in an empty temporary directory
 (``_hermetic_cwd``): the checkout usually sits inside a live operator instance, and a
-cwd walk from it would resolve and scan that instance (bug
-``doctor-tests-walk-the-real-workspace-tmp-zone``).
+cwd walk from it would resolve and scan that instance.
 
 Protected paths (relative to the repo root, checked recursively):
   .claude/
@@ -47,22 +46,21 @@ from unittest import mock
 
 import pytest
 
-pytest_plugins = ("pytester",)
+pytest_plugins = ("pytester", "tests.fixtures.cli_sentence")
 
 # Repo-cleanliness law: the test run must never materialize bytecode caches inside
 # the working tree. Import-time compilation happens BEFORE any in-script
 # ``sys.dont_write_bytecode`` guard can run (e.g. tests importing the
 # ``public/scripts/*.py`` sources), so the suite-wide switch is the only reliable
-# enforcement point (AC-W5-01).
+# enforcement point.
 sys.dont_write_bytecode = True
 
 from dadaia_workspace.infrastructure.subprocess_runner import ProcessResult  # noqa: E402
 from tests.fixtures.harness_env import suite_env  # noqa: E402
+from tests.helpers import oslib  # noqa: E402
 
 # Every subprocess a test spawns (`python -m dadaia_workspace...`: CLI verbs, hooks) must
-# import THIS checkout, whatever the venv's install mode or the worktree it runs in — bugs
-# hook-subprocess-tests-import-the-installed-package-not-the-checkout and
-# worktree-subprocess-cli-tests-import-the-shared-venvs-editable-install-not-the-worktree.
+# import THIS checkout, whatever the venv's install mode or the worktree it runs in.
 # One rule, in the suite env (pytest_configure); never a per-helper copy.
 _CHECKOUT_ROOT = Path(__file__).resolve().parent.parent
 # A child CPython normalizes its own `sys.executable`; a `../` launch keeps the dots here, so
@@ -70,8 +68,9 @@ _CHECKOUT_ROOT = Path(__file__).resolve().parent.parent
 sys.executable = os.path.normpath(sys.executable)
 
 # No process the suite runs or spawns may resolve the operator instance this checkout sits
-# in, nor the one owning the running venv (bug test-subprocesses-resolve-the-live-instance):
-# the fence is in the suite env every child inherits, and the one resolver honours it. The instance's registry and repos/ are fingerprinted around the session.
+# in, nor the one owning the running venv: the fence is in the suite env every child
+# inherits, and the one resolver honours it. The instance's registry and repos/ are
+# fingerprinted around the session.
 _INSTANCE_SENTINEL = Path(".dadaia") / "states" / "spec_contexts.json"
 _FENCED_ROOTS: tuple[Path, ...] = tuple(
     p
@@ -108,8 +107,10 @@ GIT_QUIET_INCLUDE = f'[include]\n\tpath = "{_GIT_QUIET.as_posix()}"\n'
 # Every git process sees one GLOBAL config carrying a committer identity, never the
 # developer's (CI runners have none): global scope, so a repo's own `user.*` and a
 # test's own GIT_CONFIG_GLOBAL still win — a test about a missing identity sets its own.
+# `core.autocrlf=false` keeps a host's (Windows runner's) system autocrlf off the LF test repos.
 _GIT_GLOBAL = _publish(
-    "dadaia-tests", f"{GIT_QUIET_INCLUDE}[user]\n\tname = T\n\temail = t@example.invalid\n"
+    "dadaia-tests",
+    f"{GIT_QUIET_INCLUDE}[user]\n\tname = T\n\temail = t@example.invalid\n[core]\n\tautocrlf = false\n",
 )
 #: What the suite env adds to the parent's: the checkout first on every child's import path,
 #: the fence, and the quiet git config.
@@ -214,12 +215,22 @@ _PROCESS_MODULES = frozenset(
         "dadaia_workspace.infrastructure.subprocess_runner",
     }
 )
+#: The OS helper's process starters: a module that holds one of them (by any name) is medium.
+_PROCESS_CALLABLES = (
+    oslib.run,
+    oslib.run_bytes,
+    oslib.run_line,
+    oslib.run_cmdline,
+    oslib.popen,
+    oslib.popen_bytes,
+    oslib.stub_cli,
+)
 _SEAM_MODULES = _PROCESS_MODULES | {
     "tests.fixtures.real_git",
     "dadaia_workspace.infrastructure.git_subprocess",
 }
 
-# Bug ``windows-xdist-workers-crash-on-unit-fast-tier``: the table above is calibrated on
+# The table above is calibrated on
 # the Linux runners. Windows CI runs the tree-copying install/doctor tests 2-3x slower
 # (measured: <5s Linux vs 9.7-16s Windows for one unit test) and pytest-timeout's only
 # Windows method (``thread``) ends the xdist worker with ``os._exit`` — reported as an
@@ -227,8 +238,7 @@ _SEAM_MODULES = _PROCESS_MODULES | {
 # never a per-test marker.
 _TIER_TIMEOUT_PLATFORM_FACTOR: dict[str, int] = {"win32": 3}
 # Coverage tracing (pytest --cov) roughly halves execution speed on the same runner
-# (bug tier-ceiling-trips-under-coverage-instrumentation-on-windows-contract-coverage-job:
-# a 30s-ceiling unit test measured 32.3s under --cov on Windows).
+# (a 30s-ceiling unit test measured 32.3s under --cov on Windows).
 _TIER_TIMEOUT_COVERAGE_FACTOR = 2
 
 
@@ -246,7 +256,7 @@ def tier_timeout_seconds(
 
 
 def _validate_quarantine_markers(items: list[pytest.Item]) -> None:
-    """S-20/S-21: a quarantined test without a registered bug id refuses collection.
+    """A quarantined test without a registered bug id refuses collection.
 
     Quarantine is a lane out of the gating selectors — usable ONLY with a live bug
     (`@pytest.mark.quarantine(bug="<bug-slug>")`). An unregistered quarantine would be
@@ -264,17 +274,20 @@ def _validate_quarantine_markers(items: list[pytest.Item]) -> None:
                 "`dadaia bugs append` first."
             )
             # Under xdist the UsageError kills the worker and surfaces as an opaque
-            # INTERNALERROR on the controller (T-070-09 finding 2) — print the
+            # INTERNALERROR on the controller: print the
             # actionable line to stderr FIRST so it reaches the operator either way.
             print(f"\n[quarantine-discipline] {message}", file=sys.stderr, flush=True)
             raise pytest.UsageError(message)
 
 
 def _reaches(item: pytest.Item, seams: frozenset[str]) -> bool:
-    """True when a name in the test module is, or comes from, one of *seams*."""
+    """True when a name in the test module is, or comes from, one of *seams*, or is one of the
+    OS helper's process starters (under any name)."""
     values = vars(item.module).values() if hasattr(item, "module") else ()
     return any(
-        getattr(v, attr, None) in seams for v in values for attr in ("__module__", "__name__")
+        v in _PROCESS_CALLABLES or getattr(v, attr, None) in seams
+        for v in values
+        for attr in ("__module__", "__name__")
     )
 
 
@@ -364,7 +377,7 @@ def _no_real_venv_in_tests() -> Iterator[None]:
     the venv python, so we replace the builder with a no-op that just materialises the
     directory and returns its path (matching FakePythonEnvironmentManager's behaviour).
 
-    Bug test-suite-real-venv-and-ci-longpole — two escapes closed, both guarded by
+    Two escapes are closed, both guarded by
     tests/unit/test_no_real_venv_backstop.py and the import round-trip assertion:
 
     1. SCOPE: this fixture is session-scoped (was function-scoped). pytest instantiates

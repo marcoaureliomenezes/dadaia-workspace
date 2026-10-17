@@ -1,11 +1,10 @@
-"""``SpecContextProject.associated_repos`` and the one repo-resolution accessor (FR15).
+"""``SpecContextProject.associated_repos`` and the one repo-resolution accessor.
 
-The main repo (``repo_slug``/``repo_url``) stays the sole specs/bind target (G13, I4,
-FR19); ``associated_repos`` is an *additive*, ordered collection next to it. A15.3
-requires exactly one accessor for "the context's repos" — this module proves
-``SpecContextProject.all_repos()`` is that accessor: main first, then every associated
-repo in registration order, and that a context with zero associated repos yields exactly
-the main repo (the behavioural half of A15.2, at the model layer).
+The main repo (``repo_slug``/``repo_url``) stays the sole specs/bind target;
+``associated_repos`` is an *additive*, ordered collection next to it. The one accessor for
+"the context's repos" is ``SpecContextProject.all_repos()``: main first, then every
+associated repo in registration order, and a context with zero associated repos yields
+exactly the main repo.
 """
 
 from __future__ import annotations
@@ -45,7 +44,7 @@ def test_associated_repos_defaults_empty_and_is_ordered() -> None:
 
 
 def test_all_repos_zero_associated_yields_only_main() -> None:
-    """A15.2 (model half): zero associated repos == behaviourally just the main repo."""
+    """Zero associated repos == behaviourally just the main repo."""
     ctx = _ctx()
     assert ctx.all_repos() == (AssociatedRepo(slug="alpha", url="https://github.com/org/alpha"),)
 

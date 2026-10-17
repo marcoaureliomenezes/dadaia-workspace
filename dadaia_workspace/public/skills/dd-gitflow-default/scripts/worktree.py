@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Canonical worktrees `worktrees/<repo>/<name>` on branch `wt/<name>`, stdlib
 only: `new` opens one, `merge` lands it after its checks, `clean` drops an empty one,
-`hash` prints a verdict's binding, `list` reads ours from git.
+`hash` prints a verdict's binding, `sync` rebases a tree and those below it, `list` reads ours from git.
 """
 
 from __future__ import annotations
@@ -12,26 +12,33 @@ import sys
 from pathlib import Path
 
 sys.dont_write_bytecode = True
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+#: One bootstrap statement: this folder and the kernel, at the front.
+sys.path[:0] = [
+    str(Path(__file__).resolve().parent),
+    str(Path(__file__).resolve().parents[2] / "dd-bug-resolution" / "scripts"),
+]
 
-from _worktree_end import clean, digest, merge  # noqa: E402
-from _worktree_git import find_root, rows  # noqa: E402
-from _worktree_names import Refusal  # noqa: E402
-from _worktree_new import new  # noqa: E402
+from _git import GitError
+from _platform import inline, use_utf8_stdio
+from _refusal import report, spell_fix
+from _worktree_end import clean, digest, merge
+from _worktree_git import rows, workspace_of
+from _worktree_names import LAUNCH, Refusal
+from _worktree_new import new
+from _worktree_sync import sync
 
 __all__ = ["main"]
 
 
 def main(argv: list[str] | None = None) -> int:
+    use_utf8_stdio()
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     verbs = parser.add_subparsers(dest="verb", required=True)
-    make = verbs.add_parser(
-        "new", help="open a plain change, job, task, define or backlog worktree"
-    )
+    make = verbs.add_parser("new", help="open an rc, main, task, backlog or hotfix worktree")
     make.add_argument("repo")
     make.add_argument(
         "name",
-        help="<name>, <M.m.p>-rc<N>/<job>[--<task-id>], <M.m.p>-rc<N>/define, backlog/<slug>, hotfix/<bug-id>",
+        help="<M.m.p>/rc-<N>/wt-rc, <M.m.p>/rc-<N>/job-<n>/wt-main or wt-task-<kkk>, <M.m.p>/wt-backlog-<slug>, <M.m.p>/wt-hotfix-<bug-id>",
     )
 
     def end_args(end: argparse.ArgumentParser) -> None:
@@ -41,19 +48,28 @@ def main(argv: list[str] | None = None) -> int:
         )
         end.add_argument("--drop", action="store_true", help="discard the other ignored files")
 
-    end_args(verbs.add_parser("merge", help="land a worktree on its branch after its gate"))
+    end_args(verbs.add_parser("merge", help="land a worktree on its parent after its gate"))
     end_args(verbs.add_parser("clean", help="remove a merged or commit-less worktree"))
+    verbs.add_parser(
+        "sync", help="rebase a tree and the trees below it, parents first"
+    ).add_argument("path")
     seal = verbs.add_parser("hash", help="the diff_sha256 binding a verdict carries for a sha")
     seal.add_argument("path")
     seal.add_argument("--sha", required=True)
-    verbs.add_parser("list", help="our dadaia:-locked worktrees").add_argument(
+    verbs.add_parser("list", help="our worktrees and the leftovers git does not list").add_argument(
         "--json", action="store_true"
     )
     args = parser.parse_args(argv)
     try:
-        root = find_root()
+        if (root := workspace_of(Path.cwd(), Path(__file__))) is None:  # projected inside one
+            raise Refusal(
+                "no workspace root above the cwd or this script", "uvx dadaia-workspace init"
+            )
         if args.verb == "new":
             print(f"[ok] {new(root, args.repo, args.name)}")
+            return 0
+        if args.verb == "sync":
+            print(f"[ok] {sync(root, args.path)}")
             return 0
         if args.verb == "hash":
             print(digest(root, args.path, args.sha))
@@ -64,12 +80,19 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         found = rows(root)
     except Refusal as refusal:
-        print(f"[error] {refusal}", f"fix: {refusal.fix}", sep="\n", file=sys.stderr)
+        report(refusal, refusal.fix)
+        return 1
+    except GitError as failure:  # no check named it: an agent act, then the same call
+        again = inline(*LAUNCH, *(sys.argv[1:] if argv is None else argv))
+        report(failure, f"Agent action: clear the git failure above, then rerun {again}")
         return 1
     if args.json:
         print(json.dumps(found, indent=2))
     for row in [] if args.json else found:
-        print(f"{row['state']}  {row['path']}" + (f"  fix: {row['fix']}" if row["fix"] else ""))
+        print(
+            f"{row['state']}  {row['path']}"
+            + (f"  {spell_fix(str(row['fix']))}" if row["fix"] else "")
+        )
     return 0
 
 

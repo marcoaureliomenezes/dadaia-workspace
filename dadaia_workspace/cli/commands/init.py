@@ -11,13 +11,14 @@ from dadaia_workspace import container
 from dadaia_workspace.cli._fail import fail
 from dadaia_workspace.cli.commands.context import create_fix, print_next_step
 from dadaia_workspace.core import harness_registry
-from dadaia_workspace.core.cli_line import cli_path, fix_line
+from dadaia_workspace.core.cli_line import fix_line, shell_line
 from dadaia_workspace.core.exceptions import (
     ContextAlreadyExistsError,
     DadaiaError,
     WorkspaceVenvBootstrapError,
-    WorkspaceVenvNewerError,
 )
+from dadaia_workspace.core.model_registry import TEMPLATES
+from dadaia_workspace.core.platform import workspace_cli_path
 from dadaia_workspace.features.spec_context.service import slug_from_url
 
 console = Console()
@@ -27,7 +28,7 @@ _LAW_NOTE = "Sessions launch at the workspace root."
 
 #: How ``init`` is invoked before any workspace (and so any ``.dadaia/.venv``) exists —
 #: every ``fix:`` line init prints starts here, so each one runs as printed.
-_INIT = "uvx dadaia-workspace init"
+_INIT = ("uvx", "dadaia-workspace", "init")
 reconcile_workspace = container.reconcile_workspace
 
 
@@ -40,17 +41,19 @@ class InitPlan:
     repo: str = ""
     associated: tuple[str, ...] = ()
 
-    def command(self, directory: object = None) -> str:
+    def command(self, directory: object = None, runner: tuple[str, ...] = _INIT) -> str:
         """The ``init`` invocation that runs this plan — every flag it carries, so a
         ``fix:`` line built from it never drops a level (*directory* overrides DIR)."""
-        repos = [f"--repo {self.repo}"] if self.repo else []
-        repos += [f"--associated-repo {url}" for url in self.associated]
-        target = self.directory if directory is None else directory
-        return " ".join(filter(None, [_INIT, str(target), "--harness", self.harness, *repos]))
+        target = str(self.directory if directory is None else directory)
+        flags = [("--repo", self.repo)] if self.repo else []
+        flags += [("--associated-repo", url) for url in self.associated]
+        return shell_line(
+            *runner, *filter(None, [target]), "--harness", self.harness, *sum(flags, ())
+        )
 
 
 def _interactive() -> bool:
-    """Prompts are asked only when a human can answer them (D1)."""
+    """Prompts are asked only when a human can answer them."""
     return sys.stdin.isatty()
 
 
@@ -61,7 +64,7 @@ def _root(directory: str) -> Path:
 
 
 def _profile_harness(directory: str) -> str:
-    """An existing workspace answers ``--harness`` from its own profile (AC2.1)."""
+    """An existing workspace answers ``--harness`` from its own profile."""
     root = _root(directory)
     if not (root / ".dadaia").is_dir():
         return ""
@@ -79,16 +82,14 @@ def _plan(directory: str, harness: str, repo: str, associated: tuple[str, ...]) 
         return InitPlan(directory, harness, repo, associated)
     first = harness_registry.L1_ENTRY_HARNESSES[0]
     if not _interactive():
-        fix = InitPlan(directory or "", harness or first, repo, associated).command()
+        plan = InitPlan(directory or "", harness or first, repo, associated)
         fail(
             "init needs DIR and --harness when no terminal can answer prompts; "
-            f"harnesses: {', '.join(harness_registry.L1_ENTRY_HARNESSES)}.\nfix: "
-            + (
-                fix
-                if directory
-                else f"Operator action: run `{fix}` with the new workspace's "
-                "directory as its first argument"
-            )
+            f"harnesses: {', '.join(harness_registry.L1_ENTRY_HARNESSES)}.",
+            plan.command()
+            if directory
+            else f"Agent action: run `{plan.command()}` with the new workspace's "
+            "directory as its first argument",
         )
     directory = directory or str(Path.cwd() / typer.prompt("Workspace name"))
     harness = harness or typer.prompt(
@@ -123,6 +124,11 @@ def init(
         "--associated-repo",
         help="Clone URL of an associated repo of the --repo project (repeatable).",
     ),
+    template: str | None = typer.Option(
+        None,
+        "--template",
+        help=f"Agent model template to save and project: {', '.join(TEMPLATES)}.",
+    ),
     skip_assets: bool = typer.Option(
         False, "--skip-assets", help="Skip installing public agent assets"
     ),
@@ -141,21 +147,21 @@ def init(
         root.parent / ((root.name or "dadaia") + "-workspace")
     )
     if root.exists() and not root.is_dir():
-        fail(f"'{root}' is not a directory.\nfix: {sibling_fix}")
+        fail(f"'{root}' is not a directory.", sibling_fix)
     # A directory that already holds `.dadaia/` is THIS workspace (a re-run, idempotent);
     # anything else non-empty is a foreign tree and is never scaffolded over.
     if root.is_dir() and any(root.iterdir()) and not (root / ".dadaia").is_dir():
-        fail(f"'{root}' already holds a foreign tree (not a dadaia workspace).\nfix: {sibling_fix}")
+        fail(f"'{root}' already holds a foreign tree (not a dadaia workspace).", sibling_fix)
     root.mkdir(parents=True, exist_ok=True)
 
     svc = container.build_workspace_service(root)
     try:
         before, after, action = svc.venv_change(root)
-        installed = svc.init(root, skip_assets=skip_assets, harnesses=(chosen,))
-    except WorkspaceVenvNewerError as exc:
-        fail(f"{exc}\nfix: {fix_line(root, 'init', str(root), '--harness', chosen)}")
+        installed = svc.init(root, skip_assets=skip_assets, harnesses=(chosen,), template=template)
     except WorkspaceVenvBootstrapError as exc:
-        fail(exc)
+        cli = workspace_cli_path(root)  # the venv's own init only where the venv exists
+        runner = (str(cli), "init") if cli.is_file() else _INIT
+        fail(exc, replace(plan, harness=chosen).command(root, runner))
 
     console.print(f"[green]✓[/green] Workspace {root} ({chosen})", highlight=False, soft_wrap=True)
     if skip_assets:
@@ -166,28 +172,31 @@ def init(
             console.print(item, markup=False)
     else:
         console.print(f"[green]✓[/green] {len(installed)} asset(s) installed", highlight=False)
-    console.print(f"CLI: {cli_path(root)}", markup=False, highlight=False, soft_wrap=True)
+    console.print(f"CLI: {workspace_cli_path(root)}", markup=False, highlight=False, soft_wrap=True)
     console.print(_LAW_NOTE, markup=False, soft_wrap=True)
 
-    if action == "upgrade":
-        _reconcile_upgrade(root, before, after)
+    if action in ("upgrade", "repair"):
+        _reconcile_upgrade(root, action, before, after)
     elif before is not None:
         console.print(f"already at {before}", markup=False, highlight=False)
 
     print_next_step(root, _create_context(root, plan) if plan.repo else None)
 
 
-def _reconcile_upgrade(root: Path, before: str | None, after: str | None) -> None:
-    """D3: re-init IS the upgrade — the freshly installed venv is reconciled."""
+def _reconcile_upgrade(root: Path, action: str, before: str | None, after: str | None) -> None:
+    """Re-init is the upgrade: the freshly installed venv is reconciled."""
     result = reconcile_workspace(
         root,
         expected_version=after or "",
     )
     if not result.ok:
-        fix = fix_line(root, "reconcile", "--expect-version", after or "")
-        fail(f"reconcile after upgrade failed: {result.error}\nfix: {fix}")
+        fail(
+            f"reconcile after upgrade failed: {result.error}",
+            fix_line(root, "reconcile", "--expect-version", after or ""),
+        )
     container.build_spec_context_service(root).refresh_hooks()
-    console.print(f"upgraded {before} -> {after}", markup=False, highlight=False)
+    line = f"repaired -> {after}" if action == "repair" else f"upgraded {before} -> {after}"
+    console.print(line, markup=False, highlight=False)
 
 
 def _create_context(root: Path, plan: InitPlan) -> str:
@@ -206,6 +215,6 @@ def _create_context(root: Path, plan: InitPlan) -> str:
                 raise
             ctx_svc.alive(slug)
     except (DadaiaError, OSError) as exc:
-        fail(f"{exc}\nfix: {create_fix(root, exc, None, [plan.repo, *plan.associated])}")
+        fail(exc, create_fix(root, exc, None, [plan.repo, *plan.associated]))
     console.print(f"[green]✓[/green] {slug} ALIVE", highlight=False, soft_wrap=True)
     return slug

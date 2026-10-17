@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""The audit ledger's ONE writer and validator — `specs/audits/<dir>/FINDINGS.jsonl`
-and its append-only archive, stdlib only.
+"""Change a committed finding or close the audit (`disposition`, `close`), and validate the audit.
 
-``audit.py <verb> --specs <path>``. A finding is APPENDED by an agent's file tools
-(immutable core, like an ADR); this script owns the two acts that CHANGE one: the
-governance triple, and the all-or-nothing close that archives the audit and deletes its
-directory. Every write builds the new bytes, runs `check` over them, and only then
+`check` validates `specs/audits/<dir>/FINDINGS.jsonl` and its append-only archive, stdlib only.
+
+``audit.py <verb> --specs <path>``. A finding is APPENDED by hand (immutable core, like an
+ADR); this script owns the two acts that CHANGE one: the governance triple, and the
+all-or-nothing close that archives the audit and deletes its directory. Every write builds the new bytes, runs `check` over them, and only then
 replaces the file — so this script's writer and its validator cannot disagree.
 """
 
@@ -19,14 +19,18 @@ from pathlib import Path
 # A projected skill folder is not a package dir to litter: the sibling modules below
 # import without leaving a `__pycache__` beside them.
 sys.dont_write_bytecode = True
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-#: Source-tree fallback: before `public stage` copies `_ledger.py` in beside this file.
-sys.path.append(str(Path(__file__).resolve().parents[2] / "dd-bug-resolution" / "scripts"))
+#: One bootstrap line: this folder and the kernel, at the front (source tree before stage).
+sys.path[:0] = [
+    str(Path(__file__).resolve().parent),
+    str(Path(__file__).resolve().parents[2] / "dd-bug-resolution" / "scripts"),
+]
 
-import _audit_verbs as vb  # noqa: E402
-from _audit_check import DISPOSITIONS, check  # noqa: E402
-from _audit_store import Refusal  # noqa: E402
-from _specs import find_specs, refuse  # noqa: E402
+import _audit_verbs as vb
+import _findings
+from _audit_check import DISPOSITIONS, check
+from _platform import use_utf8_stdio
+from _refusal import Refusal
+from _specs import find_specs, refuse
 
 _HELP = {
     "disposition": "rewrite one finding's disposition, release and reason, in place",
@@ -57,6 +61,7 @@ def _parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
+    use_utf8_stdio()
     args = _parser().parse_args(argv)
     specs = find_specs(args.specs)
     if args.verb == "check":
@@ -64,9 +69,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.json:
             print(json.dumps(findings, indent=2))
         else:
-            for finding in findings:
-                print(f"{finding['code']} error {finding['path']}:{finding['line']} "
-                      f"{finding['message']}")  # fmt: skip
+            _findings.print_text(findings)
         return 1 if findings else 0
     try:
         if args.verb == "disposition":

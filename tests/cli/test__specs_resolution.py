@@ -1,9 +1,9 @@
-"""Caller-owned ``resolve_context_for_cli`` resolution and its context-NAME allowlist (v0.1.80 FR3).
+"""Caller-owned ``resolve_context_for_cli`` resolution and its context-NAME allowlist.
 
 the seam never borrows a foreign first-ALIVE context; a traversal-shaped
 ``explicit`` (deliberate input) raises naming the value, a traversal-shaped ``DADAIA_CONTEXT``
-(ambient) is treated as unset; sa-bind-has-two-stores#S1, #S2, #S3; T-50-02 rung 3 (the repo
-containing cwd) resolves any registered ``repos/<slug>``.
+(ambient) is treated as unset; the repo
+containing cwd resolves any registered ``repos/<slug>``.
 """
 
 from __future__ import annotations
@@ -14,12 +14,14 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.cli._specs_resolution import resolve_context_for_cli
+from tests.helpers.oslib import write_text
 
 
 def _mk_workspace(root: Path, contexts: list[str]) -> None:
     states = root / ".dadaia" / "states"
     states.mkdir(parents=True)
-    (states / "spec_contexts.json").write_text(
+    write_text(
+        states / "spec_contexts.json",
         json.dumps(
             {
                 "schema_version": "2",
@@ -37,7 +39,6 @@ def _mk_workspace(root: Path, contexts: list[str]) -> None:
                 ],
             }
         ),
-        encoding="utf-8",
     )
 
 

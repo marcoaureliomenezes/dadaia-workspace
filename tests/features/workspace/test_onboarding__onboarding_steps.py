@@ -1,4 +1,4 @@
-"""AC1.7 (T-050-17): the census of the onboarding step list — ids,
+"""The census of the onboarding step list — ids,
 kinds and order — replaces the old regex census of fix text."""
 
 from __future__ import annotations

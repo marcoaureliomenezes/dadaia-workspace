@@ -1,5 +1,4 @@
-"""shallow-clone-history-finding-fix-line-never-clears#history: a
-history read that a shallow clone cannot answer names the missing history, and its fix
+"""A history read that a shallow clone cannot answer names the missing history, and its fix
 line, run verbatim, clears the refusal.
 
 size: MEDIUM — real git clones over file:// and the real release script's `drift` verb.
@@ -8,7 +7,6 @@ size: MEDIUM — real git clones over file:// and the real release script's `dri
 from __future__ import annotations
 
 import json
-import shlex
 import subprocess
 import sys
 from pathlib import Path
@@ -16,6 +14,9 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.core import cli_line
+from dadaia_workspace.infrastructure.ledger_scripts import worktree_rows
+from tests.helpers.oslib import run as os_run
+from tests.helpers.oslib import run_line, write_text
 from tests.helpers.release_state import PLAN
 from tests.public.skills.dd_release_implementation.scripts.test_release import (
     script,  # noqa: F401  (the staged-skill fixture)
@@ -25,12 +26,12 @@ pytestmark = pytest.mark.slow(reason="real git clones")
 
 
 def _git(cwd: Path, *argv: str) -> str:
-    done = subprocess.run(["git", *argv], cwd=cwd, capture_output=True, text=True, check=True)
+    done = os_run(["git", *argv], cwd=cwd, check=True)
     return done.stdout.strip()
 
 
 def _commit(repo: Path, name: str) -> str:
-    (repo / name).write_text(name, "utf-8")
+    write_text(repo / name, name)
     _git(repo, "add", "-A")
     _git(repo, "commit", "-qm", name)
     return _git(repo, "rev-parse", "HEAD")
@@ -40,9 +41,7 @@ def _origin(tmp: Path) -> Path:
     """A CLOSURE release whose memory entry spans c1..c2, HEAD one commit later."""
     origin = tmp / "origin"
     (origin / "specs" / "memory" / "product").mkdir(parents=True)
-    (origin / "specs" / "memory" / "product" / "catalog.json").write_text(
-        '{"features": []}\n', "utf-8"
-    )
+    write_text(origin / "specs" / "memory" / "product" / "catalog.json", '{"features": []}\n')
     _git(tmp, "init", "-q", "origin")
     _git(origin, "config", "user.email", "t@example.invalid")
     _git(origin, "config", "user.name", "t")
@@ -50,10 +49,10 @@ def _origin(tmp: Path) -> Path:
     release = origin / "specs" / "releases" / "9.9.9"
     (release / "rc-1").mkdir(parents=True)
     for name in ("SPEC.md", "PLAN.md", "TASKS.md"):
-        (release / "rc-1" / name).write_text(
+        write_text(
+            release / "rc-1" / name,
             f"# x\n\n{PLAN if name == 'PLAN.md' else '**Origin:** operator-demand'}"
             + ("\n\n## Bug window review\n" if name == "SPEC.md" else ""),
-            "utf-8",
         )
     ts = "2026-01-01T00:00:00Z"
     state = {
@@ -63,14 +62,14 @@ def _origin(tmp: Path) -> Path:
         "log": [{"ts": ts, "agent": "release.py memory", "kind": "memory", "text": "m",
                  "since": c1, "until": c2, "reviewed": [], "changed": []}],
     }  # fmt: skip
-    (release / "_RELEASE.json").write_text(json.dumps(state, indent=2) + "\n", "utf-8")
+    write_text(release / "_RELEASE.json", json.dumps(state, indent=2) + "\n")
     _commit(origin, "c.txt")
     return origin
 
 
 def _drift(release: Path, specs: Path) -> subprocess.CompletedProcess[str]:
     argv = [sys.executable, str(release), "drift", "--specs", str(specs)]
-    return subprocess.run(argv, capture_output=True, text=True, check=False)
+    return os_run(argv, check=False)
 
 
 def test_a_shallow_clone_finding_names_the_history_and_its_fix_clears_it(
@@ -89,7 +88,58 @@ def test_a_shallow_clone_finding_names_the_history_and_its_fix_clears_it(
         for line in refused.stderr.splitlines()
         if line.startswith("fix: ")
     ]
-    assert shlex.split(fix) == shlex.split(cli_line.git_line(clone, "fetch", "--unshallow"))
-    subprocess.run(shlex.split(fix), check=True, capture_output=True)
+    assert fix == cli_line.git_line(clone, "fetch", "--unshallow")
+    run_line(fix, check=True)
     cleared = _drift(script, clone / "specs")
     assert (cleared.returncode, cleared.stderr) == (0, "")
+
+
+class _Answer:
+    def __init__(self, rows: list[dict[str, object]]) -> None:
+        self.returncode, self.stdout, self.stderr = 0, json.dumps(rows), ""
+
+
+def test_worktree_rows_keeps_the_contexts_repos_and_the_rows_no_context_owns(
+    tmp_path: Path,
+) -> None:
+    """The one filter: this context's repos plus `registered: false`, no other repo's."""
+    rows: list[dict[str, object]] = [
+        {"repo": "mine", "path": "/w/a", "registered": True},
+        {"repo": "theirs", "path": "/w/b", "registered": True},
+        {"repo": "gone", "path": "/w/c", "registered": False},
+    ]
+
+    class _Runner:
+        def run(self, argv: object, **_: object) -> _Answer:
+            return _Answer(rows)
+
+    found, failed, fix = worktree_rows(tmp_path, {"mine"}, runner=_Runner())
+
+    assert ([r["path"] for r in found], failed, fix) == (["/w/a", "/w/c"], "", "")
+
+
+class _Refused:
+    returncode, stdout, stderr = 1, "", "no repo here\n"
+
+
+class _Broken:
+    def run(self, argv: object, **_: object) -> object:
+        raise OSError("gone")
+
+
+class _Refuses:
+    def run(self, argv: object, **_: object) -> object:
+        return _Refused()
+
+
+@pytest.mark.parametrize(
+    "runner", [_Broken(), _Refuses()], ids=["spawn-fails", "refuses-without-a-fix"]
+)
+def test_a_failed_worktree_read_names_the_public_runner_as_its_fix(
+    tmp_path: Path, runner: object
+) -> None:
+    """The fix is the workspace CLI's `worktree list`, never the skill script's path."""
+    found, failed, fix = worktree_rows(tmp_path, {"mine"}, runner=runner)  # type: ignore[arg-type]
+
+    assert found == [] and failed.startswith("list failed: ")
+    assert fix == cli_line.fix_line(tmp_path, "worktree", "list")

@@ -48,7 +48,6 @@ dadaia-workspace = "dadaia_workspace.cli.main:_safe_app"
 python = "^3.12"
 typer = ">=0.27.1"
 rich = ">=13,<16"
-pyyaml = "^6.0"
 jsonschema = "^4"
 packaging = ">=22"
 
@@ -59,6 +58,8 @@ pytest-cov = ">=5,<8"
 ruff = ">=0.16.2"
 mypy = ">=2.3.0,<3.0"
 types-PyYAML = ">=6"
+# the differential oracle of the frontmatter owner (tests and guard scripts only)
+pyyaml = "^6.0"
 pytest-randomly = "^4.1.0"
 import-linter = ">=2.11"
 # The declared build backend, so the bootstrap e2e can `pip wheel --no-build-isolation`
@@ -83,6 +84,10 @@ target-version = "py312"
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]
 ignore = ["E501", "B008"]
+
+[tool.ruff.lint.per-file-ignores]
+# The skill entry points bootstrap sys.path before their sibling imports (kernel rule 2).
+"dadaia_workspace/public/skills/*/scripts/*.py" = ["E402"]
 
 # Bug ruff-0-16-2-markdown-python-fence-format-drift: ruff 0.16.2 started reformatting
 # fenced Python code blocks embedded in Markdown by default, which reached 5
@@ -124,7 +129,7 @@ markers = [
     "small: no process, no real git: 10 s",
     "medium: reaches a process or real git: 60 s",
     "slow: tests over 1s or tests that start a server/subprocess",
-    "tmp: temporary debugging tests excluded from default runs",
+    "tmp: scaffolding of the open job, collected",
     "flaky: observed pass+fail on identical code; being diagnosed",
     "quarantine: out of gating selectors; requires bug= id",
 ]
@@ -138,7 +143,6 @@ norecursedirs = [
     "dist",
     "venv",
     ".venv",
-    "tests/tmp",
 ]
 # Disk guard: only retain tmp_path trees for FAILED tests (default keeps the last 3
 # full sessions, which — combined with per-test venvs — exhausted the disk). See the

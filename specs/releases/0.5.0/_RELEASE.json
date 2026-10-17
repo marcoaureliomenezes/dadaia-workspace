@@ -3,12 +3,12 @@
   "release": "0.5.0",
   "phase": "CLOSURE",
   "defined": {
-    "sha": "8726693711b27a4ca931aef278f2e6a3c567e72a",
-    "ts": "2026-10-09T15:12:02Z"
+    "sha": "96b9008b8",
+    "ts": "2026-10-15T00:30:26Z"
   },
   "implemented": {
-    "sha": "ed7f76224bc1810e7b7f93d8014dec8307aead10",
-    "ts": "2026-10-09T22:29:24Z"
+    "sha": "cafc4003d7b1c218d4ea41f85b8c39d65732b5fc",
+    "ts": "2026-10-16T05:12:35Z"
   },
   "shipped": null,
   "log": [
@@ -1589,6 +1589,497 @@
       "agent": "dd-product-engineer",
       "kind": "summary",
       "text": "delivered: a law bar of at least 9 with two independent 319/319 scorecards; release-job admission by IMPLEMENTATION phase; twelve carried REBUILD units and one shared child-process environment builder; JsonContextStore as the sole spec_contexts.json writer, including bootstrap seeding, with the semantic writer baseline reduced from 4 to 1; seven import contracts and zero suppressed edges; a repaired critical-path aggregate of -3 reported from the original Job 6 -7 plus the late repair's -21 meaningful source and +25 RED/metadata, awaiting independent reviewer validation; 17-atom full-window memory reconciliation; findings F003, F004, F005, F009, F018, F048, F051, F123 and F135 resolved. The earlier literal 3 to 1 registry-writer proof is withdrawn because blind review exposed the second bootstrap writer; the replacement claim uses semantic ownership. F004 is N/A (0 eligible, 0 recurrences), never 0%; F009 has 0 registered-window bugs and N/A (0/0) fix-induced share; the only allowed hand-kept-list touch is the generated shipped-hashes.json update; F018's three raw grep hits are classified as nonspawn; F048 and F051 were already resolved in the October 5 bug records; F135's seven cache-only feature directories were held by the existing reaper primitive and remeasured at zero residual directories; carried: CP1 and CP3 plus backlog items skill-scripts-one-kernel, one-task-id-subject-grammar and origin-findings-renamed-to-the-spec-head to rc-13; F004's mandatory 14-day remeasurement and G1's final charged time await the exact-head green candidate PR endpoint. Two candidate-CI rework families and the shared fixture restoration remain disclosed outside the bug cohort. The late repair has local source-ownership, focused-test, Ruff, mypy and seven-contract import evidence, but this summary makes no claim that independent review, candidate CI or the PR is complete; backlog exits: none."
+    },
+    {
+      "ts": "2026-10-10T18:19:39Z",
+      "agent": "release.py new",
+      "kind": "note",
+      "text": "Candidate born on 0.5.0 (prior candidate closed at ed7f76224bc1810e7b7f93d8014dec8307aead10)"
+    },
+    {
+      "ts": "2026-10-10T20:42:12Z",
+      "agent": "release.py",
+      "kind": "milestone",
+      "candidate": "rc-13",
+      "milestone": "defined",
+      "sha": "7227f80761df822e4596a3ff78d1beaec1062528",
+      "text": "Candidate defined at 7227f80761df822e4596a3ff78d1beaec1062528; phase IMPLEMENTATION."
+    },
+    {
+      "ts": "2026-10-11T00:58:51Z",
+      "agent": "release.py",
+      "kind": "milestone",
+      "candidate": "rc-13",
+      "milestone": "implemented",
+      "sha": "d68a7c42f",
+      "text": "Candidate implemented at d68a7c42f; phase CLOSURE."
+    },
+    {
+      "ts": "2026-10-11T01:03:17Z",
+      "agent": "release.py memory",
+      "kind": "memory",
+      "text": "Memory reconciled over bef96935ac73a1915d383d5345c2ce59f6639162..18dcdf32f9a8: 7 reviewed, 8 changed.",
+      "since": "bef96935ac73a1915d383d5345c2ce59f6639162",
+      "until": "18dcdf32f9a840f67b23a9e3cdf2da635ebc6710",
+      "reviewed": [
+        "agent-comms",
+        "harness-cursor",
+        "harness-devin",
+        "product-vision",
+        "specs-migration",
+        "workspace-doctor",
+        "bug-ledger"
+      ],
+      "changed": [
+        "agent-orchestration",
+        "agentic-entities",
+        "public-asset-distribution",
+        "harness-claude-code",
+        "harness-codex",
+        "harness-copilot",
+        "workspace-init",
+        "release-lifecycle"
+      ]
+    },
+    {
+      "ts": "2026-10-11T01:06:40Z",
+      "agent": "main-thread",
+      "kind": "summary",
+      "text": "delivered: subagent model tiers — five personas (dd-product-engineer, dd-code-reviewer, dd-sw-engineer-sr, dd-sw-engineer-jr, dd-researcher) replace dd-software-engineer; templates name alias tiers (fable, opus, sonnet, haiku) with TIER_CODEX for Codex ids and balanced as default; public install and init --template as the one selector; overlay overrides removed and refused with a fix line; public doctor prints the model-resolution line; job files carry who; bug agent-model-templates-pin-superseded-sonnet-and-haiku resolved; hotfix release-closure-refuses-the-next-candidates-define-tree resolved under ADR 0241 (amends 0128); ADR 0240 accepted and its measured_by repaired; production code net -148 lines; carried: review LOW/MEDIUM findings to the next bug window (test_privacy_check second walker, researcher projection check, persona-frontmatter if, citations docstring, hotfix test placement) and the operator proposals (Codex researcher sandbox, frozen store error bug, reconcile rollback advice); backlog exits: subagent-model-tiers (delivered)."
+    },
+    {
+      "ts": "2026-10-11T03:03:53Z",
+      "agent": "release.py new",
+      "kind": "note",
+      "text": "Candidate born on 0.5.0 (prior candidate closed at d68a7c42f)"
+    },
+    {
+      "ts": "2026-10-11T13:28:45Z",
+      "agent": "release.py",
+      "kind": "milestone",
+      "candidate": "rc-14",
+      "milestone": "defined",
+      "sha": "49fc4403a",
+      "text": "Candidate defined at 49fc4403a; phase IMPLEMENTATION."
+    },
+    {
+      "ts": "2026-10-13T07:21:36Z",
+      "agent": "release.py",
+      "kind": "milestone",
+      "candidate": "rc-14",
+      "milestone": "implemented",
+      "sha": "b4fd9cd8b",
+      "text": "Candidate implemented at b4fd9cd8b; phase CLOSURE."
+    },
+    {
+      "ts": "2026-10-13T07:32:04Z",
+      "agent": "release.py memory",
+      "kind": "memory",
+      "text": "Memory reconciled over 18dcdf32f9a840f67b23a9e3cdf2da635ebc6710..373ed0322cfc: 13 reviewed, 14 changed.",
+      "since": "18dcdf32f9a840f67b23a9e3cdf2da635ebc6710",
+      "until": "373ed0322cfcaf3066d3a583db703176ed6848fe",
+      "reviewed": [
+        "harness-claude-code",
+        "harness-codex",
+        "harness-copilot",
+        "harness-cursor",
+        "harness-devin",
+        "harness-kimi-code",
+        "consumer-agent-support",
+        "context-portability",
+        "server-registry",
+        "specs-migration",
+        "workspace-init",
+        "audits-canon",
+        "sdd-gate-v3"
+      ],
+      "changed": [
+        "worktrees",
+        "release-lifecycle",
+        "agent-orchestration",
+        "bug-ledger",
+        "public-asset-distribution",
+        "pypi-distribution",
+        "agentic-entities",
+        "context-management",
+        "cross-platform-portability",
+        "spec-context-project",
+        "workspace-doctor",
+        "agent-comms",
+        "backlog-ledger",
+        "product-vision"
+      ]
+    },
+    {
+      "ts": "2026-10-13T07:35:55Z",
+      "agent": "dd-product-engineer",
+      "kind": "summary",
+      "text": "delivered: rc-14 — FR1-FR17 one owner per fact under ADR 0246 (the dd-bug-resolution kernel, no projected copy, schemas in their writer skills, pyyaml dev-only, one frontmatter, slug, clock, platform and git owner), the fifteen Origin bugs resolved (21812ba95), every refusal carrying its fix, dd-grill-me stage references and triggers, the language-neutral shipped law, derived harness coverage, the specs-revert hotfix shape, the bug batch trigger and attempt cap; FR18 review-rework prevention (worktree.py preflight, verdict.py stats, promoted law rules); FR19 contract-first suite under ADR 0248 as amended by 0249 (fix-line contract home, guards beside pytest cases, v32 at ceiling 0 over the package, tests and scripts, tests/tmp/<job> refused at the job merge, scripts/mutate.py optional readout, the operator-order rule for leaving a suite); ADRs 0243-0249 accepted; measured_by of 0246 and 0248 repaired (7739269ff); memory reconciled (14 changed, 13 reviewed). Readouts (PLAN.md Closure readouts; commands named there): functions 1,486, cases 3,925, test/package line ratio 1.978x (49,914/25,229; 1.739x with scripts/ 3,468), a readout only since ADR 0249 voided the 1.2x target, beside the 2026-10-12 baseline 1,393 / 3,276 / 1.86x and the PLAN base 1,434 / 3,603 / 1.875x at 8938e853a; 8-week churn +114713/-135682 (not comparable with the baseline's +3,406/-3,345), +10718/-8741 since 79484b173; mutation scores of the reviewed diffs not collected; verdict.py stats 0.5.0-rc14: 46 sequences, 79 verdicts, 34 rejected, 22/46 first-pass rejected (G7's baseline). Not measured: the four-hook wall times and the first Windows and macOS PR run (AC9.5). Closed unmerged or discarded: Job 23 (J23.T1-T5 superseded by ADR 0249, branch deleted at 5b1ec351c; the test_privacy_check.py REBUILD row closes with it); the restage-test plain tree (tip e847164c3); the gate-cuts plain tree (operator 2026-10-13, 'Descartar (Recommended)', tip 1612d93c4) Derived docs: README.md, docs/quickstart.md and docs/getting-started.md gain the bind record's bind_id through the plain change wt/docs-bind-id before the candidate PR, so nothing is carried for them; carried: architecture-adr-section-generated (active, Wave 4 triage and generated section) and law-one-home-residual parts (b) and (c) with it, as SPEC §4 states (part (b), the ADR-ledger triage of process rules, spent rulings, principles and measured_by, is not done by ADR 0243, which only ratifies P-01, P-09, P-14 and P-15; the entry's histo exit reason reads '(b) ADR 0243 accepted' and stands uncorrected, because backlog.py has no verb to amend an exit and a second exit is refused); the G1 shortfalls D1 git runners, D2 two bare os.replace, D7-D9 ledger-store commit and finding helpers and the cli/commands/specs.py:94 inline fix line (backlog one-owner-residue-after-the-kernel), D4 verdict.py context pattern (open bug verdict-context-pattern-disagrees-with-core); the 5-task-tree cap removal (backlog task-worktree-cap-removed); the reconcile tree's post-CLOSURE writes lacking a dd-gitflow-default §3a row and a specs/AGENTS.md §4 closure exception (backlog reconcile-tree-writes-have-a-commit-shape, grill first); the 5 open non-Origin bugs to the next bug window: verdict-validation-stated-three-ways-without-the-reviewed-tree, preflight-skips-checks-merge-runs, backlog-exit-refuses-on-an-unrelated-spec-origin, verdict-context-pattern-disagrees-with-core, verdict-writer-emits-a-handoff-the-schema-rejects (resolved during the closure: merge-gate-validates-the-verdict-without-the-reviewed-tree at a7400aeed; schema-move-left-memory-sources-stale, fix 6f7aff3d5, and rebind-in-the-stamp-second-is-not-reinjected, fix babc1a587, at 3bf7fa0ad); backlog exits: delivered (13) adr-0122-zero-backlog-destined-to-this-release, dd-ask-me-owned-questioning-skill, public-law-language-neutral, harness-specific-surface-minimized, hotfix-specs-revert-commit-shape, bug-batch-cause-trigger-and-attempt-cap, programmatic-dates-in-skills, impacted-test-selection, law-one-home-residual, skill-scripts-one-kernel, tests-tmp-expire-at-job-merge, review-mutation-on-the-diff, closure-test-suite-readouts; superseded (21) define-backlog-merge-runs-verify, job-gate-runs-the-law-deletion-check, merge-entry-times-survive-rebase, hypothesis-cache-stays-out-of-repo-trees, task-gate-drops-deleted-paths-itself, architecture-principles-measured-by-re-pointed, fix-reader-rebuild-under-c, task-gate-declared-owner-tests, pr-merge-method-pinned, phase-implementation-has-a-place, stage-gate-keeps-only-the-red-check, verdict-author-unbound, judge-config-outside-the-script-dir, gate-reuses-a-green-result-for-the-same-tree, process-proportional-to-change-size, bug-status-deferred-banned, quality-scorecard-ruler, task-lines-carry-seam-and-adr-clause, test-suite-diet, tests-one-contract-one-home, policy-tests-leave-pytest (the last three citing the operator, 2026-10-12: 'eu não autorizo deletar testes. nem mesmo que findings passem reto')."
+    },
+    {
+      "ts": "2026-10-13T15:04:40Z",
+      "agent": "release.py new",
+      "kind": "note",
+      "text": "Candidate born on 0.5.0 (prior candidate closed at b4fd9cd8b)"
+    },
+    {
+      "ts": "2026-10-13T15:04:49Z",
+      "agent": "release.py",
+      "kind": "milestone",
+      "candidate": "rc-15",
+      "milestone": "defined",
+      "sha": "71eb1a091",
+      "text": "Candidate defined at 71eb1a091; phase IMPLEMENTATION."
+    },
+    {
+      "ts": "2026-10-14T07:32:15Z",
+      "agent": "release.py",
+      "kind": "milestone",
+      "candidate": "rc-15",
+      "milestone": "implemented",
+      "sha": "537233467",
+      "text": "Candidate implemented at 537233467; phase CLOSURE."
+    },
+    {
+      "ts": "2026-10-14T13:01:34Z",
+      "agent": "dd-product-engineer",
+      "kind": "summary",
+      "text": "delivered: rc-15 — FR1-FR10 over Jobs 1-12: preflight is merge minus the verdict and the merge gate's fix line carries the reviewed tree (Job 1); reconcile rows in dd-gitflow-default §3a and closure readouts only in the summary (Job 2); bytecode off at the one env owner _git.scrubbed_env (Job 3); one kernel context-name grammar (Job 4); the bugs.py git call and the store refusal template on their owners (Job 5); the closure drift decider in the kernel and doctor in the job gate (Job 6); backlog exit reads only the --release SPEC (Job 7); the verdict writer validates its own file against the reviewed tree (Job 8); the task-tree cap removed under ADR 0250 (Job 9); the DEFINITION done-marker check removed (Job 10); the measured_by resolver, the ledger-rendered adr-list block and FIXED-2 over it under ADR 0251 (Job 11); the ADR label grammar and pairing law removed, canon 12 re-pinned (Job 12). Reconciliation: ADRs 0252-0262 accepted by the operator 2026-10-13 (84 records superseded, 0259 amends 0152), 64 measured_by repairs, the adr-list block rendered (138 accepted records), the 22 ADR label lines and the three pairing-rule statements removed from canonical memory, QUALITY.md cites ADR 0262, memory reconciled (26-atom drift worklist), README.md, docs/quickstart.md and docs/getting-started.md updated. Bugs resolved inside rc-15, 26 (id, RED, fix, caused_by): during implementation scorecard-fix-3-left-the-repo-specs-law-stale (fix 142095c44, none) and mutate-owner-import-writes-checkout-bytecode (fix da4bbb99a, J3.T4); at the Reconciliation backlog-exit-refuses-on-an-unrelated-spec-origin (ab690576f, 2eba6ed5e, J11.T2), check-reads-crash-on-non-utf8-input (712484919, c449b3779, J1.T7), check-verbs-text-output-drops-the-fix-line (09d0d6717, ec7e4cf48, J2.T2), doctor-ledger-lane-absent-specs-dir-fix-never-clears (265f4bfb3, 7bc7f26e5, none; four ledger-lane findings, decider core.specs_version.state), doctor-specs-dir-file-reads-as-a-foreign-tree (0c3b7a923, 9f300b4a1, T-050-22), e2e-bootstrap-fixture-seeds-a-venv-without-python (427d7966c, ae2d5c349, none), init-oserror-from-the-venv-interpreter (3614b020f, d2bd75b30, init-venv-installs-index-version-not-running-distribution), init-reports-same-when-the-venv-probe-fails (4046b6be3, 1e52fb25c, reinit-with-unchanged-version-label-mixes-venv-and-projection), preflight-skips-checks-merge-runs (3420e5976, d2cea6103, J17.T2), specs-dir-symlink-refusal-prints-no-fix-line (bf42f2d50, 537233467, sa-rich-printer-wraps-fix-lines), specs-init-on-a-file-crashes-with-a-traceback (ea975c41f, 9f300b4a1, doctor-specs-dir-file-reads-as-a-foreign-tree), test-doctor-judges-no-instance-cannot-tell-fenced-from-crashed (0d0fbd910, 0d0fbd910 test-only, T-050-190), verdict-context-pattern-disagrees-with-core (710554fee, d072cd85e, J14.T7), verdict-refusals-print-no-fix-line (c165046de, 1899b2863, J10.S3.T1), verdict-validation-stated-three-ways-without-the-reviewed-tree (f1c4e6b2e, fd82f9c2b, merge-gate-validates-the-verdict-without-the-reviewed-tree), verdict-writer-emits-a-handoff-the-schema-rejects (cb6f34e3f, 6f882432c, J10.S3.T1), worktree-list-hides-a-non-empty-stray-directory (b4311d5df, ffa34bb48, J13.T6), worktree-merge-crashes-with-a-traceback-when-the-job-tree-is-gone (b34bea8dd, 7b84a7ff5, T-050-95), worktree-no-work-branch-fix-names-the-tag-derived-version-not-the-live-release (cd92ebf29, b10444ce5, J13.T6), bug-lineage-refuses-a-task-id-of-the-historical-grammar (b0f3d7a38, 35d0c8b98, J2.T2), adr-superseded-citation-judges-the-generated-adr-list-block (1e5d26896, a6cddda33, J11.T5), mem-drift-2-judges-the-generated-adr-list-block (47567ca7f, beb24bde5 after 961a3d591 and the REBUILDs a1654984f and d67cfa3a5 onto core.fixed_sections.authored_text, J11.T5), mem-placeholder-fix-deletes-a-memory-file-that-mentions-a-token (2e97fc363, f4063ae8d, scaffold-repair-cannot-remediate-invalid-placeholder-atom), mem-placeholder-fix-deletes-an-atom-the-operator-filled (d6c49d62f, c974efbe5 after 48f70750a, scaffold-repair-cannot-remediate-invalid-placeholder-atom). The fixes 35d0c8b98, a6cddda33 and the mem-drift-2 and mem-placeholder series through c974efbe5 landed on feature/0.5.0 after the CLOSURE commit, which named feature 537233467 as implemented. Job-file deltas after approval (main-thread rulings): job7.md:10's fix line now ends 'then rerun this exit with --disposition <chosen>.' and the job gained the release-folder membership refusal; job8's W: was extended to the scripts/guards/slop.py row and that extension then removed; job10's W: was extended to CONTEXT-MAP.md:41 and the dead fixture setup; job11's R1 resolves a CI job as path::name, R2 reads rule codes from the package source, and core/fixed_sections.py was edited; job12 T3 refreshed the law mirrors in its code commit and its W: was extended to the memory seeds. Measurements (commands and shas in .dadaia/tmp/dd-sw-engineer-sr/20261014/rc15-measurements.md): G1 bugs.py status 0 open, none of the five Origin bugs open (re-read at 317c8943b: 0 open). G2 git grep of _CROSS_SKILL_EDGES and _EDGE_PATH_LINES over dadaia_workspace, scripts and tests empty, test_public_assets__public_scripts_thin_wrapper.py 111 passed. G3 git diff --shortstat 00edfadff..537233467 -- dadaia_workspace scripts (00edfadff, the define base): 121 files, +1074/-712, net +362; by owner Jobs 1-12 +90 (Job 11 +117 for FR10, the renderer and resolver under ADR 0251; Job 8 +35 for FR8, the verdict writer's validation; the other ten jobs -62), the 19 bug-fix commits +298 (features/specs +143 for the specs-path kind REBUILD and refusals, python_env.py +33, core/platform.py +26), scorecard fixes and reverts -26; the post-closure fixes 537233467..c974efbe5 add 7 files +77/-33. G7 verdict.py stats 0.5.0-rc15, re-read 2026-10-14 at d621bec0f: 27 sequences, 32 verdicts, 5 rejected, 4/27 first-pass rejected (14.8%), against rc-14's 47, 81, 35 and 23/47 (48.9%); both targets met (rejected at most 10, first-pass at most 20%). AC2.3 git grep of PYTHONDONTWRITEBYTECODE, dont_write_bytecode and -B at 537233467: 37 hits, the four env literals PLAN §1.2 lists as leaving are gone, and every other hit is in the §1.2 table except scripts/mutate.py:39 (sys.dont_write_bytecode = True, Job 3's in-process switch replacing the :229 env literal), which PLAN §1.2 does not list; test__git.py:83,84,90 is covered by the owner row. AC4.3 _commit.commit( call sites 3 at 537233467 and 3 at 00edfadff; '\"git\"' argv only in _git.py:36, plus a fix-line string in _platform.py:61 and text in CODEX.md:66. AC9.2 git grep TASK_CAP or 'at most 5' over dadaia_workspace and tests empty (5 hits at 00edfadff). Step 5 ADD justification: net production lines of Jobs 1-12 +90, positive for FR10 (Job 11) and FR8 (Job 8), each past its PLAN estimate (+60 to +90 and about +8); carried: none, no open bug (bugs.py status 0 open; operator, 2026-10-14: an rc never closes with an open bug); backlog exits: delivered (6) one-bytecode-off-owner, release-drift-edge-runs-memory-drift, architecture-adr-section-generated, one-owner-residue-after-the-kernel, reconcile-tree-writes-have-a-commit-shape, task-worktree-cap-removed, each with --release 0.5.0."
+    },
+    {
+      "ts": "2026-10-14T13:01:47Z",
+      "agent": "release.py memory",
+      "kind": "memory",
+      "text": "Memory reconciled over 373ed0322cfcaf3066d3a583db703176ed6848fe..768e1bf62072: 7 reviewed, 19 changed.",
+      "since": "373ed0322cfcaf3066d3a583db703176ed6848fe",
+      "until": "768e1bf620722940f94af00e7907095fbc8d50ff",
+      "reviewed": [
+        "agentic-entities",
+        "harness-copilot",
+        "harness-cursor",
+        "harness-devin",
+        "spec-context-project",
+        "consumer-agent-support",
+        "context-management"
+      ],
+      "changed": [
+        "agent-comms",
+        "agent-orchestration",
+        "pypi-distribution",
+        "harness-claude-code",
+        "harness-codex",
+        "harness-kimi-code",
+        "product-vision",
+        "cross-platform-portability",
+        "server-registry",
+        "specs-migration",
+        "workspace-doctor",
+        "workspace-init",
+        "audits-canon",
+        "backlog-ledger",
+        "bug-ledger",
+        "release-lifecycle",
+        "sdd-gate-v3",
+        "worktrees",
+        "public-asset-distribution"
+      ]
+    },
+    {
+      "ts": "2026-10-14T14:05:01Z",
+      "agent": "dd-product-engineer",
+      "kind": "summary",
+      "text": "delivered: rc-15 — FR1-FR10 over Jobs 1-12: preflight is merge minus the verdict and the merge gate's fix line carries the reviewed tree (Job 1); reconcile rows in dd-gitflow-default §3a and closure readouts only in the summary (Job 2); bytecode off at the one env owner _git.scrubbed_env (Job 3); one kernel context-name grammar (Job 4); the bugs.py git call and the store refusal template on their owners (Job 5); the closure drift decider in the kernel and doctor in the job gate (Job 6); backlog exit reads only the --release SPEC (Job 7); the verdict writer validates its own file against the reviewed tree (Job 8); the task-tree cap removed under ADR 0250 (Job 9); the DEFINITION done-marker check removed (Job 10); the measured_by resolver, the ledger-rendered adr-list block and FIXED-2 over it under ADR 0251 (Job 11); the ADR label grammar and pairing law removed, canon 12 re-pinned (Job 12). Reconciliation: ADRs 0252-0262 accepted by the operator 2026-10-13 (84 records superseded, 0259 amends 0152), 64 measured_by repairs, the adr-list block rendered (138 accepted records), the 22 ADR label lines and the three pairing-rule statements removed from canonical memory, QUALITY.md cites ADR 0262, memory reconciled (26-atom drift worklist), README.md, docs/quickstart.md and docs/getting-started.md updated. Bugs resolved inside rc-15, 27 (id, RED, fix, caused_by): during implementation scorecard-fix-3-left-the-repo-specs-law-stale (fix 142095c44, none) and mutate-owner-import-writes-checkout-bytecode (fix da4bbb99a, J3.T4); at the Reconciliation backlog-exit-refuses-on-an-unrelated-spec-origin (ab690576f, 2eba6ed5e, J11.T2), check-reads-crash-on-non-utf8-input (712484919, c449b3779, J1.T7), check-verbs-text-output-drops-the-fix-line (09d0d6717, ec7e4cf48, J2.T2), doctor-ledger-lane-absent-specs-dir-fix-never-clears (265f4bfb3, 7bc7f26e5, none; four ledger-lane findings, decider core.specs_version.state), doctor-specs-dir-file-reads-as-a-foreign-tree (0c3b7a923, 9f300b4a1, T-050-22), e2e-bootstrap-fixture-seeds-a-venv-without-python (427d7966c, ae2d5c349, none), init-oserror-from-the-venv-interpreter (3614b020f, d2bd75b30, init-venv-installs-index-version-not-running-distribution), init-reports-same-when-the-venv-probe-fails (4046b6be3, 1e52fb25c, reinit-with-unchanged-version-label-mixes-venv-and-projection), preflight-skips-checks-merge-runs (3420e5976, d2cea6103, J17.T2), specs-dir-symlink-refusal-prints-no-fix-line (bf42f2d50, 537233467, sa-rich-printer-wraps-fix-lines), specs-init-on-a-file-crashes-with-a-traceback (ea975c41f, 9f300b4a1, doctor-specs-dir-file-reads-as-a-foreign-tree), test-doctor-judges-no-instance-cannot-tell-fenced-from-crashed (0d0fbd910, 0d0fbd910 test-only, T-050-190), verdict-context-pattern-disagrees-with-core (710554fee, d072cd85e, J14.T7), verdict-refusals-print-no-fix-line (c165046de, 1899b2863, J10.S3.T1), verdict-validation-stated-three-ways-without-the-reviewed-tree (f1c4e6b2e, fd82f9c2b, merge-gate-validates-the-verdict-without-the-reviewed-tree), verdict-writer-emits-a-handoff-the-schema-rejects (cb6f34e3f, 6f882432c, J10.S3.T1), worktree-list-hides-a-non-empty-stray-directory (b4311d5df, ffa34bb48, J13.T6), worktree-merge-crashes-with-a-traceback-when-the-job-tree-is-gone (b34bea8dd, 7b84a7ff5, T-050-95), worktree-no-work-branch-fix-names-the-tag-derived-version-not-the-live-release (cd92ebf29, b10444ce5, J13.T6), bug-lineage-refuses-a-task-id-of-the-historical-grammar (b0f3d7a38, 35d0c8b98, J2.T2), adr-superseded-citation-judges-the-generated-adr-list-block (1e5d26896, a6cddda33, J11.T5), mem-drift-2-judges-the-generated-adr-list-block (47567ca7f, beb24bde5 after 961a3d591 and the REBUILDs a1654984f and d67cfa3a5 onto core.fixed_sections.authored_text, J11.T5), mem-placeholder-fix-deletes-a-memory-file-that-mentions-a-token (2e97fc363, f4063ae8d, scaffold-repair-cannot-remediate-invalid-placeholder-atom), mem-placeholder-fix-deletes-an-atom-the-operator-filled (d6c49d62f, c974efbe5 after 48f70750a, scaffold-repair-cannot-remediate-invalid-placeholder-atom), cli-line-guard-judges-the-generated-adr-list-block (5913791d6, d9995f074, 704cc2d80 and 93b97deaf; 4abd0df01 after 2192e2e46, c54cbf98c and 51119a027; J11.T5; five test and guard scans of the memory corpus read authored_text, test-side only). The fixes 35d0c8b98, a6cddda33, the mem-drift-2 and mem-placeholder series through c974efbe5 and the cli-line-guard series through 4abd0df01 landed on feature/0.5.0 after the CLOSURE commit, which named feature 537233467 as implemented. Job-file deltas after approval (main-thread rulings): job7.md:10's fix line now ends 'then rerun this exit with --disposition <chosen>.' and the job gained the release-folder membership refusal; job8's W: was extended to the scripts/guards/slop.py row and that extension then removed; job10's W: was extended to CONTEXT-MAP.md:41 and the dead fixture setup; job11's R1 resolves a CI job as path::name, R2 reads rule codes from the package source, and core/fixed_sections.py was edited; job12 T3 refreshed the law mirrors in its code commit and its W: was extended to the memory seeds. Measurements (commands and shas in .dadaia/tmp/dd-sw-engineer-sr/20261014/rc15-measurements.md): G1 bugs.py status 0 open, none of the five Origin bugs open (re-read at 317c8943b: 0 open). G2 git grep of _CROSS_SKILL_EDGES and _EDGE_PATH_LINES over dadaia_workspace, scripts and tests empty, test_public_assets__public_scripts_thin_wrapper.py 111 passed. G3 git diff --shortstat 00edfadff..537233467 -- dadaia_workspace scripts (00edfadff, the define base): 121 files, +1074/-712, net +362; by owner Jobs 1-12 +90 (Job 11 +117 for FR10, the renderer and resolver under ADR 0251; Job 8 +35 for FR8, the verdict writer's validation; the other ten jobs -62), the 19 bug-fix commits +298 (features/specs +143 for the specs-path kind REBUILD and refusals, python_env.py +33, core/platform.py +26), scorecard fixes and reverts -26; the post-closure fixes 537233467..c974efbe5 add 7 files +77/-33. G7 verdict.py stats 0.5.0-rc15, re-read 2026-10-14 at d621bec0f: 27 sequences, 32 verdicts, 5 rejected, 4/27 first-pass rejected (14.8%), against rc-14's 47, 81, 35 and 23/47 (48.9%); both targets met (rejected at most 10, first-pass at most 20%). AC2.3 git grep of PYTHONDONTWRITEBYTECODE, dont_write_bytecode and -B at 537233467: 37 hits, the four env literals PLAN §1.2 lists as leaving are gone, and every other hit is in the §1.2 table except scripts/mutate.py:39 (sys.dont_write_bytecode = True, Job 3's in-process switch replacing the :229 env literal), which PLAN §1.2 does not list; test__git.py:83,84,90 is covered by the owner row. AC4.3 _commit.commit( call sites 3 at 537233467 and 3 at 00edfadff; '\"git\"' argv only in _git.py:36, plus a fix-line string in _platform.py:61 and text in CODEX.md:66. AC9.2 git grep TASK_CAP or 'at most 5' over dadaia_workspace and tests empty (5 hits at 00edfadff). Step 5 ADD justification: net production lines of Jobs 1-12 +90, positive for FR10 (Job 11) and FR8 (Job 8), each past its PLAN estimate (+60 to +90 and about +8); carried: none, no open bug (bugs.py status 0 open; operator, 2026-10-14: an rc never closes with an open bug); backlog exits: delivered (6) one-bytecode-off-owner, release-drift-edge-runs-memory-drift, architecture-adr-section-generated, one-owner-residue-after-the-kernel, reconcile-tree-writes-have-a-commit-shape, task-worktree-cap-removed, each with --release 0.5.0."
+    },
+    {
+      "ts": "2026-10-14T19:15:24Z",
+      "agent": "dd-product-engineer",
+      "kind": "summary",
+      "text": "delivered: rc-15 — FR1-FR10 over Jobs 1-12: preflight is merge minus the verdict and the merge gate's fix line carries the reviewed tree (Job 1); reconcile rows in dd-gitflow-default §3a and closure readouts only in the summary (Job 2); bytecode off at the one env owner _git.scrubbed_env (Job 3); one kernel context-name grammar (Job 4); the bugs.py git call and the store refusal template on their owners (Job 5); the closure drift decider in the kernel and doctor in the job gate (Job 6); backlog exit reads only the --release SPEC (Job 7); the verdict writer validates its own file against the reviewed tree (Job 8); the task-tree cap removed under ADR 0250 (Job 9); the DEFINITION done-marker check removed (Job 10); the measured_by resolver, the ledger-rendered adr-list block and FIXED-2 over it under ADR 0251 (Job 11); the ADR label grammar and pairing law removed, canon 12 re-pinned (Job 12). Reconciliation: ADRs 0252-0262 accepted by the operator 2026-10-13 (84 records superseded, 0259 amends 0152), 64 measured_by repairs, the adr-list block rendered (138 accepted records), the 22 ADR label lines and the three pairing-rule statements removed from canonical memory, QUALITY.md cites ADR 0262, memory reconciled (26-atom drift worklist), README.md, docs/quickstart.md and docs/getting-started.md updated. Bugs resolved inside rc-15, 34, read from the resolved BUGS.jsonl records closed since the rc-15 definition (id, RED, fix, caused_by): during implementation scorecard-fix-3-left-the-repo-specs-law-stale (fix 142095c44, none) and mutate-owner-import-writes-checkout-bytecode (fix da4bbb99a, J3.T4); at the Reconciliation backlog-exit-refuses-on-an-unrelated-spec-origin (ab690576f, 2eba6ed5e, J11.T2), check-reads-crash-on-non-utf8-input (712484919, c449b3779, J1.T7), check-verbs-text-output-drops-the-fix-line (09d0d6717, ec7e4cf48, J2.T2), doctor-ledger-lane-absent-specs-dir-fix-never-clears (265f4bfb3, 7bc7f26e5, none; four ledger-lane findings, decider core.specs_version.state), doctor-specs-dir-file-reads-as-a-foreign-tree (0c3b7a923, 9f300b4a1, T-050-22), e2e-bootstrap-fixture-seeds-a-venv-without-python (427d7966c, ae2d5c349, none), init-oserror-from-the-venv-interpreter (3614b020f, d2bd75b30, init-venv-installs-index-version-not-running-distribution), init-reports-same-when-the-venv-probe-fails (4046b6be3, 1e52fb25c, reinit-with-unchanged-version-label-mixes-venv-and-projection), preflight-skips-checks-merge-runs (3420e5976, d2cea6103, J17.T2), specs-dir-symlink-refusal-prints-no-fix-line (bf42f2d50, 537233467, sa-rich-printer-wraps-fix-lines), specs-init-on-a-file-crashes-with-a-traceback (ea975c41f, 9f300b4a1, doctor-specs-dir-file-reads-as-a-foreign-tree), test-doctor-judges-no-instance-cannot-tell-fenced-from-crashed (0d0fbd910, 0d0fbd910 test-only, T-050-190), verdict-context-pattern-disagrees-with-core (710554fee, d072cd85e, J14.T7), verdict-refusals-print-no-fix-line (c165046de, 1899b2863, J10.S3.T1), verdict-validation-stated-three-ways-without-the-reviewed-tree (f1c4e6b2e, fd82f9c2b, merge-gate-validates-the-verdict-without-the-reviewed-tree), verdict-writer-emits-a-handoff-the-schema-rejects (cb6f34e3f, 6f882432c, J10.S3.T1), worktree-list-hides-a-non-empty-stray-directory (b4311d5df, ffa34bb48, J13.T6), worktree-merge-crashes-with-a-traceback-when-the-job-tree-is-gone (b34bea8dd, 7b84a7ff5, T-050-95), worktree-no-work-branch-fix-names-the-tag-derived-version-not-the-live-release (cd92ebf29, b10444ce5, J13.T6), bug-lineage-refuses-a-task-id-of-the-historical-grammar (b0f3d7a38, 35d0c8b98, J2.T2), adr-superseded-citation-judges-the-generated-adr-list-block (1e5d26896, a6cddda33, J11.T5), mem-drift-2-judges-the-generated-adr-list-block (47567ca7f, beb24bde5 after 961a3d591 and the REBUILDs a1654984f and d67cfa3a5 onto core.fixed_sections.authored_text, J11.T5), mem-placeholder-fix-deletes-a-memory-file-that-mentions-a-token (2e97fc363, f4063ae8d, scaffold-repair-cannot-remediate-invalid-placeholder-atom), mem-placeholder-fix-deletes-an-atom-the-operator-filled (d6c49d62f, c974efbe5 after 48f70750a, scaffold-repair-cannot-remediate-invalid-placeholder-atom), cli-line-guard-judges-the-generated-adr-list-block (5913791d6, d9995f074, 704cc2d80 and 93b97deaf; 4abd0df01 after 2192e2e46, c54cbf98c and 51119a027; J11.T5; five test and guard scans of the memory corpus read authored_text, test-side only), memory-entry-until-breaks-when-the-reconcile-tree-rebases (6015da031, 04510a316 after 6068de5e2, c201a9bce and the REBUILD 5b64988f5; memory-window-bound-shallow-clone-named-as-rebase; the window opens at the newest memory until or defined.sha HEAD reaches, else the root commit), release-check-names-the-memory-pass-an-operator-action (e6a0d9e7e, 52d086a0d after 5c964ae7b, check-verbs-text-output-drops-the-fix-line), restore-and-reinstall-fix-lines-name-an-operator-action (d05b1a6b4, 52d086a0d after 5c964ae7b, check-reads-crash-on-non-utf8-input), agent-acts-are-labelled-operator-action (f4edc4cc8, 6ea866584 after dd5dd7df2, 9c14dfcfb, 2d9914ee2, 52d086a0d, b40b88da8, 3f0200358, the REBUILD 764651946 and a23e1d65c; none; three fix forms under ADR 0263, which amends 0158), states-file-write-block-prints-public-install-as-its-fix (3a10072c5, 10bff2858, T-050-117), guard-fix-lines-keep-placeholders (f2140a625, 52739ac3c, J7.S5.T1), ship-archive-never-reaches-the-next-work-branch (cfe37ae02, REBUILD fb127322a, none; the work branch is renamed at each promote, one work_versions rule). The fixes 35d0c8b98, a6cddda33, the mem-drift-2 and mem-placeholder series through c974efbe5 the cli-line-guard series through 4abd0df01, the memory-window series through 04510a316, the fix-form series (5c964ae7b through 6ea866584, 10bff2858, 52739ac3c) and the work-branch REBUILD fb127322a landed on feature/0.5.0 after the CLOSURE commit, which named feature 537233467 as implemented. Job-file deltas after approval (main-thread rulings): job7.md:10's fix line now ends 'then rerun this exit with --disposition <chosen>.' and the job gained the release-folder membership refusal; job8's W: was extended to the scripts/guards/slop.py row and that extension then removed; job10's W: was extended to CONTEXT-MAP.md:41 and the dead fixture setup; job11's R1 resolves a CI job as path::name, R2 reads rule codes from the package source, and core/fixed_sections.py was edited; job12 T3 refreshed the law mirrors in its code commit and its W: was extended to the memory seeds. Measurements (commands and shas in .dadaia/tmp/dd-sw-engineer-sr/20261014/rc15-measurements.md): G1 bugs.py status 0 open, none of the five Origin bugs open (re-read at 317c8943b: 0 open). G2 git grep of _CROSS_SKILL_EDGES and _EDGE_PATH_LINES over dadaia_workspace, scripts and tests empty, test_public_assets__public_scripts_thin_wrapper.py 111 passed. G3 git diff --shortstat 00edfadff..537233467 -- dadaia_workspace scripts (00edfadff, the define base): 121 files, +1074/-712, net +362; by owner Jobs 1-12 +90 (Job 11 +117 for FR10, the renderer and resolver under ADR 0251; Job 8 +35 for FR8, the verdict writer's validation; the other ten jobs -62), the 19 bug-fix commits +298 (features/specs +143 for the specs-path kind REBUILD and refusals, python_env.py +33, core/platform.py +26), scorecard fixes and reverts -26; the post-closure fixes 537233467..fb127322a add 65 files +413/-267 (the fix-form relabel across the package and skills, the gate's state-file lane, the memory window and the work-branch rule). G7 verdict.py stats 0.5.0-rc15, re-read 2026-10-14 at d621bec0f: 27 sequences, 32 verdicts, 5 rejected, 4/27 first-pass rejected (14.8%), against rc-14's 47, 81, 35 and 23/47 (48.9%); both targets met (rejected at most 10, first-pass at most 20%). AC2.3 git grep of PYTHONDONTWRITEBYTECODE, dont_write_bytecode and -B at 537233467: 37 hits, the four env literals PLAN §1.2 lists as leaving are gone, and every other hit is in the §1.2 table except scripts/mutate.py:39 (sys.dont_write_bytecode = True, Job 3's in-process switch replacing the :229 env literal), which PLAN §1.2 does not list; test__git.py:83,84,90 is covered by the owner row. AC4.3 _commit.commit( call sites 3 at 537233467 and 3 at 00edfadff; '\"git\"' argv only in _git.py:36, plus a fix-line string in _platform.py:61 and text in CODEX.md:66. AC9.2 git grep TASK_CAP or 'at most 5' over dadaia_workspace and tests empty (5 hits at 00edfadff). Step 5 ADD justification: net production lines of Jobs 1-12 +90, positive for FR10 (Job 11) and FR8 (Job 8), each past its PLAN estimate (+60 to +90 and about +8); carried: none, no open bug, none of the 34 carried (bugs.py status 0 open at d1493662b; operator, 2026-10-14: an rc never closes with an open bug); backlog exits: delivered (6) one-bytecode-off-owner, release-drift-edge-runs-memory-drift, architecture-adr-section-generated, one-owner-residue-after-the-kernel, reconcile-tree-writes-have-a-commit-shape, task-worktree-cap-removed, each with --release 0.5.0."
+    },
+    {
+      "ts": "2026-10-14T19:15:34Z",
+      "agent": "release.py memory",
+      "kind": "memory",
+      "text": "Memory reconciled over 373ed0322cfcaf3066d3a583db703176ed6848fe..960ccc14e0a9: 6 reviewed, 20 changed.",
+      "since": "373ed0322cfcaf3066d3a583db703176ed6848fe",
+      "until": "960ccc14e0a97a53146a8871ea44fc2014dafdf4",
+      "reviewed": [
+        "agentic-entities",
+        "harness-copilot",
+        "harness-cursor",
+        "harness-devin",
+        "spec-context-project",
+        "consumer-agent-support"
+      ],
+      "changed": [
+        "agent-comms",
+        "agent-orchestration",
+        "pypi-distribution",
+        "harness-claude-code",
+        "harness-codex",
+        "harness-kimi-code",
+        "product-vision",
+        "cross-platform-portability",
+        "server-registry",
+        "specs-migration",
+        "workspace-doctor",
+        "workspace-init",
+        "audits-canon",
+        "backlog-ledger",
+        "bug-ledger",
+        "release-lifecycle",
+        "sdd-gate-v3",
+        "worktrees",
+        "public-asset-distribution",
+        "context-management"
+      ]
+    },
+    {
+      "ts": "2026-10-14T19:37:39Z",
+      "agent": "dd-product-engineer",
+      "kind": "summary",
+      "text": "delivered: rc-15 — FR1-FR10 over Jobs 1-12: preflight is merge minus the verdict and the merge gate's fix line carries the reviewed tree (Job 1); reconcile rows in dd-gitflow-default §3a and closure readouts only in the summary (Job 2); bytecode off at the one env owner _git.scrubbed_env (Job 3); one kernel context-name grammar (Job 4); the bugs.py git call and the store refusal template on their owners (Job 5); the closure drift decider in the kernel and doctor in the job gate (Job 6); backlog exit reads only the --release SPEC (Job 7); the verdict writer validates its own file against the reviewed tree (Job 8); the task-tree cap removed under ADR 0250 (Job 9); the DEFINITION done-marker check removed (Job 10); the measured_by resolver, the ledger-rendered adr-list block and FIXED-2 over it under ADR 0251 (Job 11); the ADR label grammar and pairing law removed, canon 12 re-pinned (Job 12). Reconciliation: ADRs 0252–0263 accepted (0252-0262 by the operator 2026-10-13: 84 records superseded, 0259 amends 0152; 0263 on 2026-10-14, amends 0158, the three fix forms), 64 measured_by repairs, the adr-list block rendered (139 accepted ADR records), the 22 ADR label lines and the three pairing-rule statements removed from canonical memory, QUALITY.md cites ADR 0262, memory reconciled (26-atom drift worklist), README.md, docs/quickstart.md and docs/getting-started.md updated. Bugs resolved inside rc-15, 35, read from the resolved BUGS.jsonl records closed since the rc-15 definition (id, RED, fix, caused_by): during implementation scorecard-fix-3-left-the-repo-specs-law-stale (fix 142095c44, none) and mutate-owner-import-writes-checkout-bytecode (fix da4bbb99a, J3.T4); at the Reconciliation backlog-exit-refuses-on-an-unrelated-spec-origin (ab690576f, 2eba6ed5e, J11.T2), check-reads-crash-on-non-utf8-input (712484919, c449b3779, J1.T7), check-verbs-text-output-drops-the-fix-line (09d0d6717, ec7e4cf48, J2.T2), doctor-ledger-lane-absent-specs-dir-fix-never-clears (265f4bfb3, 7bc7f26e5, none; four ledger-lane findings, decider core.specs_version.state), doctor-specs-dir-file-reads-as-a-foreign-tree (0c3b7a923, 9f300b4a1, T-050-22), e2e-bootstrap-fixture-seeds-a-venv-without-python (427d7966c, ae2d5c349, none), init-oserror-from-the-venv-interpreter (3614b020f, d2bd75b30, init-venv-installs-index-version-not-running-distribution), init-reports-same-when-the-venv-probe-fails (4046b6be3, 1e52fb25c, reinit-with-unchanged-version-label-mixes-venv-and-projection), preflight-skips-checks-merge-runs (3420e5976, d2cea6103, J17.T2), specs-dir-symlink-refusal-prints-no-fix-line (bf42f2d50, 537233467, sa-rich-printer-wraps-fix-lines), specs-init-on-a-file-crashes-with-a-traceback (ea975c41f, 9f300b4a1, doctor-specs-dir-file-reads-as-a-foreign-tree), test-doctor-judges-no-instance-cannot-tell-fenced-from-crashed (0d0fbd910, 0d0fbd910 test-only, T-050-190), verdict-context-pattern-disagrees-with-core (710554fee, d072cd85e, J14.T7), verdict-refusals-print-no-fix-line (c165046de, 1899b2863, J10.S3.T1), verdict-validation-stated-three-ways-without-the-reviewed-tree (f1c4e6b2e, fd82f9c2b, merge-gate-validates-the-verdict-without-the-reviewed-tree), verdict-writer-emits-a-handoff-the-schema-rejects (cb6f34e3f, 6f882432c, J10.S3.T1), worktree-list-hides-a-non-empty-stray-directory (b4311d5df, ffa34bb48, J13.T6), worktree-merge-crashes-with-a-traceback-when-the-job-tree-is-gone (b34bea8dd, 7b84a7ff5, T-050-95), worktree-no-work-branch-fix-names-the-tag-derived-version-not-the-live-release (cd92ebf29, b10444ce5, J13.T6), bug-lineage-refuses-a-task-id-of-the-historical-grammar (b0f3d7a38, 35d0c8b98, J2.T2), adr-superseded-citation-judges-the-generated-adr-list-block (1e5d26896, a6cddda33, J11.T5), mem-drift-2-judges-the-generated-adr-list-block (47567ca7f, beb24bde5 after 961a3d591 and the REBUILDs a1654984f and d67cfa3a5 onto core.fixed_sections.authored_text, J11.T5), mem-placeholder-fix-deletes-a-memory-file-that-mentions-a-token (2e97fc363, f4063ae8d, scaffold-repair-cannot-remediate-invalid-placeholder-atom), mem-placeholder-fix-deletes-an-atom-the-operator-filled (d6c49d62f, c974efbe5 after 48f70750a, scaffold-repair-cannot-remediate-invalid-placeholder-atom), cli-line-guard-judges-the-generated-adr-list-block (5913791d6, d9995f074, 704cc2d80 and 93b97deaf; 4abd0df01 after 2192e2e46, c54cbf98c and 51119a027; J11.T5; five test and guard scans of the memory corpus read authored_text, test-side only), memory-entry-until-breaks-when-the-reconcile-tree-rebases (6015da031, 04510a316 after 6068de5e2, c201a9bce and the REBUILD 5b64988f5; memory-window-bound-shallow-clone-named-as-rebase; the window opens at the newest memory until or defined.sha HEAD reaches, else the root commit), release-check-names-the-memory-pass-an-operator-action (e6a0d9e7e, 52d086a0d after 5c964ae7b, check-verbs-text-output-drops-the-fix-line), restore-and-reinstall-fix-lines-name-an-operator-action (d05b1a6b4, 52d086a0d after 5c964ae7b, check-reads-crash-on-non-utf8-input), agent-acts-are-labelled-operator-action (f4edc4cc8, 6ea866584 after dd5dd7df2, 9c14dfcfb, 2d9914ee2, 52d086a0d, b40b88da8, 3f0200358, the REBUILD 764651946 and a23e1d65c; none; three fix forms under ADR 0263, which amends 0158), states-file-write-block-prints-public-install-as-its-fix (3a10072c5, 10bff2858, T-050-117), guard-fix-lines-keep-placeholders (f2140a625, 52739ac3c, J7.S5.T1), ship-archive-never-reaches-the-next-work-branch (cfe37ae02, REBUILD fb127322a, none; the work branch is renamed at each promote, one work_versions rule), release-check-info-origin-rows-carry-a-fix (ed8b0102e, REBUILD 1454be5f9, T-050-147; LOW; an info Origin row carries no fix). The fixes 35d0c8b98, a6cddda33, the mem-drift-2 and mem-placeholder series through c974efbe5 the cli-line-guard series through 4abd0df01, the memory-window series through 04510a316, the fix-form series (5c964ae7b through 6ea866584, 10bff2858, 52739ac3c) the work-branch REBUILD fb127322a, the Origin-row REBUILD 1454be5f9 and the law correction d4e6ba389 (one memory entry per reconcile pass, the latest governs) landed on feature/0.5.0 after the CLOSURE commit, which named feature 537233467 as implemented. Job-file deltas after approval (main-thread rulings): job7.md:10's fix line now ends 'then rerun this exit with --disposition <chosen>.' and the job gained the release-folder membership refusal; job8's W: was extended to the scripts/guards/slop.py row and that extension then removed; job10's W: was extended to CONTEXT-MAP.md:41 and the dead fixture setup; job11's R1 resolves a CI job as path::name, R2 reads rule codes from the package source, and core/fixed_sections.py was edited; job12 T3 refreshed the law mirrors in its code commit and its W: was extended to the memory seeds. Measurements (commands and shas in .dadaia/tmp/dd-sw-engineer-sr/20261014/rc15-measurements.md): G1 bugs.py status 0 open, none of the five Origin bugs open (re-read at 317c8943b: 0 open). G2 git grep of _CROSS_SKILL_EDGES and _EDGE_PATH_LINES over dadaia_workspace, scripts and tests empty, test_public_assets__public_scripts_thin_wrapper.py 111 passed. G3 git diff --shortstat 00edfadff..537233467 -- dadaia_workspace scripts (00edfadff, the define base): 121 files, +1074/-712, net +362; by owner Jobs 1-12 +90 (Job 11 +117 for FR10, the renderer and resolver under ADR 0251; Job 8 +35 for FR8, the verdict writer's validation; the other ten jobs -62), the 19 bug-fix commits +298 (features/specs +143 for the specs-path kind REBUILD and refusals, python_env.py +33, core/platform.py +26), scorecard fixes and reverts -26; the post-closure fixes 537233467..fb127322a add 65 files +413/-267 (the fix-form relabel across the package and skills, the gate's state-file lane, the memory window and the work-branch rule). G7 verdict.py stats 0.5.0-rc15, re-read 2026-10-14 at d621bec0f: 27 sequences, 32 verdicts, 5 rejected, 4/27 first-pass rejected (14.8%), against rc-14's 47, 81, 35 and 23/47 (48.9%); both targets met (rejected at most 10, first-pass at most 20%). AC2.3 git grep of PYTHONDONTWRITEBYTECODE, dont_write_bytecode and -B at 537233467: 37 hits, the four env literals PLAN §1.2 lists as leaving are gone, and every other hit is in the §1.2 table except scripts/mutate.py:39 (sys.dont_write_bytecode = True, Job 3's in-process switch replacing the :229 env literal), which PLAN §1.2 does not list; test__git.py:83,84,90 is covered by the owner row. AC4.3 _commit.commit( call sites 3 at 537233467 and 3 at 00edfadff; '\"git\"' argv only in _git.py:36, plus a fix-line string in _platform.py:61 and text in CODEX.md:66. AC9.2 git grep TASK_CAP or 'at most 5' over dadaia_workspace and tests empty (5 hits at 00edfadff). Step 5 ADD justification: net production lines of Jobs 1-12 +90, positive for FR10 (Job 11) and FR8 (Job 8), each past its PLAN estimate (+60 to +90 and about +8); carried: none, no open bug, none of the 35 carried (bugs.py status 0 open at e2c042767; operator, 2026-10-14: an rc never closes with an open bug); backlog exits: delivered (6) one-bytecode-off-owner, release-drift-edge-runs-memory-drift, architecture-adr-section-generated, one-owner-residue-after-the-kernel, reconcile-tree-writes-have-a-commit-shape, task-worktree-cap-removed, each with --release 0.5.0."
+    },
+    {
+      "ts": "2026-10-14T19:37:49Z",
+      "agent": "release.py memory",
+      "kind": "memory",
+      "text": "Memory reconciled over 373ed0322cfcaf3066d3a583db703176ed6848fe..4d339a3a7c4f: 6 reviewed, 20 changed.",
+      "since": "373ed0322cfcaf3066d3a583db703176ed6848fe",
+      "until": "4d339a3a7c4f64b3b400a2569acc53b2ef9d9f9a",
+      "reviewed": [
+        "agentic-entities",
+        "harness-copilot",
+        "harness-cursor",
+        "harness-devin",
+        "spec-context-project",
+        "consumer-agent-support"
+      ],
+      "changed": [
+        "agent-comms",
+        "agent-orchestration",
+        "pypi-distribution",
+        "harness-claude-code",
+        "harness-codex",
+        "harness-kimi-code",
+        "product-vision",
+        "cross-platform-portability",
+        "server-registry",
+        "specs-migration",
+        "workspace-doctor",
+        "workspace-init",
+        "audits-canon",
+        "backlog-ledger",
+        "bug-ledger",
+        "release-lifecycle",
+        "sdd-gate-v3",
+        "worktrees",
+        "public-asset-distribution",
+        "context-management"
+      ]
+    },
+    {
+      "ts": "2026-10-14T19:53:08Z",
+      "agent": "dd-product-engineer",
+      "kind": "summary",
+      "text": "delivered: rc-15 — FR1-FR10 over Jobs 1-12: preflight is merge minus the verdict and the merge gate's fix line carries the reviewed tree (Job 1); reconcile rows in dd-gitflow-default §3a and closure readouts only in the summary (Job 2); bytecode off at the one env owner _git.scrubbed_env (Job 3); one kernel context-name grammar (Job 4); the bugs.py git call and the store refusal template on their owners (Job 5); the closure drift decider in the kernel and doctor in the job gate (Job 6); backlog exit reads only the --release SPEC (Job 7); the verdict writer validates its own file against the reviewed tree (Job 8); the task-tree cap removed under ADR 0250 (Job 9); the DEFINITION done-marker check removed (Job 10); the measured_by resolver, the ledger-rendered adr-list block and FIXED-2 over it under ADR 0251 (Job 11); the ADR label grammar and pairing law removed, canon 12 re-pinned (Job 12). Reconciliation: ADRs 0252–0263 accepted (0252-0262 by the operator 2026-10-13: 84 records superseded, 0259 amends 0152; 0263 on 2026-10-14, amends 0158, the three fix forms), 64 measured_by repairs, the adr-list block rendered (139 accepted ADR records), the 22 ADR label lines and the three pairing-rule statements removed from canonical memory, QUALITY.md cites ADR 0262, memory reconciled (26-atom drift worklist), README.md, docs/quickstart.md and docs/getting-started.md updated. Bugs resolved inside rc-15, 36, read from the resolved BUGS.jsonl records closed since the rc-15 definition (id, RED, fix, caused_by): during implementation scorecard-fix-3-left-the-repo-specs-law-stale (fix 142095c44, none) and mutate-owner-import-writes-checkout-bytecode (fix da4bbb99a, J3.T4); at the Reconciliation backlog-exit-refuses-on-an-unrelated-spec-origin (ab690576f, 2eba6ed5e, J11.T2), check-reads-crash-on-non-utf8-input (712484919, c449b3779, J1.T7), check-verbs-text-output-drops-the-fix-line (09d0d6717, ec7e4cf48, J2.T2), doctor-ledger-lane-absent-specs-dir-fix-never-clears (265f4bfb3, 7bc7f26e5, none; four ledger-lane findings, decider core.specs_version.state), doctor-specs-dir-file-reads-as-a-foreign-tree (0c3b7a923, 9f300b4a1, T-050-22), e2e-bootstrap-fixture-seeds-a-venv-without-python (427d7966c, ae2d5c349, none), init-oserror-from-the-venv-interpreter (3614b020f, d2bd75b30, init-venv-installs-index-version-not-running-distribution), init-reports-same-when-the-venv-probe-fails (4046b6be3, 1e52fb25c, reinit-with-unchanged-version-label-mixes-venv-and-projection), preflight-skips-checks-merge-runs (3420e5976, d2cea6103, J17.T2), specs-dir-symlink-refusal-prints-no-fix-line (bf42f2d50, 537233467, sa-rich-printer-wraps-fix-lines), specs-init-on-a-file-crashes-with-a-traceback (ea975c41f, 9f300b4a1, doctor-specs-dir-file-reads-as-a-foreign-tree), test-doctor-judges-no-instance-cannot-tell-fenced-from-crashed (0d0fbd910, 0d0fbd910 test-only, T-050-190), verdict-context-pattern-disagrees-with-core (710554fee, d072cd85e, J14.T7), verdict-refusals-print-no-fix-line (c165046de, 1899b2863, J10.S3.T1), verdict-validation-stated-three-ways-without-the-reviewed-tree (f1c4e6b2e, fd82f9c2b, merge-gate-validates-the-verdict-without-the-reviewed-tree), verdict-writer-emits-a-handoff-the-schema-rejects (cb6f34e3f, 6f882432c, J10.S3.T1), worktree-list-hides-a-non-empty-stray-directory (b4311d5df, ffa34bb48, J13.T6), worktree-merge-crashes-with-a-traceback-when-the-job-tree-is-gone (b34bea8dd, 7b84a7ff5, T-050-95), worktree-no-work-branch-fix-names-the-tag-derived-version-not-the-live-release (cd92ebf29, b10444ce5, J13.T6), bug-lineage-refuses-a-task-id-of-the-historical-grammar (b0f3d7a38, 35d0c8b98, J2.T2), adr-superseded-citation-judges-the-generated-adr-list-block (1e5d26896, a6cddda33, J11.T5), mem-drift-2-judges-the-generated-adr-list-block (47567ca7f, beb24bde5 after 961a3d591 and the REBUILDs a1654984f and d67cfa3a5 onto core.fixed_sections.authored_text, J11.T5), mem-placeholder-fix-deletes-a-memory-file-that-mentions-a-token (2e97fc363, f4063ae8d, scaffold-repair-cannot-remediate-invalid-placeholder-atom), mem-placeholder-fix-deletes-an-atom-the-operator-filled (d6c49d62f, c974efbe5 after 48f70750a, scaffold-repair-cannot-remediate-invalid-placeholder-atom), cli-line-guard-judges-the-generated-adr-list-block (5913791d6, d9995f074, 704cc2d80 and 93b97deaf; 4abd0df01 after 2192e2e46, c54cbf98c and 51119a027; J11.T5; five test and guard scans of the memory corpus read authored_text, test-side only), memory-entry-until-breaks-when-the-reconcile-tree-rebases (6015da031, 04510a316 after 6068de5e2, c201a9bce and the REBUILD 5b64988f5; memory-window-bound-shallow-clone-named-as-rebase; the window opens at the newest memory until or defined.sha HEAD reaches, else the root commit), release-check-names-the-memory-pass-an-operator-action (e6a0d9e7e, 52d086a0d after 5c964ae7b, check-verbs-text-output-drops-the-fix-line), restore-and-reinstall-fix-lines-name-an-operator-action (d05b1a6b4, 52d086a0d after 5c964ae7b, check-reads-crash-on-non-utf8-input), agent-acts-are-labelled-operator-action (f4edc4cc8, 6ea866584 after dd5dd7df2, 9c14dfcfb, 2d9914ee2, 52d086a0d, b40b88da8, 3f0200358, the REBUILD 764651946 and a23e1d65c; none; three fix forms under ADR 0263, which amends 0158), states-file-write-block-prints-public-install-as-its-fix (3a10072c5, 10bff2858, T-050-117), guard-fix-lines-keep-placeholders (f2140a625, 52739ac3c, J7.S5.T1), ship-archive-never-reaches-the-next-work-branch (cfe37ae02, REBUILD fb127322a, none; the work branch is renamed at each promote, one work_versions rule), release-check-info-origin-rows-carry-a-fix (ed8b0102e and da99ab8c8, REBUILD 0a8902e64 after 1454be5f9, T-050-147; LOW; every info row of release.py check carries no fix, built by _findings.info), release-check-origin-sweep-reads-a-retired-log-kind (8d807208c and abfde8e02, REBUILD 49163dacd, J3.T2; MEDIUM; the candidate's closure summary is the Origin sweep signal). The fixes 35d0c8b98, a6cddda33, the mem-drift-2 and mem-placeholder series through c974efbe5 the cli-line-guard series through 4abd0df01, the memory-window series through 04510a316, the fix-form series (5c964ae7b through 6ea866584, 10bff2858, 52739ac3c) the work-branch REBUILD fb127322a, the Origin-row REBUILDs 1454be5f9 and 0a8902e64, the sweep-signal REBUILD 49163dacd and the law correction through 6c430b4b8 (a memory entry per reconcile pass, the latest governs) landed on feature/0.5.0 after the CLOSURE commit, which named feature 537233467 as implemented. Job-file deltas after approval (main-thread rulings): job7.md:10's fix line now ends 'then rerun this exit with --disposition <chosen>.' and the job gained the release-folder membership refusal; job8's W: was extended to the scripts/guards/slop.py row and that extension then removed; job10's W: was extended to CONTEXT-MAP.md:41 and the dead fixture setup; job11's R1 resolves a CI job as path::name, R2 reads rule codes from the package source, and core/fixed_sections.py was edited; job12 T3 refreshed the law mirrors in its code commit and its W: was extended to the memory seeds. Measurements (commands and shas in .dadaia/tmp/dd-sw-engineer-sr/20261014/rc15-measurements.md): G1 bugs.py status 0 open, none of the five Origin bugs open (re-read at 317c8943b: 0 open). G2 git grep of _CROSS_SKILL_EDGES and _EDGE_PATH_LINES over dadaia_workspace, scripts and tests empty, test_public_assets__public_scripts_thin_wrapper.py 111 passed. G3 git diff --shortstat 00edfadff..537233467 -- dadaia_workspace scripts (00edfadff, the define base): 121 files, +1074/-712, net +362; by owner Jobs 1-12 +90 (Job 11 +117 for FR10, the renderer and resolver under ADR 0251; Job 8 +35 for FR8, the verdict writer's validation; the other ten jobs -62), the 19 bug-fix commits +298 (features/specs +143 for the specs-path kind REBUILD and refusals, python_env.py +33, core/platform.py +26), scorecard fixes and reverts -26; the post-closure fixes 537233467..fb127322a add 65 files +413/-267 (the fix-form relabel across the package and skills, the gate's state-file lane, the memory window and the work-branch rule). G7 verdict.py stats 0.5.0-rc15, re-read 2026-10-14 at d621bec0f: 27 sequences, 32 verdicts, 5 rejected, 4/27 first-pass rejected (14.8%), against rc-14's 47, 81, 35 and 23/47 (48.9%); both targets met (rejected at most 10, first-pass at most 20%). AC2.3 git grep of PYTHONDONTWRITEBYTECODE, dont_write_bytecode and -B at 537233467: 37 hits, the four env literals PLAN §1.2 lists as leaving are gone, and every other hit is in the §1.2 table except scripts/mutate.py:39 (sys.dont_write_bytecode = True, Job 3's in-process switch replacing the :229 env literal), which PLAN §1.2 does not list; test__git.py:83,84,90 is covered by the owner row. AC4.3 _commit.commit( call sites 3 at 537233467 and 3 at 00edfadff; '\"git\"' argv only in _git.py:36, plus a fix-line string in _platform.py:61 and text in CODEX.md:66. AC9.2 git grep TASK_CAP or 'at most 5' over dadaia_workspace and tests empty (5 hits at 00edfadff). Step 5 ADD justification: net production lines of Jobs 1-12 +90, positive for FR10 (Job 11) and FR8 (Job 8), each past its PLAN estimate (+60 to +90 and about +8); carried: none, no open bug, none of the 36 carried (bugs.py status 0 open at e5056d458; operator, 2026-10-14: an rc never closes with an open bug); backlog exits: delivered (6) one-bytecode-off-owner, release-drift-edge-runs-memory-drift, architecture-adr-section-generated, one-owner-residue-after-the-kernel, reconcile-tree-writes-have-a-commit-shape, task-worktree-cap-removed, each with --release 0.5.0."
+    },
+    {
+      "ts": "2026-10-14T19:53:08Z",
+      "agent": "release.py memory",
+      "kind": "memory",
+      "text": "Memory reconciled over 373ed0322cfcaf3066d3a583db703176ed6848fe..5e39682973c5: 6 reviewed, 20 changed.",
+      "since": "373ed0322cfcaf3066d3a583db703176ed6848fe",
+      "until": "5e39682973c5c00e869eb247b8607ab08744beb1",
+      "reviewed": [
+        "agentic-entities",
+        "harness-copilot",
+        "harness-cursor",
+        "harness-devin",
+        "spec-context-project",
+        "consumer-agent-support"
+      ],
+      "changed": [
+        "agent-comms",
+        "agent-orchestration",
+        "pypi-distribution",
+        "harness-claude-code",
+        "harness-codex",
+        "harness-kimi-code",
+        "product-vision",
+        "cross-platform-portability",
+        "server-registry",
+        "specs-migration",
+        "workspace-doctor",
+        "workspace-init",
+        "audits-canon",
+        "backlog-ledger",
+        "bug-ledger",
+        "release-lifecycle",
+        "sdd-gate-v3",
+        "worktrees",
+        "public-asset-distribution",
+        "context-management"
+      ]
+    },
+    {
+      "ts": "2026-10-14T21:21:22Z",
+      "agent": "release.py new",
+      "kind": "note",
+      "text": "Candidate born on 0.5.0 (prior candidate closed at 537233467)"
+    },
+    {
+      "ts": "2026-10-15T00:30:26Z",
+      "agent": "release.py",
+      "kind": "milestone",
+      "candidate": "rc-16",
+      "milestone": "defined",
+      "sha": "96b9008b8",
+      "text": "Candidate defined at 96b9008b8; phase IMPLEMENTATION."
+    },
+    {
+      "ts": "2026-10-16T05:12:35Z",
+      "agent": "release.py",
+      "kind": "milestone",
+      "candidate": "rc-16",
+      "milestone": "implemented",
+      "sha": "cafc4003d7b1c218d4ea41f85b8c39d65732b5fc",
+      "text": "Candidate implemented at cafc4003d7b1c218d4ea41f85b8c39d65732b5fc; phase CLOSURE."
+    },
+    {
+      "ts": "2026-10-16T05:13:10Z",
+      "agent": "release.py memory",
+      "kind": "memory",
+      "text": "Memory reconciled over 5e39682973c5c00e869eb247b8607ab08744beb1..1c43b993d3cc: 4 reviewed, 15 changed.",
+      "since": "5e39682973c5c00e869eb247b8607ab08744beb1",
+      "until": "1c43b993d3cc8178905aaa3fdd9b29aa35a0a376",
+      "reviewed": [
+        "agentic-entities",
+        "agent-evals",
+        "consumer-agent-support",
+        "audits-canon"
+      ],
+      "changed": [
+        "agent-comms",
+        "agent-orchestration",
+        "public-asset-distribution",
+        "pypi-distribution",
+        "product-vision",
+        "spec-context-project",
+        "specs-migration",
+        "workspace-doctor",
+        "workspace-init",
+        "backlog-ledger",
+        "bug-ledger",
+        "release-lifecycle",
+        "sdd-gate-v3",
+        "worktrees",
+        "context-management"
+      ]
+    },
+    {
+      "ts": "2026-10-16T05:15:49Z",
+      "agent": "dd-product-engineer",
+      "kind": "summary",
+      "text": "delivered: rc-16 the worktree hierarchy under ADR 0264 (supersedes 0125, 0191, 0241; amends 0120): worktrees/<repo>/<v>/ with a real rc integration branch wt-rc, a base derived from the path, the plain kind deleted, `dadaia worktree` as the one runner and a reference-transaction ref gate installed by `ci install-hook` (Jobs 1-9); the closure waits for job, task and lane trees (AC5.1, AC5.5); memory, derived docs and the closure ledgers reconciled (Job 10, memory reconciled: 15 changed, 4 reviewed); bugs resolved inside rc-16: 20, all archived at closure, with the Origin bug new-reconcile-opens-while-a-job-is-open fixed by J4.T18 and the hotfix protected-globs-miss-a-plain-tree-path resolved in the closure batch; the job gate is `python scripts/ci.py job` and the preflight verb is deleted (job-gate-runs-the-whole-ci-line-and-preflight-runs-it-again, 58c415a56 and 7c5bd1f35); G4 ruling: the AC6.1 grep excludes the cutover line worktrees-AGENTS.md:27; G5 size readout: Job 9 adds +112 production lines against the SPEC estimate of +60 python, because the privacy remedy became a gated verb, and the rc as a whole is +834/-553 python and +76/-0 shell (`git diff --numstat 96b9008b8..cafc4003d -- dadaia_workspace scripts`); G6 verdict.py stats 0.5.0-rc16: 14 sequences, 25 verdicts, 11 rejected, first-pass rejected 8/14; rollout (AC10.4, the main thread's acts after the Reconciliation merge, no migration code), in order: (1) the cleanup 'Agente arruma, sem perda' in every repo holding an old-grammar tree (empty dirs and branches with no own commit deleted, a tree with own work turned into tag archive/wt/<name> before removal; known: worktrees/rand-engine/0.8.0-rc1/define live and 4 commits ahead so its owner merges or tags it first, worktrees/rand-engine/0.7.0-rc1 empty dir, worktrees/<consumer>/0.12.0b-impl with wt/0.12.0{a,b,c}), (2) `public install`, `doctor --fix`, `doctor`, (3) `ci install-hook --force` per repo, (4) `certify`; carried: the eight rc-16 intake and late-review backlog entries (worktree-scripts-loose-ends, skill-kernel-loose-ends, package-loose-ends, push-gate-remedy-follow-ups, law-and-docs-text-loose-ends, test-quality-loose-ends, ref-gate-hardening-follow-ups, several-work-fix-line-follow-ups), no open bug; backlog exits: worktree-hierarchy (delivered)."
+    },
+    {
+      "ts": "2026-10-16T05:28:32Z",
+      "agent": "release.py memory",
+      "kind": "memory",
+      "text": "Memory reconciled over 1c43b993d3cc8178905aaa3fdd9b29aa35a0a376..4cf528bee476: 1 reviewed, 1 changed.",
+      "since": "1c43b993d3cc8178905aaa3fdd9b29aa35a0a376",
+      "until": "4cf528bee476184126ef1f36c6c6f8d47f474a00",
+      "reviewed": [
+        "public-asset-distribution"
+      ],
+      "changed": [
+        "product-vision"
+      ]
+    },
+    {
+      "ts": "2026-10-17T04:08:04Z",
+      "agent": "release.py memory",
+      "kind": "memory",
+      "text": "Memory reconciled over 4cf528bee476184126ef1f36c6c6f8d47f474a00..8310cb22cf98: 15 reviewed, 12 changed.",
+      "since": "4cf528bee476184126ef1f36c6c6f8d47f474a00",
+      "until": "8310cb22cf980b43963528ed195ab021b51293be",
+      "reviewed": [
+        "agent-comms",
+        "agent-orchestration",
+        "agentic-entities",
+        "harness-claude-code",
+        "harness-codex",
+        "harness-copilot",
+        "harness-cursor",
+        "harness-devin",
+        "product-vision",
+        "spec-context-project",
+        "context-management",
+        "context-portability",
+        "audits-canon",
+        "backlog-ledger",
+        "worktrees"
+      ],
+      "changed": [
+        "cross-platform-portability",
+        "sdd-gate-v3",
+        "public-asset-distribution",
+        "harness-kimi-code",
+        "workspace-init",
+        "workspace-doctor",
+        "server-registry",
+        "consumer-agent-support",
+        "specs-migration",
+        "bug-ledger",
+        "release-lifecycle",
+        "pypi-distribution"
+      ]
+    },
+    {
+      "ts": "2026-10-17T04:29:22Z",
+      "agent": "release.py memory",
+      "kind": "memory",
+      "text": "Memory reconciled over 4cf528bee476184126ef1f36c6c6f8d47f474a00..cb41565821e0: 15 reviewed, 12 changed.",
+      "since": "4cf528bee476184126ef1f36c6c6f8d47f474a00",
+      "until": "cb41565821e0cc26498cacd8abcfc5c19a222f7a",
+      "reviewed": [
+        "agent-comms",
+        "agent-orchestration",
+        "agentic-entities",
+        "harness-claude-code",
+        "harness-codex",
+        "harness-copilot",
+        "harness-cursor",
+        "harness-devin",
+        "product-vision",
+        "spec-context-project",
+        "context-management",
+        "context-portability",
+        "audits-canon",
+        "backlog-ledger",
+        "worktrees"
+      ],
+      "changed": [
+        "cross-platform-portability",
+        "sdd-gate-v3",
+        "public-asset-distribution",
+        "harness-kimi-code",
+        "workspace-init",
+        "workspace-doctor",
+        "server-registry",
+        "consumer-agent-support",
+        "specs-migration",
+        "bug-ledger",
+        "release-lifecycle",
+        "pypi-distribution"
+      ]
+    },
+    {
+      "ts": "2026-10-17T05:14:54Z",
+      "agent": "dd-product-engineer",
+      "kind": "summary",
+      "text": "delivered: rc-16 (1) the new worktree layout under ADR 0264 (supersedes 0125, 0191, 0241; amends 0120): worktrees/<repo>/<v>/ with a real rc integration branch wt-rc, a base derived from the path, the plain kind deleted, `dadaia worktree` as the one runner and a reference-transaction ref gate installed by `ci install-hook` (Jobs 1-9); the closure waits for job, task and lane trees (AC5.1, AC5.5); the job gate is `python scripts/ci.py job` and the preflight verb is deleted; (2) the OS boundary in one kernel module, `_platform.py`, under ADR 0265 (accepted, amends 0220): text codec, child-process decode, venv layout and path spelling, process control, filesystem semantics and shell spelling each decided once, the reference-transaction and pre-push hooks shims over Python, tests reaching the OS only through `tests/helpers/oslib.py`; (3) Windows support: UTF-8 stdio at every entry point, one command renderer, Kimi hooks run through cmd.exe wrappers with the one TOML encoder; memory and derived docs reconciled (Job 10; last window 4cf528bee..cb4156582: 15 reviewed, 12 changed); bugs resolved inside rc-16: 53, all archived (20 at the first closure, 33 in this reconcile, 951 kept), the Origin bug new-reconcile-opens-while-a-job-is-open fixed by J4.T18, 0 open; G4 ruling: the AC6.1 grep excludes the cutover line worktrees-AGENTS.md:27; G5 size readout: +2384/-1480 python and +61/-77 shell (`git diff --numstat 96b9008b8..b05443f5a -- dadaia_workspace scripts`), above the +60 python estimate because Job 9's privacy remedy became a gated verb and the OS-boundary REBUILD landed inside the rc; G6 independent measurement by the main thread: `verdict.py stats 0.5.0-rc16` prints 0 (it reads only wt/0.5.0/rc-16/ names; rc-16's trees used old-layout and version-scoped names); the library's `_handoffs.reviewer_records` over `.dadaia/handoff/dadaia-workspace/`, produced at or after rc-16's define (2026-10-15T00:30:26Z), grouped by scope branch: 95 trees, 121 sequences, 203 verdicts, 89 rejected, first-pass rejected 67/121; CI green on 38034fc66: push 39002615490, PR 39002618502 (windows-latest included), secret scan 39002618490; rollout (AC10.4, the main thread's acts after the Reconciliation merge, no migration code), in order: (1) the cleanup 'Agente arruma, sem perda' in every repo holding an old-grammar tree or wt/* branch (no own commit: deleted; own work: tag archive/wt/<name>, then removed), (2) `public install`, `doctor --fix`, `doctor`, (3) `ci install-hook --force` per repo, (4) `certify`; carried: none; backlog exits: worktree-hierarchy (delivered, recorded 2026-10-16)."
     }
   ]
 }

@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import hashlib
 import json
-import os
 from collections.abc import Iterable
 from pathlib import Path
 
+from dadaia_workspace.core import platform
 from dadaia_workspace.infrastructure.privacy_check import (
     _PUBLIC_ASSET_IGNORED_DIRS,
     _PUBLIC_ASSET_IGNORED_SUFFIXES,
@@ -39,15 +39,11 @@ def iter_public_files(root: Path) -> Iterable[Path]:
 
 def read_link_target(path: Path) -> str:
     """A symlink's target in POSIX spelling on every OS."""
-    return os.readlink(path).replace(os.sep, "/")
+    return platform.norm_sep(str(path.readlink()))
 
 
 def _sha256(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
+    return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 def _entry_digest(path: Path) -> str | None:
@@ -55,7 +51,7 @@ def _entry_digest(path: Path) -> str | None:
 
     A symlink digests its target string, so a link and a copy stay distinguishable.
     """
-    if path.is_symlink():
+    if platform.is_link(path):
         return hashlib.sha256(read_link_target(path).encode("utf-8")).hexdigest()
     if path.is_file():
         return _sha256(path)
@@ -70,9 +66,15 @@ def _json_dump(data: object) -> str:
     return json.dumps(data, indent=2, sort_keys=True) + "\n"
 
 
-def _toml_escape(value: object) -> str:
-    """*value* as a TOML string: multi-line basic when it holds a newline, else basic."""
-    s = str(value)
+_TOML_CONTROL = {
+    n: f"\\u{n:04x}" for n in [*range(9), *range(11, 32), 127]
+}  # tab and newline stay literal
+
+
+def toml_escape(value: object) -> str:
+    """*value* as a TOML string: multi-line basic when it holds a newline, else basic. The
+    multi-line form opens on its own line: TOML drops a newline right after the opening quotes."""
+    s = str(value).replace("\\", "\\\\").translate(_TOML_CONTROL)
     if "\n" in s:
-        return '"""' + s.replace('"""', '\\"\\"\\"') + '"""'
-    return '"' + s.replace("\\", "\\\\").replace('"', '\\"') + '"'
+        return '"""\n' + s.replace('"""', '\\"\\"\\"') + '"""'
+    return '"' + s.replace('"', '\\"') + '"'

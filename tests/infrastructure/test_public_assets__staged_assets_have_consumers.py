@@ -1,6 +1,5 @@
 """Every staged asset has a real consumer; what has none is not produced or checked.
 
-sa-staged-assets-without-consumers#44.1, #44.2, #44.3, #44.4, #44.5.
 Size: MEDIUM (a real stage + install into tmp_path; the public doctor through the CLI).
 """
 
@@ -8,6 +7,7 @@ from __future__ import annotations
 
 import re
 import shutil
+import uuid
 from pathlib import Path
 from unittest.mock import patch
 
@@ -18,13 +18,15 @@ from dadaia_workspace.cli.main import app
 from dadaia_workspace.core.exceptions import PublicAssetError
 from dadaia_workspace.infrastructure.agent_transcodes import codex_agent_toml_bytes
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
+from tests.fixtures.real_git import git
 from tests.helpers.harness_profile import register_all
+from tests.helpers.oslib import decode, read_text, write_text
 
 pytestmark = pytest.mark.slow(reason="real public stage + install into tmp_path")
 
 _PKG = Path(__file__).resolve().parents[2] / "dadaia_workspace"
 
-#: 44.2 — every staged family and the production module that reads it from
+#: Every staged family and the production module that reads it from
 #: ``.dadaia/agentic/`` (literal; the check is that the reader names the family).
 _READERS = {
     "agents": "infrastructure/projection_rules.py",
@@ -43,19 +45,17 @@ def _installed(tmp_path: Path) -> Path:
 
 
 def test_every_staged_family_has_a_registered_production_reader(tmp_path: Path) -> None:
-    """sa-staged-assets-without-consumers#44.2."""
     ws = tmp_path / "ws"
     FileSystemPublicAssetManager().stage(ws)
     staged = sorted(p.name for p in (ws / ".dadaia" / "agentic").iterdir())
 
     assert staged == sorted(_READERS)
     for family, reader in _READERS.items():
-        assert family.split(".")[0] in (_PKG / reader).read_text(encoding="utf-8"), family
+        assert family.split(".")[0] in read_text(_PKG / reader), family
 
 
 def test_rules_is_no_claude_family_and_only_the_codex_policy(tmp_path: Path) -> None:
-    """sa-staged-assets-without-consumers#44.3; sa-staged-assets-without-consumers#44.1:
-    the public doctor neither needs nor names an agents index."""
+    """The public doctor neither needs nor names an agents index."""
     ws = _installed(tmp_path)
     (ws / ".dadaia" / "agentic" / "agents.index.json").unlink(missing_ok=True)
     with patch("dadaia_workspace.cli.commands.public.resolve_workspace_root", return_value=ws):
@@ -71,32 +71,31 @@ def test_rules_is_no_claude_family_and_only_the_codex_policy(tmp_path: Path) -> 
 
 def _persona_without_model(tmp_path: Path) -> Path:
     persona = tmp_path / "dd-extra.md"
-    persona.write_text(
-        "---\nname: dd-extra\ndescription: x\nactivity_class: MUTATING\n---\n# body\n",
-        encoding="utf-8",
+    write_text(
+        persona, "---\nname: dd-extra\ndescription: x\nactivity_class: MUTATING\n---\n# body\n"
     )
     return persona
 
 
 def test_a_persona_without_a_model_is_refused_on_codex(tmp_path: Path) -> None:
-    """sa-staged-assets-without-consumers#44.4 (Codex): no silent default model."""
+    """Codex: no silent default model."""
     with pytest.raises(PublicAssetError):
         codex_agent_toml_bytes(_persona_without_model(tmp_path), "dd-extra", None)
 
 
 def test_a_persona_without_a_model_is_refused_on_claude(tmp_path: Path) -> None:
-    """sa-staged-assets-without-consumers#44.4 (Claude): no session-model inheritance."""
+    """Claude: no session-model inheritance."""
     ws = tmp_path / "ws"
     register_all(ws)
     manager = FileSystemPublicAssetManager()
-    manager._public_dir = shutil.copytree(manager._public_dir, tmp_path / "public")  # noqa: SLF001
-    shutil.copy2(_persona_without_model(tmp_path), manager._public_dir / "agents")  # noqa: SLF001
+    manager._public_dir = shutil.copytree(manager._public_dir, tmp_path / "public")
+    shutil.copy2(_persona_without_model(tmp_path), manager._public_dir / "agents")
 
     with pytest.raises(PublicAssetError):
         manager.install(ws)
 
 
-#: Retired persona names: the pre-0.4.7 bare names, ADR 0022's coordinator and the
+#: Retired persona names: the pre-0.4.7 bare names, the retired coordinator and the
 #: pre-consolidation roles.
 _RETIRED_ROLES = frozenset(
     {
@@ -114,15 +113,36 @@ _FIXTURE_AGENT = re.compile(r"""\bagent"?\s*[:=]\s*["']([a-z-]+)["']""")
 
 
 def test_no_retired_fixture_role() -> None:
-    """sa-staged-assets-without-consumers#44.5: no retired role is a fixture agent under
+    """No retired role is a fixture agent under
     tests/ or in production."""
-    tests = Path(__file__).resolve().parents[1]
+    root = _PKG.parent
     retired = [
         f"{path}:{name}"
-        for root in (tests, _PKG)
-        for path in sorted(root.rglob("*"))
+        for path in sorted(
+            root / p for p in git(root, "ls-files", "tests", "dadaia_workspace").splitlines()
+        )
         if path.suffix in {".py", ".json"} and path.name != Path(__file__).name
-        for name in _FIXTURE_AGENT.findall(path.read_text(encoding="utf-8", errors="replace"))
+        for name in _FIXTURE_AGENT.findall(decode(path.read_bytes()))
         if name in _RETIRED_ROLES
     ]
     assert retired == []
+
+
+def test_the_retired_role_scan_survives_an_untracked_scratch_file_deleted_mid_scan(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    scratch = _PKG.parent / "tests" / "tmp" / f"role-race-{uuid.uuid4().hex[:8]}"
+    scratch.mkdir(parents=True)
+    read = Path.read_bytes
+
+    def read_after_delete(self: Path) -> bytes:
+        shutil.rmtree(scratch, ignore_errors=True)
+        return read(self)
+
+    try:
+        write_text(scratch / "test_gone.py", "X = 1\n")
+        monkeypatch.setattr(Path, "read_bytes", read_after_delete)
+        test_no_retired_fixture_role()
+    finally:
+        monkeypatch.undo()
+        shutil.rmtree(scratch, ignore_errors=True)

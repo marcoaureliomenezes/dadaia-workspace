@@ -1,14 +1,11 @@
 """The doctor's `ledgers` delegation seam.
 
-Each `specs/` ledger has exactly ONE validator since FR2: the skill script that also
-writes it.  Before this module the doctor carried a second implementation of every
-ledger schema (`features/specs/ledgers.py`, deleted here) — two readers of one
-contract, drifting apart by construction.
+Each `specs/` ledger has exactly one validator: the skill script that also writes it.
 
 This module runs each script's `check --specs <dir> --json` and re-emits its findings.
 It lives in `infrastructure/` because running a subprocess is an infrastructure act
 (`features` may not import `subprocess` — setup.cfg). Its rows are the one table of
-the scripts' paths: every `fix:` naming a ledger script spells it by `<ROW>.invocation`.
+the scripts' paths.
 
 The interpreter is always `sys.executable`: the installed script may have no exec bit
 (Windows), and the venv's Python is the one that must read the tree.
@@ -18,15 +15,14 @@ from __future__ import annotations
 
 import json
 import sys
-from collections.abc import Iterator, Sequence
+from collections.abc import Collection, Iterator, Sequence
 from dataclasses import dataclass
-from functools import cache
 from pathlib import Path
-from types import ModuleType
 from typing import Any, Protocol
 
-from dadaia_workspace.core.cli_line import fix_line, script_line
+from dadaia_workspace.core.cli_line import fix_line, fix_of, without_fix
 from dadaia_workspace.core.doctor_rules import SectionFinding
+from dadaia_workspace.core.skill_owner import load_owner
 from dadaia_workspace.core.workspace_resolver import own_workspace_root
 from dadaia_workspace.infrastructure.subprocess_runner import SubprocessProcessRunner
 
@@ -39,6 +35,7 @@ __all__ = [
     "RELEASE_SCRIPT",
     "LedgerScript",
     "load_owner",
+    "own_workspace_root",
     "resolve_script",
     "script_findings",
     "script_repairs",
@@ -71,32 +68,16 @@ class LedgerScript:
     def code(self) -> str:
         return f"LEDGER-{self.name}-SCHEMA"
 
-    @property
-    def invocation(self) -> str:
-        """The `fix:` spelling — the installed path, run through the interpreter."""
-        return script_line(f".agents/skills/{self.skill}/scripts/{self.filename}")
 
-
-#: One row per ledger script (0.4.7 FR2's table). A new ledger is a row, never a branch.
+#: One row per ledger script. A new ledger is a row, never a branch.
 BUGS_SCRIPT = LedgerScript("BUGS", "dd-bug-resolution", "bugs.py")
 BACKLOG_SCRIPT = LedgerScript("BACKLOG", "dd-backlog-definition", "backlog.py")
 RELEASE_SCRIPT = LedgerScript("RELEASE", "dd-release-implementation", "release.py")
 AUDIT_SCRIPT = LedgerScript("FINDINGS", "dd-audit-project", "audit.py")
 MEMORY_SCRIPT = LedgerScript("MEMORY", "dd-spec-navigator", "memory.py", ("catalog", "generate"))
-#: Not a ledger: the worktrees' owner, read by `worktree_rows` alone (ADR 0135).
+#: Not a ledger: the worktrees' owner, read by `worktree_rows` alone.
 WORKTREE_SCRIPT = LedgerScript("WORKTREES", "dd-gitflow-default", "worktree.py")
 LEDGER_SCRIPTS = (BUGS_SCRIPT, BACKLOG_SCRIPT, RELEASE_SCRIPT, AUDIT_SCRIPT)
-
-
-@cache
-def load_owner(skill: str, module: str) -> ModuleType:
-    """The packaged ``<skill>/scripts/<module>.py``, executed from source into a module —
-    the one package path into ``public/skills`` (ADR 0135); no bytecode lands beside it."""
-    path = _PACKAGE_SKILLS / skill / "scripts" / f"{module}.py"
-    owner = ModuleType(module)
-    owner.__file__ = str(path)
-    exec(compile(path.read_text(encoding="utf-8"), path, "exec"), owner.__dict__)
-    return owner
 
 
 class _Runner(Protocol):
@@ -132,15 +113,15 @@ def resolve_script(script: LedgerScript, specs_dir: Path) -> Path | None:
     return None
 
 
-def _unrunnable(script: LedgerScript, reason: str) -> SectionFinding:
+def _unrunnable(script: LedgerScript, reason: str, fix: str = "") -> SectionFinding:
     return SectionFinding(
         code=script.code,
         verdict="error",
         message=f"{script.skill}/scripts/{script.filename} {reason}",
         canonical=False,
         error=True,
-        # The one remediation for a script that cannot run at all: re-project the skills.
-        fix=fix_line(None, "public", "install"),
+        # The script's own refusal fix, else the one for a script that cannot run: re-project.
+        fix=fix or fix_line(None, "public", "install"),
     )
 
 
@@ -174,7 +155,8 @@ def script_findings(specs_dir: Path, runner: _Runner | None = None) -> list[Sect
             continue
         records = _parse(result)
         if records is None:
-            findings.append(_unrunnable(script, f"check exited {result.returncode} with no JSON"))
+            reason = f"check exited {result.returncode} with no JSON"
+            findings.append(_unrunnable(script, reason, fix_of(result.stderr)))
             continue
         findings.extend(
             _finding(script, record) for record in records if record.get("verdict") != "info"
@@ -218,19 +200,28 @@ def _parse(result: Any) -> list[dict[str, Any]] | None:
 
 
 def worktree_rows(
-    root: Path, runner: _Runner | None = None
+    root: Path, repos: Collection[str], runner: _Runner | None = None
 ) -> tuple[list[dict[str, Any]], str, str]:
-    """Read the owner's bounded ``worktree.py list --json`` result once."""
+    """Read the owner's bounded ``list --json`` result once: the rows of *repos* (a
+    context's) plus the rows no context owns (``registered: false``), never another context's."""
     path = resolve_script(WORKTREE_SCRIPT, root)
     if path is None:
-        return [], "list failed: worktree.py is not installed", fix_line(root, "public", "install")
+        return (
+            [],
+            "list failed: the dd-gitflow-default worktree scripts are not installed",
+            fix_line(root, "public", "install"),
+        )
     process = runner if runner is not None else SubprocessProcessRunner()
     try:
         done = process.run([sys.executable, str(path), "list", "--json"], cwd=root, timeout=10.0)
         found = json.loads(done.stdout) if done.returncode == 0 else None
     except (OSError, TimeoutError, ValueError) as exc:
-        return [], f"list failed: {type(exc).__name__}", f"{WORKTREE_SCRIPT.invocation} list"
+        return [], f"list failed: {type(exc).__name__}", fix_line(root, "worktree", "list")
     if not isinstance(found, list):  # the script's refusal: reason, then its one fix line
-        reason, _, fix = done.stderr.strip().partition("\nfix: ")
-        return [], f"list failed: {reason}", fix or f"{WORKTREE_SCRIPT.invocation} list"
-    return found, "", ""
+        reason = without_fix(done.stderr).strip()
+        return (
+            [],
+            f"list failed: {reason}",
+            fix_of(done.stderr, fix_line(root, "worktree", "list")),
+        )
+    return [r for r in found if r["repo"] in repos or r.get("registered") is False], "", ""

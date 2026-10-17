@@ -6,11 +6,10 @@ from __future__ import annotations
 
 import importlib.util
 import os
-import shlex
+import re
 import shutil
 import subprocess
 import sys
-import sysconfig
 from pathlib import Path
 
 import pytest
@@ -18,6 +17,7 @@ import yaml
 
 from tests.fixtures.harness_env import suite_env
 from tests.fixtures.stores import fake_venv
+from tests.helpers.oslib import link, read_text, run, write_text
 
 pytestmark = pytest.mark.slow(reason="each case spawns scripts/ci.py and its tools")
 _REPO = Path(__file__).resolve().parents[2]
@@ -39,15 +39,14 @@ def _checkout(root: Path, files: dict[str, str]) -> Path:
         shutil.copyfile(_REPO / kept, root / kept)
     for rel, text in files.items():
         (root / rel).parent.mkdir(parents=True, exist_ok=True)
-        (root / rel).write_text(text, encoding="utf-8")
+        write_text(root / rel, text)
     return root
 
 
 def _ci(checkout: Path, job: str, python: str = sys.executable) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
+    return run(
         [python, str(checkout / "scripts" / "ci.py"), job],
         cwd=checkout,
-        # an outer coverage session (the medium tests run under it) must not steer this inner one
         env=suite_env(
             os.environ,
             Path.home(),
@@ -57,26 +56,14 @@ def _ci(checkout: Path, job: str, python: str = sys.executable) -> subprocess.Co
                 if k == "PYTHONDONTWRITEBYTECODE" or k.startswith(("COV_CORE_", "COVERAGE"))
             ),
         ),
-        capture_output=True,
-        text=True,
         check=False,
     )
 
 
 def _instance(root: Path) -> Path:
     (root / ".dadaia" / "states").mkdir(parents=True)
-    (root / ".dadaia" / "states" / "spec_contexts.json").write_text('{"contexts": []}\n')
+    write_text(root / ".dadaia" / "states" / "spec_contexts.json", '{"contexts": []}\n')
     return root
-
-
-def _venv_owned_by(instance: Path) -> str:
-    """A python whose ``sys.prefix`` is ``<instance>/.dadaia/.venv``: ``fake_venv``'s copy of
-    this interpreter, and a ``.pth`` onto its packages — no install."""
-    venv = instance / ".dadaia" / ".venv"
-    site = venv / Path(sysconfig.get_path("purelib")).relative_to(sys.prefix)
-    site.mkdir(parents=True)
-    (site / "deps.pth").write_text(sysconfig.get_path("purelib") + "\n")
-    return str(fake_venv(instance))
 
 
 @pytest.mark.parametrize(
@@ -122,9 +109,16 @@ def test_doctor_judges_no_instance(tmp_path: Path, owner: str) -> None:
     instance = _instance(tmp_path / "inst")
     nested = owner == "encloses the checkout"
     checkout = _checkout(instance / "repos" / "co" if nested else tmp_path / "co", {})
-    (checkout / "dadaia_workspace").symlink_to(_REPO / "dadaia_workspace")
-    done = _ci(checkout, "doctor", sys.executable if nested else _venv_owned_by(instance))
+    if not link(str(_REPO / "dadaia_workspace"), checkout / "dadaia_workspace", is_dir=True):
+        pytest.skip("the host refuses symlinks")
+    done = _ci(checkout, "doctor", sys.executable if nested else str(fake_venv(instance, pth=True)))
     assert "doctor --specs-dir specs" in done.stdout
+    # the doctor ran to its own verdict: a finding line, then the fix: line that clears it
+    lines = done.stdout.splitlines()
+    assert any(
+        re.match(r"[A-Z]+-\S+ (error|warning) ", ln) and nxt.startswith("fix:")
+        for ln, nxt in zip(lines, lines[1:], strict=False)
+    )
     # The workspace section (WS-*) judges a resolved instance; the fenced run resolves none.
     assert [ln for ln in done.stdout.splitlines() if ln.startswith("WS-")] == []
 
@@ -157,14 +151,20 @@ def _plan(*argv: str) -> list[str]:
 def test_job_verify_is_the_fast_check() -> None:
     assert _plan("job") == _plan() == [
         "lint: ruff format", "lint: ruff check", "lint: lint-imports", "typecheck: mypy",
-        "guards: guards", "guards: guards --planted", "unit-fast: unit-fast",
+        "guards: guards", "guards: guards --planted", "unit-fast: unit-fast", "doctor: doctor",
     ]  # fmt: skip
 
 
+@pytest.mark.parametrize("job", ["task", "stage"])
+def test_only_the_job_level_exists(tmp_path: Path, job: str) -> None:
+    done = _ci(_checkout(tmp_path, {}), job)
+    assert done.returncode != 0
+    assert "--- " not in done.stdout  # an unknown job runs no step
+    assert f"'{job}'" in done.stderr
+
+
 def test_pushes_use_linux_and_pull_requests_use_the_full_matrix() -> None:
-    workflow = yaml.load(
-        (_REPO / ".github/workflows/ci.yml").read_text("utf-8"), Loader=yaml.BaseLoader
-    )
+    workflow = yaml.load(read_text(_REPO / ".github/workflows/ci.yml"), Loader=yaml.BaseLoader)
     triggers = workflow["on"]
     assert set(triggers["push"]["branches"]) >= {"feature/**", "wt/**"}
     assert set(triggers["pull_request"]["branches"]) == {"main", "develop"}
@@ -180,14 +180,20 @@ def test_pushes_use_linux_and_pull_requests_use_the_full_matrix() -> None:
     }
 
 
+def _words(line: str) -> list[str]:
+    """A documented line's argv: split on blanks, a double quote groups one word (no kernel splitter
+    serves a documented line: the gate's own is private to its script)."""
+    return [w.strip('"') for w in re.findall(r'"[^"]*"|[^\s"]+', line)]
+
+
 @pytest.mark.parametrize("doc", ["tests/README.md", "tests/AGENTS.md"])
 def test_documented_coverage_line_leaves_no_coverage_file_in_the_checkout(
     tmp_path: Path, doc: str
 ) -> None:
-    """AC2.1: on CI, the doc's own ``pytest --cov`` line, run in a git checkout, leaves no
+    """On CI, the doc's own ``pytest --cov`` line, run in a git checkout, leaves no
     coverage file there (tracked, untracked or ignored)."""
     line = next(
-        ln for ln in (_REPO / doc).read_text(encoding="utf-8").splitlines()
+        ln for ln in read_text(_REPO / doc).splitlines()
         if ln.startswith("python -m pytest") and "--cov" in ln
     )  # fmt: skip
     files = {
@@ -200,7 +206,7 @@ def test_documented_coverage_line_leaves_no_coverage_file_in_the_checkout(
         ),
     }
     checkout = _checkout(tmp_path, files)
-    subprocess.run(["git", "init", "-q"], cwd=checkout, check=True)
+    run(["git", "init", "-q"], cwd=checkout, check=True)
     tmp = tmp_path / "tmp"  # where the plugin's temp dir lives, and is gone after exit
     tmp.mkdir()
     env = suite_env(
@@ -209,11 +215,14 @@ def test_documented_coverage_line_leaves_no_coverage_file_in_the_checkout(
         unset=("COVERAGE_FILE",),
         overrides={"CI": "true", "TMPDIR": str(tmp)},
     )
-    argv = [sys.executable, *shlex.split(line)[1:]]
-    assert subprocess.run(argv, cwd=checkout, env=env, check=False).returncode == 0
+    argv = [sys.executable, *_words(line)[1:]]
+    assert run(argv, cwd=checkout, env=env, check=False).returncode == 0
     assert [p.name for p in tmp.iterdir() if p.name.startswith("dadaia-cov-")] == []
-    status = subprocess.run(
-        ["git", "status", "--porcelain", "--ignored"],
-        cwd=checkout, capture_output=True, text=True, check=True,
-    ).stdout  # fmt: skip
+    status = run(["git", "status", "--porcelain", "--ignored"], cwd=checkout, check=True).stdout  # fmt: skip
     assert [ln for ln in status.splitlines() if "coverage" in ln] == []
+
+
+def test_a_documented_line_keeps_a_quoted_multi_word_value_as_one_word() -> None:
+    assert _words('python -m pytest -m "not slow" --cov=pkg') == [
+        "python", "-m", "pytest", "-m", "not slow", "--cov=pkg",
+    ]  # fmt: skip

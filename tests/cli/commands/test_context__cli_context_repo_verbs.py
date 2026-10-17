@@ -1,7 +1,6 @@
-"""v0.4.4 FR17 A17.1-A17.3 (T-044-28): `context repo add/remove` are
-idempotent, refuse loudly (unknown context or slug, a conflicting URL, the main repo's own
-slug) leaving the record unchanged, and `remove` never deletes an on-disk checkout — it
-says what it leaves behind.
+"""`context repo add/remove` are idempotent, refuse loudly (unknown context or slug, a
+conflicting URL) leaving the record unchanged, and `remove` never deletes an on-disk
+checkout — it says what it leaves behind. Adding the main repo's own slug is a no-op.
 """
 
 from __future__ import annotations
@@ -10,9 +9,6 @@ import json
 from pathlib import Path
 
 import pytest
-
-pytest.importorskip("fcntl")
-
 from typer.testing import CliRunner  # noqa: E402
 
 from dadaia_workspace.cli.main import app  # noqa: E402
@@ -25,6 +21,7 @@ from dadaia_workspace.infrastructure.python_env import (  # noqa: E402
     VenvPythonEnvironmentManager,
 )
 from tests.fakes import seed_dead_context
+from tests.helpers.oslib import read_text, write_text
 
 _runner = CliRunner()
 
@@ -42,9 +39,7 @@ def workspace(tmp_path: Path, monkeypatch) -> Path:  # type: ignore[no-untyped-d
 
 
 def _record(workspace: Path, name: str) -> dict:  # type: ignore[type-arg]
-    data = json.loads(
-        (workspace / ".dadaia" / "states" / "spec_contexts.json").read_text(encoding="utf-8")
-    )
+    data = json.loads(read_text(workspace / ".dadaia" / "states" / "spec_contexts.json"))
     contexts = data.get("contexts", data)
     if isinstance(contexts, dict):
         return contexts[name]
@@ -74,7 +69,6 @@ def test_repo_add_is_idempotent(foo: Path) -> None:
     ("argv", "text"),
     [
         pytest.param(["add", "foo", "assoc-a", "--url", "https://x.test/b.git"], "remove", id="conflicting-url-names-remove"),
-        pytest.param(["add", "foo", "foo-repo"], "main repo", id="A17.3-main-repo-slug"),
         pytest.param(["add", "nope", "assoc-b"], "not found", id="add-unknown-context"),
         pytest.param(["add", "foo", "not a valid slug"], "", id="add-invalid-slug"),
         pytest.param(["remove", "foo", "never-added"], "never-added", id="remove-unknown-slug"),
@@ -89,17 +83,24 @@ def test_a_refused_repo_verb_exits_1_and_changes_nothing(
     assert _record(foo, "foo")["associated_repos"] == _A
 
 
+def test_a17_2_adding_the_own_main_slug_is_a_no_op(foo: Path) -> None:
+    before = _record(foo, "foo")
+    result = _runner.invoke(app, ["context", "repo", "add", "foo", "foo-repo"])
+    assert result.exit_code == 0, result.output
+    assert _record(foo, "foo") == before
+
+
 @pytest.mark.parametrize(
     ("checkout", "text"), [(True, "untouched"), (False, "no on-disk checkout")]
 )
 def test_repo_remove_never_deletes_a_checkout_and_says_so(
     foo: Path, checkout: bool, text: str
 ) -> None:
-    """A17.2; A17.1: a second remove of the same slug is a loud failure."""
+    """A second remove of the same slug is a loud failure."""
     on_disk = foo / "repos" / "assoc-a"
     if checkout:
         on_disk.mkdir(parents=True)
-        (on_disk / "marker.txt").write_text("still here\n", encoding="utf-8")
+        write_text(on_disk / "marker.txt", "still here\n")
 
     result = _runner.invoke(app, ["context", "repo", "remove", "foo", "assoc-a"])
 

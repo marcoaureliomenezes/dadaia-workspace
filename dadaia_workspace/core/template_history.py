@@ -1,11 +1,9 @@
-"""Shipped-version history for projected template assets — bug
-``upgrade-never-refreshes-uncustomised-scoped-law-projection`` (MEDIUM).
+"""Shipped-version history for projected template assets.
 
 A projected law file (``specs/AGENTS.md``) is installed once and then never refreshed:
 overwriting it could destroy operator customisation, so ``dadaia doctor`` reports drift
-(TREE-5) and declines to repair. Without a way to recognise our own earlier output, a file
-nobody ever edited is protected exactly like a hand-written one — and every instance kept
-scoped law citing a command the CLI had already removed.
+and declines to repair. Without a way to recognise our own earlier output, a file
+nobody ever edited is protected exactly like a hand-written one.
 
 This module supplies the missing evidence: the set of sha256 digests of every version of a
 template this project has published. On-disk bytes found in that set were written by us
@@ -25,6 +23,7 @@ import hashlib
 import json
 from pathlib import Path
 
+from dadaia_workspace.core import platform
 from dadaia_workspace.core.workspace_layout import render_registry_tables
 
 __all__ = ["SHIPPED_HASHES_FILENAME", "load_shipped_hashes", "was_shipped"]
@@ -42,8 +41,8 @@ def load_shipped_hashes(templates_dir: Path) -> dict[str, set[str]]:
     """
     history_path = templates_dir / SHIPPED_HASHES_FILENAME
     try:
-        raw = json.loads(history_path.read_text(encoding="utf-8"))
-    except (OSError, ValueError, RecursionError):
+        raw = json.loads(platform.read_text(history_path))
+    except (OSError, ValueError, RecursionError, platform.Undecodable):
         # RecursionError: a deeply nested document blows the JSON parser's stack; a corrupt
         # history must degrade to "nothing is provably ours", never take the doctor down.
         return {}

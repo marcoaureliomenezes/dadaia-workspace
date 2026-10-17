@@ -1,6 +1,5 @@
-"""AC6.2 (T-050-11): the constitution gitflow reads back; one merge-writer
-keeps every other key and the body byte-identical. Bug
-upgrade-leaves-project-specs-unmigrated-and-silent: the canon a tree must meet is pinned
+"""The constitution gitflow reads back; one merge-writer
+keeps every other key and the body byte-identical. The canon a tree must meet is pinned
 to ``CANONICAL_SPECS_VERSION``."""
 
 from __future__ import annotations
@@ -13,12 +12,13 @@ from dadaia_workspace.core.fixed_sections import FIXED_SECTIONS
 from dadaia_workspace.core.gitflow import DEFAULT, Gitflow, merge_frontmatter, read_gitflow
 from dadaia_workspace.core.specs_version import CANON_AT as _CANON_AT
 from dadaia_workspace.core.specs_version import CANONICAL_SPECS_VERSION, state
+from tests.helpers.oslib import read_text, write_text
 
 _CUSTOM = Gitflow(principal="trunk", integration="next", work_prefix="work/")
 
 
 def _write(tmp_path: Path, text: str) -> Path:
-    (tmp_path / "constitution.md").write_text(text, encoding="utf-8")
+    write_text(tmp_path / "constitution.md", text)
     return tmp_path
 
 
@@ -59,7 +59,7 @@ def test_merge_preserves_unknown_keys_and_body(tmp_path: Path) -> None:
         "owner:\n  - a\n  - b\n---" + body,
     )
     merge_frontmatter(specs, specs_pattern_version=CANONICAL_SPECS_VERSION, gitflow=DEFAULT)
-    text = (specs / "constitution.md").read_text(encoding="utf-8")
+    text = read_text(specs / "constitution.md")
     assert text.endswith("---" + body)
     assert "constitution_version: 6.0.0  # note\nowner:\n  - a\n  - b\n" in text
     assert state(specs)[0] == "canonical"
@@ -69,9 +69,9 @@ def test_merge_preserves_unknown_keys_and_body(tmp_path: Path) -> None:
 def test_merge_is_idempotent(tmp_path: Path) -> None:
     specs = _write(tmp_path, "---\nx: 1\n---\nbody\n")
     merge_frontmatter(specs, gitflow=_CUSTOM)
-    once = (specs / "constitution.md").read_text(encoding="utf-8")
+    once = read_text(specs / "constitution.md")
     merge_frontmatter(specs, gitflow=_CUSTOM)
-    assert (specs / "constitution.md").read_text(encoding="utf-8") == once
+    assert read_text(specs / "constitution.md") == once
 
 
 def test_merge_replaces_a_block_style_gitflow(tmp_path: Path) -> None:
@@ -80,7 +80,7 @@ def test_merge_replaces_a_block_style_gitflow(tmp_path: Path) -> None:
         "---\ngitflow:\n  principal: main\n  integration: develop\n  work: feature/\nz: 2\n---\nb\n",
     )
     merge_frontmatter(specs, gitflow=_CUSTOM)
-    text = (specs / "constitution.md").read_text(encoding="utf-8")
+    text = read_text(specs / "constitution.md")
     assert text.count("principal") == 1
     assert "\nz: 2\n" in text
     assert read_gitflow(specs) == (_CUSTOM, None)
@@ -89,7 +89,7 @@ def test_merge_replaces_a_block_style_gitflow(tmp_path: Path) -> None:
 def test_merge_prepends_a_block_when_absent(tmp_path: Path) -> None:
     specs = _write(tmp_path, "# no frontmatter\n")
     merge_frontmatter(specs, specs_pattern_version=7)
-    assert (specs / "constitution.md").read_text(encoding="utf-8") == (
+    assert read_text(specs / "constitution.md") == (
         "---\nspecs_pattern_version: 7\n---\n# no frontmatter\n"
     )
 

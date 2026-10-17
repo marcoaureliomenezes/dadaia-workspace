@@ -1,12 +1,9 @@
 """Table-driven tests for ``core.handoff_index``.
 
-release 0.5.1 K6 (one module owns version routing, the self_pull
-rule and artifact resolution); sa-json-schema-validated-by-two-engines (jsonschema is the
-one engine).
+One module owns version routing, the self_pull rule and artifact resolution;
+jsonschema is the one engine.
 
-sa-handoff-self-pull-requirement-diverges (0.5.0 WP-46): the schema admits only
-handoff-v1.2 (sa-handoff-self-pull-requirement-diverges#46.1) and self_pull is always required
-(sa-handoff-self-pull-requirement-diverges#46.2).
+The schema admits only handoff-v1.2, and self_pull is always required.
 """
 
 from __future__ import annotations
@@ -19,11 +16,12 @@ import pytest
 
 from dadaia_workspace.core.exceptions import HandoffSchemaError
 from dadaia_workspace.core.handoff_index import Handoff, HandoffIndex
+from tests.helpers.oslib import read_text, write_text
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _SCHEMA_PATH = _REPO_ROOT / "dadaia_workspace" / "public" / "schemas" / "handoff-v1.schema.json"
 _FIXTURES = Path(__file__).resolve().parents[1] / "fixtures" / "handoffs"
-_SCHEMA = json.loads(_SCHEMA_PATH.read_text(encoding="utf-8"))
+_SCHEMA = json.loads(read_text(_SCHEMA_PATH))
 
 
 # ---------------------------------------------------------------------------
@@ -33,7 +31,7 @@ _SCHEMA = json.loads(_SCHEMA_PATH.read_text(encoding="utf-8"))
 
 def _write(path: Path, doc: dict[str, object]) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(doc, indent=2), encoding="utf-8")
+    write_text(path, json.dumps(doc, indent=2))
     return path
 
 
@@ -44,9 +42,9 @@ _REF = "specs/memory/ARCHITECTURE.md"
 def _atom(root: Path) -> Path:
     """*root* as a workspace: its registry, and the atom the default fixture self-pulls."""
     (root / ".dadaia" / "states").mkdir(parents=True, exist_ok=True)
-    (root / ".dadaia" / "states" / "spec_contexts.json").write_text('{"contexts": []}')
+    write_text(root / ".dadaia" / "states" / "spec_contexts.json", '{"contexts": []}')
     (root / _REF).parent.mkdir(parents=True, exist_ok=True)
-    (root / _REF).write_text("# Architecture\n", encoding="utf-8")
+    write_text(root / _REF, "# Architecture\n")
     return root
 
 
@@ -54,7 +52,7 @@ def _base_doc(**overrides: object) -> dict[str, object]:
     doc: dict[str, object] = {
         "schema_version": "handoff-v1.2",
         "self_pull": {"refs": [_REF]},
-        "agent": "dd-software-engineer",
+        "agent": "dd-sw-engineer-sr",
         "context": "dadaia-workspace",
         "produced_at": "2026-08-28T12:00:00Z",
         "scope": "table-driven fixture",
@@ -80,7 +78,7 @@ def _base_doc(**overrides: object) -> dict[str, object]:
 )
 def test_malformed_handoff_classification(tmp_path: Path, name: str, content: str) -> None:
     path = tmp_path / "bad.handoff.json"
-    path.write_text(content, encoding="utf-8")
+    write_text(path, content)
 
     handoff = Handoff.load(path)
 
@@ -93,8 +91,7 @@ def test_malformed_handoff_classification(tmp_path: Path, name: str, content: st
 # ---------------------------------------------------------------------------
 # 3. Version routing — the schema's own ``schema_version`` enum is the router;
 #    a future/unknown token is refused explicitly, never silently downgraded
-#    (bug reports-sidecar-version-detection-misroutes-future-tokens, fixed at the root:
-#    there is no second ad-hoc detector left to misroute it).
+#    (there is no second ad-hoc detector left to misroute it).
 # ---------------------------------------------------------------------------
 
 
@@ -113,7 +110,7 @@ def test_malformed_handoff_classification(tmp_path: Path, name: str, content: st
 def test_schema_version_routing_matrix(
     tmp_path: Path, schema_version: str, expect_valid: bool
 ) -> None:
-    """sa-handoff-self-pull-requirement-diverges#46.1: only handoff-v1.2 is valid."""
+    """Only handoff-v1.2 is valid."""
     doc = _base_doc(schema_version=schema_version)
     path = _write(tmp_path / "h.handoff.json", doc)
     handoff = Handoff.load(path)
@@ -126,9 +123,8 @@ def test_schema_version_routing_matrix(
 
 
 def test_v12_requires_self_pull(tmp_path: Path) -> None:
-    """sa-handoff-self-pull-requirement-diverges#46.2: a v1.2 without self_pull is
-    INVALID, naming the field; sa-json-schema-validated-by-two-engines: the error is
-    jsonschema's own."""
+    """A v1.2 without self_pull is
+    INVALID, naming the field; the error is jsonschema's own."""
     doc = _base_doc()
     del doc["self_pull"]
     result = Handoff.load(_write(tmp_path / "v12.handoff.json", doc)).validate(
@@ -150,7 +146,7 @@ def test_real_fixture_v12_deepening_audit_self_pull_refs_and_hash_pass_schema_sh
     path = _FIXTURES / "v1.2-deepening-audit-self-pull.handoff.json"
     handoff = Handoff.load(path)
     (tmp_path / ".dadaia" / "states").mkdir(parents=True)  # an empty workspace: its registry
-    (tmp_path / ".dadaia" / "states" / "spec_contexts.json").write_text('{"contexts": []}')
+    write_text(tmp_path / ".dadaia" / "states" / "spec_contexts.json", '{"contexts": []}')
 
     result = handoff.validate(workspace_root=tmp_path, schema=_SCHEMA)
 
@@ -169,8 +165,7 @@ def test_artifact_path_none_when_undeclared(tmp_path: Path) -> None:
 
 
 def test_artifact_path_resolves_repos_specs_audits_workspace_rooted(tmp_path: Path) -> None:
-    """Bug handoff-artifact-path-cannot-reference-specs-audits: a
-    repos/<slug>/specs/audits/<UTC>/audit.md path resolves — it is NOT
+    """A repos/<slug>/specs/audits/<UTC>/audit.md path resolves — it is NOT
     .dadaia/reports/-prefixed, and the one rule has no such special case."""
     audit = tmp_path / "repos" / "dadaia-workspace" / "specs" / "audits" / "2026-06-10" / "audit.md"
     audit.parent.mkdir(parents=True)
@@ -311,15 +306,16 @@ def _v12_doc_with_refs(refs: list[str]) -> dict[str, object]:
 
 
 def test_self_pull_ref_existence_and_missing_ref_named(tmp_path: Path) -> None:
-    """sa-context-repo-mapping-falls-back-to-the-name#B3: refs resolve in the context's
+    """Refs resolve in the context's
     registered repo — the context NAME (dadaia-workspace) differs from its repo slug."""
     states = tmp_path / ".dadaia" / "states"
     states.mkdir(parents=True)
-    (states / "spec_contexts.json").write_text(
-        json.dumps({"contexts": [{"name": "dadaia-workspace", "repo_slug": "alphamain"}]})
+    write_text(
+        states / "spec_contexts.json",
+        json.dumps({"contexts": [{"name": "dadaia-workspace", "repo_slug": "alphamain"}]}),
     )
     (tmp_path / "repos" / "alphamain" / "specs" / "memory").mkdir(parents=True)
-    (tmp_path / "repos" / "alphamain" / "specs" / "memory" / "TECHSTACK.md").write_text("x")
+    write_text(tmp_path / "repos" / "alphamain" / "specs" / "memory" / "TECHSTACK.md", "x")
 
     handoff = Handoff.load(
         _write(
@@ -342,17 +338,19 @@ def test_self_pull_resolves_against_reviewed_root_before_workspace(tmp_path: Pat
     disk must resolve — reviewed_root wins."""
     workspace = tmp_path / "workspace"
     (workspace / ".dadaia" / "states").mkdir(parents=True)
-    (workspace / ".dadaia" / "states" / "spec_contexts.json").write_text(
-        json.dumps({"contexts": [{"name": "dadaia-workspace", "repo_slug": "dadaia-workspace"}]})
+    write_text(
+        workspace / ".dadaia" / "states" / "spec_contexts.json",
+        json.dumps({"contexts": [{"name": "dadaia-workspace", "repo_slug": "dadaia-workspace"}]}),
     )
     (workspace / "repos" / "dadaia-workspace" / "specs" / "memory").mkdir(parents=True)
-    (workspace / "repos" / "dadaia-workspace" / "specs" / "memory" / "TECHSTACK.md").write_text(
-        "checked-out-branch version"
+    write_text(
+        workspace / "repos" / "dadaia-workspace" / "specs" / "memory" / "TECHSTACK.md",
+        "checked-out-branch version",
     )
 
     reviewed_worktree = tmp_path / "linked-worktree"
     (reviewed_worktree / "specs" / "memory").mkdir(parents=True)
-    (reviewed_worktree / "specs" / "memory" / "QUALITY.md").write_text("only in the reviewed tree")
+    write_text(reviewed_worktree / "specs" / "memory" / "QUALITY.md", "only in the reviewed tree")
 
     handoff = Handoff.load(
         _write(
@@ -378,11 +376,12 @@ def test_self_pull_falls_back_to_workspace_when_reviewed_root_lacks_the_ref(tmp_
     under the ordinary repos/<context>/<ref> candidate still resolves."""
     workspace = tmp_path / "workspace"
     (workspace / ".dadaia" / "states").mkdir(parents=True)
-    (workspace / ".dadaia" / "states" / "spec_contexts.json").write_text(
-        json.dumps({"contexts": [{"name": "dadaia-workspace", "repo_slug": "dadaia-workspace"}]})
+    write_text(
+        workspace / ".dadaia" / "states" / "spec_contexts.json",
+        json.dumps({"contexts": [{"name": "dadaia-workspace", "repo_slug": "dadaia-workspace"}]}),
     )
     (workspace / "repos" / "dadaia-workspace" / "specs" / "memory").mkdir(parents=True)
-    (workspace / "repos" / "dadaia-workspace" / "specs" / "memory" / "TECHSTACK.md").write_text("x")
+    write_text(workspace / "repos" / "dadaia-workspace" / "specs" / "memory" / "TECHSTACK.md", "x")
 
     reviewed_worktree = tmp_path / "linked-worktree"
     reviewed_worktree.mkdir()  # exists, but carries none of the referenced files
@@ -414,3 +413,10 @@ def test_handoff_index_validate_file_raises_handoff_schema_error_when_unstaged(
 
     with pytest.raises(HandoffSchemaError):
         index.validate_file(handoff_path)
+
+
+def test_load_records_a_non_utf8_handoff_instead_of_raising(tmp_path: Path) -> None:
+    """``Handoff.load`` never raises: bytes that are not UTF-8 are a recorded malformation."""
+    path = tmp_path / "h.handoff.json"
+    path.write_bytes(b'{"agent": "caf\xe9"}')
+    assert Handoff.load(path).malformed_error is not None

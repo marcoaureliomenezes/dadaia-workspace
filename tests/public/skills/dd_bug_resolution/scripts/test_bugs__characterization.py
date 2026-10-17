@@ -1,16 +1,19 @@
-"""Characterization net for the six public ``bugs.py`` seams owned by CP3."""
+"""Characterization net for the six public ``bugs.py`` seams."""
 
 from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
 
 import pytest
 
+from dadaia_workspace.core.skill_owner import load_owner
 from tests.fixtures.harness_env import suite_env
+from tests.helpers.oslib import read_text, run, write_text
 from tests.helpers.skill_scripts import stage_skill_scripts
 
 pytestmark = [
@@ -50,7 +53,7 @@ def _bytes(*records: dict[str, object]) -> bytes:
 
 
 def _git(repo: Path, *args: str) -> None:
-    subprocess.run(
+    run(
         [
             "git",
             "-c",
@@ -61,8 +64,6 @@ def _git(repo: Path, *args: str) -> None:
         ],
         cwd=repo,
         env=suite_env(os.environ, repo),
-        capture_output=True,
-        text=True,
         check=True,
     )
 
@@ -80,14 +81,7 @@ def _run(
             "raise SystemExit(bugs.main(sys.argv[1:]))"
         )
         command = [sys.executable, "-c", bootstrap, str(script.parent), *args]
-    return subprocess.run(
-        command,
-        cwd=repo,
-        env=suite_env(os.environ, repo),
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    return run(command, cwd=repo, env=suite_env(os.environ, repo), check=False)
 
 
 def test_all_public_bug_verbs_pin_output_and_each_ledger_write(tmp_path: Path) -> None:
@@ -104,7 +98,7 @@ def test_all_public_bug_verbs_pin_output_and_each_ledger_write(tmp_path: Path) -
     ledger.parent.mkdir(parents=True)
     source = repo / "src/module.py"
     source.parent.mkdir(parents=True)
-    source.write_text("value = 1\n", encoding="utf-8")
+    write_text(source, "value = 1\n")
     replacement = _open("replacement")
     rejected = _open("to-reject")
     resolved = _open("to-resolve")
@@ -125,6 +119,7 @@ def test_all_public_bug_verbs_pin_output_and_each_ledger_write(tmp_path: Path) -
         "repro": "python -m append",
         "expected": "Append succeeds",
         "correlates": [],
+        "fix_sha": None,
     }
     append = _run(
         script,
@@ -134,8 +129,6 @@ def test_all_public_bug_verbs_pin_output_and_each_ledger_write(tmp_path: Path) -
         "appended",
         "--reported-by",
         "characterizer",
-        "--ts",
-        _OPENED,
         "--title",
         "Appended bug",
         "--severity",
@@ -157,6 +150,10 @@ def test_all_public_bug_verbs_pin_output_and_each_ledger_write(tmp_path: Path) -
         "--specs",
         str(specs),
     )
+    records = load_owner("dd-bug-resolution", "_ledger").parse(read_text(ledger))
+    stamped = records[-1]
+    assert re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", stamped["ts"])
+    appended["ts"] = stamped["ts"]
     after_append = _bytes(replacement, rejected, resolved, superseded, appended)
     assert (append.returncode, append.stdout, append.stderr) == (
         0,
@@ -279,3 +276,31 @@ def test_all_public_bug_verbs_pin_output_and_each_ledger_write(tmp_path: Path) -
     assert (specs / "bugs/_archive/bugs_histo.jsonl").read_bytes() == _bytes(
         rejected, resolved, superseded
     )
+
+
+def test_append_rejects_ts_option_as_unknown(tmp_path: Path) -> None:
+    stage_skill_scripts(
+        "dd-release-implementation", tmp_path / "skills/dd-release-implementation/scripts"
+    )
+    script = (
+        stage_skill_scripts("dd-bug-resolution", tmp_path / "skills/dd-bug-resolution/scripts")
+        / "bugs.py"
+    )
+    repo = tmp_path / "repo"
+    ledger = repo / "specs/bugs/BUGS.jsonl"
+    ledger.parent.mkdir(parents=True)
+    ledger.write_bytes(b"")
+    (repo / "src").mkdir()
+    write_text(repo / "src/module.py", "value = 1\n")
+    _git(repo.parent, "init", "-q", str(repo))
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-qm", "fixture")
+    valid = [
+        "append", "--bug-id", "x", "--reported-by", "r", "--title", "T", "--severity", "LOW",
+        "--surface", "src", "--component", "c", "--context", "k", "--symptom", "s",
+        "--repro", "p", "--expected", "e", "--correlates", "none", "--specs", str(repo / "specs"),
+    ]  # fmt: skip
+    result = _run(script, repo, *valid, "--ts", _OPENED)
+    assert result.returncode == 2
+    assert "unrecognized arguments: --ts" in result.stderr
+    assert ledger.read_bytes() == b""

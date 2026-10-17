@@ -1,25 +1,45 @@
-"""The ONE spelling of the workspace CLI and its venv tools (ADR 0045): absolute paths,
-so every ``fix:`` runs from any cwd — ``shlex`` on POSIX; on Windows forward slashes, a
-part holding a blank quoted whole — the executable's quote opened after its drive letter
-(``C":/a b/x.exe"``), since a line opening with a quote is a PowerShell expression."""
+"""The ONE spelling of the workspace CLI and its venv tools: absolute paths, so every
+``fix:`` runs from any cwd. The quoting rule belongs to the kernel's `_platform.py`."""
 
 from __future__ import annotations
 
-import shlex
 import sys
 from pathlib import Path, PurePath
 
 from dadaia_workspace.core import platform
+from dadaia_workspace.core.skill_owner import load_owner
 
 
-def cli_path[P: PurePath](root: P) -> P:
-    """The workspace CLI's real executable (``Scripts\\dadaia.exe`` on Windows)."""
-    return _venv_tool(root / ".dadaia" / ".venv", "dadaia")
+def fix_of(text: str, default: str = "") -> str:
+    """The first `fix:` line of a child script's *text*: the kernel's one parser."""
+    return str(load_owner("dd-bug-resolution", "_refusal").fix_of(text, default))
+
+
+def without_fix(text: str) -> str:
+    """*text* with its `fix:` lines removed: the kernel's one stripper."""
+    return str(load_owner("dd-bug-resolution", "_refusal").without_fix(text))
+
+
+def spell_fix(fix: str) -> str:
+    """The `fix:` line of *fix*: the kernel's one spelling."""
+    return str(load_owner("dd-bug-resolution", "_refusal").spell_fix(fix))
+
+
+def reinstall_fix(start: Path) -> str:
+    """The command that repairs a shipped file under *start*: the kernel's one decider."""
+    return str(load_owner("dd-bug-resolution", "_jsonl").reinstall_fix(start))
+
+
+def cli_words(root: PurePath | None, *argv: str) -> tuple[str, ...]:
+    """The words that run the workspace CLI of *root* (the venv running now when ``None``) with
+    *argv*: rendered once, by ``command`` for a fix or ``platform.inline`` inside a sentence."""
+    venv = platform.venv_dir(root) if root is not None else Path(sys.prefix)
+    return (*platform.cli_argv(venv), *argv)
 
 
 def fix_line(root: PurePath | None, *argv: str) -> str:
     """``<absolute CLI> argv…`` quoted for the host shell (:func:`venv_line` for the CLI)."""
-    return venv_line(root, "dadaia", *argv)
+    return platform.command(*cli_words(root, *argv))
 
 
 #: The skills this package ships — present wherever the running CLI is installed.
@@ -36,43 +56,31 @@ def script_line(script: str, *argv: str) -> str:
 def venv_line(root: PurePath | None, tool: str, *argv: str) -> str:
     """``<absolute venv tool> argv…`` for *tool* (``dadaia``, ``pip``, ``python``) of the
     workspace venv; no workspace (*root* ``None``: CI) names the venv running now."""
-    venv = root / ".dadaia" / ".venv" if root is not None else Path(sys.prefix)
-    return shell_line(str(_venv_tool(venv, tool)), *argv)
-
-
-def _venv_tool[P: PurePath](venv: P, tool: str) -> P:
-    caps = platform.PLATFORM
-    return venv / caps.venv_scripts_dir / f"{tool}{caps.venv_exe_suffix}"
+    venv = platform.venv_dir(root) if root is not None else Path(sys.prefix)
+    return platform.command(str(platform.venv_tool(venv, tool)), *argv)
 
 
 def git_line(repo: str | PurePath, *argv: str) -> str:
     """``git -C <repo> argv…`` — every git fix names its repo, so it runs from any cwd."""
-    return shell_line("git", "-C", str(repo), *argv)
+    return platform.command("git", "-C", str(repo), *argv)
 
 
 def shell_line(*parts: str) -> str:
-    """*parts* joined into one command line quoted for the host shell."""
-    if platform.PLATFORM.venv_exe_suffix:  # Windows
-        head, *argv = (_win_quote(part.replace("\\", "/")) for part in parts)
-        if head.startswith('"'):  # a drive path: open the quote after its first char
-            head = f'{head[1]}"{head[2:]}'
-        return " ".join((head, *argv))
-    return shlex.join(parts)
+    """*parts* as one finished command line for the host shell: the kernel's ``command``."""
+    return platform.command(*parts)
 
 
 def mkdir_line(directory: PurePath) -> str:
     """Create *directory* and its parents, idempotent — one interpreter line that runs
     unchanged under sh, bash, cmd and PowerShell (no shell builtin differs per OS)."""
-    code = f"import pathlib; pathlib.Path(r'{directory}').mkdir(parents=True, exist_ok=True)"
-    return shell_line(sys.executable, "-c", code)
+    code = "import pathlib, sys; pathlib.Path(sys.argv[1]).mkdir(parents=True, exist_ok=True)"
+    return platform.command(sys.executable, "-c", code, str(directory))
 
 
 def materialize_line(link: PurePath, target: PurePath) -> str:
     """Replace the symlink *link* by a regular copy of *target* (``os.remove`` drops the
     link, never its target) — the same interpreter line on every OS."""
-    code = f"import os, shutil; os.remove(r'{link}'); shutil.copyfile(r'{target}', r'{link}')"
-    return shell_line(sys.executable, "-c", code)
-
-
-def _win_quote(arg: str) -> str:
-    return arg if arg and not any(c in arg for c in ' \t"') else f'"{arg}"'
+    code = (
+        "import os, shutil, sys; os.remove(sys.argv[1]); shutil.copyfile(sys.argv[2], sys.argv[1])"
+    )
+    return platform.command(sys.executable, "-c", code, str(link), str(target))

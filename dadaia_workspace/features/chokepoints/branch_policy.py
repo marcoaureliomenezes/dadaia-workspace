@@ -1,21 +1,25 @@
-"""Branch policy — the project gitflow read by role (ADRs 0037, 0046); zero I/O.
+"""Branch policy — the project gitflow read by role; zero I/O.
 
 Also home of :class:`Decision`, the outcome every chokepoint gate returns (this module
 has no internal-package dependency, so siblings import it from here)."""
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 
-from dadaia_workspace.core.cli_line import git_line
+from dadaia_workspace.core import platform
+from dadaia_workspace.core.cli_line import cli_words, git_line, spell_fix
+from dadaia_workspace.core.exceptions import GitSyncError
 from dadaia_workspace.core.gitflow import Gitflow
-from dadaia_workspace.core.models.git_scan import SHA_SHAPE_RE, ZERO_SHA
+from dadaia_workspace.core.models.git_scan import SHA_SHAPE_RE, is_zero_sha
 
 __all__ = [
     "Decision",
     "GateFixes",
     "PushRef",
     "check_branch_policy",
+    "check_ref_policy",
     "parse_push_stdin",
 ]
 
@@ -41,7 +45,7 @@ class PushRef:
 
     @property
     def is_deletion(self) -> bool:
-        return self.local_sha == ZERO_SHA or not self.local_sha
+        return is_zero_sha(self.local_sha) or not self.local_sha
 
     @property
     def is_tag(self) -> bool:
@@ -96,7 +100,9 @@ def _pushable(branch: str) -> bool:
 
 def _blocked(text: str, fix: str) -> Decision:
     """One refusal with one single-command fix (no ``&&``: Windows PowerShell 5.1)."""
-    return Decision(allowed=False, message=f"[pre-push] BLOCKED: {text} ({_LAW}).\nfix: {fix}")
+    return Decision(
+        allowed=False, message=f"[pre-push] BLOCKED: {text} ({_LAW}).\n{spell_fix(fix)}"
+    )
 
 
 def _refuse_branch(
@@ -104,7 +110,7 @@ def _refuse_branch(
 ) -> Decision:
     """Actionable refusal for a non-pushable ref (*branch* ``None``: not a branch head)."""
     role = gitflow.role_of(branch) if branch is not None else None
-    if role is not None and ref.remote_sha == ZERO_SHA:
+    if role is not None and is_zero_sha(ref.remote_sha):
         other = gitflow.integration if role == "principal" else gitflow.principal
         return _blocked(
             f"creating the {role} branch '{branch}' on an origin that already holds "
@@ -125,7 +131,7 @@ def _refuse_branch(
     return _blocked(
         f"the {role} branch '{branch}' is never pushed directly — it advances only via a PR "
         f"from '{head}'",
-        f"Operator action: open a PR/MR from '{head}' into '{branch}' on your git host",
+        f"Agent action: open a PR/MR from '{head}' into '{branch}' on your git host",
     )
 
 
@@ -136,8 +142,8 @@ def check_branch_policy(
     births: frozenset[str] = frozenset(),
 ) -> Decision | None:
     """The first refusal, or ``None``: each ref lands on a work or job branch from the
-    same-named local head, or births the principal/integration at a sha in *births*
-    (ADR 0036; R13); those two are otherwise PR-only."""
+    same-named local head, or births the principal/integration at a sha in *births*;
+    those two are otherwise PR-only."""
     for ref in refs:
         if not ref.remote_ref.startswith(HEADS_PREFIX):
             return _refuse_branch(ref, None, gitflow, fixes)
@@ -157,3 +163,52 @@ def check_branch_policy(
                 git_line(fixes.repo, "branch", "-m", ref.local_ref[len(HEADS_PREFIX) :], branch),
             )
     return None
+
+
+def _audit_descendant(
+    moved: Callable[[str, str], tuple[bool, list[str]]], old: str, new: str
+) -> bool:
+    """True when *old* is an ancestor of *new* and every changed path, at least one, is in the
+    ``audit`` zone; an unreadable fact is False."""
+    try:
+        descendant, zones = moved(old, new)
+    except GitSyncError:
+        return False
+    return descendant and bool(zones) and set(zones) == {"audit"}
+
+
+def check_ref_policy(
+    lines: list[str],
+    gitflow: Gitflow,
+    origin: dict[str, str],
+    repo: str,
+    moved: Callable[[str, str], tuple[bool, list[str]]],
+) -> Decision:
+    """The first refusal over ``<old> <new> <ref>`` lines: a work-branch update or creation
+    (new non-zero, different from old) must land on origin's sha for its ref, or be an audit-only
+    descendant move per ``moved(old, new) -> (old is an ancestor of new, zone of each renames-off
+    changed path)``, read only for a move that would otherwise be refused; deletions, non-work refs
+    and a ref origin does not hold pass. The fix names the tree to open for *repo*."""
+    for line in filter(str.strip, lines):
+        old, new, ref = line.split()
+        branch = ref.removeprefix(HEADS_PREFIX)
+        held = origin.get(ref)
+        if (
+            is_zero_sha(new)
+            or old == new
+            or gitflow.role_of(branch) != "work"
+            or held in ("", None, new)
+            or (not is_zero_sha(old) and _audit_descendant(moved, old, new))
+        ):
+            continue
+        fix = (
+            f"Agent action: open a tree for this change with {platform.inline(*cli_words(None, 'worktree', 'new', repo))} "
+            "and the name of a live job, a backlog slug or a hotfix bug id, then land the change "
+            "through that tree's merge"
+        )
+        return Decision(
+            allowed=False,
+            message=f"[ref-gate] BLOCKED: '{branch}' would move to {new}, origin holds {held} ({_LAW}).\n"
+            f"{spell_fix(fix)}",
+        )
+    return Decision(allowed=True)

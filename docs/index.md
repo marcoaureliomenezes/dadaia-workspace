@@ -19,7 +19,7 @@ agents, and its unit is the context.
 
 A workspace is one folder. The agent session launches at its root, always. Projects
 live in repos inside it (`repos/<slug>/`), which take agent work only as merges from
-their worktrees under `worktrees/<repo>/`, and the governance — the root `AGENTS.md`
+their worktree hierarchy under `worktrees/<repo>/<M.m.p>/`, and the governance — the root `AGENTS.md`
 map, the scoped `AGENTS.md` files, `.agents/skills`, `.agents/agents`, `.dadaia/` —
 lives outside every repo. A project is a context: one main repo, where `specs/` lives,
 plus its associated repos. A workspace holds many contexts and a context many repos; it
@@ -49,7 +49,7 @@ A human drives it from a shell in three levels:
 `uvx dadaia-workspace init <dir> --harness <name> --repo <url>` provisions the
 workspace and its first project ALIVE (`context bind` binds),
 `.dadaia/.venv/bin/dadaia specs init --context <slug>` brings the project's `specs/`
-to the canon, the first pass fills memory, `context baseline` publishes it, and
+to the canon (cutting the work branch when the repo has none), the first pass fills memory in a backlog lane, `context baseline` publishes it, and
 `.dadaia/.venv/bin/dadaia doctor` prints the next step and every finding with one
 fix line; `.dadaia/.venv/bin/dadaia context create --main-repo <url>` adds the next
 project, and re-running the `uvx` init line upgrades the workspace.

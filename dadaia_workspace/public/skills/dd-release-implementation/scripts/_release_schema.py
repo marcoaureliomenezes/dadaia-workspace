@@ -7,48 +7,59 @@ import datetime as _dt
 import functools
 import json
 import re
-import subprocess
-from collections.abc import Iterable
 from pathlib import Path
+from typing import Any
+
+import _git
+from _grammar import STATE, STATUS_RE, TASK_ID_RE, candidate_dir, candidate_number, sole_live
+from _ledger import load_schema
+from _platform import read_text
 
 CODE = "LEDGER-RELEASE-SCHEMA"
-STATE = "_RELEASE.json"
 HISTO = "releases/_archive/releases_histo.jsonl"
 #: One candidate's documents, born in its own `rc-<N>/` and never rewritten after closure; its
 #: tasks live in one job file per job, `rc-<N>/tasks/job<n>.md` (a closed rc keeps `TASKS.md`).
 CANDIDATE_DOCS = ("SPEC.md", "PLAN.md")
-#: A candidate folder; the live one is the highest N — `core.release_state.CANDIDATE_RE`.
-CANDIDATE_RE = re.compile(r"^rc-([1-9][0-9]*)$")
-#: The three lifecycle phases — pinned equal to the schema's enum; a shipped release
-#: moves whole to `_archive/<v>/` (ADR 0152 (1)).
-PHASES = ("DEFINITION", "IMPLEMENTATION", "CLOSURE")
-#: The phases in which the live candidate's trio is REQUIRED; DEFINITION is authoring it.
-TRIO_PHASES = frozenset({"IMPLEMENTATION", "CLOSURE"})
+#: The lifecycle phases, read from the `release-state-v1` enum; a shipped release moves whole to `_archive/<v>/`.
+PHASES = tuple(load_schema("release-state-v1")["properties"]["phase"]["enum"])
+#: The phases in which the live candidate's SPEC, PLAN and job files are REQUIRED; the first, DEFINITION, is authoring it.
+DEFINITION, IMPLEMENTATION, CLOSURE = PHASES
+TRIO_PHASES = frozenset(PHASES[1:])
+#: What a task's error says when its `W:` names the memory tree: a CLOSURE candidate's is history.
+MEMORY_WRITE = "writes specs/memory"
 #: A release ships `delivered` — the one histo disposition this ledger writes.
 DELIVERED = "delivered"
 APPROVED = "Approved"
-SEMVER_RE = re.compile(r"^\d+\.\d+\.\d+$")
-#: A shipped commit sha as a human pastes it from a merge: short (7) to full (40).
-SHA_RE = re.compile(r"^[0-9a-f]{7,40}$")
-#: The task markers in order — open < reserved < done (ADR 0111); the ONE task-line grammar.
-MARKS = (" ", "-", "x")
-#: A task line: indent and any Markdown bullet (``-``, ``*``, ``+``) or none, the marker, the rest.
-MARK_RE = re.compile(r"^([ \t]*(?:[-*+][ \t]*)?\[)([ x-])(\].*)$", re.MULTILINE)
-_STATUS_RE = re.compile(r"^\*\*Status:\*\*\s*(.+?)\s*$", re.MULTILINE)
-#: The Origin clause kinds, each at most once on the line (ADR 0161).
+#: The Origin clause kinds, each at most once on the line.
 ORIGIN_KINDS = ("backlog", "bugs", "findings")
 _ORIGIN_RE = re.compile(r"^\*\*Origin:\*\*[ \t]*(.*?)[ \t]*$", re.MULTILINE)
 _ORIGIN_GRAMMAR = "operator-demand | backlog:<ids>; bugs:<ids>; findings:<ids>, each kind once"
-TASK_ID_RE = re.compile(r"^J[1-9][0-9]*(?:\.S[1-9][0-9]*)?\.T[1-9][0-9]*$")
 
 
-def utc_now() -> str:
-    return _dt.datetime.now(_dt.UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+#: The closure summary grammar: `delivered: …; carried: …; backlog exits: …`.
+SUMMARY = re.compile(
+    r"delivered: (?P<delivered>.+?); carried: (?P<carried>.+?); backlog exits: (?P<exits>.+)"
+)
+
+
+def closure_summary(state: dict[str, Any]) -> dict[str, str]:
+    """The live candidate's closure summary as ``delivered``, ``carried`` and ``exits``: the
+    last `kind: summary` entry at or after ``defined.ts``, past DEFINITION; empty when none
+    or malformed; the word ``none`` reads as an empty field."""
+    since = str((state.get("defined") or {}).get("ts") or "")
+    if state.get("phase") == "DEFINITION":
+        return {}
+    for entry in reversed(state.get("log") or []):
+        if entry.get("kind") == "summary" and str(entry.get("ts")) >= since:
+            found = SUMMARY.fullmatch(str(entry.get("text", "")))
+            fields = found.groupdict() if found else {}
+            return {name: "" if text == "none" else text for name, text in fields.items()}
+    return {}
 
 
 def extract_status(text: str) -> str | None:
-    """The ``**Status:**`` token a trio document carries, or ``None``."""
-    match = _STATUS_RE.search(text)
+    """The ``**Status:**`` token a SPEC, PLAN or job document carries, or ``None``."""
+    match = STATUS_RE.search(text)
     return match.group(1) if match else None
 
 
@@ -56,35 +67,20 @@ class ShallowClone(ValueError):
     """*specs* sits in a shallow clone: no instant can be placed in its cut history."""
 
 
-class Unreadable(ValueError):
+class UnreadableRelease(ValueError):
     """A release state or the history `candidate_at` reads is unreadable; ``args[1]`` is the act."""
 
 
-def live_ids(specs: Path) -> list[str]:
-    """Every SemVer-named release directory directly under ``releases/`` carrying a state
-    document — `_archive` is not live."""
-    releases = specs / "releases"
-    if not releases.is_dir():
-        return []
-    return sorted(
-        d.name
-        for d in releases.iterdir()
-        if d.is_dir() and SEMVER_RE.match(d.name) and (d / STATE).is_file()
-    )
-
-
 def live_id(specs: Path) -> str:
-    """The ONE live release id; :class:`Unreadable` names why not and its act."""
-    from _specs import choice, script  # on every caller's sys.path; a runpy load never acts
+    """The ONE live release id; none live raises :class:`UnreadableRelease`, several the kernel
+    ``Refusal``, each with its act."""
+    from _specs import choice, script  # the entry point's bootstrap resolves it
 
-    ids, release = live_ids(specs), script(Path(__file__).resolve().parent / "release.py")
-    if not ids:
-        raise choice(Unreadable("no live release under specs/releases/ — nothing to operate on",
-                                f"{release} new"), "with the release version you choose")  # fmt: skip
-    if len(ids) > 1:
-        raise Unreadable(f"multiple live release directories carry {STATE}: {', '.join(ids)} — "
-                         "the release-candidates model allows exactly one", f"{release} check")  # fmt: skip
-    return ids[0]
+    release = script(Path(__file__).resolve().parent / "release.py")
+    if (live := sole_live(specs)) is None:
+        raise choice(UnreadableRelease("no live release under specs/releases/ — nothing to operate on",
+                                release("new")), "with the release version you choose")  # fmt: skip
+    return live
 
 
 def utc(ts: str) -> _dt.datetime:
@@ -99,15 +95,15 @@ def releases(specs: Path) -> dict[str, tuple[_dt.datetime, _dt.datetime | None]]
     spans: dict[str, tuple[_dt.datetime, _dt.datetime | None]] = {}
     for path in [*(specs / "releases").glob(f"*/{STATE}"), *(specs / "releases/_archive").glob(f"*/{STATE}")]:  # fmt: skip
         try:
-            state = json.loads(path.read_text(encoding="utf-8"))
+            state = json.loads(read_text(path))
             shipped = (state.get("shipped") or {}).get("ts")
             spans[path.parent.name] = (
                 utc(state["log"][0]["ts"]),
                 utc(shipped) if shipped else None,
             )
         except (OSError, ValueError, LookupError, TypeError, AttributeError) as exc:
-            raise Unreadable(f"{path} has no readable first log ts and shipped ts ({exc})",
-                             f"Operator action: repair {path} until `release.py check` passes") from None  # fmt: skip
+            raise UnreadableRelease(f"{path} has no readable first log ts and shipped ts ({exc})",
+                             f"Agent action: repair {path} until `release.py check` passes") from None  # fmt: skip
     return spans
 
 
@@ -115,26 +111,28 @@ def releases(specs: Path) -> dict[str, tuple[_dt.datetime, _dt.datetime | None]]
 def candidate_adds(specs: Path) -> list[tuple[_dt.datetime, str, str]]:
     """Each candidate's birth as (instant, release, rc): a commit adding exactly one
     rc-<N>/SPEC.md whose status reads non-Approved; a shallow history is refused."""
-    git = ["git", "-C", str(specs)]
-    shallow = subprocess.run([*git, "rev-parse", "--is-shallow-repository"], capture_output=True, text=True, encoding="utf-8", errors="replace", check=False)  # fmt: skip
-    if shallow.stdout.strip() == "true":
+    if _git.git(specs, "rev-parse", "--is-shallow-repository", check=False).strip() == "true":
         raise ShallowClone(f"{specs} is in a shallow clone: a release candidate read from a cut history "
-                           "would be stamped wrong for good (ADR 0187)")  # fmt: skip
-    head = subprocess.run([*git, "rev-parse", "-q", "--verify", "HEAD"], capture_output=True, check=False)  # fmt: skip
-    log = subprocess.run([*git, "log", "--diff-filter=A", "--name-only", "--format=%x00%H %cI", "--",
-                          ":(glob)releases/**/rc-*/SPEC.md"], capture_output=True, text=True, encoding="utf-8", errors="replace", check=False)  # fmt: skip
-    if head.returncode == 0 and log.returncode:  # a repo with no commit yet holds no birth
-        from _specs import git_line  # on every caller's sys.path; a runpy load never acts
+                           "would be stamped wrong for good")  # fmt: skip
+    try:
+        _git.git(specs, "rev-parse", "-q", "--verify", "HEAD")
+    except RuntimeError:  # a repo with no commit yet holds no birth
+        return []
+    try:
+        log = _git.git(specs, "log", "--diff-filter=A", "--name-only", "--format=%x00%H %cI", "--",
+                       ":(glob)releases/**/rc-*/SPEC.md")  # fmt: skip
+    except RuntimeError as exc:
+        from _platform import git_line  # the entry point's bootstrap resolves it
 
-        raise Unreadable(f"cannot read the history of {specs}: {log.stderr.strip()}",
-                         git_line(specs, "fsck"))  # fmt: skip
+        raise UnreadableRelease(
+            f"cannot read the history of {specs}: {exc}", git_line(specs, "fsck")
+        ) from None
     adds = []
-    for commit in log.stdout.split("\0")[1:] if head.returncode == 0 else []:
+    for commit in log.split("\0")[1:]:
         sha, *paths = commit.split()
         if len(paths) != 2:  # the instant, then exactly one added SPEC.md
             continue
-        show = subprocess.run([*git, "show", f"{sha}:{paths[1]}"], capture_output=True, text=True, encoding="utf-8", errors="replace", check=False)  # fmt: skip
-        if extract_status(show.stdout) != APPROVED:
+        if extract_status(_git.git(specs, "show", f"{sha}:{paths[1]}", check=False)) != APPROVED:
             parts = paths[1].split("/")
             adds.append((utc(paths[0]), parts[-3], parts[-2]))
     return adds
@@ -143,7 +141,7 @@ def candidate_adds(specs: Path) -> list[tuple[_dt.datetime, str, str]]:
 def candidate_at(specs: Path, instant: str) -> dict[str, str]:
     """The ONE answer to "which candidate held *instant*": the release whose half-open span
     holds it, the rc born last before it in that release, else ``unknown``; raises
-    :class:`ShallowClone`, :class:`Unreadable`, or ``ValueError`` for a bad *instant*."""
+    :class:`ShallowClone`, :class:`UnreadableRelease`, or ``ValueError`` for a bad *instant*."""
     when = utc(instant)
     adds = candidate_adds(specs)
     held = (r for r, (start, end) in releases(specs).items() if start <= when and (end is None or when < end))  # fmt: skip
@@ -154,7 +152,7 @@ def candidate_at(specs: Path, instant: str) -> dict[str, str]:
 
 def origin(text: str) -> dict[str, list[str]]:
     """The ids the first ``**Origin:**`` line carries, by kind; ``{}`` for operator-demand.
-    The ONE Origin parser (ADR 0161): raises ``ValueError`` saying what is wrong."""
+    The ONE Origin parser: raises ``ValueError`` saying what is wrong."""
     match = _ORIGIN_RE.search(text)
     if match is None:
         raise ValueError(f"has no `**Origin:**` line ({_ORIGIN_GRAMMAR})")
@@ -174,23 +172,35 @@ def origin_line(text: str) -> int:
     return text.count("\n", 0, match.start()) + 1 if match else 1
 
 
-def candidate_number(names: Iterable[str]) -> int:
-    """The highest ``rc-<N>`` among *names*, 0 when none — the live candidate's number."""
-    return max((int(m.group(1)) for n in names if (m := CANDIDATE_RE.match(n))), default=0)
+def _milestone_rc(state: dict[str, Any]) -> int:
+    """The number of the last ``milestone`` entry's candidate; 0 when the log has none."""
+    entries = state.get("log") or []
+    names = [str(e.get("candidate")) for e in entries if e.get("kind") == "milestone"]
+    return candidate_number(names)
 
 
-def candidate_dir(release_dir: Path) -> Path | None:
-    """The highest-numbered ``rc-<N>/`` under *release_dir* (ADR 0150) —
-    `core.gitflow.candidate_dir`'s twin; ``None`` when there is none."""
-    n = candidate_number(d.name for d in release_dir.iterdir() if d.is_dir())
-    return release_dir / f"rc-{n}" if n else None
+def _last_rc(release_dir: Path, state: dict[str, Any] | None) -> int:
+    """The ONE rule for "the last candidate": the last ``milestone`` entry's, else the highest
+    ``rc-<N>`` folder, else 1 for a live release's legacy flat trio, else 0. With no state the
+    trio is not counted: that call places it (the upgrade fold)."""
+    if last := _milestone_rc(state or {}):
+        return last
+    folders = candidate_number(d.name for d in release_dir.iterdir() if d.is_dir()) if release_dir.is_dir() else 0  # fmt: skip
+    return folders or int(state is not None and (release_dir / "SPEC.md").is_file())
 
 
-def next_candidate(release_dir: Path) -> Path:
-    """The ``rc-<N+1>/`` a new candidate is born in — past every ``rc-<N>`` entry, a stray
-    file included, so the birth never lands on an existing path."""
-    names = [p.name for p in release_dir.iterdir()] if release_dir.is_dir() else []
-    return release_dir / f"rc-{candidate_number(names) + 1}"
+def current_candidate(release_dir: Path, state: dict[str, Any]) -> Path | None:
+    """The ``rc-<N>/`` the release is working: the last candidate in IMPLEMENTATION or CLOSURE,
+    the one past a milestone's in DEFINITION; ``None`` for a legacy flat release, which has no folder."""
+    if last := _milestone_rc(state):
+        return release_dir / f"rc-{last + (state.get('phase') == DEFINITION)}"
+    return candidate_dir(release_dir)
+
+
+def next_candidate(release_dir: Path, state: dict[str, Any] | None) -> Path:
+    """The ``rc-<N+1>/`` a candidate is born in: past the last candidate, so a drafted folder
+    there is adopted."""
+    return release_dir / f"rc-{_last_rc(release_dir, state) + 1}"
 
 
 def writes(line: str) -> list[str]:
@@ -278,6 +288,10 @@ def current_job_writes(text: str, rel: str) -> tuple[set[str] | None, list[str]]
         paths = writes(f"`W:` {cells[writes_at]}")
         if not paths:
             errors.append(f"{rel} task {task_id} has no exact `W:` set")
+        if any(p.split("/")[:2] == ["specs", "memory"] for p in paths):
+            errors.append(
+                f"{rel} task {task_id} {MEMORY_WRITE} — memory is closure procedure (RC-FLOW step 4)"
+            )
         authority.update(paths)
     return authority, errors
 
@@ -346,8 +360,16 @@ def current_plan_jobs(text: str) -> tuple[dict[str, tuple[int, set[str]]] | None
     )
     if errors:
         return {}, errors
+    return _plan_jobs(rows, headers)
+
+
+def _plan_jobs(
+    rows: list[str], headers: list[str]
+) -> tuple[dict[str, tuple[int, set[str]]], list[str]]:
+    """The DAG's job -> (wave, exact writes) from its data *rows*, and why a row is refused."""
     job_at, wave_at, writes_at = (headers.index(name) for name in ("job", "wave", "w:"))
     jobs: dict[str, tuple[int, set[str]]] = {}
+    errors: list[str] = []
     for line in rows:
         cells = _cells(line)
         if len(cells) != len(headers) or not cells[job_at]:
@@ -357,11 +379,10 @@ def current_plan_jobs(text: str) -> tuple[dict[str, tuple[int, set[str]]] | None
         row_paths = re.findall(r"`([^`]+)`", cells[writes_at])
         if not cells[wave_at].isdigit() or not row_paths:
             errors.append(f"PLAN.md DAG job {job} has no numeric wave and exact `W:` set")
-            continue
-        if job in jobs:
+        elif job in jobs:
             errors.append(f"PLAN.md DAG repeats {job}")
-            continue
-        jobs[job] = (int(cells[wave_at]), set(row_paths))
+        else:
+            jobs[job] = (int(cells[wave_at]), set(row_paths))
     if not jobs:
         errors.append("PLAN.md DAG has no jobs")
     return jobs, errors

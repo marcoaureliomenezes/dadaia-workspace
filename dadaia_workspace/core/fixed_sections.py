@@ -48,8 +48,18 @@ def render_fixed_section(text: str, section_id: str, fragment: str) -> str:
     return f"{prefix}{opening}\n{fragment}{closing}\n"
 
 
+_BLOCK_RE = re.compile(
+    r"\n*^<!-- dadaia:fixed (\S+) -->\n.*?^<!-- /dadaia:fixed \1 -->$\n?", re.MULTILINE | re.DOTALL
+)
+
+
 def strip_fixed_sections(text: str) -> str:
-    """*text* with every fixed section (markers and body) removed — what an operator
-    authored, independent of which fragment version ``doctor --fix`` rendered."""
-    pattern = r"\n*^<!-- dadaia:fixed (\S+) -->\n.*?^<!-- /dadaia:fixed \1 -->$\n?"
-    return re.sub(pattern, "", text, flags=re.MULTILINE | re.DOTALL).rstrip("\n") + "\n"
+    """*text* with every fixed section (markers and body) removed, whatever fragment version
+    ``doctor --fix`` rendered — the shape a stub is compared to its shipped template by."""
+    return _BLOCK_RE.sub("", text).rstrip("\n") + "\n"
+
+
+def authored_text(text: str) -> str:
+    """What an operator authored: *text* with every closed fixed section (markers and body)
+    blanked, its line count kept — the one read every content judge of memory text goes through."""
+    return _BLOCK_RE.sub(lambda m: "\n" * m.group().count("\n"), text)

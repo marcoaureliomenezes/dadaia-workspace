@@ -21,6 +21,7 @@ from dadaia_workspace.core.harness_registry import (
 from dadaia_workspace.features.workspace import service as workspace_service_module
 from dadaia_workspace.infrastructure import agent_transcodes as agent_transcodes_module
 from dadaia_workspace.infrastructure import projection_rules as projection_rules_module
+from tests.helpers.oslib import read_text
 
 
 def test_every_record_carries_a_directory_an_agent_transcode_and_a_hook_derivation() -> None:
@@ -55,7 +56,7 @@ def test_the_legacy_constants_derive_from_the_record_table() -> None:
 def test_the_projection_table_carries_no_harness_named_literal(module: ModuleType) -> None:
     """A harness name in the projection table — or in `init`, which owns no projection —
     IS the per-harness branch coming back."""
-    source = Path(module.__file__ or "").read_text(encoding="utf-8")
+    source = read_text(Path(module.__file__ or ""))
     offenders = [
         f'"{name}"' for name in L1_ENTRY_HARNESSES if f'"{name}"' in source or f"'{name}'" in source
     ]

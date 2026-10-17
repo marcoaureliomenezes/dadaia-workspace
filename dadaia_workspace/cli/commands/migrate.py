@@ -2,11 +2,9 @@
 
 Bare ``dadaia migrate`` performs the state-file migration (spec_contexts.json v1 → v2).
 
-Note: ``dadaia migrate memory-yaml`` was removed in memory-markdown-source-v1.
-      HTML → YAML migration is no longer needed (.md is the canonical source).
-Note: ``dadaia migrate tree-v2`` (specs/ directory tree layout, from R1) is RETIRED
-      (v0.5.1 T-051-16, K10) — the v0 -> v1 leg of the deleted migration chain.
-      A tree still below canonical uses dadaia-workspace 0.4.x's ``migrate tree-v2``.
+Note: ``dadaia migrate memory-yaml`` is removed; ``.md`` is the canonical memory source.
+Note: ``dadaia migrate tree-v2`` is retired. A tree still below canonical uses
+      dadaia-workspace 0.4.x's ``migrate tree-v2``.
 """
 
 from __future__ import annotations

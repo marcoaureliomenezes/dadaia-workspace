@@ -1,6 +1,6 @@
 """The upgrade journey starts from a release that is really on the index.
 
-Owner: dd-software-engineer.
+Owner: dd-sw-engineer-sr.
 """
 
 from __future__ import annotations

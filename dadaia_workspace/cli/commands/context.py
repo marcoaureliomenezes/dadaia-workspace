@@ -3,7 +3,6 @@
 import json
 import os
 import sys
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -19,7 +18,7 @@ from dadaia_workspace.cli._specs_resolution import (
     resolve_session_id,
 )
 from dadaia_workspace.cli.redact import build_context_redactor
-from dadaia_workspace.core import session_store
+from dadaia_workspace.core import clock, session_store
 from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.exceptions import (
     AssociatedRepoConflictError,
@@ -45,7 +44,7 @@ from dadaia_workspace.features.spec_context.service import (
 from dadaia_workspace.features.workspace import onboarding
 
 app = typer.Typer(help="Manage Spec Context Projects.")
-# FR17 (v0.4.4, T-044-28): associated-repo registry verbs, nested under `context repo`
+# Associated-repo registry verbs, nested under `context repo`
 # — same `app.add_typer` pattern as `specs release`/`specs segment`.
 repo_app = typer.Typer(help="Manage a context's associated repos (main repo excluded).")
 app.add_typer(repo_app, name="repo")
@@ -63,8 +62,8 @@ def _ctx_service() -> SpecContextService:
 
 def _ctx_to_dict(svc: SpecContextService, ctx: SpecContextProject) -> dict[str, Any]:
     """The one record ``list`` and ``show`` render, JSON and table alike; every branch
-    resolved live through ``repos_live_status`` (FR18/A18.3), the stored snapshot kept
-    as ``stored_branch`` (A18.1); ``gitflow`` is the one reader's, off the main repo (ADR 0144)."""
+    resolved live through ``repos_live_status``, the stored snapshot kept as
+    ``stored_branch``; ``gitflow`` is the one reader's, off the main repo."""
     statuses = svc.repos_live_status(ctx)
     main_status, associated_statuses = statuses[0], statuses[1:]
     main_path = resolve_workspace_root() / "repos" / ctx.repo_slug
@@ -98,25 +97,21 @@ def _ctx_to_dict(svc: SpecContextService, ctx: SpecContextProject) -> dict[str, 
     }
 
 
-def _now_iso() -> str:
-    return datetime.now(tz=UTC).isoformat()
-
-
 def _sessions_dir(workspace_root: Path) -> Path:
-    # Session-store path via the single owner (T-011-05 / FR-W1-05, ADR-12) — the bind CLI
-    # no longer constructs the ``.dadaia/sessions`` path itself.
+    # Session-store path via the single owner — the bind CLI
+    # constructs no ``.dadaia/sessions`` path itself.
     return session_store.sessions_dir(workspace_root)
 
 
 def _live_session(workspace_root: Path, session_id: str) -> dict[str, Any] | None:
     """This caller's own session record, or ``None`` when absent/stale — the single
-    owner's predicate (:func:`core.session_store.live_session`, F002)."""
+    owner's predicate (:func:`core.session_store.live_session`)."""
     record = session_store.live_session(workspace_root, session_id)
     return None if record is None else dict(record)
 
 
 def print_next_step(workspace_root: Path, focus: str | None = None) -> None:
-    """The derived onboarding next step (FR6 AC6.2) — the text ``doctor`` also reports."""
+    """Print the derived onboarding next step, the text ``doctor`` also reports."""
     trees = alive_context_trees(workspace_root)
     bind, session = own_bind_for_cli()
     step = onboarding.next_step(
@@ -127,11 +122,9 @@ def print_next_step(workspace_root: Path, focus: str | None = None) -> None:
 
 
 def create_fix(root: Path, error: Exception, name: str | None, urls: list[str]) -> str:
-    """The invocation, every ``--associated-repo`` kept (AC3.5); what failed is the
+    """The invocation, every ``--associated-repo`` kept; what failed is the
     operator's choice, named in words — never the failing command repeated; an owned slug
     names its owner."""
-    if isinstance(error, AssociatedRepoConflictError):
-        return fix_line(root, "context", "list")
     if isinstance(error, ContextAlreadyExistsError):
         name = None
     flags = [arg for u in urls[1:] for arg in ("--associated-repo", u)]
@@ -139,9 +132,9 @@ def create_fix(root: Path, error: Exception, name: str | None, urls: list[str]) 
         root, "context", "create", *([name] if name else []), "--main-repo", urls[0], *flags
     )
     if isinstance(error, ContextAlreadyExistsError):
-        return f"Operator action: choose a context name no context holds and run `{fix}` with it"
+        return f"Agent action: choose a context name no context holds and run `{fix}` with it"
     if isinstance(error, GitCloneError):
-        return f"Operator action: run `{fix}` with a reachable clone URL in place of {error.url}"
+        return f"Agent action: run `{fix}` with a reachable clone URL in place of {error.url}"
     return fix
 
 
@@ -155,17 +148,15 @@ def create(
         [], "--associated-repo", help="Clone URL of an associated repo; repeatable"
     ),
 ) -> None:
-    """Clone (or adopt) every repo, install the pre-push hook, make the context ALIVE —
+    """Clone (or adopt) every repo, install the pre-push and reference-transaction hooks, make the context ALIVE —
     one step; on failure nothing is left behind."""
     ws = resolve_workspace_root()
     try:
         ctx = container.build_spec_context_service(ws).create(
             main_repo, name=name, associated_urls=tuple(associated)
         )
-    except SchemaVersionError as e:  # the registry's refusal carries its own one fix
-        fail(e)
     except (DadaiaError, OSError) as e:
-        fail(f"{e}\nfix: {create_fix(ws, e, name, [main_repo, *associated])}")
+        fail(e, create_fix(ws, e, name, [main_repo, *associated]))
     suffix = f", {len(ctx.associated_repos)} associated repo(s)" if ctx.associated_repos else ""
     console.print(
         f"[green]✓[/green] Context '[bold]{ctx.name}[/bold]' created and ALIVE "
@@ -290,12 +281,8 @@ def show(
 def alive(name: str = typer.Argument(..., help="Context name to make ALIVE")) -> None:
     """Transition a context to ALIVE; clone repo if absent. Idempotent if already ALIVE."""
     try:
-        ws = resolve_workspace_root()
-        ctx = container.build_spec_context_service(ws).alive(name)
+        ctx = container.build_spec_context_service(resolve_workspace_root()).alive(name)
         console.print(f"[green]✓[/green] Context '[bold]{ctx.name}[/bold]' is now ALIVE")
-    except SchemaVersionError as exc:
-        print(str(exc), file=sys.stderr)
-        raise typer.Exit(1) from None
     except DadaiaError as e:
         fail(e)
 
@@ -344,16 +331,16 @@ def bind(name: str = typer.Argument(..., help="Context name to bind to")) -> Non
     try:
         if svc.show(name).state == ContextState.DEAD:
             fix = fix_line(workspace_root, "context", "alive", name)
-            fail(f"Context '{name}' is DEAD — bring it back first.\nfix: {fix}")
+            fail(f"Context '{name}' is DEAD — bring it back first.", fix)
     except ContextNotFoundError as e:
         fail(e)
-    # ADR 0116: the gate, the hooks and this record share one id; bind never mints one.
+    # The gate, the hooks and this record share one id; bind never mints one.
     session_id = resolve_session_id(os.environ)
     if not session_id:
         fail(
-            "No session id in this shell: a bind needs one the gate and the hooks can see.\n"
-            "fix: Operator action: export DADAIA_SESSION_ID set to a stable id of your choice "
-            "before opening the session"
+            "No session id in this shell: a bind needs one the gate and the hooks can see.",
+            "Operator action: export DADAIA_SESSION_ID set to a stable id of your choice "
+            "before opening the session",
         )
     _sessions_dir(workspace_root).mkdir(parents=True, exist_ok=True)
     session_store.write_session(
@@ -364,13 +351,13 @@ def bind(name: str = typer.Argument(..., help="Context name to bind to")) -> Non
             context=name,
             runtime=os.environ.get("DADAIA_RUNTIME", "unknown"),
             pid=os.getpid(),
-            now=_now_iso(),
+            now=clock.now_iso(),
         ),
     )
     console.print(f"[green]✓[/green] Bound to '[bold]{name}[/bold]' (session id: {session_id})")
 
 
-# ------------------------------------------------------------------ context repo (FR17)
+# ------------------------------------------------------------------ context repo
 
 
 @repo_app.command(name="add")
@@ -389,16 +376,17 @@ def repo_add(
     same slug with a DIFFERENT URL is refused — this verb is the one place an
     associated repo's URL is set, so the recovery path is 'context repo remove'
     then 'context repo add' again, never a second divergent URL-update verb.
-    Adding the context's own main repo slug is refused (it is already covered).
+    Adding the context's own main repo slug is a no-op (it is already covered).
     """
     try:
         ctx, was_added = _ctx_service().add_repo(ctx_name, slug, url)
-    except (ContextNotFoundError, InvalidContextNameError, AssociatedRepoConflictError) as e:
+    except (
+        ContextNotFoundError,
+        InvalidContextNameError,
+        AssociatedRepoConflictError,
+        RepoUrlMissingError,
+    ) as e:
         fail(e)
-    except RepoUrlMissingError as e:
-        ws = resolve_workspace_root()
-        add = fix_line(ws, "context", "repo", "add", ctx_name, slug, "--url")
-        fail(f"{e}\nfix: Operator action: run `{add}` with the repo's clone URL")
 
     if was_added:
         console.print(
@@ -406,9 +394,10 @@ def repo_add(
             f"'[bold]{ctx_name}[/bold]' ({len(ctx.associated_repos)} associated repo(s) total)."
         )
     else:
+        what = "is this context's main repo" if slug == ctx.repo_slug else "is already registered"
         console.print(
-            f"[green]✓[/green] Associated repo '[bold]{slug}[/bold]' is already registered "
-            f"on context '[bold]{ctx_name}[/bold]' with this URL — no change."
+            f"[green]✓[/green] '[bold]{slug}[/bold]' {what} "
+            f"on context '[bold]{ctx_name}[/bold]' — no change."
         )
 
 
@@ -456,6 +445,3 @@ def delete(name: str = typer.Argument(..., help="Context name to delete")) -> No
         console.print(f"[green]✓[/green] Context '[bold]{name}[/bold]' deleted")
     except (ContextNotFoundError, ContextStateError) as e:
         fail(e)
-
-
-# v2 removals: activate/deactivate/promote/use removed in v0.1.7

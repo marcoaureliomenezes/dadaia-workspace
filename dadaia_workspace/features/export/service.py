@@ -2,9 +2,9 @@
 
 import json
 from dataclasses import dataclass, replace
-from datetime import UTC, datetime
 from pathlib import Path
 
+from dadaia_workspace.core import clock
 from dadaia_workspace.core.atomic_write import atomic_write
 from dadaia_workspace.core.models.spec_context import (
     EXPORT_SCHEMA_VERSION,
@@ -48,9 +48,8 @@ class ExportService:
 
     def _refresh_branches(self, now: str) -> list[tuple[SpecContextProject, str | None]]:
         """Re-read the checked-out branch of every ALIVE repo on disk and write it through
-        the store with ``dataclasses.replace`` — a field-by-field rebuild once dropped
-        ``associated_repos`` from the live store (T-044-29). Returns each context with the
-        instant it was synced: ``now`` when refreshed, else its ``dead_since``."""
+        the store with ``dataclasses.replace``, which keeps every other field. Returns each
+        context with the instant it was synced: ``now`` when refreshed, else its ``dead_since``."""
         rows: list[tuple[SpecContextProject, str | None]] = []
         for ctx in self._store.list_all():
             repo = self._workspace_root / "repos" / ctx.repo_slug
@@ -63,7 +62,7 @@ class ExportService:
         return rows
 
     def run(self) -> ExportResult:
-        now = datetime.now(tz=UTC).isoformat()
+        now = clock.now_iso()
         rows = self._refresh_branches(now)
         payload = {
             "schema_version": EXPORT_SCHEMA_VERSION,

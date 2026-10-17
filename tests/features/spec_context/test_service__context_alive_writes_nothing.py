@@ -7,12 +7,7 @@ holds it (HEAD unchanged, porcelain clean, no ``specs/``) with the pre-push hook
 
 from __future__ import annotations
 
-import subprocess
 from pathlib import Path
-
-import pytest
-
-pytest.importorskip("fcntl")
 
 from dadaia_workspace.container import scan_publish_candidates
 from dadaia_workspace.core.models.spec_context import (  # noqa: E402
@@ -26,22 +21,22 @@ from dadaia_workspace.features.spec_context.service import (
 )
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient  # noqa: E402
 from tests.fixtures.stores import context_store
+from tests.helpers.oslib import run, write_text
+from tests.helpers.oslib import run as os_run
 
 
 def _git(cwd: Path, *args: str) -> str:
-    return subprocess.run(
-        ["git", *args], cwd=cwd, capture_output=True, text=True, check=True
-    ).stdout.strip()
+    return run(["git", *args], cwd=cwd, check=True).stdout.strip()
 
 
 def _seeded_remote(tmp_path: Path, name: str) -> tuple[Path, str]:
     bare = tmp_path / f"{name}.git"
-    subprocess.run(["git", "init", "--bare", "-q", str(bare)], check=True)
+    os_run(["git", "init", "--bare", "-q", str(bare)], check=True)
     seed = tmp_path / f"seed-{name}"
-    subprocess.run(["git", "clone", "-q", str(bare), str(seed)], check=True)
+    os_run(["git", "clone", "-q", str(bare), str(seed)], check=True)
     _git(seed, "config", "user.email", "test@example.com")
     _git(seed, "config", "user.name", "Test")
-    (seed / "README.md").write_text("init\n", encoding="utf-8")
+    write_text(seed / "README.md", "init\n")
     _git(seed, "add", "README.md")
     _git(seed, "commit", "-q", "-m", "init")
     _git(seed, "push", "-q", "-u", "origin", "HEAD")
@@ -60,10 +55,10 @@ def test_alive_on_dead_context_writes_no_specs_commits_nothing_and_hooks_every_r
         SpecContextProject(
             name="app",
             repo_slug="app",
-            repo_url=str(main_url),
+            repo_url=main_url.as_uri(),
             state=ContextState.DEAD,
             created_at="2026-09-24T00:00:00Z",
-            associated_repos=(AssociatedRepo(slug="lib", url=str(assoc_url)),),
+            associated_repos=(AssociatedRepo(slug="lib", url=assoc_url.as_uri()),),
         )
     )
     service = SpecContextService(
@@ -86,23 +81,23 @@ def test_alive_on_dead_context_writes_no_specs_commits_nothing_and_hooks_every_r
 
 
 def test_an_adopted_checkouts_own_pre_push_survives_create_and_alive(tmp_path: Path) -> None:
-    """Review finding 5 (T-048-02): the composition root never overwrites an operator's
+    """The composition root never overwrites an operator's
     hook in an adopted checkout; a repo this call cloned is still hooked."""
     from dadaia_workspace import container
 
     workspace = tmp_path / "ws"
     states = workspace / ".dadaia" / "states"
     states.mkdir(parents=True)
-    (states / "spec_contexts.json").write_text('{"contexts": []}', encoding="utf-8")
+    write_text(states / "spec_contexts.json", '{"contexts": []}')
     main_url, _ = _seeded_remote(tmp_path, "app")
     assoc_url, _ = _seeded_remote(tmp_path, "lib")
     adopted = workspace / "repos" / "app"
-    subprocess.run(["git", "clone", "-q", str(main_url), str(adopted)], check=True)
+    os_run(["git", "clone", "-q", main_url.as_uri(), str(adopted)], check=True)
     own = b"#!/bin/sh\n# the operator's own pre-push\nexit 0\n"
     (adopted / ".git" / "hooks" / "pre-push").write_bytes(own)
     service = container.build_spec_context_service(workspace)
 
-    service.create(str(main_url), associated_urls=(str(assoc_url),))
+    service.create(main_url.as_uri(), associated_urls=(assoc_url.as_uri(),))
     service.alive("app")
 
     assert (adopted / ".git" / "hooks" / "pre-push").read_bytes() == own

@@ -6,10 +6,9 @@ from __future__ import annotations
 
 import os
 import sys
-from datetime import UTC, datetime
 from pathlib import Path
 
-from dadaia_workspace.core import invocation, session_store
+from dadaia_workspace.core import clock, invocation, session_store
 from dadaia_workspace.hooks import _common
 
 
@@ -20,7 +19,7 @@ def main() -> int:
         return 0
     workspace = invocation.resolve_root(cwd=Path.cwd(), target_path=None)
     if workspace is not None:  # touch_last_seen_at never raises: an unwritable record is None
-        session_store.touch_last_seen_at(workspace, sess_id, now=datetime.now(tz=UTC).isoformat())
+        session_store.touch_last_seen_at(workspace, sess_id, now=clock.now_iso())
     return 0
 
 

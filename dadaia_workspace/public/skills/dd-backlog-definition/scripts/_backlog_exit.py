@@ -13,38 +13,49 @@ import sys
 from pathlib import Path
 from typing import Any
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+import _clock
+import _git
+from _backlog_schema import DISPOSITIONS
+from _backlog_store import SCRIPT, Items
+from _bugs_store import read_records
+from _platform import command, run
+from _refusal import Refusal, fix_of
 
-from _backlog_schema import DISPOSITIONS  # noqa: E402
-from _backlog_store import SCRIPT, Items, Refusal  # noqa: E402
-from _backlog_write import today  # noqa: E402
-from _release_schema import origin  # noqa: E402
-from _specs import quote  # noqa: E402
+#: `release.py`'s Origin parser, run as its own script: the one reader of the line.
+_RELEASE = (
+    Path(__file__).resolve().parents[2] / "dd-release-implementation" / "scripts" / "release.py"
+)
 
 
-def _picks(specs: Path, slug: str) -> list[str]:
-    """Each release whose candidate SPEC (``rc-<N>/``, ADR 0150) carries *slug* in its
-    Origin's `backlog:` clause — read by `release.py`'s one parser (ADR 0161)."""
-    picks = []
-    for spec in (specs / "releases").glob("*/rc-*/SPEC.md"):
-        try:
-            if slug in origin(spec.read_text(encoding="utf-8")).get("backlog", []):
-                picks.append(spec.parents[1].name)
-        except ValueError:
-            continue  # a malformed Origin picks nothing; `release.py check` reports it
-    return sorted(set(picks), key=lambda v: [int(p) if p.isdigit() else -1 for p in v.split(".")])
+def _origin_ids(spec: Path) -> list[str]:
+    """The `backlog:` ids of *spec*'s first Origin line, as `release.py origin` prints them."""
+    done = run([sys.executable, str(_RELEASE), "origin", str(spec)], env=_git.scrubbed_env())
+    if done.returncode:
+        lines = done.stderr.splitlines()
+        fix = fix_of(done.stderr, command(sys.executable, str(_RELEASE), "origin", str(spec)))
+        raise Refusal(f"Origin unreadable: {lines[0] if lines else done.returncode}", fix)
+    return [ln[len("backlog ") :] for ln in done.stdout.splitlines() if ln.startswith("backlog ")]
 
 
 def _release(specs: Path, slug: str, disposition: str, release: str | None) -> None:
-    """A release whose candidate SPEC picked *slug*; the fix keeps the disposition."""
-    picks = _picks(specs, slug)
-    if release not in picks:
+    """*release* must name a folder directly under `releases/`, and that folder's candidate SPECs
+    must name *slug* in an Origin's `backlog:` clause."""
+    releases = specs / "releases"
+    if release not in (
+        {p.name for p in releases.iterdir() if p.is_dir()} if releases.is_dir() else set()
+    ):
         raise Refusal(
-            f"--release {release or '(none)'}: no releases/<v>/rc-<N>/SPEC.md first `**Origin:**` line "
+            f"--release {release or '(none)'} names no folder directly under {releases}",
+            f"Agent action: pass --release with the release folder under {releases} whose SPEC "
+            f"names {slug}, then rerun this exit with --disposition {disposition}.",
+        )  # fmt: skip
+    folder = releases / release
+    if not any(slug in _origin_ids(s) for s in folder.glob("rc-*/SPEC.md")):
+        raise Refusal(
+            f"--release {release}: no {folder}/rc-<N>/SPEC.md first `**Origin:**` line "
             f"picks {slug!r} — only a release that picked an item can exit it as {disposition!r}",
-            f"{SCRIPT} exit {slug} --disposition {disposition} --release {picks[-1]}" if picks
-            else f"Operator action: name {slug} in the `backlog:` clause of a candidate SPEC's "
-                 f"first `**Origin:**` line under {specs / 'releases'}, then rerun this exit.",
+            f"Agent action: name {slug} in the backlog: clause of the first **Origin:** line "
+            f"of a SPEC under {folder}, then rerun this exit with --disposition {disposition}.",
         )  # fmt: skip
 
 
@@ -53,30 +64,19 @@ def _reason(specs: Path, slug: str, disposition: str, reason: str | None) -> Non
     if not (reason or "").strip():
         raise Refusal(
             f"{disposition!r} requires --reason: the histo record is the only trace of why {slug!r} left",
-            f"Operator action: rerun `{SCRIPT} exit {slug} --disposition {disposition} --specs "
-            f"{quote(str(specs))}` with a "
+            f"Agent action: rerun `{SCRIPT.inline('exit', slug, '--disposition', disposition, specs=specs)}` with a "
             f"one-line --reason saying why {slug} is refused.",
         )  # fmt: skip
 
 
 def _bug(specs: Path, slug: str, disposition: str, reason: str | None) -> None:
-    """The id of the BUGS.jsonl record the item is handed to (ADR 0137), read by the bug
-    skill's reader — imported here, so only this exit depends on that skill."""
-    from _bugs_store import Refusal as BugRefusal  # noqa: PLC0415
-    from _bugs_store import read_records  # noqa: PLC0415
-
+    """The id of the BUGS.jsonl record the item is handed to, read by the bug skill's reader."""
     bugs = specs / "bugs" / "BUGS.jsonl"
-    try:
-        ids = {record.get("id") for record in read_records(bugs)}
-    except BugRefusal as exc:  # translated at the seam: one Refusal type leaves this module
-        raise Refusal(str(exc), exc.fix) from exc
+    ids = {record.get("id") for record in read_records(bugs)}
     if reason not in ids:
         raise Refusal(
             f"--reason {reason!r} names no record of {bugs}: `to-bug` hands {slug!r} to a registered bug",
-            f"Operator action: register the bug {slug} becomes with bugs.py append "
-            f"(dd-bug-registration), then rerun `{SCRIPT} exit {slug} --disposition {disposition} "
-            f"--specs {quote(str(specs))}` "
-            "with its id as --reason.",
+            f"Operator action: confirm {slug} as a bug (dd-bug-registration §2)",
         )  # fmt: skip
 
 
@@ -105,7 +105,7 @@ def check_exit(specs: Path, active: Items, slug: str, values: dict[str, Any]) ->
         raise Refusal(
             f"unknown disposition {disposition!r}: a backlog item exits as one of "
             f"{'|'.join(DISPOSITIONS)}",
-            "Operator action: a postponed item stays in active[] and needs no exit.",
+            "Agent action: a postponed item stays in active[] and needs no exit.",
         )
     flag, verify = EVIDENCE[disposition]
     verify(specs, slug, disposition, values[flag])
@@ -116,7 +116,7 @@ def histo_record(entry: dict[str, Any], values: dict[str, Any]) -> dict[str, Any
     """The one histo-record-v1 shape: ``entry`` IS the removed object."""
     return {
         "id": entry["id"],
-        "ts": values.get("ts") or today(),
+        "ts": _clock.today(),
         "disposition": values["disposition"],
         "release": values["release"],
         "reason": values["reason"],

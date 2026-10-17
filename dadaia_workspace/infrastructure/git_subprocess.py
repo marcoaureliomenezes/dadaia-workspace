@@ -1,14 +1,15 @@
 """GitSubprocessClient — git operations via stdlib subprocess."""
 
-import os
 import subprocess
 from collections.abc import Sequence
 from pathlib import Path
 
-from dadaia_workspace.core.cli_line import fix_line, git_line
+from dadaia_workspace.core import platform
+from dadaia_workspace.core.cli_line import fix_line, fix_of, git_line, without_fix
 from dadaia_workspace.core.exceptions import GitCloneError, GitSyncError
-from dadaia_workspace.core.gitflow import DEFAULT, Gitflow, read_gitflow
+from dadaia_workspace.core.gitflow import DEFAULT, Gitflow, read_gitflow, work_branch
 from dadaia_workspace.core.models.git_scan import GitObjectReadError
+from dadaia_workspace.core.skill_owner import load_owner
 from dadaia_workspace.infrastructure.git_objects import unpublished
 
 #: A lost branch's archive-tag push, also recording it under ``refs/remotes/origin/archive/``.
@@ -26,51 +27,34 @@ def _run(
     stdin: str | None = None,
     env: dict[str, str] | None = None,
 ) -> subprocess.CompletedProcess[str]:
-    environ = {**os.environ, **env} if env else None
-    return subprocess.run(
+    return platform.run(
         args,
         cwd=cwd,
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
         input=stdin,
-        env=environ,
+        env={**load_owner("dd-bug-resolution", "_git").scrubbed_env(), **(env or {})},
     )
 
 
 def _commit(path: Path, msg: str, pathspec: Sequence[str] | None = None) -> None:
     """Run ``git commit`` against whatever is currently staged in *path*.
 
-    ``commit_paths``'s commit; git's own identity rule applies, never a fallback identity
-    (:meth:`GitSubprocessClient.identity_fix` is the one probe). When *pathspec* is given (``commit_paths``, v0.4.3
-    T-043-14/FR10/A10.2), the commit itself is scoped with a trailing ``-- <pathspec>``
-    — this is what makes it honest even when the index carries OTHER staged content
-    (operator pre-staged, or a concurrent caller): ``git commit -- <pathspec>`` commits
-    only the changes matching *pathspec*, leaving everything else staged and untouched.
+    Git's own identity rule applies; no fallback identity is supplied
+    (:meth:`GitSubprocessClient.identity_fix` is the one probe). When *pathspec* is
+    given, the commit is scoped with a trailing ``-- <pathspec>``: only the changes
+    matching *pathspec* are committed, and anything else staged stays staged.
 
-    CWE-367 (v0.4.3 T-043-23 security-review rework, LOW residual, documented rather
-    than redesigned — see the handoff's own alternative resolution): ``git commit --
-    <pathspec>`` is documented git behaviour (``git commit --help``, ``-o``/``--only``,
-    "the DEFAULT mode of operation ... if any paths are given on the command line") to
-    commit the UPDATED WORKING-TREE CONTENTS of the named paths at commit time, NOT
-    necessarily the exact bytes ``git add`` staged a moment earlier in ``commit_paths``.
-    Under the NO-LOCKS DOCTRINE a concurrent agent could, in principle, mutate one of
-    *pathspec*'s files in the window between ``commit_paths``'s ``git add`` and this
-    call, and the newer worktree content — not the reviewed/staged content — would be
-    committed. Every current caller passes paths it JUST wrote itself, with no
-    intervening yield point, so this is a theoretical race, not an observed defect; a
-    fix that eliminated it entirely (a temporary index via ``GIT_INDEX_FILE`` or
-    ``write-tree``/``commit-tree``) is a bigger design change than this hardening pass
-    covers, and is deliberately left as a follow-up rather than half-landed here.
+    CWE-367: ``git commit -- <pathspec>`` commits the working-tree contents of the named
+    paths at commit time, not necessarily the bytes ``git add`` staged earlier in
+    ``commit_paths``. A concurrent writer could change one of those files in between;
+    every caller passes paths it has just written, with no yield point in between.
     """
     commit_cmd = ["git", "commit", "-m", msg]
     if pathspec:
         commit_cmd += ["--", *pathspec]
     result = _run(commit_cmd, cwd=path)
 
-    # Bug 2 fix: treat empty stdout+stderr with non-zero exit as silent
-    # no-op (submodule edge case); include both streams in error message.
+    # An empty stdout and stderr with a non-zero exit is a silent no-op (submodule
+    # edge case); both streams go in the error message.
     if result.returncode != 0:
         stdout = result.stdout.strip()
         stderr = result.stderr.strip()
@@ -97,7 +81,7 @@ class GitSubprocessClient:
         """Rename ``repo/src`` to ``repo/dst``, staging the rename of its tracked files —
         never committing. A tree git does not track is renamed on disk alone."""
         if not _run(["git", "ls-files", "--", src], cwd=repo).stdout.strip():
-            (repo / src).rename(repo / dst)
+            platform.replace(repo / src, repo / dst)
             return
         result = _run(["git", "mv", "--", src, dst], cwd=repo)
         if result.returncode != 0:
@@ -123,28 +107,13 @@ class GitSubprocessClient:
     def commit_paths(self, path: Path, msg: str, paths: Sequence[str]) -> None:
         """Stage and commit exactly *paths* — never a blanket ``-A``/``-u`` sweep.
 
-        Bug context-alive-sweeps-unrelated-worktree-changes (MEDIUM): callers that
-        must commit only the files THEY themselves just wrote (e.g. the ``context
-        alive`` scaffold commit) use this, never a blanket stage, so pre-existing
-        unrelated worktree modifications stay untouched and uncommitted. A no-op
-        (nothing staged, nothing committed) when *paths* is empty.
+        Stage and commit exactly *paths*, never a blanket stage, so unrelated worktree
+        modifications stay untouched and uncommitted. A no-op when *paths* is empty.
 
-        v0.4.3 T-043-14/FR10 hardening — honest by construction:
-
-        - **A10.1** — a non-zero ``git add`` exit raises :class:`GitSyncError`; a stage
-          that did not happen must never silently become (part of) a commit.
-        - **A10.2** — the commit itself is path-scoped (``git commit -m <msg> --
-          <paths>``, via ``_commit``'s *pathspec*), not a bare ``git commit``, so
-          content the OPERATOR pre-staged (or any other already-staged content) is
-          never swept into this commit even though it stays in the index.
-        - **A10.3** — every path is wrapped in the literal pathspec-magic escape
-          (``:(literal)<path>``, git's own defence per gitglossary(7) ``pathspec``):
-          every *paths* entry this seam ever receives is a concrete repo-relative
-          filename the caller itself just wrote (template names, scaffold files) —
-          never an operator- or attacker-influenced glob — so a path that happens to
-          contain a pathspec-magic character (``:``/``*``/``!``/``?``/…) is still
-          staged and committed as the literal file it names, never reinterpreted as a
-          glob or an exclude pattern.
+        Raises :class:`GitSyncError` when ``git add`` exits non-zero. The commit is
+        path-scoped, so already-staged content outside *paths* stays out of it. Each path
+        is wrapped in the ``:(literal)`` pathspec magic: a pathspec-magic character in a
+        name is staged as the literal file it names, never read as a glob.
         """
         if not paths:
             return
@@ -170,14 +139,16 @@ class GitSubprocessClient:
     def unrecoverable(self, path: Path) -> list[str]:
         """One fix line per thing removing *path* loses: a linked worktree, or a local
         branch carrying a commit neither origin nor HEAD holds — archived on origin as
-        ``archive/<branch>/<sha7>`` (ADR 0120: a tag push is never gated on branch policy),
+        ``archive/<branch>/<sha7>`` (a tag push is never gated on branch policy),
         the push recording it under ``refs/remotes/origin/`` so ``unpushed`` sees origin hold
         it until a ``fetch --prune`` drops it (re-running the line restores it); commits with
         no remote; a stash entry, which lives only in this checkout."""
         if self.has_commits(path) and not self.has_remote(path):
-            return [f"Operator action: add the clone URL of {path} as its origin remote"]
-        run = _run(["git", "worktree", "list", "--porcelain"], cwd=path).stdout.split("\n")
-        trees = [line[9:] for line in run if line.startswith("worktree ")][1:]
+            return [f"Agent action: add the clone URL of {path} as its origin remote"]
+        listed = _run(["git", "worktree", "list", "--porcelain"], cwd=path).stdout
+        trees = [
+            t["worktree"] for t in load_owner("dd-bug-resolution", "_git").parse_worktrees(listed)
+        ]
         refs = ["git", "for-each-ref", "--format=%(objectname) %(refname:short)", "refs/heads"]
         heads = [line.split(" ", 1) for line in _run(refs, cwd=path).stdout.split("\n") if line]
         in_head = ["git", "merge-base", "--is-ancestor"]  # HEAD itself is pushed by dead()
@@ -200,12 +171,12 @@ class GitSubprocessClient:
 
     def identity_fix(self, path: Path) -> str:
         """The ONE identity probe — git's own rule (env, config, auto-detection): ``""``
-        when git resolves an author and a committer, else the operator action setting one."""
+        when git resolves an author and a committer, else the agent action setting one."""
         for ident in ("GIT_AUTHOR_IDENT", "GIT_COMMITTER_IDENT"):
             if _run(["git", "var", ident], cwd=path).returncode != 0:
                 named = _run(["git", "config", "user.name"], cwd=path).stdout.strip()
                 key = "user.email" if named else "user.name"
-                return f"Operator action: set git {key} in the config of {path}"
+                return f"Agent action: set git {key} in the config of {path}"
         return ""
 
     def push(self, path: Path) -> None:
@@ -225,41 +196,49 @@ class GitSubprocessClient:
         self, path: Path, *args: str, stdin: str | None = None, env: dict[str, str] | None = None
     ) -> str:
         """One git command in *path* (*env* over the process environment): its stripped
-        stdout, else ``GitSyncError`` carrying git's full output (CONFLICT is on stdout)."""
+        stdout, else ``GitSyncError`` carrying git's full output (CONFLICT is on stdout); the
+        first ``fix:`` line of that output becomes the error's ``fix``."""
         result = _run(["git", *args], cwd=path, stdin=stdin, env=env)
         if result.returncode != 0:
-            output = f"{result.stdout}\n{result.stderr}".strip()
-            raise GitSyncError(f"git {args[0]} failed in {path}:\n{output}")
+            text = f"{result.stdout}\n{result.stderr}".strip()
+            fix, output = fix_of(text), without_fix(text).strip()
+            raise GitSyncError(f"git {args[0]} failed in {path}:\n{output}", fix=fix)
         return result.stdout.strip()
 
     def gitflow(self, repo: Path, main_repo: Path | None = None) -> tuple[Gitflow, str | None]:
-        """ADR 0048 — the ONE gitflow reader (the gate, ``baseline``, ``dead``, onboarding):
-        the constitution committed at HEAD, else the newest on a local branch or on origin,
-        else — an associated repo — its *main_repo*'s; never a working tree; else DEFAULT
-        plus the warning."""
+        """Read the gitflow of *repo*: the constitution committed at HEAD, else the newest
+        on a local branch or on origin, else (an associated repo) that of *main_repo*;
+        never a working tree. Falls back to DEFAULT with a warning."""
         text = self.committed_text(repo, "specs/constitution.md")
         if text is None and main_repo is not None and main_repo.resolve() != repo.resolve():
             return self.gitflow(main_repo)
         if text is None:
             return DEFAULT, (
                 f"{repo}: no specs/constitution.md — using the default gitflow\n"
-                f"fix: {fix_line(None, 'specs', 'init', '--specs-dir', str(repo / 'specs'))}"
+                f"hint: {fix_line(None, 'specs', 'init', '--specs-dir', str(repo / 'specs'))}"
             )
         return read_gitflow(repo / "specs", text)
 
     def published(self, path: Path) -> bool:
-        """Whether the project is published (local, offline, AC4.1): ``origin/<integration>``
-        of the committed gitflow exists and ``specs/constitution.md`` is on origin."""
+        """Whether the project is published: ``origin/<integration>`` of the committed
+        gitflow exists and ``specs/constitution.md`` is on origin. Offline; reads refs only."""
         ref = f"refs/remotes/origin/{self.gitflow(path)[0].integration}"
         born = _run(["git", "rev-parse", "-q", "--verify", ref], cwd=path)
         rel = "specs/constitution.md"
         result = _run(["git", "log", "--remotes=origin", "-n1", "--format=%H", "--", rel], cwd=path)
         return born.returncode == 0 and bool(result.stdout.strip())
 
+    def work_version(self, path: Path) -> str:
+        """The work-branch version of the repo at *path*, by the committed gitflow's work prefix:
+        the one local work branch's version, else the next one to create. Raises the skill's
+        refusal when several work branches exist."""
+        flow = self.gitflow(path)[0]
+        return work_branch(path, flow, path.name).removeprefix(flow.work_prefix)
+
     def committed_text(self, path: Path, rel: str) -> str | None:
         """*rel* at HEAD, else at the newest commit touching it on a local branch or an
-        ``origin`` remote-tracking ref — never another remote's (ADR 0048: local,
-        offline); ``None`` when none carries it (``-C``: *path* may not exist)."""
+        ``origin`` remote-tracking ref, never another remote's. Offline. ``None`` when
+        none carries it (*path* may not exist)."""
         git = ["git", "-C", str(path)]
         newest = _run(
             [*git, "log", "--branches", "--remotes=origin", "-n1", "--format=%H", "--", rel]
@@ -316,11 +295,7 @@ class GitSubprocessClient:
     def remote_url(self, path: Path) -> str:
         """Return the URL of the ``origin`` remote, or ``""`` if none is configured.
 
-        Drives the repo_url back-fill (FR-W2-03 / T-011-08): when a context record
-        has an empty ``repo_url`` but the repo is on disk with an ``origin`` remote,
-        ``alive``/``dead`` read the canonical URL straight from the repo. Returns
-        the empty string on any failure (no remote, not a repo) so callers treat it
-        as "nothing to back-fill" rather than raising.
+        Returns the empty string on any failure (no remote, not a repo) and never raises.
         """
         result = _run(["git", "remote", "get-url", "origin"], cwd=path)
         if result.returncode != 0:

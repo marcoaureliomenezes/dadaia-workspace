@@ -1,6 +1,6 @@
 """SpecsDoctor structural checks: one row per code (fires or silent).
 
-A release dir's name is TREE-8's (sa-release-dir-placement-judged-by-tree8-and-spec-doc-027)."""
+A release dir's name is TREE-8's."""
 
 from __future__ import annotations
 
@@ -18,6 +18,8 @@ from dadaia_workspace.features.specs.memory_canon import (
     read_fixed_fragment,
     render_fixed_section,
 )
+from tests.helpers.oslib import read_text, write_text
+from tests.helpers.oslib import read_text as os_read_text
 
 _REPO_ROOT = Path(__file__).parent.parent.parent.parent
 _TEMPLATES_DIR = _REPO_ROOT / "dadaia_workspace" / "public" / "templates"
@@ -93,7 +95,7 @@ def _write_release_jsonl(specs: Path, release_id: str, phase: str) -> None:
         "shipped": None,
         "log": [],
     }
-    (rdir / "_RELEASE.json").write_text(_json.dumps(state) + "\n", encoding="utf-8")
+    write_text(rdir / "_RELEASE.json", _json.dumps(state) + "\n")
 
 
 def _make_clean_specs_tree(root: Path, release_id: str = "1.2.3") -> Path:
@@ -102,22 +104,19 @@ def _make_clean_specs_tree(root: Path, release_id: str = "1.2.3") -> Path:
     (specs / "releases" / release_id / "rc-1").mkdir(parents=True)
     (specs / "backlog").mkdir(parents=True)
 
-    (specs / "constitution.md").write_text("# Constitution\n\nThe laws.\n", encoding="utf-8")
-    (specs / "memory" / "product" / "index.md").write_text(
-        MINIMAL_MEMORY_PRODUCT_INDEX_MD, encoding="utf-8"
+    write_text(specs / "constitution.md", "# Constitution\n\nThe laws.\n")
+    write_text(specs / "memory" / "product" / "index.md", MINIMAL_MEMORY_PRODUCT_INDEX_MD)
+    write_text(
+        specs / "memory" / "product" / "testarea" / "feature-a.md",
+        MINIMAL_MEMORY_PRODUCT_FEATURE_MD,
     )
-    (specs / "memory" / "product" / "testarea" / "feature-a.md").write_text(
-        MINIMAL_MEMORY_PRODUCT_FEATURE_MD, encoding="utf-8"
-    )
-    (specs / "memory" / "ARCHITECTURE.md").write_text(
-        MINIMAL_MEMORY_ARCHITECTURE_MD, encoding="utf-8"
-    )
-    (specs / "memory" / "QUALITY.md").write_text(
+    write_text(specs / "memory" / "ARCHITECTURE.md", MINIMAL_MEMORY_ARCHITECTURE_MD)
+    write_text(
+        specs / "memory" / "QUALITY.md",
         "---\nslug: quality-assurance\ntitle: Quality Assurance\n"
         "tldr: 'QA standards.'\nsummary: 'QA standards and anti-slop rules.'\n"
         "tags: []\nagent_tier: self-pull\ntoken_estimate: 20\n"
         "---\n\n## Standards\n\nQA standards.\n",
-        encoding="utf-8",
     )
     _write_release_jsonl(specs, release_id, "IMPLEMENTATION")
     spec_md = (
@@ -126,14 +125,14 @@ def _make_clean_specs_tree(root: Path, release_id: str = "1.2.3") -> Path:
     )
     plan_md = "# Plan\n\n**Status:** Approved\n\nShort.\n"
     tasks_md = "# Tasks\n\n**Status:** Approved\n\n- [-] T1 something\n"
-    (specs / "releases" / release_id / "rc-1" / "SPEC.md").write_text(spec_md, encoding="utf-8")
-    (specs / "releases" / release_id / "rc-1" / "PLAN.md").write_text(plan_md, encoding="utf-8")
-    (specs / "releases" / release_id / "rc-1" / "TASKS.md").write_text(tasks_md, encoding="utf-8")
+    write_text(specs / "releases" / release_id / "rc-1" / "SPEC.md", spec_md)
+    write_text(specs / "releases" / release_id / "rc-1" / "PLAN.md", plan_md)
+    write_text(specs / "releases" / release_id / "rc-1" / "TASKS.md", tasks_md)
     for rel, section_id in FIXED_SECTIONS:
         path = specs / rel
         fragment = read_fixed_fragment(_PUBLIC_DIR, section_id)
-        rendered = render_fixed_section(path.read_text(encoding="utf-8"), section_id, fragment)
-        path.write_text(rendered, encoding="utf-8")
+        rendered = render_fixed_section(read_text(path), section_id, fragment)
+        write_text(path, rendered)
     return specs
 
 
@@ -146,8 +145,9 @@ def _by_code(issues: list[SectionFinding], code: str) -> list[SectionFinding]:
 
 
 def _write_tasks(specs: Path, release_id: str, body: str) -> None:
-    (specs / "releases" / release_id / "rc-1" / "TASKS.md").write_text(
-        f"# Tasks\n\n**Status:** Approved\n\n{body}\n", encoding="utf-8"
+    write_text(
+        specs / "releases" / release_id / "rc-1" / "TASKS.md",
+        f"# Tasks\n\n**Status:** Approved\n\n{body}\n",
     )
 
 
@@ -159,7 +159,7 @@ def test_clean_tree_has_no_errors(tmp_path: Path) -> None:
 def _replace(rel: str, old: str, new: str) -> Callable[[Path], None]:
     def mutate(specs: Path) -> None:
         path = specs / rel
-        path.write_text(path.read_text(encoding="utf-8").replace(old, new), encoding="utf-8")
+        write_text(path, read_text(path).replace(old, new))
 
     return mutate
 
@@ -167,7 +167,7 @@ def _replace(rel: str, old: str, new: str) -> Callable[[Path], None]:
 def _write(rel: str, text: str) -> Callable[[Path], None]:
     def mutate(specs: Path) -> None:
         (specs / rel).parent.mkdir(parents=True, exist_ok=True)
-        (specs / rel).write_text(text, encoding="utf-8")
+        write_text(specs / rel, text)
 
     return mutate
 
@@ -240,20 +240,20 @@ def test_the_source_scaffold_carries_the_area_law_files() -> None:
 
 def test_tree5_drift_is_reported_never_auto_repaired(tmp_path: Path) -> None:
     specs_drift = _make_clean_specs_tree(tmp_path / "drift")
-    (specs_drift / "AGENTS.md").write_text("# AGENTS\n\nCustomised.\n", encoding="utf-8")
+    write_text(specs_drift / "AGENTS.md", "# AGENTS\n\nCustomised.\n")
     tree5 = _by_code(SpecsDoctor(specs_drift, templates_dir=_TEMPLATES_DIR).check(), "TREE-5")
     assert tree5 and not tree5[0].fixable and "drift" in tree5[0].message.lower()
 
     specs_ok = _make_clean_specs_tree(tmp_path / "ok")
-    canonical = render_registry_tables((_TEMPLATES_DIR / "specs-AGENTS.md").read_text("utf-8"))
-    (specs_ok / "AGENTS.md").write_text(canonical, encoding="utf-8")
+    canonical = render_registry_tables(os_read_text(_TEMPLATES_DIR / "specs-AGENTS.md"))
+    write_text(specs_ok / "AGENTS.md", canonical)
     root_law = str(specs_ok / "AGENTS.md")
     issues = SpecsDoctor(specs_ok, templates_dir=_TEMPLATES_DIR).check()
     assert [i for i in _by_code(issues, "TREE-5") if finding_path(i) == root_law] == []
 
 
 def test_one_defect_one_code_missing_active_artifact(tmp_path: Path) -> None:
-    """F005: trio presence has ONE home, `release.py check`; the specs section reports
+    """Trio presence has ONE home, `release.py check`; the specs section reports
     nothing for a missing PLAN.md and fix never creates it."""
     specs = _make_clean_specs_tree(tmp_path)
     plan = specs / "releases" / "1.2.3" / "rc-1" / "PLAN.md"

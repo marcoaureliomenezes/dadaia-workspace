@@ -12,11 +12,15 @@ from __future__ import annotations
 import json
 from collections.abc import Mapping
 from dataclasses import dataclass, replace
+from pathlib import PurePath, PurePosixPath, PureWindowsPath
 
+from dadaia_workspace.core import platform
+from dadaia_workspace.core.cli_line import spell_fix
 from dadaia_workspace.core.harness_registry import HarnessRecord, HookFormat
+from dadaia_workspace.core.skill_owner import load_owner
 
 #: The SessionStart lane: the one reaper, run as a CLI process at every
-#: session start — never a hook module (P-12). ``--quiet`` prints only what it deleted, so
+#: session start — never a hook module. ``--quiet`` prints only what it deleted, so
 #: a compliant workspace adds nothing to the model context.
 REAPER_ARGS = "doctor --fix --expired-only --quiet"
 #: Every row's ``timeout``, in seconds — all six harnesses read that key (Copilot as the
@@ -37,13 +41,15 @@ class HookAnswer:
 @dataclass(frozen=True)
 class HookLane:
     """One behaviour lane rendered as one executable: ``python -B -m <argv>`` after the
-    ``env`` exports; ``decides`` marks the lane whose stdout a :class:`HookAnswer` remaps."""
+    ``env`` exports, with the harness's own arguments when it ``forwards`` them; ``decides``
+    marks the lane whose stdout a :class:`HookAnswer` remaps."""
 
     name: str
     argv: str
     env: tuple[tuple[str, str], ...] = ()
     decides: bool = False
     timeout: int = SESSION_TIMEOUT_S
+    forwards: bool = False
 
     @property
     def speaks(self) -> bool:
@@ -94,6 +100,7 @@ class HookDialect:
     bare: bool = False
     prefix: str = ""
     wrapper: str = "{harness}-{lane}"
+    windows_wrapper: str = ""
     root: str = _SELF_ROOT
     ungated: tuple[str, ...] = ()
     overrides: tuple[str, ...] = ()
@@ -102,16 +109,18 @@ class HookDialect:
         return next(each.timeout for each in self.lanes if each.name == lane)
 
 
-_GATE = HookLane("pre-gate", 'dadaia_workspace.hooks.pre_gate "$@"', (), True, TOOL_TIMEOUT_S)
+_GATE = HookLane("pre-gate", "dadaia_workspace.hooks.pre_gate", (), True, TOOL_TIMEOUT_S, True)
 _REAPER = HookLane("doctor-expired", f"dadaia_workspace {REAPER_ARGS}")
-_POST = HookLane("post-gate", 'dadaia_workspace.hooks.sdd_post_gate "$@"', timeout=TOOL_TIMEOUT_S)
-_CTX = HookLane("ctx-inject", 'dadaia_workspace.hooks.ctx_inject "$@"')
+_POST = HookLane(
+    "post-gate", "dadaia_workspace.hooks.sdd_post_gate", timeout=TOOL_TIMEOUT_S, forwards=True
+)
+_CTX = HookLane("ctx-inject", "dadaia_workspace.hooks.ctx_inject", forwards=True)
 _CODEX_OUT = ("DADAIA_HOOK_OUTPUT", "codex-json")
 _KIMI = ("DADAIA_RUNTIME", "kimi-code")
 _START = ("DADAIA_HOOK_EVENT", "SessionStart")
 _REAP = ("SessionStart", "doctor-expired", "startup|resume")
 
-#: One row per :class:`HookFormat`, total by construction (ADR 0054: every pre-tool event
+#: One row per :class:`HookFormat`, total by construction: every pre-tool event
 #: is gated; a format with no blocking contract declares ``ungated``).
 HOOK_DIALECTS: dict[HookFormat, HookDialect] = {
     HookFormat.NONE: HookDialect(),
@@ -121,7 +130,7 @@ HOOK_DIALECTS: dict[HookFormat, HookDialect] = {
             HookFileSpec(
                 "settings.json",
                 (
-                    ("PreToolUse", "pre-gate", "Edit|Write|MultiEdit|NotebookEdit|Bash"),
+                    ("PreToolUse", "pre-gate", "Edit|Write|MultiEdit|NotebookEdit"),
                     ("PostToolUse", "post-gate", "*"),
                     ("UserPromptSubmit", "ctx-inject", ""),
                     *(
@@ -141,14 +150,19 @@ HOOK_DIALECTS: dict[HookFormat, HookDialect] = {
             replace(_GATE, env=(_KIMI,)),
             replace(_POST, env=(_KIMI,)),
             replace(_CTX, env=(_KIMI,)),
-            HookLane("post-compact", _CTX.argv, (("DADAIA_HOOK_EVENT", "PostCompact"), _KIMI)),
+            HookLane(
+                "post-compact",
+                _CTX.argv,
+                (("DADAIA_HOOK_EVENT", "PostCompact"), _KIMI),
+                forwards=True,
+            ),
             _REAPER,
         ),
         files=(
             HookFileSpec(
                 "config.toml",
                 (
-                    ("PreToolUse", "pre-gate", "^(Edit|Write|Bash)$"),
+                    ("PreToolUse", "pre-gate", "^(Edit|Write)$"),
                     ("PostToolUse", "post-gate", None),
                     ("UserPromptSubmit", "ctx-inject", None),
                     ("PostCompact", "post-compact", "manual|auto"),
@@ -158,6 +172,7 @@ HOOK_DIALECTS: dict[HookFormat, HookDialect] = {
         ),
         answer=HookAnswer(exit_code=2),
         wrapper="dadaia-kimi-{lane}.sh",
+        windows_wrapper="dadaia-kimi-{lane}.cmd",
         root=_CWD_ROOT,
     ),
     HookFormat.CODEX_HOOKS: HookDialect(
@@ -169,6 +184,7 @@ HOOK_DIALECTS: dict[HookFormat, HookDialect] = {
                 "ctx-inject-session-start",
                 _CTX.argv,
                 (_CODEX_OUT, _START),
+                forwards=True,
             ),
             _REAPER,
         ),
@@ -176,7 +192,7 @@ HOOK_DIALECTS: dict[HookFormat, HookDialect] = {
             HookFileSpec(
                 "hooks.json",
                 (
-                    ("PreToolUse", "pre-gate", "^(apply_patch|Edit|Write|Bash)$"),
+                    ("PreToolUse", "pre-gate", "^(apply_patch|Edit|Write)$"),
                     ("PostToolUse", "post-gate", None),
                     ("SessionStart", "ctx-inject-session-start", "startup|resume"),
                     _REAP,
@@ -250,81 +266,136 @@ def hook_wrapper_command(name: str) -> str:
     return f".dadaia/hooks/{name}"
 
 
-def wrapper_name(record: HarnessRecord, lane: str) -> str:
-    """The wrapper filename of *record*'s *lane*."""
-    return HOOK_DIALECTS[record.hooks].wrapper.format(harness=record.name, lane=lane)
+def _runs_cmd(dialect: HookDialect, caps: platform.Capabilities | None) -> bool:
+    """Whether *dialect*'s shell on *caps* (default: this host) is ``cmd.exe``."""
+    return bool(dialect.windows_wrapper) and (caps or platform.PLATFORM).windows
 
 
-#: The ONE missing-venv posture (DEC-10): warn on stderr naming the venv, ``{tell}`` the
+def wrapper_name(
+    record: HarnessRecord, lane: str, caps: platform.Capabilities | None = None
+) -> str:
+    """The wrapper filename of *record*'s *lane* on *caps* (default: this host)."""
+    dialect = HOOK_DIALECTS[record.hooks]
+    name = dialect.windows_wrapper if _runs_cmd(dialect, caps) else dialect.wrapper
+    return name.format(harness=record.name, lane=lane)
+
+
+_POSIX, _WINDOWS = platform.Capabilities.detect("linux"), platform.Capabilities.detect("win32")
+#: The workspace venv as each shell spells it, the root left open (``$ROOT``, ``%ROOT%``).
+_SH_VENV = platform.venv_dir(PurePosixPath("$ROOT"))
+_CMD_VENV = platform.venv_dir(PureWindowsPath("%ROOT%"))
+#: The one missing-venv posture: warn on stderr naming the venv, ``{tell}`` the
 #: agent (a ctx-inject lane), exit 0. ``$ROOT`` is the workspace (``$ESC`` JSON-escaped);
 #: POSIX ``bin/python`` or Windows ``Scripts/python.exe``.
 VENV_PYTHON = (
-    'for PYTHON_BIN in "$ROOT/.dadaia/.venv/bin/python" "$ROOT/.dadaia/.venv/Scripts/python.exe"; do\n'
+    f'for PYTHON_BIN in "{platform.python_in(_SH_VENV, _POSIX)}" "{platform.python_in(_SH_VENV, _WINDOWS)}"; do\n'
     '  [ -x "$PYTHON_BIN" ] && break\n'
     "done\n"
     'if [ ! -x "$PYTHON_BIN" ]; then\n'
-    '  echo "dadaia hook: no workspace venv at $ROOT/.dadaia/.venv — hook skipped" >&2\n'
+    '  echo "{warning}" >&2\n'
     """  ESC=$(printf '%s' "$ROOT" | sed 's/[\\\\"]/\\\\&/g')\n"""
     "{tell}  exit 0\n"
     "fi\n"
 )
-#: What every ctx-inject firing tells the agent until the venv is fixed (AC2.7).
+#: What every venv-less firing says on stderr, and ctx-inject tells the agent; ``{venv}`` is open.
+VENV_WARNING = "dadaia hook: no workspace venv at {venv} \u2014 hook skipped"
 VENV_MISSING = (
-    "dadaia: no workspace venv at $ROOT/.dadaia/.venv — the gate is off.\n"
-    "fix: uvx dadaia-workspace init $ROOT\n"
+    "dadaia: no workspace venv at {venv} \u2014 the gate is off.\n"
+    + spell_fix(load_owner("dd-bug-resolution", "_jsonl").REINSTALL_ACT)
+    + "\n"
 )
 
 
-def _tell(lane: HookLane) -> str:
-    """A ctx-inject *lane*'s ``printf`` of :data:`VENV_MISSING` in its envelope, root slot open."""
+def _told(lane: HookLane, venv: PurePath) -> str:
+    """What a ctx-inject *lane* tells the agent about *venv*, in its envelope; empty elsewhere."""
     if lane.argv != _CTX.argv:
         return ""
+    return envelope(dict(lane.env), VENV_MISSING.replace("{venv}", str(venv)))
+
+
+def _tell(lane: HookLane) -> str:
+    """A ctx-inject *lane*'s ``printf`` of :func:`_told`, root slot open."""
+    if not (text := _told(lane, _SH_VENV)):
+        return ""
     slot = "'\"$ESC\"'" if lane.speaks else "'\"$ROOT\"'"
-    return f"  printf '%s' '{slot.join(envelope(dict(lane.env), VENV_MISSING).split('$ROOT'))}'\n"
+    text = text.replace("'", "'\\''")  # for a single-quoted sh word
+    return f"  printf '%s' '{slot.join(text.split('$ROOT'))}'\n"
 
 
-def _translator(answer: HookAnswer) -> str:
-    """Remap the gate's native envelope into *answer*'s shape, as parsed JSON (never a
-    key-order text match). Only a deny is answered — no wrapper emits an explicit allow
-    (ADR 0054). No single quote: it is embedded in a single-quoted ``sh`` word."""
-    say = (
-        f'sys.stderr.write(reason + "\\n")\n    raise SystemExit({answer.exit_code})\n'
-        if answer.exit_code
-        else f'print(json.dumps({{"{answer.decision_key}": "deny", "{answer.reason_key}": reason}}))\n'
-    )
-    return (
-        "import json,sys\n"
-        "try:\n"
-        '    out = json.load(sys.stdin).get("hookSpecificOutput", {})\n'
-        "except Exception:\n"
-        "    raise SystemExit(0)\n"
-        'if out.get("permissionDecision") == "deny":\n'
-        '    reason = out.get("permissionDecisionReason", "")\n'
-        f"    {say}"
-    )
+def _oem(text: str) -> str:
+    """*text* for a batch file, which cmd reads in the OEM code page: the dash folds to ASCII."""
+    return text.replace("\u2014", "-")
 
 
-def hook_wrapper_contents(record: HarnessRecord) -> dict[str, str]:
-    """Return ``{wrapper filename: script}``: one argument-free executable per lane, so
-    every harness registers a plain path whether it shell-parses or direct-execs it."""
+def _cmd_script(lane: HookLane, dialect: HookDialect) -> str:
+    """The ``cmd.exe`` batch of *lane*, the same contract as the sh wrapper: the workspace is the
+    nearest sentinel from the cwd, a missing venv warns and exits 0, a deciding lane's deny
+    becomes the dialect's exit code. CRLF, as batch labels require."""
+    python = '"%PYTHON_BIN%" -B -m'
+    run = f"{python} {lane.argv}{' %*' if lane.forwards else ''}"
+    if dialect.answer is not None and lane.decides:
+        run += f" | {python} dadaia_workspace.hooks.translate {dialect.answer.exit_code}"
+    # ponytail: echo breaks on a workspace path holding & or ^ (the exit stays 0); quote it if one appears
+    tell = _oem(_told(lane, _CMD_VENV))  # a cmd dialect speaks plain text; JSON would need escaping
+    lines = [
+        "@echo off",
+        "setlocal EnableExtensions DisableDelayedExpansion",
+        'set "ROOT=%CD%"',
+        ":up",
+        'if exist "%ROOT%\\.dadaia\\states\\spec_contexts.json" goto found',
+        'for %%I in ("%ROOT%\\..") do set "UP=%%~fI"',
+        'if "%UP%"=="%ROOT%" exit /b 0',
+        'set "ROOT=%UP%"',
+        "goto up",
+        ":found",
+        f'set "PYTHON_BIN={platform.python_in(_CMD_VENV, _WINDOWS)}"',
+        'if exist "%PYTHON_BIN%" goto run',
+        f"echo {_oem(VENV_WARNING.replace('{venv}', str(_CMD_VENV)))}>&2",
+        *(f"echo {line}" for line in tell.splitlines()),
+        "exit /b 0",
+        ":run",
+        *(f'set "{key}={value}"' for key, value in lane.env),
+        run,
+        "exit /b %ERRORLEVEL%",
+        "",
+    ]
+    return "\r\n".join(lines)
+
+
+def hook_wrapper_contents(
+    record: HarnessRecord, caps: platform.Capabilities | None = None
+) -> dict[str, str]:
+    """Return ``{wrapper filename: script}`` on *caps* (default: this host): one argument-free
+    executable per lane, so every harness registers a plain path whether it shell-parses or
+    direct-execs it."""
     dialect = HOOK_DIALECTS[record.hooks]
     answer = dialect.answer
     wrappers: dict[str, str] = {}
     for lane in dialect.lanes:
-        venv = VENV_PYTHON.format(tell=_tell(lane))
+        name = wrapper_name(record, lane.name, caps)
+        if _runs_cmd(dialect, caps):
+            wrappers[name] = _cmd_script(lane, dialect)
+            continue
+        warning = VENV_WARNING.replace("{venv}", str(_SH_VENV))
+        venv = VENV_PYTHON.format(warning=warning, tell=_tell(lane))
         prologue = f"#!/usr/bin/env sh\nset -eu\n{dialect.root}{venv}"
         exports = "".join(f'{key}="{value}"\nexport {key}\n' for key, value in lane.env)
-        run = f'"$PYTHON_BIN" -B -m {lane.argv}'
+        run = f'"$PYTHON_BIN" -B -m {lane.argv}{' "$@"' if lane.forwards else ""}'
         if answer is not None and lane.decides:
+            words = (
+                str(answer.exit_code)
+                if answer.exit_code
+                else f"{answer.decision_key} {answer.reason_key}"
+            )
             body = (
                 f"_envelope=$({run}) || exit 0\n"
-                f"printf '%s' \"$_envelope\" | \"$PYTHON_BIN\" -B -c '{_translator(answer)}'\n"
+                f'printf \'%s\' "$_envelope" | "$PYTHON_BIN" -B -m dadaia_workspace.hooks.translate {words}\n'
             )
         elif answer is not None and not answer.exit_code and not lane.speaks:
             body = f"exec {run} >&2\n"  # stdout is this harness's decision channel
         else:
             body = f"exec {run}\n"
-        wrappers[wrapper_name(record, lane.name)] = f"{prologue}{exports}{body}"
+        wrappers[name] = f"{prologue}{exports}{body}"
     return wrappers
 
 

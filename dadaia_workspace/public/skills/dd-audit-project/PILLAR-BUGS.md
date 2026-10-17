@@ -2,7 +2,7 @@
 
 Disclosed sibling of `SKILL.md`, pillar 1. The lineage window, filter and resolution
 facts live in `dd-bug-resolution/LINEAGE.md`; record validity lives in
-`.dadaia/agentic/schemas/bugs/bug-record-v1.schema.json`. Input is every bug
+`.agents/skills/dd-bug-resolution/scripts/schemas/bug-record-v1.schema.json`. Input is every bug
 record whose `ts` or `closed_at` falls inside that window.
 
 ## Resolution evidence
@@ -10,10 +10,9 @@ record whose `ts` or `closed_at` falls inside that window.
 - Inspect a fix with `git show <fix_sha> --stat --patch`. Report a missing commit or a
   release-squash trail as coarse evidence instead of inventing attribution.
 - Derive diff direction from the named commit's production numstat. Direction is an
-  audit result, not a ledger field.
+  audit result.
 - Read the prior candidate's `SPEC.md` `## Bug window review` for the maturity verdict.
-  The release summary owns delivered, carried and backlog-exit scope; pillar 1 does not
-  reconstruct that scope from retired bug fields.
+  The release summary owns delivered, carried and backlog-exit scope.
 
 ## Recurrence and fix-induced bugs
 
@@ -26,7 +25,7 @@ record whose `ts` or `closed_at` falls inside that window.
 ## The nine forensic metrics
 
 A pillar-1 run reporting fewer than nine is incomplete. Each metric reports the window's
-value against the previous audit from `audits_histo.jsonl`. Metrics 7 and 8 have target 0.
+value against the previous audit's `AUDIT.md`, from git history, where it was committed before `audit.py close` removed it. Metrics 7 and 8 have target 0.
 
 | # | Metric | Definition / evidence |
 |---|---|---|
@@ -34,15 +33,13 @@ value against the previous audit from `audits_histo.jsonl`. Metrics 7 and 8 have
 | 2 | Complete resolutions | resolved records satisfying the canonical resolution facts |
 | 3 | Fix-shape ratio | `net-negative / (net-neutral + net-positive)` from `git show --numstat <fix_sha>` on production paths |
 | 4 | Same-surface re-bug rate at 3d/14d | group on exact `surface` |
-| 5 | Hand-kept-list touch count | named fix commits touching the fixed path set below |
+| 5 | Hand-kept-list touch count | named fix commits touching the hand-kept files (below) |
 | 6 | Test-layer bug share | `surface == "tests"` or `component` starts with `tests/` |
 | 7 | Scanner-vs-prose recurrence | scanner-term symptom and a fix touching only docs/tests |
 | 8 | Sweep closures as `resolved` | resolved records whose `fix_sha` touches no production code |
 | 9 | REBUILD share | resolved records with `caused_by != none` whose named fix commit identifies a REBUILD |
 
-Metric 5's fixed path set is `.gitignore`, `privacy_baseline.json`,
-`shipped-hashes.json`, `*_golden/*.json`, skill-roster files and literal
-`frozenset({...})` inventories.
+Metric 5's hand-kept files are those that list by hand what code could derive: ignore lists, digest or baseline ledgers, golden fixtures, literal name inventories.
 
 ## Additional checks
 
@@ -52,8 +49,9 @@ Metric 5's fixed path set is `.gitignore`, `privacy_baseline.json`,
 - Report any resolved record that fails the canonical resolution-fact check.
 - Check bug registration and fix commit shapes against `dd-gitflow-default` §3a.
 
+Rates are trends, never a gate.
+
 ## Pillar 1 output
 
 Pillar 1 appends findings with reproducible commands and results. Bug records remain
-product facts; audit coverage is established by the audit record and git history rather
-than a marker copied into every bug.
+product facts; audit coverage is established by the audit record and git history.

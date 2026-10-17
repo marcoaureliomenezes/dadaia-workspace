@@ -1,6 +1,6 @@
 """``projection_rules(plan)`` — the ONE table every projection family renders from.
 
-0.4.7 FR2: the harness seam is a *record*, not a class. Each
+The harness seam is a *record*, not a class. Each
 :class:`~dadaia_workspace.core.harness_registry.HarnessRecord` names how its harness
 consumes the authored persona set (``agent_transcode``) and which format its hook
 registration serializes into (``hooks``); this module holds one builder per enum value
@@ -21,6 +21,7 @@ import json
 from collections.abc import Callable, Mapping
 from pathlib import Path
 
+from dadaia_workspace.core import platform
 from dadaia_workspace.core.exceptions import PublicAssetError
 from dadaia_workspace.core.harness_registry import (
     HARNESS_RECORDS,
@@ -36,6 +37,7 @@ from dadaia_workspace.infrastructure.codex_doctor import (
     dcx8_codex_rules_shape,
 )
 from dadaia_workspace.infrastructure.install_helpers import (
+    persona_fields,
     render_claude_agent,
     resolve_codex_agent_model,
 )
@@ -54,7 +56,6 @@ from dadaia_workspace.infrastructure.runtime_config import (
     merge_claude_settings,
     upsert_kimi_hooks_block,
 )
-from dadaia_workspace.infrastructure.runtime_transforms.codex_assets import _parse_agent_frontmatter
 from dadaia_workspace.infrastructure.runtime_transforms.hook_wrappers import (
     hook_documents,
     hook_wrapper_contents,
@@ -134,11 +135,11 @@ def _agents_agent_rules(
             _src: Path = src,
             _resolved: ResolvedAgentModel | None = resolved_models.get(src.stem),
         ) -> bytes:
-            text = _src.read_text(encoding="utf-8")
+            text = platform.read_text(_src)
             if _resolved is not None:
                 return render_claude_agent(text, _resolved).encode("utf-8")
             # An authored model renders verbatim; a persona with none is refused.
-            resolve_codex_agent_model(_src.stem, _parse_agent_frontmatter(text).get("model"), None)
+            resolve_codex_agent_model(_src.stem, persona_fields(text).get("model"), None)
             return _src.read_bytes()
 
         rules.append(
@@ -193,8 +194,8 @@ def _settings_merge_checks(record: HarnessRecord, workspace_root: Path) -> list[
     if not dst.is_file():
         return []
     try:
-        loaded = json.loads(dst.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
+        loaded = json.loads(platform.read_text(dst))
+    except (OSError, ValueError, platform.Undecodable):
         return []
     if not isinstance(loaded, dict):
         return []
@@ -301,20 +302,6 @@ HOOK_RULE_BUILDERS: dict[
     HookFormat.DEVIN_HOOKS: _hook_files_rules,
     HookFormat.COPILOT_HOOKS: _hook_files_rules,
 }
-
-
-def harnesses_with_a_hook_derivation() -> frozenset[str]:
-    """The registered harnesses whose hook format renders something today.
-
-    A deterministic behaviour reaches a harness only through its hook derivation, so
-    this is what the entity registry may claim an implementation for. Derived from the
-    builder table, never listed: a format that grows a builder joins the set for free.
-    """
-    return frozenset(
-        name
-        for name, record in HARNESS_RECORDS.items()
-        if HOOK_RULE_BUILDERS[record.hooks] is not no_rules
-    )
 
 
 #: The doctor residue a byte-compare cannot express, per :class:`HookFormat`.

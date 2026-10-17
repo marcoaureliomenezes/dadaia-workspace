@@ -1,8 +1,8 @@
 name: CI
 
-# Gitflow by role (specs/constitution.md `gitflow:`): the work branch and a job branch
-# `wt/<M.m.p>-rc<N>/<job>` are the ONLY pushable branches; the integration and principal
-# branches advance by PR only. Push events run the Linux jobs below; Windows and macOS run
+# Gitflow by role (specs/constitution.md `gitflow:`): the work branch and the rc, main and backlog
+# `wt/` kinds (`pushable()` in `_worktree_names.py`) are the ONLY pushable branches; the integration
+# and principal branches advance by PR only. Push events run the Linux jobs below; Windows and macOS run
 # only on pull requests. The triggers below are
 # literal (GitHub reads no file) and pinned to the library gitflow by the ci-triggers-gitflow
 # guard; pr-source-guard reads the gitflow itself. The security review is the local
@@ -41,9 +41,6 @@ jobs:
       fail-fast: false
       matrix:
         os: [windows-latest, macos-latest]
-    env:
-      PYTHONUTF8: "1"
-      PYTHONIOENCODING: "utf-8"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
@@ -197,9 +194,6 @@ jobs:
       fail-fast: false
       matrix:
         os: [windows-latest, macos-latest]
-    env:
-      PYTHONUTF8: "1"
-      PYTHONIOENCODING: "utf-8"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
@@ -221,14 +215,11 @@ jobs:
     name: Contract coverage (Windows/macOS)
     if: ${{ github.event_name == 'pull_request' }}
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 20
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
         os: [windows-latest, macos-latest]
-    env:
-      PYTHONUTF8: "1"
-      PYTHONIOENCODING: "utf-8"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:

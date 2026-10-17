@@ -1,8 +1,7 @@
 """sdd_gate's ALLOW/BLOCK verdict, driven as a real PreToolUse subprocess.
 
-the install ledger decides PROTECTED (sa-gate-path-classes-diverge-from-the-law);
-scope is path-first and repos/<r>/ is merge-only (T-050-97, AC1.1); the gate never blocks on
-concurrency (NO-LOCKS doctrine, v0.1.76); a fenced root stays protected (AC1.3); a repo's own AGENTS.md is never law (v0.4.5 FR1).
+The install ledger decides PROTECTED; scope is path-first and repos/<r>/ is merge-only; the gate
+never blocks on concurrency; a fenced root stays protected; a repo's own AGENTS.md is never law.
 """
 
 from __future__ import annotations
@@ -16,15 +15,17 @@ from typing import Any
 import pytest
 
 from dadaia_workspace.core import session_store
+from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.workspace_resolver import FENCE_ENV
 from tests.fixtures.harness_env import claude_hook_env, run_hook_subprocess
+from tests.helpers.oslib import write_text
 
 
 def _mk_workspace(tmp_path: Path, *slugs: str) -> Path:
     (tmp_path / ".dadaia" / "states").mkdir(parents=True)
-    (tmp_path / ".dadaia" / "states" / "spec_contexts.json").write_text(
+    write_text(
+        tmp_path / ".dadaia" / "states" / "spec_contexts.json",
         json.dumps({"contexts": [{"name": s, "repo_slug": s, "state": "alive"} for s in slugs]}),
-        encoding="utf-8",
     )
     for s in slugs:
         (tmp_path / "repos" / s / "specs").mkdir(parents=True, exist_ok=True)
@@ -57,7 +58,7 @@ def _row(id: str, target: Any, want: str | None = None, **opts: Any) -> Any:
              "SEC-01", fence=True),
         _row("worktree-agents-md-is-never-law-A1.1", _WT_A + "AGENTS.md", records=_BOUND_A),
         _row("AC1.1-bound-repos-write-names-the-worktree", "repos/a/src/x.py",
-             "worktree.py list", records=_BOUND_A),
+             "@wt", records=_BOUND_A),
         _row("apply-patch-a-later-protected-header-blocks-T-014-02",
              _PATCH.format(".dadaia/sessions/runtime/a.ptr"), "SEC-01", tool="apply_patch"),
         _row("apply-patch-all-headers-allowed", _PATCH.format("docs/notes.md"), tool="apply_patch"),
@@ -83,7 +84,8 @@ def _row(id: str, target: Any, want: str | None = None, **opts: Any) -> Any:
           for r in (".agents/skills/dd-x/SKILL.md", ".dadaia/states/install_ledger.json")),
         *(_row(f"sa-gate-path-classes-diverge-from-the-law#B39-7-ledgered-law-{r}", r, _BLOCK,
                ledger=True) for r in ("AGENTS.md", ".dadaia/AGENTS.md", ".dadaia/tmp/AGENTS.md")),
-        *(_row(f"B39-7-unledgered-law-is-an-ordinary-write-{r}", r)  # root AGENTS.md: floor, gate-protects-nothing-without-install-ledger
+        # unledgered law is a floor, not a PROTECTED path
+        *(_row(f"B39-7-unledgered-law-is-an-ordinary-write-{r}", r)
           for r in (".dadaia/AGENTS.md", ".dadaia/tmp/AGENTS.md")),
         _row("sa-gate-path-classes-diverge-from-the-law#B39-3-a-tmp-probe-agents-md",
              ".dadaia/tmp/probe/20260927/AGENTS.md", ledger=True),
@@ -99,14 +101,16 @@ def test_gate_verdict(tmp_path: Path, target: Any, want: str | None, opts: dict[
         entries = [
             {"relpath": p, "sha256": "0" * 64, "family": "x", "kind": "file"} for p in _LEDGERED
         ]
-        (ws / ".dadaia" / "states" / "install_ledger.json").write_text(
-            json.dumps({"schema_version": "1", "entries": entries}), encoding="utf-8"
+        write_text(
+            ws / ".dadaia" / "states" / "install_ledger.json",
+            json.dumps({"schema_version": "1", "entries": entries}),
         )
     if opts.get("truncated"):
-        (ws / ".dadaia" / "states" / "spec_contexts.json").write_text('{"contexts": [{"na')
+        write_text(ws / ".dadaia" / "states" / "spec_contexts.json", '{"contexts": [{"na')
     now = datetime.now(tz=UTC).isoformat()
     for sid, record in opts.get("records", {}).items():
         session_store.write_session(ws, sid, {"session_id": sid, "last_seen_at": now, **record})
+    want = want and want.replace("@wt", fix_line(ws, "worktree", "list"))
     tool = opts.get("tool", "Write")
     if tool == "apply_patch":
         tool_input: dict[str, Any] = {"command": target}
@@ -131,12 +135,11 @@ def test_gate_verdict(tmp_path: Path, target: Any, want: str | None, opts: dict[
 
 @pytest.mark.medium
 def test_a_truncated_registry_is_no_context_at_the_gate(tmp_path: Path) -> None:
-    """sa-context-repo-mapping-falls-back-to-the-name#B4 (the gate leg; `context show`
-    prints REG-SCHEMA since AC3.9, test_registry_version_grammar): with a truncated
-    spec_contexts.json and DADAIA_CONTEXT naming a context, the real hook neither crashes
-    nor scope-blocks an id-less worktree write (no context is registered, ADR 0116)."""
+    """A truncated registry is no context at the gate: with a truncated spec_contexts.json and
+    DADAIA_CONTEXT naming a context, the real hook neither crashes nor scope-blocks an id-less
+    worktree write (no context is registered)."""
     ws = _mk_workspace(tmp_path, "proj", "other")
-    (ws / ".dadaia" / "states" / "spec_contexts.json").write_text('{"contexts": [{"na')
+    write_text(ws / ".dadaia" / "states" / "spec_contexts.json", '{"contexts": [{"na')
     env = claude_hook_env(ws, session_id="s")
     env.pop("CLAUDE_CODE_SESSION_ID", None)
     env["DADAIA_CONTEXT"] = "proj"

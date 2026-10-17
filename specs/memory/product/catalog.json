@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-09T22:51:05Z",
+  "generated_at": "2026-10-17T04:29:04Z",
   "features": [
     {
       "rank": 1,
@@ -14,9 +14,10 @@
         "handoff",
         "schema"
       ],
-      "token_estimate": 536,
+      "token_estimate": 671,
       "depends_on": [
         "worktrees",
+        "release-lifecycle",
         "workspace-doctor",
         "public-asset-distribution"
       ],
@@ -32,8 +33,8 @@
       "slug": "agent-orchestration",
       "title": "agent-orchestration",
       "area": "agents",
-      "tldr": "Three dd- personas are leaf workers dispatched by the main thread; SDD documents, worktrees and handoffs carry the work, never an orchestration runtime.",
-      "summary": "The role boundary, task-level dispatch contract, evidence flow and install-time model and privilege resolution for the product, software and review personas.",
+      "tldr": "Five dd- personas are leaf workers dispatched by the main thread; SDD documents, worktrees and handoffs carry the work, never an orchestration runtime.",
+      "summary": "The role boundary, task-level dispatch by the job file's who column, evidence flow and install-time model and privilege resolution for the product, senior and junior engineering, research and review personas.",
       "path": "specs/memory/product/agents/agent-orchestration.md",
       "tags": [
         "orchestration",
@@ -41,12 +42,14 @@
         "dispatch",
         "sdd"
       ],
-      "token_estimate": 441,
+      "token_estimate": 852,
       "depends_on": [
         "worktrees",
         "release-lifecycle",
-        "agentic-entities",
+        "bug-ledger",
         "public-asset-distribution",
+        "workspace-init",
+        "agentic-entities",
         "agent-comms",
         "audits-canon"
       ],
@@ -61,7 +64,7 @@
       "slug": "agentic-entities",
       "title": "agentic-entities",
       "area": "agents",
-      "tldr": "One registry names three personas, five deterministic behaviors and two abstract rules; a behavior map assigns each shipped skill and scoped law to an owner.",
+      "tldr": "One registry names five personas, five deterministic behaviors and two abstract rules; a behavior map assigns each shipped skill and scoped law to an owner.",
       "summary": "The harness-neutral entity registry, its projected implementations, the universal authored surface and the structural ownership and citation checks that keep agentic law complete.",
       "path": "specs/memory/product/agents/agentic-entities.md",
       "tags": [
@@ -70,7 +73,7 @@
         "derivation",
         "governance"
       ],
-      "token_estimate": 417,
+      "token_estimate": 548,
       "depends_on": [
         "sdd-gate-v3",
         "public-asset-distribution",
@@ -81,7 +84,7 @@
       ],
       "sources": [
         "dadaia_workspace/public/entities/**",
-        "dadaia_workspace/public/schemas/behavior-map-v1.schema.json",
+        "dadaia_workspace/features/spec_context/behavior-map*.json",
         "dadaia_workspace/public/data/CONTEXT-MAP.md",
         "dadaia_workspace/public/skills/**",
         "dadaia_workspace/infrastructure/entity_doctor.py"
@@ -118,7 +121,7 @@
       "title": "public-asset-distribution",
       "area": "distribution",
       "tldr": "Public install stages packaged assets and projects shared law, agents, skills and every registered harness; public doctor reports projection drift.",
-      "summary": "The stage, install and doctor chain that distributes the agentic surface — deterministic staging, rendered personas, whole-folder skills, registry-derived harness files, specs scaffold, projection pruning and privacy checks.",
+      "summary": "The install and doctor chain that distributes the agentic surface — deterministic staging, rendered personas, whole-folder skills, registry-derived harness files, specs scaffold, projection pruning and privacy checks.",
       "path": "specs/memory/product/distribution/public-asset-distribution.md",
       "tags": [
         "public",
@@ -127,9 +130,11 @@
         "projection",
         "privacy"
       ],
-      "token_estimate": 1060,
+      "token_estimate": 1467,
       "depends_on": [
         "agentic-entities",
+        "bug-ledger",
+        "agent-orchestration",
         "workspace-init",
         "workspace-doctor",
         "specs-migration",
@@ -171,7 +176,7 @@
         "release",
         "packaging"
       ],
-      "token_estimate": 1075,
+      "token_estimate": 1345,
       "depends_on": [
         "release-lifecycle",
         "QUALITY",
@@ -196,7 +201,7 @@
       "title": "harness-claude-code",
       "area": "harness",
       "tldr": "Entry harness with native sub-agent dispatch; reads the root AGENTS.md map natively and reaches skills and personas through per-entry symlinks into .agents/.",
-      "summary": "How Claude Code loads the workspace law, reaches the three dd- personas and the skills, binds a session, and which hook events carry the workspace's behaviours.",
+      "summary": "How Claude Code loads the workspace law, reaches the five dd- personas and the skills, binds a session, and which hook events carry the workspace's behaviours.",
       "path": "specs/memory/product/harness/harness-claude-code.md",
       "tags": [
         "harness",
@@ -225,7 +230,7 @@
       "title": "harness-codex",
       "area": "harness",
       "tldr": "Entry harness on the Codex CLI: native AGENTS.md chain and .agents/skills; .codex/ carries config, hooks, the command policy and persona TOML.",
-      "summary": "Codex reads the root map, the root->cwd AGENTS.md chain and .agents/skills natively; .codex/ holds config.toml, hooks.json, the command-policy rules and the three dd- persona TOMLs transcoded from .agents/agents/.",
+      "summary": "Codex reads the root map, the root->cwd AGENTS.md chain and .agents/skills natively; .codex/ holds config.toml, hooks.json, the command-policy rules and the five dd- persona TOMLs transcoded from .agents/agents/.",
       "path": "specs/memory/product/harness/harness-codex.md",
       "tags": [
         "harness",
@@ -233,7 +238,7 @@
         "projection",
         "hooks"
       ],
-      "token_estimate": 396,
+      "token_estimate": 401,
       "depends_on": [
         "agentic-entities",
         "sdd-gate-v3",
@@ -254,7 +259,7 @@
       "title": "harness-copilot",
       "area": "harness",
       "tldr": "Entry harness on GitHub Copilot CLI — native root AGENTS.md and .agents/skills; .github/ carries agent transcodes and two hook files, bootstrap at start.",
-      "summary": "Copilot reads the universal surface natively; its projection is the three dd- personas as .github/agents/*.agent.md and two hook files answered in Copilot's permissionDecision JSON, and nothing else under .github/.",
+      "summary": "Copilot reads the universal surface natively; its projection is the five dd- personas as .github/agents/*.agent.md and two hook files answered in Copilot's permissionDecision JSON, and nothing else under .github/.",
       "path": "specs/memory/product/harness/harness-copilot.md",
       "tags": [
         "harness",
@@ -345,7 +350,7 @@
         "hooks",
         "binding"
       ],
-      "token_estimate": 366,
+      "token_estimate": 471,
       "depends_on": [
         "agentic-entities",
         "sdd-gate-v3",
@@ -372,7 +377,7 @@
         "paradigm",
         "pillars"
       ],
-      "token_estimate": 487,
+      "token_estimate": 705,
       "depends_on": [
         "context-management",
         "worktrees",
@@ -404,7 +409,7 @@
         "lifecycle",
         "concurrency"
       ],
-      "token_estimate": 580,
+      "token_estimate": 626,
       "depends_on": [
         "context-management",
         "specs-migration",
@@ -458,7 +463,7 @@
         "release-gate",
         "sdd"
       ],
-      "token_estimate": 387,
+      "token_estimate": 394,
       "depends_on": [
         "pypi-distribution",
         "workspace-init",
@@ -489,7 +494,7 @@
         "session",
         "privacy"
       ],
-      "token_estimate": 2880,
+      "token_estimate": 3033,
       "depends_on": [
         "specs-migration",
         "workspace-doctor",
@@ -544,8 +549,8 @@
       "slug": "cross-platform-portability",
       "title": "cross-platform-portability",
       "area": "platform",
-      "tldr": "Linux, macOS and Windows through one platform capability seam carrying the venv layout, Python hooks and cross-OS CI legs.",
-      "summary": "dadaia_workspace/core/platform.py is the single capability source — two flags, the venv scripts directory and the executable suffix — read by the modules that build venv paths; no port, adapter pair or file lock exists for portability.",
+      "tldr": "Linux, macOS and Windows through one OS boundary, the kernel's _platform.py, deciding every host fact; core/platform.py is the package's door to it.",
+      "summary": "The kernel module dd-bug-resolution/scripts/_platform.py decides every host fact — text codec and newlines, child processes, venv layout, exec bit, process liveness and listeners, filesystem swap and links, the sandbox home and shell spelling — as functions over one capability value; skill scripts import it as a sibling, the package reaches it through core/platform.py, tests through tests/helpers/oslib.py; no port, adapter pair or file lock exists for portability.",
       "path": "specs/memory/product/platform/cross-platform-portability.md",
       "tags": [
         "platform",
@@ -555,16 +560,19 @@
         "macos",
         "linux"
       ],
-      "token_estimate": 339,
+      "token_estimate": 841,
       "depends_on": [
-        "workspace-init",
+        "bug-ledger",
+        "workspace-doctor",
+        "public-asset-distribution",
         "sdd-gate-v3",
         "ARCHITECTURE",
         "server-registry",
-        "public-asset-distribution"
+        "workspace-init"
       ],
       "sources": [
-        "dadaia_workspace/core/platform.py"
+        "dadaia_workspace/core/platform.py",
+        "dadaia_workspace/public/skills/dd-bug-resolution/scripts/_platform.py"
       ]
     },
     {
@@ -581,7 +589,7 @@
         "ports",
         "ttl"
       ],
-      "token_estimate": 340,
+      "token_estimate": 437,
       "depends_on": [
         "workspace-init",
         "agentic-entities"
@@ -595,8 +603,8 @@
       "slug": "specs-migration",
       "title": "specs-migration",
       "area": "platform",
-      "tldr": "specs init establishes canon and gitflow; specs upgrade reaches pattern 12; migrate updates the context registry.",
-      "summary": "The persisted-state upgrade verbs: specs init scaffolds or upgrades a dadaia tree and preserves a foreign tree in specs-bkp; specs upgrade runs the supported migration and repair set before stamping pattern 12; migrate updates the context registry atomically.",
+      "tldr": "specs init establishes canon and gitflow; specs upgrade reaches pattern 13; migrate updates the context registry.",
+      "summary": "The persisted-state upgrade verbs: specs init scaffolds or upgrades a dadaia tree and preserves a foreign tree in specs-bkp; specs upgrade runs the supported migration and repair set before stamping pattern 13; migrate updates the context registry atomically.",
       "path": "specs/memory/product/platform/specs-migration.md",
       "tags": [
         "migration",
@@ -605,7 +613,7 @@
         "registry",
         "onboarding"
       ],
-      "token_estimate": 1102,
+      "token_estimate": 1281,
       "depends_on": [
         "public-asset-distribution",
         "sdd-gate-v3",
@@ -640,15 +648,15 @@
         "compliance",
         "privacy"
       ],
-      "token_estimate": 2951,
+      "token_estimate": 3660,
       "depends_on": [
         "public-asset-distribution",
         "sdd-gate-v3",
         "context-management",
         "workspace-init",
         "QUALITY",
-        "specs-migration",
         "worktrees",
+        "specs-migration",
         "release-lifecycle",
         "audits-canon"
       ],
@@ -682,7 +690,7 @@
         "upgrade",
         "onboarding"
       ],
-      "token_estimate": 1893,
+      "token_estimate": 2261,
       "depends_on": [
         "context-management",
         "specs-migration",
@@ -691,7 +699,9 @@
         "public-asset-distribution",
         "server-registry",
         "sdd-gate-v3",
+        "agent-orchestration",
         "harness-kimi-code",
+        "worktrees",
         "cross-platform-portability"
       ],
       "sources": [
@@ -718,7 +728,7 @@
         "specs",
         "memory"
       ],
-      "token_estimate": 350,
+      "token_estimate": 404,
       "depends_on": [
         "bug-ledger",
         "release-lifecycle",
@@ -727,7 +737,6 @@
         "QUALITY"
       ],
       "sources": [
-        "dadaia_workspace/public/schemas/audits/finding-record-v1.schema.json",
         "dadaia_workspace/public/schemas/ADRs/**",
         "dadaia_workspace/public/skills/dd-audit-project/**",
         "dadaia_workspace/features/specs/doctor_adr.py"
@@ -747,7 +756,7 @@
         "ledger",
         "governance"
       ],
-      "token_estimate": 857,
+      "token_estimate": 1018,
       "depends_on": [
         "agent-orchestration",
         "worktrees",
@@ -757,8 +766,6 @@
       ],
       "sources": [
         "dadaia_workspace/public/skills/dd-backlog-definition/**",
-        "dadaia_workspace/public/schemas/backlog/**",
-        "dadaia_workspace/public/schemas/histo/**",
         "dadaia_workspace/features/backlog/**",
         "dadaia_workspace/core/models/backlog.py"
       ]
@@ -777,8 +784,10 @@
         "lineage",
         "resolution"
       ],
-      "token_estimate": 447,
+      "token_estimate": 957,
       "depends_on": [
+        "cross-platform-portability",
+        "public-asset-distribution",
         "release-lifecycle",
         "worktrees",
         "audits-canon",
@@ -786,7 +795,6 @@
         "QUALITY"
       ],
       "sources": [
-        "dadaia_workspace/public/schemas/bugs/bug-record-v1.schema.json",
         "dadaia_workspace/public/scaffold/bugs/AGENTS.md",
         "dadaia_workspace/public/skills/dd-bug-resolution/**"
       ]
@@ -806,17 +814,17 @@
         "state",
         "closure"
       ],
-      "token_estimate": 487,
+      "token_estimate": 1239,
       "depends_on": [
+        "agent-orchestration",
         "worktrees",
+        "agent-comms",
         "bug-ledger",
         "backlog-ledger",
         "audits-canon",
-        "workspace-doctor",
-        "agent-orchestration"
+        "workspace-doctor"
       ],
       "sources": [
-        "dadaia_workspace/public/schemas/releases/release-state-v1.schema.json",
         "dadaia_workspace/public/skills/dd-release-definition/**",
         "dadaia_workspace/public/skills/dd-release-implementation/**",
         "dadaia_workspace/features/specs/doctor_release.py"
@@ -827,8 +835,8 @@
       "slug": "sdd-gate-v3",
       "title": "sdd-gate-v3",
       "area": "sdd",
-      "tldr": "No-lock enforcement combines root-entry hygiene and SDD write policy before tools, then applies branch, specs-canon and privacy checks at push.",
-      "summary": "The two-policy pre-tool gate, path classes and bind scope, fail-open boundaries, one-fix refusal shape and range-scoped git publication chokepoint.",
+      "tldr": "No-lock enforcement — root-entry hygiene and SDD write policy before tools; branch, canon and privacy checks at push; a ref gate on raw ref moves.",
+      "summary": "The two-policy pre-tool gate, path classes and bind scope, fail-open boundaries, one-fix refusal shape, range-scoped git publication chokepoint with its remedy verb, and the reference-transaction ref gate.",
       "path": "specs/memory/product/sdd/sdd-gate-v3.md",
       "tags": [
         "gate",
@@ -837,11 +845,12 @@
         "privacy",
         "git"
       ],
-      "token_estimate": 526,
+      "token_estimate": 1289,
       "depends_on": [
+        "cross-platform-portability",
+        "worktrees",
         "context-management",
         "workspace-doctor",
-        "worktrees",
         "agentic-entities",
         "public-asset-distribution",
         "ARCHITECTURE"
@@ -850,9 +859,11 @@
         "dadaia_workspace/hooks/pre_gate.py",
         "dadaia_workspace/hooks/root_whitelist.py",
         "dadaia_workspace/hooks/sdd_gate.py",
+        "dadaia_workspace/hooks/translate.py",
+        "dadaia_workspace/hooks/ref_transaction.py",
         "dadaia_workspace/cli/commands/ci.py",
         "dadaia_workspace/features/chokepoints/**",
-        "dadaia_workspace/infrastructure/data/privacy_baseline.json",
+        "dadaia_workspace/public/skills/dd-bug-resolution/scripts/privacy_baseline.json",
         "dadaia_workspace/infrastructure/git_objects.py"
       ]
     },
@@ -861,8 +872,8 @@
       "slug": "worktrees",
       "title": "worktrees",
       "area": "sdd",
-      "tldr": "Repository changes are isolated in canonical plain, release, task, backlog or hotfix worktrees and land by worktree.py merge after the gate for that tree shape.",
-      "summary": "The worktree grammar, recorded bases, RED/implementation separation, one reviewed job or plain-change gate, merge cleanup and closure holds.",
+      "tldr": "Worktrees nest under worktrees/<repo>/<v>/ — wt-rc, wt-main, wt-task and the backlog and hotfix lanes — and each merges into its parent after its gate.",
+      "summary": "The one path grammar and the base it derives, the per-kind gates (task separation, the reviewed job gate, the rc's ledger checks), sync, the level AGENTS.md files, merge cleanup, the rows list and closure holds.",
       "path": "specs/memory/product/sdd/worktrees.md",
       "tags": [
         "worktrees",
@@ -871,13 +882,13 @@
         "merge",
         "review"
       ],
-      "token_estimate": 501,
+      "token_estimate": 1424,
       "depends_on": [
-        "sdd-gate-v3",
         "release-lifecycle",
+        "context-management",
+        "sdd-gate-v3",
         "bug-ledger",
         "workspace-doctor",
-        "context-management",
         "agent-orchestration"
       ],
       "sources": [
@@ -886,7 +897,10 @@
         "dadaia_workspace/public/skills/dd-gitflow-default/scripts/_worktree_git.py",
         "dadaia_workspace/public/skills/dd-gitflow-default/scripts/_worktree_names.py",
         "dadaia_workspace/public/skills/dd-gitflow-default/scripts/_worktree_new.py",
-        "dadaia_workspace/public/data/worktrees-AGENTS.md"
+        "dadaia_workspace/public/skills/dd-gitflow-default/scripts/_worktree_sync.py",
+        "dadaia_workspace/public/skills/dd-gitflow-default/scripts/levels/*.md",
+        "dadaia_workspace/public/data/worktrees-AGENTS.md",
+        "dadaia_workspace/cli/commands/worktree.py"
       ]
     }
   ]

@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from dadaia_workspace.core import platform
 from dadaia_workspace.core.atomic_write import atomic_write
 from dadaia_workspace.core.models.install_ledger import InstallLedger
 
@@ -30,11 +31,11 @@ class JsonInstallLedgerStore:
         if not path.exists():
             return None
         try:
-            data = json.loads(path.read_text(encoding="utf-8"))
+            data = json.loads(platform.read_text(path))
             if not isinstance(data, dict):
                 return None
             return InstallLedger.from_dict(data)
-        except (OSError, ValueError):
+        except (OSError, ValueError, platform.Undecodable):
             return None
 
     def write(self, states_dir: Path, ledger: InstallLedger) -> None:
@@ -44,7 +45,7 @@ class JsonInstallLedgerStore:
         new_text = json.dumps(ledger.to_dict(), indent=2)
         if path.exists():
             try:
-                if path.read_text(encoding="utf-8") == new_text:
+                if platform.read_text(path) == new_text:
                     return
             except OSError:
                 pass

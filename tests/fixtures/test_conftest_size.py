@@ -1,6 +1,6 @@
-"""AC7.3: the size marker comes from what a test reaches, never from its folder. Each case
+"""The size marker comes from what a test reaches, never from its folder. Each case
 is judged by a real inner collection (pytester) over a throwaway module placed under the
-checkout's gitignored ``tests/tmp/``, where the root conftest applies."""
+checkout's ``tests/tmp/``, where the root conftest applies."""
 
 from __future__ import annotations
 
@@ -10,6 +10,8 @@ from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
+
+from tests.helpers.oslib import write_text
 
 _CHECKOUT = Path(__file__).resolve().parents[2]
 
@@ -95,7 +97,7 @@ def inner() -> Iterator[Path]:
 def test_size_follows_what_the_test_reaches(
     pytester: pytest.Pytester, inner: Path, source: str, size: str, other: str
 ) -> None:
-    (inner / "test_inner_case.py").write_text(source, encoding="utf-8")
+    write_text(inner / "test_inner_case.py", source)
     nodeid = f"tests/tmp/{inner.name}/test_inner_case.py::test_inner"
 
     def collected(marker: str) -> list[str]:
@@ -112,7 +114,7 @@ def test_a_journey_under_e2e_is_e2e_whatever_it_reaches(pytester: pytest.Pyteste
     where = _CHECKOUT / "tests" / "e2e" / f"size-{uuid.uuid4().hex[:8]}"
     where.mkdir(parents=True)
     try:
-        (where / "test_inner_case.py").write_text(_SUBPROCESS, encoding="utf-8")
+        write_text(where / "test_inner_case.py", _SUBPROCESS)
         nodeid = f"tests/e2e/{where.name}/test_inner_case.py::test_inner"
 
         def collected(marker: str) -> list[str]:

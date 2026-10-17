@@ -1,4 +1,4 @@
-"""`specs init` must not scaffold the forbidden workspace-root specs/ (validation-027 F-04/F-10).
+"""`specs init` must not scaffold the forbidden workspace-root specs/
 
 Coherence law: a gate never demands what its tooling refuses. `specs doctor` refuses
 the workspace-root specs/ fallback (Root Law), so `specs init` must refuse to CREATE

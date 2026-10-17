@@ -1,14 +1,15 @@
-"""T2 block-list bug (AC11.1): on each version the grader passes the planted correct fix and
+"""T2 block-list: on each version the grader passes the planted correct fix and
 fails the planted assert-rewriting one (``tests/fixtures/evals/t2/``).
 
-Docker is required: a missing tool fails the row, never skips it. 600 s as in ``test_evals_t1``.
+Docker is required: a missing tool fails the row, never skips it. 600 s, as the T1 timeout.
 
-Owner: dd-software-engineer
+Owner: dd-sw-engineer-sr
 """
 
 import pytest
 
 from tests.helpers.evals import ROOT, T2, VERSIONS, reward
+from tests.helpers.oslib import read_text
 
 pytestmark = [pytest.mark.e2e, pytest.mark.slow, pytest.mark.timeout(600)]
 
@@ -16,7 +17,7 @@ _PLANTS = ROOT / "tests" / "fixtures" / "evals" / "t2"
 
 
 def _planted(version: str, *plants: str) -> str:
-    script = "\n".join((_PLANTS / f"{p}.sh").read_text(encoding="utf-8") for p in plants)
+    script = "\n".join(read_text(_PLANTS / f"{p}.sh") for p in plants)
     return reward(T2, version, script)
 
 

@@ -1,5 +1,5 @@
-"""0.4.6 AC12 (FR14/D14: the zone and canon tables are rendered from the
-registry at ``public stage``); size: SMALL.
+"""The zone and canon tables are rendered from the
+registry at ``public stage``; size: SMALL.
 
 The two ``.dadaia/**`` law fragments carry placeholders; ``stage`` fills them from
 ``core.workspace_layout`` before the manifest hashes the staged bytes. The pure renderer is
@@ -20,6 +20,7 @@ from dadaia_workspace.core.workspace_layout import (
     render_registry_tables,
 )
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
+from tests.helpers.oslib import read_text
 
 
 def test_zones_placeholder_renders_one_row_per_zone() -> None:
@@ -45,19 +46,15 @@ def test_text_without_placeholders_is_returned_unchanged() -> None:
 def test_stage_renders_every_data_fragment_before_the_manifest_hashes_it(
     tmp_path: Path,
 ) -> None:
-    """sa-specs-init-writes-unrendered-law#B38-2: stage's writer leaves no registry
+    """Stage's writer leaves no registry
     placeholder in any staged Markdown (the one renderer, core.workspace_layout)."""
     FileSystemPublicAssetManager().stage(tmp_path)
     agentic = tmp_path / ".dadaia" / "agentic"
     fragments = sorted(agentic.rglob("*.md"))
     assert fragments
-    leftovers = [
-        p.name
-        for p in fragments
-        if render_registry_tables(p.read_text("utf-8")) != p.read_text("utf-8")
-    ]
+    leftovers = [p.name for p in fragments if render_registry_tables(read_text(p)) != read_text(p)]
     assert not leftovers
-    manifest = json.loads((agentic / "manifest.json").read_text("utf-8"))
+    manifest = json.loads(read_text(agentic / "manifest.json"))
     recorded = {a["path"]: a["sha256"] for a in manifest["assets"]}
     for name in ("dadaia-AGENTS.md", "states-AGENTS.md"):
         rendered = agentic / "data" / name

@@ -1,7 +1,5 @@
-"""AC2.1–AC2.6, AC1.9 (release 0.5.0 candidate 2, ADR 0041 `measured_by`);
-AC5.2, AC5.3 (release 0.5.0 candidate 4, the Authorities table); AC1.17(3) (ADR 0150, the
-pinned pair resolving the live candidate); AC3.2 (candidate 7, ADR 0161: the one Origin
-parser and the trace, re-homed from SPEC-DOC-048).
+"""The release script's contracts: `measured_by`, the Authorities table, the pinned pair that
+resolves the live candidate, and the one Origin parser with its trace.
 
 `release.py phase IMPLEMENTATION` admits a candidate only when PLAN.md carries the As-is
 review table — structure only — and the skeleton `dd-release-definition` teaches passes
@@ -18,7 +16,7 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.core import gitflow
-from dadaia_workspace.core.release_state import CANDIDATE_RE
+from tests.helpers.oslib import read_text, run, write_text
 from tests.helpers.skill_scripts import stage_skill_scripts
 
 _REPO_ROOT = Path(__file__).resolve().parents[5]
@@ -30,7 +28,6 @@ _GOOD = "## 1. As-is review\n\n## 2. Strategy\n"
 
 @pytest.fixture
 def script(tmp_path: Path) -> Path:
-    stage_skill_scripts("dd-spec-navigator", tmp_path / "skills" / "dd-spec-navigator" / "scripts")
     return (
         stage_skill_scripts(
             "dd-release-implementation",
@@ -49,23 +46,23 @@ def _specs(tmp_path: Path, plan: str, *, plan_status: str = "Approved") -> Path:
         ("PLAN.md", plan),
     ):
         status = plan_status if name == "PLAN.md" else "Approved"
-        (release / "rc-1" / name).write_text(f"# {name}\n\n**Status:** {status}\n\n{body}", "utf-8")
+        write_text(release / "rc-1" / name, f"# {name}\n\n**Status:** {status}\n\n{body}")
     state: dict[str, object] = {"schema": "release-state-v1", "release": "0.5.0", "phase": "DEFINITION",
              "defined": None, "implemented": None, "shipped": None, "log": []}  # fmt: skip
-    (release / "_RELEASE.json").write_text(json.dumps(state, indent=2) + "\n", "utf-8")
+    write_text(release / "_RELEASE.json", json.dumps(state, indent=2) + "\n")
     return specs
 
 
 def _phase(script: Path, specs: Path) -> subprocess.CompletedProcess[str]:
     argv = [sys.executable, str(script), "phase", "IMPLEMENTATION", "--sha", "abc1234"]
-    return subprocess.run([*argv, "--specs", str(specs)], capture_output=True, text=True)
+    return run([*argv, "--specs", str(specs)])
 
 
 def _admits(script: Path, tmp_path: Path, plan: str) -> None:
     specs = _specs(tmp_path, plan)
     result = _phase(script, specs)
     assert result.returncode == 0, result.stderr
-    state = json.loads((specs / "releases/0.5.0/_RELEASE.json").read_text("utf-8"))
+    state = json.loads(read_text(specs / "releases/0.5.0/_RELEASE.json"))
     assert (state["phase"], state["defined"]["sha"]) == ("IMPLEMENTATION", "abc1234")
     assert len(state["log"]) == 1
 
@@ -73,7 +70,7 @@ def _admits(script: Path, tmp_path: Path, plan: str) -> None:
 def test_an_approved_spec_and_plan_enter_implementation_with_no_tasks_file(
     script: Path, tmp_path: Path
 ) -> None:
-    """AC1.9 (ADR 0194): the job files carry the tasks; no `TASKS.md`, no PLAN table judge."""
+    """The job files carry the tasks; no `TASKS.md`, no PLAN table judge."""
     _admits(script, tmp_path, _dag(*_CHAIN[:2]))
 
 
@@ -83,33 +80,33 @@ def test_an_unapproved_plan_refuses(script: Path, tmp_path: Path) -> None:
 
 
 def test_the_pinned_pair_resolves_the_same_live_candidate(tmp_path: Path) -> None:
-    """AC1.17(3): one grammar (`rc-<N>`, N from 1, no leading zero); the package and the
-    scripts pick the same highest `rc-<N>/` directory, and birth the next one past a stray
-    `rc-<N>` file; none without a candidate."""
+    """One grammar (`rc-<N>`, N from 1, no leading zero); the package and the
+    scripts pick the same highest `rc-<N>/` directory; none without a candidate."""
     sys.path.insert(0, str(_SCRIPTS))
-    import _release_schema as twin
+    sys.path.append(str(_SCRIPTS.parents[1] / "dd-bug-resolution" / "scripts"))
     import _release_store
 
-    assert twin.CANDIDATE_RE.pattern == CANDIDATE_RE.pattern
     release = tmp_path / "releases" / "1.0.0"
     release.mkdir(parents=True)
-    (release / "_RELEASE.json").write_text('{"phase": "DEFINITION"}', encoding="utf-8")
+    write_text(release / "_RELEASE.json", '{"phase": "DEFINITION"}')
     pair = (gitflow.resolve_live_candidate, lambda s: _release_store.live_release(s).candidate)
     assert [resolve(tmp_path) for resolve in pair] == [None, None]
     for name in ("rc-2", "rc-10", "rc-9", "rc-01", "rc-0", "notes"):
         (release / name).mkdir()
-    (release / "rc-11").write_text("", encoding="utf-8")
+    write_text(release / "rc-11", "")
     assert [resolve(tmp_path) for resolve in pair] == [release / "rc-10"] * 2
-    assert gitflow.next_candidate(release) == twin.next_candidate(release) == release / "rc-12"
 
 
-# --- the Origin line (ADR 0161; SPEC-DOC-048's cases re-homed by name) ---------------
+# --- the Origin line ---------------
 
 
 def _origin_rows(script: Path, specs: Path) -> list[dict[str, str]]:
-    done = subprocess.run([sys.executable, str(script), "check", "--json", "--specs", str(specs)],
-                          capture_output=True, text=True)  # fmt: skip
+    done = run([sys.executable, str(script), "check", "--json", "--specs", str(specs)])  # fmt: skip
     return [f for f in json.loads(done.stdout) if "Origin" in f["message"]]
+
+
+def _run_text(script: Path, specs: Path) -> str:
+    return run([sys.executable, str(script), "check", "--specs", str(specs)]).stdout  # fmt: skip
 
 
 def _check(script: Path, specs: Path) -> list[str]:
@@ -119,7 +116,7 @@ def _check(script: Path, specs: Path) -> list[str]:
 def _seed_ledgers(specs: Path, *, log: list[dict[str, object]] | None = None) -> None:
     def jsonl(rel: str, *records: dict[str, object]) -> None:
         (specs / rel).parent.mkdir(parents=True, exist_ok=True)
-        (specs / rel).write_text("".join(json.dumps(r) + "\n" for r in records), "utf-8")
+        write_text(specs / rel, "".join(json.dumps(r) + "\n" for r in records))
 
     active = {"schema": "backlog-v1", "active": [{"id": "a-real-entry"}]}
     jsonl("backlog/BACKLOG.json", active)
@@ -132,7 +129,7 @@ def _seed_ledgers(specs: Path, *, log: list[dict[str, object]] | None = None) ->
     jsonl("audits/20260930-x/FINDINGS.jsonl", {"id": "20260930-x-F001", "release": "0.5.0"})
     if log is not None:
         state = specs / "releases/0.5.0/_RELEASE.json"
-        state.write_text(json.dumps({**json.loads(state.read_text("utf-8")), "log": log}), "utf-8")
+        write_text(state, json.dumps({**json.loads(read_text(state)), "log": log}))
 
 
 @pytest.mark.parametrize(
@@ -157,11 +154,11 @@ def _seed_ledgers(specs: Path, *, log: list[dict[str, object]] | None = None) ->
     ],
 )  # fmt: skip
 def test_spec_origin(script: Path, tmp_path: Path, origin: str, needles: list[str]) -> None:
-    """sa-spec-doc-033-duplicates-bugs-check#B4: an Origin id resolves whatever its record's
+    """An Origin id resolves whatever its record's
     status or schema; a finding names only the unresolved ids."""
     specs = _specs(tmp_path, _GOOD)
     _seed_ledgers(specs)
-    (specs / "releases/0.5.0/rc-1/SPEC.md").write_text(f"**Status:** Approved\n{origin}\n", "utf-8")
+    write_text(specs / "releases/0.5.0/rc-1/SPEC.md", f"**Status:** Approved\n{origin}\n")
 
     messages = _check(script, specs)
 
@@ -173,13 +170,12 @@ def test_spec_origin(script: Path, tmp_path: Path, origin: str, needles: list[st
 def test_origin_trace_reads_the_closure_summary_instead_of_derived_ledger_fields(
     script: Path, tmp_path: Path
 ) -> None:
-    """AC5.1: the summary is the closure fact for delivered, carried and backlog exits;
+    """The summary is the closure fact for delivered, carried and backlog exits;
     Origin tracing does not reconstruct those facts from bug/backlog record fields."""
     specs = _specs(tmp_path, _GOOD)
     state = specs / "releases/0.5.0/_RELEASE.json"
-    (specs / "releases/0.5.0/rc-1/SPEC.md").write_text(
-        "# S\n\n**Status:** Approved\n**Origin:** backlog:a-real-entry; bugs:still-broken,already-fixed\n"
-        "\n## Bug window review\n", "utf-8")  # fmt: skip
+    write_text(specs / "releases/0.5.0/rc-1/SPEC.md", "# S\n\n**Status:** Approved\n**Origin:** backlog:a-real-entry; bugs:still-broken,already-fixed\n"
+        "\n## Bug window review\n")  # fmt: skip
     summary = {
         "ts": "2026-01-02T00:00:00Z",
         "agent": "closer",
@@ -187,7 +183,7 @@ def test_origin_trace_reads_the_closure_summary_instead_of_derived_ledger_fields
         "text": "delivered: bugs:already-fixed; carried: bugs:still-broken; backlog exits: a-real-entry",
     }
     _seed_ledgers(specs, log=[summary])
-    state.write_text(json.dumps({**json.loads(state.read_text("utf-8")), "phase": "CLOSURE"}))
+    write_text(state, json.dumps({**json.loads(read_text(state)), "phase": "CLOSURE"}))
 
     rows = _origin_rows(script, specs)
     assert [(row["message"], row["verdict"]) for row in rows] == [
@@ -195,19 +191,47 @@ def test_origin_trace_reads_the_closure_summary_instead_of_derived_ledger_fields
         ("Origin bugs:still-broken traced", "info"),
         ("Origin bugs:already-fixed traced", "info"),
     ]
+    assert all("fix" not in row for row in rows)
+
+
+def test_an_untraced_origin_id_is_an_error_only_once_the_closure_summary_is_logged(
+    script: Path, tmp_path: Path
+) -> None:
+    """The Reconciliation's sweep ends in the `summary` entry: before it an untraced
+    id is an info row with no fix, after it an error with its fix."""
+    specs = _specs(tmp_path, _GOOD)
+    state = specs / "releases/0.5.0/_RELEASE.json"
+    write_text(
+        specs / "releases/0.5.0/rc-1/SPEC.md",
+        "# S\n\n**Status:** Approved\n**Origin:** bugs:half-written\n\n## Bug window review\n",
+    )
+    summary = {"ts": "2026-01-02T00:00:00Z", "agent": "closer", "kind": "summary",
+               "text": "delivered: none; carried: none; backlog exits: none"}  # fmt: skip
+
+    def origin_row(log: list[dict[str, object]]) -> tuple[str, str]:
+        _seed_ledgers(specs, log=log)
+        write_text(state, json.dumps({**json.loads(read_text(state)), "phase": "CLOSURE",
+                                     "defined": {"sha": "abc1234", "ts": "2026-01-01T00:00:00Z"}}))  # fmt: skip
+        lines = _run_text(script, specs).splitlines()
+        at = next(n for n, ln in enumerate(lines) if "Origin bugs:half-written" in ln)
+        return lines[at].split(" ", 2)[1], lines[at + 1][:5]
+
+    assert origin_row([]) == ("info", "LEDGE")
+    assert origin_row([summary]) == ("error", "fix: ")
 
 
 def test_a_backlog_exit_rejected_by_disposition_traces(script: Path, tmp_path: Path) -> None:
-    """release-check-reads-status-of-backlog-exits: `backlog.py exit --disposition rejected`
+    """`backlog.py exit --disposition rejected`
     writes `disposition` and no `status`; the carried id traces."""
     specs = _specs(tmp_path, _GOOD)
     _seed_ledgers(specs)
-    with (specs / "backlog/_archive/backlog_histo.jsonl").open("a") as histo:
-        histo.write(json.dumps({"id": "declined", "disposition": "rejected"}) + "\n")
-    (specs / "releases/0.5.0/rc-1/SPEC.md").write_text("**Origin:** backlog:declined\n", "utf-8")
+    histo = specs / "backlog/_archive/backlog_histo.jsonl"
+    write_text(
+        histo, read_text(histo) + json.dumps({"id": "declined", "disposition": "rejected"}) + "\n"
+    )
+    write_text(specs / "releases/0.5.0/rc-1/SPEC.md", "**Origin:** backlog:declined\n")
 
-    listed = subprocess.run([sys.executable, str(script), "check", "--specs", str(specs)],
-                            capture_output=True, text=True)  # fmt: skip
+    listed = run([sys.executable, str(script), "check", "--specs", str(specs)])  # fmt: skip
 
     assert [ln.split(" ", 3)[3] for ln in listed.stdout.splitlines() if " info " in ln] == [
         "Origin backlog:declined traced"
@@ -217,28 +241,29 @@ def test_a_backlog_exit_rejected_by_disposition_traces(script: Path, tmp_path: P
 def test_a_stacked_candidate_in_definition_lists_its_carried_ids(
     script: Path, tmp_path: Path
 ) -> None:
-    """AC5.1: `new` keeps the closed candidate's summary; a stacked candidate in
+    """`new` keeps the closed candidate's summary; a stacked candidate in
     DEFINITION has no closure summary of its own yet."""
     specs = _specs(tmp_path, _GOOD)
     state = specs / "releases/0.5.0/_RELEASE.json"
-    state.write_text(json.dumps({**json.loads(state.read_text("utf-8")),
+    write_text(state, json.dumps({**json.loads(read_text(state)),
                                  "defined": {"sha": "abc1234", "ts": "2026-01-01T00:00:00Z"},
                                  "implemented": {"sha": "abc1235", "ts": "2026-01-02T00:00:00Z"}}))  # fmt: skip
     _seed_ledgers(specs, log=[{"ts": "2026-01-03T00:00:00Z", "agent": "a", "kind": "summary",
                                "text": "delivered: none; carried: none; backlog exits: a-real-entry"}])  # fmt: skip
     (specs / "releases/0.5.0/rc-2").mkdir()
-    (specs / "releases/0.5.0/rc-2/SPEC.md").write_text(
-        "**Status:** Draft\n**Origin:** backlog:a-real-entry\n", "utf-8"
+    write_text(
+        specs / "releases/0.5.0/rc-2/SPEC.md",
+        "**Status:** Draft\n**Origin:** backlog:a-real-entry\n",
     )
 
     assert _check(script, specs) == []
 
 
 def test_only_the_live_candidate_is_ranked(script: Path, tmp_path: Path) -> None:
-    """ADR 0150 (3): the highest rc-<N>/ is ranked; a closed rc-1 is history."""
+    """The highest `rc-<N>/` is ranked; a closed lower-numbered candidate is history."""
     specs = _specs(tmp_path, _GOOD)
     (specs / "releases/0.5.0/rc-2").mkdir()
-    (specs / "releases/0.5.0/rc-2/SPEC.md").write_text("**Status:** Draft\n", "utf-8")
+    write_text(specs / "releases/0.5.0/rc-2/SPEC.md", "**Status:** Draft\n")
 
     [row] = _origin_rows(script, specs)
 
@@ -258,7 +283,7 @@ _JOB = (
     "- J2.S2.T1 — AC2.1 · `W:` `src/x.py` · owner `tests/unit/test_x.py`\n"
 )
 
-_JOB1 = (  # the rc-9 job1 file's shape: titled stages, prose contracts, AC ranges
+_JOB1 = (  # a job1 file's shape: titled stages, prose contracts, AC ranges
     "# TASKS — 0.5.0 rc-9, Job 1 — the demolition\n\n## Stage J1.S1 — RED (tests only)\n\n"
     "- Contract: exit tests are each AC's acceptance test as a strict xfail; envelope `tests/**`.\n\n"
     "- J1.S1.T1 — AC1.1 · `W:` `tests/integration/test_ci_script.py` · owner same\n"
@@ -269,7 +294,7 @@ _JOB1 = (  # the rc-9 job1 file's shape: titled stages, prose contracts, AC rang
     "- J1.S2.T1 — AC1.1 · `W:` `scripts/ci.py` · owner `test_ci_script.py`\n"
 )
 
-_JOB_TABLE = (  # the rc-9 job files' task tables: the `W:` column holds each row's writes
+_JOB_TABLE = (  # job files' task tables: the `W:` column holds each row's writes
     "## Stage J1.S1 — RED\n\n- Contract: x\n\n| id | AC | `W:` | owner |\n|---|---|---|---|\n"
     "| T1 | AC1 | `tests/unit/test_t.py` | same |\n"
 )
@@ -286,12 +311,11 @@ _JOB_TABLE = (  # the rc-9 job files' task tables: the `W:` column holds each ro
 def test_check_judges_each_job_file(
     script: Path, tmp_path: Path, job: str, needle: str | None
 ) -> None:
-    """AC1.10 (ADR 0194, 0196): a job file parses into stages; stage 1 writes tests only."""
+    """A job file parses into stages; stage 1 writes tests only."""
     specs = _specs(tmp_path, _dag(*_CHAIN[:2]))
     (tasks := specs / "releases/0.5.0/rc-1/tasks").mkdir()
-    (tasks / "j2.md").write_text(job, "utf-8")
-    done = subprocess.run([sys.executable, str(script), "check", "--json", "--specs", str(specs)],
-                          capture_output=True, text=True)  # fmt: skip
+    write_text(tasks / "j2.md", job)
+    done = run([sys.executable, str(script), "check", "--json", "--specs", str(specs)])  # fmt: skip
     messages = [f["message"] for f in json.loads(done.stdout) if "tasks/" in f["path"]]
     assert messages == ([needle] if needle else [])
     phase = _phase(script, specs)  # the transition judges the same job file alike
@@ -314,19 +338,18 @@ def test_check_judges_each_job_file(
 def test_check_validates_a_jobs_merge_entry(
     script: Path, tmp_path: Path, text: str, bad: bool
 ) -> None:
-    """AC1.7: a job's `kind: merge` entry carries its six measurements (start..job_gate_runs)."""
+    """A job's `kind: merge` entry carries its six measurements (start..job_gate_runs)."""
     specs = _specs(tmp_path, _GOOD)
     state = specs / "releases/0.5.0/_RELEASE.json"
     entry = {"ts": "2026-10-05T18:00:00Z", "agent": "j", "kind": "merge", "text": text}
-    state.write_text(json.dumps({**json.loads(state.read_text("utf-8")), "log": [entry]}))
-    done = subprocess.run([sys.executable, str(script), "check", "--json", "--specs", str(specs)],
-                          capture_output=True, text=True)  # fmt: skip
+    write_text(state, json.dumps({**json.loads(read_text(state)), "log": [entry]}))
+    done = run([sys.executable, str(script), "check", "--json", "--specs", str(specs)])  # fmt: skip
     hits = [f for f in json.loads(done.stdout) if "kind merge" in f["message"]]
     assert len(hits) == int(bad)
 
 
 def _dag(*rows: tuple[str, str]) -> str:
-    """A PLAN in the rc-9 shape: `## DAG` table (job | waits on | why), then `### Hot files`."""
+    """A PLAN: `## DAG` table (job | waits on | why), then `### Hot files`."""
     table = "".join(f"| {job} | {waits} | x |\n" for job, waits in rows)
     return (f"{_GOOD}\n## DAG\n\n| job | waits on | why |\n|---|---|---|\n{table}"
             "\n### Hot files\n\n- `scripts/ci.py`: Job 1, then Job 2.\n")  # fmt: skip
@@ -359,17 +382,16 @@ _RECON = ("Reconciliation", "Jobs 1–8")
 def test_check_refuses_each_trio_row(
     script: Path, tmp_path: Path, plan: str, job: str, needle: str | None
 ) -> None:
-    """AC4.2: one trio per refusal, one fix line each; the valid trio exits 0."""
+    """One trio per refusal, one fix line each; the valid trio exits 0."""
     specs = _specs(tmp_path, plan)
     (tasks := specs / "releases/0.5.0/rc-1/tasks").mkdir()
-    (tasks / "j2.md").write_text(job, "utf-8")
-    done = subprocess.run([sys.executable, str(script), "check", "--json", "--specs", str(specs)],
-                          capture_output=True, text=True)  # fmt: skip
+    write_text(tasks / "j2.md", job)
+    done = run([sys.executable, str(script), "check", "--json", "--specs", str(specs)])  # fmt: skip
     errors = [f for f in json.loads(done.stdout) if f["verdict"] == "error"]
     assert (done.returncode, len(errors)) == ((1, 1) if needle else (0, 0))
     for error in errors:
         assert needle in error["message"]
-        assert error["fix"].startswith(("fix: ", "Operator action: ")) and "\n" not in error["fix"]
+        assert error["fix"].startswith(("fix: ", "Agent action: ")) and "\n" not in error["fix"]
 
 
 @pytest.mark.parametrize(
@@ -383,9 +405,7 @@ def test_phase_implementation_refuses_a_plan_without_a_dag(
 ) -> None:
     """The PLAN carries one dependency DAG; its refusal has one fix line."""
     result = _phase(script, _specs(tmp_path, plan))
-    fixes = [
-        ln for ln in result.stderr.splitlines() if ln.startswith(("fix: ", "Operator action: "))
-    ]
+    fixes = [ln for ln in result.stderr.splitlines() if ln.startswith(("fix: ", "Agent action: "))]
     assert (result.returncode, needle in result.stderr, len(fixes)) == (1, True, 1)
 
 
@@ -402,13 +422,13 @@ def test_phase_implementation_accepts_the_jobs_and_tasks_dialect(
     specs = _specs(tmp_path, plan)
     tasks = specs / "releases/0.5.0/rc-1/tasks"
     tasks.mkdir()
-    tasks.joinpath("job1.md").write_text(
+    write_text(
+        tasks.joinpath("job1.md"),
         "# Job 1\n\n"
         "| task | AC | `W:` | outcome |\n"
         "|---|---|---|---|\n"
         "| J1.T1 | AC2.1 | `tests/test_a.py` | RED |\n"
         "| J1.T2 | AC2.1 | `src/a.py` | GREEN |\n",
-        encoding="utf-8",
     )
 
     result = _phase(script, specs)
@@ -437,7 +457,7 @@ def _phase_with_current_jobs(
     tasks = specs / "releases/0.5.0/rc-1/tasks"
     tasks.mkdir()
     for name, body in jobs.items():
-        tasks.joinpath(name).write_text(body, encoding="utf-8")
+        write_text(tasks.joinpath(name), body)
     return _phase(script, specs)
 
 
@@ -564,10 +584,7 @@ def test_a_first_stage_may_write_tests_by_any_language_convention(
     `pkg/x_test.go` passes `check` and `phase IMPLEMENTATION`."""
     specs = _specs(tmp_path, _dag(*_CHAIN[:2]))
     (tasks := specs / "releases/0.5.0/rc-1/tasks").mkdir()
-    (tasks / "j2.md").write_text(
-        _JOB_TABLE.replace("tests/unit/test_t.py", "pkg/x_test.go"), "utf-8"
-    )
-    done = subprocess.run([sys.executable, str(script), "check", "--json", "--specs", str(specs)],
-                          capture_output=True, text=True)  # fmt: skip
+    write_text(tasks / "j2.md", _JOB_TABLE.replace("tests/unit/test_t.py", "pkg/x_test.go"))
+    done = run([sys.executable, str(script), "check", "--json", "--specs", str(specs)])  # fmt: skip
     assert [f["message"] for f in json.loads(done.stdout) if "tasks/" in f["path"]] == []
     assert _phase(script, specs).returncode == 0

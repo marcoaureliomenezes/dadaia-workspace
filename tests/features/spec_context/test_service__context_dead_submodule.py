@@ -1,15 +1,11 @@
-"""rc-9 AC3.6 row 24 (context-dead-submodule-refusal-prints-a-worktree-move-that-cannot-run):
-a submodule is no linked worktree — dead holds the repo holding it, and the submodule's
+"""A submodule is no linked worktree — dead holds the repo holding it, and the submodule's
 relative gitdir still resolves after the move. Size: MEDIUM — real git in tmp_path."""
 
 from __future__ import annotations
 
-import subprocess
 from pathlib import Path
 
 import pytest
-
-pytest.importorskip("fcntl")
 
 from dadaia_workspace.core.models.spec_context import ContextState  # noqa: E402
 from tests.features.spec_context.test_service__context_dead_holds import (  # noqa: E402
@@ -17,6 +13,7 @@ from tests.features.spec_context.test_service__context_dead_holds import (  # no
     _git,
     _published,
 )
+from tests.helpers.oslib import run
 
 pytestmark = pytest.mark.slow
 
@@ -31,8 +28,6 @@ def test_dead_holds_a_repo_with_a_submodule_and_its_gitdir_resolves(tmp_path: Pa
     service.dead("proj")
 
     [held] = (tmp_path / "ws" / ".dadaia" / "reaped").glob("*/repos/main/sub")
-    resolved = subprocess.run(
-        ["git", "rev-parse", "--is-inside-work-tree"], cwd=held, capture_output=True, text=True
-    )
+    resolved = run(["git", "rev-parse", "--is-inside-work-tree"], cwd=held)
     assert resolved.stdout == "true\n", resolved.stderr
     assert store.get("proj").state is ContextState.DEAD  # type: ignore[union-attr]

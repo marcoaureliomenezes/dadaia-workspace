@@ -1,6 +1,6 @@
-"""The rendered Codex ``.rules`` auto-allows only argv-closed readers (``ls cat``); interpreter-capable
-sed/rg (``1e``, ``w``, ``-i``, ``--pre``) prompt (#B1-#B3); registry.json says so (#B4).
-Size: SMALL; #B1 also asks the real ``codex execpolicy`` when the binary is on PATH.
+"""The rendered Codex ``.rules`` auto-allows only argv-closed readers (``ls cat``);
+interpreter-capable sed/rg (``1e``, ``w``, ``-i``, ``--pre``) prompt; registry.json says so.
+Size: SMALL; the real ``codex execpolicy`` is also asked when the binary is on PATH.
 """
 
 from __future__ import annotations
@@ -10,7 +10,6 @@ import itertools
 import json
 import re
 import shutil
-import subprocess
 from pathlib import Path
 
 import pytest
@@ -18,6 +17,7 @@ import pytest
 from dadaia_workspace.infrastructure.runtime_transforms.codex_assets import (
     _render_codex_command_policy_rules,
 )
+from tests.helpers.oslib import read_text, run, write_text
 
 _REGISTRY = Path(__file__).resolve().parents[3] / "dadaia_workspace/public/entities/registry.json"
 _RULE = re.compile(r"prefix_rule\((.*?)\n\)", re.S)
@@ -37,7 +37,7 @@ def _allowed_prefixes() -> set[tuple[str, ...]]:
 
 
 def test_b3_read_only_inspection_stays_allowed() -> None:
-    """#B2 and #B3: the allow set is exactly the read-only one, so no allowed prefix is
+    """The allow set is exactly the read-only one, so no allowed prefix is
     write- or exec-capable."""
     assert _allowed_prefixes() == {("ls",), ("cat",)}
 
@@ -57,13 +57,9 @@ def test_b1_codex_execpolicy_allows_only_read_only_commands(
     tmp_path: Path, argv: list[str], allowed: bool
 ) -> None:
     rules = tmp_path / "dadaia-command-policy.rules"
-    rules.write_text(_render_codex_command_policy_rules(), encoding="utf-8")
-    out = subprocess.run(
-        ["codex", "execpolicy", "check", "--rules", str(rules), "--", *argv],
-        capture_output=True,
-        text=True,
-        check=True,
-        timeout=60,
+    write_text(rules, _render_codex_command_policy_rules())
+    out = run(
+        ["codex", "execpolicy", "check", "--rules", str(rules), "--", *argv], check=True, timeout=60
     ).stdout
     assert (json.loads(out).get("decision") == "allow") is allowed
 
@@ -74,10 +70,10 @@ def test_public_install_inherits_host_policy_while_force_prompts(
     tmp_path: Path, executable: str
 ) -> None:
     rules = tmp_path / "dadaia-command-policy.rules"
-    rules.write_text(_render_codex_command_policy_rules(), encoding="utf-8")
+    write_text(rules, _render_codex_command_policy_rules())
 
     def decision(*options: str) -> str | None:
-        out = subprocess.run(
+        out = run(
             [
                 "codex",
                 "execpolicy",
@@ -90,8 +86,6 @@ def test_public_install_inherits_host_policy_while_force_prompts(
                 "install",
                 *options,
             ],
-            capture_output=True,
-            text=True,
             check=True,
             timeout=60,
         ).stdout
@@ -104,7 +98,7 @@ def test_public_install_inherits_host_policy_while_force_prompts(
 
 
 def test_b4_the_registry_mandate_describes_the_rendered_file() -> None:
-    rules = json.loads(_REGISTRY.read_text(encoding="utf-8"))["rules"]
+    rules = json.loads(read_text(_REGISTRY))["rules"]
     mandate = next(r["mandate"] for r in rules if r["id"] == "codex-command-policy")
     assert "venv-guard" not in mandate
     assert all(token in mandate for token in ("ls", "cat")) and " sed" not in mandate

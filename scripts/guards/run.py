@@ -30,12 +30,12 @@ Session = dict[str, Any]
 Plant = Callable[[Path], Session | None]
 Check = tuple[Callable[["Tree"], list[str]], dict[str, Plant]]
 
-_CI = "scripts/ci.py"  # the Linux CI jobs (T-050-190)
+_CI = "scripts/ci.py"  # the Linux CI jobs
 
 
 def tracked(root: Path, *spec: str) -> list[str]:
     """Every git-tracked path under *spec*: the one enumerator. A scratch file another
-    process writes under ``tests/tmp/`` is never in it (bugs 465, 467)."""
+    process writes under ``tests/tmp/`` is never in it."""
     out = subprocess.run(
         ["git", "ls-files", "-z", "--", *spec], cwd=root, capture_output=True, check=True
     ).stdout.decode()

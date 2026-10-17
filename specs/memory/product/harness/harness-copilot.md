@@ -2,7 +2,7 @@
 slug: harness-copilot
 title: harness-copilot
 tldr: Entry harness on GitHub Copilot CLI — native root AGENTS.md and .agents/skills; .github/ carries agent transcodes and two hook files, bootstrap at start.
-summary: Copilot reads the universal surface natively; its projection is the three dd- personas as .github/agents/*.agent.md and two hook files answered in Copilot's permissionDecision JSON, and nothing else under .github/.
+summary: Copilot reads the universal surface natively; its projection is the five dd- personas as .github/agents/*.agent.md and two hook files answered in Copilot's permissionDecision JSON, and nothing else under .github/.
 tags: [harness, copilot, projection, hooks]
 sources:
   - dadaia_workspace/core/harness_registry.py

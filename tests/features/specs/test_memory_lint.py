@@ -1,5 +1,5 @@
-"""Unit tests for ``features.specs.memory_lint`` — the ONE canonical LINT-1 implementation
-(v0.4.3 T-043-20/FR16), imported directly by ``doctor_memory``.
+"""Unit tests for ``features.specs.memory_lint``, the one canonical LINT-1 implementation,
+imported directly by ``doctor_memory``.
 """
 
 from __future__ import annotations
@@ -14,6 +14,7 @@ from dadaia_workspace.features.specs.memory_lint import (
     load_frontmatter_schema,
     main,
 )
+from tests.helpers.oslib import read_text, write_text
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 
@@ -47,7 +48,7 @@ def _make_atom(
     lines.append("---")
     content = "\n".join(lines) + "\n\n" + body
     path = dir_path / (filename or f"{slug}.md")
-    path.write_text(content, encoding="utf-8")
+    write_text(path, content)
     return path
 
 
@@ -78,9 +79,7 @@ def test_forbidden_heading_is_an_error(tmp_path: Path) -> None:
 
 
 def test_novel_heading_is_never_flagged(tmp_path: Path) -> None:
-    """The heading-vocabulary check (a curated allowlist of "known" headings) is
-    retired (v0.5.0): a heading vocabulary is prose policy, not a lint. A heading
-    nobody has ever seen before is neither an error nor a warning — only frontmatter
+    """A heading nobody has ever seen before is neither an error nor a warning — only frontmatter
     schema conformance, forbidden (changelog/history) headings, duplicate headings,
     and wikilink resolution remain mechanically checked."""
     schema = load_frontmatter_schema()
@@ -114,7 +113,7 @@ def test_missing_required_frontmatter_field_is_an_error(tmp_path: Path) -> None:
         "---\n\n## Purpose\n\nBody.\n"
     )
     path = tmp_path / "test-atom.md"
-    path.write_text(content, encoding="utf-8")
+    write_text(path, content)
 
     result = lint_atom(path, tmp_path, schema)
 
@@ -123,15 +122,12 @@ def test_missing_required_frontmatter_field_is_an_error(tmp_path: Path) -> None:
 
 
 def test_multiple_missing_required_fields_are_all_reported(tmp_path: Path) -> None:
-    """Checker half of bug memory-trio-missing-required-frontmatter-fields:
-    ``jsonschema.validate()`` (single-error) used to report only the FIRST missing
-    required field, so an author fixing one at a time never saw the next until a
-    re-run. ``lint_atom`` now iterates every schema error, so all missing fields
-    surface in one pass."""
+    """``lint_atom`` iterates every schema error, so all missing required fields surface in
+    one pass."""
     schema = load_frontmatter_schema()
     content = "---\nslug: test-atom\n---\n\n## Purpose\n\nBody.\n"
     path = tmp_path / "test-atom.md"
-    path.write_text(content, encoding="utf-8")
+    write_text(path, content)
 
     result = lint_atom(path, tmp_path, schema)
 
@@ -166,12 +162,28 @@ def test_wikilink_resolution_valid_and_broken(tmp_path: Path) -> None:
     assert not any("[[target]]" in e for e in result.errors)
 
 
+def test_a_wikilink_inside_a_fixed_section_is_not_judged_and_the_same_link_outside_is(
+    tmp_path: Path,
+) -> None:
+    """A rendered block carries ledger text, whose links the operator cannot correct."""
+    schema = load_frontmatter_schema()
+    line = "- 0007 \u2014 Split [[spec-tree]] into two atoms"
+    inside = (
+        f"## Purpose\n\n<!-- dadaia:fixed adr-list -->\n{line}\n<!-- /dadaia:fixed adr-list -->\n"
+    )
+    path = _make_atom(tmp_path, slug="ARCHITECTURE", filename="ARCHITECTURE.md", body=inside)
+    assert lint_atom(path, tmp_path, schema).errors == []
+    path = _make_atom(
+        tmp_path, slug="ARCHITECTURE", filename="ARCHITECTURE.md", body=f"## Purpose\n\n{line}\n"
+    )
+    errors = lint_atom(path, tmp_path, schema).errors
+    assert len(errors) == 1 and "Wikilink [[spec-tree]]" in errors[0], errors
+
+
 @pytest.mark.parametrize("stem", ["ARCHITECTURE", "TECHSTACK", "QUALITY"])
 def test_toplevel_trio_slug_is_its_filename_stem(tmp_path: Path, stem: str) -> None:
-    """0.4.7 FR9. ONE rule, no exception table: a `slug` equals its
-    filename stem, the top-level trio included. The alias table that mapped
-    `architecture` -> `ARCHITECTURE.md` was a second slug-resolution mechanism whose
-    third copy (panel `_md_render`) already caused `panel-wikilink-slug-hardcoded`."""
+    """One rule, no exception table: a `slug` equals its filename stem, the top-level trio
+    included."""
     schema = load_frontmatter_schema()
     path = _make_atom(tmp_path, slug=stem, filename=f"{stem}.md")
 
@@ -181,8 +193,7 @@ def test_toplevel_trio_slug_is_its_filename_stem(tmp_path: Path, stem: str) -> N
 
 
 def test_the_retired_alias_slug_is_now_a_stem_mismatch(tmp_path: Path) -> None:
-    """0.4.7 FR9. `slug: architecture` on `ARCHITECTURE.md` was the
-    ONE named exception; with the alias table deleted it is an ordinary mismatch."""
+    """`slug: architecture` on `ARCHITECTURE.md` is an ordinary stem mismatch."""
     schema = load_frontmatter_schema()
     path = _make_atom(tmp_path, slug="architecture", filename="ARCHITECTURE.md")
 
@@ -202,8 +213,8 @@ def test_slug_stem_mismatch_errors(tmp_path: Path) -> None:
 
 @pytest.mark.parametrize("stem", ["ARCHITECTURE", "TECHSTACK", "QUALITY"])
 def test_wikilink_resolves_iff_the_named_file_exists(tmp_path: Path, stem: str) -> None:
-    """0.4.7 FR9. `[[x]]` resolves iff `x.md` exists under memory/ —
-    the trio is linkable by its stem, and by nothing else."""
+    """`[[x]]` resolves iff `x.md` exists under memory/ — the trio is linkable by its stem,
+    and by nothing else."""
     schema = load_frontmatter_schema()
     _make_atom(tmp_path, slug=stem, filename=f"{stem}.md")
     path = _make_atom(tmp_path, slug="source", body=f"## Purpose\n\nsee [[{stem}]]\n")
@@ -221,7 +232,7 @@ def test_lint_directory_scans_toplevel_and_product_subdir_excludes_index(
     product_dir = tmp_path / "product"
     product_dir.mkdir()
     _make_atom(product_dir, slug="feature-a")
-    (product_dir / "index.md").write_text("# TOC\n", encoding="utf-8")  # no frontmatter, excluded
+    write_text(product_dir / "index.md", "# TOC\n")  # no frontmatter, excluded
 
     results = lint_directory(tmp_path, schema)
 
@@ -253,22 +264,16 @@ def test_main_end_to_end_exit_codes(tmp_path: Path, shape: str, expected_exit: i
 
 
 # ---------------------------------------------------------------------------
-# Ported from the deleted tests/unit/scripts/test_lint_memory_atoms.py — validates a
-# REAL on-disk public asset (the frontmatter schema) against this package's canon,
-# never a duplicate of the behavioral tests above (see the module docstring). Its
-# three siblings (scaffold-atom-headings-allowlisted, memory-feature-template-
-# headings-allowlisted, allowlist-content-pins) retired with HEADING_ALLOWLIST
-# itself (v0.5.0): a heading vocabulary is prose policy, not a lint.
+# Validates a REAL on-disk public asset (the frontmatter schema) against this package's
+# canon, never a duplicate of the behavioral tests above.
 # ---------------------------------------------------------------------------
 
 
 def test_agent_tier_property_absent_from_schema() -> None:
-    """The expired ``agent_tier`` property must stay out of the frontmatter schema.
+    """The ``agent_tier`` property stays out of the frontmatter schema.
 
-    Deprecated in v0.1.53 (zero runtime consumers) and dropped in v0.1.61 (D-1; zero
-    carriers among all memory atoms). With ``additionalProperties: false`` its absence
-    means any atom carrying ``agent_tier`` is a hard validation error — this pin
-    prevents silent re-introduction.
+    With ``additionalProperties: false`` its absence means any atom carrying ``agent_tier``
+    is a hard validation error — this pin prevents silent re-introduction.
     """
     schema = load_frontmatter_schema()
     assert "agent_tier" not in schema["properties"]
@@ -276,14 +281,14 @@ def test_agent_tier_property_absent_from_schema() -> None:
 
 
 # --------------------------------------------------------------------------- #
-# T-047-93 — a product atom declares the code it describes (`sources`).
+# A product atom declares the code it describes (`sources`).
 # --------------------------------------------------------------------------- #
 
 
 def _product_tree(tmp_path: Path) -> tuple[Path, Path]:
     """A repo with one real source file and an empty `specs/memory/product/area/`."""
     (tmp_path / "src").mkdir()
-    (tmp_path / "src" / "code.py").write_text("x = 1\n", encoding="utf-8")
+    write_text(tmp_path / "src" / "code.py", "x = 1\n")
     memory_dir = tmp_path / "specs" / "memory"
     area = memory_dir / "product" / "area"
     area.mkdir(parents=True)
@@ -349,7 +354,7 @@ def _product(tmp_path: Path, body: str) -> list[str]:
     memory = tmp_path / "specs" / "memory"
     area = memory / "product" / "area"
     area.mkdir(parents=True)
-    (tmp_path / "pyproject.toml").write_text("", encoding="utf-8")
+    write_text(tmp_path / "pyproject.toml", "")
     path = _make_atom(area, slug="atom", body=body, extra_fm_fields=_SOURCES_FM)
     return _narrative(lint_atom(path, memory, load_frontmatter_schema()).errors)
 
@@ -358,14 +363,21 @@ def _body_line(path_text: str, needle: str) -> int:
     return path_text.splitlines().index(needle) + 1
 
 
-def test_narrative_exempts_the_principle_adr_line(tmp_path: Path) -> None:
-    """T-047-98. `ADR: NNNN (accepted)` names the decision that
-    governs a principle — it is current truth, not history."""
+def test_narrative_leaves_the_principle_adr_line_alone(tmp_path: Path) -> None:
+    """`ADR: NNNN (accepted)` names the decision that governs a principle — it is current
+    truth, not history."""
     assert _canonical(tmp_path, "## Principles\n\nADR: 0023 (accepted)\n") == []
 
 
+def test_narrative_task_id_is_the_release_grammar_not_the_dead_one(tmp_path: Path) -> None:
+    """`J<n>.T<k>` is a task id (history); the dead `T-<n>-<k>` shape is not."""
+    errors = _canonical(tmp_path, "## Purpose\n\nDelivered by J3.T2.\n")
+    assert len(errors) == 1 and "task id 'J3.T2'" in errors[0], errors
+    assert _canonical(tmp_path, "## Purpose\n\nDelivered by T-5-1.\n") == []
+
+
 def test_narrative_exempts_code_fences(tmp_path: Path) -> None:
-    """T-047-98. A fenced example may carry any token."""
+    """A fenced example may carry any token."""
     body = "## Purpose\n\n```\nrelease 0.4.7 on 2026-09-22 for T-047-98\n```\n"
     assert _canonical(tmp_path, body) == []
 
@@ -377,28 +389,28 @@ def test_narrative_exempts_code_fences(tmp_path: Path) -> None:
         "Since 0.4.7 the gate reads nothing.",
         "Candidate c11 rewrote it.",
         "Built in rc-4.",
-        "Delivered by T-047-98.",
+        "Delivered by J3.T2.",
         "Covers FR4.",
     ],
     ids=["iso-date", "release-id", "candidate", "rc", "task-id", "fr-id"],
 )
 def test_narrative_token_in_any_memory_file_names_its_line(tmp_path: Path, line: str) -> None:
-    """T-047-98. Each token class is history in every memory file."""
+    """Each token class is history in every memory file."""
     body = f"## Purpose\n\nCurrent truth.\n{line}\n"
     path = _make_atom(tmp_path, slug="QUALITY", filename="QUALITY.md", body=body)
     errors = _narrative(lint_atom(path, tmp_path, load_frontmatter_schema()).errors)
-    expected = _body_line(path.read_text(encoding="utf-8"), line)
+    expected = _body_line(read_text(path), line)
     assert len(errors) == 1, errors
     assert errors[0].startswith(f"MEM-NARRATIVE-1 line {expected}:"), errors
 
 
 def test_narrative_ignores_versions_that_are_not_release_ids(tmp_path: Path) -> None:
-    """T-047-98. A loopback address or a two-part version is no release."""
+    """A loopback address or a two-part version is no release."""
     assert _canonical(tmp_path, "## Purpose\n\nBinds 127.0.0.1 on Python 3.12.\n") == []
 
 
 def test_narrative_ignores_a_pinned_dependency_version(tmp_path: Path) -> None:
-    """T-047-98. `tool==x.y.z` is a dependency pin, a fact of the stack."""
+    """`tool==x.y.z` is a dependency pin, a fact of the stack."""
     assert _canonical(tmp_path, "## Purpose\n\nMutation runs `mutmut==3.7.0`.\n") == []
 
 
@@ -418,15 +430,48 @@ def test_narrative_ignores_a_pinned_dependency_version(tmp_path: Path) -> None:
     ],
 )
 def test_narrative_history_phrase_in_a_product_atom(tmp_path: Path, phrase: str) -> None:
-    """T-047-98. A history phrase is an ERROR in a product atom."""
+    """A history phrase is an ERROR in a product atom."""
     line = f"The verb {phrase} here."
     errors = _product(tmp_path, f"## Purpose\n\nCurrent truth.\n{line}\n")
     atom = tmp_path / "specs" / "memory" / "product" / "area" / "atom.md"
-    expected = _body_line(atom.read_text(encoding="utf-8"), line)
+    expected = _body_line(read_text(atom), line)
     assert len(errors) == 1, errors
     assert errors[0].startswith(f"MEM-NARRATIVE-1 line {expected}:"), errors
 
 
 def test_narrative_history_phrase_outside_product_is_not_flagged(tmp_path: Path) -> None:
-    """T-047-98. The phrase table applies to product atoms only."""
+    """The phrase table applies to product atoms only."""
     assert _canonical(tmp_path, "## Principles\n\nA retired path is no longer read.\n") == []
+
+
+def test_narrative_exempts_the_principle_adr_line(tmp_path: Path) -> None:
+    """`ADR: NNNN (accepted)` names the decision that
+    governs a principle — it is current truth, not history."""
+    assert _canonical(tmp_path, "## Principles\n\nADR: 0023 (accepted)\n") == []
+
+
+def test_narrative_exempts_a_fixed_section_block_and_not_the_same_line_outside(
+    tmp_path: Path,
+) -> None:
+    """A rendered block carries ledger text, whatever tokens it holds."""
+    line = "- 0042 — Delivered by J3.T2"
+    inside = (
+        f"## Purpose\n\n<!-- dadaia:fixed adr-list -->\n{line}\n<!-- /dadaia:fixed adr-list -->\n"
+    )
+    assert _canonical(tmp_path, inside) == []
+    errors = _canonical(tmp_path, f"## Purpose\n\n{line}\n")
+    assert len(errors) == 1 and "task id 'J3.T2'" in errors[0], errors
+
+
+def test_narrative_exempts_only_a_closed_fixed_section_pair(tmp_path: Path) -> None:
+    """A lone opening marker exempts nothing, and later line numbers do not move."""
+    line = "- 0042 — Delivered by J3.T2"
+    lone = f"## Purpose\n\n<!-- dadaia:fixed adr-list -->\n{line}\n"
+    errors = _canonical(tmp_path, lone)
+    assert len(errors) == 1 and errors[0].startswith("MEM-NARRATIVE-1 line "), errors
+    paired = (
+        "## Purpose\n\n<!-- dadaia:fixed adr-list -->\nA\nB\n<!-- /dadaia:fixed adr-list -->\n"
+        f"{line}\n"
+    )
+    after = _canonical(tmp_path, paired)
+    assert len(after) == 1 and "line 16:" in after[0], after

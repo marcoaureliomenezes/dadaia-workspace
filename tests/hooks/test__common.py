@@ -8,8 +8,12 @@ of that seam, shared by gate/heartbeat/ctx-inject).
 
 from __future__ import annotations
 
+import os
+import sys
+
 from dadaia_workspace.core import invocation
 from dadaia_workspace.hooks import _common
+from tests.helpers.oslib import run
 
 
 def test_target_path_forms() -> None:
@@ -39,10 +43,7 @@ def test_target_path_forms() -> None:
 
 
 def test_target_paths_multi_file_all_headers() -> None:
-    """T-014-02 (FR-W4-04) regression: target_paths() returns ALL apply_patch file headers
-    so the gate can classify every file and let the most restrictive verdict win — the
-    unique failure detector this file exists to keep.
-    """
+    """target_paths() returns ALL apply_patch file headers, so the gate classifies every file."""
     assert _common.target_paths({"tool_input": {"file_path": "/a/b.py"}}) == ["/a/b.py"]
     assert _common.target_paths({"path": "/c.py"}) == ["/c.py"]
     assert _common.target_paths({"tool_input": {"notebook_path": "/n.ipynb"}}) == ["/n.ipynb"]
@@ -71,3 +72,11 @@ def test_sanitize_session_id_strips_traversal() -> None:
     assert invocation.sanitize_session_id("../../etc/passwd") == "etcpasswd"
     assert invocation.sanitize_session_id("abc-123_XYZ") == "abc-123_XYZ"
     assert invocation.sanitize_session_id(None) == ""
+
+
+def test_stdin_is_read_as_utf8_whatever_codec_the_host_pipe_defaults_to() -> None:
+    """A UTF-8 payload holding a non-ASCII path reads whole, never as ``{}`` (a gate fail-open)."""
+    code = "from dadaia_workspace.hooks import _common; print(ord(_common.read_stdin_json()['p']))"
+    env = {**os.environ, "PYTHONIOENCODING": "cp1252", "PYTHONUTF8": "0"}
+    done = run([sys.executable, "-c", code], input='{"p": "\u00c1"}', env=env)
+    assert (done.returncode, done.stdout.strip()) == (0, "193")

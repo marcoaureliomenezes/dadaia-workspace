@@ -1,4 +1,4 @@
-"""agentic-projections-agent-writable: the schema and the harness wiring that judge a verdict are PROTECTED.
+"""The schema and the harness wiring that judge a verdict are PROTECTED.
 
 In-process `sdd_gate.evaluate_payload` on absolute paths, in a workspace with no install ledger.
 """
@@ -11,6 +11,7 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.hooks import sdd_gate
+from tests.helpers.oslib import write_text
 
 _BUG = "agentic-projections-agent-writable"
 _PROTECTED = (".dadaia/agentic/schemas/handoff-v1.schema.json", ".claude/settings.local.json")
@@ -19,7 +20,7 @@ _PROTECTED = (".dadaia/agentic/schemas/handoff-v1.schema.json", ".claude/setting
 def _workspace(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     states = tmp_path / ".dadaia" / "states"
     states.mkdir(parents=True)
-    (states / "spec_contexts.json").write_text(json.dumps({"contexts": []}), encoding="utf-8")
+    write_text(states / "spec_contexts.json", json.dumps({"contexts": []}))
     monkeypatch.chdir(tmp_path)
     monkeypatch.delenv("DADAIA_CONTEXT", raising=False)
     return tmp_path
@@ -40,7 +41,7 @@ def test_an_agent_write_to_a_judging_projection_is_blocked_with_one_fix_line(
     reason = _verdict(_workspace(tmp_path, monkeypatch), tool, rel)
 
     assert reason is not None
-    assert sum(line.startswith(("fix:", "Operator action:")) for line in reason.splitlines()) == 1
+    assert sum(line.startswith(("fix:", "Agent action:")) for line in reason.splitlines()) == 1
 
 
 @pytest.mark.small

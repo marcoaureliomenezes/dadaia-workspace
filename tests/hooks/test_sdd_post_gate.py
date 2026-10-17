@@ -1,33 +1,9 @@
-"""sdd-artifact-linter-mutates-task-markers: a "post-write linter" was reported (re-filed from a consumer repo's ledger) to mutate
-``[ ]``/``[-]``/``[x]`` task markers, ``**Status:**`` tokens, and body content of
-``specs/releases/**/*.md`` between an agent's ``Read`` and its next ``Edit``. The bug's
-own ``expected`` clause: a linter on SDD markdown may normalize whitespace ONLY — it must
-never mutate markers, Status tokens, or inject/duplicate body content.
+"""A PostToolUse writer never rewrites SDD markdown: task markers, Status tokens and body content
+stay byte-identical.
 
-T-044-03's honest reproduction attempt (real subprocess invocation of every wired hook
-against a fixture ``TASKS.md``, plus direct calls to every explicit CLI-verb writer named
-in the task) found NO code path in this package that reproduces the symptom — R-3: the
-report was misfiled from a consumer repo whose ledger carried its own (since-removed or
-never-shared) formatter. This test is the evidenced-negative's RED-capable pin: it runs
-every product-owned SDD-markdown writer this package ships over one fixture and asserts
-markers, Status tokens, and body-paragraph count survive byte-identical. A future writer
-that starts touching ``specs/releases/**/*.md`` content automatically breaks this test on
-its very first run.
-
-Census (file:line, T-044-03):
-
-1. The 3 hooks this package wires into every harness — the only code that runs
-   automatically around a file-tool write (verified against the projected
-   ``.claude/settings.json`` / ``.codex/hooks.json`` instance, both wrapping the same
-   Python modules):
-   - ``dadaia_workspace/hooks/pre_gate.py`` (PreToolUse) — emits an allow/block envelope
-     only (``hooks/_common.py:176-208`` ``emit_allow``/``emit_block``); it never rewrites
-     ``tool_input``, so it cannot touch the bytes a subsequent Edit/Write applies.
-   - ``dadaia_workspace/hooks/sdd_post_gate.py`` (PostToolUse) — writes only to
-     ``.dadaia/sessions/`` (presence renewal); it never opens a ``specs/releases/**`` path.
-   - ``dadaia_workspace/hooks/ctx_inject.py`` (SessionStart/UserPromptSubmit) — writes
-     only sentinel/compact markers under ``.dadaia/tmp/`` (``ctx_inject.py:378,435``); it
-     reads memory atoms, never writes release artifacts.
+Drives every product-owned writer that runs around a file-tool write over one fixture of
+``specs/releases/**/*.md``: the pre-gate, the post-gate and the ctx-inject hook. Each reads or
+writes only its own state; none writes a release artifact.
 """
 
 from __future__ import annotations
@@ -40,6 +16,7 @@ import pytest
 
 from dadaia_workspace.core.spec_status import STATUS_LINE
 from tests.fixtures.harness_env import claude_hook_env, run_hook_subprocess
+from tests.helpers.oslib import read_text, write_text
 
 _MARKER_RE = re.compile(r"^- \[([ xX-])\]", re.MULTILINE)
 
@@ -101,7 +78,7 @@ def _seed_release_tasks_md(specs_dir: Path, release_id: str = "v1.0.0") -> Path:
     release_dir = specs_dir / "releases" / release_id / "rc-1"
     release_dir.mkdir(parents=True, exist_ok=True)
     path = release_dir / "TASKS.md"
-    path.write_text(_FIXTURE_TASKS_MD, encoding="utf-8")
+    write_text(path, _FIXTURE_TASKS_MD)
     return path
 
 
@@ -113,9 +90,9 @@ def _seed_release_tasks_md(specs_dir: Path, release_id: str = "v1.0.0") -> Path:
 def _mk_hook_workspace(tmp_path: Path, ctx: str = "dummy-ctx") -> Path:
     states = tmp_path / ".dadaia" / "states"
     states.mkdir(parents=True)
-    (states / "spec_contexts.json").write_text(
+    write_text(
+        states / "spec_contexts.json",
         json.dumps({"contexts": [{"repo_slug": ctx, "state": "alive"}]}),
-        encoding="utf-8",
     )
     return tmp_path
 
@@ -125,7 +102,7 @@ def test_pre_gate_hook_never_mutates_tasks_md_between_read_and_edit(tmp_path: Pa
     ws = _mk_hook_workspace(tmp_path)
     specs_dir = ws / "worktrees" / "dummy-ctx" / "0.5.0-rc1/j1" / "specs"
     target = _seed_release_tasks_md(specs_dir)
-    before = target.read_text(encoding="utf-8")
+    before = read_text(target)
 
     env = claude_hook_env(ws, session_id="pre-gate-sess", extra={"DADAIA_CONTEXT": "dummy-ctx"})
     result = run_hook_subprocess(
@@ -144,7 +121,7 @@ def test_pre_gate_hook_never_mutates_tasks_md_between_read_and_edit(tmp_path: Pa
     assert result.returncode == 0, result.stderr
     assert result.block_envelope() is None, "the gate must ALLOW a plain in-scope Edit"
 
-    after = target.read_text(encoding="utf-8")
+    after = read_text(target)
     _assert_sdd_invariants_preserved(before, after)
 
 
@@ -153,7 +130,7 @@ def test_sdd_post_gate_hook_never_mutates_tasks_md_content(tmp_path: Path) -> No
     ws = _mk_hook_workspace(tmp_path)
     specs_dir = ws / "repos" / "dummy-ctx" / "specs"
     target = _seed_release_tasks_md(specs_dir)
-    before = target.read_text(encoding="utf-8")
+    before = read_text(target)
 
     env = claude_hook_env(ws, session_id="post-gate-sess", extra={"DADAIA_CONTEXT": "dummy-ctx"})
     result = run_hook_subprocess(
@@ -167,7 +144,7 @@ def test_sdd_post_gate_hook_never_mutates_tasks_md_content(tmp_path: Path) -> No
     )
     assert result.returncode == 0, result.stderr
 
-    after = target.read_text(encoding="utf-8")
+    after = read_text(target)
     _assert_sdd_invariants_preserved(before, after)
 
 
@@ -178,17 +155,17 @@ def test_ctx_inject_hook_never_mutates_tasks_md_content(tmp_path: Path) -> None:
     target = _seed_release_tasks_md(specs_dir)
     mem = specs_dir / "memory"
     mem.mkdir(parents=True, exist_ok=True)
-    (mem / "TECHSTACK.md").write_text("# tech\nPython 3.12\n", encoding="utf-8")
+    write_text(mem / "TECHSTACK.md", "# tech\nPython 3.12\n")
     (mem / "product").mkdir(exist_ok=True)
-    (mem / "product" / "catalog.json").write_text('{"features": []}', encoding="utf-8")
-    before = target.read_text(encoding="utf-8")
+    write_text(mem / "product" / "catalog.json", '{"features": []}')
+    before = read_text(target)
 
     env = claude_hook_env(ws, extra={"DADAIA_CONTEXT": "dummy-ctx"})
     env.pop("CLAUDE_CODE_SESSION_ID", None)  # force resolution via the stdin field
     result = run_hook_subprocess("ctx_inject", {"session_id": "ctx-inject-sess"}, env)
     assert result.returncode == 0, result.stderr
 
-    after = target.read_text(encoding="utf-8")
+    after = read_text(target)
     _assert_sdd_invariants_preserved(before, after)
 
 

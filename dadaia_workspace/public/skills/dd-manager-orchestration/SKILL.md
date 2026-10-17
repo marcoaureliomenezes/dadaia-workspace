@@ -8,9 +8,8 @@ description: >
 
 ## 1. Dispatch protocol
 
-1. The main thread dispatches the three roles; resolve the target agent and task from the root `AGENTS.md` map §2.
-2. Only the main thread calls other agents — a leaf specialist cannot chain
-   further dispatch; route a leaf's returned handoff to its `next_handoff.agent`.
+1. The main thread dispatches the five roles; resolve the target agent from the root `AGENTS.md` map §2. Research and extraction go to `dd-researcher`, never `Explore` or `general-purpose`.
+2. Only the main thread calls other agents; route a leaf's returned handoff to its `next_handoff.agent`.
 3. Open every dispatch prompt with this block:
 
    ```
@@ -20,20 +19,24 @@ description: >
    task_id: <J<n>.T<k> or the review target>
    worktree: <path>
    ```
-4. Reports land where the root `AGENTS.md` map §4 says; every report
-   feeding another agent gets a handoff under `.dadaia/handoff/<context>/`.
-5. Open, merge and clean worktrees with `python3 .agents/skills/dd-gitflow-default/scripts/worktree.py new|merge|clean` (`worktrees/AGENTS.md`).
-6. The task is the unit of dispatch, never a job: sub-agents work disjoint tasks in parallel, one per task worktree (`worktrees/AGENTS.md` §1).
+4. Reports land where the root `AGENTS.md` map §4 says; a report feeding another agent gets a handoff under `.dadaia/handoff/<context>/`.
+5. Open, merge, clean and sync worktrees with `.dadaia/.venv/bin/dadaia worktree new|merge|clean|sync` (`worktrees/AGENTS.md`).
+6. The task is the unit of dispatch, never a job: sub-agents work disjoint tasks in parallel, one `wt-task-<kkk>` tree each (`worktrees/AGENTS.md` §1).
+7. Dispatch by the job file's `who:` (shape rule: `dd-release-definition` §5): `sr` → dd-sw-engineer-sr, `jr` → dd-sw-engineer-jr, `pe`/`cr` → the owning persona. Pass no model; the installed template decides.
+8. A REJECTED verdict whose finding names a `jr` task re-dispatches that task to dd-sw-engineer-sr.
+9. A ruling carries its reproduction and a consumer sweep across every repo of the context.
+10. A rework brief names the finding's contract class, requires its RED test first and a sweep of every other site of the class, and carries the bug history to read, the seams with evidence and the merge hazards with sibling jobs.
+11. One fresh agent per task, its full scope in its first prompt; a changed scope is a new dispatch, and an agent that stops early leaves the rest to a new dispatch against the same worktree.
+12. Check commits, files and test runs yourself; a handoff reported but not written does not count.
+13. A status answer counts each open class with its number.
 
 ## 2. Conflict resolution
 
 1. Resolve a decision by domain with the Decision Authority table (§3); evidence
    means `file:line`, spec citation, command output, or handoff field.
 2. On a two-agent deadlock: each agent states its position with evidence in the `findings` of its handoff or verdict; the main thread writes a synthesis naming the exact decision point.
-3. Still unresolved: call `dd-grill-me`, ask the operator one concrete question,
-   and reflect the answer in SPEC, PLAN, job files, ADR, or memory per the phase.
-4. Stop and surface to the operator on any Escalation trigger (§3); keep the §3
-   discipline table.
+3. Still unresolved: before launch, call `dd-grill-me` and reflect the operator's answer in SPEC, PLAN, job files, ADR, or memory per the phase; after launch, decide by law, ADRs and rulings (a failing old test: the root map §1 test line) and log it with the label `dd-grill-me` gives an unruled default.
+4. Between launch and the closure summary the main thread asks the operator nothing: every question belongs to `dd-grill-me` before launch. An act the law reserves to the operator, and a bug proposal, wait for the closure summary as one batch while independent tasks continue; the exception is a block-list bug (`specs/bugs/AGENTS.md` §2, a security finding included), put to the operator at once since it stops every merge.
 
 ## 3. Reference tables
 
@@ -41,14 +44,14 @@ description: >
 
 | Domain | Primary authority | May object with evidence | Tie-breaker |
 |---|---|---|---|
-| Scope, SPEC, memory, backlog | dd-product-engineer | any agent | operator |
-| PLAN, job files, implementation, tests | dd-software-engineer | dd-code-reviewer | operator |
-| Every review lens (architecture, security, QA, product, audit, AI surface) | dd-code-reviewer | dd-software-engineer | operator |
+| Scope, SPEC, memory, backlog | dd-product-engineer | any agent | main thread; operator for a product-contract change |
+| PLAN, job files, implementation, tests | dd-sw-engineer-sr | dd-code-reviewer | main thread |
+| Every review lens (architecture, security, QA, product, audit, AI surface) | dd-code-reviewer | dd-sw-engineer-sr | main thread |
 
-### Escalation triggers — stop and surface to the operator
+### Escalation triggers — a report line, not a wait
 
 1. Required SPEC/PLAN/job files or a resolvable `_RELEASE.json` `phase` missing or not
-   approved (`python3 .agents/skills/dd-release-implementation/scripts/release.py check --specs <specs-dir>` exits non-zero; a hotfix job needs only its open bug).
+   approved (the `specs/AGENTS.md` §3 precondition fails: `phase` is not `IMPLEMENTATION`, or `python3 .agents/skills/dd-release-implementation/scripts/release.py check --specs <specs-dir>` exits non-zero on the job files; a hotfix lane needs only its open bug).
 2. A CRITICAL security issue.
 3. A dispatched agent returns `[SCOPE ERROR]`.
 4. Three or more unresolved conflicts open.
@@ -60,12 +63,12 @@ description: >
 |---|---|
 | Chain agents only through the main thread | Every hand-off stays traceable |
 | Merge a task only with its validation evidence | Acceptance is checked |
-| Merge, deploy or close only after the reviewer's `APPROVED` | `worktrees/AGENTS.md` §2 |
-| Edit production files only inside a job's or task's worktree | Each edit traces to its task |
+| Merge a `wt-main`, `wt-rc` or lane tree (`wt-backlog-*`, `wt-hotfix-*`), deploy or close only after the reviewer's `APPROVED` | `worktrees/AGENTS.md` §2 |
+| Edit production files only inside a task's or hotfix lane's worktree | The edit then passes its tree's merge checks and review. |
 | Land an edit inside an open job as one of its tasks | Micro-dispatch: the ritual wait it adds outweighs the edit |
 | Keep private/project-specific details out of public assets | Security and portability |
 
 ## 4. Done when
 
-- Every job, plain, define or backlog merge names an APPROVED verdict file; every dispatch prompt carries that block.
-- Every conflict either resolved via evidence-based authority or escalated.
+- Every `wt-main`, `wt-rc` or lane merge names an APPROVED verdict file; every dispatch prompt carries that block.
+- Every conflict either resolved via evidence-based authority or reported.

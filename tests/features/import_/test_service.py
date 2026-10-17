@@ -1,12 +1,12 @@
-"""AC11 (FR13 / D15, T-046-31): `dadaia import` registers unknown names DEAD;
-bug import-registers-unvalidated-slugs-that-doctor-fix-inv5-rmtrees: every imported record goes
+"""`dadaia import` registers unknown names DEAD; every imported record goes
 through `SpecContextService.register`, the ONE guarded registry seam — a name or slug failing the
 allowlist, or a slug another context owns, is skipped with its reason and never written.
 
-Size: SMALL — the input file is the SPEC FR13 worked example; the store is a fake.
+Size: SMALL — the input file is the documented example; the store is a fake.
 """
 
 import json
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
@@ -23,6 +23,7 @@ from dadaia_workspace.features.spec_context.service import SpecContextService
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
 from tests.fixtures.stores import context_store
+from tests.helpers.oslib import write_text
 
 _EXPORT = {
     "schema_version": "spec-contexts-export-v1",
@@ -75,7 +76,7 @@ def _importer(tmp_path: Path, store: JsonContextStore) -> ImportService:
 
 def _export_file(tmp_path: Path, *records: dict[str, object]) -> Path:
     file = tmp_path / "spec-contexts.json"
-    file.write_text(json.dumps({**_EXPORT, "contexts": list(records)}), encoding="utf-8")
+    write_text(file, json.dumps({**_EXPORT, "contexts": list(records)}))
     return file
 
 
@@ -94,7 +95,7 @@ def _record(name: str, slug: str, **overrides: object) -> dict[str, object]:
 
 def test_import_saves_unknown_names_dead_and_skips_known_names(tmp_path: Path) -> None:
     file = tmp_path / "spec-contexts.json"
-    file.write_text(json.dumps(_EXPORT), encoding="utf-8")
+    write_text(file, json.dumps(_EXPORT))
     store = context_store(tmp_path / "states")
     store.save(_ALPHA)
 
@@ -187,7 +188,7 @@ def test_import_rejects_files_outside_the_contract(
 ) -> None:
     file = tmp_path / "spec-contexts.json"
     if content is not None:
-        file.write_text(content, encoding="utf-8")
+        write_text(file, content)
     store = context_store(tmp_path / "states")
 
     with pytest.raises(ValueError, match=reason):
@@ -201,10 +202,30 @@ def test_import_refuses_a_record_missing_a_field_naming_it(tmp_path: Path) -> No
     del record["name"]
     store = context_store(tmp_path / "states")
 
-    with pytest.raises(Exception) as caught:  # noqa: PT011 - the type is the assertion
+    with pytest.raises(Exception) as caught:
         _importer(tmp_path, store).run(_export_file(tmp_path, record))
 
     assert isinstance(caught.value, DadaiaError)
     assert "name" in str(caught.value)
     assert str(caught.value).count("fix:") == 1
     assert store.list_all() == []
+
+
+@pytest.mark.parametrize(
+    ("content", "tail"),
+    [
+        (None, "'{export}'."),
+        (json.dumps({**_EXPORT, "schema_version": "x"}), "only '{export}' output"),
+    ],
+)
+def test_the_export_hint_renders_the_cli_words_inline(
+    tmp_path: Path, content: str | None, tail: str, sentence: Callable[..., str]
+) -> None:
+    file = tmp_path / "spec-contexts.json"
+    if content is not None:
+        write_text(file, content)
+
+    with pytest.raises(ValueError) as refused:
+        _importer(tmp_path, context_store(tmp_path / "states")).run(file)
+
+    assert tail.format(export=sentence(None, "export")) in str(refused.value)

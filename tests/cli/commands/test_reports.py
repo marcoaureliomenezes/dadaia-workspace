@@ -13,6 +13,7 @@ from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES
 from dadaia_workspace.features.workspace.service import WorkspaceService
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
+from tests.helpers.oslib import read_text, write_text
 
 _runner = CliRunner()
 
@@ -37,13 +38,13 @@ def _make_valid_handoff(
 ) -> Path:
     """Create a minimal valid handoff.json file with a companion artifact."""
     artifact_path = base_dir / f"{stem}.html"
-    artifact_path.write_text(f"<html>{stem}</html>", encoding="utf-8")
+    write_text(artifact_path, f"<html>{stem}</html>")
     content_hash = hashlib.sha256(artifact_path.read_bytes()).hexdigest()
 
     doc: dict = {
         "schema_version": "handoff-v1.2",
         "self_pull": {"refs": ["AGENTS.md"]},  # the root map every initialized workspace has
-        "agent": "dd-software-engineer",
+        "agent": "dd-sw-engineer-sr",
         "context": "dadaia-workspace",
         "produced_at": "2026-05-17T00:00:00Z",
         "scope": "dadaia-workspace/test",
@@ -59,7 +60,7 @@ def _make_valid_handoff(
         doc["release_id"] = release_id
 
     handoff_path = base_dir / f"{stem}.handoff.json"
-    handoff_path.write_text(json.dumps(doc), encoding="utf-8")
+    write_text(handoff_path, json.dumps(doc))
     return handoff_path
 
 
@@ -85,7 +86,7 @@ def _make_invalid_handoff(base_dir: Path, stem: str = "bad") -> Path:
         },
     }
     handoff_path = base_dir / f"{stem}.handoff.json"
-    handoff_path.write_text(json.dumps(doc), encoding="utf-8")
+    write_text(handoff_path, json.dumps(doc))
     return handoff_path
 
 
@@ -109,7 +110,7 @@ def test_valid_handoff_exits_0_with_valid_count_and_json_shape(tmp_path: Path, m
     json_result = _runner.invoke(app, ["reports", "validate", str(handoff_path), "--json"])
     assert json_result.exit_code == 0, json_result.output
     # `.stdout` (pure stdout), not `.output` (stdout+stderr mixed, per Click 8.2's own
-    # docstring): the resolved-workspace-root diagnostic (T-043-47/A30.5) writes to
+    # docstring): the resolved-workspace-root diagnostic writes to
     # stderr precisely so it never pollutes the --json stdout payload's list shape.
     data = json.loads(json_result.stdout)
     assert isinstance(data, list)
@@ -121,9 +122,8 @@ def test_valid_handoff_exits_0_with_valid_count_and_json_shape(tmp_path: Path, m
 
 
 def test_schema_violation_always_exits_nonzero(tmp_path: Path, monkeypatch) -> None:
-    """sa-rich-printer-wraps-fix-lines#S6: an INVALID file exits 1 (exit-code truthfulness,
-    validation-029 F-12): the old non-strict 'print INVALID, exit 0' contract masked
-    tampered/malformed handoffs from every consuming script."""
+    """An INVALID file exits 1: a zero exit on INVALID would mask tampered or
+    malformed handoffs from every consuming script."""
     _init_workspace(tmp_path)
     monkeypatch.chdir(tmp_path)
 
@@ -169,7 +169,7 @@ def test_schema_staged_after_install_and_not_in_claude_schemas_dir(
     tmp_path: Path, monkeypatch
 ) -> None:
     """After workspace init + stage, handoff-v1.schema.json exists in
-    agentic/schemas/ and is consumable by the CLI, while FR1/A1 enforces that the
+    agentic/schemas/ and is consumable by the CLI, while the
     schema is NOT projected to .claude/schemas/."""
     _init_workspace(tmp_path)
     monkeypatch.chdir(tmp_path)
@@ -177,7 +177,7 @@ def test_schema_staged_after_install_and_not_in_claude_schemas_dir(
     schema_path = tmp_path / ".dadaia" / "agentic" / "schemas" / "handoff-v1.schema.json"
     assert schema_path.exists(), f"Schema not found at {schema_path}"
 
-    schema_data = json.loads(schema_path.read_text(encoding="utf-8"))
+    schema_data = json.loads(read_text(schema_path))
     assert schema_data.get("$schema") == "https://json-schema.org/draft/2020-12/schema"
 
     handoff_path = _make_valid_handoff(tmp_path)
@@ -191,11 +191,10 @@ def test_schema_staged_after_install_and_not_in_claude_schemas_dir(
 
 
 # ---------------------------------------------------------------------------
-# Bug ancestor-walk-workspace-root-silent-mistarget (T-043-47/A30.5) — a bare
-# `dadaia reports validate <path>` run from a cwd outside the handoff's own workspace
+# A bare `dadaia reports validate <path>` run from a cwd outside the handoff's own workspace
 # silently resolves artifact.path against the WRONG ancestor root and reports a false
-# INVALID/missing_artifact. `--workspace` is the escape hatch, and the resolved root is
-# always named in the command's output so a false negative is never misread.
+# INVALID/missing_artifact. `--workspace` is the escape hatch, and the resolved root is always named
+# in the command's output so a false negative is never misread.
 # ---------------------------------------------------------------------------
 
 
@@ -250,14 +249,14 @@ def test_reports_validate_always_emits_resolved_workspace_root_json_mode(
 def test_a_retired_version_without_self_pull_is_invalid(
     tmp_path: Path, monkeypatch, version: str
 ) -> None:
-    """sa-handoff-self-pull-requirement-diverges#46.1: v1/v1.1 without self_pull exit 1
+    """v1/v1.1 without self_pull exit 1
     naming schema_version."""
     _init_workspace(tmp_path)
     monkeypatch.chdir(tmp_path)
-    doc = json.loads(_make_valid_handoff(tmp_path).read_text(encoding="utf-8"))
+    doc = json.loads(read_text(_make_valid_handoff(tmp_path)))
     doc.pop("self_pull")
     path = tmp_path / "old.handoff.json"
-    path.write_text(json.dumps(doc | {"schema_version": version}), encoding="utf-8")
+    write_text(path, json.dumps(doc | {"schema_version": version}))
 
     result = _runner.invoke(app, ["reports", "validate", str(path)])
 

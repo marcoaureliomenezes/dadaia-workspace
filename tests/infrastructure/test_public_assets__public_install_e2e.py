@@ -1,5 +1,5 @@
-"""The rendered ``.dadaia/**`` law fragments (0.4.6 AC12) and no ``.dadaia/scripts``
-projection (0.4.6 AC10).
+"""The rendered ``.dadaia/**`` law fragments, and no ``.dadaia/scripts``
+projection.
 """
 
 from __future__ import annotations
@@ -8,6 +8,7 @@ from pathlib import Path
 
 from dadaia_workspace.core.workspace_layout import DADAIA_ZONES, STATES_CANON
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
+from tests.helpers.oslib import read_text
 
 
 def _table_rows(text: str) -> list[str]:
@@ -21,7 +22,7 @@ def test_installed_dadaia_agents_md_carries_the_rendered_zone_table(tmp_path: Pa
     ws.mkdir()
     FileSystemPublicAssetManager().install(ws)
 
-    zones = (ws / ".dadaia" / "AGENTS.md").read_text(encoding="utf-8")
+    zones = read_text(ws / ".dadaia" / "AGENTS.md")
     assert "<!-- zones -->" not in zones
     rows = _table_rows(zones)
     assert len(rows) == len(DADAIA_ZONES)
@@ -29,28 +30,27 @@ def test_installed_dadaia_agents_md_carries_the_rendered_zone_table(tmp_path: Pa
         zone.name for zone in DADAIA_ZONES
     ]
 
-    states = (ws / ".dadaia" / "states" / "AGENTS.md").read_text(encoding="utf-8")
+    states = read_text(ws / ".dadaia" / "states" / "AGENTS.md")
     assert "<!-- canon -->" not in states
     assert {row.strip("| `") for row in _table_rows(states)} == STATES_CANON
 
 
 def test_install_all_projects_no_dadaia_scripts(tmp_path: Path) -> None:
-    """0.4.6 AC10 (FR12): ``install()`` creates no ``.dadaia/scripts`` and the
+    """``install()`` creates no ``.dadaia/scripts`` and the
     staged manifest names no such path. Git hooks and CI execute the package copy under
-    ``dadaia_workspace/public/scripts/``; nothing reads a staged copy, so none is staged
-    (sa-staged-assets-without-consumers#44.2)."""
+    ``dadaia_workspace/public/scripts/``; nothing reads a staged copy, so none is staged."""
     ws = tmp_path / "ws"
     ws.mkdir()
     FileSystemPublicAssetManager().install(ws)
 
     assert not (ws / ".dadaia" / "scripts").exists()
     assert not (ws / ".dadaia" / "agentic" / "scripts").exists()
-    manifest = (ws / ".dadaia" / "agentic" / "manifest.json").read_text(encoding="utf-8")
+    manifest = read_text(ws / ".dadaia" / "agentic" / "manifest.json")
     assert ".dadaia/scripts" not in manifest
 
 
 def test_nested_operator_pair_untouched_and_root_map_projected(tmp_path: Path) -> None:
-    """sa-public-install-writes-the-root-map-into-product-repos#K1 sa-public-install-writes-the-root-map-into-product-repos#K2 (rewritten from the fan-out e2e): install projects
+    """Install projects
     the root map byte-identical to data/AGENTS.md and leaves operator nested law alone."""
     ws = tmp_path / "ws"
     services = ws / "services"

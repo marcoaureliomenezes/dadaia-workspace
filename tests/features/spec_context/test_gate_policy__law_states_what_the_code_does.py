@@ -1,4 +1,4 @@
-"""sa-text-restates-rules-the-code-contradicts: a law or docstring
+"""A law or docstring
 sentence that restates a rule states what the code does, or cites the code instead.
 Size: SMALL — text reads, one AST walk, in-process gate calls; one pre-gate subprocess, as
 stdin is the only way an unreadable payload reaches the hook.
@@ -9,7 +9,6 @@ from __future__ import annotations
 import ast
 import configparser
 import re
-import subprocess
 import sys
 from pathlib import Path, PurePath
 from types import ModuleType
@@ -20,6 +19,7 @@ from dadaia_workspace.core import context_registry
 from dadaia_workspace.features.spec_context import gate_policy
 from dadaia_workspace.hooks import pre_gate, root_whitelist, sdd_gate
 from dadaia_workspace.infrastructure.runtime_transforms import hook_wrappers
+from tests.helpers.oslib import read_text, run, write_text
 
 _REPO = Path(__file__).resolve().parents[3]
 _PKG = _REPO / "dadaia_workspace"
@@ -31,35 +31,32 @@ def _fail_open_rows(
 ) -> dict[str, bool]:
     """One row per fail-open path, keyed by the evidence the law names, each read from code."""
     (tmp / ".dadaia/states").mkdir(parents=True)
-    (tmp / ".dadaia/states/spec_contexts.json").write_text("{trunc", "utf-8")
+    write_text(tmp / ".dadaia/states/spec_contexts.json", "{trunc")
     gate = [sys.executable, "-m", "dadaia_workspace.hooks.pre_gate"]
-    unreadable = subprocess.run(gate, input="not json", capture_output=True, text=True,
-                                cwd=tmp)  # fmt: skip
+    unreadable = run(gate, input="not json", cwd=tmp)  # fmt: skip
 
     def raises(_: dict[str, object]) -> str:
         raise RuntimeError
 
     monkeypatch.setattr(pre_gate, "_POLICIES", (raises,))
-    bash = {"tool_name": "Bash", "tool_input": {"command": "echo x > AGENTS.md"}}
     worktree = {"root": PurePath("/ws"), "zone": "worktree", "repo": "r", "owner": "r"}
     return {
-        "ADR 0118": f"past {hook_wrappers.TOOL_TIMEOUT_S} s" in law["ADR 0118"],
-        "ADRs 0096, 0103, 0133": sdd_gate.evaluate_payload(bash) is None,
-        "ADR 0116": gate_policy.evaluate("worktrees/r/w/x.py", has_id=False, **worktree)[0]
+        "TOOL_TIMEOUT_S": f"past {hook_wrappers.TOOL_TIMEOUT_S} s" in law["TOOL_TIMEOUT_S"],
+        "gate_policy": gate_policy.evaluate("worktrees/r/w/x.py", has_id=False, **worktree)[0]
         == gate_policy.Decision.ALLOW
         != gate_policy.evaluate("worktrees/r/w/x.py", **worktree)[0],
         "`pre_gate`": pre_gate.evaluate_payload({}) is None,
         "`read_stdin_json`": unreadable.returncode == 0 and "deny" not in unreadable.stdout,
-        "ADR 0132": context_registry.registered_slugs(tmp) == ({"*"}, {"*"}),
+        "registered_slugs": context_registry.registered_slugs(tmp) == ({"*"}, {"*"}),
     }
 
 
 def test_the_map_lists_every_fail_open_path_the_code_has(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """AC4.9 (FR seventh-fail-open-path-law-line, F080): the map's fail-open list is
+    """The map's fail-open list is
     set-equal to the code's paths, each naming its evidence; no sentence pinned."""
-    line = next(ln for ln in _MAP.read_text("utf-8").splitlines() if "fails open on:" in ln)
+    line = next(ln for ln in read_text(_MAP).splitlines() if "fails open on:" in ln)
     items = line.split("fails open on:")[1].rstrip(".").split(";")
     named = {m[1]: i for i in items if (m := re.search(r"\(([^()]+)\)\s*$", i))}
     rows = _fail_open_rows(named, tmp_path, monkeypatch)
@@ -74,7 +71,7 @@ def _block_rows(tmp: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, bool]:
     """One row per block the code has, keyed by the evidence the law names, each read in-process."""
     for name, registry in (("ok", '{"contexts": []}'), ("bad", "{trunc")):
         (tmp / name / ".dadaia/states").mkdir(parents=True)
-        (tmp / name / ".dadaia/states/spec_contexts.json").write_text(registry, "utf-8")
+        write_text(tmp / name / ".dadaia/states/spec_contexts.json", registry)
 
     def write(name: str, rel: str, policy: ModuleType) -> str | None:
         monkeypatch.chdir(tmp / name)
@@ -94,31 +91,31 @@ def _block_rows(tmp: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, bool]:
         "PROTECTED": write("ok", "AGENTS.md", sdd_gate) is not None,
         "out-of-scope": gate_policy.evaluate("worktrees/b/w/x.py", root=PurePath("/ws"), **away)[0]
         == gate_policy.Decision.BLOCK,
-        "ADR 0105": write("bad", "repos/r/src/x.py", sdd_gate) is not None,
+        "_MERGE_ONLY_MESSAGE": write("bad", "repos/r/src/x.py", sdd_gate) is not None,
     }
 
 
 def test_the_map_lists_every_block_the_code_has(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """AC12.5 (root-enforcement-section-states-false-blocks): §3's `blocks:` list is set-equal
+    """§3's `blocks:` list is set-equal
     to the code's blocks, each naming its evidence, merge-only included; the fail-open item
-    `(ADR 0132)` names the merge-only block; no §3 line claims a PR check, the line naming
-    APPROVED names `worktree.py merge`."""
-    section = _MAP.read_text("utf-8").split("## 3.")[1].split("\n## ")[0].splitlines()
+    `(registered_slugs)` names the merge-only block; no §3 line claims a PR check, the line naming
+    APPROVED names `dadaia worktree merge`."""
+    section = read_text(_MAP).split("## 3.")[1].split("\n## ")[0].splitlines()
     line = next((ln for ln in section if "blocks:" in ln), "")
     items = line.partition("blocks:")[2].rstrip(".").split(";")
     named = {m[1]: i for i in items if (m := re.search(r"\(([^()]+)\)\s*$", i))}
     rows = _block_rows(tmp_path, monkeypatch)
     assert line and len(named) == len(items) and sorted(named) == sorted(rows)
     assert [k for k, held in rows.items() if not held] == []
-    assert any("merge-only" in ln for ln in section if "(ADR 0132)" in ln)
-    assert all("worktree.py merge" in ln for ln in section if "APPROVED" in ln)
+    assert any("merge-only" in ln for ln in section if "(registered_slugs)" in ln)
+    assert all("dadaia worktree merge" in ln for ln in section if "APPROVED" in ln)
     assert not any("green" in ln for ln in section)
 
 
 def test_the_bind_resolution_contract_covers_every_verb_module() -> None:
-    """sa-text-restates-rules-the-code-contradicts#49.4: every cli/commands/* module is a
+    """Every cli/commands/* module is a
     source of the bind-resolution-seam contract, so a direct core.invocation import in any
     verb (harness, reconcile, capabilities, certify included) breaks lint-imports."""
     config = configparser.ConfigParser()
@@ -134,14 +131,14 @@ def test_the_bind_resolution_contract_covers_every_verb_module() -> None:
 
 
 def test_os_name_is_read_only_through_the_platform_seam() -> None:
-    """sa-text-restates-rules-the-code-contradicts#49.5: no `os.name` read in the package
+    """No operating-system-name read in the package
     outside core/platform (python_env branches on PLATFORM). Stdlib skill scripts under
     public/ cannot import core and are out of this ratchet."""
     reads = [
         f"{path.relative_to(_REPO)}:{node.lineno}"
         for path in sorted(_PKG.rglob("*.py"))
         if "public" not in path.relative_to(_PKG).parts
-        for node in ast.walk(ast.parse(path.read_text("utf-8")))
+        for node in ast.walk(ast.parse(read_text(path)))
         if isinstance(node, ast.Attribute) and node.attr == "name"
         and isinstance(node.value, ast.Name) and node.value.id == "os"
     ]  # fmt: skip
@@ -167,11 +164,11 @@ def test_a_skill_prescribes_no_act_its_own_laws_forbid_or_its_writer_cannot_do(
 ) -> None:
     """The ledger laws (`specs/bugs/AGENTS.md`: no event stream; root map: fixes never rewrite old
     asserts; `backlog.py`: new, exit, check) bind the skills that teach those ledgers."""
-    assert phrase not in (_SKILLS / skill).read_text("utf-8")
+    assert phrase not in read_text(_SKILLS / skill)
 
 
 def test_the_orchestration_skill_dispatches_a_task_never_a_job() -> None:
-    """ADR 0190: the task is the dispatch unit, so step 6 of `dd-manager-orchestration` names no
+    """The task is the dispatch unit, so step 6 of `dd-manager-orchestration` names no
     job as a unit of dispatch."""
-    skill = (_SKILLS / "dd-manager-orchestration/SKILL.md").read_text("utf-8")
+    skill = read_text(_SKILLS / "dd-manager-orchestration/SKILL.md")
     assert "unit of dispatch is a job" not in skill

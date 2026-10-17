@@ -6,6 +6,7 @@ import re
 import tomllib
 from pathlib import Path
 
+from dadaia_workspace.core import platform
 from dadaia_workspace.core.models.doctor_report import DoctorLine, DoctorStatus
 from dadaia_workspace.infrastructure.runtime_transforms.codex_assets import (
     _CODEX_SKILL_REF_PREFIXES,
@@ -22,7 +23,7 @@ def dcx7_codex_skill_refs(workspace_root: Path) -> list[DoctorLine]:
         return out
     for toml_file in sorted(codex_agents.glob("*.toml")):
         try:
-            data = tomllib.loads(toml_file.read_text(encoding="utf-8"))
+            data = tomllib.loads(platform.read_text(toml_file))
         except (OSError, tomllib.TOMLDecodeError):
             continue
         instructions = data.get("developer_instructions", "")

@@ -1,4 +1,4 @@
-"""retired-lib-asset-leaves-orphan-projection: projection reconciliation diffs against the install ledger: prune only a pristine orphan."""
+"""Projection reconciliation diffs against the install ledger: prune only a pristine orphan."""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ from pathlib import Path
 
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from tests.helpers.harness_profile import register_all
+from tests.helpers.oslib import read_text, write_text
 
 
 def _install_all(ws: Path) -> FileSystemPublicAssetManager:
@@ -17,24 +18,19 @@ def _install_all(ws: Path) -> FileSystemPublicAssetManager:
 
 
 def test_retired_family_is_pruned_on_next_install(tmp_path: Path) -> None:
-    """A retired family's pristine projection is pruned; an operator-modified one is retained.
-
-    sa-public-install-unlinks-operator-files-outside-its-ledger#D3;
-    sa-public-install-unlinks-operator-files-outside-its-ledger#D4;
-    sa-doctor-reaps-harness-owned-entries#H4.
-    """
+    """A retired family's pristine projection is pruned; an operator-modified one is retained."""
     ws = tmp_path / "ws"
     ws.mkdir()
     mgr = FileSystemPublicAssetManager()
-    mgr._public_dir = shutil.copytree(mgr._public_dir, tmp_path / "public")  # noqa: SLF001
+    mgr._public_dir = shutil.copytree(mgr._public_dir, tmp_path / "public")
     register_all(ws)
     mgr.install(ws)
-    skills_src = mgr._public_dir / "skills"  # noqa: SLF001
+    skills_src = mgr._public_dir / "skills"
     pristine, edited = sorted(p.name for p in skills_src.iterdir() if p.is_dir())[:2]
     gone = ws / ".agents" / "skills" / pristine / "SKILL.md"
     kept = ws / ".agents" / "skills" / edited / "SKILL.md"
     assert gone.is_file()
-    kept.write_text(kept.read_text(encoding="utf-8") + "\nOPERATOR EDIT\n")
+    write_text(kept, read_text(kept) + "\nOPERATOR EDIT\n")
 
     shutil.rmtree(skills_src)
     installed = mgr.install(ws)
@@ -46,7 +42,7 @@ def test_retired_family_is_pruned_on_next_install(tmp_path: Path) -> None:
 
 
 def test_no_ledger_bootstrap_prunes_nothing(tmp_path: Path) -> None:
-    """sa-public-install-unlinks-operator-files-outside-its-ledger#D5 — no ledger: prune nothing."""
+    """No ledger: prune nothing."""
     ws = tmp_path / "ws"
     ws.mkdir()
     mgr = _install_all(ws)
@@ -56,7 +52,7 @@ def test_no_ledger_bootstrap_prunes_nothing(tmp_path: Path) -> None:
     ledger.unlink()
     stray = ws / ".agents" / "skills" / "operator-own-skill" / "SKILL.md"
     stray.parent.mkdir(parents=True)
-    stray.write_text("mine\n", encoding="utf-8")
+    write_text(stray, "mine\n")
 
     installed = mgr.install(ws)
 
@@ -65,8 +61,7 @@ def test_no_ledger_bootstrap_prunes_nothing(tmp_path: Path) -> None:
 
 
 def test_every_install_keeps_every_ledgered_path_the_library_still_ships(tmp_path: Path) -> None:
-    """sa-scoped-public-install-prunes-the-gate-wiring#L2,
-    sa-public-install-unlinks-operator-files-outside-its-ledger#D3 — a whole, forced or
+    """A whole, forced or
     claude-scoped install keeps every previously ledgered path on disk."""
     from dadaia_workspace.infrastructure.json_install_ledger_store import JsonInstallLedgerStore
 

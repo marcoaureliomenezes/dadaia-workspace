@@ -17,14 +17,20 @@ from pathlib import Path
 # A projected skill folder is not a package dir to litter: the sibling modules below
 # import without leaving a `__pycache__` beside them.
 sys.dont_write_bytecode = True
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-sys.path.append(str(Path(__file__).resolve().parents[2] / "dd-bug-resolution" / "scripts"))
+#: One bootstrap statement: this folder and the kernel, at the front.
+sys.path[:0] = [
+    str(Path(__file__).resolve().parent),
+    str(Path(__file__).resolve().parents[2] / "dd-bug-resolution" / "scripts"),
+]
 
-import _memory_catalog as cat  # noqa: E402
-import _memory_drift as dft  # noqa: E402
-from _memory_check import check  # noqa: E402
-from _memory_schema import CATALOG, INDEX  # noqa: E402
-from _specs import find_specs, refuse  # noqa: E402
+import _findings
+import _memory_catalog as cat
+import _memory_drift as dft
+from _memory_check import check
+from _memory_schema import INDEX
+from _platform import use_utf8_stdio, write_text
+from _refusal import Refusal
+from _specs import CATALOG, find_specs, refuse
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -47,8 +53,8 @@ def _parser() -> argparse.ArgumentParser:
 def _generate(specs: Path) -> str:
     """Rewrite BOTH generated files from the atoms — one act, no half-refresh."""
     catalog = cat.generate(specs)
-    (specs / CATALOG).write_text(cat.serialize(catalog), encoding="utf-8")
-    (specs / INDEX).write_text(cat.render(specs, catalog), encoding="utf-8")
+    write_text(specs / CATALOG, cat.catalog_text(catalog))
+    write_text(specs / INDEX, cat.render(specs, catalog))
     count = len(catalog["features"])
     return f"[ok] {CATALOG} and {INDEX} written ({count} feature{'s' if count != 1 else ''})"
 
@@ -61,6 +67,7 @@ def _drift(args: argparse.Namespace, specs: Path) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
+    use_utf8_stdio()
     args = _parser().parse_args(argv)
     reads = args.verb in ("check", "drift")
     specs = find_specs(args.specs, ledger=None if reads else "specs/memory/product/catalog.json")
@@ -69,15 +76,13 @@ def main(argv: list[str] | None = None) -> int:
         if args.json:
             print(json.dumps(findings, indent=2))
         else:
-            for finding in findings:
-                print(f"{finding['code']} error {finding['path']}:{finding['line']} "
-                      f"{finding['message']}")  # fmt: skip
+            _findings.print_text(findings)
         return 1 if findings else 0
     try:
         if args.verb == "drift":
             return _drift(args, specs)
         print(_generate(specs))
-    except (cat.Refusal, dft.Refusal) as refusal:
+    except Refusal as refusal:
         return refuse(refusal, specs)
     return 0
 

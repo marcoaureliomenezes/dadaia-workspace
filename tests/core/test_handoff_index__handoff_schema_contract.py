@@ -1,11 +1,9 @@
 """The shipped record schemas: closed envelopes, and what each accepts and refuses.
 
-handoff-v1 (DADAIA §5.4; sa-handoff-self-pull-requirement-diverges#46.1,
-sa-handoff-self-pull-requirement-diverges#46.2, sa-handoff-self-pull-requirement-diverges#46.3:
-one ``jsonschema`` engine, one verdict per doc); bug-record-v1 (SPEC v0.5.0 A2.1); finding-record-v1
-(A13.1); decision-record-v1 (v0.5.0 specs-canon closure); release-state-v1 (no ``rc`` at any depth).
+handoff-v1, bug-record-v1, finding-record-v1, decision-record-v1 and release-state-v1 share one
+``jsonschema`` engine, one verdict per doc; release-state-v1 has no ``rc`` at any depth.
 Size: SMALL — schema documents only. The schema checks live here, not beside the stdlib-only core
-models (bug mutation-baseline-core-models-scope-now-imports-jsonschema-isolated-venv-cannot-collect).
+models.
 """
 
 from __future__ import annotations
@@ -17,18 +15,21 @@ from typing import Any
 import pytest
 from jsonschema import Draft202012Validator
 
+from tests.helpers.oslib import read_text
+
 _SCHEMAS = Path(__file__).resolve().parents[2] / "dadaia_workspace" / "public" / "schemas"
+_SKILLS = _SCHEMAS.parent / "skills"
 _PATHS = {
     "handoff": _SCHEMAS / "handoff-v1.schema.json",
-    "bug": _SCHEMAS / "bugs" / "bug-record-v1.schema.json",
-    "finding": _SCHEMAS / "audits" / "finding-record-v1.schema.json",
+    "bug": _SKILLS / "dd-bug-resolution/scripts/schemas/bug-record-v1.schema.json",
+    "finding": _SKILLS / "dd-audit-project/scripts/schemas/finding-record-v1.schema.json",
     "adr": _SCHEMAS / "ADRs" / "decision-record-v1.schema.json",
-    "release": _SCHEMAS / "releases" / "release-state-v1.schema.json",
+    "release": _SKILLS / "dd-release-implementation/scripts/schemas/release-state-v1.schema.json",
 }
 
 
 def _schema(kind: str) -> dict[str, Any]:
-    return json.loads(_PATHS[kind].read_text(encoding="utf-8"))  # type: ignore[no-any-return]
+    return json.loads(read_text(_PATHS[kind]))  # type: ignore[no-any-return]
 
 
 _TS = "2026-08-27T10:31:16Z"
@@ -48,11 +49,11 @@ _BASE: dict[str, dict[str, Any]] = {
         "verdict": "APPROVED",
         "verdict_reason": "Contract is valid.",
     },
-    # write-once fields absent entirely, never null (A2.2b)
+    # write-once fields are absent entirely, never null
     "bug": {
         "id": "sample-bug",
         "ts": _TS,
-        "reported_by": "dd-software-engineer",
+        "reported_by": "dd-sw-engineer-sr",
         "title": "sample bug",
         "severity": "MEDIUM",
         "surface": "tests",
@@ -66,7 +67,7 @@ _BASE: dict[str, dict[str, Any]] = {
         "caused_by": None,
         "closed_at": None,
     },
-    # the SPEC FR13 example, as appended
+    # the example, as appended
     "finding": {
         "id": "20261020-five-release-window-F003",
         "pillar": "bugs",
@@ -101,7 +102,7 @@ _BASE: dict[str, dict[str, Any]] = {
     },
 }
 
-#: The governance rewrite each record takes after its fix/remediation — valid, immutable core untouched.
+#: The governance rewrite each record takes after its fix/remediation: valid, immutable core untouched.
 _REWRITE: dict[str, dict[str, Any]] = {
     "bug": {
         "status": "resolved",
@@ -125,7 +126,7 @@ _REWRITE: dict[str, dict[str, Any]] = {
             "caused_by", "closed_at", "solution", "fix_sha", "superseded_by",
         }, id="bug"),
         pytest.param("finding", {"id", "pillar", "severity", "refs", "claim", "evidence", "disposition", "release", "reason"}, id="finding"),
-        pytest.param("adr", {"id", "ts", "title", "status", "context", "decision", "consequences", "measured_by", "supersedes", "amends", "ruling"}, id="adr"),
+        pytest.param("adr", {"id", "ts", "title", "status", "context", "decision", "consequences", "measured_by", "supersedes", "amends", "options", "ruling"}, id="adr"),
         pytest.param("release", {"schema", "release", "phase", "defined", "implemented", "shipped", "log"}, id="release"),
     ],
 )  # fmt: skip
@@ -140,8 +141,11 @@ def test_schema_is_draft_2020_12_and_closes_the_envelope(
     if properties is not None:
         assert set(schema["properties"]) == properties
         if kind != "bug":
-            # ADR 0151 M1: `ruling` is required on `accepted` only, by the schema's allOf.
-            assert set(schema["properties"]) == set(schema["required"]) | {"ruling"} & properties
+            # `ruling` is required on `accepted` only, by the schema's allOf.
+            assert (
+                set(schema["properties"])
+                == set(schema["required"]) | {"options", "ruling"} & properties
+            )
 
 
 def _milestone(**extra: object) -> dict[str, object]:
@@ -188,7 +192,7 @@ _DROP = object()
         pytest.param("handoff", {"artifact": _artifact_path("../report.html")}, None, id="handoff-parent-traversal"),
         pytest.param("handoff", {"artifact": _artifact_path(".dadaia/reports/../states/p.json")}, None, id="handoff-embedded-parent-traversal"),
         pytest.param("bug", {"unexpected": "nope"}, None, id="bug-unknown-property"),
-        # no `picked` status: the pick is the bundled definition commit (v0.5.0 FR2)
+        # no `picked` status: the pick is the bundled definition commit
         pytest.param("bug", {"status": "picked"}, "status", id="bug-picked-status"),
         pytest.param("bug", {"status": "deferred"}, "status", id="bug-deferred-status"),
         pytest.param("finding", {"unexpected": "nope"}, None, id="finding-unknown-property"),
@@ -226,14 +230,17 @@ def test_an_invalid_record_is_refused(
 def test_mutability_is_declared_per_property_and_the_rewrite_spares_the_core(
     kind: str, categories: set[str]
 ) -> None:
-    """A2.1/A13.1: every property carries ``x-mutability`` in its closed set; ``required`` is
-    every property but the write-once ones; the governance rewrite touches no immutable-core field.
+    """Every property carries ``x-mutability`` in its closed set; ``required`` is
+    every property but the write-once ones and `fix_sha`, absent until a resolve sets it; the governance rewrite touches no immutable-core field.
     A finding's only mutable fields are disposition/release/reason."""
     properties = _schema(kind)["properties"]
     mutability = {name: spec["x-mutability"] for name, spec in properties.items()}
     assert set(mutability.values()) == categories
     required = set(_schema(kind)["required"])
-    assert required == {n for n, c in mutability.items() if c != "write-once"}
+    unset_until_resolved = {"fix_sha"} if kind == "bug" else set()
+    assert (
+        required == {n for n, c in mutability.items() if c != "write-once"} - unset_until_resolved
+    )
     assert not {n for n in _REWRITE[kind] if mutability[n] == "immutable-core"}
     if kind == "finding":
         assert {n for n, c in mutability.items() if c == "mutable-governance"} == set(
@@ -242,16 +249,16 @@ def test_mutability_is_declared_per_property_and_the_rewrite_spares_the_core(
 
 
 def test_the_bug_law_points_at_x_mutability_and_lists_no_fields() -> None:
-    """sa-spec-doc-033-duplicates-bugs-check#B7: the scaffold bugs law names the schema's
+    """The scaffold bugs law names the schema's
     x-mutability and restates no field list (no line naming three or more properties)."""
     properties = set(_schema("bug")["properties"])
-    law = (_SCHEMAS.parent / "scaffold" / "bugs" / "AGENTS.md").read_text(encoding="utf-8")
+    law = read_text(_SCHEMAS.parent / "scaffold" / "bugs" / "AGENTS.md")
     assert "x-mutability" in law
     assert not [ln for ln in law.splitlines() if len(properties & set(ln.split("`"))) >= 3]
 
 
 def test_the_surface_names_no_library_fact() -> None:
-    """sa-consumer-law-carries-library-facts#FR8.1: the bug schema projected beside every
+    """The bug schema projected beside every
     consumer's bugs.py carries no library layer or package list for ``surface``."""
     surface = _schema("bug")["properties"]["surface"]
     assert "enum" not in surface and "x-enum-append" not in surface
@@ -260,6 +267,5 @@ def test_the_surface_names_no_library_fact() -> None:
 
 
 def test_handoff_schema_verdict_enum_is_the_two_tokens() -> None:
-    """verdict-vocabulary-persona-schema-mismatch: the one verdict vocabulary (the public text
-    rows live in test_public_source_hygiene)."""
+    """The one verdict vocabulary (the public text rows live in test_public_source_hygiene)."""
     assert _schema("handoff")["properties"]["verdict"]["enum"] == ["APPROVED", "REJECTED"]

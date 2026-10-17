@@ -1,12 +1,6 @@
-"""F011 (20260830-design-bug-surface-audit): memory-canon facts have ONE home —
-``features.specs.memory_canon`` — and every consumer imports it.
-
-Multiplied before the fold: the required-memory-file list (canon.CANON rows,
-doctor_structural._TREE3_MEMORY_FILES, doctor_memory.TOPLEVEL_MEMORY_FILES), the
-forbidden-heading vocabulary (doctor_memory prefix regex vs memory_lint exact
-frozenset — already divergent: singular 'Version' and unaccented 'Historico'
-passed lint), and the wikilink regex compiled three times.
-"""
+"""Memory-canon facts have ONE home — ``features.specs.memory_canon`` — and every consumer
+imports it: the required-memory-file list, the forbidden-heading vocabulary and the
+wikilink regex."""
 
 from __future__ import annotations
 
@@ -18,6 +12,7 @@ from dadaia_workspace.features.specs import (
     memory_canon,
     memory_lint,
 )
+from tests.helpers.oslib import write_text
 
 
 def test_memory_canon_facts_are_one_object_everywhere() -> None:
@@ -45,10 +40,10 @@ def test_lint_flags_the_headings_the_doctor_flags(tmp_path: Path) -> None:
     memory_dir = tmp_path / "memory"
     (memory_dir / "product" / "area").mkdir(parents=True)
     atom = memory_dir / "product" / "area" / "sample.md"
-    atom.write_text(
+    write_text(
+        atom,
         "---\nslug: sample\ntitle: Sample\ncategory: support\ntldr: One line.\n"
         "summary: Summary line.\ntags: [x]\n---\n# Sample\n\n## Version\n\nbody\n\n## Historico\n\nbody\n",
-        encoding="utf-8",
     )
     schema = memory_lint.load_frontmatter_schema()
     result = memory_lint.lint_atom(atom, memory_dir, schema)

@@ -2,7 +2,7 @@
 workspace defines. This contract pins both halves of that sentence against the live
 projection table, not against a hand-listed set of harnesses. Coverage (the gate judges
 every harness's native payload) is proven by payload parity, not string search:
-``tests/infrastructure/runtime_transforms/test_hook_wrappers.py`` (sa-gate-blind-on-cursor-copilot-devin#B8).
+``tests/infrastructure/runtime_transforms/test_hook_wrappers.py``.
 
 - **No invention** — every ``dadaia_workspace`` entrypoint any projected hook artifact
   references must be named by some Deterministic Behavior in
@@ -22,22 +22,22 @@ from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.core.harness_registry import HARNESS_RECORDS, HarnessRecord
+from dadaia_workspace.core.harness_registry import HARNESS_RECORDS, HarnessRecord, HookFormat
 from dadaia_workspace.infrastructure.install_plan import InstallPlan
 from dadaia_workspace.infrastructure.projection import ProjectionRule
 from dadaia_workspace.infrastructure.projection_rules import (
     HOOK_RULE_BUILDERS,
-    harnesses_with_a_hook_derivation,
 )
+from tests.helpers.oslib import read_text
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _PUBLIC = _REPO_ROOT / "dadaia_workspace" / "public"
 _REGISTRY = _PUBLIC / "entities" / "registry.json"
 
 #: The SDD gate's single merged PreToolUse entrypoint — root whitelist, venv guard and
-#: the gate itself are three behaviours behind ONE module (FR-W4-01).
+#: the gate itself are three behaviours behind ONE module.
 _PRE_GATE = "dadaia_workspace.hooks.pre_gate"
-#: The session-start reaper lane: a CLI process, never a ``hooks.*`` module (P-12).
+#: The session-start reaper lane: a CLI process, never a ``hooks.*`` module.
 _REAPER = "-m dadaia_workspace doctor --fix --expired-only"
 
 #: Every ``dadaia_workspace`` reference a hook artifact may carry, as a dotted module
@@ -76,7 +76,7 @@ def _workspace_wrappers(
 
 
 def _derived_records() -> list[HarnessRecord]:
-    return [HARNESS_RECORDS[name] for name in sorted(harnesses_with_a_hook_derivation())]
+    return [r for _, r in sorted(HARNESS_RECORDS.items()) if r.hooks is not HookFormat.NONE]
 
 
 def _record_ids(record: HarnessRecord) -> str:
@@ -98,7 +98,7 @@ def test_no_hook_artifact_references_an_undefined_behaviour(
 ) -> None:
     """No file exists for a behaviour the workspace does not define: every entrypoint a
     projected hook artifact names must trace to a Deterministic Behavior."""
-    behaviors_blob = json.dumps(json.loads(_REGISTRY.read_text(encoding="utf-8"))["behaviors"])
+    behaviors_blob = json.dumps(json.loads(read_text(_REGISTRY))["behaviors"])
     referenced = set()
     for text in _rendered(_hook_rules(record, workspace)).values():
         referenced.update(_ENTRYPOINT_RE.findall(text))
@@ -124,14 +124,14 @@ def test_every_projected_wrapper_is_projected_executable(
         assert rule.mode == 0o755, f"{rule.label} is not projected executable"
 
 
-#: sa-hook-parity-claims-false-and-interpreter-rules-diverge#B1 — the table, literally.
+#: The table, literally.
 _BEHAVIOUR_TABLE = {
     "claude": {"ctx_inject", "pre_gate", "reaper", "sdd_post_gate"},
     "codex": {"ctx_inject", "pre_gate", "reaper", "sdd_post_gate"},
-    "kimi-code": {"ctx_inject", "pre_gate", "reaper", "sdd_post_gate"},
+    "kimi-code": {"ctx_inject", "pre_gate", "reaper", "sdd_post_gate", "translate"},
     "devin": {"ctx_inject", "pre_gate", "reaper"},
-    "cursor": {"ctx_inject", "pre_gate", "reaper"},
-    "copilot": {"ctx_inject", "pre_gate", "reaper"},
+    "cursor": {"ctx_inject", "pre_gate", "reaper", "translate"},
+    "copilot": {"ctx_inject", "pre_gate", "reaper", "translate"},
 }
 _BEHAVIOUR_RE = re.compile(r"-m dadaia_workspace(?:\.hooks\.([a-z_]+)| doctor)")
 
@@ -141,7 +141,7 @@ def _behaviours(text: str) -> set[str]:
 
 
 def test_the_behaviour_table_is_derived_and_the_registry_declares_it(workspace: Path) -> None:
-    """sa-hook-parity-claims-false-and-interpreter-rules-diverge#B1: rendering every
+    """Rendering every
     harness's hooks yields the declared table; the registry names ctx_inject/the post gate
     exactly where they are wired."""
     derived = {
@@ -149,30 +149,26 @@ def test_the_behaviour_table_is_derived_and_the_registry_declares_it(workspace: 
         for record in _derived_records()
     }
     assert derived == _BEHAVIOUR_TABLE
-    behaviors = {
-        b["id"]: b["implementations"] for b in json.loads(_REGISTRY.read_text("utf-8"))["behaviors"]
-    }
+    behaviors = {b["id"]: b for b in json.loads(read_text(_REGISTRY))["behaviors"]}
+    gaps = behaviors["context-memory-injection"].get("gaps", {})
     for harness, wired in _BEHAVIOUR_TABLE.items():
-        assert ("ctx_inject" in behaviors["context-memory-injection"][harness]) is (
-            "ctx_inject" in wired
-        )
-        assert ("post" in behaviors["sdd-gate"][harness]) is ("sdd_post_gate" in wired)
+        assert ("ctx_inject" in wired) is (harness not in gaps)
 
 
 def test_no_text_claims_behaviour_parity() -> None:
-    """sa-hook-parity-claims-false-and-interpreter-rules-diverge#B2: the hook derivation
+    """The hook derivation
     never claims "only serialization" differs nor that "no harness adds a behaviour".
     (The memory atom's copy is reconciled at the closure memory pass — dd-product-engineer.)"""
     hooks_py = _REPO_ROOT / "dadaia_workspace/infrastructure/runtime_transforms/hook_wrappers.py"
-    text = " ".join(hooks_py.read_text("utf-8").split()).replace("*", "").lower()
+    text = " ".join(read_text(hooks_py).split()).replace("*", "").lower()
     assert "only serialization" not in text
     assert "no harness adds a behaviour" not in text
     assert "same four" not in text
 
 
 def test_runtime_config_bakes_no_interpreter() -> None:
-    """sa-hook-parity-claims-false-and-interpreter-rules-diverge#B6: no render-time
+    """No render-time
     interpreter: runtime_config never reads sys.executable or builds a venv path."""
-    source = (_REPO_ROOT / "dadaia_workspace/infrastructure/runtime_config.py").read_text("utf-8")
+    source = read_text(_REPO_ROOT / "dadaia_workspace/infrastructure/runtime_config.py")
     assert "sys.executable" not in source
     assert "venv_scripts_dir" not in source

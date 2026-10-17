@@ -6,8 +6,6 @@ summary: The backlog ledger — specs/backlog/BACKLOG.json holding every live en
 tags: [sdd, backlog, ledger, governance]
 sources:
   - dadaia_workspace/public/skills/dd-backlog-definition/**
-  - dadaia_workspace/public/schemas/backlog/**
-  - dadaia_workspace/public/schemas/histo/**
   - dadaia_workspace/features/backlog/**
   - dadaia_workspace/core/models/backlog.py
 ---
@@ -16,19 +14,19 @@ sources:
 
 - Only the operator creates demand; `dd-product-engineer` curates it, and an entry materializes only through the main thread's operator-facing intake report or an operator-ratified deferral inside a release ([[agent-orchestration]]).
 - `specs/backlog/` holds `BACKLOG.json` (`backlog-v1`, `{schema, active: [...]}`), `AGENTS.md` and `_archive/backlog_histo.jsonl`; no per-entry file exists.
-- An `active[]` entry carries `title`, `opened`, `status`, `description`, `provenance`, optional `intents` and `relates` — the live entries it was judged to update, obsolete or relate to at birth, empty for none, absent when the backlog was empty; its slug matches `^[a-z][a-z0-9-]+$`.
+- An `active[]` entry carries `title`, `opened`, `status`, `description`, `provenance`, optional `intents` and `relates` — the live entries it was judged to update, obsolete or relate to at birth, empty for none, absent when the backlog was empty; its slug matches the schema's one `$defs.slug` grammar — lowercase letters and digits, starting with a letter, single hyphens between groups, no trailing hyphen — which the worktree names reuse ([[worktrees]]).
 - `status` is a lowercase live token, never a backlog terminal word; an `idea` needs no intents, every later status binds `intents[]` whose subjects resolve to one of four anchor kinds, each derived from live truth: `code` (a repo-relative tracked path, any language, an optional `#word` that must occur in the file), `catalog` (a catalog slug), `doc` (a `SPEC-DOC` id or memory heading anchor) or `invariant` (an `INV-*` id).
 - A near-duplicate of a live entry exits `rejected`, its `--reason` `absorbed by <existing slug>`; no entry is merged into another.
-- The document is written in a `backlog/<slug>` worktree, which lands `specs/` only, `BUGS.jsonl` included, so a bug registration and the `to-bug` exit it receives share one ([[worktrees]], [[bug-ledger]]).
-- A release picks an entry by naming its slug in the `backlog:` clause of a candidate SPEC's first `**Origin:**` line, read by `release.py`'s one Origin parser; the entry stays in `active[]` and exits once, at the closure disposition sweep ([[release-lifecycle]]); a deferred entry stays in `active[]`.
+- The document is written in a `<v>/wt-backlog-<slug>` lane, which lands `specs/` only, `BUGS.jsonl` included, so a bug registration and the `to-bug` exit it receives share one ([[worktrees]], [[bug-ledger]]).
+- A release picks an entry by naming its slug in the `backlog:` clause of a candidate SPEC's first `**Origin:**` line, read by `release.py`'s one Origin parser, which `backlog.py exit` runs as `release.py origin`; the entry stays in `active[]` and exits once, at the closure disposition sweep ([[release-lifecycle]]); a deferred entry stays in `active[]`.
 
 ## The writer — `backlog.py`
 
 - `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py <verb> [--specs <path>]` is the one writer and validator; every write validates the bytes it is about to commit, so writer and validator cannot disagree, and refuses a new entry or histo record carrying a match the push refuses that the document's published text does not already carry ([[bug-ledger]]).
 - `new <slug> [--title] [--description] [--provenance] [--intent KIND:REF=CHANGE] --relates <slugs>|none` (KIND one of `code|doc|invariant|catalog`) appends one entry born at `idea`; with a non-empty `active[]` it refuses a missing `--relates` or one naming a slug not live, listing the live slugs.
 - `exit <slug> --disposition delivered|superseded|rejected|to-bug [--release <id>] [--reason <text>] [--summary <text>]` removes the one `active[]` object and appends one `histo-record-v1` `{id, ts, disposition, release, reason, summary, entry}`, `entry` being the removed object, redacted.
-- `exit` refuses before writing anything, each refusal with one fix line: a slug not live in `active[]` (already exited or unknown); a disposition outside the four (`Operator action: a postponed item stays in active[] and needs no exit`); `delivered`/`superseded` without a `--release` whose candidate SPEC picked the slug, the fix naming the latest picking release, else an `Operator action:` to name the slug in a SPEC's Origin; `rejected` without `--reason`; `to-bug` whose `--reason` names no `BUGS.jsonl` record, read through `bugs.py`'s reader, the fix an `Operator action:` to register that bug first.
-- `check [--json]` validates `BACKLOG.json` and `backlog_histo.jsonl`, one finding per invalid entry or line, its fix an `Operator action:` to discard or revert the change that wrote it and redo it through `backlog.py new` or `exit`.
+- `exit` refuses before writing anything, each refusal with one fix line: a slug not live in `active[]` (already exited or unknown); a disposition outside the four (`Agent action: a postponed item stays in active[] and needs no exit`); `delivered`/`superseded` whose `--release` names no folder directly under `releases/`, the fix an `Agent action:` to pass the release folder whose SPEC names the slug and rerun with the same disposition; a `--release` folder none of whose `rc-<N>/SPEC.md` names the slug in its first Origin's `backlog:` clause, the fix an `Agent action:` to name it there and rerun with the same disposition (only that folder's SPECs are read); `rejected` without `--reason`; `to-bug` whose `--reason` names no `BUGS.jsonl` record, read through `bugs.py`'s reader, the fix an `Operator action:` to confirm that bug so it is registered first, since a registration follows the operator's confirmation.
+- `check [--json]` validates `BACKLOG.json` and `backlog_histo.jsonl`, one finding per invalid entry or line, printed with its `fix:` line on the next line: an `Agent action:` to revert the commit that introduced it (or delete it while uncommitted) and redo it through `backlog.py new` or `exit`. A file that is not UTF-8 is one finding carrying the `Agent action:` to re-encode the failing line as UTF-8 in place, every other line kept.
 
 ## Validation
 

@@ -1,6 +1,6 @@
 """Context-injection hook (SessionStart, UserPromptSubmit, PostCompact): transport for
-:func:`injection_policy.decide_injection`. Re-injects when the session's ``bound_at`` or
-the PostCompact marker is newer than its sentinel (``ctx-inject-fired-<sid>``)."""
+:func:`injection_policy.decide_injection`. Re-injects when the session's ``bind_id`` is not the
+one its sentinel (``ctx-inject-fired-<sid>``) recorded, or the PostCompact marker is newer."""
 
 from __future__ import annotations
 
@@ -8,10 +8,10 @@ import contextlib
 import json
 import os
 import sys
-from datetime import UTC, datetime
 from pathlib import Path
 
-from dadaia_workspace.core import invocation, session_store, workspace_layout
+from dadaia_workspace.core import clock, invocation, platform, session_store, workspace_layout
+from dadaia_workspace.core.cli_line import spell_fix
 from dadaia_workspace.core.doctor_rules import SectionFinding, render_finding
 from dadaia_workspace.core.exceptions import SchemaVersionError
 from dadaia_workspace.features.spec_context import injection_policy
@@ -27,11 +27,10 @@ _COMPACT_PREFIX = "ctx-compact-"
 
 def _session_bound_at(workspace: Path, session_id: str) -> float | None:
     record = session_store.read_session(workspace, session_id)
-    raw = record.get("bound_at") if isinstance(record, dict) else None
-    try:
-        return datetime.fromisoformat(raw).timestamp() if isinstance(raw, str) else None
-    except ValueError:
-        return None
+    bound = (
+        session_store.parse_instant(record.get("bound_at")) if isinstance(record, dict) else None
+    )
+    return bound.timestamp() if bound else None
 
 
 def _resolve_context() -> str:
@@ -69,53 +68,54 @@ def _tech_stack_section(raw: str) -> str:
 
 def _build_memory(specs_dir: Path) -> str:
     """``constitution.md`` + the tech-stack section + the catalog digest (else ``index.md``)
-    — one hook for every harness, so every harness gets the constitution (ADR 0103)."""
+    — one hook for every harness, so every harness gets the constitution."""
     memory_dir = specs_dir / "memory"
     if not memory_dir.is_dir():
         return ""
     parts = ["", "=== workspace memory (constitution + tech + catalog) ==="]
     with contextlib.suppress(OSError):
-        parts.append((specs_dir / "constitution.md").read_text(encoding="utf-8").strip())
+        parts.append(platform.read_text(specs_dir / "constitution.md").strip())
     architecture = memory_dir / "ARCHITECTURE.md"
     if architecture.is_file():
         with contextlib.suppress(OSError):
-            section = _tech_stack_section(architecture.read_text(encoding="utf-8"))
+            section = _tech_stack_section(platform.read_text(architecture))
             if section:
                 parts.append(section)
     catalog = memory_dir / "product" / "catalog.json"
     index = memory_dir / "product" / "index.md"
     if catalog.is_file():
         with contextlib.suppress(OSError):
-            parts.append(_digest_catalog(catalog.read_text(encoding="utf-8")))
+            parts.append(_digest_catalog(platform.read_text(catalog)))
     elif index.is_file():
         with contextlib.suppress(OSError):
-            parts.append(index.read_text(encoding="utf-8"))
+            parts.append(platform.read_text(index))
     parts.append("=== end memory bootstrap ===")
     return "\n".join(parts)
 
 
-def _read_sentinel(sentinel: Path) -> tuple[float | None, str]:
-    """``(mtime, recorded slug)``; ``(None, "")`` when absent."""
+def _read_sentinel(sentinel: Path) -> tuple[float | None, str, str]:
+    """``(mtime, recorded slug, recorded bind_id)``; ``(None, "", "")`` when absent."""
     try:
         mtime = sentinel.stat().st_mtime
     except OSError:
-        return None, ""
+        return None, "", ""
     text = ""
     with contextlib.suppress(OSError):
-        text = sentinel.read_text(encoding="utf-8").strip()
-    return mtime, text.removeprefix("ctx=").strip() if text.startswith("ctx=") else ""
+        text = platform.read_text(sentinel)
+    fields = dict(line.split("=", 1) for line in text.splitlines() if "=" in line)
+    return mtime, fields.get("ctx", "").strip(), fields.get("bind", "").strip()
 
 
-def _stamp_sentinel(tmp_dir: Path, sentinel: Path, slug: str) -> None:
+def _stamp_sentinel(tmp_dir: Path, sentinel: Path, slug: str, bind_id: str) -> None:
     with contextlib.suppress(OSError):
         tmp_dir.mkdir(parents=True, exist_ok=True)
-        sentinel.write_text(f"ctx={slug}\n" if slug else "", encoding="utf-8")
+        platform.write_text(sentinel, f"ctx={slug}\nbind={bind_id}\n" if slug else "")
 
 
 def _read_help_digest(workspace: Path) -> str:
     """The CLI help digest install/reconcile built, or ``""`` — the hook never builds it."""
     try:
-        return (workspace / ".dadaia" / "agentic" / "help-digest.md").read_text(encoding="utf-8")
+        return platform.read_text(workspace / ".dadaia" / "agentic" / "help-digest.md")
     except OSError:
         return ""
 
@@ -149,17 +149,16 @@ def _worktrees(workspace: Path, context: str) -> list[str]:
             if context in invocation.alive_context_names(workspace)
             else ()
         )
-        found, failed, fix = worktree_rows(workspace)
+        found, failed, fix = worktree_rows(workspace, repos)
     except Exception:  # noqa: BLE001 — fail-open: a hook never crashes the session
         return []
     if failed:
-        return [f"WORKTREE warning {failed}\nfix: {fix}"]
+        return [f"WORKTREE warning {failed}\n{spell_fix(fix)}"]
     return [
         f"WORKTREE {'warning' if row['warn'] else 'info'} {row['state']} {row['path']}"
         + "".join(f"  {key}={row[key]}" for key in ("age_hours", "ahead", "dirty") if key in row)
-        + (f"\nfix: {row['fix']}" if row["fix"] else "")
+        + (f"\n{spell_fix(row['fix'])}" if row["fix"] else "")
         for row in found
-        if row["repo"] in repos
     ]
 
 
@@ -176,6 +175,7 @@ def _emit_bootstrap(workspace: Path, context: str) -> None:
 
 
 def main() -> int:
+    platform.use_utf8_stdio()
     payload = _common.read_stdin_json()
     workspace = invocation.resolve_root(cwd=Path.cwd(), target_path=None)
     if workspace is None:
@@ -183,18 +183,18 @@ def main() -> int:
         return 0
     own = invocation.resolve_session_id(os.environ) or None
     if own:  # the operator's prompt is activity too: renew the liveness clock
-        session_store.touch_last_seen_at(workspace, own, now=datetime.now(tz=UTC).isoformat())
+        session_store.touch_last_seen_at(workspace, own, now=clock.now_iso())
     session_id = own or "workspace"
     tmp_dir = workspace / workspace_layout.MARKER_DIR
     sentinel = tmp_dir / f"{_SENTINEL_PREFIX}{session_id}"
     compact_marker = tmp_dir / f"{_COMPACT_PREFIX}{session_id}"
-    sentinel_mtime, recorded_slug = _read_sentinel(sentinel)
+    sentinel_mtime, recorded_slug, recorded_bind = _read_sentinel(sentinel)
     event: injection_policy.Event = "prompt"
     if os.environ.get("DADAIA_HOOK_EVENT") == "PostCompact":  # Kimi: stamp, then emit
         event = "postcompact"
         with contextlib.suppress(OSError):
             tmp_dir.mkdir(parents=True, exist_ok=True)
-            compact_marker.write_text("", encoding="utf-8")
+            platform.write_text(compact_marker, "")
     elif "SessionStart" in (os.environ.get("DADAIA_HOOK_EVENT"), payload.get("hook_event_name")):
         # compact/clear re-enter this session; a resume continues it; anything else is new
         source = payload.get("source")
@@ -203,28 +203,30 @@ def main() -> int:
         elif source != "resume":
             event = "session_start"
 
-    def newer(stamp: float | None) -> bool:
-        return sentinel_mtime is not None and stamp is not None and stamp > sentinel_mtime
-
+    record = session_store.read_session(workspace, session_id)
+    bind_id = str(record.get("bind_id") or "").strip() if isinstance(record, dict) else ""
+    compact_mtime = _read_sentinel(compact_marker)[0]
     try:
         decision = injection_policy.decide_injection(
             event=event,
             context=_resolve_context(),
             recorded_slug=recorded_slug,
             sentinel_exists=sentinel_mtime is not None,
-            compacted=newer(_read_sentinel(compact_marker)[0]),
-            rebound=newer(_session_bound_at(workspace, session_id)),
+            compacted=sentinel_mtime is not None
+            and compact_mtime is not None
+            and compact_mtime > sentinel_mtime,
+            rebound=bool(bind_id) and bind_id != recorded_bind,
         )
         if decision.emit == "bootstrap":
             _emit_bootstrap(workspace, decision.context)
         elif decision.emit == "preflight":
             _emit(_generic_preflight(workspace, own, decision.context))
     except SchemaVersionError as refused:  # unreadable, never "no context": the doctor's finding
-        finding = SectionFinding("REG-SCHEMA", "error", refused.problem, False, True, refused.fix)
+        finding = SectionFinding("REG-SCHEMA", "error", refused.message, False, True, refused.fix)
         _emit(render_finding(finding) + "\n")
         return 0
     if decision.stamp_slug is not None:
-        _stamp_sentinel(tmp_dir, sentinel, decision.stamp_slug)
+        _stamp_sentinel(tmp_dir, sentinel, decision.stamp_slug, bind_id)
     return 0
 
 

@@ -17,13 +17,13 @@ Every library skill must satisfy all fifteen; each rule's detail lives in the se
 | 6 | Every step ends on a checkable, demanding completion criterion | §4 |
 | 7 | Leading words over prose; a vocabulary skill says "use these terms exactly" with an Avoid list | §5 |
 | 8 | Positive by default; a prohibition stays only with a demonstrated failure, paired with the positive | §5 |
-| 9 | Prune no-ops, sediment, duplication; git keeps history; a prohibition carries its short reason or a bug/ADR id | §6 |
+| 9 | Prune no-ops, sediment, duplication; git keeps history; a prohibition carries its short reason | §6 |
 | 10 | Right altitude: intent over mechanics that go stale (paths, snippets), with the prototype exception | §6 |
 | 11 | Steps are actions in execution order, one idea each; the branch decision comes first; templates are fenced blocks | §8 |
 | 12 | The set is curated and composed: overlap resolves by merge or by one skill calling the other | §7 |
 | 13 | Determinism goes to a script/template sibling; the skill authors only the stages | §3 |
 | 14 | Human gates are explicit: facts are the agent's job, decisions are the operator's | §8 |
-| 15 | The ecosystem stays equalized: behavior-map, grants, law citations and projections move with the skill | §9 |
+| 15 | The ecosystem stays equalized: grants, law citations and projections move with the skill | §9 |
 
 ---
 
@@ -64,7 +64,7 @@ Every library skill must satisfy all fifteen; each rule's detail lives in the se
 - A sibling is one ALL-CAPS.md per topic, pointed at with its reaching condition ("deepening a cluster → `DEEPENING.md`").
 - A deterministic procedure ships as a script/template sibling; the skill's job reduces to authoring its variable parts.
 - Co-location: keep a concept's definition, rule, and caveat under one heading, not scattered.
-- Sprawl is the failure disclosure cures; the SKILL.md size thresholds live in `behavior-map.json`.
+- Sprawl is the failure disclosure cures; doctor warns `SKILL-MD-LENGTH` past the SKILL.md size threshold.
 
 ---
 
@@ -87,7 +87,7 @@ Every library skill must satisfy all fifteen; each rule's detail lives in the se
 - A vocabulary skill states "use these terms exactly", pairs each term with its _Avoid_ list, and every sibling skill speaks it.
 - Negation is the failure mode beside this lever: a prohibition drags the banned behavior into context.
 - Prompt the positive: state the target ("link to the canonical source") instead of the banned behavior.
-- A prohibition stays only with a demonstrated failure: its short reason or a bug/ADR id beside it, paired with the positive target.
+- A prohibition stays only with a demonstrated failure: its short reason beside it, paired with the positive target.
 - A negation of something retired ("no such flag exists") is sediment — delete it with the shape it mourns.
 - Audit test: each prohibition without a reason is a rewrite to the positive.
 
@@ -135,11 +135,10 @@ decision-rich part.
 
 A skill moves with its ecosystem: any authoring act (create, merge, rename, delete, restructure) carries in the same change:
 
-1. `entities/behavior-map.json` — the row (exactly one per skill) and `declared_overlaps`.
-2. Persona `skills:` grants.
-3. Law citations — the root map and every scoped `AGENTS.md` SOURCE under `public/` that names the skill.
-4. Cross-citations in sibling skills (the citation contract test checks every path-shaped token in `public/**`).
-5. Reprojection — per `.dadaia/AGENTS.md` §4, `public doctor` `[ok]`; stale projected directories removed from every harness target.
+1. Persona `skills:` grants.
+2. Law citations — the root map and every scoped `AGENTS.md` SOURCE under `public/` that names the skill.
+3. Cross-citations in sibling skills (the citation contract test checks every path-shaped token in `public/**`).
+4. Reprojection — per `.dadaia/AGENTS.md` §4, `public doctor` `[ok]`; stale projected directories removed from every harness target.
 
 ---
 

@@ -1,10 +1,10 @@
-"""``dadaia specs upgrade`` orchestration (FR-S04 / FR-S05; simplified v0.5.1 T-051-16).
+"""``dadaia specs upgrade`` orchestration.
 
 Sequence: read the tree through ``specs_version.state`` -- an absent, malformed or
 foreign tree raises :class:`UpgradeRefused` carrying that state's fix, without touching
 the filesystem; an upgradable tree walks the hops (:func:`fold_tech_stack`, the doctor's repair set) and is re-stamped;
 a tree already at canonical is a no-op except for the empty ``_ideas/`` removal.
-Every other repair is the doctor's (``specs upgrade`` runs its repair set, WP-14).
+Every other repair is the doctor's (``specs upgrade`` runs its repair set).
 """
 
 from __future__ import annotations
@@ -13,17 +13,20 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from dadaia_workspace.core import platform
 from dadaia_workspace.core import specs_version as _version
 from dadaia_workspace.core.atomic_write import atomic_write
-from dadaia_workspace.core.frontmatter import FRONTMATTER_RE
+from dadaia_workspace.core.cli_line import cli_words
+from dadaia_workspace.core.exceptions import DadaiaError
+from dadaia_workspace.core.frontmatter import split
 from dadaia_workspace.core.gitflow import candidate_dir, merge_frontmatter, next_candidate
 from dadaia_workspace.core.release_state import RELEASE_ID_RE
 from dadaia_workspace.core.spec_status import APPROVED, DRAFT, IN_REVIEW, STATUS_LINE
 from dadaia_workspace.core.workspace_layout import CANDIDATE_DOCUMENTS
 
 
-class UpgradeRefused(Exception):
-    """The tree cannot be upgraded; nothing was written."""
+class UpgradeRefused(DadaiaError):
+    """The tree cannot be upgraded; nothing was written. ``fix`` is its one remedy line."""
 
 
 @dataclass
@@ -41,9 +44,9 @@ class UpgradeResult:
     #: to the English vocabulary (planned-only when ``dry_run``).
     status_rewritten: list[Path] = field(default_factory=list)
     #: ``memory/TECHSTACK.md`` folded into ``ARCHITECTURE.md``'s ``## Tech Stack``
-    #: section and deleted by the 6 -> 7 hop (planned-only when ``dry_run``).
+    #: section and deleted (planned-only when ``dry_run``).
     tech_stack_folded: list[Path] = field(default_factory=list)
-    #: A flat live trio moved into the next ``rc-<N>/`` by the 8 -> 9 hop (ADR 0150).
+    #: A flat live trio moved into the next ``rc-<N>/``.
     trio_folded: list[Path] = field(default_factory=list)
 
 
@@ -54,17 +57,18 @@ def upgrade(
     delete goes through *remove* — the caller's one guarded deleter (``sweep.remove``).
 
     Raises :class:`UpgradeRefused`, before any write, for a tree ``state`` does not call
-    upgradable or canonical, or one still organised two-tier (ADR 0082).
+    upgradable or canonical, or one still organised two-tier.
     """
     kind, fix = _version.state(specs_dir)
     if kind not in ("upgradable", "canonical"):
-        raise UpgradeRefused(f"specs tree {specs_dir} is {kind}; nothing written.\nfix: {fix}")
+        raise UpgradeRefused(f"specs tree {specs_dir} is {kind}; nothing written.", fix or "")
     goal = _version.CANONICAL_SPECS_VERSION
     architecture = specs_dir / "memory" / "ARCHITECTURE.md"
-    if architecture.is_file() and _RETIRED_PART_HEADING in architecture.read_text("utf-8"):
+    if architecture.is_file() and _RETIRED_PART_HEADING in platform.read_text(architecture):
         raise UpgradeRefused(
-            f"{architecture} is two-tier ({_RETIRED_PART_HEADING!r}): nowhere safe to fold "
-            "into. Rewrite it as ## Principles / ## Tech Stack / ## Structure, then re-run."
+            f"{architecture} is two-tier ({_RETIRED_PART_HEADING!r}): nowhere safe to fold into.",
+            "Agent action: rewrite its headings as ## Principles / ## Tech Stack / "
+            f"## Structure, then re-run `{platform.inline(*cli_words(None, 'specs', 'upgrade', '--specs-dir', str(specs_dir)))}`.",
         )
 
     if dry_run:
@@ -98,9 +102,8 @@ def _release_dirs(specs_dir: Path) -> list[Path]:
 
 
 def plan_flat_trio_fold(specs_dir: Path) -> list[tuple[Path, Path]]:
-    """Each candidate document still flat at a release root — a v8 tree — and the
-    ``rc-<N+1>/`` path it moves to. Judged by shape, not by the state file's name, so the
-    fold never waits on the legacy rename (ADR 0150)."""
+    """Each candidate document still flat at a release root, and the ``rc-<N+1>/`` path
+    it moves to. Judged by shape, not by the state file's name."""
     return [
         (d / name, next_candidate(d) / name)
         for d in _release_dirs(specs_dir)
@@ -115,7 +118,7 @@ def fold_flat_trio(specs_dir: Path) -> list[Path]:
     planned = plan_flat_trio_fold(specs_dir)
     for source, target in planned:
         target.parent.mkdir(exist_ok=True)
-        source.rename(target)
+        platform.replace(source, target)
     return [source for source, _ in planned]
 
 
@@ -124,7 +127,7 @@ def fold_flat_trio(specs_dir: Path) -> list[Path]:
 _TECH_STACK_HEADING = "## Tech Stack"
 
 #: The retired two-tier shape: a fold appended to it lands outside both parts, so
-#: :func:`upgrade` refuses the tree whole (ADR 0082).
+#: :func:`upgrade` refuses the tree whole.
 _RETIRED_PART_HEADING = "## Part 1 — Principles"
 
 
@@ -137,7 +140,7 @@ def plan_tech_stack_fold(specs_dir: Path) -> list[Path]:
 
 def fold_tech_stack(specs_dir: Path, remove: Callable[[Path], object]) -> list[Path]:
     """Append ``TECHSTACK.md``'s body under ``## Tech Stack`` at the end of
-    ``ARCHITECTURE.md``, then delete the file — the 6 -> 7 hop (memory canon v7).
+    ``ARCHITECTURE.md``, then delete the file.
 
     The body is everything after the document's own H1/frontmatter title block, taken
     verbatim: the hop moves a consumer's authored text, it never rewrites it. A refused
@@ -148,8 +151,8 @@ def fold_tech_stack(specs_dir: Path, remove: Callable[[Path], object]) -> list[P
 
 def _fold(tech: Path, remove: Callable[[Path], object]) -> bool:
     architecture = tech.parent / "ARCHITECTURE.md"
-    body = _tech_stack_body(tech.read_text(encoding="utf-8"))
-    original = architecture.read_text(encoding="utf-8")
+    body = _tech_stack_body(platform.read_text(tech))
+    original = platform.read_text(architecture)
     atomic_write(architecture, f"{original.rstrip(chr(10))}\n\n{_TECH_STACK_HEADING}\n\n{body}\n")
     folded = False
     try:
@@ -162,16 +165,15 @@ def _fold(tech: Path, remove: Callable[[Path], object]) -> bool:
 
 def _tech_stack_body(text: str) -> str:
     """*text* minus its YAML frontmatter and its leading ``# `` title line."""
-    fm = FRONTMATTER_RE.match(text)
-    remainder = text[fm.end() :] if fm else text
-    lines = remainder.splitlines()
+    parts = split(text)
+    lines = (parts[1] if parts else text).splitlines()
     while lines and (not lines[0].strip() or lines[0].startswith("# ")):
         lines.pop(0)
     return "\n".join(lines).strip()
 
 
 def plan_empty_ideas_dir(specs_dir: Path) -> list[Path]:
-    """``specs/releases/_ideas/`` left the canon (0.4.7 c5, ADR 0019): a live tree whose
+    """``specs/releases/_ideas/`` is not part of the canon: a live tree whose
     ``_ideas/`` holds nothing but the scaffolded ``AGENTS.md`` is repaired losslessly."""
     ideas = specs_dir / "releases" / "_ideas"
     if not ideas.is_dir():
@@ -198,7 +200,7 @@ _RETIRED_STATUS_TOKENS = {
 def _live_trio_documents(specs_dir: Path) -> list[tuple[Path, Path]]:
     """(where the text is read, where it lands after the fold) for each release's live
     candidate — the rewrite touches only a ``**Status:**`` line. A closed ``rc-<N>/`` and
-    ``releases/_archive/`` are history, never rewritten (ADR 0150)."""
+    ``releases/_archive/`` are history, never rewritten."""
     moves = plan_flat_trio_fold(specs_dir)
     folded = {source.parent for source, _ in moves}
     live = [candidate_dir(d) for d in _release_dirs(specs_dir) if d not in folded]
@@ -210,7 +212,7 @@ def plan_status_token_rewrites(specs_dir: Path) -> list[Path]:
     return [
         target
         for source, target in _live_trio_documents(specs_dir)
-        if _rewrite_status_line(text := source.read_text(encoding="utf-8")) != text
+        if _rewrite_status_line(text := platform.read_text(source)) != text
     ]
 
 
@@ -218,7 +220,7 @@ def rewrite_status_tokens(specs_dir: Path) -> list[Path]:
     """Rewrite the planned set in place, returning what was rewritten."""
     rewritten = plan_status_token_rewrites(specs_dir)
     for path in rewritten:
-        text = path.read_text(encoding="utf-8")
+        text = platform.read_text(path)
         atomic_write(path, _rewrite_status_line(text))
     return rewritten
 

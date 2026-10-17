@@ -1,0 +1,114 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "backlog-v1",
+  "title": "Backlog Document v1",
+  "description": "The single-source specs/backlog/BACKLOG.json document: 'active' holds every live backlog item; a closed item's terminal record lives in specs/backlog/_archive/backlog_histo.jsonl, never here. Live-entry authoring authority is specs/backlog/AGENTS.md §2.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "active"],
+  "properties": {
+    "schema": {
+      "const": "backlog-v1",
+      "description": "Document schema id — always the literal string 'backlog-v1'."
+    },
+    "active": {
+      "type": "array",
+      "description": "One entry per live backlog item, in document order; 'id' is unique within this array (backlog.py check).",
+      "items": { "$ref": "#/$defs/activeItem" }
+    }
+  },
+  "$defs": {
+    "slug": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$",
+      "description": "The one slug grammar: lowercase letters and digits, starting with a letter, single hyphens between groups (a '--' is the worktree job/task separator), no trailing hyphen."
+    },
+    "activeItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "title", "opened", "status", "description", "provenance"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "$ref": "#/$defs/slug",
+          "description": "Backlog slug — the retired '### <slug>' heading text. Stable identity; never renumbered or reused."
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Short human-readable name — the retired '**Title:**' bullet."
+        },
+        "opened": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+          "description": "ISO 8601 date (YYYY-MM-DD) the entry was opened — the retired '**Opened:**' bullet."
+        },
+        "status": {
+          "type": "string",
+          "description": "Live-stage token, lowercase; 'idea' is exempt from intents. A terminal word belongs to a backlog_histo.jsonl record, never to a live entry (backlog.py check).",
+          "pattern": "^[a-z][a-z0-9-]*$"
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1,
+          "description": "One-paragraph description of the need — the retired '**Description:**' bullet."
+        },
+        "provenance": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Where this entry came from (operator request, or an intake-report item id + approval date) — the retired '**Provenance:**' bullet."
+        },
+        "intents": {
+          "type": "array",
+          "description": "Optional typed intents[]: each binds one change to one canonical subject anchor. Required once 'status' is past 'idea' (backlog.py check, LEDGER-BACKLOG-SCHEMA); absent or empty is valid at 'idea'.",
+          "items": { "$ref": "#/$defs/intent" }
+        },
+        "relates": {
+          "type": "array",
+          "description": "The live entries this one was judged to update, obsolete or relate to at birth, empty for none; absent when the backlog was empty.",
+          "items": { "$ref": "#/$defs/slug" }
+        }
+      }
+    },
+    "intent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["subject", "change"],
+      "if": { "properties": { "subject": { "properties": { "kind": { "const": "code" } } } } },
+      "then": { "properties": { "subject": { "properties": { "ref": {
+        "pattern": "^(?!\\s*[/~]|\\s*[A-Za-z]:[\\\\/])(?!(?:[^#]*/)?\\.\\.[/#])[^#]*[^#\\s][^#]*(?:#[^#]*[^#\\s][^#]*)?$",
+        "description": "kind=code: a repo-relative tracked path, any language, '#word' optional — never absolute, '~', a drive or a '..' segment (a committed backlog carries no operator-local path)."
+      } } } } },
+      "properties": {
+        "subject": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "ref"],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": ["code", "doc", "invariant", "catalog"],
+              "description": "The registry source class this subject ref resolves against (dadaia_workspace.core.models.backlog.SubjectKind)."
+            },
+            "ref": {
+              "type": "string",
+              "pattern": "\\S",
+              "description": "The typed reference itself — a repo-relative 'path[#word]' for kind=code (the 'then' rule above), a catalog.json feature slug for kind=catalog, a SPEC-DOC id or memory heading anchor for kind=doc, an INV-* id for kind=invariant."
+            },
+            "surface": {
+              "type": "string",
+              "enum": ["existing", "new"],
+              "default": "existing",
+              "description": "'existing' (default) — ref must resolve to a live registry anchor. 'new' — this item INTRODUCES the surface; bound by declared identity, never forced onto an unrelated existing anchor."
+            }
+          }
+        },
+        "change": {
+          "type": "string",
+          "pattern": "\\S",
+          "description": "Human-readable delta this item proposes for the bound subject."
+        }
+      }
+    }
+  }
+}

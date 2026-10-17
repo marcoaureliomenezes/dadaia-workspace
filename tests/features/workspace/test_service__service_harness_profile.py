@@ -1,7 +1,7 @@
 """``WorkspaceService.init`` persists the harness profile through the ONE writer,
 ``JsonHarnessProfileStore.write`` — the service never spells the file (the inline
 ``_write_harness_profile`` copy is gone). Re-running ``init`` with the same set is a no-op
-(no spurious rewrite, no second hook entry). An absent profile file (a pre-v0.1.58 workspace)
+(no spurious rewrite, no second hook entry). An absent profile file (a workspace with no profile file)
 reads as ``None`` — the "treated as all-four" back-compat convention every consumer honours.
 
 These are unit-level assertions over the real service with fake asset/venv managers; the
@@ -22,6 +22,7 @@ from dadaia_workspace.features.workspace import service as service_module
 from dadaia_workspace.features.workspace.service import WorkspaceService
 from dadaia_workspace.infrastructure.json_harness_profile_store import JsonHarnessProfileStore
 from tests.fakes import FakePublicAssetManager, FakePythonEnvironmentManager
+from tests.helpers.oslib import read_text
 
 
 @pytest.fixture()
@@ -54,18 +55,18 @@ def test_init_persists_the_harness_profile_through_the_one_store(
         service.init(tmp_path, skip_assets=True, harnesses=harnesses)
 
     assert JsonHarnessProfileStore().read(tmp_path / ".dadaia" / "states") == HarnessProfile(schema_version="1", harnesses=expected)
-    assert json.loads(_profile_path(tmp_path).read_text(encoding="utf-8")) == {"schema_version": "1", "harnesses": list(expected)}
+    assert json.loads(read_text(_profile_path(tmp_path))) == {"schema_version": "1", "harnesses": list(expected)}
     if inits[1:] == inits[:1]:
         assert (_profile_path(tmp_path).read_bytes(), _profile_path(tmp_path).stat().st_mtime_ns) == before
 
 
 def test_an_absent_profile_reads_none(tmp_path: Path) -> None:
-    """A pre-v0.1.58 workspace (no profile file) reads as None: the all-four convention."""
+    """A workspace with no profile file reads as None: the all-four convention."""
     assert JsonHarnessProfileStore().read(tmp_path) is None
 
 
 def test_init_writes_the_profile_through_the_store_and_never_spells_the_file() -> None:
-    """AC9 (FR8): one writer. The service holds no copy of the profile's file name or
+    """One writer. The service holds no copy of the profile's file name or
     payload shape — both live only in ``infrastructure/json_harness_profile_store``."""
     source = inspect.getsource(service_module)
 

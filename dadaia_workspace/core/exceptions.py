@@ -2,9 +2,15 @@
 
 from __future__ import annotations
 
+from dadaia_workspace.core.cli_line import spell_fix
+
 
 class DadaiaError(Exception):
-    """Base class for all dadaia-workspace domain errors."""
+    """Base class for all dadaia-workspace domain errors; ``fix`` is its one remedy line."""
+
+    def __init__(self, message: str = "", fix: str = "") -> None:
+        self.message, self.fix = message, fix
+        super().__init__(f"{message}\n{spell_fix(fix)}" if fix else message)
 
 
 class WorkspaceNotInitializedError(DadaiaError):
@@ -28,8 +34,12 @@ class InvalidContextNameError(DadaiaError, ValueError):
 
     Raised at ``SpecContextService.register``/``add_repo`` — the one place every registry
     insert passes — so ``context create``, ``context repo add`` and ``dadaia import`` refuse
-    the same names (bug import-registers-unvalidated-slugs-that-doctor-fix-inv5-rmtrees).
+    the same names.
     """
+
+
+class SpecsDirUnresolvedError(DadaiaError, ValueError):
+    """``resolve_specs_dir`` cannot name a specs directory: none given or bound, or the one given is a symlink."""
 
 
 class AssociatedRepoConflictError(DadaiaError):
@@ -43,6 +53,10 @@ class AssociatedRepoConflictError(DadaiaError):
 
 class AssociatedRepoNotFoundError(DadaiaError):
     """``remove_repo``: the slug is not a registered associated repo of the context."""
+
+
+class NotAGitRepositoryError(DadaiaError):
+    """A git operation was asked of a directory that is not a git repository."""
 
 
 class PublicAssetError(DadaiaError):
@@ -80,24 +94,20 @@ class HandoffValidationError(DadaiaError):
 
     def __init__(self, field_path: str, message: str) -> None:
         self.field_path = field_path
-        self.message = message
         super().__init__(f"{field_path}: {message}")
+        self.message = message
 
 
 class SchemaVersionError(DadaiaError):
     """spec_contexts.json is unreadable at its schema version: the *problem* and its ONE
-    *fix* (``migrate --yes``, or an ``Operator action:`` when no dadaia verb clears it)."""
-
-    def __init__(self, problem: str, fix: str) -> None:
-        self.problem, self.fix = problem, fix
-        super().__init__(f"{problem}\nfix: {fix}")
+    *fix* (``migrate --yes``, or an ``Agent action:`` when no dadaia verb clears it)."""
 
 
 class WorkspaceVenvBootstrapError(DadaiaError, RuntimeError):
     """Workspace venv bootstrap could not create the venv or install the distribution.
 
     Inherits ``DadaiaError`` so the CLI entrypoint renders it as ONE operator-facing
-    line (bug r3b-portability-import-venv-permission, F-22 class): as a bare
+    line: as a bare
     ``RuntimeError`` it slipped past ``cli/main``'s ``except DadaiaError`` and every
     venv-bootstrap failure — ``init``, ``import``, ``certify``, ``reconcile`` alike —
     reached the operator as a raw traceback. ``RuntimeError`` is kept in the bases so
@@ -106,7 +116,7 @@ class WorkspaceVenvBootstrapError(DadaiaError, RuntimeError):
 
 
 class WorkspaceVenvNewerError(WorkspaceVenvBootstrapError):
-    """The workspace venv carries a NEWER dadaia-workspace than the running one (AC2.3).
+    """The workspace venv carries a NEWER dadaia-workspace than the running one.
 
     A downgrade is refused before any write; *installed* names the version to run
     ``init`` with instead.
@@ -126,7 +136,7 @@ class BootstrapPackageError(DadaiaError, ValueError):
     A dangling value is the normal state after a candidate wheel is replaced, so the
     message must name the offending value and what is required of it — a bare
     ``ValueError`` said neither and (before the CLI boundary landed) tracebacked
-    (bug f22-cli-boundary-is-a-whitelist-not-a-boundary). ``ValueError`` is kept in the
+    ``ValueError`` is kept in the
     bases so existing ``except ValueError`` call sites keep working.
     """
 

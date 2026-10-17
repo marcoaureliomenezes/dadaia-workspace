@@ -77,8 +77,8 @@ def test_canon_violations_keeps_only_the_bad_paths_in_order() -> None:
 
 
 def test_a_job_file_is_canon_beside_a_closed_rcs_tasks_file() -> None:
-    """AC1.9 (ADR 0194): `rc-<N>/tasks/<job>.md` is canon; a stray `tasks/` file is not; a
-    closed rc's `TASKS.md` still is."""
+    """A job file under a candidate's `tasks/` is canon; a stray `tasks/` file is not; a
+    closed candidate's `TASKS.md` still is."""
     assert canon_violations(
         [
             "releases/0.5.0/rc-9/tasks/job2.md",

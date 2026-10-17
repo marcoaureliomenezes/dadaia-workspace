@@ -1,4 +1,4 @@
-"""Unit tests for T-PROP-02: doctor staging-vs-projected drift detection.
+"""Doctor staging-vs-projected drift detection.
 
 Verifies that `dadaia public doctor` (via FileSystemPublicAssetManager.doctor):
 1. Exits 0 and emits [ok] for every staged asset on a clean workspace.
@@ -14,10 +14,7 @@ pinned by tests/cli/commands/test_doctor__doctor_exit_verdict.py.
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
-
-import pytest
 
 from dadaia_workspace.core.models.doctor_report import (
     DoctorStatus,
@@ -26,6 +23,7 @@ from dadaia_workspace.infrastructure.projection import doctor_rules, tree_bytes_
 from dadaia_workspace.infrastructure.public_assets import (
     FileSystemPublicAssetManager,
 )
+from tests.helpers.oslib import detect, make_executable
 
 
 def _render_one(line: object) -> str:
@@ -54,7 +52,7 @@ def _make_manager(public_dir: Path) -> FileSystemPublicAssetManager:
 
 
 def test_drift_and_missing_exit_nonzero(tmp_path: Path) -> None:
-    """T-PROP-02 AC-1/AC-3: staged SHA differs from projected → [drift]; staged asset
+    """Staged SHA differs from projected → [drift]; staged asset
     with no projection at all → [missing]. Both are the doctor's non-zero-exit codes."""
     public_dir = tmp_path / "public"
     public_dir.mkdir()
@@ -78,7 +76,7 @@ def test_drift_and_missing_exit_nonzero(tmp_path: Path) -> None:
 
 
 def test_clean_ok_paths_incl_scripts(tmp_path: Path) -> None:
-    """T-PROP-02 AC-2: identical staged/projected content is [ok]."""
+    """Identical staged/projected content is [ok]."""
     public_dir = tmp_path / "public"
     public_dir.mkdir()
     mgr = _make_manager(public_dir)
@@ -94,16 +92,18 @@ def test_clean_ok_paths_incl_scripts(tmp_path: Path) -> None:
     assert "[missing]" not in line
 
 
-@pytest.mark.skipif(os.name == "nt", reason="Windows has no POSIX exec bit")
 def test_an_executable_rule_that_lost_its_exec_bit_is_drift(tmp_path: Path) -> None:
-    """sa-projected-file-judged-by-four-verifiers: doctor_rules is the one verifier, with an
-    exec-bit mode check — equal bytes with a cleared exec bit are [drift]; chmod clears it."""
+    """doctor_rules is the one verifier, with an exec-bit mode check — equal bytes with no exec bit
+    are [drift] on a host that has one; make_executable gives it back. A host without exec bits
+    (the extension decides) never reads the file as lacking one."""
     src, dst = tmp_path / "src" / "hook.sh", tmp_path / "dst" / "hook.sh"
     _write(src, b"#!/bin/sh\n")
     _write(dst, b"#!/bin/sh\n")
-    src.chmod(0o755)
-    dst.chmod(0o644)
+    make_executable(src)
     rules = tree_bytes_rules(src.parent, dst.parent, harness="agents", label_prefix="s/")
-    assert [line.render() for line in doctor_rules(rules)] == ["[drift] s/hook.sh (not executable)"]
-    dst.chmod(0o755)
+    lacking = ["[drift] s/hook.sh (not executable)"]
+    assert [line.render() for line in doctor_rules(rules)] == (
+        ["[ok] s/hook.sh"] if detect().windows else lacking
+    )
+    make_executable(dst)
     assert [line.status for line in doctor_rules(rules)] == [DoctorStatus.OK]

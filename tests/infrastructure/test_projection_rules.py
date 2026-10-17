@@ -17,6 +17,7 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.infrastructure.projection_rules import _DADAIA_FAMILY_AGENTS_MD
+from tests.helpers.oslib import read_text
 from tests.helpers.scan_population import assert_populated
 
 _PKG_ROOT = Path(__file__).resolve().parents[2] / "dadaia_workspace"
@@ -60,7 +61,7 @@ _FIRST_NUMBERED_STEP = re.compile(r"^1\. (?P<body>.+)$", re.MULTILINE)
 
 
 def _first_numbered_step(skill: str) -> str:
-    text = (_SKILLS_DIR / skill / "SKILL.md").read_text(encoding="utf-8")
+    text = read_text(_SKILLS_DIR / skill / "SKILL.md")
     match = _FIRST_NUMBERED_STEP.search(text)
     assert match is not None, (
         f"{skill}/SKILL.md has no numbered procedure at all — step 1 must be "
@@ -71,7 +72,7 @@ def _first_numbered_step(skill: str) -> str:
 
 @pytest.mark.parametrize("skill", sorted(STEP_ONE_LAW))
 def test_skill_step_one_opens_its_scoped_law(skill: str) -> None:
-    """FR2a — the first numbered step names the area's scoped law, root-relative."""
+    """The first numbered step names the area's scoped law, root-relative."""
     expected = STEP_ONE_LAW[skill]
     step = _first_numbered_step(skill)
     assert expected in step, (
@@ -81,7 +82,7 @@ def test_skill_step_one_opens_its_scoped_law(skill: str) -> None:
 
 
 def test_every_step_one_path_is_an_installed_scoped_law() -> None:
-    """FR2c — a step-1 path names a scoped law the library actually ships."""
+    """A step-1 path names a scoped law the library actually ships."""
     assert_populated(set(STEP_ONE_LAW), sentinel="dd-cli-library")
     missing = sorted(
         f"{skill} -> {path}"
@@ -140,7 +141,7 @@ def test_every_scoped_law_source_has_an_installed_path() -> None:
 
 
 def test_every_scoped_law_is_cited_by_the_map_or_a_skill_step_one() -> None:
-    """FR2 — a scoped `AGENTS.md` nobody opens is law nobody reads."""
+    """A scoped `AGENTS.md` nobody opens is law nobody reads."""
     cited = set(_map_surface_rows()) | set(STEP_ONE_LAW.values())
     orphans = sorted(set(SCOPED_SOURCE_BY_INSTALLED_PATH) - cited)
     assert orphans == [], (
@@ -156,7 +157,7 @@ _SURFACE_TABLE_HEADER = "| Surface |"
 
 
 def _map_lines() -> list[str]:
-    return _CONTEXT_MAP.read_text(encoding="utf-8").split("\n")
+    return read_text(_CONTEXT_MAP).split("\n")
 
 
 def _map_surface_rows() -> dict[str, int]:
@@ -189,9 +190,9 @@ def test_context_map_has_exactly_one_row_per_surface() -> None:
 
 def test_context_map_is_projected_nowhere() -> None:
     """A library document: no projection rule may install it into a runtime tree."""
-    rule_sources = (_PKG_ROOT / "infrastructure" / "projection_rules.py").read_text(
-        encoding="utf-8"
-    ) + (_PKG_ROOT / "infrastructure" / "public_assets.py").read_text(encoding="utf-8")
+    rule_sources = read_text(_PKG_ROOT / "infrastructure" / "projection_rules.py") + read_text(
+        _PKG_ROOT / "infrastructure" / "public_assets.py"
+    )
     assert "CONTEXT-MAP" not in rule_sources, (
         "CONTEXT-MAP.md is a library document — it is staged with `data/` and installed "
         "nowhere; a projection rule naming it is the bug."
@@ -203,11 +204,10 @@ def _norm_statement(line: str) -> str:
 
 
 def test_no_statement_lives_in_two_shipped_homes() -> None:
-    """AC1.2 (0.4.7 c6): a rule lives in one home — no normalised bullet statement of
-    60+ chars appears in two shipped rule files or skills (the root map, every scoped
-    AGENTS.md source, every skill Markdown, the fixed sections). A statement is a bullet;
-    numbered procedure steps (two skills may open the same scoped law) and prose headers
-    are not statements."""
+    """A rule lives in one home: no normalised bullet statement of 60+ chars appears in two
+    shipped rule files or skills (the root map, every scoped AGENTS.md source, every skill
+    Markdown, the fixed sections). A statement is a bullet; numbered procedure steps (two
+    skills may open the same scoped law) and prose headers are not statements."""
     shipped = [
         *sorted(_PUBLIC.glob("skills/**/*.md")),
         *sorted(_PUBLIC.glob("scaffold/**/AGENTS.md")),
@@ -217,7 +217,7 @@ def test_no_statement_lives_in_two_shipped_homes() -> None:
     ]
     homes: dict[str, set[str]] = {}
     for path in shipped:
-        for line in path.read_text(encoding="utf-8").splitlines():
+        for line in read_text(path).splitlines():
             if not line.lstrip().startswith("- "):
                 continue
             key = _norm_statement(line)
@@ -227,3 +227,33 @@ def test_no_statement_lives_in_two_shipped_homes() -> None:
     assert duplicated == {}, "a statement lives in two homes:\n" + "\n".join(
         f"  {v} :: {k[:90]}" for k, v in duplicated.items()
     )
+
+
+def test_a_settings_file_that_is_not_utf8_raises_no_foreign_hook_warning(tmp_path: Path) -> None:
+    from dadaia_workspace.core.harness_registry import HARNESS_RECORDS
+    from dadaia_workspace.infrastructure import projection_rules
+
+    record = HARNESS_RECORDS["claude"]
+    settings = tmp_path / str(record.directory) / "settings.json"
+    settings.parent.mkdir(parents=True)
+    settings.write_bytes(b'{"hooks": "caf\xe9"}')
+
+    assert projection_rules._settings_merge_checks(record, tmp_path) == []
+
+
+def test_the_agents_persona_render_over_a_file_that_is_not_utf8_is_undecodable(
+    tmp_path: Path,
+) -> None:
+    from dadaia_workspace.infrastructure import projection_rules
+    from tests.helpers.oslib import Undecodable
+
+    agentic = tmp_path / "agentic"
+    (agentic / "agents").mkdir(parents=True)
+    latin = agentic / "agents" / "a.md"
+    latin.write_bytes(b"---\nname: a\n---\ncaf\xe9\n")
+
+    (rule,) = projection_rules._agents_agent_rules(agentic, tmp_path / "ws", {})
+
+    with pytest.raises(Undecodable) as refused:
+        rule.render(None)
+    assert refused.value.path == latin
