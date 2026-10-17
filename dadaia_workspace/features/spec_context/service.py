@@ -93,7 +93,7 @@ class DeadUnpushedCommitsError(DadaiaError):
 def _worktree_git_dir(tree: Path) -> Path:
     """The common git dir a move of linked worktree *tree* runs from — Windows refuses to
     rename a process's cwd, so never *tree* itself."""
-    gitdir: str = platform.read_text(tree / ".git").removeprefix("gitdir:").strip()
+    gitdir = platform.read_text(tree / ".git").removeprefix("gitdir:").strip()
     return (tree / gitdir).parents[1]
 
 

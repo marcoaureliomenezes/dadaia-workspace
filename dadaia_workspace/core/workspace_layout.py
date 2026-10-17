@@ -246,7 +246,7 @@ def dadaiaignore_seed(workspace: Path) -> str:
     """What a new ``.dadaiaignore`` starts with — ``init`` and ``doctor --fix`` alike: the
     legacy ``states/instance_exceptions.txt`` 1:1 (then held as slop), else the template."""
     try:
-        return str(platform.read_text(workspace / ".dadaia" / "states" / "instance_exceptions.txt"))
+        return platform.read_text(workspace / ".dadaia" / "states" / "instance_exceptions.txt")
     except OSError:
         return (
             "# Operator-only: root-relative patterns, * within a segment, / = dir,\n"

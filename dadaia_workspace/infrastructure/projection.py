@@ -195,7 +195,7 @@ def _read_bytes(path: Path) -> bytes | None:
 def _posix_relpath(target: Path, start: Path) -> str:
     """A relative path with ``/`` separators on every OS: the one spelling a link target
     and its ledger digest carry, so Windows and POSIX agree byte for byte."""
-    return str(platform.norm_sep(os.path.relpath(target, start)))
+    return platform.norm_sep(os.path.relpath(target, start))
 
 
 def _link_target(rule: ProjectionRule) -> str:

@@ -39,7 +39,7 @@ def iter_public_files(root: Path) -> Iterable[Path]:
 
 def read_link_target(path: Path) -> str:
     """A symlink's target in POSIX spelling on every OS."""
-    return str(platform.norm_sep(str(path.readlink())))
+    return platform.norm_sep(str(path.readlink()))
 
 
 def _sha256(path: Path) -> str:

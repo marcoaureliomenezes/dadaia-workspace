@@ -27,13 +27,12 @@ def _run(
     stdin: str | None = None,
     env: dict[str, str] | None = None,
 ) -> subprocess.CompletedProcess[str]:
-    done: subprocess.CompletedProcess[str] = platform.run(
+    return platform.run(
         args,
         cwd=cwd,
         input=stdin,
         env={**load_owner("dd-bug-resolution", "_git").scrubbed_env(), **(env or {})},
     )
-    return done
 
 
 def _commit(path: Path, msg: str, pathspec: Sequence[str] | None = None) -> None:

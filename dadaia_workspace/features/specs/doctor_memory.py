@@ -33,7 +33,7 @@ _PKGS_NODE_RE = re.compile(r'pkgs\["([^"]*)"\]')
 
 def _read_or_empty(path: Path) -> str:
     try:
-        return str(platform.read_text(path))
+        return platform.read_text(path)
     except OSError:
         return ""  # never flag, never delete on uncertainty
 

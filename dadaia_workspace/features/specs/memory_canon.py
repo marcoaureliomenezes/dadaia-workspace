@@ -69,7 +69,7 @@ def read_fixed_fragment(public_dir: Path, section_id: str) -> str:
 
     Raises Undecodable, carrying the reinstall act, when the file is not UTF-8."""
     path = public_dir / "data" / "fixed" / f"{section_id}.md"
-    return str(platform.read_text(path, reinstall_fix(public_dir)))
+    return platform.read_text(path, reinstall_fix(public_dir))
 
 
 def is_forbidden_memory_heading(heading: str) -> bool:

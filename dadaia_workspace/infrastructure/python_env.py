@@ -273,7 +273,7 @@ def _path_candidates(min_minor: int) -> list[str]:
     alongside it (e.g. ``/usr/bin/python3.12`` next to a ``python3 -> python3.10``
     symlink).
 
-    CWE-426 (untrusted search path): on POSIX, ``shutil.which``
+    CWE-426 (untrusted search path): ``shutil.which``
     can return a RELATIVE path when PATH itself carries a relative entry (e.g. a
     leading ``.`` — an untrusted or misconfigured PATH). A relative result is rejected
     here, before it can reach :func:`_interpreter_version`.
@@ -489,10 +489,9 @@ class VenvPythonEnvironmentManager:
             subprocess.CalledProcessError: *check* and a non-zero exit.
         """
         try:
-            done: subprocess.CompletedProcess[str] = platform.run(
+            return platform.run(
                 [self.python_executable(workspace_root), *args], check=check, env=env
             )
-            return done
         except OSError as exc:
             raise WorkspaceVenvBootstrapError(
                 f"workspace venv python cannot run: {exc}.",

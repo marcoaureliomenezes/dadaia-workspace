@@ -115,7 +115,7 @@ def _stamp_sentinel(tmp_dir: Path, sentinel: Path, slug: str, bind_id: str) -> N
 def _read_help_digest(workspace: Path) -> str:
     """The CLI help digest install/reconcile built, or ``""`` — the hook never builds it."""
     try:
-        return str(platform.read_text(workspace / ".dadaia" / "agentic" / "help-digest.md"))
+        return platform.read_text(workspace / ".dadaia" / "agentic" / "help-digest.md")
     except OSError:
         return ""
 

@@ -64,10 +64,7 @@ def _run(
     as a raw ``subprocess`` exception.
     """
     try:
-        done: subprocess.CompletedProcess[bytes] = platform.run_bytes(
-            args, cwd=cwd, input=input_bytes, timeout=_TIMEOUT_S
-        )
-        return done
+        return platform.run_bytes(args, cwd=cwd, input=input_bytes, timeout=_TIMEOUT_S)
     except OSError as exc:  # no git on PATH, or a cwd that is not a directory (WinError 267)
         raise GitRunError(f"git could not run in {cwd}: {exc}") from exc
     except subprocess.TimeoutExpired as exc:
