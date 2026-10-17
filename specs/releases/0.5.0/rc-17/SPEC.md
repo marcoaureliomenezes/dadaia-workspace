@@ -87,7 +87,7 @@ The rc-16 review found nine weak points (grill findings W1–W9): fix-induced bu
 
 ## 2. Measurable Goals — the 9-metric readout (acceptance of FR9)
 
-rc-18 is judged on this table. Baselines 1, 2, 4 and 6 are agent defaults, unruled (grill record, Post-SPEC section); the rest are the grill's findings.
+rc-18 is judged on this table. Baselines 1, 2, 4, 6 and 9 are agent defaults, unruled (grill record, Post-SPEC section, and the main thread 2026-10-17); the rest are the grill's findings.
 
 | # | metric | rc-16 baseline | target |
 |---|---|---|---|
@@ -96,10 +96,10 @@ rc-18 is judged on this table. Baselines 1, 2, 4 and 6 are agent defaults, unrul
 | 3 | merge `verify:` wall time | `ci.py job` median 1m52 over 6 runs; 125 s before, 1221 s during the J4.T16 widening (W4) | <= 150 s |
 | 4 | closure duration, CLOSURE to the candidate PR merge | 40.5 h: CLOSURE 10-16 02:12 -> PR #296 merge 10-17 18:42 | <= 4 h |
 | 5 | CI red share of the work branch's runs | 22/93 failed since 10-14, 24 % (W6) | <= 10 % |
-| 6 | non-block work landed after CLOSURE | recomputed by the FR9 reader for rc-16, rc-17's method (the grill: 3 streams, OS-boundary REBUILD 74 commits, Kimi, scorecard) | 0 |
+| 6 | non-block commits landed after CLOSURE | 74+: the OS-boundary REBUILD commits after the CLOSURE stamp (W5/W7) | 0 |
 | 7 | memory drift at the PR: atoms `release.py drift` names at the `wt-rc` head | 13 atoms (W9); 14 by `2aca959f9` | 0 |
 | 8 | hand-typed fix-line labels outside the producer | 155 in 52 files (W2) | 0 |
-| 9 | REBUILD-due fixes landed as a patch | no rc-16 reading; this SPEC's window review judged 14 of 59 fixes REBUILD | 0 |
+| 9 | REBUILD-due fixes landed as a patch | none: starts at rc-17's own readout; the closest rc-16-era reading, not a baseline, is 14 of 59 REBUILD verdicts in this SPEC's bug window review | 0 |
 
 ## 3. Requirements
 
@@ -148,7 +148,7 @@ Operator: "A: law line + next rc opens at once (Recommended)".
 
 - AC5.1 After `release.py phase CLOSURE`, only block-list bugs (`specs/bugs/AGENTS.md` §2) land on the `wt-rc`; any other bug, REBUILD or operator demand becomes a job of the next rc. Test: none, law text (`RC-FLOW.md` step 4, `specs/releases/AGENTS.md`); metric 6 reads it.
 - AC5.2 The closure is the reconcile alone, and the next rc is born at once. Test: none, law text; metric 4 reads it.
-- AC5.3 `specs/constitution.md` §5 states that the agentic scorecard is the final rc's last implementation job before the promote, never after the closure summary; `dd-product-engineer`, the constitution's writer, lands it in the job the PLAN names. Test: none, law text.
+- AC5.3 `specs/constitution.md` §5 states that the agentic scorecard is the final rc's last implementation job before the promote, never after the closure summary. `dd-product-engineer`, the constitution's writer, lands it in its `pe` task commit, whose body quotes the Q5 ruling, the operator's decision under constitution §4 (agent default, unruled; precedent `e04ca698d`). Test: none, law text.
 
 ### FR6 — Windows by static rules (W6)
 
@@ -181,7 +181,7 @@ Agent default, unruled: the shipped reader needs only local data and reads `gh` 
 - AC9.1 `verdict.py stats <M.m.p>-rc<N>` is REBUILT as the one reader of the §2 table: it prints metrics 1, 2, 4, 6, 7 and 9 from local ledgers, handoffs and git, each with its value and target, and the oldest verdict record it read. Test: unit, each metric over fixture ledgers and handoffs.
 - AC9.2 It prints metrics 3 and 5 only when `gh` is present and answers; otherwise it omits them and exits 0. Test: unit.
 - AC9.3 Every rc closure summary carries the table. Test: none, the closure procedure (`RC-FLOW.md` step 4).
-- AC9.4 The reader computes the rc-16 baselines of metrics 2 and 6 by the method it applies to rc-17, and the rc-17 closure summary carries both readings. Test: none, the closure procedure.
+- AC9.4 The reader computes the rc-16 baseline of metric 2 by the method it applies to rc-17, and the rc-17 closure summary carries that reading. Test: none, the closure procedure.
 
 ### FR10 — SeveralWork fix-line follow-ups (`several-work-fix-line-follow-ups`)
 
@@ -195,7 +195,7 @@ Operator (Q10): "Weak points + 3 overlaps (Recommended)".
 Operator (Q10): "Weak points + 3 overlaps (Recommended)".
 
 - AC11.1 Items (1), (2), (4), (5) and the text parts of (3) of the entry land under FR7's row: the `bugs.py update` commit row, the `scripts/ci.py` docstring, `RELEASE-EVENTS.md:25`, `scripts/CONSUMER_VALIDATION_RECIPE.md` R-04, `docs/cli.md:10`, the scratch-only probe recipe in `dd-code-review`, the `pkill -f`/`pgrep -f` line. Test: none, law and doc text.
-- AC11.2 `_release_tree.py` calls `closure_summary` once, and the duplicated contract helpers have one home. Test: unit (existing tests green, unchanged).
+- AC11.2 `_release_tree.py` calls `closure_summary` once. Test: unit (existing tests green, unchanged).
 
 ### FR12 — no repo `.venv` in the hook runner search (CWE-427)
 
@@ -253,4 +253,4 @@ Operator (Q8): "rc-17 reconciles the 13 atoms". Agent default, unruled: `harness
 ## 7. Open questions
 
 - Q1–Q6 of the Draft are answered 2026-10-17 (the grill record's Post-SPEC section): Q1 §5, Q2 §2, Q3 FR12, Q4 §6, Q5 FR13, Q6 §2 and AC9.4.
-- Q7. Metric 9 has no rc-16 baseline; it opens at rc-17's own readout unless the operator names one.
+- The update's four questions are answered 2026-10-17 by the main thread, each an agent default, unruled: metric 2 alone is recomputed and metric 6 keeps 74+ (§2); metric 9 starts at rc-17's readout (§2); the Q5 ruling carries the constitution line (AC5.3); AC11.2 drops the entry's unnamed "duplicated contract helpers" half.
