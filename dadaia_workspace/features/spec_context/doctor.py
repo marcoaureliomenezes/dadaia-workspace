@@ -492,7 +492,7 @@ class DoctorService:
                 fix = ""
                 if verdict is FindingVerdict.SLOP and entry.name in workspace_layout.NEVER_MOVED:
                     detail = "(credentials and repositories live outside the workspace: the library never moves them)"
-                    fix = f"Operator action: move {entry.name} out of the workspace, or name it in .dadaiaignore"
+                    fix = f"Operator action: move {entry.name} out of the workspace"
                 out.append(self._finding(zone, base, entry, verdict, detail, fix=fix))
         return out
 
