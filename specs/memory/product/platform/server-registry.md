@@ -15,8 +15,8 @@ sources:
 - `next --project <name> [--min-port N] [--max-port N] [--json]` returns the project's live port if it holds one, else a base port hashed from the project name in 3000-3999, else the first free port; a full range exits 1 naming `clean`.
 - `register --port N --project <name> [--url] [--pid] [--ttl <hours, default 8>] [--description]` drops stale entries first, is idempotent for the same project, and exits 1 naming the owner when another project holds the port; any explicit port is accepted.
 - `release --port N` and/or `--project <name>` removes matching entries; a port owned by another project exits 1.
-- `clean [--dry-run]` removes entries whose TTL elapsed or whose PID is gone; on a non-POSIX host only the TTL is judged.
-- `scan [--json]` is read-only: it parses `ss -tlnp`, lists LISTEN ports above 1024 that no entry covers, enriched with the process command line and cwd, and marks `lan_exposed` for wildcard binds; without `/proc` or `ss` it returns an empty list.
+- `clean [--dry-run]` removes entries whose TTL elapsed or whose PID is gone; the kernel judges a PID's liveness on every host (a process query on Windows).
+- `scan [--json]` is read-only: it asks the kernel for the host's TCP listeners (`ss -tlnp` plus `/proc`), lists LISTEN ports above 1024 that no entry covers, enriched with the process command line and cwd, and marks `lan_exposed` for wildcard binds; without `/proc` or `ss` it returns an empty list.
 
 ## Runtime state
 

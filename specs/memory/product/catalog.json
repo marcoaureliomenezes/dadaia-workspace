@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-16T14:23:08Z",
+  "generated_at": "2026-10-17T04:07:21Z",
   "features": [
     {
       "rank": 1,
@@ -130,7 +130,7 @@
         "projection",
         "privacy"
       ],
-      "token_estimate": 1307,
+      "token_estimate": 1395,
       "depends_on": [
         "agentic-entities",
         "bug-ledger",
@@ -176,7 +176,7 @@
         "release",
         "packaging"
       ],
-      "token_estimate": 1322,
+      "token_estimate": 1345,
       "depends_on": [
         "release-lifecycle",
         "QUALITY",
@@ -350,7 +350,7 @@
         "hooks",
         "binding"
       ],
-      "token_estimate": 366,
+      "token_estimate": 429,
       "depends_on": [
         "agentic-entities",
         "sdd-gate-v3",
@@ -463,7 +463,7 @@
         "release-gate",
         "sdd"
       ],
-      "token_estimate": 387,
+      "token_estimate": 394,
       "depends_on": [
         "pypi-distribution",
         "workspace-init",
@@ -549,8 +549,8 @@
       "slug": "cross-platform-portability",
       "title": "cross-platform-portability",
       "area": "platform",
-      "tldr": "Linux, macOS and Windows through one platform capability seam carrying the venv layout, Python hooks and cross-OS CI legs.",
-      "summary": "dadaia_workspace/core/platform.py is the package's one platform seam over the kernel's one host reader — the venv scripts directory, the executable suffix and the Windows path flavor, plus the one venv-executable rule; no port, adapter pair or file lock exists for portability.",
+      "tldr": "Linux, macOS and Windows through one OS boundary, the kernel's _platform.py, deciding every host fact; core/platform.py is the package's door to it.",
+      "summary": "The kernel module dd-bug-resolution/scripts/_platform.py decides every host fact — text codec and newlines, child processes, venv layout, exec bit, process liveness and listeners, filesystem swap and links, the sandbox home and shell spelling — as functions over one capability value; skill scripts import it as a sibling, the package reaches it through core/platform.py, tests through tests/helpers/oslib.py; no port, adapter pair or file lock exists for portability.",
       "path": "specs/memory/product/platform/cross-platform-portability.md",
       "tags": [
         "platform",
@@ -560,17 +560,19 @@
         "macos",
         "linux"
       ],
-      "token_estimate": 431,
+      "token_estimate": 798,
       "depends_on": [
         "bug-ledger",
-        "workspace-init",
+        "workspace-doctor",
+        "public-asset-distribution",
         "sdd-gate-v3",
         "ARCHITECTURE",
         "server-registry",
-        "public-asset-distribution"
+        "workspace-init"
       ],
       "sources": [
-        "dadaia_workspace/core/platform.py"
+        "dadaia_workspace/core/platform.py",
+        "dadaia_workspace/public/skills/dd-bug-resolution/scripts/_platform.py"
       ]
     },
     {
@@ -587,7 +589,7 @@
         "ports",
         "ttl"
       ],
-      "token_estimate": 418,
+      "token_estimate": 437,
       "depends_on": [
         "workspace-init",
         "agentic-entities"
@@ -611,7 +613,7 @@
         "registry",
         "onboarding"
       ],
-      "token_estimate": 1264,
+      "token_estimate": 1281,
       "depends_on": [
         "public-asset-distribution",
         "sdd-gate-v3",
@@ -646,7 +648,7 @@
         "compliance",
         "privacy"
       ],
-      "token_estimate": 3611,
+      "token_estimate": 3660,
       "depends_on": [
         "public-asset-distribution",
         "sdd-gate-v3",
@@ -688,7 +690,7 @@
         "upgrade",
         "onboarding"
       ],
-      "token_estimate": 2146,
+      "token_estimate": 2261,
       "depends_on": [
         "context-management",
         "specs-migration",
@@ -782,8 +784,9 @@
         "lineage",
         "resolution"
       ],
-      "token_estimate": 919,
+      "token_estimate": 957,
       "depends_on": [
+        "cross-platform-portability",
         "public-asset-distribution",
         "release-lifecycle",
         "worktrees",
@@ -811,7 +814,7 @@
         "state",
         "closure"
       ],
-      "token_estimate": 1234,
+      "token_estimate": 1239,
       "depends_on": [
         "agent-orchestration",
         "worktrees",
@@ -842,8 +845,9 @@
         "privacy",
         "git"
       ],
-      "token_estimate": 1103,
+      "token_estimate": 1289,
       "depends_on": [
+        "cross-platform-portability",
         "worktrees",
         "context-management",
         "workspace-doctor",
@@ -855,6 +859,8 @@
         "dadaia_workspace/hooks/pre_gate.py",
         "dadaia_workspace/hooks/root_whitelist.py",
         "dadaia_workspace/hooks/sdd_gate.py",
+        "dadaia_workspace/hooks/translate.py",
+        "dadaia_workspace/hooks/ref_transaction.py",
         "dadaia_workspace/cli/commands/ci.py",
         "dadaia_workspace/features/chokepoints/**",
         "dadaia_workspace/public/skills/dd-bug-resolution/scripts/privacy_baseline.json",

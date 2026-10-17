@@ -15,7 +15,7 @@ sources:
 - Exactly one bare-SemVer release directory is live. `_RELEASE.json` contains `phase`, `defined`, `implemented`, `shipped` and an append-only `log`.
 - New log entries use only `note`, `milestone`, `summary` and closure-only `memory`; historical kinds remain readable.
 - Each candidate lives in `rc-<N>/` with approved `SPEC.md`, `PLAN.md` and one `tasks/<job>.md` per job. The highest candidate is live.
-- PLAN carries the as-is review, job DAG, waves and complete write sets. Each job file carries lean task rows with task id, `who` (`sr`, `jr`, `pe` or `cr`, the dispatched persona, [[agent-orchestration]]), AC and exact write set; no stage grammar and no done marker exist. A task whose write set names `specs/memory` is an error until the candidate reaches CLOSURE, where its rows are history; memory is the Reconciliation's.
+- PLAN carries the as-is review, job DAG, waves and complete write sets. Each job file carries lean task rows with task id, `who` (`sr`, `jr`, `pe` or `cr`, the dispatched persona, [[agent-orchestration]]), AC and exact write set; no stage grammar and no done marker exist. A task whose write set names `specs/memory` is an error until the candidate reaches CLOSURE, where its rows are history; memory is reconciled in the `wt-rc`'s last commits.
 
 ## Lifecycle
 
