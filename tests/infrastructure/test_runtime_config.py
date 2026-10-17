@@ -11,7 +11,9 @@ from pathlib import Path
 
 import pytest
 
+from dadaia_workspace.core import platform
 from dadaia_workspace.core.harness_registry import HARNESS_RECORDS
+from dadaia_workspace.core.platform import Capabilities
 from dadaia_workspace.infrastructure.runtime_config import (
     KIMI_BLOCK_BEGIN,
     KIMI_BLOCK_END,
@@ -60,6 +62,20 @@ def test_kimi_hooks_block_parses_as_toml_and_pins_rules() -> None:
     assert by_event["PostCompact"]["command"] == (
         "/tmp/kimi-home-test/hooks/dadaia-kimi-post-compact.sh"
     )
+
+
+@pytest.mark.parametrize("host", ["linux", "win32"])
+@pytest.mark.parametrize("home", ["/tmp/kimi home", "/tmp/o'brien", "/tmp/kimi-home-test"])
+def test_kimi_hook_command_is_the_kernels_spelling_of_the_wrapper_path(
+    host: str, home: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr("dadaia_workspace.core.platform.PLATFORM", Capabilities.detect(host))
+    wrapper = f"{home}/hooks/dadaia-kimi-pre-gate.sh"
+    spelled = platform.command(wrapper)
+    # a head with no spelling on the host stays the raw path; an Agent action is never a command
+    expected = wrapper if spelled.startswith("Agent action:") else spelled
+    hooks = tomllib.loads(kimi_hooks_block(Path(home)))["hooks"]
+    assert {h["event"]: h["command"] for h in hooks}["PreToolUse"] == expected
 
 
 @pytest.mark.parametrize(
