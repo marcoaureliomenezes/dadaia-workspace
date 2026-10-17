@@ -522,7 +522,7 @@ def test_the_job_gate_runs_scripts_ci_job_as_argv_on_the_head_it_lands(
         act, line, where = fixes(result)[0].split("`")
         assert act == "fix: Agent action: make "
         assert line == "python scripts/ci.py job"
-        assert where == f" exit 0 in {tree} and commit the fix in this worktree"
+        assert where == f" exit 0 in {tree} and commit the fix in a task of this job"
 
 
 def test_a_job_merge_needs_a_verdict_naming_its_ci_matrix_run(root: Path) -> None:
@@ -793,6 +793,9 @@ def test_a_hotfix_lands_on_the_work_branch_only_through_a_verdict_and_the_job_ga
 
     assert red.returncode == 1 and red.stdout.splitlines().count("ci job") == 1
     assert git(repo, "rev-parse", "feature/0.5.0").strip() == work and tree.exists()
+    assert fixes(red) == [
+        f"fix: Agent action: make `python scripts/ci.py job` exit 0 in {tree} and commit the fix in this worktree"
+    ]
 
 
 def test_an_open_task_blocks_its_main_tree_merge(root: Path) -> None:
