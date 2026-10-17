@@ -33,10 +33,12 @@ from tests.helpers.oslib import run as os_run
 from tests.helpers.release_state import write_release_phase
 from tests.helpers.skill_scripts import stage_skill_scripts
 from tests.helpers.worktree_ws import (
+    CI,
     NEW_JOB,
     NEW_TASK,
     SCRIPT,
     approve,
+    associate,
     commit,
     fixes,
     git,
@@ -202,6 +204,30 @@ def test_a_backlog_tree_lands_specs_only_through_the_ledger_checks(root: Path) -
     assert landed.returncode == 0, landed.stderr
     assert git(repo, "rev-parse", "feature/0.5.0").strip() == sha
     assert "ci " not in landed.stdout and not tree.exists()
+
+
+@pytest.mark.parametrize("name", [RC, BACKLOG])
+def test_an_associated_repo_tree_lands_with_no_ledger_check_of_its_own(
+    tmp_path: Path, name: str
+) -> None:
+    """`a` holds no `specs/`: its rc and backlog trees land on the verdict and gate alone."""
+    make_workspace(root := tmp_path)
+    associate(root, "Approved")
+    repo = root / "repos/a"
+    (repo / "scripts").mkdir()
+    write_text(repo / "AGENTS.md", "verify: python scripts/ci.py job\n")
+    write_text(repo / "scripts/ci.py", CI)
+    git(repo, "add", "-A")
+    git(repo, "commit", "-qm", "gate")
+    git(repo, "branch", "-f", "feature/0.5.0")
+    git(repo, "switch", "-q", "feature/0.5.0")
+    assert run(root, "new", "a", name).returncode == 0
+    tree = root / "worktrees/a" / name
+    sha = commit(tree, "AGENTS.md", "verify: python scripts/ci.py job\n# gate\n")
+    approve(root, sha, name=name, repo="a")
+    landed = run(root, "merge", str(tree))
+    assert landed.returncode == 0, landed.stderr
+    assert git(repo, "rev-parse", "feature/0.5.0").strip() == sha and not tree.exists()
 
 
 def test_work_branch_refusals_fix_runs_verbatim(tmp_path: Path) -> None:

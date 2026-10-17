@@ -198,12 +198,12 @@ def open_tree(root: Path, name: str) -> Path:
     return root / "worktrees/r" / name
 
 
-def diff_hash(root: Path, sha: str, name: str | None = None) -> str:
-    """The oracle: sha256 (UTF-8) of `git diff-tree -r -z --full-index <merge-base> <sha>` in `r`,
+def diff_hash(root: Path, sha: str, name: str | None = None, repo: str = "r") -> str:
+    """The oracle: sha256 (UTF-8) of `git diff-tree -r -z --full-index <merge-base> <sha>` in repo *repo*,
     the merge-base taken against the branch tree *name* is cut from; the work branch with no *name*."""
-    repo = root / "repos/r"
-    base = git(repo, "merge-base", _parent(name) if name else "feature/0.5.0", sha).strip()
-    diff = git(repo, "diff-tree", "-r", "-z", "--full-index", base, sha)
+    checkout = root / "repos" / repo
+    base = git(checkout, "merge-base", _parent(name) if name else "feature/0.5.0", sha).strip()
+    diff = git(checkout, "diff-tree", "-r", "-z", "--full-index", base, sha)
     return hashlib.sha256(diff.encode("utf-8")).hexdigest()
 
 
@@ -215,6 +215,7 @@ def approve(
     verdict: str = "APPROVED",
     valid: bool = True,
     at: str = "T10:00:00Z",
+    repo: str = "r",
 ) -> Path:
     """The reviewer's verdict as `verdict.py` writes it: a handoff naming *sha*, its diff bound over
     the base of tree *name* (the work branch with no *name*), emitted *at*."""
@@ -226,7 +227,7 @@ def approve(
         "verdict": verdict,
         "scope": f"wt/{name or NEW_JOB}@{sha}",
         "reviewed_sha": sha,
-        "diff_sha256": diff_hash(root, sha, name),
+        "diff_sha256": diff_hash(root, sha, name, repo),
         "produced_at": f"2026-10-02{at}",
     }
     write_text(handoff, json.dumps({**body, **({"schema_version": "1.2"} if valid else {})}))
