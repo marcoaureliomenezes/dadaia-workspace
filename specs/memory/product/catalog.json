@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-17T04:07:21Z",
+  "generated_at": "2026-10-17T04:29:04Z",
   "features": [
     {
       "rank": 1,
@@ -130,7 +130,7 @@
         "projection",
         "privacy"
       ],
-      "token_estimate": 1395,
+      "token_estimate": 1467,
       "depends_on": [
         "agentic-entities",
         "bug-ledger",
@@ -350,7 +350,7 @@
         "hooks",
         "binding"
       ],
-      "token_estimate": 429,
+      "token_estimate": 471,
       "depends_on": [
         "agentic-entities",
         "sdd-gate-v3",
@@ -560,7 +560,7 @@
         "macos",
         "linux"
       ],
-      "token_estimate": 798,
+      "token_estimate": 841,
       "depends_on": [
         "bug-ledger",
         "workspace-doctor",
