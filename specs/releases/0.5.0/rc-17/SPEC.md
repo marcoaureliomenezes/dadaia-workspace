@@ -1,4 +1,4 @@
-# SPEC — Release: 0.5.0
+# SPEC — Release: 0.5.0, candidate 17 — fix the 9 weak points
 
 **Status:** Draft
 **Release ID:** 0.5.0
@@ -6,33 +6,243 @@
 **Opened:** 2026-10-17
 **Origin:** backlog:several-work-fix-line-follow-ups,law-and-docs-text-loose-ends
 
+Operator demand, 2026-10-17, verbatim: "we will do a last release candidate right now that must handle [the 9 weak points] ... and after finishing the release candidate that will handle all of them, we will do another one to verify if we were efficient or not."
+
+Sources: the grill record `.dadaia/reports/dadaia-workspace/grill/rc17-weak-points.md` (rulings verbatim, findings W1–W9); the rc-16 review artifact https://claude.ai/artifact/V1WH3ZAm7sbn17AVvYX7ob (v2); ADR **0266** (amends 0159) and ADR **0267**, both accepted 2026-10-17. The CWE-427 item has no slug of its own: it is item (3) of `law-and-docs-text-loose-ends`. Paths are relative to `repos/dadaia-workspace/`.
+
+Operator rulings, verbatim (each FR quotes its own):
+
+- Q10 rc-17 edge: "Weak points + 3 overlaps (Recommended)". Q11 rc-18 load: "Remaining 5 follow-ups + group B (Recommended)". Confirm: "Confirm + accept both ADRs (Recommended)".
+
 ---
 
 ## Bug window review
 
-(Read the prior candidate's `## Bug window review`, then inspect each resolved record's
-persisted `fix_sha` with `git show` as `dd-bug-resolution/LINEAGE.md` defines.)
+**Window:** fixes closed after rc-16's window (`rc-16/SPEC.md`, fixes closed to 2026-10-14T19:53Z): the 53 records rc-16 archived (`1c43b993d`, 20; `b05443f5a`, 33) plus 6 resolved in `BUGS.jsonl` on 2026-10-17, the Codex hotfix `5ba9591ff..0f49df91a` included: **59 bugs**. Each fix was read with `git show`; the sha column lists the series where the ledger `fix_sha` is only its last commit. Verdicts: 45 KEEP, 14 REBUILD in three units, R1–R3.
+
+| bug id | fix sha(s) | unit | verdict | reason (evidence) |
+|---|---|---|---|---|
+| `ref-gate-malformed-line-fix-carries-placeholders` | `522a25372` | `cli/commands/ci.py` `ref_gate_check` fix text | REBUILD R1 | a hand-typed act text rewritten at its site (+1/-1): the class ADR 0266 removes |
+| `several-work-branches-blank-the-doctor-report` | `681f04c77` | `features/workspace/onboarding.py` first-pass row | REBUILD R1 | +17/-5: a `try/except SeveralWorkBranches` second path that strips the label by `removeprefix` |
+| `several-work-fix-deletes-the-checked-out-branch` | `af6b055e6` | `_worktree_git.py` SeveralWork, `onboarding.py` | REBUILD R1 | CRITICAL, caused by `ship-archive-never-reaches-the-next-work-branch`'s fix; two follow-up bugs rewrote two tests' asserts |
+| `several-work-rework-leaves-two-gitflow-tests-on-the-old-fix-line` | `e5bc72344` | `tests/core/test_gitflow.py` | REBUILD R1 | asserts moved to the new literal; third fix on one fix line |
+| `several-work-agent-action-fix-breaks-the-verbatim-fix-runner-row` | `8074a594d` | `test__worktree_end.py` | REBUILD R1 | assert changed; `fixes(two)[0]` drops the one-fix check (FR10) |
+| `missing-verify-refusal-fix-is-itself-blocked` | `42bbdf11c` | `_worktree_end.py` verify refusal fix line | REBUILD R1 | an `if root` branch and a rootless `worktree sync` second spelling; first of three fixes on this line in one day |
+| `verify-red-fix-line-commits-outside-a-task-tree` | `bcd1fe3cf` | same | REBUILD R1 | a per-kind branch inside the act text (+3/-1) |
+| `rc-red-verify-fix-line-gives-code-no-route` | `89d7c0b28`, `aa6a3a978`, `18dd60121` | same | REBUILD R1 | a `known` branch picks the act; a hand-typed `Operator action:` |
+| `operator-action-fix-lines-hand-over-agent-acts` | `29c757964`, `f5263f80f` | every `Operator action:` site, the census | REBUILD R1 | caused by `agent-acts-are-labelled-operator-action`; six sites relabelled by hand plus a census exception table (`_OPERATOR_ACTIONS`) |
+| `resolve-records-a-fix-sha-a-later-rebase-unreaches` | `c10a5ebf8`, `4e9dd349c` | `_bugs_check._unreached`, `_git.py` | REBUILD R2 | first of three fixes on `_unreached`, each caused by the previous |
+| `unreached-check-refuses-a-shallow-clone-that-holds-every-fix-sha`, `unreached-check-crashes-on-a-percent-in-the-script-path` | `cc76aa03c` | `_unreached` | REBUILD R2 | second fix, two bugs |
+| `unreached-fix-sha-judges-only-the-main-repo` | `6449771a6` | `_unreached` | REBUILD R2 | CRITICAL, third; +27/-7: a second path for associated repos that reads `.dadaia/states/spec_contexts.json` from a skill script |
+| `ref-gate-admits-a-forced-move-git-hands-a-zero-old-sha` | `a1fc328ce` | `ci.py` `ref_gate_check` | REBUILD R3 | +4: a branch re-reading the old sha; the shell hook keeps a second creation decider; six fixes on the ref gate in the window (§6 Q1) |
+| `ref-gate-reads-a-sha256-zero-old-sha-as-a-move` | `cafc4003d` | `git_scan.is_zero_sha` | KEEP | one predicate replaces five literal compares |
+| `ref-gate-audit-escape-judges-a-move-by-tree-diff-not-ancestry` | `0d038d7fe`, `11791da1e`, `c470bafd0` | `check_ref_policy` | KEEP | REBUILD: one decider over facts the caller reads |
+| `ref-gate-admits-a-work-branch-delete-then-recreate-at-any-commit` | `1fddc9df4` | `check_ref_policy` | KEEP | REBUILD, net -1 |
+| `ref-gate-trusts-a-locally-writable-origin-tracking-ref`, `ref-gate-blind-to-a-branch-rename-onto-the-work-branch` | `1038afdf0` | worktrees law line 6 | KEEP | operator ruling 2026-10-16 narrowed the promise; text only |
+| `ref-gate-refuses-the-denylist-journey-raw-commit-after-install-hook` | `ceb3edcbd` | E2E push journey | KEEP | the journey follows the product order; no assert loosened |
+| `ref-gate-block-fix-line-forwards-to-a-projected-runner-that-lags-the-hook` | `b2968964d`, `b103154e2` | `cli/commands/worktree.py` forwarder | KEEP | through the one marker builder (+4/-4) |
+| `skill-md-split-pin-left-on-the-deleted-plain-tree` | `7702e638d` | `test_entity_doctor.py` | KEEP | test follows rc-16 AC2.3's approved contract (+10/-18) |
+| `prepush-ipv4-baseline-refuses-dotted-package-versions` | `2b95d56a3` | `denylist_scan.scan_objects` | KEEP | the skip scoped to content in the one scanner (+4/-4) |
+| `tests-fallback-classes-test-named-ci-files-as-tests` | `4e853dfd3` | `_worktree_end._is_test_path` | KEEP | one condition in the one classifier |
+| `protected-globs-miss-a-plain-tree-path` | `7cec79317` | `workspace_layout.protected_glob` | KEEP | REBUILD, net -2 |
+| `new-reconcile-opens-while-a-job-is-open` | `1a190ef5d` | `_release_phase.py` closure wait | KEEP | net -3 |
+| `bound-fix-spawn-oserror-prints-a-traceback-not-a-fix` | `6de643648` | `_specs.run_cli` | KEEP | REBUILD: three spawns into one owner |
+| `job-gate-runs-the-whole-ci-line-and-preflight-runs-it-again` | `58c415a56`, `7c5bd1f35` | the repo `verify:` line | KEEP | restores `ci.py job`; the law hole that let it widen is FR4 |
+| `memory-citation-judge-calls-every-passthrough-verb-dead` | `2c7adb05c` | `citations.dead_verb_citations` | KEEP | the leaf rule inside the one judge (+2) |
+| `frontmatter-differential-reads-scratch-files-another-worker-deletes` | `369b4c17d` | staged-assets test | KEEP | test-only, tracked files |
+| `cli-prints-unicode-marks-without-setting-utf8-stdio` | `b1d7f1fa3`, `de980fea5` | `platform.use_utf8_stdio`, `__main__.py` | KEEP | one entry point |
+| `utf8-stdio-stderr-test-hardcodes-a-posix-line-ending-on-windows` | `a38399c11` | `test_main__utf8_stdio.py` | KEEP | reads through `oslib.run` |
+| `shipped-hashes-lack-the-win32-render-digest-of-the-current-law` | `4ce501efc`, `47e628068` | `shipped-hashes.json` | KEEP | data append |
+| `tests-hand-spell-platform-paths-and-fix-lines` | `eb3e9afea`, `f42db671b`, `678904cbb` | five test files | KEEP | expectations on the kernel spelling |
+| `test-fixtures-write-non-ascii-text-without-an-encoding` | `6c1e1874b`, `bce78ad80` | test fixtures | KEEP | encoding passed; FR6 makes the class static |
+| `tests-type-wrong-windows-asset-counts` | `21776f5da` | characterization tests | KEEP, noted | literals set to the observed Windows counts, the tests' existing form |
+| `test-runs-a-shebang-stub-directly-on-windows` | `5de38391a` | reference-transaction tests | KEEP | the one `fake_venv` builder |
+| `fake-venv-copies-the-venv-redirector-not-the-base-interpreter` | `94564d7db` | `tests/fixtures/stores.py` | KEEP | +2/-2 |
+| `fake-venv-cli-test-decodes-utf8-help-output-with-the-locale-codec-on-windows` | `23d40bc8f` | fixtures, `.github/workflows/ci.yml` | KEEP, noted | the commit's subject names another bug; it moves the fix-line contract rows into `tests/fixtures/fix_world.py` (net -726) and raises the Windows/macOS contract job timeout 20 -> 30 min (§6 Q4) |
+| `registry-test-control-block-calls-real-os-kill-on-windows` | `73804f71b` | `test_registry.py` | KEEP | patches `os.kill` at the boundary |
+| `mutate-coverage-lookup-misses-windows-backslash-keys` | `f58a8aa5a` | `scripts/mutate.py` | KEEP | one compare form |
+| `init-sibling-fix-line-is-hand-joined-and-unrunnable-with-a-blank-in-the-path` | `00161a164` | `InitPlan.command` | KEEP | REBUILD onto the kernel speller |
+| `memory-atom-edit-left-the-generated-catalog-stale` | `dedb3fe80` | catalog pair | KEEP | the pair lands together; FR8 places the pass |
+| `hook-lane-cost-test-counts-bytecode-cache-opens` | `4ee5237f9` | `test_ctx_inject.py` | KEEP | cold cache pinned; the rejected attempt was reverted |
+| `certify-journey-tests-exceed-the-medium-tier-ceiling-under-load` | `8e7c86b6e` | certification tests | KEEP | no ceiling changed; the slow journey moved to E2E |
+| `cli-line-and-the-kernel-render-one-argv-two-ways-on-windows` | `671587164` | `core/cli_line.py` | KEEP | REBUILD onto the kernel `command` |
+| `constitution-text-read-raises-on-a-non-utf8-constitution`, `doctor-memory-reads-crash-on-a-non-utf8-document` | `56bf1c49c` | the kernel text door | KEEP | reads through the one door |
+| `kernel-round-trip-test-runs-powershell-under-posix-spelling-on-linux-and-macos` | `4f6e1d9a0` | `test__platform__command.py` | KEEP | +1/-1 |
+| `os-boundary-child-process-decode-is-spelled-per-call-site`, `os-boundary-venv-layout-and-path-spelling-leak-outside-the-seam` | `2af08de96` | infrastructure onto the kernel door | KEEP | REBUILD, net -73 |
+| `os-boundary-filesystem-semantics-are-assumed-posix-per-call-site` | `d502512d5` | `_atomic.py` | KEEP | the kernel `is_link` |
+| `os-boundary-process-control-is-posix-only-at-the-call-site` | `b2644bd28` | `spec_context/sweep.py` | KEEP | the kernel `file_owner`, net -2 |
+| `os-boundary-text-codec-is-decided-per-call-site` | `87a29d3f5`, `be928cd62` | kernel, entry points | KEEP | ADR 0265's one door |
+| `win32-quote-leaves-shell-metacharacters-unquoted-in-fix-lines` | `87a29d3f5` | `_platform.quote`, `spell` | KEEP, noted | the ADR 0265 kernel (+1251/-75), redo of the reverted `17752dbd4` |
+| `windows-head-with-a-blank-garbles-the-pip-launcher-command-line-in-cmd` | `cedd3456d` | `_platform.head` | KEEP | REBUILD, net -7 |
+| `os-boundary-shell-spelling-has-several-producers-and-a-lossy-quoter` | `38034fc66` | kernel `command`/`inline`, Kimi wrappers | KEEP, noted | production code under a `test(` subject (+336/-75); one encoder |
+| `wt-rc-merge-runs-ledger-checks-on-an-associated-repo-tree` | `183a36590` (RED), `b8bf1bb11` | `_worktree_end._ledgers` | KEEP | REBUILD: one decider for rc and backlog |
+| `codex-push-rule-conflicts-with-workspace-gitflow` | `e677235a2` (RED), `f791ae8cf`; memory `152dd7b66` | `codex_assets.py` command policy | KEEP | deletion, net -8 |
+
+**REBUILD work list** (bugs law §2; each keeps the contract tests its fixes hardened): FR1 takes R1 (AC1.4), FR2 takes R2 (AC2.5). R3 is unplaced: §6 Q1.
 
 ## 1. Problem
 
-(Describe the problem this release solves.)
+The rc-16 review found nine weak points (grill findings W1–W9): fix-induced bugs with no sibling lookup (W1); fix-line labels typed by hand at 155 sites (W2); 100 of 232 rc-16 verdicts rejected with no implementer self-check (W3); two law holes that let the job gate widen from 125 s to 1221 s for 11.6 h (W4); a closure that took unscoped work after CLOSURE (W5/W7); Windows and macOS PR reds from codec, line-ending and path classes (W6); no commit row for pure law text (W8); and memory reconciled only at CLOSURE while 13 atoms drifted after it (W9). rc-18 verifies whether rc-17 was efficient, on the readout of FR9.
 
-## 2. Measurable Goals
+## 2. Measurable Goals — the 9-metric readout (acceptance of FR9)
 
-(List observable outcomes.)
+Baselines are the grill record's findings; rc-18 is judged on this table.
 
-## 3. Non-goals
+| # | metric | rc-16 baseline (grill finding) | target |
+|---|---|---|---|
+| 1 | fix-induced bugs: records with `caused_by` not `none` / all records | 218/435, 50 % (0.5.0 to date, W1) | <= 20 % |
+| 2 | first-pass approval: trees whose first verdict is `APPROVED` / trees | 71/110, 65 % (W3) | >= 70 % |
+| 3 | merge `verify:` wall time | `ci.py job` median 1m52 over 6 runs; 125 s before, 1221 s during the J4.T16 widening (W4) | <= 150 s |
+| 4 | closure duration, `implemented.ts` to the `wt-rc` merge | pass 0.3 h; OS-boundary REBUILD 13.1 h; Kimi 6.1 h; scorecard 7.4 h + 16 h (W5/W7); no total in the record (§6 Q2) | <= 4 h |
+| 5 | CI red share of the work branch's runs | 22/93 failed since 10-14, 24 % (W6) | <= 10 % |
+| 6 | non-block work landed after CLOSURE | 3 streams: OS-boundary REBUILD (74 commits), Kimi, scorecard (W5/W7) | 0 |
+| 7 | memory drift at the PR: atoms `release.py drift` names at the `wt-rc` head | 13 atoms (W9) | 0 |
+| 8 | hand-typed fix-line labels outside the producer | 155 in 52 files (W2) | 0 |
+| 9 | REBUILD-due fixes landed as a patch | not in the grill record (§6 Q2) | 0 |
 
-(Explicitly list what this release does NOT cover.)
+## 3. Requirements
 
-## 4. Requirements
+Wave ranking, by the pick: (1) law, skills and dev loop — FR3, FR4, FR5, FR7, FR8, FR11; (2) shared foundation — FR1's producer, FR2's ledger fields, FR6's lint rule; (3) features and bugs — FR1's call-site sweep with R1, FR2's append and R2, FR9, FR10, FR12; (4) promote-facing — FR13 and the closure readout.
 
-(List the scope clusters / acceptance criteria.)
+### FR1 — one fix-line label producer (W2, ADR 0266)
 
-## 5. Constraints and risks
+Operator: "A: one act() producer (Recommended)".
 
-(Upstream blockers, sequencing constraints, risk table.)
+- AC1.1 `act(kind, text)` in `dadaia_workspace/public/skills/dd-bug-resolution/scripts/_platform.py` returns `Agent action: <text>` and `Operator action: <text>`; the package reaches it through `core/cli_line.py` and `core/platform.py`. Test: unit.
+- AC1.2 No file under `dadaia_workspace/` but `_platform.py` holds either label literal: one contract test greps the tree and finds hits only in the producer (metric 8). Test: unit.
+- AC1.3 The per-site census tests collapse into the AC1.2 test; every fix line still clears its refusal in the existing refusal-clears tests, unchanged. Test: integration.
+- AC1.4 R1: the red-verify and missing-verify refusal fix lines of `_worktree_end.py`, the SeveralWork fix line (`_worktree_git.py`, the `onboarding.py` first-pass row) and the ref gate's malformed-line fix are rebuilt onto `act()` with one path each; the contract tests their window fixes hardened stay green, unloosened. Test: unit.
 
-## 6. Open questions
+### FR2 — the bug surface derived from fix files (W1, ADR 0267)
 
-(Questions the operator must decide before approval, or `none`.)
+Operator: "A: derive the surface (Recommended)".
+
+- AC2.1 `bug-record-v1` drops the typed `surface` field and `bugs.py append` drops `--surface`; records written before keep it, and `bugs.py check` accepts them as legacy. Test: unit.
+- AC2.2 `bugs.py resolve` records in the record the files its `fix_sha` touched. Test: unit (`tests/public/skills/dd_bug_resolution/scripts/test_bugs.py`, the ADR's `measured_by`).
+- AC2.3 `bugs.py append` prints every earlier bug whose recorded fix files intersect the new bug's files or component, each line naming the REBUILD due (`REBUILD due: 3rd bug on <file>`). Test: unit.
+- AC2.4 The law that reads `surface` reads the fix files instead: `dd-bug-registration` §3 step 2, `dd-bug-resolution` `LINEAGE.md` §The filter, `dd-release-definition` §2. Test: none, law text; the reviewer greps for `surface` leftovers.
+- AC2.5 R2: one reader of a record's fix commit serves both `resolve`'s file list and the reachability check `_unreached`; the contract tests of the three window fixes stay green. Test: unit.
+
+### FR3 — the implementer self-check (W3)
+
+Operator: "A: self-check, no gate change (Recommended)"; the operator asked that the gate not grow.
+
+- AC3.1 `dd-release-implementation` states the self-check once: `python scripts/ci.py job` (median 1m52, unchanged), the touched test directories, and an own-diff grep (0.014 s) for hand-typed labels, the platform literals of FR6 and leftovers of the swept pattern. The repo `verify:` line and the merge checks do not change. Test: none, law text; the reviewer confirms `git diff` of the `verify:` line is empty.
+- AC3.2 The implementer personas point to that step and do not restate it. Test: none, law text.
+- AC3.3 `dd-bug-registration` gains two steps: `git blame` the failing lines to propose `caused_by`; search the ledger for correlates. Test: none, law text.
+
+### FR4 — two gate-law holes closed (W4)
+
+Operator: "A: close both law holes (Recommended)".
+
+- AC4.1 The root map line on gate cost (`dadaia_workspace/public/data/AGENTS.md:27`) measures a `verify:` change against the `verify:` it replaces, never against itself. Test: none, law text.
+- AC4.2 `dd-grill-me` `SKILL.md:32`: Recommended never marks a heavier gate. Test: none, law text.
+- AC4.3 The dev pin test of the repo `verify:` line stays, green and unchanged. Test: unit (existing).
+
+### FR5 — closure scope (W5/W7)
+
+Operator: "A: law line + next rc opens at once (Recommended)".
+
+- AC5.1 After `release.py phase CLOSURE`, only block-list bugs (`specs/bugs/AGENTS.md` §2) land on the `wt-rc`; any other bug, REBUILD or operator demand becomes a job of the next rc. Test: none, law text (`RC-FLOW.md` step 4, `specs/releases/AGENTS.md`); metric 6 reads it.
+- AC5.2 The closure is the reconcile alone, and the next rc is born at once. Test: none, law text; metric 4 reads it.
+- AC5.3 The agentic scorecard is the final rc's last implementation job before the promote, never after the closure summary. Test: none, law text.
+
+### FR6 — Windows by static rules (W6)
+
+Operator: "A: static rules, no new step (Recommended)"; the grill's honest estimate is 20-25 % fewer Windows/macOS reds.
+
+- AC6.1 ruff `PLW1514` runs on `dadaia_workspace/` in the existing lint step; no CI step or job is added. Test: the lint step itself (`python scripts/ci.py lint` exits 0 with the rule on).
+- AC6.2 The 128 product `read_text`/`write_text` calls with no encoding are fixed. Test: AC6.1's lint rule.
+- AC6.3 `.gitattributes` sets `eol=lf` on `tests/` and `scripts/`. Test: none, one config line; the evidence is `git check-attr eol` on one file of each tree.
+
+### FR7 — a `docs(law)` commit row (W8)
+
+Operator: "A: a docs(law) row (Recommended)".
+
+- AC7.1 `dd-gitflow-default` §3a gains a `docs(law)` row: pure law or doc text, committed in the job tree that found it, one review, no ledger record; text a program prints stays Arm B. Test: none, law text.
+
+### FR8 — the memory pass goes last (W9)
+
+Operator: "A: memory pass goes last (Recommended)".
+
+- AC8.1 `RC-FLOW.md` step 4 runs `release.py drift` and the memory pass as the last reconcile step before the `wt-rc` merge and PR, after `measured_by` repairs, the measurement, the sweep and GC; the 2026-10-08 ruling stands (staleness judged by existence, `91e1d1991`). Test: none, law text; metric 7 reads it.
+
+### FR9 — the 9-metric readout (measurement)
+
+Operator: "A: extend verdict.py stats (Recommended)".
+
+- AC9.1 `verdict.py stats <M.m.p>-rc<N>` is REBUILT as the one reader that prints the §2 table, each metric with its value and target. Test: unit, each metric over fixture ledgers and handoffs.
+- AC9.2 A metric whose source needs `gh` prints `unread` when `gh` cannot answer, and the verb exits 0. Test: unit.
+- AC9.3 Every rc closure summary carries the table. Test: none, the closure procedure (`RC-FLOW.md` step 4).
+
+### FR10 — SeveralWork fix-line follow-ups (`several-work-fix-line-follow-ups`)
+
+Operator (Q10): "Weak points + 3 overlaps (Recommended)".
+
+- AC10.1 `tests/public/skills/dd_gitflow_default/scripts/test__worktree_end.py:213` takes `[fix] = fixes(two)`, so the one-fix check of `run_fix` holds. Test: unit.
+- AC10.2 Root map §3's `Agent action: <one act>` wording agrees with the ruled SeveralWork form. Test: none, law text.
+
+### FR11 — law and doc text loose ends (`law-and-docs-text-loose-ends`)
+
+Operator (Q10): "Weak points + 3 overlaps (Recommended)".
+
+- AC11.1 Items (1), (2), (4), (5) and the text parts of (3) of the entry land under FR7's row: the `bugs.py update` commit row, the `scripts/ci.py` docstring, `RELEASE-EVENTS.md:25`, `scripts/CONSUMER_VALIDATION_RECIPE.md` R-04, `docs/cli.md:10`, the scratch-only probe recipe in `dd-code-review`, the `pkill -f`/`pgrep -f` line. Test: none, law and doc text.
+- AC11.2 `_release_tree.py` calls `closure_summary` once, and the duplicated contract helpers have one home. Test: unit (existing tests green, unchanged).
+
+### FR12 — no repo `.venv` in the hook runner search (CWE-427)
+
+Operator (Q10): "Weak points + 3 overlaps (Recommended)". The fix shape is an agent default, unruled (§6 Q3).
+
+- AC12.1 `public/scripts/reference-transaction.sh:31` and `public/scripts/pre-push-ci-gate.sh:26` resolve the runner only from a `.dadaia/.venv` found walking up from the repo; the repo `.venv` fallback is deleted. Test: integration, a planted `<repo>/.venv` runner is never run.
+
+### FR13 — the 13-atom memory reconcile (W9)
+
+Operator (Q8): "rc-17 reconciles the 13 atoms".
+
+- AC13.1 The rc-17 memory pass reviews or changes the 13 atoms of the grill: `agent-orchestration`, `agentic-entities`, `public-asset-distribution`, `spec-context-project`, `context-management`, `specs-migration`, `workspace-doctor`, `audits-canon`, `backlog-ledger`, `bug-ledger`, `release-lifecycle`, `sdd-gate-v3`, `worktrees`, plus every atom drift names by then (`harness-codex` today, §6 Q5); `release.py drift` at the PR head names none. Test: none, the closure check (`release.py check` requires the memory entry).
+
+## 4. Exits at closure
+
+- `several-work-fix-line-follow-ups` and `law-and-docs-text-loose-ends` exit `delivered` with `--release 0.5.0`.
+
+## 5. Not in rc-17
+
+- rc-18, the verification rc (Q11): `worktree-scripts-loose-ends`, `skill-kernel-loose-ends`, `package-loose-ends`, `push-gate-remedy-follow-ups`, `test-quality-loose-ends`, and group B: `spec-context-branch-field-deleted`, `worktree-layout-per-context`, `context-dead-snapshots-open-worktrees`, `context-show-derives-worktrees`, `launch-operator-acts`.
+- Every other active backlog entry waits.
+
+## 6. Constraints and risks
+
+### Gate law for rc-17
+
+- The job gate is `python scripts/ci.py job` (median 1m52). An implementer's definition of done is that, plus the touched test directories, plus the own-diff self-check of FR3. No preflight; no full CI line; CI on push is the net.
+
+### Replaces
+
+- The typed `surface` field of `bug-record-v1`, `bugs.py append --surface` with its tracked-directory check (`_bugs_write.py:54-59`), and the surface-keyed candidate lookup (`_bugs_write.candidates`); legacy records keep the field as history.
+- `LINEAGE.md` §The filter's "Match `surface` exactly".
+- The per-site label literals `Agent action:` and `Operator action:`, 155 in 52 files.
+- The per-site census tests (`tests/fixtures/fix_census.py` and its consumers) and the `_OPERATOR_ACTIONS` exception table, replaced by one grep test.
+- ADR 0159's pinned builder pair, for labels (amended by ADR 0266).
+- The R1 per-site act branches: the `if root` rootless sync spelling, the per-kind and `known` act choices in `_worktree_end.py`, and the onboarding row's own `SeveralWorkBranches` catch.
+- R2's second reachability path in `_unreached`, which reads the workspace registry from a skill script.
+- Free closure scope: any non-block work on the `wt-rc` after CLOSURE.
+- The current memory-pass placement: `RC-FLOW.md` step 4 runs it right after `release.py phase CLOSURE`.
+- The scorecard run after the closure summary.
+- The self-referential cap text: root map §1's gate-cost line read against the `verify:` being changed.
+- `verdict.py stats`'s four counters (`sequences`, `verdicts`, `rejected`, `first_pass_rejected`), replaced by the 9-metric table.
+- The repo `.venv` fallback of the two hook runners.
+
+### Risks
+
+- FR1 edits about 155 call sites in one REBUILD job (ADR 0266 consequences); the AC1.2 grep is the leftover check.
+- FR2 leaves two record shapes in the ledger; the reader treats the typed field as legacy (ADR 0267 consequences).
+- FR6 removes about 20-25 % of the Windows/macOS reds by the grill's estimate; metric 5's target may not hold on static rules alone.
+
+## 7. Open questions
+
+- Q1. `ref-gate-hardening-follow-ups` is in neither the rc-17 scope nor the rc-18 list (Q11's "Remaining 5 follow-ups" names five others), and the window's R3 REBUILD lands on that unit. Which rc takes it?
+- Q2. The grill record has no rc-16 total closure hours (metric 4) and no REBUILD-due-patched count (metric 9); its fix-induced count (metric 1) is the 0.5.0 total, not rc-16's alone. Are these baselines measured before rc-18, or do they open at rc-17's own readout?
+- Q3. FR12's fix shape, deleting the repo `.venv` fallback from both hooks, is an agent default, unruled.
+- Q4. `23d40bc8f` raised the Windows/macOS contract job timeout from 20 to 30 min, which changes a merge check; the record names no operator ruling for it.
+- Q5. `release.py drift` at `2aca959f9` names 14 atoms: the grill's 13 plus `harness-codex`, which `152dd7b66` corrected with no memory entry.
+- Q6. First-pass readings disagree: the grill says 71/110 trees passed first; the rc-16 summary reads 67/121 first-pass rejected. FR9's REBUILD fixes one definition; which one is the baseline?
