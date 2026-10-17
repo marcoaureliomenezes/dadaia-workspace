@@ -174,8 +174,9 @@ def kimi_hooks_block(home: Path) -> str:
         if matcher is not None:
             lines.append(f'matcher = "{matcher}"')
         wrapper = f"{(home / 'hooks').as_posix()}/{wrapper_name(record, lane)}"
-        # Kimi runs `command` as a shell string; a head with no spelling stays the raw path.
-        lines.append(f"command = {toml_escape(platform.head(wrapper))}")
+        # Kimi runs `command` as a shell string (`cmd.exe` on Windows, which keeps a quoted head);
+        # a word with no spelling stays the raw path.
+        lines.append(f"command = {toml_escape(platform.quote(wrapper))}")
         lines.append(f"timeout = {HOOK_DIALECTS[record.hooks].timeout(lane)}")
         rules.append("\n".join(lines))
     return f"{KIMI_BLOCK_BEGIN}\n" + "\n\n".join(rules) + f"\n{KIMI_BLOCK_END}\n"

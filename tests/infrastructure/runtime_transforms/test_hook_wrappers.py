@@ -30,7 +30,7 @@ from dadaia_workspace.infrastructure.runtime_transforms.hook_wrappers import (
     hook_documents,
     hook_wrapper_contents,
 )
-from tests.fixtures.harness_env import git_bash, suite_env
+from tests.fixtures.harness_env import fire_kimi, git_bash, suite_env
 from tests.fixtures.stores import fake_venv, own_venv_python
 from tests.helpers.oslib import read_text, run, write_text
 
@@ -68,10 +68,12 @@ def _run(ws: Path, harness: str, case: str, **env_extra: str) -> subprocess.Comp
         if repos
         else payload
     )
+    if harness == "kimi-code":  # the registered command, run by the host's own shell
+        return fire_kimi(ws.with_name(f"{ws.name}-kimi"), "pre-gate", ws, payload, overrides=env_extra)  # fmt: skip
     if harness == "claude":
         argv = [str(own_venv_python(ws)), "-B", "-m", "dadaia_workspace.hooks.pre_gate"]
     else:
-        name = "dadaia-kimi-pre-gate.sh" if harness == "kimi-code" else f"{harness}-pre-gate"
+        name = f"{harness}-pre-gate"
         body = hook_wrapper_contents(HARNESS_RECORDS[harness])[name]
         write_text(ws / ".dadaia" / "hooks" / name, body)
         argv = [git_bash(), str(ws / ".dadaia" / "hooks" / name)]
@@ -157,6 +159,11 @@ def test_ac1_2_every_ctx_inject_wrapper_answers_on_stdout(ws: Path, harness: str
     )
     vendor = {"cursor": "additional_context", "copilot": "additionalContext"}.get(harness)
     env = suite_env(os.environ, Path.home(), overrides={"DADAIA_CONTEXT": "alpha"})
+    if harness == "kimi-code":  # the registered commands, run by the host's own shell
+        for lane in ("ctx-inject", "post-compact"):
+            out = fire_kimi(ws.with_name(f"{ws.name}-kimi"), lane, ws, "{}", overrides={"DADAIA_CONTEXT": "alpha"}).stdout  # fmt: skip
+            assert "[alpha]" in out, (lane, out)
+        return
     wrappers = hook_wrapper_contents(HARNESS_RECORDS[harness])
     docs = json.dumps(hook_documents(HARNESS_RECORDS[harness]))  # registered, not only rendered
     names = sorted(n for n, body in wrappers.items() if "hooks.ctx_inject" in body and n in docs)

@@ -145,13 +145,7 @@ def _render_codex_agent_toml(
       ``install_helpers.resolve_codex_agent_model`` (the one effort authority)
     - ``developer_instructions`` — triple-quoted multiline basic string
 
-    The function avoids external TOML serialiser dependencies; it builds the
-    content manually and is safe for all printable Unicode in instructions text.
-
-    In a TOML triple-quoted basic string, backslashes are escape characters.
-    All literal backslashes in the body must be doubled (``\\``), and any
-    embedded triple-double-quote sequences must be escaped character-by-character
-    to prevent premature string termination.
+    Every string goes through :func:`toml_escape`, the one TOML encoder.
 
     *developer_instructions* is compacted before serialization:
     :func:`_compact_codex_developer_instructions` strips inline shared-law /
@@ -161,10 +155,6 @@ def _render_codex_agent_toml(
     write/refusal boundaries pass through unchanged.
     """
     developer_instructions = _compact_codex_developer_instructions(developer_instructions)
-    # Step 1: escape backslashes first (must precede triple-quote escaping).
-    escaped = developer_instructions.replace("\\", "\\\\")
-    # Step 2: escape any embedded triple-double-quote sequences.
-    escaped = escaped.replace('"""', '\\"\\"\\"')
     lines: list[str] = [
         f"name = {toml_escape(name)}\n",
     ]
@@ -175,7 +165,7 @@ def _render_codex_agent_toml(
             f"model = {toml_escape(model)}\n",
             'sandbox_mode = "workspace-write"\n',
             f"model_reasoning_effort = {toml_escape(reasoning_effort)}\n",
-            f'developer_instructions = """\n{escaped}\n"""\n',
+            f"developer_instructions = {toml_escape(developer_instructions + '\n')}\n",
         ]
     )
     return "".join(lines)

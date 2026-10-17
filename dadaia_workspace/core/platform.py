@@ -34,8 +34,9 @@ class Capabilities(NamedTuple):
 PLATFORM: Capabilities = Capabilities.detect()
 
 
-def _caps() -> _owner.Caps:
-    return _owner.Caps(PLATFORM.venv_scripts_dir, PLATFORM.venv_exe_suffix, PLATFORM.windows)
+def _caps(caps: Capabilities | None = None) -> _owner.Caps:
+    caps = caps or PLATFORM
+    return _owner.Caps(caps.venv_scripts_dir, caps.venv_exe_suffix, caps.windows)
 
 
 def venv_dir[P: PurePath](root: P) -> P:
@@ -83,9 +84,9 @@ def git_inline(repo: Path | str, *argv: str) -> str:
     return _owner.git_inline(repo, *argv, caps=_caps())
 
 
-def python_in[P: PurePath](venv: P) -> P:
-    """Where *venv* keeps its interpreter on the current ``PLATFORM``."""
-    return _owner.python_in(venv, _caps())
+def python_in[P: PurePath](venv: P, caps: Capabilities | None = None) -> P:
+    """Where *venv* keeps its interpreter on *caps* (default: the current ``PLATFORM``)."""
+    return _owner.python_in(venv, _caps(caps))
 
 
 def is_fully_qualified(candidate: str) -> bool:

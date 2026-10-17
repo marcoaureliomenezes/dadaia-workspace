@@ -23,10 +23,19 @@ from dadaia_workspace.infrastructure.runtime_config import (
 from dadaia_workspace.infrastructure.runtime_transforms.hook_wrappers import (
     hook_wrapper_contents,
 )
+from tests.fixtures.harness_env import fire_kimi
 from tests.helpers.oslib import run, write_text
 
 _HOME = Path("/tmp/kimi-home-test")
-_SHIMS = hook_wrapper_contents(HARNESS_RECORDS["kimi-code"])
+
+
+@pytest.fixture
+def posix_host(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The sh shims and POSIX command spelling, whatever the host; the Windows rows patch their own caps."""
+    monkeypatch.setattr("dadaia_workspace.core.platform.PLATFORM", Capabilities.detect("linux"))
+
+
+_SHIMS = hook_wrapper_contents(HARNESS_RECORDS["kimi-code"], Capabilities.detect("linux"))
 
 
 @pytest.mark.parametrize(
@@ -37,7 +46,7 @@ def test_kimi_code_home(env: dict[str, str], home: Path) -> None:
     assert kimi_code_home(env) == home
 
 
-def test_kimi_hooks_block_parses_as_toml_and_pins_rules() -> None:
+def test_kimi_hooks_block_parses_as_toml_and_pins_rules(posix_host: None) -> None:
     block = kimi_hooks_block(_HOME)
     assert block.startswith(KIMI_BLOCK_BEGIN + "\n")
     assert block.endswith(KIMI_BLOCK_END + "\n")
@@ -73,9 +82,9 @@ def test_kimi_hooks_block_parses_as_toml_and_pins_rules() -> None:
             "'/tmp/o'\"'\"'brien/hooks/dadaia-kimi-pre-gate.sh'",
         ),
         ("linux", "/tmp/kimi-home-test", "/tmp/kimi-home-test/hooks/dadaia-kimi-pre-gate.sh"),
-        ("win32", "/tmp/kimi home", "/tmp/kimi home/hooks/dadaia-kimi-pre-gate.sh"),
-        ("win32", "/tmp/o'brien", "/tmp/o'brien/hooks/dadaia-kimi-pre-gate.sh"),
-        ("win32", "C:/kimi", "C:/kimi/hooks/dadaia-kimi-pre-gate.sh"),
+        ("win32", "/tmp/kimi home", '"/tmp/kimi home/hooks/dadaia-kimi-pre-gate.cmd"'),
+        ("win32", "/tmp/o'brien", '"/tmp/o\'brien/hooks/dadaia-kimi-pre-gate.cmd"'),
+        ("win32", "C:/kimi", "C:/kimi/hooks/dadaia-kimi-pre-gate.cmd"),
     ],
 )
 def test_kimi_hook_command_is_spelled_for_the_host_shell(
@@ -132,10 +141,9 @@ def test_kimi_hook_shims_are_valid_sh_syntax(body: str, tmp_path: Path) -> None:
     run(["sh", "-n", str(shim)], check=True)
 
 
-@pytest.mark.skipif(shutil.which("sh") is None, reason="POSIX sh unavailable")
-def test_pre_gate_shim_fails_open_outside_dadaia_workspaces(tmp_path: Path) -> None:
-    shim = tmp_path / "pre-gate.sh"
-    write_text(shim, _SHIMS["dadaia-kimi-pre-gate.sh"])
-    proc = run(["sh", str(shim)], input='{"tool_name": "Write"}', cwd=tmp_path)
+def test_pre_gate_command_fails_open_outside_dadaia_workspaces(tmp_path: Path) -> None:
+    """The registered command, run by the host's shell as Kimi runs it, in a directory no
+    `.dadaia/states/spec_contexts.json` sentinel sits above: silent, exit 0."""
+    proc = fire_kimi(tmp_path / "k", "pre-gate", tmp_path, '{"tool_name": "Write"}')
     assert proc.returncode == 0
     assert proc.stderr == ""

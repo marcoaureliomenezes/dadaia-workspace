@@ -72,8 +72,9 @@ _TOML_CONTROL = {
 
 
 def toml_escape(value: object) -> str:
-    """*value* as a TOML string: multi-line basic when it holds a newline, else basic."""
+    """*value* as a TOML string: multi-line basic when it holds a newline, else basic. The
+    multi-line form opens on its own line: TOML drops a newline right after the opening quotes."""
     s = str(value).replace("\\", "\\\\").translate(_TOML_CONTROL)
     if "\n" in s:
-        return '"""' + s.replace('"""', '\\"\\"\\"') + '"""'
+        return '"""\n' + s.replace('"""', '\\"\\"\\"') + '"""'
     return '"' + s.replace('"', '\\"') + '"'

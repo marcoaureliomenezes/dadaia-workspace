@@ -73,6 +73,7 @@ __all__ = [
     "claude_hook_env",
     "git_bash",
     "codex_hook_env",
+    "fire_kimi",
     "kimi_hook_env",
     "retire_tree",
     "run_bash",
@@ -459,6 +460,44 @@ def run_python(*args: str, **kwargs: Any) -> subprocess.CompletedProcess[str]:
 def run_bash(command: str, **kwargs: Any) -> subprocess.CompletedProcess[str]:
     """Run *command* under :func:`git_bash` ``-c``."""
     return oslib.run([git_bash(), "-c", command], **kwargs)
+
+
+def fire_kimi(
+    home: Path,
+    lane: str,
+    cwd: Path,
+    payload: str = "",
+    *,
+    overrides: Mapping[str, str] | None = None,
+    cmd_switches: str = "",
+) -> subprocess.CompletedProcess[str]:
+    """Install Kimi's shims for this host under *home*, then run *lane*'s registered command as
+    Kimi does: ``sh -c`` on POSIX, ``cmd /d /s /c "<command>"`` on Windows (*cmd_switches* go
+    before ``/d``). The wrappers and the command are rendered with the host's own capabilities."""
+    import tomllib
+
+    from dadaia_workspace.core.harness_registry import HARNESS_RECORDS
+    from dadaia_workspace.infrastructure.runtime_config import kimi_hooks_block
+    from dadaia_workspace.infrastructure.runtime_transforms.hook_wrappers import (
+        HOOK_DIALECTS,
+        hook_wrapper_contents,
+    )
+
+    record = HARNESS_RECORDS["kimi-code"]
+    (home / "hooks").mkdir(parents=True, exist_ok=True)
+    for name, body in hook_wrapper_contents(record).items():
+        (home / "hooks" / name).write_bytes(body.encode())
+        oslib.make_executable(home / "hooks" / name)
+    events = HOOK_DIALECTS[record.hooks].files[0].events
+    rules = tomllib.loads(kimi_hooks_block(home))["hooks"]
+    command = next(
+        r["command"] for (_, name, _), r in zip(events, rules, strict=True) if name == lane
+    )
+    env = suite_env(os.environ, Path.home(), overrides=overrides)
+    if platform.PLATFORM.windows:
+        line = f'cmd {cmd_switches} /d /s /c "{command}"'
+        return oslib.run_cmdline(line, input=payload.encode(), cwd=cwd, env=env, timeout=60)  # type: ignore[arg-type]
+    return oslib.run(["sh", "-c", command], input=payload, cwd=cwd, env=env, timeout=60)
 
 
 def retire_tree(tree: Path, into: Path) -> Path:

@@ -25,6 +25,9 @@ from dadaia_workspace.infrastructure.public_assets_common import toml_escape
         "\x7f",
         "a\x01\nb\x7f",
         "a\rb\nc",
+        "\nlead",
+        "\n\nlead",
+        "\n",
     ],
 )
 def test_toml_escape_round_trips(value: str) -> None:
@@ -33,7 +36,7 @@ def test_toml_escape_round_trips(value: str) -> None:
 
 @pytest.mark.parametrize(
     ("value", "text"),
-    [("plain", '"plain"'), ('a"b', '"a\\"b"'), ("a\nb", '"""a\nb"""')],
+    [("plain", '"plain"'), ('a"b', '"a\\"b"'), ("a\nb", '"""\na\nb"""'), ("x\n", '"""\nx\n"""')],
 )
-def test_toml_escape_keeps_the_shapes_codex_projects(value: str, text: str) -> None:
+def test_toml_escape_multi_line_opens_on_its_own_line(value: str, text: str) -> None:
     assert toml_escape(value) == text

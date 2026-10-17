@@ -11,6 +11,7 @@ A projected Codex persona citing a non-existent ``dd-`` skill must produce the D
 
 from __future__ import annotations
 
+import tomllib
 from pathlib import Path
 
 from dadaia_workspace.core.model_registry import ResolvedAgentModel
@@ -19,6 +20,7 @@ from dadaia_workspace.infrastructure.codex_doctor import dcx7_codex_skill_refs
 from dadaia_workspace.infrastructure.runtime_config import codex_config
 from dadaia_workspace.infrastructure.runtime_transforms.codex_assets import (
     _CODEX_SKILL_REF_PREFIXES,
+    _render_codex_agent_toml,
 )
 from tests.helpers.oslib import write_text
 
@@ -135,3 +137,9 @@ def test_a_persona_that_is_not_utf8_is_skipped_by_the_agents_config_blocks(tmp_p
     blocks = codex_assets._render_agents_config_file_blocks(tmp_path)
 
     assert blocks == '[agents."good"]\nconfig_file = "agents/good.toml"\n'
+
+
+def test_codex_developer_instructions_round_trip_through_the_one_toml_encoder() -> None:
+    body = 'tab\there \x01 back\\slash """ quote\n\nlast line'
+    text = _render_codex_agent_toml("n", "m", body, reasoning_effort="high")
+    assert tomllib.loads(text)["developer_instructions"] == body + "\n"
