@@ -213,7 +213,7 @@ def _gate(tree: Path, work: str) -> None:
                      f" wt-hotfix lane when the work branch's {key} fails too, then `{sync}`"}  # fmt: skip
         raise Refusal(f"{key} exited {done.returncode}",
                       f"Agent action: make `{inline(*argv)}` exit 0 in {tree} and "
-                      + act.get(kind_of(name or ""), "commit the fix in this worktree"))  # fmt: skip
+                      + act.get(kind_of(name or "") or "", "commit the fix in this worktree"))  # fmt: skip
 
 
 def _is_test_path(path: str, globs: list[str]) -> bool:
