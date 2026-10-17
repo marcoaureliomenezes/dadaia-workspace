@@ -163,7 +163,11 @@ def test_the_marker_passes_every_update_without_a_runner_call(repo: _Repo) -> No
 def test_unresolvable_runner_warns_and_exits_zero(repo: _Repo) -> None:
     repo.stub.unlink()
     git_dir = str(Path(shutil.which("git") or "git").parent)
-    env = suite_env(os.environ, repo.root, overrides={"PATH": f"{git_dir}{os.pathsep}{os.defpath}"})
+    sh_dir = (
+        str(Path(git_bash()).parents[1] / "usr" / "bin") if PLATFORM.windows else ""
+    )  # git spawns its hook through `sh`
+    path = os.pathsep.join(filter(None, [git_dir, sh_dir, os.defpath]))
+    env = suite_env(os.environ, repo.root, overrides={"PATH": path})
     done = run(
         ["git", "commit", "-q", "--allow-empty", "-m", "on main"],
         cwd=repo.root,

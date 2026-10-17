@@ -26,8 +26,9 @@ from tests.fixtures.harness_env import git_bash, suite_env
 from tests.fixtures.stores import fake_venv
 from tests.helpers.oslib import detect, make_executable, run, write_text
 
-#: A directory name the shell must not take apart; a double quote cannot name one on Windows.
-_ODD = "w's" if detect().windows else 'w"s'
+#: A directory name the shell must not take apart. Windows has no double quote in a name, and Git
+#: Bash's argv parser drops a `'` from a space-free argument, so there a space stands in.
+_ODD = "w s" if detect().windows else 'w"s'
 _SH = git_bash() if detect().windows else "sh"
 _WRITE = json.dumps({"tool_name": "Write", "tool_input": {"file_path": "x.md"}})
 
@@ -114,7 +115,8 @@ def test_the_claude_hook_survives_a_moved_workspace(tmp_path: Path) -> None:
     moved = tmp_path / "after"
     shutil.move(str(tmp_path / "before"), moved)
     payload_dir = moved / "stray.md"
-    done = run([_SH, "-c", _claude_pre_gate()], input=json.dumps({"tool_name": "Write", "tool_input": {"file_path": str(payload_dir)},
+    # the trailing space makes Windows quote the argument whole; unquoted, Git Bash loses an inner `"`
+    done = run([_SH, "-c", _claude_pre_gate() + " "], input=json.dumps({"tool_name": "Write", "tool_input": {"file_path": str(payload_dir)},
                           "cwd": str(moved)}), cwd=moved, timeout=60, env=suite_env(
             os.environ, Path.home(), overrides={"CLAUDE_PROJECT_DIR": str(moved)}
         ))  # fmt: skip

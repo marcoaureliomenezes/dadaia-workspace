@@ -81,9 +81,12 @@ def test_an_update_of_a_wt_branch_loads_no_kernel(tmp_path: Path) -> None:
     """The common firing, a commit in a wt tree, imports neither the kernel nor pathlib."""
     code = (
         "import sys\n"
+        "banned = {'dadaia_workspace.core.platform', 'pathlib', 'types'}\n"
+        "for name in banned:\n"
+        "    sys.modules.pop(name, None)\n"  # a coverage .pth preloads some; only the hook's imports count
         "from dadaia_workspace.hooks import ref_transaction\n"
         f"assert ref_transaction.main({_UPDATE!r}) == 0\n"
-        "assert not {'dadaia_workspace.core.platform', 'pathlib', 'types'} & set(sys.modules)\n"
+        "assert not banned & set(sys.modules)\n"
     )
     done = run([sys.executable, "-B", "-c", code], env=suite_env(os.environ, tmp_path), timeout=60)
     assert done.returncode == 0, done.stderr
