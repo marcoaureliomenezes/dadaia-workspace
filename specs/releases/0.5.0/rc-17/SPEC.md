@@ -231,6 +231,7 @@ The bug, CRITICAL, a Stall: `dadaia_workspace/hooks/ref_transaction.py:67-69` re
 - AC14.4 The fix line of every refusal the ref gate still prints is runnable in the state it refuses. Test: integration, each refusal's fix line run in its refused fixture.
 - AC14.5 R3: one decider judges a `wt/*` ref line; the old-sha re-read branch of `a1fc328ce` and any creation decision left in the shell shim go; the contract tests of the ref gate's window fixes stay green, unloosened. Test: unit.
 - AC14.6 Each item of `ref-gate-hardening-follow-ups` that survives at the rc-17 head (the PLAN's as-is review names which, with `path:line`) lands: a raise inside a decided BLOCK stays a BLOCK, the shim header states the law's `wt/*` rule, the forced-move LOWs. Test: unit for a behaviour; none for comment text or an item shown gone.
+- AC14.7 Operator ruling 2026-10-17, "Refuse recreate (Recommended)": recreating a work branch (a zero-old line on `refs/heads/<work>`) passes only at a sha its `refs/remotes/origin/<work>` contains, the same rule as a move; the never-reproduced SHA-length patterns leave `ref-gate-hardening-follow-ups` for a new backlog entry at closure intake. Test: integration for the hook, unit for the decision.
 
 ## 4. Exits at closure
 
