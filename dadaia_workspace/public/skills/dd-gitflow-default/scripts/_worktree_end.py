@@ -207,9 +207,13 @@ def _gate(tree: Path, work: str) -> None:
                                        " (no shell: no VAR=value prefix, no sh -c)")) from error  # fmt: skip
     if done.returncode:
         name = (locate(tree.relative_to(root).as_posix()) or ("", ""))[1]
-        into = "a task of this job" if kind_of(name or "") == "main" else "this worktree"
+        sync = inline(*cli_words(root, "worktree", "sync", str(tree)))
+        act = {"main": "commit the fix in a task of this job",
+               "rc": "commit the fix in this worktree when a reconcile commit is at fault, or through a"
+                     f" wt-hotfix lane when the work branch's {key} fails too, then `{sync}`"}  # fmt: skip
         raise Refusal(f"{key} exited {done.returncode}",
-                      f"Agent action: make `{inline(*argv)}` exit 0 in {tree} and commit the fix in {into}")  # fmt: skip
+                      f"Agent action: make `{inline(*argv)}` exit 0 in {tree} and "
+                      + act.get(kind_of(name or ""), "commit the fix in this worktree"))  # fmt: skip
 
 
 def _is_test_path(path: str, globs: list[str]) -> bool:
