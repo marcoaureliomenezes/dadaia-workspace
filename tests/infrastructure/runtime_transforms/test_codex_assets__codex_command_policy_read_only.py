@@ -1,6 +1,5 @@
-"""The rendered Codex ``.rules`` auto-allows only argv-closed readers (``ls cat``);
-interpreter-capable sed/rg (``1e``, ``w``, ``-i``, ``--pre``) prompt; registry.json says so.
-Size: SMALL; the real ``codex execpolicy`` is also asked when the binary is on PATH.
+"""The rendered Codex ``.rules`` auto-allows only the closed readers ``ls`` and
+``cat``. Native ``codex execpolicy`` checks cover the rendered policy when available.
 """
 
 from __future__ import annotations
@@ -95,6 +94,31 @@ def test_public_install_inherits_host_policy_while_force_prompts(
 
     assert decision() is None
     assert decision("--force") == "prompt"
+
+
+@pytest.mark.skipif(shutil.which("codex") is None, reason="codex CLI not on PATH")
+def test_git_push_leaves_the_decision_to_workspace_gitflow(tmp_path: Path) -> None:
+    rules = tmp_path / "dadaia-command-policy.rules"
+    write_text(rules, _render_codex_command_policy_rules())
+    out = run(
+        [
+            "codex",
+            "execpolicy",
+            "check",
+            "--rules",
+            str(rules),
+            "--",
+            "git",
+            "push",
+            "origin",
+            "feature/0.5.0",
+        ],
+        check=True,
+        timeout=60,
+    ).stdout
+    decision = json.loads(out).get("decision")
+    assert decision != "allow"
+    assert decision is None
 
 
 def test_b4_the_registry_mandate_describes_the_rendered_file() -> None:
