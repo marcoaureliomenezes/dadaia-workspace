@@ -107,8 +107,10 @@ GIT_QUIET_INCLUDE = f'[include]\n\tpath = "{_GIT_QUIET.as_posix()}"\n'
 # Every git process sees one GLOBAL config carrying a committer identity, never the
 # developer's (CI runners have none): global scope, so a repo's own `user.*` and a
 # test's own GIT_CONFIG_GLOBAL still win — a test about a missing identity sets its own.
+# `core.autocrlf=false` keeps a host's (Windows runner's) system autocrlf off the LF test repos.
 _GIT_GLOBAL = _publish(
-    "dadaia-tests", f"{GIT_QUIET_INCLUDE}[user]\n\tname = T\n\temail = t@example.invalid\n"
+    "dadaia-tests",
+    f"{GIT_QUIET_INCLUDE}[user]\n\tname = T\n\temail = t@example.invalid\n[core]\n\tautocrlf = false\n",
 )
 #: What the suite env adds to the parent's: the checkout first on every child's import path,
 #: the fence, and the quiet git config.
