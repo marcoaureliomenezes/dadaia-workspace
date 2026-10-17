@@ -8,7 +8,7 @@ import shutil
 import uuid
 from pathlib import Path
 
-from _platform import replace, write_text
+from _platform import is_link, replace, write_text
 
 __all__ = ["SymlinkRefusedError", "atomic_write", "refuse_symlink"]
 
@@ -24,7 +24,7 @@ class SymlinkRefusedError(OSError):
 
 def refuse_symlink(path: Path) -> None:
     """The writer's one symlink rule, for a caller that swaps content in by another act."""
-    if path.is_symlink():
+    if is_link(path):
         raise SymlinkRefusedError(path)
 
 
