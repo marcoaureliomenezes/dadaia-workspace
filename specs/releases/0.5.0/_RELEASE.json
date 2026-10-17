@@ -2035,6 +2035,45 @@
         "release-lifecycle",
         "pypi-distribution"
       ]
+    },
+    {
+      "ts": "2026-10-17T04:29:22Z",
+      "agent": "release.py memory",
+      "kind": "memory",
+      "text": "Memory reconciled over 4cf528bee476184126ef1f36c6c6f8d47f474a00..cb41565821e0: 15 reviewed, 12 changed.",
+      "since": "4cf528bee476184126ef1f36c6c6f8d47f474a00",
+      "until": "cb41565821e0cc26498cacd8abcfc5c19a222f7a",
+      "reviewed": [
+        "agent-comms",
+        "agent-orchestration",
+        "agentic-entities",
+        "harness-claude-code",
+        "harness-codex",
+        "harness-copilot",
+        "harness-cursor",
+        "harness-devin",
+        "product-vision",
+        "spec-context-project",
+        "context-management",
+        "context-portability",
+        "audits-canon",
+        "backlog-ledger",
+        "worktrees"
+      ],
+      "changed": [
+        "cross-platform-portability",
+        "sdd-gate-v3",
+        "public-asset-distribution",
+        "harness-kimi-code",
+        "workspace-init",
+        "workspace-doctor",
+        "server-registry",
+        "consumer-agent-support",
+        "specs-migration",
+        "bug-ledger",
+        "release-lifecycle",
+        "pypi-distribution"
+      ]
     }
   ]
 }
