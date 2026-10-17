@@ -36,7 +36,7 @@ Scope: this file governs only `specs/releases/`.
 
 ## 4. _RELEASE.json
 
-- The active release's phase is its `phase` field — read directly, no reconciliation, no event-stream replay.
+- The active release's phase is its `phase` field — read directly.
 - Who sets which milestone, and the exact shape per field: `dd-release-implementation`'s `RELEASE-EVENTS.md`.
 
 ## 5. Promote

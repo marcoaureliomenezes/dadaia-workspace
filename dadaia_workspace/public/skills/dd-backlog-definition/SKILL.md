@@ -12,7 +12,7 @@ description: >
 
 1. Open `specs/backlog/AGENTS.md` (the area's scoped law) and follow it.
 2. Before `backlog.py new`, read the main thread's `dd-grill-me` backlog-stage handoff (`dd-grill-me`'s `references/backlog.md`).
-3. Write in a `wt-backlog-<slug>` lane (`.dadaia/.venv/bin/dadaia worktree new`; `worktrees/AGENTS.md` §1). Append via `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py new <slug> --title "…" --description "…" --provenance "<operator words or intake item + date>" --relates <slugs>|none`; validate via `.dadaia/.venv/bin/dadaia doctor` (`ledgers`
+3. Write inside the `wt-backlog-<slug>` lane the main thread opened (`worktrees/AGENTS.md` §1). Append via `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py new <slug> --title "…" --description "…" --provenance "<operator words or intake item + date>" --relates <slugs>|none`; validate via `.dadaia/.venv/bin/dadaia doctor` (`ledgers`
    section).
 
 ## Continuous curation
@@ -44,9 +44,9 @@ description: >
 
 - `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py check --specs <specs-dir>` exits 0 and `.dadaia/.venv/bin/dadaia doctor` prints no `BL-` finding.
 - Every entry added this session names its intake item or operator words in `provenance`.
-- Human review has compared every pair of active entries by domain subject: no semantic
+- Every pair of active entries was compared by domain subject: no semantic
   duplicate remains active, and each absorbed duplicate has a `rejected` history record naming the retained slug.
-- Human review has classified every staleness candidate: a postponed item remains active;
+- Every staleness candidate is classified: a postponed item remains active;
   an invalid item has a `rejected` history record with its one-line reason.
 
 ## References

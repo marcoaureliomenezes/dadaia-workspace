@@ -20,7 +20,7 @@ Scope: this file governs only `specs/ADRs/`.
 - Only the operator accepts: the main thread writes `accepted` with `ruling: {date, words}` (his verbatim words, in the turn he rules; the question plus the chosen option, never only an answer id) and `measured_by` naming a check of a kind `specs/memory/AGENTS.md` §2 lists; never delegated, and no role agent writes `accepted` or `ruling`.
 - `accepted` is then immutable: `context`/`decision`/`consequences` never rewritten again.
 - A reversal is a new record naming the earlier `id` in `supersedes`/`amends`.
-- Rejecting is a `status: "rejected"` edit by the operator.
+- The main thread writes `rejected` on the operator's ruling.
 - Superseding is a new record proposal; once accepted, the superseded record stays in `decisions.jsonl` with `status: superseded` and the successor's `supersedes` naming it (one id, or comma-separated ids ascending).
 - A superseded record keeps its `id` and its line.
 

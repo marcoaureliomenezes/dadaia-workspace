@@ -37,8 +37,8 @@ The `Surface` column names the path or entity as it appears in an installed work
 | Surface | Purpose | Belongs |
 |---|---|---|
 | `AGENTS.md` | the root map: the flow, the roles, the gate invariants, the root, credentials, and one line per scoped file | statements; the index of every other surface |
-| `specs/AGENTS.md` | the canon of a specs tree and its status tokens | canon table, status tokens, doctor codes |
-| `specs/releases/AGENTS.md` | candidates, phases, promote | release procedure and commit shapes |
+| `specs/AGENTS.md` | the canon of a specs tree and its status tokens | canon table, status tokens, load order |
+| `specs/releases/AGENTS.md` | candidates, phases, promote | release procedure |
 | `specs/backlog/AGENTS.md` | the operator's demand queue and its exits | `BACKLOG.json` shape, intake gate, dispositions |
 | `specs/bugs/AGENTS.md` | what a bug is and how it is proposed, recorded, resolved | bug procedure and the redaction rule |
 | `specs/memory/AGENTS.md` | current product truth and who writes it | atoms, ownership |
@@ -49,7 +49,7 @@ The `Surface` column names the path or entity as it appears in an installed work
 | `.dadaia/tmp/AGENTS.md` | the TTL scratch lane | what may be written there and for how long |
 | `.dadaia/states/AGENTS.md` | CLI-owned state files | who writes them and by which verb |
 | `worktrees/AGENTS.md` | the canonical worktrees | the rc hierarchy and lanes, two gates, one review, one venv, hygiene |
-| `repos/<slug>/AGENTS.md` | a repo working tree | clean-tree rule, cache redirection |
+| `repos/<slug>/AGENTS.md` | a repo working tree | clean-tree rule, cache redirection, the `verify:` and `tests:` lines |
 
 ## 3. Skills — `.agents/skills/dd-*/SKILL.md`
 

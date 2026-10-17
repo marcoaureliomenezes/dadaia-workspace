@@ -27,7 +27,7 @@ cost(file) = tokens(file) x invocations(file) x unit_price(tier)
 | Skill body | Only when the skill is loaded | Right home for deep protocols and tables |
 | Frontmatter (any) | Parsed by tooling, not re-reasoned | Put machine-enforced hard rules here |
 
-- Corollary: depth belongs in skills, not personas — an inlined 40-line protocol pays every dispatch, a referenced skill only when needed.
+- Corollary: depth belongs in skills, not personas (which surface holds what: `.dadaia/agentic/data/CONTEXT-MAP.md`) — an inlined 40-line protocol pays every dispatch.
 - A table compresses roughly 3-5x versus prose carrying the same machine-readable signal.
 
 | Content shape | Use | Reason |
