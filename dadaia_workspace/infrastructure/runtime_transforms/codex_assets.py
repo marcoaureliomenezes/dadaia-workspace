@@ -14,7 +14,7 @@ from dadaia_workspace.core import platform
 from dadaia_workspace.core.frontmatter import Frontmatter, parse
 from dadaia_workspace.core.model_registry import TIER_CODEX
 from dadaia_workspace.core.workspace_layout import render_registry_tables
-from dadaia_workspace.infrastructure.public_assets_common import _toml_escape
+from dadaia_workspace.infrastructure.public_assets_common import toml_escape
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -166,15 +166,15 @@ def _render_codex_agent_toml(
     # Step 2: escape any embedded triple-double-quote sequences.
     escaped = escaped.replace('"""', '\\"\\"\\"')
     lines: list[str] = [
-        f"name = {_toml_escape(name)}\n",
+        f"name = {toml_escape(name)}\n",
     ]
     if description:
-        lines.append(f"description = {_toml_escape(description)}\n")
+        lines.append(f"description = {toml_escape(description)}\n")
     lines.extend(
         [
-            f"model = {_toml_escape(model)}\n",
+            f"model = {toml_escape(model)}\n",
             'sandbox_mode = "workspace-write"\n',
-            f"model_reasoning_effort = {_toml_escape(reasoning_effort)}\n",
+            f"model_reasoning_effort = {toml_escape(reasoning_effort)}\n",
             f'developer_instructions = """\n{escaped}\n"""\n',
         ]
     )

@@ -71,7 +71,7 @@ _TOML_CONTROL = {
 }  # tab and newline stay literal
 
 
-def _toml_escape(value: object) -> str:
+def toml_escape(value: object) -> str:
     """*value* as a TOML string: multi-line basic when it holds a newline, else basic."""
     s = str(value).replace("\\", "\\\\").translate(_TOML_CONTROL)
     if "\n" in s:

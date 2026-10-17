@@ -1,4 +1,4 @@
-"""``_toml_escape`` is the one TOML string encoder: every value round-trips through ``tomllib``."""
+"""``toml_escape`` is the one TOML string encoder: every value round-trips through ``tomllib``."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import tomllib
 
 import pytest
 
-from dadaia_workspace.infrastructure.public_assets_common import _toml_escape
+from dadaia_workspace.infrastructure.public_assets_common import toml_escape
 
 
 @pytest.mark.parametrize(
@@ -28,7 +28,7 @@ from dadaia_workspace.infrastructure.public_assets_common import _toml_escape
     ],
 )
 def test_toml_escape_round_trips(value: str) -> None:
-    assert tomllib.loads(f"k = {_toml_escape(value)}\n") == {"k": value}
+    assert tomllib.loads(f"k = {toml_escape(value)}\n") == {"k": value}
 
 
 @pytest.mark.parametrize(
@@ -36,4 +36,4 @@ def test_toml_escape_round_trips(value: str) -> None:
     [("plain", '"plain"'), ('a"b', '"a\\"b"'), ("a\nb", '"""a\nb"""')],
 )
 def test_toml_escape_keeps_the_shapes_codex_projects(value: str, text: str) -> None:
-    assert _toml_escape(value) == text
+    assert toml_escape(value) == text
