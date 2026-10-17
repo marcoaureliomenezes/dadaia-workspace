@@ -46,7 +46,7 @@ def _register_specless_context(root: Path, *names: str) -> None:
     for name in names:
         repo = root / "repos" / name
         repo.mkdir(parents=True)
-        run(["git", "init", "-q", str(repo)], check=True)  # noqa: S603, S607
+        run(["git", "init", "-q", str(repo)], check=True)
         for target, source in workspace_layout.INSTALLED_GIT_HOOKS:  # what `create` installs
             shipped = (workspace_layout.public_scripts_dir() / source).read_bytes()
             (repo / ".git" / "hooks" / target).write_bytes(shipped)

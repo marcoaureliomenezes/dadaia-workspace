@@ -49,7 +49,7 @@ def test_public_projection_lifecycle(tmp_path: Path, monkeypatch: pytest.MonkeyP
     shutil.copytree(source_public.parent / "hooks", package_dir / "hooks")
     (public_dir / "data" / "AGENTS.md").write_bytes(_FIXTURE_SOURCE)
     manager = FileSystemPublicAssetManager()
-    manager._public_dir = public_dir  # noqa: SLF001 — package asset-provider boundary
+    manager._public_dir = public_dir
     service = PublicAssetService(
         manager, agent_policy_loader=lambda root: JsonAgentModelPolicyStore(root).load()
     )

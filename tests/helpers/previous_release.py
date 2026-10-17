@@ -20,5 +20,5 @@ def previous_release(source: str, published: Iterable[str]) -> str:
 
 
 def published_releases() -> list[str]:
-    with urllib.request.urlopen(_INDEX, timeout=30) as response:  # noqa: S310 — fixed https URL
+    with urllib.request.urlopen(_INDEX, timeout=30) as response:
         return list(json.load(response)["releases"])

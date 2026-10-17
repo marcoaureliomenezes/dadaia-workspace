@@ -21,7 +21,7 @@ from dadaia_workspace.infrastructure.public_assets_common import iter_public_fil
 def default_public_dir() -> Path:
     """The package's real ``dadaia_workspace/public/`` tree — the same root
     ``install()``/``doctor()``/``stage()`` read from by default."""
-    return FileSystemPublicAssetManager()._public_dir  # noqa: SLF001
+    return FileSystemPublicAssetManager()._public_dir
 
 
 def scan(public_dir: Path | None = None) -> list[str]:

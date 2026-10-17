@@ -202,7 +202,7 @@ def test_import_refuses_a_record_missing_a_field_naming_it(tmp_path: Path) -> No
     del record["name"]
     store = context_store(tmp_path / "states")
 
-    with pytest.raises(Exception) as caught:  # noqa: PT011 - the type is the assertion
+    with pytest.raises(Exception) as caught:
         _importer(tmp_path, store).run(_export_file(tmp_path, record))
 
     assert isinstance(caught.value, DadaiaError)

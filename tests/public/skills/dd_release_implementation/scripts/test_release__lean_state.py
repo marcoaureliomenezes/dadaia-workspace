@@ -374,7 +374,7 @@ def test_ship_refuses_every_open_bug_then_carries_each_authorized_id(
 # --- one state reader, a drafted next candidate adopted, `origin` ---
 
 
-def _jsonl_owner():  # noqa: ANN202
+def _jsonl_owner():
     return load_owner("dd-bug-resolution", "_jsonl")
 
 

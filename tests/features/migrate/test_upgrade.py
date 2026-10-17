@@ -43,7 +43,7 @@ def _materialize(link: Path, target: Path) -> str:
 
 
 def _md5(path: Path) -> str:
-    return hashlib.md5(path.read_bytes()).hexdigest()  # noqa: S324 — identity, not security
+    return hashlib.md5(path.read_bytes()).hexdigest()
 
 
 def _tree_with_linked_quality(tmp_path: Path) -> tuple[Path, Path]:

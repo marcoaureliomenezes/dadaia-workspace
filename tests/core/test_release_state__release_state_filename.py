@@ -13,7 +13,7 @@ from dadaia_workspace.features.specs.doctor_common import resolve_active_release
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]
                        / "dadaia_workspace/public/skills/dd-bug-resolution/scripts"))  # fmt: skip
-import _grammar  # noqa: E402
+import _grammar
 
 from tests.helpers.oslib import write_text
 

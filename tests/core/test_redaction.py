@@ -23,7 +23,7 @@ def _lines(tmp_path: Path, text: str) -> list[str]:
     write_text(public_dir / "data" / "AGENTS.md", text)
     write_text(lib / "AGENTS.md", text)
     manager = FileSystemPublicAssetManager()
-    manager._public_dir = public_dir  # noqa: SLF001
+    manager._public_dir = public_dir
     ws = tmp_path / "ws"
     ws.mkdir()
     return [line.render() for line in manager.doctor(ws) if "public-privacy:" in line.render()]

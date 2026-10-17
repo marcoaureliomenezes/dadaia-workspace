@@ -198,9 +198,9 @@ def test_public_privacy_gate_flags_identifiers(
     write_text(data_dir / "AGENTS.md", f"Private endpoint: {_PRIVACY_TEST_TERM}\n")
 
     manager = FileSystemPublicAssetManager()
-    manager._public_dir = public_dir  # noqa: SLF001
+    manager._public_dir = public_dir
 
-    report = manager._check_public_privacy()  # noqa: SLF001
+    report = manager._check_public_privacy()
 
     rendered = [line.render() for line in report]
     assert any(line.startswith("[error] public-privacy:") for line in rendered)
@@ -466,7 +466,7 @@ def test_a_single_skill_rename_is_green_everywhere_after_one_place(
     # skill-set comparison): `installed_skills == skill_names()`, now a live call, not a
     # hardcoded literal — so it needs zero edit to reflect the rename.
     mgr = FileSystemPublicAssetManager()
-    mgr._public_dir = mirror_public  # noqa: SLF001 — exercise the mirror only
+    mgr._public_dir = mirror_public
     ws = tmp_path / "ws"
     ws.mkdir()
     mgr.install(ws)
@@ -496,7 +496,7 @@ def test_the_three_design_skills_are_gone_from_stage_install_and_the_shipped_tre
         write_text(earlier / "skills" / name / "SKILL.md", f"---\nname: {name}\n---\n")
     register_all(ws)
     old_manager = FileSystemPublicAssetManager()
-    old_manager._public_dir = earlier  # noqa: SLF001 — exercise the earlier tree only
+    old_manager._public_dir = earlier
     old_manager.install(ws)
     assert {n for n in _DESIGN_SKILLS if (stale / n / "SKILL.md").exists()} == set(_DESIGN_SKILLS)
     manager = FileSystemPublicAssetManager()
@@ -571,7 +571,7 @@ def test_install_prunes_the_instance_copy_of_the_deleted_engineer(tmp_path: Path
     ws = tmp_path / "ws"
     register_all(ws)
     old = FileSystemPublicAssetManager()
-    old._public_dir = earlier  # noqa: SLF001 — exercise the earlier tree only
+    old._public_dir = earlier
     old.install(ws)
     assert (ws / ".claude" / "agents" / f"{_OLD_ENGINEER}.md").exists()
 

@@ -43,7 +43,7 @@ def test_package_and_sibling_import_share_one_module_and_exception_class():
     from dadaia_workspace.core.skill_owner import load_owner
 
     owner = load_owner("dd-bug-resolution", "_ledger")
-    import _ledger  # type: ignore[import-not-found]  # noqa: PLC0415  (the sibling spelling)
+    import _ledger  # type: ignore[import-not-found]
 
     assert owner is sys.modules["_ledger"]
     assert owner.LineError is _ledger.LineError

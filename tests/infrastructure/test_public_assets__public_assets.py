@@ -39,7 +39,7 @@ def no_denylist(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
 
 def _manager(public_dir: Path) -> FileSystemPublicAssetManager:
     manager = FileSystemPublicAssetManager()
-    manager._public_dir = public_dir  # noqa: SLF001
+    manager._public_dir = public_dir
     return manager
 
 
@@ -118,7 +118,7 @@ def test_public_privacy_doctor_verdict(
     """
     (tmp_path / "public" / "data").mkdir(parents=True)
     write_text(tmp_path / "public" / "data" / name, text)
-    report = [line.render() for line in _manager(tmp_path / "public")._check_public_privacy()]  # noqa: SLF001
+    report = [line.render() for line in _manager(tmp_path / "public")._check_public_privacy()]
     if flagged is None:
         assert report == ["[ok] public-privacy (baseline structural scan, no operator denylist)"]
     else:

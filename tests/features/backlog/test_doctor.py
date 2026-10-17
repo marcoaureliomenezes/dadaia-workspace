@@ -81,7 +81,7 @@ def test_the_doctor_judges_a_live_entry_as_backlog_py_check_does(row: str, tmp_p
     (tmp_path / "pkg").mkdir()
     write_text(tmp_path / "pkg" / "m.py", _SOURCE)
     write_text(tmp_path / "pkg" / "w.go", "type Widget struct{}\n")
-    run(["git", "init", "-q"], cwd=tmp_path, check=True)  # noqa: S603, S607
+    run(["git", "init", "-q"], cwd=tmp_path, check=True)
     active = [
         _active_entry(
             f"e{n}",
