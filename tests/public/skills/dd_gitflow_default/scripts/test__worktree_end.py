@@ -619,6 +619,39 @@ def test_a_verify_line_refusal_clears_by_its_printed_act(
     assert landed.returncode == 0, landed.stderr
 
 
+def test_an_rc_gate_red_from_the_work_branch_clears_through_a_hotfix_then_the_printed_sync(
+    tmp_path: Path,
+) -> None:
+    (root := tmp_path / "ws").mkdir()
+    make_workspace(root)
+    repo = root / "repos/r"
+    git(repo, "checkout", "-q", "feature/0.5.0")
+    commit(repo, "RED-job", "")
+    flags = ("--bug-id", "some-bug", "--reported-by", "t", "--title", "t", "--severity", "LOW",
+             "--surface", "scripts", "--component", "c", "--context", "c", "--symptom", "s",
+             "--repro", "r", "--expected", "e", "--correlates", "none")  # fmt: skip
+    run_python(str(_PACKAGE_SKILLS / "dd-bug-resolution/scripts/bugs.py"), "append",
+               "--specs", str(repo / "specs"), *flags, check=True)  # fmt: skip
+    git(repo, "add", "-A")
+    git(repo, "commit", "-qm", "bug")
+    assert run(root, "new", "r", RC).returncode == 0
+    tree = root / "worktrees/r" / RC
+    approve(root, commit(tree, "src/z.py"), name=RC)
+    refused = run(root, "merge", str(tree))
+    sync = inline(*cli_argv(venv_dir(root)), "worktree", "sync", str(tree))
+    assert refused.returncode == 1 and fixes(refused)[0].endswith(f"then `{sync}`")
+    hotfix = root / "worktrees/r/0.5.0/wt-hotfix-some-bug"
+    assert run(root, "new", "r", "0.5.0/wt-hotfix-some-bug").returncode == 0
+    git(hotfix, "rm", "-q", "RED-job")
+    git(hotfix, "commit", "-qm", "fix code")
+    approve(root, git(hotfix, "rev-parse", "HEAD").strip(), name="0.5.0/wt-hotfix-some-bug")
+    assert run(root, "merge", str(hotfix)).returncode == 0
+    assert run(root, "sync", str(tree)).returncode == 0
+    approve(root, git(tree, "rev-parse", "HEAD").strip(), name=RC, at="T11:00:00Z")
+    landed = run(root, "merge", str(tree))
+    assert landed.returncode == 0, landed.stderr
+
+
 def test_a_tests_line_after_a_utf8_bom_is_declared(tmp_path: Path) -> None:
     """A BOM before the first line does not hide `tests:`."""
     sys.path.insert(0, str(_PACKAGE_SKILLS / "dd-gitflow-default" / "scripts"))
