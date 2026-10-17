@@ -343,3 +343,16 @@ def test_a_nested_hold_stamps_its_top_entry(tmp_path: Path) -> None:
     sweep.hold(tmp_path, tmp_path / "a" / "b" / "c", "a/b/c")
 
     assert top.stat().st_mtime > 1_000_000_000
+
+
+@pytest.mark.parametrize(
+    ("kernel_answer", "named"),
+    [((1000, "alice"), "alice"), ((1000, "1000"), "1000"), (None, "another account")],
+    ids=["resolvable", "unresolvable-uid", "no-account-database"],
+)
+def test_the_owner_named_is_the_kernels_answer(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, kernel_answer: tuple[int, str] | None, named: str
+) -> None:
+    """The owner text comes from the kernel's ``file_owner`` alone (posix answers and win32's None)."""
+    monkeypatch.setattr(sweep.platform, "file_owner", lambda _path: kernel_answer)
+    assert sweep._owner(tmp_path) == named
