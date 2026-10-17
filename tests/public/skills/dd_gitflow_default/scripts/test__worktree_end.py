@@ -573,35 +573,52 @@ def test_a_code_commit_made_on_the_job_branch_lands_once_reviewed(root: Path) ->
     assert (root / RC_TREE / "src/stray.py").is_file()
 
 
-@pytest.mark.parametrize(
-    ("declared", "act"),
-    [("", "add this repo's job gate as a verify: line to"),
-     ("FOO=1 python scripts/ci.py job", "make the verify: line of")],
-    ids=["absent", "env-assignment"],
-)  # fmt: skip
-def test_a_job_gate_reads_the_work_branch_verify_line_not_its_own(
-    root: Path, declared: str, act: str
-) -> None:
+def test_a_job_gate_reads_the_work_branch_verify_line_not_its_own(root: Path) -> None:
     """A job whose task rewrote `verify:` is still judged by the work branch's
-    line; its absent or unstartable refusal names the work branch, and doing that act lands."""
+    line; its unstartable refusal names the work branch, and doing that act lands."""
     rc, tree, agents = root / RC_TREE, root / TREE, root / "repos/r/AGENTS.md"
     good = read_text(agents)
     rest = "".join(ln for ln in good.splitlines(keepends=True) if not ln.startswith("verify:"))
-    commit(rc, "AGENTS.md", (f"verify: {declared}\n" if declared else "") + rest)
+    commit(rc, "AGENTS.md", "verify: FOO=1 python scripts/ci.py job\n" + rest)
     git(tree, "merge", "-q", "--ff-only", WORK)
     land(root, "AGENTS.md", good)  # the job's own line never judges it
     approve(root, land(root, "src/a.py"), name=NEW_JOB)
     refused = run(root, "merge", TREE)
     assert refused.returncode == 1 and "Traceback" not in refused.stderr
-    tail = (f" and commit it on {WORK}" if not declared else
-            f" on {WORK} one argv list that starts: it runs without a shell"
-            " — no VAR=value prefix, no sh -c")  # fmt: skip
-    assert fixes(refused) == [f"fix: Agent action: {act} {agents}{tail}"]
+    assert fixes(refused) == [
+        f"fix: Agent action: make the verify: line of AGENTS.md on {WORK} one argv list that"
+        " starts (it runs without a shell: no VAR=value prefix, no sh -c), landed through a"
+        " wt-backlog lane, then `worktree sync` this tree"
+    ]
     commit(rc, "AGENTS.md", good)
     git(tree, "rebase", "-q", WORK)
     approve(root, git(tree, "rev-parse", "HEAD").strip(), at="T11:00:00Z", name=NEW_JOB)
     landed = run(root, "merge", TREE)
     assert landed.returncode == 0, landed.stderr
+
+
+def test_a_missing_verify_line_lands_through_a_backlog_lane(root: Path) -> None:
+    """The refusal for an absent `verify:` names an act the gates admit: a backlog lane lands the
+    repo's `AGENTS.md`, runs no `verify:`, and the refused hotfix merges after a sync."""
+    repo = root / "repos/r"
+    good = read_text(repo / "AGENTS.md")
+    commit(repo, "AGENTS.md", "")
+    commit(repo, "specs/bugs/BUGS.jsonl", '{"id": "some-bug", "status": "open"}\n')
+    hotfix = open_tree(root, HOTFIX)
+    approve(root, commit(hotfix, "src/a.py"), name=HOTFIX)
+    refused = run(root, "merge", str(hotfix))
+    assert fixes(refused) == [
+        "fix: Agent action: add this repo's job gate as a verify: line of AGENTS.md on"
+        " feature/0.5.0, landed through a wt-backlog lane, then `worktree sync` this tree"
+    ]
+    lane = open_tree(root, BACKLOG)
+    approve(root, commit(lane, "AGENTS.md", good), name=BACKLOG)
+    landed = run(root, "merge", str(lane))
+    assert landed.returncode == 0, landed.stderr
+    _fix(root, run(root, "merge", str(hotfix)))
+    approve(root, git(hotfix, "rev-parse", "HEAD").strip(), at="T11:00:00Z", name=HOTFIX)
+    done = run(root, "merge", str(hotfix))
+    assert done.returncode == 0, done.stderr
 
 
 def test_a_tests_line_after_a_utf8_bom_is_declared(tmp_path: Path) -> None:
