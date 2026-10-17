@@ -408,6 +408,7 @@ def test_each_refusal_fix_keeps_the_chosen_disposition(
         return
     if fix.startswith(("fix: Agent action:", "fix: Operator action:")):
         assert f"--disposition {disposition}" in fix
+        assert "bugs.py append" not in fix
         assert _histo(specs) == []
         return
     ran = run([git_bash(), "-c", fix.removeprefix("fix: ")])
