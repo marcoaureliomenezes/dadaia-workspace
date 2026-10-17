@@ -14,7 +14,7 @@ import tempfile
 from pathlib import Path
 
 from tests.e2e.test_one_line_bootstrap import _build_wheel
-from tests.helpers.oslib import run
+from tests.helpers.oslib import run, write_text
 
 ROOT = Path(__file__).resolve().parents[2]
 BASELINE = "0.4.7"
@@ -63,7 +63,7 @@ def image(task: str, version: str) -> str:
             req = f"/lib/{wheel().name}"
         else:
             req = f"dadaia-workspace=={version}"
-        (ctx / "lib" / "requirements.txt").write_text(req + "\n", encoding="utf-8")
+        write_text(ctx / "lib" / "requirements.txt", req + "\n")
         tag = f"dadaia-evals-{task}:{version}"
         sh("docker", "build", "-q", "-t", tag, str(ctx))
     return tag

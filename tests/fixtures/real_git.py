@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from tests.helpers.oslib import run
+from tests.helpers.oslib import run, write_text
 
 
 def git(cwd: Path, *args: str) -> str:
@@ -20,7 +20,7 @@ def seeded_remote(
     git(parent, "init", "-q", "-b", branch, str(seed))
     for rel, text in (files or {"README.md": "init\n"}).items():
         (seed / rel).parent.mkdir(parents=True, exist_ok=True)
-        (seed / rel).write_text(text, encoding="utf-8")
+        write_text(seed / rel, text)
     git(seed, "add", "-A")
     git(seed, "commit", "-q", "-m", "init")
     git(seed, "push", "-q", str(bare), f"HEAD:{branch}")
@@ -52,7 +52,7 @@ class PushRepo:
         for rel, data in files.items():
             target = self.path / rel
             target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_bytes(data) if isinstance(data, bytes) else target.write_text(data)
+            target.write_bytes(data) if isinstance(data, bytes) else write_text(target, data)
         git(self.path, "add", "-A")
         git(self.path, "commit", "-q", "--allow-empty", "-m", message)
         return git(self.path, "rev-parse", "HEAD")

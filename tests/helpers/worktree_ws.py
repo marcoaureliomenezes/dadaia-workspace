@@ -23,6 +23,7 @@ from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from tests.fixtures.harness_env import run_bash, suite_env
 from tests.fixtures.stores import context_store, fake_venv
 from tests.helpers.oslib import run as run_text
+from tests.helpers.oslib import write_text
 
 SCRIPT = (
     Path(__file__).resolve().parents[2]
@@ -89,18 +90,20 @@ def git(repo: Path, *args: str) -> str:
 
 
 def make_workspace(root: Path) -> Path:
-    (root / ".gitconfig").write_text("[user]\n\tname = t\n\temail = t@t\n")  # HOME for rebase
+    write_text(root / ".gitconfig", "[user]\n\tname = t\n\temail = t@t\n")  # HOME for rebase
     (root / ".dadaia/states").mkdir(parents=True)
-    (root / ".dadaia/states/spec_contexts.json").write_text("{}")
+    write_text(root / ".dadaia/states/spec_contexts.json", "{}")
     _stub_cli(root, {"main_repo": "r", "associated_repos": [], "gitflow": FLOW})
     repo = root / "repos/r"
     rel = repo / "specs/releases/0.5.0/rc-1"
     rel.mkdir(parents=True)
     git(repo, "init", "-q")
-    (rel / "SPEC.md").write_text(
-        "# SPEC\n\n**Status:** Approved\n\n**Origin:** operator-demand\n\n## Bug window review\n"
+    write_text(
+        rel / "SPEC.md",
+        "# SPEC\n\n**Status:** Approved\n\n**Origin:** operator-demand\n\n## Bug window review\n",
     )
-    (rel / "PLAN.md").write_text(
+    write_text(
+        rel / "PLAN.md",
         "# PLAN\n\n**Status:** Approved\n\n"
         "## As-is review\n\n"
         "| unit | today | bugs | verdict | why |\n"
@@ -110,21 +113,21 @@ def make_workspace(root: Path) -> Path:
         "| job | wave | waits on | `W:` |\n"
         "|---|---|---|---|\n"
         "| Job 1 | 1 | — | `src/a.py` |\n",
-        encoding="utf-8",
     )
     tasks = rel / "tasks"
     tasks.mkdir()
-    (tasks / "job1.md").write_text(
-        "# Job 1\n\n| task | AC | `W:` |\n|---|---|---|\n| J1.T1 | AC2.1 | `src/a.py` |\n"
+    write_text(
+        tasks / "job1.md",
+        "# Job 1\n\n| task | AC | `W:` |\n|---|---|---|\n| J1.T1 | AC2.1 | `src/a.py` |\n",
     )
     state = {"schema": "release-state-v1", "release": "0.5.0", "phase": "IMPLEMENTATION",
              "defined": {"sha": "initial", "ts": "2026-10-09T09:00:00Z"},
              "implemented": None, "shipped": None, "log": []}  # fmt: skip
-    (rel.parent / "_RELEASE.json").write_text(json.dumps(state))
-    (repo / ".gitignore").write_text("*.scratch\n__pycache__/\n")
+    write_text(rel.parent / "_RELEASE.json", json.dumps(state))
+    write_text(repo / ".gitignore", "*.scratch\n__pycache__/\n")
     (repo / "scripts").mkdir()
-    (repo / "scripts/ci.py").write_text(CI)
-    (repo / "AGENTS.md").write_text("verify: python scripts/ci.py job\n")
+    write_text(repo / "scripts/ci.py", CI)
+    write_text(repo / "AGENTS.md", "verify: python scripts/ci.py job\n")
     git(repo, "add", "-A")
     git(repo, "commit", "-qm", "init")
     git(repo, "branch", "feature/0.5.0")
@@ -135,7 +138,7 @@ def associate(root: Path, spec: str, slugs: tuple[str, ...] = ("a",)) -> None:
     """Repos *slugs* join `r`'s context with `feature/0.5.0` and no specs; `r`'s SPEC is *spec*."""
     _stub_cli(root, {"main_repo": "r", "associated_repos": [{"slug": s} for s in slugs],
                      "gitflow": FLOW})  # fmt: skip
-    (root / ".dadaia/states/spec_contexts.json").write_text(json.dumps({"contexts": [
+    write_text(root / ".dadaia/states/spec_contexts.json", json.dumps({"contexts": [
         {"repo_slug": "r", "associated_repos": [{"slug": s} for s in slugs]}]}))  # fmt: skip
     for slug in slugs:
         (repo := root / "repos" / slug).mkdir()
@@ -143,7 +146,7 @@ def associate(root: Path, spec: str, slugs: tuple[str, ...] = ("a",)) -> None:
         git(repo, "commit", "-q", "--allow-empty", "-m", "init")
         git(repo, "branch", "feature/0.5.0")
     spec_md = root / "repos/r/specs/releases/0.5.0/rc-1/SPEC.md"
-    spec_md.write_text(f"**Status:** {spec}\n")
+    write_text(spec_md, f"**Status:** {spec}\n")
     git(root / "repos/r", "commit", "-qam", "spec")
     git(root / "repos/r", "branch", "-f", "feature/0.5.0")
 
@@ -165,7 +168,7 @@ def run(root: Path, *args: str, input: str | None = None) -> subprocess.Complete
 
 def registered_doctor(root: Path) -> DoctorService:
     """The doctor over *root* with context `c` (main repo `r`) ALIVE."""
-    (root / ".dadaia/states/spec_contexts.json").write_text('{"contexts": []}')
+    write_text(root / ".dadaia/states/spec_contexts.json", '{"contexts": []}')
     store = context_store(root / ".dadaia/states")
     store.save(SpecContextProject("c", ContextState.ALIVE, "r", "", "2026-09-30T00:00:00+00:00"))
     return DoctorService(store, GitSubprocessClient(), root)
@@ -177,7 +180,7 @@ def fixes(result: subprocess.CompletedProcess[str]) -> list[str]:
 
 def commit(tree: Path, rel: str, text: str = "x = 1\n") -> str:
     (tree / rel).parent.mkdir(parents=True, exist_ok=True)
-    (tree / rel).write_text(text, encoding="utf-8")
+    write_text(tree / rel, text)
     git(tree, "add", rel)
     git(tree, "commit", "-q", "--allow-empty", "-m", rel)
     return git(tree, "rev-parse", "HEAD").strip()
@@ -226,7 +229,7 @@ def approve(
         "diff_sha256": diff_hash(root, sha, name),
         "produced_at": f"2026-10-02{at}",
     }
-    handoff.write_text(json.dumps({**body, **({"schema_version": "1.2"} if valid else {})}))
+    write_text(handoff, json.dumps({**body, **({"schema_version": "1.2"} if valid else {})}))
     return handoff
 
 
@@ -252,7 +255,7 @@ def attempt(
         git(tree, "mv", *mv)
     for rel, text in files.items():
         (tree / rel).parent.mkdir(parents=True, exist_ok=True)
-        (tree / rel).write_text(text, encoding="utf-8")
+        write_text(tree / rel, text)
         git(tree, "add", rel)
     name = f"test({task_id}): {next(iter(files), mv[1])}" if task_id else next(iter(files), mv[1])
     git(tree, "commit", "-qm", name)
