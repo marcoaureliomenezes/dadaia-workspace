@@ -402,9 +402,8 @@ def test_a_hotfix_job_needs_its_open_bug_record_on_the_work_branch(
     _bug_record(root, status)
     refused = _run(root, "new", "r", "0.5.0/wt-hotfix-a-block-bug")
     assert refused.returncode == 1 and "a-block-bug" in refused.stderr
-    assert _fixes(refused) == [
-        "fix: Operator action: confirm bug a-block-bug (dd-bug-registration §2)"
-    ]
+    act = "confirm bug a-block-bug" if status is None else "confirm the regression as a new bug"
+    assert _fixes(refused) == [f"fix: Operator action: {act} (dd-bug-registration §2)"]
     assert not (root / "worktrees/r/0.5.0").exists()
 
 
