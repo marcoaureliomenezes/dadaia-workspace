@@ -46,8 +46,10 @@ def _refuse_unopened_bug(main: Path, work: str, bug: str) -> None:
     except ValueError:
         found = []
     if not any(r.get("id") == bug and r.get("status") == OPEN for r in found):
+        known = any(r.get("id") == bug for r in found)
+        act = "the regression as a new bug" if known else f"bug {bug}"
         raise Refusal(f"no open bug record {bug} on {work}",
-                      f"Operator action: confirm bug {bug} (dd-bug-registration §2)")  # fmt: skip
+                      f"Operator action: confirm {act} (dd-bug-registration §2)")  # fmt: skip
 
 
 def _refuse_unready(main: Path, version: str, rc: str) -> None:
