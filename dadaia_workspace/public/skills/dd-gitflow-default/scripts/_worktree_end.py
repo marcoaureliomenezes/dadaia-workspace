@@ -133,10 +133,10 @@ def _undo(tree: Path, work: str, rel: str) -> str:
 
 
 def _check_specs_only(tree: Path, work: str) -> None:
-    """A backlog tree lands `specs/` alone: its merge runs no test."""
+    """A backlog tree lands `specs/` and the repo's `AGENTS.md` alone: its merge runs no test."""
     for rel in git(tree, "diff", "--name-only", f"{work}...HEAD").splitlines():
-        if not rel.startswith("specs/"):
-            raise Refusal(f"{rel} is code; a backlog tree lands specs/ only — "
+        if rel != "AGENTS.md" and not rel.startswith("specs/"):
+            raise Refusal(f"{rel} is code; a backlog tree lands specs/ and AGENTS.md only — "
                           "code lands through a job", _undo(tree, work, rel))  # fmt: skip
 
 
@@ -149,6 +149,11 @@ def _check_ancestor(root: Path, tree: Path, work: str) -> None:
             f"{work} moved past this branch's base",
             command(*cli_words(root, "worktree", "sync", str(tree))),
         ) from error
+
+
+def _land_line(act: str) -> str:
+    """The one act that lands a repo-law line: a backlog lane carries it, and no gate waits on it."""
+    return f"Agent action: {act}, landed through a wt-backlog lane, then `worktree sync` this tree"
 
 
 def _declared(tree: Path, work: str, key: str) -> str:
@@ -169,7 +174,7 @@ def _declared_argv(tree: Path, work: str, key: str) -> list[str]:
     line = _declared(tree, work, key)
     if _WORD.sub("", line).strip():
         raise Refusal(f"the {key} line of {work} has an unclosed quote",
-                      f"Agent action: close the quote in the {key} line of AGENTS.md on {work} and commit it")  # fmt: skip
+                      _land_line(f"close the quote in the {key} line of AGENTS.md on {work}"))  # fmt: skip
     return [_QUOTED.sub(lambda m: m[1] if m[1] is not None else m[2], w) for w in _WORD.findall(line)]  # fmt: skip
 
 
@@ -182,11 +187,9 @@ def _gate(tree: Path, work: str) -> None:
         raise Refusal(
             f"no workspace owns {tree}", "Agent action: run this merge inside its workspace"
         )
-    repo_name = tree.relative_to(tree_path(root, "")).parts[0]
-    agents = root / "repos" / repo_name / "AGENTS.md"
     if not argv:
         raise Refusal(f"this repo declares no {key} command",
-                      f"Agent action: add this repo's job gate as a {key} line to {agents} and commit it on {work}")  # fmt: skip
+                      _land_line(f"add this repo's job gate as a {key} line of AGENTS.md on {work}"))  # fmt: skip
     env = scrubbed_env()
     env["PATH"] = os.pathsep.join([str(venv_tool(venv_dir(root), "python").parent), env.get("PATH", "")])  # fmt: skip
     try:
@@ -194,8 +197,8 @@ def _gate(tree: Path, work: str) -> None:
                               stderr=subprocess.STDOUT)  # fmt: skip
     except OSError as error:
         raise Refusal(f"{key} {' '.join(argv)!r} cannot start: {error}",
-                      f"Agent action: make the {key} line of {agents} on {work} one argv list that starts:"
-                      " it runs without a shell — no VAR=value prefix, no sh -c") from error  # fmt: skip
+                      _land_line(f"make the {key} line of AGENTS.md on {work} one argv list that starts (it runs"
+                                 " without a shell: no VAR=value prefix, no sh -c)")) from error  # fmt: skip
     if done.returncode:
         raise Refusal(f"{key} exited {done.returncode}",
                       f"Agent action: make `{inline(*argv)}` exit 0 in {tree} and commit the fix in this worktree")  # fmt: skip

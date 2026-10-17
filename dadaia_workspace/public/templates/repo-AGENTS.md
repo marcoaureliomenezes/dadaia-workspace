@@ -3,9 +3,9 @@
 Scope: this file governs production-source work inside this repo.
 Workspace SDD rules live in the root `AGENTS.md`; spec artifact rules live in `specs/AGENTS.md`.
 
-Edit this file directly for repo-specific behavior. It is not overwritten by `.dadaia/.venv/bin/dadaia public install`.
+Change this file through a worktree merge, like any repo file; `public install` never overwrites it.
 
-`verify: <one argv command>` (required by every job merge) and `tests: <globs>` (test paths an implementation commit may not touch), each as a line starting at column 0 here; `.dadaia/.venv/bin/dadaia worktree merge` reads `verify:` from the merge's base branch and `tests:` from the job's `wt-rc` (`worktrees/AGENTS.md` §2); a line's words split on whitespace, quotes group a word, and backslashes are literal.
+A line `verify: <one argv command>` (required by every job merge) and `tests: <globs>` (test paths an implementation commit may not touch), each as a line starting at column 0 here; `.dadaia/.venv/bin/dadaia worktree merge` reads `verify:` from the merge's base branch and `tests:` from the job's `wt-rc` (`worktrees/AGENTS.md` §2); a line's words split on whitespace, quotes group a word, and backslashes are literal.
 
 ## 1. Source boundaries
 

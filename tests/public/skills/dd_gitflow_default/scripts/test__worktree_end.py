@@ -603,7 +603,13 @@ def test_a_missing_verify_line_lands_through_a_backlog_lane(root: Path) -> None:
     repo = root / "repos/r"
     good = read_text(repo / "AGENTS.md")
     commit(repo, "AGENTS.md", "")
-    commit(repo, "specs/bugs/BUGS.jsonl", '{"id": "some-bug", "status": "open"}\n')
+    append = _PACKAGE_SKILLS / "dd-bug-resolution/scripts/bugs.py"
+    flags = ("--bug-id", "some-bug", "--reported-by", "t", "--title", "t", "--severity", "LOW",
+             "--surface", "scripts", "--component", "c", "--context", "c", "--symptom", "s",
+             "--repro", "r", "--expected", "e", "--correlates", "none")  # fmt: skip
+    run_python(str(append), "append", "--specs", str(repo / "specs"), *flags, check=True)
+    git(repo, "add", "-A")
+    git(repo, "commit", "-qm", "bug")
     hotfix = open_tree(root, HOTFIX)
     approve(root, commit(hotfix, "src/a.py"), name=HOTFIX)
     refused = run(root, "merge", str(hotfix))
@@ -615,7 +621,7 @@ def test_a_missing_verify_line_lands_through_a_backlog_lane(root: Path) -> None:
     approve(root, commit(lane, "AGENTS.md", good), name=BACKLOG)
     landed = run(root, "merge", str(lane))
     assert landed.returncode == 0, landed.stderr
-    _fix(root, run(root, "merge", str(hotfix)))
+    git(hotfix, "rebase", "-q", "feature/0.5.0")
     approve(root, git(hotfix, "rev-parse", "HEAD").strip(), at="T11:00:00Z", name=HOTFIX)
     done = run(root, "merge", str(hotfix))
     assert done.returncode == 0, done.stderr
