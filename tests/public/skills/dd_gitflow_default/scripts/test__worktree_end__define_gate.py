@@ -8,6 +8,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+from tests.helpers.oslib import cli_argv, inline, venv_dir
 from tests.helpers.worktree_ws import approve, commit, fixes, git, make_workspace, patch_cli, run
 
 LANE, RC = "0.5.0/wt-backlog-d", "0.5.0/rc-1/wt-rc"
@@ -68,6 +69,39 @@ def test_an_rc_merge_runs_the_job_gate(tmp_path: Path) -> None:
     git(root / "repos/r", "checkout", "-q", "feature/0.5.0")
     assert run(root, "new", "r", RC).returncode == 0
     tree = root / "worktrees/r" / RC
-    approve(root, commit(tree, "RED-job", ""))
+    approve(root, commit(tree, "RED-job", ""), name=RC)
     refused = run(root, "merge", str(tree))
+    sync = inline(*cli_argv(venv_dir(root)), "worktree", "sync", str(tree))
     assert refused.returncode == 1 and "verify: exited 1" in refused.stderr
+    assert fixes(refused) == [
+        f"fix: Agent action: make `python scripts/ci.py job` exit 0 in {tree} and commit the fix"
+        " in this worktree when a reconcile commit is at fault, or through a wt-hotfix lane when"
+        f" the work branch's verify: fails too, then `{sync}`"
+    ]
+
+
+def test_an_rc_gate_red_from_the_work_branch_clears_through_a_hotfix_then_the_printed_sync(
+    tmp_path: Path,
+) -> None:
+    (root := tmp_path / "ws").mkdir()
+    make_workspace(root)
+    repo = root / "repos/r"
+    git(repo, "checkout", "-q", "feature/0.5.0")
+    commit(repo, "RED-job", "")
+    commit(repo, "specs/bugs/BUGS.jsonl", '{"id": "some-bug", "status": "open"}\n')
+    assert run(root, "new", "r", RC).returncode == 0
+    tree = root / "worktrees/r" / RC
+    approve(root, commit(tree, "src/z.py"), name=RC)
+    refused = run(root, "merge", str(tree))
+    sync = inline(*cli_argv(venv_dir(root)), "worktree", "sync", str(tree))
+    assert refused.returncode == 1 and fixes(refused)[0].endswith(f"then `{sync}`")
+    hotfix = root / "worktrees/r/0.5.0/wt-hotfix-some-bug"
+    assert run(root, "new", "r", "0.5.0/wt-hotfix-some-bug").returncode == 0
+    git(hotfix, "rm", "-q", "RED-job")
+    git(hotfix, "commit", "-qm", "fix code")
+    approve(root, git(hotfix, "rev-parse", "HEAD").strip(), name="0.5.0/wt-hotfix-some-bug")
+    assert run(root, "merge", str(hotfix)).returncode == 0
+    assert run(root, "sync", str(tree)).returncode == 0
+    approve(root, git(tree, "rev-parse", "HEAD").strip(), name=RC, at="T11:00:00Z")
+    landed = run(root, "merge", str(tree))
+    assert landed.returncode == 0, landed.stderr
