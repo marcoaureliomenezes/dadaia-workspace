@@ -120,6 +120,20 @@ def test_the_kernel_spells_the_fix_line_and_the_reinstall_act(tmp_path: Path) ->
     )
 
 
+def test_the_reinstall_fix_of_a_root_win32_cannot_spell_is_an_act(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = tmp_path / "a$b"
+    (root / ".dadaia" / "states").mkdir(parents=True)
+    write_text(root / ".dadaia" / "states" / "spec_contexts.json", "{}")
+    monkeypatch.setattr("sys.platform", "win32")
+    fix = cli_line.reinstall_fix(root / "specs")
+    assert fix == (
+        f"Agent action: run uvx dadaia-workspace init {root.resolve()}, "
+        f"quoting {root.resolve()} for your shell"
+    )
+
+
 def test_no_string_outside_the_kernel_spells_a_fix_line_by_hand() -> None:
     package = Path(cli_line.__file__).resolve().parents[1]
     spelled = re.compile(r"(?<![\w-])fix:")
