@@ -48,7 +48,7 @@ The branch contract by role; the names are `specs/constitution.md`'s `gitflow:` 
 
 ## 3a. Commit shapes — each write in its own shape
 
-`<code>` is any path outside `specs/`; `<id>` is the current task id `J<n>.T<k>`.
+`<code>` is any path outside `specs/`; `<id>` is the current task id `J<n>.T<k>`, in a lane its `<slug>`.
 
 | # | Tree | Write | Message |
 |---|---|---|---|

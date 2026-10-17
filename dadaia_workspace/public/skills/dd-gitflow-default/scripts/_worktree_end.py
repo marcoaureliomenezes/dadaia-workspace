@@ -152,12 +152,12 @@ def _check_ancestor(root: Path, tree: Path, work: str) -> None:
 
 
 def _land_line(tree: Path, work: str, act: str) -> str:
-    """The one act that lands a repo-law line on *work*: a backlog lane carries it (its merge still
-    runs the verdict and the ledger checks), then the tree that owns *work* syncs."""
+    """The one act that lands a repo-law line: a backlog lane carries it onto the work branch (its
+    merge still runs the verdict and the ledger checks), then the tree owning *work* syncs."""
     root = workspace_of(tree)
-    owner = tree_path(root, tree.relative_to(tree_path(root, "")).parts[0], work.removeprefix("wt/")) if root and work.startswith("wt/") else tree  # fmt: skip
-    sync = inline(*cli_words(root, "worktree", "sync", str(owner))) if root else "worktree sync"
-    return f"Agent action: {act} through a wt-backlog lane, then `{sync}`"
+    repo = root / "repos" / tree.relative_to(tree_path(root, "")).parts[0]
+    owner = _into(repo, work) if work.startswith("wt/") else tree
+    return f"Agent action: {act} through a wt-backlog lane, then `{inline(*cli_words(root, 'worktree', 'sync', str(owner)))}`"  # fmt: skip
 
 
 def _declared(tree: Path, work: str, key: str) -> str:
