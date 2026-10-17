@@ -25,7 +25,7 @@ from dadaia_workspace.core.atomic_write import SymlinkRefusedError
 from dadaia_workspace.core.atomic_write import atomic_write as shim_write
 from dadaia_workspace.core.skill_owner import load_owner
 from tests.helpers.oslib import (
-    PERMISSIONS_ENFORCED,
+    detect,
     is_link,
     make_readonly,
     read_text,
@@ -48,10 +48,11 @@ _Write = Callable[..., None]
 
 
 def _moded(path: Path, text: str) -> int:
-    """Write *text* to *path*, read-only where permissions bind (then its mode differs from a
-    fresh sibling's in a non-exec bit under any umask); the mode."""
+    """Write *text* to *path*, read-only off Windows (a read-only file there refuses the swap; elsewhere
+    chmod holds for root too, and the mode then differs from a fresh sibling's in a non-exec bit
+    under any umask); the mode."""
     write_text(path, text)
-    if PERMISSIONS_ENFORCED:
+    if not detect().windows:
         make_readonly(path)
         sibling = path.with_name("fresh-" + path.name)
         write_text(sibling, text)
