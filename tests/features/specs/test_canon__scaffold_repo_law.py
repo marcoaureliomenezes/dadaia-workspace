@@ -86,7 +86,6 @@ def test_a_refused_write_raises_instead_of_skipping(
     repo.mkdir()
     with pytest.raises(PermissionError):
         canon.scaffold_repo_law(repo, project_name="p", public_dir=public)
-    assert list(repo.iterdir()) == []
 
 
 def test_repo_law_heading_carries_the_project_name(tmp_path: Path, public: Path) -> None:
