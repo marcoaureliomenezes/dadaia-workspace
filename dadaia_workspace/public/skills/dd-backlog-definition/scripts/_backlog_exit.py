@@ -76,10 +76,7 @@ def _bug(specs: Path, slug: str, disposition: str, reason: str | None) -> None:
     if reason not in ids:
         raise Refusal(
             f"--reason {reason!r} names no record of {bugs}: `to-bug` hands {slug!r} to a registered bug",
-            f"Operator action: confirm {slug} as a bug, register it with bugs.py append "
-            f"(dd-bug-registration), then rerun "
-            f"`{SCRIPT.inline('exit', slug, '--disposition', disposition, specs=specs)}` "
-            "with its id as --reason.",
+            f"Operator action: confirm {slug} as a bug (dd-bug-registration §2)",
         )  # fmt: skip
 
 
