@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """`worktree.py merge|clean`: end one canonical worktree — land it on its parent's branch after
 its gate, or drop an empty one — never with `--force` or `-D`, re-runnable after a stop. A task
-lands after test separation, unreviewed; a main tree, a rc (plus the ledger checks) and a hotfix
+lands after test separation, unreviewed; a main tree, a rc (plus, in the main repo, the ledger checks) and a hotfix
 after their review and the job gate; a backlog tree lands `specs/` after its review and the ledger
-checks alone. The job gate is the repo's own declared `verify:` line, run as one argv list."""
+checks alone (an associated repo holds no `specs/`, so those checks skip). The job gate is the repo's own declared `verify:` line, run as one argv list."""
 
 from __future__ import annotations
 
@@ -278,8 +278,10 @@ def _checks(root: Path, tree: Path) -> Iterator[tuple[str, subprocess.CompletedP
     yield "dadaia doctor", cli(root, "doctor", "--specs-dir", str(tree / "specs"), tree=tree)
 
 
-def _ledgers(root: Path, tree: Path) -> None:
-    """A rc or backlog merge's ledger gate: the ledger checks and the doctor on the tree, a red one relaying its own first `fix:` line."""
+def _ledgers(root: Path, repo: Path, tree: Path) -> None:
+    """A rc or backlog merge's ledger gate: the ledger checks and the doctor on the tree, a red one relaying its own first `fix:` line; an associated repo holds no `specs/`, so it has none."""
+    if flow_for(root, repo)["main"] != repo.name:
+        return
     for name, done in _checks(root, tree):
         if done.returncode:
             out = done.stdout + done.stderr
@@ -382,7 +384,7 @@ def _kind_checks(root: Path, repo: Path, tree: Path, name: str, onto: str, into:
     verdict = partial(_check_approved, root, tree, onto, name)
     gate = [ancestor, verdict, partial(_gate, tree, onto)]
     children, scaffold = partial(_open_children, repo, name), partial(_scaffold, tree, name)
-    ledgers, specs = partial(_ledgers, root, tree), partial(_check_specs_only, tree, onto)
+    ledgers, specs = partial(_ledgers, root, repo, tree), partial(_check_specs_only, tree, onto)
     tests = lambda: _refuse_implementation_tests(tree, onto, _target(root, str(into))[3])  # noqa: E731
     table: dict[str | None, list[Callable[[], object]]] = {
         "task": [ancestor, tests, partial(_refuse_dirty, into)],
