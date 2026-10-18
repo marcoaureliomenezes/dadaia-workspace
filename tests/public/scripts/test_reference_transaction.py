@@ -220,3 +220,16 @@ def test_a_venv_without_the_package_is_a_runner_fault_and_passes(repo: _Repo) ->
     )
     assert done.returncode == 0, done.stderr
     assert "update allowed" in done.stderr, done.stderr
+
+
+def test_a_runner_planted_in_the_repo_is_never_run_ahead_of_the_workspace_venv(repo: _Repo) -> None:
+    """A `<repo>/.dadaia/.venv` interpreter committed in the repo loses to the workspace venv above it."""
+    marker = repo.root.parent / "planted-ran"
+    python = repo.root / ".dadaia" / ".venv" / "bin" / "python"
+    python.parent.mkdir(parents=True)
+    python.write_text(f"#!/bin/sh\ntouch '{marker.as_posix()}'\nexit 0\n")
+    make_executable(python)
+    done = repo.git("worktree", "add", "-q", "-b", "wt/x", str(repo.root.parent / "tree"))
+    assert done.returncode != 0
+    assert f"fix: {oslib.command(str(repo.stub), 'worktree', 'new', 'repo', 'x')}" in done.stderr
+    assert not marker.exists()

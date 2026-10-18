@@ -41,18 +41,15 @@ def _shim(repo: Path, *args: str, stdin: str = "") -> subprocess.CompletedProces
     return run([git_bash(), str(GATE_SCRIPT), *args], cwd=repo, input=stdin, env=env, timeout=60)
 
 
-@pytest.mark.parametrize(
-    ("name", "expect_label"),
-    [("walk_up_to_workspace_venv", "workspace-venv"), ("repo_local_venv", "")],
-)
-def test_runner_resolution_branch_table(tmp_path: Path, name: str, expect_label: str) -> None:
+@pytest.mark.parametrize("name", ["walk_up_to_workspace_venv", "repo_local_venv"])
+def test_runner_resolution_branch_table(tmp_path: Path, name: str) -> None:
     if name == "walk_up_to_workspace_venv":
         ws = tmp_path / "ws"
         repo = _repo(ws / "repos" / "slug")
         runner = _runner(ws / ".dadaia" / ".venv")
         res = _shim(repo, "--probe-only")
         assert res.returncode == 0, res.stderr
-        assert expect_label in res.stdout
+        assert "workspace-venv" in res.stdout
         assert runner.as_posix() in res.stdout
         assert "poetry" not in res.stdout
         return
@@ -62,7 +59,25 @@ def test_runner_resolution_branch_table(tmp_path: Path, name: str, expect_label:
     res = _shim(repo, "--probe-only")
     assert res.returncode == 1, res.stdout
     assert "could not locate the dadaia runner" in res.stderr
-    assert "repo-venv" not in res.stdout
+
+
+def test_a_runner_planted_in_the_repo_is_never_run_ahead_of_the_workspace_venv(
+    tmp_path: Path,
+) -> None:
+    """A `<repo>/.dadaia/.venv` runner committed in the repo loses to the workspace venv above it."""
+    ws = tmp_path / "ws"
+    repo = _repo(ws / "repos" / "slug")
+    runner = _runner(ws / ".dadaia" / ".venv")
+    marker = tmp_path / "planted-ran"
+    _runner(repo / ".dadaia" / ".venv", f"#!python\nopen({str(marker)!r}, 'w').close()\n")
+    probe = _shim(repo, "--probe-only")
+    assert probe.returncode == 0, probe.stderr
+    assert runner.as_posix() in probe.stdout
+    res = _shim(
+        repo, stdin=f"refs/heads/feature/0.0.1 {'a' * 40} refs/heads/feature/0.0.1 {_ZERO}\n"
+    )
+    assert res.returncode == 0, res.stderr
+    assert not marker.exists()
 
 
 def test_the_other_hosts_layout_is_probed_too(tmp_path: Path) -> None:
