@@ -39,7 +39,7 @@ def _repo_root() -> Path:
     try:
         out = platform.run(["git", "rev-parse", "--show-toplevel"], check=True)
     except (subprocess.CalledProcessError, FileNotFoundError):
-        fail("not inside a git repository", "Agent action: run it inside a git repository")
+        fail("not inside a git repository", platform.act("agent", "run it inside a git repository"))
     return Path(out.stdout.strip())
 
 
@@ -112,22 +112,30 @@ def _rewrite_unpublished(repo: Path, oldest: str, message: str | None) -> None:
     if sha not in build_git_object_reader().unpublished(repo, tip):
         refusal = (
             f"cannot rewrite {oldest}: origin already holds it, or it is not in HEAD's history",
-            "Agent action: pass the oldest commit origin does not hold, as the push gate's fix line names it",
+            platform.act(
+                "agent",
+                "pass the oldest commit origin does not hold, as the push gate's fix line names it",
+            ),
         )
     elif not listed:
         refusal = (
             "the push gate lists no denylist or canon finding in HEAD's unpublished range",
-            "Agent action: land the change through a worktree; this remedy answers a push gate refusal only",
+            platform.act(
+                "agent",
+                "land the change through a worktree; this remedy answers a push gate refusal only",
+            ),
         )
     elif stray:
         refusal = (
             f"the working tree changes paths the gate did not list: {', '.join(stray)}",
-            "Agent action: revert or unstage every path the gate did not list, and add no path",
+            platform.act(
+                "agent", "revert or unstage every path the gate did not list, and add no path"
+            ),
         )
     elif message and not (isinstance(decision, GateDecision) and decision.message_listed):
         refusal = (
             "the push gate lists no commit message, so the message stays",
-            "Agent action: run the remedy again without the message option",
+            platform.act("agent", "run the remedy again without the message option"),
         )
     if refusal:
         fail(*refusal)
@@ -244,7 +252,10 @@ def ref_gate_check() -> None:
     if any(len(parts) != 3 for parts in lines):
         fail(
             "[ref-gate] BLOCKED: a ref line is not `<old> <new> <ref>`",
-            "Agent action: pipe one line per ref update, each holding the old sha, the new sha and the ref name",
+            platform.act(
+                "agent",
+                "pipe one line per ref update, each holding the old sha, the new sha and the ref name",
+            ),
         )
     git = build_git_client()
     gitflow = _gitflow(repo_root)[0]
