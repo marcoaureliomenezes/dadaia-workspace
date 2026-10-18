@@ -38,6 +38,7 @@ axes are reported side by side with equal weight, so no axis hides another's fin
 - Read `<specs-dir>/releases/<v>/rc-<N>/SPEC.md` (`**Status:** Approved`) and the job's `rc-<N>/tasks/job<n>.md`.
 - Does the diff do what they say — nothing more, nothing less?
 - Scope growth beyond the task's declared write set is a finding, even when the code is good.
+- A shape-11 `docs(law)` commit (`dd-gitflow-default` §3a) outside the job's `W:` is accepted only when its body cites the finding and names the file.
 - Acceptance criteria without corresponding evidence (test/assertion) is a finding.
 - Read `rc-<N>/PLAN.md` §1 (As-is review) beside the SPEC and job files: a DELETE or REBUILD unit the range leaves unchanged is HIGH.
 - A KEEP unit the range grew is a finding.
