@@ -82,8 +82,11 @@ line-length = 100
 target-version = "py312"
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B", "SIM"]
+select = ["E", "F", "I", "UP", "B", "SIM", "PLW1514"]
 ignore = ["E501", "B008"]
+# Preview is on only to reach PLW1514; explicit-preview-rules keeps every other preview rule off.
+preview = true
+explicit-preview-rules = true
 
 [tool.ruff.lint.per-file-ignores]
 # The skill entry points bootstrap sys.path before their sibling imports (kernel rule 2).
