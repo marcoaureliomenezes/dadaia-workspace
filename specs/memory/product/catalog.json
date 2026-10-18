@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-18T04:33:16Z",
+  "generated_at": "2026-10-18T04:51:28Z",
   "features": [
     {
       "rank": 1,
@@ -14,7 +14,7 @@
         "handoff",
         "schema"
       ],
-      "token_estimate": 883,
+      "token_estimate": 934,
       "depends_on": [
         "worktrees",
         "release-lifecycle",
@@ -786,7 +786,7 @@
         "lineage",
         "resolution"
       ],
-      "token_estimate": 1169,
+      "token_estimate": 1231,
       "depends_on": [
         "cross-platform-portability",
         "public-asset-distribution",
