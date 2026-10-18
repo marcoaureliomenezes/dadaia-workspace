@@ -17,9 +17,9 @@ import _bugs_write as wr
 import _findings
 import _jsonl
 from _atomic import SymlinkRefusedError
-from _bugs_check import LEDGER, OPEN, STATUS_BY_VERB, check
-from _bugs_store import Refusal, commit, read_records
-from _git import GitError, git
+from _bugs_check import HISTO, LEDGER, OPEN, STATUS_BY_VERB, check
+from _bugs_store import Records, Refusal, commit, read_records
+from _git import GitError, git, touched
 from _platform import act, use_utf8_stdio
 from _refusal import report
 from _specs import find_specs, refuse
@@ -30,7 +30,6 @@ _OPTIONS: dict[str, tuple[str, ...]] = {
         "--reported-by",
         "--title",
         "--severity",
-        "--surface",
         "--component",
         "--context",
         "--symptom",
@@ -78,6 +77,17 @@ def _parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _history(specs: Path) -> Records:
+    """The live ledger's records and the archive's."""
+    return read_records(specs / LEDGER) + (
+        read_records(specs / HISTO) if (specs / HISTO).is_file() else []
+    )
+
+
+def _ordinal(n: int) -> str:
+    return f"{n}{'th' if 10 <= n % 100 <= 20 else {1: 'st', 2: 'nd', 3: 'rd'}.get(n % 10, 'th')}"
+
+
 def _read(args: argparse.Namespace, specs: Path) -> int:
     records = read_records(specs / LEDGER)
     if args.verb == "stats":
@@ -88,6 +98,9 @@ def _read(args: argparse.Namespace, specs: Path) -> int:
         ):
             for value, count in sorted(Counter(values).items()):
                 print(f"{label}:{value}\t{count}")
+        for path, ids in wr.by_file(_history(specs)).items():
+            if len(ids) > 1:
+                print(f"rebuild-due:{path}\t{','.join(ids)}")
         return 0
     selected = [r for r in records if args.include_closed or r.get("status") == OPEN]
     for record in sorted(selected, key=lambda r: str(r["id"])):
@@ -114,16 +127,20 @@ def _write(args: argparse.Namespace, specs: Path) -> int:
         values["ts"] = wr.now_iso()
         values["reported_by"] = values["reported_by"] or "dd-sw-engineer-sr"
         try:
-            listed = git(specs, "ls-files", "--full-name", ":/")
+            tracked = git(specs, "ls-files", "--full-name", ":/").splitlines()
         except (OSError, GitError) as exc:
             raise Refusal(
                 f"cannot list the repo's tracked directories: {getattr(exc, 'stderr', exc)}",
                 act("agent", "point --specs at a specs tree inside a git repo"),
             ) from None
-        dirs = {part for path in listed.splitlines() for part in path.split("/")[:-1]}
-        near = wr.candidates(read_records(ledger), values["surface"])
-        print(f"correlation candidates on {values['surface']!r}: {', '.join(near) or 'none'}")
-        commit(ledger, lambda records: wr.append(records, values, dirs))
+        history, comp = _history(specs), values["component"].rstrip("/")
+        earlier = sorted({i for p, ids in wr.by_file(history).items() if p == comp or p.startswith(comp + "/") for i in ids})  # fmt: skip
+        for bug in earlier:
+            print(f"earlier bug on {comp}: {bug}")
+        if earlier:
+            print(f"REBUILD due: {_ordinal(len(earlier) + 1)} bug on {comp}")
+        known = {str(r["id"]) for r in history}
+        commit(ledger, lambda records: wr.append(records, values, tracked, known))
         print(f"[ok] registered {values['id']} -> {specs}")
         return 0
     if args.verb == "update":
@@ -132,6 +149,8 @@ def _write(args: argparse.Namespace, specs: Path) -> int:
         print(f"[ok] updated {', '.join(sorted(changes))} for {args.bug_id}")
         return 0
     values = _jsonl.values(args, _OPTIONS[args.verb])
+    if args.verb == "resolve" and (files := touched(specs.parent, values["fix_sha"] or "")):
+        values["fix_files"] = files
     commit(ledger, lambda records: tr.transition(records, args.bug_id, args.verb, values))
     print(f"[ok] {STATUS_BY_VERB[args.verb]} {args.bug_id}")
     return 0

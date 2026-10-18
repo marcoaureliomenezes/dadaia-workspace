@@ -53,6 +53,13 @@ def reaches(repo: Path, sha: str) -> bool:
     return True
 
 
+def touched(repo: Path, sha: str) -> list[str]:
+    """The paths commit *sha* touched in *repo*; none when git does not know it."""
+    return git(
+        repo, "diff-tree", "--root", "--no-commit-id", "--name-only", "-r", sha, check=False
+    ).splitlines()
+
+
 def parse_worktrees(text: str) -> list[dict[str, str]]:
     """Every linked worktree of a `worktree list --porcelain` *text* (the main checkout excluded)."""
     parsed = [
