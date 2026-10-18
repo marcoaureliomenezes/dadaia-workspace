@@ -41,7 +41,7 @@ line here and `--help` disagree, `--help` wins.
   on a conflict `list --status all`, `clean` (stale = TTL expired or pid gone), then `next`.
 - `scan [--json]` lists listeners no entry covers (Linux `ss`; empty elsewhere).
 
-- Stop a process by its registered PID only, never by name or pattern.
+- Stop a process by its registered PID only, never by name or pattern: `pkill -f` and `pgrep -f` waiters match processes you did not start; kill only the PIDs you started.
 - Run a gate unpiped, or under `set -o pipefail`, and record its exit code; a piped exit code is the last command's.
 
 ## Done when
