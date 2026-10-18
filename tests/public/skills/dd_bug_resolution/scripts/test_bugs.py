@@ -596,6 +596,53 @@ def test_append_takes_a_correlate_that_only_the_archive_holds(script: Path, tmp_
     assert _records(specs)[-1]["correlates"] == ["old-one"]
 
 
+def test_append_refuses_a_correlate_no_ledger_or_archive_holds(
+    script: Path, tmp_path: Path
+) -> None:
+    specs = _ledger(tmp_path, _sibling("a-bug", "cli/x.py"))
+    before = (specs / "bugs/BUGS.jsonl").read_bytes()
+    done = _run(script, *_append_argv(specs), "--correlates", "a-bug,ghost")
+    assert done.returncode == 1 and "--correlates" in done.stderr, done.stderr
+    assert (specs / "bugs/BUGS.jsonl").read_bytes() == before
+
+
+@pytest.mark.parametrize("component", ["cli/x.py#run", "cli/x.py/"])
+def test_append_takes_a_component_that_names_a_tracked_path_in_free_text(
+    script: Path, tmp_path: Path, component: str
+) -> None:
+    specs = _ledger(tmp_path, _sibling("b1", "cli/x.py"), _sibling("b4", "hooks/y.py"))
+    done = _run(script, *_append_argv(specs, component), "--correlates", "b1")
+    assert done.returncode == 0, done.stderr
+    assert done.stdout.splitlines()[:2] == [
+        "earlier bug on cli/x.py: b1", "REBUILD due: 2nd bug on cli/x.py",
+    ]  # fmt: skip
+    assert _records(specs)[-1]["component"] == component
+
+
+def test_append_without_a_component_is_one_refusal_with_one_fix_line(
+    script: Path, tmp_path: Path
+) -> None:
+    specs = _ledger(tmp_path)
+    argv = _append_argv(specs)
+    del argv[argv.index("--component") : argv.index("--component") + 2]
+    done = _run(script, *argv, "--correlates", "none")
+    assert done.returncode == 1 and "Traceback" not in done.stderr, done.stderr
+    assert len([ln for ln in done.stderr.splitlines() if ln.startswith("fix: ")]) == 1
+    assert _records(specs) == []
+
+
+@pytest.mark.parametrize("sha", ["--output={planted}", "b" * 40])
+def test_resolve_reads_no_fix_files_from_a_sha_the_repo_does_not_reach(
+    script: Path, tmp_path: Path, sha: str
+) -> None:
+    specs = _ledger(tmp_path, _OPEN_RECORD)
+    planted = tmp_path / "planted"
+    _run(script, "resolve", "a-bug", "--cause", "c", "--caused-by", "none", "--solution", "s",
+         f"--fix-sha={sha.format(planted=planted)}", "--specs", str(specs))  # fmt: skip
+    assert not planted.exists()
+    assert "fix_files" not in _records(specs)[0] or _records(specs)[0]["fix_files"] is None
+
+
 def test_append_takes_no_surface_flag(script: Path, tmp_path: Path) -> None:
     specs = _ledger(tmp_path)
     done = _run(script, *_append_argv(specs), "--correlates", "none", "--" + "surface", "cli")
