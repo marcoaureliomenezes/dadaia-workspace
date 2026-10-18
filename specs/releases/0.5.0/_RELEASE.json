@@ -2153,6 +2153,12 @@
         "agent-comms",
         "bug-ledger"
       ]
+    },
+    {
+      "ts": "2026-10-18T12:14:34Z",
+      "agent": "dd-product-engineer",
+      "kind": "summary",
+      "text": "delivered: rc-17, the nine weak points (SPEC FR1-FR14) in 8 jobs and 45 tasks: (1) one `act(kind, text)` fix-line label producer (ADR 0266, amends 0159); (2) the bug surface derived from `fix_files` (ADR 0267), `append` listing the earlier bugs and the REBUILD due; (3) the implementer self-check; (4) the law holes on gate inflation and closure scope closed; (5) the Windows static pin, ruff PLW1514 (ADR 0268, accepted 2026-10-18, amends 0265); (6) the `docs(law)` commit shape 11; (7) the CWE-427 hook runner walk from the repo root's parent; (8) the ref gate's one zero-old decider (FR14, CRITICAL ref-gate-refuses-pack-refs-of-wt-branches); (9) the `verdict.py stats` 6-metric readout; the loose ends; memory reconciled in two passes (16 + 2 changed); bugs inside rc-17: 3 resolved, all archived, 0 open: ref-gate-refuses-pack-refs-of-wt-branches (caused_by J3.T8) and two fix-induced bugs found at closure, append-crashes-on-the-event-shaped-archive (CRITICAL, caused_by J4.T3) and stats-names-the-repo-by-its-checkout-folder (HIGH, caused_by J5.T4), both fixed on wt-rc by the operator's ruling 'Fix on wt-rc (Recommended)'; 8 stale rc-16 wt/* branches bundled and deleted; readout (AC9.3), rc-17: metric 1 fix-induced 1/1 (100%), target <= 20%, the window ending at CLOSURE, so the two closure bugs above fall after it; metric 2 first-pass approval 4/8 (50%), target >= 70%, missed; metric 3 merge verify: wall time median 105 s over the 4 job merges measured this session (Job 7 194 s, Job 4 102 s, Job 6 87 s, Job 5 108 s), target <= 150 s; metric 4 closure duration n/a until the PR merges, target <= 4 h; metric 5 CI red share read after the push, target <= 10%; metric 6 non-block commits after closure 0, target 0; metric 7 memory drift 0, target 0; metric 8 hand-typed labels 0 by the one-grep contract test, target 0; metric 9 rebuild-due patches 0, target 0; AC9.4, rc-16 by the same method: metric 1 16/20 (80%), metric 2 15/42 (36%), metric 4 40.5 h, metric 6 199; carried: none; backlog exits: several-work-fix-line-follow-ups, law-and-docs-text-loose-ends and ref-gate-hardening-follow-ups (delivered); new: ref-gate-open-questions, rc17-review-loose-ends."
     }
   ]
 }
