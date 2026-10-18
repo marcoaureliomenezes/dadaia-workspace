@@ -19,6 +19,7 @@ from typing import Any
 
 import pytest
 
+from dadaia_workspace.infrastructure.ledger_scripts import load_owner
 from tests.helpers.oslib import read_text, run, write_text
 from tests.helpers.skill_scripts import stage_skill_scripts
 
@@ -295,3 +296,26 @@ def test_the_ledger_walk_skips_a_fenced_root(tmp_path: Path, monkeypatch: pytest
     assert ledger.workspace_of(tmp_path / "specs") == tmp_path.resolve()
     monkeypatch.setenv("DADAIA_FENCED_ROOTS", str(tmp_path))
     assert ledger.workspace_of(tmp_path / "specs") is None
+
+
+def _ledger_module() -> Any:
+    return load_owner("dd-bug-resolution", "_ledger")
+
+
+def _workspace(root: Path) -> Path:
+    (root / ".dadaia/states").mkdir(parents=True)
+    write_text(root / ".dadaia/states/spec_contexts.json", "{}")
+    (root / "specs/bugs").mkdir(parents=True)
+    return root / "specs/bugs/BUGS.jsonl"
+
+
+def test_a_denylist_named_by_the_environment_refuses_a_listed_term(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ledger_file = _workspace(tmp_path)
+    write_text(tmp_path / "terms.json", '{"zorblax": "private"}')
+    monkeypatch.setenv("DADAIA_PRIVACY_DENYLIST", str(tmp_path / "terms.json"))
+    refusal = _ledger_module().private_refusal([{"title": "zorblax"}], ledger_file)
+    assert refusal is not None
+    assert refusal[0].startswith("field 'title' carries ")
+    assert refusal[0].endswith("which the push refuses — nothing was written")

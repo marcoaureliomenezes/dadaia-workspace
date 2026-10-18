@@ -214,8 +214,5 @@ def test_unfilled_placeholder_atom_is_reported_with_the_fill_or_delete_line(tmp_
         "---\nslug: SLUG_PLACEHOLDER\ntitle: TITLE_PLACEHOLDER\ntldr: t\nsummary: s\n---\n\n# X\n",
     )
     [issue] = MemoryValidator(specs).check_placeholder_atoms()
-    assert (issue.code, issue.fixable, issue.fix) == (
-        "MEM-PLACEHOLDER-1",
-        False,
-        "Agent action: fill or delete the atom",
-    )
+    assert (issue.code, issue.fixable) == ("MEM-PLACEHOLDER-1", False)
+    assert issue.fix == f"Agent action: fill or delete the atom {atom}"

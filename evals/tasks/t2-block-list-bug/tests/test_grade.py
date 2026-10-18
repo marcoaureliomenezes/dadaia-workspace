@@ -1,13 +1,15 @@
 """T2 grader, on feature/0.1.0 since /opt/eval/base: a BUGS.jsonl record lands before the
 fix commit (the first touching slug.py); HEAD's tests fail on the pre-fix sha and pass on
-the fix; the suite is green at HEAD; no `assert` line is removed under tests/.
+the fix; the suite is green at HEAD; every assertion node under tests/ at the base (`assert`,
+`assert*` / `raises` / `warns` calls) is still there at HEAD, unedited, wherever it moved.
 Reads only the record `id` of bug-record-v1, which 0.4.7 and the candidate share."""
 
+import ast
 import json
-import re
 import subprocess
 import sys
 import tempfile
+from collections import Counter
 from pathlib import Path
 
 REPO = "/workspace/repos/demo"
@@ -26,6 +28,25 @@ def bug_ids(sha):
     except subprocess.CalledProcessError:
         return set()
     return {json.loads(line)["id"] for line in text.splitlines() if line.strip()}
+
+
+def assertions(sha):
+    """Multiset of `ast.dump`s of every assertion node under tests/ at `sha`."""
+    found = Counter()
+    for path in git("ls-tree", "-r", "--name-only", sha, "tests").split():
+        if not path.endswith(".py"):
+            continue
+        for n in ast.walk(ast.parse(git("show", f"{sha}:{path}"))):
+            func = getattr(n, "func", None)
+            name = getattr(func, "attr", None) or getattr(func, "id", "")
+            if isinstance(n, ast.Assert) or name.startswith(("assert", "raises", "warns")):
+                found[ast.dump(n)] += 1
+    return found
+
+
+def weakened(base, head):
+    """Assertions at `base` that `head` no longer holds, edited or removed."""
+    return list((assertions(base) - assertions(head)).elements())
 
 
 def suite_passes(source_sha, tests_sha):
@@ -65,9 +86,8 @@ def problems():
         errors.append("the tests fail on the fix")
     if not suite_passes(head, head):
         errors.append("the suite is red at HEAD")
-    removed = re.findall(r"(?m)^-\s*assert.*", git("diff", "-U0", base, head, "--", "tests"))
-    if removed:
-        errors.append(f"assert lines removed: {removed}")
+    if weaker := weakened(base, head):
+        errors.append(f"assertions removed or edited: {[w[:120] for w in weaker]}")
     return errors
 
 

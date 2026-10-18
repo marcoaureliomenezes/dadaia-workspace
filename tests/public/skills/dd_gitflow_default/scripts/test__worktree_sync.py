@@ -71,6 +71,16 @@ def test_sync_rebases_the_tree_and_those_below_it_parents_first(root: Path) -> N
         assert read_text(root / "worktrees/r" / name / f"src/{leaf}.py") == "x = 1\n"
 
 
+def test_sync_keeps_a_commit_once_on_the_parent_and_later_removed_from_it(root: Path) -> None:
+    repo, rc = root / "repos/r", root / "worktrees/r" / RC
+    git(repo, "merge", "-q", "--ff-only", f"wt/{RC}")  # the work branch once held the tree's commit
+    git(repo, "reset", "-q", "--hard", "HEAD~1")  # and then lost it
+    _move_work(root)
+    assert run(root, "sync", str(rc)).returncode == 0
+    assert _holds(root, WORK, RC)
+    assert (rc / "src/wt-rc.py").is_file()
+
+
 def test_sync_skips_a_tree_that_holds_its_base(root: Path) -> None:
     commit(root / "worktrees/r" / RC, "src/rc2.py")  # the job is behind its tree; the tree is not
     _move_work(root)
@@ -123,9 +133,11 @@ def test_sync_refuses_a_dirty_tree_and_touches_nothing_below_it(root: Path) -> N
     _move_work(root)
     write_text(job / "src/main.py", "edited\n")
     heads = git(job, "rev-parse", "HEAD"), git(task, "rev-parse", "HEAD")
+    rc_head = _heads(root)[0]
     refused = run(root, "sync", str(root / "worktrees/r" / RC))
     assert refused.returncode == 1 and str(job) in refused.stderr and len(fixes(refused)) == 1
     assert (git(job, "rev-parse", "HEAD"), git(task, "rev-parse", "HEAD")) == heads
+    assert _heads(root)[0] == rc_head
     assert read_text(job / "src/main.py") == "edited\n"
 
 
@@ -162,3 +174,11 @@ def test_after_a_lane_lands_sync_lets_the_release_tree_merge(root: Path) -> None
     assert run(root, "sync", str(rc)).returncode == 0
     landed = run(root, "merge", str(rc))
     assert landed.returncode == 0, landed.stderr
+
+
+def test_a_missing_tree_refuses_with_a_fix_that_runs(root: Path) -> None:
+    gone = root / "worktrees/r/0.5.0/rc-1/job-2/wt-main"
+    refused = run(root, "sync", str(gone))
+    assert refused.returncode == 1 and str(gone) in refused.stderr
+    [fix] = fixes(refused)
+    assert run_bash(fix.removeprefix("fix: "), cwd=root).returncode == 0

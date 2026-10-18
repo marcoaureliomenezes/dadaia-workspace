@@ -126,7 +126,7 @@ def init(
     replace_foreign: bool = typer.Option(
         False,
         "--replace-foreign",
-        help=f"Consent to move a foreign specs/ to {_BACKUP}/ (git mv, staged).",
+        help=f"Consent to move a foreign specs/ to {_BACKUP}/ (tracked files via git mv, staged).",
     ),
     principal: str | None = typer.Option(
         None, "--principal", help="Principal branch. Default: kept, else origin/HEAD, else main."
@@ -143,7 +143,7 @@ def init(
     """Bring a repo's specs/ to the canon, committing only the scaffold on a new work branch.
 
     Absent: scaffold. Upgradable or canonical: upgrade, then fill missing files. Foreign:
-    after consent, `git mv specs specs-bkp` (staged) and scaffold.
+    after consent, move specs/ to specs-bkp/ (tracked files staged) and scaffold.
     """
     rerun: tuple[str, ...] = ("--specs-dir", str(specs_dir))
     if specs_dir is None:
@@ -162,6 +162,10 @@ def init(
     if kind in ("malformed", "file"):
         fail("nothing written", fix or "")
     flow = _gitflow(target, principal, integration, work_prefix, rerun)
+    if kind == "foreign" and not replace_foreign:  # a refusal writes nothing, the cut included
+        _move_foreign(target, rerun, replace_foreign)
+    cut = _enter_work_branch(target.parent, flow)
+    kind, fix = specs_version.state(target)
     refused = False  # an unrelated error the repair left never blocks the gitflow write
     if kind == "foreign":
         _move_foreign(target, rerun, replace_foreign)
@@ -187,21 +191,34 @@ def init(
     )
     if refused:
         raise typer.Exit(1)
-    _commit_on_work_branch(target.parent, flow)
+    if cut:
+        _commit_scaffold(target.parent, cut)
     if kind in ("absent", "foreign"):
         typer.echo(f"[ok] {target} at pattern version {specs_version.CANONICAL_SPECS_VERSION}")
 
 
-def _commit_on_work_branch(repo: Path, flow: Gitflow) -> None:
-    """Cut the local work branch when absent and commit only the scaffold on it, leaving it
-    checked out; with the branch present, or outside a git root, nothing happens."""
+def _enter_work_branch(repo: Path, flow: Gitflow) -> str:
+    """The first step of init, before anything is written: a local work branch switches
+    nothing; an absent one is cut from ``origin/<work>``, else the integration branch (local,
+    else ``origin``), else HEAD. Returns its name when it was cut, else ``""``."""
     git = container.build_git_client()
-    if not git.is_git_root(repo):
-        return
+    if not repo.is_dir() or not git.is_git_root(repo):
+        return ""
     work = work_branch(repo, flow, repo.name)
-    if git.git(repo, "for-each-ref", f"refs/heads/{work}"):
-        return
-    git.git(repo, "switch", "-c", work)
+    refs = set(git.git(repo, "for-each-ref", "--format=%(refname)").split())
+    if f"refs/heads/{work}" in refs:
+        return ""
+    order = (f"origin/{work}", flow.integration, f"origin/{flow.integration}")
+    start = next(
+        (r for r in order if f"refs/remotes/{r}" in refs or f"refs/heads/{r}" in refs), None
+    )
+    git.git(repo, "switch", "-c", work, *([start] if start else []))
+    return work
+
+
+def _commit_scaffold(repo: Path, work: str) -> None:
+    """Commit only the scaffold paths on the checked-out work branch, when any differ."""
+    git = container.build_git_client()
     paths = [p for p in ONBOARDING if (repo / p).exists()]
     if git.git(repo, "status", "--porcelain", "--", *paths):
         git.commit_paths(repo, "chore: scaffold the dadaia specs", paths)
@@ -247,4 +264,4 @@ def _move_foreign(target: Path, rerun: tuple[str, ...], replace_foreign: bool) -
         backup = backup / f"{datetime.now(UTC):%Y%m%dT%H%M%SZ}"
     rel = backup.relative_to(target.parent).as_posix()
     container.build_git_client().move(target.parent, target.name, rel)
-    typer.echo(f"[moved] {target} -> {backup} (staged, not committed)")
+    typer.echo(f"[moved] {target} -> {backup} (tracked files staged)")

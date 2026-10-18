@@ -108,7 +108,7 @@ def test_dadaiaignore_invalid_lines_and_segment_scope(tmp_path: Path) -> None:
     assert wl.parse_dadaiaignore(text) == (("*.png",), ("secrets",), invalid)
     tree = tmp_path / "worktrees" / "r" / "x" / "y"
     (tree / "src").mkdir(parents=True)
-    write_text(tree / ".git", "gitdir: elsewhere\n")
+    write_text(tree / ".git", "gitdir: ../main/.git/worktrees/j1\n")
 
     def pg(rel: str, *globs: str) -> str | None:
         return wl.protected_glob(tmp_path, rel, globs or ("secrets",))
@@ -133,7 +133,7 @@ def test_a_planted_git_entry_never_unanchors_a_multi_segment_glob(tmp_path: Path
     """A ``.git`` written below the real tree root adds an anchor and never removes the root."""
     tree = tmp_path / "worktrees" / "r" / "0.5.0-rc1" / "j1"
     (tree / "docs" / "data-master").mkdir(parents=True)
-    write_text(tree / ".git", "gitdir: elsewhere\n")
+    write_text(tree / ".git", "gitdir: ../main/.git/worktrees/j1\n")
     rel, globs = "worktrees/r/0.5.0-rc1/j1/docs/data-master/x.md", ("docs/data-master",)
     assert wl.protected_glob(tmp_path, rel, globs) == "docs/data-master"
     write_text(tree / "docs" / ".git", "")

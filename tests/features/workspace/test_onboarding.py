@@ -16,7 +16,6 @@ import pytest
 from dadaia_workspace.core import workspace_layout
 from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.gitflow import SeveralWorkBranches
-from dadaia_workspace.core.skill_owner import load_owner
 from dadaia_workspace.core.specs_version import CANONICAL_SPECS_VERSION, state
 from dadaia_workspace.features.specs.rules import RULES
 from dadaia_workspace.features.workspace.onboarding import next_step
@@ -151,29 +150,14 @@ def test_the_text_names_the_kind_and_carries_one_fix_line(tmp_path: Path) -> Non
     assert head.startswith("Next (command step context): ") and fix == f"fix: {step.command}"
 
 
-@pytest.mark.parametrize(
-    ("fix", "first"),
-    [
-        (
-            "Agent action: run `git -C /r switch feature/0.2.0`, then run `git -C /r branch -d feature/0.1.0`",
-            "run `git -C /r switch feature/0.2.0`, then run `git -C /r branch -d feature/0.1.0`",
-        ),
-        (
-            "Agent action: run `git -C /r switch feature/0.2.0`, then merge feature/0.1.0 into feature/0.2.0, then run `git -C /r branch -d feature/0.1.0`",
-            "run `git -C /r switch feature/0.2.0`, then merge feature/0.1.0 into feature/0.2.0, then run `git -C /r branch -d feature/0.1.0`",
-        ),
-    ],
-)
 def test_several_work_branches_make_the_first_pass_an_agent_step_with_the_refusals_fix(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, fix: str, first: str
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    several = load_owner("dd-gitflow-default", "_worktree_git").SeveralWork(
-        "2 work branches", first, "0.2.0"
-    )
-    assert several.fix == fix
+    first = "run `x`, then run `y`"
+    several = SeveralWorkBranches("2 work branches", first, "0.2.0")
 
     def refuse(_s: object, _p: object) -> str:
-        raise SeveralWorkBranches(several)
+        raise several
 
     monkeypatch.setattr(f"{_CLIENT}.work_version", refuse)
     specs = _specs(tmp_path, "proj")

@@ -26,11 +26,17 @@ __all__ = [
 
 @dataclass(frozen=True)
 class Decision:
-    """``allowed`` keys the hook's exit code; ``warn`` is advisory, never blocks."""
+    """``allowed`` keys the hook's exit code; ``warn`` is advisory, never blocks; *listed* are
+    the paths a refusal names (a commit message is listed as such): what its remedy may touch."""
 
     allowed: bool
     message: str = ""
     warn: str | None = None
+    listed: frozenset[str] = frozenset()
+
+    @property
+    def message_listed(self) -> bool:
+        return "(commit message)" in self.listed
 
 
 @dataclass(frozen=True)

@@ -24,6 +24,7 @@ import pytest
 from dadaia_workspace.infrastructure.privacy_check import PORTUGUESE_CONTROL_TERMS
 from tests.fixtures.real_git import git
 from tests.helpers.oslib import Undecodable, read_text, run, write_text
+from tests.helpers.privacy_fixtures import internal_host, private_ip
 from tests.helpers.scan_population import assert_populated
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -332,3 +333,26 @@ def test_the_retired_persona_scan_skips_a_tracked_file_that_is_not_utf8(
     monkeypatch.setattr(module, "__file__", str(tmp_path / "dadaia_workspace" / "plain.md"))
 
     test_the_retired_persona_name_stays_out_of_library_and_tests()
+
+
+def test_a_lock_file_skips_only_the_pattern_naming_its_path(tmp_path: Path) -> None:
+    from dadaia_workspace.core.models.doctor_report import DoctorStatus
+    from dadaia_workspace.infrastructure.privacy_check import check_public_privacy
+
+    public = tmp_path / "lib" / "dadaia_workspace" / "public"
+    public.mkdir(parents=True)
+    write_text(public / "package-lock.json", f'{{"v": "{private_ip()}"}}\n')
+    assert [line.status for line in check_public_privacy(public, lambda d: d.iterdir())] == [
+        DoctorStatus.OK
+    ]
+
+    write_text(
+        public / "package-lock.json", f'{{"v": "{private_ip()}", "h": "{internal_host("box")}"}}\n'
+    )
+    [hit] = check_public_privacy(public, lambda d: d.iterdir())
+    assert "package-lock.json" in hit.text and "internal hostname" in hit.text
+
+    (public / "package-lock.json").unlink()
+    write_text(public / "notes.json", f'{{"v": "{private_ip()}"}}\n')
+    [line] = check_public_privacy(public, lambda d: d.iterdir())
+    assert line.status is DoctorStatus.ERROR and "notes.json" in line.text

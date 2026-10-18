@@ -11,7 +11,7 @@ from collections.abc import Callable, Collection
 from dataclasses import dataclass
 from enum import StrEnum
 from functools import cached_property
-from pathlib import Path, PurePosixPath
+from pathlib import Path, PurePath, PurePosixPath
 from typing import Literal
 
 from dadaia_workspace.core import invocation, platform
@@ -273,11 +273,24 @@ def _matches(sub: str, pattern: str) -> bool:
     return len(parts) == len(globs) and all(map(fnmatch.fnmatch, parts, globs))
 
 
+def is_worktree_gitfile(entry: Path) -> bool:
+    """A linked worktree's ``.git`` file: a regular file, not a link, whose gitdir sits in
+    ``<common>/worktrees/``."""
+    if not entry.is_file() or platform.is_link(entry):
+        return False
+    try:
+        gitdir = platform.read_text(entry).removeprefix("gitdir:").strip()
+    except (OSError, platform.Undecodable):
+        return False
+    return PurePath(gitdir).parent.name == "worktrees"
+
+
 def protected_glob(root: Path, rel: str, protected: tuple[str, ...]) -> str | None:
     """The protected glob a prefix of the repo-relative part of *rel* (workspace-relative, under
     *root*) matches, else ``None``. Under ``repos/<r>/`` the root is the repo; under
-    ``worktrees/<r>/`` every ancestor of *rel* below ``<r>`` holding a ``.git`` entry is a root,
-    so a planted entry only adds one. Fails closed: with none, it matches at every depth."""
+    ``worktrees/<r>/`` every ancestor of *rel* below ``<r>`` holding a ``.git`` file that is a real
+    worktree gitfile is a root, so a planted entry of any other shape
+    never anchors. Fails closed: with none, it matches at every depth."""
     parts = rel.replace("\\", "/").split("/")
     zone = invocation.scope(root, root.joinpath(*parts))[1]
     if zone == "root":
@@ -286,7 +299,9 @@ def protected_glob(root: Path, rel: str, protected: tuple[str, ...]) -> str | No
     anchors = [0]
     if zone == "worktree":
         anchors = [
-            k - 2 for k in range(3, len(parts)) if root.joinpath(*parts[:k], ".git").exists()
+            k - 2
+            for k in range(3, len(parts))
+            if is_worktree_gitfile(root.joinpath(*parts[:k], ".git"))
         ] or list(range(len(tail)))
     subs = ("/".join(tail[i : j + 1]) for i in anchors for j in range(i, len(tail)))
     return next((g for sub in subs for g in protected if _matches(sub, g)), None)
@@ -417,7 +432,7 @@ SpecsArea = Literal[
 _SHAPE_TOKENS: tuple[tuple[str, str], ...] = (
     ("<M.m.p>", RELEASE_ID_RE.pattern[1:-1]),
     ("rc-<N>", CANDIDATE_RE.pattern[1:-1]),
-    ("<40hex>", r"[0-9a-f]{40}"),
+    ("<40hex>", r"(?:[0-9a-f]{40}|[0-9a-f]{64})"),
     ("<YYYYMMDD-slug>", AUDIT_DIR_NAME_PATTERN),
     ("<area>", r"[a-z][a-z0-9_-]*"),
     ("<slug>", r"[a-z][a-z0-9_-]*"),

@@ -83,7 +83,9 @@ def main(argv: list[str] | None = None) -> int:
         report(refusal, refusal.fix)
         return 1
     except GitError as failure:  # no check named it: an agent act, then the same call
-        again = inline(*LAUNCH, *(sys.argv[1:] if argv is None else argv))
+        words = sys.argv[1:] if argv is None else argv
+        path = getattr(args, "path", None)
+        again = inline(*LAUNCH, *(str(Path(w).resolve()) if w == path else w for w in words))
         report(failure, act("agent", f"clear the git failure above, then rerun {again}"))
         return 1
     if args.json:

@@ -19,7 +19,9 @@ from dadaia_workspace import container
 from dadaia_workspace.cli.commands import ci
 from dadaia_workspace.cli.main import app
 from dadaia_workspace.core.cli_line import fix_line
+from dadaia_workspace.core.gitflow import Gitflow, SeveralWorkBranches
 from dadaia_workspace.core.specs_version import CANONICAL_SPECS_VERSION
+from dadaia_workspace.features.chokepoints.branch_policy import Decision
 from tests.helpers.oslib import run, write_text
 from tests.helpers.oslib import run as os_run
 
@@ -247,3 +249,37 @@ def test_a_malformed_privacy_baseline_fails_the_gate_closed_with_one_fix_line(
     assert [ln for ln in err.splitlines() if ln.startswith("fix:")] == [
         "fix: Agent action: reinstall the workspace"
     ]
+
+
+def test_push_gate_check_help_names_the_rewrite_remedy_and_its_contract() -> None:
+    result = _runner.invoke(app, ["ci", "push-gate-check", "--help"])
+    assert result.exit_code == 0, result.output
+    assert (
+        "Remedy for a refused push: --rewrite-from re-commits the whole unpublished range "
+        "as one commit, over edits and deletions of the paths the gate lists."
+    ) in " ".join(result.output.split())
+
+
+def test_a_decision_carries_its_listed_paths_even_when_it_lists_none() -> None:
+    decision = Decision(allowed=True)
+    assert decision.listed == frozenset()
+    assert decision.message_listed is False
+
+
+def test_several_work_branches_warn_and_keep_the_gate_on_the_kept_branch(
+    monkeypatch, tmp_path: Path, capsys
+) -> None:
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    flow = Gitflow("main", "dev", "feature/")
+    monkeypatch.setattr(ci, "_gitflow", lambda _r: (flow, None, "repo"))
+
+    def several(*_a: object) -> str:
+        raise SeveralWorkBranches("2 work branches", "run `x`, then run `y`", "0.2.0")
+
+    monkeypatch.setattr(ci, "work_branch", several)
+    _, fixes = ci._gate_inputs(repo, "HEAD")
+    assert fixes.work == "feature/0.2.0"
+    assert capsys.readouterr().err == (
+        "[pre-push] WARNING: 2 work branches\nhint: Agent action: run `x`, then run `y`\n"
+    )

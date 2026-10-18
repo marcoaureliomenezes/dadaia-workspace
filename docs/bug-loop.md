@@ -1,7 +1,8 @@
 # The bug loop
 
-Register → RED → fix → resolve. A confirmed block-list bug uses a hotfix lane; other bugs
-enter the approved release scope through its ordinary job structure.
+Register → RED → fix → resolve. A confirmed bug in code the work branch holds uses a hotfix lane;
+after CLOSURE a block-list bug in code only the `wt-rc` holds is fixed on that `wt-rc`;
+other bugs enter the approved release scope through its ordinary job structure.
 
 ## 1. Register — ask first
 
@@ -21,7 +22,8 @@ python3 .agents/skills/dd-bug-resolution/scripts/bugs.py append \
 The ledger holds one record per bug, keyed by id. `append` prints each earlier bug whose
 recorded fix files lie under a path the `component` names, with the REBUILD due on that
 path, opens the record, refuses a duplicate id or a `component` naming no tracked path, and
-requires `--correlates` as ledger or archive ids, or `none`. `component` is precise free text; its tracked paths
+requires `--correlates` as ledger or archive ids (repeated or comma-separated), or `none`;
+`update --set correlates=<a>,<b>` records a correlate found later. `component` is precise free text; its tracked paths
 are the bug's files. Every supplied value passes the same privacy check used by the push gate.
 
 Not a bug: an agent mistake, wrong usage, an environment limit, designed validation, law

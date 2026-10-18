@@ -19,7 +19,7 @@ from dadaia_workspace.cli._specs_resolution import (
 from dadaia_workspace.core import platform
 from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.exceptions import GitSyncError
-from dadaia_workspace.core.gitflow import Gitflow, work_branch
+from dadaia_workspace.core.gitflow import Gitflow, SeveralWorkBranches, work_branch
 from dadaia_workspace.core.models.git_scan import ZERO_SHA
 from dadaia_workspace.core.platform import act
 from dadaia_workspace.core.skill_owner import load_owner
@@ -73,7 +73,7 @@ def _gate_inputs(repo_root: Path, head: str) -> tuple[Gitflow, GateFixes]:
         typer.echo(f"[pre-push] WARNING: {warning}", err=True)
     try:
         work = work_branch(repo_root, gitflow, slug)
-    except load_owner("dd-gitflow-default", "_worktree_git").SeveralWork as several:
+    except SeveralWorkBranches as several:
         typer.echo(f"[pre-push] WARNING: {several.message}\nhint: {several.fix}", err=True)
         work = gitflow.work_prefix + several.keep
     except load_owner("dd-bug-resolution", "_refusal").Refusal as refusal:
@@ -90,7 +90,6 @@ def _rewrite_unpublished(repo: Path, oldest: str, message: str | None) -> None:
     *message* replaces the message only when the gate lists a commit message. The git calls
     carry the sanctioned-tool marker (``git_subprocess``): the ref gate passes them."""
     from dadaia_workspace.container import build_git_client, build_git_object_reader
-    from dadaia_workspace.features.chokepoints.push_gate import GateDecision
 
     git = build_git_client()
     tip = git.git(repo, "rev-parse", "HEAD")
@@ -102,7 +101,7 @@ def _rewrite_unpublished(repo: Path, oldest: str, message: str | None) -> None:
     held = git.git(repo, "for-each-ref", "--format=%(objectname)", f"refs/remotes/origin/{branch}")
     line = f"refs/heads/{branch} {tip} refs/heads/{branch} {held or ZERO_SHA}"
     decision = _gate_decision(repo, lambda: line)
-    listed = decision.listed if isinstance(decision, GateDecision) else frozenset()
+    listed = decision.listed
     changed = git.git(repo, "diff", "--name-status", "--no-renames", "-z", tip).split("\0")
     stray = sorted(
         p
@@ -131,7 +130,7 @@ def _rewrite_unpublished(repo: Path, oldest: str, message: str | None) -> None:
             f"the working tree changes paths the gate did not list: {', '.join(stray)}",
             act("agent", "revert or unstage every path the gate did not list, and add no path"),
         )
-    elif message and not (isinstance(decision, GateDecision) and decision.message_listed):
+    elif message and not decision.message_listed:
         refusal = (
             "the push gate lists no commit message, so the message stays",
             act("agent", "run the remedy again without the message option"),
@@ -231,7 +230,8 @@ def push_gate_check(
     injected; a call site that fails to wire the object reader is a defect, never a
     bypass. No repo or context name is a term source.
 
-    With ``--rewrite-from`` it runs the gate's own remedy instead (``_rewrite_unpublished``).
+    Remedy for a refused push: --rewrite-from re-commits the whole unpublished range as one
+    commit, over edits and deletions of the paths the gate lists.
     """
     if rewrite_from is not None:
         return _rewrite_unpublished(repo or _repo_root(), rewrite_from, message)

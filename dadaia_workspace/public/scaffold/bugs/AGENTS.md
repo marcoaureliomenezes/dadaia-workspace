@@ -19,9 +19,8 @@ Scope: this file governs only `specs/bugs/`.
 
 - The block list, closed: (1) the work branch's `verify:` line is red; (2) a Stall; (3) the running task cannot deliver its AC;
   (4) a security finding; (5) data loss or corruption.
-- After `release.py phase CLOSURE`, only a block-list bug lands in that rc, through the version's hotfix lane and `worktree sync`; any other confirmed bug, REBUILD or operator demand is a job of the next rc, which opens at once.
-- A block-list bug is a hotfix: a `<v>/wt-hotfix-<bug-id>` lane (`worktrees/AGENTS.md` §1–2), landing before any
-  other merge; its fix body names `block: <item>`; no SPEC amendment.
+- Any confirmed bug in code the work branch holds takes a `<v>/wt-hotfix-<bug-id>` lane (`worktrees/AGENTS.md` §1–2), in any phase, landing before any other merge, then `worktree sync`.
+- After `release.py phase CLOSURE`, a fix to code that exists only on the `wt-rc` lands in that rc only for a block-list bug; any other confirmed bug there, REBUILD or operator demand is a job of the next rc, which opens at once. A block-list bug in that code takes the `wt-rc`: its registration, `test(` commit, fix, `bugs.py update` and `resolve` are commits there, under its merge's `verify:` and `APPROVED` verdict; its `test(` and fix commits name `block: <item>`, the only path that requires it; no SPEC amendment.
 - Every other confirmed bug becomes explicit candidate scope. Ship refuses an open bug unless
   the operator authorizes that exact id; the authorization is recorded verbatim and the bug remains open for the next candidate.
 - Any fix whose `caused_by` is not `none`, a bug's fix or a feature task, is a REBUILD of the unit, keeping its tests.
@@ -34,7 +33,7 @@ Scope: this file governs only `specs/bugs/`.
 
 - Each field's class is its `x-mutability` in `bug-record-v1`; this law lists no fields.
 - `immutable-core`: never rewritten once appended.
-- `write-once`: settable once (`correlates` at registration, the rest at closure), then immutable.
+- `write-once`: settable once at closure, then immutable.
 - `mutable-governance`: rewritten in place, atomic refuse-stale.
 
 ## 4. Authoring rules

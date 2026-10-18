@@ -12,6 +12,7 @@ import pytest
 
 from dadaia_workspace.core.cli_line import git_line
 from dadaia_workspace.core.exceptions import GitCloneError, GitSyncError
+from dadaia_workspace.core.gitflow import SeveralWorkBranches
 from dadaia_workspace.core.skill_owner import load_owner
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from tests.conftest import _GIT_QUIET
@@ -210,9 +211,7 @@ def test_work_version_refuses_when_several_work_branches_exist(tmp_path: Path) -
     for branch in ("feature/0.1.0", "feature/0.2.0"):
         _git(repo, "branch", branch)
 
-    with pytest.raises(
-        load_owner("dd-bug-resolution", "_refusal").Refusal, match="2 work branches"
-    ):
+    with pytest.raises(SeveralWorkBranches, match="2 work branches"):
         GitSubprocessClient().work_version(repo)
 
 
@@ -221,7 +220,8 @@ def test_work_version_refuses_when_several_work_branches_exist(tmp_path: Path) -
 def test_the_several_work_branches_fix_runs_and_clears_the_refusal(
     tmp_path: Path, checked_out: str, merged: bool
 ) -> None:
-    """The printed fix removes the lower branch from whichever branch the checkout is on."""
+    """The printed fix, run in passes of at most three acts, removes the lower branch from
+    whichever branch the checkout is on."""
     repo = _scaffolded(tmp_path / "r")
     _git(repo, "switch", "-qc", "third")
     _git(repo, "switch", "-qc", "feature/0.1.0")
@@ -235,13 +235,25 @@ def test_the_several_work_branches_fix_runs_and_clears_the_refusal(
     _git(repo, "switch", "-q", checked_out)
     client = GitSubprocessClient()
 
-    with pytest.raises(load_owner("dd-bug-resolution", "_refusal").Refusal) as caught:
-        client.work_version(repo)
-
-    steps = re.findall(r"git -C [^\s`]+ (?:switch|branch -d) [^\s`]+", caught.value.fix)
-    for step in steps:
-        if not merged and step.startswith(git_line(repo, "branch", "-d")):
-            _git(repo, "merge", "-q", "feature/0.1.0")  # the agent's merge act
-        done = run_line(step)
-        assert done.returncode == 0, done.stderr
+    passes = 0
+    while True:
+        try:
+            client.work_version(repo)
+        except SeveralWorkBranches as caught:
+            passes += 1
+            assert passes <= 3, caught.fix
+            acts = caught.fix.removeprefix("Agent action: ").split(", then ")
+            assert len(acts) <= 3, caught.fix
+            for act in acts:
+                act = act.removeprefix("run ")
+                if act.startswith("merge "):
+                    low, high = re.fullmatch(r"merge (\S+) into (\S+)", act).groups()
+                    assert client.current_branch(repo) == high
+                    _git(repo, "merge", "-q", low)  # the agent's merge act
+                else:
+                    done = run_line(act.strip("`"))
+                    assert done.returncode == 0, done.stderr
+        else:
+            break
+    assert passes == (1 if merged else 2)
     assert client.work_version(repo) == "0.2.0"

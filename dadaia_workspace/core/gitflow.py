@@ -8,7 +8,7 @@ import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Literal
+from typing import Literal
 
 from dadaia_workspace.core import platform
 from dadaia_workspace.core.exceptions import DadaiaError
@@ -96,24 +96,24 @@ def resolve_live_candidate(specs_dir: Path) -> Path | None:
 _git = load_owner("dd-gitflow-default", "_worktree_git")
 
 
-class SeveralWorkBranches(_git.SeveralWork, DadaiaError):  # type: ignore[misc,name-defined]
-    """The skill's several-work-branches refusal as a ``DadaiaError``, so the CLI renders its fix."""
+class SeveralWorkBranches(DadaiaError):
+    """Several local work branches; *keep* is the version the rule keeps, *text* the unlabeled act."""
 
-    def __init__(self, several: Any) -> None:
-        DadaiaError.__init__(self, several.args[0], several.fix)
-        self.keep, self.text = several.keep, several.text
+    def __init__(self, message: str, text: str, keep: str) -> None:
+        super().__init__(message, act("agent", text))
+        self.text, self.keep = text, keep
 
 
 def work_branch(repo: Path, flow: Gitflow, main: str) -> str:
     """The repo's work branch by the skill's one rule (``work_version``); with none, the name to
     create (``next_version``); several raise ``SeveralWorkBranches``, which carries the skill's
-    fix. *main* is the main repo's slug."""
+    text. *main* is the main repo's slug."""
     rule = {"work": flow.work_prefix, "integration": flow.integration, "main": main}
     if _git.work_versions(repo, rule):
         try:
             return str(flow.work_prefix + _git.work_version(repo, rule))
         except _git.SeveralWork as several:
-            raise SeveralWorkBranches(several) from several
+            raise SeveralWorkBranches(several.args[0], several.text, several.keep) from several
     return str(flow.work_prefix + _git.next_version(repo, rule))
 
 

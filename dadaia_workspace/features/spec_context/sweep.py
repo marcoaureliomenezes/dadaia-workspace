@@ -29,11 +29,11 @@ import shutil
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from pathlib import Path, PurePath
+from pathlib import Path
 
 from dadaia_workspace.core import platform
 from dadaia_workspace.core.platform import act
-from dadaia_workspace.core.workspace_layout import occupied
+from dadaia_workspace.core.workspace_layout import is_worktree_gitfile, occupied
 
 __all__ = [
     "Skipped",
@@ -111,17 +111,6 @@ def _inside(workspace_root: Path, target: Path) -> bool:
     return True
 
 
-def _is_gitfile(entry: Path) -> bool:
-    """A linked worktree's ``.git`` file: its gitdir sits in ``<common>/worktrees/``."""
-    if not entry.is_file() or platform.is_link(entry):
-        return False
-    try:
-        gitdir = platform.read_text(entry).removeprefix("gitdir:").strip()
-    except (OSError, platform.Undecodable):
-        return False
-    return PurePath(gitdir).parent.name == "worktrees"
-
-
 def linked_worktree(workspace_root: Path, target: Path) -> Path | None:
     """The linked worktree *target* sits inside or whose subtree holds one — an rmtree
     of ``tmp/<agent>/<day>/`` kills every worktree below it. Local and cheap: no git
@@ -130,12 +119,12 @@ def linked_worktree(workspace_root: Path, target: Path) -> Path | None:
     for ancestor in (here, *here.parents):
         if ancestor == root:
             break
-        if _is_gitfile(ancestor / ".git"):
+        if is_worktree_gitfile(ancestor / ".git"):
             return ancestor
     if platform.is_link(target) or not target.is_dir():
         return None
     trees = (Path(d) for d, _, files in os.walk(target) if ".git" in files)
-    return next((d for d in trees if _is_gitfile(d / ".git")), None)
+    return next((d for d in trees if is_worktree_gitfile(d / ".git")), None)
 
 
 def rmtree(target: Path) -> OSError | None:

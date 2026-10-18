@@ -11,26 +11,21 @@ from _grammar import STATE
 from _jsonl import Unreadable, parse_object
 from _platform import act, command, is_link
 from _specs import parse
-from _worktree_git import flow_for, git, not_a_name, work_version
+from _worktree_git import flow_for, git, not_a_name, work_version, work_versions
 from _worktree_names import (
     LAUNCH,
+    LEVEL_FILE,
     LOCK,
     NAME_RE,
     Refusal,
     base_of,
     branch,
     kind_of,
+    level_folders,
     tree_path,
 )
 
 _LEVELS = Path(__file__).parent / "levels"
-_LEVEL_FILES = ("version", "rc", "job")  # the folder at each depth under worktrees/<repo>/
-
-
-def _level_folders(home: Path, name: str) -> list[tuple[Path, str]]:
-    """The level folders *name* sits in under *home*, outermost first, each with its level file."""
-    parts = name.split("/")[:-1]
-    return [(home.joinpath(*parts[:i]), level) for i, level in enumerate(_LEVEL_FILES[: len(parts)], 1)]  # fmt: skip
 
 
 def _refuse_symlink(root: Path, repo_name: str) -> None:
@@ -52,9 +47,10 @@ def _refuse_unopened_bug(main: Path, work: str, bug: str) -> None:
                       act("operator", f"confirm {what} (dd-bug-registration §2)"))  # fmt: skip
 
 
-def _refuse_unready(main: Path, version: str, rc: str) -> None:
+def _refuse_unready(root: Path, main: Path, version: str, rc: str) -> None:
     """A main tree opens only while its release is in IMPLEMENTATION on the rc's `wt-rc` branch."""
-    rc_branch = branch(f"{version}/{rc}/wt-rc")
+    rc_name = f"{version}/{rc}/wt-rc"
+    rc_branch = branch(rc_name)
     fix = act("agent", f"repair {STATE} on {rc_branch} until release.py check passes")
     try:
         state = parse_object(git(main, "show", f"{rc_branch}:specs/releases/{version}/{STATE}", check=False), fix)  # fmt: skip
@@ -62,7 +58,7 @@ def _refuse_unready(main: Path, version: str, rc: str) -> None:
         raise Refusal(f"{STATE} on {rc_branch}: {bad}", bad.fix) from bad
     if state.get("phase") != "IMPLEMENTATION":
         raise Refusal(f"a job needs release {version} in phase IMPLEMENTATION on {rc_branch}",
-                      act("agent", f"reach phase IMPLEMENTATION in {STATE} on {rc_branch} (release.py phase), then open its job again"))  # fmt: skip
+                      act("agent", f"reach phase IMPLEMENTATION in {STATE} on {rc_branch} at {tree_path(root, main.name, rc_name)} (release.py phase), then open its job again"))  # fmt: skip
 
 
 def new(root: Path, repo_name: str, name: str) -> Path:
@@ -70,22 +66,25 @@ def new(root: Path, repo_name: str, name: str) -> Path:
     _refuse_symlink(root, repo_name)
     flow = flow_for(root, repo)
     match = NAME_RE.match(name)
-    version = work_version(repo, flow) if match else ""
-    if match is None or match["v"] != version:
+    if match is None:
+        live = work_versions(repo, flow)
+        raise not_a_name(name, live[0] if len(live) == 1 else "")
+    version = work_version(repo, flow)
+    if match["v"] != version:
         raise not_a_name(name, version)
     start = base_of(name, flow["work"]) or ""
     if not git(repo, "branch", "--list", start).strip():  # a tree is cut from its parent's branch
         raise Refusal(f"no {start} branch", command(*LAUNCH, "new", repo.name, start.removeprefix("wt/")))  # fmt: skip
     if kind_of(name) == "main":
-        _refuse_unready(root / "repos" / flow["main"], version, match["rc"])
+        _refuse_unready(root, root / "repos" / flow["main"], version, match["rc"])
     if match["bug"]:
         _refuse_unopened_bug(root / "repos" / flow["main"], start, match["bug"])
     tree = tree_path(root, repo_name, name)
     if git(repo, "branch", "--list", branch(name)).strip():
         raise Refusal(f"{branch(name)} exists", command(*LAUNCH, "list"))
-    made = [(folder, level) for folder, level in _level_folders(tree_path(root, repo_name), name) if not folder.exists()]  # fmt: skip
+    made = [(folder, level) for folder, level in level_folders(tree_path(root, repo_name), name) if not folder.exists()]  # fmt: skip
     git(repo, "worktree", "add", "-q", "--lock", "--reason", f"{LOCK}{name}", "-b", branch(name),
         str(tree), start)  # fmt: skip
     for folder, level in made:
-        shutil.copyfile(_LEVELS / f"{level}.md", folder / "AGENTS.md")
+        shutil.copyfile(_LEVELS / f"{level}.md", folder / LEVEL_FILE)
     return tree

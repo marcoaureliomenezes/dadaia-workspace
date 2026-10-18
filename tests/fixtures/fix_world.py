@@ -8,6 +8,7 @@ size: MEDIUM — real git and real CLI child processes, no network.
 from __future__ import annotations
 
 import contextlib
+import inspect
 import os
 import re
 import shutil
@@ -260,14 +261,24 @@ class World:
 class Case:
     """*build* plants the refusal and returns the command that hits it (argv, or a shell
     line run in the repo); *before* is the documented step the refusal text asks
-    for before its fix (an edit), or the act an action fix names; *then* replaces the re-run when the fix renames what the
+    for before its fix (an edit), or the act an action fix names (an act declaring a second
+    parameter is handed the printed fix line); *then* replaces the re-run when the fix renames what the
     refused command named; *done* asserts the published end state."""
 
     build: Callable[[World], list[str] | str]
     done: Callable[[World], None]
-    before: Callable[[World], None] | None = None
+    before: Callable[..., None] | None = None
     then: list[str] | str | None = None
     replaces: bool = False
+
+    def play(self, world: World, fix: str) -> None:
+        """Runs *before* on *world*; a two-parameter act is handed the printed *fix* line."""
+        if self.before is None:
+            return
+        if len(inspect.signature(self.before).parameters) == 2:
+            self.before(world, fix)
+        else:
+            self.before(world)
 
 
 @dataclass(frozen=True)
@@ -816,6 +827,28 @@ def _work_ahead_of_origin(world: World) -> str:
     )
 
 
+def _work_forced(world: World) -> list[str]:
+    """The work branch, published, forced to a commit origin does not hold: the real hook refuses."""
+    _published(world)
+    world.git(world.repo, "branch", "feature/0.1.0", "origin/develop")
+    world.git(world.repo, "push", "-q", "origin", "feature/0.1.0")
+    world.git(world.repo, "fetch", "-q", "origin")
+    world.commit("a.txt", "a", branch="other")
+    return ["git", "branch", "-f", "feature/0.1.0", "other"]
+
+
+def _open_a_tree(world: World, fix: str) -> None:
+    """The act the refusal names: the printed runner and repo slug open a tree, which the merge lands."""
+    named = re.search(r"with (.+) and the name of", fix)
+    assert named, f"no runner command in the fix: {fix}"
+    done = world.run(f"{named[1]} 0.1.0/wt-backlog-foo", world.repo)
+    assert done.returncode == 0, done.stderr
+
+
+def _tree_opened(world: World) -> None:
+    assert "wt/0.1.0/wt-backlog-foo" in world.git(world.repo, "branch", "--list", "wt/*")
+
+
 def _land_the_work_branch(world: World) -> None:
     """What a tree's merge and push leave: origin holds the work branch's tip."""
     world.git(world.repo, "push", "-q", "origin", "feature/0.1.0")
@@ -841,7 +874,10 @@ _REFUSALS: dict[str, tuple[Case | tuple[Case, ...] | Skip, ...]] = {
         Case(_mismatch, _work_pushed, then="git push -q origin feature/1.0.0"),
     ),
     "branch_policy.check_ref_policy": (
-        Case(_work_ahead_of_origin, _work_pushed_0_1_0, before=_land_the_work_branch),
+        (
+            Case(_work_ahead_of_origin, _work_pushed_0_1_0, before=_land_the_work_branch),
+            Case(_work_forced, _tree_opened, before=_open_a_tree, replaces=True),
+        ),
     ),
     "push_gate._rewrite_fix": (
         (

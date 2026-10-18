@@ -231,8 +231,8 @@ class GitSubprocessClient:
 
     def work_version(self, path: Path) -> str:
         """The work-branch version of the repo at *path*, by the committed gitflow's work prefix:
-        the one local work branch's version, else the next one to create. Raises the skill's
-        refusal when several work branches exist."""
+        the one local work branch's version, else the next one to create. Raises
+        ``SeveralWorkBranches`` when several local work branches exist."""
         flow = self.gitflow(path)[0]
         return work_branch(path, flow, path.name).removeprefix(flow.work_prefix)
 

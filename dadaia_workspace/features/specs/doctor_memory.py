@@ -95,7 +95,7 @@ class MemoryValidator:
                 str(path),
                 fix=act(
                     "agent",
-                    "fill or delete the atom"
+                    f"fill or delete the atom {path}"
                     if is_placeholder_atom(path)
                     else f"replace the token in {fields} of {path}",
                 ),

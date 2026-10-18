@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-18T04:51:28Z",
+  "generated_at": "2026-10-19T01:54:53Z",
   "features": [
     {
       "rank": 1,
@@ -14,7 +14,7 @@
         "handoff",
         "schema"
       ],
-      "token_estimate": 934,
+      "token_estimate": 998,
       "depends_on": [
         "worktrees",
         "release-lifecycle",
@@ -42,11 +42,11 @@
         "dispatch",
         "sdd"
       ],
-      "token_estimate": 973,
+      "token_estimate": 1035,
       "depends_on": [
+        "bug-ledger",
         "worktrees",
         "release-lifecycle",
-        "bug-ledger",
         "public-asset-distribution",
         "workspace-init",
         "agentic-entities",
@@ -97,7 +97,7 @@
       "title": "agent-evals",
       "area": "distribution",
       "tldr": "The library's own agent evals — two graded tasks run on the candidate wheel and a PyPI baseline by one dispatch-or-schedule workflow.",
-      "summary": "evals/ holds a cold-onboarding task and a block-list-bug task, each graded by a script on the state the agent leaves; .github/workflows/eval.yml runs each three times on a baseline release and on the candidate wheel built from its own checkout, scans every upload for the model secret, and blocks when the candidate drops where the baseline passed.",
+      "summary": "evals/ holds a cold-onboarding task and a block-list-bug task, each graded by a script on the state the agent leaves; .github/workflows/eval.yml runs each three times on a baseline release and on the candidate wheel built from its own checkout, scans every upload for the model secret, and blocks when a gated task falls below its floor on the candidate or drops where the baseline passed.",
       "path": "specs/memory/product/distribution/agent-evals.md",
       "tags": [
         "evals",
@@ -105,7 +105,7 @@
         "release-gate",
         "distribution"
       ],
-      "token_estimate": 440,
+      "token_estimate": 521,
       "depends_on": [
         "pypi-distribution",
         "QUALITY",
@@ -131,16 +131,16 @@
         "projection",
         "privacy"
       ],
-      "token_estimate": 1482,
+      "token_estimate": 1505,
       "depends_on": [
         "agentic-entities",
         "bug-ledger",
         "agent-orchestration",
+        "sdd-gate-v3",
         "workspace-init",
         "workspace-doctor",
         "specs-migration",
         "context-management",
-        "sdd-gate-v3",
         "pypi-distribution",
         "consumer-agent-support",
         "harness-kimi-code"
@@ -615,7 +615,7 @@
         "registry",
         "onboarding"
       ],
-      "token_estimate": 1281,
+      "token_estimate": 1346,
       "depends_on": [
         "public-asset-distribution",
         "sdd-gate-v3",
@@ -650,7 +650,7 @@
         "compliance",
         "privacy"
       ],
-      "token_estimate": 3653,
+      "token_estimate": 3695,
       "depends_on": [
         "public-asset-distribution",
         "sdd-gate-v3",
@@ -758,7 +758,7 @@
         "ledger",
         "governance"
       ],
-      "token_estimate": 1021,
+      "token_estimate": 1065,
       "depends_on": [
         "agent-orchestration",
         "worktrees",
@@ -786,7 +786,7 @@
         "lineage",
         "resolution"
       ],
-      "token_estimate": 1231,
+      "token_estimate": 1574,
       "depends_on": [
         "cross-platform-portability",
         "public-asset-distribution",
@@ -816,7 +816,7 @@
         "state",
         "closure"
       ],
-      "token_estimate": 1377,
+      "token_estimate": 1515,
       "depends_on": [
         "agent-orchestration",
         "worktrees",
@@ -847,7 +847,7 @@
         "privacy",
         "git"
       ],
-      "token_estimate": 1392,
+      "token_estimate": 1457,
       "depends_on": [
         "cross-platform-portability",
         "worktrees",
@@ -884,7 +884,7 @@
         "merge",
         "review"
       ],
-      "token_estimate": 1601,
+      "token_estimate": 2092,
       "depends_on": [
         "release-lifecycle",
         "context-management",

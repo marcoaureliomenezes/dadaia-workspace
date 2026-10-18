@@ -23,8 +23,8 @@ HISTORICAL_TASK_RE = re.compile(
     r"^(?:- \[.\]\s*|\|\s*)\**(T-[0-9]+-[0-9]+[A-Z]?|J[A-Z]\.S[1-9][0-9]*\.T[1-9][0-9]*)\b"
 )
 STATUS_RE = re.compile(r"^\*\*Status:\*\*\s*(.+?)\s*$", re.MULTILINE)
-#: A git object id as a human pastes it from a merge: short (7) to full (40).
-SHA_RE = re.compile(r"^[0-9a-f]{7,40}$")
+#: A git object id as a human pastes it from a merge: short (7) to full (40), or SHA-256 (64).
+SHA_RE = re.compile(r"^(?:[0-9a-f]{7,40}|[0-9a-f]{64})$")
 #: A full git object id, SHA-1 (40) or SHA-256 (64) hex; the all-zero id matches it.
 OBJECT_ID_RE = re.compile(r"^[0-9a-fA-F]{40}$|^[0-9a-fA-F]{64}$")
 

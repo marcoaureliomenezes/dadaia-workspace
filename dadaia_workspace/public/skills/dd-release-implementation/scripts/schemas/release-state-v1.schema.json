@@ -175,17 +175,17 @@
           },
           "sha": {
             "type": "string",
-            "pattern": "^[0-9a-f]{7,40}$",
+            "pattern": "^(?:[0-9a-f]{7,40}|[0-9a-f]{64})$",
             "description": "kind 'milestone' only: the commit the stamp names."
           },
           "since": {
             "type": "string",
-            "pattern": "^[0-9a-f]{7,40}$",
+            "pattern": "^(?:[0-9a-f]{7,40}|[0-9a-f]{64})$",
             "description": "kind 'memory' only: the commit the reconciliation window opened at — the previous memory entry's until, else defined.sha."
           },
           "until": {
             "type": "string",
-            "pattern": "^[0-9a-f]{7,40}$",
+            "pattern": "^(?:[0-9a-f]{7,40}|[0-9a-f]{64})$",
             "description": "kind 'memory' only: the HEAD the reconciliation window closed at; the next window opens here."
           },
           "reviewed": {

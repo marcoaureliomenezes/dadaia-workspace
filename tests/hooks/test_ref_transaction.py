@@ -7,6 +7,7 @@ Owner: dd-sw-engineer-sr
 from __future__ import annotations
 
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -14,6 +15,7 @@ import pytest
 
 from dadaia_workspace.core.cli_line import reinstall_fix
 from dadaia_workspace.core.platform import Capabilities
+from dadaia_workspace.core.skill_owner import load_owner
 from dadaia_workspace.hooks import ref_transaction
 from tests.fixtures.harness_env import suite_env
 from tests.helpers import oslib
@@ -125,3 +127,54 @@ def test_a_zero_old_line_for_a_missing_wt_ref_is_refused_beside_an_existing_one(
     monkeypatch.setattr(sys, "prefix", str(_venv(tmp_path, "venv", None)))
     assert ref_transaction.main(_CREATE) == 1
     assert capsys.readouterr().err.startswith(f"{_BLOCKED}\nfix: ")
+
+
+def test_a_forced_unmarked_move_of_an_existing_wt_branch_passes(repo: Path) -> None:
+    """Through git with the hook installed, `branch -f` moving a wt ref to a commit that does not
+    descend from its tip is no creation and the hook adds no gate for it."""
+    _commit_and_branch(repo, "wt/x")
+    hook = repo / ".git" / "hooks" / "reference-transaction"
+    write_text(
+        hook,
+        f'#!/bin/sh\n[ "$1" = prepared ] || exit 0\nexec "{sys.executable}" -B -m '
+        "dadaia_workspace.hooks.ref_transaction\n",
+    )
+    make_executable(hook, oslib.detect(sys.platform))
+    tree = run(
+        ["git", "hash-object", "-t", "tree", "-w", "--stdin"], cwd=repo, input="", check=True
+    )
+    orphan = run(["git", "-c", "user.email=t@example.invalid", "-c", "user.name=T", "commit-tree",
+                  tree.stdout.strip(), "-m", "d"], cwd=repo, check=True).stdout.strip()  # fmt: skip
+    moved = run(["git", "branch", "-f", "wt/x", orphan], cwd=repo)
+    assert (moved.returncode, moved.stderr) == (0, "")
+    assert run(["git", "rev-parse", "wt/x"], cwd=repo).stdout.strip() == orphan
+
+
+@pytest.mark.parametrize("sub", ["", "sub"])
+@pytest.mark.parametrize("where", ["main", "linked"])
+def test_the_hook_and_main_checkout_name_the_same_repo(
+    where: str,
+    sub: str,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """The slug in the creation fix is the main checkout's folder name, as `_git.main_checkout` reads it."""
+    main = tmp_path / "primary-checkout"
+    main.mkdir()
+    run(["git", "init", "-q"], cwd=main, check=True)
+    run(["git", "-c", "user.email=t@example.invalid", "-c", "user.name=T", "commit", "-q",
+         "--allow-empty", "-m", "c"], cwd=main, check=True)  # fmt: skip
+    linked = tmp_path / "linked-tree"
+    run(["git", "worktree", "add", "-q", "-b", "side", str(linked)], cwd=main, check=True)
+    cwd = (main if where == "main" else linked) / sub
+    cwd.mkdir(exist_ok=True)
+    monkeypatch.chdir(cwd)
+    caps = oslib.detect("linux")
+    monkeypatch.setattr("dadaia_workspace.core.platform.PLATFORM", Capabilities.detect("linux"))
+    monkeypatch.setattr(sys, "prefix", str(_venv(tmp_path, "venv", caps)))
+    assert ref_transaction.main(_CREATE) == 1
+    slug = re.search(r"worktree new (\S+) x", capsys.readouterr().err)
+    assert slug is not None
+    assert slug.group(1) == load_owner("dd-bug-resolution", "_git").main_checkout(cwd).name
+    assert slug.group(1) == "primary-checkout"

@@ -27,7 +27,7 @@ recorded fix files or `component` in the bounded window ([`LINEAGE.md`](LINEAGE.
 `fix_sha` with `git show`; a `caused_by` other than `none` makes this fix a REBUILD (`specs/bugs/AGENTS.md` §2);
 grep every decider of the same fact and name its one owner before any fix;
 carry the link to Phase 6 (`resolve --caused-by`; `update` repairs);
-echo the `caused_by:`/`evidence:`/`prior diffs read:`/`rebuild:` block in the fix commit body.
+echo the `caused_by:`/`evidence:`/`prior diffs read:`/`rebuild:` block in the fix commit body; a `caused_by` other than `none` names its REBUILD unit in `rebuild:`, never `rebuild: none`.
 *Done when prior diffs were actually read, the owner is named, and the link and the rebuild decision (`rebuild` or `none`) are decided.*
 
 **Phase 1 — Red loop.** This is the skill; everything after it is mechanical. Build a

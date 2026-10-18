@@ -10,6 +10,7 @@ import os
 import re
 import subprocess
 import time
+from functools import cache
 from pathlib import Path
 
 from _git import git as git, parse_worktrees, scrubbed_env as scrubbed_env  # isort: skip
@@ -17,7 +18,16 @@ from _grammar import SEMVER_RE, TAG_RE, sole_live
 from _platform import act, cli_argv, command, git_inline, git_line, inline, is_link, venv_dir
 from _specs import run_cli
 from _specs import workspace_of as workspace_of
-from _worktree_names import LAUNCH, Refusal, base_of, branch, name_of, tree_path
+from _worktree_names import (
+    LAUNCH,
+    Refusal,
+    base_of,
+    branch,
+    is_bare_level,
+    kind_of,
+    name_of,
+    tree_path,
+)
 
 
 def diff_sha256(tree: Path, work: str, tip: str) -> str:
@@ -45,6 +55,7 @@ def cli(root: Path, *args: str, tree: Path | None = None) -> subprocess.Complete
     return run_cli(root, *args, cwd=tree or root, env=scrubbed_env() | fence, stdin=subprocess.DEVNULL)  # fmt: skip
 
 
+@cache  # ponytail: per-process, the CLI runs one verb per process; thread it through merge if a long-lived caller appears
 def gitflows(root: Path) -> dict[str, dict[str, str]]:
     """Each registered repo's gitflow `{principal, integration, work, main}` (`main`: its
     context's main repo), read by the one
@@ -96,6 +107,18 @@ class SeveralWork(Refusal):
         self.text, self.keep = text, keep
 
 
+def drop_steps(repo: Path, low: str, high: str) -> list[str]:
+    """The act steps that delete branch *low* once it is merged into *high*: its upstream unset
+    when it has one, since git's `-d` judges an upstream rather than HEAD, then `-d`; empty when
+    *low* is not merged. At most two steps, never `-D`."""
+    if not git(repo, "branch", "--merged", high, "--list", low).strip():
+        return []
+    steps = []
+    if git(repo, "for-each-ref", "--format=%(upstream)", f"refs/heads/{low}").strip():
+        steps.append(f"run `{git_inline(repo, 'branch', '--unset-upstream', low)}`")
+    return [*steps, f"run `{git_inline(repo, 'branch', '-d', low)}`"]
+
+
 def work_version(repo: Path, flow: dict[str, str]) -> str:
     prefix = flow["work"]
     versions = work_versions(repo, flow)
@@ -104,10 +127,8 @@ def work_version(repo: Path, flow: dict[str, str]) -> str:
     if versions:
         ordered = sorted(versions, key=lambda v: tuple(map(int, v.split("."))))
         low, high = f"{prefix}{ordered[0]}", f"{prefix}{ordered[-1]}"
-        drop = git_inline(repo, "branch", "-d", low)
-        merged = git(repo, "branch", "--merged", high, "--list", low).strip()
-        then = "run" if merged else f"merge {low} into {high}, then run"
-        text = f"run `{git_inline(repo, 'switch', high)}`, then {then} `{drop}`"
+        drop = ", then ".join(drop_steps(repo, low, high)) or f"merge {low} into {high}"
+        text = f"run `{git_inline(repo, 'switch', high)}`, then {drop}"
         raise SeveralWork(f"{len(versions)} work branches", text, ordered[-1])
     nxt = next_version(repo, flow)
     remote = git(
@@ -121,7 +142,7 @@ def work_version(repo: Path, flow: dict[str, str]) -> str:
 
 def not_a_name(name: str, live: str = "") -> Refusal:
     """The one refusal of a name the grammar does not take; its one fix lists the trees."""
-    shape = live or "0.5.0"
+    shape = live or "<M.m.p>"
     return Refusal(
         f"not a worktree name: {name!r} (expected {shape}/rc-<N>/wt-rc, {shape}/rc-<N>/job-<n>/wt-main, {shape}/rc-<N>/job-<n>/wt-task-<kkk>, {shape}/wt-backlog-<slug> or {shape}/wt-hotfix-<bug>)",  # fmt: skip
         command(*LAUNCH, "list"),
@@ -156,7 +177,7 @@ def _row(repo: Path, path: str, state: str, age: float = 0.0, **facts: object) -
             "agent", f"remove the directory {path}, then run `{inline(*LAUNCH, verb, path)}`"
         )
     return {"repo": repo.name, "path": path, "state": state, "age_hours": age, "registered": True,
-            **facts, "warn": state not in ("ready", "open", "empty") or age > 24,
+            "kind": None, **facts, "warn": state not in ("ready", "open", "empty") or age > 24,
             "fix": line if state in ("ready", "orphan") else "",
             "exit": line if state in ("ready", "open", "empty", "orphan") else ""}  # fmt: skip
 
@@ -176,19 +197,18 @@ def _ours(repo: Path, flow: dict[str, str], name: str, path: str) -> dict[str, o
         dirty(Path(path)),
     )
     state = "empty" if not ahead else "open" if changed else "ready"
-    return _row(repo, path, state, _age(repo, name), name=name, ahead=ahead, dirty=changed)
+    return _row(repo, path, state, _age(repo, name), name=name, kind=kind_of(name), ahead=ahead, dirty=changed)  # fmt: skip
 
 
-def _strays(folder: Path, listed: set[Path], ancestors: set[Path]) -> list[Path]:
-    """The leaf folders under *folder* that no tree lists nor is an ancestor of one: strays at any depth."""
+def _strays(home: Path, folder: Path, listed: set[Path], ancestors: set[Path]) -> list[Path]:
+    """The leaf folders under *folder* that no tree lists nor is an ancestor of one, a bare level
+    folder of *home* aside: strays at any depth."""
     out: list[Path] = []
     for child in sorted(folder.glob("*")):
         here = child.resolve()
         if child.is_dir() and not is_link(child) and here not in listed:
-            sub = _strays(child, listed, ancestors)
-            # a level folder holding only its AGENTS.md is layout, not a stray
-            layout = [p.name for p in child.iterdir()] == ["AGENTS.md"]
-            out += sub if sub or here in ancestors or layout else [child]
+            sub = _strays(home, child, listed, ancestors)
+            out += sub if sub or here in ancestors or is_bare_level(home, child) else [child]
     return out
 
 
@@ -199,16 +219,24 @@ def _absent(root: Path, repo: Path, held: set[str], found: list[dict[str, object
     home = tree_path(root, repo.name)
     for ref in git(repo, "for-each-ref", "--format=%(refname:short)", "refs/heads/wt/").split():
         if f"refs/heads/{ref}" not in held:
-            row = _row(repo, str(home / ref.removeprefix("wt/")), "orphan")
-            if not name_of(ref):  # a name `merge` refuses names no merge as its exit
-                row |= {"fix": "", "exit": ""}
+            name = ref.removeprefix("wt/")
+            row = _row(repo, str(home / name), "orphan", kind=kind_of(name))
+            # `merge` refuses a name off the grammar: git drops a branch HEAD holds; one with
+            # commits of its own has no exit (the unpublished-branch rule of `context dead` owns
+            # it) and a fix that waits on an agent
+            if not name_of(ref):
+                if steps := drop_steps(repo, ref, "HEAD"):
+                    line = act("agent", ", then ".join(steps)) if len(steps) > 1 else git_line(repo, "branch", "-d", ref)  # fmt: skip
+                    row |= {"fix": line, "exit": line}
+                else:
+                    row |= {"fix": act("agent", f"land or archive the wt/* branch {ref}, then close again"), "exit": ""}  # fmt: skip
             out.append(row)
     listed = {Path(str(r["path"])).resolve() for r in (*found, *out)}
     ancestors = {p for path in listed for p in path.parents}
     return out + [
         _row(repo, str(stray), "unregistered")
         | {"fix": act("agent", f"remove the directory {stray}")}
-        for stray in _strays(home, listed, ancestors)
+        for stray in _strays(home, home, listed, ancestors)
     ]
 
 
@@ -217,8 +245,10 @@ def _repo_rows(root: Path, repo: Path, flow: dict[str, str]) -> list[dict[str, o
     out: list[dict[str, object]] = []
     for tree in trees:
         path, name = tree["worktree"], mine.get(Path(tree["worktree"]).resolve())
-        if name is None or not Path(path).is_dir():
-            out.append(_row(repo, path, "foreign" if name is None else "orphan"))
+        if name is None:
+            out.append(_row(repo, path, "foreign") | {"fix": act("agent", f"land the work of the linked worktree {path}, then remove it: no tree of this workspace")})  # fmt: skip
+        elif not Path(path).is_dir():
+            out.append(_row(repo, path, "orphan", name=name, kind=kind_of(name)))
         else:
             out.append(_ours(repo, flow, name, path))
     return out + _absent(root, repo, {t.get("branch", "") for t in trees}, out)

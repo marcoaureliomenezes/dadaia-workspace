@@ -31,11 +31,14 @@ from tests.helpers.worktree_ws import run as _run
 
 RC = "0.5.0/rc-1/wt-rc"
 LANE = "0.5.0/wt-backlog-an-idea"
-#: The one fix of a main tree refused for the rc's phase.
-PHASE_FIX = (
-    "fix: Agent action: reach phase IMPLEMENTATION in _RELEASE.json on wt/0.5.0/rc-1/wt-rc"
-    " (release.py phase), then open its job again"
-)
+
+
+def phase_fix(root: Path) -> str:
+    """The one fix of a main tree refused for the rc's phase: it names the main repo's rc tree."""
+    return (
+        "fix: Agent action: reach phase IMPLEMENTATION in _RELEASE.json on wt/0.5.0/rc-1/wt-rc"
+        f" at {root / 'worktrees/r' / RC} (release.py phase), then open its job again"
+    )
 
 
 @pytest.fixture
@@ -79,7 +82,7 @@ def test_a_release_job_needs_the_implementation_phase(definition_root: Path) -> 
     refused = _run(definition_root, "new", "r", NEW_JOB)
 
     assert refused.returncode != 0
-    assert _fixes(refused) == [PHASE_FIX]
+    assert _fixes(refused) == [phase_fix(definition_root)]
     assert not (definition_root / "worktrees/r" / NEW_JOB).exists()
     assert _git(repo, "branch", "--list", f"wt/{NEW_JOB}").strip() == ""
 
@@ -273,7 +276,8 @@ def _word(path: Path) -> str:
 def test_a_task_needs_its_job_branch_and_the_sixth_task_opens(root: Path) -> None:
     """A task is cut from its main tree; the number of open tasks is not capped."""
     orphan = _run(root, "new", "r", NEW_TASK)
-    assert orphan.returncode == 1 and _fixes(orphan)[0].endswith(f"worktree.py new r {NEW_JOB}")
+    [orphan_fix] = _fixes(orphan)
+    assert orphan.returncode == 1 and orphan_fix.endswith(f"worktree.py new r {NEW_JOB}")
     assert _run(root, "new", "r", RC).returncode == 0
     assert _run(root, "new", "r", NEW_JOB).returncode == 0
     for task in range(1, 7):
@@ -325,7 +329,21 @@ def test_an_associated_job_reads_the_main_repos_spec(
         )  # the rc's own tree needs no release phase
     result = _run(root, "new", "a", NEW_JOB)
     assert (result.returncode, result.stdout.strip()) == (code, f"[ok] {root / out}" if out else "")
-    assert _fixes(result) == ([] if code == 0 else [PHASE_FIX])
+    assert _fixes(result) == ([] if code == 0 else [phase_fix(root)])
+
+
+def test_an_associated_jobs_phase_refusal_names_the_main_repos_rc_tree(root: Path) -> None:
+    associate(root, "Draft")
+    _set_release(root, "DEFINITION")
+    for repo in ("r", "a"):
+        assert _run(root, "new", repo, RC).returncode == 0
+
+    refused = _run(root, "new", "a", NEW_JOB)
+
+    assert refused.returncode == 1
+    [fix] = _fixes(refused)
+    assert str(root / "worktrees/r" / RC) in fix
+    assert str(root / "worktrees/a") not in fix
 
 
 def test_symlinked_worktrees_component_refuses(

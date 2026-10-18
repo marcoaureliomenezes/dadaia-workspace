@@ -11,6 +11,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -196,7 +197,7 @@ def test_check_refuses_a_fix_sha_that_no_ref_reaches(script: Path, tmp_path: Pat
     assert "\nfix: " in done.stdout
 
 
-def test_the_unreached_fix_sha_fix_line_is_one_act_without_a_placeholder(
+def test_the_unreached_fix_sha_fix_line_is_one_act_pinning_the_literal_SHA(
     script: Path, tmp_path: Path
 ) -> None:
     specs = _ledger(tmp_path)
@@ -207,10 +208,16 @@ def test_the_unreached_fix_sha_fix_line_is_one_act_without_a_placeholder(
     run([*git, "commit", "-q", "--allow-empty", "-m", "base"], check=True)
     fix = _run(script, "check", "--specs", str(specs)).stdout.splitlines()[-1]
     assert fix.startswith("fix: Agent action: ") and "<" not in fix, fix
+    assert "fix_sha=SHA" in fix, fix
 
 
-def test_a_shallow_clone_is_one_finding_not_one_per_record(script: Path, tmp_path: Path) -> None:
-    """A cut history is named once, with its own fix; no record is judged unreached."""
+@pytest.mark.parametrize(("ids", "depth", "code"), [
+    (("a-bug", "b-bug"), "1", 1),  # a cut history is named once, with its own fix
+    (("a-bug",), "2", 0),  # reachability is judged first: a cut is named only for a sha the clone cannot place
+])  # fmt: skip
+def test_a_shallow_clone_is_judged_by_reachability_first(
+    script: Path, tmp_path: Path, ids: tuple[str, ...], depth: str, code: int
+) -> None:
     origin = tmp_path / "origin"
     origin.mkdir()
     git = ["git", "-C", str(origin), "-c", "user.name=t", "-c", "user.email=t@t.test"]
@@ -220,38 +227,20 @@ def test_a_shallow_clone_is_one_finding_not_one_per_record(script: Path, tmp_pat
     resolved = [
         {**_OPEN_RECORD, "id": i, "status": "resolved", "closed_at": "2026-09-21T10:00:00Z",
          "cause": "c", "solution": "s", "caused_by": "none", "fix_sha": sha}
-        for i in ("a-bug", "b-bug")
+        for i in ids
     ]  # fmt: skip
     specs = _ledger(origin, *resolved)
     run([*git, "add", "specs"], check=True)
     run([*git, "commit", "-q", "-m", "ledger"], check=True)
     clone = tmp_path / "clone"
-    run(["git", "clone", "-q", "--depth", "1", origin.as_uri(), str(clone)], check=True)
+    run(["git", "clone", "-q", "--depth", depth, origin.as_uri(), str(clone)], check=True)
     done = _run(script, "check", "--specs", str(clone / specs.relative_to(origin)))
-    assert done.returncode == 1, done.stdout
-    assert done.stdout.count("LEDGER-BUGS-SCHEMA") == 1 and "shallow" in done.stdout, done.stdout
-    assert "fetch --unshallow" in done.stdout.splitlines()[-1]
-
-
-def test_a_shallow_clone_whose_history_holds_every_fix_sha_is_clean(
-    script: Path, tmp_path: Path
-) -> None:
-    """Reachability is judged first: a cut is named only for a sha the clone cannot place."""
-    origin = tmp_path / "origin"
-    origin.mkdir()
-    git = ["git", "-C", str(origin), "-c", "user.name=t", "-c", "user.email=t@t.test"]
-    run([*git, "init", "-q"], check=True)
-    run([*git, "commit", "-q", "--allow-empty", "-m", "fix"], check=True)
-    sha = run([*git, "rev-parse", "HEAD"], check=True).stdout.strip()
-    resolved = {**_OPEN_RECORD, "status": "resolved", "closed_at": "2026-09-21T10:00:00Z",
-                "cause": "c", "solution": "s", "caused_by": "none", "fix_sha": sha}  # fmt: skip
-    specs = _ledger(origin, resolved)
-    run([*git, "add", "specs"], check=True)
-    run([*git, "commit", "-q", "-m", "ledger"], check=True)
-    clone = tmp_path / "clone"
-    run(["git", "clone", "-q", "--depth", "2", origin.as_uri(), str(clone)], check=True)
-    done = _run(script, "check", "--specs", str(clone / specs.relative_to(origin)))
-    assert done.returncode == 0, done.stdout
+    assert done.returncode == code, done.stdout
+    assert done.stdout.count("LEDGER-BUGS-SCHEMA") == code, done.stdout
+    assert ("shallow" in done.stdout) is bool(code), done.stdout
+    assert ("fetch --unshallow" in "".join(done.stdout.splitlines()[-1:])) is bool(code), (
+        done.stdout
+    )
 
 
 def test_a_fix_sha_any_repo_of_the_context_reaches_is_clean(script: Path, tmp_path: Path) -> None:
@@ -325,6 +314,55 @@ def _archive(specs: Path, bug_id: str) -> None:
                 "closed_at": "2026-09-21T00:00:00Z"}  # fmt: skip
     (specs / "bugs" / "_archive").mkdir()
     write_text(specs / "bugs" / "_archive" / "bugs_histo.jsonl", json.dumps(archived) + "\n")
+
+
+def test_an_id_in_both_the_ledger_and_the_archive_is_one_finding_with_one_fix_line(
+    script: Path, tmp_path: Path
+) -> None:
+    specs = _ledger(tmp_path, _OPEN_RECORD)
+    _archive(specs, "a-bug")
+    done = _run(script, "check", "--specs", str(specs))
+    assert done.returncode == 1, done.stdout
+    lines = [ln for ln in done.stdout.splitlines() if ln.strip()]
+    assert len(lines) == 2 and lines[1].startswith("fix: "), lines
+    assert lines[0].startswith("LEDGER-BUGS-SCHEMA error ") and "bugs/BUGS.jsonl:1" in lines[0]
+    assert "'a-bug'" in lines[0] and "BUGS.jsonl" in lines[1], lines
+
+
+def test_an_event_line_id_that_is_also_live_is_not_refused(script: Path, tmp_path: Path) -> None:
+    specs = _ledger(tmp_path, _OPEN_RECORD)
+    (specs / "bugs" / "_archive").mkdir()
+    event = {"event": "archived", "data": {"id": "a-bug", "status": "Closed"}}
+    write_text(specs / "bugs" / "_archive" / "bugs_histo.jsonl", json.dumps(event) + "\n")
+    done = _run(script, "check", "--specs", str(specs))
+    assert (done.returncode, done.stdout) == (0, "")
+
+
+def test_two_plain_records_of_one_id_in_the_archive_are_one_finding(
+    script: Path, tmp_path: Path
+) -> None:
+    specs = _ledger(tmp_path, _OPEN_RECORD)
+    histo = specs / "bugs" / "_archive" / "bugs_histo.jsonl"
+    histo.parent.mkdir()
+    write_text(histo, "".join(json.dumps(_closed("old-a")) + "\n" for _ in range(2)))
+    done = _run(script, "check", "--specs", str(specs), "--json")
+    assert done.returncode == 1, done.stdout
+    found = json.loads(done.stdout)
+    assert [(f["path"], f["line"]) for f in found] == [("bugs/_archive/bugs_histo.jsonl", 2)]
+    assert "'old-a'" in found[0]["message"] and "bugs_histo.jsonl" in found[0]["fix"], found
+
+
+def test_an_append_of_an_id_already_plain_in_the_archive_is_refused(
+    script: Path, tmp_path: Path
+) -> None:
+    specs = _ledger(tmp_path, _OPEN_RECORD)
+    _archive(specs, "old-a")
+    before = (specs / "bugs" / "BUGS.jsonl").read_bytes()
+    done = _run(script, *_append_argv(specs, bug_id="old-a"), "--correlates", "none")
+    assert done.returncode == 1, done.stdout + done.stderr
+    assert "'old-a'" in done.stderr and done.stderr.count("fix: ") == 1, done.stderr
+    assert "--bug-id" in done.stderr, done.stderr
+    assert (specs / "bugs" / "BUGS.jsonl").read_bytes() == before
 
 
 @pytest.mark.parametrize("bad", ["[1, 2]", "{not json"])
@@ -531,8 +569,8 @@ def test_append_registers_one_open_record(script: Path, tmp_path: Path) -> None:
 
 def _sibling(bug_id: str, *files: str) -> dict[str, object]:
     record = {**_OPEN_RECORD, "id": bug_id, "status": "resolved", "closed_at": "2026-09-21T10:00:00Z",
-              "cause": "c", "solution": "s", "caused_by": "none", "fix_sha": "a" * 40,
-              "fix_files": list(files)}  # fmt: skip
+              "cause": "c", "solution": "s", "caused_by": "none",
+              "fix_sha": (bug_id.encode().hex() * 40)[:40], "fix_files": list(files)}  # fmt: skip
     del record["surface"]
     return record
 
@@ -577,6 +615,24 @@ def test_append_prints_the_earlier_bugs_whose_fix_files_match_and_the_rebuild_du
         "b1",
         "b3",
     ]
+
+
+def test_a_fix_commit_shared_by_three_bugs_counts_once_toward_a_files_rebuild_due(
+    script: Path, tmp_path: Path
+) -> None:
+    shared = [{**_sibling(i, "cli/x.py"), "fix_sha": "c" * 40} for i in ("b1", "b2", "b3")]
+    twice = [_sibling("b4", "tests/t.py"), _sibling("b5", "tests/t.py")]
+    specs = _ledger(tmp_path, *shared, *twice)
+    stats = _run(script, "stats", "--specs", str(specs))
+    assert [ln for ln in stats.stdout.splitlines() if ln.startswith("rebuild-due:")] == [
+        "rebuild-due:tests/t.py\tb4,b5"
+    ]
+    done = _run(script, *_append_argv(specs), "--correlates", "b1,b2,b3")
+    assert done.returncode == 0, done.stderr
+    assert done.stdout.splitlines()[:4] == [
+        "earlier bug on cli/x.py: b1", "earlier bug on cli/x.py: b2",
+        "earlier bug on cli/x.py: b3", "REBUILD due: 2nd bug on cli/x.py",
+    ]  # fmt: skip
 
 
 def test_append_lists_a_bug_once_when_two_of_its_files_match(script: Path, tmp_path: Path) -> None:
@@ -658,6 +714,38 @@ def test_resolve_reads_no_fix_files_from_a_sha_the_repo_does_not_reach(
          f"--fix-sha={sha.format(planted=planted)}", "--specs", str(specs))  # fmt: skip
     assert not planted.exists()
     assert "fix_files" not in _records(specs)[0] or _records(specs)[0]["fix_files"] is None
+
+
+@pytest.mark.parametrize(("sha", "spawned"), [("--output={planted}", False), ("b" * 40, True)])
+def test_check_reports_a_sha_the_repo_does_not_reach_and_runs_no_git_on_a_malformed_one(
+    script: Path, tmp_path: Path, sha: str, spawned: bool
+) -> None:
+    sha = sha.format(planted=tmp_path / "planted")
+    specs = _ledger(tmp_path, {**_OPEN_RECORD, "fix_sha": sha})
+    trace, env = _traced(tmp_path)
+    done = _run(script, "check", "--specs", str(specs), env=env)
+    assert (
+        done.returncode == 1
+        and f"fix_sha {sha} is no ancestor of HEAD" in done.stdout + done.stderr
+    )
+    assert not (tmp_path / "planted").exists()
+    assert spawned or not any(sha in ln for ln in _trace_lines(trace))
+
+
+def test_append_refuses_a_state_file_term_with_no_environment_variable(
+    script: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("DADAIA_PRIVACY_DENYLIST", raising=False)
+    (tmp_path / ".dadaia/states").mkdir(parents=True)
+    write_text(tmp_path / ".dadaia/states/spec_contexts.json", "{}")
+    write_text(tmp_path / ".dadaia/states/privacy_denylist.json", json.dumps({"zorblax": "client"}))
+    specs = _ledger(tmp_path)
+    before = (specs / "bugs/BUGS.jsonl").read_bytes()
+    argv = _append_argv(specs)
+    argv[argv.index("--title") + 1] = "a zorblax leak"
+    done = _run(script, *argv, "--correlates", "none")
+    assert done.returncode == 1 and "field 'title' carries" in done.stderr, done.stderr
+    assert (specs / "bugs/BUGS.jsonl").read_bytes() == before
 
 
 def test_append_takes_no_surface_flag(script: Path, tmp_path: Path) -> None:
@@ -1209,3 +1297,163 @@ def test_json_output_carries_one_object_per_finding(script: Path, tmp_path: Path
     assert payload[0]["code"] == "LEDGER-BUGS-SCHEMA"
     assert payload[0]["verdict"] == "error"
     assert payload[0]["line"] == 1
+
+
+def _closed_on(bug_id: str, closed_at: str, caused_by: str, *files: str) -> dict[str, object]:
+    return {**_sibling(bug_id, *files), "closed_at": closed_at, "caused_by": caused_by}
+
+
+def test_stats_window_counts_what_closed_between_two_stamps(script: Path, tmp_path: Path) -> None:
+    """b2 and b5 share a fixed file with an out-of-window bug, b3 fixed a file alone, b4 closed
+    after the window; the archive counts like the live ledger."""
+    specs = _ledger(
+        tmp_path,
+        _closed_on("b1", "2026-09-10T00:00:00Z", "none", "cli/x.py"),
+        _closed_on("b2", "2026-09-20T00:00:00Z", "b1", "cli/x.py"),
+        _closed_on("b3", "2026-09-25T00:00:00Z", "none", "solo.py"),
+        _closed_on("b4", "2026-10-05T00:00:00Z", "b1", "other.py"),
+        _OPEN_RECORD,
+    )
+    _archived(
+        specs,
+        _closed_on("b5", "2026-09-22T00:00:00Z", "none", "hooks/y.py"),
+        _closed_on("b6", "2026-08-01T00:00:00Z", "none", "hooks/y.py"),
+    )
+    window = ["--closed-after", "2026-09-15T00:00:00Z", "--closed-until", "2026-10-01T00:00:00Z"]
+    done = _run(script, "stats", "--specs", str(specs), *window)
+    assert done.returncode == 0, done.stderr
+    lines = done.stdout.splitlines()
+    assert [ln for ln in lines if ln.split("\t")[0] in ("closed", "fix-induced", "rebuild-due")] == [
+        "closed\t3", "fix-induced\t1", "rebuild-due\t2",
+    ]  # fmt: skip
+    plain = _run(script, "stats", "--specs", str(specs))
+    assert not [ln for ln in plain.stdout.splitlines() if ln.startswith(("closed", "fix-induced"))]
+
+
+def test_named_paths_drops_a_bare_directory_word_and_splits_a_trailing_period(
+    script: Path, tmp_path: Path
+) -> None:
+    module = load_owner("dd-bug-resolution", "_bugs_write")
+    tracked = ["cli/x.py", ".github/x.py"]
+    assert module.named_paths("the cli fails in cli/x.py", tracked) == ["cli/x.py"]
+    assert module.named_paths("it broke cli/x.py.", tracked) == ["cli/x.py"]
+    assert module.named_paths("cli", tracked) == ["cli"]
+
+
+def test_named_paths_drops_a_bare_word_only_beside_a_slash_path() -> None:
+    named_paths = load_owner("dd-bug-resolution", "_bugs_write").named_paths
+    tracked = ["cli/x.py", "hooks/y.py"]
+    assert named_paths("cli hooks", tracked) == ["cli", "hooks"]
+    assert named_paths("cli cli/x.py", tracked) == ["cli/x.py"]
+
+
+def test_append_takes_repeated_correlates_and_the_help_states_the_comma_form(
+    script: Path, tmp_path: Path
+) -> None:
+    specs = _ledger(tmp_path, _sibling("b1", "cli/x.py"), _sibling("b3", "cli/x.py"))
+    done = _run(script, *_append_argv(specs), "--correlates", "b1", "--correlates", "b3")
+    assert done.returncode == 0, done.stderr
+    assert _records(specs)[-1]["correlates"] == ["b1", "b3"]
+    helped = " ".join(_run(script, "append", "--help").stdout.split())
+    assert "--correlates" in helped and "comma" in helped
+
+
+def test_update_records_a_correlates_list(script: Path, tmp_path: Path) -> None:
+    specs = _ledger(tmp_path, _OPEN_RECORD, _sibling("b1", "cli/x.py"), _sibling("b2", "cli/x.py"))
+    done = _run(script, "update", "a-bug", "--set", "correlates=b1,b2", "--specs", str(specs))
+    assert done.returncode == 0, done.stderr
+    assert done.stdout.strip() == "[ok] updated correlates for a-bug"
+    assert _records(specs)[0]["correlates"] == ["b1", "b2"]
+
+
+def _traced(tmp_path: Path) -> tuple[Path, dict[str, str]]:
+    """A git trace file and the env that makes every git child of the script append to it."""
+    trace = tmp_path / "git.trace"
+    return trace, os.environ | {"GIT_TRACE": str(trace)}
+
+
+def _trace_lines(trace: Path) -> list[str]:
+    return read_text(trace).splitlines() if trace.exists() else []
+
+
+def test_reaches_hands_git_no_malformed_sha(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _ledger(tmp_path)
+    trace, env = _traced(tmp_path)
+    monkeypatch.setenv("GIT_TRACE", env["GIT_TRACE"])
+    assert load_owner("dd-bug-resolution", "_git").reaches(tmp_path, "--output=x") is False
+    assert _trace_lines(trace) == []
+
+
+def test_fix_files_reads_the_files_of_every_reachable_sha_in_one_diff_tree(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _ledger(tmp_path)
+    first, second = _fix_commit(tmp_path, "cli/x.py"), _fix_commit(tmp_path, ".github/x.py")
+    trace, env = _traced(tmp_path)
+    monkeypatch.setenv("GIT_TRACE", env["GIT_TRACE"])
+    found = load_owner("dd-bug-resolution", "_git").fix_files(
+        tmp_path, [first, second, "b" * 40, "--output=x"]
+    )
+    assert found == {first: ["cli/x.py"], second: [".github/x.py"]}
+    spawned = [ln for ln in _trace_lines(trace) if "built-in: git" in ln]
+    assert len(spawned) == 2
+    assert len([ln for ln in spawned if "diff-tree" in ln]) == 1
+
+
+def test_check_reads_each_reachable_fix_commit_once(script: Path, tmp_path: Path) -> None:
+    _ledger(tmp_path)
+    sha = _fix_commit(tmp_path, "cli/x.py")
+    specs = _ledger(tmp_path, {**_sibling("b1", "cli/x.py"), "fix_sha": sha})
+    trace, env = _traced(tmp_path)
+    assert _run(script, "check", "--specs", str(specs), env=env).returncode == 0
+    assert len([ln for ln in _trace_lines(trace) if "rev-list" in ln]) == 1
+
+
+def test_check_spends_the_same_git_reachability_reads_on_four_fix_shas_as_on_one(
+    script: Path, tmp_path: Path
+) -> None:
+    def reads(count: int) -> int:
+        root = tmp_path / f"n{count}"
+        _ledger(root)
+        shas = [_fix_commit(root, "cli/x.py") for _ in range(count)]
+        specs = _ledger(root, *({**_sibling(f"b{i}", "cli/x.py"), "fix_sha": s} for i, s in enumerate(shas)))  # fmt: skip
+        trace, env = _traced(root)
+        assert _run(script, "check", "--specs", str(specs), env=env).returncode == 0
+        spawned = [ln for ln in _trace_lines(trace) if "built-in: git" in ln]
+        return len([ln for ln in spawned if "merge-base" in ln or "rev-list" in ln])
+
+    assert reads(4) == reads(1)
+
+
+def test_append_finds_the_earlier_bugs_of_records_without_fix_files_in_one_diff_tree(
+    script: Path, tmp_path: Path
+) -> None:
+    _ledger(tmp_path)
+    first, second = _fix_commit(tmp_path, "cli/x.py"), _fix_commit(tmp_path, "cli/x.py")
+    old = [{**_sibling(i, "cli/x.py"), "fix_sha": sha} for i, sha in (("b1", first), ("b2", second))]
+    for record in old:
+        del record["fix_files"]
+    specs = _ledger(tmp_path, *old)
+    trace, env = _traced(tmp_path)
+    done = _run(script, *_append_argv(specs), "--correlates", "b1,b2", env=env)
+    assert done.returncode == 0, done.stderr
+    assert done.stdout.splitlines()[:3] == [
+        "earlier bug on cli/x.py: b1", "earlier bug on cli/x.py: b2",
+        "REBUILD due: 3rd bug on cli/x.py",
+    ]  # fmt: skip
+    [reads] = [ln for ln in read_text(trace).splitlines() if "diff-tree" in ln]
+    assert "--stdin" in reads, reads
+
+
+@pytest.mark.parametrize(("sha", "accepted"), [("a" * 64, True), ("a" * 63, False)])
+def test_the_sha_grammar_and_the_record_schema_agree_on_a_64_hex_fix_sha(
+    sha: str, accepted: bool
+) -> None:
+    schema = json.loads(
+        read_text(_PUBLIC / "skills/dd-bug-resolution/scripts/schemas/bug-record-v1.schema.json")
+    )
+    grammar = load_owner("dd-bug-resolution", "_grammar")
+    assert bool(grammar.SHA_RE.match(sha)) is accepted
+    assert bool(re.search(schema["properties"]["fix_sha"]["pattern"], sha)) is accepted

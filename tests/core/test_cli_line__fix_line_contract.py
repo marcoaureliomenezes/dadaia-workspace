@@ -385,8 +385,8 @@ def _chain(ws: Path, case: Case) -> str:
         assert fix not in seen, f"no progress — the same fix line again:\n{fix}"
         seen.append(fix)
         act = fix.startswith(_ACT_LABELS)
-        if case.before is not None and (act or step == 0):
-            case.before(world)
+        if act or step == 0:
+            case.play(world, fix)
         ran = None if act else world.run(fix, world.elsewhere)  # a fix line runs from any cwd
         assert ran is None or ran.returncode == 0, f"the fix does not run:\n{fix}\n{ran}"
         if case.replaces and step == 0:

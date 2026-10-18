@@ -60,36 +60,47 @@ def _refuse_unapproved_docs(live: Live) -> Path:
     return candidate
 
 
+def _owner() -> Path:
+    """The worktree owner script, run as its own process: the one reader of the worktree rows."""
+    return Path(__file__).resolve().parents[2] / "dd-gitflow-default" / "scripts" / "worktree.py"
+
+
 def _worktree_rows(root: Path) -> list[dict[str, Any]]:
     """The rows of `worktree.py list --json`, the worktrees' one owner, run as its own script."""
-    owner = Path(__file__).resolve().parents[2] / "dd-gitflow-default" / "scripts" / "worktree.py"
-    done = run([sys.executable, str(owner), "list", "--json"], cwd=root, env=_git.scrubbed_env())
+    fix = command(sys.executable, str(_owner()), "list")
+    try:
+        done = run(
+            [sys.executable, str(_owner()), "list", "--json"], cwd=root, env=_git.scrubbed_env()
+        )
+    except OSError as exc:
+        raise Refusal(f"worktree rows unreadable: {exc}", fix) from exc
     if done.returncode:
         lines = done.stderr.splitlines()
-        fix = fix_of(done.stderr, command(sys.executable, str(owner), "list"))
-        raise Refusal(f"worktree rows unreadable: {lines[0] if lines else done.returncode}", fix)
+        raise Refusal(
+            f"worktree rows unreadable: {lines[0] if lines else done.returncode}",
+            fix_of(done.stderr, fix),
+        )
     rows: list[dict[str, Any]] = json.loads(done.stdout)
     return rows
 
 
 def _refuse_open_worktrees(specs: Path) -> None:
-    """Closure waits for every worktree row of the repo, bar its own tree: a candidate's `wt-rc`
-    tree holds no work and never blocks it. Read from the worktree owner's rows."""
+    """Closure waits for every worktree row of the repo bar a `wt-rc` tree (it holds no work) and
+    the tree it runs from. Read from the worktree owner's rows."""
     from _ledger import workspace_of
 
     root = workspace_of(specs)
     if root is None:  # no workspace holds this tree: there is no worktree to wait for
         return
-    top = _git.git(specs, "rev-parse", "--path-format=absolute", "--show-toplevel",
-                   "--git-common-dir", check=False).split() or ["", ""]  # fmt: skip
-    repo = Path(top[1]).parent.name
-    held = [r for r in _worktree_rows(root) if r["repo"] == repo
-            and Path(str(r["path"])).name != "wt-rc"
-            and Path(str(r["path"])).resolve() != Path(top[0]).resolve()]  # fmt: skip
+    main = _git.main_checkout(specs)
+    own = Path(_git.git(specs, "rev-parse", "--show-toplevel").strip()).resolve()
+    held = [
+        r for r in _worktree_rows(root)
+        if r["repo"] == main.name and r["kind"] != "rc" and Path(str(r["path"])).resolve() != own
+    ]  # fmt: skip
     if held:
-        fix = held[0]["exit"] or act("agent", f"land or remove the wt/* work at {held[0]['path']}, then close again")  # fmt: skip
-        raise Refusal(f"repos/{repo} still holds {len(held)} open wt/* worktree(s) — a "
-                      "candidate closes with every one merged", str(fix))  # fmt: skip
+        raise Refusal(f"repos/{main.name} still holds {len(held)} open wt/* worktree(s) — a "
+                      "candidate closes with every one merged", held[0]["exit"] or held[0]["fix"])  # fmt: skip
 
 
 #: The one verb that moves each phase forward — every refusal's fix names it, so a fix
@@ -108,7 +119,7 @@ def set_phase(specs: Path, phase: str, sha: str) -> tuple[str, str]:
     """Move the live release to *phase* and stamp its milestone."""
     if not SHA_RE.match(sha):
         raise Refusal(
-            f"--sha {sha!r} is not a 7-40 character lowercase hex commit sha",
+            f"--sha {sha!r} is not a commit sha",
             at_head(specs, "phase", phase),
         )
     live = live_release(specs)

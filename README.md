@@ -109,11 +109,11 @@ through the gate asserting ALLOW. No lease, lock or wait path exists; the gate r
 Work runs as candidates inside one live release: a picked set, an as-is review of every
 unit it touches, a grill, SPEC, a PLAN drawing a DAG of jobs and one job file per job; the candidate lives on its `wt-rc` worktree, each task runs in its own worktree and
 lands on its job's `wt-main` after its gate, each job lands on the `wt-rc` only after the reviewer's `APPROVED`, then the
-Reconciliation closes it — disposition sweep, then memory reconciliation last; after CLOSURE only a block-list bug lands — the `wt-rc` lands on the work branch and the work -> integration merge follows; `.dadaia/.venv/bin/dadaia worktree <verb>` runs every worktree verb (branch names: the constitution's `gitflow:`). The
+Reconciliation closes it — disposition sweep, then memory reconciliation last; after CLOSURE a hotfix still syncs in, and in code only the `wt-rc` holds only a block-list bug lands — the `wt-rc` lands on the work branch and the work -> integration merge follows; `.dadaia/.venv/bin/dadaia worktree <verb>` runs every worktree verb (branch names: the constitution's `gitflow:`). The
 ledger scripts under `.agents/skills/*/scripts/` (`bugs.py`, `backlog.py`,
 `release.py`, `audit.py`) are each record's one writer. A bug is proposed to the
-operator and registered only after confirmation; a block-list bug is fixed at once in a
-`wt-hotfix-<bug-id>` lane with a RED test, while any other bug becomes explicit candidate scope. Ship
+operator and registered only after confirmation; a bug in code the work branch holds is fixed in a
+`wt-hotfix-<bug-id>` lane with a RED test, a block-list bug in code only the `wt-rc` holds after CLOSURE on that `wt-rc`, while any other bug becomes explicit candidate scope. Ship
 may carry an open bug only with the operator's exact recorded authorization. Completed work leaves as a `handoff-v1` record, validated by
 `.dadaia/.venv/bin/dadaia reports validate`.
 

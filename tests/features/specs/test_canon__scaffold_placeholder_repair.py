@@ -2,8 +2,7 @@
 
 A legacy placeholder atom (a memory atom whose frontmatter keeps a template token such as
 ``SLUG_PLACEHOLDER``) is reported as MEM-PLACEHOLDER-1, not auto-fixable, its fix line naming
-fill or delete. ``doctor --fix`` leaves it byte for byte; the ``specs upgrade`` dry run reports
-it without deleting it; exact-token detection never flags or touches a filled atom.
+fill or delete. ``doctor --fix`` leaves it byte for byte.
 """
 
 from __future__ import annotations
@@ -61,12 +60,16 @@ def test_fix_reports_placeholder_and_leaves_it_byte_for_byte(tmp_path: Path) -> 
     specs, atom = _placeholder_atom(tmp_path)
     before = atom.read_bytes()
     [flagged] = [i for i in _doctor(specs).check() if i.code == "MEM-PLACEHOLDER-1"]
-    assert (flagged.fixable, flagged.verdict, flagged.fix) == (False, "error", _FILL_OR_DELETE)
+    assert (flagged.fixable, flagged.verdict, flagged.fix) == (
+        False,
+        "error",
+        f"{_FILL_OR_DELETE} {atom}",
+    )
 
     _doctor(specs).fix()
     assert atom.read_bytes() == before
     [still] = [i for i in _doctor(specs).check() if i.code == "MEM-PLACEHOLDER-1"]
-    assert still.fix == _FILL_OR_DELETE
+    assert still.fix == f"{_FILL_OR_DELETE} {atom}"
 
 
 def test_filled_atom_is_never_flagged_or_removed(tmp_path: Path) -> None:
@@ -156,7 +159,7 @@ def test_the_legacy_memory_template_verbatim_is_reported_and_kept(tmp_path: Path
     write_text(atom, _LEGACY_TEMPLATE)
     before = atom.read_bytes()
     [flagged] = [i for i in _doctor(specs).check() if i.code == "MEM-PLACEHOLDER-1"]
-    assert (flagged.fixable, flagged.fix) == (False, _FILL_OR_DELETE)
+    assert (flagged.fixable, flagged.fix) == (False, f"{_FILL_OR_DELETE} {atom}")
     _doctor(specs).fix()
     assert atom.read_bytes() == before
 

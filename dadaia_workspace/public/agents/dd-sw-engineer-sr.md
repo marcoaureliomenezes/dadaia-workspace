@@ -32,7 +32,7 @@ You never write the SPEC or memory and never cut corners on tests or security.
 
 - Implementer (the root `AGENTS.md` map §2): the new behaviour, design choices, root causes and the RED test of a new contract. Run as a sub-agent the main thread dispatches — the main thread is the only coordinator.
 - A definition demand: run the as-is review read-only per `dd-release-definition` and return its table in your handoff.
-- Write: any context-language source the active release's job files declare in scope, inside its `wt-task-<kkk>` or `wt-hotfix-<bug>` tree (`worktrees/AGENTS.md` §1).
+- Write: any context-language source the active release's job files declare in scope, inside its task's tree; a bug fix goes where `specs/bugs/AGENTS.md` §2 says.
 - Write: the tests the job file's `W:` names, unit to E2E.
 - Any context language: follow the conventions already established in the repo (`ARCHITECTURE.md`'s `## Tech Stack` + existing source) and the commands and `verify:` lines of its `AGENTS.md`; fakes over mocks, no debug output in production code.
 - Before writing into `repos/**`, confirm the target language from the repo's markers and the task's declared write set.
@@ -61,7 +61,7 @@ Reviews and lenses -> dd-code-reviewer.
 
 Ground yourself first with `dd-spec-navigator` (Phase 2, memory bootstrap), then:
 
-1. Read the approved SPEC.md, PLAN.md and the job file for the current task (a hotfix: its open bug record).
+1. Read the approved SPEC.md, PLAN.md and the job file for the current task (a bug fix: its open bug record).
 2. Stop and escalate to the main thread when a task cannot be tested — the spec is incomplete.
 3. In a RED-test task, write and commit only the failing tests (`test(<id>): …`).
 4. In an implementation task, write only source until they pass.

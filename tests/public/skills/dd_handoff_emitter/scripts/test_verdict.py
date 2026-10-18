@@ -433,7 +433,7 @@ def test_stats_prints_the_local_metric_table_over_the_candidate_window(tmp_path:
     _record(root, f"wt/0.5.0/rc-99/job-4/wt-main{sha}", "REJECTED", "01", agent="dd-sw-engineer-sr")
     _record(root, f"wt/0.5.0/rc-99/job-9/wt-main{sha}", "APPROVED", "01", context="other")
     _stub(root, "dd-bug-resolution", "bugs.py",
-          'assert sys.argv[1] == "stats"\nprint("total\\t9")\nprint("rebuild-due:a.py\\ta,z")\nprint("rebuild-due:b.py\\te,w")')  # fmt: skip
+          'assert sys.argv[1] == "stats"\nprint("total\\t9")\nprint("closed\\t4\\nfix-induced\\t1\\nrebuild-due\\t1")\nprint("rebuild-due:a.py\\ta,z")\nprint("rebuild-due:b.py\\te,w")')  # fmt: skip
     _stub(root, "dd-release-implementation", "release.py",
           'assert sys.argv[1:3] == ["drift", "--json"]\nprint(\'{"since": "s", "atoms": ["a", "b", "c"], "uncovered": []}\')\nsys.exit(1)')  # fmt: skip
     done = _stats(root)
@@ -541,6 +541,269 @@ def test_stats_reads_absent_data_as_n_a_and_exits_zero(tmp_path: Path) -> None:
         "9 rebuild-due patches\tn/a\t0\n"
         "oldest record\tn/a\n",
     ), done.stderr
+
+
+def _closed(root: Path, *rows: tuple[str, str, str]) -> None:
+    """Resolved bugs `(id, caused_by, closed_at)` in the repo's ledger."""
+    (ledger := root / "repos/r/specs/bugs/BUGS.jsonl").parent.mkdir(parents=True, exist_ok=True)
+    write_text(
+        ledger,
+        "".join(
+            json.dumps({"id": i, "status": "resolved", "caused_by": by, "closed_at": at}) + "\n"
+            for i, by, at in rows
+        ),
+    )
+
+
+def _metric1(done: subprocess.CompletedProcess[str]) -> str:
+    assert done.returncode == 0, done.stderr
+    return next(x for x in done.stdout.splitlines() if x.startswith("1 "))
+
+
+def test_stats_of_a_candidate_the_log_never_names_reads_n_a_for_every_metric(
+    tmp_path: Path,
+) -> None:
+    root = _stats_workspace(tmp_path)
+    _log(
+        root,
+        [
+            _born("2026-10-12T09:00:00Z"),
+            _milestone("2026-10-12T11:00:00Z", "rc-98", "implemented", "1" * 40),
+        ],
+    )
+    _closed(root, ("a", "x", "2026-10-12T12:00:00Z"))
+    done = _stats(root, "0.5.0-rc99")
+    assert (done.returncode, done.stdout) == (
+        0,
+        "metric\tvalue\ttarget\n"
+        "1 fix-induced bugs\tn/a\t<= 20%\n"
+        "2 first-pass approval\tn/a\t>= 70%\n"
+        "4 closure duration\tn/a\t<= 4 h\n"
+        "6 non-block commits after closure\tn/a\t0\n"
+        "7 memory drift\tn/a\t0\n"
+        "9 rebuild-due patches\tn/a\t0\n"
+        "oldest record\tn/a\n",
+    ), done.stderr
+
+
+def test_stats_counts_a_bug_closed_between_two_candidates_in_exactly_one_window(
+    tmp_path: Path,
+) -> None:
+    root = _stats_workspace(tmp_path)
+    _log(
+        root,
+        [
+            _born("2026-10-10T08:00:00Z"),
+            _milestone("2026-10-11T08:00:00Z", "rc-98", "implemented", "1" * 40),
+            _born("2026-10-12T09:00:00Z"),
+            _milestone("2026-10-12T11:00:00Z", "rc-99", "implemented", "2" * 40),
+        ],
+    )
+    _closed(
+        root,
+        ("x", "none", "2026-10-11T08:00:00Z"),
+        ("y", "x", "2026-10-11T20:00:00Z"),
+        ("z", "none", "2026-10-12T11:00:00Z"),
+        ("w", "none", "2026-10-12T11:00:01Z"),
+    )
+    assert _metric1(_stats(root, "0.5.0-rc98")) == "1 fix-induced bugs\t0/1 (0%)\t<= 20%"
+    assert _metric1(_stats(root, "0.5.0-rc99")) == "1 fix-induced bugs\t1/2 (50%)\t<= 20%"
+
+
+def test_stats_window_of_the_first_candidate_has_no_lower_bound(tmp_path: Path) -> None:
+    root = _stats_workspace(tmp_path)
+    _log(
+        root,
+        [
+            _entry("2026-10-12T09:00:00Z", "note", "Release 0.5.0 born"),
+            _milestone("2026-10-12T11:00:00Z", "rc-1", "implemented", "2" * 40),
+        ],
+    )
+    _closed(root, ("a", "x", "2026-10-05T10:00:00Z"), ("b", "none", "2026-10-12T10:00:00Z"))
+    assert _metric1(_stats(root, "0.5.0-rc1")) == "1 fix-induced bugs\t1/2 (50%)\t<= 20%"
+
+
+def test_stats_reads_the_closed_counts_by_running_the_bug_script_without_its_internals(
+    tmp_path: Path,
+) -> None:
+    root = _stats_workspace(tmp_path)
+    scripts = root / ".agents/skills/dd-bug-resolution/scripts"
+    (scripts / "_bugs_store.py").unlink()
+    _log(
+        root,
+        [
+            _born("2026-10-10T08:00:00Z"),
+            _milestone("2026-10-11T08:00:00Z", "rc-98", "implemented", "1" * 40),
+            _born("2026-10-12T09:00:00Z"),
+            _milestone("2026-10-12T11:00:00Z", "rc-99", "implemented", "2" * 40),
+        ],
+    )
+    _stub(
+        root,
+        "dd-bug-resolution",
+        "bugs.py",
+        'a = sys.argv\nassert a[1] == "stats"\n'
+        'assert a[a.index("--closed-after") + 1] == "2026-10-11T08:00:00Z"\n'
+        'assert a[a.index("--closed-until") + 1] == "2026-10-12T11:00:00Z"\n'
+        'print("closed\\t3\\nfix-induced\\t1\\nrebuild-due\\t2")',
+    )
+    done = _stats(root)
+    assert done.returncode == 0, done.stderr
+    lines = done.stdout.splitlines()
+    assert "1 fix-induced bugs\t1/3 (33%)\t<= 20%" in lines
+    assert "9 rebuild-due patches\t2\t0" in lines
+
+
+def _merge_at(repo: Path, into: str, other: str, at: str) -> None:
+    git(repo, "checkout", "-q", into)
+    env = suite_env(
+        os.environ,
+        Path.home(),
+        overrides={
+            "HOME": str(repo),
+            "PATH": os.environ["PATH"],
+            "GIT_CONFIG_NOSYSTEM": "1",
+            "GIT_COMMITTER_DATE": at,
+        },  # fmt: skip
+    )
+    ident = ["-c", "user.name=t", "-c", "user.email=t@t"]
+    landed = os_run(["git", *ident, "merge", "-q", "--no-ff", "-m", f"Merge {other}", other], cwd=repo, env=env)  # fmt: skip
+    assert landed.returncode == 0, landed.stderr
+
+
+def _dev_side_merge(repo: Path, at: str) -> str:
+    """Cut `dev` from the current HEAD, merge a side branch into it at *at*, return to the first branch."""
+    work = git(repo, "rev-parse", "--abbrev-ref", "HEAD").strip()
+    git(repo, "checkout", "-q", "-b", "dev")
+    git(repo, "checkout", "-q", "-b", "side")
+    git(repo, "commit", "-q", "--allow-empty", "-m", "docs(memory): side work")
+    git(repo, "checkout", "-q", "dev")
+    git(repo, "commit", "-q", "--allow-empty", "-m", "docs(memory): integration side")
+    _merge_at(repo, "dev", "side", at)
+    git(repo, "checkout", "-q", work)
+    return work
+
+
+def test_stats_counts_the_integration_line_merge_not_a_back_merge_into_the_work_branch(
+    tmp_path: Path,
+) -> None:
+    root = _stats_workspace(tmp_path)
+    repo = root / "repos/r"
+    work = git(repo, "rev-parse", "--abbrev-ref", "HEAD").strip()
+    _dev_side_merge(repo, "2026-10-12T08:00:00Z")
+    git(repo, "commit", "-q", "--allow-empty", "-m", "feat(J1.T0): the closure")
+    closure = git(repo, "rev-parse", "HEAD").strip()
+    _log(
+        root,
+        [
+            _born("2026-10-12T09:00:00Z"),
+            _milestone("2026-10-12T11:00:00Z", "rc-99", "implemented", closure),
+        ],
+    )
+    git(repo, "commit", "-q", "--allow-empty", "-m", "feat(J1.T1): before the back-merge")
+    _merge_at(repo, work, "dev", "2026-10-12T12:00:00Z")
+    git(repo, "commit", "-q", "--allow-empty", "-m", "feat(J1.T2): after the back-merge")
+    _merge_at(repo, "dev", work, "2026-10-12T14:30:00Z")
+    done = _stats(root)
+    assert done.returncode == 0, done.stderr
+    lines = done.stdout.splitlines()
+    assert "4 closure duration\t3.5 h\t<= 4 h" in lines
+    assert "6 non-block commits after closure\t2\t0" in lines
+
+
+def test_stats_reads_closure_duration_as_n_a_when_no_integration_merge_holds_the_closure(
+    tmp_path: Path,
+) -> None:
+    root = _stats_workspace(tmp_path)
+    repo = root / "repos/r"
+    _dev_side_merge(repo, "2026-10-12T08:00:00Z")
+    git(repo, "commit", "-q", "--allow-empty", "-m", "feat(J1.T0): the closure")
+    closure = git(repo, "rev-parse", "HEAD").strip()
+    _log(
+        root,
+        [
+            _born("2026-10-12T09:00:00Z"),
+            _milestone("2026-10-12T11:00:00Z", "rc-99", "implemented", closure),
+        ],
+    )
+    git(repo, "commit", "-q", "--allow-empty", "-m", "feat(J1.T1): after the closure")
+    git(repo, "commit", "-q", "--allow-empty", "-m", "feat(J1.T2): after the closure too")
+    done = _stats(root)
+    assert done.returncode == 0, done.stderr
+    lines = done.stdout.splitlines()
+    assert "4 closure duration\tn/a\t<= 4 h" in lines
+    assert "6 non-block commits after closure\t2\t0" in lines
+
+
+def test_stats_of_a_malformed_candidate_name_reads_n_a_for_every_metric(tmp_path: Path) -> None:
+    root = _stats_workspace(tmp_path)
+    done = _stats(root, "0.5.0-rcX")
+    assert (done.returncode, done.stdout) == (
+        0,
+        "metric\tvalue\ttarget\n"
+        "1 fix-induced bugs\tn/a\t<= 20%\n"
+        "2 first-pass approval\tn/a\t>= 70%\n"
+        "4 closure duration\tn/a\t<= 4 h\n"
+        "6 non-block commits after closure\tn/a\t0\n"
+        "7 memory drift\tn/a\t0\n"
+        "9 rebuild-due patches\tn/a\t0\n"
+        "oldest record\tn/a\n",
+    ), done.stderr
+    assert "Traceback" not in done.stderr
+
+
+def test_stats_with_the_root_found_and_the_cli_missing_refuses_with_the_install_fix(
+    tmp_path: Path,
+) -> None:
+    root = _stats_workspace(tmp_path)
+    _log(root, [_born("2026-10-12T09:00:00Z"), _milestone("2026-10-12T11:00:00Z", "rc-99", "implemented", "2" * 40)])  # fmt: skip
+    shutil.rmtree(root / ".dadaia/.venv")
+    refused = _stats(root)
+    assert refused.returncode == 1
+    assert refused.stderr.startswith("[error] no workspace CLI\nfix: uvx dadaia-workspace init ")
+    assert refused.stderr.count("fix:") == 1 and refused.stdout == ""
+
+
+def test_stats_of_a_candidate_without_a_release_folder_reads_every_metric_as_n_a(
+    tmp_path: Path,
+) -> None:
+    root = _stats_workspace(tmp_path)
+    done = _stats(root, "9.9.9-rc1")
+    assert (done.returncode, done.stdout) == (
+        0,
+        "metric\tvalue\ttarget\n"
+        "1 fix-induced bugs\tn/a\t<= 20%\n"
+        "2 first-pass approval\tn/a\t>= 70%\n"
+        "4 closure duration\tn/a\t<= 4 h\n"
+        "6 non-block commits after closure\tn/a\t0\n"
+        "7 memory drift\tn/a\t0\n"
+        "9 rebuild-due patches\tn/a\t0\n"
+        "oldest record\tn/a\n",
+    ), done.stderr
+
+
+@pytest.mark.parametrize(
+    ("body", "why"),
+    [
+        (
+            b"{bad",
+            "the document is not valid JSON (Expecting property name enclosed in double quotes)",
+        ),
+        (b"[]", "the document is not a JSON object"),
+        (b"{\xff}", None),
+    ],
+)
+def test_stats_of_an_unreadable_release_state_is_refused_with_one_fix_line(
+    tmp_path: Path, body: bytes, why: str | None
+) -> None:
+    root = _stats_workspace(tmp_path)
+    state = root / "repos/r/specs/releases/0.5.0/_RELEASE.json"
+    state.write_bytes(body)
+    done = _stats(root)
+    first, *rest = done.stderr.splitlines()
+    assert (done.returncode, done.stdout, len(rest)) == (1, "", 1), done.stderr
+    assert first == f"[error] {why or f'{state} is not valid UTF-8'}", done.stderr
+    assert rest[0].startswith("fix: Agent action: ") and str(state) in rest[0], done.stderr
 
 
 _STUB_VALIDATE = '    sys.exit(0 if "schema_version" in json.load(open(args[2])) else 1)'

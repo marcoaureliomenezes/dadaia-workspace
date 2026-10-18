@@ -6,12 +6,18 @@ removal as the fix, and a git failure ends as one refusal. Size: MEDIUM (real gi
 from __future__ import annotations
 
 import json
+import os
+import re
+import shutil
+import subprocess
 from pathlib import Path
 from typing import Any
 
 import pytest
 
 from dadaia_workspace.core.platform import quote
+from dadaia_workspace.core.skill_owner import load_owner
+from tests.fixtures.harness_env import run_bash
 from tests.helpers.oslib import link, write_text
 from tests.helpers.worktree_ws import commit, fixes, git, make_workspace, run
 
@@ -31,6 +37,7 @@ _COLUMNS = {
     "warn",
     "fix",
     "exit",
+    "kind",
 }
 
 
@@ -73,6 +80,72 @@ def test_ahead_counts_against_the_parent_branch(root: Path) -> None:
     }
 
 
+def test_each_named_row_carries_the_kind_of_its_leaf(root: Path) -> None:
+    _open(root, RC)
+    _open(root, MAIN, f"wt/{RC}")
+    _open(root, TASK, f"wt/{MAIN}")
+    _open(root, LANE)
+    git(root / "repos/r", "branch", "wt/0.5.0/wt-backlog-an-idea", "feature/0.5.0")
+
+    found = {r["name"] if "name" in r else Path(r["path"]).name: r["kind"] for r in _rows(root)}
+
+    assert found == {
+        RC: "rc",
+        MAIN: "main",
+        TASK: "task",
+        LANE: "hotfix",
+        "wt-backlog-an-idea": "backlog",
+    }
+
+
+def test_every_row_state_the_owner_emits_carries_an_exit_or_a_fix(
+    root: Path, tmp_path: Path
+) -> None:
+    repo = root / "repos/r"
+    _open(root, TASK)
+    commit(_open(root, LANE), "src/a.py")
+    dirty_tree = _open(root, "0.5.0/wt-backlog-idea")
+    commit(dirty_tree, "src/b.py")
+    write_text(dirty_tree / "loose.txt", "x")
+    git(repo, "branch", "wt/0.5.0/rc-1/job-2/wt-main", "feature/0.5.0")
+    git(repo, "branch", "wt/0.5.0/wt-hotfix-dead", "feature/0.5.0")
+    (root / "worktrees/r/0.5.0/wt-hotfix-dead").mkdir(parents=True)
+    gone = _open(root, MAIN)
+    commit(gone, "src/c.py")
+    shutil.rmtree(gone)
+    git(repo, "branch", "wt/old-merged", "feature/0.5.0")
+    old = tmp_path / "old-unmerged"
+    git(repo, "worktree", "add", "-q", "-b", "wt/old-unmerged", str(old), "feature/0.5.0")
+    commit(old, "src/d.py")
+    git(repo, "worktree", "remove", str(old))
+    git(
+        repo, "worktree", "add", "-q", "-b", "elsewhere", str(tmp_path / "foreign"), "feature/0.5.0"
+    )
+    (root / "worktrees/r/stray").mkdir()
+
+    found = [r for r in _rows(root) if r["path"] != str(repo)]
+
+    assert sorted(r["state"] for r in found) == [
+        "empty", "foreign", "open", "orphan", "orphan", "orphan", "orphan", "orphan",
+        "ready", "unregistered",
+    ]  # fmt: skip
+    assert [r["kind"] for r in found if r.get("name") == MAIN] == ["main"]
+    assert [r["path"] for r in found if not (r["exit"] or r["fix"])] == []
+    by_name = {Path(r["path"]).name: r for r in found}
+    assert by_name["old-unmerged"]["exit"] == ""
+    assert "wt/old-unmerged" in by_name["old-unmerged"]["fix"]
+    assert by_name["old-merged"]["exit"] == by_name["old-merged"]["fix"] != ""
+    assert by_name["foreign"]["exit"] == ""
+    assert by_name["foreign"]["fix"].startswith("Agent action: land")
+
+
+def test_a_name_refusal_with_no_live_version_names_no_fixed_one() -> None:
+    refusal = load_owner("dd-gitflow-default", "_worktree_git").not_a_name("bogus")
+
+    assert "0.5.0" not in str(refusal)
+    assert "<M.m.p>/rc-<N>/wt-rc" in str(refusal)
+
+
 def test_the_row_schema_and_the_unregistered_rows_stay(root: Path) -> None:
     commit(_open(root, LANE), "src/a.py")
     gone = root / "repos/gone"
@@ -95,6 +168,50 @@ def test_an_orphan_wt_branch_at_any_depth_is_one_row_with_the_merge_as_its_fix(r
 
     assert orphan["path"] == str(root / "worktrees/r" / TASK)
     assert orphan["fix"].endswith(f"worktree.py merge {quote(orphan['path'])}")
+
+
+@pytest.mark.parametrize("ahead", [False, True], ids=["merged", "unmerged"])
+def test_an_off_grammar_orphan_branch_has_an_exit_only_when_git_branch_d_runs(
+    root: Path, ahead: bool
+) -> None:
+    repo = root / "repos/r"
+    tip = "feature/0.5.0"
+    if ahead:
+        tip = git(repo, "commit-tree", "-p", tip, "-m", "x", f"{tip}^{{tree}}").strip()
+    git(repo, "branch", "wt/stray", tip)
+
+    [orphan] = [r for r in _rows(root) if r["state"] == "orphan"]
+
+    assert (orphan["fix"], orphan["exit"]) == (
+        (
+            "Agent action: land or archive the wt/* branch wt/stray, then close again",
+            "",
+        )
+        if ahead
+        else (f"git -C {quote(str(repo))} branch -d wt/stray",) * 2
+    )
+
+
+def test_an_off_grammar_orphan_branch_with_a_diverged_upstream_is_deleted_by_its_line(
+    root: Path, tmp_path_factory: pytest.TempPathFactory
+) -> None:
+    repo = root / "repos/r"
+    origin = tmp_path_factory.mktemp("origin")
+    git(origin, "init", "-q", "--bare")
+    git(repo, "remote", "add", "origin", str(origin))
+    other = git(repo, "commit-tree", "-m", "x", "feature/0.5.0^{tree}").strip()
+    git(repo, "push", "-q", "origin", f"{other}:refs/heads/wt/stray")
+    git(repo, "fetch", "-q", "origin")
+    git(repo, "branch", "--track", "wt/stray", "feature/0.5.0")
+    git(repo, "branch", "--set-upstream-to", "origin/wt/stray", "wt/stray")
+
+    [orphan] = [r for r in _rows(root) if r["state"] == "orphan"]
+    env = {**os.environ, "HOME": str(root), "GIT_CONFIG_NOSYSTEM": "1"}
+    for step in re.findall(r"`([^`]+)`", orphan["fix"]) or [orphan["fix"]]:
+        run_bash(step, cwd=root, env=env, check=True)
+
+    assert git(repo, "branch", "--list", "wt/stray") == ""
+    assert orphan["exit"] == orphan["fix"]
 
 
 @pytest.mark.parametrize("filled", [True, False], ids=["non-empty", "empty"])
@@ -154,3 +271,55 @@ def test_a_symlink_under_worktrees_is_never_walked_into(
     ]
 
     assert reached == []
+
+
+@pytest.mark.parametrize(
+    ("rel", "stray"),
+    [
+        ("foo", "foo"),
+        ("0.5.0/foo", "0.5.0/foo"),
+        ("0.5.0/rc-1/job-1/job-2", "0.5.0/rc-1/job-1/job-2"),
+        ("0.5.0", None),
+    ],
+)
+def test_a_folder_holding_only_an_agents_file_is_layout_only_at_the_depth_its_name_fits(
+    root: Path, rel: str, stray: str | None
+) -> None:
+    (root / "worktrees/r" / rel).mkdir(parents=True)
+    write_text(root / "worktrees/r" / rel / "AGENTS.md", "x")
+    found = [r["path"] for r in _rows(root) if r["state"] == "unregistered"]
+    assert found == ([] if stray is None else [str(root / "worktrees/r" / stray)])
+
+
+@pytest.mark.parametrize("merged", [True, False], ids=["merged", "unmerged"])
+def test_the_several_work_fix_deletes_a_pushed_low_branch_that_has_later_commits(
+    tmp_path: Path, merged: bool
+) -> None:
+    owner = load_owner("dd-gitflow-default", "_worktree_git")
+    git(tmp_path, "init", "-q", "--bare", "o.git")
+    repo = tmp_path / "r"
+    git(tmp_path, "init", "-q", "r")
+    commit(repo, "a.txt")
+    git(repo, "remote", "add", "origin", str(tmp_path / "o.git"))
+    git(repo, "switch", "-q", "-c", "feature/0.1.0")
+    git(repo, "push", "-q", "-u", "origin", "feature/0.1.0")
+    commit(repo, "later.txt")
+    git(repo, "switch", "-q", "-c", "feature/0.2.0", "main")
+    if merged:
+        git(repo, "merge", "-q", "--no-edit", "feature/0.1.0")
+    passes = 0
+    while True:
+        try:
+            assert owner.work_version(repo, {"work": "feature/"}) == "0.2.0"
+            break
+        except owner.SeveralWork as refused:
+            passes += 1
+            steps = refused.text.split(", then ")
+            assert len(steps) <= 3
+            for step in steps:
+                if step.startswith("merge "):
+                    git(repo, "merge", "-q", "--no-edit", "feature/0.1.0")
+                else:
+                    subprocess.run(step.removeprefix("run ").strip("`"), shell=True, check=True)
+    assert passes == (1 if merged else 2)
+    assert "feature/0.1.0" not in git(repo, "branch", "--list", "feature/*")

@@ -70,7 +70,7 @@ def _reason(stdout: str, stderr: str) -> Refusal:
 
 
 def _stats(argv: list[str]) -> int:
-    """Print the local metric table of one candidate over its birth-to-CLOSURE window."""
+    """Print the local metric table of one candidate from the previous candidate's CLOSURE to this one's."""
     parser = argparse.ArgumentParser(prog="verdict.py stats", description=_stats.__doc__)
     parser.add_argument("rc", help="<M.m.p>-rc<N>")
     parser.add_argument("--specs", type=Path)

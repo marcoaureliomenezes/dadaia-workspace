@@ -52,7 +52,7 @@ description: >
 ### Escalation triggers — a report line, not a wait
 
 1. Required SPEC/PLAN/job files or a resolvable `_RELEASE.json` `phase` missing or not
-   approved (the `specs/AGENTS.md` §3 precondition fails: `phase` is not `IMPLEMENTATION`, or `python3 .agents/skills/dd-release-implementation/scripts/release.py check --specs <specs-dir>` exits non-zero on the job files; a hotfix lane needs only its open bug).
+   approved (the `specs/AGENTS.md` §3 precondition fails: `phase` is not `IMPLEMENTATION`, or `python3 .agents/skills/dd-release-implementation/scripts/release.py check --specs <specs-dir>` exits non-zero on the job files; a bug fix under `specs/bugs/AGENTS.md` §2 needs only its open bug).
 2. A CRITICAL security issue.
 3. A dispatched agent returns `[SCOPE ERROR]`.
 4. Three or more unresolved conflicts open.
@@ -65,7 +65,7 @@ description: >
 | Chain agents only through the main thread | Every hand-off stays traceable |
 | Merge a task only with its validation evidence | Acceptance is checked |
 | Merge a `wt-main`, `wt-rc` or lane tree (`wt-backlog-*`, `wt-hotfix-*`), deploy or close only after the reviewer's `APPROVED` | `worktrees/AGENTS.md` §2 |
-| Edit production files only inside a task's or hotfix lane's worktree | The edit then passes its tree's merge checks and review. |
+| Edit production files only inside the tree its task names; a bug fix, where `specs/bugs/AGENTS.md` §2 says | The edit then passes its tree's merge checks and review. |
 | Land an edit inside an open job as one of its tasks | Micro-dispatch: the ritual wait it adds outweighs the edit |
 | Keep private/project-specific details out of public assets | Security and portability |
 

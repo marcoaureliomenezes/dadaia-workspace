@@ -1,6 +1,8 @@
 """A job merge lands only a verdict that names a sha of the job's range in `reviewed_sha` and
-carries the `diff_sha256` of the diff the merge lands; a hand form, a missing or other hash, a sha outside the job's range and a
-same-patch rebase over other blobs each refuse. `worktree.py hash` prints the binding.
+carries the `diff_sha256` of the diff the merge lands, on a tree with no uncommitted change; a
+hand form, a missing or other hash, a sha outside the job's range, a stale sha and a same-patch
+rebase over other blobs each refuse. `worktree.py hash` prints the binding or refuses a bad
+sha or path; a plain name is refused by `new`.
 Size: MEDIUM (real git, tmp workspace, a stub CLI).
 """
 
@@ -163,19 +165,22 @@ def test_a_bound_approval_of_head_lands(root: Path) -> None:
     assert git(root / "repos/r", "rev-parse", f"wt/{RC}").strip() == head
 
 
-@pytest.mark.parametrize("verdict", ["missing", "rejected", "other-sha", "other-diff"])
-def test_a_plain_name_is_refused_as_not_a_worktree_name_whatever_the_verdict(
-    root: Path, verdict: str
-) -> None:
+def test_a_bound_approval_does_not_land_a_tree_with_uncommitted_changes(root: Path) -> None:
+    head = land(root, "src/a.py")
+    approve(root, head, name=NEW_JOB)
+    write_text(root / TREE / "wip.txt", "x")
+
+    refused = run(root, "merge", TREE)
+
+    assert refused.returncode == 1 and f"{root / TREE} has uncommitted changes" in refused.stderr
+    [fix] = fixes(refused)
+    assert fix.startswith("fix: Agent action: stage the paths `") and "clean -fd" in fix
+    assert git(root / "repos/r", "rev-parse", f"wt/{RC}").strip() != head
+
+
+def test_a_plain_name_is_refused_as_not_a_worktree_name(root: Path) -> None:
     repo = root / "repos/r"
     base = git(repo, "rev-parse", "HEAD").strip()
-    head = land(root, "src/a.py")
-    if verdict == "rejected":
-        approve(root, head, verdict="REJECTED")
-    elif verdict == "other-sha":
-        _hand(root, head, reviewed_sha=base, diff_sha256=diff_hash(root, head, NEW_JOB))
-    elif verdict == "other-diff":
-        _hand(root, head, reviewed_sha=head, diff_sha256=diff_hash(root, base, NEW_JOB))
 
     refused = run(root, "new", "r", "maintenance")
 

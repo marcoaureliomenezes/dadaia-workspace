@@ -38,7 +38,8 @@ and tasks are the only implementation levels.
 
 Arm B proposes and registers a confirmed bug, establishes lineage, lands a lowest-level
 RED case, fixes the owning seam, proves GREEN and resolves the record with `cause`,
-`solution`, `caused_by` and `fix_sha`, plus the fix's `fix_files`. A block-list bug uses a hotfix lane; other bugs enter
+`solution`, `caused_by` and `fix_sha`, plus the fix's `fix_files`. A bug in code the work branch holds uses a hotfix lane; after CLOSURE a
+block-list bug in code only the `wt-rc` holds is fixed on that `wt-rc`; other bugs enter
 approved candidate scope. Documents record the flow; there is no in-repository flow engine.
 
 ## The gate

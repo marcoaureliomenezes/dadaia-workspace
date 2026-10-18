@@ -5,7 +5,7 @@ canon predicate and the :class:`ObjectSource` are injected by ``cli/commands/ci.
 from __future__ import annotations
 
 from collections.abc import Callable, Iterable, Iterator, Sequence
-from dataclasses import dataclass, replace
+from dataclasses import replace
 from pathlib import Path
 from typing import Protocol
 
@@ -33,7 +33,7 @@ from dadaia_workspace.features.chokepoints.denylist_scan import (
     scan_objects,
 )
 
-__all__ = ["GateDecision", "push_gate_decision"]
+__all__ = ["push_gate_decision"]
 
 _DENYLIST_LAW = ".dadaia/AGENTS.md §3 — pre-push refuses a denylisted secret"
 _MAX_LISTED_HITS = 10
@@ -42,22 +42,6 @@ _REWRITE = (
     "(origin's history is never rewritten). Remove what is listed from the files first; when "
     "the message carries it, append `--message` and the new text to the fix. Push after this command:"
 )
-
-
-#: The path label the object reader gives a commit message body.
-_COMMIT_MESSAGE = "(commit message)"
-
-
-@dataclass(frozen=True)
-class GateDecision(Decision):
-    """A refusal on a denylist hit or a canon violation carries the *listed* paths it names
-    (a commit message is listed as such): what its remedy may touch."""
-
-    listed: frozenset[str] = frozenset()
-
-    @property
-    def message_listed(self) -> bool:
-        return _COMMIT_MESSAGE in self.listed
 
 
 class ObjectSource(Protocol):
@@ -262,5 +246,5 @@ def push_gate_decision(
         message="[pre-push] branch policy + specs-canon scan + denylist scan passed; allow.",
     )
     if message:
-        decision = GateDecision(allowed=False, message=f"{message}\n{fix}", listed=listed)
+        decision = Decision(allowed=False, message=f"{message}\n{fix}", listed=listed)
     return _notes(decision, binaries, oversized, masker)

@@ -81,18 +81,28 @@ def tasks(root: Path) -> set[str]:
 
 
 def findings_for(
-    text: str, rel: str = LEDGER, archived: frozenset[str] = frozenset(), root: Path = _ledger.SPECS
+    text: str, rel: str = LEDGER, archived: str = "", root: Path = _ledger.SPECS
 ) -> list[dict[str, Any]]:
     """Every finding the ledger *text* carries — the ONE validation path, run both by
     ``check`` over the committed file and by every write over its own candidate bytes.
-    Lineage: a `caused_by` names a record of *text* or *archived*, or a task a
-    `TASKS.md` under *root*`/releases/` carries, and never loops."""
+    Lineage: a `caused_by` names a record of *text* or of the archive text *archived*, or a task
+    a `TASKS.md` under *root*`/releases/` carries, and never loops. An id holds at most one plain
+    record across *text* and *archived*; a pre-v6 event line is not a record."""
     schema = load_schema()
     lines: dict[int, list[str]] = {}
     fixes: dict[int, str] = {}  # a line a governance verb clears
     seen: dict[str, int] = {}
     links: dict[str, object] = {}
     legacy_ids: set[str] = set()
+    plain: dict[str, int] = {}
+    twice: list[dict[str, Any]] = []
+    for number, record in _archive_lines(archived, events=False):
+        if (first := plain.setdefault(str(record["id"]), number)) != number:
+            twice.append(_findings.finding(
+                CODE, HISTO, number,
+                f"duplicate record id {record['id']!r} (first archived at line {first})",
+                _ledger.unwritten(root / HISTO, number, "`bugs.py archive`", _LAW),
+            ))  # fmt: skip
 
     def add(line: int, message: str) -> None:
         lines.setdefault(line, []).append(message)
@@ -109,10 +119,19 @@ def findings_for(
         first = seen.setdefault(record["id"], number)
         if first != number:
             add(number, f"duplicate record id {record['id']!r} (first appended at line {first})")
+        if record["id"] in plain:
+            add(number, f"record id {record['id']!r} is also a record of the archive "
+                f"(line {plain[record['id']]} of {HISTO})")  # fmt: skip
         links.setdefault(record["id"], record["caused_by"])
         if record.keys() >= _LEGACY_MARKERS:
             legacy_ids.add(record["id"])
-    known = {None, "none", *links, *archived, *tasks(root)}
+    known = {
+        None,
+        "none",
+        *links,
+        *(str(r["id"]) for r in archived_records(archived)),
+        *tasks(root),
+    }
     for bug_id, target in links.items():
         if bug_id in legacy_ids:
             continue
@@ -133,7 +152,7 @@ def findings_for(
         _findings.finding(CODE, rel, n, "; ".join(m),
                         fixes.get(n) or _ledger.unwritten(root / rel, n, _VERBS, _LAW))
         for n, m in sorted(lines.items())
-    ]  # fmt: skip
+    ] + twice  # fmt: skip
 
 
 def histo_findings(text: str, root: Path = _ledger.SPECS) -> list[dict[str, Any]]:
@@ -151,23 +170,32 @@ def histo_findings(text: str, root: Path = _ledger.SPECS) -> list[dict[str, Any]
     )  # fmt: skip
 
 
+def _archive_lines(text: str, events: bool = True) -> Iterator[tuple[int, dict[str, Any]]]:
+    """The `(line, record)` pairs of the archive *text*: a plain line is a record, an event line
+    contributes its `data` when *events*; a line with no `id` or an unreadable one is
+    `histo_findings`' to name."""
+    for number, record, why in _jsonl.walk(text):
+        if why or not isinstance(record, dict):
+            continue
+        if events and "event" in record and isinstance(record.get("data"), dict):
+            record = record["data"]
+        if "id" in record:
+            yield number, record
+
+
 def archived_records(text: str) -> list[dict[str, Any]]:
-    """The records of the archive *text*: a plain line is one, an event line contributes its
-    `data`; a line with no `id` or an unreadable one is `histo_findings`' to name."""
-    found = (r["data"] if "event" in r and isinstance(r.get("data"), dict) else r for _, r, why in _jsonl.walk(text) if not why and isinstance(r, dict))  # fmt: skip
-    return [r for r in found if "id" in r]
+    """The records of the archive *text*, event lines' `data` included."""
+    return [record for _, record in _archive_lines(text)]
 
 
-def archived_ids(text: str) -> frozenset[str]:
-    """The record ids of the archive *text*."""
-    return frozenset(str(r["id"]) for r in archived_records(text))
+def plain_ids(text: str) -> frozenset[str]:
+    """The ids of the archive *text*'s plain records: the ids no new record may take."""
+    return frozenset(str(record["id"]) for _, record in _archive_lines(text, events=False))
 
 
 def _siblings(specs: Path) -> list[Path]:
-    """The other git checkouts under `<main>/../../repos` (main: the checkout whose git common
-    dir holds *specs*), each child carrying a `.git` and not main; none when that directory
-    does not exist."""
-    main = Path(_git.git(specs.parent, "rev-parse", "--path-format=absolute", "--git-common-dir", check=False).strip()).parent  # fmt: skip
+    """The other git checkouts under `<main>/../../repos`: each child carrying a `.git` and not main."""
+    main = _git.main_checkout(specs.parent)
     beside = main.parent.parent / "repos"
     return [p for p in sorted(beside.iterdir()) if p != main and (p / ".git").exists()] if beside.is_dir() else []  # fmt: skip
 
@@ -176,19 +204,21 @@ def _unreached(specs: Path, text: str, root: Path) -> list[dict[str, Any]]:
     """The live records whose `fix_sha` no repo beside the main one reaches from its HEAD, one
     finding each; where a repo is a shallow clone a miss cannot be judged, so the misses are
     one finding for the cut."""
-    repos, update = [specs.parent], script(Path(__file__).with_name("bugs.py"))
+    repos, bugs = [specs.parent], script(Path(__file__).with_name("bugs.py"))
     shas = [(n, r) for n, r, why in _jsonl.walk(text) if not why and isinstance(r, dict) and r.get("fix_sha")]  # fmt: skip
-    missed = [(n, r) for n, r in shas if _git.fix_files(repos[0], r["fix_sha"]) is None]
+    own = _git.reached(repos[0])
+    missed = [(n, r) for n, r in shas if r["fix_sha"] not in own]
     if missed:
         repos += _siblings(specs)
-        missed = [(n, r) for n, r in missed if all(_git.fix_files(p, r["fix_sha"]) is None for p in repos[1:])]  # fmt: skip
+        beside = set().union(*map(_git.reached, repos[1:]))
+        missed = [(n, r) for n, r in missed if r["fix_sha"] not in beside]
     if missed and (cut := next((p for p in repos if _git.shallow(p)), None)):
-        return [_findings.finding(CODE, LEDGER, missed[0][0], "the clone is shallow: no fix_sha can be judged", git_line(cut, "fetch", "--unshallow"))]  # fmt: skip
+        return [_findings.finding(CODE, LEDGER, missed[0][0], "the clone is shallow: its misses cannot be judged", git_line(cut, "fetch", "--unshallow"))]  # fmt: skip
     return [
         _findings.finding(
             CODE, LEDGER, n, f"{r['id']!r} fix_sha {r['fix_sha']} is no ancestor of HEAD of {', '.join(p.name for p in repos)}",
             act("agent", "find the fix commit's sha in git log and run "
-                f"`{update.inline('update', r['id'], '--set', 'fix_sha=SHA', specs=root)}`"),
+                f"`{bugs.inline('update', r['id'], '--set', 'fix_sha=SHA', specs=root)}`"),
         )
         for n, r in missed
     ]  # fmt: skip
@@ -204,6 +234,6 @@ def check(specs: Path) -> list[dict[str, Any]]:
     root = specs.resolve()
     unreached = _unreached(specs, text, root)
     return sorted(
-        findings_for(text, archived=archived_ids(archived), root=root) + unreached,
-        key=lambda f: f["line"],
+        findings_for(text, archived=archived, root=root) + unreached,
+        key=lambda f: (f["path"], f["line"]),
     ) + histo_findings(archived, root)

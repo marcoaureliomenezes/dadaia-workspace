@@ -10,7 +10,7 @@ from typing import Any
 
 import _commit
 import _jsonl
-from _bugs_check import HISTO, LEDGER, archived_ids, archived_records, findings_for
+from _bugs_check import HISTO, LEDGER, archived_records, findings_for, plain_ids
 from _ledger import private_refusal, replace
 from _platform import read_text
 from _refusal import Refusal as Refusal
@@ -39,16 +39,21 @@ def history(specs: Path) -> Records:
     )
 
 
+def archived_plain_ids(specs: Path) -> frozenset[str]:
+    """The ids of the archive's plain records."""
+    return plain_ids(read_text(specs / HISTO)) if (specs / HISTO).is_file() else frozenset()
+
+
 def _validator(path: Path, rel: str) -> Callable[[Records, Records, str, Records], str]:
     def validate(written: Records, records: Records, old: str, moved: Records) -> str:
-        known = archived_ids(old) | {str(r.get("id")) for r in moved}
+        archived = old + _jsonl.serialize(moved)
         why = private_refusal((r for r in written if r not in records), path)
         if why is not None:
             raise Refusal(*why)
         return _commit.validated(
             _jsonl.serialize(written),
             rel,
-            lambda text: findings_for(text, rel, known, path.parents[1]),
+            lambda text: findings_for(text, rel, archived, path.parents[1]),
             script(Path(__file__).parent / "bugs.py")("check"),
         )
 

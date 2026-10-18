@@ -12,6 +12,7 @@ from dadaia_workspace.core.exceptions import DadaiaError
 from dadaia_workspace.core.gitflow import (
     DEFAULT,
     Gitflow,
+    SeveralWorkBranches,
     from_mapping,
     live_release_id,
     work_branch,
@@ -198,10 +199,10 @@ def test_several_work_branches_refuse_with_the_skills_fix_line(tmp_path: Path) -
         "-m",
         "lower",
     )
-    with pytest.raises(load_owner("dd-gitflow-default", "_worktree_names").Refusal) as refused:
+    with pytest.raises(SeveralWorkBranches) as refused:
         work_branch(repo, Gitflow("main", "dev", "feature/"), "r")
     assert refused.value.fix == (
-        f"Agent action: run `{git_line(repo, 'switch', 'feature/0.6.0')}`, then merge feature/0.5.0 into feature/0.6.0, then run `{git_line(repo, 'branch', '-d', 'feature/0.5.0')}`"
+        f"Agent action: run `{git_line(repo, 'switch', 'feature/0.6.0')}`, then merge feature/0.5.0 into feature/0.6.0"
     )
 
 
@@ -216,3 +217,30 @@ def test_several_work_branches_refuse_as_the_one_error_type_that_carries_its_fix
     fix = f"Agent action: run `{git_line(repo, 'switch', 'feature/0.6.0')}`, then run `{git_line(repo, 'branch', '-d', 'feature/0.5.0')}`"
     assert refused.value.fix == fix
     assert str(refused.value) == f"2 work branches\nfix: {fix}"
+
+
+def test_several_work_branches_is_one_dadaia_error_built_from_message_text_and_keep() -> None:
+    several = SeveralWorkBranches("2 work branches", "run `x`, then run `y`", "0.2.0")
+    skill_class = load_owner("dd-gitflow-default", "_worktree_git").SeveralWork
+    assert not isinstance(several, skill_class)
+    assert isinstance(several, DadaiaError)
+    assert (several.message, several.text, several.keep) == (
+        "2 work branches",
+        "run `x`, then run `y`",
+        "0.2.0",
+    )
+    assert several.fix == "Agent action: run `x`, then run `y`"
+    assert str(several) == "2 work branches\nfix: Agent action: run `x`, then run `y`"
+
+
+@pytest.mark.medium
+def test_work_branch_with_several_raises_the_one_class_and_never_the_skills(
+    tmp_path: Path,
+) -> None:
+    repo = _repo(tmp_path, ["feature/0.5.0", "feature/0.6.0"], None)
+    with pytest.raises(SeveralWorkBranches) as refused:
+        work_branch(repo, Gitflow("main", "dev", "feature/"), "r")
+    skill_class = load_owner("dd-gitflow-default", "_worktree_git").SeveralWork
+    assert type(refused.value) is SeveralWorkBranches
+    assert not isinstance(refused.value, skill_class)
+    assert refused.value.keep == "0.6.0"

@@ -8,13 +8,19 @@ Size: MEDIUM (reads the shipped source tree and runs `git ls-files`; no fixture,
 
 from __future__ import annotations
 
+import json
 import re
 import shutil
+import subprocess
+import sys
 import uuid
 from pathlib import Path
 
+import pytest
+
 import dadaia_workspace
-from tests.helpers.oslib import read_text, run, write_text
+from dadaia_workspace.core.skill_owner import load_owner
+from tests.helpers.oslib import command, read_text, run, write_text
 
 _PKG = Path(dadaia_workspace.__file__).resolve().parent
 _TESTS = _PKG.parent / "tests"
@@ -81,3 +87,61 @@ def test_an_untracked_scratch_file_under_tests_is_not_judged() -> None:
     finally:
         shutil.rmtree(scratch, ignore_errors=True)
     assert [h for h in hits if scratch.name in h] == []
+
+
+def test_an_unspawnable_release_script_refuses_with_its_one_fix_line(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def missing(argv: list[str], **_: object) -> subprocess.CompletedProcess[str]:
+        raise FileNotFoundError(argv[0])
+
+    owner = load_owner("dd-backlog-definition", "_backlog_exit")
+    monkeypatch.setattr(owner, "run", missing)
+    spec = tmp_path / "SPEC.md"
+    with pytest.raises(owner.Refusal) as refused:
+        owner._origin_ids(spec)
+    assert refused.value.fix == command(sys.executable, str(owner._RELEASE), "origin", str(spec))
+
+
+def test_to_bug_reads_the_bug_ledger_through_the_one_jsonl_reader(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    owner = load_owner("dd-backlog-definition", "_backlog_exit")
+    monkeypatch.setattr(owner._jsonl, "read", lambda _path: [{"id": "b-1"}])
+    owner._bug(tmp_path, "slug", "to-bug", "b-1")
+    with pytest.raises(owner.Refusal, match="names no record"):
+        owner._bug(tmp_path, "slug", "to-bug", "b-2")
+
+
+_BACKLOG = (
+    Path(dadaia_workspace.__file__).resolve().parent
+    / "public"
+    / "skills"
+    / "dd-backlog-definition"
+    / "scripts"
+    / "backlog.py"
+)
+
+
+def test_a_malformed_bug_ledger_refuses_naming_its_line_with_one_fix_line(tmp_path: Path) -> None:
+    """A `to-bug` exit over a BUGS.jsonl it cannot read in full refuses naming the line and
+    one `sed` fix line, never with a traceback."""
+    specs = tmp_path / "specs"
+    (specs / "backlog").mkdir(parents=True)
+    write_text(
+        specs / "backlog" / "BACKLOG.json",
+        json.dumps({"schema": "backlog-v1", "active": [{"id": "an-idea"}]}) + "\n",
+    )
+    (specs / "bugs").mkdir()
+    ledger = specs / "bugs" / "BUGS.jsonl"
+    write_text(ledger, json.dumps({"id": "a-bug"}) + "\nnot json\n")
+    done = run(
+        [sys.executable, str(_BACKLOG), "exit", "an-idea", "--specs", str(specs),
+         "--disposition", "to-bug", "--reason", "a-bug"],
+        check=False,
+    )  # fmt: skip
+    assert done.returncode == 1, done.stdout + done.stderr
+    assert "Traceback" not in done.stderr
+    assert "BUGS.jsonl:2" in done.stderr
+    fixes = [ln for ln in (done.stdout + done.stderr).splitlines() if ln.startswith("fix:")]
+    assert fixes == [f"fix: {command('sed', '-n', '2p', str(ledger))}"]

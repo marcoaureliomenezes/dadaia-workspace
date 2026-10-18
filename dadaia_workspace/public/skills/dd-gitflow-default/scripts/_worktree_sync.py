@@ -41,21 +41,41 @@ def _holds(root: Path, tree: Path, base: str) -> bool:
     return True
 
 
+def _fork(tree: Path, key: str, base: str) -> str:
+    """The commit *tree* was cut from: the one a conflicted run saved while it still holds, else the merge-base."""
+    saved = git(tree, "config", "--get", f"{key}.syncfork", check=False).strip()
+    if saved:
+        try:
+            git(tree, "merge-base", "--is-ancestor", saved, "HEAD")
+            return saved
+        except RuntimeError:
+            pass
+    return git(tree, "merge-base", "HEAD", base).strip()
+
+
 def sync(root: Path, path: str) -> str:
     order = _cascade(root, path)
     for tree, _ in order:  # a dirty tree stops the cascade before any tree moves
         _refuse_dirty(tree)
+    keys = {
+        tree: "branch." + git(tree, "symbolic-ref", "--short", "HEAD").strip() for tree, _ in order
+    }
+    forks = {tree: _fork(tree, keys[tree], base) for tree, base in order}  # before any parent moves
+    for tree, fork in forks.items():  # a conflict stops the run: the rerun reads these
+        git(tree, "config", f"{keys[tree]}.syncfork", fork)
     moved = 0
     for tree, base in order:
         if _holds(root, tree, base):
+            git(tree, "config", "--unset", f"{keys[tree]}.syncfork", check=False)
             continue
         try:
-            git(tree, "rebase", "--fork-point", base)
+            git(tree, "rebase", "--onto", base, forks[tree])
+            git(tree, "config", "--unset", f"{keys[tree]}.syncfork", check=False)
         except RuntimeError as error:
             git(tree, "rebase", "--abort", check=False)
             fix = act(
                 "agent",
-                f"resolve the conflict by hand (`{git_inline(tree, 'rebase', base)}`), "
+                f"resolve the conflict by hand (`{git_inline(tree, 'rebase', '--onto', base, forks[tree])}`), "
                 f"then rerun `{inline(*cli_words(root, 'worktree', 'sync', path))}`",
             )
             raise Refusal(f"{tree} conflicts rebasing onto {base}", fix) from error
