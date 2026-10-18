@@ -104,7 +104,10 @@ class Undecodable(Refusal):
         super().__init__(
             f"{path} is not valid UTF-8",
             fix
-            or f"Agent action: re-encode line {line} of {path.resolve()} as UTF-8 in place; every other line stays",
+            or act(
+                "agent",
+                f"re-encode line {line} of {path.resolve()} as UTF-8 in place; every other line stays",
+            ),
         )
         self.path, self.line = path, line
 
@@ -436,7 +439,17 @@ def command(*argv: str, caps: Caps | None = None) -> str:
     """The finished command line of *argv*, real values included; with a word that has no safe
     spelling on the host, ``Agent action: run `` and :func:`inline`'s text instead."""
     text, safe = _inline(argv, caps or detect())
-    return text if safe else f"Agent action: run {text}"
+    return text if safe else act("agent", f"run {text}")
+
+
+_LABELS = {"agent": "Agent action", "operator": "Operator action"}
+
+
+def act(kind: str, text: str) -> str:
+    """*text* behind the label of *kind* (``agent`` or ``operator``); any other *kind* raises ``ValueError``."""
+    if kind not in _LABELS:
+        raise ValueError(f"unknown action kind {kind!r}")
+    return f"{_LABELS[kind]}: {text}"
 
 
 def git_line(repo: Path | str, *argv: str, caps: Caps | None = None) -> str:

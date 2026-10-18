@@ -79,6 +79,11 @@ def inline(*argv: str) -> str:
     return _owner.inline(*argv, caps=_caps())
 
 
+def act(kind: str, text: str) -> str:
+    """The action line of *kind* (``agent`` or ``operator``) carrying *text*, by the kernel's rule."""
+    return _owner.act(kind, text)
+
+
 def git_inline(repo: Path | str, *argv: str) -> str:
     """``git -C <repo> argv…`` as text inside a sentence, by the kernel's rule fed the current ``PLATFORM``."""
     return _owner.git_inline(repo, *argv, caps=_caps())
