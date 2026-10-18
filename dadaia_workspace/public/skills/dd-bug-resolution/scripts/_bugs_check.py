@@ -161,7 +161,7 @@ def archived_ids(text: str) -> frozenset[str]:
 
 
 def _siblings(specs: Path) -> list[Path]:
-    """The other git checkouts beside the main repo that holds *specs*, under the workspace's `repos/`; none outside that layout."""
+    """The git checkouts under the workspace's `repos/` other than the main repo that holds *specs*; none outside that layout."""
     main = Path(_git.git(specs.parent, "rev-parse", "--path-format=absolute", "--git-common-dir", check=False).strip()).parent  # fmt: skip
     beside = main.parent.parent / "repos"
     return [p for p in sorted(beside.iterdir()) if p != main and (p / ".git").exists()] if beside.is_dir() else []  # fmt: skip
@@ -173,10 +173,10 @@ def _unreached(specs: Path, text: str, root: Path) -> list[dict[str, Any]]:
     one finding for the cut."""
     repos, update = [specs.parent], script(Path(__file__).with_name("bugs.py"))
     shas = [(n, r) for n, r, why in _jsonl.walk(text) if not why and isinstance(r, dict) and r.get("fix_sha")]  # fmt: skip
-    missed = [(n, r) for n, r in shas if not _git.reaches(repos[0], r["fix_sha"])]
+    missed = [(n, r) for n, r in shas if _git.fix_files(repos[0], r["fix_sha"]) is None]
     if missed:
         repos += _siblings(specs)
-        missed = [(n, r) for n, r in missed if not any(_git.reaches(p, r["fix_sha"]) for p in repos[1:])]  # fmt: skip
+        missed = [(n, r) for n, r in missed if all(_git.fix_files(p, r["fix_sha"]) is None for p in repos[1:])]  # fmt: skip
     if missed and (cut := next((p for p in repos if _git.shallow(p)), None)):
         return [_findings.finding(CODE, LEDGER, missed[0][0], "the clone is shallow: no fix_sha can be judged", git_line(cut, "fetch", "--unshallow"))]  # fmt: skip
     return [

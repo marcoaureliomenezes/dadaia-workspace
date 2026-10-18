@@ -7,6 +7,7 @@ import os
 from collections.abc import Mapping
 from pathlib import Path
 
+from _grammar import SHA_RE
 from _platform import run
 
 #: `git rev-parse --local-env-vars` less the config injectors: what makes git answer for another repo. Identity, config and ssh are the caller's.
@@ -53,11 +54,12 @@ def reaches(repo: Path, sha: str) -> bool:
     return True
 
 
-def touched(repo: Path, sha: str) -> list[str]:
-    """The paths commit *sha* touched in *repo*; none when git does not know it."""
-    return git(
-        repo, "diff-tree", "--root", "--no-commit-id", "--name-only", "-r", sha, check=False
-    ).splitlines()
+def fix_files(repo: Path, sha: str) -> list[str] | None:
+    """The paths commit *sha* touched, or None unless *sha* is a hex sha that the HEAD of *repo* reaches."""
+    if not SHA_RE.fullmatch(sha or "") or not reaches(repo, sha):
+        return None
+    out = git(repo, "diff-tree", "--root", "--no-commit-id", "--name-only", "-r", "-z", sha)
+    return [p for p in out.split("\0") if p]
 
 
 def parse_worktrees(text: str) -> list[dict[str, str]]:

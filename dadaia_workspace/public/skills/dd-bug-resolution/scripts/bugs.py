@@ -19,7 +19,7 @@ import _jsonl
 from _atomic import SymlinkRefusedError
 from _bugs_check import HISTO, LEDGER, OPEN, STATUS_BY_VERB, check
 from _bugs_store import Records, Refusal, commit, read_records
-from _git import GitError, git, touched
+from _git import GitError, fix_files, git
 from _platform import act, use_utf8_stdio
 from _refusal import report
 from _specs import find_specs, refuse
@@ -127,18 +127,20 @@ def _write(args: argparse.Namespace, specs: Path) -> int:
         values["ts"] = wr.now_iso()
         values["reported_by"] = values["reported_by"] or "dd-sw-engineer-sr"
         try:
-            tracked = git(specs, "ls-files", "--full-name", ":/").splitlines()
+            tracked = git(specs, "ls-files", "-z", "--full-name", ":/").split("\0")
         except (OSError, GitError) as exc:
             raise Refusal(
                 f"cannot list the repo's tracked directories: {getattr(exc, 'stderr', exc)}",
                 act("agent", "point --specs at a specs tree inside a git repo"),
             ) from None
-        history, comp = _history(specs), values["component"].rstrip("/")
-        earlier = sorted({i for p, ids in wr.by_file(history).items() if p == comp or p.startswith(comp + "/") for i in ids})  # fmt: skip
-        for bug in earlier:
-            print(f"earlier bug on {comp}: {bug}")
-        if earlier:
-            print(f"REBUILD due: {_ordinal(len(earlier) + 1)} bug on {comp}")
+        history = _history(specs)
+        fixed = wr.by_file(history)
+        for path in wr.named_paths(values["component"], tracked):
+            earlier = sorted({i for p, ids in fixed.items() if wr.under(p, path) for i in ids})
+            for bug in earlier:
+                print(f"earlier bug on {path}: {bug}")
+            if earlier:
+                print(f"REBUILD due: {_ordinal(len(earlier) + 1)} bug on {path}")
         known = {str(r["id"]) for r in history}
         commit(ledger, lambda records: wr.append(records, values, tracked, known))
         print(f"[ok] registered {values['id']} -> {specs}")
@@ -149,7 +151,7 @@ def _write(args: argparse.Namespace, specs: Path) -> int:
         print(f"[ok] updated {', '.join(sorted(changes))} for {args.bug_id}")
         return 0
     values = _jsonl.values(args, _OPTIONS[args.verb])
-    if args.verb == "resolve" and (files := touched(specs.parent, values["fix_sha"] or "")):
+    if args.verb == "resolve" and (files := fix_files(specs.parent, values["fix_sha"] or "")):
         values["fix_files"] = files
     commit(ledger, lambda records: tr.transition(records, args.bug_id, args.verb, values))
     print(f"[ok] {STATUS_BY_VERB[args.verb]} {args.bug_id}")

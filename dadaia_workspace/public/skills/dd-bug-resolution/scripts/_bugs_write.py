@@ -10,6 +10,7 @@ refuses a differing second write, and a field a verb owns is never `update`'s.
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -39,20 +40,29 @@ def by_file(records: Records) -> dict[str, list[str]]:
     return {path: sorted(ids) for path, ids in sorted(found.items())}
 
 
+def under(path: str, top: str) -> bool:
+    return path == top or path.startswith(top + "/")
+
+
+def named_paths(component: str | None, tracked: list[str]) -> list[str]:
+    """The tracked files or directories a free-text *component* names, in order, once each; a trailing `/` is dropped."""
+    tokens = dict.fromkeys(t.rstrip("/") for t in re.split(r"[\s#:,;()'\"`]+", component or ""))
+    return [t for t in tokens if t and any(under(p, t) for p in tracked)]
+
+
 def append(
     records: Records, values: dict[str, Any], tracked: list[str], known: set[str]
 ) -> Records:
-    """One brand-new record, `status: "open"`. Refuses a duplicate id, a surface that is
-    a tracked path, and a record naming no ledger or archive ids or `none` as its
-    correlation; the schema check does the rest."""
+    """One brand-new record, `status: "open"`. Refuses a duplicate id, a component text that
+    names no tracked path, and a `correlates` that is not `none` or ledger/archive ids
+    (*known*); the schema check does the rest."""
     bug_id = values["id"]
     if any(r.get("id") == bug_id for r in records):
         raise choice(Refusal(f"bug id {bug_id!r} already exists — a reopen is a NEW record declaring "
                      "'caused_by: <prior-id>' at resolve, never a second record under this id"),
                      "with --bug-id set to an id no record holds", "--bug-id")  # fmt: skip
-    component = str(values.get("component"))
-    if not any(p == component or p.startswith(component.rstrip("/") + "/") for p in tracked):
-        raise choice(Refusal(f"component {component!r} names no tracked path"),
+    if not named_paths(values.get("component"), tracked):
+        raise choice(Refusal(f"component {values.get('component') or ''!r} names no tracked path"),
                      "with --component set to a file or directory tracked in the repo",
                      "--component")  # fmt: skip
     correlates = values.get("correlates")
