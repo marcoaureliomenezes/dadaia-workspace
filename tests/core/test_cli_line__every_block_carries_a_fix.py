@@ -274,6 +274,8 @@ def _render(
             return again(table)
         case ast.Call(func=ast.Attribute(value=receiver)) if not isinstance(receiver, ast.Name):
             return again(receiver)
+        case ast.Call(func=ast.Name(id="act"), args=[ast.Constant(value="agent" | "operator" as kind), arg]):  # fmt: skip
+            return f"{kind.capitalize()} action: {again(arg)}"
         case ast.Call(func=ast.Name(id="spell_fix"), args=[arg]):  # the one `fix:` spelling
             return f"fix: {again(arg)}"
         case ast.Call(
@@ -494,9 +496,11 @@ def test_the_scans_bite() -> None:
         'raise Refusal("m", SCRIPT("check", specs=s))\n'
         'raise Refusal("m", SCRIPT("check", note="dadaia doctor"))\n'
         'raise Refusal("m", _SCRIPT("check", "dadaia doctor"))\n'
+        'raise Refusal("m", act("agent", "edit <file>"))\n'
+        'raise Refusal("m", act("agent", f"edit {name}"))\n'
     )
     assert _code_sites({"m.py": ast.parse(source)}) == [
-        f"m.py:{n}" for n in (1, 12, 13, 15, 16, 2, 3, 4, 5, 6, 8, 9)
+        f"m.py:{n}" for n in (1, 12, 13, 15, 16, 17, 2, 3, 4, 5, 6, 8, 9)
     ]
     shipped = (
         "made by `dadaia public install`\n"

@@ -298,25 +298,46 @@ _OPERATOR_ACTIONS = {
 
 
 def _operator_action_texts(source: str) -> list[str]:
-    """Every string in *source* that holds `Operator action: `, from the label to its end;
-    adjacent literals are one string and an f-string's values read as `{source}`."""
+    """Every text in *source* that is an `Operator action:`, from the label to its end: a string
+    holding the label, or the text of an `act("operator", ...)` call; adjacent literals are one
+    string and an f-string's values read as `{source}`."""
     tree, inner, found = ast.parse(source), set(), []
-    for node in ast.walk(tree):
-        if id(node) in inner:
-            continue
+
+    def spelled(node: ast.AST) -> str | None:
         if isinstance(node, ast.JoinedStr):
             inner.update(id(n) for n in ast.walk(node) if n is not node)
-            text = "".join(
+            return "".join(
                 v.value if isinstance(v, ast.Constant) else "{" + ast.unparse(v.value) + "}"
                 for v in node.values
             )
-        elif isinstance(node, ast.Constant) and isinstance(node.value, str):
-            text = node.value
-        else:
+        if isinstance(node, ast.Constant) and isinstance(node.value, str):
+            return node.value
+        return None
+
+    for node in ast.walk(tree):
+        if id(node) in inner:
             continue
-        if "Operator action: " in text:
+        if (
+            isinstance(node, ast.Call)
+            and getattr(node.func, "id", "") == "act"
+            and len(node.args) == 2
+            and isinstance(node.args[0], ast.Constant)
+            and node.args[0].value == "operator"
+            and (text := spelled(node.args[1])) is not None
+        ):
+            found.append(text)
+        elif (text := spelled(node)) is not None and "Operator action: " in text:
             found.append(text.split("Operator action: ", 1)[1])
     return found
+
+
+def test_an_operator_action_text_reads_a_literal_and_an_act_call() -> None:
+    source = (
+        'a = "fix: Operator action: relaunch it"\n'
+        'b = act("operator", f"remove {target}")\n'
+        'c = act("agent", "edit the file")\n'
+    )
+    assert _operator_action_texts(source) == ["relaunch it", "remove {target}"]
 
 
 def test_an_operator_action_is_one_act_the_law_reserves_to_the_human() -> None:
