@@ -215,3 +215,19 @@ def test_a_head_without_a_blank_round_trips_through_the_real_launchers(
         stub = oslib.stub_cli(tmp_path / "v", "echoargs", f"#!python\n{_ECHO}\n", python)
         line = K.command(str(stub), "x", "y z")
     assert _through(shell, line) == (0, "['x', 'y z']")
+
+
+def test_act_spells_the_label_of_its_kind() -> None:
+    assert K.act("agent", "x") == "Agent action: x"
+    assert K.act("operator", "x") == "Operator action: x"
+
+
+@pytest.mark.parametrize("kind", ["", "Agent", "human", "agent "])
+def test_act_of_any_other_kind_raises(kind: str) -> None:
+    with pytest.raises(ValueError):
+        K.act(kind, "x")
+
+
+def test_command_with_an_unspellable_word_is_the_agent_act_of_its_text() -> None:
+    line = K.command("python", "/s/w.py", "$x", caps=WIN)
+    assert line == K.act("agent", "run python /s/w.py $x, quoting $x for your shell")

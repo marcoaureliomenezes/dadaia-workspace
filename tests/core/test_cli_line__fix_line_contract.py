@@ -1315,3 +1315,16 @@ def test_no_fix_line_literal_in_the_library_names_the_skill_script() -> None:
             if any("worktree.py" in literal(c) for c in carried):
                 hits.append(f"{path.relative_to(_PKG.parent)}:{node.lineno}")
     assert sorted(set(hits)) == []
+
+
+def test_only_the_producer_spells_an_action_label() -> None:
+    """The one-grep contract: `Agent action:` / `Operator action:` appear in no library module but `_platform.py`."""
+    label = re.compile(r"(Agent|Operator) action:")
+    hits = [
+        f"{p.relative_to(_PKG.parent).as_posix()}:{n}"
+        for p in sorted(_PKG.rglob("*.py"))
+        if p.name != "_platform.py"
+        for n, line in enumerate(read_text(p).splitlines(), 1)
+        if label.search(line)
+    ]
+    assert hits == []
