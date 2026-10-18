@@ -329,14 +329,16 @@ def _stub(root: Path, skill: str, script: str, body: str) -> None:
     write_text(root / ".agents/skills" / skill / "scripts" / script, f"import sys\n{body}\n")
 
 
-def _stats(root: Path, rc: str = "0.5.0-rc99") -> subprocess.CompletedProcess[str]:
+def _stats(
+    root: Path, rc: str = "0.5.0-rc99", specs: str = "repos/r/specs"
+) -> subprocess.CompletedProcess[str]:
     script = root / ".agents/skills" / SKILL / "scripts/verdict.py"
     env = suite_env(
         os.environ,
         Path.home(),
         overrides={"PATH": os.environ["PATH"], "HOME": str(root), "GIT_CONFIG_NOSYSTEM": "1"},
     )
-    argv = [sys.executable, str(script), "stats", rc, "--specs", "repos/r/specs"]
+    argv = [sys.executable, str(script), "stats", rc, "--specs", specs]
     return os_run(argv, cwd=root, env=env)
 
 
@@ -416,6 +418,9 @@ def test_stats_prints_the_local_metric_table_over_the_candidate_window(tmp_path:
                 for i, by, at in rows
             ),
         )  # fmt: skip
+    histo = ledger / "_archive/bugs_histo.jsonl"
+    event = {"ts": "2026-08-28T12:45:33Z", "event": "archived", "agent": "claude-code", "data": {"id": "g", "status": "Closed"}}  # fmt: skip
+    write_text(histo, json.dumps(event) + "\n" + read_text(histo))
     write_text(ledger / "BUGS.jsonl", read_text(ledger / "BUGS.jsonl") + json.dumps({"id": "f", "status": "open", "caused_by": "none"}) + "\n")  # fmt: skip
     sha = "@" + "a" * 40
     # written out of time order: the first verdict of a tree is read by `produced_at`
@@ -443,6 +448,22 @@ def test_stats_prints_the_local_metric_table_over_the_candidate_window(tmp_path:
         "9 rebuild-due patches\t1\t0\n"
         "oldest record\t2026-10-09T10:00:01Z\n",
     ), done.stderr
+
+
+def test_stats_of_a_worktree_reads_the_same_table_as_the_repo_checkout(tmp_path: Path) -> None:
+    root = _stats_workspace(tmp_path)
+    repo = root / "repos/r"
+    _log(root, [_born("2026-10-12T09:00:00Z"),
+                _milestone("2026-10-12T11:00:00Z", "rc-99", "implemented", git(repo, "rev-parse", "HEAD").strip())])  # fmt: skip
+    git(repo, "add", "-A")
+    git(repo, "commit", "-qm", "state")
+    tree = root / "worktrees/r/wt-rc"
+    git(repo, "worktree", "add", "-q", "-b", "wt-rc", str(tree))
+    _record(root, "wt/0.5.0/rc-99/job-1/wt-main@" + "a" * 40, "APPROVED", "01")
+    main, moved = _stats(root), _stats(root, specs="worktrees/r/wt-rc/specs")
+    assert main.returncode == moved.returncode == 0, moved.stderr
+    assert "2 first-pass approval\t1/1 (100%)\t>= 70%\n" in moved.stdout
+    assert moved.stdout == main.stdout
 
 
 def test_stats_reads_closure_duration_as_n_a_before_the_integration_merge(tmp_path: Path) -> None:
