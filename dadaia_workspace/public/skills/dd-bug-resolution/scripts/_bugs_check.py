@@ -161,7 +161,9 @@ def archived_ids(text: str) -> frozenset[str]:
 
 
 def _siblings(specs: Path) -> list[Path]:
-    """The git checkouts under the workspace's `repos/` other than the main repo that holds *specs*; none outside that layout."""
+    """The other git checkouts under `<main>/../../repos` (main: the checkout whose git common
+    dir holds *specs*), each child carrying a `.git` and not main; none when that directory
+    does not exist."""
     main = Path(_git.git(specs.parent, "rev-parse", "--path-format=absolute", "--git-common-dir", check=False).strip()).parent  # fmt: skip
     beside = main.parent.parent / "repos"
     return [p for p in sorted(beside.iterdir()) if p != main and (p / ".git").exists()] if beside.is_dir() else []  # fmt: skip
