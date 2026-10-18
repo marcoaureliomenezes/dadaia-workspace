@@ -9,7 +9,7 @@ from collections.abc import Iterable, Iterator
 from pathlib import Path
 from typing import Any
 
-from _platform import Caps, command, read_text
+from _platform import Caps, act, command, read_text
 from _refusal import Refusal
 from _root import workspace_of
 
@@ -27,7 +27,9 @@ class Unreadable(Refusal):
 
 
 #: The act that repairs a workspace whose location is unknown.
-REINSTALL_ACT = "Agent action: run `uvx dadaia-workspace init` with the workspace's directory as its first argument"
+REINSTALL_ACT = act(
+    "agent", "run `uvx dadaia-workspace init` with the workspace's directory as its first argument"
+)
 
 
 def reinstall_fix(start: Path, caps: Caps | None = None) -> str:

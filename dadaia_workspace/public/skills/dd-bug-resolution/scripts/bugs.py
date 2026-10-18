@@ -20,7 +20,7 @@ from _atomic import SymlinkRefusedError
 from _bugs_check import LEDGER, OPEN, STATUS_BY_VERB, check
 from _bugs_store import Refusal, commit, read_records
 from _git import GitError, git
-from _platform import use_utf8_stdio
+from _platform import act, use_utf8_stdio
 from _refusal import report
 from _specs import find_specs, refuse
 
@@ -118,7 +118,7 @@ def _write(args: argparse.Namespace, specs: Path) -> int:
         except (OSError, GitError) as exc:
             raise Refusal(
                 f"cannot list the repo's tracked directories: {getattr(exc, 'stderr', exc)}",
-                "Agent action: point --specs at a specs tree inside a git repo",
+                act("agent", "point --specs at a specs tree inside a git repo"),
             ) from None
         dirs = {part for path in listed.splitlines() for part in path.split("/")[:-1]}
         near = wr.candidates(read_records(ledger), values["surface"])
@@ -158,7 +158,7 @@ def main(argv: list[str] | None = None) -> int:
     except SymlinkRefusedError as exc:
         report(
             f"{exc} — nothing was written",
-            f"Agent action: replace {exc.path} with a regular file holding its content",
+            act("agent", f"replace {exc.path} with a regular file holding its content"),
         )
         return 1
 

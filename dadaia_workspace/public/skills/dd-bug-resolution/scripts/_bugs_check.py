@@ -18,7 +18,7 @@ import _git
 import _jsonl
 import _ledger
 from _grammar import HISTORICAL_TASK_RE, TASK_ID_RE
-from _platform import git_line, read_text
+from _platform import act, git_line, read_text
 from _root import STATES as _STATES
 from _specs import script
 
@@ -127,8 +127,8 @@ def findings_for(
             add(seen[bug_id], f"{bug_id!r} caused_by {why}")
             bugs = script(Path(__file__).with_name("bugs.py"))
             fixes[seen[bug_id]] = (  # a cycle's wrong link is a judgement; a dangling one is not
-                f"Agent action: decide which of {', '.join(chain)} names the wrong cause and "
-                f"set its caused_by to the real cause's id, or none, through `{bugs.inline('update', specs=root)}` ({_LAW})" if at == bug_id
+                act("agent", f"decide which of {', '.join(chain)} names the wrong cause and "
+                    f"set its caused_by to the real cause's id, or none, through `{bugs.inline('update', specs=root)}` ({_LAW})") if at == bug_id
                 else bugs("update", bug_id, "--set", "caused_by=none", specs=root)
             )  # fmt: skip
     return [
@@ -191,8 +191,8 @@ def _unreached(specs: Path, text: str, root: Path) -> list[dict[str, Any]]:
     return [
         _findings.finding(
             CODE, LEDGER, n, f"{r['id']!r} fix_sha {r['fix_sha']} is no ancestor of HEAD of {', '.join(p.name for p in repos)}",
-            "Agent action: find the fix commit's sha in git log and run "
-            f"`{update.inline('update', r['id'], '--set', 'fix_sha=SHA', specs=root)}`",
+            act("agent", "find the fix commit's sha in git log and run "
+                f"`{update.inline('update', r['id'], '--set', 'fix_sha=SHA', specs=root)}`"),
         )
         for n, r in missed
     ]  # fmt: skip
