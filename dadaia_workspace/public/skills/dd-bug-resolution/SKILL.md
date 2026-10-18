@@ -23,7 +23,7 @@ compatibility: Standalone Agent Skill; the full lifecycle lives in a dadaia-work
 ## 2. The method — seven phases, each gated
 
 **Phase 0 — Lineage.** Read the bug ledger for prior fixes to the same
-`surface`/`component` in the bounded window ([`LINEAGE.md`](LINEAGE.md)); inspect every named
+recorded fix files or `component` in the bounded window ([`LINEAGE.md`](LINEAGE.md)); inspect every named
 `fix_sha` with `git show`; a `caused_by` other than `none` makes this fix a REBUILD (`specs/bugs/AGENTS.md` §2);
 grep every decider of the same fact and name its one owner before any fix;
 carry the link to Phase 6 (`resolve --caused-by`; `update` repairs);

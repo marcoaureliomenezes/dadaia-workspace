@@ -16,8 +16,8 @@ record whose `ts` or `closed_at` falls inside that window.
 
 ## Recurrence and fix-induced bugs
 
-- Recurrence is a later record on the same exact `surface`, registered after the earlier
-  record's resolution.
+- Recurrence is a later record sharing a recorded fix file with the earlier record,
+  registered after the earlier record's resolution.
 - A fix-induced bug is a later record whose component names a file touched by the earlier
   record's `fix_sha`, with `caused_by` naming that earlier bug.
 - A contradicted `caused_by: none` is a finding.
@@ -32,9 +32,9 @@ value against the previous audit's `AUDIT.md`, from git history, where it was co
 | 1 | Registrations per reporter | group records by `reported_by` |
 | 2 | Complete resolutions | resolved records satisfying the canonical resolution facts |
 | 3 | Fix-shape ratio | `net-negative / (net-neutral + net-positive)` from `git show --numstat <fix_sha>` on production paths |
-| 4 | Same-surface re-bug rate at 3d/14d | group on exact `surface` |
+| 4 | Same-surface re-bug rate at 3d/14d | group by recorded fix files |
 | 5 | Hand-kept-list touch count | named fix commits touching the hand-kept files (below) |
-| 6 | Test-layer bug share | `surface == "tests"` or `component` starts with `tests/` |
+| 6 | Test-layer bug share | `component` starts with `tests/` |
 | 7 | Scanner-vs-prose recurrence | scanner-term symptom and a fix touching only docs/tests |
 | 8 | Sweep closures as `resolved` | resolved records whose `fix_sha` touches no production code |
 | 9 | REBUILD share | resolved records with `caused_by != none` whose named fix commit identifies a REBUILD |

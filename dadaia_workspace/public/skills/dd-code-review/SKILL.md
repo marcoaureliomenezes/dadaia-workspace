@@ -47,7 +47,7 @@ axes are reported side by side with equal weight, so no axis hides another's fin
 
 ## 4. Axis 3 — Bug-surface
 
-- Pull the touched feature's ledger slice: `grep -h '"surface": "<surface>"' <specs-dir>/bugs/BUGS.jsonl <specs-dir>/bugs/_archive/bugs_histo.jsonl`.
+- Pull the touched feature's ledger slice: the records whose recorded `fix_files` name a file the diff touches: `grep -h '"<file>"' <specs-dir>/bugs/BUGS.jsonl <specs-dir>/bugs/_archive/bugs_histo.jsonl`, one touched file per run.
 - Answer WITH EVIDENCE: did this diff reduce, keep, or increase the feature's bug surface?
 - The operator's rule applied as a review axis: a diff that GROWS the feature is a stop —
   a branch, flag, special case, second code path or cross-feature reach-in added by a fix
