@@ -290,7 +290,7 @@ _OPERATOR_ACTIONS = {
     ("public/skills/dd-backlog-definition/scripts/_backlog_exit.py", "confirm {slug} as a bug (dd-bug-registration §2)"): "ruling",
     ("public/skills/dd-bug-resolution/scripts/_ledger.py", "rewrite {path} as one JSON object mapping each term to its reason"): "protected",
     ("public/skills/dd-cli-library/scripts/registry.py", "delete {_platform.quote(str(path))} — the next registry.py run starts an empty registry"): "protected",
-    ("public/skills/dd-gitflow-default/scripts/_worktree_new.py", "confirm {act} (dd-bug-registration §2)"): "ruling",
+    ("public/skills/dd-gitflow-default/scripts/_worktree_new.py", "confirm {what} (dd-bug-registration §2)"): "ruling",
     ("public/skills/dd-release-implementation/scripts/_release_phase.py", "set '**Status:** {APPROVED}' in {document.resolve()}"): "ruling",
     ("public/skills/dd-release-implementation/scripts/release.py", "authorize carrying {', '.join(missing)}"): "ruling",
     ("public/skills/dd-release-implementation/scripts/release.py", "authorize carrying {bug_id}"): "ruling",
