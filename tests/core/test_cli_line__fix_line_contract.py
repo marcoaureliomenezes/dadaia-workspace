@@ -1330,20 +1330,42 @@ def test_no_fix_line_literal_in_the_library_names_the_skill_script() -> None:
     assert sorted(set(hits)) == []
 
 
+#: The POSIX shim's one label line, whole: its exception is keyed by this text, never its number.
+_SHIM = "dadaia_workspace/public/scripts/pre-push-ci-gate.sh"
+_SHIM_LABEL = r'    echo "[pre-push]   fix: Agent action: install the workspace venv (re-run \`uvx dadaia-workspace init\` at the workspace root)." >&2'
+
+
+def _action_label_hits(pkg: Path) -> list[str]:
+    """Each `Agent action:` / `Operator action:` line of *pkg*'s `.py` and `.sh` files, but the
+    kernel producer and the shim's one exact line; a second copy of that line is a hit."""
+    label = re.compile(r"(Agent|Operator) action:")
+    producer = "dadaia_workspace/public/skills/dd-bug-resolution/scripts/_platform.py"
+    hits: list[str] = []
+    for p in sorted([*pkg.rglob("*.py"), *pkg.rglob("*.sh")]):
+        rel = p.relative_to(pkg.parent).as_posix()
+        if rel == producer:
+            continue
+        exempt = rel == _SHIM
+        for n, line in enumerate(read_text(p).splitlines(), 1):
+            if not label.search(line):
+                continue
+            if exempt and line == _SHIM_LABEL:
+                exempt = False
+                continue
+            hits.append(f"{rel}:{n}")
+    return hits
+
+
 def test_only_the_producer_spells_an_action_label() -> None:
     """The one-grep contract: `Agent action:` / `Operator action:` appear in no `.py` or `.sh`
     under the library but the kernel producer and the POSIX shim's one line."""
-    label = re.compile(r"(Agent|Operator) action:")
-    producer = "dadaia_workspace/public/skills/dd-bug-resolution/scripts/_platform.py"
-    shim = "dadaia_workspace/public/scripts/pre-push-ci-gate.sh:32"
-    hits = [
-        site
-        for p in sorted([*_PKG.rglob("*.py"), *_PKG.rglob("*.sh")])
-        if (rel := p.relative_to(_PKG.parent).as_posix()) != producer
-        for n, line in enumerate(read_text(p).splitlines(), 1)
-        if label.search(line) and (site := f"{rel}:{n}") != shim
-    ]
-    assert hits == []
+    assert _action_label_hits(_PKG) == []
+
+
+def test_a_second_action_label_line_in_the_shim_is_a_hit(tmp_path: Path) -> None:
+    pkg = tmp_path / "dadaia_workspace"
+    _write(pkg / "public" / "scripts" / "pre-push-ci-gate.sh", f"{_SHIM_LABEL}\n{_SHIM_LABEL}\n")
+    assert _action_label_hits(pkg) == [f"{_SHIM}:2"]
 
 
 def _attribute_act_calls(pkg: Path) -> list[str]:
