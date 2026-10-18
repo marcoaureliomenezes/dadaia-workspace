@@ -21,6 +21,7 @@ from dadaia_workspace.core import platform
 from dadaia_workspace.core.cli_line import reinstall_fix
 from dadaia_workspace.core.doctor_rules import Rule, SectionFinding
 from dadaia_workspace.core.fixed_sections import authored_text
+from dadaia_workspace.core.platform import act
 from dadaia_workspace.features.specs.doctor_types import Severity, specs_finding
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from dadaia_workspace.infrastructure.ledger_scripts import load_owner
@@ -131,10 +132,13 @@ def adr_list_block(specs_dir: Path) -> str:
     ``measured_by`` resolves to nothing."""
     if unresolved := unresolved_measured_by(specs_dir):
         raise ValueError(
-            "Agent action: set the measured_by of ADR "
-            + ", ".join(i for i, _ in unresolved)
-            + " to a tracked path, a path::name test or workflow-job id, or a rule code"
-            " (an in-place `chore(adrs): repair` commit)."
+            act(
+                "agent",
+                "set the measured_by of ADR "
+                + ", ".join(i for i, _ in unresolved)
+                + " to a tracked path, a path::name test or workflow-job id, or a rule code"
+                " (an in-place `chore(adrs): repair` commit).",
+            )
         )
     return "".join(
         f"- {r['id']} — {r['title']}\n"

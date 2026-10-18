@@ -13,6 +13,7 @@ from dadaia_workspace.core.cli_line import cli_words, git_line, spell_fix
 from dadaia_workspace.core.exceptions import GitSyncError
 from dadaia_workspace.core.gitflow import Gitflow
 from dadaia_workspace.core.models.git_scan import SHA_SHAPE_RE, is_zero_sha
+from dadaia_workspace.core.platform import act
 
 __all__ = [
     "Decision",
@@ -131,7 +132,7 @@ def _refuse_branch(
     return _blocked(
         f"the {role} branch '{branch}' is never pushed directly — it advances only via a PR "
         f"from '{head}'",
-        f"Agent action: open a PR/MR from '{head}' into '{branch}' on your git host",
+        act("agent", f"open a PR/MR from '{head}' into '{branch}' on your git host"),
     )
 
 
@@ -201,10 +202,11 @@ def check_ref_policy(
             or (not is_zero_sha(old) and _audit_descendant(moved, old, new))
         ):
             continue
-        fix = (
-            f"Agent action: open a tree for this change with {platform.inline(*cli_words(None, 'worktree', 'new', repo))} "
+        fix = act(
+            "agent",
+            f"open a tree for this change with {platform.inline(*cli_words(None, 'worktree', 'new', repo))} "
             "and the name of a live job, a backlog slug or a hotfix bug id, then land the change "
-            "through that tree's merge"
+            "through that tree's merge",
         )
         return Decision(
             allowed=False,

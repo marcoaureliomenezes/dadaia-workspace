@@ -11,6 +11,7 @@ from dadaia_workspace.core import platform
 from dadaia_workspace.core.atomic_write import atomic_write
 from dadaia_workspace.core.cli_line import mkdir_line, reinstall_fix, shell_line
 from dadaia_workspace.core.doctor_rules import SectionFinding
+from dadaia_workspace.core.platform import act
 from dadaia_workspace.core.template_history import was_shipped
 from dadaia_workspace.core.workspace_layout import (
     SCOPED_LAW_AREAS,
@@ -246,5 +247,5 @@ class StructuralValidator:
             "placeholder. Never auto-fixed — it may be real content; move/rename it into the "
             "canon shape, or delete it, by hand (TREE-8).",
             str(entry),
-            fix=f"Agent action: move {entry} into its canon shape, or out of specs/",
+            fix=act("agent", f"move {entry} into its canon shape, or out of specs/"),
         )

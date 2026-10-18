@@ -10,6 +10,7 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 from dadaia_workspace.core.doctor_rules import Rule, SectionFinding
+from dadaia_workspace.core.platform import act
 from dadaia_workspace.features.specs import doctor_adr
 
 if TYPE_CHECKING:
@@ -38,7 +39,7 @@ RULES: tuple[SpecsRule, ...] = (
     _rule(
         ("SPEC-DOC-001",),
         lambda d: d._coherence.check_constitution(),
-        fix_help="Agent action: restore <specs>/constitution.md, then commit.",
+        fix_help=act("agent", "restore <specs>/constitution.md, then commit."),
     ),
     _rule(
         ("SPEC-DOC-002",),
@@ -85,7 +86,10 @@ RULES: tuple[SpecsRule, ...] = (
     _rule(
         ("ADR-SUPERSEDED-CITATION",),
         lambda d: doctor_adr.superseded_adr_citations(d.specs_dir, d.public_dir),
-        fix_help="Agent action: cite the successor recorded in <specs>/ADRs/decisions.jsonl instead, then commit.",
+        fix_help=act(
+            "agent",
+            "cite the successor recorded in <specs>/ADRs/decisions.jsonl instead, then commit.",
+        ),
     ),
     _rule(
         ("MEM-DRIFT-2",),
@@ -108,7 +112,9 @@ RULES: tuple[SpecsRule, ...] = (
     _rule(
         ("SPEC-DOC-026",),
         lambda d: d._release.check_unique_release_ids(),
-        fix_help="Agent action: rename one of the duplicated dirs under <specs>/releases, then commit.",
+        fix_help=act(
+            "agent", "rename one of the duplicated dirs under <specs>/releases, then commit."
+        ),
     ),
     _rule(
         ("SPEC-DOC-046",),

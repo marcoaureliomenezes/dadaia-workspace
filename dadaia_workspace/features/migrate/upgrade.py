@@ -20,6 +20,7 @@ from dadaia_workspace.core.cli_line import cli_words
 from dadaia_workspace.core.exceptions import DadaiaError
 from dadaia_workspace.core.frontmatter import split
 from dadaia_workspace.core.gitflow import candidate_dir, merge_frontmatter, next_candidate
+from dadaia_workspace.core.platform import act
 from dadaia_workspace.core.release_state import RELEASE_ID_RE
 from dadaia_workspace.core.spec_status import APPROVED, DRAFT, IN_REVIEW, STATUS_LINE
 from dadaia_workspace.core.workspace_layout import CANDIDATE_DOCUMENTS
@@ -67,8 +68,11 @@ def upgrade(
     if architecture.is_file() and _RETIRED_PART_HEADING in platform.read_text(architecture):
         raise UpgradeRefused(
             f"{architecture} is two-tier ({_RETIRED_PART_HEADING!r}): nowhere safe to fold into.",
-            "Agent action: rewrite its headings as ## Principles / ## Tech Stack / "
-            f"## Structure, then re-run `{platform.inline(*cli_words(None, 'specs', 'upgrade', '--specs-dir', str(specs_dir)))}`.",
+            act(
+                "agent",
+                "rewrite its headings as ## Principles / ## Tech Stack / "
+                f"## Structure, then re-run `{platform.inline(*cli_words(None, 'specs', 'upgrade', '--specs-dir', str(specs_dir)))}`.",
+            ),
         )
 
     if dry_run:

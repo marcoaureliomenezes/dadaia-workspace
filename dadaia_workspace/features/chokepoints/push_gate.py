@@ -17,6 +17,7 @@ from dadaia_workspace.core.models.git_scan import (
     ScannedObject,
     is_zero_sha,
 )
+from dadaia_workspace.core.platform import act
 from dadaia_workspace.features.chokepoints.branch_policy import (
     HEADS_PREFIX,
     Decision,
@@ -110,7 +111,7 @@ def _rewrite_fix(ref: PushRef, object_source: ObjectSource, repo: Path, fixes: G
     """The rewrite-verb remedy for the first refused ref (origin is never rewritten)."""
     branch = ref.local_ref.removeprefix(HEADS_PREFIX)
     if ref.local_ref.startswith("refs/tags/") or not fixes.head:
-        fix = "Agent action: a tag or a detached HEAD has no branch to amend; push a branch."
+        fix = act("agent", "a tag or a detached HEAD has no branch to amend; push a branch.")
     elif branch != ref.local_ref and branch != fixes.head:
         fix = git_line(fixes.repo, "switch", branch)
     else:
@@ -161,7 +162,7 @@ def _read_failure(exc: GitObjectReadError, masker: PathMasker, repo: Path) -> De
         message=_fail_closed(f"reading the pushed-range git objects failed ({exc}{masked})")
         + "\n"
         + spell_fix(
-            "Operator action: make git runnable here"  # not corruption: no fsck
+            act("operator", "make git runnable here")  # not corruption: no fsck
             if isinstance(exc, GitRunError)
             else git_line(repo, "fsck")
         ),
