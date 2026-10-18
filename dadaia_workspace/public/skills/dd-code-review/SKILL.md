@@ -61,7 +61,7 @@ axes are reported side by side with equal weight, so no axis hides another's fin
 - The verdict is the enum `APPROVED`/`REJECTED`: on a worktree, written by `verdict.py` (`worktrees/AGENTS.md` §2); on a PR, returned as text the main thread quotes (`dd-gitflow-default` §3b).
 - A re-review judges the finding's class, not only the changed lines.
 - A green internal gate that diverges from real consumer behavior is itself a bug.
-- A reviewer probe runs in scratch only: a copy of the context, with the live workspace root listed in `DADAIA_FENCED_ROOTS` so no dadaia verb acts on the live instance; never `doctor --fix`. A probe that reaches the live workspace is a finding.
+- A reviewer probe runs in scratch only: a copy of the context, with the live workspace root listed in `DADAIA_FENCED_ROOTS`; an explicit `--specs` path bypasses that fence, so every explicit path must point into the copy; never `doctor --fix`. A probe that reaches the live workspace is a finding.
 
 ## 5. Done when — the report carries
 
