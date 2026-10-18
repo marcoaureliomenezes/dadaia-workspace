@@ -1008,7 +1008,8 @@ def test_a_quote_groups_one_word_of_a_declared_line(
 
 
 def test_an_unbalanced_quote_in_a_declared_line_is_one_refusal_with_one_fix(tmp_path: Path) -> None:
-    tree = make_workspace(tmp_path) / "repos" / "law"
+    root = make_workspace(tmp_path)
+    tree = root / "repos" / "law"
     tree.mkdir()
     end = _law_end(tree, b'verify: pytest -m "not e2e tests\n')
 
@@ -1020,5 +1021,5 @@ def test_an_unbalanced_quote_in_a_declared_line_is_one_refusal_with_one_fix(tmp_
         "Agent action: close the quote in the verify: line of AGENTS.md on work through a "
         "wt-backlog lane, then `"
     )
-    assert refused.value.fix.endswith(f"worktree sync {tree}`")
+    assert refused.value.fix.endswith(f"then `{_sync_line(root, tree)}`")
     assert "\n" not in refused.value.fix
