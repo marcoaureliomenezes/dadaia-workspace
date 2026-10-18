@@ -117,7 +117,12 @@ def test_ref_gate_passes_the_origin_sha_creation_and_a_non_work_ref(
 def test_ref_gate_refuses_a_zero_old_line_for_an_existing_work_ref_off_origin(
     monkeypatch, tmp_path: Path, zeros: int
 ) -> None:
-    """``git branch -f`` and ``update-ref`` with no old sha hand git's zero old sha."""
+    """``git branch -f`` and ``update-ref`` with no old sha hand git's zero old sha.
+
+    The reference-transaction hook resolves a zero old sha for an existing ref to its current
+    value before it calls the verb, so the old sha arrives resolved; this test feeds the verb the
+    zero itself.
+    """
     repo, _ = _work_repo(tmp_path)
     _commit(repo, **{"src__a.py": "x = 1\n"})
     other = _commit(repo, **{"src__b.py": "y = 2\n"})
