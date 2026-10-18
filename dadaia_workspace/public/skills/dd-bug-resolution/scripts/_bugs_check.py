@@ -151,13 +151,16 @@ def histo_findings(text: str, root: Path = _ledger.SPECS) -> list[dict[str, Any]
     )  # fmt: skip
 
 
+def archived_records(text: str) -> list[dict[str, Any]]:
+    """The records of the archive *text*: a plain line is one, an event line contributes its
+    `data`; a line with no `id` or an unreadable one is `histo_findings`' to name."""
+    found = (r["data"] if "event" in r and isinstance(r.get("data"), dict) else r for _, r, why in _jsonl.walk(text) if not why and isinstance(r, dict))  # fmt: skip
+    return [r for r in found if "id" in r]
+
+
 def archived_ids(text: str) -> frozenset[str]:
-    """The record ids of the archive *text*; an unreadable line is `histo_findings`' to name."""
-    return frozenset(
-        str(record["id"])
-        for _, record, why in _jsonl.walk(text)
-        if not why and isinstance(record, dict) and "id" in record
-    )
+    """The record ids of the archive *text*."""
+    return frozenset(str(r["id"]) for r in archived_records(text))
 
 
 def _siblings(specs: Path) -> list[Path]:

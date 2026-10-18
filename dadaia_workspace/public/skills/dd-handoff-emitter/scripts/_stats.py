@@ -11,7 +11,6 @@ from pathlib import Path
 from typing import Any
 
 import _bugs_store
-from _bugs_check import HISTO, LEDGER
 from _git import git, scrubbed_env
 from _handoffs import reviewer_records
 from _platform import run
@@ -83,7 +82,7 @@ def table(root: Path, specs: Path, rc: str) -> str:
     state = json.loads((specs / "releases" / rc.partition("-rc")[0] / "_RELEASE.json").read_text(encoding="utf-8"))  # fmt: skip
     birth, end, sha, newest = _window(state, rc)
     name, integration = _context(root, repo.name) or (None, None)
-    closed = [r for p in (specs / LEDGER, specs / HISTO) if p.is_file() for r in _bugs_store.read_records(p) if birth <= str(r.get("closed_at") or "") <= end]  # fmt: skip
+    closed = [r for r in _bugs_store.history(specs) if birth <= str(r.get("closed_at") or "") <= end]
     trees: dict[str, list[tuple[str, str]]] = {}
     seen = []
     for _path, data in reviewer_records(root):

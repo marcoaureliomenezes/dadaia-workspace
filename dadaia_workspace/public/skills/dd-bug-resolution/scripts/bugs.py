@@ -17,8 +17,8 @@ import _bugs_write as wr
 import _findings
 import _jsonl
 from _atomic import SymlinkRefusedError
-from _bugs_check import HISTO, LEDGER, OPEN, STATUS_BY_VERB, check
-from _bugs_store import Records, Refusal, commit, read_records
+from _bugs_check import LEDGER, OPEN, STATUS_BY_VERB, check
+from _bugs_store import Refusal, commit, history, read_records
 from _git import GitError, fix_files, git
 from _platform import act, use_utf8_stdio
 from _refusal import report
@@ -77,13 +77,6 @@ def _parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _history(specs: Path) -> Records:
-    """The live ledger's records and the archive's."""
-    return read_records(specs / LEDGER) + (
-        read_records(specs / HISTO) if (specs / HISTO).is_file() else []
-    )
-
-
 def _ordinal(n: int) -> str:
     return f"{n}{'th' if 10 <= n % 100 <= 20 else {1: 'st', 2: 'nd', 3: 'rd'}.get(n % 10, 'th')}"
 
@@ -98,7 +91,7 @@ def _read(args: argparse.Namespace, specs: Path) -> int:
         ):
             for value, count in sorted(Counter(values).items()):
                 print(f"{label}:{value}\t{count}")
-        for path, ids in wr.by_file(_history(specs)).items():
+        for path, ids in wr.by_file(history(specs)).items():
             if len(ids) > 1:
                 print(f"rebuild-due:{path}\t{','.join(ids)}")
         return 0
@@ -133,15 +126,15 @@ def _write(args: argparse.Namespace, specs: Path) -> int:
                 f"cannot list the repo's tracked directories: {getattr(exc, 'stderr', exc)}",
                 act("agent", "point --specs at a specs tree inside a git repo"),
             ) from None
-        history = _history(specs)
-        fixed = wr.by_file(history)
+        past = history(specs)
+        fixed = wr.by_file(past)
         for path in wr.named_paths(values["component"], tracked):
             earlier = sorted({i for p, ids in fixed.items() if wr.under(p, path) for i in ids})
             for bug in earlier:
                 print(f"earlier bug on {path}: {bug}")
             if earlier:
                 print(f"REBUILD due: {_ordinal(len(earlier) + 1)} bug on {path}")
-        known = {str(r["id"]) for r in history}
+        known = {str(r["id"]) for r in past}
         commit(ledger, lambda records: wr.append(records, values, tracked, known))
         print(f"[ok] registered {values['id']} -> {specs}")
         return 0
