@@ -84,7 +84,9 @@ def table(root: Path, specs: Path, rc: str) -> str:
     state = json.loads((specs / "releases" / rc.partition("-rc")[0] / "_RELEASE.json").read_text(encoding="utf-8"))  # fmt: skip
     birth, end, sha, newest = _window(state, rc)
     name, integration = _context(root, repo) or (None, None)
-    closed = [r for r in _bugs_store.history(specs) if birth <= str(r.get("closed_at") or "") <= end]
+    closed = [
+        r for r in _bugs_store.history(specs) if birth <= str(r.get("closed_at") or "") <= end
+    ]
     trees: dict[str, list[tuple[str, str]]] = {}
     seen = []
     for _path, data in reviewer_records(root):
