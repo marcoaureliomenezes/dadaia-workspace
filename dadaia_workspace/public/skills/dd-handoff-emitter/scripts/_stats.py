@@ -49,12 +49,14 @@ def _window(state: dict[str, Any], rc: str) -> tuple[str, str, str | None, bool]
     return birth, done["ts"] if done else now, done["sha"] if done else None, not later
 
 
-def _context(root: Path, repo: str) -> tuple[str, str] | None:
-    """(context name, integration branch) of the context that owns *repo*."""
+def _context(root: Path, repo: Path) -> tuple[str, str] | None:
+    """(context name, integration branch) of the context that owns *repo*, named by the parent
+    of its git common dir, so a worktree and its main checkout answer alike."""
+    slug = Path(git(repo, "rev-parse", "--path-format=absolute", "--git-common-dir", check=False).strip()).parent.name  # fmt: skip
     done = run_cli(root, "context", "list", "--json", env=scrubbed_env())
     try:
         rows = json.loads(done.stdout)
-        row = next(r for r in rows if r.get("gitflow") and repo in (r["main_repo"], *(a["slug"] for a in r["associated_repos"])))  # fmt: skip
+        row = next(r for r in rows if r.get("gitflow") and slug in (r["main_repo"], *(a["slug"] for a in r["associated_repos"])))  # fmt: skip
         return str(row["name"]), str(row["gitflow"]["integration"])
     except (ValueError, StopIteration, TypeError, KeyError):
         return None
@@ -81,7 +83,7 @@ def table(root: Path, specs: Path, rc: str) -> str:
     repo = specs.parent
     state = json.loads((specs / "releases" / rc.partition("-rc")[0] / "_RELEASE.json").read_text(encoding="utf-8"))  # fmt: skip
     birth, end, sha, newest = _window(state, rc)
-    name, integration = _context(root, repo.name) or (None, None)
+    name, integration = _context(root, repo) or (None, None)
     closed = [r for r in _bugs_store.history(specs) if birth <= str(r.get("closed_at") or "") <= end]
     trees: dict[str, list[tuple[str, str]]] = {}
     seen = []
