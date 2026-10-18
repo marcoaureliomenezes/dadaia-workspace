@@ -100,7 +100,7 @@ class SeveralWorkBranches(_git.SeveralWork, DadaiaError):  # type: ignore[misc,n
 
     def __init__(self, several: Any) -> None:
         DadaiaError.__init__(self, several.args[0], several.fix)
-        self.keep = several.keep
+        self.keep, self.text = several.keep, several.text
 
 
 def work_branch(repo: Path, flow: Gitflow, main: str) -> str:

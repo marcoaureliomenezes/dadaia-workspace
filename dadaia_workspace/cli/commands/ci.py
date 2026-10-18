@@ -21,6 +21,7 @@ from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.exceptions import GitSyncError
 from dadaia_workspace.core.gitflow import Gitflow, work_branch
 from dadaia_workspace.core.models.git_scan import ZERO_SHA, is_zero_sha
+from dadaia_workspace.core.platform import act
 from dadaia_workspace.core.skill_owner import load_owner
 from dadaia_workspace.features.chokepoints.branch_policy import (
     HEADS_PREFIX,
@@ -39,7 +40,7 @@ def _repo_root() -> Path:
     try:
         out = platform.run(["git", "rev-parse", "--show-toplevel"], check=True)
     except (subprocess.CalledProcessError, FileNotFoundError):
-        fail("not inside a git repository", platform.act("agent", "run it inside a git repository"))
+        fail("not inside a git repository", act("agent", "run it inside a git repository"))
     return Path(out.stdout.strip())
 
 
@@ -112,7 +113,7 @@ def _rewrite_unpublished(repo: Path, oldest: str, message: str | None) -> None:
     if sha not in build_git_object_reader().unpublished(repo, tip):
         refusal = (
             f"cannot rewrite {oldest}: origin already holds it, or it is not in HEAD's history",
-            platform.act(
+            act(
                 "agent",
                 "pass the oldest commit origin does not hold, as the push gate's fix line names it",
             ),
@@ -120,7 +121,7 @@ def _rewrite_unpublished(repo: Path, oldest: str, message: str | None) -> None:
     elif not listed:
         refusal = (
             "the push gate lists no denylist or canon finding in HEAD's unpublished range",
-            platform.act(
+            act(
                 "agent",
                 "land the change through a worktree; this remedy answers a push gate refusal only",
             ),
@@ -128,14 +129,12 @@ def _rewrite_unpublished(repo: Path, oldest: str, message: str | None) -> None:
     elif stray:
         refusal = (
             f"the working tree changes paths the gate did not list: {', '.join(stray)}",
-            platform.act(
-                "agent", "revert or unstage every path the gate did not list, and add no path"
-            ),
+            act("agent", "revert or unstage every path the gate did not list, and add no path"),
         )
     elif message and not (isinstance(decision, GateDecision) and decision.message_listed):
         refusal = (
             "the push gate lists no commit message, so the message stays",
-            platform.act("agent", "run the remedy again without the message option"),
+            act("agent", "run the remedy again without the message option"),
         )
     if refusal:
         fail(*refusal)
@@ -252,7 +251,7 @@ def ref_gate_check() -> None:
     if any(len(parts) != 3 for parts in lines):
         fail(
             "[ref-gate] BLOCKED: a ref line is not `<old> <new> <ref>`",
-            platform.act(
+            act(
                 "agent",
                 "pipe one line per ref update, each holding the old sha, the new sha and the ref name",
             ),
