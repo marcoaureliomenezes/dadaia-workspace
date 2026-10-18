@@ -11,7 +11,7 @@ from pathlib import Path
 import _clock
 from _grammar import SEMVER_RE, STATE, live_ids
 from _ledger import records, replace
-from _platform import is_link, quote, write_text
+from _platform import act, is_link, quote, write_text
 from _refusal import Refusal
 from _release_schema import next_candidate
 from _release_store import SCRIPT, State, at_head, read_state, validated
@@ -105,7 +105,9 @@ def refuse_unfree(specs: Path, release_id: str) -> State | None:
         if is_link(path):
             raise Refusal(
                 f"{path.name} resolves through a symlink — refusing to mint through one",
-                f"Agent action: replace the symlink {quote(str(path))} with a real directory or file",
+                act(
+                    "agent", f"replace the symlink {quote(str(path))} with a real directory or file"
+                ),
             )
     if findings := tree_findings(specs):
         first = f"{findings[0]['path']} {findings[0]['message']}"

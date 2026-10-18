@@ -18,7 +18,7 @@ import _git
 from _backlog_schema import DISPOSITIONS
 from _backlog_store import SCRIPT, Items
 from _bugs_store import read_records
-from _platform import command, run
+from _platform import act, command, run
 from _refusal import Refusal, fix_of
 
 #: `release.py`'s Origin parser, run as its own script: the one reader of the line.
@@ -46,17 +46,23 @@ def _release(specs: Path, slug: str, disposition: str, release: str | None) -> N
     ):
         raise Refusal(
             f"--release {release or '(none)'} names no folder directly under {releases}",
-            f"Agent action: pass --release with the release folder under {releases} whose SPEC "
-            f"names {slug}, then rerun this exit with --disposition {disposition}.",
-        )  # fmt: skip
+            act(
+                "agent",
+                f"pass --release with the release folder under {releases} whose SPEC "
+                f"names {slug}, then rerun this exit with --disposition {disposition}.",
+            ),
+        )
     folder = releases / release
     if not any(slug in _origin_ids(s) for s in folder.glob("rc-*/SPEC.md")):
         raise Refusal(
             f"--release {release}: no {folder}/rc-<N>/SPEC.md first `**Origin:**` line "
             f"picks {slug!r} — only a release that picked an item can exit it as {disposition!r}",
-            f"Agent action: name {slug} in the backlog: clause of the first **Origin:** line "
-            f"of a SPEC under {folder}, then rerun this exit with --disposition {disposition}.",
-        )  # fmt: skip
+            act(
+                "agent",
+                f"name {slug} in the backlog: clause of the first **Origin:** line "
+                f"of a SPEC under {folder}, then rerun this exit with --disposition {disposition}.",
+            ),
+        )
 
 
 def _reason(specs: Path, slug: str, disposition: str, reason: str | None) -> None:
@@ -64,8 +70,11 @@ def _reason(specs: Path, slug: str, disposition: str, reason: str | None) -> Non
     if not (reason or "").strip():
         raise Refusal(
             f"{disposition!r} requires --reason: the histo record is the only trace of why {slug!r} left",
-            f"Agent action: rerun `{SCRIPT.inline('exit', slug, '--disposition', disposition, specs=specs)}` with a "
-            f"one-line --reason saying why {slug} is refused.",
+            act(
+                "agent",
+                f"rerun `{SCRIPT.inline('exit', slug, '--disposition', disposition, specs=specs)}` with a "
+                f"one-line --reason saying why {slug} is refused.",
+            ),
         )  # fmt: skip
 
 
@@ -76,7 +85,7 @@ def _bug(specs: Path, slug: str, disposition: str, reason: str | None) -> None:
     if reason not in ids:
         raise Refusal(
             f"--reason {reason!r} names no record of {bugs}: `to-bug` hands {slug!r} to a registered bug",
-            f"Operator action: confirm {slug} as a bug (dd-bug-registration §2)",
+            act("operator", f"confirm {slug} as a bug (dd-bug-registration §2)"),
         )  # fmt: skip
 
 
@@ -105,7 +114,7 @@ def check_exit(specs: Path, active: Items, slug: str, values: dict[str, Any]) ->
         raise Refusal(
             f"unknown disposition {disposition!r}: a backlog item exits as one of "
             f"{'|'.join(DISPOSITIONS)}",
-            "Agent action: a postponed item stays in active[] and needs no exit.",
+            act("agent", "a postponed item stays in active[] and needs no exit."),
         )
     flag, verify = EVIDENCE[disposition]
     verify(specs, slug, disposition, values[flag])

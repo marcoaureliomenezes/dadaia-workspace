@@ -117,7 +117,12 @@ def test_ref_gate_passes_the_origin_sha_creation_and_a_non_work_ref(
 def test_ref_gate_refuses_a_zero_old_line_for_an_existing_work_ref_off_origin(
     monkeypatch, tmp_path: Path, zeros: int
 ) -> None:
-    """``git branch -f`` and ``update-ref`` with no old sha hand git's zero old sha."""
+    """``git branch -f`` and ``update-ref`` with no old sha hand git's zero old sha.
+
+    The reference-transaction hook resolves a zero old sha for an existing ref to its current
+    value before it calls the verb, so the old sha arrives resolved; this test feeds the verb the
+    zero itself.
+    """
     repo, _ = _work_repo(tmp_path)
     _commit(repo, **{"src__a.py": "x = 1\n"})
     other = _commit(repo, **{"src__b.py": "y = 2\n"})
@@ -162,6 +167,46 @@ def test_ref_gate_refuses_an_audit_update_that_touches_any_other_path(
     tip = _commit(repo, **{"specs__audits__a.md": "finding\n", "src__a.py": "x = 1\n"})
 
     result = _ref_gate(monkeypatch, repo, f"{base} {tip} {_WORK_REF}")
+
+    assert result.exit_code == 1
+    assert "[ref-gate] BLOCKED" in result.output
+    assert result.output.count("fix: ") == 1
+
+
+def test_ref_gate_refuses_when_the_move_check_faults(monkeypatch, tmp_path: Path) -> None:
+    """A fault while reading the move's facts is a refusal the hook can read, never a fail-open."""
+    from dadaia_workspace import container
+
+    repo, base = _work_repo(tmp_path)
+    tip = _commit(repo, **{"specs__audits__2026-10-14.md": "finding\n"})
+    real = container.build_git_client()
+
+    class Faulting:
+        def __getattr__(self, name: str):
+            return getattr(real, name)
+
+        def git(self, root: Path, *args: str) -> str:
+            if args[0] == "rev-list":
+                raise OSError("git vanished")
+            return real.git(root, *args)
+
+    monkeypatch.setattr(container, "build_git_client", Faulting)
+
+    result = _ref_gate(monkeypatch, repo, f"{base} {tip} {_WORK_REF}")
+
+    assert result.exit_code == 1
+    assert "[ref-gate] BLOCKED" in result.output
+    assert result.output.count("fix: ") == 1
+
+
+def test_ref_gate_refuses_recreating_the_work_ref_off_origin_with_one_fix(
+    monkeypatch, tmp_path: Path
+) -> None:
+    repo, _ = _work_repo(tmp_path)
+    tip = _commit(repo, **{"src__a.py": "x = 1\n"})
+    _git(repo, "update-ref", "-d", _WORK_REF)
+
+    result = _ref_gate(monkeypatch, repo, f"{'0' * 40} {tip} {_WORK_REF}")
 
     assert result.exit_code == 1
     assert "[ref-gate] BLOCKED" in result.output

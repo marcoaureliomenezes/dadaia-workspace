@@ -15,7 +15,7 @@ from typing import Any
 import _clock
 import _git
 from _grammar import SHA_RE, STATE
-from _platform import command, read_text, run
+from _platform import act, command, read_text, run
 from _refusal import Refusal, fix_of
 from _release_check import candidate_errors
 from _release_schema import (
@@ -44,7 +44,10 @@ def _refuse_unapproved_docs(live: Live) -> Path:
         if not document.is_file():
             raise Refusal(
                 f"release {live.release_id} has no {document.relative_to(live.release_dir).as_posix()}",
-                f"Agent action: write {document.resolve()} (its writer per specs/AGENTS.md §4) and put it to the operator for approval",
+                act(
+                    "agent",
+                    f"write {document.resolve()} (its writer per specs/AGENTS.md §4) and put it to the operator for approval",
+                ),
             )
         status = extract_status(read_text(document))
         if status != APPROVED:
@@ -52,7 +55,7 @@ def _refuse_unapproved_docs(live: Live) -> Path:
                 f"{document.relative_to(live.release_dir).as_posix()} of release {live.release_id} "
                 f"carries status {status!r} — SPEC and PLAN "
                 f"must both be '**Status:** {APPROVED}' to enter {IMPLEMENTATION}",
-                f"Operator action: set '**Status:** {APPROVED}' in {document.resolve()}",
+                act("operator", f"set '**Status:** {APPROVED}' in {document.resolve()}"),
             )
     return candidate
 
@@ -84,7 +87,7 @@ def _refuse_open_worktrees(specs: Path) -> None:
             and Path(str(r["path"])).name != "wt-rc"
             and Path(str(r["path"])).resolve() != Path(top[0]).resolve()]  # fmt: skip
     if held:
-        fix = held[0]["exit"] or f"Agent action: land or remove the wt/* work at {held[0]['path']}, then close again"  # fmt: skip
+        fix = held[0]["exit"] or act("agent", f"land or remove the wt/* work at {held[0]['path']}, then close again")  # fmt: skip
         raise Refusal(f"repos/{repo} still holds {len(held)} open wt/* worktree(s) — a "
                       "candidate closes with every one merged", str(fix))  # fmt: skip
 

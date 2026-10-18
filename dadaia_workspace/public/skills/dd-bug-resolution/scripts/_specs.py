@@ -11,7 +11,7 @@ from pathlib import Path
 
 from _jsonl import reinstall_fix
 from _ledger import parse as parse
-from _platform import cli_argv, cli_path, command, inline, run, venv_dir
+from _platform import act, cli_argv, cli_path, command, inline, run, venv_dir
 from _refusal import Refusal, report
 from _root import workspace_of as workspace_of
 
@@ -57,7 +57,7 @@ def run_cli(
 
 def _bound_fix(here: Path, rerun: Script, ledger: str | None) -> tuple[str, str]:
     if not (root := workspace_of(here)):
-        return "Agent action: re-run inside a repo that holds its specs/ tree", ""
+        return act("agent", "re-run inside a repo that holds its specs/ tree"), ""
     try:
         repo = str(json.loads(run_cli(root, "context", "show", "--json").stdout)["main_repo"])
     except Refusal as refusal:
@@ -83,7 +83,7 @@ class Fix(str):
 
 class Script(tuple[str, ...]):
     """The argv prefix of a script: calling it gives the finished :class:`Fix` over every word,
-    and :meth:`inline` the same words as text inside an ``Agent action:`` sentence. *specs* adds
+    and :meth:`inline` the same words as text inside an action sentence. *specs* adds
     ``--specs <path>``."""
 
     def _argv(self, words: tuple[str, ...], specs: Path | str | None) -> tuple[str, ...]:
@@ -126,7 +126,7 @@ def refuse(refusal: Exception, specs: Path) -> int:
     if argv is not None and "--specs" not in argv and argv[:2] == _rerun()[:2]:
         argv = (*argv, "--specs", str(specs))
     if argv is not None:
-        fix = f"Agent action: run `{inline(*argv)}` {supply}" if supply else command(*argv)
+        fix = act("agent", f"run `{inline(*argv)}` {supply}") if supply else command(*argv)
     elif supply and fix:
         fix = f"{fix} ({supply})"
     report(refusal, str(fix))

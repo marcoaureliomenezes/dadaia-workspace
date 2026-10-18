@@ -290,7 +290,7 @@ _OPERATOR_ACTIONS = {
     ("public/skills/dd-backlog-definition/scripts/_backlog_exit.py", "confirm {slug} as a bug (dd-bug-registration §2)"): "ruling",
     ("public/skills/dd-bug-resolution/scripts/_ledger.py", "rewrite {path} as one JSON object mapping each term to its reason"): "protected",
     ("public/skills/dd-cli-library/scripts/registry.py", "delete {_platform.quote(str(path))} — the next registry.py run starts an empty registry"): "protected",
-    ("public/skills/dd-gitflow-default/scripts/_worktree_new.py", "confirm {act} (dd-bug-registration §2)"): "ruling",
+    ("public/skills/dd-gitflow-default/scripts/_worktree_new.py", "confirm {what} (dd-bug-registration §2)"): "ruling",
     ("public/skills/dd-release-implementation/scripts/_release_phase.py", "set '**Status:** {APPROVED}' in {document.resolve()}"): "ruling",
     ("public/skills/dd-release-implementation/scripts/release.py", "authorize carrying {', '.join(missing)}"): "ruling",
     ("public/skills/dd-release-implementation/scripts/release.py", "authorize carrying {bug_id}"): "ruling",
@@ -298,25 +298,38 @@ _OPERATOR_ACTIONS = {
 
 
 def _operator_action_texts(source: str) -> list[str]:
-    """Every string in *source* that holds `Operator action: `, from the label to its end;
-    adjacent literals are one string and an f-string's values read as `{source}`."""
-    tree, inner, found = ast.parse(source), set(), []
-    for node in ast.walk(tree):
-        if id(node) in inner:
-            continue
+    """Every text in *source* passed to an `act("operator", ...)` call; a string or f-string
+    argument reads whole, an f-string's values as `{source}`."""
+
+    def spelled(node: ast.AST) -> str | None:
         if isinstance(node, ast.JoinedStr):
-            inner.update(id(n) for n in ast.walk(node) if n is not node)
-            text = "".join(
+            return "".join(
                 v.value if isinstance(v, ast.Constant) else "{" + ast.unparse(v.value) + "}"
                 for v in node.values
             )
-        elif isinstance(node, ast.Constant) and isinstance(node.value, str):
-            text = node.value
-        else:
-            continue
-        if "Operator action: " in text:
-            found.append(text.split("Operator action: ", 1)[1])
-    return found
+        if isinstance(node, ast.Constant) and isinstance(node.value, str):
+            return node.value
+        return None
+
+    return [
+        spelled(node.args[1]) or f"<not a literal: {ast.unparse(node.args[1])}>"
+        for node in ast.walk(ast.parse(source))
+        if isinstance(node, ast.Call)
+        and getattr(node.func, "id", "") == "act"
+        and len(node.args) == 2
+        and isinstance(node.args[0], ast.Constant)
+        and node.args[0].value == "operator"
+    ]
+
+
+def test_an_operator_action_text_reads_an_act_call() -> None:
+    source = 'b = act("operator", f"remove {target}")\nc = act("agent", "edit the file")\n'
+    assert _operator_action_texts(source) == ["remove {target}"]
+
+
+def test_an_operator_action_whose_text_is_a_variable_is_a_hit() -> None:
+    source = 'a = act("operator", text)\nb = act("operator", "x" + y)\n'
+    assert _operator_action_texts(source) == ["<not a literal: text>", "<not a literal: 'x' + y>"]
 
 
 def test_an_operator_action_is_one_act_the_law_reserves_to_the_human() -> None:
@@ -1315,3 +1328,65 @@ def test_no_fix_line_literal_in_the_library_names_the_skill_script() -> None:
             if any("worktree.py" in literal(c) for c in carried):
                 hits.append(f"{path.relative_to(_PKG.parent)}:{node.lineno}")
     assert sorted(set(hits)) == []
+
+
+#: The POSIX shim's one label line, whole: its exception is keyed by this text, never its number.
+_SHIM = "dadaia_workspace/public/scripts/pre-push-ci-gate.sh"
+_SHIM_LABEL = r'    echo "[pre-push]   fix: Agent action: install the workspace venv (re-run \`uvx dadaia-workspace init\` at the workspace root)." >&2'
+
+
+def _action_label_hits(pkg: Path) -> list[str]:
+    """Each `Agent action:` / `Operator action:` line of *pkg*'s `.py` and `.sh` files, but the
+    kernel producer and the shim's one exact line; a second copy of that line is a hit."""
+    label = re.compile(r"(Agent|Operator) action:")
+    producer = "dadaia_workspace/public/skills/dd-bug-resolution/scripts/_platform.py"
+    hits: list[str] = []
+    for p in sorted([*pkg.rglob("*.py"), *pkg.rglob("*.sh")]):
+        rel = p.relative_to(pkg.parent).as_posix()
+        if rel == producer:
+            continue
+        exempt = rel == _SHIM
+        for n, line in enumerate(read_text(p).splitlines(), 1):
+            if not label.search(line):
+                continue
+            if exempt and line == _SHIM_LABEL:
+                exempt = False
+                continue
+            hits.append(f"{rel}:{n}")
+    return hits
+
+
+def test_only_the_producer_spells_an_action_label() -> None:
+    """The one-grep contract: `Agent action:` / `Operator action:` appear in no `.py` or `.sh`
+    under the library but the kernel producer and the POSIX shim's one line."""
+    assert _action_label_hits(_PKG) == []
+
+
+def test_a_second_action_label_line_in_the_shim_is_a_hit(tmp_path: Path) -> None:
+    pkg = tmp_path / "dadaia_workspace"
+    _write(pkg / "public" / "scripts" / "pre-push-ci-gate.sh", f"{_SHIM_LABEL}\n{_SHIM_LABEL}\n")
+    assert _action_label_hits(pkg) == [f"{_SHIM}:2"]
+
+
+def _attribute_act_calls(pkg: Path) -> list[str]:
+    """Every `<x>.act(...)` call under *pkg*."""
+    return [
+        f"{p.relative_to(pkg.parent).as_posix()}:{node.lineno}"
+        for p in sorted(pkg.rglob("*.py"))
+        for node in ast.walk(ast.parse(read_text(p)))
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr == "act"
+    ]
+
+
+def test_no_module_calls_act_through_an_attribute() -> None:
+    """An action label is spelled by a bare `act(...)`; `platform.act(...)` is not a producer call."""
+    assert _attribute_act_calls(_PKG) == []
+
+
+def test_a_planted_attribute_act_call_is_a_hit(tmp_path: Path) -> None:
+    pkg = tmp_path / "dadaia_workspace"
+    _write(pkg / "core" / "platform.py", "act = _owner.act\n")
+    _write(pkg / "features" / "gate.py", 'text = platform.act("agent", "edit the file")\n')
+    assert _attribute_act_calls(pkg) == ["dadaia_workspace/features/gate.py:1"]

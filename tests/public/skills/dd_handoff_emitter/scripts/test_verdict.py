@@ -283,13 +283,15 @@ def _record(
     *,
     hold: bool = False,
     agent: str = "dd-code-reviewer",
+    minute: str = "2026-10-12T10:00",
+    context: str = "c",
 ) -> None:
     """A verdict handoff with the keys `verdict.py` writes (schema-validated), at *at* seconds."""
-    produced = f"2026-10-12T10:00:{at}Z"
+    produced = f"{minute}:{at}Z"
     body = {
         "schema_version": "handoff-v1.2",
         "agent": agent,
-        "context": "c",
+        "context": context,
         "produced_at": produced,
         "verdict": verdict,
         "verdict_reason": "r",
@@ -300,36 +302,244 @@ def _record(
     }
     schema = json.loads(read_text(PKG / "public/schemas/handoff-v1.schema.json"))
     jsonschema.validate(body, schema)
-    base = root / (".dadaia/reaped/x/.dadaia/handoff/c" if hold else ".dadaia/handoff/c")
+    base = root / (
+        f".dadaia/reaped/x/.dadaia/handoff/{context}" if hold else f".dadaia/handoff/{context}"
+    )
     base.mkdir(parents=True, exist_ok=True)
     name = f"{produced.replace(':', '')}-{agent}-{verdict}-{scope.replace('/', '_')}.handoff.json"
     write_text(base / name, json.dumps(body, indent=2) + "\n")
 
 
-def test_stats_counts_the_rc_verdict_sequences_in_produced_at_order(tmp_path: Path) -> None:
-    root, _tree, _head = _workspace(tmp_path)
-    rc99, sha = "wt/0.5.0/rc-99", "@" + "a" * 40
-    # written out of time order: the count reads `produced_at`, not the file listing
-    _record(root, f"{rc99}/job-1/wt-main{sha}", "REJECTED", "03")
-    _record(root, f"{rc99}/job-1/wt-main{sha}", "REJECTED", "01")
-    _record(root, f"{rc99}/job-1/wt-main{sha}", "APPROVED", "02")
-    _record(root, f"{rc99}/job-2/wt-main{sha}", "APPROVED", "01", hold=True)
-    _record(root, f"{rc99}/job-3/wt-main{sha}", "REJECTED", "01")
-    _record(root, f"{rc99}/job-3/wt-main{sha}", "REJECTED", "02")
-    _record(root, f"{rc99}/job-3/wt-main{sha}", "APPROVED", "03")
-    _record(root, f"wt/0.5.0/rc-98/job-1/wt-main{sha}", "REJECTED", "01")
-    _record(root, f"wt/0.5.0-rc99/job-1/wt-main{sha}", "REJECTED", "01")  # old layout: not counted
-    _record(root, f"{rc99}/job-4/wt-main{sha}", "REJECTED", "01", agent="dd-sw-engineer-sr")
+def _stats_workspace(tmp_path: Path) -> Path:
+    """A workspace with the skill scripts where an install puts them."""
+    (root := tmp_path / "ws").mkdir()
+    make_workspace(root)
+    for skill in (SKILL, "dd-bug-resolution", "dd-release-implementation"):
+        stage_skill_scripts(skill, root / ".agents/skills" / skill / "scripts")
+    patch_cli(root, '"main_repo": "r"', '"name": "c", "main_repo": "r"')
+    return root
+
+
+def _log(root: Path, log: list[dict[str, str]]) -> None:
+    state = root / "repos/r/specs/releases/0.5.0/_RELEASE.json"
+    write_text(state, json.dumps({**json.loads(read_text(state)), "log": log}))
+
+
+def _stub(root: Path, skill: str, script: str, body: str) -> None:
+    write_text(root / ".agents/skills" / skill / "scripts" / script, f"import sys\n{body}\n")
+
+
+def _stats(
+    root: Path, rc: str = "0.5.0-rc99", specs: str = "repos/r/specs"
+) -> subprocess.CompletedProcess[str]:
     script = root / ".agents/skills" / SKILL / "scripts/verdict.py"
     env = suite_env(
         os.environ,
         Path.home(),
         overrides={"PATH": os.environ["PATH"], "HOME": str(root), "GIT_CONFIG_NOSYSTEM": "1"},
     )
-    done = os_run([sys.executable, str(script), "stats", "0.5.0-rc99"], cwd=root, env=env)
+    argv = [sys.executable, str(script), "stats", rc, "--specs", specs]
+    return os_run(argv, cwd=root, env=env)
+
+
+def _entry(ts: str, kind: str, text: str, **more: str) -> dict[str, str]:
+    agent = "release.py new" if " born" in text else "release.py"
+    return {"ts": ts, "agent": agent, "kind": kind, "text": text, **more}
+
+
+def _born(ts: str) -> dict[str, str]:
+    return _entry(ts, "note", "Candidate born on 0.5.0 (prior candidate closed at x)")
+
+
+def _milestone(ts: str, rc: str, milestone: str, sha: str) -> dict[str, str]:
+    return _entry(
+        ts, "milestone", f"{milestone} at {sha}", candidate=rc, milestone=milestone, sha=sha
+    )
+
+
+def test_stats_prints_the_local_metric_table_over_the_candidate_window(tmp_path: Path) -> None:
+    """A lane tree and a free-named tree count, a tree outside birth-to-CLOSURE does not, a record
+    held by the reaper is read, and the oldest record read is printed whatever its window."""
+    root = _stats_workspace(tmp_path)
+    repo = root / "repos/r"
+    closure = git(repo, "rev-parse", "HEAD").strip()
+    _log(
+        root,
+        [
+            _born("2026-10-10T08:00:00Z"),
+            _milestone("2026-10-11T08:00:00Z", "rc-98", "implemented", "0" * 40),
+            _born("2026-10-12T09:00:00Z"),
+            _milestone("2026-10-12T09:30:00Z", "rc-99", "defined", "1" * 40),
+            _milestone("2026-10-12T11:00:00Z", "rc-99", "implemented", closure),
+            _born("2026-10-12T14:30:00Z"),
+        ],
+    )
+    git(repo, "branch", "dev")
+    git(repo, "checkout", "-q", "-b", "topic")
+    for message in (
+        "fix(bugs): a - cause\n\nblock: item",
+        "refactor(J1.T1): REBUILD x",
+        "docs(memory): reconcile",
+        "feat(J1.T2): y",
+        "docs(law): z",
+        "chore(release): w",
+    ):
+        git(repo, "commit", "-q", "--allow-empty", "-m", message)
+    git(repo, "checkout", "-q", "dev")
+    merged = suite_env(
+        os.environ,
+        Path.home(),
+        overrides={
+            "HOME": str(repo),
+            "PATH": os.environ["PATH"],
+            "GIT_CONFIG_NOSYSTEM": "1",
+            "GIT_COMMITTER_DATE": "2026-10-12T14:30:00Z",
+        },
+    )
+    ident = ["-c", "user.name=t", "-c", "user.email=t@t"]
+    landed = os_run(["git", *ident, "merge", "-q", "--no-ff", "-m", "Merge candidate", "topic"], cwd=repo, env=merged)  # fmt: skip
+    assert landed.returncode == 0, landed.stderr
+    git(repo, "commit", "-q", "--allow-empty", "-m", "feat(J9.T9): a later candidate's work")
+    ledger = repo / "specs/bugs"
+    for name, rows in (
+        ("BUGS.jsonl", (("a", "none", "10:30"), ("b", "a", "10:31"))),
+        (
+            "_archive/bugs_histo.jsonl",
+            (("c", "none", "10:32"), ("d", "none", "10:33"), ("e", "x", "09:59")),
+        ),
+    ):
+        (ledger / name).parent.mkdir(parents=True, exist_ok=True)
+        day = lambda hhmm, n=name: "2026-10-10" if hhmm == "09:59" else "2026-10-12"  # noqa: E731
+        write_text(
+            ledger / name,
+            "".join(
+                json.dumps({"id": i, "status": "resolved", "caused_by": by,
+                            "closed_at": f"{day(at)}T{at}:00Z"}) + "\n"
+                for i, by, at in rows
+            ),
+        )  # fmt: skip
+    histo = ledger / "_archive/bugs_histo.jsonl"
+    event = {"ts": "2026-08-28T12:45:33Z", "event": "archived", "agent": "claude-code", "data": {"id": "g", "status": "Closed"}}  # fmt: skip
+    write_text(histo, json.dumps(event) + "\n" + read_text(histo))
+    write_text(ledger / "BUGS.jsonl", read_text(ledger / "BUGS.jsonl") + json.dumps({"id": "f", "status": "open", "caused_by": "none"}) + "\n")  # fmt: skip
+    sha = "@" + "a" * 40
+    # written out of time order: the first verdict of a tree is read by `produced_at`
+    _record(root, f"wt/0.5.0/rc-99/job-3/wt-main{sha}", "APPROVED", "03")
+    _record(root, f"wt/0.5.0/rc-99/job-3/wt-main{sha}", "REJECTED", "01")
+    _record(root, f"wt/0.5.0/rc-99/job-1/wt-main{sha}", "APPROVED", "01")
+    _record(root, f"wt/0.5.0/wt-backlog-notes{sha}", "APPROVED", "01", hold=True)
+    _record(root, f"wt/0.5.0/free-tree{sha}", "REJECTED", "01")
+    _record(root, f"wt/0.5.0/wt-hotfix-old{sha}", "REJECTED", "01", minute="2026-10-09T10:00")
+    _record(root, f"wt/0.5.0/rc-99/job-4/wt-main{sha}", "REJECTED", "01", agent="dd-sw-engineer-sr")
+    _record(root, f"wt/0.5.0/rc-99/job-9/wt-main{sha}", "APPROVED", "01", context="other")
+    _stub(root, "dd-bug-resolution", "bugs.py",
+          'assert sys.argv[1] == "stats"\nprint("total\\t9")\nprint("rebuild-due:a.py\\ta,z")\nprint("rebuild-due:b.py\\te,w")')  # fmt: skip
+    _stub(root, "dd-release-implementation", "release.py",
+          'assert sys.argv[1:3] == ["drift", "--json"]\nprint(\'{"since": "s", "atoms": ["a", "b", "c"], "uncovered": []}\')\nsys.exit(1)')  # fmt: skip
+    done = _stats(root)
     assert (done.returncode, done.stdout) == (
         0,
-        "sequences 4\nverdicts 7\nrejected 4\nfirst_pass_rejected 3/4\n",
+        "metric\tvalue\ttarget\n"
+        "1 fix-induced bugs\t1/4 (25%)\t<= 20%\n"
+        "2 first-pass approval\t2/4 (50%)\t>= 70%\n"
+        "4 closure duration\t3.5 h\t<= 4 h\n"
+        "6 non-block commits after closure\t3\t0\n"
+        "7 memory drift\t3\t0\n"
+        "9 rebuild-due patches\t1\t0\n"
+        "oldest record\t2026-10-09T10:00:01Z\n",
+    ), done.stderr
+
+
+def test_stats_of_a_worktree_reads_the_same_table_as_the_repo_checkout(tmp_path: Path) -> None:
+    root = _stats_workspace(tmp_path)
+    repo = root / "repos/r"
+    _log(root, [_born("2026-10-12T09:00:00Z"),
+                _milestone("2026-10-12T11:00:00Z", "rc-99", "implemented", git(repo, "rev-parse", "HEAD").strip())])  # fmt: skip
+    git(repo, "add", "-A")
+    git(repo, "commit", "-qm", "state")
+    tree = root / "worktrees/r/wt-rc"
+    git(repo, "worktree", "add", "-q", "-b", "wt-rc", str(tree))
+    _record(root, "wt/0.5.0/rc-99/job-1/wt-main@" + "a" * 40, "APPROVED", "01")
+    main, moved = _stats(root), _stats(root, specs="worktrees/r/wt-rc/specs")
+    assert main.returncode == moved.returncode == 0, moved.stderr
+    assert "2 first-pass approval\t1/1 (100%)\t>= 70%\n" in moved.stdout
+    assert moved.stdout == main.stdout
+
+
+def test_stats_reads_closure_duration_as_n_a_before_the_integration_merge(tmp_path: Path) -> None:
+    root = _stats_workspace(tmp_path)
+    repo = root / "repos/r"
+    closure = git(repo, "rev-parse", "HEAD").strip()
+    git(repo, "branch", "dev")
+    _log(
+        root,
+        [
+            _born("2026-10-12T09:00:00Z"),
+            _milestone("2026-10-12T09:30:00Z", "rc-99", "defined", "1" * 40),
+            _milestone("2026-10-12T11:00:00Z", "rc-99", "implemented", closure),
+        ],
+    )
+    done = _stats(root)
+    assert done.returncode == 0, done.stderr
+    assert "4 closure duration\tn/a\t<= 4 h" in done.stdout.splitlines()
+
+
+def test_stats_reads_memory_drift_only_for_the_newest_candidate(tmp_path: Path) -> None:
+    root = _stats_workspace(tmp_path)
+    _log(
+        root,
+        [
+            _born("2026-10-12T09:00:00Z"),
+            _milestone("2026-10-12T09:30:00Z", "rc-99", "defined", "1" * 40),
+            _born("2026-10-12T14:30:00Z"),
+            _milestone("2026-10-12T15:00:00Z", "rc-100", "defined", "2" * 40),
+        ],
+    )
+    _stub(root, "dd-release-implementation", "release.py",
+          'print(\'{"since": "s", "atoms": ["a"], "uncovered": []}\')\nsys.exit(1)')  # fmt: skip
+    older, newest = _stats(root), _stats(root, "0.5.0-rc100")
+    assert "7 memory drift\tn/a\t0" in older.stdout.splitlines(), older.stderr
+    assert "7 memory drift\t1\t0" in newest.stdout.splitlines(), newest.stderr
+
+
+def test_stats_window_of_a_first_candidate_opens_at_its_release_born_note(tmp_path: Path) -> None:
+    root = _stats_workspace(tmp_path)
+    _log(
+        root,
+        [
+            _entry("2026-10-12T09:00:00Z", "note", "Release 0.5.0 born"),
+            _milestone("2026-10-12T09:30:00Z", "rc-1", "defined", "1" * 40),
+            _milestone("2026-10-12T11:00:00Z", "rc-1", "implemented", "2" * 40),
+            _born("2026-10-12T14:30:00Z"),
+        ],
+    )
+    _record(root, f"wt/0.5.0/rc-1/job-1/wt-main@{'a' * 40}", "APPROVED", "01")
+    done = _stats(root, "0.5.0-rc1")
+    assert "2 first-pass approval\t1/1 (100%)\t>= 70%" in done.stdout.splitlines(), done.stderr
+
+
+def test_stats_reads_absent_data_as_n_a_and_exits_zero(tmp_path: Path) -> None:
+    root = _stats_workspace(tmp_path)
+    _log(
+        root,
+        [
+            _born("2026-10-12T09:00:00Z"),
+            _milestone("2026-10-12T09:30:00Z", "rc-99", "defined", "1" * 40),
+        ],
+    )
+    _stub(root, "dd-bug-resolution", "bugs.py", "sys.exit(1)")
+    _stub(root, "dd-release-implementation", "release.py", "sys.exit(1)")
+    done = _stats(root)
+    assert (done.returncode, done.stdout) == (
+        0,
+        "metric\tvalue\ttarget\n"
+        "1 fix-induced bugs\tn/a\t<= 20%\n"
+        "2 first-pass approval\tn/a\t>= 70%\n"
+        "4 closure duration\tn/a\t<= 4 h\n"
+        "6 non-block commits after closure\tn/a\t0\n"
+        "7 memory drift\tn/a\t0\n"
+        "9 rebuild-due patches\tn/a\t0\n"
+        "oldest record\tn/a\n",
     ), done.stderr
 
 

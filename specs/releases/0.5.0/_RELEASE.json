@@ -3,12 +3,12 @@
   "release": "0.5.0",
   "phase": "CLOSURE",
   "defined": {
-    "sha": "96b9008b8",
-    "ts": "2026-10-15T00:30:26Z"
+    "sha": "fe889db8cf3bf1e4f5be6156eb252681ee8a1732",
+    "ts": "2026-10-17T23:57:15Z"
   },
   "implemented": {
-    "sha": "cafc4003d7b1c218d4ea41f85b8c39d65732b5fc",
-    "ts": "2026-10-16T05:12:35Z"
+    "sha": "f21f47f5a39f8249924d4ef547b192b7c4b54f38",
+    "ts": "2026-10-18T04:24:02Z"
   },
   "shipped": null,
   "log": [
@@ -2080,6 +2080,85 @@
       "agent": "dd-product-engineer",
       "kind": "summary",
       "text": "delivered: rc-16 (1) the new worktree layout under ADR 0264 (supersedes 0125, 0191, 0241; amends 0120): worktrees/<repo>/<v>/ with a real rc integration branch wt-rc, a base derived from the path, the plain kind deleted, `dadaia worktree` as the one runner and a reference-transaction ref gate installed by `ci install-hook` (Jobs 1-9); the closure waits for job, task and lane trees (AC5.1, AC5.5); the job gate is `python scripts/ci.py job` and the preflight verb is deleted; (2) the OS boundary in one kernel module, `_platform.py`, under ADR 0265 (accepted, amends 0220): text codec, child-process decode, venv layout and path spelling, process control, filesystem semantics and shell spelling each decided once, the reference-transaction and pre-push hooks shims over Python, tests reaching the OS only through `tests/helpers/oslib.py`; (3) Windows support: UTF-8 stdio at every entry point, one command renderer, Kimi hooks run through cmd.exe wrappers with the one TOML encoder; memory and derived docs reconciled (Job 10; last window 4cf528bee..cb4156582: 15 reviewed, 12 changed); bugs resolved inside rc-16: 53, all archived (20 at the first closure, 33 in this reconcile, 951 kept), the Origin bug new-reconcile-opens-while-a-job-is-open fixed by J4.T18, 0 open; G4 ruling: the AC6.1 grep excludes the cutover line worktrees-AGENTS.md:27; G5 size readout: +2384/-1480 python and +61/-77 shell (`git diff --numstat 96b9008b8..b05443f5a -- dadaia_workspace scripts`), above the +60 python estimate because Job 9's privacy remedy became a gated verb and the OS-boundary REBUILD landed inside the rc; G6 independent measurement by the main thread: `verdict.py stats 0.5.0-rc16` prints 0 (it reads only wt/0.5.0/rc-16/ names; rc-16's trees used old-layout and version-scoped names); the library's `_handoffs.reviewer_records` over `.dadaia/handoff/dadaia-workspace/`, produced at or after rc-16's define (2026-10-15T00:30:26Z), grouped by scope branch: 95 trees, 121 sequences, 203 verdicts, 89 rejected, first-pass rejected 67/121; CI green on 38034fc66: push 39002615490, PR 39002618502 (windows-latest included), secret scan 39002618490; rollout (AC10.4, the main thread's acts after the Reconciliation merge, no migration code), in order: (1) the cleanup 'Agente arruma, sem perda' in every repo holding an old-grammar tree or wt/* branch (no own commit: deleted; own work: tag archive/wt/<name>, then removed), (2) `public install`, `doctor --fix`, `doctor`, (3) `ci install-hook --force` per repo, (4) `certify`; carried: none; backlog exits: worktree-hierarchy (delivered, recorded 2026-10-16)."
+    },
+    {
+      "ts": "2026-10-17T22:37:16Z",
+      "agent": "release.py new",
+      "kind": "note",
+      "text": "Candidate born on 0.5.0 (prior candidate closed at cafc4003d7b1c218d4ea41f85b8c39d65732b5fc)"
+    },
+    {
+      "ts": "2026-10-17T23:57:15Z",
+      "agent": "release.py",
+      "kind": "milestone",
+      "candidate": "rc-17",
+      "milestone": "defined",
+      "sha": "fe889db8cf3bf1e4f5be6156eb252681ee8a1732",
+      "text": "Candidate defined at fe889db8cf3bf1e4f5be6156eb252681ee8a1732; phase IMPLEMENTATION."
+    },
+    {
+      "ts": "2026-10-18T04:24:02Z",
+      "agent": "release.py",
+      "kind": "milestone",
+      "candidate": "rc-17",
+      "milestone": "implemented",
+      "sha": "f21f47f5a39f8249924d4ef547b192b7c4b54f38",
+      "text": "Candidate implemented at f21f47f5a39f8249924d4ef547b192b7c4b54f38; phase CLOSURE."
+    },
+    {
+      "ts": "2026-10-18T04:33:35Z",
+      "agent": "release.py memory",
+      "kind": "memory",
+      "text": "Memory reconciled over cb41565821e0cc26498cacd8abcfc5c19a222f7a..c0d24f3ecee7: 6 reviewed, 16 changed.",
+      "since": "cb41565821e0cc26498cacd8abcfc5c19a222f7a",
+      "until": "c0d24f3ecee7e4dac6ffcea04199264318831a75",
+      "reviewed": [
+        "agent-evals",
+        "harness-codex",
+        "spec-context-project",
+        "server-registry",
+        "specs-migration",
+        "workspace-init"
+      ],
+      "changed": [
+        "agent-comms",
+        "agent-orchestration",
+        "agentic-entities",
+        "public-asset-distribution",
+        "pypi-distribution",
+        "product-vision",
+        "consumer-agent-support",
+        "context-management",
+        "cross-platform-portability",
+        "workspace-doctor",
+        "audits-canon",
+        "backlog-ledger",
+        "bug-ledger",
+        "release-lifecycle",
+        "sdd-gate-v3",
+        "worktrees"
+      ]
+    },
+    {
+      "ts": "2026-10-18T04:51:28Z",
+      "agent": "release.py memory",
+      "kind": "memory",
+      "text": "Memory reconciled over c0d24f3ecee7e4dac6ffcea04199264318831a75..f9f685c3a2d9: 1 reviewed, 2 changed.",
+      "since": "c0d24f3ecee7e4dac6ffcea04199264318831a75",
+      "until": "f9f685c3a2d9a2a4d989f0d2bc7ce0e9d90d4434",
+      "reviewed": [
+        "agentic-entities"
+      ],
+      "changed": [
+        "agent-comms",
+        "bug-ledger"
+      ]
+    },
+    {
+      "ts": "2026-10-18T12:14:34Z",
+      "agent": "dd-product-engineer",
+      "kind": "summary",
+      "text": "delivered: rc-17, the nine weak points (SPEC FR1-FR14) in 8 jobs and 45 tasks: (1) one `act(kind, text)` fix-line label producer (ADR 0266, amends 0159); (2) the bug surface derived from `fix_files` (ADR 0267), `append` listing the earlier bugs and the REBUILD due; (3) the implementer self-check; (4) the law holes on gate inflation and closure scope closed; (5) the Windows static pin, ruff PLW1514 (ADR 0268, accepted 2026-10-18, amends 0265); (6) the `docs(law)` commit shape 11; (7) the CWE-427 hook runner walk from the repo root's parent; (8) the ref gate's one zero-old decider (FR14, CRITICAL ref-gate-refuses-pack-refs-of-wt-branches); (9) the `verdict.py stats` 6-metric readout; the loose ends; memory reconciled in two passes (16 + 2 changed); bugs inside rc-17: 3 resolved, all archived, 0 open: ref-gate-refuses-pack-refs-of-wt-branches (caused_by J3.T8) and two fix-induced bugs found at closure, append-crashes-on-the-event-shaped-archive (CRITICAL, caused_by J4.T3) and stats-names-the-repo-by-its-checkout-folder (HIGH, caused_by J5.T4), both fixed on wt-rc by the operator's ruling 'Fix on wt-rc (Recommended)'; 8 stale rc-16 wt/* branches bundled and deleted; readout (AC9.3), rc-17: metric 1 fix-induced 1/1 (100%), target <= 20%, the window ending at CLOSURE, so the two closure bugs above fall after it; metric 2 first-pass approval 4/8 (50%), target >= 70%, missed; metric 3 merge verify: wall time median 105 s over the 4 job merges measured this session (Job 7 194 s, Job 4 102 s, Job 6 87 s, Job 5 108 s), target <= 150 s; metric 4 closure duration n/a until the PR merges, target <= 4 h; metric 5 CI red share read after the push, target <= 10%; metric 6 non-block commits after closure 0, target 0; metric 7 memory drift 0, target 0; metric 8 hand-typed labels 0 by the one-grep contract test, target 0; metric 9 rebuild-due patches 0, target 0; AC9.4, rc-16 by the same method: metric 1 16/20 (80%), metric 2 15/42 (36%), metric 4 40.5 h, metric 6 199; carried: none; backlog exits: several-work-fix-line-follow-ups, law-and-docs-text-loose-ends and ref-gate-hardening-follow-ups (delivered); new: ref-gate-open-questions, rc17-review-loose-ends."
     }
   ]
 }

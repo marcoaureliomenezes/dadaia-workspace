@@ -234,7 +234,7 @@ def test_bugs_append_into_a_symlinked_ledger_exits_1_with_one_fix_line(tmp_path:
     (repo / "specs" / "bugs").mkdir(parents=True)
     _symlink(repo / "specs" / "bugs" / "BUGS.jsonl", real)
     argv = ["append", "--specs", str(repo / "specs"), "--bug-id", "x", "--title", "t",
-            "--severity", "LOW", "--surface", "cli", "--component", "c", "--context", "c",
+            "--severity", "LOW", "--component", "cli/x.py", "--context", "c",
             "--symptom", "s", "--repro", "r", "--expected", "e", "--correlates", "none"]  # fmt: skip
     done = run([sys.executable, "-B", str(_BUGS), *argv], check=False, cwd=tmp_path)
     assert done.returncode == 1, done.stdout + done.stderr

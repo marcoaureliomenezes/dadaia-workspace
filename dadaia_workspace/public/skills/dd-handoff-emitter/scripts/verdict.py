@@ -10,8 +10,11 @@ import sys
 from pathlib import Path
 
 sys.dont_write_bytecode = True
-#: One bootstrap statement: the kernel, at the front.
-sys.path[:0] = [str(Path(__file__).resolve().parents[2] / "dd-bug-resolution" / "scripts")]
+#: One bootstrap statement: this folder and the kernel, at the front.
+sys.path[:0] = [
+    str(Path(__file__).resolve().parent),
+    str(Path(__file__).resolve().parents[2] / "dd-bug-resolution" / "scripts"),
+]
 
 import _atomic
 import _clock
@@ -19,10 +22,11 @@ import _ledger
 import _root
 from _git import scrubbed_env
 from _grammar import CONTEXT_NAME_RE
-from _handoffs import REVIEWER, reviewer_records
-from _platform import run, use_utf8_stdio, write_text
+from _handoffs import REVIEWER
+from _platform import act, run, use_utf8_stdio, write_text
 from _refusal import Refusal, fix_of, report
-from _specs import run_cli
+from _specs import find_specs, run_cli
+from _stats import table as _stats_table
 
 _WORKTREE = Path(__file__).resolve().parents[2] / "dd-gitflow-default" / "scripts" / "worktree.py"
 _OWN = (
@@ -33,8 +37,8 @@ _OWN = (
 
 def _body(text: str) -> dict[str, object]:
     """The stdin object. Raises `Refusal` when it is not one verdict.py may extend."""
-    fix = (
-        "Agent action: pipe one JSON object without the keys verdict.py owns, then rerun verdict.py"
+    fix = act(
+        "agent", "pipe one JSON object without the keys verdict.py owns, then rerun verdict.py"
     )
     try:
         body = json.loads(text)
@@ -54,48 +58,30 @@ def _reason(stdout: str, stderr: str) -> Refusal:
     except (ValueError, LookupError, TypeError):  # no JSON: the CLI refused before validating
         said = stderr.splitlines()
         fix = fix_of(
-            stderr, "Agent action: resolve the workspace CLI error above, then rerun verdict.py"
+            stderr, act("agent", "resolve the workspace CLI error above, then rerun verdict.py")
         )
         why = next((x[7:] for x in said if x.startswith("Error: ")), stderr.strip() or "no output")
         return Refusal(why, fix)
     where, why = err["field_path"], err["message"]
     return Refusal(
         f"{where}: {why}",
-        f"Agent action: correct {where} in the stdin body ({why}), then rerun verdict.py",
+        act("agent", f"correct {where} in the stdin body ({why}), then rerun verdict.py"),
     )
 
 
 def _stats(argv: list[str]) -> int:
-    """Count the verdict sequences of one candidate: a tree name's verdicts up to an APPROVED."""
+    """Print the local metric table of one candidate over its birth-to-CLOSURE window."""
     parser = argparse.ArgumentParser(prog="verdict.py stats", description=_stats.__doc__)
     parser.add_argument("rc", help="<M.m.p>-rc<N>")
-    rc = parser.parse_args(argv).rc
+    parser.add_argument("--specs", type=Path)
+    args = parser.parse_args(argv)
     root = _root.workspace_of(Path.cwd())
     if root is None:
         raise Refusal(
             "no workspace above the current directory",
-            "Agent action: run verdict.py stats from inside the workspace, then rerun it",
+            act("agent", "run verdict.py stats from inside the workspace, then rerun it"),
         )
-    by_tree: dict[str, list[tuple[str, str]]] = {}
-    for _path, data in reviewer_records(root):
-        branch = str(data.get("scope", "")).partition("@")[0]
-        if branch.startswith(f"wt/{rc.replace('-rc', '/rc-', 1)}/"):
-            by_tree.setdefault(branch, []).append(
-                (str(data.get("produced_at")), str(data.get("verdict")))
-            )
-    sequences = rejected_first = verdicts = rejected = 0
-    for trail in by_tree.values():
-        opening = True
-        for _at, verdict in sorted(trail):
-            verdicts += 1
-            rejected += verdict == "REJECTED"
-            if opening:
-                sequences += 1
-                rejected_first += verdict == "REJECTED"
-            opening = verdict == "APPROVED"
-    print(
-        f"sequences {sequences}\nverdicts {verdicts}\nrejected {rejected}\nfirst_pass_rejected {rejected_first}/{sequences}"
-    )
+    sys.stdout.write(_stats_table(root, find_specs(args.specs), args.rc))
     return 0
 
 
@@ -124,7 +110,7 @@ def _run(argv: list[str]) -> int:
         if not re.fullmatch(pattern, getattr(args, name)):
             raise Refusal(
                 f"--{name} must match {pattern}",
-                f"Agent action: pass a {name} matching that pattern, then rerun verdict.py",
+                act("agent", f"pass a {name} matching that pattern, then rerun verdict.py"),
             )
     tree = Path(args.path).resolve()
     body = _body(sys.stdin.read())
@@ -156,7 +142,7 @@ def _run(argv: list[str]) -> int:
     except FileExistsError:
         raise Refusal(
             f"{target.name} exists; rerun in a second",
-            "Agent action: rerun verdict.py in a second",
+            act("agent", "rerun verdict.py in a second"),
         ) from None
     try:
         checked = run_cli(root, "reports", "validate", str(target), "--reviewed-root", str(tree), "--json", env=scrubbed_env())  # fmt: skip

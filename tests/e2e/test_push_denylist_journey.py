@@ -124,7 +124,7 @@ def test_a_record_whose_context_carries_a_published_term_registers_and_pushes(
     def register(bug_id: str, run_env: dict[str, str]) -> None:
         done = run([sys.executable, str(bugs), "append", "--specs", str(repo / "specs"),
              "--bug-id", bug_id, "--reported-by", "t", "--title", "t", "--severity", "LOW",
-             "--surface", "cli", "--component", "c", "--context", f"{_PLANTED_TERM}-games",
+             "--component", "cli/x.py", "--context", f"{_PLANTED_TERM}-games",
              "--symptom", "s", "--repro", "r", "--expected", "e", "--correlates", "none"], cwd=repo, env=run_env, timeout=_EXIT_DEADLINE)  # fmt: skip
         assert done.returncode == 0, done.stderr
         _git(["add", "-A"], repo)

@@ -29,6 +29,7 @@ description: >
 11. One fresh agent per task, its full scope in its first prompt; a changed scope is a new dispatch, and an agent that stops early leaves the rest to a new dispatch against the same worktree.
 12. Check commits, files and test runs yourself; a handoff reported but not written does not count.
 13. A status answer counts each open class with its number.
+14. When a task's work merges or its hand-back is checked, stop every agent of that task still running; a finished agent is never left running.
 
 ## 2. Conflict resolution
 

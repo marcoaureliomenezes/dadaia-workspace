@@ -33,6 +33,7 @@ from dadaia_workspace.core.harness_registry import (
 from dadaia_workspace.core.models.doctor_report import DoctorLine
 from dadaia_workspace.core.models.harness_profile import HarnessProfile
 from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
+from dadaia_workspace.core.platform import act
 from dadaia_workspace.core.workspace_layout import Zone, ZoneClass
 from dadaia_workspace.features.spec_context import sweep
 from dadaia_workspace.features.spec_context.service import (
@@ -160,13 +161,14 @@ class DoctorService:
             f"repos/*/dadaia_workspace/public/skills/{skill}/SKILL.md"
         )
         if next(found, None) is None:
-            return (
-                f"Operator action: split {skill}/SKILL.md at its library source; "
-                "this workspace holds none and never edits the projection"
+            return act(
+                "operator",
+                f"split {skill}/SKILL.md at its library source; "
+                "this workspace holds none and never edits the projection",
             )
-        return (
-            f"Agent action: add the split of {skill}/SKILL.md to a task of the open rc, "
-            "then run public install"
+        return act(
+            "agent",
+            f"add the split of {skill}/SKILL.md to a task of the open rc, then run public install",
         )
 
     def check_skill_md_length(self) -> list[SectionFinding]:
@@ -492,7 +494,7 @@ class DoctorService:
                 fix = ""
                 if verdict is FindingVerdict.SLOP and entry.name in workspace_layout.NEVER_MOVED:
                     detail = "(credentials and repositories live outside the workspace: the library never moves them)"
-                    fix = f"Operator action: move {entry.name} out of the workspace"
+                    fix = act("operator", f"move {entry.name} out of the workspace")
                 out.append(self._finding(zone, base, entry, verdict, detail, fix=fix))
         return out
 
@@ -564,8 +566,8 @@ class DoctorService:
         for zone in workspace_layout.zones_with_ttl():
             for finding in self._ttl_findings(zone, now):  # the act asks the worktree question
                 if finding.verdict is FindingVerdict.EXPIRED:
-                    act = _EXPIRY_ACT[zone.cls]
-                    step = partial(act, self._workspace_root, finding.target, finding.path)
+                    expire = _EXPIRY_ACT[zone.cls]
+                    step = partial(expire, self._workspace_root, finding.target, finding.path)
                     actions.extend(sweep.guarded(finding.code, finding.path, step))
         return actions
 

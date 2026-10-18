@@ -14,6 +14,7 @@ from dadaia_workspace.core import platform
 from dadaia_workspace.core.atomic_write import atomic_write
 from dadaia_workspace.core.cli_line import materialize_line, reinstall_fix
 from dadaia_workspace.core.doctor_rules import SectionFinding
+from dadaia_workspace.core.platform import act
 from dadaia_workspace.features.specs import citations, doctor_adr, memory_canon, memory_lint
 from dadaia_workspace.features.specs.canon import default_public_dir, is_canon_path
 from dadaia_workspace.features.specs.doctor_types import Severity, finding_path, specs_finding
@@ -92,10 +93,11 @@ class MemoryValidator:
                 Severity.ERROR,
                 f"{path.relative_to(self.specs_dir).as_posix()} keeps a template token in {fields}",
                 str(path),
-                fix=(
-                    "Agent action: fill or delete the atom"
+                fix=act(
+                    "agent",
+                    "fill or delete the atom"
                     if is_placeholder_atom(path)
-                    else f"Agent action: replace the token in {fields} of {path}"
+                    else f"replace the token in {fields} of {path}",
                 ),
             )
             for path in sorted(mem_dir.rglob("*.md"))
@@ -216,7 +218,7 @@ class MemoryValidator:
                     Severity.ERROR,
                     f"memory/{rel} {problem}",
                     str(p),
-                    fix=f"Agent action: {fix}",
+                    fix=act("agent", fix),
                 )
             )
         return issues
@@ -236,7 +238,7 @@ class MemoryValidator:
                 Severity.ERROR,
                 err,
                 str(result.path),
-                fix=f"Agent action: correct {result.path} ({err})",
+                fix=act("agent", f"correct {result.path} ({err})"),
             )
             for result in memory_lint.lint_directory(mem_dir, schema)
             for err in result.errors

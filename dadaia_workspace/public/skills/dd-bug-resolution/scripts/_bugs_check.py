@@ -8,7 +8,6 @@ commit, so a writer/validator disagreement is unrepresentable. The schema is
 
 from __future__ import annotations
 
-import json
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
@@ -18,8 +17,7 @@ import _git
 import _jsonl
 import _ledger
 from _grammar import HISTORICAL_TASK_RE, TASK_ID_RE
-from _platform import git_line, read_text
-from _root import STATES as _STATES
+from _platform import act, git_line, read_text
 from _specs import script
 
 CODE = "LEDGER-BUGS-SCHEMA"
@@ -127,8 +125,8 @@ def findings_for(
             add(seen[bug_id], f"{bug_id!r} caused_by {why}")
             bugs = script(Path(__file__).with_name("bugs.py"))
             fixes[seen[bug_id]] = (  # a cycle's wrong link is a judgement; a dangling one is not
-                f"Agent action: decide which of {', '.join(chain)} names the wrong cause and "
-                f"set its caused_by to the real cause's id, or none, through `{bugs.inline('update', specs=root)}` ({_LAW})" if at == bug_id
+                act("agent", f"decide which of {', '.join(chain)} names the wrong cause and "
+                    f"set its caused_by to the real cause's id, or none, through `{bugs.inline('update', specs=root)}` ({_LAW})") if at == bug_id
                 else bugs("update", bug_id, "--set", "caused_by=none", specs=root)
             )  # fmt: skip
     return [
@@ -153,46 +151,44 @@ def histo_findings(text: str, root: Path = _ledger.SPECS) -> list[dict[str, Any]
     )  # fmt: skip
 
 
+def archived_records(text: str) -> list[dict[str, Any]]:
+    """The records of the archive *text*: a plain line is one, an event line contributes its
+    `data`; a line with no `id` or an unreadable one is `histo_findings`' to name."""
+    found = (r["data"] if "event" in r and isinstance(r.get("data"), dict) else r for _, r, why in _jsonl.walk(text) if not why and isinstance(r, dict))  # fmt: skip
+    return [r for r in found if "id" in r]
+
+
 def archived_ids(text: str) -> frozenset[str]:
-    """The record ids of the archive *text*; an unreadable line is `histo_findings`' to name."""
-    return frozenset(
-        str(record["id"])
-        for _, record, why in _jsonl.walk(text)
-        if not why and isinstance(record, dict) and "id" in record
-    )
+    """The record ids of the archive *text*."""
+    return frozenset(str(r["id"]) for r in archived_records(text))
 
 
-def _associated(specs: Path) -> list[Path]:
-    """The checkouts of the associated repos of the context whose main repo holds *specs*. The
-    registry is read at `<root>/.dadaia/states` beside `repos/<main>/.git`, a git fact: the
-    gate's fence blocks a walk to the workspace and its CLI alike. None when it does not answer."""
+def _siblings(specs: Path) -> list[Path]:
+    """The other git checkouts under `<main>/../../repos` (main: the checkout whose git common
+    dir holds *specs*), each child carrying a `.git` and not main; none when that directory
+    does not exist."""
     main = Path(_git.git(specs.parent, "rev-parse", "--path-format=absolute", "--git-common-dir", check=False).strip()).parent  # fmt: skip
-    root = main.parent.parent
-    try:
-        rows = json.loads(read_text(root / _STATES / "spec_contexts.json"))["contexts"]
-        slugs = [a["slug"] for r in rows if r.get("repo_slug") == main.name for a in r["associated_repos"]]  # fmt: skip
-    except (OSError, ValueError, LookupError, TypeError):
-        return []
-    return [p for s in slugs if (p := root / "repos" / s).is_dir()]
+    beside = main.parent.parent / "repos"
+    return [p for p in sorted(beside.iterdir()) if p != main and (p / ".git").exists()] if beside.is_dir() else []  # fmt: skip
 
 
 def _unreached(specs: Path, text: str, root: Path) -> list[dict[str, Any]]:
-    """The live records whose `fix_sha` no repo of the context reaches from its HEAD, one
+    """The live records whose `fix_sha` no repo beside the main one reaches from its HEAD, one
     finding each; where a repo is a shallow clone a miss cannot be judged, so the misses are
     one finding for the cut."""
     repos, update = [specs.parent], script(Path(__file__).with_name("bugs.py"))
     shas = [(n, r) for n, r, why in _jsonl.walk(text) if not why and isinstance(r, dict) and r.get("fix_sha")]  # fmt: skip
-    missed = [(n, r) for n, r in shas if not _git.reaches(repos[0], r["fix_sha"])]
+    missed = [(n, r) for n, r in shas if _git.fix_files(repos[0], r["fix_sha"]) is None]
     if missed:
-        repos += _associated(specs)
-        missed = [(n, r) for n, r in missed if not any(_git.reaches(p, r["fix_sha"]) for p in repos[1:])]  # fmt: skip
+        repos += _siblings(specs)
+        missed = [(n, r) for n, r in missed if all(_git.fix_files(p, r["fix_sha"]) is None for p in repos[1:])]  # fmt: skip
     if missed and (cut := next((p for p in repos if _git.shallow(p)), None)):
         return [_findings.finding(CODE, LEDGER, missed[0][0], "the clone is shallow: no fix_sha can be judged", git_line(cut, "fetch", "--unshallow"))]  # fmt: skip
     return [
         _findings.finding(
             CODE, LEDGER, n, f"{r['id']!r} fix_sha {r['fix_sha']} is no ancestor of HEAD of {', '.join(p.name for p in repos)}",
-            "Agent action: find the fix commit's sha in git log and run "
-            f"`{update.inline('update', r['id'], '--set', 'fix_sha=SHA', specs=root)}`",
+            act("agent", "find the fix commit's sha in git log and run "
+                f"`{update.inline('update', r['id'], '--set', 'fix_sha=SHA', specs=root)}`"),
         )
         for n, r in missed
     ]  # fmt: skip

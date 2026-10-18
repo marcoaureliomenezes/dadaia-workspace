@@ -33,13 +33,15 @@ description: >
    ```bash
    python3 .agents/skills/dd-bug-resolution/scripts/bugs.py append --specs <specs-dir> \
      --bug-id <slug> --reported-by <agent> --title "…" --severity LOW\|MEDIUM\|HIGH\|CRITICAL \
-     --surface … --component … --context … --symptom … --repro … --expected … --correlates <ids>\|none
+     --component … --context … --symptom … --repro … --expected … --correlates <ids>\|none
    ```
-2. The surface is the name of a directory tracked in the repo.
-3. In a `wt-main` or `wt-backlog-<slug>` tree (`worktrees/AGENTS.md` §1), stage `BUGS.jsonl`; commit `chore(bugs): report <id>` — shape 1 of `dd-gitflow-default` §3a.
-4. A bug belongs to the context whose tooling broke: its own `specs/bugs/`, plus an
+2. `--component` is the path of the failing component; siblings come from the fix files the ledger records, so no surface is typed.
+3. Propose `caused_by`: `git blame` the lines the fix will replace and name the bug or task of the commit that introduced them; `none` only when blame gives no candidate.
+4. `--correlates`: search `specs/bugs/BUGS.jsonl` and `specs/bugs/_archive/bugs_histo.jsonl` for the component path and the symptom, and list every hit; `none` only when both searches are empty.
+5. In a `wt-main` or `wt-backlog-<slug>` tree (`worktrees/AGENTS.md` §1), stage `BUGS.jsonl`; commit `chore(bugs): report <id>` — shape 1 of `dd-gitflow-default` §3a.
+6. A bug belongs to the context whose tooling broke: its own `specs/bugs/`, plus an
    upstream report when the broken tool is someone else's.
-5. Hand the fix to `dd-bug-resolution` once the record exists.
+7. Hand the fix to `dd-bug-resolution` once the record exists.
 
 ## 4. Done when
 

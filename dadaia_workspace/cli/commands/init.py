@@ -18,7 +18,7 @@ from dadaia_workspace.core.exceptions import (
     WorkspaceVenvBootstrapError,
 )
 from dadaia_workspace.core.model_registry import TEMPLATES
-from dadaia_workspace.core.platform import workspace_cli_path
+from dadaia_workspace.core.platform import act, workspace_cli_path
 from dadaia_workspace.features.spec_context.service import slug_from_url
 
 console = Console()
@@ -88,8 +88,10 @@ def _plan(directory: str, harness: str, repo: str, associated: tuple[str, ...]) 
             f"harnesses: {', '.join(harness_registry.L1_ENTRY_HARNESSES)}.",
             plan.command()
             if directory
-            else f"Agent action: run `{plan.command()}` with the new workspace's "
-            "directory as its first argument",
+            else act(
+                "agent",
+                f"run `{plan.command()}` with the new workspace's directory as its first argument",
+            ),
         )
     directory = directory or str(Path.cwd() / typer.prompt("Workspace name"))
     harness = harness or typer.prompt(

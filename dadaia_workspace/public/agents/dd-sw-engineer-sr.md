@@ -67,7 +67,8 @@ Ground yourself first with `dd-spec-navigator` (Phase 2, memory bootstrap), then
 4. In an implementation task, write only source until they pass.
 5. Run the repo's declared typecheck and lint clean.
 6. Run the bare commands — the repo's configuration already redirects every cache out of the tree; assert real behavior, never the absence of failure.
-7. Spec ambiguity goes back to the main thread — never guess, never widen scope.
+7. Before handing back, run the self-check of `dd-release-implementation` §3.
+8. Spec ambiguity goes back to the main thread — never guess, never widen scope.
 
 ## 4. Outputs
 

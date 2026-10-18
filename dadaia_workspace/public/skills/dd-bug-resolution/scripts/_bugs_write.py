@@ -9,13 +9,12 @@ refuses a differing second write, and a field a verb owns is never `update`'s.
 
 from __future__ import annotations
 
-import datetime as _dt
-import difflib
 import json
+import re
 from pathlib import Path
 from typing import Any
 
-from _bugs_check import OPEN, STATUS_BY_VERB, TERMINAL, load_schema
+from _bugs_check import OPEN, TERMINAL, load_schema
 from _bugs_store import Records, Refusal, by_id
 from _clock import now_iso as now_iso
 from _specs import choice, script
@@ -32,38 +31,47 @@ _VERB_OWNED = {"status": _TRANSITIONS, "closed_at": _TRANSITIONS, "superseded_by
 _SCRIPT = script(Path(__file__).parent / "bugs.py")
 
 
-def candidates(records: Records, surface: object) -> list[str]:
-    """The records a new bug on *surface* is judged against: the open ones and
-    those resolved in the last 30 days, a recurrence."""
-    since = (_dt.datetime.fromisoformat(now_iso()) - _dt.timedelta(days=30)).strftime(
-        "%Y-%m-%dT%H:%M:%SZ"
-    )
-    return sorted(str(r["id"]) for r in records if r.get("surface") == surface and (
-        r.get("status") == OPEN or r.get("status") == STATUS_BY_VERB["resolve"] and str(r.get("closed_at")) >= since))  # fmt: skip
+def by_file(records: Records) -> dict[str, list[str]]:
+    """Each path some record's `fix_files` names, with the ids that fixed it, sorted."""
+    found: dict[str, set[str]] = {}
+    for r in records:
+        for path in r.get("fix_files") or ():
+            found.setdefault(path, set()).add(str(r["id"]))
+    return {path: sorted(ids) for path, ids in sorted(found.items())}
 
 
-def append(records: Records, values: dict[str, Any], dirs: set[str]) -> Records:
-    """One brand-new record, `status: "open"`. Refuses a duplicate id, a surface that is
-    not one tracked directory name, and a record naming no ledger ids or `none` as
-    its correlation; the schema check does the rest."""
+def under(path: str, top: str) -> bool:
+    return path == top or path.startswith(top + "/")
+
+
+def named_paths(component: str | None, tracked: list[str]) -> list[str]:
+    """The tracked files or directories a free-text *component* names, in order, once each; a trailing `/` is dropped."""
+    tokens = dict.fromkeys(t.rstrip("/") for t in re.split(r"[\s#:,;()'\"`]+", component or ""))
+    return [t for t in tokens if t and any(under(p, t) for p in tracked)]
+
+
+def append(
+    records: Records, values: dict[str, Any], tracked: list[str], known: set[str]
+) -> Records:
+    """One brand-new record, `status: "open"`. Refuses a duplicate id, a component text that
+    names no tracked path, and a `correlates` that is not `none` or ledger/archive ids
+    (*known*); the schema check does the rest."""
     bug_id = values["id"]
     if any(r.get("id") == bug_id for r in records):
         raise choice(Refusal(f"bug id {bug_id!r} already exists — a reopen is a NEW record declaring "
                      "'caused_by: <prior-id>' at resolve, never a second record under this id"),
                      "with --bug-id set to an id no record holds", "--bug-id")  # fmt: skip
-    surface = str(values.get("surface"))
-    if surface not in dirs:
-        close = ", ".join(difflib.get_close_matches(surface, sorted(dirs), 5, 0)) or "none"
-        raise choice(Refusal(f"surface {surface!r} is not the name of a directory tracked in this repo"),
-                     f"with --surface set to a tracked directory (closest: {close})",
-                     "--surface")  # fmt: skip
+    if not named_paths(values.get("component"), tracked):
+        raise choice(Refusal(f"component {values.get('component') or ''!r} names no tracked path"),
+                     "with --component set to a file or directory tracked in the repo",
+                     "--component")  # fmt: skip
     correlates = values.get("correlates")
     ids = [] if correlates == "none" else str(correlates or "").split(",")
-    if not set(ids) <= {r.get("id") for r in records}:
-        raise choice(Refusal("name the ledger ids this bug correlates with — the candidates are listed above"),
+    if not set(ids) <= known:
+        raise choice(Refusal("name the ledger ids this bug correlates with — the earlier bugs on the component are listed above"),
                      "with --correlates set to the comma-separated ids, or none",
                      "--correlates")  # fmt: skip
-    record = {key: values.get(key) for key in CORE} | {"correlates": ids}
+    record = {key: values[key] for key in CORE if values.get(key) is not None} | {"correlates": ids}
     record.update({key: None for key in GOVERNANCE})
     record["status"] = OPEN
     return [*records, record]

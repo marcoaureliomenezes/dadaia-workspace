@@ -13,7 +13,7 @@ from typing import Any
 import _git
 from _grammar import STATE, STATUS_RE, TASK_ID_RE, candidate_dir, candidate_number, sole_live
 from _ledger import load_schema
-from _platform import read_text
+from _platform import act, read_text
 
 CODE = "LEDGER-RELEASE-SCHEMA"
 HISTO = "releases/_archive/releases_histo.jsonl"
@@ -103,7 +103,7 @@ def releases(specs: Path) -> dict[str, tuple[_dt.datetime, _dt.datetime | None]]
             )
         except (OSError, ValueError, LookupError, TypeError, AttributeError) as exc:
             raise UnreadableRelease(f"{path} has no readable first log ts and shipped ts ({exc})",
-                             f"Agent action: repair {path} until `release.py check` passes") from None  # fmt: skip
+                             act("agent", f"repair {path} until `release.py check` passes")) from None  # fmt: skip
     return spans
 
 

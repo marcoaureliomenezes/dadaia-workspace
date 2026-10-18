@@ -17,7 +17,7 @@ of repeating it.
 
 ## The filter
 
-- Match `surface` exactly. It is the stable grouping key.
+- Group by recorded fix files: a record matches when its `fix_files` share a file with the bug's files (its `component` paths).
 - Match `component` by engineering judgement; it is precise free text, not an enum.
 - Read at most the 20 most recent matching records in the window, ordered by
   `closed_at`, newest first.

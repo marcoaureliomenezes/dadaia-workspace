@@ -48,7 +48,10 @@ def suite_passes(source_sha, tests_sha):
 
 
 def problems():
-    base, head = Path("/opt/eval/base").read_text().strip(), git("rev-parse", BRANCH).strip()
+    base, head = (
+        Path("/opt/eval/base").read_text(encoding="utf-8").strip(),
+        git("rev-parse", BRANCH).strip(),
+    )
     fixes = git("rev-list", "--reverse", f"{base}..{head}", "--", "slug.py").split()
     if not fixes:
         return ["no commit fixes slug.py"]

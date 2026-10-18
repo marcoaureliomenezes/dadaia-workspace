@@ -183,16 +183,9 @@ def _render_codex_command_policy_rules() -> str:
 prefix_rule(
     pattern = [["ls", "cat"]],
     decision = "allow",
-    justification = "Argv-closed readers only; sed, rg, find and git can write or exec, so they prompt.",
+    justification = "Allows only the argv-closed readers ls and cat.",
     match = ["ls -la", "cat AGENTS.md"],
     not_match = ["sed -n 1,80p AGENTS.md", "rg --pre ./x.sh pat ."],
-)
-
-prefix_rule(
-    pattern = ["git", "push"],
-    decision = "prompt",
-    justification = "Publishing branches requires explicit operator approval after review gates.",
-    match = ["git push origin feature/x"],
 )
 
 # prefix_rule matches the argv prefix LITERALLY (no PATH lookup, no basename

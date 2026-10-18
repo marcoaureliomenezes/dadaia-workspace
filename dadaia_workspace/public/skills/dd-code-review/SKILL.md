@@ -38,6 +38,7 @@ axes are reported side by side with equal weight, so no axis hides another's fin
 - Read `<specs-dir>/releases/<v>/rc-<N>/SPEC.md` (`**Status:** Approved`) and the job's `rc-<N>/tasks/job<n>.md`.
 - Does the diff do what they say — nothing more, nothing less?
 - Scope growth beyond the task's declared write set is a finding, even when the code is good.
+- A shape-11 `docs(law)` commit (`dd-gitflow-default` §3a) outside the job's `W:` is accepted only when its body cites the finding and names the file.
 - Acceptance criteria without corresponding evidence (test/assertion) is a finding.
 - Read `rc-<N>/PLAN.md` §1 (As-is review) beside the SPEC and job files: a DELETE or REBUILD unit the range leaves unchanged is HIGH.
 - A KEEP unit the range grew is a finding.
@@ -47,7 +48,7 @@ axes are reported side by side with equal weight, so no axis hides another's fin
 
 ## 4. Axis 3 — Bug-surface
 
-- Pull the touched feature's ledger slice: `grep -h '"surface": "<surface>"' <specs-dir>/bugs/BUGS.jsonl <specs-dir>/bugs/_archive/bugs_histo.jsonl`.
+- Pull the touched feature's ledger slice: the records whose recorded `fix_files` name a file the diff touches: `grep -h '"<file>"' <specs-dir>/bugs/BUGS.jsonl <specs-dir>/bugs/_archive/bugs_histo.jsonl`, one touched file per run.
 - Answer WITH EVIDENCE: did this diff reduce, keep, or increase the feature's bug surface?
 - The operator's rule applied as a review axis: a diff that GROWS the feature is a stop —
   a branch, flag, special case, second code path or cross-feature reach-in added by a fix
@@ -60,6 +61,7 @@ axes are reported side by side with equal weight, so no axis hides another's fin
 - The verdict is the enum `APPROVED`/`REJECTED`: on a worktree, written by `verdict.py` (`worktrees/AGENTS.md` §2); on a PR, returned as text the main thread quotes (`dd-gitflow-default` §3b).
 - A re-review judges the finding's class, not only the changed lines.
 - A green internal gate that diverges from real consumer behavior is itself a bug.
+- A reviewer probe runs in scratch only: a copy of the context, with the live workspace root listed in `DADAIA_FENCED_ROOTS`; an explicit `--specs` path bypasses that fence, so every explicit path must point into the copy; never `doctor --fix`. A probe that reaches the live workspace is a finding.
 
 ## 5. Done when — the report carries
 

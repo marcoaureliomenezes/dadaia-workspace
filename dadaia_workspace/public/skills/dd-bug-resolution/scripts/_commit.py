@@ -12,7 +12,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from _platform import read_text
+from _platform import act, read_text
 from _refusal import Refusal
 
 Records = list[dict[str, Any]]
@@ -73,7 +73,7 @@ def commit(
         if stamp(path) != before:
             raise Refusal(
                 f"{path.name} changed twice under this write — nothing was written",
-                "Agent action: re-run the same command, unchanged",
+                act("agent", "re-run the same command, unchanged"),
             )
     if archive and histo is not None:
         replace(histo, archive(old, moved))

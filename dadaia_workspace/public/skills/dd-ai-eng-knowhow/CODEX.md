@@ -63,11 +63,10 @@ Current-doc corrections to keep active:
 
 ```
 prefix_rule(
-    pattern = ["git", "push"],
+    pattern = [".dadaia/.venv/bin/dadaia", "context", "dead"],
     decision = "prompt",
-    justification = "Publishing requires operator approval.",
-    match = ["git push origin feature/x"],
-    not_match = ["git status"],
+    justification = "Making a context dead syncs and removes a repository from disk.",
+    match = [".dadaia/.venv/bin/dadaia context dead dadaia-workspace"],
 )
 ```
 
@@ -85,7 +84,7 @@ prefix_rule(
 | Use when | durable guidance the model follows | must block or prompt on a command |
 
 - Reach for a Codex Rule only for command policy, never to make the model "think" differently.
-- Candidate dadaia rules: `prompt` on `git push` (publishing follows review).
+- Work-branch pushes follow the root `AGENTS.md` Gitflow and its shipped pre-push chokepoint.
 - Candidate dadaia rules: `prompt` on `.dadaia/.venv/bin/dadaia context dead` and `.dadaia/.venv/bin/dadaia public install --force`; ordinary install inherits host policy.
 - Candidate dadaia rules: `forbidden` on destructive sweeps over `repos/` (user projects).
 - Projection invariant: `dadaia-command-policy.rules` must contain `prefix_rule(` and never `command_allowed(`.

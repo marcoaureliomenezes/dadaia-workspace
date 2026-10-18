@@ -26,7 +26,7 @@ import _findings
 import _ledger
 from _clock import now_iso as utc_now
 from _grammar import SHA_RE, STATE
-from _platform import Undecodable, read_text, use_utf8_stdio
+from _platform import Undecodable, act, read_text, use_utf8_stdio
 from _platform import replace as move
 from _refusal import Refusal, report
 from _release_check import ship_histo_findings
@@ -113,12 +113,12 @@ def _origin(spec: Path) -> int:
         report(bad, bad.fix)
         return 1
     except (OSError, ValueError) as error:
-        act = (
+        what = (
             "pass the path of an existing SPEC.md"
             if isinstance(error, OSError)
             else "edit its `**Origin:**` line"
         )
-        report(f"{spec} {error}", f"Agent action: {act}")
+        report(f"{spec} {error}", act("agent", what))
         return 1
     print(
         *(f"{kind} {i}" for kind in ORIGIN_KINDS for i in carried.get(kind, [])),
@@ -174,13 +174,13 @@ def _allowed_open_bugs(args: argparse.Namespace, specs: Path) -> list[str]:
     if len(allowed) != len(args.allow_open):
         raise Refusal(
             "--allow-open repeats an id — supply exactly one flag per open bug",
-            "Agent action: remove the duplicate --allow-open flag",
+            act("agent", "remove the duplicate --allow-open flag"),
         )
     if missing := sorted(set(open_ids) - set(allowed)):
         fix = (
-            f"Agent action: resolve {', '.join(missing)} before shipping"
+            act("agent", f"resolve {', '.join(missing)} before shipping")
             if not allowed
-            else f"Operator action: authorize carrying {', '.join(missing)}"
+            else act("operator", f"authorize carrying {', '.join(missing)}")
         )
         raise Refusal(
             f"open bug(s) require one --allow-open flag each: {', '.join(missing)}",
@@ -189,7 +189,7 @@ def _allowed_open_bugs(args: argparse.Namespace, specs: Path) -> list[str]:
     if extra := sorted(set(allowed) - set(open_ids)):
         raise Refusal(
             f"--allow-open names bug(s) not open: {', '.join(extra)}",
-            f"Agent action: remove --allow-open for {', '.join(extra)}",
+            act("agent", f"remove --allow-open for {', '.join(extra)}"),
         )
     return allowed
 
@@ -209,12 +209,12 @@ def _refuse_unauthorized(allowed: list[str], state: dict[str, Any]) -> None:
         if not authorized:
             raise Refusal(
                 f"--allow-open {bug_id} has no authorization note",
-                f"Operator action: authorize carrying {bug_id}",
+                act("operator", f"authorize carrying {bug_id}"),
             )
         if not carried:
             raise Refusal(
                 f"--allow-open {bug_id} has no closure summary carry",
-                f"Agent action: add {bug_id} to the carried field of the kind: summary entry",
+                act("agent", f"add {bug_id} to the carried field of the kind: summary entry"),
             )
 
 

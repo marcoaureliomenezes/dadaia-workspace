@@ -15,7 +15,7 @@ from typing import Any
 import _findings
 import _ledger
 from _ledger import SPECS, load_schema, validate
-from _platform import read_text
+from _platform import act, read_text
 
 CODE = "LEDGER-FINDINGS-SCHEMA"
 AUDITS = "audits"
@@ -43,10 +43,12 @@ def _fix(rel: str, root: Path) -> Callable[[int], str]:
     law = "specs/audits/AGENTS.md"
     if rel == HISTO:
         return lambda line: _ledger.unwritten(root / rel, line, "`audit.py close`", law)
-    return lambda line: (
-        f"Agent action: write line {line} of {root / rel} as one finding-record-v1 "
+    return lambda line: act(
+        "agent",
+        f"write line {line} of {root / rel} as one finding-record-v1 "
         f"record — a bound session writes audit findings directly; a disposition moves "
-        f"only by `audit.py disposition` ({law})")  # fmt: skip
+        f"only by `audit.py disposition` ({law})",
+    )
 
 
 def live_findings(text: str, rel: str, root: Path = SPECS) -> list[Finding]:
@@ -93,8 +95,8 @@ def check(specs: Path) -> list[Finding]:
         if not path.is_file():
             message = f"an audit directory carries {FINDINGS}; this one does not"
             out.append(_findings.finding(CODE, f"{AUDITS}/{directory.name}", 0, message,
-                       f"Agent action: write {path.resolve()} with one finding-record-v1 line per "
-                       "finding of its AUDIT.md (specs/audits/AGENTS.md)"))  # fmt: skip
+                       act("agent", f"write {path.resolve()} with one finding-record-v1 line per "
+                       "finding of its AUDIT.md (specs/audits/AGENTS.md)")))  # fmt: skip
             continue
         out.extend(
             live_findings(

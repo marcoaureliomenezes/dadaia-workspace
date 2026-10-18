@@ -198,14 +198,18 @@ def test_with_no_venv_at_all_the_shim_warns_and_passes(repo: _Repo) -> None:
     assert "could not locate the dadaia runner" in done.stderr, done.stderr
 
 
-def test_the_repos_own_venv_is_the_last_resort(repo: _Repo) -> None:
-    """No workspace venv above the repo: the hook runs from the repo's own `.venv`."""
+def test_the_repos_own_venv_is_never_run(repo: _Repo) -> None:
+    """No workspace venv above the repo: a planted `<repo>/.venv` interpreter is not run, the hook warns and passes."""
     _no_venv(repo)
-    fake_venv(repo.root.parent / "own")
-    shutil.move(repo.root.parent / "own" / ".dadaia" / ".venv", repo.root / ".venv")
+    marker = repo.root.parent / "planted-ran"
+    python = repo.root / ".venv" / "bin" / "python"
+    python.parent.mkdir(parents=True)
+    python.write_text(f"#!/bin/sh\ntouch '{marker.as_posix()}'\nexit 3\n")
+    make_executable(python)
     done = repo.git("worktree", "add", "-q", "-b", "wt/x", str(repo.root.parent / "tree"))
-    assert done.returncode != 0
-    assert "[ref-gate] BLOCKED refs/heads/wt/x" in done.stderr, done.stderr
+    assert done.returncode == 0, done.stderr
+    assert "could not locate the dadaia runner" in done.stderr, done.stderr
+    assert not marker.exists()
 
 
 def test_a_venv_without_the_package_is_a_runner_fault_and_passes(repo: _Repo) -> None:
@@ -216,3 +220,16 @@ def test_a_venv_without_the_package_is_a_runner_fault_and_passes(repo: _Repo) ->
     )
     assert done.returncode == 0, done.stderr
     assert "update allowed" in done.stderr, done.stderr
+
+
+def test_a_runner_planted_in_the_repo_is_never_run_ahead_of_the_workspace_venv(repo: _Repo) -> None:
+    """A `<repo>/.dadaia/.venv` interpreter committed in the repo loses to the workspace venv above it."""
+    marker = repo.root.parent / "planted-ran"
+    python = repo.root / ".dadaia" / ".venv" / "bin" / "python"
+    python.parent.mkdir(parents=True)
+    python.write_text(f"#!/bin/sh\ntouch '{marker.as_posix()}'\nexit 0\n")
+    make_executable(python)
+    done = repo.git("worktree", "add", "-q", "-b", "wt/x", str(repo.root.parent / "tree"))
+    assert done.returncode != 0
+    assert f"fix: {oslib.command(str(repo.stub), 'worktree', 'new', 'repo', 'x')}" in done.stderr
+    assert not marker.exists()

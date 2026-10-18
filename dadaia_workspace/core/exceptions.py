@@ -100,7 +100,7 @@ class HandoffValidationError(DadaiaError):
 
 class SchemaVersionError(DadaiaError):
     """spec_contexts.json is unreadable at its schema version: the *problem* and its ONE
-    *fix* (``migrate --yes``, or an ``Agent action:`` when no dadaia verb clears it)."""
+    *fix* (``migrate --yes``, or an act when no dadaia verb clears it)."""
 
 
 class WorkspaceVenvBootstrapError(DadaiaError, RuntimeError):

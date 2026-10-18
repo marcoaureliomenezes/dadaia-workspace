@@ -237,7 +237,8 @@ def test_work_branch_refusals_fix_runs_verbatim(tmp_path: Path) -> None:
     git(repo, "branch", "feature/0.4.9", "feature/0.5.0")  # two work branches: the older goes
     two = run(ws, "new", "r", RC)
     assert "2 work branches" in two.stderr
-    for step in fixes(two)[0].split("`")[1::2]:  # Agent action: the backticked steps, in order
+    [fix] = fixes(two)
+    for step in fix.split("`")[1::2]:  # Agent action: the backticked steps, in order
         run_bash(step, check=True)
     assert not git(repo, "branch", "--list", "feature/0.4.9").strip()
     git(repo, "branch", "-m", "feature/0.5.0", "dev")  # none: the fix cuts one from dev
@@ -614,7 +615,7 @@ def test_a_verify_line_refusal_clears_by_its_printed_act(
     commit(repo, "AGENTS.md", f"verify: {declared}\n" if declared else "")
     if kind == "hotfix":
         flags = ("--bug-id", "some-bug", "--reported-by", "t", "--title", "t", "--severity", "LOW",
-                 "--surface", "scripts", "--component", "c", "--context", "c", "--symptom", "s",
+                 "--component", "AGENTS.md", "--context", "c", "--symptom", "s",
                  "--repro", "r", "--expected", "e", "--correlates", "none")  # fmt: skip
         run_python(str(_PACKAGE_SKILLS / "dd-bug-resolution/scripts/bugs.py"), "append",
                    "--specs", str(repo / "specs"), *flags, check=True)  # fmt: skip
@@ -654,7 +655,7 @@ def test_an_rc_gate_red_from_the_work_branch_clears_through_a_hotfix_then_the_pr
     git(repo, "checkout", "-q", "feature/0.5.0")
     commit(repo, "RED-job", "")
     flags = ("--bug-id", "some-bug", "--reported-by", "t", "--title", "t", "--severity", "LOW",
-             "--surface", "scripts", "--component", "c", "--context", "c", "--symptom", "s",
+             "--component", "AGENTS.md", "--context", "c", "--symptom", "s",
              "--repro", "r", "--expected", "e", "--correlates", "none")  # fmt: skip
     run_python(str(_PACKAGE_SKILLS / "dd-bug-resolution/scripts/bugs.py"), "append",
                "--specs", str(repo / "specs"), *flags, check=True)  # fmt: skip
@@ -1007,10 +1008,18 @@ def test_a_quote_groups_one_word_of_a_declared_line(
 
 
 def test_an_unbalanced_quote_in_a_declared_line_is_one_refusal_with_one_fix(tmp_path: Path) -> None:
-    end = _law_end(tmp_path, b'verify: pytest -m "not e2e tests\n')
+    root = make_workspace(tmp_path)
+    tree = root / "repos" / "law"
+    tree.mkdir()
+    end = _law_end(tree, b'verify: pytest -m "not e2e tests\n')
 
     with pytest.raises(end.Refusal) as refused:
-        end._declared_argv(tmp_path, "work", "verify:")
+        end._declared_argv(tree, "work", "verify:")
 
-    assert refused.value.fix.startswith("Agent action: ")
+    assert refused.value.args[0] == "the verify: line of work has an unclosed quote"
+    assert refused.value.fix.startswith(
+        "Agent action: close the quote in the verify: line of AGENTS.md on work through a "
+        "wt-backlog lane, then `"
+    )
+    assert refused.value.fix.endswith(f"then `{_sync_line(root, tree)}`")
     assert "\n" not in refused.value.fix

@@ -10,8 +10,9 @@ from typing import Any
 
 import _commit
 import _jsonl
-from _bugs_check import HISTO, LEDGER, archived_ids, findings_for
+from _bugs_check import HISTO, LEDGER, archived_ids, archived_records, findings_for
 from _ledger import private_refusal, replace
+from _platform import read_text
 from _refusal import Refusal as Refusal
 from _specs import script
 
@@ -29,6 +30,13 @@ def read_records(path: Path) -> Records:
             "cannot read in full",
             f"sed -n '{exc.number}p' {path}",
         ) from exc
+
+
+def history(specs: Path) -> Records:
+    """The live ledger's records and the archive's."""
+    return read_records(specs / LEDGER) + (
+        archived_records(read_text(specs / HISTO)) if (specs / HISTO).is_file() else []
+    )
 
 
 def _validator(path: Path, rel: str) -> Callable[[Records, Records, str, Records], str]:

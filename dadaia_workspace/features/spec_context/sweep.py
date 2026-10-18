@@ -32,6 +32,7 @@ from datetime import UTC, datetime
 from pathlib import Path, PurePath
 
 from dadaia_workspace.core import platform
+from dadaia_workspace.core.platform import act
 from dadaia_workspace.core.workspace_layout import occupied
 
 __all__ = [
@@ -187,7 +188,9 @@ def remove(workspace_root: Path, target: Path, label: str) -> str | Skipped | No
     )
     if isinstance(failure, PermissionError):
         held = Path(failure.filename or target)
-        line += f" — {held} sits in a directory owned by {_owner(held.parent)}; Operator action: remove {target}"
+        line += f" — {held} sits in a directory owned by {_owner(held.parent)}; " + act(
+            "operator", f"remove {target}"
+        )
     return Skipped(line)
 
 

@@ -20,7 +20,8 @@ from dadaia_workspace.core import platform
 from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.exceptions import GitSyncError
 from dadaia_workspace.core.gitflow import Gitflow, work_branch
-from dadaia_workspace.core.models.git_scan import ZERO_SHA, is_zero_sha
+from dadaia_workspace.core.models.git_scan import ZERO_SHA
+from dadaia_workspace.core.platform import act
 from dadaia_workspace.core.skill_owner import load_owner
 from dadaia_workspace.features.chokepoints.branch_policy import (
     HEADS_PREFIX,
@@ -39,7 +40,7 @@ def _repo_root() -> Path:
     try:
         out = platform.run(["git", "rev-parse", "--show-toplevel"], check=True)
     except (subprocess.CalledProcessError, FileNotFoundError):
-        fail("not inside a git repository", "Agent action: run it inside a git repository")
+        fail("not inside a git repository", act("agent", "run it inside a git repository"))
     return Path(out.stdout.strip())
 
 
@@ -112,22 +113,28 @@ def _rewrite_unpublished(repo: Path, oldest: str, message: str | None) -> None:
     if sha not in build_git_object_reader().unpublished(repo, tip):
         refusal = (
             f"cannot rewrite {oldest}: origin already holds it, or it is not in HEAD's history",
-            "Agent action: pass the oldest commit origin does not hold, as the push gate's fix line names it",
+            act(
+                "agent",
+                "pass the oldest commit origin does not hold, as the push gate's fix line names it",
+            ),
         )
     elif not listed:
         refusal = (
             "the push gate lists no denylist or canon finding in HEAD's unpublished range",
-            "Agent action: land the change through a worktree; this remedy answers a push gate refusal only",
+            act(
+                "agent",
+                "land the change through a worktree; this remedy answers a push gate refusal only",
+            ),
         )
     elif stray:
         refusal = (
             f"the working tree changes paths the gate did not list: {', '.join(stray)}",
-            "Agent action: revert or unstage every path the gate did not list, and add no path",
+            act("agent", "revert or unstage every path the gate did not list, and add no path"),
         )
     elif message and not (isinstance(decision, GateDecision) and decision.message_listed):
         refusal = (
             "the push gate lists no commit message, so the message stays",
-            "Agent action: run the remedy again without the message option",
+            act("agent", "run the remedy again without the message option"),
         )
     if refusal:
         fail(*refusal)
@@ -235,8 +242,12 @@ def push_gate_check(
 
 @app.command("ref-gate-check")
 def ref_gate_check() -> None:
-    """Reference-transaction gate: ``<old> <new> <ref>`` lines on stdin; a work-branch update
-    must land on origin's sha, or be a descendant move touching only ``specs/audits/**``."""
+    """Reference-transaction gate: a work-branch update must land on origin's sha.
+
+    Reads ``<old> <new> <ref>`` lines on stdin. The reference-transaction hook resolves a zero
+    old sha to the ref's current value before it calls this verb, so an existing ref's old sha
+    arrives resolved; a descendant move touching only ``specs/audits/**`` passes.
+    """
     from dadaia_workspace.container import build_git_client
 
     repo_root = _repo_root()
@@ -244,7 +255,10 @@ def ref_gate_check() -> None:
     if any(len(parts) != 3 for parts in lines):
         fail(
             "[ref-gate] BLOCKED: a ref line is not `<old> <new> <ref>`",
-            "Agent action: pipe one line per ref update, each holding the old sha, the new sha and the ref name",
+            act(
+                "agent",
+                "pipe one line per ref update, each holding the old sha, the new sha and the ref name",
+            ),
         )
     git = build_git_client()
     gitflow = _gitflow(repo_root)[0]
@@ -262,9 +276,6 @@ def ref_gate_check() -> None:
     for old, new, ref in lines:
         tracking = f"refs/remotes/origin/{ref.removeprefix(HEADS_PREFIX)}"
         held = git.git(repo_root, "for-each-ref", "--format=%(objectname)", tracking)
-        # git hands a zero old sha for a forced move too; the ref still holds its value in `prepared`.
-        if is_zero_sha(old):
-            old = git.git(repo_root, "for-each-ref", "--format=%(objectname)", ref) or old
         decision = check_ref_policy(
             [f"{old} {new} {ref}"], gitflow, {ref: held}, repo_root.name, moved
         )

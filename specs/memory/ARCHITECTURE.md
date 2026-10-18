@@ -267,6 +267,9 @@ flowchart TB
 - 0263 — A fix line has three forms: a runnable command, 'Agent action: <one act>' for an act an agent performs, and 'Operator action: <one act>' only for an act the law reserves to the human
 - 0264 — Worktrees are a hierarchy under worktrees/<repo>/<v>/: an rc integration branch wt-rc, a base derived from the path, the plain kind deleted, and the CLI enforced by a git hook
 - 0265 — The OS boundary is one module of the skill kernel, _platform.py; no other file decides a host fact
+- 0266 — A fix line's label is spelled by one producer, act(kind, text), beside command() in the skill kernel's _platform.py; call sites pass only the act text
+- 0267 — A bug record's surface is derived from the files its fix commit touched, never typed; append lists the earlier bugs whose fixes touched the same files
+- 0268 — The OS boundary admits one lint rule: ruff PLW1514 (a text open names its encoding), in the existing ruff step; still no guard and no gate
 <!-- /dadaia:fixed adr-list -->
 
 <!-- dadaia:fixed slop-code -->

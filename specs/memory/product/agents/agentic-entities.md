@@ -18,7 +18,7 @@ sources:
 - Persona source files and registry personas form a bijection. Wired hook entrypoints map to registered behaviors, and projected core rules map to registered rules.
 - The five behaviors are root-whitelist, SDD gate, context-memory injection, git chokepoints and workspace-level tool-cache placement. Root-whitelist and SDD gate share the pre-tool entrypoint; context injection covers session start and prompt submission; git chokepoints are repository hooks; harnesses with an environment surface point supported tool caches at `.dadaia/tmp/` ([[sdd-gate-v3]]).
 - A behavior names only its exceptions: the `dadaia_workspace.*` `modules` a hook lane runs, and `gaps`, the harnesses that cannot implement it with the reason. Coverage derives from the harness records: each harness must run one of a behavior's modules in a hook lane or be listed in its `gaps`, every `gaps` key is a harness record, every lane module is named by some behavior, and every named module resolves to a source file; any break is an `ENT-DERIVE-1` drift line.
-- Every BLOCK emits one fix line. Hook wrappers fail open when the workspace venv is absent and tell the operator how to initialize the workspace.
+- Every BLOCK emits one fix line, its `Agent action:` or `Operator action:` label spelled only by the kernel's `act(kind, text)` ([[cross-platform-portability]]). Hook wrappers fail open when the workspace venv is absent and tell the operator how to initialize the workspace.
 - Operator-created entities are outside derivation; the registry governs what the library ships.
 
 ## Universal surface

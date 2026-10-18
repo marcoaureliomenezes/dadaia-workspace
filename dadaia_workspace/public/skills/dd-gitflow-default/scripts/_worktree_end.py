@@ -20,7 +20,7 @@ from functools import partial
 from pathlib import Path
 
 from _handoffs import REVIEWER, reviewer_records
-from _platform import command, git_inline, git_line, inline, run, venv_dir, venv_tool
+from _platform import act, command, git_inline, git_line, inline, run, venv_dir, venv_tool
 from _refusal import fix_of, without_fix
 from _worktree_git import (
     cli,
@@ -58,9 +58,12 @@ def _refuse_dirty(tree: Path) -> None:
     if dirty(tree):
         raise Refusal(
             f"{tree} has uncommitted changes",
-            f"Agent action: stage the paths `{git_inline(tree, 'status', '--short')}` lists and commit them"
-            f" in their commit shape (`{git_inline(tree, 'commit')}`) or remove them (`{git_inline(tree, 'clean', '-fd')}`"
-            f" and `{git_inline(tree, 'restore', '-SW', '.')}`) — never a stash every worktree shares",
+            act(
+                "agent",
+                f"stage the paths `{git_inline(tree, 'status', '--short')}` lists and commit them"
+                f" in their commit shape (`{git_inline(tree, 'commit')}`) or remove them (`{git_inline(tree, 'clean', '-fd')}`"
+                f" and `{git_inline(tree, 'restore', '-SW', '.')}`) — never a stash every worktree shares",
+            ),
         )
 
 
@@ -128,8 +131,8 @@ def _rmdir(tree: Path, name: str) -> None:
 
 def _undo(tree: Path, work: str, rel: str) -> str:
     """The one act putting *rel* back to the work branch's version, absent included."""
-    return (f"Agent action: revert {rel} to {work} in one commit — "
-            f"`{git_inline(tree, 'restore', '-s', work, '-SW', '--', rel)}` and `{git_inline(tree, 'commit')}`")  # fmt: skip
+    return act("agent", f"revert {rel} to {work} in one commit — "
+               f"`{git_inline(tree, 'restore', '-s', work, '-SW', '--', rel)}` and `{git_inline(tree, 'commit')}`")  # fmt: skip
 
 
 def _check_specs_only(tree: Path, work: str) -> None:
@@ -151,15 +154,24 @@ def _check_ancestor(root: Path, tree: Path, work: str) -> None:
         ) from error
 
 
-def _land_line(tree: Path, work: str, act: str) -> str:
+def _workspace(tree: Path) -> Path:
+    """The workspace owning *tree*; none owns it is a refusal."""
+    if (root := workspace_of(tree)) is None:
+        raise Refusal(
+            f"no workspace owns {tree}", act("agent", "run this merge inside its workspace")
+        )
+    return root
+
+
+def _land_line(tree: Path, work: str, text: str) -> str:
     """The one act that lands a repo-law line: a backlog lane carries it onto the work branch (its
     merge still runs the verdict and the ledger checks), then the tree owning *work* syncs."""
-    root = workspace_of(tree)
+    root = _workspace(tree)
     owner = tree
-    if root and work.startswith("wt/"):
+    if work.startswith("wt/"):
         owner = _into(root / "repos" / tree.relative_to(tree_path(root, "")).parts[0], work)
-    sync = inline(*cli_words(root, "worktree", "sync", str(owner))) if root else "worktree sync"
-    return f"Agent action: {act} through a wt-backlog lane, then `{sync}`"
+    sync = inline(*cli_words(root, "worktree", "sync", str(owner)))
+    return act("agent", f"{text} through a wt-backlog lane, then `{sync}`")
 
 
 def _declared(tree: Path, work: str, key: str) -> str:
@@ -188,11 +200,7 @@ def _gate(tree: Path, work: str) -> None:
     """Run *work*'s tracked `verify:` once."""
     key = "verify:"
     argv = _declared_argv(tree, work, key)
-    root = workspace_of(tree)
-    if root is None:
-        raise Refusal(
-            f"no workspace owns {tree}", "Agent action: run this merge inside its workspace"
-        )
+    root = _workspace(tree)
     if not argv:
         raise Refusal(f"this repo declares no {key} command",
                       _land_line(tree, work, f"add this repo's job gate as a {key} line of AGENTS.md on {work}"))  # fmt: skip
@@ -207,13 +215,19 @@ def _gate(tree: Path, work: str) -> None:
                                        " (no shell: no VAR=value prefix, no sh -c)")) from error  # fmt: skip
     if done.returncode:
         name = (locate(tree.relative_to(root).as_posix()) or ("", ""))[1]
-        sync = inline(*cli_words(root, "worktree", "sync", str(tree)))
-        act = {"main": "commit the fix in a task of this job",
-               "rc": "commit the fix in this worktree when a reconcile commit is at fault, or through a"
-                     f" wt-hotfix lane when the work branch's {key} fails too, then `{sync}`"}  # fmt: skip
+        match kind_of(name or ""):
+            case "main":
+                tail = "commit the fix in a task of this job"
+            case "rc":
+                sync = inline(*cli_words(root, "worktree", "sync", str(tree)))
+                tail = (
+                    "commit the fix in this worktree when a reconcile commit is at fault, or through a"
+                    f" wt-hotfix lane when the work branch's verify: fails too, then `{sync}`"
+                )
+            case _:
+                tail = "commit the fix in this worktree"
         raise Refusal(f"{key} exited {done.returncode}",
-                      f"Agent action: make `{inline(*argv)}` exit 0 in {tree} and "
-                      + act.get(kind_of(name or "") or "", "commit the fix in this worktree"))  # fmt: skip
+                      act("agent", f"make `{inline(*argv)}` exit 0 in {tree} and {tail}"))  # fmt: skip
 
 
 def _is_test_path(path: str, globs: list[str]) -> bool:
@@ -242,7 +256,10 @@ def _refuse_implementation_tests(tree: Path, onto: str, law: str) -> None:
         if test := next((path for path in paths if _is_test_path(path, declared)), None):
             raise Refusal(
                 f"implementation commit {commit[:12]} touches test path {test}",
-                f"Agent action: move {test} to the separate RED test dispatch and keep this implementation commit source-only",
+                act(
+                    "agent",
+                    f"move {test} to the separate RED test dispatch and keep this implementation commit source-only",
+                ),
             )
 
 
@@ -263,7 +280,10 @@ def _scaffold(tree: Path, name: str) -> None:
     if git(tree, "ls-files", "--", f"tests/tmp/{job}").strip():
         raise Refusal(
             f"{folder} exists: promote each test in it into its contract's home, or the operator orders its delete, before the job lands",  # fmt: skip
-            f"Agent action: promote each test in {folder} into its contract's home (a delete needs the operator's order), then commit the removal",  # fmt: skip
+            act(
+                "agent",
+                f"promote each test in {folder} into its contract's home (a delete needs the operator's order), then commit the removal",
+            ),
         )
 
 
@@ -286,7 +306,7 @@ def _ledgers(root: Path, repo: Path, tree: Path) -> None:
         if done.returncode:
             out = done.stdout + done.stderr
             print(without_fix(out), end="")
-            raise Refusal(f"{name} check failed on {tree / 'specs'}", fix_of(out, f"Agent action: fix the findings above in {tree} and commit them"))  # fmt: skip
+            raise Refusal(f"{name} check failed on {tree / 'specs'}", fix_of(out, act("agent", f"fix the findings above in {tree} and commit them")))  # fmt: skip
 
 
 def _series(tree: Path, work: str, tip: str) -> list[tuple[str, str]]:
@@ -358,14 +378,14 @@ def _check_approved(root: Path, tree: Path, work: str, name: str) -> None:
     want = diff_sha256(tree, work, head)
     if any(row[3].get("diff_sha256") != want for row in decided):
         raise Refusal(f"no {REVIEWER} verdict binds the diff {head} lands",
-                      f"Agent action: dispatch {REVIEWER} on {tree} at HEAD {head}; its verdict.py run writes the verdict")  # fmt: skip
+                      act("agent", f"dispatch {REVIEWER} on {tree} at HEAD {head}; its verdict.py run writes the verdict"))  # fmt: skip
 
 
 def digest(root: Path, path: str, sha: str) -> str:
     """The binding a verdict carries for *sha* of a worktree, as one JSON object."""
     _, tree, name, onto = _target(root, path)
     if git(tree, "rev-parse", "--verify", "--quiet", f"{sha}^{{commit}}", check=False).strip() != sha:  # fmt: skip
-        raise Refusal(f"{sha} is not a commit sha of {tree}", f"Agent action: pass a 40-hex commit of {tree}")  # fmt: skip
+        raise Refusal(f"{sha} is not a commit sha of {tree}", act("agent", f"pass a 40-hex commit of {tree}"))  # fmt: skip
     scope = f"{branch(name)}@{git(tree, 'rev-parse', 'HEAD').strip()}"
     return json.dumps({"root": str(root), "scope": scope, "reviewed_sha": sha, "diff_sha256": diff_sha256(tree, onto, sha)})  # fmt: skip
 
@@ -425,7 +445,7 @@ def merge(root: Path, path: str, keep: list[str], drop: bool) -> str:
         git(into, "merge", "-q", "--ff-only", ref)
     except RuntimeError as error:
         _check_ancestor(root, tree, onto)  # moved while merge ran; else a stray the operator owns
-        fix = f"Agent action: commit or remove the paths above in {into}"
+        fix = act("agent", f"commit or remove the paths above in {into}")
         raise Refusal(f"fast-forward failed: {error}", fix) from error
     _remove(into, tree, name, kept)
     return f"{ref} merged into {onto}"

@@ -37,6 +37,7 @@ from dadaia_workspace.core.models.spec_context import (
     ContextState,
     SpecContextProject,
 )
+from dadaia_workspace.core.platform import act
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.spec_context.service import (
     SpecContextService,
@@ -132,9 +133,9 @@ def create_fix(root: Path, error: Exception, name: str | None, urls: list[str]) 
         root, "context", "create", *([name] if name else []), "--main-repo", urls[0], *flags
     )
     if isinstance(error, ContextAlreadyExistsError):
-        return f"Agent action: choose a context name no context holds and run `{fix}` with it"
+        return act("agent", f"choose a context name no context holds and run `{fix}` with it")
     if isinstance(error, GitCloneError):
-        return f"Agent action: run `{fix}` with a reachable clone URL in place of {error.url}"
+        return act("agent", f"run `{fix}` with a reachable clone URL in place of {error.url}")
     return fix
 
 
@@ -339,8 +340,11 @@ def bind(name: str = typer.Argument(..., help="Context name to bind to")) -> Non
     if not session_id:
         fail(
             "No session id in this shell: a bind needs one the gate and the hooks can see.",
-            "Operator action: export DADAIA_SESSION_ID set to a stable id of your choice "
-            "before opening the session",
+            act(
+                "operator",
+                "export DADAIA_SESSION_ID set to a stable id of your choice "
+                "before opening the session",
+            ),
         )
     _sessions_dir(workspace_root).mkdir(parents=True, exist_ok=True)
     session_store.write_session(

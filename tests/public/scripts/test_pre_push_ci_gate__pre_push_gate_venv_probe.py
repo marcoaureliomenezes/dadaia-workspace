@@ -1,7 +1,6 @@
 """The pre-push shim finds the dadaia runner, in this order, and fails closed with none:
 
-  1. walk UP from the repo root to ``<ws>/.dadaia/.venv/<scripts>/dadaia`` (either host's layout)
-  2. the repo's own ``.venv/<scripts>/dadaia``
+  walk UP from the repo root to ``<ws>/.dadaia/.venv/<scripts>/dadaia`` (either host's layout)
 
 ``--probe-only`` prints the resolved runner and exits 0; every other run hands git's ref lines
 and the ``ci push-gate-check`` verb to it. Each test drives the real shim through Git Bash in a
@@ -42,18 +41,15 @@ def _shim(repo: Path, *args: str, stdin: str = "") -> subprocess.CompletedProces
     return run([git_bash(), str(GATE_SCRIPT), *args], cwd=repo, input=stdin, env=env, timeout=60)
 
 
-@pytest.mark.parametrize(
-    ("name", "expect_label"),
-    [("walk_up_to_workspace_venv", "workspace-venv"), ("repo_local_venv", "repo-venv")],
-)
-def test_runner_resolution_branch_table(tmp_path: Path, name: str, expect_label: str) -> None:
+@pytest.mark.parametrize("name", ["walk_up_to_workspace_venv", "repo_local_venv"])
+def test_runner_resolution_branch_table(tmp_path: Path, name: str) -> None:
     if name == "walk_up_to_workspace_venv":
         ws = tmp_path / "ws"
         repo = _repo(ws / "repos" / "slug")
         runner = _runner(ws / ".dadaia" / ".venv")
         res = _shim(repo, "--probe-only")
         assert res.returncode == 0, res.stderr
-        assert expect_label in res.stdout
+        assert "workspace-venv" in res.stdout
         assert runner.as_posix() in res.stdout
         assert "poetry" not in res.stdout
         return
@@ -61,8 +57,27 @@ def test_runner_resolution_branch_table(tmp_path: Path, name: str, expect_label:
     repo = _repo(tmp_path / "repo-with-local-venv")
     _runner(repo / ".venv")
     res = _shim(repo, "--probe-only")
+    assert res.returncode == 1, res.stdout
+    assert "could not locate the dadaia runner" in res.stderr
+
+
+def test_a_runner_planted_in_the_repo_is_never_run_ahead_of_the_workspace_venv(
+    tmp_path: Path,
+) -> None:
+    """A `<repo>/.dadaia/.venv` runner committed in the repo loses to the workspace venv above it."""
+    ws = tmp_path / "ws"
+    repo = _repo(ws / "repos" / "slug")
+    runner = _runner(ws / ".dadaia" / ".venv")
+    marker = tmp_path / "planted-ran"
+    _runner(repo / ".dadaia" / ".venv", f"#!python\nopen({str(marker)!r}, 'w').close()\n")
+    probe = _shim(repo, "--probe-only")
+    assert probe.returncode == 0, probe.stderr
+    assert runner.as_posix() in probe.stdout
+    res = _shim(
+        repo, stdin=f"refs/heads/feature/0.0.1 {'a' * 40} refs/heads/feature/0.0.1 {_ZERO}\n"
+    )
     assert res.returncode == 0, res.stderr
-    assert expect_label in res.stdout
+    assert not marker.exists()
 
 
 def test_the_other_hosts_layout_is_probed_too(tmp_path: Path) -> None:

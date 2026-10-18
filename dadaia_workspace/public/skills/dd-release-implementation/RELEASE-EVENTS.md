@@ -22,7 +22,7 @@ release state.
 |---|---|---|
 | `note` | `release.py new`, or the agent recording an operator authorization verbatim | The entry holds one fact that belongs to no typed entry. |
 | `milestone` | `release.py phase` | `{candidate, milestone, sha}` matches the transition. |
-| `summary` | `dd-product-engineer`, Read-then-Edit | Its whole text is one line of the shape `delivered: …; carried: …; backlog exits: …`. |
+| `summary` | `dd-product-engineer`, Read-then-Edit | `release.py check` fullmatches its text, one line, against `delivered: …; carried: …; backlog exits: …`; each field is non-empty, `none` standing for an empty one. The last one at or after `defined.ts` is the closure summary. |
 | `memory` | `release.py memory` | The latest `memory` entry governs and carries `{since, until, reviewed, changed}`. |
 
 `memory` is closure-only. A rerun at the same HEAD appends nothing. `release.py check`

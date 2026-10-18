@@ -16,6 +16,7 @@ from pathlib import Path
 from dadaia_workspace.core import platform
 from dadaia_workspace.core.doctor_rules import Rule, SectionFinding
 from dadaia_workspace.core.models.backlog import INTENTS_EXEMPT_STATUS, Intent
+from dadaia_workspace.core.platform import act
 from dadaia_workspace.features.backlog.subject_registry import BindStatus, Registry, build_registry
 from dadaia_workspace.infrastructure.ledger_scripts import load_owner
 
@@ -63,13 +64,19 @@ RULES: tuple[LedgerRule, ...] = (
         ("BL-SCHEMA",),
         SECTION,
         _check_schema,
-        fix_help="Agent action: correct the entry this finding names in <specs>/backlog/BACKLOG.json, then commit.",
+        fix_help=act(
+            "agent",
+            "correct the entry this finding names in <specs>/backlog/BACKLOG.json, then commit.",
+        ),
     ),
     Rule(
         ("BL-CONFLICT",),
         SECTION,
         _check_conflict,
-        fix_help="Agent action: exit one of the twins this finding names from <specs>/backlog/BACKLOG.json, then commit.",
+        fix_help=act(
+            "agent",
+            "exit one of the twins this finding names from <specs>/backlog/BACKLOG.json, then commit.",
+        ),
     ),
 )
 

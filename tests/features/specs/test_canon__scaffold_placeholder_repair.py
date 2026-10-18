@@ -1,10 +1,9 @@
-"""Placeholder-atom repair.
+"""Placeholder-atom detection: reported, never repaired.
 
-Old scaffolds shipped a raw ``memory/product/feature.md`` template
-(``SLUG_PLACEHOLDER`` & friends) that NO verb could remediate. Now: the doctor flags it as fixable
-(MEM-PLACEHOLDER-1) as an unfixable report, ``--fix`` keeps it, and ``specs upgrade`` repairs even a
-current-version tree (dry-run reports without deleting). Exact-token detection means
-filled atoms are never touched.
+A legacy placeholder atom (a memory atom whose frontmatter keeps a template token such as
+``SLUG_PLACEHOLDER``) is reported as MEM-PLACEHOLDER-1, not auto-fixable, its fix line naming
+fill or delete. ``doctor --fix`` leaves it byte for byte; the ``specs upgrade`` dry run reports
+it without deleting it; exact-token detection never flags or touches a filled atom.
 """
 
 from __future__ import annotations

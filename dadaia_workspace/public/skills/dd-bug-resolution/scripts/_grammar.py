@@ -7,6 +7,7 @@ import re
 from collections.abc import Iterable
 from pathlib import Path
 
+from _platform import act
 from _refusal import Refusal
 
 STATE = "_RELEASE.json"
@@ -44,7 +45,7 @@ def sole_live(specs: Path) -> str | None:
     ids = live_ids(specs)
     if len(ids) > 1:
         raise Refusal(f"multiple live release directories carry {STATE}: {', '.join(ids)} — exactly one is allowed",
-                      f"Agent action: keep one of {', '.join(ids)} live under {specs / 'releases'}; ship or move out the others")  # fmt: skip
+                      act("agent", f"keep one of {', '.join(ids)} live under {specs / 'releases'}; ship or move out the others"))  # fmt: skip
     return ids[0] if ids else None
 
 

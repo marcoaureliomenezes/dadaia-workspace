@@ -6,7 +6,7 @@
   "type": "object",
   "additionalProperties": false,
   "required": [
-    "id", "ts", "reported_by", "title", "severity", "surface", "component",
+    "id", "ts", "reported_by", "title", "severity", "component",
     "context", "symptom", "repro", "expected", "status", "cause", "caused_by",
     "closed_at"
   ],
@@ -25,7 +25,7 @@
     },
     "surface": {
       "type": "string", "minLength": 1, "x-mutability": "immutable-core",
-      "description": "A directory name tracked in the repo; bugs.py append refuses any other."
+      "description": "Legacy: a directory name on records filed before fix files were recorded; new records carry none."
     },
     "correlates": {
       "type": "array", "items": {"type": "string", "minLength": 1},
@@ -50,6 +50,9 @@
     "solution": {"type": "string", "minLength": 1, "x-mutability": "write-once"},
     "fix_sha": {
       "type": ["string", "null"], "pattern": "^[0-9a-f]{40}$", "x-mutability": "mutable-governance"
+    },
+    "fix_files": {
+      "type": "array", "items": {"type": "string", "minLength": 1}, "x-mutability": "write-once"
     },
     "superseded_by": {"type": "string", "minLength": 1, "x-mutability": "write-once"}
   }

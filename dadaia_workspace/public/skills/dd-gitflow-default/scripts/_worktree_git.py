@@ -14,7 +14,7 @@ from pathlib import Path
 
 from _git import git as git, parse_worktrees, scrubbed_env as scrubbed_env  # isort: skip
 from _grammar import SEMVER_RE, TAG_RE, sole_live
-from _platform import cli_argv, command, git_inline, git_line, inline, is_link, venv_dir
+from _platform import act, cli_argv, command, git_inline, git_line, inline, is_link, venv_dir
 from _specs import run_cli
 from _specs import workspace_of as workspace_of
 from _worktree_names import LAUNCH, Refusal, base_of, branch, name_of, tree_path
@@ -89,11 +89,11 @@ def next_version(repo: Path, flow: dict[str, str]) -> str:
 
 
 class SeveralWork(Refusal):
-    """Several local work branches; *keep* is the version the rule keeps."""
+    """Several local work branches; *keep* is the version the rule keeps, *text* the unlabeled act."""
 
-    def __init__(self, message: str, fix: str, keep: str) -> None:
-        super().__init__(message, fix)
-        self.keep = keep
+    def __init__(self, message: str, text: str, keep: str) -> None:
+        super().__init__(message, act("agent", text))
+        self.text, self.keep = text, keep
 
 
 def work_version(repo: Path, flow: dict[str, str]) -> str:
@@ -107,8 +107,8 @@ def work_version(repo: Path, flow: dict[str, str]) -> str:
         drop = git_inline(repo, "branch", "-d", low)
         merged = git(repo, "branch", "--merged", high, "--list", low).strip()
         then = "run" if merged else f"merge {low} into {high}, then run"
-        fix = f"Agent action: run `{git_inline(repo, 'switch', high)}`, then {then} `{drop}`"
-        raise SeveralWork(f"{len(versions)} work branches", fix, ordered[-1])
+        text = f"run `{git_inline(repo, 'switch', high)}`, then {then} `{drop}`"
+        raise SeveralWork(f"{len(versions)} work branches", text, ordered[-1])
     nxt = next_version(repo, flow)
     remote = git(
         repo, "branch", "-r", "--list", f"*/{prefix}{nxt}", "--format=%(refname:short)"
@@ -152,8 +152,8 @@ def _row(repo: Path, path: str, state: str, age: float = 0.0, **facts: object) -
     line = command(*LAUNCH, verb, path)
     # merge cannot clear a directory git does not know
     if state == "orphan" and Path(path).exists():
-        line = (
-            f"Agent action: remove the directory {path}, then run `{inline(*LAUNCH, verb, path)}`"
+        line = act(
+            "agent", f"remove the directory {path}, then run `{inline(*LAUNCH, verb, path)}`"
         )
     return {"repo": repo.name, "path": path, "state": state, "age_hours": age, "registered": True,
             **facts, "warn": state not in ("ready", "open", "empty") or age > 24,
@@ -207,7 +207,7 @@ def _absent(root: Path, repo: Path, held: set[str], found: list[dict[str, object
     ancestors = {p for path in listed for p in path.parents}
     return out + [
         _row(repo, str(stray), "unregistered")
-        | {"fix": f"Agent action: remove the directory {stray}"}
+        | {"fix": act("agent", f"remove the directory {stray}")}
         for stray in _strays(home, listed, ancestors)
     ]
 
@@ -229,8 +229,11 @@ def _unregistered(repo: Path, trees: list[dict[str, str]]) -> list[dict[str, obj
     return [
         _row(repo, t["worktree"], "unregistered", registered=False)
         | {
-            "fix": f"Agent action: land the work of {t['worktree']}, then run "
-            f"`{git_inline(repo, 'worktree', 'remove', '--force', '--force', t['worktree'])}`"
+            "fix": act(
+                "agent",
+                f"land the work of {t['worktree']}, then run "
+                f"`{git_inline(repo, 'worktree', 'remove', '--force', '--force', t['worktree'])}`",
+            )
         }  # fmt: skip
         for t in trees
     ]

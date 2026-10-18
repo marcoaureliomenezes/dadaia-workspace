@@ -152,10 +152,11 @@ runs every worktree verb: `new`, `merge`, `sync`, `clean`, `hash`, `list`.
    `.dadaia/.venv/bin/dadaia worktree sync <wt-rc path>` rebases the rc and its trees,
    parents first.
 6. **Close the candidate.** The Reconciliation, as the last commits of the `wt-rc`:
-   `release.py phase CLOSURE --sha <sha>` (no job, task or lane tree open), memory
-   reconciliation with its derived docs, the closure `log` entries, the disposition
-   sweep (`backlog.py exit`, `audit.py disposition`/`close`, `bugs.py archive`),
-   artifact GC; then the `wt-rc` merges into the work branch through the job gate plus
+   `release.py phase CLOSURE --sha <sha>` (no job, task or lane tree open), the
+   closure `log` entries, the disposition sweep (`backlog.py exit`, `audit.py
+   disposition`/`close`, `bugs.py archive`), artifact GC, and last the memory
+   reconciliation with its derived docs; after CLOSURE only a block-list bug lands, through
+   the hotfix lane and `worktree sync`, and any other work opens the next candidate. Then the `wt-rc` merges into the work branch through the job gate plus
    the ledger checks, and the work -> integration PR merges green.
 7. **Continue or promote.** Continue: `release.py new` with the same id stacks the next
    candidate, reopening `DEFINITION`. Promote: merge the integration branch into the

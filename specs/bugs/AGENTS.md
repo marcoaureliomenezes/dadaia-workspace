@@ -19,6 +19,7 @@ Scope: this file governs only `specs/bugs/`.
 
 - The block list, closed: (1) the work branch's `verify:` line is red; (2) a Stall; (3) the running task cannot deliver its AC;
   (4) a security finding; (5) data loss or corruption.
+- After `release.py phase CLOSURE`, only a block-list bug lands in that rc, through the version's hotfix lane and `worktree sync`; any other confirmed bug, REBUILD or operator demand is a job of the next rc, which opens at once.
 - A block-list bug is a hotfix: a `<v>/wt-hotfix-<bug-id>` lane (`worktrees/AGENTS.md` §1–2), landing before any
   other merge; its fix body names `block: <item>`; no SPEC amendment.
 - Every other confirmed bug becomes explicit candidate scope. Ship refuses an open bug unless

@@ -18,7 +18,7 @@ import _jsonl
 import _privacy
 from _commit import stamp as stamp
 from _findings import finding as finding
-from _platform import Undecodable, git_inline, read_text
+from _platform import Undecodable, act, git_inline, read_text
 from _refusal import report
 from _root import STATES as _STATES
 from _root import workspace_of as workspace_of
@@ -145,8 +145,8 @@ def unwritten(file: Path, at: int | str, verbs: str, law: str) -> str:
     else:
         what = f"{file} fails at {at} ({law})"
         finder = f"`{git_inline(file.parent, 'log', '-p', '--', file.name)}` lists them"
-    return (f"Agent action: {what} — revert the commit that introduced it ({finder}), or delete "
-            f"the line if you wrote it and it is still uncommitted, then redo the change through {verbs}")  # fmt: skip
+    return act("agent", f"{what} — revert the commit that introduced it ({finder}), or delete "
+        f"the line if you wrote it and it is still uncommitted, then redo the change through {verbs}")  # fmt: skip
 
 
 def replace(path: Path, text: str) -> None:
@@ -172,7 +172,9 @@ def terms(root: Path | None) -> list[tuple[str, str]]:
         if not isinstance(raw, dict):
             report(
                 f"privacy denylist {path} is not one JSON object",
-                f"Operator action: rewrite {path} as one JSON object mapping each term to its reason",
+                act(
+                    "operator", f"rewrite {path} as one JSON object mapping each term to its reason"
+                ),
             )
             raise SystemExit(1)
         if raw:
@@ -213,7 +215,9 @@ def private_refusal(records: Iterable[dict[str, Any]], path: Path) -> tuple[str,
             return (
                 f"field {key!r} carries {_privacy.mask(hit)!r}, which the push refuses — "
                 "nothing was written",
-                "Agent action: re-run this command with that value rewritten without the "
-                "private term",
+                act(
+                    "agent",
+                    "re-run this command with that value rewritten without the private term",
+                ),
             )
     return None

@@ -56,7 +56,6 @@ _BASE: dict[str, dict[str, Any]] = {
         "reported_by": "dd-sw-engineer-sr",
         "title": "sample bug",
         "severity": "MEDIUM",
-        "surface": "tests",
         "component": "features/bugs/service.py#BugService",
         "context": "dadaia-workspace",
         "symptom": "something broke",
@@ -111,6 +110,7 @@ _REWRITE: dict[str, dict[str, Any]] = {
         "solution": "the fix narrative",
         "caused_by": "none",
         "fix_sha": "a" * 40,
+        "fix_files": ["features/bugs/service.py"],
     },
     "finding": {"disposition": "resolved", "release": "0.5.1", "reason": "one render path"},
 }
@@ -123,7 +123,7 @@ _REWRITE: dict[str, dict[str, Any]] = {
         pytest.param("bug", {
             "id", "ts", "reported_by", "title", "severity", "surface", "correlates",
             "component", "context", "symptom", "repro", "expected", "status", "cause",
-            "caused_by", "closed_at", "solution", "fix_sha", "superseded_by",
+            "caused_by", "closed_at", "solution", "fix_sha", "fix_files", "superseded_by",
         }, id="bug"),
         pytest.param("finding", {"id", "pillar", "severity", "refs", "claim", "evidence", "disposition", "release", "reason"}, id="finding"),
         pytest.param("adr", {"id", "ts", "title", "status", "context", "decision", "consequences", "measured_by", "supersedes", "amends", "options", "ruling"}, id="adr"),
@@ -237,11 +237,14 @@ def test_mutability_is_declared_per_property_and_the_rewrite_spares_the_core(
     mutability = {name: spec["x-mutability"] for name, spec in properties.items()}
     assert set(mutability.values()) == categories
     required = set(_schema(kind)["required"])
-    unset_until_resolved = {"fix_sha"} if kind == "bug" else set()
+    unset_until_resolved = {"fix_sha", "surface"} if kind == "bug" else set()
     assert (
         required == {n for n, c in mutability.items() if c != "write-once"} - unset_until_resolved
     )
     assert not {n for n in _REWRITE[kind] if mutability[n] == "immutable-core"}
+    if kind == "bug":
+        assert mutability["fix_files"] == "write-once"
+        assert properties["fix_files"]["type"] == "array"
     if kind == "finding":
         assert {n for n, c in mutability.items() if c == "mutable-governance"} == set(
             _REWRITE[kind]

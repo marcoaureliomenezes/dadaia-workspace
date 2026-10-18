@@ -19,7 +19,7 @@ import _git
 from _grammar import SHA_RE, STATE
 from _jsonl import parse_object
 from _ledger import records, replace
-from _platform import read_text
+from _platform import act, read_text
 from _refusal import Refusal
 from _release_check import state_findings
 from _release_schema import UnreadableRelease, current_candidate, live_id
@@ -38,7 +38,7 @@ def at_head(specs: Path, *words: str) -> str:
         sha = ""
     if SHA_RE.match(sha):
         return SCRIPT(*words, "--sha", sha)
-    return f"Agent action: run `{SCRIPT.inline(*words)}` with --sha set to the short sha of HEAD"
+    return act("agent", f"run `{SCRIPT.inline(*words)}` with --sha set to the short sha of HEAD")
 
 
 @dataclass(frozen=True)
@@ -53,7 +53,7 @@ class Live:
 
 def read_state(path: Path) -> State:
     """One state document, refusing anything this script cannot read in full."""
-    fix = f"Agent action: repair {path} until `{SCRIPT.inline('check')}` passes"
+    fix = act("agent", f"repair {path} until `{SCRIPT.inline('check')}` passes")
     try:
         text = read_text(path)
     except OSError as exc:

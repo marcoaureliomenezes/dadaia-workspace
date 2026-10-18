@@ -57,8 +57,9 @@ The branch contract by role; the names are `specs/constitution.md`'s `gitflow:` 
 | 2 | `wt-backlog-<slug>`, `wt-rc` (define) | ADR proposal: `specs/ADRs/decisions.jsonl` | `docs(adr): propose <slug>` |
 | 2 | `wt-backlog-<slug>`, `wt-rc` (define, reconcile) | In-place `measured_by` repair: `specs/ADRs/decisions.jsonl` | `chore(adrs): repair …` |
 | 2 | `wt-rc` (define, reconcile) | ADR acceptance or rejection: `specs/ADRs/decisions.jsonl`, `specs/memory/*` | `docs(adr): accept <slug>` or `docs(adr): reject <slug>` |
-| 3 | a `wt-task-<kkk>` or `wt-hotfix` tree | Bug fix or REBUILD: `<code>`, red loop in the body, a hotfix's naming `block: <item>`; the regression test lands first as a `test(` commit (a task's shape 6, or the hotfix lane's) | `fix(bugs): <id> — <cause>`; a REBUILD `refactor(bugs): <id> — REBUILD <unit>: …`; a group names its N ids |
+| 3 | a `wt-task-<kkk>` or `wt-hotfix` tree | Bug fix or REBUILD: `<code>`, red loop in the body, a hotfix's naming `block: <item>`; the regression test lands first as a `test(` commit (a task's shape 6, or the hotfix lane's, naming `block: <item>` too) | `fix(bugs): <id> — <cause>`; a REBUILD `refactor(bugs): <id> — REBUILD <unit>: …`; a group names its N ids |
 | 4 | a `wt-main`, `wt-hotfix` or `wt-backlog-<slug>` tree | Terminal transition without code (`resolve` after its named shape-3 fix commit, `supersede`, `reject`): `specs/bugs/BUGS.jsonl` | `chore(bugs): <verb> <id> — <reason, by task-id, or fix sha>`; per class `chore(bugs): <verb> class <class> — <reason>`, one id per body line |
+| 4 | a `wt-main`, `wt-hotfix` or `wt-backlog-<slug>` tree | Governance update without a status change (`bugs.py update`): `specs/bugs/BUGS.jsonl` | `chore(bugs): update <id> — <field>: <reason>` |
 | 4 | `wt-rc` (reconcile) | Archive terminal bugs: `specs/bugs/BUGS.jsonl`, `specs/bugs/_archive/bugs_histo.jsonl` | `chore(bugs): archive <ids>` |
 | 5 | `wt-rc` (define) | Release definition, and a candidate's birth (`release.py new` writes `_RELEASE.json` and the SPEC stub in one transaction): `specs/releases/<v>/rc-<N>/*`, `specs/releases/<v>/_RELEASE.json` | `feat(specs): define candidate …` |
 | 6 | a task tree, or a `wt-backlog-<slug>` lane (the repo's `AGENTS.md` alone) | Task: its `W:` | `conventional-commit(<id>): description`, a REBUILD `refactor(<id>): REBUILD <unit> — …` |
@@ -67,6 +68,7 @@ The branch contract by role; the names are `specs/constitution.md`'s `gitflow:` 
 | 9 | `wt-rc` (reconcile) | Memory pass and derived docs: `specs/memory/*`, `README.md`, `docs/*.md` | `docs(memory): …` |
 | 9 | the `wt-backlog-first-pass` lane | Memory pass: `specs/memory/*` | `docs(memory): …` |
 | 10 | `wt-rc` (define, reconcile), a `wt-backlog-<slug>` lane on the next work branch (§2 step 11, `ship`) | Release state: `specs/releases/<v>/_RELEASE.json` and `specs/releases/_archive/**`, only when [`RELEASE-EVENTS.md`](../dd-release-implementation/RELEASE-EVENTS.md) requires a current entry | `chore(release): …` |
+| 11 | the job tree that found the defect (`wt-main`) | Pure law or doc text that no program prints (a fix line, `--help` or a schema stays Arm B, shape 3): the file it corrects; no `BUGS.jsonl` record | `docs(law): <what>`; the body cites the finding; one review |
 
 ## 3b. The PR gate
 

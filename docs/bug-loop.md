@@ -14,21 +14,22 @@ severity. `append` runs only after the operator confirms.
 python3 .agents/skills/dd-bug-resolution/scripts/bugs.py append \
   --bug-id doctor-exits-zero-with-errors --reported-by dd-sw-engineer-sr \
   --title "doctor exits 0 while reporting error findings" \
-  --severity HIGH --surface cli --component "cli/commands/doctor.py#run" \
+  --severity HIGH --component "cli/commands/doctor.py#run" \
   --context demo --symptom "…" --repro "…" --expected "…" --correlates none
 ```
 
-The ledger holds one record per bug, keyed by id. `append` prints correlation candidates,
-opens the record, refuses a duplicate id or unknown tracked-directory `surface`, and
-requires `--correlates <ids>|none`. `component` remains precise free text. Every supplied
-value passes the same privacy check used by the push gate.
+The ledger holds one record per bug, keyed by id. `append` prints each earlier bug whose
+recorded fix files lie under a path the `component` names, with the REBUILD due on that
+path, opens the record, refuses a duplicate id or a `component` naming no tracked path, and
+requires `--correlates` as ledger or archive ids, or `none`. `component` is precise free text; its tracked paths
+are the bug's files. Every supplied value passes the same privacy check used by the push gate.
 
 Not a bug: an agent mistake, wrong usage, an environment limit, designed validation, law
 ambiguity or a missing feature.
 
 ## 2. Lineage, then RED
 
-Read at most the 20 most recent records sharing the bug's surface or component since the
+Read at most the 20 most recent records sharing the bug's recorded fix files or component since the
 newest archived audit. Inspect the persisted `fix_sha` commits and blame the production
 lines the new fix replaces. End with `caused_by: <bug-id> | <task-id> | none`; use `none`
 only when blame offers no candidate.

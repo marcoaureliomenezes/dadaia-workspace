@@ -13,6 +13,7 @@ from typing import Any, Literal
 from dadaia_workspace.core import platform
 from dadaia_workspace.core.exceptions import DadaiaError
 from dadaia_workspace.core.frontmatter import FrontmatterError, parse, split
+from dadaia_workspace.core.platform import act
 from dadaia_workspace.core.skill_owner import load_owner
 
 __all__ = [
@@ -100,7 +101,7 @@ class SeveralWorkBranches(_git.SeveralWork, DadaiaError):  # type: ignore[misc,n
 
     def __init__(self, several: Any) -> None:
         DadaiaError.__init__(self, several.args[0], several.fix)
-        self.keep = several.keep
+        self.keep, self.text = several.keep, several.text
 
 
 def work_branch(repo: Path, flow: Gitflow, main: str) -> str:
@@ -171,7 +172,7 @@ def constitution_problem(specs_dir: Path, text: str | None = None) -> tuple[str,
     if not reason:
         return None
     cause = f"{constitution_path(specs_dir)}: {reason}"
-    return cause, f"Agent action: repair the YAML frontmatter of {cause}"
+    return cause, act("agent", f"repair the YAML frontmatter of {cause}")
 
 
 def read_gitflow(specs_dir: Path, text: str | None = None) -> tuple[Gitflow, str | None]:

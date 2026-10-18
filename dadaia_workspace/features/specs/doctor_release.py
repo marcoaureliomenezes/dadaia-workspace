@@ -14,6 +14,7 @@ from pathlib import Path
 
 from dadaia_workspace.core import platform
 from dadaia_workspace.core.doctor_rules import SectionFinding
+from dadaia_workspace.core.platform import act
 from dadaia_workspace.core.release_state import (
     LEGACY_RELEASE_STATE_FILENAME,
     RELEASE_ID_RE,
@@ -72,7 +73,7 @@ class ReleaseValidator:
                         severity=Severity.ERROR,
                         description=f"{fname} has no `**Status:**` line",
                         path=str(fpath),
-                        fix=f"Agent action: add the `**Status:**` line to {fpath}",
+                        fix=act("agent", f"add the `**Status:**` line to {fpath}"),
                     )
                 )
             elif status not in CANONICAL_STATUS:
@@ -85,7 +86,7 @@ class ReleaseValidator:
                             f"Valid: {sorted(CANONICAL_STATUS)}"
                         ),
                         path=str(fpath),
-                        fix=f"Agent action: set a canonical `**Status:**` in {fpath}",
+                        fix=act("agent", f"set a canonical `**Status:**` in {fpath}"),
                     )
                 )
             elif status != APPROVED and active.phase in _PHASES[1:]:

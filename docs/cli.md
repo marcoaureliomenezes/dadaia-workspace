@@ -7,7 +7,7 @@
 ## dadaia ci — Git-hook chokepoints: the pre-push and ref gates and their installer.
 - ci install-hook — Install the pre-push and reference-transaction gates.
 - ci push-gate-check — Pre-push gate: branch policy by the project gitflow + the range-scoped denylist scan.
-- ci ref-gate-check — Reference-transaction gate: ``<old> <new> <ref>`` lines on stdin; a work-branch update
+- ci ref-gate-check — Reference-transaction gate: a work-branch update must land on origin's sha.
 
 ## dadaia context — Manage Spec Context Projects.
 - context alive — Transition a context to ALIVE; clone repo if absent. Idempotent if already ALIVE.

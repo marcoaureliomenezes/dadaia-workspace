@@ -341,8 +341,8 @@ def test_a_write_over_an_unreadable_line_refuses_naming_it(
     assert f"sed -n '2p' {ledger}" in done.stderr
 
 
-_APPEND = ["append", "--bug-id", "x", "--title", "t", "--severity", "LOW", "--surface", "cli",
-           "--component", "c", "--context", "c", "--symptom", "s", "--repro", "r", "--expected", "e"]  # fmt: skip
+_APPEND = ["append", "--bug-id", "x", "--title", "t", "--severity", "LOW",
+           "--component", "cli/x.py", "--context", "c", "--symptom", "s", "--repro", "r", "--expected", "e"]  # fmt: skip
 
 
 @pytest.mark.parametrize(
@@ -519,63 +519,220 @@ def test_append_registers_one_open_record(script: Path, tmp_path: Path) -> None:
     specs = _ledger(tmp_path)
     done = _run(
         script, "append", "--specs", str(specs), "--bug-id", "new-bug", "--title", "t",
-        "--severity", "LOW", "--surface", "cli", "--component", "c", "--context", "ctx",
+        "--severity", "LOW", "--component", "cli/x.py", "--context", "ctx",
         "--symptom", "s", "--repro", "r", "--expected", "e", "--correlates", "none",
     )  # fmt: skip
     assert done.returncode == 0, done.stderr
-    assert "\n[ok] registered new-bug" in done.stdout
+    assert done.stdout == f"[ok] registered new-bug -> {specs}\n"
     [record] = _records(specs)
     assert record["status"] == "open" and record["closed_at"] is None
     assert _run(script, "check", "--specs", str(specs)).returncode == 0
 
 
-def test_append_names_its_correlations_from_the_ledger(script: Path, tmp_path: Path) -> None:
-    """Append lists the open and the recently resolved records on its
-    surface, refusing without `--correlates` or with an id the ledger lacks."""
-    recent = {
-        **_OPEN_RECORD,
-        "id": "recent",
-        "status": "resolved",
-        "closed_at": "2999-01-01T00:00:00Z",
-    }
-    old = {**recent, "id": "old", "ts": "1999-01-01T00:00:00Z", "closed_at": "2000-01-01T00:00:00Z"}
-    other = {**_OPEN_RECORD, "id": "other", "surface": "hooks"}
-    specs = _ledger(tmp_path, _OPEN_RECORD, recent, old, other)
-    argv = ["append", "--specs", str(specs), "--bug-id", "new-bug", "--title", "t",
-            "--severity", "LOW", "--surface", "cli", "--component", "c", "--context", "ctx",
+def _sibling(bug_id: str, *files: str) -> dict[str, object]:
+    record = {**_OPEN_RECORD, "id": bug_id, "status": "resolved", "closed_at": "2026-09-21T10:00:00Z",
+              "cause": "c", "solution": "s", "caused_by": "none", "fix_sha": "a" * 40,
+              "fix_files": list(files)}  # fmt: skip
+    del record["surface"]
+    return record
+
+
+_LEGACY_EVENT = {"ts": "2026-08-28T12:45:33Z", "event": "archived", "agent": "claude-code",
+                 "data": {"id": "legacy-one", "status": "Closed", "severity": "HIGH",
+                          "reported": "2026-06-11", "resolved_in": "v0.1.13",
+                          "surface": "panel", "source": "pre-v6"}}  # fmt: skip
+
+
+def _archived(specs: Path, *records: dict[str, object]) -> None:
+    """The archive as the real one is: legacy event lines first, then the plain records."""
+    (specs / "bugs" / "_archive").mkdir(parents=True, exist_ok=True)
+    write_text(specs / "bugs" / "_archive" / "bugs_histo.jsonl",
+               "".join(json.dumps(r) + "\n" for r in (_LEGACY_EVENT, *records)))  # fmt: skip
+
+
+def _append_argv(specs: Path, component: str = "cli/x.py", bug_id: str = "new-bug") -> list[str]:
+    return ["append", "--specs", str(specs), "--bug-id", bug_id, "--title", "t",
+            "--severity", "LOW", "--component", component, "--context", "ctx",
             "--symptom", "s", "--repro", "r", "--expected", "e"]  # fmt: skip
-    bare, stray = _run(script, *argv), _run(script, *argv, "--correlates", "a-bug,ghost")
-    assert bare.returncode == stray.returncode == 1
-    assert "candidates on 'cli': a-bug, recent\n" in bare.stdout
-    named = _run(script, *argv, "--correlates", "a-bug,old")
-    assert named.stdout.startswith("correlation candidates on 'cli': a-bug, recent\n")
-    assert _records(specs)[-1]["correlates"] == ["a-bug", "old"]
 
 
-@pytest.mark.parametrize(
-    ("field", "value", "needle"),
-    [("surface", "cli", None), ("surface", ".github", None), ("surface", "unknown", "(closest: .github, cli)"),
-     ("context", "", "shorter than its minLength"), ("component", "", "shorter than its minLength")],
-)  # fmt: skip
-def test_append_takes_a_tracked_directory_surface_and_non_blank_fields(
-    script: Path, tmp_path: Path, field: str, value: str, needle: str | None
-) -> None:
-    """The tracked-directory set is the one decider: `.github` admitted, an untracked
-    `unknown` refused naming close matches. A blank context or component is refused.
-    Every refusal leaves the ledger untouched."""
-    specs = _ledger(tmp_path)
-    values = {"surface": "cli", "context": "ctx", "component": "c", field: value}
-    done = _run(script, "append", "--specs", str(specs), "--bug-id", "b", "--title", "t",
-                "--severity", "LOW", *[f"--{k}={v}" for k, v in values.items()],
-                "--symptom", "s", "--repro", "r", "--expected", "e", "--correlates", "none")  # fmt: skip
-    assert (done.returncode, needle is None or needle in done.stderr) == (int(bool(needle)), True)
-    assert len(_records(specs)) == int(needle is None), done.stderr
-
-
-def test_append_judges_the_surface_against_its_own_repo_under_a_foreign_git_env(
+def test_append_prints_the_earlier_bugs_whose_fix_files_match_and_the_rebuild_due(
     script: Path, tmp_path: Path
 ) -> None:
-    """With GIT_DIR and GIT_WORK_TREE on another repo, a directory tracked only there is refused."""
+    """Live and archived records whose `fix_files` hold the component's path are listed by id;
+    a legacy record without `fix_files` never matches. Without `--correlates` it refuses."""
+    specs = _ledger(
+        tmp_path, _sibling("b1", "cli/x.py"), _sibling("b4", "hooks/y.py"), _OPEN_RECORD
+    )
+    _archived(specs, _sibling("b3", "cli/x.py", "z"))
+    argv = _append_argv(specs)
+    bare, named = _run(script, *argv), _run(script, *argv, "--correlates", "b1,b3")
+    assert bare.returncode == 1
+    assert named.returncode == 0, named.stderr
+    assert named.stdout.splitlines()[:3] == [
+        "earlier bug on cli/x.py: b1", "earlier bug on cli/x.py: b3",
+        "REBUILD due: 3rd bug on cli/x.py",
+    ]  # fmt: skip
+    assert "surface" not in _records(specs)[-1] and _records(specs)[-1]["correlates"] == [
+        "b1",
+        "b3",
+    ]
+
+
+def test_append_lists_a_bug_once_when_two_of_its_files_match(script: Path, tmp_path: Path) -> None:
+    specs = _ledger(tmp_path, _sibling("b1", "cli/x.py", "cli/y.py"))
+    done = _run(script, *_append_argv(specs, "cli"), "--correlates", "b1")
+    assert done.returncode == 0, done.stderr
+    assert done.stdout.splitlines()[:2] == ["earlier bug on cli: b1", "REBUILD due: 2nd bug on cli"]
+
+
+def test_append_prints_no_rebuild_due_for_a_first_bug_on_a_file(
+    script: Path, tmp_path: Path
+) -> None:
+    specs = _ledger(tmp_path, _sibling("b4", "hooks/y.py"))
+    done = _run(script, *_append_argv(specs), "--correlates", "none")
+    assert done.returncode == 0, done.stderr
+    assert "REBUILD due" not in done.stdout and "earlier bug" not in done.stdout
+
+
+def test_append_takes_a_correlate_that_only_the_archive_holds(script: Path, tmp_path: Path) -> None:
+    specs = _ledger(tmp_path)
+    _archived(specs, _sibling("old-one", "cli/x.py"))
+    done = _run(script, *_append_argv(specs), "--correlates", "old-one")
+    assert done.returncode == 0, done.stderr
+    assert _records(specs)[-1]["correlates"] == ["old-one"]
+
+
+def test_append_takes_a_correlate_that_only_a_legacy_archive_event_names(
+    script: Path, tmp_path: Path
+) -> None:
+    specs = _ledger(tmp_path)
+    _archived(specs)
+    done = _run(script, *_append_argv(specs), "--correlates", "legacy-one")
+    assert done.returncode == 0, done.stderr
+    assert _records(specs)[-1]["correlates"] == ["legacy-one"]
+
+
+def test_append_refuses_a_correlate_no_ledger_or_archive_holds(
+    script: Path, tmp_path: Path
+) -> None:
+    specs = _ledger(tmp_path, _sibling("a-bug", "cli/x.py"))
+    before = (specs / "bugs/BUGS.jsonl").read_bytes()
+    done = _run(script, *_append_argv(specs), "--correlates", "a-bug,ghost")
+    assert done.returncode == 1 and "--correlates" in done.stderr, done.stderr
+    assert (specs / "bugs/BUGS.jsonl").read_bytes() == before
+
+
+@pytest.mark.parametrize("component", ["cli/x.py#run", "cli/x.py/"])
+def test_append_takes_a_component_that_names_a_tracked_path_in_free_text(
+    script: Path, tmp_path: Path, component: str
+) -> None:
+    specs = _ledger(tmp_path, _sibling("b1", "cli/x.py"), _sibling("b4", "hooks/y.py"))
+    done = _run(script, *_append_argv(specs, component), "--correlates", "b1")
+    assert done.returncode == 0, done.stderr
+    assert done.stdout.splitlines()[:2] == [
+        "earlier bug on cli/x.py: b1", "REBUILD due: 2nd bug on cli/x.py",
+    ]  # fmt: skip
+    assert _records(specs)[-1]["component"] == component
+
+
+def test_append_without_a_component_is_one_refusal_with_one_fix_line(
+    script: Path, tmp_path: Path
+) -> None:
+    specs = _ledger(tmp_path)
+    argv = _append_argv(specs)
+    del argv[argv.index("--component") : argv.index("--component") + 2]
+    done = _run(script, *argv, "--correlates", "none")
+    assert done.returncode == 1 and "Traceback" not in done.stderr, done.stderr
+    assert len([ln for ln in done.stderr.splitlines() if ln.startswith("fix: ")]) == 1
+    assert _records(specs) == []
+
+
+@pytest.mark.parametrize("sha", ["--output={planted}", "b" * 40])
+def test_resolve_reads_no_fix_files_from_a_sha_the_repo_does_not_reach(
+    script: Path, tmp_path: Path, sha: str
+) -> None:
+    specs = _ledger(tmp_path, _OPEN_RECORD)
+    planted = tmp_path / "planted"
+    _run(script, "resolve", "a-bug", "--cause", "c", "--caused-by", "none", "--solution", "s",
+         f"--fix-sha={sha.format(planted=planted)}", "--specs", str(specs))  # fmt: skip
+    assert not planted.exists()
+    assert "fix_files" not in _records(specs)[0] or _records(specs)[0]["fix_files"] is None
+
+
+def test_append_takes_no_surface_flag(script: Path, tmp_path: Path) -> None:
+    specs = _ledger(tmp_path)
+    done = _run(script, *_append_argv(specs), "--correlates", "none", "--" + "surface", "cli")
+    assert done.returncode == 2 and "unrecognized arguments" in done.stderr
+    assert _records(specs) == []
+
+
+def test_append_refuses_a_component_that_names_no_tracked_path(
+    script: Path, tmp_path: Path
+) -> None:
+    specs = _ledger(tmp_path)
+    done = _run(script, *_append_argv(specs, "nowhere/at-all.py"), "--correlates", "none")
+    assert (
+        done.returncode == 1
+        and "component 'nowhere/at-all.py' names no tracked path" in done.stderr
+    )
+    assert _records(specs) == []
+
+
+def test_append_refuses_a_blank_context(script: Path, tmp_path: Path) -> None:
+    specs = _ledger(tmp_path)
+    argv = _append_argv(specs)
+    argv[argv.index("--context") + 1] = ""
+    done = _run(script, *argv, "--correlates", "none")
+    assert done.returncode == 1 and "shorter than its minLength" in done.stderr
+    assert _records(specs) == []
+
+
+def _fix_commit(root: Path, path: str) -> str:
+    """A commit touching only *path*, after one that holds the rest."""
+    git = ["git", "-C", str(root), "-c", "user.name=t", "-c", "user.email=t@t.test"]
+    run([*git, "add", "-A"], check=True)
+    run([*git, "commit", "-q", "--allow-empty", "-m", "base"], check=True)
+    write_text(root / path, read_text(root / path) + "# fixed\n")
+    run([*git, "commit", "-q", "-am", "fix"], check=True)
+    return run([*git, "rev-parse", "HEAD"], check=True).stdout.strip()
+
+
+def test_a_legacy_record_with_a_surface_passes_check(script: Path, tmp_path: Path) -> None:
+    _ledger(tmp_path)
+    sha = _fix_commit(tmp_path, "cli/x.py")
+    current = {**_sibling("new", "cli/x.py"), "fix_sha": sha}
+    specs = _ledger(tmp_path, _OPEN_RECORD, current)
+    done = _run(script, "check", "--specs", str(specs))
+    assert done.returncode == 0, done.stdout + done.stderr
+
+
+def test_resolve_records_the_fix_files_once(script: Path, tmp_path: Path) -> None:
+    specs = _ledger(tmp_path, _OPEN_RECORD)
+    sha = _fix_commit(tmp_path, "cli/x.py")
+    done = _run(script, *_resolve_argv(sha=sha), "--specs", str(specs))
+    assert done.returncode == 0, done.stderr
+    assert _records(specs)[0]["fix_files"] == ["cli/x.py"]
+    again = _run(script, "update", "a-bug", "--set", "fix_files=other.py", "--specs", str(specs))
+    assert again.returncode == 1 and "write-once" in again.stderr
+    assert _records(specs)[0]["fix_files"] == ["cli/x.py"]
+
+
+def test_stats_reports_the_files_two_or_more_bugs_fixed(script: Path, tmp_path: Path) -> None:
+    specs = _ledger(tmp_path, _sibling("b1", "cli/x.py"), _sibling("b2", "cli/x.py", "hooks/y.py"),
+                    _sibling("b4", "hooks/y.py"), _sibling("b5", "solo.py"), _OPEN_RECORD)  # fmt: skip
+    _archived(specs, _sibling("b3", "cli/x.py"))
+    done = _run(script, "stats", "--specs", str(specs))
+    assert done.returncode == 0, done.stderr
+    assert [ln for ln in done.stdout.splitlines() if ln.startswith("rebuild-due:")] == [
+        "rebuild-due:cli/x.py\tb1,b2,b3", "rebuild-due:hooks/y.py\tb2,b4",
+    ]  # fmt: skip
+
+
+def test_append_judges_the_component_against_its_own_repo_under_a_foreign_git_env(
+    script: Path, tmp_path: Path
+) -> None:
+    """With GIT_DIR and GIT_WORK_TREE on another repo, a path tracked only there is refused."""
     specs = _ledger(tmp_path / "own")
     other = tmp_path / "other"
     (other / "foreign").mkdir(parents=True)
@@ -584,7 +741,7 @@ def test_append_judges_the_surface_against_its_own_repo_under_a_foreign_git_env(
     run(["git", "-C", str(other), "add", "foreign"], check=True)
     env = {**os.environ, "GIT_DIR": str(other / ".git"), "GIT_WORK_TREE": str(other)}
     done = run([sys.executable, str(script), "append", "--specs", str(specs), "--bug-id", "b",
-         "--title", "t", "--severity", "LOW", "--surface", "foreign", "--component", "c",
+         "--title", "t", "--severity", "LOW", "--component", "foreign/x.py",
          "--context", "ctx", "--symptom", "s", "--repro", "r", "--expected", "e",
          "--correlates", "none"], check=False, env=env)  # fmt: skip
     assert done.returncode == 1 and "foreign" in done.stderr, done.stderr
@@ -599,7 +756,7 @@ def test_an_agent_action_run_outside_the_tree_keeps_its_specs_and_known_argv(
     specs, elsewhere = _ledger(tmp_path), tmp_path / "elsewhere"
     elsewhere.mkdir()
     done = _run(script, "append", "--specs", str(specs), "--bug-id", "b", "--title", "t",
-                "--severity", "LOW", "--surface", "nowhere", "--component", "c", "--context",
+                "--severity", "LOW", "--component", "nowhere/x.py", "--context",
                 "ctx", "--symptom", "s", "--repro", "r", "--expected", "e", "--correlates",
                 "none", cwd=elsewhere)  # fmt: skip
     (fix,) = [ln for ln in done.stderr.splitlines() if ln.startswith("fix: ")]
@@ -617,7 +774,7 @@ def test_append_outside_a_git_tree_is_one_refusal_naming_the_cause(
     specs = tmp_path / "specs"
     (specs / "bugs").mkdir(parents=True)
     done = _run(script, "append", "--specs", str(specs), "--bug-id", "b", "--title", "t",
-                "--severity", "LOW", "--surface", "cli", "--component", "c", "--context", "ctx",
+                "--severity", "LOW", "--component", "cli/x.py", "--context", "ctx",
                 "--symptom", "s", "--repro", "r", "--expected", "e", "--correlates", "none")  # fmt: skip
     assert done.returncode == 1 and "Traceback" not in done.stderr
     assert "cannot list the repo's tracked directories: fatal:" in done.stderr
@@ -629,7 +786,7 @@ def test_append_refuses_a_duplicate_id_and_writes_nothing(script: Path, tmp_path
     before = (specs / "bugs" / "BUGS.jsonl").read_bytes()
     done = _run(
         script, "append", "--specs", str(specs), "--bug-id", "a-bug", "--title", "t",
-        "--severity", "LOW", "--surface", "cli", "--component", "c", "--context", "ctx",
+        "--severity", "LOW", "--component", "cli/x.py", "--context", "ctx",
         "--symptom", "s", "--repro", "r", "--expected", "e",
     )  # fmt: skip
     assert done.returncode == 1
@@ -662,7 +819,7 @@ def test_the_seam_refuses_exactly_what_the_push_refuses(
     argv[argv.index("--solution") + 1] = value
     appended = _run(
         script, "append", "--specs", str(specs), "--bug-id", "leaky", "--title", "t",
-        "--severity", "LOW", "--surface", "cli", "--component", "c", "--context", "ctx",
+        "--severity", "LOW", "--component", "cli/x.py", "--context", "ctx",
         "--symptom", value, "--repro", "r", "--expected", "e", "--correlates", "none",
     )  # fmt: skip
     resolved = _run(script, *argv, "--specs", str(specs))
@@ -711,7 +868,7 @@ def test_the_seam_verdict_equals_the_push_verdict_over_the_published_ledger(
 
     done = _run(
         script, "append", "--specs", str(root / "specs"), "--bug-id", "new-bug", "--title",
-        "t", "--severity", "LOW", "--surface", "cli", "--component", "c", "--context",
+        "t", "--severity", "LOW", "--component", "cli/x.py", "--context",
         context, "--symptom", "s", "--repro", "r", "--expected", "e", "--correlates", "none",
     )  # fmt: skip
 
