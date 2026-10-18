@@ -237,7 +237,8 @@ def test_work_branch_refusals_fix_runs_verbatim(tmp_path: Path) -> None:
     git(repo, "branch", "feature/0.4.9", "feature/0.5.0")  # two work branches: the older goes
     two = run(ws, "new", "r", RC)
     assert "2 work branches" in two.stderr
-    for step in fixes(two)[0].split("`")[1::2]:  # Agent action: the backticked steps, in order
+    [fix] = fixes(two)
+    for step in fix.split("`")[1::2]:  # Agent action: the backticked steps, in order
         run_bash(step, check=True)
     assert not git(repo, "branch", "--list", "feature/0.4.9").strip()
     git(repo, "branch", "-m", "feature/0.5.0", "dev")  # none: the fix cuts one from dev
