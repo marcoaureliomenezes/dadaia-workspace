@@ -42,6 +42,7 @@ description: >
 
 - Live release resolved (`dd-spec-navigator` Phase 3).
 - Task committed under its id in its `wt-task-<kkk>` tree; the main thread runs its `WT merge` (`worktrees/AGENTS.md` §2).
+- The implementer hands back with no process of its own still running (no background command, `jobs` empty).
 - Current step (`RC-FLOW.md`) identified before attempting its unlock action.
 - Self-check before every hand-back: run the repo's `verify:` line and the test directories the change reaches, then read your own `git diff <base>...HEAD` for removed assertions, newly skipped tests, hand-typed fix-line labels, platform literals in assertions and the sweep greps the job file names; a hit is fixed or reported, never handed back silently.
 - A push relies on the `verify:` of each `wt-rc` and hotfix merge into the work branch, with no rerun; the reviewer's `APPROVED` on the work-branch head before its PR (`dd-gitflow-default` §3b).
