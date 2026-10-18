@@ -1,7 +1,6 @@
 """The pre-push shim finds the dadaia runner, in this order, and fails closed with none:
 
-  1. walk UP from the repo root to ``<ws>/.dadaia/.venv/<scripts>/dadaia`` (either host's layout)
-  2. the repo's own ``.venv/<scripts>/dadaia``
+  walk UP from the repo root to ``<ws>/.dadaia/.venv/<scripts>/dadaia`` (either host's layout)
 
 ``--probe-only`` prints the resolved runner and exits 0; every other run hands git's ref lines
 and the ``ci push-gate-check`` verb to it. Each test drives the real shim through Git Bash in a
@@ -44,7 +43,7 @@ def _shim(repo: Path, *args: str, stdin: str = "") -> subprocess.CompletedProces
 
 @pytest.mark.parametrize(
     ("name", "expect_label"),
-    [("walk_up_to_workspace_venv", "workspace-venv"), ("repo_local_venv", "repo-venv")],
+    [("walk_up_to_workspace_venv", "workspace-venv"), ("repo_local_venv", "")],
 )
 def test_runner_resolution_branch_table(tmp_path: Path, name: str, expect_label: str) -> None:
     if name == "walk_up_to_workspace_venv":
@@ -61,8 +60,9 @@ def test_runner_resolution_branch_table(tmp_path: Path, name: str, expect_label:
     repo = _repo(tmp_path / "repo-with-local-venv")
     _runner(repo / ".venv")
     res = _shim(repo, "--probe-only")
-    assert res.returncode == 0, res.stderr
-    assert expect_label in res.stdout
+    assert res.returncode == 1, res.stdout
+    assert "could not locate the dadaia runner" in res.stderr
+    assert "repo-venv" not in res.stdout
 
 
 def test_the_other_hosts_layout_is_probed_too(tmp_path: Path) -> None:
