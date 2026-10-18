@@ -1349,3 +1349,31 @@ def test_only_the_producer_spells_an_action_label() -> None:
         if label.search(line)
     ]
     assert hits == []
+
+
+def _attribute_act_calls(pkg: Path) -> list[str]:
+    """Every `<x>.act(...)` call under *pkg*, except the door that delegates to the producer."""
+    door = pkg / "core" / "platform.py"
+    return [
+        f"{p.relative_to(pkg.parent).as_posix()}:{node.lineno}"
+        for p in sorted(pkg.rglob("*.py"))
+        if p != door
+        for node in ast.walk(ast.parse(read_text(p)))
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr == "act"
+    ]
+
+
+def test_only_the_door_calls_act_through_an_attribute() -> None:
+    """An action label is spelled by a bare `act(...)`; `platform.act(...)` is not a producer call."""
+    assert _attribute_act_calls(_PKG) == []
+
+
+def test_a_planted_attribute_act_call_is_a_hit(tmp_path: Path) -> None:
+    pkg = tmp_path / "dadaia_workspace"
+    _write(
+        pkg / "core" / "platform.py", "def act(kind, text):\n    return _owner.act(kind, text)\n"
+    )
+    _write(pkg / "features" / "gate.py", 'text = platform.act("agent", "edit the file")\n')
+    assert _attribute_act_calls(pkg) == ["dadaia_workspace/features/gate.py:1"]
