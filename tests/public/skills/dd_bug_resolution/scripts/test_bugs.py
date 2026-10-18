@@ -537,10 +537,17 @@ def _sibling(bug_id: str, *files: str) -> dict[str, object]:
     return record
 
 
+_LEGACY_EVENT = {"ts": "2026-08-28T12:45:33Z", "event": "archived", "agent": "claude-code",
+                 "data": {"id": "legacy-one", "status": "Closed", "severity": "HIGH",
+                          "reported": "2026-06-11", "resolved_in": "v0.1.13",
+                          "surface": "panel", "source": "pre-v6"}}  # fmt: skip
+
+
 def _archived(specs: Path, *records: dict[str, object]) -> None:
+    """The archive as the real one is: legacy event lines first, then the plain records."""
     (specs / "bugs" / "_archive").mkdir(parents=True, exist_ok=True)
     write_text(specs / "bugs" / "_archive" / "bugs_histo.jsonl",
-               "".join(json.dumps(r) + "\n" for r in records))  # fmt: skip
+               "".join(json.dumps(r) + "\n" for r in (_LEGACY_EVENT, *records)))  # fmt: skip
 
 
 def _append_argv(specs: Path, component: str = "cli/x.py", bug_id: str = "new-bug") -> list[str]:
@@ -594,6 +601,16 @@ def test_append_takes_a_correlate_that_only_the_archive_holds(script: Path, tmp_
     done = _run(script, *_append_argv(specs), "--correlates", "old-one")
     assert done.returncode == 0, done.stderr
     assert _records(specs)[-1]["correlates"] == ["old-one"]
+
+
+def test_append_takes_a_correlate_that_only_a_legacy_archive_event_names(
+    script: Path, tmp_path: Path
+) -> None:
+    specs = _ledger(tmp_path)
+    _archived(specs)
+    done = _run(script, *_append_argv(specs), "--correlates", "legacy-one")
+    assert done.returncode == 0, done.stderr
+    assert _records(specs)[-1]["correlates"] == ["legacy-one"]
 
 
 def test_append_refuses_a_correlate_no_ledger_or_archive_holds(
