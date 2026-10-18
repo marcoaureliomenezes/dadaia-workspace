@@ -35,6 +35,7 @@ from dadaia_workspace.core.models.spec_context import (
     RepoLiveStatus,
     SpecContextProject,
 )
+from dadaia_workspace.core.platform import act
 from dadaia_workspace.core.template_history import was_shipped
 from dadaia_workspace.features.spec_context import sweep
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
@@ -102,7 +103,7 @@ def _require_allowlisted(label: str, value: str) -> None:
         raise InvalidContextNameError(
             f"invalid {label} {value!r}: use only letters, digits, '-' and '_' — the one "
             "allowlist every verb enforces, so a context that is registered is always usable.",
-            fix=f"Agent action: pick a {label} of letters, digits, '-' and '_' only",
+            fix=act("agent", f"pick a {label} of letters, digits, '-' and '_' only"),
         )
 
 
@@ -167,7 +168,10 @@ def install_git_hooks(repo_root: Path, *, force: bool = False) -> list[Path]:
     if hooks_dir is None:
         raise NotAGitRepositoryError(
             f"{repo_root} is not a git repository",
-            fix=f"Agent action: run it on a git repository, or '{platform.git_inline(repo_root, 'init')}'",
+            fix=act(
+                "agent",
+                f"run it on a git repository, or '{platform.git_inline(repo_root, 'init')}'",
+            ),
         )
     hooks_dir.mkdir(parents=True, exist_ok=True)
     written = []
@@ -285,12 +289,12 @@ class SpecContextService:
                 raise AssociatedRepoConflictError(
                     f"'{repo.slug}' is context '{ctx.name}''s own main repo slug — it is "
                     "always included via all_repos() and can never also be an associated repo.",
-                    fix="Agent action: drop that --associated-repo URL, the main repo is included",
+                    fix=act("agent", "drop that --associated-repo URL, the main repo is included"),
                 )
             if repo.slug in seen:
                 raise AssociatedRepoConflictError(
                     f"associated repo slug '{repo.slug}' given more than once.",
-                    fix="Agent action: pass each --associated-repo URL once",
+                    fix=act("agent", "pass each --associated-repo URL once"),
                 )
             seen.add(repo.slug)
             self._refuse_slug(ctx.name, repo.slug, repo.url)
@@ -323,7 +327,7 @@ class SpecContextService:
                     f"'{platform.inline(*cli_words(self._workspace_root, 'context', 'dead', name))}' push "
                     f"and delete '{other.name}''s working "
                     "tree.",
-                    fix=f"Agent action: choose a different slug, or coordinate with '{other.name}'",
+                    fix=act("agent", f"choose a different slug, or coordinate with '{other.name}'"),
                 )
 
     def add_repo(self, name: str, slug: str, repo_url: str = "") -> tuple[SpecContextProject, bool]:
@@ -352,7 +356,7 @@ class SpecContextService:
             return ctx, False
         add = fix_line(self._workspace_root, "context", "repo", "add", name, slug, "--url")
         self._refuse_slug(
-            name, slug, repo_url, f"Agent action: run `{add}` with the repo's clone URL"
+            name, slug, repo_url, act("agent", f"run `{add}` with the repo's clone URL")
         )
         existing = next((r for r in ctx.associated_repos if r.slug == slug), None)
         if existing is not None:
@@ -510,7 +514,7 @@ class SpecContextService:
                     raise RepoUrlMissingError(
                         f"'{repo.slug}' has no clone URL and no checkout at repos/{repo.slug} "
                         f"— 'context alive {name}' cannot obtain it.",
-                        fix=f"Agent action: clone the '{repo.slug}' repository into {repo_dest}",
+                        fix=act("agent", f"clone the '{repo.slug}' repository into {repo_dest}"),
                     )
                 try:
                     self._git.clone(repo.url, repo_dest)
@@ -648,8 +652,11 @@ class SpecContextService:
         fix = (
             fix_line(self._workspace_root, *argv, found[0])
             if len(found) == 1
-            else "Agent action: choose the principal branch origin holds and run "
-            f"`{platform.inline(*cli_words(self._workspace_root, *argv))}` with it"
+            else act(
+                "agent",
+                "choose the principal branch origin holds and run "
+                f"`{platform.inline(*cli_words(self._workspace_root, *argv))}` with it",
+            )
         )
         raise ContextStateError(
             f"Context '{name}': origin holds no principal '{flow.principal}' (origin candidates: "
@@ -688,7 +695,7 @@ class SpecContextService:
                 raise RepoUrlMissingError(
                     f"{lead} has no clone URL (no origin remote) — removing it would leave "
                     "nothing 'context alive' could clone back. Nothing was touched.",
-                    fix=f"Agent action: add the clone URL of {path} as its origin remote",
+                    fix=act("agent", f"add the clone URL of {path} as its origin remote"),
                 )
             if not (path.exists() and self._git.is_git_root(path)):
                 continue
@@ -696,9 +703,10 @@ class SpecContextService:
                 raise DeadReviewRequiredError(
                     f"{lead} has {len(dirty)} uncommitted change(s); dead never "
                     "commits. Nothing was touched.",
-                    fix="Agent action: move "
-                    + ", ".join(str(path / rel) for rel in dirty)
-                    + " into a worktree",
+                    fix=act(
+                        "agent",
+                        "move " + ", ".join(str(path / rel) for rel in dirty) + " into a worktree",
+                    ),
                 )
             held = [r for r in trees if r["repo"] == slug and r["exit"]]  # the owner's exits
             lost = [refix] if failed else [r["exit"] for r in held]
@@ -706,7 +714,7 @@ class SpecContextService:
             if tree := sweep.linked_worktree(self._workspace_root, path):
                 move = git_line(_worktree_git_dir(tree), "worktree", "move", str(tree))
                 lost.append(
-                    f"Agent action: choose a directory to keep {tree} in and run `{move}` with it"
+                    act("agent", f"choose a directory to keep {tree} in and run `{move}` with it")
                 )
             if lost:
                 raise DeadUnpushedCommitsError(
@@ -767,7 +775,7 @@ class SpecContextService:
                 again = fix_line(self._workspace_root, "context", "dead", name)
                 raise ContextStateError(
                     f"Context '{name}' stays ALIVE: {done}",
-                    fix=f"Agent action: free {repo_path} for the move, then run `{again}`",
+                    fix=act("agent", f"free {repo_path} for the move, then run `{again}`"),
                 )
 
         dead_ctx = SpecContextProject(

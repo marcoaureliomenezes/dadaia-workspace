@@ -21,6 +21,7 @@ from pathlib import Path, PurePath
 
 from dadaia_workspace.core import workspace_layout
 from dadaia_workspace.core.cli_line import fix_line, mkdir_line, spell_fix
+from dadaia_workspace.core.platform import act
 
 __all__ = ["Decision", "PathClass", "classify_path", "evaluate"]
 
@@ -32,8 +33,8 @@ _DRAFT: _Fix = lambda root, _: mkdir_line(root / ".dadaia" / "tmp")  # noqa: E73
 #: One fix per refusal, total: a new ``FloorRefusal`` member fails here, as ``REFUSALS`` does.
 _FIXES: dict[workspace_layout.FloorRefusal, _Fix] = {
     _R.LAW: lambda root, _: fix_line(root, "public", "install"),
-    _R.STATE: lambda root, _: (
-        "Agent action: use the verb or skill script that owns that state file instead of editing it"
+    _R.STATE: lambda root, _: act(
+        "agent", "use the verb or skill script that owns that state file instead of editing it"
     ),
     _R.OPERATOR: _DRAFT,
     _R.GLOB: _DRAFT,
@@ -144,7 +145,7 @@ def evaluate(
         fix = (  # an id-less session's bind is its env: only the operator can change it
             fix_line(root, "context", "bind", owner)
             if has_id
-            else f"Operator action: relaunch this session with DADAIA_CONTEXT={owner}"
+            else act("operator", f"relaunch this session with DADAIA_CONTEXT={owner}")
         )
         return Decision.BLOCK, message + spell_fix(fix)
     if zone == "repo":
