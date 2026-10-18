@@ -100,3 +100,28 @@ def test_a_fault_of_the_hook_itself_warns_and_lets_the_update_through(tmp_path: 
     done = run(argv, input=line, cwd=tmp_path, env=env, timeout=60)
     assert done.returncode == 0, done.stderr
     assert "update allowed" in done.stderr, done.stderr
+
+
+def _commit_and_branch(repo: Path, *branches: str) -> None:
+    run(["git", "-c", "user.email=t@example.invalid", "-c", "user.name=T", "commit", "-q",
+         "--allow-empty", "-m", "c"], cwd=repo, check=True)  # fmt: skip
+    for name in branches:
+        run(["git", "branch", name], cwd=repo, check=True)
+
+
+def test_a_zero_old_line_for_an_existing_wt_ref_passes(
+    repo: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A ref packing hands git a zero old sha for refs that already exist: not a creation."""
+    _commit_and_branch(repo, "wt/x")
+    assert ref_transaction.main(_CREATE) == 0
+    assert capsys.readouterr().err == ""
+
+
+def test_a_zero_old_line_for_a_missing_wt_ref_is_refused_beside_an_existing_one(
+    repo: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    _commit_and_branch(repo, "wt/y")
+    monkeypatch.setattr(sys, "prefix", str(_venv(tmp_path, "venv", None)))
+    assert ref_transaction.main(_CREATE) == 1
+    assert capsys.readouterr().err.startswith(f"{_BLOCKED}\nfix: ")

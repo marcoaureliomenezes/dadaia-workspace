@@ -10,6 +10,7 @@ Owner: dd-sw-engineer-sr
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import subprocess
 from pathlib import Path
@@ -19,6 +20,7 @@ import pytest
 import dadaia_workspace
 from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.platform import PLATFORM
+from tests.fixtures.fix_world import World
 from tests.fixtures.stores import fake_venv, own_venv_python
 from tests.helpers.oslib import make_executable, run, write_text
 
@@ -435,3 +437,84 @@ def test_the_rewrite_verb_refuses_a_commit_origin_already_holds(
     published = repo.ok("rev-parse", f"origin/{_WORK}")
     done = _verb(repo, published, env=env)
     _assert_verb_refused(repo, done, before)
+
+
+def _packed(repo: _Repo, *argv: str) -> subprocess.CompletedProcess[str]:
+    """*argv* over a `wt/*` branch that exists already (the runner made it, marked)."""
+    done = repo.git("update-ref", "refs/heads/wt/0.5.0/rc-17/wt-rc", "HEAD", wt=True)
+    assert done.returncode == 0, done.stderr
+    return repo.git(*argv)
+
+
+@pytest.mark.parametrize("argv", [("pack-refs", "--all"), ("gc", "-q")], ids=["pack-refs", "gc"])
+def test_packing_the_refs_of_an_existing_wt_branch_passes(
+    repo: _Repo, argv: tuple[str, ...]
+) -> None:
+    done = _packed(repo, *argv)
+    assert done.returncode == 0, done.stderr
+    assert "BLOCKED" not in done.stderr
+    assert repo.ok("rev-parse", "refs/heads/wt/0.5.0/rc-17/wt-rc") == repo.ok("rev-parse", "HEAD")
+
+
+def test_a_raw_wt_branch_creation_is_refused(repo: _Repo) -> None:
+    done = repo.git("branch", "wt/0.5.0/rc-17/wt-rc")
+    assert done.returncode != 0
+    assert "[ref-gate] BLOCKED refs/heads/wt/0.5.0/rc-17/wt-rc" in done.stderr
+    assert (
+        repo.git("rev-parse", "-q", "--verify", "refs/heads/wt/0.5.0/rc-17/wt-rc").returncode != 0
+    )
+
+
+def _fix_world(tmp_path: Path) -> World:
+    world = World.of(tmp_path)
+    world.seed()
+    world.clone()
+    world.git(world.repo, "branch", "feature/0.1.0", "origin/develop")
+    world.git(world.repo, "push", "-q", "origin", "feature/0.1.0")
+    world.git(world.repo, "fetch", "-q", "origin")
+    return world
+
+
+def _stderr_fix(done: subprocess.CompletedProcess[str]) -> str:
+    return next(ln for ln in done.stderr.splitlines() if ln.startswith("fix: "))[len("fix: ") :]
+
+
+def _fix_command(done: subprocess.CompletedProcess[str]) -> str:
+    """The shell command inside the printed fix; `worktree new <repo>` gets a live name."""
+    text = re.sub(r"^Agent action: ", "", _stderr_fix(done))
+    command = re.sub(r"^.* with (?=\S+ worktree new )", "", text.split(" and the name", 1)[0])
+    return f"{command} 0.1.0/wt-backlog-foo" if command.endswith("worktree new proj") else command
+
+
+def test_the_creation_refusals_fix_runs_in_the_refused_state(tmp_path: Path) -> None:
+    world = _fix_world(tmp_path)
+    refused = world.run(["git", "branch", "wt/0.1.0/wt-backlog-foo"], world.repo)
+    assert refused.returncode != 0
+    fix = world.run(_stderr_fix(refused), world.repo)
+    assert fix.returncode == 0, fix.stderr
+    assert "wt/0.1.0/wt-backlog-foo" in world.git(world.repo, "branch", "--list", "wt/*")
+
+
+def test_the_work_branch_refusals_fix_runs_in_the_refused_state(tmp_path: Path) -> None:
+    world = _fix_world(tmp_path)
+    world.git(world.repo, "checkout", "-q", "-b", "other")
+    world.commit("a.txt", "a")
+    refused = world.run(["git", "branch", "-f", "feature/0.1.0", "other"], world.repo)
+    assert refused.returncode != 0
+    fix = world.run(_fix_command(refused), world.repo)
+    assert fix.returncode == 0, fix.stderr
+
+
+def test_recreating_the_work_branch_at_another_commit_is_refused_with_a_runnable_fix(
+    tmp_path: Path,
+) -> None:
+    world = _fix_world(tmp_path)
+    world.git(world.repo, "checkout", "-q", "-b", "other")
+    world.commit("a.txt", "a")
+    world.git(world.repo, "checkout", "-q", "origin/develop")
+    world.git(world.repo, "branch", "-D", "feature/0.1.0")
+    refused = world.run(["git", "branch", "feature/0.1.0", "other"], world.repo)
+    assert refused.returncode != 0
+    assert "[ref-gate] BLOCKED" in refused.stderr
+    fix = world.run(_fix_command(refused), world.repo)
+    assert fix.returncode == 0, fix.stderr
