@@ -1007,10 +1007,17 @@ def test_a_quote_groups_one_word_of_a_declared_line(
 
 
 def test_an_unbalanced_quote_in_a_declared_line_is_one_refusal_with_one_fix(tmp_path: Path) -> None:
-    end = _law_end(tmp_path, b'verify: pytest -m "not e2e tests\n')
+    tree = make_workspace(tmp_path) / "repos" / "law"
+    tree.mkdir()
+    end = _law_end(tree, b'verify: pytest -m "not e2e tests\n')
 
     with pytest.raises(end.Refusal) as refused:
-        end._declared_argv(tmp_path, "work", "verify:")
+        end._declared_argv(tree, "work", "verify:")
 
-    assert refused.value.fix.startswith("Agent action: ")
+    assert refused.value.args[0] == "the verify: line of work has an unclosed quote"
+    assert refused.value.fix.startswith(
+        "Agent action: close the quote in the verify: line of AGENTS.md on work through a "
+        "wt-backlog lane, then `"
+    )
+    assert refused.value.fix.endswith(f"worktree sync {tree}`")
     assert "\n" not in refused.value.fix

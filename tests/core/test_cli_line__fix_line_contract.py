@@ -312,20 +312,24 @@ def _operator_action_texts(source: str) -> list[str]:
         return None
 
     return [
-        text
+        spelled(node.args[1]) or f"<not a literal: {ast.unparse(node.args[1])}>"
         for node in ast.walk(ast.parse(source))
         if isinstance(node, ast.Call)
         and getattr(node.func, "id", "") == "act"
         and len(node.args) == 2
         and isinstance(node.args[0], ast.Constant)
         and node.args[0].value == "operator"
-        and (text := spelled(node.args[1])) is not None
     ]
 
 
 def test_an_operator_action_text_reads_an_act_call() -> None:
     source = 'b = act("operator", f"remove {target}")\nc = act("agent", "edit the file")\n'
     assert _operator_action_texts(source) == ["remove {target}"]
+
+
+def test_an_operator_action_whose_text_is_a_variable_is_a_hit() -> None:
+    source = 'a = act("operator", text)\nb = act("operator", "x" + y)\n'
+    assert _operator_action_texts(source) == ["<not a literal: text>", "<not a literal: 'x' + y>"]
 
 
 def test_an_operator_action_is_one_act_the_law_reserves_to_the_human() -> None:
@@ -1327,25 +1331,26 @@ def test_no_fix_line_literal_in_the_library_names_the_skill_script() -> None:
 
 
 def test_only_the_producer_spells_an_action_label() -> None:
-    """The one-grep contract: `Agent action:` / `Operator action:` appear in no library module but `_platform.py`."""
+    """The one-grep contract: `Agent action:` / `Operator action:` appear in no `.py` or `.sh`
+    under the library but the kernel producer and the POSIX shim's one line."""
     label = re.compile(r"(Agent|Operator) action:")
+    producer = "dadaia_workspace/public/skills/dd-bug-resolution/scripts/_platform.py"
+    shim = "dadaia_workspace/public/scripts/pre-push-ci-gate.sh:32"
     hits = [
-        f"{p.relative_to(_PKG.parent).as_posix()}:{n}"
-        for p in sorted(_PKG.rglob("*.py"))
-        if p.name != "_platform.py"
+        site
+        for p in sorted([*_PKG.rglob("*.py"), *_PKG.rglob("*.sh")])
+        if (rel := p.relative_to(_PKG.parent).as_posix()) != producer
         for n, line in enumerate(read_text(p).splitlines(), 1)
-        if label.search(line)
+        if label.search(line) and (site := f"{rel}:{n}") != shim
     ]
     assert hits == []
 
 
 def _attribute_act_calls(pkg: Path) -> list[str]:
-    """Every `<x>.act(...)` call under *pkg*, except the door that delegates to the producer."""
-    door = pkg / "core" / "platform.py"
+    """Every `<x>.act(...)` call under *pkg*."""
     return [
         f"{p.relative_to(pkg.parent).as_posix()}:{node.lineno}"
         for p in sorted(pkg.rglob("*.py"))
-        if p != door
         for node in ast.walk(ast.parse(read_text(p)))
         if isinstance(node, ast.Call)
         and isinstance(node.func, ast.Attribute)
@@ -1353,15 +1358,13 @@ def _attribute_act_calls(pkg: Path) -> list[str]:
     ]
 
 
-def test_only_the_door_calls_act_through_an_attribute() -> None:
+def test_no_module_calls_act_through_an_attribute() -> None:
     """An action label is spelled by a bare `act(...)`; `platform.act(...)` is not a producer call."""
     assert _attribute_act_calls(_PKG) == []
 
 
 def test_a_planted_attribute_act_call_is_a_hit(tmp_path: Path) -> None:
     pkg = tmp_path / "dadaia_workspace"
-    _write(
-        pkg / "core" / "platform.py", "def act(kind, text):\n    return _owner.act(kind, text)\n"
-    )
+    _write(pkg / "core" / "platform.py", "act = _owner.act\n")
     _write(pkg / "features" / "gate.py", 'text = platform.act("agent", "edit the file")\n')
     assert _attribute_act_calls(pkg) == ["dadaia_workspace/features/gate.py:1"]
