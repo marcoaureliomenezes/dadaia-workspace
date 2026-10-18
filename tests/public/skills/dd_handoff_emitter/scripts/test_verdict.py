@@ -368,8 +368,7 @@ def test_stats_prints_the_local_metric_table_over_the_candidate_window(tmp_path:
             _born("2026-10-12T14:30:00Z"),
         ],
     )
-    write_text(repo / "specs/constitution.md", '---\ngitflow: {"integration": "develop"}\n---\n')
-    git(repo, "branch", "develop")
+    git(repo, "branch", "dev")
     git(repo, "checkout", "-q", "-b", "topic")
     for message in (
         "fix(bugs): a - cause\n\nblock: item",
@@ -380,7 +379,7 @@ def test_stats_prints_the_local_metric_table_over_the_candidate_window(tmp_path:
         "chore(release): w",
     ):
         git(repo, "commit", "-q", "--allow-empty", "-m", message)
-    git(repo, "checkout", "-q", "develop")
+    git(repo, "checkout", "-q", "dev")
     merged = suite_env(
         os.environ,
         Path.home(),
@@ -444,8 +443,7 @@ def test_stats_reads_closure_duration_as_n_a_before_the_integration_merge(tmp_pa
     root = _stats_workspace(tmp_path)
     repo = root / "repos/r"
     closure = git(repo, "rev-parse", "HEAD").strip()
-    git(repo, "branch", "develop")
-    write_text(repo / "specs/constitution.md", '---\ngitflow: {"integration": "develop"}\n---\n')
+    git(repo, "branch", "dev")
     _log(
         root,
         [
