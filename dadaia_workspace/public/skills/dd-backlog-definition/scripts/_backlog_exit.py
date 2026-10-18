@@ -51,7 +51,7 @@ def _release(specs: Path, slug: str, disposition: str, release: str | None) -> N
                 f"pass --release with the release folder under {releases} whose SPEC "
                 f"names {slug}, then rerun this exit with --disposition {disposition}.",
             ),
-        )  # fmt: skip
+        )
     folder = releases / release
     if not any(slug in _origin_ids(s) for s in folder.glob("rc-*/SPEC.md")):
         raise Refusal(
@@ -62,7 +62,7 @@ def _release(specs: Path, slug: str, disposition: str, release: str | None) -> N
                 f"name {slug} in the backlog: clause of the first **Origin:** line "
                 f"of a SPEC under {folder}, then rerun this exit with --disposition {disposition}.",
             ),
-        )  # fmt: skip
+        )
 
 
 def _reason(specs: Path, slug: str, disposition: str, reason: str | None) -> None:

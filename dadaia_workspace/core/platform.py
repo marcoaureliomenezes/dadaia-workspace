@@ -79,11 +79,6 @@ def inline(*argv: str) -> str:
     return _owner.inline(*argv, caps=_caps())
 
 
-def act(kind: str, text: str) -> str:
-    """The action line of *kind* (``agent`` or ``operator``) carrying *text*, by the kernel's rule."""
-    return _owner.act(kind, text)
-
-
 def git_inline(repo: Path | str, *argv: str) -> str:
     """``git -C <repo> argv…`` as text inside a sentence, by the kernel's rule fed the current ``PLATFORM``."""
     return _owner.git_inline(repo, *argv, caps=_caps())
@@ -121,6 +116,7 @@ def make_executable(path: Path) -> None:
 
 # The kernel's functions that read no capability: the door hands them out unchanged.
 Undecodable = _owner.Undecodable
+act = _owner.act
 can_write = _owner.can_write
 decode = _owner.decode
 effective_uid = _owner.effective_uid

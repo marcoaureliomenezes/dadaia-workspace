@@ -17,7 +17,7 @@ import sys
 import time
 from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path, PurePath, PurePosixPath
-from typing import IO, Any, NamedTuple
+from typing import IO, Any, Literal, NamedTuple
 
 from _refusal import Refusal
 
@@ -445,7 +445,7 @@ def command(*argv: str, caps: Caps | None = None) -> str:
 _LABELS = {"agent": "Agent action", "operator": "Operator action"}
 
 
-def act(kind: str, text: str) -> str:
+def act(kind: Literal["agent", "operator"], text: str) -> str:
     """*text* behind the label of *kind* (``agent`` or ``operator``); any other *kind* raises ``ValueError``."""
     if kind not in _LABELS:
         raise ValueError(f"unknown action kind {kind!r}")

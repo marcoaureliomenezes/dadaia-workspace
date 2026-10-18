@@ -196,11 +196,6 @@ def _declared_argv(tree: Path, work: str, key: str) -> list[str]:
     return [_QUOTED.sub(lambda m: m[1] if m[1] is not None else m[2], w) for w in _WORD.findall(line)]  # fmt: skip
 
 
-_GATE_TAILS = {"main": "commit the fix in a task of this job",
-           "rc": "commit the fix in this worktree when a reconcile commit is at fault, or through a"
-                 " wt-hotfix lane when the work branch's verify: fails too, then `{sync}`"}  # fmt: skip
-
-
 def _gate(tree: Path, work: str) -> None:
     """Run *work*'s tracked `verify:` once."""
     key = "verify:"
@@ -220,10 +215,17 @@ def _gate(tree: Path, work: str) -> None:
                                        " (no shell: no VAR=value prefix, no sh -c)")) from error  # fmt: skip
     if done.returncode:
         name = (locate(tree.relative_to(root).as_posix()) or ("", ""))[1]
-        sync = inline(*cli_words(root, "worktree", "sync", str(tree)))
-        tail = _GATE_TAILS.get(kind_of(name or "") or "", "commit the fix in this worktree").format(
-            sync=sync
-        )
+        match kind_of(name or ""):
+            case "main":
+                tail = "commit the fix in a task of this job"
+            case "rc":
+                sync = inline(*cli_words(root, "worktree", "sync", str(tree)))
+                tail = (
+                    "commit the fix in this worktree when a reconcile commit is at fault, or through a"
+                    f" wt-hotfix lane when the work branch's verify: fails too, then `{sync}`"
+                )
+            case _:
+                tail = "commit the fix in this worktree"
         raise Refusal(f"{key} exited {done.returncode}",
                       act("agent", f"make `{inline(*argv)}` exit 0 in {tree} and {tail}"))  # fmt: skip
 
@@ -257,7 +259,7 @@ def _refuse_implementation_tests(tree: Path, onto: str, law: str) -> None:
                 act(
                     "agent",
                     f"move {test} to the separate RED test dispatch and keep this implementation commit source-only",
-                ),  # fmt: skip
+                ),
             )
 
 
@@ -281,7 +283,7 @@ def _scaffold(tree: Path, name: str) -> None:
             act(
                 "agent",
                 f"promote each test in {folder} into its contract's home (a delete needs the operator's order), then commit the removal",
-            ),  # fmt: skip
+            ),
         )
 
 
