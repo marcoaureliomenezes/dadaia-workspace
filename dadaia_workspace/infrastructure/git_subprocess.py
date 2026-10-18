@@ -9,6 +9,7 @@ from dadaia_workspace.core.cli_line import fix_line, fix_of, git_line, without_f
 from dadaia_workspace.core.exceptions import GitCloneError, GitSyncError
 from dadaia_workspace.core.gitflow import DEFAULT, Gitflow, read_gitflow, work_branch
 from dadaia_workspace.core.models.git_scan import GitObjectReadError
+from dadaia_workspace.core.platform import act
 from dadaia_workspace.core.skill_owner import load_owner
 from dadaia_workspace.infrastructure.git_objects import unpublished
 
@@ -144,7 +145,7 @@ class GitSubprocessClient:
         it until a ``fetch --prune`` drops it (re-running the line restores it); commits with
         no remote; a stash entry, which lives only in this checkout."""
         if self.has_commits(path) and not self.has_remote(path):
-            return [f"Agent action: add the clone URL of {path} as its origin remote"]
+            return [act("agent", f"add the clone URL of {path} as its origin remote")]
         listed = _run(["git", "worktree", "list", "--porcelain"], cwd=path).stdout
         trees = [
             t["worktree"] for t in load_owner("dd-bug-resolution", "_git").parse_worktrees(listed)
@@ -159,7 +160,7 @@ class GitSubprocessClient:
             and self.unpushed(path, f"refs/heads/{b}")
         ]
         stashes = _run(["git", "stash", "list"], cwd=path).stdout.count("\n")
-        stash = f"Operator action: pop or drop the {stashes} stash entry(ies) of {path}"
+        stash = act("operator", f"pop or drop the {stashes} stash entry(ies) of {path}")
         return (
             [git_line(path, "worktree", "remove", t) for t in trees]
             + [
@@ -176,7 +177,7 @@ class GitSubprocessClient:
             if _run(["git", "var", ident], cwd=path).returncode != 0:
                 named = _run(["git", "config", "user.name"], cwd=path).stdout.strip()
                 key = "user.email" if named else "user.name"
-                return f"Agent action: set git {key} in the config of {path}"
+                return act("agent", f"set git {key} in the config of {path}")
         return ""
 
     def push(self, path: Path) -> None:

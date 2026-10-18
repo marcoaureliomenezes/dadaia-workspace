@@ -9,6 +9,7 @@ from typing import cast
 
 from dadaia_workspace.core import platform
 from dadaia_workspace.core.exceptions import SchemaVersionError
+from dadaia_workspace.core.platform import act
 
 
 def read(path: Path) -> dict[str, object]:
@@ -27,7 +28,7 @@ def read(path: Path) -> dict[str, object]:
         shape = '{"contexts": [...]}'
         raise SchemaVersionError(
             f"{path} is not one {shape} object.",
-            f"Operator action: rewrite {path} as one {shape} object",
+            act("operator", f"rewrite {path} as one {shape} object"),
         )
     return data
 

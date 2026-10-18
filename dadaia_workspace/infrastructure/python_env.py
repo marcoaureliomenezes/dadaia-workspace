@@ -27,6 +27,7 @@ from dadaia_workspace.core.exceptions import (
     WorkspaceVenvBootstrapError,
     WorkspaceVenvNewerError,
 )
+from dadaia_workspace.core.platform import act
 from dadaia_workspace.infrastructure.provider_version import provider_version
 
 __all__ = [
@@ -495,8 +496,11 @@ class VenvPythonEnvironmentManager:
         except OSError as exc:
             raise WorkspaceVenvBootstrapError(
                 f"workspace venv python cannot run: {exc}.",
-                f"Agent action: delete {platform.quote(str(self._venv_path(workspace_root)))} and run "
-                f"`{platform.inline('uvx', 'dadaia-workspace', 'init', workspace_root)}`",
+                act(
+                    "agent",
+                    f"delete {platform.quote(str(self._venv_path(workspace_root)))} and run "
+                    f"`{platform.inline('uvx', 'dadaia-workspace', 'init', workspace_root)}`",
+                ),
             ) from exc
 
     def _probe_provider(self, workspace_root: str) -> "subprocess.CompletedProcess[str]":

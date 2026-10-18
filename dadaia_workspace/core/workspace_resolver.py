@@ -18,6 +18,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from dadaia_workspace.core.exceptions import WorkspaceNotInitializedError
+from dadaia_workspace.core.platform import act
 from dadaia_workspace.core.skill_owner import load_owner
 
 _root = load_owner("dd-bug-resolution", "_root")
@@ -94,7 +95,7 @@ def not_initialized(
     )
     return WorkspaceNotInitializedError(
         f"No initialized workspace found from '{searched}'.{partial}",
-        fix="Agent action: run `uvx dadaia-workspace init` with the new workspace's directory",
+        fix=act("agent", "run `uvx dadaia-workspace init` with the new workspace's directory"),
     )
 
 

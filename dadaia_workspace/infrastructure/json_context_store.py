@@ -17,6 +17,7 @@ from dadaia_workspace.core.models.spec_context import (
     ContextState,
     SpecContextProject,
 )
+from dadaia_workspace.core.platform import act
 from dadaia_workspace.core.workspace_layout import occupied
 
 _VERSION = 3
@@ -37,10 +38,10 @@ def parse_schema_version(data: dict, path: Path) -> int:  # type: ignore[type-ar
     text = str(_VERSION if raw is None else raw)
     if isinstance(raw, bool) or not text.isdigit():
         problem = f"spec_contexts.json schema_version {raw!r} is not a number."
-        raise SchemaVersionError(problem, f"Operator action: set it to {_VERSION} in {path}")
+        raise SchemaVersionError(problem, act("operator", f"set it to {_VERSION} in {path}"))
     if int(text) > _VERSION:
         problem = f"spec_contexts.json schema_version {text} is newer than this dadaia."
-        raise SchemaVersionError(problem, f"Agent action: upgrade dadaia-workspace to read {path}")
+        raise SchemaVersionError(problem, act("agent", f"upgrade dadaia-workspace to read {path}"))
     legacy = any(c.get("state") in LEGACY_STATES for c in data.get("contexts", []))
     return 1 if legacy or int(text) < 2 else int(text)
 
@@ -58,7 +59,7 @@ def _load(path: Path) -> dict:  # type: ignore[type-arg]
         if missing := [k for k in ROW_KEYS if k not in row]:
             raise SchemaVersionError(
                 f"{path}: context row {row.get('name')!r} has no {', '.join(missing)}.",
-                f"Operator action: add {', '.join(missing)} to that row of {path}",
+                act("operator", f"add {', '.join(missing)} to that row of {path}"),
             )
     return data
 

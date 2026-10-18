@@ -22,6 +22,7 @@ from dadaia_workspace.core.atomic_write import SymlinkRefusedError
 from dadaia_workspace.core.cli_line import fix_line, materialize_line, spell_fix
 from dadaia_workspace.core.doctor_rules import SectionFinding
 from dadaia_workspace.core.gitflow import DEFAULT, Gitflow, from_mapping, work_branch
+from dadaia_workspace.core.platform import act
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.migrate import upgrade as upgrade_feature
 from dadaia_workspace.features.migrate.upgrade import UpgradeRefused, UpgradeResult
@@ -150,7 +151,7 @@ def init(
             ctx = resolve_context_for_cli(context)
         except ValueError as exc:
             init = fix_line(None, "specs", "init", "--context")
-            fail(exc, f"Agent action: choose a registered context and run `{init}` with it")
+            fail(exc, act("agent", f"choose a registered context and run `{init}` with it"))
         tree = resolve_context_specs_dir_for_cli(workspace := resolve_workspace_root(), ctx)
         if tree is None:  # a name the registry does not know owns no tree to write
             fail(f"no registered context {ctx!r}", fix_line(workspace, "context", "list"))

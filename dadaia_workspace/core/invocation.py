@@ -18,6 +18,7 @@ from dadaia_workspace.core import context_registry, platform, workspace_resolver
 from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.exceptions import SpecsDirUnresolvedError
 from dadaia_workspace.core.models.spec_context import CONTEXT_NAME_RE
+from dadaia_workspace.core.platform import act
 from dadaia_workspace.core.session_store import live_session
 
 __all__ = [
@@ -245,7 +246,7 @@ def resolve_specs_dir(specs_dir: str | None) -> Path:
         if platform.is_link(path):
             raise SpecsDirUnresolvedError(
                 f"Refusing a symlinked specs root: {path} is a symlink.",
-                fix=f"Agent action: point --specs-dir at the real directory, not the link {path}",
+                fix=act("agent", f"point --specs-dir at the real directory, not the link {path}"),
             )
         return path.resolve()
 
@@ -255,8 +256,11 @@ def resolve_specs_dir(specs_dir: str | None) -> Path:
 
     raise SpecsDirUnresolvedError(
         "Could not resolve specs_dir. Pass --specs-dir or bind a context.",
-        fix="Agent action: pass --specs-dir with the specs/ directory, or run "
-        f"`{fix_line(None, 'context', 'bind')}` with a context name",
+        fix=act(
+            "agent",
+            "pass --specs-dir with the specs/ directory, or run "
+            f"`{fix_line(None, 'context', 'bind')}` with a context name",
+        ),
     )
 
 

@@ -17,6 +17,7 @@ from typing import Literal
 from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.frontmatter import Frontmatter, parse
 from dadaia_workspace.core.gitflow import constitution_problem, constitution_text, specs_path_kind
+from dadaia_workspace.core.platform import act
 
 #: Single source of truth for the current canonical specs-pattern version.
 #: Bump this whenever the canon a tree must meet changes. A canon change that
@@ -44,7 +45,7 @@ def state(
     The fix names *context* when given, else *specs_dir* itself."""
     if text is None and (on_disk := specs_path_kind(specs_dir)) != "tree":
         if on_disk == "file":  # `specs init` cannot build a tree on a non-directory
-            return "file", f"Agent action: move {specs_dir} aside, it is not a directory"
+            return "file", act("agent", f"move {specs_dir} aside, it is not a directory")
         kind: State = "absent"
     elif problem := constitution_problem(specs_dir, text):
         return "malformed", problem[1]
