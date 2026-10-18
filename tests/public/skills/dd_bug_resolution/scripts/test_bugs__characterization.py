@@ -114,7 +114,7 @@ def test_all_public_bug_verbs_pin_output_and_each_ledger_write(tmp_path: Path) -
         "reported_by": "characterizer",
         "title": "Appended bug",
         "severity": "MEDIUM",
-        "component": "bugs.py",
+        "component": "src/module.py",
         "symptom": "Append symptom",
         "repro": "python -m append",
         "expected": "Append succeeds",
@@ -133,10 +133,8 @@ def test_all_public_bug_verbs_pin_output_and_each_ledger_write(tmp_path: Path) -
         "Appended bug",
         "--severity",
         "MEDIUM",
-        "--surface",
-        "src",
         "--component",
-        "bugs.py",
+        "src/module.py",
         "--context",
         "characterization",
         "--symptom",
@@ -297,7 +295,7 @@ def test_append_rejects_ts_option_as_unknown(tmp_path: Path) -> None:
     _git(repo, "commit", "-qm", "fixture")
     valid = [
         "append", "--bug-id", "x", "--reported-by", "r", "--title", "T", "--severity", "LOW",
-        "--surface", "src", "--component", "c", "--context", "k", "--symptom", "s",
+        "--component", "src/module.py", "--context", "k", "--symptom", "s",
         "--repro", "p", "--expected", "e", "--correlates", "none", "--specs", str(repo / "specs"),
     ]  # fmt: skip
     result = _run(script, repo, *valid, "--ts", _OPENED)

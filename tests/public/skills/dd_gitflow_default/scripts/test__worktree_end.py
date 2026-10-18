@@ -614,7 +614,7 @@ def test_a_verify_line_refusal_clears_by_its_printed_act(
     commit(repo, "AGENTS.md", f"verify: {declared}\n" if declared else "")
     if kind == "hotfix":
         flags = ("--bug-id", "some-bug", "--reported-by", "t", "--title", "t", "--severity", "LOW",
-                 "--surface", "scripts", "--component", "c", "--context", "c", "--symptom", "s",
+                 "--component", "AGENTS.md", "--context", "c", "--symptom", "s",
                  "--repro", "r", "--expected", "e", "--correlates", "none")  # fmt: skip
         run_python(str(_PACKAGE_SKILLS / "dd-bug-resolution/scripts/bugs.py"), "append",
                    "--specs", str(repo / "specs"), *flags, check=True)  # fmt: skip
@@ -654,7 +654,7 @@ def test_an_rc_gate_red_from_the_work_branch_clears_through_a_hotfix_then_the_pr
     git(repo, "checkout", "-q", "feature/0.5.0")
     commit(repo, "RED-job", "")
     flags = ("--bug-id", "some-bug", "--reported-by", "t", "--title", "t", "--severity", "LOW",
-             "--surface", "scripts", "--component", "c", "--context", "c", "--symptom", "s",
+             "--component", "AGENTS.md", "--context", "c", "--symptom", "s",
              "--repro", "r", "--expected", "e", "--correlates", "none")  # fmt: skip
     run_python(str(_PACKAGE_SKILLS / "dd-bug-resolution/scripts/bugs.py"), "append",
                "--specs", str(repo / "specs"), *flags, check=True)  # fmt: skip

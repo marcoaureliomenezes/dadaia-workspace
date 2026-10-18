@@ -160,7 +160,7 @@ def test_following_the_not_utf8_fix_keeps_every_valid_record(tmp_path: Path) -> 
         return os_run([sys.executable, str(script), *argv, "--specs", str(specs)], check=False)
 
     appended = run("append", "--bug-id", "a-bug", "--reported-by", "x", "--title", "caf\u00e9",
-                   "--severity", "LOW", "--surface", "src", "--component", "c", "--context", "ctx",
+                   "--severity", "LOW", "--component", "src/m.py", "--context", "ctx",
                    "--symptom", "s", "--repro", "r", "--expected", "e", "--correlates", "none")  # fmt: skip
     assert appended.returncode == 0, appended.stderr
     ledger.write_bytes(ledger.read_bytes().replace("caf\u00e9".encode(), b"caf\xe9"))
