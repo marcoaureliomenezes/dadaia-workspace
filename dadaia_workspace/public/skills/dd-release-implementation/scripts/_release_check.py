@@ -21,7 +21,7 @@ import _findings
 import _jsonl
 import _ledger
 from _ledger import SPECS, load_schema, validate
-from _platform import read_text
+from _platform import act, read_text
 from _release_schema import (
     CODE,
     DELIVERED,
@@ -176,11 +176,11 @@ def candidate_errors(candidate: Path) -> list[tuple[Path, str, str]]:
     if plan.is_file():
         text = read_text(plan)
         planned = current_plan_jobs(text)[0]
-        redo = f"Agent action: correct the as-is review and DAG in {plan.resolve()}"
+        redo = act("agent", f"correct the as-is review and DAG in {plan.resolve()}")
         found += [(plan, e, redo) for e in plan_errors(text) + (dag_errors(text) if planned is None else [])]  # fmt: skip
     authorities: dict[str, set[str]] = {}
     for job in sorted(candidate.glob("tasks/*.md")):
-        rel, fix = f"tasks/{job.name}", f"Agent action: correct {job.resolve()} (dd-release-definition §5)"  # fmt: skip
+        rel, fix = f"tasks/{job.name}", act("agent", f"correct {job.resolve()} (dd-release-definition §5)")  # fmt: skip
         body = read_text(job)
         found += [(job, e, fix) for e in job_errors(body, rel)]
         if (writes := current_job_writes(body, rel)[0]) is None:
@@ -188,15 +188,15 @@ def candidate_errors(candidate: Path) -> list[tuple[Path, str, str]]:
         number = job.stem.removeprefix("job")
         if not number.isdigit() or number.startswith("0"):
             found.append((job, f"current task authority {job.name} has no positive-numbered job filename",
-                          f"Agent action: rename {job.resolve()} to its canonical positive-numbered job filename"))  # fmt: skip
+                          act("agent", f"rename {job.resolve()} to its canonical positive-numbered job filename")))  # fmt: skip
         else:
             authorities[f"Job {int(number)}"] = writes
     if planned:
         jobs = {name: row for name, row in planned.items() if name != "Reconciliation"}
         if set(jobs) != set(authorities):
             found.append((plan, "PLAN.md DAG jobs do not equal the current tasks/job<n>.md authorities",
-                          f"Agent action: make every current job appear exactly once in {plan.resolve()}"))  # fmt: skip
+                          act("agent", f"make every current job appear exactly once in {plan.resolve()}")))  # fmt: skip
         found += [(plan, f"PLAN.md DAG {name} `W:` is not its exact task-file union",
-                   f"Agent action: set {name}'s exact `W:` in {plan.resolve()} from tasks/job{name.split()[-1]}.md")  # fmt: skip
+                   act("agent", f"set {name}'s exact `W:` in {plan.resolve()} from tasks/job{name.split()[-1]}.md"))  # fmt: skip
                   for name, (_, owned) in jobs.items() if name in authorities and owned != authorities[name]]  # fmt: skip
     return found
