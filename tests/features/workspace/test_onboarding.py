@@ -168,7 +168,7 @@ def test_several_work_branches_make_the_first_pass_an_agent_step_with_the_refusa
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, fix: str, first: str
 ) -> None:
     several = load_owner("dd-gitflow-default", "_worktree_git").SeveralWork(
-        "2 work branches", fix, "0.2.0"
+        "2 work branches", first, "0.2.0"
     )
 
     def refuse(_s: object, _p: object) -> str:
