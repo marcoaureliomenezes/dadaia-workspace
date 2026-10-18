@@ -7,7 +7,7 @@ from __future__ import annotations
 from collections import deque
 from pathlib import Path
 
-from _platform import command, git_inline, inline
+from _platform import act, command, git_inline, inline
 from _worktree_end import _check_ancestor, _refuse_dirty, _target
 from _worktree_git import cli_words, flow_for, git, ours
 from _worktree_names import LAUNCH, Refusal, base_of, branch
@@ -53,9 +53,10 @@ def sync(root: Path, path: str) -> str:
             git(tree, "rebase", "--fork-point", base)
         except RuntimeError as error:
             git(tree, "rebase", "--abort", check=False)
-            fix = (
-                f"Agent action: resolve the conflict by hand (`{git_inline(tree, 'rebase', base)}`), "
-                f"then rerun `{inline(*cli_words(root, 'worktree', 'sync', path))}`"
+            fix = act(
+                "agent",
+                f"resolve the conflict by hand (`{git_inline(tree, 'rebase', base)}`), "
+                f"then rerun `{inline(*cli_words(root, 'worktree', 'sync', path))}`",
             )
             raise Refusal(f"{tree} conflicts rebasing onto {base}", fix) from error
         moved += 1

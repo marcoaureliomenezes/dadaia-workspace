@@ -19,7 +19,7 @@ sys.path[:0] = [
 ]
 
 from _git import GitError
-from _platform import inline, use_utf8_stdio
+from _platform import act, inline, use_utf8_stdio
 from _refusal import report, spell_fix
 from _worktree_end import clean, digest, merge
 from _worktree_git import rows, workspace_of
@@ -84,7 +84,7 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     except GitError as failure:  # no check named it: an agent act, then the same call
         again = inline(*LAUNCH, *(sys.argv[1:] if argv is None else argv))
-        report(failure, f"Agent action: clear the git failure above, then rerun {again}")
+        report(failure, act("agent", f"clear the git failure above, then rerun {again}"))
         return 1
     if args.json:
         print(json.dumps(found, indent=2))
