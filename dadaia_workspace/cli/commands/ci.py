@@ -242,8 +242,12 @@ def push_gate_check(
 
 @app.command("ref-gate-check")
 def ref_gate_check() -> None:
-    """Reference-transaction gate: ``<old> <new> <ref>`` lines on stdin; a work-branch update
-    must land on origin's sha, or be a descendant move touching only ``specs/audits/**``."""
+    """Reference-transaction gate: a work-branch update must land on origin's sha.
+
+    Reads ``<old> <new> <ref>`` lines on stdin. The reference-transaction hook resolves a zero
+    old sha to the ref's current value before it calls this verb, so an existing ref's old sha
+    arrives resolved; a descendant move touching only ``specs/audits/**`` passes.
+    """
     from dadaia_workspace.container import build_git_client
 
     repo_root = _repo_root()

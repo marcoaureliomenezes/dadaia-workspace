@@ -1,6 +1,6 @@
 """The ONE source of the Linux CI jobs and repository verification:
-``python scripts/ci.py [<job>...]`` runs the named ``ci.yml`` jobs (all of them when none is
-given); ``job`` runs lint, mypy, guards and the small tier; ``--changed`` runs the tests
+``python scripts/ci.py [<job>...]`` runs the named ``ci.yml`` jobs; no argument, or ``job``, runs
+the job level (``STAGE``: lint, typecheck, guards, unit-fast, doctor); ``--changed`` runs the tests
 ``scripts/impact.py`` selects. Each step
 prints ``PASS``/``FAIL <step>: <command>``; every step runs; exit 1 if any failed. Standard
 library only: the ``repo-hygiene`` and ``doctor`` jobs install no dev group."""
