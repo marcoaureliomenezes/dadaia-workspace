@@ -368,13 +368,32 @@ def test_stats_prints_the_local_metric_table_over_the_candidate_window(tmp_path:
             _born("2026-10-12T14:30:00Z"),
         ],
     )
+    write_text(repo / "specs/constitution.md", '---\ngitflow: {"integration": "develop"}\n---\n')
+    git(repo, "branch", "develop")
+    git(repo, "checkout", "-q", "-b", "topic")
     for message in (
         "fix(bugs): a - cause\n\nblock: item",
         "refactor(J1.T1): REBUILD x",
         "docs(memory): reconcile",
         "feat(J1.T2): y",
+        "docs(law): z",
+        "chore(release): w",
     ):
         git(repo, "commit", "-q", "--allow-empty", "-m", message)
+    git(repo, "checkout", "-q", "develop")
+    merged = suite_env(
+        os.environ,
+        Path.home(),
+        overrides={
+            "HOME": str(repo),
+            "PATH": os.environ["PATH"],
+            "GIT_CONFIG_NOSYSTEM": "1",
+            "GIT_COMMITTER_DATE": "2026-10-12T14:30:00Z",
+        },
+    )
+    ident = ["-c", "user.name=t", "-c", "user.email=t@t"]
+    landed = os_run(["git", *ident, "merge", "-q", "--no-ff", "-m", "Merge candidate", "topic"], cwd=repo, env=merged)  # fmt: skip
+    assert landed.returncode == 0, landed.stderr
     ledger = repo / "specs/bugs"
     for name, rows in (
         ("BUGS.jsonl", (("a", "none", "10:30"), ("b", "a", "10:31"))),
@@ -414,11 +433,30 @@ def test_stats_prints_the_local_metric_table_over_the_candidate_window(tmp_path:
         "1 fix-induced bugs\t1/4 (25%)\t<= 20%\n"
         "2 first-pass approval\t2/4 (50%)\t>= 70%\n"
         "4 closure duration\t3.5 h\t<= 4 h\n"
-        "6 non-block commits after closure\t2\t0\n"
+        "6 non-block commits after closure\t3\t0\n"
         "7 memory drift\t3\t0\n"
         "9 rebuild-due patches\t2\t0\n"
         "oldest record\t2026-10-09T10:00:01Z\n",
     ), done.stderr
+
+
+def test_stats_reads_closure_duration_as_n_a_before_the_integration_merge(tmp_path: Path) -> None:
+    root = _stats_workspace(tmp_path)
+    repo = root / "repos/r"
+    closure = git(repo, "rev-parse", "HEAD").strip()
+    git(repo, "branch", "develop")
+    write_text(repo / "specs/constitution.md", '---\ngitflow: {"integration": "develop"}\n---\n')
+    _log(
+        root,
+        [
+            _born("2026-10-12T09:00:00Z"),
+            _milestone("2026-10-12T09:30:00Z", "rc-99", "defined", "1" * 40),
+            _milestone("2026-10-12T11:00:00Z", "rc-99", "implemented", closure),
+        ],
+    )
+    done = _stats(root)
+    assert done.returncode == 0, done.stderr
+    assert "4 closure duration\tn/a\t<= 4 h" in done.stdout.splitlines()
 
 
 def test_stats_reads_absent_data_as_n_a_and_exits_zero(tmp_path: Path) -> None:
