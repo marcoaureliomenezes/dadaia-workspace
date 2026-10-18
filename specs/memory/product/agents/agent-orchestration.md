@@ -31,11 +31,12 @@ The main thread is the operator's session and the only dispatcher. It owns intak
 - The main thread dispatches by the job file's `who` column: `sr` to `dd-sw-engineer-sr`, `jr` to `dd-sw-engineer-jr`, `pe` and `cr` to the owning persona; research goes to `dd-researcher`. The definition's reviewer judges each `who` against the shape rule.
 - A REJECTED verdict whose finding names a `jr` task re-dispatches that task to `dd-sw-engineer-sr`.
 - The task is the implementation dispatch unit. A behavior begins with a RED-test dispatch and continues in a fresh implementation dispatch that cannot touch test paths ([[worktrees]]).
+- Before every hand-back an implementer runs one self-check, stated once in `dd-release-implementation` and pointed to by both engineer personas: the repo's `verify:` line, the test directories the change reaches, and a read of its own diff for removed assertions, newly skipped tests, hand-typed fix-line labels, platform literals in assertions and the job's sweep greps; it hands back with no process of its own still running. When a task's work merges or its hand-back is checked, the main thread stops every agent of that task still running.
 - Jobs and tasks may run concurrently only where the approved PLAN and exact write sets permit it. Git exposes races; no agent acquires a lock.
 - No runtime advances the lifecycle. `_RELEASE.json`, approved definition documents, job files, worktrees, commits and handoffs are the evidence ([[release-lifecycle]]).
 - Only the main thread opens and merges canonical worktrees. A leaf works inside the path it receives and returns a validated handoff.
 - A `wt-main`, `wt-rc`, backlog or hotfix tree lands only after the reviewer's `APPROVED` verdict binds to its exact diff; task merges are unreviewed and enforce git hygiene plus RED/implementation separation.
-- A review is dispatched on the tree as it stands; no preflight runs before it, and the reviewer never runs `verify:`: its `## Verify` section reports the tests it ran itself (the revert-RED check) and, for a PR, the CI result of the PR head. The merge runs `verify:` once ([[worktrees]]).
+- A review is dispatched on the tree as it stands; no preflight runs before it, and the reviewer never runs `verify:`: its `## Verify` section reports the tests it ran itself (the revert-RED check) and, for a PR, the `verify:` result the PR gate requires of its head. The merge runs `verify:` once ([[worktrees]]).
 
 ## Questions and decisions
 

@@ -38,7 +38,7 @@ and tasks are the only implementation levels.
 
 Arm B proposes and registers a confirmed bug, establishes lineage, lands a lowest-level
 RED case, fixes the owning seam, proves GREEN and resolves the record with `cause`,
-`solution`, `caused_by` and `fix_sha`. A block-list bug uses a hotfix lane; other bugs enter
+`solution`, `caused_by` and `fix_sha`, plus the fix's `fix_files`. A block-list bug uses a hotfix lane; other bugs enter
 approved candidate scope. Documents record the flow; there is no in-repository flow engine.
 
 ## The gate
@@ -60,7 +60,7 @@ release history.
 
 `specs/bugs/BUGS.jsonl` holds one record per bug, appended once. New records use
 `open | resolved | superseded | rejected`; resolution persists `cause`, `solution`,
-`caused_by` and `fix_sha`, while git supplies the implementation diff. The next SPEC's
+`caused_by`, `fix_sha` and `fix_files`, while git supplies the implementation diff. The next SPEC's
 bug-window review owns maturity, and the closure summary owns delivered and carried scope.
 
 `specs/backlog/BACKLOG.json` is the operator's active demand queue. An entry is created by

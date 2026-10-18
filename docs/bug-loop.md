@@ -18,9 +18,10 @@ python3 .agents/skills/dd-bug-resolution/scripts/bugs.py append \
   --context demo --symptom "…" --repro "…" --expected "…" --correlates none
 ```
 
-The ledger holds one record per bug, keyed by id. `append` prints correlation candidates,
-opens the record, refuses a duplicate id or a `component` naming no tracked path, and
-requires `--correlates <ids>|none`. `component` is precise free text; its tracked paths
+The ledger holds one record per bug, keyed by id. `append` prints each earlier bug whose
+recorded fix files lie under a path the `component` names, with the REBUILD due on that
+path, opens the record, refuses a duplicate id or a `component` naming no tracked path, and
+requires `--correlates` as ledger or archive ids, or `none`. `component` is precise free text; its tracked paths
 are the bug's files. Every supplied value passes the same privacy check used by the push gate.
 
 Not a bug: an agent mistake, wrong usage, an environment limit, designed validation, law

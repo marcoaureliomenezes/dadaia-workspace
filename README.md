@@ -109,7 +109,7 @@ through the gate asserting ALLOW. No lease, lock or wait path exists; the gate r
 Work runs as candidates inside one live release: a picked set, an as-is review of every
 unit it touches, a grill, SPEC, a PLAN drawing a DAG of jobs and one job file per job; the candidate lives on its `wt-rc` worktree, each task runs in its own worktree and
 lands on its job's `wt-main` after its gate, each job lands on the `wt-rc` only after the reviewer's `APPROVED`, then the
-Reconciliation closes it — memory reconciliation, disposition sweep — the `wt-rc` lands on the work branch and the work -> integration merge follows; `.dadaia/.venv/bin/dadaia worktree <verb>` runs every worktree verb (branch names: the constitution's `gitflow:`). The
+Reconciliation closes it — disposition sweep, then memory reconciliation last; after CLOSURE only a block-list bug lands — the `wt-rc` lands on the work branch and the work -> integration merge follows; `.dadaia/.venv/bin/dadaia worktree <verb>` runs every worktree verb (branch names: the constitution's `gitflow:`). The
 ledger scripts under `.agents/skills/*/scripts/` (`bugs.py`, `backlog.py`,
 `release.py`, `audit.py`) are each record's one writer. A bug is proposed to the
 operator and registered only after confirmation; a block-list bug is fixed at once in a

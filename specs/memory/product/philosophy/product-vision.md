@@ -19,11 +19,12 @@ sources:
 
 ## Product principles
 
-- Simplicity and lightness are the first law: the lightest solution that works wins, and a heavier one is chosen only when a lighter one was tried and failed. A requirement applied to every task, job or deletion is a gate, states its measured cost per run, and that cost never exceeds one run of the job's `verify:` gate without the operator's ruling. The `verify:` line and the merge checks are gates: changing one states its measured cost and needs the operator's ruling; no step reruns a check the merge runs; a heavier gate is never the recommended option. A new gate names the heavier one it deletes.
+- Simplicity and lightness are the first law: the lightest solution that works wins, and a heavier one is chosen only when a lighter one was tried and failed. A requirement applied to every task, job or deletion is a gate, states its measured cost per run, and that cost never exceeds one run of the job's `verify:` gate as it stood before the change without the operator's ruling. The `verify:` line and the merge checks are gates: a change to one states its measured cost against the line it replaces, never against itself, and needs the operator's ruling; no step reruns a check the merge runs; a heavier gate is never the recommended option. A new gate names the heavier one it deletes.
 - Context is explicit: a bind scopes the session to one context's repository set and injects its constitution and memory.
 - Documents are the lifecycle: backlog, approved definition, job files, release state and record stores carry progress; no workflow engine advances them.
-- Mechanical boundaries cover path class, bind scope, root hygiene and push publication. Each refusal carries one fix line: a runnable command, an `Agent action:` an agent performs, or an `Operator action:` only for an act the law reserves to the operator ([[sdd-gate-v3]]).
+- Mechanical boundaries cover path class, bind scope, root hygiene and push publication. Each refusal carries one fix line: a runnable command, an `Agent action:` an agent performs (one act may chain up to three steps), or an `Operator action:` only for an act the law reserves to the operator ([[sdd-gate-v3]]).
 - Concurrency remains visible through git; no lock hides overlap.
+- The version's agentic scorecard, every cell at 9 or more by two independent judges, is the final candidate's last implementation job, before the promote and never after the closure summary.
 - Evidence is produced by the mechanism that judged the artifact and binds to the judged sha.
 - Features and fixes spend future options when they add coupling. Delivery alternates with deletion, simplification or decoupling that restores options.
 - Mechanisms without a current demand are removed, and runtime state, reports, handoffs, caches and projections stay in their canonical homes.

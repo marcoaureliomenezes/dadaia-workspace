@@ -2,7 +2,7 @@
 slug: cross-platform-portability
 title: cross-platform-portability
 tldr: Linux, macOS and Windows through one OS boundary, the kernel's _platform.py, deciding every host fact; core/platform.py is the package's door to it.
-summary: The kernel module dd-bug-resolution/scripts/_platform.py decides every host fact — text codec and newlines, child processes, venv layout, exec bit, process liveness and listeners, filesystem swap and links, the sandbox home and shell spelling — as functions over one capability value; skill scripts import it as a sibling, the package reaches it through core/platform.py, tests through tests/helpers/oslib.py; no port, adapter pair or file lock exists for portability.
+summary: The kernel module dd-bug-resolution/scripts/_platform.py decides every host fact — text codec and newlines, child processes, venv layout, exec bit, process liveness and listeners, filesystem swap and links, the sandbox home, shell spelling and the action labels of a fix line — as functions over one capability value; skill scripts import it as a sibling, the package reaches it through core/platform.py, tests through tests/helpers/oslib.py; no port, adapter pair or file lock exists for portability.
 tags: [platform, cross-platform, portability, windows, macos, linux]
 sources:
   - dadaia_workspace/core/platform.py
@@ -20,6 +20,7 @@ sources:
 ## Shell spelling
 
 - Every runnable line a fix or message prints comes from one producer, the kernel's `command(*argv)`, with real values; `inline` is the same words inside a sentence, and `quote` and `head` spell one word. `core/cli_line.py` builds the workspace CLI's words and hands them to it ([[sdd-gate-v3]]).
+- Every `Agent action:` and `Operator action:` label comes from one producer, the kernel's `act(kind, text)` (`agent` or `operator`; any other kind raises), which the package reaches through `core/platform.py` and calls bare; a contract test greps every `.py` and `.sh` file of the package and finds a label literal only in the producer and in the one fix line of the POSIX pre-push shim, which runs no Python.
 - POSIX spells each word with `shlex` quoting. Windows spells backslashes as `/`, leaves letters and digits of any alphabet and `._-/:+` bare (`=` too, except in the command head), and wraps any other word, a number-like word and the empty word in double quotes — the one form Git Bash, cmd and PowerShell all read alike.
 - On Windows a word holding `"`, `$`, `` ` ``, `%`, `!`, a line break, a typographic quote or a Unicode space other than blank and tab has no spelling, nor has a command head that would need quotes (a head holding a blank among them). A line with such a word is printed as `Agent action: run <the words as they are>, quoting <word> for your shell`, never as a runnable line.
 - A test hands printed lines to every installed shell (Git Bash, cmd, PowerShell where present) and checks the words come back unchanged.
