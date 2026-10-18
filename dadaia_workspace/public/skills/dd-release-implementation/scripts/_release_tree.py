@@ -167,13 +167,12 @@ def _origin_findings(specs: Path) -> list[dict[str, Any]]:
     text, rel = read_text(spec), spec.relative_to(specs).as_posix()
     out, line = _window_findings(spec, text, live.state, rel), origin_line(text)
     try:
-        rows = _trace(
-            specs, live.release_id, origin(text), "; ".join(closure_summary(live.state).values())
-        )
+        closure = closure_summary(live.state)
+        rows = _trace(specs, live.release_id, origin(text), "; ".join(closure.values()))
     except ValueError as error:
         return out + [_findings.finding(CODE, rel, line, str(error), act("agent", f"rewrite the Origin "
                               f"line {line} of {spec} to the Origin grammar ({error})"))]  # fmt: skip
-    swept = bool(live.state.get("shipped") or closure_summary(live.state))
+    swept = bool(live.state.get("shipped") or closure)
     return out + [_origin_row(specs, spec, line, live, swept, row) for row in rows]
 
 
