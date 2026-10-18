@@ -523,7 +523,7 @@ def test_append_registers_one_open_record(script: Path, tmp_path: Path) -> None:
         "--symptom", "s", "--repro", "r", "--expected", "e", "--correlates", "none",
     )  # fmt: skip
     assert done.returncode == 0, done.stderr
-    assert "\n[ok] registered new-bug" in done.stdout
+    assert done.stdout == f"[ok] registered new-bug -> {specs}\n"
     [record] = _records(specs)
     assert record["status"] == "open" and record["closed_at"] is None
     assert _run(script, "check", "--specs", str(specs)).returncode == 0
@@ -570,6 +570,13 @@ def test_append_prints_the_earlier_bugs_whose_fix_files_match_and_the_rebuild_du
         "b1",
         "b3",
     ]
+
+
+def test_append_lists_a_bug_once_when_two_of_its_files_match(script: Path, tmp_path: Path) -> None:
+    specs = _ledger(tmp_path, _sibling("b1", "cli/x.py", "cli/y.py"))
+    done = _run(script, *_append_argv(specs, "cli"), "--correlates", "b1")
+    assert done.returncode == 0, done.stderr
+    assert done.stdout.splitlines()[:2] == ["earlier bug on cli: b1", "REBUILD due: 2nd bug on cli"]
 
 
 def test_append_prints_no_rebuild_due_for_a_first_bug_on_a_file(

@@ -121,6 +121,7 @@ def test_all_public_bug_verbs_pin_output_and_each_ledger_write(tmp_path: Path) -
         "correlates": [],
         "fix_sha": None,
     }
+    del appended["surface"]
     append = _run(
         script,
         repo,
@@ -155,8 +156,7 @@ def test_all_public_bug_verbs_pin_output_and_each_ledger_write(tmp_path: Path) -
     after_append = _bytes(replacement, rejected, resolved, superseded, appended)
     assert (append.returncode, append.stdout, append.stderr) == (
         0,
-        "correlation candidates on 'src': replacement, to-reject, to-resolve, "
-        f"to-supersede\n[ok] registered appended -> {specs}\n",
+        f"[ok] registered appended -> {specs}\n",
         "",
     )
     assert ledger.read_bytes() == after_append
