@@ -1,8 +1,9 @@
 """The ``reference-transaction`` hook: routes raw ref moves to the ref gate.
 
 The shim runs this module on git's ``prepared`` firing, unmarked (``DADAIA_WT=1`` passes every
-line there), with ``<old> <new> <ref>`` lines on STDIN. Creating ``refs/heads/wt/*`` is refused
-with the runner's fix; updating it passes; any other ``refs/heads/*`` update whose new sha is not
+line there), with ``<old> <new> <ref>`` lines on STDIN. A zero old sha is read against the ref
+itself, since ref packing hands one for refs that exist: only a missing ``refs/heads/wt/*`` ref is
+a creation, refused with the runner's fix; any other ``refs/heads/*`` update whose new sha is not
 origin's goes to ``dadaia ci ref-gate-check``, which owns the policy. Only that command's
 ``[ref-gate] BLOCKED`` refusal exits 3, which the shim turns into a refusal: an unrunnable or
 faulting runner warns and passes, since this fires on every ref update and failing closed would
@@ -64,6 +65,10 @@ def main(stdin: bytes) -> int:
         if len(parts) != 3:
             continue
         old, new, ref = parts
+        if ref.startswith(_HEADS) and _zero(old) and not _zero(new):
+            platform = _kernel()
+            existing = platform.run(["git", "rev-parse", "-q", "--verify", platform.decode(ref)])
+            old = existing.stdout.strip().encode() or old
         if ref.startswith(_WT):
             if _zero(old) and not _zero(new):
                 return _creation_refusal(ref)
@@ -72,7 +77,7 @@ def main(stdin: bytes) -> int:
             tracking = f"refs/remotes/origin/{platform.decode(ref[len(_HEADS) :])}"
             held = platform.run(["git", "rev-parse", "-q", "--verify", tracking]).stdout.strip()
             if platform.decode(new) != held:
-                gated.append(platform.decode(line))
+                gated.append(platform.decode(b" ".join((old, new, ref))))
     if not gated:
         return 0
     from pathlib import Path
