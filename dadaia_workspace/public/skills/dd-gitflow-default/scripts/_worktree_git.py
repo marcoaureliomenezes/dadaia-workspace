@@ -85,11 +85,11 @@ def flow_for(root: Path, repo: Path) -> dict[str, str]:
     return flow
 
 
-def work_versions(repo: Path, flow: dict[str, str]) -> list[str]:
-    """The versions of the repo's local work-prefix branches, whatever release is live."""
-    prefix = flow["work"]
-    branches = git(repo, "branch", "--list", f"{prefix}*", "--format=%(refname:short)").split()
-    return [b[len(prefix) :] for b in branches if SEMVER_RE.match(b[len(prefix) :])]
+def work_versions(repo: Path, flow: dict[str, str], ref: str = "refs/heads") -> list[str]:
+    """The versions of the work-prefix branches under *ref* (`refs/heads` or `refs/remotes/origin`)."""
+    head = f"{ref}/{flow['work']}"
+    names = git(repo, "for-each-ref", "--format=%(refname)", f"{head}*").split()
+    return [v for n in names if SEMVER_RE.match(v := n[len(head) :])]
 
 
 def next_version(repo: Path, flow: dict[str, str]) -> str:
@@ -119,17 +119,24 @@ def drop_steps(repo: Path, low: str, high: str) -> list[str]:
     return [*steps, f"run `{git_inline(repo, 'branch', '-d', low)}`"]
 
 
-def work_version(repo: Path, flow: dict[str, str]) -> str:
+def several_work(repo: Path, flow: dict[str, str], versions: list[str], ref: str = "refs/heads") -> tuple[str, str]:  # fmt: skip
+    """The highest of several *versions* and the unlabeled act over the local branches ("" for an origin read)."""
+    ordered = sorted(versions, key=lambda v: tuple(map(int, v.split("."))))
+    if ref != "refs/heads":
+        return ordered[-1], ""
+    low, high = (f"{flow['work']}{ordered[i]}" for i in (0, -1))
+    drop = ", then ".join(drop_steps(repo, low, high)) or f"merge {low} into {high}"
+    return ordered[-1], f"run `{git_inline(repo, 'switch', high)}`, then {drop}"
+
+
+def work_version(repo: Path, flow: dict[str, str], ref: str = "refs/heads") -> str:
     prefix = flow["work"]
-    versions = work_versions(repo, flow)
+    versions = work_versions(repo, flow, ref)
     if len(versions) == 1:
         return versions[0]
     if versions:
-        ordered = sorted(versions, key=lambda v: tuple(map(int, v.split("."))))
-        low, high = f"{prefix}{ordered[0]}", f"{prefix}{ordered[-1]}"
-        drop = ", then ".join(drop_steps(repo, low, high)) or f"merge {low} into {high}"
-        text = f"run `{git_inline(repo, 'switch', high)}`, then {drop}"
-        raise SeveralWork(f"{len(versions)} work branches", text, ordered[-1])
+        keep, text = several_work(repo, flow, versions, ref)
+        raise SeveralWork(f"{len(versions)} work branches", text, keep)
     nxt = next_version(repo, flow)
     remote = git(
         repo, "branch", "-r", "--list", f"*/{prefix}{nxt}", "--format=%(refname:short)"
