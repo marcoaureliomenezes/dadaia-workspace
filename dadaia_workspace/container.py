@@ -1,12 +1,15 @@
 """Composition root — builds services with concrete infrastructure."""
 
 import logging
+import tempfile
+from functools import partial
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from dadaia_workspace.features.certification import CertificationResult
 
+from dadaia_workspace.core.platform import write_text
 from dadaia_workspace.core.workspace_resolver import not_initialized
 from dadaia_workspace.features.capabilities import distribution_version
 from dadaia_workspace.features.chokepoints.denylist_scan import BaselinePatternLike
@@ -137,6 +140,31 @@ def scan_publish_candidates(repo: Path, rels: list[str]) -> dict[str, str]:
     return {h.path: f"{h.source_layer} '{h.masked_term}' (line {h.line})" for h in outcome.hits}
 
 
+def scan_bundle(workspace_root: Path, bundle: Path, repo: Path) -> dict[str, str]:
+    """The pre-push matcher over the objects *bundle* adds to *repo*, as the push gate reads
+    them: a scratch bare repo borrows *repo*'s objects, one `origin` ref per prerequisite the
+    bundle needs, then the bundle is unbundled there. Nothing is written into *repo*."""
+    from dadaia_workspace.features.chokepoints.denylist_scan import scan_objects
+
+    git = GitSubprocessClient().git
+    with bundle.open("rb") as handle:
+        header = [line.strip() for line in iter(handle.readline, b"\n")][1:]
+    prerequisites = [line[1:41].decode() for line in header if line.startswith(b"-")]
+    tmp = workspace_root / ".dadaia" / "tmp"
+    tmp.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(dir=tmp, prefix="scan-") as name:
+        scratch = Path(name)
+        git(scratch, "init", "-q", "--bare")
+        store = git(repo, "rev-parse", "--path-format=absolute", "--git-path", "objects")
+        write_text(scratch / "objects" / "info" / "alternates", store + "\n")
+        for i, sha in enumerate(prerequisites):
+            git(scratch, "update-ref", f"refs/remotes/origin/p{i}", sha)
+        head = git(scratch, "bundle", "unbundle", str(bundle)).split()[0]
+        found = GitSubprocessObjectReader().new_objects(scratch, head, "")
+        outcome = scan_objects(found, load_denylist_terms(), load_denylist_baseline_patterns())
+    return {h.path: f"{h.source_layer} '{h.masked_term}' (line {h.line})" for h in outcome.hits}
+
+
 def build_doctor_service(
     workspace_root: Path, *, rows: WorktreeRows = worktree_rows
 ) -> DoctorService:
@@ -153,7 +181,9 @@ def build_doctor_service(
 def build_export_service(workspace_root: Path) -> ExportService:
     _guard_initialized(workspace_root)
     return ExportService(
-        context_store=build_context_store(workspace_root), workspace_root=workspace_root
+        context_store=build_context_store(workspace_root),
+        workspace_root=workspace_root,
+        scan_bundle=partial(scan_bundle, workspace_root),
     )
 
 

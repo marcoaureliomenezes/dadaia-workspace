@@ -7,12 +7,14 @@ import json
 import os
 import tarfile
 import tempfile
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
 from dadaia_workspace.core.atomic_write import atomic_write
 from dadaia_workspace.core.exceptions import DadaiaError
 from dadaia_workspace.core.models.spec_context import EXPORT_SCHEMA_VERSION, SpecContextProject
+from dadaia_workspace.core.platform import act
 from dadaia_workspace.core.skill_owner import load_owner
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
 from dadaia_workspace.infrastructure.json_harness_profile_store import JsonHarnessProfileStore
@@ -45,8 +47,15 @@ def _record(ctx: SpecContextProject) -> dict[str, object]:
     }
 
 
+ScanBundle = Callable[[Path, Path], dict[str, str]]
+"""``(bundle, repo)`` -> one masked finding per offending path of the objects the bundle adds."""
+
+
 class ExportService:
-    def __init__(self, context_store: JsonContextStore, workspace_root: Path) -> None:
+    def __init__(
+        self, context_store: JsonContextStore, workspace_root: Path, scan_bundle: ScanBundle
+    ) -> None:
+        self._scan = scan_bundle
         self._store = context_store
         self._workspace_root = workspace_root
 
@@ -107,6 +116,21 @@ class ExportService:
                 bundles = self._bundles(slugs, dist, Path(scratch))
             except _REFUSED as exc:
                 raise DadaiaError(str(exc), fix=getattr(exc, "fix", "")) from exc
+            hits = [
+                f"{arc}: {path}: {why}"
+                for arc, file in sorted(bundles.items())
+                for path, why in self._scan(
+                    file, self._workspace_root / "repos" / arc.split("/")[0]
+                ).items()
+            ]
+            if hits:
+                raise DadaiaError(
+                    "export blocked, no archive written: a bundle holds a secret or a denylisted "
+                    "term (values redacted):\n" + "\n".join(hits),
+                    fix=act(
+                        "agent", "remove each value from its commit, then run the export again"
+                    ),
+                )
             built = Path(scratch) / "workspace-export.tar.gz"
             with tarfile.open(built, "w:gz") as tar:
                 data = text.encode()
