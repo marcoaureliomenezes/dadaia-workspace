@@ -12,8 +12,11 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace import container
+from dadaia_workspace.core.cli_line import fix_line, git_line
 from dadaia_workspace.core.exceptions import DadaiaError
 from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
+from dadaia_workspace.core.platform import act
+from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from tests.fixtures.stores import context_store
 from tests.helpers.oslib import write_text
 from tests.helpers.privacy_fixtures import aws_key_shape
@@ -167,22 +170,66 @@ def test_a_pause_bundle_is_never_dropped_when_its_repo_is_off_disk(
     with pytest.raises(DadaiaError) as refused:
         _export(root)
 
-    assert PAUSED in str(refused.value) and refused.value.fix
+    assert PAUSED in str(refused.value)
+    assert refused.value.fix == fix_line(root, "context", "alive", "c")
     assert not (root / ".dadaia/dist" / ARCHIVE).exists()
+
+
+def _refused_scan(root: Path) -> DadaiaError:
+    """The refusal of an export whose scan failed: no archive, no scratch path named."""
+    with pytest.raises(DadaiaError) as refused:
+        _export(root)
+    assert not (root / ".dadaia/dist" / ARCHIVE).exists()
+    assert ".dadaia/tmp" not in f"{refused.value}\n{refused.value.fix}"
+    return refused.value
 
 
 @pytest.mark.timeout(15)
-def test_a_truncated_pause_bundle_refuses_instead_of_spinning(root: Path) -> None:
+@pytest.mark.parametrize(
+    "header",
+    [b"# v2 git bundle\n", b"# v2 git bundle\n-\n\n", b"# v2 git bundle\n-\xff\xfe x\n\n"],
+    ids=["truncated", "bare-prerequisite", "non-utf8-prerequisite"],
+)
+def test_a_damaged_pause_bundle_refuses_with_the_fsck_line(root: Path, header: bytes) -> None:
     commit(tree := open_tree(root, PAUSED), "specs/paused.md")
     assert run(root, "pause", str(tree)).returncode == 0
-    bundle = root / ".dadaia/dist/r" / f"{PAUSED}.bundle"
-    bundle.write_bytes(b"# v2 git bundle\n")
+    (root / ".dadaia/dist/r" / f"{PAUSED}.bundle").write_bytes(header)
 
-    with pytest.raises(DadaiaError) as refused:
-        _export(root)
+    assert _refused_scan(root).fix == git_line(root / "repos/r", "fsck")
 
-    assert refused.value.fix
-    assert not (root / ".dadaia/dist" / ARCHIVE).exists()
+
+def test_a_pause_bundle_missing_its_prerequisites_refuses_and_keeps_the_bundle(
+    root: Path,
+) -> None:
+    commit(tree := open_tree(root, PAUSED), "specs/paused.md")
+    assert run(root, "pause", str(tree)).returncode == 0
+    shutil.rmtree(root / "repos/r")
+    git(root / "repos", "init", "-q", "r")
+
+    assert _refused_scan(root).fix == git_line(root / "repos/r", "fsck")
+    assert (root / ".dadaia/dist/r" / f"{PAUSED}.bundle").is_file()
+
+
+def test_git_that_cannot_run_refuses_with_the_push_gates_fix(
+    root: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    commit(open_tree(root, LANE), "specs/notes.md")
+
+    def missing(*_args: object, **_kwargs: object) -> str:
+        raise FileNotFoundError("git")
+
+    monkeypatch.setattr(GitSubprocessClient, "git", missing)
+
+    assert _refused_scan(root).fix == act("operator", "make git runnable here")
+
+
+def test_a_dirty_job_tree_is_not_carried_and_does_not_refuse(root: Path) -> None:
+    open_tree(root, RC)
+    commit(job := open_tree(root, NEW_JOB), "src/job.py")
+    write_text(job / "src/job.py", "changed\n")
+    commit(open_tree(root, LANE), "specs/notes.md")
+
+    assert _members(_export(root)) == [f"r/{LANE}.bundle", "spec-contexts.json"]
 
 
 def test_a_symlinked_pause_bundle_refuses_and_is_never_archived(root: Path, tmp_path: Path) -> None:
