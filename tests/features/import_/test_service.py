@@ -26,7 +26,7 @@ from tests.fixtures.stores import context_store
 from tests.helpers.oslib import write_text
 
 _EXPORT = {
-    "schema_version": "spec-contexts-export-v1",
+    "schema_version": "export-v1",
     "exported_at": "2026-09-03T15:00:00+00:00",
     "dadaia_version": "0.4.6",
     "contexts": [
@@ -178,7 +178,7 @@ def test_import_refusal_of_one_record_does_not_stop_the_others(tmp_path: Path) -
         (None, "not found"),
         ("{not json", "not valid JSON"),
         (json.dumps({**_EXPORT, "schema_version": "workspace-export-v0"}), "schema_version"),
-        (json.dumps({"schema_version": "spec-contexts-export-v1"}), "contexts"),
+        (json.dumps({"schema_version": "export-v1"}), "contexts"),
     ],
 )
 def test_import_rejects_files_outside_the_contract(
