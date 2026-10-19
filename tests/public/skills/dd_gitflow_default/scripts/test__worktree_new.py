@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -476,6 +477,24 @@ def test_an_unreadable_release_state_refuses_a_job_and_creates_nothing(
     )
     assert len(_fixes(refused)) == 1
     assert _git(repo, "branch", "--list", f"wt/{NEW_JOB}").strip() == ""
+    assert not (root / "worktrees/r" / NEW_JOB).exists()
+
+
+@pytest.mark.parametrize("gone", ["release folder", "rc tree"])
+def test_a_main_tree_reads_an_rc_without_a_release_state_as_not_implementation(
+    root: Path, gone: str
+) -> None:
+    """A new version's wt-rc exists before `release.py new`, and a tree can be removed by hand:
+    either way the rc holds no state, so the job is refused for its phase and nothing is created."""
+    assert _run(root, "new", "r", RC).returncode == 0
+    rc_tree = root / "worktrees/r" / RC
+    shutil.rmtree(rc_tree / "specs/releases/0.5.0" if gone == "release folder" else rc_tree)
+
+    refused = _run(root, "new", "r", NEW_JOB)
+
+    assert (refused.returncode, refused.stdout) == (1, "")
+    assert "Traceback" not in refused.stderr
+    assert _fixes(refused) == [phase_fix(root)]
     assert not (root / "worktrees/r" / NEW_JOB).exists()
 
 
