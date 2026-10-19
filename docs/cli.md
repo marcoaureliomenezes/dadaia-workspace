@@ -31,8 +31,6 @@
 ## dadaia help — Derived help surfaces (docker-style; generated, never transcribed).
 - help tree — Print the compact CLI digest derived from the live command tree.
 
-## dadaia import — Register every context of an exported `spec-contexts.json` not known here as DEAD.
-
 ## dadaia init — Bootstrap a dadaia workspace in DIR for one harness: .dadaia/, the law, and that harness's projection.
 
 ## dadaia migrate — Migration helpers for dadaia workspace and spec trees.
