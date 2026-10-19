@@ -1396,8 +1396,7 @@ def test_fix_files_reads_the_files_of_every_given_sha_in_one_diff_tree(
     found = load_owner("dd-bug-resolution", "_git").fix_files(tmp_path, [first, second])
     assert found == {first: ["cli/x.py"], second: [".github/x.py"]}
     spawned = [ln for ln in _trace_lines(trace) if "built-in: git" in ln]
-    assert len(spawned) == 2
-    assert len([ln for ln in spawned if "diff-tree" in ln]) == 1
+    assert len(spawned) == len([ln for ln in spawned if "diff-tree" in ln]) == 1
 
 
 def test_check_reads_the_history_of_a_repo_once(script: Path, tmp_path: Path) -> None:
@@ -1529,7 +1528,7 @@ def test_check_refuses_a_record_no_commit_of_head_cites_with_one_fix_line(
 
 def test_resolve_records_the_sha_and_files_of_the_id_commit(script: Path, tmp_path: Path) -> None:
     specs = _ledger(tmp_path, _OPEN_RECORD)
-    sha = _commit_as(tmp_path, _FIXED)
+    sha = _fix_commit(tmp_path, "cli/x.py", _FIXED)
     done = _run(script, "resolve", "a-bug", "--cause", "c", "--caused-by", "none",
                 "--solution", "s", "--specs", str(specs))  # fmt: skip
     assert done.returncode == 0, done.stdout + done.stderr
@@ -1554,7 +1553,8 @@ def test_resolve_with_no_id_commit_is_one_refusal_with_one_fix_line(
 
 def test_resolve_takes_no_fix_sha_flag(script: Path, tmp_path: Path) -> None:
     specs = _ledger(tmp_path, _OPEN_RECORD)
-    done = _run(script, *_resolve_argv(sha=_commit_as(tmp_path, _FIXED)), "--specs", str(specs))
+    _commit_as(tmp_path, _FIXED)
+    done = _run(script, *_resolve_argv(), "--fix-sha", "a" * 40, "--specs", str(specs))
     assert done.returncode == 2 and "unrecognized arguments" in done.stderr
     assert _records(specs)[0]["status"] == "open"
 

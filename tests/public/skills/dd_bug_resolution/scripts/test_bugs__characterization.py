@@ -118,7 +118,6 @@ def test_all_public_bug_verbs_pin_output_and_each_ledger_write(tmp_path: Path) -
         "repro": "python -m append",
         "expected": "Append succeeds",
         "correlates": [],
-        "fix_sha": None,
     }
     del appended["surface"]
     append = _run(
