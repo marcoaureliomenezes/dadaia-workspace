@@ -310,10 +310,9 @@ def _ledgers(root: Path, repo: Path, tree: Path, scripts: Callable[[Path], list[
     """`check` of each script *scripts* names per ledger, then the doctor; an associated repo has no `specs/`."""
     if flow_for(root, repo)["main"] != repo.name:
         return
-    for rel in _LEDGERS:
-        for script in scripts(rel):
-            argv = [sys.executable, str(script), "check", "--specs", str(tree / "specs")]
-            _refuse_red(rel.name, run(argv, cwd=tree, env=scrubbed_env(), stdin=subprocess.DEVNULL), tree)  # fmt: skip
+    for script in [s for rel in _LEDGERS for s in scripts(rel)]:
+        argv = [sys.executable, str(script), "check", "--specs", str(tree / "specs")]
+        _refuse_red(script.name, run(argv, cwd=tree, env=scrubbed_env(), stdin=subprocess.DEVNULL), tree)  # fmt: skip
     _refuse_red("dadaia doctor", cli(root, "doctor", "--specs-dir", str(tree / "specs"), tree=tree), tree)  # fmt: skip
 
 
