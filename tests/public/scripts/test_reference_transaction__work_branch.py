@@ -447,7 +447,7 @@ def test_the_rewrite_leaves_every_cited_commit_reachable_once_its_printed_fix_ru
     write_text(repo.root / "leak.txt", "a\n")
     done = _verb(repo, oldest, env=env)
     assert done.returncode == 0, done.stderr
-    fixed = run_bash(_single_fix(done).split("`")[1], cwd=repo.root, check=False)
+    fixed = run_bash(_single_fix(done), cwd=repo.root, check=False)
     assert fixed.returncode == 0, fixed.stderr
     assert repo.git("merge-base", "--is-ancestor", oldest, "HEAD").returncode == 1
     cited = json.loads(read_text(repo.root / "specs" / "bugs" / "BUGS.jsonl"))["fix_sha"]
