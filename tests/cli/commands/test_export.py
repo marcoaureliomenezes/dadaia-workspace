@@ -16,7 +16,7 @@ from dadaia_workspace.features.workspace.service import WorkspaceService
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
-from tests.helpers.oslib import read_text, run
+from tests.helpers.oslib import read_text
 
 _runner = CliRunner()
 
@@ -39,7 +39,6 @@ def _ctx(name: str, state: ContextState) -> SpecContextProject:
         repo_url=f"https://example.com/{name}.git",
         created_at="2026-01-01T00:00:00+00:00",
         dead_since=None if state is ContextState.ALIVE else "2026-08-01T00:00:00+00:00",
-        current_branch="develop",
     )
 
 
@@ -69,11 +68,7 @@ def test_export_then_import_restores_unknown_contexts_dead_and_skips_known(
 
     beta = target.get("beta")
     assert beta is not None
-    assert (beta.state, beta.repo_url, beta.current_branch) == (
-        ContextState.DEAD,
-        "https://example.com/beta.git",
-        "develop",
-    )
+    assert (beta.state, beta.repo_url) == (ContextState.DEAD, "https://example.com/beta.git")
     assert beta.dead_since is not None
     assert target.get("alpha") == _ctx("alpha", ContextState.ALIVE)
 
@@ -87,40 +82,6 @@ def test_import_refuses_a_file_outside_the_contract(tmp_path: Path) -> None:
 
     assert result.exit_code == 1
     assert "Error" in result.output
-
-
-def _real_checkout(repo: Path, branch: str) -> None:
-    for args in (
-        ["init", "-q", "-b", "main"],
-        ["config", "user.email", "test@test"],
-        ["config", "user.name", "test"],
-        ["commit", "-q", "--allow-empty", "-m", "init"],
-        ["checkout", "-q", "-b", branch],
-    ):
-        run(["git", *args], cwd=repo, check=True)
-
-
-def test_export_refreshes_an_alive_context_branch_from_its_real_checkout(tmp_path: Path) -> None:
-    """An ALIVE context's `branch` is re-read from the repo's
-    real checked-out HEAD at export time, superseding the stale store value, in both the
-    store and the exported record.
-
-    Size: MEDIUM — a real `git init`/`checkout` under `repos/<slug>` drives the real
-    `GitSubprocessClient` through the CLI."""
-    source = _workspace(tmp_path / "source")
-    source.save(_ctx("alpha", ContextState.ALIVE))  # the store still says "develop"
-    repo = tmp_path / "source" / "repos" / "alpha"
-    repo.mkdir(parents=True)
-    _real_checkout(repo, "feature/test")
-
-    exported = _runner.invoke(app, ["export", "--workspace", str(tmp_path / "source")])
-    assert exported.exit_code == 0, exported.output
-
-    file = tmp_path / "source" / ".dadaia" / "dist" / "spec-contexts.json"
-    payload = json.loads(read_text(file))
-    assert [(c["name"], c["branch"]) for c in payload["contexts"]] == [("alpha", "feature/test")]
-    alpha = source.get("alpha")
-    assert alpha is not None and alpha.current_branch == "feature/test"
 
 
 @pytest.mark.parametrize("verb", ["import", "export"])

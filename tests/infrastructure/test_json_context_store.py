@@ -34,7 +34,6 @@ def _make_ctx(
         created_at="2026-01-01T00:00:00",
         alive_since=None,
         dead_since=None,
-        current_branch=None,
     )
 
 
@@ -62,14 +61,12 @@ def test_crud_round_trips(tmp_path: Path) -> None:
         created_at="2026-01-01T00:00:00",
         alive_since="2026-06-01T00:00:00",
         dead_since=None,
-        current_branch="main",
     )
     store.update(updated)
     fetched = store.get("alpha")
     assert fetched is not None
     assert fetched.state == ContextState.ALIVE
     assert fetched.alive_since == "2026-06-01T00:00:00"
-    assert fetched.current_branch == "main"
 
     store.delete("alpha")
     assert store.get("alpha") is None
@@ -168,7 +165,6 @@ def test_a_fresh_store_writes_v3_rows_without_legacy_fields(tmp_path: Path) -> N
         created_at="2026-01-01T00:00:00Z",
         alive_since="2026-05-01T00:00:00Z",
         dead_since=None,
-        current_branch="main",
     )
     fresh_store.save(ctx)
     fresh_ctx_file = fresh_ws / "spec_contexts.json"

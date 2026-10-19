@@ -58,7 +58,6 @@ _ALPHA = SpecContextProject(
     repo_url="https://example.com/alpha.git",
     created_at="2026-01-01T00:00:00+00:00",
     alive_since="2026-01-02T00:00:00+00:00",
-    current_branch="main",
 )
 
 
@@ -114,7 +113,6 @@ def test_import_saves_unknown_names_dead_and_skips_known_names(tmp_path: Path) -
         created_at=beta.created_at,
         alive_since=None,
         dead_since=beta.created_at,
-        current_branch="develop",
         associated_repos=(AssociatedRepo(slug="infra", url="https://example.com/infra.git"),),
     )
 

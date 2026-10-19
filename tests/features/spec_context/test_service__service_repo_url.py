@@ -94,8 +94,7 @@ def test_alive_and_dead_backfill_an_empty_repo_url_from_origin(
         register_dead(fake_service, "foo", "foo", "")
     else:
         store.save(SpecContextProject(name="foo", state=ContextState.ALIVE, repo_slug="foo", repo_url="",
-                                      created_at="2026-01-01T00:00:00+00:00", alive_since="2026-01-01T00:00:00+00:00",
-                                      current_branch=git(repo, "branch", "--show-current")))  # fmt: skip
+                                      created_at="2026-01-01T00:00:00+00:00", alive_since="2026-01-01T00:00:00+00:00")))  # fmt: skip
 
     ctx = getattr(fake_service, verb)("foo")
 

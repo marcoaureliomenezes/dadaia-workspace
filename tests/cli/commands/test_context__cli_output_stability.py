@@ -89,7 +89,6 @@ _KEYS = {
     "alive_since",
     "dead_since",
     "current_branch",
-    "stored_branch",
     "associated_repos",
     "gitflow",
 }

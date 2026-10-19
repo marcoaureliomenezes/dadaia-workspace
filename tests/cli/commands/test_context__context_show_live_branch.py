@@ -1,6 +1,5 @@
 """For an ALIVE context whose repo is on disk, `context list` and `context show` both report the
-LIVE checked-out branch (one resolver, `repo_live_status`) and expose the stored snapshot
-as `stored_branch`; with no repo on disk the snapshot is reported.
+LIVE checked-out branch (one resolver, `repo_live_status`); with no repo on disk there is none.
 """
 
 from __future__ import annotations
@@ -55,7 +54,7 @@ def _make_workspace_with_repo(root: Path) -> Path:
     return ws
 
 
-@pytest.mark.parametrize(("on_disk", "branch"), [(True, "feature/v9.9.9"), (False, "main")])
+@pytest.mark.parametrize(("on_disk", "branch"), [(True, "feature/v9.9.9"), (False, None)])
 def test_list_and_show_report_the_live_branch_else_the_stored_one(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, on_disk: bool, branch: str
 ) -> None:
@@ -69,4 +68,4 @@ def test_list_and_show_report_the_live_branch_else_the_stored_one(
     row = next(r for r in listed if r["name"] == _CTX)
 
     for payload in (shown, row):
-        assert (payload["current_branch"], payload["stored_branch"]) == (branch, "main"), payload
+        assert payload["current_branch"] == branch, payload

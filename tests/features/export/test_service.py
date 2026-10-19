@@ -14,7 +14,6 @@ from dadaia_workspace.core.workspace_layout import zones_with_canon
 from dadaia_workspace.features.export.service import ExportService
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
-from tests.fixtures.real_git import clone, seeded_remote
 from tests.fixtures.stores import context_store
 from tests.helpers.oslib import read_text
 
@@ -38,16 +37,10 @@ def _service(root: Path) -> tuple[ExportService, JsonContextStore]:
     return ExportService(context_store=store, git_client=git, workspace_root=root), store
 
 
-def test_export_writes_fr13_records_and_refreshes_alive_branches_only(tmp_path: Path) -> None:
+def test_export_writes_fr13_records(tmp_path: Path) -> None:
     svc, store = _service(tmp_path)
-    store.save(_ctx("alpha", ContextState.ALIVE, current_branch="main", associated_repos=(_INFRA,)))
-    store.save(
-        _ctx(
-            "beta", ContextState.DEAD, current_branch="main", dead_since="2026-08-01T00:00:00+00:00"
-        )
-    )
-    for name, branch in (("alpha", "feature/0.4.6"), ("beta", "stale-checkout")):
-        clone(seeded_remote(tmp_path, name, branch=branch), tmp_path / "repos" / name)
+    store.save(_ctx("alpha", ContextState.ALIVE, associated_repos=(_INFRA,)))
+    store.save(_ctx("beta", ContextState.DEAD, dead_since="2026-08-01T00:00:00+00:00"))
 
     result = svc.run()
 
@@ -69,7 +62,6 @@ def test_export_writes_fr13_records_and_refreshes_alive_branches_only(tmp_path: 
                 "name": "alpha",
                 "state": "ALIVE",
                 "repo_url": "https://example.com/alpha.git",
-                "branch": "feature/0.4.6",
                 "associated_repos": [{"slug": "infra", "url": "https://example.com/infra.git"}],
                 "last_sync_at": exported_at,
             },
@@ -78,7 +70,6 @@ def test_export_writes_fr13_records_and_refreshes_alive_branches_only(tmp_path: 
                 "name": "beta",
                 "state": "DEAD",
                 "repo_url": "https://example.com/beta.git",
-                "branch": "main",
                 "associated_repos": [],
                 "last_sync_at": "2026-08-01T00:00:00+00:00",
             },
@@ -88,10 +79,7 @@ def test_export_writes_fr13_records_and_refreshes_alive_branches_only(tmp_path: 
     assert result.contexts == 2
 
     alpha = store.get("alpha")
-    assert alpha is not None
-    assert (alpha.current_branch, alpha.associated_repos) == ("feature/0.4.6", (_INFRA,))
-    beta = store.get("beta")
-    assert beta is not None and beta.current_branch == "main"
+    assert alpha is not None and alpha.associated_repos == (_INFRA,)
 
 
 def test_export_overwrites_the_single_artifact(tmp_path: Path) -> None:

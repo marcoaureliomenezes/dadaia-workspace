@@ -49,7 +49,6 @@ def _ctx(
         created_at="2026-01-01T00:00:00",
         alive_since="2026-06-01T00:00:00Z" if state == ContextState.ALIVE else None,
         dead_since=None,
-        current_branch="main" if state == ContextState.ALIVE else None,
     )
 
 
