@@ -12,8 +12,8 @@ from typing import Any
 
 from _git import git, main_checkout, scrubbed_env
 from _handoffs import reviewer_records
-from _jsonl import parse_object
-from _platform import act, read_text, run
+from _platform import run
+from _refusal import Refusal, fix_of
 from _specs import run_cli
 
 _FREE = ("docs(memory)", "chore(release)", "chore(backlog)", "chore(bugs)", "docs(adr)", "chore(adrs)")  # fmt: skip
@@ -87,11 +87,11 @@ def _after_closure(repo: Path, sha: str | None, tip: str) -> str:
 
 
 def table(root: Path, specs: Path, rc: str) -> str:
-    """The tab-separated metric table of candidate *rc* (`<M.m.p>-rc<N>`); absent data reads `n/a`; an unreadable release state raises a Refusal."""
+    """The tab-separated metric table of candidate *rc* (`<M.m.p>-rc<N>`); absent data reads `n/a`; a release state `release.py check` refuses raises its Refusal."""
     repo = specs.parent
-    path = specs / "releases" / rc.partition("-rc")[0] / "_RELEASE.json"
-    fix = act("agent", f"repair {path} until `release.py check` passes")
-    state = parse_object(read_text(path, fix), fix) if path.is_file() else {}
+    if fix := fix_of(out := _script("dd-release-implementation", "release.py", "check", "--specs", str(specs), ok=(0, 1)) or ""):  # fmt: skip
+        raise Refusal(out.partition(" error ")[2].partition("\n")[0], fix)
+    state = json.loads(p.read_text("utf-8")) if (p := specs / "releases" / rc.partition("-rc")[0] / "_RELEASE.json").is_file() else {}  # fmt: skip
     window = _window(state, rc)
     seen: list[str] = []
     vals = [NA] * 6
