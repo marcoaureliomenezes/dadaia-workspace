@@ -16,7 +16,6 @@ from dadaia_workspace.core.exceptions import (
     AssociatedRepoConflictError,
     ContextAlreadyExistsError,
     DadaiaError,
-    GitSyncError,
     InvalidContextNameError,
     RepoUrlMissingError,
     WorkspaceVenvBootstrapError,
@@ -91,9 +90,11 @@ def _plan(
         return InitPlan(directory, harness, repo, associated, from_)
     first = harness_registry.L1_ENTRY_HARNESSES[0]
     if not _interactive():
-        plan = InitPlan(directory or "", harness or first, repo, associated, from_)
+        plan = InitPlan(
+            directory or "", harness or ("" if from_ else first), repo, associated, from_
+        )
         fail(
-            "init needs DIR and --harness when no terminal can answer prompts; "
+            f"init needs DIR{'' if from_ else ' and --harness'} when no terminal can answer prompts; "
             f"harnesses: {', '.join(harness_registry.L1_ENTRY_HARNESSES)}.",
             plan.command()
             if directory
@@ -177,6 +178,10 @@ def init(
     sibling_fix = plan.command(root.parent / ((root.name or "dadaia") + "-workspace"))
     if root.exists() and not root.is_dir():
         fail(f"'{root}' is not a directory.", sibling_fix)
+    if plan.from_ and (root / ".dadaia").is_dir():
+        fail(
+            f"'{root}' is already a dadaia workspace; --from restores into a new one.", sibling_fix
+        )
     # A directory that already holds `.dadaia/` is THIS workspace (a re-run, idempotent);
     # anything else non-empty is a foreign tree and is never scaffolded over.
     if root.is_dir() and any(root.iterdir()) and not (root / ".dadaia").is_dir():
@@ -228,7 +233,7 @@ def _read(source: str) -> Artifact:
 def _restore(root: Path, artifact: Artifact, source: Path) -> None:
     """``--from``: register each context DEAD through ``register``, list what cannot be fetched,
     place a hard artifact's bundles, and print the ``context alive`` line of each ALIVE one."""
-    contexts = container.build_spec_context_service(root)
+    contexts, git = container.build_spec_context_service(root), container.build_git_client()
     alive, unborn = [], []
     for ctx in artifact.contexts:
         try:
@@ -241,17 +246,19 @@ def _restore(root: Path, artifact: Artifact, source: Path) -> None:
             InvalidContextNameError,
             AssociatedRepoConflictError,
         ) as exc:
-            _say(f"skipped ({exc})   {ctx.name}")
+            _say(f"skipped   {ctx.name}   ({exc.message})")
         else:
             _say(f"registered (dead)   {ctx.name}")
-            for repo in (r for r in ctx.all_repos() if r.url and not _reachable(root, r.url)):
-                _say(f"unreachable   {repo.url}   ({ctx.name})")
-            alive += [ctx.name] * (ctx.name in artifact.alive)
+            for repo in ctx.all_repos():
+                if repo.url and not git.reachable(repo.url):
+                    _say(f"unreachable   {repo.url}   ({ctx.name})")
+            if ctx.name in artifact.alive:
+                alive.append(ctx.name)
     if unborn:
         empty = [f"repos/{r.slug}" for c in unborn for r in c.all_repos() if not r.url]
         _say(spell_fix(act("agent", f"add a remote to {', '.join(empty)}, then export again")))
     try:
-        container.build_export_service(root).restore(source)
+        container.build_export_service(root).restore(source, artifact)
     except DadaiaError as exc:
         fail(exc)
     if alive:
@@ -261,17 +268,9 @@ def _restore(root: Path, artifact: Artifact, source: Path) -> None:
 
 
 def _say(text: str) -> None:
-    console.print(text, markup=False, highlight=False, soft_wrap=True)
-
-
-def _reachable(root: Path, url: str) -> bool:
-    try:
-        container.build_git_client().git(
-            root, "ls-remote", "--heads", url, env={"GIT_TERMINAL_PROMPT": "0"}
-        )
-    except GitSyncError:
-        return False
-    return True
+    """Print *text* with each control character an artifact may carry shown as its escape."""
+    safe = "".join(c if c.isprintable() else repr(c)[1:-1] for c in text)
+    console.print(safe, markup=False, highlight=False, soft_wrap=True)
 
 
 def _reconcile_upgrade(root: Path, action: str, before: str | None, after: str | None) -> None:
