@@ -138,3 +138,25 @@ def test_a_planted_git_entry_never_unanchors_a_multi_segment_glob(tmp_path: Path
     assert wl.protected_glob(tmp_path, rel, globs) == "docs/data-master"
     write_text(tree / "docs" / ".git", "")
     assert wl.protected_glob(tmp_path, rel, globs) == "docs/data-master"
+
+
+@pytest.mark.parametrize(
+    ("rel", "is_dir", "expected"),
+    [
+        (".dadaia/dist/spec-contexts.json", False, "canon"),
+        (".dadaia/dist/workspace-export.tar.gz", False, "canon"),
+        (".dadaia/dist/myrepo", True, "canon"),
+        (".dadaia/dist/myrepo/r.bundle", False, "canon"),
+        (".dadaia/dist/stray", True, "slop"),
+        (".dadaia/dist/stray.bundle", False, "slop"),
+    ],
+)
+def test_dist_admits_the_export_artifacts_and_registered_slug_folders(
+    rel: str, is_dir: bool, expected: str
+) -> None:
+    assert wl.verdict(rel, is_dir, (), ("myrepo",), ()) == expected
+
+
+def test_the_doctor_fix_never_moves_a_registered_repos_bundle() -> None:
+    """``--fix`` moves exactly the ``slop`` entries, so a bundle of a registered repo must not be one."""
+    assert wl.verdict(".dadaia/dist/myrepo/r.bundle", False, (), ("myrepo",), ()) != "slop"
