@@ -4,14 +4,15 @@ a bundle of each open lane and `wt-rc` tree and each pause bundle)."""
 
 import io
 import json
-import os
 import tarfile
 import tempfile
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
+from dadaia_workspace.core import platform
 from dadaia_workspace.core.atomic_write import atomic_write
+from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.exceptions import DadaiaError
 from dadaia_workspace.core.models.spec_context import EXPORT_SCHEMA_VERSION, SpecContextProject
 from dadaia_workspace.core.platform import act
@@ -21,9 +22,6 @@ from dadaia_workspace.infrastructure.json_harness_profile_store import JsonHarne
 from dadaia_workspace.infrastructure.ledger_scripts import worktree_rows
 from dadaia_workspace.infrastructure.provider_version import provider_version
 
-_names = load_owner("dd-gitflow-default", "_worktree_names")
-_flow = load_owner("dd-gitflow-default", "_worktree_git")
-_end = load_owner("dd-gitflow-default", "_worktree_end")
 _pause = load_owner("dd-gitflow-default", "_worktree_pause")
 _REFUSED = (
     load_owner("dd-bug-resolution", "_refusal").Refusal,
@@ -46,6 +44,9 @@ def _record(ctx: SpecContextProject) -> dict[str, object]:
         "associated_repos": [{"slug": r.slug, "url": r.url or None} for r in ctx.associated_repos],
     }
 
+
+_CARRIED = ("backlog", "hotfix", "rc")
+"""The kinds of tree an export carries: the lanes and the `wt-rc`; a job or task tree is not."""
 
 ScanBundle = Callable[[Path, Path], dict[str, str]]
 """``(bundle, repo)`` -> one masked finding per offending path of the objects the bundle adds."""
@@ -74,56 +75,60 @@ class ExportService:
         }
         text = json.dumps(payload, indent=2) + "\n"
         if hard:
-            slugs = {
-                r.slug
-                for ctx in contexts
-                for r in ctx.all_repos()
-                if (self._workspace_root / "repos" / r.slug).is_dir()
-            }
-            return ExportResult(self._archive(text, slugs, dist), len(contexts))
+            owners = {r.slug: ctx.name for ctx in contexts for r in ctx.all_repos()}
+            return ExportResult(self._archive(text, owners, dist), len(contexts))
         path = dist / "spec-contexts.json"
         atomic_write(path, text, ensure_parent=True)
         return ExportResult(path=path, contexts=len(contexts))
 
-    def _bundles(self, slugs: set[str], dist: Path, scratch: Path) -> dict[str, Path]:
-        """`<repo>/<name>.bundle` -> file: pause's bundles as they sit, and a commits-only bundle,
-        made in *scratch*, of each open lane and `wt-rc` tree that holds a commit origin lacks."""
-        rows, failed, fix = worktree_rows(self._workspace_root, slugs) if slugs else ([], "", "")
+    def _bundles(self, owners: dict[str, str], dist: Path, scratch: Path) -> dict[str, Path]:
+        """`<repo>/<name>.bundle` -> file, from the owner's rows alone: pause's bundles as they sit,
+        and a commits-only bundle, made in *scratch*, of each lane and `wt-rc` tree."""
+        rows, failed, fix = worktree_rows(self._workspace_root, set(owners))
         if failed:
             raise DadaiaError(f"export cannot read the worktrees: {failed}", fix=fix)
-        home, found = (self._workspace_root / "worktrees").resolve(), {}
-        for row in rows:
-            tree = Path(row["path"])
-            arc = f"{tree.resolve().relative_to(home).as_posix()}.bundle"
+        found: dict[str, Path] = {}
+        for row in (r for r in rows if r["repo"] in owners):
+            name = row.get("name")
             if row["state"] == "paused":
-                found[arc] = dist / arc
-            elif row["kind"] in ("backlog", "hotfix", "rc") and row["state"] in ("ready", "open"):
-                repo, ref = self._workspace_root / "repos" / row["repo"], _names.branch(row["name"])
-                _end._refuse_dirty(tree)
-                if (
-                    _flow.git(repo, "rev-list", "--count", ref, "--not", "--remotes=origin").strip()
-                    != "0"
-                ):
-                    _pause.write_bundle(repo, ref, scratch / arc)
-                    found[arc] = scratch / arc
+                member = _pause.member(row["repo"], name)
+                found[member] = dist / member
+            elif row.get("kind") in _CARRIED and row["state"] in ("ready", "open", "empty"):
+                repo = self._workspace_root / "repos" / row["repo"]
+                if bundled := _pause.carry(repo, Path(row["path"]), name, scratch):
+                    found[bundled] = scratch / bundled
         return found
 
-    def _archive(self, text: str, slugs: set[str], dist: Path) -> Path:
+    def _scanned(self, bundles: dict[str, Path], owners: dict[str, str]) -> list[str]:
+        """One masked finding per offending path of *bundles*; a symlink, or a bundle whose repo
+        is not checked out (nothing to scan it against), refuses."""
+        hits = []
+        for arc, file in sorted(bundles.items()):
+            repo = self._workspace_root / "repos" / arc.split("/")[0]
+            if file.is_symlink():
+                raise DadaiaError(
+                    f"{arc} is a symlink; an archive carries bundle files only",
+                    fix=act("agent", f"replace {file} with the bundle file itself, then export"),
+                )
+            if not repo.is_dir():
+                raise DadaiaError(
+                    f"{arc} cannot be scanned: its repo is not checked out",
+                    fix=fix_line(
+                        self._workspace_root, "context", "alive", owners[arc.split("/")[0]]
+                    ),
+                )
+            hits += [f"{arc}: {path}: {why}" for path, why in self._scan(file, repo).items()]
+        return hits
+
+    def _archive(self, text: str, owners: dict[str, str], dist: Path) -> Path:
         tmp = self._workspace_root / ".dadaia" / "tmp"
         tmp.mkdir(parents=True, exist_ok=True)
         with tempfile.TemporaryDirectory(dir=tmp, prefix="export-") as scratch:
             try:
-                bundles = self._bundles(slugs, dist, Path(scratch))
+                bundles = self._bundles(owners, dist, Path(scratch))
             except _REFUSED as exc:
                 raise DadaiaError(str(exc), fix=getattr(exc, "fix", "")) from exc
-            hits = [
-                f"{arc}: {path}: {why}"
-                for arc, file in sorted(bundles.items())
-                for path, why in self._scan(
-                    file, self._workspace_root / "repos" / arc.split("/")[0]
-                ).items()
-            ]
-            if hits:
+            if hits := self._scanned(bundles, owners):
                 raise DadaiaError(
                     "export blocked, no archive written: a bundle holds a secret or a denylisted "
                     "term (values redacted):\n" + "\n".join(hits),
@@ -134,11 +139,11 @@ class ExportService:
             built = Path(scratch) / "workspace-export.tar.gz"
             with tarfile.open(built, "w:gz") as tar:
                 data = text.encode()
-                member = tarfile.TarInfo("spec-contexts.json")
-                member.size = len(data)
-                tar.addfile(member, io.BytesIO(data))
+                head = tarfile.TarInfo("spec-contexts.json")
+                head.size = len(data)
+                tar.addfile(head, io.BytesIO(data))
                 for arc, file in sorted(bundles.items()):
                     tar.add(file, arcname=arc)
             dist.mkdir(parents=True, exist_ok=True)
-            os.replace(built, dist / built.name)
+            platform.replace(built, dist / built.name)
         return dist / "workspace-export.tar.gz"

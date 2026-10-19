@@ -29,6 +29,23 @@ def write_bundle(repo: Path, ref: str, dest: Path) -> None:
         raise
 
 
+def member(repo: str, name: str) -> str:
+    """`<repo>/<name>.bundle`: where a tree's bundle sits under `.dadaia/dist/` and in an export."""
+    return f"{repo}/{name}.bundle"
+
+
+def carry(repo: Path, tree: Path, name: str, into: Path) -> str | None:
+    """Writes the commits of the lane or `wt-rc` tree *name* at *tree* that no `origin` ref holds
+    to `<into>/<repo>/<name>.bundle` and returns that member; `None`, writing nothing, when origin
+    holds them all. Refuses a dirty tree first, whatever it is ahead."""
+    _refuse_dirty(tree)
+    ref = branch(name)
+    if git(repo, "rev-list", "--count", ref, "--not", "--remotes=origin").strip() == "0":
+        return None
+    write_bundle(repo, ref, into / (found := member(repo.name, name)))
+    return found
+
+
 def pause(root: Path, path: str) -> str:
     """Bundles the tree at *path*, removes it and its local `wt/` branch; refuses first, touching
     nothing, a job or task tree, a dirty one, one holding ignored files, a `wt-rc` with a tree
@@ -39,7 +56,6 @@ def pause(root: Path, path: str) -> str:
         raise Refusal(f"{tree} is a {kind_of(name)} tree: only a lane or a wt-rc pauses", land)
     if not any(Path(row["path"]).resolve() == tree for row in ours(repo)):
         raise Refusal(f"{tree} is not a worktree of ours", command(*LAUNCH, "list"))
-    _refuse_dirty(tree)
     if held := _precious(tree):
         raise Refusal(
             f"{tree} holds ignored files: {', '.join(held)}",
@@ -47,16 +63,14 @@ def pause(root: Path, path: str) -> str:
         )
     if kind_of(name) == "rc":
         _open_children(repo, name)
-    ref = branch(name)
-    if git(repo, "rev-list", "--count", ref, "--not", "--remotes=origin").strip() == "0":
+    ref, dist = branch(name), root / ".dadaia" / "dist"
+    if (found := carry(repo, tree, name, dist)) is None:
         raise Refusal(f"{ref} holds no commit origin lacks", land)
-    dest = root.joinpath(".dadaia", "dist", repo.name, f"{name}.bundle")
-    write_bundle(repo, ref, dest)
     git(repo, "worktree", "unlock", str(tree), check=False)
     git(repo, "worktree", "remove", str(tree))
     _rmdir(tree, name)
     git(repo, "update-ref", "-d", f"refs/heads/{ref}")
-    return f"paused {ref} at {dest}"
+    return f"paused {ref} at {dist / found}"
 
 
 def resume(root: Path, path: str) -> str:
@@ -94,5 +108,5 @@ def paused_rows(root: Path) -> list[dict[str, object]]:
         repo, *_ = bundle.relative_to(root / ".dadaia" / "dist").parts
         name = bundle.relative_to(root / ".dadaia" / "dist" / repo).with_suffix("").as_posix()
         path = str(tree_path(root, repo, name))
-        out.append(_row(Path(repo), path, "paused", kind="paused"))
+        out.append(_row(Path(repo), path, "paused", name=name, kind="paused"))
     return out

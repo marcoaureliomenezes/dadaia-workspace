@@ -9,7 +9,9 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from dadaia_workspace.features.certification import CertificationResult
 
-from dadaia_workspace.core.platform import write_text
+from dadaia_workspace.core.exceptions import DadaiaError, GitSyncError
+from dadaia_workspace.core.models.git_scan import GitObjectReadError
+from dadaia_workspace.core.platform import act, write_text
 from dadaia_workspace.core.workspace_resolver import not_initialized
 from dadaia_workspace.features.capabilities import distribution_version
 from dadaia_workspace.features.chokepoints.denylist_scan import BaselinePatternLike
@@ -147,21 +149,27 @@ def scan_bundle(workspace_root: Path, bundle: Path, repo: Path) -> dict[str, str
     from dadaia_workspace.features.chokepoints.denylist_scan import scan_objects
 
     git = GitSubprocessClient().git
-    with bundle.open("rb") as handle:
-        header = [line.strip() for line in iter(handle.readline, b"\n")][1:]
-    prerequisites = [line[1:41].decode() for line in header if line.startswith(b"-")]
+    with bundle.open("rb") as handle:  # the header is bounded: a crafted file never reads on
+        header = handle.read(1 << 20).split(b"\n\n", 1)[0].split(b"\n")[1:]
+    prerequisites = [line[1:].split()[0].decode() for line in header if line[:1] == b"-"]
     tmp = workspace_root / ".dadaia" / "tmp"
     tmp.mkdir(parents=True, exist_ok=True)
-    with tempfile.TemporaryDirectory(dir=tmp, prefix="scan-") as name:
-        scratch = Path(name)
-        git(scratch, "init", "-q", "--bare")
-        store = git(repo, "rev-parse", "--path-format=absolute", "--git-path", "objects")
-        write_text(scratch / "objects" / "info" / "alternates", store + "\n")
-        for i, sha in enumerate(prerequisites):
-            git(scratch, "update-ref", f"refs/remotes/origin/p{i}", sha)
-        head = git(scratch, "bundle", "unbundle", str(bundle)).split()[0]
-        found = GitSubprocessObjectReader().new_objects(scratch, head, "")
-        outcome = scan_objects(found, load_denylist_terms(), load_denylist_baseline_patterns())
+    try:
+        with tempfile.TemporaryDirectory(dir=tmp, prefix="scan-") as name:
+            scratch = Path(name)
+            git(scratch, "init", "-q", "--bare")
+            store = git(repo, "rev-parse", "--path-format=absolute", "--git-path", "objects")
+            write_text(scratch / "objects" / "info" / "alternates", store + "\n")
+            for i, sha in enumerate(prerequisites):
+                git(scratch, "update-ref", f"refs/remotes/origin/p{i}", sha)
+            head = git(scratch, "bundle", "unbundle", str(bundle)).split()[0]
+            found = GitSubprocessObjectReader().new_objects(scratch, head, "")
+            outcome = scan_objects(found, load_denylist_terms(), load_denylist_baseline_patterns())
+    except (GitSyncError, GitObjectReadError, IndexError, ValueError) as exc:
+        raise DadaiaError(
+            f"{bundle.name} cannot be scanned ({exc})",
+            fix=act("agent", f"delete {bundle} or re-pause its tree, then run the export again"),
+        ) from exc
     return {h.path: f"{h.source_layer} '{h.masked_term}' (line {h.line})" for h in outcome.hits}
 
 
