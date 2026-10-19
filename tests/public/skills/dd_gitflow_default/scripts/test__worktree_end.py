@@ -883,6 +883,66 @@ def test_a_task_lands_on_its_main_tree_with_no_verdict_and_no_gate(root: Path) -
     assert git(root / "repos/r", "rev-parse", WORK).strip() != sha
 
 
+def _real_denylist_gate(root: Path) -> None:
+    """The stub's one real verb: `ci push-gate-check`, the matcher and its remedy, from this checkout's source."""
+    patch_cli(
+        root,
+        "else:\n    sys.stdin.read()",
+        'elif args[:2] == ["ci", "push-gate-check"]:\n    import os, subprocess\n'
+        f"    sys.exit(subprocess.call([{sys.executable!r}, \"-m\", \"dadaia_workspace\", *args],"
+        f" env=dict(os.environ, PYTHONPATH={str(Path(__file__).parents[5])!r})))\n"
+        "else:\n    sys.stdin.read()",
+    )
+    write_text(root / ".dadaia/states/spec_contexts.json", '{"contexts": []}')  # the real verb reads it
+
+
+def test_a_task_carrying_a_denylisted_literal_is_refused_then_lands_by_its_printed_fix(
+    root: Path,
+) -> None:
+    address = ".".join(["8"] * 4)  # a public IPv4 literal, spelled so this file holds none
+    _real_denylist_gate(root)
+    task = open_tree(root, NEW_TASK)
+    (task / "tests").mkdir()
+    for name, text in (("a", f'HOST = "{address}"\n'), ("b", "B = 1\n")):
+        write_text(task / f"tests/test_{name}.py", text)
+        git(task, "add", f"tests/test_{name}.py")
+        git(task, "commit", "-qm", f"test(J1.T1): red {name}")
+    onto = git(root / TREE, "rev-parse", "HEAD").strip()
+
+    refused = run(root, "merge", str(task))
+
+    assert refused.returncode == 1
+    assert "tests/test_a.py" in refused.stderr and address not in refused.stderr
+    assert git(root / TREE, "rev-parse", "HEAD").strip() == onto
+    write_text(task / "tests/test_a.py", "HOST = None\n")  # the term removed, as the refusal says
+    _fix(root, refused)
+    landed = run(root, "merge", str(task))
+    assert landed.returncode == 0, landed.stderr
+    landed_range = f"{onto}..{WORK}"
+    assert address not in git(root / "repos/r", "log", "-p", landed_range)
+    messages = git(root / "repos/r", "log", "--format=%B", landed_range)
+    assert "test(J1.T1): red a" in messages and "test(J1.T1): red b" in messages
+
+
+@pytest.mark.parametrize("kind", ["main", "hotfix", "backlog"])
+def test_every_tree_kind_is_refused_for_a_denylisted_literal(root: Path, kind: str) -> None:
+    address = ".".join(["8"] * 4)
+    _real_denylist_gate(root)
+    tree = {
+        "main": lambda: root / TREE,
+        "hotfix": lambda: _hotfix(root),
+        "backlog": lambda: open_tree(root, BACKLOG),
+    }[kind]()
+    rel = "specs/a.md" if kind == "backlog" else "src/a.py"
+    commit(tree, rel, f"HOST {address}\n")
+
+    refused = run(root, "merge", str(tree))
+
+    assert refused.returncode == 1
+    assert rel in refused.stderr and address not in refused.stderr
+    assert len(fixes(refused)) == 1
+
+
 def test_a_dirty_main_tree_refuses_its_tasks_merge(root: Path) -> None:
     task, sha = _task_tree(root)
     write_text(root / TREE / "wip.py", "")  # untracked in the tree the task lands on

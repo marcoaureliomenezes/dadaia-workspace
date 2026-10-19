@@ -62,6 +62,31 @@ def test_push_gate_check_always_wires_a_real_object_source(monkeypatch, tmp_path
     assert "leak.md:1" in result.output
 
 
+def test_onto_judges_the_content_of_a_range_on_a_branch_no_push_could_carry(
+    monkeypatch, tmp_path: Path
+) -> None:
+    """`--onto` refuses the denylisted blob of `<onto>..HEAD` on a task branch (never pushable),
+    and its rewrite fix starts at the range's own oldest commit, never below `<onto>`."""
+    repo = tmp_path / "repo"
+    base = _init_repo(repo)
+    os_run(["git", "switch", "-q", "-c", "wt/0.5.0/rc-1/job-1/wt-task-001"], cwd=repo, check=True)
+    shas = []
+    for rel, text in (("leak.md", "zz-synthetic-term\n"), ("more.md", "m\n")):
+        write_text(repo / rel, text)
+        os_run(["git", "add", "-A"], cwd=repo, check=True)
+        os_run(["git", "commit", "-q", "-m", f"add {rel}"], cwd=repo, check=True)
+        shas.append(_git(repo, "rev-parse", "HEAD"))
+    first = shas[0]
+    monkeypatch.setattr(ci, "_repo_root", lambda: repo)
+    monkeypatch.setattr(container, "load_denylist_terms", lambda: (("zz-synthetic-term", "t"),))
+
+    done = _runner.invoke(app, ["ci", "push-gate-check", "--onto", base])
+
+    assert done.exit_code == 1, done.output
+    assert "leak.md:1" in done.output and "zz-synthetic-term" not in done.output
+    assert f"--rewrite-from {first}" in done.output and base not in done.output.split("fix:")[-1]
+
+
 def _stamped_specs(repo: Path, version: int) -> str:
     """Commit the stamp: the gate reads the pushed commit, never the checkout."""
     write_text(
