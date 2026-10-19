@@ -17,7 +17,7 @@ from dadaia_workspace.cli._specs_resolution import (
     scope,
 )
 from dadaia_workspace.core import platform
-from dadaia_workspace.core.cli_line import fix_line, script_line, spell_fix
+from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.exceptions import GitSyncError
 from dadaia_workspace.core.gitflow import Gitflow, SeveralWorkBranches, work_branch
 from dadaia_workspace.core.models.git_scan import ZERO_SHA
@@ -137,7 +137,6 @@ def _rewrite_unpublished(repo: Path, oldest: str, message: str | None) -> None:
         )
     if refusal:
         fail(*refusal)
-    folded = {sha, *git.git(repo, "rev-list", tip, f"^{sha}").split()}
     git.git(repo, "reset", "--soft", sha)
     git.git(
         repo,
@@ -145,45 +144,7 @@ def _rewrite_unpublished(repo: Path, oldest: str, message: str | None) -> None:
         "-qa",
         "--amend",
         "--allow-empty",
-        "-m",
-        message or f"chore: rewrite unpublished range {sha[:9]}..{tip[:9]}",
-    )
-    fix = _repoint_cited(repo, folded, git.git(repo, "rev-parse", "HEAD"))
-    if fix:
-        typer.echo(spell_fix(fix), err=True)
-
-
-def _repoint_cited(repo: Path, folded: set[str], new: str) -> str:
-    """The one act that re-points to *new* every live ledger record whose ``fix_sha`` the
-    fold of *folded* unreached, else ``""``. The ledger is the main repo's, so an associated
-    repo's range is read there; the fold never writes it."""
-    workspace = resolve_workspace_root_for_cli(repo)
-    owner = repo_owner(workspace, repo)
-    foreign = owner is not None and owner[1] != owner[2]
-    ledger = (
-        workspace / "repos" / owner[2] if owner and foreign else repo
-    ) / "specs/bugs/BUGS.jsonl"
-    rows = load_owner("dd-bug-resolution", "_jsonl").walk(
-        ledger.read_text(encoding="utf-8") if ledger.is_file() else ""
-    )
-    ids = [
-        r["id"]
-        for _, r, why in rows
-        if not why and isinstance(r, dict) and r.get("fix_sha") in folded
-    ]
-    if not ids:
-        return ""
-    line = script_line(
-        ".agents/skills/dd-bug-resolution/scripts/bugs.py",
-        "update",
-        *ids,
-        "--set",
-        f"fix_sha={new}",
-    )
-    where = f" from a worktree of {owner[2]}" if owner and foreign else ""
-    return act(
-        "agent",
-        f"re-point the ledger records the fold unreached: run `{line}`{where}, then commit it",
+        *(("-m", message) if message else ("--no-edit",)),
     )
 
 
