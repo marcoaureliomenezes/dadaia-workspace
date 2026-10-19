@@ -70,7 +70,7 @@ def test_two_tracked_copies_of_a_ledger_script_both_run_and_judge_the_tree(tmp_p
     approve(root, git(tree, "rev-parse", "HEAD").strip(), name=RC)
     landed = run(root, "merge", str(tree))
     assert landed.returncode == 0, landed.stderr
-    assert sorted(log.read_text().split()) == sorted(f"{tree}/{f}/{rel}" for f in (SKILLS, ".agents/skills"))  # fmt: skip
+    assert sorted(log.read_text().splitlines()) == sorted(str(tree / f / rel) for f in (SKILLS, ".agents/skills"))  # fmt: skip
 
 
 def test_a_tracked_ledger_script_under_a_path_with_a_space_is_the_trees_own(tmp_path: Path) -> None:
