@@ -17,7 +17,7 @@ import pytest
 from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app
-from dadaia_workspace.core.cli_line import fix_line, shell_line
+from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.infrastructure.json_harness_profile_store import JsonHarnessProfileStore
 from tests.fixtures.stores import fake_venv
 from tests.helpers.oslib import read_text, write_text
@@ -199,7 +199,11 @@ def _rec(name: str, slug: str, url: str) -> dict[str, object]:
     return {"slug": slug, "name": name, "state": "dead", "repo_url": url, "associated_repos": []}
 
 
-def test_a_second_init_from_into_a_workspace_refuses_and_keeps_every_file_in_dist(
+def _snapshot(ws: Path) -> dict[str, bytes]:
+    return {str(p.relative_to(ws)): p.read_bytes() for p in sorted(ws.rglob("*")) if p.is_file()}
+
+
+def test_a_second_init_from_of_a_hard_artifact_refuses_before_any_write_and_keeps_dist(
     tmp_path: Path, source: tuple[dict[str, object], Path]
 ) -> None:
     payload, bundle = source
@@ -208,15 +212,29 @@ def test_a_second_init_from_into_a_workspace_refuses_and_keeps_every_file_in_dis
     assert _runner.invoke(app, ["init", str(ws), "--from", str(artifact)]).exit_code == 0
     kept = ws / ".dadaia/dist" / MEMBER
     kept.write_bytes(b"local paused work")
+    before = _snapshot(ws)
 
     result = _runner.invoke(app, ["init", str(ws), "--from", str(artifact)])
 
     assert result.exit_code == 1, result.output
-    fresh = shell_line(
-        "uvx", "dadaia-workspace", "init", str(tmp_path / "ws-workspace"), "--from", str(artifact)
-    )
-    assert [ln for ln in result.output.splitlines() if ln.startswith("fix: ")] == [f"fix: {fresh}"]
-    assert kept.read_bytes() == b"local paused work"
+    [fix] = [ln for ln in result.output.splitlines() if ln.startswith("fix: ")]
+    assert fix.startswith("fix: Agent action: move ") and str(kept) in fix
+    assert _snapshot(ws) == before
+
+
+def test_init_from_a_soft_artifact_into_an_existing_workspace_replicates_it(
+    tmp_path: Path, source: tuple[dict[str, object], Path]
+) -> None:
+    ws = tmp_path / "ws"
+    assert _runner.invoke(app, ["init", str(ws), "--harness", "claude"]).exit_code == 0
+
+    result = _runner.invoke(app, ["init", str(ws), "--from", str(_soft(tmp_path, source[0]))])
+
+    assert result.exit_code == 0, result.output
+    states = ws / ".dadaia" / "states"
+    assert JsonHarnessProfileStore().resolve(states, ws).harnesses == ("claude", "codex")
+    registry = json.loads(read_text(states / "spec_contexts.json"))["contexts"]
+    assert sorted(c["name"] for c in registry) == ["app", "ghost"]
 
 
 def test_init_from_skips_a_known_an_invalid_and_a_conflicting_record_and_keeps_the_rest(
