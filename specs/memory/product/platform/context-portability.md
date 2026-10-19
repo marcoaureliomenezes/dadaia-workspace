@@ -6,9 +6,8 @@ summary: Moving a workspace's Spec Context Projects to another workspace — exp
 tags: [context, export, import, portability]
 sources:
   - dadaia_workspace/features/export/**
-  - dadaia_workspace/features/import_/**
   - dadaia_workspace/cli/commands/export.py
-  - dadaia_workspace/cli/commands/import_.py
+  - dadaia_workspace/cli/commands/init.py
 ---
 
 ## Why one atom
