@@ -88,21 +88,7 @@ def test_export_help_does_not_name_import() -> None:
     assert "import" not in helped.output.lower()
 
 
-def test_import_refuses_a_file_outside_the_contract(tmp_path: Path) -> None:
-    _workspace(tmp_path / "target")
-    bogus = tmp_path / "workspace-2026.tar.gz"
-    bogus.write_bytes(b"not json")
-
-    result = _runner.invoke(app, ["import", str(bogus), "--workspace", str(tmp_path / "target")])
-
-    assert result.exit_code == 1
-    assert "Error" in result.output
-
-
-@pytest.mark.parametrize("verb", ["import", "export"])
-def test_explicit_workspace_pointing_at_an_uninitialized_dir_is_refused(
-    tmp_path: Path, verb: str
-) -> None:
+def test_explicit_workspace_pointing_at_an_uninitialized_dir_is_refused(tmp_path: Path) -> None:
     """An explicit --workspace is authoritative; a path without its own `.dadaia/` is refused
     instead of silently resolving to the enclosing live workspace.
 
@@ -114,13 +100,7 @@ def test_explicit_workspace_pointing_at_an_uninitialized_dir_is_refused(
     nested = live / ".dadaia" / "tmp" / "x"
     nested.mkdir(parents=True)
 
-    source = _workspace(tmp_path / "source")
-    source.save(_ctx("gamma", ContextState.DEAD))
-    assert _runner.invoke(app, ["export", "--workspace", str(tmp_path / "source")]).exit_code == 0
-    payload = tmp_path / "source" / ".dadaia" / "dist" / "spec-contexts.json"
-
-    argv = ["import", str(payload)] if verb == "import" else ["export"]
-    result = _runner.invoke(app, [*argv, "--workspace", str(nested)])
+    result = _runner.invoke(app, ["export", "--workspace", str(nested)])
 
     assert (result.exit_code, result.exception.__class__) == (1, SystemExit), result.output
     assert "fix: " in result.output

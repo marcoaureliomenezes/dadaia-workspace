@@ -73,7 +73,7 @@ def register_dead(
     associated_repos: tuple[Any, ...] = (),
 ) -> Any:
     """Register a DEAD context record through the service's one validation seam —
-    the fixture shape ``dadaia import`` produces (``create`` now materializes)."""
+    the fixture shape of an ``init --from`` context (``create`` now materializes)."""
     from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
 
     return service.register(
