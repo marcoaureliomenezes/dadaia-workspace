@@ -889,11 +889,13 @@ def _real_denylist_gate(root: Path) -> None:
         root,
         "else:\n    sys.stdin.read()",
         'elif args[:2] == ["ci", "push-gate-check"]:\n    import os, subprocess\n'
-        f"    sys.exit(subprocess.call([{sys.executable!r}, \"-m\", \"dadaia_workspace\", *args],"
+        f'    sys.exit(subprocess.call([{sys.executable!r}, "-m", "dadaia_workspace", *args],'
         f" env=dict(os.environ, PYTHONPATH={str(Path(__file__).parents[5])!r})))\n"
         "else:\n    sys.stdin.read()",
     )
-    write_text(root / ".dadaia/states/spec_contexts.json", '{"contexts": []}')  # the real verb reads it
+    write_text(
+        root / ".dadaia/states/spec_contexts.json", '{"contexts": []}'
+    )  # the real verb reads it
 
 
 def test_a_task_carrying_a_denylisted_literal_is_refused_then_lands_by_its_printed_fix(
