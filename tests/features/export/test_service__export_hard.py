@@ -335,7 +335,7 @@ def test_a_damaged_header_refusal_relays_gits_own_reason_and_keeps_the_bundle(ro
     assert bundle.read_bytes() == damaged
 
 
-def test_a_failed_unbundle_relays_gits_reason_and_is_not_the_operators_ruling(
+def test_a_failed_unbundle_relays_gits_reason_and_names_the_scratch_act(
     root: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     bundle = _paused(root)
@@ -352,5 +352,8 @@ def test_a_failed_unbundle_relays_gits_reason_and_is_not_the_operators_ruling(
     refused = _refused_scan(root)
 
     assert "write error: disk full" in str(refused)
-    assert "rule whether" not in refused.fix
+    assert refused.fix == act(
+        "agent",
+        f"free space and write permission under {root / '.dadaia/tmp'}, then rerun the export",
+    )
     assert bundle.read_bytes() == kept
