@@ -1,17 +1,28 @@
 #!/usr/bin/env python3
 """`worktree.py pause`: park one clean lane or `wt-rc` tree as a bundle of the commits origin lacks
-at `.dadaia/dist/<repo>/<name>.bundle`, then drop the tree and its local branch. Nothing is
-committed or pushed."""
+at `.dadaia/dist/<repo>/<name>.bundle`, then drop the tree and its local branch; `resume` brings both
+back from the bundle and deletes it. Nothing is committed or pushed."""
 
 from __future__ import annotations
 
+import shutil
 import tempfile
 from pathlib import Path
 
 from _platform import act, command
 from _worktree_end import _open_children, _refuse_dirty, _target
 from _worktree_git import git, ours
-from _worktree_names import LAUNCH, Refusal, branch, kind_of
+from _worktree_names import (
+    LAUNCH,
+    LEVEL_FILE,
+    LOCK,
+    Refusal,
+    branch,
+    kind_of,
+    level_folders,
+    tree_path,
+)
+from _worktree_new import _LEVELS
 
 
 def write_bundle(repo: Path, ref: str, dest: Path) -> None:
@@ -57,3 +68,27 @@ def pause(root: Path, path: str) -> str:
     git(repo, "worktree", "remove", str(tree))
     git(repo, "update-ref", "-d", f"refs/heads/{ref}")
     return f"paused {ref} at {dest}"
+
+
+def resume(root: Path, path: str) -> str:
+    """Recreates the local `wt/` branch and the tree at *path* from its pause bundle, then deletes
+    the bundle and the `dist/<repo>/` folders it leaves empty; refuses, touching nothing, a branch
+    that exists or a missing bundle."""
+    repo, tree, name, _ = _target(root, path)
+    ref, dist = branch(name), root / ".dadaia" / "dist" / repo.name
+    bundle = dist / f"{name}.bundle"
+    if git(repo, "branch", "--list", ref).strip():
+        raise Refusal(f"{ref} exists", command(*LAUNCH, "list"))
+    if not bundle.is_file():
+        raise Refusal(f"no bundle at {bundle}", command(*LAUNCH, "list"))
+    made = [(f, lv) for f, lv in level_folders(tree_path(root, repo.name), name) if not f.exists()]
+    git(repo, "fetch", "-q", str(bundle), f"{ref}:{ref}")
+    git(repo, "worktree", "add", "-q", "--lock", "--reason", f"{LOCK}{name}", str(tree), ref)
+    for folder, level in made:
+        shutil.copyfile(_LEVELS / f"{level}.md", folder / LEVEL_FILE)
+    bundle.unlink()
+    for folder in bundle.parents:
+        if folder == dist.parent or any(folder.iterdir()):
+            break
+        folder.rmdir()
+    return f"resumed {ref} at {tree}"

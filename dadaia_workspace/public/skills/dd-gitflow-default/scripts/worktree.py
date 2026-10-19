@@ -25,7 +25,7 @@ from _worktree_end import clean, digest, merge
 from _worktree_git import rows, workspace_of
 from _worktree_names import LAUNCH, Refusal
 from _worktree_new import new
-from _worktree_pause import pause
+from _worktree_pause import pause, resume
 from _worktree_sync import sync
 
 __all__ = ["main"]
@@ -57,6 +57,7 @@ def main(argv: list[str] | None = None) -> int:
     verbs.add_parser("pause", help="bundle a lane or wt-rc tree, then remove it").add_argument(
         "path"
     )
+    verbs.add_parser("resume", help="recreate a paused tree from its bundle").add_argument("path")
     seal = verbs.add_parser("hash", help="the diff_sha256 binding a verdict carries for a sha")
     seal.add_argument("path")
     seal.add_argument("--sha", required=True)
@@ -77,6 +78,9 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         if args.verb == "pause":
             print(f"[ok] {pause(root, args.path)}")
+            return 0
+        if args.verb == "resume":
+            print(f"[ok] {resume(root, args.path)}")
             return 0
         if args.verb == "hash":
             print(digest(root, args.path, args.sha))
