@@ -3,15 +3,17 @@
 
 from __future__ import annotations
 
+import json
 import shutil
+import sys
 from pathlib import Path
 
 from _bugs_check import OPEN
 from _grammar import STATE
-from _jsonl import Unreadable, parse_object
-from _platform import act, command, is_link
+from _platform import act, command, is_link, run
+from _refusal import fix_of
 from _specs import parse
-from _worktree_git import flow_for, git, not_a_name, work_version, work_versions
+from _worktree_git import flow_for, git, not_a_name, scrubbed_env, work_version, work_versions
 from _worktree_names import (
     LAUNCH,
     LEVEL_FILE,
@@ -48,17 +50,15 @@ def _refuse_unopened_bug(main: Path, work: str, bug: str) -> None:
 
 
 def _refuse_unready(root: Path, main: Path, version: str, rc: str) -> None:
-    """A main tree opens only while its release is in IMPLEMENTATION on the rc's `wt-rc` branch."""
+    """A main tree opens only while its release, on the rc's tree, passes `release.py check` and is in IMPLEMENTATION."""
     rc_name = f"{version}/{rc}/wt-rc"
-    rc_branch = branch(rc_name)
-    fix = act("agent", f"repair {STATE} on {rc_branch} until release.py check passes")
-    try:
-        state = parse_object(git(main, "show", f"{rc_branch}:specs/releases/{version}/{STATE}", check=False), fix)  # fmt: skip
-    except Unreadable as bad:
-        raise Refusal(f"{STATE} on {rc_branch}: {bad}", bad.fix) from bad
-    if state.get("phase") != "IMPLEMENTATION":
-        raise Refusal(f"a job needs release {version} in phase IMPLEMENTATION on {rc_branch}",
-                      act("agent", f"reach phase IMPLEMENTATION in {STATE} on {rc_branch} at {tree_path(root, main.name, rc_name)} (release.py phase), then open its job again"))  # fmt: skip
+    rc_tree = tree_path(root, main.name, rc_name)
+    out = run([sys.executable, str(Path(__file__).resolve().parents[2] / "dd-release-implementation/scripts/release.py"), "check", "--specs", str(rc_tree / "specs")], env=scrubbed_env()).stdout  # fmt: skip
+    if fix := fix_of(out):
+        raise Refusal(out.partition(" error ")[2].partition("\n")[0], fix)
+    if json.loads((rc_tree / "specs/releases" / version / STATE).read_text("utf-8")).get("phase") != "IMPLEMENTATION":  # fmt: skip
+        raise Refusal(f"a job needs release {version} in phase IMPLEMENTATION on {branch(rc_name)}",
+                      act("agent", f"reach phase IMPLEMENTATION in {STATE} on {branch(rc_name)} at {rc_tree} (release.py phase), then open its job again"))  # fmt: skip
 
 
 def absent_levels(root: Path, repo_name: str, name: str) -> list[tuple[Path, str]]:
