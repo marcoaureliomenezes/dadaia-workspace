@@ -22,18 +22,31 @@ _ARCHIVE_PUSH = (
 )
 
 
+_PROBE_TIMEOUT_S = 15
+
+
 def _run(
     args: list[str],
     cwd: Path | None = None,
     stdin: str | None = None,
     env: dict[str, str] | None = None,
+    timeout: float | None = None,
 ) -> subprocess.CompletedProcess[str]:
     return platform.run(
         args,
         cwd=cwd,
         input=stdin,
+        timeout=timeout,
         env={**load_owner("dd-bug-resolution", "_git").scrubbed_env(), **(env or {})},
     )
+
+
+def _refuse_unsafe_url(url: str) -> None:
+    """Block the two transports that turn a URL into code/option execution: ``ext::`` runs an
+    arbitrary helper (RCE) and a leading "-" can be parsed by git as an option (argument
+    injection). https/ssh/git@ and local-path / file:// URLs pass."""
+    if url.startswith("ext::") or url.startswith("-"):
+        raise GitCloneError(f"refusing to clone from unsafe URL: {url!r}", url)
 
 
 def _commit(path: Path, msg: str, pathspec: Sequence[str] | None = None) -> None:
@@ -68,15 +81,25 @@ def _commit(path: Path, msg: str, pathspec: Sequence[str] | None = None) -> None
 
 class GitSubprocessClient:
     def clone(self, url: str, dest: Path) -> None:
-        # Block the two transports that turn a URL into code/option execution:
-        # ``ext::`` runs an arbitrary helper (RCE) and a leading "-" can be parsed
-        # by git as an option (argument injection). Legitimate https/ssh/git@ and
-        # local-path / file:// clones are still allowed.
-        if url.startswith("ext::") or url.startswith("-"):
-            raise GitCloneError(f"refusing to clone from unsafe URL: {url!r}", url)
+        _refuse_unsafe_url(url)
         result = _run(["git", "clone", "-c", "core.longpaths=true", url, str(dest)])
         if result.returncode != 0:
             raise GitCloneError(f"git clone failed for {url!r}: {result.stderr.strip()}", url)
+
+    def reachable(self, url: str) -> bool:
+        """Whether `git ls-remote` lists *url* within the probe timeout, with nothing to prompt
+        for (no terminal, no ssh password); an unsafe, unreachable or hanging url is `False`."""
+        try:
+            _refuse_unsafe_url(url)
+            done = _run(
+                ["git", "ls-remote", "--heads", "--", url],
+                stdin="",
+                timeout=_PROBE_TIMEOUT_S,
+                env={"GIT_TERMINAL_PROMPT": "0", "GIT_SSH_COMMAND": "ssh -o BatchMode=yes"},
+            )
+        except (GitCloneError, subprocess.TimeoutExpired, OSError):
+            return False
+        return done.returncode == 0
 
     def move(self, repo: Path, src: str, dst: str) -> None:
         """Rename ``repo/src`` to ``repo/dst``, staging the rename of its tracked files —
