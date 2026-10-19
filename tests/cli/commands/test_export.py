@@ -65,6 +65,7 @@ def test_export_writes_the_artifact_and_leaves_the_registry_alone(tmp_path: Path
     assert registry.read_bytes() == before
 
 
+@pytest.mark.medium
 def test_export_hard_writes_one_archive(tmp_path: Path) -> None:
     source = _workspace(tmp_path / "source")
     source.save(_ctx("alpha", ContextState.DEAD))
