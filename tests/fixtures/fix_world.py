@@ -644,6 +644,23 @@ def _alive_remote_gone(world: World) -> list[str]:
     return ["context", "alive", "proj"]
 
 
+def _alive_no_integration(world: World) -> list[str]:
+    """Origin holds `main` only: neither a work branch nor the declared integration branch."""
+    world.seed(_constitution(), "main")
+    store = JsonContextStore(world.ws / ".dadaia" / "states")
+    store.update(
+        SpecContextProject(
+            "proj", ContextState.DEAD, "proj", world.bare.as_uri(), "2026-01-01T00:00:00+00:00"
+        )
+    )
+    return ["context", "alive", "proj"]
+
+
+def _origin_gains_develop(world: World) -> None:
+    world.git(world.tmp / "seed", "push", "-q", world.bare.as_uri(), "HEAD:refs/heads/develop")
+    world.git(world.repo, "fetch", "-q", "origin")
+
+
 # ── dead cases ───────────────────────────────────────────────────────────────────────
 
 
@@ -917,6 +934,7 @@ _REFUSALS: dict[str, tuple[Case | tuple[Case, ...] | Skip, ...]] = {
     "service.SpecContextService.alive": (
         Case(_no_url_no_checkout, _cloned, before=_clone),
         Case(_alive_remote_gone, _cloned, before=_remote_back),
+        Case(_alive_no_integration, _cloned, before=_origin_gains_develop),
     ),
     "service.SpecContextService.baseline": (
         Case(_no_checkout, _cloned),
