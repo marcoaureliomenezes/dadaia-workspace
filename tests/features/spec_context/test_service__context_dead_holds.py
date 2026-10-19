@@ -134,7 +134,7 @@ def _wt(repo: Path, *, checked_out: bool) -> None:
 def _paused_lane_bundle(repo: Path) -> None:
     """An open `_wt` lane as pause leaves it: tree removed, local `wt/*` ref gone, a bundle in dist."""
     tree = repo.parents[1] / "worktrees" / repo.name / "0.5.0/wt-hotfix-b"
-    bundle = repo.parents[1] / ".dadaia" / "dist" / repo.name / "wt-hotfix-b.bundle"
+    bundle = repo.parents[1] / ".dadaia" / "dist" / repo.name / "0.5.0/wt-hotfix-b.bundle"
     bundle.parent.mkdir(parents=True)
     _git("bundle", "create", str(bundle), "wt/0.5.0/wt-hotfix-b", cwd=repo)
     _git("worktree", "unlock", str(tree), cwd=repo)
@@ -221,6 +221,9 @@ def test_dead_refuses_an_open_lane_and_passes_once_the_lane_is_paused(tmp_path: 
     service.dead("proj")
 
     assert store.get("proj").state is ContextState.DEAD  # type: ignore[union-attr]
+    with pytest.raises(ContextStateError, match=r"paused[\s\S]*worktree\.py resume"):
+        service.delete("proj")
+    assert store.get("proj") is not None
 
 
 def test_dead_fix_for_an_unpushable_branch_clears_the_block(tmp_path: Path) -> None:

@@ -130,17 +130,29 @@ def test_dead_refuses_to_drop_a_stash_the_repo_holds(
     )
 
 
-def test_delete_refuses_while_dist_holds_a_pause_bundle(
-    service: SpecContextService, store: JsonContextStore, workspace_root: Path
+def test_delete_refuses_while_the_owner_lists_a_paused_tree(
+    store: JsonContextStore, workspace_root: Path
 ) -> None:
-    """A DEAD context whose repo has a bundle in `dist/<repo>/` keeps its record, fix: resume or move."""
-    register_dead(service, "proj", "my-repo", "https://github.com/org/my-repo")
-    dist = workspace_root / ".dadaia" / "dist" / "my-repo"
-    dist.mkdir(parents=True)
-    write_text(dist / "lane.bundle", "x")
+    """A DEAD context whose repo has a paused tree in the owner's rows keeps its record; the refusal
+    is the owner's resume line."""
+    resume = "worktree.py resume <tree>"
+    paused = {"repo": "my-repo", "state": "paused", "path": "<tree>", "exit": resume}
 
-    with pytest.raises(ContextStateError, match=r"fix: .*(resume|move)") as refused:
+    def rows(_root: Path, _repos: object) -> tuple[list[dict[str, object]], str, str]:
+        return [paused], "", ""
+
+    service = SpecContextService(
+        context_store=store,
+        git_client=GitSubprocessClient(),
+        workspace_root=workspace_root,
+        install_hooks=lambda _repo: None,
+        secret_scan=scan_publish_candidates,
+        worktree_rows=rows,
+    )
+    register_dead(service, "proj", "my-repo", "https://github.com/org/my-repo")
+
+    with pytest.raises(ContextStateError, match="paused") as refused:
         service.delete("proj")
 
-    assert str(refused.value).count("fix: ") == 1
+    assert str(refused.value).endswith(f"fix: {resume}")
     assert store.get("proj") is not None
