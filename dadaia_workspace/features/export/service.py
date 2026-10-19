@@ -65,7 +65,12 @@ class ExportService:
         }
         text = json.dumps(payload, indent=2) + "\n"
         if hard:
-            slugs = {r.slug for ctx in contexts for r in ctx.all_repos()}
+            slugs = {
+                r.slug
+                for ctx in contexts
+                for r in ctx.all_repos()
+                if (self._workspace_root / "repos" / r.slug).is_dir()
+            }
             return ExportResult(self._archive(text, slugs, dist), len(contexts))
         path = dist / "spec-contexts.json"
         atomic_write(path, text, ensure_parent=True)
@@ -74,7 +79,7 @@ class ExportService:
     def _bundles(self, slugs: set[str], dist: Path, scratch: Path) -> dict[str, Path]:
         """`<repo>/<name>.bundle` -> file: pause's bundles as they sit, and a commits-only bundle,
         made in *scratch*, of each open lane and `wt-rc` tree that holds a commit origin lacks."""
-        rows, failed, fix = worktree_rows(self._workspace_root, slugs)
+        rows, failed, fix = worktree_rows(self._workspace_root, slugs) if slugs else ([], "", "")
         if failed:
             raise DadaiaError(f"export cannot read the worktrees: {failed}", fix=fix)
         home, found = (self._workspace_root / "worktrees").resolve(), {}
