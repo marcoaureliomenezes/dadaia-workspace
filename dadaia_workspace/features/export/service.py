@@ -186,6 +186,23 @@ class ExportService:
         alive = tuple(str(r["name"]) for r in records if r.get("state") == "alive")
         return Artifact(harnesses, tuple(contexts), alive)
 
+    def restore(self, path: Path) -> None:
+        """Extracts a hard artifact's bundles to `.dadaia/dist/<repo>/<name>.bundle`, where
+        `worktree resume` finds them; a soft artifact has none. Every member is checked first and
+        extracted with `filter="data"`, so no path escapes `dist` and no link lands."""
+        if not tarfile.is_tarfile(path):
+            return
+        dist = self._workspace_root / ".dadaia" / "dist"
+        try:
+            with tarfile.open(path) as tar:
+                members = tar.getmembers()
+                if bad := next((m.name for m in members if not _member_ok(m)), None):
+                    raise _refuse(f"'{path.name}' has an unsafe member: {bad!r}.")
+                dist.mkdir(parents=True, exist_ok=True)
+                tar.extractall(dist, [m for m in members if m.name != _JSON_MEMBER], filter="data")
+        except (tarfile.TarError, OSError) as exc:
+            raise _refuse(f"'{path.name}' cannot be extracted ({type(exc).__name__}).") from exc
+
     def run(self, hard: bool = False) -> ExportResult:
         """Writes the artifact and returns its path; the registry is only read."""
         contexts = self._store.list_all()
