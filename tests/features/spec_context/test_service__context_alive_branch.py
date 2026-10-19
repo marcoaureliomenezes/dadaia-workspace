@@ -39,7 +39,13 @@ def service(workspace_root: Path) -> SpecContextService:
 def _remote_with(workspace_root: Path, *branches: str) -> Path:
     remote = seeded_remote(workspace_root.parent, "foo")
     for branch in branches:
-        git(workspace_root.parent / "seed-foo", "push", "-q", str(remote), f"HEAD:refs/heads/{branch}")
+        git(
+            workspace_root.parent / "seed-foo",
+            "push",
+            "-q",
+            str(remote),
+            f"HEAD:refs/heads/{branch}",
+        )
     return remote
 
 
