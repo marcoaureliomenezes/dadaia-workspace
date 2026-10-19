@@ -40,7 +40,7 @@ _MAX_LISTED_HITS = 10
 _REWRITE = (
     "Uncommit the unpublished range down to its oldest commit and re-commit it as one "
     "(origin's history is never rewritten). Remove what is listed from the files first; when "
-    "the message carries it, append `--message` and the new text to the fix; keep any `fix(bugs): …` line. Push after this command:"
+    "the message carries it, append `--message` and the new text to the fix; keep any `fix(bugs): …` line, `refactor(bugs): …` lines included. Push after this command:"
 )
 
 
@@ -209,6 +209,7 @@ def push_gate_decision(
         ]
     except GitObjectReadError as exc:
         return _read_failure(exc, masker, repo)
+    messages = frozenset[str]()
     if canon:
         message = _refusal(
             f"the pushed range publishes {len(canon)} specs/ path(s) violating the v6 canon "
@@ -238,6 +239,7 @@ def push_gate_decision(
         )
         fix = _rewrite_fix(hits[0][0], object_source, repo, fixes)
         listed = frozenset(h.path for _, h in hits)
+        messages = frozenset(h.sha for _, h in hits if h.path == "(commit message)")
     else:
         message = fix = ""
         listed = frozenset()
@@ -246,5 +248,7 @@ def push_gate_decision(
         message="[pre-push] branch policy + specs-canon scan + denylist scan passed; allow.",
     )
     if message:
-        decision = Decision(allowed=False, message=f"{message}\n{fix}", listed=listed)
+        decision = Decision(
+            allowed=False, message=f"{message}\n{fix}", listed=listed, messages=messages
+        )
     return _notes(decision, binaries, oversized, masker)

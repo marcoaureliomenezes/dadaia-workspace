@@ -138,14 +138,9 @@ def _rewrite_unpublished(repo: Path, oldest: str, message: str | None) -> None:
         )
     if refusal:
         fail(*refusal)
-    from dadaia_workspace.container import load_denylist_baseline_patterns, load_denylist_terms
-    from dadaia_workspace.features.chokepoints.denylist_scan import scan_objects
-
     log = git.git(repo, "log", "--reverse", "--format=%H%x00%B%x1e", tip, "--not", f"{sha}^@")
     folded = [e.strip().partition("\0")[::2] for e in log.split("\x1e") if e.strip()]
-    objects = build_git_object_reader().new_objects(repo, tip, held or ZERO_SHA)
-    hits = scan_objects(objects, load_denylist_terms(), load_denylist_baseline_patterns()).hits
-    replaced = {h.sha for h in hits} if message else set()
+    replaced = decision.messages if message else ()
     text = "\n\n".join([message or "", *(m for c, m in folded if c not in replaced)]).strip()
     git.git(repo, "reset", "--soft", sha)
     git.git(repo, "commit", "-qa", "--amend", "--allow-empty", "--cleanup=whitespace", "-m", text)

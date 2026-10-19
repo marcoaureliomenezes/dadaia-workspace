@@ -35,8 +35,10 @@ _SCRIPT = script(Path(__file__).parent / "bugs.py")
 def by_file(records: Records, repo: Path) -> dict[str, dict[str, str]]:
     """Each path some record fixed, with the id -> fix sha of the records that fixed it, by id; a record without
     `fix_files` is read from its id commit, all of them in one `diff-tree` of *repo*."""
-    commits = fix_commit([repo], [str(r["id"]) for r in records if not r.get("fix_files")])
-    touched = fix_files(repo, [sha for _, sha in commits.values()])
+    commits = fix_commit(repo, [str(r["id"]) for r in records if not r.get("fix_files")])
+    touched: dict[str, list[str]] = {}
+    for each in {at for at, _ in commits.values()}:
+        touched |= fix_files(each, [sha for at, sha in commits.values() if at == each])
     found: dict[str, dict[str, str]] = {}
     for r in records:
         sha = str(r.get("fix_sha") or r["id"])

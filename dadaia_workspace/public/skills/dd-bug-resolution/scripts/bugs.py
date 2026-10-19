@@ -17,7 +17,7 @@ import _bugs_write as wr
 import _findings
 import _jsonl
 from _atomic import SymlinkRefusedError
-from _bugs_check import LEDGER, OPEN, STATUS_BY_VERB, check, siblings
+from _bugs_check import LEDGER, OPEN, STATUS_BY_VERB, check
 from _bugs_store import Refusal, archived_plain_ids, commit, history, read_records
 from _git import GitError, fix_commit, fix_files, git
 from _platform import act, use_utf8_stdio
@@ -169,7 +169,7 @@ def _write(args: argparse.Namespace, specs: Path) -> int:
         return 0
     values = _jsonl.values(args, _OPTIONS[args.verb])
     if args.verb == "resolve":
-        found = fix_commit([specs.parent, *siblings(specs.parent)], [args.bug_id])
+        found = fix_commit(specs.parent, [args.bug_id])
         if args.bug_id not in found:
             raise Refusal(
                 f"no commit of HEAD holds the line `fix(bugs): {args.bug_id} — …`",
