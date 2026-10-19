@@ -58,5 +58,5 @@ def test_reconcile_reports_every_step_and_persists_the_v2_registry(
             "capability-canary",
         ],
     }
-    expected_registry = b'{\n  "schema_version": "2",\n  "contexts": []\n}'
+    expected_registry = b'{\n  "schema_version": "3",\n  "contexts": []\n}'
     assert registry.read_bytes() == expected_registry

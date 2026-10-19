@@ -49,7 +49,6 @@ def _row(*, state: str, associated_repos: list[dict[str, str]] | None = None) ->
         "created_at": "2026-01-01T00:00:00Z",
         "alive_since": "2026-01-02T00:00:00Z" if state == "alive" else None,
         "dead_since": "2026-01-03T00:00:00Z" if state == "dead" else None,
-        "current_branch": "feature/1.2.3",
         "associated_repos": associated_repos or [],
     }
 
