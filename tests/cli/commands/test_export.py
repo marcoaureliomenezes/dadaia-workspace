@@ -16,6 +16,7 @@ from dadaia_workspace.features.workspace.service import WorkspaceService
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
+from tests.fixtures.stores import fake_venv
 from tests.helpers.oslib import read_text
 
 _runner = CliRunner()
@@ -68,6 +69,7 @@ def test_export_writes_the_artifact_and_leaves_the_registry_alone(tmp_path: Path
 @pytest.mark.medium
 def test_export_hard_writes_one_archive(tmp_path: Path) -> None:
     source = _workspace(tmp_path / "source")
+    fake_venv(tmp_path / "source", cli="#!python\nprint('[]')\n")  # `worktree list` reads no trees
     source.save(_ctx("alpha", ContextState.DEAD))
 
     exported = _runner.invoke(app, ["export", "--hard", "--workspace", str(tmp_path / "source")])
