@@ -10,12 +10,13 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
+from dadaia_workspace.cli.commands import context as context_cmd
 from dadaia_workspace.cli.main import app
 from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES
 from dadaia_workspace.core.platform import PLATFORM
 from dadaia_workspace.features.workspace.service import WorkspaceService
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
-from tests.fakes import FakePythonEnvironmentManager
+from tests.fakes import FakePythonEnvironmentManager, NoWorktreeContainer
 from tests.helpers.oslib import read_text, write_text
 
 _runner = CliRunner()
@@ -82,7 +83,12 @@ def test_context_bind_persists_the_callers_session_record(workspace: Path) -> No
     assert datetime.fromisoformat(record["bound_at"]).tzinfo is not None
 
 
-def test_context_delete_removes_one_dead_registry_record(workspace: Path) -> None:
+def test_context_delete_removes_one_dead_registry_record(
+    workspace: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        context_cmd, "container", NoWorktreeContainer()
+    )  # delete reads the owner's rows
     registry = _write_registry(workspace, _row(state="dead"))
 
     result = _runner.invoke(app, ["context", "delete", "catalog"], terminal_width=200)
