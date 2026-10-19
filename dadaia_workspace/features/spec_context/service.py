@@ -528,12 +528,10 @@ class SpecContextService:
             self._git.checkout(repo_path, branch)
         except GitSyncError as exc:
             retry = platform.inline(*cli_words(self._workspace_root, "context", "alive", name))
+            again = platform.inline("git", "-C", str(repo_path), "checkout", branch)
             raise GitSyncError(
                 exc.message,
-                fix=act(
-                    "agent",
-                    f"make origin hold {branch} and fetch it in {repo_path}, then run `{retry}`",
-                ),
+                fix=act("agent", f"run `{again}` and resolve what it prints, then run `{retry}`"),
             ) from None
 
         ctx_fresh = self.show(name)
