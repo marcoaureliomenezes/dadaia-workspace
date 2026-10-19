@@ -9,9 +9,11 @@ Owner: dd-sw-engineer-sr
 
 from __future__ import annotations
 
+import json
 import os
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -426,6 +428,74 @@ def test_the_rewrite_verb_takes_a_new_message_when_the_term_sits_in_the_message(
     done = _verb(repo, oldest, "--message", "clean message", env=env)
     assert done.returncode == 0, done.stderr
     assert repo.ok("log", "-1", "--format=%s", _WORK) == "clean message"
+
+
+_FIX = "fix(bugs): a-bug \u2014 the cause"
+_RESOLVE = "chore(bugs): resolve a-bug \u2014 the cause"
+_BUGS = _SOURCE / "dadaia_workspace/public/skills/dd-bug-resolution/scripts/bugs.py"
+
+
+def _fix_then_its_resolve(
+    repo: _Repo, tmp_path: Path, fix_message: str, *, leak_in_file: bool
+) -> tuple[str, dict[str, str]]:
+    """A commit carrying the denylisted term (in a file, or in *fix_message*) and a ledger commit
+    resolving `a-bug` with it; returns the first commit and the env naming the denylist."""
+    denylist = tmp_path / "denylist.json"
+    write_text(denylist, f'{{"{_TERM}": "t"}}')
+    write_text(repo.root / "leak.txt", f"a {_TERM if leak_in_file else ''}\n")
+    repo.ok("add", "leak.txt")
+    assert repo.git("commit", "-q", "-m", fix_message, wt=True).returncode == 0
+    first = repo.ok("rev-parse", "HEAD")
+    record = {"id": "a-bug", "ts": "2026-10-19T10:00:00Z", "reported_by": "t", "title": "t",
+              "severity": "LOW", "component": "leak.txt", "context": "c", "symptom": "s",
+              "repro": "r", "expected": "e", "status": "resolved", "cause": "the cause",
+              "caused_by": "none", "closed_at": "2026-10-19T11:00:00Z", "solution": "s",
+              "fix_sha": first}  # fmt: skip
+    (repo.root / "specs/bugs").mkdir(parents=True)
+    write_text(repo.root / "specs/bugs/BUGS.jsonl", json.dumps(record) + "\n")
+    repo.ok("add", "specs")
+    assert repo.git("commit", "-q", "-m", _RESOLVE, wt=True).returncode == 0
+    return first, {"DADAIA_PRIVACY_DENYLIST": str(denylist)}
+
+
+def _bugs_check(repo: _Repo) -> subprocess.CompletedProcess[str]:
+    return run([sys.executable, str(_BUGS), "check", "--specs", str(repo.root / "specs")])
+
+
+def test_the_rewrite_verb_folds_every_message_so_the_fix_commit_stays_cited(
+    repo: _Repo, tmp_path: Path
+) -> None:
+    oldest, env = _fix_then_its_resolve(repo, tmp_path, _FIX, leak_in_file=True)
+    assert _bugs_check(repo).returncode == 0
+    write_text(repo.root / "leak.txt", "a\n")
+    done = _verb(repo, oldest, env=env)
+    assert done.returncode == 0, done.stderr
+    assert repo.ok("log", "-1", "--format=%B", _WORK) == f"{_FIX}\n\n{_RESOLVE}"
+    checked = _bugs_check(repo)
+    assert checked.returncode == 0, checked.stdout + checked.stderr
+
+
+def test_the_rewrite_verb_replaces_only_the_message_the_gate_lists_and_keeps_the_rest(
+    repo: _Repo, tmp_path: Path
+) -> None:
+    oldest, env = _fix_then_its_resolve(
+        repo, tmp_path, f"mentions {_TERM}\n\n{_FIX}", leak_in_file=False
+    )
+    tip = repo.ok("rev-parse", "HEAD")
+    held = repo.ok("rev-parse", f"origin/{_WORK}")
+    gate = run(
+        [str(repo.runner), "ci", "push-gate-check"],
+        input=f"refs/heads/{_WORK} {tip} refs/heads/{_WORK} {held}\n",
+        cwd=repo.root,
+        env={**os.environ, **env},
+        timeout=60,
+    )
+    assert gate.returncode != 0 and "keep any `fix(bugs): <id> \u2014 \u2026` line" in gate.stderr
+    done = _verb(repo, oldest, "--message", f"clean message\n\n{_FIX}", env=env)
+    assert done.returncode == 0, done.stderr
+    assert repo.ok("log", "-1", "--format=%B", _WORK) == f"clean message\n\n{_FIX}\n\n{_RESOLVE}"
+    checked = _bugs_check(repo)
+    assert checked.returncode == 0, checked.stdout + checked.stderr
 
 
 def test_the_rewrite_verb_refuses_a_commit_origin_already_holds(
