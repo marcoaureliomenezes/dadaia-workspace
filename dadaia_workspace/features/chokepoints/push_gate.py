@@ -9,10 +9,11 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Protocol
 
-from dadaia_workspace.core.cli_line import fix_line, git_line, read_failure_fix, spell_fix
+from dadaia_workspace.core.cli_line import fix_line, git_line, spell_fix
 from dadaia_workspace.core.gitflow import Gitflow
 from dadaia_workspace.core.models.git_scan import (
     GitObjectReadError,
+    GitRunError,
     ScannedObject,
     is_zero_sha,
 )
@@ -135,6 +136,14 @@ def _run_denylist_scan(
     except GitObjectReadError as exc:
         return _read_failure(exc, masker, repo)
     return hits, binaries, oversized
+
+
+def read_failure_fix(exc: GitObjectReadError, repo: Path) -> str:
+    """The one fix for a git-object read failure: git that could not run is not corruption, so no
+    fsck; any other read failure points git's own check at *repo*."""
+    if isinstance(exc, GitRunError):
+        return act("operator", "make git runnable here")
+    return git_line(repo, "fsck")
 
 
 def _read_failure(exc: GitObjectReadError, masker: PathMasker, repo: Path) -> Decision:

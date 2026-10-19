@@ -7,7 +7,6 @@ import sys
 from pathlib import Path, PurePath
 
 from dadaia_workspace.core import platform
-from dadaia_workspace.core.models.git_scan import GitObjectReadError, GitRunError
 from dadaia_workspace.core.skill_owner import load_owner
 
 
@@ -64,14 +63,6 @@ def venv_line(root: PurePath | None, tool: str, *argv: str) -> str:
 def git_line(repo: str | PurePath, *argv: str) -> str:
     """``git -C <repo> argv…`` — every git fix names its repo, so it runs from any cwd."""
     return platform.command("git", "-C", str(repo), *argv)
-
-
-def read_failure_fix(failure: GitObjectReadError, repo: str | PurePath) -> str:
-    """The one fix for a git-object read failure: git that could not run is not corruption, so no
-    fsck; any other read failure points git's own check at *repo*."""
-    if isinstance(failure, GitRunError):
-        return platform.act("operator", "make git runnable here")
-    return git_line(repo, "fsck")
 
 
 def shell_line(*parts: str) -> str:

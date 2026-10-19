@@ -9,13 +9,13 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from dadaia_workspace.features.certification import CertificationResult
 
-from dadaia_workspace.core.cli_line import read_failure_fix
 from dadaia_workspace.core.exceptions import DadaiaError, GitSyncError
 from dadaia_workspace.core.models.git_scan import GitObjectReadError, GitRunError
 from dadaia_workspace.core.platform import write_text
 from dadaia_workspace.core.workspace_resolver import not_initialized
 from dadaia_workspace.features.capabilities import distribution_version
 from dadaia_workspace.features.chokepoints.denylist_scan import BaselinePatternLike
+from dadaia_workspace.features.chokepoints.push_gate import read_failure_fix
 from dadaia_workspace.features.export.service import ExportService
 from dadaia_workspace.features.import_.service import ImportService
 from dadaia_workspace.features.migrate.state_v2 import execute_migration, plan_migration
