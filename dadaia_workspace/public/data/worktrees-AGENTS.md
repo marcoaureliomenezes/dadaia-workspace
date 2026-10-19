@@ -23,6 +23,7 @@ Scope: this file governs only `worktrees/**`.
 3. `wt-backlog-*` into `<work><v>`: `specs/` and any edit to the repo's `AGENTS.md` (how a missing `verify:` line lands), one review plus those same checks, no test and no `verify:` run.
 4. Each merge fast-forwards its base, removes the tree and deletes its branch; the work branch receives only closed rcs and lanes, audits aside. Release closure refuses while the repo holds any `wt/*` tree or branch but a `wt-rc` and the tree it runs from.
 
+- Every `WT merge` also refuses a tree whose `<base>..HEAD` carries a denylisted term (`.dadaia/.venv/bin/dadaia ci push-gate-check --onto <base>`, the pre-push content matcher); its fix re-commits that range as one commit, so a verdict on the old HEAD no longer binds.
 - A lane that lands during an open rc moves `<work><v>`: `WT sync <wt-rc path>` rebases `wt-rc`, each `wt-main` and each task, parents first, never pushing; it stops at the first conflict with one fix line and a re-run finishes. A ledger conflict is redone by the ledger's own writer, never hand-merged. `WT merge` re-runs cleanly after any stop.
 - Jobs of one PLAN wave and tasks of one job run in parallel only with disjoint exact `W:` sets.
 

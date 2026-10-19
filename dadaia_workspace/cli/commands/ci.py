@@ -7,6 +7,7 @@ import sys
 from collections.abc import Callable, Iterable
 from dataclasses import replace
 from pathlib import Path
+from typing import Any
 
 import typer
 
@@ -100,8 +101,7 @@ def _rewrite_unpublished(repo: Path, oldest: str, message: str | None) -> None:
         sha = oldest
     branch = git.current_branch(repo) or "HEAD"
     held = git.git(repo, "for-each-ref", "--format=%(objectname)", f"refs/remotes/origin/{branch}")
-    line = f"refs/heads/{branch} {tip} refs/heads/{branch} {held or ZERO_SHA}"
-    decision = _gate_decision(repo, lambda: line)
+    decision = _gate_decision(repo, lambda: _head_line(repo, held or ZERO_SHA), content_only=True)
     listed = decision.listed
     changed = git.git(repo, "diff", "--name-status", "--no-renames", "-z", tip).split("\0")
     stray = sorted(
@@ -146,9 +146,21 @@ def _rewrite_unpublished(repo: Path, oldest: str, message: str | None) -> None:
     git.git(repo, "commit", "-qa", "--amend", "--allow-empty", "--cleanup=whitespace", "-m", text)
 
 
-def _gate_decision(repo_root: Path, read_refs: Callable[[], str]) -> Decision:
+def _head_line(repo: Path, held: str) -> str:
+    """The pre-push ref line that publishes HEAD's branch over *held*."""
+    from dadaia_workspace.container import build_git_client
+
+    git = build_git_client()
+    branch = git.current_branch(repo) or "HEAD"
+    return f"refs/heads/{branch} {git.git(repo, 'rev-parse', 'HEAD')} refs/heads/{branch} {held}"
+
+
+def _gate_decision(
+    repo_root: Path, read_refs: Callable[[], str], content_only: bool = False
+) -> Decision:
     """The push gate's decision over the pre-push ref lines *read_refs* returns, from the
-    repo's gitflow, denylist and canon."""
+    repo's gitflow, denylist and canon; *content_only* judges the content alone (a branch no
+    push could carry, a task's, still has content)."""
     from dadaia_workspace.container import (
         build_git_client,
         build_git_object_reader,
@@ -156,7 +168,7 @@ def _gate_decision(repo_root: Path, read_refs: Callable[[], str]) -> Decision:
         load_denylist_terms,
     )
     from dadaia_workspace.core.specs_version import state
-    from dadaia_workspace.features.chokepoints import push_gate_decision
+    from dadaia_workspace.features.chokepoints import content_decision, push_gate_decision
     from dadaia_workspace.features.specs.canon import canon_violations
 
     denylist_terms = load_denylist_terms()
@@ -190,16 +202,18 @@ def _gate_decision(repo_root: Path, read_refs: Callable[[], str]) -> Decision:
             canon_fn = _no_canon_violations
         if fix:
             typer.echo(f"[pre-push] the pushed specs/ tree is {kind}\nhint: {fix}", err=True)
-    decision = push_gate_decision(
-        refs,
-        object_source=build_git_object_reader(),
-        repo=repo_root,
-        canon_violations_fn=canon_fn,
-        gitflow=gitflow,
-        fixes=fixes,
-        malformed_lines=malformed,
-        denylist_terms=denylist_terms,
-        baseline_patterns=baseline_patterns,
+    common: dict[str, Any] = {
+        "object_source": build_git_object_reader(),
+        "repo": repo_root,
+        "canon_violations_fn": canon_fn,
+        "fixes": fixes,
+        "denylist_terms": denylist_terms,
+        "baseline_patterns": baseline_patterns,
+    }
+    decision = (
+        content_decision(refs, **common)
+        if content_only
+        else push_gate_decision(refs, gitflow=gitflow, malformed_lines=malformed, **common)
     )
     if decision.warn:
         typer.echo(decision.warn, err=True)
@@ -213,6 +227,11 @@ def push_gate_check(
     ),
     repo: Path | None = typer.Option(None, "--repo", help="Remedy target. Default: cwd's repo."),
     message: str | None = typer.Option(None, "--message", help="Remedy: the one commit's message."),
+    onto: str | None = typer.Option(
+        None,
+        "--onto",
+        help="Merge gate: judge the content of `<onto>..HEAD` of the repo, no branch policy.",
+    ),
 ) -> None:
     """Pre-push gate: branch policy by the project gitflow + the range-scoped denylist scan.
 
@@ -230,10 +249,21 @@ def push_gate_check(
 
     Remedy for a refused push: --rewrite-from re-commits the whole unpublished range as one
     commit, over edits and deletions of the paths the gate lists.
+
+    The merge gate of a worktree judges the same content with --onto, on a branch of any name.
     """
     if rewrite_from is not None:
         return _rewrite_unpublished(repo or _repo_root(), rewrite_from, message)
-    decision = _gate_decision(_repo_root(), lambda: "" if sys.stdin.isatty() else sys.stdin.read())
+    if onto is not None:
+        from dadaia_workspace.container import build_git_client
+
+        repo = repo or _repo_root()
+        base = build_git_client().git(repo, "rev-parse", "--verify", f"{onto}^{{commit}}")
+        decision = _gate_decision(repo, lambda: _head_line(repo, base), content_only=True)
+    else:
+        decision = _gate_decision(
+            _repo_root(), lambda: "" if sys.stdin.isatty() else sys.stdin.read()
+        )
     if not decision.allowed:
         fail(decision.message)
 

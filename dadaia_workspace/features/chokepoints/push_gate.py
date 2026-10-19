@@ -12,6 +12,7 @@ from typing import Protocol
 from dadaia_workspace.core.cli_line import fix_line, git_line, spell_fix
 from dadaia_workspace.core.gitflow import Gitflow
 from dadaia_workspace.core.models.git_scan import (
+    ZERO_SHA,
     GitObjectReadError,
     GitRunError,
     ScannedObject,
@@ -33,7 +34,7 @@ from dadaia_workspace.features.chokepoints.denylist_scan import (
     scan_objects,
 )
 
-__all__ = ["push_gate_decision"]
+__all__ = ["content_decision", "push_gate_decision"]
 
 _DENYLIST_LAW = ".dadaia/AGENTS.md §3 — pre-push refuses a denylisted secret"
 _MAX_LISTED_HITS = 10
@@ -51,7 +52,7 @@ class ObjectSource(Protocol):
         self, repo: Path, local_sha: str, remote_sha: str
     ) -> Iterable[ScannedObject]: ...
 
-    def unpublished(self, repo: Path, sha: str) -> list[str]: ...
+    def unpublished(self, repo: Path, sha: str, held: str = ZERO_SHA) -> list[str]: ...
 
     def remote_branch(self, repo: Path, branch: str) -> bool: ...
 
@@ -99,7 +100,7 @@ def _rewrite_fix(ref: PushRef, object_source: ObjectSource, repo: Path, fixes: G
     elif branch != ref.local_ref and branch != fixes.head:
         fix = git_line(fixes.repo, "switch", branch)
     else:
-        oldest = object_source.unpublished(repo, ref.local_sha)[-1]
+        oldest = object_source.unpublished(repo, ref.local_sha, ref.remote_sha)[-1]
         fix = fix_line(
             None, "ci", "push-gate-check", "--repo", fixes.repo, "--rewrite-from", oldest
         )
@@ -171,10 +172,8 @@ def push_gate_decision(
 ) -> Decision:
     """Decide a push, first refusal wins: a malformed stdin line (fail closed); branch
     policy over every non-deletion, non-tag ref (a principal/integration birth allowed
-    when origin holds no gitflow branch or it publishes nothing); then ONE walk over
-    every non-deletion ref's new objects (tags included) for the denylist scan, while
-    the specs/ canon scan (refused first) judges only the paths each ref nets in; an unreadable object store refuses. Every
-    capability is a required parameter: an unwired call site is a CLI defect, never a
+    when origin holds no gitflow branch or it publishes nothing); then
+    :func:`content_decision`. Every capability is a required parameter: an unwired call site is a CLI defect, never a
     bypass."""
     if malformed_lines > 0:
         return Decision(
@@ -196,6 +195,30 @@ def push_gate_decision(
     )
     if refusal := check_branch_policy(branch_refs, gitflow, fixes, births):
         return refusal
+    return content_decision(
+        refs,
+        object_source=object_source,
+        repo=repo,
+        canon_violations_fn=canon_violations_fn,
+        fixes=fixes,
+        denylist_terms=denylist_terms,
+        baseline_patterns=baseline_patterns,
+    )
+
+
+def content_decision(
+    refs: list[PushRef],
+    *,
+    object_source: ObjectSource,
+    repo: Path,
+    canon_violations_fn: Callable[[Sequence[str]], Sequence[str]],
+    fixes: GateFixes,
+    denylist_terms: Iterable[tuple[str, str]] = (),
+    baseline_patterns: Iterable[BaselinePatternLike] = (),
+) -> Decision:
+    """The content half of a push, no branch policy: ONE walk over every non-deletion ref's
+    new objects (tags included) for the denylist scan, while the specs/ canon scan (refused
+    first) judges only the paths each ref nets in; an unreadable object store refuses."""
     scan_refs = [r for r in refs if not r.is_deletion]
     terms, patterns = list(denylist_terms), list(baseline_patterns)  # one-shot iterables
     masker = PathMasker(terms, patterns)

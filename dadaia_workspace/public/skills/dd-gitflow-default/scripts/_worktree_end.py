@@ -324,7 +324,12 @@ def _refuse_red(name: str, done: subprocess.CompletedProcess[str], tree: Path) -
     if done.returncode:
         out = done.stdout + done.stderr
         print(without_fix(out), end="")
-        raise Refusal(f"{name} check failed on {tree / 'specs'}", fix_of(out, act("agent", f"fix the findings above in {tree} and commit them")))  # fmt: skip
+        raise Refusal(f"{name} check failed on {tree}", fix_of(out, act("agent", f"fix the findings above in {tree} and commit them")))  # fmt: skip
+
+
+def _refuse_denylisted(root: Path, tree: Path, onto: str) -> None:
+    """Refuse a tree whose `onto..HEAD` carries a denylisted term: the pre-push content matcher."""
+    _refuse_red("the denylist scan", cli(root, "ci", "push-gate-check", "--onto", onto, tree=tree), tree)  # fmt: skip
 
 
 def _series(tree: Path, work: str, tip: str) -> list[tuple[str, str]]:
@@ -420,15 +425,16 @@ def _kind_checks(root: Path, repo: Path, tree: Path, name: str, onto: str, into:
         raise Refusal(f"{into} does not exist", git_line(repo, "worktree", "add", "-f", "-f", str(into), onto))  # fmt: skip
     ancestor = partial(_check_ancestor, root, tree, onto)
     verdict = partial(_check_approved, root, tree, onto, name)
-    gate = [ancestor, verdict, partial(_gate, tree, onto)]
+    denylist = partial(_refuse_denylisted, root, tree, onto)
+    gate = [ancestor, denylist, verdict, partial(_gate, tree, onto)]
     children, scaffold = partial(_open_children, repo, name), partial(_scaffold, tree, name)
     ledgers, specs = partial(_ledgers, root, repo, tree), partial(_check_specs_only, tree, onto)
     tests = lambda: _refuse_implementation_tests(tree, onto, _target(root, str(into))[3])  # noqa: E731
     table: dict[str | None, list[Callable[[], object]]] = {
-        "task": [ancestor, tests, partial(_refuse_dirty, into)],
+        "task": [ancestor, tests, denylist, partial(_refuse_dirty, into)],
         "main": [children, scaffold, *gate],
         "hotfix": [scaffold, *gate],
-        "backlog": [specs, ancestor, verdict, partial(ledgers, lambda rel: [_INSTANCE_SKILLS / rel])],
+        "backlog": [specs, ancestor, denylist, verdict, partial(ledgers, lambda rel: [_INSTANCE_SKILLS / rel])],
         "rc": [children, *gate, partial(ledgers, partial(_tracked, tree))],
     }  # fmt: skip
     return [partial(_refuse_dirty, tree), *table[kind_of(name)]]
