@@ -349,7 +349,10 @@ def test_a_failed_unbundle_relays_gits_reason_and_names_the_scratch_act(
 
     monkeypatch.setattr(GitSubprocessClient, "git", full_disk)
 
-    refused = _refused_scan(root)
+    with pytest.raises(DadaiaError) as caught:
+        _export(root)
+    refused = caught.value
+    assert not (root / ".dadaia/dist" / ARCHIVE).exists()
 
     assert "write error: disk full" in str(refused)
     assert refused.fix == act(
