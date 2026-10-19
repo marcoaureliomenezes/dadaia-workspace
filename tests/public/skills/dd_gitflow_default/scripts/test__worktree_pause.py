@@ -6,8 +6,10 @@ Size: MEDIUM.
 
 from __future__ import annotations
 
+import json
 import os
 import shutil
+import sys
 from collections.abc import Callable
 from pathlib import Path
 
@@ -15,11 +17,12 @@ import pytest
 
 import dadaia_workspace
 from tests.fixtures.stores import fake_venv
-from tests.helpers.oslib import make_executable, read_text, stub_cli, write_text
+from tests.helpers.oslib import command, make_executable, read_text, stub_cli, write_text
 from tests.helpers.oslib import run as os_run
 from tests.helpers.worktree_ws import (
     NEW_JOB,
     NEW_TASK,
+    SCRIPT,
     commit,
     fixes,
     git,
@@ -235,3 +238,16 @@ def test_resume_refuses_with_no_bundle(root: Path) -> None:
 
     assert refused.returncode == 1, refused.stderr
     assert len(fixes(refused)) == 1, refused.stderr
+
+
+def test_list_shows_a_paused_tree_whose_exit_is_the_resume_line(root: Path) -> None:
+    tree = _lane(root)
+    assert run(root, "pause", str(tree)).returncode == 0
+
+    rows = json.loads(run(root, "list", "--json").stdout)
+
+    (row,) = [r for r in rows if r["state"] == "paused"]
+    assert row["kind"] == "paused" and row["repo"] == "r" and row["warn"] is False
+    assert Path(row["path"]) == tree
+    assert row["exit"] == command(sys.executable, str(SCRIPT), "resume", str(tree))
+    assert row["fix"] == ""

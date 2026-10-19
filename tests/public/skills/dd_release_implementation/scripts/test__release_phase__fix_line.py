@@ -145,6 +145,10 @@ def test_the_closure_names_the_repo_by_the_main_checkout_helper(
             "worktree.py merge /w/m",
         ),
         (
+            {"kind": "paused", "state": "paused", "exit": "worktree.py resume /w/t", "fix": ""},
+            "worktree.py resume /w/t",
+        ),
+        (
             {
                 "kind": "hotfix",
                 "state": "orphan",
