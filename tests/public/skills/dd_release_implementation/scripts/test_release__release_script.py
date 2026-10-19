@@ -592,16 +592,17 @@ def test_a_first_stage_may_write_tests_by_any_language_convention(
     assert _phase(script, specs).returncode == 0
 
 
-def test_check_prints_the_schema_finding_for_a_non_object_log_entry(
-    script: Path, tmp_path: Path
+@pytest.mark.parametrize("verb", ["check", "drift"])
+def test_a_reader_prints_the_schema_finding_for_a_non_object_log_entry(
+    script: Path, tmp_path: Path, verb: str
 ) -> None:
-    """A state the schema refuses is reported by `check` as its finding, never a traceback."""
+    """A state the schema refuses is reported by every reader as its finding, never a traceback."""
     specs = _specs(tmp_path, _GOOD)
     state_path = specs / "releases/0.5.0/_RELEASE.json"
     state = json.loads(read_text(state_path))
     state["log"] = ["x"]
     write_text(state_path, json.dumps(state, indent=2) + "\n")
-    done = run([sys.executable, str(script), "check", "--specs", str(specs)])
+    done = run([sys.executable, str(script), verb, "--specs", str(specs)])
     out = done.stdout + done.stderr
     fixes = [ln for ln in out.splitlines() if ln.lstrip().startswith(("fix: ", "Agent action: "))]
     assert (done.returncode, "Traceback" in out, "log[0] must be of type object" in out) == (
