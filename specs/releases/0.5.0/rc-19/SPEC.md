@@ -10,7 +10,7 @@
 
 ## Bug window review
 
-**Window:** fixes closed after rc-18's window. rc-18's table ended with the two records resolved on 2026-10-18 before its definition (`asset-count-pins-miss-the-readout-script`, `unclosed-quote-test-hand-spells-the-sync-path`), judged there. This window holds the 8 records closed from rc-18's definition (2026-10-18T16:34:46Z) to rc-19's birth: 2 live in `BUGS.jsonl`, 6 archived. The push-gate remedy re-committed the rc-18 range as one squash, `995ac1256`. The two live records were re-pointed to it (`7c3ba5d1d`, `1f881d404`), so each is judged by its `fix_files` inside `995ac1256` and by the original commit the update replaced. The six archived records still name their original commits. Each was read with `git show`, and its code was checked present at `995ac1256`. Verdicts: 2 KEEP, 6 REBUILD in three units, R1-R3.
+**Window:** the 8 records closed from rc-18's definition (2026-10-18T16:34:46Z) to rc-19's birth (rc-18 judged the two before it): 2 live, 6 archived. The push-gate remedy squashed the rc-18 range into `995ac1256`; the two live records were re-pointed to it (`7c3ba5d1d`, `1f881d404`) and are judged by their `fix_files` there and by the original commit; the six archived keep their original commits. Each was read with `git show` and checked present at `995ac1256`. Verdicts: 2 KEEP, 6 REBUILD in three units, R1-R3.
 
 | bug id | fix sha (original) | unit | verdict | reason (evidence) |
 |---|---|---|---|---|
@@ -30,7 +30,7 @@
 
 ## 1. Problem
 
-Moving a workspace to a new machine or a teammate is a manual recipe (`init`, `dadaia import`, `context alive` per context) that carries no harness and no work in flight. `dadaia export` rewrites the registry as a side effect, and `dadaia import` stores a null `repo_url` as the text `'None'` (open bug). `context alive` checks out a stored `current_branch` that is stale in 3 of 5 ALIVE contexts (backlog measure) and swallows a failed checkout as a WARNING. Work in a lane or a `wt-rc` cannot be set aside: a tree leaves only by merge or clean, and `context dead` refuses while one is open. The operator ruled the full chain into 0.5.0 (roadmap Q4/Q5) after a deep review and three grills; ADRs 0270, 0271 and 0272 restate ADRs 0171, 0173 and 0175 against today's code. Two readers also break their contract: `verdict.py stats` crashes on a release state that breaks its schema (open bug), and the bug window review found two more units patched rather than rebuilt (R2, R3).
+Moving a workspace is a manual recipe (`init`, `dadaia import`, `context alive` per context) carrying no harness and no work in flight. `dadaia export` rewrites the registry as a side effect, and `dadaia import` stores a null `repo_url` as the text `'None'` (open bug). `context alive` checks out a stored `current_branch` that is stale in 3 of 5 ALIVE contexts and swallows a failed checkout as a WARNING. Work in a lane or a `wt-rc` cannot be set aside: a tree leaves only by merge or clean, and `context dead` refuses while one is open. The operator ruled the full chain into 0.5.0 (roadmap Q4/Q5); ADRs 0270-0272 restate 0171, 0173 and 0175 against today's code. `verdict.py stats` crashes on a release state that breaks its schema (open bug); the bug window review found two units patched, not rebuilt (R2, R3).
 
 ## 2. Measurable goals
 
@@ -40,29 +40,31 @@ Moving a workspace to a new machine or a teammate is a manual recipe (`init`, `d
 | 2 | Origin bugs | both resolved and archived | `bugs.py status` |
 | 3 | `dadaia import` | absent from `dadaia --help` and `docs/cli.md` | `dadaia help tree` |
 | 4 | REBUILDs R1-R3 | each lands as a REBUILD; net lines <= 0 on `_stats.py`, `_ledgers`, the several-work decision | `git diff --stat` per unit |
-| 5 | readout metrics 1, 2, 4, 6, 7, 9 | beside rc-18's 6/6 (100%), 2/13 (15%), n/a, 15, 0, 6 and the rc-18 targets (<= 20%, >= 70%, <= 4 h, 0, 0, 0) | `verdict.py stats 0.5.0-rc19`; baseline: the rc-18 closure summary, `_RELEASE.json` 2026-10-19T01:55:53Z, read at `df96b6d7b` |
+| 5 | readout metrics 1, 2, 4, 6, 7, 9 | beside rc-18's 6/6 (100%), 2/13 (15%), n/a, 15, 0, 6 and the rc-18 targets (<= 20%, >= 70%, <= 4 h, 0, 0, 0) | `verdict.py stats 0.5.0-rc19`; baseline: rc-18's closure summary (2026-10-19T01:55:53Z), read at `df96b6d7b` |
 
 ## 3. Non-goals
 
 - No `context dead --snapshot`, snapshots zone, WIP commit, archive tag or visibility probe (`gh`); `context dead` is unchanged (ADR 0271).
 - No package-version pin and nothing installed by `init --from`: only the `export-v1` format is pinned (ADR 0272).
 - Job and task trees are never paused nor carried; uncommitted work is never carried.
-- Only `verdict.py stats` gains the check-first read; `_worktree_new._refuse_unready` and the other release-state readers stay (the ruling names stats; `_worktree_new` reads one field of another branch's blob).
-- Every caller but `context alive` keeps reading local work branches; cleaning stale origin work branches of consumer repos is not here.
+- `_release_store.read_state` stays as it is: it is the release skill's own reader, the one `check` uses (B11).
+- Every caller but `context alive` keeps reading local work branches; stale origin work branches are not cleaned here.
 - The two push-gate bugs, the PR #298 Windows red and the six archived `fix_sha` repairs ride their own hotfix lanes (2026-10-19 rulings), outside this Origin.
-- `init-on-a-copied-workspace-leaves-a-cli-bound-to-the-original` stays open; `--from` is the supported path, the copy defect is not fixed here.
+- `init-on-a-copied-workspace-leaves-a-cli-bound-to-the-original` stays open; `--from` is the supported path.
 
 ## 4. Requirements
 
-Wave ranking, by the pick: (1) law, skills and dev loop: FR1 (Job 1), FR2, FR3; (2) shared foundation: FR4; (3) features and bugs: FR5, FR6; (4) promote-facing: `docs/cli.md` regeneration and the install-count pins move with FR3, FR5 and FR6 in the job that causes them; memory and backlog exits at closure.
+Wave ranking, by the pick: (1) law, skills and dev loop: FR1 (Job 1), FR2, FR3; (2) shared foundation: FR4; (3) features and bugs: FR5, FR6; (4) promote-facing: `docs/cli.md` and the install-count pins move with the FR3, FR5, FR6 job that causes them; memory and backlog exits at closure.
 
 ### FR1 — stats refuses a release state that breaks its schema (bug `stats-crashes-on-a-release-state-that-breaks-its-schema`, R1)
 
-Operator, 2026-10-19: "Run release.py check first (Recommended)": stats runs `release.py check` through its existing `_script` and refuses with check's fix line, then parses; no new unit, no verb.
+Operator, 2026-10-19: "Run release.py check first (Recommended)": stats runs `release.py check` through its existing `_script` and refuses with check's fix line, then parses; no new unit, no verb. By law (B6-B10): stats relays check's first error and its fix line as is.
 
-- AC1.1 RED: `verdict.py stats 0.5.0-rc18` on a `_RELEASE.json` that parses but holds (a) a log entry without `ts`, (b) a log `candidate` not shaped `rc-<N>`, (c) a log entry that is not an object exits 1 with no traceback and prints `[error]` plus exactly one `fix:` line, both `release.py check`'s for that finding. A milestone without `sha` is not a case: the schema allows it and stats reads `n/a` (as-is M15). Test: unit, one case per shape.
-- AC1.2 Stats runs `release.py check` before it parses; its own repair act and the parse refusal of `_stats.py:91-94` go, and `_window` adds no guard. Test: unit (AC1.1's cases).
-- AC1.3 The contract tests of the five prior stats fixes stay green: a version with no release folder still reads `n/a` throughout and exits 0. The unreadable-state cases (`{bad`, `[]`, non-UTF-8) keep exit 1 and one fix line; their expected message and fix line become check's by the ruling above, moved in a `test(...)` commit naming it. Test: unit (existing).
+- AC1.1 RED: `verdict.py stats 0.5.0-rc18 --specs <tree>` on a `_RELEASE.json` that parses but holds (a) a log entry without `ts`, (b) a log `candidate` not shaped `rc-<N>`, (c) a log entry that is not an object exits 1 with no traceback and prints `[error]` plus exactly one `fix:` line, both `release.py check`'s for that finding. A milestone without `sha` is not a case: the schema allows it and stats reads `n/a` (as-is M15). Test: unit, one case per shape.
+- AC1.2 Stats runs `release.py check --specs <specs>` through `_script` with `ok=(0, 1)` before it parses (today `_script` returns None on exit 1, `_stats.py:36-39`); its own repair act and the parse refusal of `_stats.py:91-94` go, and `_window` adds no guard. Test: unit (AC1.1's cases).
+- AC1.3 The contract tests of the five prior stats fixes stay green: a version with no release folder still reads `n/a` throughout and exits 0. The unreadable-state cases (`{bad`, `[]`, non-UTF-8) keep exit 1 and one fix line; their expected message and fix line become check's, in a `test(...)` commit naming the stats-reader ruling. A non-UTF-8 state is a check finding, never a check traceback (`_release_tree.py:205`); if check crashes on it, Job 1's RED covers that. Test: unit.
+- AC1.4 `_worktree_new._refuse_unready` (`_worktree_new.py:53-58`, a raw parse of another branch's blob) reaches the same schema verdict instead of its own parse, swept into Job 1; `dd-handoff-emitter/SKILL.md:55` states that stats refuses a release state `release.py check` refuses. Test: unit; none for the SKILL line.
+- AC1.5 During CLOSURE, check refuses until the memory pass is recorded (`_release_tree.py:246-265`), so the closure readout runs after the memory pass (B8, the accepted cost). Test: none, closure order.
 
 ### FR2 — one decider names a tree's ledger scripts (R2)
 
@@ -71,11 +73,12 @@ Operator, 2026-10-19: "Run release.py check first (Recommended)": stats runs `re
 
 ### FR3 — `dadaia worktree pause` and `resume` (ADR 0271; backlog `context-dead-snapshots-open-worktrees`)
 
-- AC3.1 RED: `worktree pause <path>` on a clean lane (`wt-backlog-<slug>`, `wt-hotfix-<bug-id>`) and on a clean `wt-rc` with no open child writes a commits-only bundle at `.dadaia/dist/<repo>/<name>.bundle`, verifies it, removes the tree and deletes its local branch; `worktree resume <path>` recreates the branch at the same tip and the tree, then deletes the bundle. Test: integration.
-- AC3.2 Pause refuses with nothing touched: a dirty tree (one fix line: commit first), a job or task path, a `wt-rc` with an open tree below it, a failed bundle write or verify; ignored files refuse unless `--keep` or `--drop` (inherits `_kept`). It makes no commit. Test: integration.
+- AC3.1 RED: `worktree pause <path>` on a clean lane (`wt-backlog-<slug>`, `wt-hotfix-<bug-id>`) and on a clean `wt-rc` with no open child writes `git bundle create <file> <branch> --not --remotes=origin` (A5: the basis is what origin holds) at `.dadaia/dist/<repo>/<name>.bundle`, named by `as_posix()`, verifies it, removes the tree and deletes its branch by `update-ref -d` under the CLI marker (A3: `branch -d` cannot delete an unmerged lane); `worktree resume <path>` recreates the branch at the same tip and the tree, then deletes the bundle. Test: integration.
+- AC3.2 Pause refuses with nothing touched: a dirty tree (one fix line: commit first), a tree holding ignored files (one fix line; no `--keep`/`--drop`, since `_kept` copies into the merge-only repo tree, `_worktree_end.py:75-121`; A2 supersedes the R4 default), a job or task path, a `wt-rc` with an open tree below it, a failed bundle write or verify. It makes no commit. Test: integration.
 - AC3.3 `context dead` refuses with the tree open and passes its worktree preflight after the pause; its fix line keeps naming merge and clean, and the law names pause as the third exit (as-is M10). Test: integration.
 - AC3.4 Resume creates the `wt/*` branch through the CLI marker, so the reference-transaction gate passes it; resuming a lane or `wt-rc` whose branch was pushed succeeds, the PLAN stating the remote-branch rule (R3 seam). Test: integration.
-- AC3.5 The `dist` zone admits the `<repo>/` bundle folders, the hard archive and the soft JSON; names and glob are the PLAN's (R5 seam). `worktrees/AGENTS.md` names `pause` and `resume` in its verb list, its exit line and its before-dead line; `dd-gitflow-default`'s verb list too. Test: unit for the zone; none for law text.
+- AC3.5 The `dist` canon admits `<registered slug>/` by the existing registered-slug mechanism (no `*` glob), the hard archive and the soft JSON, so `doctor --fix` never moves a bundle (today `{spec-contexts.json}`, `workspace_layout.py:199-200,314-345`); `context delete` refuses while `dist/<repo>/` holds a pause bundle, its fix: resume or move it (A1). Archive names are the PLAN's (R5). `worktrees/AGENTS.md` names `pause` and `resume` in its verb list, exit line and before-dead line; so do `dd-gitflow-default`'s list, `worktree.py:4` and `docs/getting-started.md:126`. Test: unit for the zone and the delete refusal; none for text.
+- AC3.6 Paused work stays visible (A4): `worktree list` shows each pause bundle as a `paused` row whose exit is its `resume` line (today none, `_worktree_git.py:169-182`); release closure refuses a paused tree like an open one; `context dead` passes it. Test: integration.
 
 ### FR4 — the stored branch is deleted; `alive` takes the highest origin work branch (ADRs 0171 + 0270; backlog `spec-context-branch-field-deleted`; R3)
 
@@ -83,30 +86,31 @@ Operator, 2026-10-19: "alive-only origin read, highest (Recommended)".
 
 - AC4.1 RED: reviving a DEAD context whose clone's origin holds one work branch checks it out; two, the highest; none, the integration branch. A failed checkout refuses with one fix line, never a stderr WARNING (as-is M12). Test: integration.
 - AC4.2 RED: a repo with local `{0.8.0}` and origin `{0.6.0, 0.8.0}` gives every local caller (`worktree new`, `context baseline`, `context dead`, `specs init`, `ci`, the doctor's first-pass fix) `0.8.0`, no SeveralWork (as-is M1 repro). Test: unit.
-- AC4.3 `work_versions` takes the ref prefix it reads; only `alive` passes the origin prefix and takes `SeveralWork.keep`; no other unit holds a "highest" rule. Test: unit.
-- AC4.4 R3: one decision in `_worktree_git.py` yields the kept version and the act over the local branches, which `drop_steps` stops re-deriving from its own git reads. The contract tests of the five SeveralWork bugs stay green, unloosened; the assert `301cc9f2c` changed (`tests/core/test_gitflow.py:205`) is held to the two-pass contract of the rc-18 closure ruling, which the PLAN cites. Test: unit.
-- AC4.5 `current_branch` leaves `SpecContextProject`, the store's row mapping, `context show/list` (`stored_branch` and the stored fallback), `create`, `add_repo`/`remove_repo`, `alive`, `dead`, `migrate/state_v2`, export and the import reader. ADR 0270's grep prints only the `RepoLiveStatus` live read, the `repo_live_status` docstring reworded (as-is M4). Test: none, the grep is the evidence; output pins move with the field by ADR 0171's acceptance.
-- AC4.6 `JsonContextStore` spells `schema_version` once, stamped in its one write path; `_EMPTY_CONTEXTS` and `state_v2` stop spelling it; no migration ships; a row keeps the dead key until written and no reader reads it. Test: unit.
+- AC4.3 `work_versions` takes the ref prefix it reads, local by default, so its positional callers stay unchanged (`_worktree_new.py:70,72`, `core/gitflow.py:112,115`, C20); the origin read lists `refs/remotes/origin/<work>*` (`for-each-ref`). Only `alive` passes the origin prefix and takes `SeveralWork.keep`; no other unit holds a "highest" rule. Test: unit.
+- AC4.4 R3: one decision in `_worktree_git.py` yields the kept version and the act over the local branches, which `drop_steps` stops re-deriving from its own git reads. The contract tests of the five SeveralWork bugs stay green, unloosened; the assert `301cc9f2c` changed (`tests/core/test_gitflow.py:205`) states the contract `sdd/worktrees.md:23` records: an unmerged lower is merged into the higher this pass and deleted on the next. Test: unit.
+- AC4.5 `current_branch` leaves `SpecContextProject`, the store's row mapping, `context show/list` (`stored_branch` and the stored fallback), `create`, `add_repo`/`remove_repo`, `alive`, `dead`, `migrate/state_v2`, export and the import reader. ADR 0270's grep prints only the `RepoLiveStatus` live read; the `repo_live_status` docstring (as-is M4) and `cli/commands/context.py:67`'s docstring are reworded. Test: none, the grep is the evidence; output pins move by ADR 0171's acceptance.
+- AC4.6 `JsonContextStore` spells `schema_version` once, stamped by `replace_raw` (`restore` puts back a snapshot byte for byte, `json_context_store.py:108-119`); `_EMPTY_CONTEXTS` and `state_v2` stop spelling it; no migration ships; a row keeps the dead key until written and no reader reads it. Test: unit.
 
 ### FR5 — `dadaia export`: read-only, soft and hard (ADRs 0175 + 0272; backlog `export-soft-and-hard`)
 
-- AC5.1 RED: `dadaia export` writes the soft artifact: `schema_version` `export-v1`, contexts (slug, name, state, main repo url, associated `[{slug, url}]`), `dadaia_version` and the harnesses of `harness_profile.json`; the registry is byte-identical after it (`_refresh_branches` deleted). Test: integration.
+- AC5.1 RED: `dadaia export` writes the soft artifact: `schema_version` `export-v1`, contexts (slug, name, state, main repo url, associated `[{slug, url}]`), `dadaia_version` and the harnesses of `harness_profile.json`; `state` is the registry's lowercase value (today `state.name`, `export/service.py:32`, against the store's `.value`), pinned in the schema; the registry is byte-identical after it (`_refresh_branches` deleted); `export --help` stops naming `import` (`cli/commands/export.py:23-26`). Test: integration.
 - AC5.2 A main or associated repo with no remote is recorded with url `null` (one rule, R6). Test: unit.
-- AC5.3 `dadaia export --hard` writes one `.tar.gz` in `.dadaia/dist/` holding only the soft JSON and `<repo>/<name>.bundle` members: a commits-only bundle of each open lane and `wt-rc` made at export time, and each pause bundle. A dirty open tree refuses with pause's commit-first fix line and the tree stays; job and task trees are not carried. Test: integration.
+- AC5.3 `dadaia export --hard` writes one `.tar.gz` in `.dadaia/dist/` holding only the soft JSON and `<repo>/<name>.bundle` members, names built with `as_posix()`: a bundle of each open lane and `wt-rc` made at export time on AC3.1's basis, and each pause bundle. A dirty open tree refuses with pause's commit-first fix line and the tree stays; job and task trees are not carried. Test: integration.
 - AC5.4 The hard export scans the bundles' objects with the pre-push's denylist and baseline; a planted secret refuses and leaves no archive. Export runs no visibility probe and writes no ref into `repos/<slug>` (scan input: R3 seam). Test: integration.
 - AC5.5 Both artifacts' JSON validates against one shipped `export-v1` schema; `ExportService` is the one owner that writes and reads the artifact, and bundles come from pause's one writer. Test: unit.
 
 ### FR6 — `init DIR --from <artifact>`; `dadaia import` deleted (ADRs 0175 + 0272; backlog `init-from-export`; bug `import-turns-a-null-repo-url-into-none`)
 
 - AC6.1 RED, at the `init --from` artifact reader: a context whose `repo_url` is null is never registered and never stored as `'None'`; it is listed `not replicated: no remote` with one fix line (add a remote, then re-export). The reader coerces null to `""` and `register` stays the one decider (as-is M7); a null associated url follows the same rule. Test: unit.
-- AC6.2 `init DIR --from` on a soft and on a hard artifact into a fresh workspace installs every harness the artifact names, registers its contexts DEAD through `register`, lists the repos `git ls-remote` cannot reach and prints `context alive <ctx>` for each context ALIVE in the artifact. A hard artifact's members are validated before extraction (fixed names only, no absolute path, no `..`, no link; stdlib `tarfile` `filter="data"`) and its bundles land in `.dadaia/dist/<repo>/<name>.bundle`; then `context alive`, `worktree resume` and doctor report no finding. Test: integration.
+- AC6.2 `init DIR --from` on a soft and on a hard artifact into a fresh workspace installs every harness the artifact names, registers its contexts DEAD through `register`, lists the repos `git ls-remote` cannot reach and prints `context alive <ctx>` for each context ALIVE in the artifact. A hard artifact's members are validated before extraction against a member pattern (the JSON or `<slug>/<name>.bundle`; no absolute path, no `..`, no link; stdlib `tarfile` `filter="data"`) and its bundles land in `.dadaia/dist/<repo>/<name>.bundle`; then `context alive`, `worktree resume` (a lane whose base exists only locally included) and doctor report no finding. Test: integration.
 - AC6.3 An artifact with any other `schema_version` refuses with one fix line: re-export with the current dadaia-workspace. `dadaia_version` is read for display only. Test: unit.
 - AC6.4 `--from` with `--repo` refuses with one fix line; every fix line `init` prints carries `--from` when given, built by `InitPlan.command` alone; the contract tests of the init fix-line family stay green. Test: unit.
-- AC6.5 `dadaia import` is gone: `features/import_/`, `cli/commands/import_.py`, its `cli/main.py` registration and `build_import_service`; `docs/cli.md` is regenerated; `dd-cli-library`'s verb index and `scripts/CONSUMER_VALIDATION_RECIPE.md` stop naming it. Test: unit (the help-tree pin).
+- AC6.5 `dadaia import` is gone: `features/import_/`, `cli/commands/import_.py`, its `cli/main.py` registration and `build_import_service`; `docs/cli.md` is regenerated; `dd-cli-library/SKILL.md:28`, its verb index and `scripts/CONSUMER_VALIDATION_RECIPE.md` stop naming it; docstrings naming it are reworded (`core/exceptions.py:36,112`, `spec_context/service.py:269`, `core/models/spec_context.py:11`, `tests/fakes.py:76`). Atoms citing it (`context-portability.md`, `context-management.md:44,46`, `catalog.json`, `index.md`) change in this job: doctor's citation check flags a dead verb (`doctor_memory.py:264`, `citations.py:214-237`). Operator: "Delete verb-only tests; move the rest (Recommended)": verb-only rows go; partitions the reader owns move to the `init --from` tests in a `test(...)` commit naming it. Test: unit (the help-tree pin).
 
 ### Replaces
 
 - `verdict.py stats` parsing `_RELEASE.json` itself behind per-input guards and its own repair act.
+- `_worktree_new._refuse_unready` parsing `_RELEASE.json` raw.
 - `_ledgers`' `own` flag, its `ls-files` filter and the stacked single-match rule.
 - The several-work act assembled by `drop_steps` from its own git reads apart from the version list.
 - `context alive` checking out the stored `current_branch` and swallowing a failed checkout as a WARNING.
@@ -122,7 +126,7 @@ Operator, 2026-10-19: "alive-only origin read, highest (Recommended)".
 
 - Backlog exits, `delivered` `--release 0.5.0`: `spec-context-branch-field-deleted`, `context-dead-snapshots-open-worktrees`, `export-soft-and-hard`, `init-from-export`. Both Origin bugs resolved and archived.
 - ADRs (main thread, on the 2026-10-19 rulings): 0171 and 0270 accepted (0270 amends 0171); 0271 accepted, superseding 0173 and amending 0172; 0175 and 0272 accepted (0272 amends 0175).
-- Memory pass (`MEMORY-UPDATE.md`), every atom the as-is review names (M13, M14) plus the stats readers: `platform/context-portability.md` (rewritten: soft/hard export, `init --from`, its prerequisites; its catalog entry maps the deleted `features/import_/**`), `platform/context-management.md` (`:21,31,34,46`: alive, dead, import), `platform/workspace-init.md` (`--from`), `platform/workspace-doctor.md` (the `dist` zone), `sdd/worktrees.md` (`:23` the prefixed reader, `:33` the ledger decider, `:40,45` the verb list), `sdd/release-lifecycle.md` and `agents/agent-comms.md` (stats refuses on check's finding), `catalog.json` (`:528-544`), `index.md` (`:50`), and `memory/ARCHITECTURE.md`'s features package map (`:118-123`, `import_` leaves; 12 packages become 11).
+- Memory pass (`MEMORY-UPDATE.md`), the as-is review's M13/M14 atoms plus the stats readers: `platform/context-portability.md` (rewritten; its catalog entry maps the deleted `features/import_/**`), `platform/context-management.md` (`:21,31,34,46`: alive, dead, import), `platform/workspace-init.md` (`--from`), `platform/workspace-doctor.md` (the `dist` zone), `sdd/worktrees.md` (`:23` the prefixed reader, `:33` the ledger decider, `:40,45` the verb list), `sdd/release-lifecycle.md`, `agents/agent-comms.md` (stats), `catalog.json` (`:528-544`), `index.md` (`:50`), and `memory/ARCHITECTURE.md`'s features package map (`:118-123`, `import_` leaves). Lines citing `dadaia import` change in FR6's job (AC6.5).
 
 ## 5. Constraints and risks
 
@@ -131,13 +135,13 @@ Operator, 2026-10-19: "alive-only origin read, highest (Recommended)".
 - Net lines <= 0 for FR1, FR2, FR4 and FR6 (the `import_` deletion offsets `--from`); FR3 and FR5 are net additions, a new capability no unit carries.
 - Public boundary: nothing requires a remote, CI, `gh` or a vendor CLI; the scan and bundles are local; platform facts go through `core/platform.py`, archive members are POSIX names joined by `Path` (R7).
 - Stats refuses on any `release.py check` error, an unrelated tree finding included: the ruled trade-off of the check-first read.
-- `alive` takes the highest origin work branch even when it is stale; `fetch --prune` drops a deleted one (ADR 0270).
+- Check's fix line for a schema finding is generic; stats relays it as is (B10).
+- `alive` takes the highest origin work branch even when it is stale on origin; `alive` runs no fetch, so a branch deleted upstream counts until the operator's own `fetch --prune` (D23). This corrects ADR 0270's consequence line, accepted and immutable.
 - An old `spec-contexts-export-v1` artifact on disk refuses with the re-export fix line.
-- Two new assets (`_worktree_pause.py`, `export-v1.schema.json`) move the install-count pins, which run outside `ci.py job`; the implementer runs those two test files by name (`asset-count-pins-miss-the-readout-script`).
-- Consumers of each changed public name (`dadaia import`, the artifact format, the registry key, the worktree verb list, `init`'s grammar and fix lines) are listed in the as-is review §4; a read-only `dd-researcher` pre-mortem precedes approval and the PLAN answers each hit.
-- Hotfix lanes in flight on `feature/0.5.0` may touch these files; the `wt-rc` takes them by `WT sync`.
+- Two new assets (`_worktree_pause.py`, `export-v1.schema.json`) move the install-count pins, which run outside `ci.py job` and differ per platform (138 Linux / 161 Windows today); the implementer recounts each platform's literal and runs those two test files by name (`asset-count-pins-miss-the-readout-script`). The shipped-hashes pin moves only if a scaffold or specs `AGENTS.md` source is edited.
+- Consumers of each changed public name: as-is review §4 and the `dd-researcher` pre-mortem (2026-10-19), every hit folded into an AC above; the PLAN answers each.
+- Hotfix lanes on `feature/0.5.0` reach the `wt-rc` by `WT sync`.
 
 ## 6. Open questions
 
-- For the main thread: the root map §1 deletes a test only on the operator's order. Does the acceptance of 0175 + 0272 ("dadaia import is deleted") order the deletion of `dadaia import`'s own tests (`tests/features/import_/test_service.py`, the import rows of `tests/cli/commands/test_export.py`, `tests/cli/test_main__refusals_carry_a_fix.py:150`, `tests/test_container.py`)? Recommended: yes for rows that test only the deleted verb; a partition still owned by the artifact reader moves to the `init --from` tests in a `test(...)` commit naming the ruling.
-- R3 (bundle basis, scratch-repo scan, a pushed lane on pause) and R5 (artifact names, the `dist/<repo>/` depth-2 glob) are agent defaults, PLAN seams for the sr, not operator questions.
+none. Import tests: the operator's order (AC6.5); AC1.3: the stats-reader ruling. R3's remaining seams (the bundle scan's scratch repo, a pushed lane on pause) and R5 (names) are the sr's PLAN defaults.
