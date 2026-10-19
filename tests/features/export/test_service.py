@@ -55,7 +55,7 @@ def test_export_writes_fr13_records_and_refreshes_alive_branches_only(tmp_path: 
     assert result.path == dist / "spec-contexts.json"
     assert sorted(p.name for p in dist.iterdir()) == ["spec-contexts.json"]
     dist_zone = next(zone for zone in zones_with_canon() if zone.name == "dist")
-    assert dist_zone.canon == frozenset({result.path.name})
+    assert dist_zone.canon == frozenset({result.path.name, "workspace-export.tar.gz"})
 
     payload = json.loads(read_text(result.path))
     exported_at = payload["exported_at"]
