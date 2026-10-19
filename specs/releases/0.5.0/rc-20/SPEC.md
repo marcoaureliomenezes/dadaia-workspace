@@ -75,8 +75,7 @@ Gaps, verified at `740dc6927` against the researcher's facts from `2059b779e`:
 | 4 | T3 | the image builds on the baseline and on the candidate; the grader passes a hand-done workspace and fails an empty one | `tests/e2e/test_evals_t3.py` |
 | 5 | discoverability | `llms-full.txt` committed and fresh; the keywords hold the four names; the GitHub topics equal the keywords | the contract test; `gh repo view --json repositoryTopics` |
 | 6 | docs | none of §1's index, quickstart and README defects remain; the quickstart's §1 runs as printed, both blocks | `tests/e2e/test_onboarding_journey.py` |
-| 7 | `eval.yml` on `main` | `git diff origin/main origin/feature/0.5.0 -- .github/workflows/eval.yml evals/` is empty after the lane's PR merges | `git diff` |
-| 8 | readout metrics 1, 2, 4, 6, 7, 9 | each read beside rc-19's (15/18 (83%), 2/15 (13%), n/a, 0, 0, 18) and its target (<= 20%, >= 70%, <= 4 h, 0, 0, 0) | `verdict.py stats 0.5.0-rc20`; baseline: rc-19's closure summary in `_RELEASE.json` |
+| 7 | readout metrics 1, 2, 4, 6, 7, 9 | each read beside rc-19's (15/18 (83%), 2/15 (13%), n/a, 0, 0, 18) and its target (<= 20%, >= 70%, <= 4 h, 0, 0, 0) | `verdict.py stats 0.5.0-rc20`; baseline: rc-19's closure summary in `_RELEASE.json` |
 
 ## 3. Non-goals
 
@@ -93,10 +92,10 @@ Gaps, verified at `740dc6927` against the researcher's facts from `2059b779e`:
 
 Wave ranking, by the pick:
 
-1. Law, skills and dev loop: FR1, FR2 and FR3. Job 1 executes the verdicts, and the Dependabot registration is Job 1's first commit (FR9).
+1. Law, skills and dev loop: FR1, FR2 and FR3. Job 1 executes the verdicts.
 2. Shared foundation: FR4 and FR5.
-3. Features and bugs: FR6 (T3), plus the registered bug batch (FR9).
-4. Promote-facing: FR7 (adoption) and FR8 (`eval.yml` to `main`).
+3. Features and bugs: FR6 (T3), plus the registered bug batch (FR9), each bug in the job the PLAN assigns it.
+4. Promote-facing: FR7 (adoption).
 
 ### FR1 — one relay of `release.py check` (R1)
 
@@ -126,6 +125,7 @@ Wave ranking, by the pick:
 
 - AC5.1 The `repo_live_status` docstring (`features/spec_context/service.py:468`) no longer spells `current_branch=`, and states the same contract. Test: none; 0270's grep is the evidence.
 - AC5.2 After AC5.1 merges, a shape-2 `chore(adrs): repair` on the `wt-rc` restores 0270's `measured_by` to its text before `623e50af5`: "prints only the RepoLiveStatus live read in features/spec_context/service.py, the repo_live_status docstring reworded so it no longer matches". The grep then prints one line. Test: none; the grep.
+- Note, from the PR #298 review: the docstring at `service.py:468` is accurate. It describes the live `RepoLiveStatus` value, not the deleted stored field, so the gap is text only: the docstring's spelling matches the grep. FR5 changes no behaviour.
 
 ### FR6 — eval T3 discovery (backlog `eval-t3-discovery`; ADR 0269(b))
 
@@ -142,14 +142,10 @@ Wave ranking, by the pick:
 - AC7.4 `docs/index.md` and `docs/quickstart.md` lose every defect §1 lists, and both name `init --from`. The quickstart's §1 runs as printed: both blocks, the rc tree and the version read from the repo. The test that already pins it, `test_the_quickstart_block_runs_as_printed`, is hardened in its home to cover the second block. These docs derive from memory, so the atoms change first, in the same commit (shape 9, `who: pe`). Test: E2E (the hardened journey).
 - AC7.5 README's agent section opens with a fast path of at most five lines: the install line, the `AGENTS.md` map, `doctor`, and `llms.txt` / `llms-full.txt`. Test: none, doc text; T3 is its proof.
 
-### FR8 — `eval.yml` to `main` (Q6; Operational-Change Lane)
-
-- AC8.1 On the operator's order (Q6), one PR to `main` carries only `.github/workflows/eval.yml` and the `evals/` files it reads. It merges through the constitution §2 lane: the security-APPROVE push gate on its sha and green CI. Test: none; goal 7's `git diff` is the evidence.
-
 ### FR9 — the bug window
 
-- AC9.1 `mcp-on-main-is-vulnerable-to-session-exhaustion` (CRITICAL; `--component poetry.lock`, its correlates naming the earlier `poetry.lock` bug) is registered as the first commit of rc-20's first job tree and joins the Origin `bugs:` once registered. It stays open in rc-20 and resolves at the 0.5.0 promote (`feature/0.5.0` already holds no `mcp`). Test: none; Dependabot alert #21 is the evidence.
-- AC9.2 Each re-verified live bug that the operator confirms is registered and joins the Origin. It is fixed in rc-20 under `specs/bugs/AGENTS.md` §2, RED test first, because no rc closes with an open bug. Test: per bug, its RED.
+- AC9.1 The operator confirmed 25 bugs on 2026-10-19: the 22 re-verified ones ("Register all 22, fix in rc-20 (Recommended)"), the Dependabot bug `mcp-on-main-is-vulnerable-to-session-exhaustion` ("Register, resolve at promote (Recommended)"), `windows-contract-coverage-runs-at-its-timeout` ("Register, raise cap in rc-20 (Recommended)") and `merge-scan-copies-the-denylist-precedence` ("Register, fix in rc-20 (Recommended)"). They are registered through the backlog lane `0.5.0/wt-backlog-rc20-bug-batch`, which lands before the PLAN, and they join the Origin `bugs:` once on this tree. They are not listed here as requirements; the PLAN assigns each one to a job. Test: none; `bugs.py status` is the evidence.
+- AC9.2 Each of them is fixed in rc-20 under `specs/bugs/AGENTS.md` §2, RED test first, because no rc closes with an open bug. The one exception is the Dependabot bug, which stays open in rc-20 and resolves at the 0.5.0 promote (`feature/0.5.0` already holds no `mcp`). Test: per bug, its RED.
 
 ### Replaces
 
@@ -158,22 +154,22 @@ Wave ranking, by the pick:
 - R3: `_git.context_repos` reading the registry file raw, beside `_stats._context`'s second answer to the same question.
 - R4: `scan_bundle` and its refusals living in the composition root `container.py`.
 - R5: ADR 0270's `measured_by` accepting the docstring it was written to exclude (`623e50af5`).
-- The `eval.yml` skeleton of `7af463ec0` on `main`.
 
 ### Closure
 
-- Backlog exits, `delivered` `--release 0.5.0`: `adoption-and-discoverability` and `eval-t3-discovery`. Every Origin bug is resolved and archived, except the Dependabot bug (AC9.1).
+- Backlog exits, `delivered` `--release 0.5.0`: `adoption-and-discoverability` and `eval-t3-discovery`. Every Origin bug is resolved and archived, except the Dependabot bug (AC9.2).
 - The memory pass covers the atoms that cite the moved units (`sdd/bug-ledger.md` for R3, `platform/context-portability.md` for R4, `agent-evals.md` for T3, and the docs atoms for FR7), and `catalog.json`.
 
 ## 5. Constraints and risks
 
-- Order: Job 1 (FR1-FR3) runs first. FR4 and FR5 come before FR6, and FR7 and FR8 come last. FR8 merges to `main` after FR6 lands on `feature/0.5.0`, so `main` gets T3 too.
+- Order: Job 1 (FR1-FR3) runs first. FR4 and FR5 come before FR6, and FR7 comes last. The registered bugs go where the PLAN puts them.
 - Net lines <= 0 for FR1-FR5. FR6 and FR7 are net additions, new capability that no unit carries.
 - Public boundary: T3, `llms-full.txt` and every doc require of a user no remote, CI, vendor CLI or toolchain. `eval.yml` is this repo's developer CI, not a user requirement.
-- With `eval.yml` on `main`, its weekly schedule (`eval.yml:12-13`) runs on `main`'s code. Until the promote, that is 0.4.7 with no T3 task, so each scheduled run BLOCKs on T3's floor and spends model calls. This is the cost of Q6's order.
 - T3 depends on the image resolving the candidate without pre-installing it (AC6.2). If Harbor's build cannot do that, the PLAN returns the question to the main thread before Job 6 starts.
 - Consumers of each moved name (R2-R4) are found by the as-is review and the `dd-researcher` pre-mortem. The PLAN answers each.
 
 ## 6. Open questions
 
-- For the main thread, on FR8's premise. The "Eval.yml to main" bullet says `workflow_dispatch` registers only from the default branch, so rc-21 cannot run T1+T2+T3 until the file is on `main`. But `main` already carries the registration skeleton (`7af463ec0`), and its own comment says `gh workflow run eval.yml --ref feature/<M.m.p>` runs that ref's `eval.yml`. A dispatch on `feature/0.5.0` succeeded on 2026-10-07T19:21:43Z (`gh run list --workflow eval.yml`). What FR8 still adds is the weekly schedule on `main` (rc-18 SPEC: "so its weekly cron can fire"), along with the cost noted in §5. The lighter option is to drop FR8 and let the 0.5.0 promote carry `eval.yml` to `main`. Keep FR8 or drop it?
+none.
+
+- FR8 (`eval.yml` to `main` through the Operational-Change Lane) is dropped by main-thread ruling, logged as "FR8 dropped" in the grill report. `main` already carries the `eval.yml` registration skeleton (`7af463ec0`), and `gh workflow run eval.yml --ref feature/0.5.0` ran green on 2026-10-07. So rc-21 dispatches the candidate with `--ref feature/0.5.0`, and the 0.5.0 promote carries `eval.yml` to `main`, as Q6 rules. A lane now would only add a weekly cron that tests 0.4.7 and blocks on T3's floor. The number FR8 is not reused.
