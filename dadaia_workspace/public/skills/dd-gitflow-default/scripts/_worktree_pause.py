@@ -11,7 +11,7 @@ from pathlib import Path
 from _platform import act, command
 from _worktree_end import _open_children, _refuse_dirty, _target
 from _worktree_git import git, ours
-from _worktree_names import LAUNCH, LOCK, Refusal, branch, kind_of
+from _worktree_names import LAUNCH, LOCK, Refusal, branch, kind_of, tree_path
 from _worktree_new import absent_levels, write_level_files
 
 
@@ -81,3 +81,17 @@ def resume(root: Path, path: str) -> str:
             break
         folder.rmdir()
     return f"resumed {ref} at {tree}"
+
+
+def paused_rows(root: Path) -> list[dict[str, object]]:
+    """One `paused` row per `.dadaia/dist/<repo>/**/*.bundle`: `path` is the tree `resume` takes,
+    `exit` the resume line."""
+    out: list[dict[str, object]] = []
+    for bundle in sorted((root / ".dadaia" / "dist").glob("*/**/*.bundle")):
+        repo, *_ = bundle.relative_to(root / ".dadaia" / "dist").parts
+        name = bundle.relative_to(root / ".dadaia" / "dist" / repo).with_suffix("").as_posix()
+        path = str(tree_path(root, repo, name))
+        out.append({"repo": repo, "path": path, "state": "paused", "age_hours": 0.0,
+                    "registered": True, "kind": "paused", "warn": False, "fix": "",
+                    "exit": command(*LAUNCH, "resume", path)})  # fmt: skip
+    return out

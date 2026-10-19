@@ -25,7 +25,7 @@ from _worktree_end import clean, digest, merge
 from _worktree_git import rows, workspace_of
 from _worktree_names import LAUNCH, Refusal
 from _worktree_new import new
-from _worktree_pause import pause, resume
+from _worktree_pause import pause, paused_rows, resume
 from _worktree_sync import sync
 
 __all__ = ["main"]
@@ -89,7 +89,7 @@ def main(argv: list[str] | None = None) -> int:
             end_verb = merge if args.verb == "merge" else clean
             print(f"[ok] {end_verb(root, args.path, args.keep, args.drop)}")
             return 0
-        found = rows(root)
+        found = [*rows(root), *paused_rows(root)]
     except Refusal as refusal:
         report(refusal, refusal.fix)
         return 1
