@@ -51,11 +51,13 @@ def cli(root: Path, *args: str, tree: Path | None = None) -> subprocess.Complete
     """One read-only run of the workspace CLI — the owner of every package grammar. With *tree*
     the run acts on that tree alone: its cwd, every root above it fenced, so the workspace's
     denylist file is handed over by the loader's own `$DADAIA_PRIVACY_DENYLIST` input."""
+    # the loader's own order: the variable's file when it exists, else the workspace's
+    held = (os.environ.get("DADAIA_PRIVACY_DENYLIST"), str(root / STATES / "privacy_denylist.json"))
+    denylist = next((p for p in held if p and Path(p).exists()), held[1])
     fence = (
         {
             "DADAIA_FENCED_ROOTS": os.pathsep.join(map(str, tree.resolve().parents)),
-            "DADAIA_PRIVACY_DENYLIST": os.environ.get("DADAIA_PRIVACY_DENYLIST")
-            or str(root / STATES / "privacy_denylist.json"),
+            "DADAIA_PRIVACY_DENYLIST": denylist,
         }
         if tree
         else {}

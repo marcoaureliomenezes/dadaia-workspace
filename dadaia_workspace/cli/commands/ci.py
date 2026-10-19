@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import subprocess
 import sys
-from collections.abc import Callable, Iterable
+import tempfile
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import replace
 from pathlib import Path
-from typing import Any
 
 import typer
 
@@ -103,7 +103,7 @@ def _rewrite_unpublished(repo: Path, oldest: str, message: str | None) -> None:
         sha = oldest
     branch = git.current_branch(repo) or "HEAD"
     held = git.git(repo, "for-each-ref", "--format=%(objectname)", f"refs/remotes/origin/{branch}")
-    decision = _content_decision(repo, held or ZERO_SHA)
+    decision = _content_decision(repo, held or ZERO_SHA, "[pre-push]")
     listed = decision.listed
     changed = git.git(repo, "diff", "--name-status", "--no-renames", "-z", tip).split("\0")
     stray = sorted(
@@ -140,38 +140,69 @@ def _rewrite_unpublished(repo: Path, oldest: str, message: str | None) -> None:
         )
     if refusal:
         fail(*refusal)
+    _fold(repo, sha, tip, decision, message)
+
+
+def _fold(repo: Path, sha: str, tip: str, decision: Decision, message: str | None) -> None:
+    """Re-commit *sha*..*tip* of HEAD as one commit, or as two when RED `test(` commits and others
+    mix: a test commit of the paths they touch, then the rest, so the task test-separation check
+    and a hotfix's shape-3 test commit still hold. Every folded message is kept; *message*
+    replaces those the gate lists. Each tree and message is settled in a temporary index before
+    any ref moves, which then moves once."""
+    from dadaia_workspace.container import build_git_client
+
+    git = build_git_client()
     log = git.git(repo, "log", "--reverse", "--format=%H%x00%B%x1e", tip, "--not", f"{sha}^@")
     folded = [e.strip().partition("\0")[::2] for e in log.split("\x1e") if e.strip()]
-    replaced = decision.messages if message else ()
+    replaced = set(decision.messages) if message else set()
     every, red = {c for c, _ in folded}, {c for c, m in folded if m.startswith("test(")}
-
-    def said(commits: set[str], lead: str = "") -> str:
-        return "\n\n".join([lead, *(m for c, m in folded if c in commits and c not in replaced)]).strip()  # fmt: skip
-
     try:
         parent = git.git(repo, "rev-parse", "--verify", f"{sha}^")
     except GitSyncError:
         parent = ""
-    if not (parent and red and red != every):
-        git.git(repo, "reset", "--soft", sha)
-        git.git(repo, "commit", "-qa", "--amend", "--allow-empty", "--cleanup=whitespace", "-m", said(every, message or ""))  # fmt: skip
-        return
 
-    # A RED test and its implementation fold into two commits split by path, so the task
-    # test-separation check and a hotfix's shape-3 test commit still hold.
+    def said(commits: set[str]) -> str:
+        lead = message if message and replaced & commits else ""
+        return "\n\n".join([lead or "", *(m for c, m in folded if c in commits - replaced)]).strip()
+
     def names(*args: str) -> set[str]:
         return set(filter(None, git.git(repo, *args, "-z").split("\0")))
 
-    reds = set().union(*(names("diff-tree", "--no-commit-id", "--name-only", "-r", "--no-renames", c) for c in red))  # fmt: skip
-    net = names("diff", "--name-only", "--no-renames", parent, tip)
-    git.git(repo, "reset", "-q", parent)
-    for paths, commits, lead in ((reds & net, red, message or ""), (net - reds, every - red, "")):
-        if paths:
-            git.git(repo, "add", "-A", "--", *sorted(paths))
-        git.git(repo, "commit", "-q", "--allow-empty", "--cleanup=whitespace", "-m", said(commits, lead))  # fmt: skip
+    with tempfile.TemporaryDirectory(prefix="fold-") as scratch:
+        env = {"GIT_INDEX_FILE": str(Path(scratch) / "index")}
+        git.git(repo, "read-tree", tip, env=env)
+        git.git(repo, "add", "-u", env=env)
+        final = git.git(repo, "write-tree", env=env)
+        groups: list[tuple[set[str] | None, set[str]]] = [(None, every)]
+        if parent and red and red != every:
+            reds = set().union(*(names("diff-tree", "--no-commit-id", "--name-only", "-r", "--no-renames", c) for c in red))  # fmt: skip
+            net = names("diff", "--name-only", "--no-renames", parent, tip)
+            groups = [(reds & net, red), (None, every - red)]
+        texts = [said(commits) for _, commits in groups]
+        if not all(texts):
+            fail(
+                f"a folded commit would carry no message ({sha[:12]}..{tip[:12]})",
+                act(
+                    "agent",
+                    f"re-commit the range by hand with a message: `{platform.inline('git', '-C', str(repo), 'reset', '--soft', sha)}`, then commit it",  # fmt: skip
+                ),
+            )
+        head = parent
+        for (paths, _), text in zip(groups, texts, strict=True):
+            tree = final
+            if paths is not None:
+                git.git(repo, "read-tree", parent, env=env)
+                kept = git.git(repo, "ls-tree", "-rz", final, "--", *sorted(paths), env={"GIT_LITERAL_PATHSPECS": "1"})  # fmt: skip
+                rows = {e.partition("\t")[2]: e.partition("\t")[0].split() for e in kept.split("\0") if e}  # fmt: skip
+                entries = [f"{rows[p][0]} {rows[p][2]}\t{p}" if p in rows else f"0 {ZERO_SHA}\t{p}" for p in sorted(paths)]  # fmt: skip
+                git.git(repo, "update-index", "-z", "--index-info", stdin="\0".join(entries) + "\0", env=env)  # fmt: skip
+                tree = git.git(repo, "write-tree", env=env)
+            head = git.git(repo, "commit-tree", tree, *(["-p", head] if head else []), "-m", text)
+        git.git(repo, "update-ref", "HEAD", head, tip)
+    git.git(repo, "reset", "-q")
 
 
-def _denylist() -> tuple[tuple[tuple[str, str], ...], tuple[BaselinePatternLike, ...]]:
+def _denylist(tag: str) -> tuple[tuple[tuple[str, str], ...], tuple[BaselinePatternLike, ...]]:
     """The operator terms and the baseline patterns, the scan mode on stderr."""
     from dadaia_workspace.container import load_denylist_baseline_patterns, load_denylist_terms
 
@@ -182,45 +213,36 @@ def _denylist() -> tuple[tuple[tuple[str, str], ...], tuple[BaselinePatternLike,
         else "baseline only (no operator denylist; private names go in "
         "$DADAIA_PRIVACY_DENYLIST or .dadaia/states/privacy_denylist.json)"
     )
-    typer.echo(f"[pre-push] denylist scan mode: {mode}", err=True)
+    typer.echo(f"{tag} denylist scan mode: {mode}", err=True)
     return terms, patterns
 
 
-def _content_inputs(repo_root: Path, sha: str) -> dict[str, Any]:
-    """What the content scans read besides the denylist: the object reader and the canon as the
-    commit *sha* states it (foreign/v6 carry no v6 canon). No gitflow, work-branch or
-    branch-policy input."""
-    from dadaia_workspace.container import build_git_client, build_git_object_reader
+def _canon_fn(repo_root: Path, sha: str, tag: str) -> Callable[[Sequence[str]], Sequence[str]]:
+    """The canon predicate for the specs/ tree commit *sha* holds: foreign/v6 carry no v6 canon."""
+    from dadaia_workspace.container import build_git_client
     from dadaia_workspace.core.specs_version import state
     from dadaia_workspace.features.specs.canon import canon_violations
 
     git = build_git_client()
-    canon_fn = canon_violations
-    if git.git(repo_root, "ls-tree", sha, "specs"):
-        shown = git.git(repo_root, "ls-tree", "--name-only", sha, "specs/constitution.md")
-        text = git.git(repo_root, "show", f"{sha}:{shown}") if shown else ""
-        kind, fix = state(repo_root / "specs", text)
-        if kind in ("foreign", "upgradable"):
-            canon_fn = _no_canon_violations
-        if fix:
-            typer.echo(f"[pre-push] the pushed specs/ tree is {kind}\nhint: {fix}", err=True)
-    return {
-        "object_source": build_git_object_reader(),
-        "repo": repo_root,
-        "canon_violations_fn": canon_fn,
-    }
+    if not git.git(repo_root, "ls-tree", sha, "specs"):
+        return canon_violations
+    shown = git.git(repo_root, "ls-tree", "--name-only", sha, "specs/constitution.md")
+    kind, fix = state(repo_root / "specs", git.git(repo_root, "show", f"{sha}:{shown}") if shown else "")  # fmt: skip
+    if fix:
+        typer.echo(f"{tag} the pushed specs/ tree is {kind}\nhint: {fix}", err=True)
+    return _no_canon_violations if kind in ("foreign", "upgradable") else canon_violations
 
 
 def _gate_decision(repo_root: Path, read_refs: Callable[[], str]) -> Decision:
     """The push gate's decision over the pre-push ref lines *read_refs* returns, from the
     repo's gitflow, denylist and canon."""
-    from dadaia_workspace.container import build_git_client
+    from dadaia_workspace.container import build_git_client, build_git_object_reader
     from dadaia_workspace.features.chokepoints import push_gate_decision
 
-    terms, patterns = _denylist()
+    terms, patterns = _denylist("[pre-push]")
     refs, malformed = parse_push_stdin(read_refs())
     sha = next((r.local_sha for r in refs if not r.is_deletion), "HEAD")
-    content = _content_inputs(repo_root, sha)
+    canon_fn = _canon_fn(repo_root, sha, "[pre-push]")
     # `git push origin HEAD` names its source "HEAD": the branch checked out IS that ref.
     branch = build_git_client().current_branch(repo_root)
     refs = [
@@ -228,41 +250,40 @@ def _gate_decision(repo_root: Path, read_refs: Callable[[], str]) -> Decision:
         for r in refs
     ]
     gitflow, fixes = _gate_inputs(repo_root, branch)
-    decision = push_gate_decision(
+    return push_gate_decision(
         refs,
+        object_source=build_git_object_reader(),
+        repo=repo_root,
+        canon_violations_fn=canon_fn,
         gitflow=gitflow,
         fixes=fixes,
         malformed_lines=malformed,
         denylist_terms=terms,
         baseline_patterns=patterns,
-        **content,
     )
-    if decision.warn:
-        typer.echo(decision.warn, err=True)
-    return decision
 
 
-def _content_decision(repo: Path, held: str) -> Decision:
+def _content_decision(repo: Path, held: str, tag: str) -> Decision:
     """The push gate's content half over HEAD's branch published over *held*: what a branch no
     push could carry, a task's, still holds."""
-    from dadaia_workspace.container import build_git_client
+    from dadaia_workspace.container import build_git_client, build_git_object_reader
     from dadaia_workspace.features.chokepoints import content_decision
 
     git = build_git_client()
     branch = git.current_branch(repo)
     ref = f"refs/heads/{branch or 'HEAD'}"
-    terms, patterns = _denylist()
+    terms, patterns = _denylist(tag)
     tip = git.git(repo, "rev-parse", "HEAD")
-    decision = content_decision(
+    return content_decision(
         [PushRef(ref, tip, ref, held)],
+        object_source=build_git_object_reader(),
+        repo=repo,
+        canon_violations_fn=_canon_fn(repo, tip, tag),
         fixes=GateFixes(repo=str(repo), head=branch or ""),
         denylist_terms=terms,
         baseline_patterns=patterns,
-        **_content_inputs(repo, tip),
+        tag=tag,
     )
-    if decision.warn:
-        typer.echo(decision.warn, err=True)
-    return decision
 
 
 @app.command("push-gate-check")
@@ -304,11 +325,13 @@ def push_gate_check(
 
         repo = repo or _repo_root()
         base = build_git_client().git(repo, "rev-parse", "--verify", f"{onto}^{{commit}}")
-        decision = _content_decision(repo, base)
+        decision = _content_decision(repo, base, "[merge]")
     else:
         decision = _gate_decision(
             _repo_root(), lambda: "" if sys.stdin.isatty() else sys.stdin.read()
         )
+    if decision.warn:
+        typer.echo(decision.warn, err=True)
     if not decision.allowed:
         fail(decision.message)
 

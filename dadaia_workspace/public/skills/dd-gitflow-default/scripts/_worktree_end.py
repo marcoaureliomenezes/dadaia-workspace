@@ -425,7 +425,8 @@ def _kind_checks(root: Path, repo: Path, tree: Path, name: str, onto: str, into:
         raise Refusal(f"{into} does not exist", git_line(repo, "worktree", "add", "-f", "-f", str(into), onto))  # fmt: skip
     ancestor = partial(_check_ancestor, root, tree, onto)
     verdict = partial(_check_approved, root, tree, onto, name)
-    gate = [ancestor, verdict, partial(_gate, tree, onto)]
+    job_gate = partial(_gate, tree, onto)
+    gate = [ancestor, verdict, job_gate]
     denylist = partial(_refuse_denylisted, root, tree, onto)
     children, scaffold = partial(_open_children, repo, name), partial(_scaffold, tree, name)
     ledgers, specs = partial(_ledgers, root, repo, tree), partial(_check_specs_only, tree, onto)
@@ -433,7 +434,7 @@ def _kind_checks(root: Path, repo: Path, tree: Path, name: str, onto: str, into:
     table: dict[str | None, list[Callable[[], object]]] = {
         "task": [ancestor, tests, denylist, partial(_refuse_dirty, into)],
         "main": [children, scaffold, *gate],
-        "hotfix": [scaffold, ancestor, denylist, *gate[1:]],
+        "hotfix": [scaffold, ancestor, denylist, verdict, job_gate],
         "backlog": [specs, ancestor, denylist, verdict, partial(ledgers, lambda rel: [_INSTANCE_SKILLS / rel])],
         "rc": [children, *gate, partial(ledgers, partial(_tracked, tree))],
     }  # fmt: skip

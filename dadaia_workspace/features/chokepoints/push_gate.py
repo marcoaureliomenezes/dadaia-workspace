@@ -36,11 +36,12 @@ from dadaia_workspace.features.chokepoints.denylist_scan import (
 
 __all__ = ["content_decision", "push_gate_decision"]
 
+_PUSH = "[pre-push]"
 _DENYLIST_LAW = ".dadaia/AGENTS.md §3, worktrees/AGENTS.md §2 — a denylisted secret is refused"
 _MAX_LISTED_HITS = 10
 _REWRITE = (
-    "Uncommit the unpublished range down to its oldest commit and re-commit it as one "
-    "(origin's history is never rewritten). Remove what is listed from the files first; when "
+    "Uncommit the unpublished range down to its oldest commit and re-commit it as one commit, "
+    "two when RED test commits and others mix (origin's history is never rewritten). Remove what is listed from the files first; when "
     "the message carries it, append `--message` and the new text to the fix; keep any `fix(bugs): …` line, `refactor(bugs): …` lines included. Then repeat the refused act:"
 )
 
@@ -59,29 +60,37 @@ class ObjectSource(Protocol):
     def netted_specs(self, repo: Path, local_sha: str, remote_sha: str) -> list[str]: ...
 
 
-def _refusal(head: str, rows: Sequence[str] = (), noun: str = "", advice: str = "") -> str:
+def _refusal(
+    head: str, rows: Sequence[str] = (), noun: str = "", advice: str = "", tag: str = _PUSH
+) -> str:
     """The one pre-push refusal shape: head, rows capped at 10 plus a remainder count,
     then the advice when there is any."""
-    lines = [f"[pre-push] BLOCKED: {head}", *rows[:_MAX_LISTED_HITS]]
+    lines = [f"{tag} BLOCKED: {head}", *rows[:_MAX_LISTED_HITS]]
     if len(rows) > _MAX_LISTED_HITS:
         lines.append(f"  ... and {len(rows) - _MAX_LISTED_HITS} more offending {noun}.")
     return "\n".join([*lines, *([f"  {advice}"] if advice else [])])
 
 
-def _fail_closed(what: str) -> str:
-    return _refusal(f"{what} — a policy gate never skips what it cannot evaluate (fail closed).")
+def _fail_closed(what: str, tag: str = _PUSH) -> str:
+    return _refusal(
+        f"{what} — a policy gate never skips what it cannot evaluate (fail closed).", tag=tag
+    )
 
 
 def _notes(
-    decision: Decision, binaries: int, oversized: Sequence[OversizedNote], masker: PathMasker
+    decision: Decision,
+    binaries: int,
+    oversized: Sequence[OversizedNote],
+    masker: PathMasker,
+    tag: str,
 ) -> Decision:
     """Attach the skipped-binary count and the oversized-blob notes (path masked,
     CWE-532) as a warning, allow or refuse alike."""
     lines = [
-        f"[pre-push] {binaries} binary blob(s) skipped by the denylist scan (not text-decodable)."
+        f"{tag} {binaries} binary blob(s) skipped by the denylist scan (not text-decodable)."
     ] * (binaries > 0)
     lines += [
-        f"[pre-push] {masker.mask_path(n.path)} is {n.size_bytes} byte(s) — only its first "
+        f"{tag} {masker.mask_path(n.path)} is {n.size_bytes} byte(s) — only its first "
         f"{n.scanned_bytes} byte(s) were scanned by the denylist scan; the remainder was NOT "
         "scanned. Verify the rest by hand."
         for n in oversized
@@ -114,6 +123,7 @@ def _run_denylist_scan(
     terms: list[tuple[str, str]],
     patterns: list[BaselinePatternLike],
     masker: PathMasker,
+    tag: str,
 ) -> tuple[list[tuple[PushRef, Hit]], int, list[OversizedNote]] | Decision:
     """ONE streamed walk over every ref's new objects (deduplicated across refs; a
     materialized range measured ~129 MB): denylist hits and skip counts. A read failure
@@ -135,7 +145,7 @@ def _run_denylist_scan(
             oversized.extend(outcome.oversized_notes)
             hits.extend((ref, hit) for hit in outcome.hits)
     except GitObjectReadError as exc:
-        return _read_failure(exc, masker, repo)
+        return _read_failure(exc, masker, repo, tag)
     return hits, binaries, oversized
 
 
@@ -147,12 +157,12 @@ def read_failure_fix(exc: GitObjectReadError, repo: Path) -> str:
     return git_line(repo, "fsck")
 
 
-def _read_failure(exc: GitObjectReadError, masker: PathMasker, repo: Path) -> Decision:
+def _read_failure(exc: GitObjectReadError, masker: PathMasker, repo: Path, tag: str) -> Decision:
     """A git read failure refuses (fail closed), its path masked."""
     masked = f" (path: {masker.mask_path(exc.path)})" if exc.path is not None else ""
     return Decision(
         allowed=False,
-        message=_fail_closed(f"reading the pushed-range git objects failed ({exc}{masked})")
+        message=_fail_closed(f"reading the pushed-range git objects failed ({exc}{masked})", tag)
         + "\n"
         + spell_fix(read_failure_fix(exc, repo)),
     )
@@ -215,6 +225,7 @@ def content_decision(
     fixes: GateFixes,
     denylist_terms: Iterable[tuple[str, str]] = (),
     baseline_patterns: Iterable[BaselinePatternLike] = (),
+    tag: str = _PUSH,
 ) -> Decision:
     """The content half of a push, no branch policy: ONE walk over every non-deletion ref's
     new objects (tags included) for the denylist scan, while the specs/ canon scan (refused
@@ -222,7 +233,7 @@ def content_decision(
     scan_refs = [r for r in refs if not r.is_deletion]
     terms, patterns = list(denylist_terms), list(baseline_patterns)  # one-shot iterables
     masker = PathMasker(terms, patterns)
-    scan = _run_denylist_scan(scan_refs, object_source, repo, terms, patterns, masker)
+    scan = _run_denylist_scan(scan_refs, object_source, repo, terms, patterns, masker, tag)
     if isinstance(scan, Decision):
         return scan
     hits, binaries, oversized = scan
@@ -235,7 +246,7 @@ def content_decision(
             )
         ]
     except GitObjectReadError as exc:
-        return _read_failure(exc, masker, repo)
+        return _read_failure(exc, masker, repo, tag)
     messages = frozenset[str]()
     if canon:
         message = _refusal(
@@ -247,6 +258,7 @@ def content_decision(
                 for r, p in canon
             ],
             "path(s)",
+            tag=tag,
         )
         fix = _rewrite_fix(canon[0][0], object_source, repo, fixes)
         listed = frozenset(f"specs/{p}" for _, p in canon)
@@ -262,6 +274,7 @@ def content_decision(
             "A test fixture that needs a secret shape composes it at runtime (string "
             "concatenation), never as a tracked literal. The range scope means "
             "already-published history never needs a rewrite.",
+            tag=tag,
         )
         fix = _rewrite_fix(hits[0][0], object_source, repo, fixes)
         listed = frozenset(h.path for _, h in hits)
@@ -277,4 +290,4 @@ def content_decision(
         decision = Decision(
             allowed=False, message=f"{message}\n{fix}", listed=listed, messages=messages
         )
-    return _notes(decision, binaries, oversized, masker)
+    return _notes(decision, binaries, oversized, masker, tag)
