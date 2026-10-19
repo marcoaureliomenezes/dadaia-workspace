@@ -16,7 +16,9 @@ import pytest
 
 from dadaia_workspace.core.cli_line import git_line, shell_line
 from dadaia_workspace.core.skill_owner import load_owner
+from tests.helpers import worktree_ws
 from tests.helpers.oslib import link, read_text, run, write_text
+from tests.helpers.skill_scripts import stage_skill_scripts
 from tests.helpers.worktree_ws import (
     NEW_JOB,
     NEW_TASK,
@@ -480,21 +482,61 @@ def test_an_unreadable_release_state_refuses_a_job_and_creates_nothing(
     assert not (root / "worktrees/r" / NEW_JOB).exists()
 
 
-@pytest.mark.parametrize("gone", ["release folder", "rc tree"])
 def test_a_main_tree_reads_an_rc_without_a_release_state_as_not_implementation(
-    root: Path, gone: str
+    root: Path,
 ) -> None:
-    """A new version's wt-rc exists before `release.py new`, and a tree can be removed by hand:
-    either way the rc holds no state, so the job is refused for its phase and nothing is created."""
+    """A new version's wt-rc exists before `release.py new`: it holds no state, so the job is
+    refused for its phase and nothing is created."""
     assert _run(root, "new", "r", RC).returncode == 0
-    rc_tree = root / "worktrees/r" / RC
-    shutil.rmtree(rc_tree / "specs/releases/0.5.0" if gone == "release folder" else rc_tree)
+    shutil.rmtree(root / "worktrees/r" / RC / "specs/releases/0.5.0")
 
     refused = _run(root, "new", "r", NEW_JOB)
 
     assert (refused.returncode, refused.stdout) == (1, "")
-    assert "Traceback" not in refused.stderr
-    assert _fixes(refused) == [phase_fix(root)]
+    assert refused.stderr == (
+        "[error] a job needs release 0.5.0 in phase IMPLEMENTATION on wt/0.5.0/rc-1/wt-rc\n"
+        f"{phase_fix(root)}\n"
+    )
+    assert not (root / "worktrees/r" / NEW_JOB).exists()
+
+
+def test_a_main_tree_whose_rc_tree_was_removed_by_hand_is_refused_with_a_fix_that_restores_it(
+    root: Path,
+) -> None:
+    assert _run(root, "new", "r", RC).returncode == 0
+    rc_tree = root / "worktrees/r" / RC
+    shutil.rmtree(rc_tree)
+
+    refused = _run(root, "new", "r", NEW_JOB)
+
+    fix = git_line(root / "repos/r", "worktree", "add", "-f", "-f", str(rc_tree), f"wt/{RC}")
+    assert (refused.returncode, refused.stdout) == (1, "")
+    assert refused.stderr == f"[error] {rc_tree} does not exist\nfix: {fix}\n"
+    assert not (root / "worktrees/r" / NEW_JOB).exists()
+    run_fix(root, refused)
+    assert _run(root, "new", "r", NEW_JOB).returncode == 0
+
+
+def test_a_main_tree_is_refused_when_release_check_exits_non_zero_with_no_finding(
+    root: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The exit status decides: a `release.py check` that crashes is a refusal, never a pass."""
+    assert _run(root, "new", "r", RC).returncode == 0
+    staged = stage_skill_scripts("dd-gitflow-default", tmp_path / "skills/dd-gitflow-default/scripts")  # fmt: skip
+    write_text(
+        tmp_path / "skills/dd-release-implementation/scripts/release.py",
+        "import sys\nprint('Traceback (most recent call last):', file=sys.stderr)\nsys.exit(1)\n",
+    )
+    monkeypatch.setattr(worktree_ws, "SCRIPT", staged / "worktree.py")
+
+    refused = _run(root, "new", "r", NEW_JOB)
+
+    specs = root / "worktrees/r" / RC / "specs"
+    assert (refused.returncode, refused.stdout) == (1, "")
+    assert refused.stderr == (
+        "[error] release.py check exited 1\n"
+        f"fix: Agent action: fix the findings of release.py check on {specs}\n"
+    )
     assert not (root / "worktrees/r" / NEW_JOB).exists()
 
 
