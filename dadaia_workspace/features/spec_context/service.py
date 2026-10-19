@@ -4,7 +4,6 @@ import contextlib
 import logging
 import re
 import shutil
-import sys
 from collections.abc import Callable, Collection
 from dataclasses import replace
 from enum import StrEnum
@@ -27,7 +26,7 @@ from dadaia_workspace.core.exceptions import (
     NotAGitRepositoryError,
     RepoUrlMissingError,
 )
-from dadaia_workspace.core.gitflow import Gitflow, work_branch
+from dadaia_workspace.core.gitflow import Gitflow, origin_work_branch, work_branch
 from dadaia_workspace.core.models.spec_context import (
     CONTEXT_NAME_RE,
     AssociatedRepo,
@@ -528,24 +527,16 @@ class SpecContextService:
             self._store.update(filled)
             return filled
 
-        repo_slug = ctx.repo_slug
-        repo_path = self._repo_path(repo_slug)
-
-        actual_branch: str | None = None
-
-        if ctx.current_branch:
-            try:
-                self._git.checkout(repo_path, ctx.current_branch)
-            except Exception as exc:
-                print(
-                    f"WARNING: could not checkout branch {ctx.current_branch!r}: {exc}",
-                    file=sys.stderr,
-                )
-
+        repo_path = self._repo_path(ctx.repo_slug)
+        flow = self._git.gitflow(repo_path)[0]
+        branch = origin_work_branch(repo_path, flow) or flow.integration
         try:
-            actual_branch = self._git.current_branch(repo_path)
-        except Exception:
-            actual_branch = None
+            self._git.checkout(repo_path, branch)
+        except GitSyncError as exc:
+            retry = platform.inline(*cli_words(self._workspace_root, "context", "alive", name))
+            raise GitSyncError(
+                exc.message, fix=act("agent", f"make origin hold {branch}, then run `{retry}`")
+            ) from None
 
         ctx_fresh = self.show(name)
         if ctx_fresh.state == ContextState.ALIVE:
@@ -555,7 +546,6 @@ class SpecContextService:
             state=ContextState.ALIVE,
             alive_since=clock.now_iso(),
             dead_since=None,
-            current_branch=actual_branch,
         )
         self._store.update(alive_ctx)
 
