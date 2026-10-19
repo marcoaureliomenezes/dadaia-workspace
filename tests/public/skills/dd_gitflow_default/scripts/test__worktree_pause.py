@@ -6,13 +6,25 @@ Size: MEDIUM.
 
 from __future__ import annotations
 
+import os
+import shutil
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
 
-from tests.helpers.oslib import read_text
+from tests.helpers.oslib import read_text, stub_cli, write_text
 from tests.helpers.oslib import run as os_run
-from tests.helpers.worktree_ws import commit, git, make_workspace, open_tree, run
+from tests.helpers.worktree_ws import (
+    NEW_JOB,
+    NEW_TASK,
+    commit,
+    fixes,
+    git,
+    make_workspace,
+    open_tree,
+    run,
+)
 
 RC, BACKLOG = "0.5.0/rc-1/wt-rc", "0.5.0/wt-backlog-x"
 
@@ -86,3 +98,78 @@ def test_the_bundle_holds_only_the_commits_origin_lacks(root: Path, tmp_path: Pa
     git(fresh, "fetch", "-q", str(bundle), f"{_branch(BACKLOG)}:{_branch(BACKLOG)}")
     assert git(fresh, "rev-parse", _branch(BACKLOG)).strip() == local
     assert git(fresh, "rev-list", "--count", f"{pushed}..{local}").strip() == "1"
+
+
+def _lane(root: Path) -> Path:
+    tree = open_tree(root, BACKLOG)
+    commit(tree, "specs/a.md")
+    return tree
+
+
+def _dirty(root: Path) -> Path:
+    write_text((tree := _lane(root)) / "specs/a.md", "changed\n")
+    return tree
+
+
+def _ignored(root: Path) -> Path:
+    write_text((tree := _lane(root)) / "notes.scratch", "x")
+    return tree
+
+
+def _job(root: Path) -> Path:
+    open_tree(root, RC)
+    commit(tree := open_tree(root, NEW_JOB), "src/a.py")
+    return tree
+
+
+def _task(root: Path) -> Path:
+    _job(root)
+    commit(tree := open_tree(root, NEW_TASK), "src/b.py")
+    return tree
+
+
+def _rc_with_an_open_job(root: Path) -> Path:
+    commit(rc := open_tree(root, RC), "specs/a.md")
+    open_tree(root, NEW_JOB)
+    return rc
+
+
+def _fully_pushed(root: Path) -> Path:
+    git(tree := _lane(root), "push", "-q", "origin", _branch(BACKLOG))
+    return tree
+
+
+def _failing_bundle_verify(root: Path) -> Path:
+    """`git bundle verify` fails: a `git` first on PATH that refuses that one subcommand."""
+    real = shutil.which("git")
+    source = f"""#!python
+import subprocess, sys
+args = sys.argv[1:]
+if ("bundle", "verify") in zip(args, args[1:]):
+    sys.exit("error: the bundle is corrupt")
+sys.exit(subprocess.call([{real!r}, *args]))
+"""
+    stub_cli(shim := root.parent / "shim", "git", source)
+    os.environ["PATH"] = os.pathsep.join([str(shim), os.environ["PATH"]])
+    return _lane(root)
+
+
+@pytest.mark.parametrize(
+    "setup",
+    [_dirty, _ignored, _job, _task, _rc_with_an_open_job, _fully_pushed, _failing_bundle_verify],
+)
+def test_a_refused_pause_prints_one_fix_and_touches_nothing(
+    root: Path, monkeypatch: pytest.MonkeyPatch, setup: Callable[[Path], Path]
+) -> None:
+    monkeypatch.setenv("PATH", os.environ["PATH"])  # restores PATH when a setup shims it
+    repo, tree = root / "repos/r", setup(root)
+    refs = git(repo, "for-each-ref", "--format=%(refname) %(objectname)")
+    state = git(tree, "status", "--porcelain", "--ignored")
+
+    refused = run(root, "pause", str(tree))
+
+    assert refused.returncode == 1, refused.stderr
+    assert len(fixes(refused)) == 1, refused.stderr
+    assert list((root / ".dadaia").rglob("*.bundle")) == []
+    assert git(repo, "for-each-ref", "--format=%(refname) %(objectname)") == refs
+    assert git(tree, "status", "--porcelain", "--ignored") == state
