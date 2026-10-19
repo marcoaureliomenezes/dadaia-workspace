@@ -36,12 +36,12 @@ from dadaia_workspace.features.chokepoints.denylist_scan import (
 
 __all__ = ["content_decision", "push_gate_decision"]
 
-_DENYLIST_LAW = ".dadaia/AGENTS.md §3 — pre-push refuses a denylisted secret"
+_DENYLIST_LAW = ".dadaia/AGENTS.md §3, worktrees/AGENTS.md §2 — a denylisted secret is refused"
 _MAX_LISTED_HITS = 10
 _REWRITE = (
     "Uncommit the unpublished range down to its oldest commit and re-commit it as one "
     "(origin's history is never rewritten). Remove what is listed from the files first; when "
-    "the message carries it, append `--message` and the new text to the fix; keep any `fix(bugs): …` line, `refactor(bugs): …` lines included. Push after this command:"
+    "the message carries it, append `--message` and the new text to the fix; keep any `fix(bugs): …` line, `refactor(bugs): …` lines included. Then repeat the refused act:"
 )
 
 
@@ -92,18 +92,16 @@ def _notes(
     return replace(decision, warn=warn)
 
 
-def _rewrite_fix(ref: PushRef, object_source: ObjectSource, repo: Path, fixes: GateFixes) -> str:
+def _rewrite_fix(ref: PushRef, object_source: ObjectSource, repo: Path, head: str) -> str:
     """The rewrite-verb remedy for the first refused ref (origin is never rewritten)."""
     branch = ref.local_ref.removeprefix(HEADS_PREFIX)
-    if ref.local_ref.startswith("refs/tags/") or not fixes.head:
+    if ref.local_ref.startswith("refs/tags/") or not head:
         fix = act("agent", "a tag or a detached HEAD has no branch to amend; push a branch.")
-    elif branch != ref.local_ref and branch != fixes.head:
-        fix = git_line(fixes.repo, "switch", branch)
+    elif branch != ref.local_ref and branch != head:
+        fix = git_line(str(repo), "switch", branch)
     else:
         oldest = object_source.unpublished(repo, ref.local_sha, ref.remote_sha)[-1]
-        fix = fix_line(
-            None, "ci", "push-gate-check", "--repo", fixes.repo, "--rewrite-from", oldest
-        )
+        fix = fix_line(None, "ci", "push-gate-check", "--repo", str(repo), "--rewrite-from", oldest)
     return f"{_REWRITE}\n{spell_fix(fix)}"
 
 
@@ -200,7 +198,7 @@ def push_gate_decision(
         object_source=object_source,
         repo=repo,
         canon_violations_fn=canon_violations_fn,
-        fixes=fixes,
+        head=fixes.head,
         denylist_terms=denylist_terms,
         baseline_patterns=baseline_patterns,
     )
@@ -212,7 +210,7 @@ def content_decision(
     object_source: ObjectSource,
     repo: Path,
     canon_violations_fn: Callable[[Sequence[str]], Sequence[str]],
-    fixes: GateFixes,
+    head: str,
     denylist_terms: Iterable[tuple[str, str]] = (),
     baseline_patterns: Iterable[BaselinePatternLike] = (),
 ) -> Decision:
@@ -239,7 +237,7 @@ def content_decision(
     messages = frozenset[str]()
     if canon:
         message = _refusal(
-            f"the pushed range publishes {len(canon)} specs/ path(s) violating the v6 canon "
+            f"the range carries {len(canon)} specs/ path(s) violating the v6 canon "
             "(specs/AGENTS.md).",
             [
                 f"  {r.local_ref} -> {r.remote_ref}: specs/{p} — delete the path; "
@@ -248,12 +246,11 @@ def content_decision(
             ],
             "path(s)",
         )
-        fix = _rewrite_fix(canon[0][0], object_source, repo, fixes)
+        fix = _rewrite_fix(canon[0][0], object_source, repo, head)
         listed = frozenset(f"specs/{p}" for _, p in canon)
     elif hits:
         message = _refusal(
-            f"the pushed range publishes {len(hits)} object(s) carrying a denylisted term "
-            f"({_DENYLIST_LAW}).",
+            f"the range carries {len(hits)} object(s) with a denylisted term ({_DENYLIST_LAW}).",
             [
                 f"  {r.local_ref} -> {r.remote_ref}: {masker.mask_path(h.path)}:{h.line} "
                 f"(blob {h.sha[:12]}) — masked term '{h.masked_term}' ({h.source_layer})"
@@ -264,7 +261,7 @@ def content_decision(
             "concatenation), never as a tracked literal. The range scope means "
             "already-published history never needs a rewrite.",
         )
-        fix = _rewrite_fix(hits[0][0], object_source, repo, fixes)
+        fix = _rewrite_fix(hits[0][0], object_source, repo, head)
         listed = frozenset(h.path for _, h in hits)
         messages = frozenset(h.sha for _, h in hits if h.path == "(commit message)")
     else:

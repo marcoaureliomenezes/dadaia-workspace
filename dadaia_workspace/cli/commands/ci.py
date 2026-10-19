@@ -28,6 +28,7 @@ from dadaia_workspace.features.chokepoints.branch_policy import (
     HEADS_PREFIX,
     Decision,
     GateFixes,
+    PushRef,
     check_ref_policy,
     parse_push_stdin,
 )
@@ -101,7 +102,7 @@ def _rewrite_unpublished(repo: Path, oldest: str, message: str | None) -> None:
         sha = oldest
     branch = git.current_branch(repo) or "HEAD"
     held = git.git(repo, "for-each-ref", "--format=%(objectname)", f"refs/remotes/origin/{branch}")
-    decision = _gate_decision(repo, lambda: _head_line(repo, held or ZERO_SHA), content_only=True)
+    decision = _content_decision(repo, held or ZERO_SHA)
     listed = decision.listed
     changed = git.git(repo, "diff", "--name-status", "--no-renames", "-z", tip).split("\0")
     stray = sorted(
@@ -141,26 +142,38 @@ def _rewrite_unpublished(repo: Path, oldest: str, message: str | None) -> None:
     log = git.git(repo, "log", "--reverse", "--format=%H%x00%B%x1e", tip, "--not", f"{sha}^@")
     folded = [e.strip().partition("\0")[::2] for e in log.split("\x1e") if e.strip()]
     replaced = decision.messages if message else ()
-    text = "\n\n".join([message or "", *(m for c, m in folded if c not in replaced)]).strip()
-    git.git(repo, "reset", "--soft", sha)
-    git.git(repo, "commit", "-qa", "--amend", "--allow-empty", "--cleanup=whitespace", "-m", text)
+    every, red = {c for c, _ in folded}, {c for c, m in folded if m.startswith("test(")}
+
+    def said(commits: set[str], lead: str = "") -> str:
+        return "\n\n".join([lead, *(m for c, m in folded if c in commits and c not in replaced)]).strip()  # fmt: skip
+
+    try:
+        parent = git.git(repo, "rev-parse", "--verify", f"{sha}^")
+    except GitSyncError:
+        parent = ""
+    if not (parent and red and red != every):
+        git.git(repo, "reset", "--soft", sha)
+        git.git(repo, "commit", "-qa", "--amend", "--allow-empty", "--cleanup=whitespace", "-m", said(every, message or ""))  # fmt: skip
+        return
+
+    # A RED test and its implementation fold into two commits split by path, so the task
+    # test-separation check and a hotfix's shape-3 test commit still hold.
+    def names(*args: str) -> set[str]:
+        return set(filter(None, git.git(repo, *args, "-z").split("\0")))
+
+    reds = set().union(*(names("diff-tree", "--no-commit-id", "--name-only", "-r", "--no-renames", c) for c in red))  # fmt: skip
+    net = names("diff", "--name-only", "--no-renames", parent, tip)
+    git.git(repo, "reset", "-q", parent)
+    for paths, commits, lead in ((reds & net, red, message or ""), (net - reds, every - red, "")):
+        if paths:
+            git.git(repo, "add", "-A", "--", *sorted(paths))
+        git.git(repo, "commit", "-q", "--allow-empty", "--cleanup=whitespace", "-m", said(commits, lead))  # fmt: skip
 
 
-def _head_line(repo: Path, held: str) -> str:
-    """The pre-push ref line that publishes HEAD's branch over *held*."""
-    from dadaia_workspace.container import build_git_client
-
-    git = build_git_client()
-    branch = git.current_branch(repo) or "HEAD"
-    return f"refs/heads/{branch} {git.git(repo, 'rev-parse', 'HEAD')} refs/heads/{branch} {held}"
-
-
-def _gate_decision(
-    repo_root: Path, read_refs: Callable[[], str], content_only: bool = False
-) -> Decision:
-    """The push gate's decision over the pre-push ref lines *read_refs* returns, from the
-    repo's gitflow, denylist and canon; *content_only* judges the content alone (a branch no
-    push could carry, a task's, still has content)."""
+def _content_inputs(repo_root: Path, sha: str) -> dict[str, Any]:
+    """What the content scans read: the repo's denylist, its canon as the commit *sha* states
+    it (foreign/v6 carry no v6 canon) and the object reader. No gitflow, work-branch or
+    branch-policy input."""
     from dadaia_workspace.container import (
         build_git_client,
         build_git_object_reader,
@@ -168,12 +181,9 @@ def _gate_decision(
         load_denylist_terms,
     )
     from dadaia_workspace.core.specs_version import state
-    from dadaia_workspace.features.chokepoints import content_decision, push_gate_decision
     from dadaia_workspace.features.specs.canon import canon_violations
 
     denylist_terms = load_denylist_terms()
-    baseline_patterns = load_denylist_baseline_patterns()
-
     mode = (
         "operator denylist + baseline"
         if denylist_terms
@@ -181,18 +191,7 @@ def _gate_decision(
         "$DADAIA_PRIVACY_DENYLIST or .dadaia/states/privacy_denylist.json)"
     )
     typer.echo(f"[pre-push] denylist scan mode: {mode}", err=True)
-
-    refs, malformed = parse_push_stdin(read_refs())
-    # `git push origin HEAD` names its source "HEAD": the branch checked out IS that ref.
     git = build_git_client()
-    branch = git.current_branch(repo_root)
-    refs = [
-        replace(r, local_ref=f"refs/heads/{branch}") if r.local_ref == "HEAD" and branch else r
-        for r in refs
-    ]
-    gitflow, fixes = _gate_inputs(repo_root, branch)
-    # The pushed commit's tree state, never the checkout's; foreign/v6 carry no v6 canon.
-    sha = next((r.local_sha for r in refs if not r.is_deletion), "HEAD")
     canon_fn = canon_violations
     if git.git(repo_root, "ls-tree", sha, "specs"):
         shown = git.git(repo_root, "ls-tree", "--name-only", sha, "specs/constitution.md")
@@ -202,18 +201,54 @@ def _gate_decision(
             canon_fn = _no_canon_violations
         if fix:
             typer.echo(f"[pre-push] the pushed specs/ tree is {kind}\nhint: {fix}", err=True)
-    common: dict[str, Any] = {
+    return {
         "object_source": build_git_object_reader(),
         "repo": repo_root,
         "canon_violations_fn": canon_fn,
-        "fixes": fixes,
         "denylist_terms": denylist_terms,
-        "baseline_patterns": baseline_patterns,
+        "baseline_patterns": load_denylist_baseline_patterns(),
     }
-    decision = (
-        content_decision(refs, **common)
-        if content_only
-        else push_gate_decision(refs, gitflow=gitflow, malformed_lines=malformed, **common)
+
+
+def _gate_decision(repo_root: Path, read_refs: Callable[[], str]) -> Decision:
+    """The push gate's decision over the pre-push ref lines *read_refs* returns, from the
+    repo's gitflow, denylist and canon."""
+    from dadaia_workspace.container import build_git_client
+    from dadaia_workspace.features.chokepoints import push_gate_decision
+
+    refs, malformed = parse_push_stdin(read_refs())
+    # `git push origin HEAD` names its source "HEAD": the branch checked out IS that ref.
+    branch = build_git_client().current_branch(repo_root)
+    refs = [
+        replace(r, local_ref=f"refs/heads/{branch}") if r.local_ref == "HEAD" and branch else r
+        for r in refs
+    ]
+    gitflow, fixes = _gate_inputs(repo_root, branch)
+    sha = next((r.local_sha for r in refs if not r.is_deletion), "HEAD")
+    decision = push_gate_decision(
+        refs,
+        gitflow=gitflow,
+        fixes=fixes,
+        malformed_lines=malformed,
+        **_content_inputs(repo_root, sha),
+    )
+    if decision.warn:
+        typer.echo(decision.warn, err=True)
+    return decision
+
+
+def _content_decision(repo: Path, held: str) -> Decision:
+    """The push gate's content half over HEAD's branch published over *held*: what a branch no
+    push could carry, a task's, still holds."""
+    from dadaia_workspace.container import build_git_client
+    from dadaia_workspace.features.chokepoints import content_decision
+
+    git = build_git_client()
+    branch = git.current_branch(repo)
+    ref = f"refs/heads/{branch or 'HEAD'}"
+    tip = git.git(repo, "rev-parse", "HEAD")
+    decision = content_decision(
+        [PushRef(ref, tip, ref, held)], head=branch or "", **_content_inputs(repo, tip)
     )
     if decision.warn:
         typer.echo(decision.warn, err=True)
@@ -259,7 +294,7 @@ def push_gate_check(
 
         repo = repo or _repo_root()
         base = build_git_client().git(repo, "rev-parse", "--verify", f"{onto}^{{commit}}")
-        decision = _gate_decision(repo, lambda: _head_line(repo, base), content_only=True)
+        decision = _content_decision(repo, base)
     else:
         decision = _gate_decision(
             _repo_root(), lambda: "" if sys.stdin.isatty() else sys.stdin.read()

@@ -16,6 +16,7 @@ from pathlib import Path
 from _git import git as git, parse_worktrees, scrubbed_env as scrubbed_env  # isort: skip
 from _grammar import SEMVER_RE, TAG_RE, sole_live
 from _platform import act, cli_argv, command, git_inline, git_line, inline, is_link, venv_dir
+from _root import STATES
 from _specs import run_cli
 from _specs import workspace_of as workspace_of
 from _worktree_names import (
@@ -48,9 +49,16 @@ def cli_words(root: Path, *args: str) -> tuple[str, ...]:
 
 def cli(root: Path, *args: str, tree: Path | None = None) -> subprocess.CompletedProcess[str]:
     """One read-only run of the workspace CLI — the owner of every package grammar. With *tree*
-    the run acts on that tree alone: its cwd, every root above it fenced."""
+    the run acts on that tree alone: its cwd, every root above it fenced, so the workspace's
+    denylist file is handed over by the loader's own `$DADAIA_PRIVACY_DENYLIST` input."""
     fence = (
-        {"DADAIA_FENCED_ROOTS": os.pathsep.join(map(str, tree.resolve().parents))} if tree else {}
+        {
+            "DADAIA_FENCED_ROOTS": os.pathsep.join(map(str, tree.resolve().parents)),
+            "DADAIA_PRIVACY_DENYLIST": os.environ.get("DADAIA_PRIVACY_DENYLIST")
+            or str(root / STATES / "privacy_denylist.json"),
+        }
+        if tree
+        else {}
     )
     return run_cli(root, *args, cwd=tree or root, env=scrubbed_env() | fence, stdin=subprocess.DEVNULL)  # fmt: skip
 
