@@ -169,3 +169,32 @@ def test_a_pause_bundle_is_never_dropped_when_its_repo_is_off_disk(
 
     assert PAUSED in str(refused.value) and refused.value.fix
     assert not (root / ".dadaia/dist" / ARCHIVE).exists()
+
+
+@pytest.mark.timeout(15)
+def test_a_truncated_pause_bundle_refuses_instead_of_spinning(root: Path) -> None:
+    commit(tree := open_tree(root, PAUSED), "specs/paused.md")
+    assert run(root, "pause", str(tree)).returncode == 0
+    bundle = root / ".dadaia/dist/r" / f"{PAUSED}.bundle"
+    bundle.write_bytes(b"# v2 git bundle\n")
+
+    with pytest.raises(DadaiaError) as refused:
+        _export(root)
+
+    assert refused.value.fix
+    assert not (root / ".dadaia/dist" / ARCHIVE).exists()
+
+
+def test_a_symlinked_pause_bundle_refuses_and_is_never_archived(root: Path, tmp_path: Path) -> None:
+    commit(tree := open_tree(root, PAUSED), "specs/paused.md")
+    assert run(root, "pause", str(tree)).returncode == 0
+    bundle = root / ".dadaia/dist/r" / f"{PAUSED}.bundle"
+    elsewhere = tmp_path / "elsewhere.bundle"
+    bundle.replace(elsewhere)
+    bundle.symlink_to(elsewhere)
+
+    with pytest.raises(DadaiaError) as refused:
+        _export(root)
+
+    assert PAUSED in str(refused.value) and refused.value.fix
+    assert not (root / ".dadaia/dist" / ARCHIVE).exists()
