@@ -386,3 +386,19 @@ def test_an_origin_only_lower_work_branch_yields_no_local_step(tmp_path: Path) -
     repo = _repo_with_origin(tmp_path, ["0.8.0"], ["0.6.0", "0.8.0"])
 
     assert owner.several_work(repo, {"work": "feature/"}, ["0.6.0", "0.8.0"], ORIGIN) == ("0.8.0", "")  # fmt: skip
+
+
+def test_the_several_work_act_reads_the_merged_state_and_upstream_in_one_git_read(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    owner = load_owner("dd-gitflow-default", "_worktree_git")
+    repo = _repo_with_origin(tmp_path, ["0.6.0", "0.8.0"], ["0.6.0"])
+    git(repo, "branch", "--set-upstream-to=origin/feature/0.6.0", "feature/0.6.0")
+    reads: list[tuple[str, ...]] = []
+    real = owner.git
+    monkeypatch.setattr(owner, "git", lambda tree, *args, **kw: (reads.append(args), real(tree, *args, **kw))[1])  # fmt: skip
+
+    _, text = owner.several_work(repo, {"work": "feature/"}, ["0.6.0", "0.8.0"])
+
+    assert len(reads) == 1, reads
+    assert text.count("`") == 6 and "--unset-upstream" in text and "branch -d" in text
