@@ -972,6 +972,78 @@ def test_a_red_then_green_task_lands_after_its_printed_fix_with_both_kinds_apart
     assert git(root / TREE, "show", "--format=", "--name-only", "HEAD").split() == ["src.py"]
 
 
+def _follow(root: Path, refused: subprocess.CompletedProcess[str], extra: str = "") -> Any:
+    """The refusal's one printed `fix:` line plus *extra* words, run as an agent would."""
+    (fix,) = fixes(refused)
+    env = suite_env(os.environ, Path.home(), overrides={"HOME": str(root), "GIT_CONFIG_NOSYSTEM": "1"})  # fmt: skip
+    return run_bash(f"{fix.removeprefix('fix: ')} {extra}", cwd=root, env=env, check=False)
+
+
+def _red_then(root: Path, address: str, green: str, *flags: str) -> Path:
+    """A task of a `test(` commit carrying *address*, then a `feat(` implementation commit."""
+    task = open_tree(root, NEW_TASK)
+    (task / "tests").mkdir()
+    write_text(task / "tests/test_a.py", f'HOST = "{address}"\n')
+    git(task, "add", "tests/test_a.py")
+    git(task, "commit", "-qm", "test(J1.T1): red")
+    write_text(task / "src.py", "B = 1\n")
+    git(task, "add", "src.py")
+    git(task, "commit", "-q", *flags, "-m", green)
+    return task
+
+
+def test_a_message_hit_on_the_implementation_lands_after_its_printed_fix_and_message(
+    root: Path,
+) -> None:
+    address = ".".join(["8"] * 4)  # a public IPv4 literal, spelled so this file holds none
+    _real_denylist_gate(root)
+    task = _red_then(root, address, f"feat(J1.T1): host {address}")
+    onto = git(root / TREE, "rev-parse", "HEAD").strip()
+
+    refused = run(root, "merge", str(task))
+    assert refused.returncode == 1
+    write_text(task / "tests/test_a.py", "HOST = None\n")
+    folded = _follow(root, refused, "--message 'feat(J1.T1): host'")
+
+    assert folded.returncode == 0, folded.stderr
+    landed = run(root, "merge", str(task))
+    assert landed.returncode == 0, landed.stderr
+    log = git(root / TREE, "log", "--reverse", "--format=%s", f"{onto}..HEAD").splitlines()
+    assert log == ["test(J1.T1): red", "feat(J1.T1): host"]
+    assert address not in git(root / TREE, "log", "-p", f"{onto}..HEAD")
+
+
+def test_a_fold_that_cannot_finish_changes_nothing_and_prints_one_fix(root: Path) -> None:
+    address = ".".join(["8"] * 4)
+    _real_denylist_gate(root)
+    task = _red_then(root, address, "", "--allow-empty-message")  # a group left with no message
+    head = git(task, "rev-parse", "HEAD")
+
+    refused = run(root, "merge", str(task))
+    assert refused.returncode == 1
+    write_text(task / "tests/test_a.py", "HOST = None\n")
+    stuck = _follow(root, refused)
+
+    assert stuck.returncode != 0
+    assert len([ln for ln in stuck.stderr.splitlines() if ln.startswith("fix: ")]) == 1
+    assert git(task, "rev-parse", "HEAD") == head
+    assert git(task, "status", "--porcelain").split() == ["M", "tests/test_a.py"]
+
+
+@pytest.mark.parametrize("kind", ["job", "rc"])
+def test_main_and_rc_merges_run_no_denylist_scan(root: Path, kind: str) -> None:
+    address = ".".join(["8"] * 4)
+    _real_denylist_gate(root)
+    if kind == "rc":  # the release tree lands on the repo, with no open job under it
+        git(root / "repos/r", "worktree", "remove", "-f", "-f", str(root / TREE))
+    tree, name = (root / TREE, NEW_JOB) if kind == "job" else (root / RC_TREE, RC)
+    approve(root, commit(tree, "src/a.py", f"HOST = '{address}'\n"), name=name)
+
+    landed = run(root, "merge", str(tree))
+
+    assert landed.returncode == 0, landed.stderr
+
+
 @pytest.mark.parametrize("kind", ["hotfix", "backlog"])
 def test_every_tree_kind_is_refused_for_a_denylisted_literal(root: Path, kind: str) -> None:
     address = ".".join(["8"] * 4)
