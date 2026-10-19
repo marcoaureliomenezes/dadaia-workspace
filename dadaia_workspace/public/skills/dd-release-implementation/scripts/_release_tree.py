@@ -50,7 +50,7 @@ _POINTER = {
 _ACT = {
     "backlog": "backlog entry {i} already exited naming another release",
     "bugs": "resolve bug {i} (`bugs.py resolve {i}` "
-            "with --cause, --caused-by, --solution and --fix-sha)",
+            "with --cause, --caused-by and --solution)",
     "findings": "finding {i}'s audit closed without naming release {r}",
 }  # fmt: skip
 

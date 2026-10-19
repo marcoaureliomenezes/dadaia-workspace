@@ -43,17 +43,17 @@ moves. Existing assertions remain contract evidence.
 ## 3. Fix at the owning seam
 
 Replace the faulty path and let the RED case turn GREEN. Prefer deletion and locality over
-a wrapper around the old behavior. The implementation commit's sha becomes the persisted
-`fix_sha`; its production numstat is the source for any later diff-direction analysis.
+a wrapper around the old behavior. The fix commit's `fix(bugs): <id>` line is its cite; `resolve`
+persists `fix_sha` from it; its production numstat is the source for any later diff-direction analysis.
 
 ## 4. Resolve with persisted facts
 
 ```bash
 python3 .agents/skills/dd-bug-resolution/scripts/bugs.py resolve <bug-id> \
-  --cause "…" --caused-by none --solution "…" --fix-sha <40-hex-sha>
+  --cause "…" --caused-by none --solution "…"
 ```
 
-- `resolve` requires `cause`, `caused_by`, `solution` and `fix_sha`, then stamps
+- `resolve` requires `cause`, `caused_by` and `solution`, derives `fix_sha`, then stamps
   `status: resolved` and `closed_at`.
 - `caused_by` names a live or archived bug, a known release task, or `none`; `check`
   refuses a dangling link or loop.

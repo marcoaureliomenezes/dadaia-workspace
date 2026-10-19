@@ -23,8 +23,7 @@ compatibility: Standalone Agent Skill; the full lifecycle lives in a dadaia-work
 ## 2. The method — seven phases, each gated
 
 **Phase 0 — Lineage.** Read the bug ledger for prior fixes to the same
-recorded fix files or `component` in the bounded window ([`LINEAGE.md`](LINEAGE.md)); inspect every named
-`fix_sha` with `git show`; a `caused_by` other than `none` makes this fix a REBUILD (`specs/bugs/AGENTS.md` §2);
+recorded fix files or `component` in the bounded window ([`LINEAGE.md`](LINEAGE.md)); inspect every prior fix by its `fix(bugs): <id>` line (`fix_sha` is a hint) with `git show`; a `caused_by` other than `none` makes this fix a REBUILD (`specs/bugs/AGENTS.md` §2);
 grep every decider of the same fact and name its one owner before any fix;
 carry the link to Phase 6 (`resolve --caused-by`; `update` repairs);
 echo the `caused_by:`/`evidence:`/`prior diffs read:`/`rebuild:` block in the fix commit body; a `caused_by` other than `none` names its REBUILD unit in `rebuild:`, never `rebuild: none`.
@@ -65,13 +64,13 @@ gap was returned first).*
 
 **Phase 6 — Cleanup + resolve.** Grep the probe prefix to zero:
 
-- Commit the GREEN source fix with shape 3 of `dd-gitflow-default` §3a, then resolve with its
-  40-hex sha:
+- Commit the GREEN source fix with shape 3 of `dd-gitflow-default` §3a, then resolve; it derives
+  `fix_sha` from that commit's `fix(bugs): <id>` line:
 
 ```bash
 python3 .agents/skills/dd-bug-resolution/scripts/bugs.py resolve <bug-id> --specs <specs-dir> \
   --cause "…" --caused-by <prior-bug-id>\|<task-id>\|none \
-  --solution "…" --fix-sha <40-hex-sha>
+  --solution "…"
 ```
 
 - `caused_by` names a live or archived bug, a known release task, or `none`, never a loop;

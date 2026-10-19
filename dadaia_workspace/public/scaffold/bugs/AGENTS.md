@@ -25,7 +25,7 @@ Scope: this file governs only `specs/bugs/`.
   the operator authorizes that exact id; the authorization is recorded verbatim and the bug remains open for the next candidate.
 - Any fix whose `caused_by` is not `none`, a bug's fix or a feature task, is a REBUILD of the unit, keeping its tests.
 - The next rc's `## Bug window review` judges those fixes (KEEP or REBUILD); its Job 1 executes the verdicts.
-- Close with the fix: `bugs.py resolve`, with the flags `dd-bug-resolution` Phase 6 names.
+- Close with the fix: `bugs.py resolve`, with the flags `dd-bug-resolution` Phase 6 names; a record's fix is the newest commit HEAD reaches whose message holds a line `fix(bugs): <id> — …` (a group lists its ids) or `refactor(bugs): <id> — …`, and `fix_sha` is its write-once hint.
 - Lineage before any fix: `dd-bug-resolution/LINEAGE.md`.
 - Commit exactly what the fix touched, never a blanket `-A`; a net-positive diff is judged by `dd-code-review` §6's Architecture lens at review.
 
