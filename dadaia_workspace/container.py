@@ -152,9 +152,10 @@ def scan_bundle(workspace_root: Path, bundle: Path, repo: Path) -> dict[str, str
     from dadaia_workspace.features.chokepoints.denylist_scan import scan_objects
 
     # An open lane's bundle was written a moment ago: its damage is git's, never the operator's.
+    paused = bundle.is_relative_to(workspace_root / ".dadaia" / "dist")
     damaged = (
         act("operator", f"rule whether {bundle} is restored from a copy or discarded")
-        if bundle.is_relative_to(workspace_root / ".dadaia" / "dist")
+        if paused
         else git_line(repo, "fsck")
     )
 
@@ -191,7 +192,7 @@ def scan_bundle(workspace_root: Path, bundle: Path, repo: Path) -> dict[str, str
     tmp = workspace_root / ".dadaia" / "tmp"
     with new_scratch(tmp, "scan-") as name:
         scratch, fsck = Path(name), git_line(repo, "fsck")
-        git(scratch, "init", "-q", "--bare", why="no scratch repo", fix=fsck)
+        git(scratch, "init", "-q", "--bare", why="no scratch repo", fix=scratch_fix(tmp))
         store = git(
             repo,
             "rev-parse",
@@ -214,7 +215,9 @@ def scan_bundle(workspace_root: Path, bundle: Path, repo: Path) -> dict[str, str
             why="no origin refs",
             fix=fsck,
         )
-        git(scratch, "bundle", "unbundle", str(bundle), why="git refused it", fix=scratch_fix(tmp))
+        # verify never reads the pack body: a failed unbundle is the file's if it is a pause bundle.
+        unbundled = damaged if paused else scratch_fix(tmp)
+        git(scratch, "bundle", "unbundle", str(bundle), why="git refused it", fix=unbundled)
         try:
             found = GitSubprocessObjectReader().new_objects(scratch, heads.split()[0], "")
             outcome = scan_objects(found, load_denylist_terms(), load_denylist_baseline_patterns())
