@@ -131,6 +131,17 @@ def _wt(repo: Path, *, checked_out: bool) -> None:
         _git("worktree", "remove", str(tree), cwd=repo)
 
 
+def _paused_lane_bundle(repo: Path) -> None:
+    """An open `_wt` lane as pause leaves it: tree removed, local `wt/*` ref gone, a bundle in dist."""
+    tree = repo.parents[1] / "worktrees" / repo.name / "0.5.0/wt-hotfix-b"
+    bundle = repo.parents[1] / ".dadaia" / "dist" / repo.name / "wt-hotfix-b.bundle"
+    bundle.parent.mkdir(parents=True)
+    _git("bundle", "create", str(bundle), "wt/0.5.0/wt-hotfix-b", cwd=repo)
+    _git("worktree", "unlock", str(tree), cwd=repo)
+    _git("worktree", "remove", "--force", str(tree), cwd=repo)
+    _git("branch", "-D", "wt/0.5.0/wt-hotfix-b", cwd=repo)
+
+
 def _ahead_with_work(repo: Path) -> None:
     _git("branch", "feature/0.3.0", cwd=repo)
     _ahead_on_main(repo)
@@ -196,6 +207,20 @@ def test_dead_refuses_an_unrecoverable_repo_anywhere_in_the_set_and_touches_noth
     assert (repo / ".git").is_dir() and (repo.parent / "lib" / ".git").is_dir()
     assert not (tmp_path / "ws" / ".dadaia" / "reaped").exists()
     assert store.get("proj").state is ContextState.ALIVE  # type: ignore[union-attr]
+
+
+def test_dead_refuses_an_open_lane_and_passes_once_the_lane_is_paused(tmp_path: Path) -> None:
+    """The open lane refuses with the merge fix; the paused files leave nothing for dead to lose."""
+    service, store, repo = _alive(tmp_path)
+    lib = repo.parent / "lib"
+    _wt(lib, checked_out=True)
+    with pytest.raises(DeadUnpushedCommitsError, match=r"worktree\.py merge"):
+        service.dead("proj")
+
+    _paused_lane_bundle(lib)
+    service.dead("proj")
+
+    assert store.get("proj").state is ContextState.DEAD  # type: ignore[union-attr]
 
 
 def test_dead_fix_for_an_unpushable_branch_clears_the_block(tmp_path: Path) -> None:

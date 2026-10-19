@@ -128,3 +128,19 @@ def test_dead_refuses_to_drop_a_stash_the_repo_holds(
     assert str(exc.value).endswith(
         f"fix: Operator action: pop or drop the 1 stash entry(ies) of {repo}"
     )
+
+
+def test_delete_refuses_while_dist_holds_a_pause_bundle(
+    service: SpecContextService, store: JsonContextStore, workspace_root: Path
+) -> None:
+    """A DEAD context whose repo has a bundle in `dist/<repo>/` keeps its record, fix: resume or move."""
+    register_dead(service, "proj", "my-repo", "https://github.com/org/my-repo")
+    dist = workspace_root / ".dadaia" / "dist" / "my-repo"
+    dist.mkdir(parents=True)
+    write_text(dist / "lane.bundle", "x")
+
+    with pytest.raises(ContextStateError, match=r"fix: .*(resume|move)") as refused:
+        service.delete("proj")
+
+    assert str(refused.value).count("fix: ") == 1
+    assert store.get("proj") is not None
