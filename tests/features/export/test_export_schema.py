@@ -41,7 +41,11 @@ def artifacts(tmp_path: Path) -> dict[str, dict[str, Any]]:
     stamp = "2026-01-01T00:00:00+00:00"
     store.save(
         SpecContextProject(
-            "r", ContextState.ALIVE, "r", "https://example.com/r.git", stamp,
+            "r",
+            ContextState.ALIVE,
+            "r",
+            "https://example.com/r.git",
+            stamp,
             associated_repos=(AssociatedRepo("a", "https://example.com/a.git"),),
         )  # fmt: skip
     )
