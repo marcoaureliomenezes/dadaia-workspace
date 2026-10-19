@@ -106,14 +106,15 @@ def test_the_plan_command_carries_from() -> None:
     assert plan.command() == "uvx dadaia-workspace init ws --harness claude --from a.json"
 
 
-def test_non_tty_fix_line_repeats_from(tmp_path: Path, monkeypatch) -> None:
+def test_non_tty_fix_line_repeats_from_and_adds_no_harness(tmp_path: Path, monkeypatch) -> None:
+    """A fix line never changes the run: the artifact names the harnesses, so the line adds none."""
     monkeypatch.chdir(tmp_path)
 
     result = _runner.invoke(app, ["init", "--from", "a.json"])
 
     assert result.exit_code == 1, result.output
     [fix] = [ln for ln in result.output.splitlines() if ln.startswith("fix: ")]
-    run = shell_line("uvx", "dadaia-workspace", "init", "--harness", "claude", "--from", "a.json")
+    run = shell_line("uvx", "dadaia-workspace", "init", "--from", "a.json")
     assert fix == (
         f"fix: Agent action: run `{run}` with the new workspace's directory as its first argument"
     )
