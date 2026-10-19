@@ -41,6 +41,7 @@ def test_export_writes_fr13_records(tmp_path: Path) -> None:
     svc, store = _service(tmp_path)
     store.save(_ctx("alpha", ContextState.ALIVE, associated_repos=(_INFRA,)))
     (tmp_path / "repos" / "alpha").mkdir(parents=True)
+    (tmp_path / "repos" / "beta").mkdir(parents=True)
     store.save(_ctx("beta", ContextState.DEAD, dead_since="2026-08-01T00:00:00+00:00"))
 
     result = svc.run()

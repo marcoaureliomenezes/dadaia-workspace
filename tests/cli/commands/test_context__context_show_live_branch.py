@@ -55,7 +55,7 @@ def _make_workspace_with_repo(root: Path) -> Path:
 
 
 @pytest.mark.parametrize(("on_disk", "branch"), [(True, "feature/v9.9.9"), (False, None)])
-def test_list_and_show_report_the_live_branch_else_the_stored_one(
+def test_list_and_show_report_the_live_branch_else_none(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, on_disk: bool, branch: str
 ) -> None:
     ws = _make_workspace_with_repo(tmp_path)
