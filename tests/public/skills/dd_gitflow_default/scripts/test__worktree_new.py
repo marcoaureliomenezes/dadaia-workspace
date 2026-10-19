@@ -105,6 +105,32 @@ def test_a_main_tree_reads_the_phase_on_its_rcs_tree_not_the_work_branch(
     )
 
 
+def test_a_main_tree_refuses_a_release_state_that_breaks_the_schema_with_checks_finding(
+    definition_root: Path,
+) -> None:
+    """The phase is IMPLEMENTATION, yet a log entry lacks `ts`: `release.py check` refuses the rc's tree."""
+    _set_release(definition_root, "DEFINITION", plan="Draft")
+    assert _run(definition_root, "new", "r", RC).returncode == 0
+    rc_tree = definition_root / "worktrees/r" / RC
+    state = rc_tree / "specs/releases/0.5.0/_RELEASE.json"
+    doc = json.loads(read_text(state))
+    doc.update(phase="IMPLEMENTATION", log=[{"agent": "a", "kind": "note", "text": "t"}])
+    write_text(state, json.dumps(doc))
+    _git(rc_tree, "commit", "-qam", "implementation")
+
+    refused = _run(definition_root, "new", "r", NEW_JOB)
+
+    assert (refused.returncode, refused.stdout) == (1, "")
+    assert refused.stderr.splitlines() == [
+        "[error] releases/0.5.0/_RELEASE.json:1 state.log[0] is missing required field 'ts'",
+        f"fix: Agent action: {state} fails at the keys this finding names (specs/releases/AGENTS.md: "
+        "release.py writes every _RELEASE.json field and ledger line) \u2014 revert the commit that "
+        f"introduced it (`git -C {state.parent} log -p -- _RELEASE.json` lists them), or delete the "
+        "line if you wrote it and it is still uncommitted, then redo the change through `release.py`",
+    ]
+    assert not (definition_root / "worktrees/r" / NEW_JOB).exists()
+
+
 def test_a_main_tree_needs_its_rcs_tree(root: Path) -> None:
     refused = _run(root, "new", "r", NEW_JOB)
 
