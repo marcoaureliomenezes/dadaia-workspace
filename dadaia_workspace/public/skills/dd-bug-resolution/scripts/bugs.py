@@ -64,7 +64,9 @@ def _parser() -> argparse.ArgumentParser:
         command.add_argument("--specs", type=Path, default=None, help="path to the specs/ tree")
         if verb in ("update", *tr.REQUIRED_BY_VERB):
             command.add_argument(
-                "bug_id", nargs="+" if verb == "update" else None, help="the record id to change"
+                "bug_id",
+                nargs="+" if verb == "update" else None,
+                help="the record id to change (update: one or more)",
             )
         for option in _OPTIONS.get(verb, ()):
             if option == "--correlates":
@@ -162,14 +164,11 @@ def _write(args: argparse.Namespace, specs: Path) -> int:
         return 0
     if args.verb == "update":
         changes = wr.parse_set_options(args.sets)
+        known = {str(r["id"]) for r in history(specs)}
         commit(
             ledger,
             lambda records: reduce(
-                lambda rs, i: wr.apply_update(
-                    rs, i, changes, {str(r["id"]) for r in history(specs)}
-                ),
-                args.bug_id,
-                records,
+                lambda rs, i: wr.apply_update(rs, i, changes, known), args.bug_id, records
             ),
         )
         print(f"[ok] updated {', '.join(sorted(changes))} for {', '.join(args.bug_id)}")

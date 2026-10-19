@@ -138,6 +138,7 @@ def _rewrite_unpublished(repo: Path, oldest: str, message: str | None) -> None:
     if refusal:
         fail(*refusal)
     folded = {sha, *git.git(repo, "rev-list", tip, f"^{sha}").split()}
+    ids, main = _cited_ids(repo, folded)
     git.git(repo, "reset", "--soft", sha)
     git.git(
         repo,
@@ -148,43 +149,44 @@ def _rewrite_unpublished(repo: Path, oldest: str, message: str | None) -> None:
         "-m",
         message or f"chore: rewrite unpublished range {sha[:9]}..{tip[:9]}",
     )
-    fix = _repoint_cited(repo, folded, git.git(repo, "rev-parse", "HEAD"))
-    if fix:
-        typer.echo(spell_fix(fix), err=True)
+    if ids:
+        line = script_line(
+            ".agents/skills/dd-bug-resolution/scripts/bugs.py",
+            "update",
+            *ids,
+            "--set",
+            f"fix_sha={git.git(repo, 'rev-parse', 'HEAD')}",
+        )
+        fix = f"re-point the ledger records the fold unreached: run `{line}` from a worktree of {main}"
+        typer.echo(
+            spell_fix(act("agent", f"{fix}, then land it through that tree's merge")), err=True
+        )
 
 
-def _repoint_cited(repo: Path, folded: set[str], new: str) -> str:
-    """The one act that re-points to *new* every live ledger record whose ``fix_sha`` the
-    fold of *folded* unreached, else ``""``. The ledger is the main repo's, so an associated
-    repo's range is read there; the fold never writes it."""
+def _cited_ids(repo: Path, folded: set[str]) -> tuple[list[str], str]:
+    """The ids of the live ledger records whose ``fix_sha`` is in *folded*, and the slug of
+    the main repo that holds the ledger (an associated repo's range is read there). Read
+    before the fold, so an unreadable ledger refuses while history is intact; the ledger
+    path is the owner's ``LEDGER`` constant, since no ledger verb lists records by sha."""
     workspace = resolve_workspace_root_for_cli(repo)
     owner = repo_owner(workspace, repo)
-    foreign = owner is not None and owner[1] != owner[2]
-    ledger = (
-        workspace / "repos" / owner[2] if owner and foreign else repo
-    ) / "specs/bugs/BUGS.jsonl"
-    rows = load_owner("dd-bug-resolution", "_jsonl").walk(
-        ledger.read_text(encoding="utf-8") if ledger.is_file() else ""
-    )
+    main = owner[2] if owner else repo.name
+    home = workspace / "repos" / main if owner and owner[1] != main else repo
+    ledger = home / "specs" / load_owner("dd-bug-resolution", "_bugs_check").LEDGER
+    try:
+        text = ledger.read_text(encoding="utf-8") if ledger.is_file() else ""
+    except (OSError, UnicodeDecodeError) as error:
+        fail(
+            f"cannot read {ledger}: {error}",
+            act("agent", "make the ledger a readable UTF-8 file, then run the remedy again"),
+        )
+    rows = load_owner("dd-bug-resolution", "_jsonl").walk(text)
     ids = [
         r["id"]
         for _, r, why in rows
         if not why and isinstance(r, dict) and r.get("fix_sha") in folded
     ]
-    if not ids:
-        return ""
-    line = script_line(
-        ".agents/skills/dd-bug-resolution/scripts/bugs.py",
-        "update",
-        *ids,
-        "--set",
-        f"fix_sha={new}",
-    )
-    where = f" from a worktree of {owner[2]}" if owner and foreign else ""
-    return act(
-        "agent",
-        f"re-point the ledger records the fold unreached: run `{line}`{where}, then commit it",
-    )
+    return ids, main
 
 
 def _gate_decision(repo_root: Path, read_refs: Callable[[], str]) -> Decision:
