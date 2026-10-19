@@ -178,7 +178,9 @@ def test_pushes_use_linux_and_pull_requests_use_the_full_matrix() -> None:
     assert {job.get("if") for job in cross_platform} == {
         "${{ github.event_name == 'pull_request' }}"
     }
-    assert int(workflow["jobs"]["contract-coverage-cross"]["timeout-minutes"]) >= 45  # Windows leg ran 28 min
+    assert (
+        int(workflow["jobs"]["contract-coverage-cross"]["timeout-minutes"]) >= 45
+    )  # Windows leg ran 28 min
 
 
 def _words(line: str) -> list[str]:
