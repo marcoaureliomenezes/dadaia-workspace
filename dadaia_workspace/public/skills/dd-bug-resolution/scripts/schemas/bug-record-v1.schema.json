@@ -49,7 +49,7 @@
     },
     "solution": {"type": "string", "minLength": 1, "x-mutability": "write-once"},
     "fix_sha": {
-      "type": ["string", "null"], "pattern": "^([0-9a-f]{40}|[0-9a-f]{64})$", "x-mutability": "mutable-governance"
+      "type": ["string", "null"], "pattern": "^([0-9a-f]{40}|[0-9a-f]{64})$", "x-mutability": "write-once"
     },
     "fix_files": {
       "type": "array", "items": {"type": "string", "minLength": 1}, "x-mutability": "write-once"

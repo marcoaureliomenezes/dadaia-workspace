@@ -193,34 +193,27 @@ def plain_ids(text: str) -> frozenset[str]:
     return frozenset(str(record["id"]) for _, record in _archive_lines(text, events=False))
 
 
-def _siblings(specs: Path) -> list[Path]:
+def siblings(repo: Path) -> list[Path]:
     """The other git checkouts under `<main>/../../repos`: each child carrying a `.git` and not main."""
-    main = _git.main_checkout(specs.parent)
+    main = _git.main_checkout(repo)
     beside = main.parent.parent / "repos"
     return [p for p in sorted(beside.iterdir()) if p != main and (p / ".git").exists()] if beside.is_dir() else []  # fmt: skip
 
 
-def _unreached(specs: Path, text: str, root: Path) -> list[dict[str, Any]]:
-    """The live records whose `fix_sha` no repo beside the main one reaches from its HEAD, one
-    finding each; where a repo is a shallow clone a miss cannot be judged, so the misses are
-    one finding for the cut."""
-    repos, bugs = [specs.parent], script(Path(__file__).with_name("bugs.py"))
-    shas = [(n, r) for n, r, why in _jsonl.walk(text) if not why and isinstance(r, dict) and r.get("fix_sha")]  # fmt: skip
-    own = _git.reached(repos[0])
-    missed = [(n, r) for n, r in shas if r["fix_sha"] not in own]
-    if missed:
-        repos += _siblings(specs)
-        beside = set().union(*map(_git.reached, repos[1:]))
-        missed = [(n, r) for n, r in missed if r["fix_sha"] not in beside]
+def _uncited(specs: Path, text: str) -> list[dict[str, Any]]:
+    """The live records that carry a `fix_sha` and whose id line no commit of the main repo or a repo beside it reaches from its HEAD, one finding each; where a repo is a shallow clone a miss cannot be judged, so the misses are one finding for the cut. The sha is a hint, never judged."""
+    held = {str(r["id"]): (n, r["fix_sha"]) for n, r, why in _jsonl.walk(text) if not why and isinstance(r, dict) and r.get("fix_sha")}  # fmt: skip
+    repos = [specs.parent, *siblings(specs.parent)]
+    found = _git.fix_commit(repos, held)
+    missed = [i for i in held if i not in found]
     if missed and (cut := next((p for p in repos if _git.shallow(p)), None)):
-        return [_findings.finding(CODE, LEDGER, missed[0][0], "the clone is shallow: its misses cannot be judged", git_line(cut, "fetch", "--unshallow"))]  # fmt: skip
+        return [_findings.finding(CODE, LEDGER, held[missed[0]][0], "the clone is shallow: its misses cannot be judged", git_line(cut, "fetch", "--unshallow"))]  # fmt: skip
     return [
         _findings.finding(
-            CODE, LEDGER, n, f"{r['id']!r} fix_sha {r['fix_sha']} is no ancestor of HEAD of {', '.join(p.name for p in repos)}",
-            act("agent", "find the fix commit's sha in git log and run "
-                f"`{bugs.inline('update', r['id'], '--set', 'fix_sha=SHA', specs=root)}`"),
+            CODE, LEDGER, held[i][0], f"{i!r} fix_sha {held[i][1]} has no commit in HEAD of {', '.join(p.name for p in repos)} holding the line `fix(bugs): {i} — …`",
+            act("agent", f"commit the fix with the line `fix(bugs): {i} — …` in its message"),
         )
-        for n, r in missed
+        for i in missed
     ]  # fmt: skip
 
 
@@ -232,7 +225,7 @@ def check(specs: Path) -> list[dict[str, Any]]:
     text = read_text(ledger) if ledger.is_file() else ""
     archived = read_text(histo) if histo.is_file() else ""
     root = specs.resolve()
-    unreached = _unreached(specs, text, root)
+    unreached = _uncited(specs, text)
     return sorted(
         findings_for(text, archived=archived, root=root) + unreached,
         key=lambda f: (f["path"], f["line"]),

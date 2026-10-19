@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import os
+import re
 from collections.abc import Iterable, Mapping
 from pathlib import Path
 
@@ -65,14 +66,33 @@ def reaches(repo: Path, sha: str) -> bool:
     return True
 
 
-def reached(repo: Path) -> set[str]:
-    """Every full sha the HEAD of *repo* reaches, in one `rev-list`; a malformed sha is never in it."""
-    return set(git(repo, "rev-list", "HEAD", check=False).split())
+#: A bug-fix line of a commit message: `fix(bugs): <id>[, <id>…] — …` or the REBUILD `refactor(bugs): …`.
+_FIX_LINE = re.compile(r"^(?:fix|refactor)\(bugs\): (.*?) — ", re.M)
+
+
+def fix_commit(repos: Iterable[Path], ids: Iterable[str]) -> dict[str, tuple[Path, str]]:
+    """For each of *ids*, the repo and sha of the newest commit the HEAD of the first of *repos* that has one reaches whose message holds a bug-fix line naming it (a group lists its ids separated by commas or blanks); each repo is read in one `git log` and only while an id is missing. A commit the HEAD reverts is skipped: a commit subjected `Revert "<S>"` retires the older commit subjected `<S>`, and a retired revert registers nothing."""
+    wanted, found = set(ids), {}
+    for repo in repos:
+        if wanted <= found.keys():
+            break
+        retired = set()
+        for entry in git(repo, "log", "--format=%x1e%H%x00%B", check=False).split("\x1e")[1:]:
+            sha, _, message = entry.partition("\0")
+            if (subject := message.partition("\n")[0]) in retired:
+                continue
+            if subject.startswith('Revert "'):
+                retired.add(subject[8:-1])
+            for head in _FIX_LINE.findall(message):
+                for bug in re.split(r"[,\s]+", head):
+                    if bug in wanted:
+                        found.setdefault(bug, (repo, sha))
+    return found
 
 
 def fix_files(repo: Path, shas: Iterable[str]) -> dict[str, list[str]]:
-    """The paths each of *shas* touched, all read in one `diff-tree`; a sha that is malformed or that the HEAD of *repo* does not reach is absent."""
-    asked = reached(repo).intersection(shas)
+    """The paths each of *shas*, commits of *repo*, touched, all read in one `diff-tree`."""
+    asked = set(shas)
     found: dict[str, list[str]] = {}
     files: list[str] = []
     cmd = ("diff-tree", "--stdin", "--root", "--name-only", "-r", "-z")

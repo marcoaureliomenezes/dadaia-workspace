@@ -16,7 +16,7 @@ from _bugs_write import _set, now_iso
 from _specs import choice
 
 REQUIRED_BY_VERB = {
-    "resolve": ("cause", "caused_by", "solution", "fix_sha"),
+    "resolve": ("cause", "caused_by", "solution"),
     "supersede": ("by",), "reject": ("reason",),
 }  # fmt: skip
 
@@ -38,9 +38,9 @@ def transition(
     record = by_id(records, bug_id)
     updated = dict(record)
     if verb == "resolve":
-        for key in REQUIRED_BY_VERB["resolve"]:
+        for key in (*REQUIRED_BY_VERB["resolve"], "fix_sha"):
             _set(updated, key, values[key])
-        if "fix_files" in values:
+        if values.get("fix_files"):
             _set(updated, "fix_files", values["fix_files"])
     elif verb == "supersede":
         _set(updated, "superseded_by", values["by"])

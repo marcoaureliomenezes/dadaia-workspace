@@ -85,9 +85,10 @@ def _gate_inputs(repo_root: Path, head: str) -> tuple[Gitflow, GateFixes]:
 
 def _rewrite_unpublished(repo: Path, oldest: str, message: str | None) -> None:
     """Re-commit the unpublished range of HEAD, from *oldest*, as one commit holding the
-    tracked working tree. Runs only when the push gate refuses that range on a denylist hit
-    or a canon violation, and only over edits or deletions of the paths the gate lists;
-    *message* replaces the message only when the gate lists a commit message. The git calls
+    tracked working tree and every folded message in order. Runs only when the push gate
+    refuses that range on a denylist hit or a canon violation, and only over edits or
+    deletions of the paths the gate lists; *message*, allowed only when the gate lists a
+    commit message, goes first and replaces just the messages the gate lists. The git calls
     carry the sanctioned-tool marker (``git_subprocess``): the ref gate passes them."""
     from dadaia_workspace.container import build_git_client, build_git_object_reader
 
@@ -137,15 +138,17 @@ def _rewrite_unpublished(repo: Path, oldest: str, message: str | None) -> None:
         )
     if refusal:
         fail(*refusal)
+    from dadaia_workspace.container import load_denylist_baseline_patterns, load_denylist_terms
+    from dadaia_workspace.features.chokepoints.denylist_scan import scan_objects
+
+    log = git.git(repo, "log", "--reverse", "--format=%H%x00%B%x1e", tip, "--not", f"{sha}^@")
+    folded = [e.strip().partition("\0")[::2] for e in log.split("\x1e") if e.strip()]
+    objects = build_git_object_reader().new_objects(repo, tip, held or ZERO_SHA)
+    hits = scan_objects(objects, load_denylist_terms(), load_denylist_baseline_patterns()).hits
+    replaced = {h.sha for h in hits} if message else set()
+    text = "\n\n".join([message or "", *(m for c, m in folded if c not in replaced)]).strip()
     git.git(repo, "reset", "--soft", sha)
-    git.git(
-        repo,
-        "commit",
-        "-qa",
-        "--amend",
-        "--allow-empty",
-        *(("-m", message) if message else ("--no-edit",)),
-    )
+    git.git(repo, "commit", "-qa", "--amend", "--allow-empty", "--cleanup=whitespace", "-m", text)
 
 
 def _gate_decision(repo_root: Path, read_refs: Callable[[], str]) -> Decision:

@@ -17,9 +17,9 @@ import _bugs_write as wr
 import _findings
 import _jsonl
 from _atomic import SymlinkRefusedError
-from _bugs_check import LEDGER, OPEN, STATUS_BY_VERB, check
+from _bugs_check import LEDGER, OPEN, STATUS_BY_VERB, check, siblings
 from _bugs_store import Refusal, archived_plain_ids, commit, history, read_records
-from _git import GitError, fix_files, git
+from _git import GitError, fix_commit, fix_files, git
 from _platform import act, use_utf8_stdio
 from _refusal import report
 from _specs import find_specs, refuse
@@ -37,7 +37,7 @@ _OPTIONS: dict[str, tuple[str, ...]] = {
         "--expected",
         "--correlates",
     ),
-    "resolve": ("--cause", "--caused-by", "--solution", "--fix-sha"),
+    "resolve": ("--cause", "--caused-by", "--solution"),
     "supersede": ("--by",),
     "reject": ("--reason",),
 }
@@ -47,7 +47,7 @@ _HELP = {
     "status": "list records, open only by default",
     "stats": "aggregate counts by status and severity",
     "update": "write a governance field other than status/closed_at",
-    "resolve": "close a record as resolved, with its cause, solution and fix sha",
+    "resolve": "close a record as resolved, with its cause and solution; its fix is the commit holding its fix(bugs) line",
     "supersede": "close a record as superseded by another slug",
     "reject": "close a record as rejected, with a reason",
     "archive": "move named terminal records into bugs_histo.jsonl",
@@ -168,8 +168,15 @@ def _write(args: argparse.Namespace, specs: Path) -> int:
         print(f"[ok] updated {', '.join(sorted(changes))} for {args.bug_id}")
         return 0
     values = _jsonl.values(args, _OPTIONS[args.verb])
-    if args.verb == "resolve" and (files := fix_files(specs.parent, [sha := values["fix_sha"]]).get(sha)):  # fmt: skip
-        values["fix_files"] = files
+    if args.verb == "resolve":
+        found = fix_commit([specs.parent, *siblings(specs.parent)], [args.bug_id])
+        if args.bug_id not in found:
+            raise Refusal(
+                f"no commit of HEAD holds the line `fix(bugs): {args.bug_id} — …`",
+                act("agent", f"commit the fix with the line `fix(bugs): {args.bug_id} — …` in its message, then resolve again"),
+            )  # fmt: skip
+        repo, sha = found[args.bug_id]
+        values |= {"fix_sha": sha, "fix_files": fix_files(repo, [sha]).get(sha)}
     commit(ledger, lambda records: tr.transition(records, args.bug_id, args.verb, values))
     print(f"[ok] {STATUS_BY_VERB[args.verb]} {args.bug_id}")
     return 0
