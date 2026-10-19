@@ -111,11 +111,16 @@ def drop_steps(repo: Path, low: str, high: str) -> list[str]:
     """The act steps that delete branch *low* once it is merged into *high*: its upstream unset
     when it has one, since git's `-d` judges an upstream rather than HEAD, then `-d`; empty when
     *low* is not merged. At most two steps, never `-D`."""
-    if not git(repo, "branch", "--merged", high, "--list", low).strip():
+    merged = git(
+        repo, "for-each-ref", "--merged", high, "--format=x%(upstream)", f"refs/heads/{low}"
+    )
+    if not merged.strip():
         return []
-    steps = []
-    if git(repo, "for-each-ref", "--format=%(upstream)", f"refs/heads/{low}").strip():
-        steps.append(f"run `{git_inline(repo, 'branch', '--unset-upstream', low)}`")
+    steps = (
+        [f"run `{git_inline(repo, 'branch', '--unset-upstream', low)}`"]
+        if merged.strip() != "x"
+        else []
+    )
     return [*steps, f"run `{git_inline(repo, 'branch', '-d', low)}`"]
 
 
