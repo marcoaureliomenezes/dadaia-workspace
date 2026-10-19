@@ -323,6 +323,10 @@ def _stats_workspace(tmp_path: Path) -> Path:
 def _log(root: Path, log: list[dict[str, str]]) -> None:
     state = root / "repos/r/specs/releases/0.5.0/_RELEASE.json"
     write_text(state, json.dumps({**json.loads(read_text(state)), "log": log}))
+    # a state `release.py check` passes holds the folder of each candidate its log names
+    for rc in {e["candidate"] for e in log if "candidate" in e and e["candidate"][:3] == "rc-"}:
+        if not (state.parent / rc).exists():
+            shutil.copytree(state.parent / "rc-1", state.parent / rc)
 
 
 def _stub(root: Path, skill: str, script: str, body: str) -> None:
