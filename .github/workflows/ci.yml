@@ -215,7 +215,7 @@ jobs:
     name: Contract coverage (Windows/macOS)
     if: ${{ github.event_name == 'pull_request' }}
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 45
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
