@@ -143,3 +143,14 @@ def test_a_worktree_outside_worktrees_is_not_carried_and_does_not_crash(root: Pa
     git(root / "repos/r", "worktree", "add", "-q", str(foreign), "-b", "agent-1")
 
     assert _members(_export(root)) == [f"r/{LANE}.bundle", "spec-contexts.json"]
+
+
+def test_a_dirty_tree_with_no_commit_ahead_refuses_with_pauses_fix(root: Path) -> None:
+    write_text((tree := open_tree(root, LANE)) / "scripts/ci.py", "changed\n")
+    (pause_fix,) = fixes(run(root, "pause", str(tree)))
+
+    with pytest.raises(DadaiaError) as refused:
+        _export(root)
+
+    assert refused.value.fix == pause_fix.removeprefix("fix: ")
+    assert not (root / ".dadaia/dist" / ARCHIVE).exists()
