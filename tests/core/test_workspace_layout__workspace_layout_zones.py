@@ -55,7 +55,7 @@ def test_derived_views_follow_the_registry() -> None:
     assert {z.name: z.canon for z in wl.zones_with_canon()} == {
         "states": frozenset(_SPEC_STATES_CANON),
         "sessions": frozenset({"*.json"}),
-        "dist": frozenset({"spec-contexts.json"}),
+        "dist": frozenset({"spec-contexts.json", "workspace-export.tar.gz"}),
     }
     assert [z.name for z in wl.walked_zones()] == [name for name, *_ in _SPEC_ZONES[:9]]
     assert wl.additive_prefixes() == (
