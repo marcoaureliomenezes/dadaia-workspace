@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import re
 import sys
 from typing import TextIO
 
@@ -26,6 +27,12 @@ def spell_fix(fix: str) -> str:
 def fix_of(text: str, default: str = "") -> str:
     """The first `fix:` line of a child script's *text*, else *default*: the one parser."""
     return next((ln[len(FIX) :] for ln in text.splitlines() if ln.startswith(FIX)), default)
+
+
+def check_refusal(out: str) -> Refusal | None:
+    """The Refusal a `release.py check` run states, its `[error]` or finding line and its `fix:` line, else None."""
+    m = re.search(r"^(?:\S+ error |\[error\] )(.*)$", out, re.M)
+    return Refusal(m[1], fix_of(out)) if m else None
 
 
 def without_fix(text: str) -> str:

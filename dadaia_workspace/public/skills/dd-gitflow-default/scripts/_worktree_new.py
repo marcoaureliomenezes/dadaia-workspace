@@ -11,7 +11,7 @@ from pathlib import Path
 from _bugs_check import OPEN
 from _grammar import STATE
 from _platform import act, command, is_link, run
-from _refusal import fix_of
+from _refusal import check_refusal
 from _specs import parse
 from _worktree_git import flow_for, git, not_a_name, scrubbed_env, work_version, work_versions
 from _worktree_names import (
@@ -50,13 +50,13 @@ def _refuse_unopened_bug(main: Path, work: str, bug: str) -> None:
 
 
 def _refuse_unready(root: Path, main: Path, version: str, rc: str) -> None:
-    """A main tree opens only while its release, on the rc's tree, passes `release.py check` and is in IMPLEMENTATION."""
+    """A main tree opens only while its release state, on the rc's tree, passes `release.py check` and is in IMPLEMENTATION; no state reads as not."""
     rc_name = f"{version}/{rc}/wt-rc"
     rc_tree = tree_path(root, main.name, rc_name)
-    out = run([sys.executable, str(Path(__file__).resolve().parents[2] / "dd-release-implementation/scripts/release.py"), "check", "--specs", str(rc_tree / "specs")], env=scrubbed_env()).stdout  # fmt: skip
-    if fix := fix_of(out):
-        raise Refusal(out.partition(" error ")[2].partition("\n")[0], fix)
-    if json.loads((rc_tree / "specs/releases" / version / STATE).read_text("utf-8")).get("phase") != "IMPLEMENTATION":  # fmt: skip
+    state = rc_tree / "specs/releases" / version / STATE
+    if state.is_file() and (bad := check_refusal((d := run([sys.executable, str(Path(__file__).resolve().parents[2] / "dd-release-implementation/scripts/release.py"), "check", "--specs", str(rc_tree / "specs")], env=scrubbed_env())).stdout + d.stderr)):  # fmt: skip
+        raise bad
+    if (json.loads(state.read_text("utf-8")).get("phase") if state.is_file() else None) != "IMPLEMENTATION":  # fmt: skip
         raise Refusal(f"a job needs release {version} in phase IMPLEMENTATION on {branch(rc_name)}",
                       act("agent", f"reach phase IMPLEMENTATION in {STATE} on {branch(rc_name)} at {rc_tree} (release.py phase), then open its job again"))  # fmt: skip
 
