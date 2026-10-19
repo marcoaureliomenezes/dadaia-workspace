@@ -135,3 +135,11 @@ def test_a_secret_in_a_bundle_refuses_and_leaves_no_archive_and_no_ref(
     assert aws_key_shape() not in str(refused.value)
     assert not (root / ".dadaia/dist" / ARCHIVE).exists()
     assert _refs(root) == refs
+
+
+def test_a_worktree_outside_worktrees_is_not_carried_and_does_not_crash(root: Path) -> None:
+    commit(open_tree(root, LANE), "specs/notes.md")
+    foreign = root / "repos/r/.claude/worktrees/agent-1"
+    git(root / "repos/r", "worktree", "add", "-q", str(foreign), "-b", "agent-1")
+
+    assert _members(_export(root)) == [f"r/{LANE}.bundle", "spec-contexts.json"]
