@@ -7,7 +7,6 @@ import argparse
 import json
 import sys
 from collections import Counter
-from functools import reduce
 from pathlib import Path
 
 sys.dont_write_bytecode = True
@@ -63,11 +62,7 @@ def _parser() -> argparse.ArgumentParser:
         command = sub.add_parser(verb, help=help_text)
         command.add_argument("--specs", type=Path, default=None, help="path to the specs/ tree")
         if verb in ("update", *tr.REQUIRED_BY_VERB):
-            command.add_argument(
-                "bug_id",
-                nargs="+" if verb == "update" else None,
-                help="the record id to change (update: one or more)",
-            )
+            command.add_argument("bug_id", help="the record id to change")
         for option in _OPTIONS.get(verb, ()):
             if option == "--correlates":
                 command.add_argument(option, action="append", help=_CORRELATES)
@@ -164,14 +159,13 @@ def _write(args: argparse.Namespace, specs: Path) -> int:
         return 0
     if args.verb == "update":
         changes = wr.parse_set_options(args.sets)
-        known = {str(r["id"]) for r in history(specs)}
         commit(
             ledger,
-            lambda records: reduce(
-                lambda rs, i: wr.apply_update(rs, i, changes, known), args.bug_id, records
+            lambda records: wr.apply_update(
+                records, args.bug_id, changes, {str(r["id"]) for r in history(specs)}
             ),
         )
-        print(f"[ok] updated {', '.join(sorted(changes))} for {', '.join(args.bug_id)}")
+        print(f"[ok] updated {', '.join(sorted(changes))} for {args.bug_id}")
         return 0
     values = _jsonl.values(args, _OPTIONS[args.verb])
     if args.verb == "resolve" and (files := fix_files(specs.parent, [sha := values["fix_sha"]]).get(sha)):  # fmt: skip

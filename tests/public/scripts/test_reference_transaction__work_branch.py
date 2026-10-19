@@ -351,16 +351,14 @@ def _verb(
     )
 
 
-def _leak(
-    repo: _Repo, tmp_path: Path, *, in_message: bool = False, subject: str = "leak"
-) -> tuple[str, dict[str, str]]:
+def _leak(repo: _Repo, tmp_path: Path, *, in_message: bool = False) -> tuple[str, dict[str, str]]:
     """One unpublished commit carrying the denylisted term (in a file, or only in its message);
     returns that commit and the env naming the denylist."""
     denylist = tmp_path / "denylist.json"
     write_text(denylist, f'{{"{_TERM}": "t"}}')
     write_text(repo.root / "leak.txt", f"a {'' if in_message else _TERM}\n")
     repo.ok("add", "leak.txt")
-    message = f"mentions {_TERM}" if in_message else subject
+    message = f"mentions {_TERM}" if in_message else "leak"
     assert repo.git("commit", "-q", "-m", message, wt=True).returncode == 0
     return repo.ok("rev-parse", "HEAD"), {"DADAIA_PRIVACY_DENYLIST": str(denylist)}
 
@@ -470,27 +468,6 @@ def test_the_rewrite_verb_commit_subject_states_the_range_it_folds(
     assert _verb(repo, oldest, env=env).returncode == 0
     assert repo.ok("log", "-1", "--format=%s", _WORK) == (
         f"chore: rewrite unpublished range {oldest[:9]}..{oldest[:9]}"
-    )
-
-
-def test_the_rewrite_verb_refuses_while_history_is_intact_when_the_ledger_is_unreadable(
-    repo: _Repo, tmp_path: Path
-) -> None:
-    oldest, env = _leak(repo, tmp_path)
-    write_text(repo.root / "leak.txt", "a\n")
-    (repo.root / "specs" / "bugs").mkdir(parents=True)
-    (repo.root / "specs" / "bugs" / "BUGS.jsonl").write_bytes(b"\xff\xfe\n")
-    _assert_verb_refused(repo, _verb(repo, oldest, env=env), oldest)
-
-
-def test_the_rewrite_verb_keeps_a_red_test_range_a_test_commit(
-    repo: _Repo, tmp_path: Path
-) -> None:
-    oldest, env = _leak(repo, tmp_path, subject="test(j1.t1): leak")
-    write_text(repo.root / "leak.txt", "a\n")
-    assert _verb(repo, oldest, env=env).returncode == 0
-    assert repo.ok("log", "-1", "--format=%s", _WORK) == (
-        f"test(j1.t1): rewrite unpublished range {oldest[:9]}..{oldest[:9]}"
     )
 
 

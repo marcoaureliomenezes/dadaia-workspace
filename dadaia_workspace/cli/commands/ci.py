@@ -17,7 +17,7 @@ from dadaia_workspace.cli._specs_resolution import (
     scope,
 )
 from dadaia_workspace.core import platform
-from dadaia_workspace.core.cli_line import fix_line, script_line, spell_fix
+from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.exceptions import GitSyncError
 from dadaia_workspace.core.gitflow import Gitflow, SeveralWorkBranches, work_branch
 from dadaia_workspace.core.models.git_scan import ZERO_SHA
@@ -137,8 +137,6 @@ def _rewrite_unpublished(repo: Path, oldest: str, message: str | None) -> None:
         )
     if refusal:
         fail(*refusal)
-    folded = {sha, *git.git(repo, "rev-list", tip, f"^{sha}").split()}
-    ids, main = _cited_ids(repo, folded)
     git.git(repo, "reset", "--soft", sha)
     git.git(
         repo,
@@ -146,47 +144,8 @@ def _rewrite_unpublished(repo: Path, oldest: str, message: str | None) -> None:
         "-qa",
         "--amend",
         "--allow-empty",
-        "-m",
-        message or f"chore: rewrite unpublished range {sha[:9]}..{tip[:9]}",
+        *(("-m", message) if message else ("--no-edit",)),
     )
-    if ids:
-        line = script_line(
-            ".agents/skills/dd-bug-resolution/scripts/bugs.py",
-            "update",
-            *ids,
-            "--set",
-            f"fix_sha={git.git(repo, 'rev-parse', 'HEAD')}",
-        )
-        fix = f"re-point the ledger records the fold unreached: run `{line}` from a worktree of {main}"
-        typer.echo(
-            spell_fix(act("agent", f"{fix}, then land it through that tree's merge")), err=True
-        )
-
-
-def _cited_ids(repo: Path, folded: set[str]) -> tuple[list[str], str]:
-    """The ids of the live ledger records whose ``fix_sha`` is in *folded*, and the slug of
-    the main repo that holds the ledger (an associated repo's range is read there). Read
-    before the fold, so an unreadable ledger refuses while history is intact; the ledger
-    path is the owner's ``LEDGER`` constant, since no ledger verb lists records by sha."""
-    workspace = resolve_workspace_root_for_cli(repo)
-    owner = repo_owner(workspace, repo)
-    main = owner[2] if owner else repo.name
-    home = workspace / "repos" / main if owner and owner[1] != main else repo
-    ledger = home / "specs" / load_owner("dd-bug-resolution", "_bugs_check").LEDGER
-    try:
-        text = ledger.read_text(encoding="utf-8") if ledger.is_file() else ""
-    except (OSError, UnicodeDecodeError) as error:
-        fail(
-            f"cannot read {ledger}: {error}",
-            act("agent", "make the ledger a readable UTF-8 file, then run the remedy again"),
-        )
-    rows = load_owner("dd-bug-resolution", "_jsonl").walk(text)
-    ids = [
-        r["id"]
-        for _, r, why in rows
-        if not why and isinstance(r, dict) and r.get("fix_sha") in folded
-    ]
-    return ids, main
 
 
 def _gate_decision(repo_root: Path, read_refs: Callable[[], str]) -> Decision:
