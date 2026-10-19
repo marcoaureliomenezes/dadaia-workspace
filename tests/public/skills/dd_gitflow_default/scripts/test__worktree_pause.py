@@ -75,6 +75,7 @@ def test_pause_then_resume_restores_the_branch_tip_and_tree(root: Path, name: st
     assert paused.returncode == 0, paused.stderr
     assert _bundle(root, name).is_file()
     assert not tree.exists()
+    assert not (root / "worktrees/r/0.5.0").exists()
     assert git(repo, "branch", "--list", _branch(name)) == ""
     resumed = run(root, "resume", str(tree))
     assert resumed.returncode == 0, resumed.stderr
@@ -83,6 +84,7 @@ def test_pause_then_resume_restores_the_branch_tip_and_tree(root: Path, name: st
     assert git(tree, "rev-parse", "HEAD^{tree}") == snapshot
     assert read_text(tree / "specs/notes.md") == "kept\n"
     assert git(tree, "status", "--porcelain") == ""
+    assert (root / "worktrees/r/0.5.0/AGENTS.md").is_file()
     assert not _bundle(root, name).exists()
     assert not (root / ".dadaia/dist/r").exists()
 
@@ -240,13 +242,15 @@ def test_resume_refuses_with_no_bundle(root: Path) -> None:
     assert len(fixes(refused)) == 1, refused.stderr
 
 
-def test_list_shows_a_paused_tree_whose_exit_is_the_resume_line(root: Path) -> None:
-    tree = _lane(root)
+@pytest.mark.parametrize("name", [BACKLOG, RC])
+def test_list_shows_a_paused_tree_whose_exit_is_the_resume_line(root: Path, name: str) -> None:
+    commit(tree := open_tree(root, name), "specs/a.md")
     assert run(root, "pause", str(tree)).returncode == 0
 
     rows = json.loads(run(root, "list", "--json").stdout)
 
-    (row,) = [r for r in rows if r["state"] == "paused"]
+    (row,) = rows  # no stray level folder beside the paused row
+    assert row["state"] == "paused"
     assert row["kind"] == "paused" and row["repo"] == "r" and row["warn"] is False
     assert Path(row["path"]) == tree
     assert row["exit"] == command(sys.executable, str(SCRIPT), "resume", str(tree))
