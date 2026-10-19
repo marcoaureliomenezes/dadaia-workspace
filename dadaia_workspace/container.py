@@ -153,9 +153,7 @@ def build_doctor_service(
 def build_export_service(workspace_root: Path) -> ExportService:
     _guard_initialized(workspace_root)
     return ExportService(
-        context_store=build_context_store(workspace_root),
-        git_client=GitSubprocessClient(),
-        workspace_root=workspace_root,
+        context_store=build_context_store(workspace_root), workspace_root=workspace_root
     )
 
 

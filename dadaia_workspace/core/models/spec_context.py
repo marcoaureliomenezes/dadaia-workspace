@@ -8,8 +8,8 @@ from dadaia_workspace.core.skill_owner import load_owner
 #: The kernel's context-name grammar, loaded from ``_grammar.py``.
 CONTEXT_NAME_RE = load_owner("dd-bug-resolution", "_grammar").CONTEXT_NAME_RE
 
-#: The `schema_version` `dadaia export` writes and `dadaia import` accepts.
-EXPORT_SCHEMA_VERSION = "spec-contexts-export-v1"
+#: The `schema_version` of both `dadaia export` artifacts.
+EXPORT_SCHEMA_VERSION = "export-v1"
 
 
 class ContextState(StrEnum):
