@@ -29,6 +29,7 @@ __all__ = [
     "from_mapping",
     "merge_frontmatter",
     "live_release_id",
+    "origin_work_branch",
     "next_candidate",
     "read_gitflow",
     "resolve_live_candidate",
@@ -115,6 +116,15 @@ def work_branch(repo: Path, flow: Gitflow, main: str) -> str:
         except _git.SeveralWork as several:
             raise SeveralWorkBranches(several.args[0], several.text, several.keep) from several
     return str(flow.work_prefix + _git.next_version(repo, rule))
+
+
+def origin_work_branch(repo: Path, flow: Gitflow) -> str | None:
+    """The highest work branch origin holds (remote-tracking refs, offline), ``None`` with none."""
+    rule, origin = {"work": flow.work_prefix}, "refs/remotes/origin"
+    versions = _git.work_versions(repo, rule, origin)
+    return (
+        flow.work_prefix + _git.several_work(repo, rule, versions, origin)[0] if versions else None
+    )
 
 
 def from_mapping(block: object) -> Gitflow:
