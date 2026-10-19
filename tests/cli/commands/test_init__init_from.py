@@ -76,7 +76,12 @@ def _soft(tmp_path: Path, payload: dict[str, object]) -> Path:
     return file
 
 
-def _hard(tmp_path: Path, payload: dict[str, object], *members: tarfile.TarInfo) -> Path:
+def _hard(
+    tmp_path: Path,
+    payload: dict[str, object],
+    *members: tarfile.TarInfo,
+    bundle: Path | None = None,
+) -> Path:
     data = json.dumps(payload).encode()
     with tarfile.open(archive := tmp_path / "workspace-export.tar.gz", "w:gz") as tar:
         head = tarfile.TarInfo("spec-contexts.json")
@@ -84,13 +89,9 @@ def _hard(tmp_path: Path, payload: dict[str, object], *members: tarfile.TarInfo)
         tar.addfile(head, io.BytesIO(data))
         for member in members:
             tar.addfile(member, io.BytesIO(b"x" * member.size))
+        if bundle:
+            tar.add(bundle, arcname=MEMBER)
     return archive
-
-
-def _bundle_member(bundle: Path) -> tarfile.TarInfo:
-    info = tarfile.TarInfo(MEMBER)
-    info.size = bundle.stat().st_size
-    return info
 
 
 def _findings(output: str) -> set[str]:
@@ -109,7 +110,7 @@ def test_init_from_replicates_the_workspace_and_what_follows_leaves_no_finding(
     if kind == "soft":
         artifact = _soft(tmp_path, payload)
     else:
-        artifact = _hard(tmp_path, payload, _bundle_member(bundle))
+        artifact = _hard(tmp_path, payload, bundle=bundle)
     ws = tmp_path / "ws"
 
     result = _runner.invoke(app, ["init", str(ws), "--from", str(artifact)])
