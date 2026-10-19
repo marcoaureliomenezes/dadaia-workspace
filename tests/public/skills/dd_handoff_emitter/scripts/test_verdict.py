@@ -782,36 +782,48 @@ def test_stats_of_a_candidate_without_a_release_folder_reads_every_metric_as_n_a
     ), done.stderr
 
 
-@pytest.mark.parametrize(
-    ("body", "why"),
-    [
-        (
-            b"{bad",
-            "the document is not valid JSON (Expecting property name enclosed in double quotes)",
-        ),
-        (b"[]", "the document is not a JSON object"),
-        (b"{\xff}", None),
-    ],
-)
-def test_stats_of_an_unreadable_release_state_is_refused_with_one_fix_line(
-    tmp_path: Path, body: bytes, why: str | None
-) -> None:
-    root = _stats_workspace(tmp_path)
-    state = root / "repos/r/specs/releases/0.5.0/_RELEASE.json"
-    state.write_bytes(body)
-    done = _stats(root)
-    first, *rest = done.stderr.splitlines()
-    assert (done.returncode, done.stdout, len(rest)) == (1, "", 1), done.stderr
-    assert first == f"[error] {why or f'{state} is not valid UTF-8'}", done.stderr
-    assert rest[0].startswith("fix: Agent action: ") and str(state) in rest[0], done.stderr
-
-
 _CHECK_FIX = (
     "fix: Agent action: {state} fails at the keys this finding names (specs/releases/AGENTS.md: "
     "release.py writes every _RELEASE.json field and ledger line) \u2014 revert the commit that "
     "introduced it (`git -C {state.parent} log -p -- _RELEASE.json` lists them), or delete the "
     "line if you wrote it and it is still uncommitted, then redo the change through `release.py`"
 )
+
+
+_REL = "releases/0.5.0/_RELEASE.json:1"
+
+
+@pytest.mark.parametrize(
+    ("body", "finding", "fix"),
+    [
+        (
+            b"{bad",
+            "document is not valid JSON: Expecting property name enclosed in double quotes",
+            "fix: Agent action: {state} fails at its JSON syntax (line 1) (specs/releases/AGENTS.md: "
+            "release.py writes every _RELEASE.json field and ledger line) \u2014 revert the commit "
+            "that introduced it (`git -C {state.parent} log -p -- _RELEASE.json` lists them), or "
+            "delete the line if you wrote it and it is still uncommitted, then redo the change "
+            "through `release.py`",
+        ),
+        (b"[]", "state must be of type object", _CHECK_FIX),
+        (
+            b"{\xff}",
+            "the file is not valid UTF-8",
+            "fix: Agent action: re-encode line 1 of {state} as UTF-8 in place; every other line stays",
+        ),
+    ],
+)
+def test_stats_of_an_unreadable_release_state_is_refused_with_one_fix_line(
+    tmp_path: Path, body: bytes, finding: str, fix: str
+) -> None:
+    root = _stats_workspace(tmp_path)
+    state = root / "repos/r/specs/releases/0.5.0/_RELEASE.json"
+    state.write_bytes(body)
+    done = _stats(root)
+    lines = done.stderr.splitlines()
+    assert (done.returncode, done.stdout, len(lines)) == (1, "", 2), done.stderr
+    assert lines[0] == f"[error] {_REL} {finding}", done.stderr
+    assert lines[1] == fix.format(state=state), done.stderr
 
 
 @pytest.mark.parametrize(
