@@ -22,7 +22,7 @@
 
 ## dadaia doctor — Diagnose and repair workspace, specs and ledger compliance.
 
-## dadaia export — Write `.dadaia/dist/spec-contexts.json` — one record per spec context.
+## dadaia export — Write `.dadaia/dist/spec-contexts.json` — one record per spec context, read-only.
 
 ## dadaia harness — Register and inspect the workspace's agent runtimes (harnesses).
 - harness add — Register a harness and project its runtime set into this workspace.
