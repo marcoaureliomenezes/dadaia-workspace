@@ -52,9 +52,9 @@ def _help(*argv: str) -> str:
 
 def test_deleted_groups_are_gone_and_reports_keeps_validate() -> None:
     """`doctor --fix` is the one reaper — no `clean`/`tmp`/`academy` group;
-    bugs.py is the ledger's one writer — no `bugs` group."""
+    bugs.py is the ledger's one writer — no `bugs` group; `init --from` replaces `import`."""
     groups = dict(get_command(app).commands)  # type: ignore[attr-defined]
-    assert not {"clean", "tmp", "academy", "bugs"} & set(groups)
+    assert not {"clean", "tmp", "academy", "bugs", "import"} & set(groups)
     assert set(groups["reports"].commands) == {"validate"}
 
 
