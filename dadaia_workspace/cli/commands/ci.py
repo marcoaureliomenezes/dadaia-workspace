@@ -32,6 +32,7 @@ from dadaia_workspace.features.chokepoints.branch_policy import (
     check_ref_policy,
     parse_push_stdin,
 )
+from dadaia_workspace.features.chokepoints.denylist_scan import BaselinePatternLike
 from dadaia_workspace.features.spec_context.service import install_git_hooks
 
 app = typer.Typer(help="Git-hook chokepoints: the pre-push and ref gates and their installer.")
@@ -170,27 +171,29 @@ def _rewrite_unpublished(repo: Path, oldest: str, message: str | None) -> None:
         git.git(repo, "commit", "-q", "--allow-empty", "--cleanup=whitespace", "-m", said(commits, lead))  # fmt: skip
 
 
-def _content_inputs(repo_root: Path, sha: str) -> dict[str, Any]:
-    """What the content scans read: the repo's denylist, its canon as the commit *sha* states
-    it (foreign/v6 carry no v6 canon) and the object reader. No gitflow, work-branch or
-    branch-policy input."""
-    from dadaia_workspace.container import (
-        build_git_client,
-        build_git_object_reader,
-        load_denylist_baseline_patterns,
-        load_denylist_terms,
-    )
-    from dadaia_workspace.core.specs_version import state
-    from dadaia_workspace.features.specs.canon import canon_violations
+def _denylist() -> tuple[tuple[tuple[str, str], ...], tuple[BaselinePatternLike, ...]]:
+    """The operator terms and the baseline patterns, the scan mode on stderr."""
+    from dadaia_workspace.container import load_denylist_baseline_patterns, load_denylist_terms
 
-    denylist_terms = load_denylist_terms()
+    terms, patterns = load_denylist_terms(), load_denylist_baseline_patterns()
     mode = (
         "operator denylist + baseline"
-        if denylist_terms
+        if terms
         else "baseline only (no operator denylist; private names go in "
         "$DADAIA_PRIVACY_DENYLIST or .dadaia/states/privacy_denylist.json)"
     )
     typer.echo(f"[pre-push] denylist scan mode: {mode}", err=True)
+    return terms, patterns
+
+
+def _content_inputs(repo_root: Path, sha: str) -> dict[str, Any]:
+    """What the content scans read besides the denylist: the object reader and the canon as the
+    commit *sha* states it (foreign/v6 carry no v6 canon). No gitflow, work-branch or
+    branch-policy input."""
+    from dadaia_workspace.container import build_git_client, build_git_object_reader
+    from dadaia_workspace.core.specs_version import state
+    from dadaia_workspace.features.specs.canon import canon_violations
+
     git = build_git_client()
     canon_fn = canon_violations
     if git.git(repo_root, "ls-tree", sha, "specs"):
@@ -205,8 +208,6 @@ def _content_inputs(repo_root: Path, sha: str) -> dict[str, Any]:
         "object_source": build_git_object_reader(),
         "repo": repo_root,
         "canon_violations_fn": canon_fn,
-        "denylist_terms": denylist_terms,
-        "baseline_patterns": load_denylist_baseline_patterns(),
     }
 
 
@@ -216,7 +217,10 @@ def _gate_decision(repo_root: Path, read_refs: Callable[[], str]) -> Decision:
     from dadaia_workspace.container import build_git_client
     from dadaia_workspace.features.chokepoints import push_gate_decision
 
+    terms, patterns = _denylist()
     refs, malformed = parse_push_stdin(read_refs())
+    sha = next((r.local_sha for r in refs if not r.is_deletion), "HEAD")
+    content = _content_inputs(repo_root, sha)
     # `git push origin HEAD` names its source "HEAD": the branch checked out IS that ref.
     branch = build_git_client().current_branch(repo_root)
     refs = [
@@ -224,13 +228,14 @@ def _gate_decision(repo_root: Path, read_refs: Callable[[], str]) -> Decision:
         for r in refs
     ]
     gitflow, fixes = _gate_inputs(repo_root, branch)
-    sha = next((r.local_sha for r in refs if not r.is_deletion), "HEAD")
     decision = push_gate_decision(
         refs,
         gitflow=gitflow,
         fixes=fixes,
         malformed_lines=malformed,
-        **_content_inputs(repo_root, sha),
+        denylist_terms=terms,
+        baseline_patterns=patterns,
+        **content,
     )
     if decision.warn:
         typer.echo(decision.warn, err=True)
@@ -246,9 +251,14 @@ def _content_decision(repo: Path, held: str) -> Decision:
     git = build_git_client()
     branch = git.current_branch(repo)
     ref = f"refs/heads/{branch or 'HEAD'}"
+    terms, patterns = _denylist()
     tip = git.git(repo, "rev-parse", "HEAD")
     decision = content_decision(
-        [PushRef(ref, tip, ref, held)], head=branch or "", **_content_inputs(repo, tip)
+        [PushRef(ref, tip, ref, held)],
+        fixes=GateFixes(repo=str(repo), head=branch or ""),
+        denylist_terms=terms,
+        baseline_patterns=patterns,
+        **_content_inputs(repo, tip),
     )
     if decision.warn:
         typer.echo(decision.warn, err=True)

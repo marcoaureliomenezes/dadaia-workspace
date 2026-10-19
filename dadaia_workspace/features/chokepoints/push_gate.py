@@ -92,16 +92,18 @@ def _notes(
     return replace(decision, warn=warn)
 
 
-def _rewrite_fix(ref: PushRef, object_source: ObjectSource, repo: Path, head: str) -> str:
+def _rewrite_fix(ref: PushRef, object_source: ObjectSource, repo: Path, fixes: GateFixes) -> str:
     """The rewrite-verb remedy for the first refused ref (origin is never rewritten)."""
     branch = ref.local_ref.removeprefix(HEADS_PREFIX)
-    if ref.local_ref.startswith("refs/tags/") or not head:
+    if ref.local_ref.startswith("refs/tags/") or not fixes.head:
         fix = act("agent", "a tag or a detached HEAD has no branch to amend; push a branch.")
-    elif branch != ref.local_ref and branch != head:
-        fix = git_line(str(repo), "switch", branch)
+    elif branch != ref.local_ref and branch != fixes.head:
+        fix = git_line(fixes.repo, "switch", branch)
     else:
         oldest = object_source.unpublished(repo, ref.local_sha, ref.remote_sha)[-1]
-        fix = fix_line(None, "ci", "push-gate-check", "--repo", str(repo), "--rewrite-from", oldest)
+        fix = fix_line(
+            None, "ci", "push-gate-check", "--repo", fixes.repo, "--rewrite-from", oldest
+        )
     return f"{_REWRITE}\n{spell_fix(fix)}"
 
 
@@ -198,7 +200,7 @@ def push_gate_decision(
         object_source=object_source,
         repo=repo,
         canon_violations_fn=canon_violations_fn,
-        head=fixes.head,
+        fixes=fixes,
         denylist_terms=denylist_terms,
         baseline_patterns=baseline_patterns,
     )
@@ -210,7 +212,7 @@ def content_decision(
     object_source: ObjectSource,
     repo: Path,
     canon_violations_fn: Callable[[Sequence[str]], Sequence[str]],
-    head: str,
+    fixes: GateFixes,
     denylist_terms: Iterable[tuple[str, str]] = (),
     baseline_patterns: Iterable[BaselinePatternLike] = (),
 ) -> Decision:
@@ -246,7 +248,7 @@ def content_decision(
             ],
             "path(s)",
         )
-        fix = _rewrite_fix(canon[0][0], object_source, repo, head)
+        fix = _rewrite_fix(canon[0][0], object_source, repo, fixes)
         listed = frozenset(f"specs/{p}" for _, p in canon)
     elif hits:
         message = _refusal(
@@ -261,7 +263,7 @@ def content_decision(
             "concatenation), never as a tracked literal. The range scope means "
             "already-published history never needs a rewrite.",
         )
-        fix = _rewrite_fix(hits[0][0], object_source, repo, head)
+        fix = _rewrite_fix(hits[0][0], object_source, repo, fixes)
         listed = frozenset(h.path for _, h in hits)
         messages = frozenset(h.sha for _, h in hits if h.path == "(commit message)")
     else:
