@@ -70,7 +70,6 @@ def execute_migration(store: JsonContextStore, workspace_root: Path) -> None:
     if raw is not None and parse_schema_version(raw, states_dir / "spec_contexts.json") < 2:
         store.replace_raw(
             {
-                "schema_version": "2",
                 "contexts": [
                     ctx
                     if ctx.get("state") not in LEGACY_STATES
