@@ -61,6 +61,17 @@ def _refuse_unready(root: Path, main: Path, version: str, rc: str) -> None:
                       act("agent", f"reach phase IMPLEMENTATION in {STATE} on {rc_branch} at {tree_path(root, main.name, rc_name)} (release.py phase), then open its job again"))  # fmt: skip
 
 
+def absent_levels(root: Path, repo_name: str, name: str) -> list[tuple[Path, str]]:
+    """The level folders tree *name* needs that do not exist yet, each with its level."""
+    return [(f, lv) for f, lv in level_folders(tree_path(root, repo_name), name) if not f.exists()]
+
+
+def write_level_files(made: list[tuple[Path, str]]) -> None:
+    """Writes each level's `AGENTS.md` into its folder, which a tree's `worktree add` created."""
+    for folder, level in made:
+        shutil.copyfile(_LEVELS / f"{level}.md", folder / LEVEL_FILE)
+
+
 def new(root: Path, repo_name: str, name: str) -> Path:
     repo = root / "repos" / repo_name
     _refuse_symlink(root, repo_name)
@@ -82,9 +93,8 @@ def new(root: Path, repo_name: str, name: str) -> Path:
     tree = tree_path(root, repo_name, name)
     if git(repo, "branch", "--list", branch(name)).strip():
         raise Refusal(f"{branch(name)} exists", command(*LAUNCH, "list"))
-    made = [(folder, level) for folder, level in level_folders(tree_path(root, repo_name), name) if not folder.exists()]  # fmt: skip
+    made = absent_levels(root, repo_name, name)
     git(repo, "worktree", "add", "-q", "--lock", "--reason", f"{LOCK}{name}", "-b", branch(name),
         str(tree), start)  # fmt: skip
-    for folder, level in made:
-        shutil.copyfile(_LEVELS / f"{level}.md", folder / LEVEL_FILE)
+    write_level_files(made)
     return tree
