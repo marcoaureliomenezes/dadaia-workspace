@@ -178,7 +178,8 @@ def test_a_wt_branch_with_no_tree_is_removed_by_its_rows_fix_line(
     [row] = [
         r
         for r in json.loads(run(root, "list", "--json").stdout)
-        if r["state"] == "orphan" and r["path"] == str(root / "worktrees/r" / ref.removeprefix("wt/"))
+        if r["state"] == "orphan"
+        and r["path"] == str(root / "worktrees/r" / ref.removeprefix("wt/"))
     ]
     assert row["fix"] and row["exit"] == row["fix"]
     line = row["fix"].split("`")[-2] if "`" in row["fix"] else row["fix"]
