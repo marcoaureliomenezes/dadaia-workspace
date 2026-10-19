@@ -197,7 +197,7 @@ DADAIA_ZONES: tuple[Zone, ...] = (
     Zone("reports", ZoneClass.OUTPUT, Creator.RUNTIME, None, None, "HTML reports; never reaped or committed"),
     Zone("tmp", ZoneClass.EPHEMERAL, Creator.RUNTIME, _ONE_DAY, None, "scratch + evidence"),
     Zone("reaped", ZoneClass.EPHEMERAL, Creator.RUNTIME, _SEVEN_DAYS, None, "slop held by the reaper; deleted only by TTL expiry"),
-    Zone("dist", ZoneClass.STATE, Creator.RUNTIME, None, frozenset({"spec-contexts.json"}), "the one export artifact"),
+    Zone("dist", ZoneClass.STATE, Creator.RUNTIME, None, frozenset({"spec-contexts.json", "workspace-export.tar.gz"}), "export artifacts: the soft JSON, the hard archive, and per-repo pause bundles in <repo>/"),
     Zone("mcps", ZoneClass.OPERATOR, Creator.OPERATOR, None, None, "anything an MCP server needs; never scanned"),
     Zone("references", ZoneClass.OPERATOR, Creator.OPERATOR, None, None, "operator reference clones; never scanned"),
     Zone(".venv", ZoneClass.MANAGED, Creator.INIT, None, None, "workspace venv; never scanned"),
@@ -332,7 +332,7 @@ def verdict(
             zone = next((z for z in DADAIA_ZONES if z.name == parts[1]), None)
             if zone is None or zone.canon is None:
                 return "canon"
-            allowed = zone.canon
+            allowed = {*zone.canon, *repos} if zone.name == "dist" else zone.canon
         elif depth == 1 and parts[0] in slugs:
             allowed = slugs[parts[0]]
         else:
