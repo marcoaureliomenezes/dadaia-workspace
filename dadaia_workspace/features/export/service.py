@@ -29,6 +29,23 @@ _REFUSED = (
 )
 
 
+def scratch_fix(tmp: Path) -> str:
+    """The act that clears a scratch directory or file that cannot be written under *tmp*."""
+    return act("agent", f"free space and write permission under {tmp}, then rerun the export")
+
+
+def new_scratch(tmp: Path, prefix: str) -> "tempfile.TemporaryDirectory[str]":
+    """A scratch directory under *tmp*; a failure to make it refuses with the act that clears it."""
+    try:
+        tmp.mkdir(parents=True, exist_ok=True)
+        return tempfile.TemporaryDirectory(dir=tmp, prefix=prefix)
+    except OSError as exc:
+        raise DadaiaError(
+            f"cannot create a scratch directory ({type(exc).__name__})",
+            fix=scratch_fix(tmp),
+        ) from exc
+
+
 @dataclass(frozen=True)
 class ExportResult:
     path: Path
@@ -118,9 +135,7 @@ class ExportService:
         return hits
 
     def _archive(self, text: str, owners: dict[str, str], dist: Path) -> Path:
-        tmp = self._workspace_root / ".dadaia" / "tmp"
-        tmp.mkdir(parents=True, exist_ok=True)
-        with tempfile.TemporaryDirectory(dir=tmp, prefix="export-") as scratch:
+        with new_scratch(self._workspace_root / ".dadaia" / "tmp", "export-") as scratch:
             try:
                 bundles = self._bundles(owners, dist, Path(scratch))
             except _REFUSED as exc:

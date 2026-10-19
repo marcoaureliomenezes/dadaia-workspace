@@ -1,7 +1,6 @@
 """Composition root — builds services with concrete infrastructure."""
 
 import logging
-import tempfile
 from functools import partial
 from pathlib import Path
 from typing import TYPE_CHECKING, NoReturn
@@ -11,13 +10,13 @@ if TYPE_CHECKING:
 
 from dadaia_workspace.core.cli_line import git_line
 from dadaia_workspace.core.exceptions import DadaiaError, GitSyncError
-from dadaia_workspace.core.models.git_scan import SHA_SHAPE_RE, GitObjectReadError, GitRunError
+from dadaia_workspace.core.models.git_scan import GitObjectReadError, GitRunError
 from dadaia_workspace.core.platform import act, write_text
 from dadaia_workspace.core.workspace_resolver import not_initialized
 from dadaia_workspace.features.capabilities import distribution_version
 from dadaia_workspace.features.chokepoints.denylist_scan import BaselinePatternLike
 from dadaia_workspace.features.chokepoints.push_gate import read_failure_fix
-from dadaia_workspace.features.export.service import ExportService
+from dadaia_workspace.features.export.service import ExportService, new_scratch, scratch_fix
 from dadaia_workspace.features.import_.service import ImportService
 from dadaia_workspace.features.migrate.state_v2 import execute_migration, plan_migration
 from dadaia_workspace.features.public.service import PublicAssetService
@@ -146,22 +145,17 @@ def scan_publish_candidates(repo: Path, rels: list[str]) -> dict[str, str]:
 
 def scan_bundle(workspace_root: Path, bundle: Path, repo: Path) -> dict[str, str]:
     """The pre-push matcher over the objects *bundle* adds to *repo*, as the push gate reads
-    them: a scratch bare repo borrows *repo*'s objects, one `origin` ref per prerequisite the
-    bundle needs, then the bundle is unbundled there. Nothing is written into *repo*.
-    A failure raises `DadaiaError` with the act that clears its own cause: make the file
-    readable, free the scratch space, fetch `origin` for a missing prerequisite, the operator's
-    ruling on a damaged pause bundle, or `read_failure_fix` for git or the repo."""
+    them: git's own exit statuses tell the cases apart (`list-heads` fails: a damaged header;
+    `verify` fails: a missing prerequisite), a scratch bare repo borrows *repo*'s objects and
+    `origin` refs, and the bundle is unbundled there. Nothing is written into *repo*.
+    A failure raises `DadaiaError` relaying git's reason, with the act that clears its cause."""
     from dadaia_workspace.features.chokepoints.denylist_scan import scan_objects
 
-    tmp = workspace_root / ".dadaia" / "tmp"
     # An open lane's bundle was written a moment ago: its damage is git's, never the operator's.
     damaged = (
         act("operator", f"rule whether {bundle} is restored from a copy or discarded")
         if bundle.is_relative_to(workspace_root / ".dadaia" / "dist")
         else git_line(repo, "fsck")
-    )
-    scratch_full = act(
-        "agent", f"free space and write permission under {tmp}, then rerun the export"
     )
 
     def refuse(why: str, fix: str) -> NoReturn:
@@ -170,34 +164,34 @@ def scan_bundle(workspace_root: Path, bundle: Path, repo: Path) -> dict[str, str
     def git(cwd: Path, *args: str, why: str, fix: str) -> str:
         try:
             return GitSubprocessClient().git(cwd, *args)
-        except GitSyncError:
-            refuse(why, fix)
+        except GitSyncError as exc:
+            refuse(f"{why}: {exc.message.partition(':\n')[2].strip()}", fix)
         except (OSError, TimeoutError):
             refuse("git could not run", read_failure_fix(GitRunError("git"), repo))
 
     try:
-        with bundle.open("rb") as handle:  # bounded: a crafted file never reads on
-            head, terminated, _ = handle.read(1 << 20).partition(b"\n\n")
+        bundle.open("rb").close()
     except OSError as exc:
         refuse(
             type(exc).__name__, act("agent", f"make {bundle} readable, then run the export again")
         )
-    try:
-        prerequisites = [
-            line[1:].split()[0].decode() for line in head.split(b"\n")[1:] if line[:1] == b"-"
-        ]
-        if not terminated or not all(SHA_SHAPE_RE.match(sha) for sha in prerequisites):
-            raise ValueError("header")
-    except (IndexError, ValueError):
-        refuse("its header is unreadable", damaged)
-    try:
-        tmp.mkdir(parents=True, exist_ok=True)
-        scratch_dir = tempfile.TemporaryDirectory(dir=tmp, prefix="scan-")
-    except OSError as exc:
-        refuse(type(exc).__name__, scratch_full)
-    with scratch_dir as name:
+    heads = git(
+        repo, "bundle", "list-heads", str(bundle), why="its header is unreadable", fix=damaged
+    )
+    if not heads:
+        refuse("it holds no ref", damaged)
+    git(
+        repo,
+        "bundle",
+        "verify",
+        str(bundle),
+        why="its repo lacks a prerequisite",
+        fix=git_line(repo, "fetch", "origin"),
+    )
+    tmp = workspace_root / ".dadaia" / "tmp"
+    with new_scratch(tmp, "scan-") as name:
         scratch, fsck = Path(name), git_line(repo, "fsck")
-        git(scratch, "init", "-q", "--bare", why="no scratch repo", fix=scratch_full)
+        git(scratch, "init", "-q", "--bare", why="no scratch repo", fix=fsck)
         store = git(
             repo,
             "rev-parse",
@@ -210,33 +204,20 @@ def scan_bundle(workspace_root: Path, bundle: Path, repo: Path) -> dict[str, str
         try:
             write_text(scratch / "objects" / "info" / "alternates", store + "\n")
         except OSError as exc:
-            refuse(type(exc).__name__, scratch_full)
-        for i, sha in enumerate(prerequisites):
-            fetch = git_line(repo, "fetch", "origin")
-            git(
-                scratch,
-                "cat-file",
-                "-e",
-                f"{sha}^{{commit}}",
-                why="its repo lacks a prerequisite",
-                fix=fetch,
-            )
-            git(
-                scratch,
-                "update-ref",
-                f"refs/remotes/origin/p{i}",
-                sha,
-                why="a ref failed",
-                fix=fsck,
-            )
-        unbundled = git(
-            scratch, "bundle", "unbundle", str(bundle), why="git refused it", fix=damaged
+            refuse(type(exc).__name__, scratch_fix(tmp))
+        git(
+            scratch,
+            "fetch",
+            "-q",
+            str(repo),
+            "+refs/remotes/origin/*:refs/remotes/origin/*",
+            why="no origin refs",
+            fix=fsck,
         )
+        git(scratch, "bundle", "unbundle", str(bundle), why="git refused it", fix=fsck)
         try:
-            found = GitSubprocessObjectReader().new_objects(scratch, unbundled.split()[0], "")
+            found = GitSubprocessObjectReader().new_objects(scratch, heads.split()[0], "")
             outcome = scan_objects(found, load_denylist_terms(), load_denylist_baseline_patterns())
-        except IndexError:
-            refuse("it holds no ref", damaged)
         except GitObjectReadError as exc:
             refuse(str(exc), read_failure_fix(exc, repo))
     return {h.path: f"{h.source_layer} '{h.masked_term}' (line {h.line})" for h in outcome.hits}
