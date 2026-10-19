@@ -146,8 +146,11 @@ def associate(root: Path, spec: str, slugs: tuple[str, ...] = ("a",)) -> None:
         git(repo, "commit", "-q", "--allow-empty", "-m", "init")
         git(repo, "branch", "feature/0.5.0")
     spec_md = root / "repos/r/specs/releases/0.5.0/rc-1/SPEC.md"
-    write_text(spec_md, f"**Status:** {spec}\n")
-    git(root / "repos/r", "commit", "-qam", "spec")
+    write_text(
+        spec_md,
+        f"# SPEC\n\n**Status:** {spec}\n\n**Origin:** operator-demand\n\n## Bug window review\n",
+    )  # a SPEC `release.py check` passes
+    git(root / "repos/r", "commit", "-qam", "spec", "--allow-empty")
     git(root / "repos/r", "branch", "-f", "feature/0.5.0")
 
 
