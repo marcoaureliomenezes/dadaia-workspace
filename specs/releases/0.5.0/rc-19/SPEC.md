@@ -4,7 +4,7 @@
 **Release ID:** 0.5.0
 **Owner:** dd-product-engineer
 **Opened:** 2026-10-19
-**Origin:** backlog:spec-context-branch-field-deleted,context-dead-snapshots-open-worktrees,export-soft-and-hard,init-from-export; bugs:import-turns-a-null-repo-url-into-none,stats-crashes-on-a-release-state-that-breaks-its-schema,worktree-sync-orphans-the-fix-sha-a-lanes-resolve-cites,push-gate-rewrite-orphans-shas-cited-in-the-range,check-relay-reads-a-pass-from-text-not-exit-status,rc-tree-absent-fix-line-does-not-clear-its-refusal,export-scratch-dir-failure-prints-no-fix-line,scan-refusal-hides-gits-reason
+**Origin:** backlog:spec-context-branch-field-deleted,context-dead-snapshots-open-worktrees,export-soft-and-hard,init-from-export; bugs:import-turns-a-null-repo-url-into-none,stats-crashes-on-a-release-state-that-breaks-its-schema,worktree-sync-orphans-the-fix-sha-a-lanes-resolve-cites,push-gate-rewrite-orphans-shas-cited-in-the-range,check-relay-reads-a-pass-from-text-not-exit-status,rc-tree-absent-fix-line-does-not-clear-its-refusal,export-scratch-dir-failure-prints-no-fix-line,scan-refusal-hides-gits-reason,denylist-scan-runs-only-at-pre-push
 
 ---
 
