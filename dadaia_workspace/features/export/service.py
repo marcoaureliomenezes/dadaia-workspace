@@ -77,10 +77,16 @@ class Artifact:
     contexts: tuple[SpecContextProject, ...]
     alive: tuple[str, ...]
 
+    def slugs(self) -> set[str]:
+        """The repo slugs the artifact's contexts own: the only folders its bundles may fill."""
+        return {r.slug for c in self.contexts for r in c.all_repos()}
+
 
 #: A hard artifact's only members besides the JSON: `<repo>/<name>.bundle`, never a `.`/`..` step.
 _BUNDLE = re.compile(r"[A-Za-z0-9][\w.-]*(/[\w.-]+)+\.bundle")
 _JSON_MEMBER = "spec-contexts.json"
+_JSON_CAP = 8 << 20
+_ledger = load_owner("dd-bug-resolution", "_ledger")
 
 
 def _refuse(why: str, fix: str = "") -> SchemaVersionError:
@@ -89,14 +95,32 @@ def _refuse(why: str, fix: str = "") -> SchemaVersionError:
     )
 
 
-def _member_ok(member: tarfile.TarInfo) -> bool:
-    if member.name == _JSON_MEMBER:
-        return member.isfile()
-    return (
-        member.isfile()
-        and bool(_BUNDLE.fullmatch(member.name))
-        and not {".", ".."} & set(member.name.split("/"))
-    )
+def _members(
+    tar: tarfile.TarFile, name: str, slugs: set[str] | None = None
+) -> list[tarfile.TarInfo]:
+    """The bundle members of *tar*, each checked: the JSON once and within its cap, every other a
+    regular `<repo>/<name>.bundle` file named once and, when *slugs* is given, of one of those
+    repos. Raises `SchemaVersionError` on the first member that is not."""
+    seen: set[str] = set()
+    bundles = []
+    for member in tar.getmembers():
+        if member.name in seen:
+            raise _refuse(f"'{name}' has a duplicate member {member.name!r}.")
+        seen.add(member.name)
+        if member.name == _JSON_MEMBER:
+            if member.isfile() and member.size > _JSON_CAP:
+                raise _refuse(f"'{name}' has a {_JSON_MEMBER} larger than {_JSON_CAP} bytes.")
+        elif not (
+            member.isfile()
+            and _BUNDLE.fullmatch(member.name)
+            and not {".", ".."} & set(member.name.split("/"))
+        ):
+            raise _refuse(f"'{name}' has an unsafe member: {member.name!r}.")
+        elif slugs is not None and member.name.split("/")[0] not in slugs:
+            raise _refuse(f"'{name}' has {member.name!r}, which no context of the artifact owns.")
+        else:
+            bundles.append(member)
+    return bundles
 
 
 def _text(path: Path) -> str:
@@ -110,27 +134,13 @@ def _text(path: Path) -> str:
         if not tarfile.is_tarfile(path):
             return platform.read_text(path)
         with tarfile.open(path) as tar:
-            if bad := next((m.name for m in tar.getmembers() if not _member_ok(m)), None):
-                raise _refuse(f"'{path.name}' has an unsafe member: {bad!r}.")
+            _members(tar, path.name)
             head = tar.extractfile(_JSON_MEMBER) if _JSON_MEMBER in tar.getnames() else None
             if head is None:
                 raise _refuse(f"'{path.name}' has no {_JSON_MEMBER}.")
             return head.read().decode()
     except (tarfile.TarError, OSError, UnicodeDecodeError) as exc:
         raise _refuse(f"'{path.name}' is not readable ({type(exc).__name__}).") from exc
-
-
-def _field(file: str, record: object, *keys: str) -> dict[str, object]:
-    absent = [k for k in keys if not isinstance(record, dict) or k not in record]
-    if absent:
-        raise _refuse(f"'{file}' has a record missing {', '.join(absent)}.")
-    return record  # type: ignore[return-value]
-
-
-def _url(file: str, value: object) -> str:
-    if value is not None and not isinstance(value, str):
-        raise _refuse(f"'{file}' has a url that is not text.")
-    return str(value or "")
 
 
 ScanBundle = Callable[[Path, Path], dict[str, str]]
@@ -148,58 +158,62 @@ class ExportService:
     @staticmethod
     def read(path: Path) -> Artifact:
         """The artifact at *path*, soft or hard, checked and written nowhere. Raises
-        `SchemaVersionError` (one fix line) on a missing or unreadable file, any `schema_version`
-        but `export-v1`, an unknown harness, a record missing a field, or an unsafe member."""
+        `SchemaVersionError` (one fix line) on a missing or unreadable file, anything
+        `export-v1.schema.json` refuses, an unknown harness, or a member that is unsafe,
+        repeated, oversized or owned by no context. A null url reads as `""`."""
         try:
             payload = json.loads(_text(path))
         except json.JSONDecodeError as exc:
             raise _refuse(f"'{path.name}' is not valid JSON: {exc}") from exc
-        if not isinstance(payload, dict) or payload.get("schema_version") != EXPORT_SCHEMA_VERSION:
-            raise _refuse(f"'{path.name}' does not carry schema_version {EXPORT_SCHEMA_VERSION!r}.")
-        records, names = payload.get("contexts"), payload.get("harnesses", [])
-        if not isinstance(records, list) or not isinstance(names, list):
-            raise _refuse(f"'{path.name}' has no 'contexts' list.")
+        schema = _ledger.load_schema("export-v1")
+        if problems := list(_ledger.validate(payload, schema, schema, "export")):
+            raise _refuse(
+                f"'{path.name}' is not an {EXPORT_SCHEMA_VERSION} artifact: " + "; ".join(problems)
+            )
         try:
-            harnesses = tuple(harness_registry.parse_harness_name(str(n)) for n in names)
+            harnesses = tuple(harness_registry.parse_harness_name(n) for n in payload["harnesses"])
         except ValueError as exc:
             raise _refuse(f"'{path.name}' names an unknown harness: {exc}") from exc
-        now, contexts = clock.now_iso(), []
-        for raw in records:
-            rec = _field(path.name, raw, "name", "slug", "repo_url")
-            repos = rec.get("associated_repos") or []
-            if not isinstance(repos, list):
-                raise _refuse(f"'{path.name}' has a record missing associated_repos as a list.")
-            contexts.append(
-                SpecContextProject(
-                    name=str(rec["name"]),
-                    state=ContextState.DEAD,
-                    repo_slug=str(rec["slug"]),
-                    repo_url=_url(path.name, rec["repo_url"]),
-                    created_at=now,
-                    dead_since=now,
-                    associated_repos=tuple(
-                        AssociatedRepo(str(r["slug"]), _url(path.name, r["url"]))
-                        for r in (_field(path.name, r, "slug", "url") for r in repos)
-                    ),
-                )
+        now = clock.now_iso()
+        contexts = tuple(
+            SpecContextProject(
+                name=r["name"],
+                state=ContextState.DEAD,
+                repo_slug=r["slug"],
+                repo_url=r["repo_url"] or "",
+                created_at=now,
+                dead_since=now,
+                associated_repos=tuple(
+                    AssociatedRepo(a["slug"], a["url"] or "") for a in r["associated_repos"]
+                ),
             )
-        alive = tuple(str(r["name"]) for r in records if r.get("state") == "alive")
-        return Artifact(harnesses, tuple(contexts), alive)
+            for r in payload["contexts"]
+        )
+        alive = tuple(r["name"] for r in payload["contexts"] if r["state"] == "alive")
+        artifact = Artifact(harnesses, contexts, alive)
+        if tarfile.is_tarfile(path):
+            with tarfile.open(path) as tar:
+                _members(tar, path.name, artifact.slugs())
+        return artifact
 
-    def restore(self, path: Path) -> None:
+    def restore(self, path: Path, artifact: Artifact) -> None:
         """Extracts a hard artifact's bundles to `.dadaia/dist/<repo>/<name>.bundle`, where
-        `worktree resume` finds them; a soft artifact has none. Every member is checked first and
-        extracted with `filter="data"`, so no path escapes `dist` and no link lands."""
+        `worktree resume` finds them; a soft artifact has none. Members are checked as `read`
+        checks them and extracted with `filter="data"`, streamed to disk; a file already in
+        `dist` refuses, before any write, and is never overwritten."""
         if not tarfile.is_tarfile(path):
             return
         dist = self._workspace_root / ".dadaia" / "dist"
         try:
             with tarfile.open(path) as tar:
-                members = tar.getmembers()
-                if bad := next((m.name for m in members if not _member_ok(m)), None):
-                    raise _refuse(f"'{path.name}' has an unsafe member: {bad!r}.")
+                bundles = _members(tar, path.name, artifact.slugs())
+                if taken := next((m.name for m in bundles if (dist / m.name).exists()), None):
+                    raise _refuse(
+                        f"{dist / taken} already exists.",
+                        act("agent", f"move {dist / taken} out of {dist}, then run again"),
+                    )
                 dist.mkdir(parents=True, exist_ok=True)
-                tar.extractall(dist, [m for m in members if m.name != _JSON_MEMBER], filter="data")
+                tar.extractall(dist, bundles, filter="data")
         except (tarfile.TarError, OSError) as exc:
             raise _refuse(f"'{path.name}' cannot be extracted ({type(exc).__name__}).") from exc
 
