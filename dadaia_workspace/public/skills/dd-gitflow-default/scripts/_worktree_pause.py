@@ -5,24 +5,14 @@ back from the bundle and deletes it. Nothing is committed or pushed."""
 
 from __future__ import annotations
 
-import shutil
 import tempfile
 from pathlib import Path
 
 from _platform import act, command
 from _worktree_end import _open_children, _refuse_dirty, _target
 from _worktree_git import git, ours
-from _worktree_names import (
-    LAUNCH,
-    LEVEL_FILE,
-    LOCK,
-    Refusal,
-    branch,
-    kind_of,
-    level_folders,
-    tree_path,
-)
-from _worktree_new import _LEVELS
+from _worktree_names import LAUNCH, LOCK, Refusal, branch, kind_of
+from _worktree_new import absent_levels, write_level_files
 
 
 def write_bundle(repo: Path, ref: str, dest: Path) -> None:
@@ -81,11 +71,10 @@ def resume(root: Path, path: str) -> str:
         raise Refusal(f"{ref} exists", command(*LAUNCH, "list"))
     if not bundle.is_file():
         raise Refusal(f"no bundle at {bundle}", command(*LAUNCH, "list"))
-    made = [(f, lv) for f, lv in level_folders(tree_path(root, repo.name), name) if not f.exists()]
+    made = absent_levels(root, repo.name, name)
     git(repo, "fetch", "-q", str(bundle), f"{ref}:{ref}")
     git(repo, "worktree", "add", "-q", "--lock", "--reason", f"{LOCK}{name}", str(tree), ref)
-    for folder, level in made:
-        shutil.copyfile(_LEVELS / f"{level}.md", folder / LEVEL_FILE)
+    write_level_files(made)
     bundle.unlink()
     for folder in bundle.parents:
         if folder == dist.parent or any(folder.iterdir()):
