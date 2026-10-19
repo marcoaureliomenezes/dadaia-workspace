@@ -148,7 +148,7 @@ def _memory(args: argparse.Namespace, specs: Path) -> int:
     lists = [[s for s in getattr(args, n).split(",") if s] for n in ("reviewed", "changed")]
     try:
         until = drift.git(specs.parent, "rev-parse", "HEAD")[0]
-        records = [e for e in live.state.get("log") or [] if isinstance(e, dict) and e.get("kind") == "memory"]  # fmt: skip
+        records = [e for e in live.state.get("log") or [] if e.get("kind") == "memory"]  # fmt: skip
         if records and records[-1].get("until") == until:  # a rerun at HEAD appends nothing
             print(f"[ok] release {live.release_id} memory already reconciled to {until[:12]}")
             return 0
@@ -196,7 +196,7 @@ def _allowed_open_bugs(args: argparse.Namespace, specs: Path) -> list[str]:
 
 def _refuse_unauthorized(allowed: list[str], state: dict[str, Any]) -> None:
     """Each carried open bug needs a verbatim authorization note and a closure-summary carry."""
-    log = [entry for entry in state.get("log") or [] if isinstance(entry, dict)]
+    log = state.get("log") or []
     summary = closure_summary(state).get("carried", "")
     for bug_id in allowed:
         authorized = any(

@@ -79,7 +79,7 @@ def window_start(state: State) -> list[str]:
     """The memory window's start candidates, newest first: each memory entry's `until`,
     newest entry first, then `defined.sha`."""
     bounds = [str(e["until"]) for e in reversed(state.get("log") or [])
-              if isinstance(e, dict) and e.get("kind") == "memory" and e.get("until")]  # fmt: skip
+              if e.get("kind") == "memory" and e.get("until")]  # fmt: skip
     return bounds + [str(d) for d in [(state.get("defined") or {}).get("sha")] if d]
 
 

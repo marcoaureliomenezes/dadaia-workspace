@@ -253,7 +253,7 @@ def _memory_findings(specs: Path) -> list[dict[str, Any]]:
     if live.state.get("phase") != "CLOSURE":
         return []
     stamp = str((live.state.get("implemented") or {}).get("ts") or "")
-    if any(isinstance(e, dict) and e.get("kind") == "memory" and str(e.get("ts")) >= stamp
+    if any(e.get("kind") == "memory" and str(e.get("ts")) >= stamp
            for e in live.state.get("log") or []):  # fmt: skip
         return []
     message = (f"release is in CLOSURE with no `kind: memory` log entry stamped at or after "
