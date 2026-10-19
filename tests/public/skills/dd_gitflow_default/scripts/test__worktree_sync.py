@@ -29,7 +29,10 @@ from tests.helpers.worktree_ws import (
     run,
 )
 
-_BUGS = Path(__file__).resolve().parents[5] / "dadaia_workspace/public/skills/dd-bug-resolution/scripts/bugs.py"
+_BUGS = (
+    Path(__file__).resolve().parents[5]
+    / "dadaia_workspace/public/skills/dd-bug-resolution/scripts/bugs.py"
+)
 WORK = "feature/0.5.0"
 RC, LANE = "0.5.0/rc-1/wt-rc", "0.5.0/wt-backlog-x"
 CHAIN = [RC, NEW_JOB, NEW_TASK]  # each tree is cut from the one before; the first from WORK
