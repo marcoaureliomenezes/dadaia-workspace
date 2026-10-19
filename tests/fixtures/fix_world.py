@@ -927,6 +927,11 @@ _REFUSALS: dict[str, tuple[Case | tuple[Case, ...] | Skip, ...]] = {
     ),
     "ci._repo_root": (Skip("the pre-push hook always runs inside the repo it pushes"),),
     "ci.push_gate_check": (Skip("the gate's refusal: its fix is a branch_policy/push_gate site"),),
+    "ci._fold": (
+        Skip(
+            "a group left with no message: test__worktree_end.py pins its one fix and the unchanged branch"
+        ),
+    ),
     "ci._rewrite_unpublished": (
         Skip("refuses a commit origin holds: test_reference_transaction__work_branch.py"),
     ),
