@@ -233,7 +233,8 @@ def test_a_pause_bundle_missing_its_prerequisites_refuses_with_fetch_and_then_ex
     refused = _refused_scan(root)
 
     assert refused.fix == git_line(repo, "fetch", "origin")
-    assert "lacks these prerequisite commits" in str(refused)
+    reason = run_text(["git", "bundle", "verify", str(bundle)], cwd=repo).stderr.splitlines()[0]
+    assert reason.strip() and reason.strip() in str(refused)
     assert bundle.is_file()
     _follow(root, refused.fix)
     assert f"r/{PAUSED}.bundle" in _members(_export(root))
@@ -335,28 +336,68 @@ def test_a_damaged_header_refusal_relays_gits_own_reason_and_keeps_the_bundle(ro
     assert bundle.read_bytes() == damaged
 
 
-def test_a_failed_unbundle_relays_gits_reason_and_names_the_scratch_act(
+def _space_act(root: Path) -> str:
+    return act(
+        "agent",
+        f"free space and write permission under {root / '.dadaia/tmp'}, then rerun the export",
+    )
+
+
+def _stubbed(monkeypatch: pytest.MonkeyPatch, verb: tuple[str, ...], text: str) -> None:
+    """Make the git call that starts with *verb* fail with git's *text*; every other call is real."""
+    real = GitSubprocessClient.git
+
+    def failing(self: GitSubprocessClient, path: Path, *args: str, **kw: object) -> str:
+        if args[: len(verb)] == verb:
+            raise GitSyncError(f"git {args[0]} failed in {path}:\n{text}")
+        return real(self, path, *args, **kw)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(GitSubprocessClient, "git", failing)
+
+
+def test_an_open_lanes_failed_unbundle_relays_gits_reason_and_names_the_scratch_act(
+    root: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    commit(open_tree(root, LANE), "specs/notes.md")
+    _stubbed(monkeypatch, ("bundle", "unbundle"), "fatal: write error: disk full")
+
+    with pytest.raises(DadaiaError) as refused:
+        _export(root)
+
+    assert "write error: disk full" in str(refused.value)
+    assert refused.value.fix == _space_act(root)
+
+
+def test_a_failed_scratch_init_names_the_scratch_act(
     root: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     bundle = _paused(root)
     kept = bundle.read_bytes()
-    real = GitSubprocessClient.git
+    _stubbed(monkeypatch, ("init",), "fatal: cannot mkdir: no space left on device")
 
-    def full_disk(self: GitSubprocessClient, path: Path, *args: str, **kw: object) -> str:
-        if args[:2] == ("bundle", "unbundle"):
-            raise GitSyncError(f"git bundle failed in {path}:\nfatal: write error: disk full")
-        return real(self, path, *args, **kw)  # type: ignore[arg-type]
-
-    monkeypatch.setattr(GitSubprocessClient, "git", full_disk)
-
-    with pytest.raises(DadaiaError) as caught:
+    with pytest.raises(DadaiaError) as refused:
         _export(root)
-    refused = caught.value
-    assert not (root / ".dadaia/dist" / ARCHIVE).exists()
 
-    assert "write error: disk full" in str(refused)
-    assert refused.fix == act(
-        "agent",
-        f"free space and write permission under {root / '.dadaia/tmp'}, then rerun the export",
-    )
+    assert "no space left on device" in str(refused.value)
+    assert refused.value.fix == _space_act(root)
     assert bundle.read_bytes() == kept
+
+
+def test_a_pause_bundle_with_a_truncated_pack_is_the_operators_ruling_with_gits_reason(
+    root: Path,
+) -> None:
+    bundle = _paused(root)
+    bundle.write_bytes(cut := bundle.read_bytes()[:-30])
+    scratch = root / "unbundle-probe.git"
+    git(root, "init", "-q", "--bare", str(scratch))
+    reason = run_text(["git", "bundle", "unbundle", str(bundle)], cwd=scratch).stderr.splitlines()[
+        0
+    ]
+
+    refused = _refused_scan(root)
+
+    assert reason.strip() and reason.strip() in str(refused)
+    assert refused.fix == act(
+        "operator", f"rule whether {bundle} is restored from a copy or discarded"
+    )
+    assert bundle.read_bytes() == cut
