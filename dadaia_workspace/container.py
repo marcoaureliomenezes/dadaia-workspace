@@ -214,7 +214,7 @@ def scan_bundle(workspace_root: Path, bundle: Path, repo: Path) -> dict[str, str
             why="no origin refs",
             fix=fsck,
         )
-        git(scratch, "bundle", "unbundle", str(bundle), why="git refused it", fix=fsck)
+        git(scratch, "bundle", "unbundle", str(bundle), why="git refused it", fix=scratch_fix(tmp))
         try:
             found = GitSubprocessObjectReader().new_objects(scratch, heads.split()[0], "")
             outcome = scan_objects(found, load_denylist_terms(), load_denylist_baseline_patterns())
