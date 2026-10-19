@@ -5,6 +5,7 @@ bare origin, the real worktree scripts over a tmp workspace. Size: MEDIUM.
 
 from __future__ import annotations
 
+import os
 import shutil
 import tarfile
 from pathlib import Path
@@ -14,11 +15,14 @@ import pytest
 from dadaia_workspace import container
 from dadaia_workspace.core.cli_line import fix_line, git_line
 from dadaia_workspace.core.exceptions import DadaiaError
+from dadaia_workspace.core.models.git_scan import GitObjectReadError
 from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
 from dadaia_workspace.core.platform import act
+from dadaia_workspace.infrastructure.git_objects import GitSubprocessObjectReader
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
+from tests.fixtures.harness_env import run_bash, suite_env
 from tests.fixtures.stores import context_store
-from tests.helpers.oslib import write_text
+from tests.helpers.oslib import PERMISSIONS_ENFORCED, make_readonly, make_writable, write_text
 from tests.helpers.privacy_fixtures import aws_key_shape
 from tests.helpers.worktree_ws import (
     NEW_JOB,
@@ -184,30 +188,83 @@ def _refused_scan(root: Path) -> DadaiaError:
     return refused.value
 
 
+def _follow(root: Path, fix: str) -> None:
+    """Run the refusal's one `fix:` line as an agent would, from the workspace root."""
+    env = suite_env(
+        os.environ, Path.home(), overrides={"HOME": str(root), "GIT_CONFIG_NOSYSTEM": "1"}
+    )
+    run_bash(fix, cwd=root, env=env, check=True)
+
+
+def _paused(root: Path) -> Path:
+    commit(tree := open_tree(root, PAUSED), "specs/paused.md")
+    assert run(root, "pause", str(tree)).returncode == 0
+    return root / ".dadaia/dist/r" / f"{PAUSED}.bundle"
+
+
 @pytest.mark.timeout(15)
 @pytest.mark.parametrize(
     "header",
     [b"# v2 git bundle\n", b"# v2 git bundle\n-\n\n", b"# v2 git bundle\n-\xff\xfe x\n\n"],
     ids=["truncated", "bare-prerequisite", "non-utf8-prerequisite"],
 )
-def test_a_damaged_pause_bundle_refuses_with_the_fsck_line(root: Path, header: bytes) -> None:
-    commit(tree := open_tree(root, PAUSED), "specs/paused.md")
-    assert run(root, "pause", str(tree)).returncode == 0
-    (root / ".dadaia/dist/r" / f"{PAUSED}.bundle").write_bytes(header)
-
-    assert _refused_scan(root).fix == git_line(root / "repos/r", "fsck")
-
-
-def test_a_pause_bundle_missing_its_prerequisites_refuses_and_keeps_the_bundle(
-    root: Path,
+def test_a_damaged_pause_bundle_is_the_operators_ruling_and_is_kept(
+    root: Path, header: bytes
 ) -> None:
-    commit(tree := open_tree(root, PAUSED), "specs/paused.md")
-    assert run(root, "pause", str(tree)).returncode == 0
+    (bundle := _paused(root)).write_bytes(header)
+
+    refused = _refused_scan(root)
+
+    assert refused.fix == act(
+        "operator", f"rule whether {bundle} is restored from a copy or discarded"
+    )
+    assert bundle.read_bytes() == header
+
+
+def test_a_pause_bundle_missing_its_prerequisites_refuses_with_fetch_and_then_exports(
+    root: Path, tmp_path: Path
+) -> None:
+    bundle = _paused(root)
     shutil.rmtree(root / "repos/r")
     git(root / "repos", "init", "-q", "r")
+    git(repo := root / "repos/r", "remote", "add", "origin", str(tmp_path / "origin.git"))
 
-    assert _refused_scan(root).fix == git_line(root / "repos/r", "fsck")
-    assert (root / ".dadaia/dist/r" / f"{PAUSED}.bundle").is_file()
+    refused = _refused_scan(root)
+
+    assert refused.fix == git_line(repo, "fetch", "origin")
+    assert bundle.is_file()
+    _follow(root, refused.fix)
+    assert f"r/{PAUSED}.bundle" in _members(_export(root))
+
+
+@pytest.mark.skipif(not PERMISSIONS_ENFORCED, reason="permissions do not bind this process")
+def test_an_unreadable_pause_bundle_names_the_file_and_exports_once_readable(root: Path) -> None:
+    bundle = _paused(root)
+    make_readonly(bundle, locked=True)
+    try:
+        refused = _refused_scan(root)
+    finally:
+        make_writable(bundle)
+
+    assert refused.fix == act("agent", f"make {bundle} readable, then run the export again")
+    assert f"r/{PAUSED}.bundle" in _members(_export(root))
+
+
+def test_a_git_object_read_failure_refuses_with_fsck_and_then_exports(
+    root: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    commit(open_tree(root, LANE), "specs/notes.md")
+
+    def broken(*_args: object, **_kwargs: object) -> object:
+        raise GitObjectReadError("listing the range failed")
+
+    monkeypatch.setattr(GitSubprocessObjectReader, "new_objects", broken)
+    refused = _refused_scan(root)
+
+    assert refused.fix == git_line(root / "repos/r", "fsck")
+    monkeypatch.undo()
+    _follow(root, refused.fix)
+    assert f"r/{LANE}.bundle" in _members(_export(root))
 
 
 def test_git_that_cannot_run_refuses_with_the_push_gates_fix(
