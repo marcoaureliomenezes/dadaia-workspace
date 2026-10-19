@@ -9,9 +9,11 @@ Owner: dd-sw-engineer-sr
 
 from __future__ import annotations
 
+import json
 import os
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -21,12 +23,14 @@ from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.platform import PLATFORM
 from tests.fixtures.fix_world import World, _single_fix
 from tests.fixtures.stores import fake_venv, own_venv_python
-from tests.helpers.oslib import make_executable, run, write_text
+from tests.fixtures.harness_env import run_bash
+from tests.helpers.oslib import make_executable, read_text, run, write_text
 
 pytestmark = pytest.mark.medium
 
 _SCRIPT = Path(dadaia_workspace.__file__).parent / "public" / "scripts" / "reference-transaction.sh"
 _SOURCE = Path(dadaia_workspace.__file__).parent.parent
+_BUGS = Path(dadaia_workspace.__file__).parent / "public/skills/dd-bug-resolution/scripts/bugs.py"
 _WORK = "feature/0.5.0"
 _REAL = f"""#!python
 import runpy, sys
@@ -417,6 +421,52 @@ def test_the_rewrite_verb_removes_a_listed_term_and_clears_the_gate(
         timeout=60,
     )
     assert gate.returncode == 0, gate.stderr
+
+
+def test_the_rewrite_leaves_every_cited_commit_reachable_once_its_printed_fix_runs(
+    repo: _Repo, tmp_path: Path
+) -> None:
+    oldest, env = _leak(repo, tmp_path)
+    schema = json.loads(
+        read_text(
+            Path(dadaia_workspace.__file__).parent
+            / "public/skills/dd-bug-resolution/scripts/schemas/bug-record-v1.schema.json"
+        )
+    )
+    record = {key: None for key in schema["required"]} | {
+        "id": "a-bug", "ts": "2026-09-20T10:00:00Z", "reported_by": "x", "title": "t",
+        "severity": "LOW", "surface": "cli", "component": "leak.txt", "context": "c",
+        "symptom": "s", "repro": "r", "expected": "e", "status": "resolved",
+        "cause": "c", "caused_by": "none", "solution": "s", "fix_sha": oldest,
+        "closed_at": "2026-09-20T11:00:00Z",
+    }  # fmt: skip
+    (repo.root / "specs" / "bugs").mkdir(parents=True)
+    write_text(repo.root / "specs" / "bugs" / "BUGS.jsonl", json.dumps(record) + "\n")
+    repo.ok("add", "specs")
+    assert repo.git("commit", "-q", "-m", "resolve", wt=True).returncode == 0
+    write_text(repo.root / "leak.txt", "a\n")
+    done = _verb(repo, oldest, env=env)
+    assert done.returncode == 0, done.stderr
+    fixed = run_bash(_single_fix(done), cwd=repo.root, check=False)
+    assert fixed.returncode == 0, fixed.stderr
+    assert repo.git("merge-base", "--is-ancestor", oldest, "HEAD").returncode == 1
+    cited = json.loads(read_text(repo.root / "specs" / "bugs" / "BUGS.jsonl"))["fix_sha"]
+    assert repo.git("merge-base", "--is-ancestor", cited, "HEAD").returncode == 0
+    checked = run(
+        [sys.executable, str(_BUGS), "check", "--specs", str(repo.root / "specs")], check=False
+    )
+    assert checked.returncode == 0, checked.stdout + checked.stderr
+
+
+def test_the_rewrite_verb_commit_subject_states_the_range_it_folds(
+    repo: _Repo, tmp_path: Path
+) -> None:
+    oldest, env = _leak(repo, tmp_path)
+    write_text(repo.root / "leak.txt", "a\n")
+    assert _verb(repo, oldest, env=env).returncode == 0
+    assert repo.ok("log", "-1", "--format=%s", _WORK) == (
+        f"chore: rewrite unpublished range {oldest[:9]}..{oldest[:9]}"
+    )
 
 
 def test_the_rewrite_verb_takes_a_new_message_when_the_term_sits_in_the_message(
