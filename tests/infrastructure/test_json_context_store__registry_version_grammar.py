@@ -20,6 +20,8 @@ from typer.testing import CliRunner
 from dadaia_workspace.cli.main import app
 from dadaia_workspace.core import context_registry
 from dadaia_workspace.core.cli_line import fix_line
+from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
+from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
 from tests.fixtures.harness_env import claude_hook_env, run_hook_subprocess, suite_env
 from tests.fixtures.stores import fake_venv
 from tests.helpers.oslib import command, read_text, run_line, venv_dir, venv_tool, write_text
@@ -201,3 +203,36 @@ def test_a_registry_row_missing_a_key_is_reg_schema(ws: Path) -> None:
     sections = json.loads(doctor.stdout)["sections"].values()
     (fix,) = [f["fix"] for s in sections for f in s["findings"] if f["code"] == "REG-SCHEMA"]
     assert fix.startswith("Operator action: ")
+
+
+def _ctx(name: str) -> SpecContextProject:
+    return SpecContextProject(
+        name=name, state=ContextState.DEAD, repo_slug=name, repo_url="u", created_at="t"
+    )
+
+
+def test_every_write_stamps_the_one_schema_version_and_restore_puts_back_the_bytes(
+    tmp_path: Path,
+) -> None:
+    """``replace_raw``, ``save`` and ``update`` write ``"3"`` over any older stamp; an empty
+    registry spells it the same; ``restore`` returns a snapshot byte for byte."""
+    store = JsonContextStore(tmp_path)
+    store.seed_if_absent()
+    assert store.read_raw() == {"schema_version": "3", "contexts": []}
+
+    path = tmp_path / "spec_contexts.json"
+    stale = json.dumps({"schema_version": "2", "contexts": []})
+    write_text(path, stale)
+    snapshot = store.snapshot()
+
+    store.save(_ctx("a"))
+    assert store.read_raw()["schema_version"] == "3"
+    row = {"name": "a", "state": "dead", "repo_slug": "a", "repo_url": "u", "created_at": "t"}
+    write_text(path, json.dumps({"schema_version": "2", "contexts": [row]}))
+    store.update(_ctx("a"))
+    assert store.read_raw()["schema_version"] == "3"
+    store.replace_raw({"contexts": []})
+    assert store.read_raw() == {"schema_version": "3", "contexts": []}
+
+    store.restore(snapshot)
+    assert path.read_text() == stale

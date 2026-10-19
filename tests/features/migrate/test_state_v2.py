@@ -128,6 +128,7 @@ def test_execute_migration_transforms_contexts(tmp_path: Path) -> None:
     execute_migration(store, ws)
 
     rows = {context.name: context for context in store.list_all()}
+    assert store.read_raw()["schema_version"] == "3"
 
     ctx_a = rows["ctx-a"]
     assert ctx_a.state.value == "alive"
