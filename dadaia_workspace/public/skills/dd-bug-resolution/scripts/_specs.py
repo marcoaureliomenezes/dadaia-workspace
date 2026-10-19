@@ -5,14 +5,16 @@ script prints through."""
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
 
+from _git import scrubbed_env
 from _jsonl import reinstall_fix
 from _ledger import parse as parse
 from _platform import act, cli_argv, cli_path, command, inline, run, venv_dir
-from _refusal import Refusal, report
+from _refusal import Refusal, fix_of, report
 from _root import workspace_of as workspace_of
 
 CATALOG = "memory/product/catalog.json"
@@ -53,6 +55,16 @@ def run_cli(
         return run([str(workspace_cli(root)), *args], cwd=cwd or root, env=env, stdin=stdin)
     except OSError as error:
         raise Refusal(f"the workspace CLI cannot start: {error}", reinstall_fix(root)) from error
+
+
+def check_release(specs: Path) -> None:
+    """Runs `release.py check` on *specs*; raises `Refusal` (first finding or exit status, one fix) on a non-zero exit."""
+    script = Path(__file__).resolve().parents[2] / "dd-release-implementation/scripts/release.py"
+    done = run([sys.executable, str(script), "check", "--specs", str(specs)], env=scrubbed_env())
+    out = done.stdout + done.stderr
+    if done.returncode:
+        bad = re.search(r"^(?:\S+ error |\[error\] )(.*)$", out, re.M)
+        raise Refusal(bad[1] if bad else f"release.py check exited {done.returncode}", fix_of(out, act("agent", f"fix the findings of release.py check on {specs}")))  # fmt: skip
 
 
 def _bound_fix(here: Path, rerun: Script, ledger: str | None) -> tuple[str, str]:

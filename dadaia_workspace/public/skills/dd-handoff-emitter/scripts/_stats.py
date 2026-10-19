@@ -13,8 +13,7 @@ from typing import Any
 from _git import git, main_checkout, scrubbed_env
 from _handoffs import reviewer_records
 from _platform import run
-from _refusal import check_refusal
-from _specs import run_cli
+from _specs import check_release, run_cli
 
 _FREE = ("docs(memory)", "chore(release)", "chore(backlog)", "chore(bugs)", "docs(adr)", "chore(adrs)")  # fmt: skip
 NA = "n/a"
@@ -89,8 +88,7 @@ def _after_closure(repo: Path, sha: str | None, tip: str) -> str:
 def table(root: Path, specs: Path, rc: str) -> str:
     """The tab-separated metric table of candidate *rc* (`<M.m.p>-rc<N>`); absent data reads `n/a`; a release state `release.py check` refuses raises its Refusal."""
     repo = specs.parent
-    if bad := check_refusal(_script("dd-release-implementation", "release.py", "check", "--specs", str(specs), ok=(0, 1)) or ""):  # fmt: skip
-        raise bad
+    check_release(specs)
     state = json.loads(p.read_text("utf-8")) if (p := specs / "releases" / rc.partition("-rc")[0] / "_RELEASE.json").is_file() else {}  # fmt: skip
     window = _window(state, rc)
     seen: list[str] = []

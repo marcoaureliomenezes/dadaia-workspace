@@ -5,15 +5,13 @@ from __future__ import annotations
 
 import json
 import shutil
-import sys
 from pathlib import Path
 
 from _bugs_check import OPEN
 from _grammar import STATE
-from _platform import act, command, is_link, run
-from _refusal import check_refusal
-from _specs import parse
-from _worktree_git import flow_for, git, not_a_name, scrubbed_env, work_version, work_versions
+from _platform import act, command, git_line, is_link
+from _specs import check_release, parse
+from _worktree_git import flow_for, git, not_a_name, work_version, work_versions
 from _worktree_names import (
     LAUNCH,
     LEVEL_FILE,
@@ -54,9 +52,13 @@ def _refuse_unready(root: Path, main: Path, version: str, rc: str) -> None:
     rc_name = f"{version}/{rc}/wt-rc"
     rc_tree = tree_path(root, main.name, rc_name)
     state = rc_tree / "specs/releases" / version / STATE
-    if state.is_file() and (bad := check_refusal((d := run([sys.executable, str(Path(__file__).resolve().parents[2] / "dd-release-implementation/scripts/release.py"), "check", "--specs", str(rc_tree / "specs")], env=scrubbed_env())).stdout + d.stderr)):  # fmt: skip
-        raise bad
-    if (json.loads(state.read_text("utf-8")).get("phase") if state.is_file() else None) != "IMPLEMENTATION":  # fmt: skip
+    if not rc_tree.exists():  # removed by hand while its branch lives
+        raise Refusal(f"{rc_tree} does not exist", git_line(main, "worktree", "add", "-f", "-f", str(rc_tree), branch(rc_name)))  # fmt: skip
+    phase = None
+    if state.is_file():
+        check_release(rc_tree / "specs")
+        phase = json.loads(state.read_text("utf-8")).get("phase")
+    if phase != "IMPLEMENTATION":
         raise Refusal(f"a job needs release {version} in phase IMPLEMENTATION on {branch(rc_name)}",
                       act("agent", f"reach phase IMPLEMENTATION in {STATE} on {branch(rc_name)} at {rc_tree} (release.py phase), then open its job again"))  # fmt: skip
 
