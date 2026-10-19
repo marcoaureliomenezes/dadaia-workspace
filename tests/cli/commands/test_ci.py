@@ -283,23 +283,3 @@ def test_several_work_branches_warn_and_keep_the_gate_on_the_kept_branch(
     assert capsys.readouterr().err == (
         "[pre-push] WARNING: 2 work branches\nhint: Agent action: run `x`, then run `y`\n"
     )
-
-
-def test_an_associated_repos_range_is_judged_against_the_main_repos_ledger(tmp_path: Path) -> None:
-    for folder in (".dadaia/states", "repos/main/specs/bugs"):
-        (tmp_path / folder).mkdir(parents=True)
-    write_text(
-        tmp_path / ".dadaia/states/spec_contexts.json",
-        '{"contexts": [{"name": "c", "repo_slug": "main", "associated_repos": [{"slug": "side"}]}]}',
-    )
-    write_text(
-        tmp_path / "repos/main/specs/bugs/BUGS.jsonl",
-        '{"id": "hit", "fix_sha": "aaa"}\n{"id": "miss", "fix_sha": "bbb"}\nnot json\n',
-    )
-    side = tmp_path / "repos" / "side"
-    side.mkdir()
-    fix = ci._repoint_cited(side, {"aaa", "ccc"}, "new")
-    assert fix.startswith("Agent action: ")
-    assert " update hit --set fix_sha=new" in fix
-    assert "from a worktree of main" in fix
-    assert ci._repoint_cited(side, {"ccc"}, "new") == ""

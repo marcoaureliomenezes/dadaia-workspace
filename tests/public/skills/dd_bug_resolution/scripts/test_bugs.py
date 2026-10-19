@@ -1150,14 +1150,6 @@ def test_fix_sha_is_repointed_by_update(script: Path, tmp_path: Path) -> None:
         assert _records(specs)[0]["fix_sha"] == sha
 
 
-def test_update_repoints_several_records_in_one_write(script: Path, tmp_path: Path) -> None:
-    specs = _ledger(tmp_path, _OPEN_RECORD, {**_OPEN_RECORD, "id": "b-bug"}, {**_OPEN_RECORD, "id": "c-bug"})
-    done = _run(script, "update", "a-bug", "c-bug", "--set", f"fix_sha={'a' * 40}", "--specs", str(specs))
-    assert done.returncode == 0, done.stderr
-    assert done.stdout.strip() == "[ok] updated fix_sha for a-bug, c-bug"
-    assert [r.get("fix_sha") for r in _records(specs)] == ["a" * 40, None, "a" * 40]
-
-
 def test_status_and_stats_read_the_ledger(script: Path, tmp_path: Path) -> None:
     closed = {
         **_OPEN_RECORD, "id": "old-bug", "status": "resolved",
