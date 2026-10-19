@@ -123,6 +123,14 @@ def _members(
     return bundles
 
 
+def _free(dist: Path, bundles: list[tarfile.TarInfo]) -> None:
+    """Refuses the first bundle that already sits in *dist*: a file there can be the only copy."""
+    if taken := next((dist / m.name for m in bundles if (dist / m.name).exists()), None):
+        raise _refuse(
+            f"{taken} already exists.", act("agent", f"move {taken} out of {dist}, then run again")
+        )
+
+
 def _text(path: Path) -> str:
     """The artifact's JSON text; a hard artifact's members are all checked first."""
     if not path.is_file():
@@ -156,11 +164,12 @@ class ExportService:
         self._workspace_root = workspace_root
 
     @staticmethod
-    def read(path: Path) -> Artifact:
+    def read(path: Path, into: Path | None = None) -> Artifact:
         """The artifact at *path*, soft or hard, checked and written nowhere. Raises
         `SchemaVersionError` (one fix line) on a missing or unreadable file, anything
         `export-v1.schema.json` refuses, an unknown harness, or a member that is unsafe,
-        repeated, oversized or owned by no context. A null url reads as `""`."""
+        repeated, oversized or owned by no context, or (with *into*, a workspace root) a bundle
+        already in its `dist`. A null url reads as `""`."""
         try:
             payload = json.loads(_text(path))
         except json.JSONDecodeError as exc:
@@ -193,7 +202,9 @@ class ExportService:
         artifact = Artifact(harnesses, contexts, alive)
         if tarfile.is_tarfile(path):
             with tarfile.open(path) as tar:
-                _members(tar, path.name, artifact.slugs())
+                bundles = _members(tar, path.name, artifact.slugs())
+            if into:
+                _free(into / ".dadaia" / "dist", bundles)
         return artifact
 
     def restore(self, path: Path, artifact: Artifact) -> None:
@@ -207,11 +218,7 @@ class ExportService:
         try:
             with tarfile.open(path) as tar:
                 bundles = _members(tar, path.name, artifact.slugs())
-                if taken := next((m.name for m in bundles if (dist / m.name).exists()), None):
-                    raise _refuse(
-                        f"{dist / taken} already exists.",
-                        act("agent", f"move {dist / taken} out of {dist}, then run again"),
-                    )
+                _free(dist, bundles)
                 dist.mkdir(parents=True, exist_ok=True)
                 tar.extractall(dist, bundles, filter="data")
         except (tarfile.TarError, OSError) as exc:

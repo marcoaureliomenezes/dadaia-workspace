@@ -166,7 +166,8 @@ def init(
             plan = replace(plan, harness=harness_registry.parse_harness_name(plan.harness))
     except ValueError as exc:  # a bad option value is Click's usage error (exit 2)
         raise typer.BadParameter(str(exc), param_hint="'--harness'") from None
-    artifact = _read(plan.from_) if plan.from_ else None
+    root = _root(plan.directory)
+    artifact = _read(plan.from_, root) if plan.from_ else None
     chosen = (plan.harness,) if plan.harness else artifact.harnesses if artifact else ()
     if not chosen:
         fail(
@@ -174,14 +175,9 @@ def init(
             replace(plan, harness=harness_registry.L1_ENTRY_HARNESSES[0]).command(),
         )
 
-    root = _root(plan.directory)
     sibling_fix = plan.command(root.parent / ((root.name or "dadaia") + "-workspace"))
     if root.exists() and not root.is_dir():
         fail(f"'{root}' is not a directory.", sibling_fix)
-    if plan.from_ and (root / ".dadaia").is_dir():
-        fail(
-            f"'{root}' is already a dadaia workspace; --from restores into a new one.", sibling_fix
-        )
     # A directory that already holds `.dadaia/` is THIS workspace (a re-run, idempotent);
     # anything else non-empty is a foreign tree and is never scaffolded over.
     if root.is_dir() and any(root.iterdir()) and not (root / ".dadaia").is_dir():
@@ -222,10 +218,10 @@ def init(
         print_next_step(root, _create_context(root, plan) if plan.repo else None)
 
 
-def _read(source: str) -> Artifact:
-    """The artifact at *source*, read before any write; a refusal ends the run."""
+def _read(source: str, root: Path) -> Artifact:
+    """The artifact at *source*, read before any write into *root*; a refusal ends the run."""
     try:
-        return ExportService.read(Path(source).expanduser())
+        return ExportService.read(Path(source).expanduser(), root)
     except DadaiaError as exc:
         fail(exc)
 
