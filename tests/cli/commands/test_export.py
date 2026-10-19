@@ -3,13 +3,13 @@ CLI receives `--workspace` explicitly so the resolver never walks up from cwd.
 """
 
 import json
+import tarfile
 from pathlib import Path
 
 import pytest
 from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app
-from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES
 from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
 from dadaia_workspace.features.workspace.service import WorkspaceService
@@ -42,35 +42,47 @@ def _ctx(name: str, state: ContextState) -> SpecContextProject:
     )
 
 
-def test_export_then_import_restores_unknown_contexts_dead_and_skips_known(
-    tmp_path: Path,
-) -> None:
+def test_export_writes_the_artifact_and_leaves_the_registry_alone(tmp_path: Path) -> None:
     source = _workspace(tmp_path / "source")
     source.save(_ctx("alpha", ContextState.ALIVE))
     source.save(_ctx("beta", ContextState.DEAD))
+    registry = tmp_path / "source" / ".dadaia" / "states" / "spec_contexts.json"
+    before = registry.read_bytes()
 
     exported = _runner.invoke(app, ["export", "--workspace", str(tmp_path / "source")])
+
     assert exported.exit_code == 0, exported.output
     dist = tmp_path / "source" / ".dadaia" / "dist"
     assert sorted(p.name for p in dist.iterdir()) == ["spec-contexts.json"]
     file = dist / "spec-contexts.json"
     assert str(file) in exported.output
     payload = json.loads(read_text(file))
-    assert [c["name"] for c in payload["contexts"]] == ["alpha", "beta"]
+    assert payload["schema_version"] == "export-v1"
+    assert [(c["name"], c["state"]) for c in payload["contexts"]] == [
+        ("alpha", "alive"),
+        ("beta", "dead"),
+    ]
+    assert registry.read_bytes() == before
 
-    target = _workspace(tmp_path / "target")
-    target.save(_ctx("alpha", ContextState.ALIVE))
 
-    imported = _runner.invoke(app, ["import", str(file), "--workspace", str(tmp_path / "target")])
-    assert imported.exit_code == 0, imported.output
-    assert "skipped (exists)" in imported.output and "alpha" in imported.output
-    assert fix_line(tmp_path / "target", "context", "alive", "beta") in imported.output
+def test_export_hard_writes_one_archive(tmp_path: Path) -> None:
+    source = _workspace(tmp_path / "source")
+    source.save(_ctx("alpha", ContextState.DEAD))
 
-    beta = target.get("beta")
-    assert beta is not None
-    assert (beta.state, beta.repo_url) == (ContextState.DEAD, "https://example.com/beta.git")
-    assert beta.dead_since is not None
-    assert target.get("alpha") == _ctx("alpha", ContextState.ALIVE)
+    exported = _runner.invoke(app, ["export", "--hard", "--workspace", str(tmp_path / "source")])
+
+    assert exported.exit_code == 0, exported.output
+    archive = tmp_path / "source" / ".dadaia" / "dist" / "workspace-export.tar.gz"
+    assert str(archive) in exported.output
+    with tarfile.open(archive) as tar:
+        assert tar.getnames() == ["spec-contexts.json"]
+
+
+def test_export_help_does_not_name_import() -> None:
+    helped = _runner.invoke(app, ["export", "--help"])
+
+    assert helped.exit_code == 0, helped.output
+    assert "import" not in helped.output.lower()
 
 
 def test_import_refuses_a_file_outside_the_contract(tmp_path: Path) -> None:
