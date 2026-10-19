@@ -389,7 +389,9 @@ def test_a_pause_bundle_with_a_truncated_pack_is_the_operators_ruling_with_gits_
     bundle = _paused(root)
     bundle.write_bytes(cut := bundle.read_bytes()[:-30])
     scratch = root / "unbundle-probe.git"
-    git(root, "init", "-q", "--bare", str(scratch))
+    git(
+        root, "clone", "-q", "--bare", str(root / "repos/r"), str(scratch)
+    )  # holds the prerequisites
     reason = run_text(["git", "bundle", "unbundle", str(bundle)], cwd=scratch).stderr.splitlines()[
         0
     ]
