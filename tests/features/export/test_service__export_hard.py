@@ -5,6 +5,7 @@ bare origin, the real worktree scripts over a tmp workspace. Size: MEDIUM.
 
 from __future__ import annotations
 
+import shutil
 import tarfile
 from pathlib import Path
 
@@ -153,4 +154,18 @@ def test_a_dirty_tree_with_no_commit_ahead_refuses_with_pauses_fix(root: Path) -
         _export(root)
 
     assert refused.value.fix == pause_fix.removeprefix("fix: ")
+    assert not (root / ".dadaia/dist" / ARCHIVE).exists()
+
+
+def test_a_pause_bundle_is_never_dropped_when_its_repo_is_off_disk(
+    root: Path, tmp_path: Path
+) -> None:
+    commit(tree := open_tree(root, PAUSED), "specs/paused.md")
+    assert run(root, "pause", str(tree)).returncode == 0
+    shutil.move(root / "repos/r", tmp_path / "away")
+
+    with pytest.raises(DadaiaError) as refused:
+        _export(root)
+
+    assert PAUSED in str(refused.value) and refused.value.fix
     assert not (root / ".dadaia/dist" / ARCHIVE).exists()
