@@ -20,7 +20,7 @@ from dadaia_workspace.core.models.spec_context import (
 from dadaia_workspace.core.platform import act
 from dadaia_workspace.core.workspace_layout import occupied
 
-_VERSION = 3
+SCHEMA_VERSION = 3
 
 # The keys every row carries: :func:`_from_dict` builds the model from them.
 ROW_KEYS = ("name", "state", "repo_slug", "repo_url", "created_at")
@@ -34,11 +34,11 @@ def parse_schema_version(data: dict, path: Path) -> int:  # type: ignore[type-ar
 
     A non-numeric or newer stamp raises."""
     raw = data.get("schema_version", data.get("version"))
-    text = str(_VERSION if raw is None else raw)
+    text = str(SCHEMA_VERSION if raw is None else raw)
     if isinstance(raw, bool) or not text.isdigit():
         problem = f"spec_contexts.json schema_version {raw!r} is not a number."
-        raise SchemaVersionError(problem, act("operator", f"set it to {_VERSION} in {path}"))
-    if int(text) > _VERSION:
+        raise SchemaVersionError(problem, act("operator", f"set it to {SCHEMA_VERSION} in {path}"))
+    if int(text) > SCHEMA_VERSION:
         problem = f"spec_contexts.json schema_version {text} is newer than this dadaia."
         raise SchemaVersionError(problem, act("agent", f"upgrade dadaia-workspace to read {path}"))
     legacy = any(c.get("state") in LEGACY_STATES for c in data.get("contexts", []))
@@ -103,7 +103,7 @@ class JsonContextStore:
         return cast("dict[str, Any]", json.loads(platform.read_text(self._path)))
 
     def replace_raw(self, data: dict) -> None:  # type: ignore[type-arg]
-        body = {"schema_version": str(_VERSION)} | {
+        body = {"schema_version": str(SCHEMA_VERSION)} | {
             k: v for k, v in data.items() if k != "schema_version"
         }
         atomic_write(self._path, json.dumps(body, indent=2))

@@ -1,4 +1,4 @@
-"""State-file migration: spec_contexts.json v1 → v2."""
+"""State-file migration: spec_contexts.json v1 rows to the current schema."""
 
 from __future__ import annotations
 
@@ -63,7 +63,7 @@ def plan_migration(store: JsonContextStore) -> MigrationPlan:
 
 
 def execute_migration(store: JsonContextStore, workspace_root: Path) -> None:
-    """Migrate the registry and its retired primary marker to schema v2."""
+    """Migrate the registry and its retired primary marker to the current schema."""
     states_dir = store.states_dir
     primary_file = states_dir / "primary_context.json"
     raw = store.read_raw() if store.exists() else None

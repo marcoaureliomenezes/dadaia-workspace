@@ -22,6 +22,7 @@ from dadaia_workspace.features.migrate.state_v2 import (
     execute_migration,
     plan_migration,
 )
+from dadaia_workspace.infrastructure.json_context_store import SCHEMA_VERSION
 
 app = typer.Typer(
     help="Migration helpers for dadaia workspace and spec trees.",
@@ -31,7 +32,9 @@ app = typer.Typer(
 
 def _print_plan(plan: MigrationPlan) -> None:
     """Print a human-readable diff-like summary of what the migration will do."""
-    typer.echo(f"[migrate] spec_contexts.json schema_version: {plan.schema_version_before!r} → '2'")
+    typer.echo(
+        f"[migrate] spec_contexts.json schema_version: {plan.schema_version_before!r} → '{SCHEMA_VERSION}'"
+    )
     typer.echo("")
     if plan.contexts_to_migrate:
         typer.echo("Context changes:")
@@ -102,4 +105,6 @@ def migrate_state(
     # Execute
     execute_migration(store, workspace_root)
 
-    typer.echo("[ok] Migration complete. spec_contexts.json is now at schema_version 2.")
+    typer.echo(
+        f"[ok] Migration complete. spec_contexts.json is now at schema_version {SCHEMA_VERSION}."
+    )
