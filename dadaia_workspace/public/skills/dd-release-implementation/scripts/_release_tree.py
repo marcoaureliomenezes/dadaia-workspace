@@ -126,8 +126,8 @@ def _window_findings(
         return [_findings.info(CODE, rel, head, message)]
     return [_findings.finding(CODE, rel, head, message,
             act("agent", f"open {spec} with `{BUG_WINDOW}` as its first `## ` heading, "
-            "reviewing the prior candidate's table and each resolved record's persisted "
-            "`fix_sha` with `git show` as `dd-bug-resolution/LINEAGE.md` defines"))]  # fmt: skip
+            "reviewing the prior candidate's table and each resolved record's fix, found by its "
+            "`fix(bugs)` or `refactor(bugs)` line, as `dd-bug-resolution/LINEAGE.md` defines"))]  # fmt: skip
 
 
 def _origin_row(

@@ -23,7 +23,7 @@ compatibility: Standalone Agent Skill; the full lifecycle lives in a dadaia-work
 ## 2. The method — seven phases, each gated
 
 **Phase 0 — Lineage.** Read the bug ledger for prior fixes to the same
-recorded fix files or `component` in the bounded window ([`LINEAGE.md`](LINEAGE.md)); inspect every prior fix by its `fix(bugs): <id>` line (`fix_sha` is a hint) with `git show`; a `caused_by` other than `none` makes this fix a REBUILD (`specs/bugs/AGENTS.md` §2);
+recorded fix files or `component` in the bounded window ([`LINEAGE.md`](LINEAGE.md)); inspect every prior fix by its `fix(bugs)` or `refactor(bugs)` id line (`git log -E --grep '^(fix|refactor)\(bugs\): .*<id>'`; the recorded sha is a hint) with `git show`; a `caused_by` other than `none` makes this fix a REBUILD (`specs/bugs/AGENTS.md` §2);
 grep every decider of the same fact and name its one owner before any fix;
 carry the link to Phase 6 (`resolve --caused-by`; `update` repairs);
 echo the `caused_by:`/`evidence:`/`prior diffs read:`/`rebuild:` block in the fix commit body; a `caused_by` other than `none` names its REBUILD unit in `rebuild:`, never `rebuild: none`.

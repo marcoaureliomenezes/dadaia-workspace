@@ -55,7 +55,7 @@ direction and maturity from the named commit and the bug-window review when need
   candidate. Two prior fixes on the touched module require a REBUILD.
 - Prefer a deletion-shaped fix. If the production diff grows, route it through the
   architecture lens.
-- Derive the bug-surface delta from `git show <fix_sha>` and report it in review evidence.
+- Derive the bug-surface delta from `git show` of the fix commit, found by its `fix(bugs)` or `refactor(bugs)` id line, and report it in review evidence.
 - Keep one home per definition and let ratchets move downward.
 - Treat an eval BLOCK as a contract failure to diagnose, not a verdict to waive.
 
