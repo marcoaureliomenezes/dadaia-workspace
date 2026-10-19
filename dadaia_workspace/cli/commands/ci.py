@@ -135,18 +135,10 @@ def _rewrite_unpublished(repo: Path, oldest: str, message: str | None) -> None:
             "the push gate lists no commit message, so the message stays",
             act("agent", "run the remedy again without the message option"),
         )
-    else:
-        folded = {sha, *git.git(repo, "rev-list", tip, f"^{sha}").split()}
-        try:
-            ids, main = _cited_ids(repo, folded)
-        except (OSError, UnicodeDecodeError) as error:
-            refusal = (
-                f"cannot read the ledger: {error}",
-                act("agent", "make the ledger a readable UTF-8 file, then run the remedy again"),
-            )
     if refusal:
         fail(*refusal)
-    kind = git.git(repo, "show", "-s", "--format=%s", sha).partition(":")[0]
+    folded = {sha, *git.git(repo, "rev-list", tip, f"^{sha}").split()}
+    ids, main = _cited_ids(repo, folded)
     git.git(repo, "reset", "--soft", sha)
     git.git(
         repo,
@@ -155,8 +147,7 @@ def _rewrite_unpublished(repo: Path, oldest: str, message: str | None) -> None:
         "--amend",
         "--allow-empty",
         "-m",
-        message
-        or f"{kind if kind.startswith('test(') else 'chore'}: rewrite unpublished range {sha[:9]}..{tip[:9]}",
+        message or f"chore: rewrite unpublished range {sha[:9]}..{tip[:9]}",
     )
     if ids:
         line = script_line(
@@ -166,28 +157,29 @@ def _rewrite_unpublished(repo: Path, oldest: str, message: str | None) -> None:
             "--set",
             f"fix_sha={git.git(repo, 'rev-parse', 'HEAD')}",
         )
+        fix = f"re-point the ledger records the fold unreached: run `{line}` from a worktree of {main}"
         typer.echo(
-            spell_fix(
-                act(
-                    "agent",
-                    f"re-point the ledger records the fold unreached: run `{line}` from a worktree of {main}, then land it through that tree's merge",
-                )
-            ),
-            err=True,
+            spell_fix(act("agent", f"{fix}, then land it through that tree's merge")), err=True
         )
 
 
 def _cited_ids(repo: Path, folded: set[str]) -> tuple[list[str], str]:
     """The ids of the live ledger records whose ``fix_sha`` is in *folded*, and the slug of
-    the main repo that holds the ledger (an associated repo's range is read there). Raises
-    ``OSError`` or ``UnicodeDecodeError`` on an unreadable ledger; the ledger path is the owner's ``LEDGER`` constant,
-    since no ledger verb lists records by sha."""
+    the main repo that holds the ledger (an associated repo's range is read there). Read
+    before the fold, so an unreadable ledger refuses while history is intact; the ledger
+    path is the owner's ``LEDGER`` constant, since no ledger verb lists records by sha."""
     workspace = resolve_workspace_root_for_cli(repo)
     owner = repo_owner(workspace, repo)
     main = owner[2] if owner else repo.name
     home = workspace / "repos" / main if owner and owner[1] != main else repo
     ledger = home / "specs" / load_owner("dd-bug-resolution", "_bugs_check").LEDGER
-    text = ledger.read_text(encoding="utf-8") if ledger.is_file() else ""
+    try:
+        text = ledger.read_text(encoding="utf-8") if ledger.is_file() else ""
+    except (OSError, UnicodeDecodeError) as error:
+        fail(
+            f"cannot read {ledger}: {error}",
+            act("agent", "make the ledger a readable UTF-8 file, then run the remedy again"),
+        )
     rows = load_owner("dd-bug-resolution", "_jsonl").walk(text)
     ids = [
         r["id"]
