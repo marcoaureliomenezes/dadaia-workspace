@@ -708,7 +708,9 @@ class SpecContextService:
                         "move " + ", ".join(str(path / rel) for rel in dirty) + " into a worktree",
                     ),
                 )
-            held = [r for r in trees if r["repo"] == slug and r["exit"]]  # the owner's exits
+            held = [
+                r for r in trees if r["repo"] == slug and r["exit"] and r.get("state") != "paused"
+            ]  # the owner's exits
             lost = [refix] if failed else [r["exit"] for r in held]
             lost += self._git.unrecoverable(path)
             if tree := sweep.linked_worktree(self._workspace_root, path):
@@ -802,6 +804,13 @@ class SpecContextService:
                 f"Context '{name}' is active.",
                 fix=fix_line(self._workspace_root, "context", "dead", name),
             )
+        for repo in ctx.all_repos():
+            dist = self._workspace_root / ".dadaia" / "dist" / repo.slug
+            if bundles := sorted(dist.glob("*.bundle")):
+                raise ContextStateError(
+                    f"Context '{name}': {bundles[0]} is a paused lane; delete would orphan it.",
+                    fix=act("agent", f"resume the lane or move {bundles[0]} out of {dist}"),
+                )
         self._store.delete(name)
         # A session record pointing at a deleted context degrades to unbound via the
         # resolver's own existence check (core.invocation._context_registered); there is
