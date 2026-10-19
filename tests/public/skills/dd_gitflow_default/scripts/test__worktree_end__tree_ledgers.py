@@ -60,13 +60,17 @@ def test_a_tree_ledger_the_trees_own_scripts_refuse_does_not_merge(tmp_path: Pat
     assert tree.exists()
 
 
-def test_two_tracked_copies_of_a_ledger_script_leave_the_instances_to_decide(
-    tmp_path: Path,
-) -> None:
+def test_two_tracked_copies_of_a_ledger_script_both_run_and_judge_the_tree(tmp_path: Path) -> None:
+    log = tmp_path / "ran"
+    script = f"import sys\nwith open({str(log)!r}, 'a') as f:\n    f.write(__file__ + '\\n')\nsys.exit(0)\n"
     root, tree = _release_tree(tmp_path, 0, SKILLS, ".agents/skills")
-    refused = run(root, "merge", str(tree))
-    assert refused.returncode == 1 and "bugs.py check failed" in refused.stderr
-    assert tree.exists()
+    rel = "dd-bug-resolution/scripts/bugs.py"
+    for folder in (SKILLS, ".agents/skills"):
+        commit(tree, f"{folder}/{rel}", script)
+    approve(root, git(tree, "rev-parse", "HEAD").strip(), name=RC)
+    landed = run(root, "merge", str(tree))
+    assert landed.returncode == 0, landed.stderr
+    assert sorted(log.read_text().split()) == sorted(f"{tree}/{f}/{rel}" for f in (SKILLS, ".agents/skills"))  # fmt: skip
 
 
 def test_a_tracked_ledger_script_under_a_path_with_a_space_is_the_trees_own(tmp_path: Path) -> None:
