@@ -17,7 +17,7 @@ import pytest
 from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app
-from dadaia_workspace.core.cli_line import fix_line
+from dadaia_workspace.core.cli_line import fix_line, shell_line
 from dadaia_workspace.infrastructure.json_harness_profile_store import JsonHarnessProfileStore
 from tests.fixtures.stores import fake_venv
 from tests.helpers.oslib import read_text, write_text
@@ -193,3 +193,65 @@ def test_an_artifact_of_another_format_refuses_with_the_re_export_fix_and_writes
         result.output.splitlines()
     )
     assert not ws.exists()
+
+
+def _rec(name: str, slug: str, url: str) -> dict[str, object]:
+    return {"slug": slug, "name": name, "state": "dead", "repo_url": url, "associated_repos": []}
+
+
+def test_a_second_init_from_into_a_workspace_refuses_and_keeps_every_file_in_dist(
+    tmp_path: Path, source: tuple[dict[str, object], Path]
+) -> None:
+    payload, bundle = source
+    artifact = _hard(tmp_path, payload, bundle=bundle)
+    ws = tmp_path / "ws"
+    assert _runner.invoke(app, ["init", str(ws), "--from", str(artifact)]).exit_code == 0
+    kept = ws / ".dadaia/dist" / MEMBER
+    kept.write_bytes(b"local paused work")
+
+    result = _runner.invoke(app, ["init", str(ws), "--from", str(artifact)])
+
+    assert result.exit_code == 1, result.output
+    fresh = shell_line(
+        "uvx", "dadaia-workspace", "init", str(tmp_path / "ws-workspace"), "--from", str(artifact)
+    )
+    assert [ln for ln in result.output.splitlines() if ln.startswith("fix: ")] == [f"fix: {fresh}"]
+    assert kept.read_bytes() == b"local paused work"
+
+
+def test_init_from_skips_a_known_an_invalid_and_a_conflicting_record_and_keeps_the_rest(
+    tmp_path: Path, source: tuple[dict[str, object], Path]
+) -> None:
+    payload, _ = source
+    extra = [
+        _rec("app", "app-again", "https://example.com/a.git"),
+        _rec("bad name", "bad", "https://example.com/b.git"),
+        _rec("thief", "app", "https://example.com/c.git"),
+    ]
+    artifact = _soft(tmp_path, {**payload, "contexts": [*payload["contexts"], *extra]})  # type: ignore[misc]
+    ws = tmp_path / "ws"
+
+    result = _runner.invoke(app, ["init", str(ws), "--from", str(artifact)])
+
+    assert result.exit_code == 0, result.output
+    skipped = [ln for ln in result.output.splitlines() if ln.startswith("skipped")]
+    assert [ln.split("   ")[1] for ln in skipped] == ["app", "bad name", "thief"]
+    registry = json.loads(read_text(ws / ".dadaia/states/spec_contexts.json"))["contexts"]
+    assert sorted(c["name"] for c in registry) == ["app", "ghost"]
+
+
+def test_init_from_prints_no_control_character_an_artifact_carries(
+    tmp_path: Path, source: tuple[dict[str, object], Path]
+) -> None:
+    payload, _ = source
+    hostile = [
+        _rec("evil\x1b]0;x\x07", "evil", "https://example.com/e.git"),
+        _rec("quiet", "quiet", "https://example.invalid/\x1b[2Jq.git"),
+    ]
+    artifact = _soft(tmp_path, {**payload, "contexts": hostile})
+    ws = tmp_path / "ws"
+
+    result = _runner.invoke(app, ["init", str(ws), "--from", str(artifact)])
+
+    assert result.exit_code == 0, result.output
+    assert "\x1b" not in result.output and "\x07" not in result.output
