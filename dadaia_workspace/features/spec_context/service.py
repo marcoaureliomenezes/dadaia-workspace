@@ -261,7 +261,7 @@ class SpecContextService:
         return ctx
 
     def register(self, ctx: SpecContextProject) -> SpecContextProject:
-        """Insert an already-built record (``dadaia import``) — validated exactly as
+        """Insert an already-built record (``init --from``) — validated exactly as
         ``create`` validates, nothing materialized."""
         self._validate(ctx)
         self._store.save(ctx)

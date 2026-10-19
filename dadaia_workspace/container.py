@@ -17,7 +17,6 @@ from dadaia_workspace.features.capabilities import distribution_version
 from dadaia_workspace.features.chokepoints.denylist_scan import BaselinePatternLike
 from dadaia_workspace.features.chokepoints.push_gate import read_failure_fix
 from dadaia_workspace.features.export.service import ExportService, new_scratch, scratch_fix
-from dadaia_workspace.features.import_.service import ImportService
 from dadaia_workspace.features.migrate.state_v2 import execute_migration, plan_migration
 from dadaia_workspace.features.public.service import PublicAssetService
 from dadaia_workspace.features.reconcile import ReconcileResult
@@ -246,10 +245,6 @@ def build_export_service(workspace_root: Path) -> ExportService:
         workspace_root=workspace_root,
         scan_bundle=partial(scan_bundle, workspace_root),
     )
-
-
-def build_import_service(workspace_root: Path) -> ImportService:
-    return ImportService(build_spec_context_service(workspace_root))
 
 
 def reconcile_workspace(
