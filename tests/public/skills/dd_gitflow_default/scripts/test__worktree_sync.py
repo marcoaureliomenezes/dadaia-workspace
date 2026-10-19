@@ -8,6 +8,8 @@ Size: MEDIUM (real git, tmp workspace).
 
 from __future__ import annotations
 
+import json
+import sys
 from pathlib import Path
 
 import pytest
@@ -27,6 +29,7 @@ from tests.helpers.worktree_ws import (
     run,
 )
 
+_BUGS = Path(__file__).resolve().parents[5] / "dadaia_workspace/public/skills/dd-bug-resolution/scripts/bugs.py"
 WORK = "feature/0.5.0"
 RC, LANE = "0.5.0/rc-1/wt-rc", "0.5.0/wt-backlog-x"
 CHAIN = [RC, NEW_JOB, NEW_TASK]  # each tree is cut from the one before; the first from WORK
@@ -182,3 +185,28 @@ def test_a_missing_tree_refuses_with_a_fix_that_runs(root: Path) -> None:
     assert refused.returncode == 1 and str(gone) in refused.stderr
     [fix] = fixes(refused)
     assert run_bash(fix.removeprefix("fix: "), cwd=root).returncode == 0
+
+
+def test_sync_of_a_lane_leaves_the_bug_it_resolved_fixed_with_no_ledger_step(root: Path) -> None:
+    lane = open_tree(root, LANE)
+    (lane / "src").mkdir(exist_ok=True)
+    (lane / "specs/bugs").mkdir(parents=True)
+    write_text(lane / "src/fix.py", "fixed = 1\n")
+    git(lane, "add", "src/fix.py")
+    git(lane, "commit", "-q", "-m", "fix(bugs): a-bug \u2014 the cause")
+    sha = git(lane, "rev-parse", "HEAD").strip()
+    record = {"id": "a-bug", "ts": "2026-10-19T10:00:00Z", "reported_by": "t", "title": "t",
+              "severity": "LOW", "component": "src/fix.py", "context": "c", "symptom": "s",
+              "repro": "r", "expected": "e", "status": "resolved", "cause": "the cause",
+              "caused_by": "none", "closed_at": "2026-10-19T11:00:00Z", "solution": "s",
+              "fix_sha": sha}  # fmt: skip
+    write_text(lane / "specs/bugs/BUGS.jsonl", json.dumps(record) + "\n")
+    git(lane, "add", "specs/bugs/BUGS.jsonl")
+    git(lane, "commit", "-q", "-m", "chore(bugs): resolve a-bug \u2014 the cause")
+    check = [sys.executable, str(_BUGS), "check", "--specs", str(lane / "specs")]
+    assert os_run(check).returncode == 0
+    _move_work(root)
+    assert run(root, "sync", str(lane)).returncode == 0
+    assert git(lane, "rev-parse", "HEAD~1").strip() != sha  # the rebase rewrote the cited commit
+    done = os_run(check)
+    assert done.returncode == 0, done.stdout + done.stderr
