@@ -14,7 +14,7 @@ import pytest
 
 from dadaia_workspace import container
 from dadaia_workspace.core.cli_line import fix_line, git_line
-from dadaia_workspace.core.exceptions import DadaiaError
+from dadaia_workspace.core.exceptions import DadaiaError, GitSyncError
 from dadaia_workspace.core.models.git_scan import GitObjectReadError
 from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
 from dadaia_workspace.core.platform import act
@@ -302,3 +302,23 @@ def test_a_symlinked_pause_bundle_refuses_and_is_never_archived(root: Path, tmp_
 
     assert PAUSED in str(refused.value) and refused.value.fix
     assert not (root / ".dadaia/dist" / ARCHIVE).exists()
+
+
+@pytest.mark.skipif(not PERMISSIONS_ENFORCED, reason="permissions do not bind this process")
+def test_a_scratch_dir_that_cannot_be_created_refuses_with_the_space_act_and_then_exports(
+    root: Path,
+) -> None:
+    commit(open_tree(root, LANE), "specs/notes.md")
+    (tmp := root / ".dadaia/tmp").mkdir(parents=True, exist_ok=True)
+    make_readonly(tmp)
+    try:
+        with pytest.raises(DadaiaError) as refused:
+            _export(root)
+    finally:
+        make_writable(tmp)
+
+    assert refused.value.fix == act(
+        "agent", f"free space and write permission under {tmp}, then rerun the export"
+    )
+    assert not (root / ".dadaia/dist" / ARCHIVE).exists()
+    assert f"r/{LANE}.bundle" in _members(_export(root))
