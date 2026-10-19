@@ -83,7 +83,8 @@ def test_empty_url_refusal_ctx_url_1_doctor_flag_and_export_import_clone(
     # Repo on disk with no origin: ALIVE keeps the empty url.
     repo_path = workspace / "repos" / "baz"
     repo_path.mkdir(parents=True)
-    _git(["init"], cwd=repo_path)
+    _git(["init", "-b", "develop"], cwd=repo_path)
+    _git(["commit", "--allow-empty", "-qm", "i"], cwd=repo_path)
 
     seed_dead_context(workspace, "baz", "baz", "")
     alive = _runner.invoke(app, ["context", "alive", "baz"])
@@ -105,7 +106,7 @@ def test_empty_url_refusal_ctx_url_1_doctor_flag_and_export_import_clone(
     write_text(repo_path / "README.md", "hi\n")
     _git(["add", "-A"], cwd=repo_path)
     _git(["commit", "-m", "init"], cwd=repo_path)
-    _git(["push", "-u", "origin", "main"], cwd=repo_path)
+    _git(["push", "-u", "origin", "main", "main:develop"], cwd=repo_path)
 
     # 3. A record with NO url adopts the checkout → record repo_url == "".
     seed_dead_context(workspace, "qux", "qux", "")

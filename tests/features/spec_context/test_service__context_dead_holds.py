@@ -71,6 +71,7 @@ def _published(tmp_path: Path, repo: Path) -> Path:
     _git("add", "README.md", ".gitignore", cwd=repo)
     _git("commit", "-m", "init", cwd=repo)
     _git("push", "-u", "origin", "HEAD", cwd=repo)
+    _git("push", "origin", "HEAD:refs/heads/develop", cwd=repo)
     return bare
 
 

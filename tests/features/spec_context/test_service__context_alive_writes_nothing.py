@@ -40,6 +40,7 @@ def _seeded_remote(tmp_path: Path, name: str) -> tuple[Path, str]:
     _git(seed, "add", "README.md")
     _git(seed, "commit", "-q", "-m", "init")
     _git(seed, "push", "-q", "-u", "origin", "HEAD")
+    _git(seed, "push", "-q", "origin", "HEAD:refs/heads/develop")
     return bare, _git(seed, "rev-parse", "HEAD")
 
 

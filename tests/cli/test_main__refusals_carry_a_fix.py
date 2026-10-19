@@ -64,7 +64,7 @@ def _bare_remote(tmp: Path) -> Path:
     write_text(seed / "README.md", "x")
     _git("add", "-A", cwd=seed)
     _git("commit", "-qm", "i", cwd=seed)
-    _git("push", "-q", str(bare), "main", cwd=seed)
+    _git("push", "-q", str(bare), "main", "main:develop", cwd=seed)
     return bare
 
 

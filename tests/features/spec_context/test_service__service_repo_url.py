@@ -88,6 +88,7 @@ def test_alive_and_dead_backfill_an_empty_repo_url_from_origin(
     """Last-chance capture: an empty record URL is back-filled from the
     on-disk ``origin`` — dead() BEFORE its hold removes the checkout — over a real ``file://`` remote."""
     remote = seeded_remote(workspace_root.parent, "foo")
+    git(workspace_root.parent / "seed-foo", "push", "-q", str(remote), "HEAD:refs/heads/develop")
     repo = clone(remote, workspace_root / "repos" / "foo")
     if verb == "alive":
         register_dead(fake_service, "foo", "foo", "")

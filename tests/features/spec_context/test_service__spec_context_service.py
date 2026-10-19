@@ -81,9 +81,11 @@ def test_alive_clone_behavior_state_and_not_found(
 
     # No clone at all when the repo dir is already present before the first alive().
     (workspace_root / "repos" / "other-repo").mkdir(parents=True)
+    git(workspace_root, "init", "-q", "-b", "develop", str(workspace_root / "repos" / "other-repo"))
+    git(workspace_root / "repos" / "other-repo", "commit", "-q", "--allow-empty", "-m", "i")
     register_dead(service, "other", "other-repo", remote)
     service.alive("other")
-    assert list((workspace_root / "repos" / "other-repo").iterdir()) == []
+    assert [p.name for p in (workspace_root / "repos" / "other-repo").iterdir()] == [".git"]
 
     with pytest.raises(ContextNotFoundError):
         service.alive("ghost")
