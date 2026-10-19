@@ -23,6 +23,7 @@ from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from tests.fixtures.harness_env import run_bash, suite_env
 from tests.fixtures.stores import context_store
 from tests.helpers.oslib import PERMISSIONS_ENFORCED, make_readonly, make_writable, write_text
+from tests.helpers.oslib import run as run_text
 from tests.helpers.privacy_fixtures import aws_key_shape
 from tests.helpers.worktree_ws import (
     NEW_JOB,
@@ -232,6 +233,7 @@ def test_a_pause_bundle_missing_its_prerequisites_refuses_with_fetch_and_then_ex
     refused = _refused_scan(root)
 
     assert refused.fix == git_line(repo, "fetch", "origin")
+    assert "lacks these prerequisite commits" in str(refused)
     assert bundle.is_file()
     _follow(root, refused.fix)
     assert f"r/{PAUSED}.bundle" in _members(_export(root))
@@ -322,3 +324,33 @@ def test_a_scratch_dir_that_cannot_be_created_refuses_with_the_space_act_and_the
     )
     assert not (root / ".dadaia/dist" / ARCHIVE).exists()
     assert f"r/{LANE}.bundle" in _members(_export(root))
+
+
+def test_a_damaged_header_refusal_relays_gits_own_reason_and_keeps_the_bundle(root: Path) -> None:
+    damaged = b"# v2 git bundle\n-\n\n"
+    (bundle := _paused(root)).write_bytes(damaged)
+    reason = run_text(["git", "bundle", "list-heads", str(bundle)], cwd=root / "repos/r").stderr
+
+    assert reason.strip() and reason.strip() in str(_refused_scan(root))
+    assert bundle.read_bytes() == damaged
+
+
+def test_a_failed_unbundle_relays_gits_reason_and_is_not_the_operators_ruling(
+    root: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    bundle = _paused(root)
+    kept = bundle.read_bytes()
+    real = GitSubprocessClient.git
+
+    def full_disk(self: GitSubprocessClient, path: Path, *args: str, **kw: object) -> str:
+        if args[:2] == ("bundle", "unbundle"):
+            raise GitSyncError(f"git bundle failed in {path}:\nfatal: write error: disk full")
+        return real(self, path, *args, **kw)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(GitSubprocessClient, "git", full_disk)
+
+    refused = _refused_scan(root)
+
+    assert "write error: disk full" in str(refused)
+    assert "rule whether" not in refused.fix
+    assert bundle.read_bytes() == kept
