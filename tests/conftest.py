@@ -388,7 +388,7 @@ def _no_real_venv_in_tests() -> Iterator[None]:
        Tests that need the REAL method (test_python_env.py) already capture it at import
        time and restore it locally — that pattern is unaffected.
 
-    2. SUBPROCESS: ``ImportService.bootstrap`` runs ``dadaia init`` through
+    2. SUBPROCESS: the workspace bootstrap runs ``dadaia init`` through
        ``SubprocessProcessRunner`` — a child process an in-process monkeypatch cannot
        reach, which rebuilt a real venv (~19 s unloaded / 242 s loaded) AND exercised
        whatever dadaia happened to be installed in the ambient interpreter instead of
