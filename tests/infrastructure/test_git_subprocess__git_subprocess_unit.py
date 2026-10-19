@@ -148,3 +148,58 @@ def test_commit_paths_is_a_noop_for_an_empty_path_sequence(
     calls = _fake(monkeypatch, lambda args: None)
     GitSubprocessClient().commit_paths(Path("/repo"), "message", [])
     assert calls == []
+
+
+@pytest.mark.parametrize("url", ["--upload-pack=evil", "-oProxyCommand=evil", "ext::sh -c id"])
+def test_reachable_refuses_a_hostile_url_before_git_runs(
+    url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls = _fake(monkeypatch, lambda args: None)
+
+    assert GitSubprocessClient().reachable(url) is False
+    assert calls == []
+
+
+def test_reachable_probes_with_the_url_after_the_options_end_and_nothing_to_prompt(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    seen: list[dict[str, object]] = []
+
+    def run(args: list[str], **kw: object) -> subprocess.CompletedProcess[str]:
+        seen.append({"args": args, **kw})
+        return _result()
+
+    monkeypatch.setattr(git_subprocess, "_run", run)
+
+    assert GitSubprocessClient().reachable("https://example.invalid/o/r.git") is True
+
+    [call] = seen
+    assert call["args"] == ["git", "ls-remote", "--heads", "--", "https://example.invalid/o/r.git"]
+    assert call["stdin"] == ""
+    assert isinstance(call["timeout"], int | float)
+    env = call["env"]
+    assert isinstance(env, dict)
+    assert env["GIT_TERMINAL_PROMPT"] == "0"
+    assert "BatchMode=yes" in env["GIT_SSH_COMMAND"]
+
+
+@pytest.mark.parametrize(
+    "failure", [subprocess.TimeoutExpired("git", 1), OSError("no git")], ids=["timeout", "no-git"]
+)
+def test_reachable_counts_a_timeout_or_a_missing_git_as_unreachable(
+    failure: Exception, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def run(args: list[str], **_: object) -> subprocess.CompletedProcess[str]:
+        raise failure
+
+    monkeypatch.setattr(git_subprocess, "_run", run)
+
+    assert GitSubprocessClient().reachable("https://example.invalid/o/r.git") is False
+
+
+def test_reachable_is_false_when_git_cannot_list_the_remote(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _fake(monkeypatch, lambda args: _result(rc=128, stderr="fatal: unable to access"))
+
+    assert GitSubprocessClient().reachable("https://example.invalid/o/r.git") is False
