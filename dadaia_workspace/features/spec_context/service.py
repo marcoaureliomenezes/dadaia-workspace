@@ -804,13 +804,18 @@ class SpecContextService:
                 f"Context '{name}' is active.",
                 fix=fix_line(self._workspace_root, "context", "dead", name),
             )
-        for repo in ctx.all_repos():
-            dist = self._workspace_root / ".dadaia" / "dist" / repo.slug
-            if bundles := sorted(dist.glob("*.bundle")):
-                raise ContextStateError(
-                    f"Context '{name}': {bundles[0]} is a paused lane; delete would orphan it.",
-                    fix=act("agent", f"resume the lane or move {bundles[0]} out of {dist}"),
-                )
+        rows, failed, refix = self._worktree_rows(
+            self._workspace_root, {r.slug for r in ctx.all_repos()}
+        )
+        if failed:
+            raise ContextStateError(
+                f"Context '{name}': {failed}; delete cannot see paused trees.", fix=refix
+            )
+        if paused := [r for r in rows if r.get("state") == "paused"]:
+            raise ContextStateError(
+                f"Context '{name}': {paused[0]['path']} is paused; delete would orphan its bundle.",
+                fix=paused[0]["exit"],
+            )
         self._store.delete(name)
         # A session record pointing at a deleted context degrades to unbound via the
         # resolver's own existence check (core.invocation._context_registered); there is
