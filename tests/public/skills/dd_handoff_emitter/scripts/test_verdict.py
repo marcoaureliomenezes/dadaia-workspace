@@ -854,7 +854,7 @@ def test_stats_of_a_log_entry_that_breaks_the_schema_is_refused_with_checks_find
     done = _stats(root, "0.5.0-rc18")
     lines = done.stderr.splitlines()
     assert (done.returncode, done.stdout, len(lines)) == (1, "", 2), done.stdout + done.stderr
-    assert lines[0].startswith("[error] ") and lines[0].endswith(finding), done.stderr
+    assert lines[0] == f"[error] {_REL} {finding}", done.stderr
     assert lines[1] == _CHECK_FIX.format(state=state), done.stderr
 
 
