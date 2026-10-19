@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Canonical worktrees `worktrees/<repo>/<name>` on branch `wt/<name>`, stdlib
 only: `new` opens one, `merge` lands it after its checks, `clean` drops an empty one,
-`hash` prints a verdict's binding, `sync` rebases a tree and those below it, `list` reads ours from git.
+`hash` prints a verdict's binding, `sync` rebases a tree and those below it, `list` reads ours from git,
+`pause` bundles a lane or `wt-rc` tree and removes it, `resume` restores it from that bundle.
 """
 
 from __future__ import annotations

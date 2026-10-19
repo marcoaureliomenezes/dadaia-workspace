@@ -83,6 +83,6 @@ The branch contract by role; the names are `specs/constitution.md`'s `gitflow:` 
 
 ## 5. References
 
-- Run `.dadaia/.venv/bin/dadaia worktree --help` (verbs `new`, `merge`, `sync`, `clean`, `hash`, `list`); run it, never read its source; the rules: `worktrees/AGENTS.md`.
+- Run `.dadaia/.venv/bin/dadaia worktree --help` (verbs `new`, `merge`, `sync`, `clean`, `hash`, `list`, `pause`, `resume`); run it, never read its source; the rules: `worktrees/AGENTS.md`.
 - [`CICD-AUTOMATION.md`](CICD-AUTOMATION.md) — optional: plug your own pipeline into the repo's `verify:` lines.
 - Chokepoints: `.dadaia/AGENTS.md` §3 and `worktrees/AGENTS.md`; every other rule here is discipline upheld by agents and reviewers.

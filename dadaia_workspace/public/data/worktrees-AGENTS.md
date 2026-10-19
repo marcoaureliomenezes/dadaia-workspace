@@ -2,7 +2,7 @@
 
 Scope: this file governs only `worktrees/**`.
 
-- `WT` below is `.dadaia/.venv/bin/dadaia worktree` — the one interface that opens, lists, merges, cleans and syncs a worktree (`new|merge|clean|list|sync|hash`); only the main thread opens and merges. A subagent works only inside the path it was given.
+- `WT` below is `.dadaia/.venv/bin/dadaia worktree` — the one interface that opens, lists, merges, cleans and syncs a worktree (`new|merge|clean|list|sync|hash|pause|resume`); only the main thread opens and merges. A subagent works only inside the path it was given.
 - The reference-transaction ref gate refuses creating a `wt/*` branch and moving a work branch by a raw commit, `merge --ff-only`, `reset --hard` or `update-ref`; it passes a move or a creation only when the local `refs/remotes/origin/<work>` is absent, holds the new sha, or the old sha is an ancestor of the new one and every path changed between them (renames off) is under `specs/audits/**`; `branch -m/-M/-C` onto a work branch (git writes it outside a reference transaction) and a local rewrite or deletion of that tracking ref (no network read) are out of scope; a failed ancestry or diff read refuses, and the hook lets any creation or move through when no runner is found or the runner faults. Every dadaia CLI and skill-script git call carries the marker that passes it (set by `_git.py`/`git_subprocess`).
 - A forced move of a `wt/*` branch passes the ref gate by design: `WT merge` is the chokepoint, not the hook.
 - `DADAIA_WT=1` reaches every `scrubbed_env` child, so a raw git call inside `verify:` passes the ref gate by design.
@@ -30,5 +30,5 @@ Scope: this file governs only `worktrees/**`.
 
 - A worktree never holds its own `.venv`, `.dadaia` or tool cache; caches go where the harness env points; every tree uses `<root>/.dadaia/.venv`.
 - Never `git stash` in a worktree: every worktree of a repo shares one stash stack; set work aside as a WIP commit.
-- A tree leaves only by `WT merge` or `WT clean`, which keep unmerged work; ignored files are kept (`--keep`) or dropped (`--drop`) by the operator's word.
-- Merge or clean every `wt/*` branch of a context before running `context dead`.
+- A tree leaves only by `WT merge`, `WT clean` or `WT pause`, which keep unmerged work; `WT pause` takes a lane or `wt-rc` tree only, `WT resume` restores it; ignored files are kept (`--keep`) or dropped (`--drop`) by the operator's word.
+- `WT pause` runs before `context dead`; dead keeps refusing an open `wt/*` tree, so merge or clean every `wt/*` branch of a context first.

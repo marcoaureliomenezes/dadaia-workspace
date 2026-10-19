@@ -123,7 +123,7 @@ After `context baseline`, each step writes inside a worktree that then merges in
 parent, all under `worktrees/<repo>/<M.m.p>/`: a `wt-backlog-<slug>` lane for step 1;
 the candidate's `rc-<N>/wt-rc`, its integration branch, for steps 2, 3, 4 and 6; a job's
 `rc-<N>/job-<n>/wt-main` and its `wt-task-<kkk>` trees from step 5. `.dadaia/.venv/bin/dadaia worktree <verb>`
-runs every worktree verb: `new`, `merge`, `sync`, `clean`, `hash`, `list`.
+runs every worktree verb: `new`, `merge`, `sync`, `clean`, `hash`, `list`, `pause`, `resume`.
 
 1. **Demand enters the backlog.** Only the operator creates demand;
    `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py new <slug> --relates <slugs>|none`
