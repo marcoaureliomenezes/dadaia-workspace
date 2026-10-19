@@ -22,8 +22,8 @@ import dadaia_workspace
 from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.platform import PLATFORM
 from tests.fixtures.fix_world import World, _single_fix
-from tests.fixtures.harness_env import run_bash
 from tests.fixtures.stores import fake_venv, own_venv_python
+from tests.fixtures.harness_env import run_bash
 from tests.helpers.oslib import make_executable, read_text, run, write_text
 
 pytestmark = pytest.mark.medium
