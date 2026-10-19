@@ -1,7 +1,7 @@
 """`dadaia export` — one record per spec context, written to `.dadaia/dist/spec-contexts.json`."""
 
 import json
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from pathlib import Path
 
 from dadaia_workspace.core import clock
@@ -32,7 +32,6 @@ def _record(ctx: SpecContextProject, last_sync_at: str | None) -> dict[str, obje
         "name": ctx.name,
         "state": ctx.state.name,
         "repo_url": ctx.repo_url,
-        "branch": ctx.current_branch,
         "associated_repos": [{"slug": r.slug, "url": r.url} for r in ctx.associated_repos],
         "last_sync_at": last_sync_at,
     }
@@ -46,24 +45,15 @@ class ExportService:
         self._git = git_client
         self._workspace_root = workspace_root
 
-    def _refresh_branches(self, now: str) -> list[tuple[SpecContextProject, str | None]]:
-        """Re-read the checked-out branch of every ALIVE repo on disk and write it through
-        the store with ``dataclasses.replace``, which keeps every other field. Returns each
-        context with the instant it was synced: ``now`` when refreshed, else its ``dead_since``."""
-        rows: list[tuple[SpecContextProject, str | None]] = []
-        for ctx in self._store.list_all():
-            repo = self._workspace_root / "repos" / ctx.repo_slug
-            if ctx.state is ContextState.ALIVE and repo.is_dir():
-                ctx = replace(ctx, current_branch=self._git.current_branch(repo))
-                self._store.update(ctx)
-                rows.append((ctx, now))
-            else:
-                rows.append((ctx, ctx.dead_since))
-        return rows
+    def _on_disk(self, ctx: SpecContextProject) -> bool:
+        return (self._workspace_root / "repos" / ctx.repo_slug).is_dir()
 
     def run(self) -> ExportResult:
         now = clock.now_iso()
-        rows = self._refresh_branches(now)
+        rows = [
+            (ctx, now if ctx.state is ContextState.ALIVE and self._on_disk(ctx) else ctx.dead_since)
+            for ctx in self._store.list_all()
+        ]
         payload = {
             "schema_version": EXPORT_SCHEMA_VERSION,
             "exported_at": now,

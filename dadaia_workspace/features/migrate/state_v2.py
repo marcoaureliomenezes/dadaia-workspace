@@ -82,7 +82,6 @@ def execute_migration(store: JsonContextStore, workspace_root: Path) -> None:
                         "created_at": ctx.get("created_at", ""),
                         "alive_since": ctx.get("activated_at"),
                         "dead_since": None,
-                        "current_branch": ctx.get("current_branch"),
                     }
                     for ctx in raw.get("contexts", [])
                 ],

@@ -257,10 +257,6 @@ class SpecContextService:
             for dest in created:
                 sweep.rmtree(dest)
             raise
-        branch: str | None = None
-        with contextlib.suppress(Exception):
-            branch = self._git.current_branch(self._repo_path(main_slug))
-        ctx = replace(ctx, current_branch=branch)
         self._store.save(ctx)
         return ctx
 
@@ -376,7 +372,6 @@ class SpecContextService:
             created_at=ctx.created_at,
             alive_since=ctx.alive_since,
             dead_since=ctx.dead_since,
-            current_branch=ctx.current_branch,
             associated_repos=(*ctx.associated_repos, AssociatedRepo(slug=slug, url=repo_url)),
         )
         self._store.update(updated)
@@ -406,7 +401,6 @@ class SpecContextService:
             created_at=ctx.created_at,
             alive_since=ctx.alive_since,
             dead_since=ctx.dead_since,
-            current_branch=ctx.current_branch,
             associated_repos=tuple(r for r in ctx.associated_repos if r.slug != slug),
         )
         self._store.update(updated)
@@ -466,13 +460,13 @@ class SpecContextService:
     def repo_live_status(self, repo: AssociatedRepo) -> RepoLiveStatus:
         """THE single branch-resolution implementation.
 
-        `context show`, `context list --json` and the export branch refresh all resolve a repo's on-disk presence and live checked-out
+        `context show` and `context list --json` resolve a repo's on-disk presence and live checked-out
         branch through this ONE method — never a second ad hoc git-subprocess call
         at a CLI or feature boundary.
 
         A repo that is not cloned, or whose live git query fails, degrades to
         ``on_disk=False`` / ``current_branch=None`` rather than raising — every
-        caller here is a best-effort display/export surface.
+        caller here is a best-effort display surface.
         """
         repo_path = self._repo_path(repo.slug)
         on_disk = repo_path.exists() and self._git.is_git_root(repo_path)
@@ -753,11 +747,7 @@ class SpecContextService:
         # Phase 2 — sync every repo, then hold every repo: a push's gate reads the main
         # repo's gitflow, so no repo is held before all are pushed. NO-LOCKS races.
         present = [(slug, path) for slug, path in repo_paths if path.exists()]
-        branch_before_sync: str | None = None
         for slug, repo_path in present:
-            if slug == ctx.repo_slug:
-                with contextlib.suppress(Exception):
-                    branch_before_sync = self._git.current_branch(repo_path)
             # An unborn clone reaching here is clean (Phase 1); a born one has a remote.
             if self._git.is_git_root(repo_path) and self._git.has_commits(repo_path):
                 try:
@@ -782,7 +772,6 @@ class SpecContextService:
             created_at=ctx.created_at,
             alive_since=None,
             dead_since=clock.now_iso(),
-            current_branch=branch_before_sync,
             associated_repos=ctx.associated_repos,
         )
         self._store.update(dead_ctx)

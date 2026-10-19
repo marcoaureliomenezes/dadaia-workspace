@@ -73,7 +73,6 @@ def _to_dict(ctx: SpecContextProject) -> dict:  # type: ignore[type-arg]
         "created_at": ctx.created_at,
         "alive_since": ctx.alive_since,
         "dead_since": ctx.dead_since,
-        "current_branch": ctx.current_branch,
         "associated_repos": [{"slug": r.slug, "url": r.url} for r in ctx.associated_repos],
     }
 
@@ -87,7 +86,6 @@ def _from_dict(d: dict) -> SpecContextProject:  # type: ignore[type-arg]
         created_at=d["created_at"],
         alive_since=d.get("alive_since"),
         dead_since=d.get("dead_since"),
-        current_branch=d.get("current_branch"),
         associated_repos=tuple(
             AssociatedRepo(slug=r["slug"], url=r["url"]) for r in d.get("associated_repos") or []
         ),

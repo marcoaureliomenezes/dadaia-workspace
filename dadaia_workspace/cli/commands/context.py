@@ -63,8 +63,7 @@ def _ctx_service() -> SpecContextService:
 
 def _ctx_to_dict(svc: SpecContextService, ctx: SpecContextProject) -> dict[str, Any]:
     """The one record ``list`` and ``show`` render, JSON and table alike; every branch
-    resolved live through ``repos_live_status``, the stored snapshot kept as
-    ``stored_branch``; ``gitflow`` is the one reader's, off the main repo."""
+    resolved live through ``repos_live_status``; ``gitflow`` is the one reader's, off the main repo."""
     statuses = svc.repos_live_status(ctx)
     main_status, associated_statuses = statuses[0], statuses[1:]
     main_path = resolve_workspace_root() / "repos" / ctx.repo_slug
@@ -77,8 +76,7 @@ def _ctx_to_dict(svc: SpecContextService, ctx: SpecContextProject) -> dict[str, 
         "created_at": ctx.created_at,
         "alive_since": ctx.alive_since,
         "dead_since": ctx.dead_since,
-        "current_branch": main_status.current_branch or ctx.current_branch,
-        "stored_branch": ctx.current_branch,
+        "current_branch": main_status.current_branch,
         "associated_repos": [
             {
                 "slug": status.slug,

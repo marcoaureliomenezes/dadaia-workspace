@@ -71,7 +71,6 @@ def _read(file: Path) -> list[dict[str, object]]:
 
 
 def _dead_context(record: dict[str, object], now: str) -> SpecContextProject:
-    branch = record.get("branch")
     repos = record.get("associated_repos")
     return SpecContextProject(
         name=str(record["name"]),
@@ -80,7 +79,6 @@ def _dead_context(record: dict[str, object], now: str) -> SpecContextProject:
         repo_url=str(record["repo_url"]),
         created_at=now,
         dead_since=now,
-        current_branch=None if branch is None else str(branch),
         associated_repos=tuple(
             AssociatedRepo(slug=str(r["slug"]), url=str(r["url"]))
             for r in (repos if isinstance(repos, list) else [])
