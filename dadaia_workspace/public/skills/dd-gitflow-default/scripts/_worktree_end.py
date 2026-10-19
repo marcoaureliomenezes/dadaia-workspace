@@ -3,7 +3,7 @@
 its gate, or drop an empty one — never with `--force` or `-D`, re-runnable after a stop. A task
 lands after test separation, unreviewed; a main tree, a rc (plus, in the main repo, the ledger checks) and a hotfix
 after their review and the job gate; a backlog tree lands `specs/` after its review and the ledger
-checks alone (an associated repo holds no `specs/`, so those checks skip). The job gate is the repo's own declared `verify:` line, run as one argv list."""
+checks alone (an associated repo holds no `specs/`, so those checks skip). The job gate is the repo's declared `verify:` line, run as one argv list."""
 
 from __future__ import annotations
 
@@ -123,7 +123,7 @@ def _remove(into: Path, tree: Path, name: str, kept: list[str]) -> None:
 
 def _rmdir(tree: Path, name: str) -> None:
     """Drop the folders *tree* leaves empty, its level folders cascading outward; a folder holding
-    anything beyond its own level file stops the cascade; an empty one is dropped too."""
+    anything beyond its level file stops the cascade; an empty one is dropped too."""
     home = tree.parents[name.count("/")]
     for folder, _ in reversed(names.level_folders(home, name)):
         if folder.is_dir():
@@ -300,18 +300,20 @@ def _scaffold(tree: Path, name: str) -> None:
         )
 
 
-def _ledgers(root: Path, repo: Path, tree: Path, own: bool) -> None:
-    """A rc or backlog merge's ledger gate: each ledger script's `check` on the tree's `specs/`, then
-    the workspace doctor, a red one relaying its own first `fix:` line. The scripts are the ones the
-    tree carries when *own* (its `verify:` already ran its code) and exactly one tracked path holds
-    one, else this instance's; an associated repo holds no `specs/`, so it has none."""
+def _tracked(tree: Path, rel: Path) -> list[Path]:
+    """The copies of ledger script *rel* the tree tracks (its `verify:` ran them), else this instance's."""
+    held = git(tree, "ls-files", "-z", "--", f"*/{rel.as_posix()}").split("\0")
+    return [tree / h for h in held if h] or [_INSTANCE_SKILLS / rel]
+
+
+def _ledgers(root: Path, repo: Path, tree: Path, scripts: Callable[[Path], list[Path]]) -> None:  # fmt: skip
+    """`check` of each script *scripts* names per ledger, then the doctor; an associated repo has no `specs/`."""
     if flow_for(root, repo)["main"] != repo.name:
         return
     for rel in _LEDGERS:
-        held = [h for h in git(tree, "ls-files", "-z", "--", f"*/{rel.as_posix()}").split("\0") if h and own]  # fmt: skip
-        script = tree / held[0] if len(held) == 1 else _INSTANCE_SKILLS / rel
-        argv = [sys.executable, str(script), "check", "--specs", str(tree / "specs")]
-        _refuse_red(rel.name, run(argv, cwd=tree, env=scrubbed_env(), stdin=subprocess.DEVNULL), tree)  # fmt: skip
+        for script in scripts(rel):
+            argv = [sys.executable, str(script), "check", "--specs", str(tree / "specs")]
+            _refuse_red(rel.name, run(argv, cwd=tree, env=scrubbed_env(), stdin=subprocess.DEVNULL), tree)  # fmt: skip
     _refuse_red("dadaia doctor", cli(root, "doctor", "--specs-dir", str(tree / "specs"), tree=tree), tree)  # fmt: skip
 
 
@@ -410,22 +412,22 @@ def _into(repo: Path, onto: str) -> Path:
 
 
 def _kind_checks(root: Path, repo: Path, tree: Path, name: str, onto: str, into: Path) -> list[Callable[[], object]]:  # fmt: skip
-    """The ordered checks a tree of this kind must pass to land, before `merge`'s own ending checks."""
+    """The ordered checks a tree of this kind must pass to land, before `merge`'s ending checks."""
     if not into.exists():  # the parent's tree removed by hand
         raise Refusal(f"{into} does not exist", git_line(repo, "worktree", "add", "-f", "-f", str(into), onto))  # fmt: skip
     ancestor = partial(_check_ancestor, root, tree, onto)
     verdict = partial(_check_approved, root, tree, onto, name)
     gate = [ancestor, verdict, partial(_gate, tree, onto)]
     children, scaffold = partial(_open_children, repo, name), partial(_scaffold, tree, name)
-    ledgers, specs = partial(_ledgers, root, repo, tree, kind_of(name) == "rc"), partial(_check_specs_only, tree, onto)  # fmt: skip
+    ledgers, specs = partial(_ledgers, root, repo, tree), partial(_check_specs_only, tree, onto)
     tests = lambda: _refuse_implementation_tests(tree, onto, _target(root, str(into))[3])  # noqa: E731
     table: dict[str | None, list[Callable[[], object]]] = {
         "task": [ancestor, tests, partial(_refuse_dirty, into)],
         "main": [children, scaffold, *gate],
         "hotfix": [scaffold, *gate],
-        "backlog": [specs, ancestor, verdict, ledgers],
-        "rc": [children, *gate, ledgers],
-    }
+        "backlog": [specs, ancestor, verdict, partial(ledgers, lambda rel: [_INSTANCE_SKILLS / rel])],
+        "rc": [children, *gate, partial(ledgers, partial(_tracked, tree))],
+    }  # fmt: skip
     return [partial(_refuse_dirty, tree), *table[kind_of(name)]]
 
 
