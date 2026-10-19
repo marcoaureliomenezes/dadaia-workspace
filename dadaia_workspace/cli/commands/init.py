@@ -151,7 +151,7 @@ def init(
         False, "--skip-assets", help="Skip installing public agent assets"
     ),
 ) -> None:
-    """Bootstrap a dadaia workspace in DIR for one harness: .dadaia/, the law, and that harness's projection."""
+    """Bootstrap a dadaia workspace in DIR: .dadaia/, the law, and the projection of each harness (--harness, else the --from artifact's)."""
     # Every refusal happens BEFORE any output or filesystem write, so a rejected
     # invocation leaves nothing behind (no partial workspace, no leaked payload).
     if from_ and repo:

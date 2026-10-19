@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "export-v1",
   "title": "Workspace export v1",
-  "description": "The JSON of `dadaia export`, soft or the hard archive's `spec-contexts.json` member. `repo_url` is null for a repo with no remote; `state` is the registry's lowercase value.",
+  "description": "The JSON the export command writes, soft or the hard archive's `spec-contexts.json` member. `repo_url` is null for a repo with no remote; `state` is the registry's lowercase value.",
   "type": "object",
   "required": ["schema_version", "dadaia_version", "harnesses", "contexts"],
   "additionalProperties": false,
