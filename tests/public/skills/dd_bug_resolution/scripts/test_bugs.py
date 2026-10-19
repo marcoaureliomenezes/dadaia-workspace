@@ -1457,3 +1457,117 @@ def test_the_sha_grammar_and_the_record_schema_agree_on_a_64_hex_fix_sha(
     grammar = load_owner("dd-bug-resolution", "_grammar")
     assert bool(grammar.SHA_RE.match(sha)) is accepted
     assert bool(re.search(schema["properties"]["fix_sha"]["pattern"], sha)) is accepted
+
+
+def _commit_as(root: Path, message: str, path: str = "cli/x.py") -> str:
+    """A commit of *root* touching *path*, with *message* as given (every line of it)."""
+    git = ["git", "-C", str(root), "-c", "user.name=t", "-c", "user.email=t@t.test"]
+    write_text(root / path, read_text(root / path) + "# edit\n")
+    run([*git, "commit", "-q", "-a", "-m", message], check=True)
+    return run([*git, "rev-parse", "HEAD"], check=True).stdout.strip()
+
+
+def _resolved(bug_id: str, sha: str = "a" * 40) -> dict[str, object]:
+    return {**_OPEN_RECORD, "id": bug_id, "status": "resolved", "closed_at": "2026-09-21T10:00:00Z",
+            "cause": "c", "solution": "s", "caused_by": "none", "fix_sha": sha}  # fmt: skip
+
+
+_FIXED = "fix(bugs): a-bug \u2014 c"
+_REVERT = f'Revert "{_FIXED}"'
+
+
+@pytest.mark.parametrize("messages", [
+    [_FIXED],
+    ["refactor(bugs): a-bug \u2014 REBUILD u: c"],
+    ["feat(x): y\n\nfix(bugs): a-bug \u2014 c"],  # the line may sit in the body
+    ["fix(bugs): b-bug, a-bug \u2014 c"],  # a group, separated by commas
+    ["fix(bugs): b-bug a-bug \u2014 c"],  # or by blanks
+    ["feat: x", 'Revert "feat: x"\n\nfix(bugs): a-bug \u2014 revert feat: x'],  # a revert cites
+    [_FIXED, _REVERT, f'Revert "{_REVERT}"'],  # a revert of a revert makes the fix live again
+])  # fmt: skip
+def test_check_accepts_a_record_whose_id_line_a_commit_of_head_carries(
+    script: Path, tmp_path: Path, messages: list[str]
+) -> None:
+    _ledger(tmp_path)
+    for message in messages:
+        _commit_as(tmp_path, message)
+    specs = _ledger(tmp_path, _resolved("a-bug"))
+    done = _run(script, "check", "--specs", str(specs))
+    assert done.returncode == 0, done.stdout + done.stderr
+
+
+def test_check_accepts_a_record_whose_id_commit_was_rebased(script: Path, tmp_path: Path) -> None:
+    """The recorded sha is a hint: an amend orphans it and the id line still reaches HEAD."""
+    _ledger(tmp_path)
+    sha = _commit_as(tmp_path, _FIXED)
+    specs = _ledger(tmp_path, _resolved("a-bug", sha))
+    git = ["git", "-C", str(tmp_path), "-c", "user.name=t", "-c", "user.email=t@t.test"]
+    run([*git, "commit", "-q", "--amend", "-m", _FIXED, "-m", "rebased"], check=True)
+    assert run([*git, "rev-parse", "HEAD"], check=True).stdout.strip() != sha
+    done = _run(script, "check", "--specs", str(specs))
+    assert done.returncode == 0, done.stdout + done.stderr
+
+
+@pytest.mark.parametrize("messages", [
+    ["feat: x"],  # no commit names the id
+    [_FIXED, _REVERT],  # the only commit that names it, HEAD reverts
+    ["fix(J7.T6): a-bug \u2014 c"],  # a task subject is not the line
+    ["fix(bugs): a-bug-two \u2014 c", "fix(bugs): other \u2014 a-bug"],  # an id is the whole word, before the dash
+])  # fmt: skip
+def test_check_refuses_a_record_no_commit_of_head_cites_with_one_fix_line(
+    script: Path, tmp_path: Path, messages: list[str]
+) -> None:
+    _ledger(tmp_path)
+    for message in messages:
+        _commit_as(tmp_path, message)
+    specs = _ledger(tmp_path, _resolved("a-bug"))
+    done = _run(script, "check", "--specs", str(specs))
+    assert done.returncode == 1, done.stdout
+    assert done.stdout.count("LEDGER-BUGS-SCHEMA") == 1 and "bugs/BUGS.jsonl:1" in done.stdout
+    [fix] = [ln for ln in done.stdout.splitlines() if ln.startswith("fix: ")]
+    assert fix.startswith("fix: Agent action: ") and "fix(bugs): a-bug \u2014 " in fix, fix
+
+
+def test_resolve_records_the_sha_and_files_of_the_id_commit(script: Path, tmp_path: Path) -> None:
+    specs = _ledger(tmp_path, _OPEN_RECORD)
+    sha = _commit_as(tmp_path, _FIXED)
+    done = _run(script, "resolve", "a-bug", "--cause", "c", "--caused-by", "none",
+                "--solution", "s", "--specs", str(specs))  # fmt: skip
+    assert done.returncode == 0, done.stdout + done.stderr
+    [record] = _records(specs)
+    assert (record["fix_sha"], record["fix_files"]) == (sha, ["cli/x.py"])
+    assert _run(script, "check", "--specs", str(specs)).returncode == 0
+
+
+def test_resolve_with_no_id_commit_is_one_refusal_with_one_fix_line(
+    script: Path, tmp_path: Path
+) -> None:
+    specs = _ledger(tmp_path, _OPEN_RECORD)
+    _commit_as(tmp_path, "feat: x")
+    before = (specs / "bugs/BUGS.jsonl").read_bytes()
+    done = _run(script, "resolve", "a-bug", "--cause", "c", "--caused-by", "none",
+                "--solution", "s", "--specs", str(specs))  # fmt: skip
+    assert done.returncode == 1 and "Traceback" not in done.stderr, done.stderr
+    [fix] = [ln for ln in done.stderr.splitlines() if ln.startswith("fix: ")]
+    assert "fix(bugs): a-bug \u2014 " in fix, fix
+    assert (specs / "bugs/BUGS.jsonl").read_bytes() == before
+
+
+def test_resolve_takes_no_fix_sha_flag(script: Path, tmp_path: Path) -> None:
+    specs = _ledger(tmp_path, _OPEN_RECORD)
+    done = _run(script, *_resolve_argv(sha=_commit_as(tmp_path, _FIXED)), "--specs", str(specs))
+    assert done.returncode == 2 and "unrecognized arguments" in done.stderr
+    assert _records(specs)[0]["status"] == "open"
+
+
+def test_stats_reads_the_files_of_the_id_commit_for_a_record_without_fix_files(
+    script: Path, tmp_path: Path
+) -> None:
+    _ledger(tmp_path)
+    for bug in ("b1", "b2"):
+        _commit_as(tmp_path, f"fix(bugs): {bug} \u2014 c")
+    specs = _ledger(tmp_path, _resolved("b1", "1" * 40), _resolved("b2", "2" * 40))
+    done = _run(script, "stats", "--specs", str(specs))
+    assert [ln for ln in done.stdout.splitlines() if ln.startswith("rebuild-due:")] == [
+        "rebuild-due:cli/x.py\tb1,b2"
+    ]
