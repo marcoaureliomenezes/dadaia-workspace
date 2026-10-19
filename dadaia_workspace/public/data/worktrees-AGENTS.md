@@ -30,5 +30,5 @@ Scope: this file governs only `worktrees/**`.
 
 - A worktree never holds its own `.venv`, `.dadaia` or tool cache; caches go where the harness env points; every tree uses `<root>/.dadaia/.venv`.
 - Never `git stash` in a worktree: every worktree of a repo shares one stash stack; set work aside as a WIP commit.
-- A tree leaves only by `WT merge`, `WT clean` or `WT pause`, which keep unmerged work; `WT pause` takes a lane or `wt-rc` tree only, `WT resume` restores it; ignored files are kept (`--keep`) or dropped (`--drop`) by the operator's word.
-- `WT pause` runs before `context dead`; dead keeps refusing an open `wt/*` tree, so merge or clean every `wt/*` branch of a context first.
+- A tree leaves only by `WT merge`, `WT clean` or `WT pause`, which keep unmerged work. `WT merge` and `WT clean` keep (`--keep`) or drop (`--drop`) ignored files by the operator's word; `WT pause` takes a lane or `wt-rc` tree only, refuses one holding ignored files, and `WT resume` restores it.
+- Before `context dead`, merge, clean or pause every `wt/*` tree of the context (a job or task tree is never paused); dead refuses an open one.
