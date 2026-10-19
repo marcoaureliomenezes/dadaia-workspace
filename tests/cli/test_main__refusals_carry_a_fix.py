@@ -142,6 +142,14 @@ def _dead_remote_gone(tmp: Path, monkeypatch: pytest.MonkeyPatch) -> Case:
     return root, ["context", "dead", "foo"]
 
 
+def _init_from(tmp: Path, text: str | None) -> Case:
+    tmp.mkdir(parents=True)
+    artifact = tmp / "spec-contexts.json"
+    if text is not None:
+        write_text(artifact, text)
+    return tmp, ["init", str(tmp / "ws"), "--from", str(artifact)]
+
+
 def _init_venv_fails(tmp: Path, monkeypatch: pytest.MonkeyPatch) -> Case:
     class _Boom:
         def venv_change(self, *a: Any, **k: Any) -> None:
@@ -185,7 +193,7 @@ def _symlinked_specs_dir(tmp: Path, live: bool) -> Case:
     return tmp, ["specs", "init", "--specs-dir", str(tmp / "link")]
 
 
-# (id, builder(tmp, monkeypatch) -> (cwd, argv)) — the 16 measured sites.
+# (id, builder(tmp, monkeypatch) -> (cwd, argv)) — the 19 measured sites.
 SITES: list[tuple[str, Callable[[Path, pytest.MonkeyPatch], Case]]] = [
     ("repo-add-invalid-slug", lambda t, m: _repo_add(t, "not a slug", "--url", "https://x.test/a.git")),
     ("repo-add-different-url", lambda t, m: _repo_add_other_url(t)),
@@ -197,6 +205,9 @@ SITES: list[tuple[str, Callable[[Path, pytest.MonkeyPatch], Case]]] = [
     ("dead-git-failure", _dead_remote_gone),
     ("reports-bare", lambda t, m: (_foo(t), ["reports", "validate"])),
     ("reports-missing-file", lambda t, m: (_foo(t), ["reports", "validate", "nope.handoff.json"])),
+    ("init-from-missing-file", lambda t, m: _init_from(t, None)),
+    ("init-from-not-json", lambda t, m: _init_from(t, "not json")),
+    ("init-from-unknown-format", lambda t, m: _init_from(t, json.dumps({"schema_version": "export-v0"}))),
     ("init-venv-failure", _init_venv_fails),
     ("specs-upgrade-two-tier", lambda t, m: _two_tier_architecture(t)),
     ("specs-init-malformed-constitution", lambda t, m: _malformed_constitution(t)),

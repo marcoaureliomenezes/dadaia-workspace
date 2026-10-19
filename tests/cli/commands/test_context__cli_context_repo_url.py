@@ -63,12 +63,12 @@ def _record(workspace: Path, name: str) -> dict:  # type: ignore[type-arg]
 # --------------------------------------------------------------------- (a) empty url
 
 
-def test_empty_url_refusal_ctx_url_1_doctor_flag_and_export_import_clone(
+def test_empty_url_refusal_ctx_url_1_doctor_flag_and_export_restore_clone(
     workspace: Path, tmp_path: Path
 ) -> None:
     """An unobtainable record is refused; an ALIVE context over a checkout with no origin keeps
     an empty repo_url; one whose checkout has an origin remote gets it back-filled by
-    ``context alive``, so a later export/import + ``alive`` on a second machine can clone
+    ``context alive``, so a later export + ``init --from`` + ``alive`` on a second machine can clone
     instead of failing on ``git clone ""``.
     """
     # No URL and no repos/bar checkout: nothing could ever clone it — refused, nothing
@@ -117,7 +117,7 @@ def test_empty_url_refusal_ctx_url_1_doctor_flag_and_export_import_clone(
     assert qux_alive.exit_code == 0, qux_alive.output
     assert _record(workspace, "qux")["repo_url"] == file_url
 
-    # 5. The record is now portable: on a second machine (after export/import) the empty
+    # 5. The record is now portable: on a second machine (after export and ``init --from``) the empty
     #    on-disk repo path means ``alive`` clones from the record's repo_url. An empty URL
     #    would make ``git clone ""`` fail. Prove the persisted URL is cloneable by
     #    cloning it from a fresh location (the second-machine scenario, isolated from the
