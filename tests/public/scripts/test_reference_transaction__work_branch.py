@@ -490,7 +490,7 @@ def test_the_rewrite_verb_replaces_only_the_message_the_gate_lists_and_keeps_the
         env={**os.environ, **env},
         timeout=60,
     )
-    assert gate.returncode != 0 and "keep any `fix(bugs): <id> \u2014 \u2026` line" in gate.stderr
+    assert gate.returncode != 0 and "keep any `fix(bugs): \u2026` line" in gate.stderr
     done = _verb(repo, oldest, "--message", f"clean message\n\n{_FIX}", env=env)
     assert done.returncode == 0, done.stderr
     assert repo.ok("log", "-1", "--format=%B", _WORK) == f"clean message\n\n{_FIX}\n\n{_RESOLVE}"
