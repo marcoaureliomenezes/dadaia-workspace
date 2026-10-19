@@ -168,8 +168,8 @@ def ours(repo: Path) -> list[dict[str, str]]:
 
 def _row(repo: Path, path: str, state: str, age: float = 0.0, **facts: object) -> dict[str, object]:
     """One worktree: WARN past a day or off-canon; `fix` shown only when ready or orphan;
-    `exit`, the line a hold names — `clean` for an empty tree, else `merge`."""
-    verb = "clean" if state == "empty" else "merge"
+    `exit`, the line a hold names — `clean` for an empty tree, `resume` for a paused one, else `merge`."""
+    verb = {"empty": "clean", "paused": "resume"}.get(state, "merge")
     line = command(*LAUNCH, verb, path)
     # merge cannot clear a directory git does not know
     if state == "orphan" and Path(path).exists():
@@ -177,9 +177,9 @@ def _row(repo: Path, path: str, state: str, age: float = 0.0, **facts: object) -
             "agent", f"remove the directory {path}, then run `{inline(*LAUNCH, verb, path)}`"
         )
     return {"repo": repo.name, "path": path, "state": state, "age_hours": age, "registered": True,
-            "kind": None, **facts, "warn": state not in ("ready", "open", "empty") or age > 24,
+            "kind": None, **facts, "warn": state not in ("ready", "open", "empty", "paused") or age > 24,
             "fix": line if state in ("ready", "orphan") else "",
-            "exit": line if state in ("ready", "open", "empty", "orphan") else ""}  # fmt: skip
+            "exit": line if state in ("ready", "open", "empty", "orphan", "paused") else ""}  # fmt: skip
 
 
 def _age(repo: Path, name: str) -> float:

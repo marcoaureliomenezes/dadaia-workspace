@@ -5,27 +5,28 @@ back from the bundle and deletes it. Nothing is committed or pushed."""
 
 from __future__ import annotations
 
-import tempfile
 from pathlib import Path
 
+from _git import GitError
 from _platform import act, command
-from _worktree_end import _open_children, _refuse_dirty, _rmdir, _target
-from _worktree_git import git, ours
+from _worktree_end import _open_children, _precious, _refuse_dirty, _rmdir, _target
+from _worktree_git import _row, git, ours
 from _worktree_names import LAUNCH, LOCK, Refusal, branch, kind_of, tree_path
 from _worktree_new import absent_levels, write_level_files
 
 
 def write_bundle(repo: Path, ref: str, dest: Path) -> None:
-    """Runs `git bundle create` for the commits of branch *ref* that no `origin` ref holds, verifies
-    them, and only then moves the file to *dest*. Raises `GitError` on any failure, leaving
-    nothing at *dest*."""
-    home = next(p for p in dest.parents if p.is_dir())  # same filesystem, so the move is a rename
-    with tempfile.TemporaryDirectory(dir=home) as scratch:
-        made = Path(scratch) / "made.bundle"
-        git(repo, "bundle", "create", str(made), ref, "--not", "--remotes=origin")
-        git(repo, "bundle", "verify", str(made))
-        dest.parent.mkdir(parents=True, exist_ok=True)
-        made.replace(dest)
+    """Runs `git bundle create` for the commits of branch *ref* that no `origin` ref holds, into
+    *dest*, and verifies it. Raises `GitError` on any failure, leaving nothing at *dest*."""
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    git(
+        repo, "bundle", "create", str(dest), ref, "--not", "--remotes=origin"
+    )  # git's lockfile leaves nothing on failure
+    try:
+        git(repo, "bundle", "verify", str(dest))
+    except GitError:
+        dest.unlink()
+        raise
 
 
 def pause(root: Path, path: str) -> str:
@@ -39,13 +40,10 @@ def pause(root: Path, path: str) -> str:
     if not any(Path(row["path"]).resolve() == tree for row in ours(repo)):
         raise Refusal(f"{tree} is not a worktree of ours", command(*LAUNCH, "list"))
     _refuse_dirty(tree)
-    if any(line.startswith("!! ") for line in git(tree, "status", "--porcelain", "--ignored").splitlines()):  # fmt: skip
+    if held := _precious(tree):
         raise Refusal(
-            f"{tree} holds ignored files",
-            act(
-                "agent",
-                f"delete the ignored files {tree} holds or commit them, then rerun the pause",
-            ),  # fmt: skip
+            f"{tree} holds ignored files: {', '.join(held)}",
+            act("agent", f"delete or commit {', '.join(held)}, then rerun the pause"),
         )
     if kind_of(name) == "rc":
         _open_children(repo, name)
@@ -74,7 +72,11 @@ def resume(root: Path, path: str) -> str:
         raise Refusal(f"no bundle at {bundle}", command(*LAUNCH, "list"))
     made = absent_levels(root, repo.name, name)
     git(repo, "fetch", "-q", str(bundle), f"{ref}:{ref}")
-    git(repo, "worktree", "add", "-q", "--lock", "--reason", f"{LOCK}{name}", str(tree), ref)
+    try:
+        git(repo, "worktree", "add", "-q", "--lock", "--reason", f"{LOCK}{name}", str(tree), ref)
+    except GitError:
+        git(repo, "update-ref", "-d", f"refs/heads/{ref}")
+        raise
     write_level_files(made)
     bundle.unlink()
     for folder in bundle.parents:
@@ -92,7 +94,5 @@ def paused_rows(root: Path) -> list[dict[str, object]]:
         repo, *_ = bundle.relative_to(root / ".dadaia" / "dist").parts
         name = bundle.relative_to(root / ".dadaia" / "dist" / repo).with_suffix("").as_posix()
         path = str(tree_path(root, repo, name))
-        out.append({"repo": repo, "path": path, "state": "paused", "age_hours": 0.0,
-                    "registered": True, "kind": "paused", "warn": False, "fix": "",
-                    "exit": command(*LAUNCH, "resume", path)})  # fmt: skip
+        out.append(_row(Path(repo), path, "paused", kind="paused"))
     return out

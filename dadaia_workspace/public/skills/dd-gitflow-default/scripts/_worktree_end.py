@@ -72,18 +72,22 @@ def _refuse_dirty(tree: Path) -> None:
         )
 
 
-def _kept(tree: Path, verb: str, keep: list[str], drop: bool) -> list[str]:
-    """The ignored files to copy into the repo; refuses while one is neither kept nor dropped."""
+def _precious(tree: Path) -> list[str]:
+    """The ignored files of *tree* that are not disposable: a tool cache directory or a `*.pyc` is."""
     listing = git(tree, "status", "--porcelain", "-z", "--ignored=matching")
     ignored = [  # -z: a name with a blank arrives verbatim, never C-quoted; matching: one entry per directory
         line[3:].rstrip("/") for line in listing.split("\0") if line.startswith("!! ")
     ]
-    # disposable without asking: a tool cache directory or a *.pyc
-    precious = [
+    return [
         p
         for p in ignored
         if not (p.endswith(".pyc") or any("cache" in part for part in Path(p).parts))
     ]
+
+
+def _kept(tree: Path, verb: str, keep: list[str], drop: bool) -> list[str]:
+    """The ignored files to copy into the repo; refuses while one is neither kept nor dropped."""
+    precious = _precious(tree)
     left = [p for p in precious if p not in keep]
     if left and not drop:
         raise Refusal(
