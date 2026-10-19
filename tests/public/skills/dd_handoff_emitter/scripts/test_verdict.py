@@ -329,6 +329,9 @@ def _log(root: Path, log: list[dict[str, str]]) -> None:
             shutil.copytree(state.parent / "rc-1", state.parent / rc)
 
 
+_CHECK_OK = 'if sys.argv[1] == "check":\n    sys.exit(0)\n'
+
+
 def _stub(root: Path, skill: str, script: str, body: str) -> None:
     write_text(root / ".agents/skills" / skill / "scripts" / script, f"import sys\n{body}\n")
 
@@ -439,7 +442,7 @@ def test_stats_prints_the_local_metric_table_over_the_candidate_window(tmp_path:
     _stub(root, "dd-bug-resolution", "bugs.py",
           'assert sys.argv[1] == "stats"\nprint("total\\t9")\nprint("closed\\t4\\nfix-induced\\t1\\nrebuild-due\\t1")\nprint("rebuild-due:a.py\\ta,z")\nprint("rebuild-due:b.py\\te,w")')  # fmt: skip
     _stub(root, "dd-release-implementation", "release.py",
-          'assert sys.argv[1:3] == ["drift", "--json"]\nprint(\'{"since": "s", "atoms": ["a", "b", "c"], "uncovered": []}\')\nsys.exit(1)')  # fmt: skip
+          _CHECK_OK + 'assert sys.argv[1:3] == ["drift", "--json"]\nprint(\'{"since": "s", "atoms": ["a", "b", "c"], "uncovered": []}\')\nsys.exit(1)')  # fmt: skip
     done = _stats(root)
     assert (done.returncode, done.stdout) == (
         0,
@@ -500,7 +503,7 @@ def test_stats_reads_memory_drift_only_for_the_newest_candidate(tmp_path: Path) 
         ],
     )
     _stub(root, "dd-release-implementation", "release.py",
-          'print(\'{"since": "s", "atoms": ["a"], "uncovered": []}\')\nsys.exit(1)')  # fmt: skip
+          _CHECK_OK + 'print(\'{"since": "s", "atoms": ["a"], "uncovered": []}\')\nsys.exit(1)')  # fmt: skip
     older, newest = _stats(root), _stats(root, "0.5.0-rc100")
     assert "7 memory drift\tn/a\t0" in older.stdout.splitlines(), older.stderr
     assert "7 memory drift\t1\t0" in newest.stdout.splitlines(), newest.stderr
@@ -532,7 +535,7 @@ def test_stats_reads_absent_data_as_n_a_and_exits_zero(tmp_path: Path) -> None:
         ],
     )
     _stub(root, "dd-bug-resolution", "bugs.py", "sys.exit(1)")
-    _stub(root, "dd-release-implementation", "release.py", "sys.exit(1)")
+    _stub(root, "dd-release-implementation", "release.py", _CHECK_OK + "sys.exit(1)")
     done = _stats(root)
     assert (done.returncode, done.stdout) == (
         0,
@@ -856,6 +859,22 @@ def test_stats_of_a_log_entry_that_breaks_the_schema_is_refused_with_checks_find
     assert (done.returncode, done.stdout, len(lines)) == (1, "", 2), done.stdout + done.stderr
     assert lines[0] == f"[error] {_REL} {finding}", done.stderr
     assert lines[1] == _CHECK_FIX.format(state=state), done.stderr
+
+
+def test_stats_refuses_a_release_check_that_exits_non_zero_with_no_finding(tmp_path: Path) -> None:
+    """The exit status decides: a crashed `release.py check` is a refusal, never a pass."""
+    root = _stats_workspace(tmp_path)
+    _log(
+        root, [{"agent": "a", "kind": "note", "text": "t", "candidate": "rc-18"}]
+    )  # no ts: _window KeyErrors
+    _stub(root, "dd-release-implementation", "release.py",
+          'print("Traceback (most recent call last):", file=sys.stderr)\nsys.exit(1)')  # fmt: skip
+    done = _stats(root, "0.5.0-rc18")
+    assert (done.returncode, done.stdout) == (1, ""), done.stderr
+    assert done.stderr == (
+        "[error] release.py check exited 1\n"
+        f"fix: Agent action: fix the findings of release.py check on {(root / 'repos/r/specs').resolve()}\n"
+    )
 
 
 def test_stats_of_a_milestone_without_sha_reads_n_a(tmp_path: Path) -> None:
