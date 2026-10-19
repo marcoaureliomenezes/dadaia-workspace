@@ -298,5 +298,8 @@ def test_an_associated_repos_range_is_judged_against_the_main_repos_ledger(tmp_p
     )
     side = tmp_path / "repos" / "side"
     side.mkdir()
-    assert ci._cited_ids(side, {"aaa", "ccc"}) == (["hit"], "main")
-    assert ci._cited_ids(side, {"ccc"}) == ([], "main")
+    fix = ci._repoint_cited(side, {"aaa", "ccc"}, "new")
+    assert fix.startswith("Agent action: ")
+    assert " update hit --set fix_sha=new" in fix
+    assert "from a worktree of main" in fix
+    assert ci._repoint_cited(side, {"ccc"}, "new") == ""
