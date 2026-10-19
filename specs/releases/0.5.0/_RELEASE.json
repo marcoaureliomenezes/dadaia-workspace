@@ -3,11 +3,11 @@
   "release": "0.5.0",
   "phase": "CLOSURE",
   "defined": {
-    "sha": "99362e17a3060f91f831601f924ae287de0da1cf",
+    "sha": "995ac1256df80dc72c24da008e05247ceea22886",
     "ts": "2026-10-18T16:34:46Z"
   },
   "implemented": {
-    "sha": "4f1efa7039c2c5f43ca6bc6e599746270486a5ef",
+    "sha": "995ac1256df80dc72c24da008e05247ceea22886",
     "ts": "2026-10-18T22:47:53Z"
   },
   "shipped": null,
@@ -2172,7 +2172,7 @@
       "kind": "milestone",
       "candidate": "rc-18",
       "milestone": "defined",
-      "sha": "99362e17a3060f91f831601f924ae287de0da1cf",
+      "sha": "995ac1256df80dc72c24da008e05247ceea22886",
       "text": "Candidate defined at 99362e17a3060f91f831601f924ae287de0da1cf; phase IMPLEMENTATION."
     },
     {
@@ -2181,7 +2181,7 @@
       "kind": "milestone",
       "candidate": "rc-18",
       "milestone": "implemented",
-      "sha": "4f1efa7039c2c5f43ca6bc6e599746270486a5ef",
+      "sha": "995ac1256df80dc72c24da008e05247ceea22886",
       "text": "Candidate implemented at 4f1efa7039c2c5f43ca6bc6e599746270486a5ef; phase CLOSURE."
     },
     {
@@ -2223,7 +2223,7 @@
       "kind": "memory",
       "text": "Memory reconciled over f9f685c3a2d9a2a4d989f0d2bc7ce0e9d90d4434..c47d5f8aa1db: 12 reviewed, 3 changed.",
       "since": "f9f685c3a2d9a2a4d989f0d2bc7ce0e9d90d4434",
-      "until": "c47d5f8aa1db5057f66ad1ba24d9712d48191285",
+      "until": "995ac1256df80dc72c24da008e05247ceea22886",
       "reviewed": [
         "agent-comms",
         "agent-orchestration",
@@ -2261,8 +2261,8 @@
       "agent": "release.py memory",
       "kind": "memory",
       "text": "Memory reconciled over c47d5f8aa1db5057f66ad1ba24d9712d48191285..ee561be2ffb3: 5 reviewed, 0 changed.",
-      "since": "c47d5f8aa1db5057f66ad1ba24d9712d48191285",
-      "until": "ee561be2ffb364c1f353a02c45aaff19fd74ad7c",
+      "since": "995ac1256df80dc72c24da008e05247ceea22886",
+      "until": "995ac1256df80dc72c24da008e05247ceea22886",
       "reviewed": [
         "agent-comms",
         "agentic-entities",
@@ -2277,8 +2277,8 @@
       "agent": "release.py memory",
       "kind": "memory",
       "text": "Memory reconciled over ee561be2ffb364c1f353a02c45aaff19fd74ad7c..37375e831228: 2 reviewed, 1 changed.",
-      "since": "ee561be2ffb364c1f353a02c45aaff19fd74ad7c",
-      "until": "37375e831228e3865253289b04ea1731b0e5761e",
+      "since": "995ac1256df80dc72c24da008e05247ceea22886",
+      "until": "995ac1256df80dc72c24da008e05247ceea22886",
       "reviewed": [
         "agentic-entities",
         "bug-ledger"
