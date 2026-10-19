@@ -31,7 +31,7 @@ from tests.helpers.worktree_ws import (
     run,
 )
 
-RC, BACKLOG = "0.5.0/rc-1/wt-rc", "0.5.0/wt-backlog-x"
+RC, BACKLOG, HOTFIX = "0.5.0/rc-1/wt-rc", "0.5.0/wt-backlog-x", "0.5.0/wt-hotfix-a-bug"
 
 
 @pytest.fixture
@@ -64,9 +64,13 @@ def _requires(repo: Path, bundle: Path) -> str:
     return done.stdout + done.stderr
 
 
-@pytest.mark.parametrize("name", [BACKLOG, RC])
+@pytest.mark.parametrize("name", [BACKLOG, RC, HOTFIX])
 def test_pause_then_resume_restores_the_branch_tip_and_tree(root: Path, name: str) -> None:
-    repo, tree = root / "repos/r", open_tree(root, name)
+    repo = root / "repos/r"
+    if name == HOTFIX:  # a hotfix lane is the fix of one open bug on the work branch, never pushed
+        commit(repo, "specs/bugs/BUGS.jsonl", '{"id": "a-bug", "status": "open"}\n')
+        git(repo, "push", "-q", "origin", "feature/0.5.0")
+    tree = open_tree(root, name)
     tip = commit(tree, "specs/notes.md", "kept\n")
     snapshot = git(tree, "rev-parse", "HEAD^{tree}")
 
@@ -178,6 +182,7 @@ def test_a_refused_pause_prints_one_fix_and_touches_nothing(
     assert refused.returncode == 1, refused.stderr
     assert len(fixes(refused)) == 1, refused.stderr
     assert list((root / ".dadaia").rglob("*.bundle")) == []
+    assert [p for p in (root / ".dadaia").rglob("tmp*")] == []
     assert git(repo, "for-each-ref", "--format=%(refname) %(objectname)") == refs
     assert git(tree, "status", "--porcelain", "--ignored") == state
 
@@ -233,6 +238,32 @@ def test_resume_refuses_while_the_local_branch_exists(root: Path) -> None:
     assert len(fixes(refused)) == 1, refused.stderr
     assert _bundle(root, BACKLOG).is_file()
     assert not tree.exists()
+
+
+def test_resume_onto_an_occupied_tree_path_refuses_and_leaves_no_branch(root: Path) -> None:
+    repo, tree = root / "repos/r", _lane(root)
+    assert run(root, "pause", str(tree)).returncode == 0
+    tree.mkdir(parents=True, exist_ok=True)
+    write_text(tree / "stray.txt", "x")
+
+    refused = run(root, "resume", str(tree))
+
+    assert refused.returncode == 1, refused.stderr
+    assert len(fixes(refused)) == 1, refused.stderr
+    assert git(repo, "branch", "--list", _branch(BACKLOG)) == ""
+    assert _bundle(root, BACKLOG).is_file()
+
+
+def test_a_refused_pause_for_ignored_files_names_them_and_a_cache_is_not_one(root: Path) -> None:
+    tree = _ignored(root)
+    (tree / "__pycache__").mkdir()
+    write_text(tree / "__pycache__/m.pyc", "x")
+
+    refused = run(root, "pause", str(tree))
+
+    assert refused.returncode == 1, refused.stderr
+    assert "notes.scratch" in refused.stderr
+    assert "__pycache__" not in refused.stderr
 
 
 def test_resume_refuses_with_no_bundle(root: Path) -> None:
