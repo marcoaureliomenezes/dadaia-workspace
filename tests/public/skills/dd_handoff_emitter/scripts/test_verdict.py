@@ -806,6 +806,51 @@ def test_stats_of_an_unreadable_release_state_is_refused_with_one_fix_line(
     assert rest[0].startswith("fix: Agent action: ") and str(state) in rest[0], done.stderr
 
 
+_CHECK_FIX = (
+    "fix: Agent action: {state} fails at the keys this finding names (specs/releases/AGENTS.md: "
+    "release.py writes every _RELEASE.json field and ledger line) \u2014 revert the commit that "
+    "introduced it (`git -C {state.parent} log -p -- _RELEASE.json` lists them), or delete the "
+    "line if you wrote it and it is still uncommitted, then redo the change through `release.py`"
+)
+
+
+@pytest.mark.parametrize(
+    ("entry", "finding"),
+    [
+        (
+            {"agent": "a", "kind": "note", "text": "t"},
+            "state.log[0] is missing required field 'ts'",
+        ),
+        (
+            _entry("2026-10-12T10:00:00Z", "note", "x", candidate="foo"),
+            "state.log[0].candidate value 'foo' does not match ^rc-[1-9][0-9]*$",
+        ),
+        ("x", "state.log[0] must be of type object"),
+    ],
+    ids=["no-ts", "bad-candidate", "not-an-object"],
+)
+def test_stats_of_a_log_entry_that_breaks_the_schema_is_refused_with_checks_finding(
+    tmp_path: Path, entry: object, finding: str
+) -> None:
+    root = _stats_workspace(tmp_path)
+    _log(root, [entry])  # type: ignore[list-item]
+    state = root / "repos/r/specs/releases/0.5.0/_RELEASE.json"
+    done = _stats(root, "0.5.0-rc18")
+    lines = done.stderr.splitlines()
+    assert (done.returncode, done.stdout, len(lines)) == (1, "", 2), done.stdout + done.stderr
+    assert lines[0].startswith("[error] ") and lines[0].endswith(finding), done.stderr
+    assert lines[1] == _CHECK_FIX.format(state=state), done.stderr
+
+
+def test_stats_of_a_milestone_without_sha_reads_n_a(tmp_path: Path) -> None:
+    root = _stats_workspace(tmp_path)
+    no_sha = {k: v for k, v in _milestone("2026-10-12T09:30:00Z", "rc-1", "defined", "x").items() if k != "sha"}  # fmt: skip
+    _log(root, [_born("2026-10-12T09:00:00Z"), no_sha])
+    done = _stats(root, "0.5.0-rc1")
+    assert (done.returncode, done.stderr) == (0, ""), done.stdout
+    assert "4 closure duration\tn/a\t<= 4 h\n" in done.stdout
+
+
 _STUB_VALIDATE = '    sys.exit(0 if "schema_version" in json.load(open(args[2])) else 1)'
 _REAL_VALIDATE = """    open({log!r}, "a").write(json.dumps(args) + chr(10))
     sys.path.insert(0, {kernel!r})
