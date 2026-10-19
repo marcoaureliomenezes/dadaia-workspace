@@ -912,15 +912,15 @@ def test_a_task_carrying_a_denylisted_literal_is_refused_then_lands_by_its_print
     refused = run(root, "merge", str(task))
 
     assert refused.returncode == 1
-    assert "tests/test_a.py" in refused.stderr and address not in refused.stderr
+    shown = refused.stdout + refused.stderr  # the scan's findings, then the refusal
+    assert "tests/test_a.py" in shown and address not in shown
     assert git(root / TREE, "rev-parse", "HEAD").strip() == onto
     write_text(task / "tests/test_a.py", "HOST = None\n")  # the term removed, as the refusal says
     _fix(root, refused)
     landed = run(root, "merge", str(task))
     assert landed.returncode == 0, landed.stderr
-    landed_range = f"{onto}..{WORK}"
-    assert address not in git(root / "repos/r", "log", "-p", landed_range)
-    messages = git(root / "repos/r", "log", "--format=%B", landed_range)
+    assert address not in git(root / TREE, "log", "-p", f"{onto}..HEAD")
+    messages = git(root / TREE, "log", "--format=%B", f"{onto}..HEAD")
     assert "test(J1.T1): red a" in messages and "test(J1.T1): red b" in messages
 
 
@@ -939,7 +939,8 @@ def test_every_tree_kind_is_refused_for_a_denylisted_literal(root: Path, kind: s
     refused = run(root, "merge", str(tree))
 
     assert refused.returncode == 1
-    assert rel in refused.stderr and address not in refused.stderr
+    shown = refused.stdout + refused.stderr
+    assert rel in shown and address not in shown
     assert len(fixes(refused)) == 1
 
 
