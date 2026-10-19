@@ -9,9 +9,10 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from dadaia_workspace.features.certification import CertificationResult
 
+from dadaia_workspace.core.cli_line import read_failure_fix
 from dadaia_workspace.core.exceptions import DadaiaError, GitSyncError
-from dadaia_workspace.core.models.git_scan import GitObjectReadError
-from dadaia_workspace.core.platform import act, write_text
+from dadaia_workspace.core.models.git_scan import GitObjectReadError, GitRunError
+from dadaia_workspace.core.platform import write_text
 from dadaia_workspace.core.workspace_resolver import not_initialized
 from dadaia_workspace.features.capabilities import distribution_version
 from dadaia_workspace.features.chokepoints.denylist_scan import BaselinePatternLike
@@ -149,12 +150,12 @@ def scan_bundle(workspace_root: Path, bundle: Path, repo: Path) -> dict[str, str
     from dadaia_workspace.features.chokepoints.denylist_scan import scan_objects
 
     git = GitSubprocessClient().git
-    with bundle.open("rb") as handle:  # the header is bounded: a crafted file never reads on
-        header = handle.read(1 << 20).split(b"\n\n", 1)[0].split(b"\n")[1:]
-    prerequisites = [line[1:].split()[0].decode() for line in header if line[:1] == b"-"]
     tmp = workspace_root / ".dadaia" / "tmp"
     tmp.mkdir(parents=True, exist_ok=True)
     try:
+        with bundle.open("rb") as handle:  # bounded: a crafted file never reads on
+            header = handle.read(1 << 20).split(b"\n\n", 1)[0].split(b"\n")[1:]
+        prerequisites = [line[1:].split()[0].decode() for line in header if line[:1] == b"-"]
         with tempfile.TemporaryDirectory(dir=tmp, prefix="scan-") as name:
             scratch = Path(name)
             git(scratch, "init", "-q", "--bare")
@@ -165,12 +166,17 @@ def scan_bundle(workspace_root: Path, bundle: Path, repo: Path) -> dict[str, str
             head = git(scratch, "bundle", "unbundle", str(bundle)).split()[0]
             found = GitSubprocessObjectReader().new_objects(scratch, head, "")
             outcome = scan_objects(found, load_denylist_terms(), load_denylist_baseline_patterns())
-    except (GitSyncError, GitObjectReadError, IndexError, ValueError) as exc:
-        raise DadaiaError(
-            f"{bundle.name} cannot be scanned ({exc})",
-            fix=act("agent", f"delete {bundle} or re-pause its tree, then run the export again"),
-        ) from exc
-    return {h.path: f"{h.source_layer} '{h.masked_term}' (line {h.line})" for h in outcome.hits}
+    except GitObjectReadError as exc:
+        failure = exc
+    except (OSError, TimeoutError) as exc:
+        failure = GitRunError(f"git could not run: {type(exc).__name__}")
+    except (GitSyncError, IndexError, ValueError):
+        failure = GitObjectReadError("git refused it: a damaged bundle or a missing prerequisite")
+    else:
+        return {h.path: f"{h.source_layer} '{h.masked_term}' (line {h.line})" for h in outcome.hits}
+    raise DadaiaError(
+        f"{bundle.name} cannot be scanned ({failure})", fix=read_failure_fix(failure, repo)
+    ) from failure
 
 
 def build_doctor_service(

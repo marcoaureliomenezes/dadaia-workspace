@@ -9,11 +9,10 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Protocol
 
-from dadaia_workspace.core.cli_line import fix_line, git_line, spell_fix
+from dadaia_workspace.core.cli_line import fix_line, git_line, read_failure_fix, spell_fix
 from dadaia_workspace.core.gitflow import Gitflow
 from dadaia_workspace.core.models.git_scan import (
     GitObjectReadError,
-    GitRunError,
     ScannedObject,
     is_zero_sha,
 )
@@ -145,11 +144,7 @@ def _read_failure(exc: GitObjectReadError, masker: PathMasker, repo: Path) -> De
         allowed=False,
         message=_fail_closed(f"reading the pushed-range git objects failed ({exc}{masked})")
         + "\n"
-        + spell_fix(
-            act("operator", "make git runnable here")  # not corruption: no fsck
-            if isinstance(exc, GitRunError)
-            else git_line(repo, "fsck")
-        ),
+        + spell_fix(read_failure_fix(exc, repo)),
     )
 
 

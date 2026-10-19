@@ -45,9 +45,6 @@ def _record(ctx: SpecContextProject) -> dict[str, object]:
     }
 
 
-_CARRIED = ("backlog", "hotfix", "rc")
-"""The kinds of tree an export carries: the lanes and the `wt-rc`; a job or task tree is not."""
-
 ScanBundle = Callable[[Path, Path], dict[str, str]]
 """``(bundle, repo)`` -> one masked finding per offending path of the objects the bundle adds."""
 
@@ -93,7 +90,7 @@ class ExportService:
             if row["state"] == "paused":
                 member = _pause.member(row["repo"], name)
                 found[member] = dist / member
-            elif row.get("kind") in _CARRIED and row["state"] in ("ready", "open", "empty"):
+            elif row["state"] in ("ready", "open", "empty"):
                 repo = self._workspace_root / "repos" / row["repo"]
                 if bundled := _pause.carry(repo, Path(row["path"]), name, scratch):
                     found[bundled] = scratch / bundled

@@ -29,6 +29,10 @@ def write_bundle(repo: Path, ref: str, dest: Path) -> None:
         raise
 
 
+#: The kinds of tree that pause and an export take: the lanes and the `wt-rc`.
+CARRIED = ("backlog", "hotfix", "rc")
+
+
 def member(repo: str, name: str) -> str:
     """`<repo>/<name>.bundle`: where a tree's bundle sits under `.dadaia/dist/` and in an export."""
     return f"{repo}/{name}.bundle"
@@ -37,7 +41,10 @@ def member(repo: str, name: str) -> str:
 def carry(repo: Path, tree: Path, name: str, into: Path) -> str | None:
     """Writes the commits of the lane or `wt-rc` tree *name* at *tree* that no `origin` ref holds
     to `<into>/<repo>/<name>.bundle` and returns that member; `None`, writing nothing, when origin
-    holds them all. Refuses a dirty tree first, whatever it is ahead."""
+    holds them all or *name* is no lane or `wt-rc`. Refuses a dirty tree first, whatever it is
+    ahead."""
+    if kind_of(name) not in CARRIED:
+        return None
     _refuse_dirty(tree)
     ref = branch(name)
     if git(repo, "rev-list", "--count", ref, "--not", "--remotes=origin").strip() == "0":
@@ -52,7 +59,7 @@ def pause(root: Path, path: str) -> str:
     open below it, and a branch origin already holds."""
     repo, tree, name, _ = _target(root, path)
     land = command(*LAUNCH, "merge", str(tree))
-    if kind_of(name) in ("main", "task"):
+    if kind_of(name) not in CARRIED:
         raise Refusal(f"{tree} is a {kind_of(name)} tree: only a lane or a wt-rc pauses", land)
     if not any(Path(row["path"]).resolve() == tree for row in ours(repo)):
         raise Refusal(f"{tree} is not a worktree of ours", command(*LAUNCH, "list"))
