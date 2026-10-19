@@ -4,17 +4,23 @@ a bundle of each open lane and `wt-rc` tree and each pause bundle)."""
 
 import io
 import json
+import re
 import tarfile
 import tempfile
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
-from dadaia_workspace.core import platform
+from dadaia_workspace.core import clock, harness_registry, platform
 from dadaia_workspace.core.atomic_write import atomic_write
-from dadaia_workspace.core.cli_line import fix_line
-from dadaia_workspace.core.exceptions import DadaiaError
-from dadaia_workspace.core.models.spec_context import EXPORT_SCHEMA_VERSION, SpecContextProject
+from dadaia_workspace.core.cli_line import cli_words, fix_line
+from dadaia_workspace.core.exceptions import DadaiaError, SchemaVersionError
+from dadaia_workspace.core.models.spec_context import (
+    EXPORT_SCHEMA_VERSION,
+    AssociatedRepo,
+    ContextState,
+    SpecContextProject,
+)
 from dadaia_workspace.core.platform import act
 from dadaia_workspace.core.skill_owner import load_owner
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
@@ -62,6 +68,71 @@ def _record(ctx: SpecContextProject) -> dict[str, object]:
     }
 
 
+@dataclass(frozen=True)
+class Artifact:
+    """A read `export-v1` artifact: its harness names, every context as a DEAD record (a null
+    url read as ``""``), and the names that were ALIVE where it was written."""
+
+    harnesses: tuple[str, ...]
+    contexts: tuple[SpecContextProject, ...]
+    alive: tuple[str, ...]
+
+
+#: A hard artifact's only members besides the JSON: `<repo>/<name>.bundle`, never a `.`/`..` step.
+_BUNDLE = re.compile(r"[A-Za-z0-9][\w.-]*(/[\w.-]+)+\.bundle")
+_JSON_MEMBER = "spec-contexts.json"
+
+
+def _refuse(why: str, fix: str = "") -> SchemaVersionError:
+    return SchemaVersionError(
+        why, fix or act("agent", "re-export the artifact with the current dadaia-workspace")
+    )
+
+
+def _member_ok(member: tarfile.TarInfo) -> bool:
+    if member.name == _JSON_MEMBER:
+        return member.isfile()
+    return (
+        member.isfile()
+        and bool(_BUNDLE.fullmatch(member.name))
+        and not {".", ".."} & set(member.name.split("/"))
+    )
+
+
+def _text(path: Path) -> str:
+    """The artifact's JSON text; a hard artifact's members are all checked first."""
+    if not path.is_file():
+        export = platform.inline(*cli_words(None, "export"))
+        raise _refuse(
+            f"Export file not found: '{path}'.", act("agent", f"pass a file written by `{export}`")
+        )
+    try:
+        if not tarfile.is_tarfile(path):
+            return platform.read_text(path)
+        with tarfile.open(path) as tar:
+            if bad := next((m.name for m in tar.getmembers() if not _member_ok(m)), None):
+                raise _refuse(f"'{path.name}' has an unsafe member: {bad!r}.")
+            head = tar.extractfile(_JSON_MEMBER) if _JSON_MEMBER in tar.getnames() else None
+            if head is None:
+                raise _refuse(f"'{path.name}' has no {_JSON_MEMBER}.")
+            return head.read().decode()
+    except (tarfile.TarError, OSError, UnicodeDecodeError) as exc:
+        raise _refuse(f"'{path.name}' is not readable ({type(exc).__name__}).") from exc
+
+
+def _field(file: str, record: object, *keys: str) -> dict[str, object]:
+    absent = [k for k in keys if not isinstance(record, dict) or k not in record]
+    if absent:
+        raise _refuse(f"'{file}' has a record missing {', '.join(absent)}.")
+    return record  # type: ignore[return-value]
+
+
+def _url(file: str, value: object) -> str:
+    if value is not None and not isinstance(value, str):
+        raise _refuse(f"'{file}' has a url that is not text.")
+    return str(value or "")
+
+
 ScanBundle = Callable[[Path, Path], dict[str, str]]
 """``(bundle, repo)`` -> one masked finding per offending path of the objects the bundle adds."""
 
@@ -73,6 +144,47 @@ class ExportService:
         self._scan = scan_bundle
         self._store = context_store
         self._workspace_root = workspace_root
+
+    @staticmethod
+    def read(path: Path) -> Artifact:
+        """The artifact at *path*, soft or hard, checked and written nowhere. Raises
+        `SchemaVersionError` (one fix line) on a missing or unreadable file, any `schema_version`
+        but `export-v1`, an unknown harness, a record missing a field, or an unsafe member."""
+        try:
+            payload = json.loads(_text(path))
+        except json.JSONDecodeError as exc:
+            raise _refuse(f"'{path.name}' is not valid JSON: {exc}") from exc
+        if not isinstance(payload, dict) or payload.get("schema_version") != EXPORT_SCHEMA_VERSION:
+            raise _refuse(f"'{path.name}' does not carry schema_version {EXPORT_SCHEMA_VERSION!r}.")
+        records, names = payload.get("contexts"), payload.get("harnesses", [])
+        if not isinstance(records, list) or not isinstance(names, list):
+            raise _refuse(f"'{path.name}' has no 'contexts' list.")
+        try:
+            harnesses = tuple(harness_registry.parse_harness_name(str(n)) for n in names)
+        except ValueError as exc:
+            raise _refuse(f"'{path.name}' names an unknown harness: {exc}") from exc
+        now, contexts = clock.now_iso(), []
+        for raw in records:
+            rec = _field(path.name, raw, "name", "slug", "repo_url")
+            repos = rec.get("associated_repos") or []
+            if not isinstance(repos, list):
+                raise _refuse(f"'{path.name}' has a record missing associated_repos as a list.")
+            contexts.append(
+                SpecContextProject(
+                    name=str(rec["name"]),
+                    state=ContextState.DEAD,
+                    repo_slug=str(rec["slug"]),
+                    repo_url=_url(path.name, rec["repo_url"]),
+                    created_at=now,
+                    dead_since=now,
+                    associated_repos=tuple(
+                        AssociatedRepo(str(r["slug"]), _url(path.name, r["url"]))
+                        for r in (_field(path.name, r, "slug", "url") for r in repos)
+                    ),
+                )
+            )
+        alive = tuple(str(r["name"]) for r in records if r.get("state") == "alive")
+        return Artifact(harnesses, tuple(contexts), alive)
 
     def run(self, hard: bool = False) -> ExportResult:
         """Writes the artifact and returns its path; the registry is only read."""
