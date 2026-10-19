@@ -1504,6 +1504,37 @@ def test_check_accepts_a_record_whose_id_line_a_commit_of_head_carries(
     assert done.returncode == 0, done.stdout + done.stderr
 
 
+@pytest.mark.parametrize(("reverts", "code"), [(1, 1), (2, 0), (3, 1), (4, 0)])
+def test_check_follows_the_subjects_git_writes_for_a_revert_and_its_reapply(
+    script: Path, tmp_path: Path, reverts: int, code: int
+) -> None:
+    """Each `git revert` of the newest commit is run for real, so the subjects are git's own."""
+    _ledger(tmp_path)
+    _commit_as(tmp_path, _FIXED)
+    git = ["git", "-C", str(tmp_path), "-c", "user.name=t", "-c", "user.email=t@t.test"]
+    for _ in range(reverts):
+        run([*git, "revert", "--no-edit", "HEAD"], check=True)
+    specs = _ledger(tmp_path, _resolved("a-bug"))
+    done = _run(script, "check", "--specs", str(specs))
+    assert done.returncode == code, done.stdout + done.stderr
+
+
+def test_check_reads_no_checkout_beside_the_main_repo_that_the_context_does_not_own(
+    script: Path, tmp_path: Path
+) -> None:
+    (tmp_path / "ws").mkdir()
+    root = make_workspace(tmp_path / "ws")
+    associate(root, "Approved", ("a",))
+    foreign = root / "repos" / "z"
+    foreign.mkdir()
+    git(foreign, "init", "-q")
+    commit(foreign, "fix.py")
+    git(foreign, "commit", "-q", "--amend", "-m", "fix(bugs): a-bug \u2014 c")
+    specs = _ledger(root / "repos" / "r", _resolved("a-bug"))
+    done = _run(script, "check", "--specs", str(specs))
+    assert done.returncode == 1 and "'a-bug'" in done.stdout, done.stdout
+
+
 def test_check_accepts_a_record_whose_id_commit_was_rebased(script: Path, tmp_path: Path) -> None:
     """The recorded sha is a hint: an amend orphans it and the id line still reaches HEAD."""
     _ledger(tmp_path)
