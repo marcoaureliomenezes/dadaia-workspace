@@ -4,7 +4,9 @@
 Size: SMALL — the real service over a tmp dir, the real registry; the scanner is a fake.
 """
 
+import io
 import json
+import tarfile
 from collections.abc import Callable
 from pathlib import Path
 
@@ -133,7 +135,7 @@ def test_read_returns_every_record_as_a_dead_context_and_names_the_alive_ones(
     artifact = reader.read(
         _artifact(
             tmp_path,
-            _record("alpha", state="alive", branch="feature/0.4.6", last_sync_at="2026-09-03"),
+            _record("alpha", state="alive"),
             _record("beta", slug="beta-repo", associated_repos=[infra]),
         )
     )
@@ -244,3 +246,100 @@ def test_read_refuses_a_record_missing_a_field_naming_it(
 
     assert missing in str(refused.value)
     assert str(refused.value).count("fix:") == 1
+
+
+@pytest.mark.parametrize(
+    "record",
+    [
+        {**_record("x"), "name": None},
+        _record("x", slug=None),
+        _record("x", repo_url=7),
+        _record("x", state="paused"),
+        _record("x", associated_repos=[{"slug": None, "url": None}]),
+        _record("x", associated_repos=[{"slug": "side", "url": 7}]),
+        _record("x", branch="main"),
+    ],
+    ids=[
+        "null-name",
+        "null-slug",
+        "numeric-url",
+        "unknown-state",
+        "null-assoc-slug",
+        "numeric-assoc-url",
+        "extra-key",
+    ],
+)
+def test_read_refuses_a_record_the_schema_refuses_and_never_coerces_it_to_text(
+    tmp_path: Path, record: dict[str, object]
+) -> None:
+    with pytest.raises(DadaiaError) as refused:
+        _reader(tmp_path)[0].read(_artifact(tmp_path, record))
+
+    assert str(refused.value).count("fix:") == 1
+
+
+def _hard(
+    tmp_path: Path, members: list[tuple[str, bytes]], records: tuple[dict[str, object], ...] = ()
+) -> Path:
+    head = json.dumps(
+        {
+            "schema_version": "export-v1",
+            "dadaia_version": "0.5.0",
+            "harnesses": ["claude"],
+            "contexts": list(records or (_record("app"),)),
+        }
+    ).encode()
+    with tarfile.open(archive := tmp_path / "workspace-export.tar.gz", "w:gz") as tar:
+        for name, data in [("spec-contexts.json", head), *members]:
+            info = tarfile.TarInfo(name)
+            info.size = len(data)
+            tar.addfile(info, io.BytesIO(data))
+    return archive
+
+
+@pytest.mark.parametrize(
+    ("members", "why"),
+    [
+        ([("stranger/x.bundle", b"b")], "stranger"),
+        ([("spec-contexts.json", b"{}")], "duplicate"),
+        ([("app/x.bundle", b"1"), ("app/x.bundle", b"2")], "duplicate"),
+    ],
+    ids=["slug-no-context-owns", "duplicate-json", "duplicate-bundle"],
+)
+def test_a_hard_member_the_artifact_does_not_account_for_refuses(
+    tmp_path: Path, members: list[tuple[str, bytes]], why: str
+) -> None:
+    archive = _hard(tmp_path, members)
+
+    with pytest.raises(DadaiaError, match=why) as refused:
+        _reader(tmp_path)[0].read(archive)
+
+    assert str(refused.value).count("fix:") == 1
+
+
+def test_an_oversized_json_member_refuses_before_it_is_read(tmp_path: Path) -> None:
+    archive = _hard(tmp_path, [])
+    with tarfile.open(archive, "w:gz") as tar:
+        info = tarfile.TarInfo("spec-contexts.json")
+        info.size = 16 << 20
+        tar.addfile(info, io.BytesIO(b" " * info.size))
+
+    with pytest.raises(DadaiaError, match="larger than"):
+        _reader(tmp_path)[0].read(archive)
+
+
+def test_restore_extracts_the_bundles_and_never_overwrites_a_file_in_dist(tmp_path: Path) -> None:
+    reader, _ = _reader(tmp_path)
+    archive = _hard(tmp_path, [("app/0.5.0/lane.bundle", b"from the artifact")])
+    artifact = reader.read(archive)
+    target = tmp_path / ".dadaia/dist/app/0.5.0/lane.bundle"
+
+    reader.restore(archive, artifact)
+    assert target.read_bytes() == b"from the artifact"
+    target.write_bytes(b"local paused work")
+
+    with pytest.raises(DadaiaError, match="already exists") as refused:
+        reader.restore(archive, artifact)
+
+    assert str(refused.value).count("fix:") == 1
+    assert target.read_bytes() == b"local paused work"
