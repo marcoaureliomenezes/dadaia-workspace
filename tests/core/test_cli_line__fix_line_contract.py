@@ -285,7 +285,7 @@ _OPERATOR_ACTIONS = {
     ("features/spec_context/gate_policy.py", "relaunch this session with DADAIA_CONTEXT={owner}"): "reach",
     ("features/spec_context/sweep.py", "remove {target}"): "reach",
     ("infrastructure/git_subprocess.py", "pop or drop the {stashes} stash entry(ies) of {path}"): "ruling",
-    ("infrastructure/json_context_store.py", "set it to {_VERSION} in {path}"): "protected",
+    ("infrastructure/json_context_store.py", "set it to {SCHEMA_VERSION} in {path}"): "protected",
     ("infrastructure/json_context_store.py", "add {', '.join(missing)} to that row of {path}"): "protected",
     ("public/skills/dd-backlog-definition/scripts/_backlog_exit.py", "confirm {slug} as a bug (dd-bug-registration §2)"): "ruling",
     ("public/skills/dd-bug-resolution/scripts/_ledger.py", "rewrite {path} as one JSON object mapping each term to its reason"): "protected",
