@@ -323,3 +323,66 @@ def test_the_several_work_fix_deletes_a_pushed_low_branch_that_has_later_commits
                     subprocess.run(step.removeprefix("run ").strip("`"), shell=True, check=True)
     assert passes == (1 if merged else 2)
     assert "feature/0.1.0" not in git(repo, "branch", "--list", "feature/*")
+
+
+ORIGIN = "refs/remotes/origin"
+
+
+def _repo_with_origin(tmp_path: Path, local: list[str], origin: list[str]) -> Path:
+    """A repo whose local work branches are *local* and whose origin holds *origin*."""
+    git(tmp_path, "init", "-q", "--bare", "o.git")
+    repo = tmp_path / "r"
+    git(tmp_path, "init", "-q", "r")
+    commit(repo, "a.txt")
+    git(repo, "remote", "add", "origin", str(tmp_path / "o.git"))
+    for version in origin:
+        git(repo, "push", "-q", "origin", f"HEAD:refs/heads/feature/{version}")
+    git(repo, "fetch", "-q", "origin")
+    for version in local:
+        git(repo, "branch", f"feature/{version}")
+    return repo
+
+
+def test_a_default_read_judges_local_branches_only_whatever_origin_holds(tmp_path: Path) -> None:
+    owner = load_owner("dd-gitflow-default", "_worktree_git")
+    repo = _repo_with_origin(tmp_path, ["0.8.0"], ["0.6.0", "0.8.0"])
+    flow = {"work": "feature/", "integration": "develop", "main": "r"}
+
+    assert owner.work_versions(repo, flow) == ["0.8.0"]
+    assert owner.work_version(repo, flow) == "0.8.0"
+
+
+def test_the_origin_read_lists_the_work_branches_origin_holds_and_keeps_the_highest(
+    tmp_path: Path,
+) -> None:
+    owner = load_owner("dd-gitflow-default", "_worktree_git")
+    repo = _repo_with_origin(tmp_path, ["0.8.0"], ["0.6.0", "0.8.0"])
+    flow = {"work": "feature/", "integration": "develop", "main": "r"}
+
+    assert sorted(owner.work_versions(repo, flow, ORIGIN)) == ["0.6.0", "0.8.0"]
+    with pytest.raises(owner.SeveralWork) as several:
+        owner.work_version(repo, flow, ORIGIN)
+    assert several.value.keep == "0.8.0"
+
+
+def test_the_several_work_decision_yields_the_kept_version_and_the_local_act(
+    tmp_path: Path,
+) -> None:
+    owner = load_owner("dd-gitflow-default", "_worktree_git")
+    repo = _repo_with_origin(tmp_path, ["0.6.0", "0.8.0"], [])
+    flow = {"work": "feature/"}
+
+    keep, text = owner.several_work(repo, flow, ["0.6.0", "0.8.0"])
+
+    assert keep == "0.8.0"
+    assert text == (
+        f"run `{owner.git_inline(repo, 'switch', 'feature/0.8.0')}`, "
+        f"then run `{owner.git_inline(repo, 'branch', '-d', 'feature/0.6.0')}`"
+    )
+
+
+def test_an_origin_only_lower_work_branch_yields_no_local_step(tmp_path: Path) -> None:
+    owner = load_owner("dd-gitflow-default", "_worktree_git")
+    repo = _repo_with_origin(tmp_path, ["0.8.0"], ["0.6.0", "0.8.0"])
+
+    assert owner.several_work(repo, {"work": "feature/"}, ["0.6.0", "0.8.0"], ORIGIN) == ("0.8.0", "")  # fmt: skip
