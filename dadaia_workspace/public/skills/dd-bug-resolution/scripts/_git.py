@@ -72,7 +72,7 @@ _FIX_LINE = re.compile(r"^(?:fix|refactor)\(bugs\): (.*?) — ", re.M)
 
 def fix_commit(repos: Iterable[Path], ids: Iterable[str]) -> dict[str, tuple[Path, str]]:
     """For each of *ids*, the repo and sha of the newest commit the HEAD of the first of *repos* that has one reaches whose message holds a bug-fix line naming it (a group lists its ids separated by commas or blanks); each repo is read in one `git log` and only while an id is missing. A commit the HEAD reverts is skipped: a commit subjected `Revert "<S>"` retires the older commit subjected `<S>`, and a retired revert registers nothing."""
-    wanted, found = set(ids), {}
+    wanted, found = set(ids), dict[str, tuple[Path, str]]()
     for repo in repos:
         if wanted <= found.keys():
             break
