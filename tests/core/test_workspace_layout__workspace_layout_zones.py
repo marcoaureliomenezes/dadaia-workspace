@@ -159,4 +159,4 @@ def test_dist_admits_the_export_artifacts_and_registered_slug_folders(
 
 def test_the_doctor_fix_never_moves_a_registered_repos_bundle() -> None:
     """``--fix`` moves exactly the ``slop`` entries, so a bundle of a registered repo must not be one."""
-    assert wl.verdict(".dadaia/dist/myrepo/r.bundle", False, (), ("myrepo",), ()) != "slop"
+    assert wl.verdict(".dadaia/dist/myrepo/0.5.0/rc-1/wt-rc.bundle", False, (), ("myrepo",), ()) != "slop"
