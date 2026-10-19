@@ -13,7 +13,9 @@ from pathlib import Path
 
 import pytest
 
-from tests.helpers.oslib import read_text, stub_cli, write_text
+import dadaia_workspace
+from tests.fixtures.stores import fake_venv
+from tests.helpers.oslib import make_executable, read_text, stub_cli, write_text
 from tests.helpers.oslib import run as os_run
 from tests.helpers.worktree_ws import (
     NEW_JOB,
@@ -173,3 +175,63 @@ def test_a_refused_pause_prints_one_fix_and_touches_nothing(
     assert list((root / ".dadaia").rglob("*.bundle")) == []
     assert git(repo, "for-each-ref", "--format=%(refname) %(objectname)") == refs
     assert git(tree, "status", "--porcelain", "--ignored") == state
+
+
+_HOOK = Path(dadaia_workspace.__file__).parent / "public/scripts/reference-transaction.sh"
+
+
+def _install_ref_gate(root: Path) -> None:
+    """The `reference-transaction` shim in repo `r`, over a venv that can import the package."""
+    fake_venv(root, pth=True)
+    shutil.copy(_HOOK, hook := root / "repos/r/.git/hooks/reference-transaction")
+    make_executable(hook)
+
+
+def test_resume_creates_the_branch_through_the_cli_marker(root: Path) -> None:
+    repo, tree = root / "repos/r", _lane(root)
+    tip = git(tree, "rev-parse", "HEAD").strip()
+    _install_ref_gate(root)
+    assert run(root, "pause", str(tree)).returncode == 0
+
+    raw = os_run(["git", "-C", str(repo), "branch", _branch(BACKLOG), tip])
+
+    assert raw.returncode != 0
+    assert "[ref-gate] BLOCKED" in raw.stderr
+    resumed = run(root, "resume", str(tree))
+    assert resumed.returncode == 0, resumed.stderr
+    assert git(repo, "rev-parse", _branch(BACKLOG)).strip() == tip
+
+
+def test_a_lane_whose_branch_was_pushed_resumes(root: Path) -> None:
+    tree = open_tree(root, BACKLOG)
+    commit(tree, "specs/a.md")
+    git(tree, "push", "-q", "origin", _branch(BACKLOG))
+    tip = commit(tree, "specs/b.md")
+    assert run(root, "pause", str(tree)).returncode == 0
+
+    resumed = run(root, "resume", str(tree))
+
+    assert resumed.returncode == 0, resumed.stderr
+    assert git(tree, "rev-parse", "HEAD").strip() == tip
+    assert git(root / "repos/r", "ls-remote", "--heads", "origin", _branch(BACKLOG)) != ""
+
+
+def test_resume_refuses_while_the_local_branch_exists(root: Path) -> None:
+    repo, tree = root / "repos/r", _lane(root)
+    tip = git(tree, "rev-parse", "HEAD").strip()
+    assert run(root, "pause", str(tree)).returncode == 0
+    git(repo, "branch", _branch(BACKLOG), tip)
+
+    refused = run(root, "resume", str(tree))
+
+    assert refused.returncode == 1, refused.stderr
+    assert len(fixes(refused)) == 1, refused.stderr
+    assert _bundle(root, BACKLOG).is_file()
+    assert not tree.exists()
+
+
+def test_resume_refuses_with_no_bundle(root: Path) -> None:
+    refused = run(root, "resume", str(root / "worktrees/r" / BACKLOG))
+
+    assert refused.returncode == 1, refused.stderr
+    assert len(fixes(refused)) == 1, refused.stderr
