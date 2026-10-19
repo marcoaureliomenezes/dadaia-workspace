@@ -10,51 +10,48 @@
 
 ## Bug window review
 
-**Window:** the 8 records closed from rc-18's definition (2026-10-18T16:34:46Z) to rc-19's birth (rc-18 judged the two before it): 2 live, 6 archived. The push-gate remedy squashed the rc-18 range into `995ac1256`; the two live records were re-pointed to it (`7c3ba5d1d`, `1f881d404`) and are judged by their `fix_files` there and by the original commit; the six archived keep their original commits. Each was read with `git show` and checked present at `995ac1256`. Verdicts: 2 KEEP, 6 REBUILD in three units, R1-R3.
+**Window:** the 8 records closed from rc-18's definition (2026-10-18T16:34:46Z) to rc-19's birth: 2 live, 6 archived. The push-gate remedy squashed the rc-18 range into `995ac1256`; the two live were re-pointed to it (`7c3ba5d1d`, `1f881d404`), the six archived keep theirs. Verdicts: 2 KEEP, 6 REBUILD (R1-R3).
 
 | bug id | fix sha (original) | unit | verdict | reason (evidence) |
 |---|---|---|---|---|
-| `stats-invents-a-table-for-a-missing-candidate` | `c987ad086` | `_stats.py` `table`, `_window` | REBUILD R1 | the rc-18 R2/R3 rebuild (n/a for a missing candidate, CLOSURE-to-CLOSURE window, counts read by running `bugs.py`); three bugs on the same read of the release state followed it inside rc-18 |
-| `stats-crashes-on-a-candidate-without-a-release-folder` | `242d0b830` | same | REBUILD R1 | `caused_by: J5.T2`; it adds a branch for one input, the missing file, which is still `if path.is_file() else {}` (`_stats.py:94`), while the read stays unguarded for the next bad input |
-| `stats-crashes-on-an-unreadable-release-state` | `5621889c5` | same | REBUILD R1 | `caused_by` the row above: a second guard on the same read (`parse_object` over `read_text`, `_stats.py:92-94`); the open Origin bug `stats-crashes-on-a-release-state-that-breaks-its-schema` is the third bad input on it (`_window`, `int(e["candidate"][3:])`, `e["ts"]`, `_stats.py:46-50`); four bugs on one read |
-| `merge-checks-a-tree-ledger-with-the-instance-schema` | `187950dea`, reshaped by `2b583acf5` (J5.T15), `9ca521ca6` (J5.T16) | `_worktree_end.py` `_ledgers` | REBUILD R2 | the rc-18 R1 rebuild; two review rounds reshaped it, and the next row is a bug it caused |
-| `merge-runs-a-tree-carried-ledger-script-without-verify` | `a8abf7416` | `_ledgers`, `_kind_checks` | REBUILD R2 | `caused_by` the row above; it adds a flag, `own: bool`, set by the caller as `kind_of(name) == "rc"` (`_worktree_end.py:420`) and read inside a comprehension filter (`if h and own`, `:311`). One question, which scripts judge this tree's ledgers, is decided by three stacked conditions in two functions: the `ls-files` glob, the single match and the flag. This is the unit's 4th bug in the chain `trio-status-canon-judged-outside-the-define-merge-gate` -> `wt-rc-merge-runs-ledger-checks-on-an-associated-repo-tree` -> these two |
-| `merge-gate-lets-a-test-commit-carry-source` | `995ac1256` (`09df2bff6`) | `_worktree_end.py` `_refuse_implementation_tests` | KEEP, noted | the missing half of the RED-separation rule, in the same loop with the same `_is_test_path` predicate; its RED test `5ab19c1aa` only adds lines; no other bug on the function since `freeze-deadlocks-a-repo-without-a-tests-line` (2026-10-08). Noted: its two refusal blocks mirror each other (`:259-276` at HEAD) and fold into one comparison of the path's class with the commit's (intake) |
-| `branch-d-fix-line-judges-head-not-the-upstream` | `995ac1256` (`6bb57a885`) | `_worktree_git.py` `SeveralWork` fix line, `drop_steps` | REBUILD R3 | two patterns hit. (a) Its RED commit `301cc9f2c` changed an existing assert: `tests/core/test_gitflow.py:205` drops the `-d` step from the expected fix line, a contract change made inside a fix. (b) It is the 5th bug on the line, after `several-work-fix-deletes-the-checked-out-branch`, `several-work-rework-leaves-two-gitflow-tests-on-the-old-fix-line`, `several-work-agent-action-fix-breaks-the-verbatim-fix-runner-row` and `several-work-branches-blank-the-doctor-report`. ADR 0270 changes the reader `work_versions` (`:88-92`) to take a ref prefix; `drop_steps` (`:110-119`) re-reads git apart from the version list and judges local branches only |
-| `bugs-check-misses-a-record-both-live-and-archived` | `20fefc4a7` | `_bugs_check.py` `findings_for`, `_bugs_write.py` `append` | KEEP, noted | `caused_by: none`. The rule is new, ruled by the operator on 2026-10-19 ("Event lines aren't records (Recommended)"). The fix deletes `archived_ids` and puts every archive read on one reader, `_archive_lines`; its `events` flag tells apart the two archive line shapes, which the same ruling keeps. The old asserts changed in `c96ad777d` were born in this bug's own RED commits (`a6ec66063`, `d3a018380`). Noted: "id taken" is still decided twice, in `append` (`taken`, `_bugs_write.py:71`) and in `findings_for`, which every write runs; `append`'s copy exists for its `--bug-id` fix line (intake) |
+| `stats-invents-a-table-for-a-missing-candidate` | `c987ad086` | `_stats.py` `table`, `_window` | REBUILD R1 | the rc-18 R2/R3 rebuild; three bugs on the same read followed it in rc-18 |
+| `stats-crashes-on-a-candidate-without-a-release-folder` | `242d0b830` | same | REBUILD R1 | `caused_by: J5.T2`; a branch for one input, the missing file (`_stats.py:94`) |
+| `stats-crashes-on-an-unreadable-release-state` | `5621889c5` | same | REBUILD R1 | `caused_by` the row above: a second guard on the same read (`_stats.py:92-94`); the open Origin bug is the third bad input (`_stats.py:46-50`); four bugs on one read |
+| `merge-checks-a-tree-ledger-with-the-instance-schema` | `187950dea`, reshaped by `2b583acf5` (J5.T15), `9ca521ca6` (J5.T16) | `_worktree_end.py` `_ledgers` | REBUILD R2 | the rc-18 R1 rebuild, reshaped twice in review; it caused the next row |
+| `merge-runs-a-tree-carried-ledger-script-without-verify` | `a8abf7416` | `_ledgers`, `_kind_checks` | REBUILD R2 | `caused_by` the row above; it adds the flag `own` (`_worktree_end.py:420`, read at `:311`): one question decided by three stacked conditions (glob, single match, flag) in two functions; the unit's 4th bug in AC2.2's chain |
+| `merge-gate-lets-a-test-commit-carry-source` | `995ac1256` (`09df2bff6`) | `_worktree_end.py` `_refuse_implementation_tests` | KEEP, noted | the missing half of the RED-separation rule, same loop and `_is_test_path` predicate; its RED `5ab19c1aa` only adds lines; no bug on it since 2026-10-08. Noted: its two refusal blocks mirror each other (`:259-276`) (intake) |
+| `branch-d-fix-line-judges-head-not-the-upstream` | `995ac1256` (`6bb57a885`) | `_worktree_git.py` `SeveralWork` fix line, `drop_steps` | REBUILD R3 | (a) its RED `301cc9f2c` changed an existing assert (`tests/core/test_gitflow.py:205` drops `-d`), a contract change inside a fix; (b) the line's 5th bug, after four `several-work-*` ones. |
+| `bugs-check-misses-a-record-both-live-and-archived` | `20fefc4a7` | `_bugs_check.py` `findings_for`, `_bugs_write.py` `append` | KEEP, noted | `caused_by: none`; a new rule, operator 2026-10-19 ("Event lines aren't records (Recommended)"): one archive reader `_archive_lines`, whose `events` flag that ruling keeps; the asserts `c96ad777d` changed were born in its own REDs (`a6ec66063`, `d3a018380`). Noted: "id taken" is decided twice, `append` (`_bugs_write.py:71`) and `findings_for` (intake) |
 
-**REBUILD work list** (bugs law §2; each keeps the contract tests its fixes hardened):
-- R1, `_stats.py`'s read of the release state: rc-19's first job. Operator, 2026-10-19: "Register, fold into case 2 in rc-19 (Recommended)", then "Run release.py check first (Recommended)". One REBUILD in which stats runs `release.py check` before it parses (FR1). It closes the open Origin bug and deletes the per-input guards of the three rows.
-- R2, `_ledgers`: one decider names the ledger scripts that judge a tree. The `own` flag, the glob and the single-match rule are deleted. The contract tests of the four chain bugs stay green, unloosened.
-- R3, the `SeveralWork` fix line: rebuilt together with ADR 0270's prefixed reader, so one decision names the kept work branch and the act over the local branches (FR4). The contract tests of `301cc9f2c` and of the four earlier bugs stay green.
+**REBUILD work list** (bugs law §2; each keeps the contract tests its fixes hardened): R1 `_stats.py`'s read of the release state is FR1 (Job 1); R2 `_ledgers` is FR2; R3 the `SeveralWork` fix line, with ADR 0270's prefixed reader, is AC4.4.
 
 ## 1. Problem
 
-Moving a workspace is a manual recipe (`init`, `dadaia import`, `context alive` per context) carrying no harness and no work in flight. `dadaia export` rewrites the registry as a side effect, and `dadaia import` stores a null `repo_url` as the text `'None'` (open bug). `context alive` checks out a stored `current_branch` that is stale in 3 of 5 ALIVE contexts and swallows a failed checkout as a WARNING. Work in a lane or a `wt-rc` cannot be set aside: a tree leaves only by merge or clean, and `context dead` refuses while one is open. The operator ruled the full chain into 0.5.0 (roadmap Q4/Q5); ADRs 0270-0272 restate 0171, 0173 and 0175 against today's code. `verdict.py stats` crashes on a release state that breaks its schema (open bug); the bug window review found two units patched, not rebuilt (R2, R3).
+Moving a workspace is a manual recipe (`init`, `dadaia import`, `context alive` per context) carrying no harness and no work in flight; `export` rewrites the registry, `import` stores a null `repo_url` as `'None'` (open bug). `context alive` checks out a stored `current_branch` that is stale in 3 of 5 ALIVE contexts and swallows a failed checkout as a WARNING. Work in a lane or a `wt-rc` cannot be set aside: a tree leaves only by merge or clean, and `context dead` refuses while one is open. The operator ruled the chain into 0.5.0 (roadmap Q4/Q5); ADRs 0270-0272 restate 0171, 0173 and 0175 against today's code. `verdict.py stats` crashes on a release state that breaks its schema (open bug); the bug window found two units patched, not rebuilt (R2, R3). A history rewrite orphans a resolved record's `fix_sha` (FR7).
 
 ## 2. Measurable goals
 
 | # | goal | target | source |
 |---|---|---|---|
-| 1 | the `measured_by` checks of ADRs 0270, 0271, 0272 | every one green at the rc-19 PR head | the tests named in each record; 0270's grep |
-| 2 | Origin bugs | both resolved and archived | `bugs.py status` |
+| 1 | the `measured_by` checks of ADRs 0270, 0271, 0272, 0273 | every one green at the rc-19 PR head | the tests named in each record; 0270's grep |
+| 2 | Origin bugs | every one resolved and archived | `bugs.py status` |
 | 3 | `dadaia import` | absent from `dadaia --help` and `docs/cli.md` | `dadaia help tree` |
 | 4 | REBUILDs R1-R3 | each lands as a REBUILD; net lines <= 0 on `_stats.py`, `_ledgers`, the several-work decision | `git diff --stat` per unit |
-| 5 | readout metrics 1, 2, 4, 6, 7, 9 | beside rc-18's 6/6 (100%), 2/13 (15%), n/a, 15, 0, 6 and the rc-18 targets (<= 20%, >= 70%, <= 4 h, 0, 0, 0) | `verdict.py stats 0.5.0-rc19`; baseline: rc-18's closure summary (2026-10-19T01:55:53Z), read at `df96b6d7b` |
+| 5 | readout metrics 1, 2, 4, 6, 7, 9 | beside rc-18's 6/6 (100%), 2/13 (15%), n/a, 15, 0, 6 and the rc-18 targets (<= 20%, >= 70%, <= 4 h, 0, 0, 0) | `verdict.py stats 0.5.0-rc19`; baseline: rc-18's closure summary, read at `df96b6d7b` |
 
 ## 3. Non-goals
 
 - No `context dead --snapshot`, snapshots zone, WIP commit, archive tag or visibility probe (`gh`); `context dead` is unchanged (ADR 0271).
 - No package-version pin and nothing installed by `init --from`: only the `export-v1` format is pinned (ADR 0272).
 - Job and task trees are never paused nor carried; uncommitted work is never carried.
-- `_release_store.read_state` stays as it is: it is the release skill's own reader, the one `check` uses (B11).
+- `_release_store.read_state` stays: the release skill's reader, the one `check` uses (B11).
 - Every caller but `context alive` keeps reading local work branches; stale origin work branches are not cleaned here.
-- The two push-gate bugs, the PR #298 Windows red and the six archived `fix_sha` repairs ride their own hotfix lanes (2026-10-19 rulings), outside this Origin.
+- The denylist push-gate bug, the PR #298 Windows red and the six archived `fix_sha`s keep their hotfix lanes; the rewrite one joins FR7.
 - `init-on-a-copied-workspace-leaves-a-cli-bound-to-the-original` stays open; `--from` is the supported path.
 
 ## 4. Requirements
 
-Wave ranking, by the pick: (1) law, skills and dev loop: FR1 (Job 1), FR2, FR3; (2) shared foundation: FR4; (3) features and bugs: FR5, FR6; (4) promote-facing: `docs/cli.md` and the install-count pins move with the FR3, FR5, FR6 job that causes them; memory and backlog exits at closure.
+Wave ranking, by the pick: (1) law, skills and dev loop: FR1 (Job 1), FR2, FR3, FR7 (Job 7); (2) shared foundation: FR4; (3) features and bugs: FR5, FR6; (4) promote-facing: `docs/cli.md` and the install-count pins move with the job that causes them; memory and backlog exits at closure.
 
 ### FR1 — stats refuses a release state that breaks its schema (bug `stats-crashes-on-a-release-state-that-breaks-its-schema`, R1)
 
@@ -107,6 +104,17 @@ Operator, 2026-10-19: "alive-only origin read, highest (Recommended)".
 - AC6.4 `--from` with `--repo` refuses with one fix line; every fix line `init` prints carries `--from` when given, built by `InitPlan.command` alone; the contract tests of the init fix-line family stay green. Test: unit.
 - AC6.5 `dadaia import` is gone: `features/import_/`, `cli/commands/import_.py`, its `cli/main.py` registration and `build_import_service`; `docs/cli.md` is regenerated; `dd-cli-library/SKILL.md:28`, its verb index and `scripts/CONSUMER_VALIDATION_RECIPE.md` stop naming it; docstrings naming it are reworded (`core/exceptions.py:36,112`, `spec_context/service.py:269`, `core/models/spec_context.py:11`, `tests/fakes.py:76`). Atoms citing it (`context-portability.md`, `context-management.md:44,46`, `catalog.json`, `index.md`) change in this job: doctor's citation check flags a dead verb (`doctor_memory.py:264`, `citations.py:214-237`). Operator: "Delete verb-only tests; move the rest (Recommended)": verb-only rows go; partitions the reader owns move to the `init --from` tests in a `test(...)` commit naming it. Test: unit (the help-tree pin).
 
+### FR7 — a resolved bug's fix is its id-bearing commit (ADR 0273; bugs `worktree-sync-orphans-the-fix-sha-a-lanes-resolve-cites`, `push-gate-rewrite-orphans-shas-cited-in-the-range`)
+
+Amendment, operator 2026-10-19: "Cite by the id-bearing commit (Recommended)", then "Add as rc-19 Job 7 (Recommended)": the approved rc-19 gains ADR 0273 (accepted here, amending 0267, before Job 7 starts) and Job 7. Both bugs join the Origin once rc-19 syncs with `feature/0.5.0`, which holds them; `release.py check` refuses an id absent here.
+
+- AC7.1 RED: `bugs.py check` exits 0, with no ledger step, after `worktree sync` rebases a lane's `fix(bugs): <id> — …` commit and after `push-gate-check --rewrite-from` folds it. It refuses with one fix line a resolved record carrying `fix_sha` when no commit HEAD reaches holds a line starting `fix(bugs): ` or `refactor(bugs): ` naming its id before ` — ` (a group too), or HEAD reverts the only one (a later `Revert "<its subject>"`). A revert holding `fix(bugs): <id> — revert <culprit subject>` cites it. The shallow-clone finding stands. Test: unit for check; integration for sync and the fold.
+- AC7.2 `bugs.py resolve` derives `fix_sha` and `fix_files` from that commit, refusing with one fix line when there is none; `--fix-sha` goes; `fix_sha` is write-once in `bug-record-v1`; `by_file` reads `fix_files`, else that commit's files. Test: unit.
+- AC7.3 The fold's message holds every folded message in order, after the new one when given; the re-point fix line and `_cited_ids` (reverted by the CI-red lane) stay out. Test: integration.
+- AC7.4 Before the check change, one shape-4 `chore(bugs): archive <ids>` takes out of `BUGS.jsonl` every terminal record the new check refuses at Job 7's base (the 26 task-fixed counted at `06ca6c045`, and `rewrite-remedy-fix-line-bypasses-the-one-renderer`, resolved by the revert `5a063078b`), its body naming the count. Test: none, `bugs.py check` exit 0 at the job head.
+- AC7.5 The sha-contract asserts in `test_bugs.py` (`fix_sha` unreached, its fix line, `update` re-pointing) move to the id contract in a `test(...)` commit naming 0273's acceptance; `specs/bugs/AGENTS.md` and its scaffold source state the cite rule in one line; `LINEAGE.md` and `dd-release-definition` §1 step 6 find a fix by its id line. Test: unit for the asserts; none for text.
+- AC7.6 After a RED of the push-gate orphaning, one shape-3 group commit names both bugs; the `worktree-sync-…` resolve states it re-fixes the push-gate bug. Test: integration (AC7.1's fold case).
+
 ### Replaces
 
 - `verdict.py stats` parsing `_RELEASE.json` itself behind per-input guards and its own repair act.
@@ -121,12 +129,15 @@ Operator, 2026-10-19: "alive-only origin read, highest (Recommended)".
 - "A tree leaves only by `WT merge` or `WT clean`" (`worktrees/AGENTS.md` §3): pause is a third exit.
 - The `dist` canon admitting only `spec-contexts.json`.
 - `init` taking its harness only from the flag, the profile or the prompt.
+- `bugs.py check` judging a resolved record by whether a ref reaches its `fix_sha`.
+- The rewrite remedy's re-point fix line, and a fold keeping only the oldest subject.
+- `bugs.py resolve --fix-sha` and `update` re-pointing `fix_sha`.
 
 ### Closure
 
-- Backlog exits, `delivered` `--release 0.5.0`: `spec-context-branch-field-deleted`, `context-dead-snapshots-open-worktrees`, `export-soft-and-hard`, `init-from-export`. Both Origin bugs resolved and archived.
-- ADRs (main thread, on the 2026-10-19 rulings): 0171 and 0270 accepted (0270 amends 0171); 0271 accepted, superseding 0173 and amending 0172; 0175 and 0272 accepted (0272 amends 0175).
-- Memory pass (`MEMORY-UPDATE.md`), the as-is review's M13/M14 atoms plus the stats readers: `platform/context-portability.md` (rewritten; its catalog entry maps the deleted `features/import_/**`), `platform/context-management.md` (`:21,31,34,46`: alive, dead, import), `platform/workspace-init.md` (`--from`), `platform/workspace-doctor.md` (the `dist` zone), `sdd/worktrees.md` (`:23` the prefixed reader, `:33` the ledger decider, `:40,45` the verb list), `sdd/release-lifecycle.md`, `agents/agent-comms.md` (stats), `catalog.json` (`:528-544`), `index.md` (`:50`), and `memory/ARCHITECTURE.md`'s features package map (`:118-123`, `import_` leaves). Lines citing `dadaia import` change in FR6's job (AC6.5).
+- Backlog exits, `delivered` `--release 0.5.0`: `spec-context-branch-field-deleted`, `context-dead-snapshots-open-worktrees`, `export-soft-and-hard`, `init-from-export`. Every Origin bug resolved and archived.
+- ADRs (main thread, on the 2026-10-19 rulings): 0171 and 0270 accepted (0270 amends 0171); 0271 accepted, superseding 0173 and amending 0172; 0175 and 0272 accepted (0272 amends 0175); 0273 accepted (amends 0267).
+- Memory pass (`MEMORY-UPDATE.md`): `platform/context-portability.md` (rewritten; its catalog entry maps the deleted `features/import_/**`), `platform/context-management.md` (`:21,31,34,46`), `platform/workspace-init.md`, `platform/workspace-doctor.md`, `sdd/worktrees.md` (`:23,33,40,45`), `sdd/release-lifecycle.md`, `sdd/bug-ledger.md` (FR7), `agents/agent-comms.md`, `catalog.json` (`:528-544`), `index.md` (`:50`), `ARCHITECTURE.md`'s features map (`:118-123`); lines citing `dadaia import` change in FR6's job.
 
 ## 5. Constraints and risks
 
@@ -136,12 +147,12 @@ Operator, 2026-10-19: "alive-only origin read, highest (Recommended)".
 - Public boundary: nothing requires a remote, CI, `gh` or a vendor CLI; the scan and bundles are local; platform facts go through `core/platform.py`, archive members are POSIX names joined by `Path` (R7).
 - Stats refuses on any `release.py check` error, an unrelated tree finding included: the ruled trade-off of the check-first read.
 - Check's fix line for a schema finding is generic; stats relays it as is (B10).
-- `alive` takes the highest origin work branch even when it is stale on origin; `alive` runs no fetch, so a branch deleted upstream counts until the operator's own `fetch --prune` (D23). This corrects ADR 0270's consequence line, accepted and immutable.
+- `alive` takes the highest origin work branch even if stale: it runs no fetch, so a branch deleted upstream counts until the operator's own `fetch --prune` (D23), correcting ADR 0270's immutable consequence line.
 - An old `spec-contexts-export-v1` artifact on disk refuses with the re-export fix line.
-- Two new assets (`_worktree_pause.py`, `export-v1.schema.json`) move the install-count pins, which run outside `ci.py job` and differ per platform (138 Linux / 161 Windows today); the implementer recounts each platform's literal and runs those two test files by name (`asset-count-pins-miss-the-readout-script`). The shipped-hashes pin moves only if a scaffold or specs `AGENTS.md` source is edited.
-- Consumers of each changed public name: as-is review §4 and the `dd-researcher` pre-mortem (2026-10-19), every hit folded into an AC above; the PLAN answers each.
-- Hotfix lanes on `feature/0.5.0` reach the `wt-rc` by `WT sync`.
+- Two new assets (`_worktree_pause.py`, `export-v1.schema.json`) move the per-platform install-count pins, outside `ci.py job`: the implementer recounts each literal and runs those test files by name (`asset-count-pins-miss-the-readout-script`). The shipped-hashes pin moves with Job 7's bugs-law source edit.
+- Consumers of each changed public name: as-is review §4 and the `dd-researcher` pre-mortem (2026-10-19), every hit in an AC; the PLAN answers each.
+- Hotfix lanes on `feature/0.5.0` reach the `wt-rc` by `WT sync`. Job 7 follows rc-19's sync with the CI-red revert lane; the denylist hotfix waits for Job 7 on `feature/0.5.0`.
 
 ## 6. Open questions
 
-none. Import tests: the operator's order (AC6.5); AC1.3: the stats-reader ruling. R3's remaining seams (the bundle scan's scratch repo, a pushed lane on pause) and R5 (names) are the sr's PLAN defaults.
+none. R3's remaining seams and R5 (names) are the sr's PLAN defaults.
