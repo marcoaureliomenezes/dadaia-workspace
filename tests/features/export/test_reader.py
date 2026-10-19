@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.container import scan_publish_candidates
-from dadaia_workspace.core.exceptions import RepoUrlMissingError
+from dadaia_workspace.core.exceptions import DadaiaError, RepoUrlMissingError
 from dadaia_workspace.core.models.spec_context import AssociatedRepo
 from dadaia_workspace.features.export.service import ExportService
 from dadaia_workspace.features.spec_context.service import SpecContextService
@@ -32,13 +32,15 @@ def _reader(tmp_path: Path) -> tuple[ExportService, SpecContextService]:
     return ExportService(store, tmp_path, lambda _bundle, _repo: {}), registry
 
 
-def _artifact(tmp_path: Path, *records: dict[str, object]) -> Path:
+def _artifact(
+    tmp_path: Path, *records: dict[str, object], schema_version: object = "export-v1"
+) -> Path:
     file = tmp_path / "spec-contexts.json"
     write_text(
         file,
         json.dumps(
             {
-                "schema_version": "export-v1",
+                "schema_version": schema_version,
                 "dadaia_version": "0.5.0",
                 "harnesses": ["claude"],
                 "contexts": list(records),
@@ -88,4 +90,21 @@ def test_a_context_with_a_null_url_is_refused_by_register_and_never_stored(
     with pytest.raises(RepoUrlMissingError):
         registry.register(ctx)
 
+    assert registry.list_all() == []
+
+
+@pytest.mark.parametrize("version", ["export-v0", "export-v2", "workspace-export-v0", 1, None])
+def test_any_other_schema_version_refuses_with_the_one_re_export_fix(
+    tmp_path: Path, version: object
+) -> None:
+    reader, registry = _reader(tmp_path)
+
+    with pytest.raises(DadaiaError) as refused:
+        reader.read(_artifact(tmp_path, _record("solo"), schema_version=version))
+
+    assert (
+        refused.value.fix
+        == "Agent action: re-export the artifact with the current dadaia-workspace"
+    )
+    assert str(refused.value).count("fix:") == 1
     assert registry.list_all() == []
