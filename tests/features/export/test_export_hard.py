@@ -15,6 +15,7 @@ from dadaia_workspace.core.exceptions import DadaiaError
 from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
 from tests.fixtures.stores import context_store
 from tests.helpers.oslib import write_text
+from tests.helpers.privacy_fixtures import aws_key_shape
 from tests.helpers.worktree_ws import (
     NEW_JOB,
     commit,
@@ -116,3 +117,21 @@ def test_a_dirty_open_tree_refuses_with_pauses_fix_and_stays(root: Path) -> None
     assert refused.value.fix == pause_fix.removeprefix("fix: ")
     assert (tree / "specs/a.md").read_text() == "changed\n"
     assert not (root / ".dadaia/dist" / ARCHIVE).exists()
+
+
+@pytest.mark.parametrize("where", ["open", "paused"])
+def test_a_secret_in_a_bundle_refuses_and_leaves_no_archive_and_no_ref(
+    root: Path, where: str
+) -> None:
+    commit(tree := open_tree(root, LANE), "specs/notes.md", f"k={aws_key_shape()}\n")
+    if where == "paused":
+        assert run(root, "pause", str(tree)).returncode == 0
+    refs = _refs(root)
+
+    with pytest.raises(DadaiaError) as refused:
+        _export(root)
+
+    assert "specs/notes.md" in str(refused.value) and refused.value.fix
+    assert aws_key_shape() not in str(refused.value)
+    assert not (root / ".dadaia/dist" / ARCHIVE).exists()
+    assert _refs(root) == refs
