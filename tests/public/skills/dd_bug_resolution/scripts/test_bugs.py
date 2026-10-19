@@ -1377,6 +1377,16 @@ def _trace_lines(trace: Path) -> list[str]:
     return read_text(trace).splitlines() if trace.exists() else []
 
 
+def test_reaches_hands_git_no_malformed_sha(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _ledger(tmp_path)
+    trace, env = _traced(tmp_path)
+    monkeypatch.setenv("GIT_TRACE", env["GIT_TRACE"])
+    assert load_owner("dd-bug-resolution", "_git").reaches(tmp_path, "--output=x") is False
+    assert _trace_lines(trace) == []
+
+
 def test_fix_commit_hands_git_no_id(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     _ledger(tmp_path)
     _fix_commit(tmp_path, "cli/x.py", _FIXED)
