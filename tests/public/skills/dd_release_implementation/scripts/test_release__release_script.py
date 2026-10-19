@@ -88,7 +88,9 @@ def test_the_pinned_pair_resolves_the_same_live_candidate(tmp_path: Path) -> Non
 
     release = tmp_path / "releases" / "1.0.0"
     release.mkdir(parents=True)
-    write_text(release / "_RELEASE.json", '{"phase": "DEFINITION"}')
+    state = {"schema": "release-state-v1", "release": "1.0.0", "phase": "DEFINITION",
+             "defined": None, "implemented": None, "shipped": None, "log": []}  # fmt: skip
+    write_text(release / "_RELEASE.json", json.dumps(state))
     pair = (gitflow.resolve_live_candidate, lambda s: _release_store.live_release(s).candidate)
     assert [resolve(tmp_path) for resolve in pair] == [None, None]
     for name in ("rc-2", "rc-10", "rc-9", "rc-01", "rc-0", "notes"):
@@ -602,5 +604,9 @@ def test_check_prints_the_schema_finding_for_a_non_object_log_entry(
     done = run([sys.executable, str(script), "check", "--specs", str(specs)])
     out = done.stdout + done.stderr
     fixes = [ln for ln in out.splitlines() if ln.lstrip().startswith(("fix: ", "Agent action: "))]
-    assert (done.returncode, "Traceback" in out, "log[0] must be of type object" in out) == (1, False, True)
+    assert (done.returncode, "Traceback" in out, "log[0] must be of type object" in out) == (
+        1,
+        False,
+        True,
+    )
     assert len(fixes) == 1

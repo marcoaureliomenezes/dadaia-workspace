@@ -70,6 +70,8 @@ def live_release(specs: Path) -> Live:
         raise refusal from None
     release_dir = specs / "releases" / live
     state = read_state(release_dir / STATE)
+    if found := state_findings(json.dumps(state), f"releases/{live}/{STATE}", specs.resolve()):
+        raise Refusal(found[0]["message"], found[0]["fix"])  # readers never see a refused shape
     return Live(live, release_dir, state, current_candidate(release_dir, state))
 
 

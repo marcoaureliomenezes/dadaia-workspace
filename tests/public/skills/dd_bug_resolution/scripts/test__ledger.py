@@ -31,7 +31,8 @@ TERMINAL_DISPOSITIONS = tuple(_HISTO_SCHEMA["properties"]["disposition"]["enum"]
 _HISTO = (
     '{"disposition": "rejected", "entry": {}, "id": "old", "reason": "r", "ts": "2026-01-01"}\n'
 )
-_STATE = {"schema": "release-state-v1", "release": "9.9.9", "phase": "SHIPPED"}
+_STATE = {"schema": "release-state-v1", "release": "9.9.9", "phase": "SHIPPED",
+          "defined": None, "implemented": None, "shipped": None, "log": []}  # fmt: skip
 
 #: (script, {specs-relative file: text}, argv after the verb's script path)
 _CASES: dict[str, tuple[str, dict[str, str], list[str]]] = {
