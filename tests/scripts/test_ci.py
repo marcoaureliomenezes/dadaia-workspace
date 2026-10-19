@@ -178,9 +178,11 @@ def test_pushes_use_linux_and_pull_requests_use_the_full_matrix() -> None:
     assert {job.get("if") for job in cross_platform} == {
         "${{ github.event_name == 'pull_request' }}"
     }
-    assert (
-        int(workflow["jobs"]["contract-coverage-cross"]["timeout-minutes"]) >= 45
-    )  # Windows leg ran 28 min
+
+
+def test_contract_coverage_cross_cap_is_45_minutes() -> None:
+    workflow = yaml.load(read_text(_REPO / ".github/workflows/ci.yml"), Loader=yaml.BaseLoader)
+    assert workflow["jobs"]["contract-coverage-cross"]["timeout-minutes"] == "45"
 
 
 def _words(line: str) -> list[str]:
