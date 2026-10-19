@@ -9,7 +9,7 @@ import tempfile
 from pathlib import Path
 
 from _platform import act, command
-from _worktree_end import _open_children, _refuse_dirty, _target
+from _worktree_end import _open_children, _refuse_dirty, _rmdir, _target
 from _worktree_git import git, ours
 from _worktree_names import LAUNCH, LOCK, Refusal, branch, kind_of, tree_path
 from _worktree_new import absent_levels, write_level_files
@@ -56,6 +56,7 @@ def pause(root: Path, path: str) -> str:
     write_bundle(repo, ref, dest)
     git(repo, "worktree", "unlock", str(tree), check=False)
     git(repo, "worktree", "remove", str(tree))
+    _rmdir(tree, name)
     git(repo, "update-ref", "-d", f"refs/heads/{ref}")
     return f"paused {ref} at {dest}"
 
