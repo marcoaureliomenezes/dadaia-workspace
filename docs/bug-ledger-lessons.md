@@ -7,7 +7,7 @@ of that line and the authority for the implementation diff.
 
 `caused_by` turns the ledger into a navigable history. Follow it and bug families appear:
 each link says which prior bug or task wrote the lines corrected by the later fix. Inspect
-the persisted `fix_sha` to see what actually changed.
+the fix commit, found by its `fix(bugs)` or `refactor(bugs)` id line, to see what actually changed.
 
 ## Measuring the ledger
 
@@ -44,8 +44,9 @@ scratch output is outside the measurement by construction.
 ## Lesson 3 — a derived cache breeds an environment-specific bug
 
 A ledger field that caches a fact available from git becomes wrong wherever history has a
-different shape, especially in a shallow checkout. Persist the `fix_sha`; derive numstat,
-direction and maturity from the named commit and the bug-window review when needed.
+different shape, especially in a shallow checkout. Find the fix by its id line, with the
+write-once `fix_sha` only a hint a rewrite may orphan; derive numstat, direction and maturity
+from that commit and the bug-window review when needed.
 
 ## Standing order
 

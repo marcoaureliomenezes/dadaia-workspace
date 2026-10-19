@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-19T01:54:53Z",
+  "generated_at": "2026-10-19T20:25:38Z",
   "features": [
     {
       "rank": 1,
@@ -14,7 +14,7 @@
         "handoff",
         "schema"
       ],
-      "token_estimate": 998,
+      "token_estimate": 1073,
       "depends_on": [
         "worktrees",
         "release-lifecycle",
@@ -496,7 +496,7 @@
         "session",
         "privacy"
       ],
-      "token_estimate": 3029,
+      "token_estimate": 3201,
       "depends_on": [
         "specs-migration",
         "workspace-doctor",
@@ -525,25 +525,29 @@
       "slug": "context-portability",
       "title": "context-portability",
       "area": "platform",
-      "tldr": "dadaia export writes the workspace's context set to one file; dadaia import registers each unknown context DEAD elsewhere, ready for dadaia context alive.",
-      "summary": "Moving a workspace's Spec Context Projects to another workspace — export writes .dadaia/dist/spec-contexts.json (spec-contexts-export-v1) after refreshing ALIVE branches; import accepts only that schema, registers unknown names DEAD through the same guarded insert as context create, and names the alive command that restores each.",
+      "tldr": "dadaia export writes one export-v1 artifact, soft JSON or a hard tar.gz adding the unpushed lane and wt-rc work; init DIR --from <artifact> replicates it.",
+      "summary": "Moving a workspace — export only reads the registry and writes .dadaia/dist/spec-contexts.json, or with --hard .dadaia/dist/workspace-export.tar.gz holding that JSON plus a secret-scanned bundle of each open lane and wt-rc tree and each pause bundle; init --from validates the artifact against the one export-v1 schema before any write, installs every harness it names, registers its contexts DEAD through the guarded insert, lists what it cannot replicate or reach, places the bundles where worktree resume finds them and prints the context alive line of each context ALIVE in the artifact.",
       "path": "specs/memory/product/platform/context-portability.md",
       "tags": [
         "context",
         "export",
-        "import",
-        "portability"
+        "init",
+        "portability",
+        "worktrees"
       ],
-      "token_estimate": 350,
+      "token_estimate": 1148,
       "depends_on": [
+        "worktrees",
+        "sdd-gate-v3",
         "workspace-doctor",
+        "workspace-init",
         "context-management"
       ],
       "sources": [
         "dadaia_workspace/features/export/**",
-        "dadaia_workspace/features/import_/**",
         "dadaia_workspace/cli/commands/export.py",
-        "dadaia_workspace/cli/commands/import_.py"
+        "dadaia_workspace/cli/commands/init.py",
+        "dadaia_workspace/public/schemas/export-v1.schema.json"
       ]
     },
     {
@@ -605,7 +609,7 @@
       "slug": "specs-migration",
       "title": "specs-migration",
       "area": "platform",
-      "tldr": "specs init establishes canon and gitflow; specs upgrade reaches pattern 13; migrate updates the context registry.",
+      "tldr": "specs init establishes canon and gitflow; specs upgrade reaches pattern 13; migrate brings a schema 1 context registry to the store's schema 3.",
       "summary": "The persisted-state upgrade verbs: specs init scaffolds or upgrades a dadaia tree and preserves a foreign tree in specs-bkp; specs upgrade runs the supported migration and repair set before stamping pattern 13; migrate updates the context registry atomically.",
       "path": "specs/memory/product/platform/specs-migration.md",
       "tags": [
@@ -615,7 +619,7 @@
         "registry",
         "onboarding"
       ],
-      "token_estimate": 1346,
+      "token_estimate": 1365,
       "depends_on": [
         "public-asset-distribution",
         "sdd-gate-v3",
@@ -650,7 +654,7 @@
         "compliance",
         "privacy"
       ],
-      "token_estimate": 3695,
+      "token_estimate": 3721,
       "depends_on": [
         "public-asset-distribution",
         "sdd-gate-v3",
@@ -659,6 +663,7 @@
         "QUALITY",
         "worktrees",
         "specs-migration",
+        "context-portability",
         "release-lifecycle",
         "audits-canon"
       ],
@@ -682,7 +687,7 @@
       "slug": "workspace-init",
       "title": "workspace-init",
       "area": "platform",
-      "tldr": "Level 1 — uvx dadaia-workspace init [DIR] provisions venv, zones, law, one harness; re-init upgrades; --repo adds level 2; next step from one ordered step list.",
+      "tldr": "Level 1 — uvx dadaia-workspace init [DIR] provisions venv, zones, law, harnesses; re-init upgrades; --repo adds level 2; --from replicates an export.",
       "summary": "dadaia init fills one plan from flags or prompts, provisions the venv and workspace tree, seeds state, and invokes the install path that stages current public assets before projection; re-init upgrades, and one ordered real-state step list drives onboarding guidance.",
       "path": "specs/memory/product/platform/workspace-init.md",
       "tags": [
@@ -692,11 +697,12 @@
         "upgrade",
         "onboarding"
       ],
-      "token_estimate": 2261,
+      "token_estimate": 2388,
       "depends_on": [
         "context-management",
         "specs-migration",
         "audits-canon",
+        "context-portability",
         "workspace-doctor",
         "public-asset-distribution",
         "server-registry",
@@ -730,7 +736,7 @@
         "specs",
         "memory"
       ],
-      "token_estimate": 429,
+      "token_estimate": 474,
       "depends_on": [
         "bug-ledger",
         "release-lifecycle",
@@ -777,7 +783,7 @@
       "slug": "bug-ledger",
       "title": "bug-ledger",
       "area": "sdd",
-      "tldr": "BUGS.jsonl stores one lean current record per confirmed defect; its writer persists registration, resolution and fix-file facts while git owns derived history.",
+      "tldr": "BUGS.jsonl stores one lean record per confirmed defect; a resolved bug's fix is the commit carrying its fix(bugs) or refactor(bugs) id line.",
       "summary": "The bug record grammar, confirmation and privacy boundary, terminal transitions, persisted fix lineage and fix files, the earlier-bug and REBUILD-due readout, archival and candidate integration.",
       "path": "specs/memory/product/sdd/bug-ledger.md",
       "tags": [
@@ -786,7 +792,7 @@
         "lineage",
         "resolution"
       ],
-      "token_estimate": 1574,
+      "token_estimate": 1790,
       "depends_on": [
         "cross-platform-portability",
         "public-asset-distribution",
@@ -816,7 +822,7 @@
         "state",
         "closure"
       ],
-      "token_estimate": 1515,
+      "token_estimate": 1617,
       "depends_on": [
         "agent-orchestration",
         "worktrees",
@@ -847,10 +853,11 @@
         "privacy",
         "git"
       ],
-      "token_estimate": 1457,
+      "token_estimate": 1640,
       "depends_on": [
         "cross-platform-portability",
         "worktrees",
+        "bug-ledger",
         "context-management",
         "workspace-doctor",
         "agentic-entities",
@@ -874,8 +881,8 @@
       "slug": "worktrees",
       "title": "worktrees",
       "area": "sdd",
-      "tldr": "Worktrees nest under worktrees/<repo>/<v>/ — wt-rc, wt-main, wt-task and the backlog and hotfix lanes — and each merges into its parent after its gate.",
-      "summary": "The one path grammar and the base it derives, the per-kind gates (task separation, the reviewed job gate, the rc's ledger checks), sync, the level AGENTS.md files, merge cleanup, the rows list and closure holds.",
+      "tldr": "Trees nest under worktrees/<repo>/<v>/ (wt-rc, wt-main, wt-task, backlog and hotfix lanes); each merges into its parent after its gate; a lane or wt-rc pauses.",
+      "summary": "The one path grammar and the base it derives, the per-kind gates (task separation, the merge denylist scan, the reviewed job gate, the rc's ledger checks), sync, pause and resume, the level AGENTS.md files, merge cleanup, the rows list and closure holds.",
       "path": "specs/memory/product/sdd/worktrees.md",
       "tags": [
         "worktrees",
@@ -884,11 +891,11 @@
         "merge",
         "review"
       ],
-      "token_estimate": 2092,
+      "token_estimate": 2637,
       "depends_on": [
-        "release-lifecycle",
         "context-management",
         "sdd-gate-v3",
+        "release-lifecycle",
         "bug-ledger",
         "workspace-doctor",
         "agent-orchestration"
@@ -899,6 +906,7 @@
         "dadaia_workspace/public/skills/dd-gitflow-default/scripts/_worktree_git.py",
         "dadaia_workspace/public/skills/dd-gitflow-default/scripts/_worktree_names.py",
         "dadaia_workspace/public/skills/dd-gitflow-default/scripts/_worktree_new.py",
+        "dadaia_workspace/public/skills/dd-gitflow-default/scripts/_worktree_pause.py",
         "dadaia_workspace/public/skills/dd-gitflow-default/scripts/_worktree_sync.py",
         "dadaia_workspace/public/skills/dd-gitflow-default/scripts/levels/*.md",
         "dadaia_workspace/public/data/worktrees-AGENTS.md",

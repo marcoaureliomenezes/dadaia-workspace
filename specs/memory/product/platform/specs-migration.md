@@ -1,7 +1,7 @@
 ---
 slug: specs-migration
 title: specs-migration
-tldr: specs init establishes canon and gitflow; specs upgrade reaches pattern 13; migrate updates the context registry.
+tldr: specs init establishes canon and gitflow; specs upgrade reaches pattern 13; migrate brings a schema 1 context registry to the store's schema 3.
 summary: "The persisted-state upgrade verbs: specs init scaffolds or upgrades a dadaia tree and preserves a foreign tree in specs-bkp; specs upgrade runs the supported migration and repair set before stamping pattern 13; migrate updates the context registry atomically."
 tags: [migration, upgrade, specs, registry, onboarding]
 sources:
@@ -38,7 +38,7 @@ sources:
 
 ## `dadaia migrate`
 
-- Bare `dadaia migrate [--dry-run] [--yes]` migrates `.dadaia/states/spec_contexts.json` from schema 1 to 2: states `ativo`/`inativo` become `alive`/`dead`, `activated_at` becomes `alive_since`, `is_primary` is dropped, `dead_since` added, `states/primary_context.json` deleted and `.dadaia/sessions/` created.
+- Bare `dadaia migrate [--dry-run] [--yes]` migrates `.dadaia/states/spec_contexts.json` from schema 1 to the context store's one schema version, 3, which the store's writer stamps and `migrate` prints: states `ativo`/`inativo` become `alive`/`dead`, `activated_at` becomes `alive_since`, `is_primary` is dropped, `dead_since` added, `states/primary_context.json` deleted and `.dadaia/sessions/` created.
 - It prints the plan and asks for confirmation unless `--yes`. `dadaia reconcile` runs the same migration as one of its steps.
 - A registry at schema 2 or above, the context store's own schema 3 included, is nothing to do for both `dadaia migrate` and reconcile; a non-numeric schema version is refused with manual intervention required.
 - The context store refuses a schema 1 registry with `dadaia migrate` as the fix and reads schema 2 and 3 alike ([[context-management]]).

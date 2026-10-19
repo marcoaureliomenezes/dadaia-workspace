@@ -76,6 +76,11 @@ reruns init; then
 `.dadaia/.venv/bin/dadaia specs init --context <ctx>` refreshes each project's specs law.
 `.dadaia/.venv/bin/dadaia harness add <name>` adds a harness later.
 
+**Move:** `.dadaia/.venv/bin/dadaia export` writes the workspace's contexts and harnesses
+to `.dadaia/dist/spec-contexts.json` (`--hard`: a tar.gz adding a secret-scanned bundle of
+the unpushed lane and `wt-rc` work); `uvx dadaia-workspace init <dir> --from <artifact>`
+replicates it, every context DEAD until its printed `context alive` line runs.
+
 `.dadaia/.venv/bin/dadaia context bind <ctx>` writes one session record (context,
 runtime, pid, `bound_at`, `bind_id`, `last_seen_at`) under the session id the environment carries and acquires
 nothing. The bind's scope is the context's main repo plus its associated repos, and it

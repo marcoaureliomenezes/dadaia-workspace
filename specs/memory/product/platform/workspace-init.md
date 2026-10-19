@@ -1,7 +1,7 @@
 ---
 slug: workspace-init
 title: workspace-init
-tldr: Level 1 — uvx dadaia-workspace init [DIR] provisions venv, zones, law, one harness; re-init upgrades; --repo adds level 2; next step from one ordered step list.
+tldr: Level 1 — uvx dadaia-workspace init [DIR] provisions venv, zones, law, harnesses; re-init upgrades; --repo adds level 2; --from replicates an export.
 summary: dadaia init fills one plan from flags or prompts, provisions the venv and workspace tree, seeds state, and invokes the install path that stages current public assets before projection; re-init upgrades, and one ordered real-state step list drives onboarding guidance.
 tags: [workspace, init, setup, upgrade, onboarding]
 sources:
@@ -20,14 +20,14 @@ sources:
 
 ## Bootstrap
 
-- `uvx dadaia-workspace init [DIR] [--harness <name>] [--repo <url> [--associated-repo <url>]...] [--template <id>] [--skip-assets]` is the only verb that works on an empty directory; every later command runs through the workspace's own `.dadaia/.venv/bin/dadaia`.
+- `uvx dadaia-workspace init [DIR] [--harness <name>] [--repo <url> [--associated-repo <url>]... | --from <artifact>] [--template <id>] [--skip-assets]` is the only verb that works on an empty directory; every later command runs through the workspace's own `.dadaia/.venv/bin/dadaia`.
 - Flags and prompts fill ONE plan: on a TTY a missing DIR or harness is asked (a bare name becomes `./<name>`), then the main-repo URL (blank = none) and associated URLs until a blank line; with no TTY a missing DIR or harness exits 1 with the init line completed from the plan (the first entry harness when none is named), an absent DIR making it `Agent action: run <init> with the new workspace's directory as its first argument`; a missing `--repo` is never an error.
-- Every refusal's `fix:` line is rendered from the plan itself, so it repeats the invocation's `--repo` and every `--associated-repo`.
-- `--harness` names one registered harness (`claude`, `codex`, `kimi-code`, `cursor`, `devin`, `copilot`); on an existing workspace it defaults to the persisted profile's first harness.
+- Every refusal's `fix:` line is rendered from the plan itself (`InitPlan.command`), so it repeats the invocation's `--harness`, `--from`, `--repo` and every `--associated-repo`.
+- `--harness` names one registered harness (`claude`, `codex`, `kimi-code`, `cursor`, `devin`, `copilot`); on an existing workspace it defaults to the persisted profile's first harness; with `--from` the harnesses are every one the artifact names, so none is asked, and `--from` with `--repo` is refused ([[context-portability]]).
 - DIR is created if absent and never resolved from the cwd; a non-directory or a non-empty directory without `.dadaia/` is refused, exit 1, with a sibling `<dir>-workspace` in the `fix:` line; every refusal happens before any write.
-- It provisions `.dadaia/.venv` (stdlib venv plus pip, the package's dependencies resolved from PyPI), every `.dadaia/` zone whose creator is init or install, and `.agents/skills`; the harness's own directory comes from its projection. An absent zone is [[workspace-doctor]]'s `WS-<zone>-missing`.
+- It provisions `.dadaia/.venv` (stdlib venv plus pip, the package's dependencies resolved from PyPI), every `.dadaia/` zone whose creator is init or install, and `.agents/skills`; each harness's own directory comes from its projection. An absent zone is [[workspace-doctor]]'s `WS-<zone>-missing`.
 - The venv mirrors the running distribution: editable from a source checkout, else its re-packed wheel written to a system temp directory deleted after the install; `DADAIA_BOOTSTRAP_PACKAGE=<wheel>` names another wheel. A base Python without `ensurepip` is reported as missing `ensurepip`/`venv`; any other venv creation failure names a `noexec` target as its likely cause.
-- A failed dependency install says the venv resolves its dependencies from PyPI (network required) and quotes the installer's last whole lines, never a mid-line cut; a failed bootstrap's fix line is the plan's `init` again — the chosen harness and every repo flag kept — run by the venv's own CLI when it exists, else by `uvx dadaia-workspace init`.
+- A failed dependency install says the venv resolves its dependencies from PyPI (network required) and quotes the installer's last whole lines, never a mid-line cut; a failed bootstrap's fix line is the plan's `init` again — the chosen harness, `--from` and every repo flag kept — run by the venv's own CLI when it exists, else by `uvx dadaia-workspace init`.
 - The tree it lays down is a view of `dadaia_workspace/core/workspace_layout.py` — the root law, `DADAIA_ZONES`, `STATES_CANON` — the same rows `dadaia public install` renders into the law files as it stages ([[public-asset-distribution]]).
 - It seeds `states/spec_contexts.json` and `states/server_registry.json` as empty documents without overwriting existing data ([[server-registry]]), and the absent level-1 root files from `workspace_layout.LEVEL1_SEEDS`: `.dadaiaignore` from the legacy `states/instance_exceptions.txt`, verbatim, else a comment-only template, and an empty `prompt.md`; an entry already present — a dangling link included — is never rewritten (one exception: a list-form `states/privacy_denylist.json` is converted once to the one object form, the original held in `.dadaia/reaped/`; any other content is left for the loader to refuse, [[sdd-gate-v3]]), each file is the operator's from then on, and the doctor's SessionStart lane re-creates one that goes missing ([[workspace-doctor]]); the root `AGENTS.md` comes from `public install`, which saves the `--template` agent-model template when one is named ([[agent-orchestration]]).
 - `states/harness_profile.json` is the roster, written through the profile store's one writer (shared with `dadaia doctor --fix`); a re-init with another harness merges into the persisted roster, never narrowing it.
@@ -35,6 +35,10 @@ sources:
 - Output is at most twelve lines: the workspace line, one asset-count line (never a per-path listing), `CLI: <absolute path of .dadaia/.venv/bin/dadaia>`, the root-launch note, then the next step; no harness-specific or user-settings advice is printed; no line names a bare `dadaia` verb.
 - The only write outside the workspace is the documented Kimi Code user config ([[harness-kimi-code]]); init deletes no projection.
 - `dadaia harness add <name>` invokes the staging install path for that harness and appends it to the roster; `dadaia harness list` reads it.
+
+## From an export
+
+- `init DIR --from <artifact>` reads and checks the `export-v1` artifact, soft or hard, before any write, then lays down the workspace with every harness it names, registers its contexts DEAD, places a hard artifact's bundles in `.dadaia/dist/` and prints `context alive <name>` for each context that was ALIVE where it was written ([[context-portability]]); the output's workspace line names every harness installed.
 
 ## Upgrade
 

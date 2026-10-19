@@ -61,7 +61,8 @@ release history.
 
 `specs/bugs/BUGS.jsonl` holds one record per bug, appended once. New records use
 `open | resolved | superseded | rejected`; resolution persists `cause`, `solution`,
-`caused_by`, `fix_sha` and `fix_files`, while git supplies the implementation diff. The next SPEC's
+`caused_by`, `fix_sha` and `fix_files`, all derived from the fix commit that carries the bug's
+`fix(bugs)` or `refactor(bugs)` id line (the sha a hint), while git supplies the implementation diff. The next SPEC's
 bug-window review owns maturity, and the closure summary owns delivered and carried scope.
 
 `specs/backlog/BACKLOG.json` is the operator's active demand queue. An entry is created by

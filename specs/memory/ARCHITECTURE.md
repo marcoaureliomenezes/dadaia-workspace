@@ -115,12 +115,12 @@ flowchart TB
 - `core/atomic_write.py`, `core/clock.py`, `core/frontmatter.py`, `core/platform.py` and `core/redaction.py` are typed doors over their kernel owners and import only `core.skill_owner` among the package's modules (ADR 0246).
 - `features/migrate` stamps `specs_pattern_version: 13` (`core/specs_version.CANONICAL_SPECS_VERSION`) or refuses; a tree below v6 is foreign, and `specs init --replace-foreign` moves it to `specs-bkp/` before the canon is scaffolded.
 
-### `dadaia_workspace/features` — package map (12 packages)
+### `dadaia_workspace/features` — package map (11 packages)
 
 ```mermaid
 flowchart TB
     subgraph features["dadaia_workspace/features"]
-      pkgs["backlog · capabilities · certification · chokepoints · export · import_ · migrate · public · reconcile · spec_context · specs · workspace"]
+      pkgs["backlog · capabilities · certification · chokepoints · export · migrate · public · reconcile · spec_context · specs · workspace"]
     end
     container["container.py"] --> features
     features --> core["core"]

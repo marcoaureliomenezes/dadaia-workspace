@@ -32,7 +32,8 @@ ambiguity or a missing feature.
 ## 2. Lineage, then RED
 
 Read at most the 20 most recent records sharing the bug's recorded fix files or component since the
-newest archived audit. Inspect the persisted `fix_sha` commits and blame the production
+newest archived audit. Inspect each prior fix, the commit whose `fix(bugs): <id>` or
+`refactor(bugs): <id>` line names its bug (the recorded `fix_sha` is only a hint), and blame the production
 lines the new fix replaces. End with `caused_by: <bug-id> | <task-id> | none`; use `none`
 only when blame offers no candidate.
 
@@ -43,8 +44,8 @@ moves. Existing assertions remain contract evidence.
 ## 3. Fix at the owning seam
 
 Replace the faulty path and let the RED case turn GREEN. Prefer deletion and locality over
-a wrapper around the old behavior. The fix commit's `fix(bugs): <id>` line is its cite; `resolve`
-persists `fix_sha` from it; its production numstat is the source for any later diff-direction analysis.
+a wrapper around the old behavior. The fix commit's `fix(bugs): <id>` line (a REBUILD's `refactor(bugs): <id>`) is its cite, so a
+rebase or sync that keeps the message keeps the fix found; `resolve` derives `fix_sha` and `fix_files` from it; its production numstat is the source for any later diff-direction analysis.
 
 ## 4. Resolve with persisted facts
 

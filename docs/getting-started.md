@@ -49,6 +49,16 @@ invocation's `--repo` and `--associated-repo` flags. It lays down:
 `init` deletes no projection; `.dadaia/.venv/bin/dadaia harness add <name>` adds a
 harness later and `.dadaia/.venv/bin/dadaia harness list` reads the roster.
 
+To move a workspace, `.dadaia/.venv/bin/dadaia export` writes
+`.dadaia/dist/spec-contexts.json` (every context, its repo urls and the harness roster),
+and `export --hard` writes `.dadaia/dist/workspace-export.tar.gz`, that JSON plus a
+secret-scanned bundle of each open lane and `wt-rc` tree and each paused one; export only
+reads the registry. `uvx dadaia-workspace init <dir> --from <artifact>` (never with
+`--repo`) installs every harness the artifact names, registers its contexts DEAD, lists a
+context with no remote as not replicated, places the bundles in `.dadaia/dist/` and prints
+`context alive <ctx>` for each context that was ALIVE; then `worktree resume` restores each
+bundled tree.
+
 ## Level 2 — the project
 
 A context — a Spec Context Project — is the unit of work: one canonical `specs/` tree
