@@ -323,10 +323,11 @@ def test_merge_needs_a_valid_approval_of_the_exact_head(
     result = run(root, "merge", TREE)
     head = git(root / TREE, "rev-parse", "HEAD").strip()
     assert result.returncode == 1 and head in result.stderr
-    expected = [*cli_argv(venv_dir(root)), "reports", "validate", str(target)]
     if named:
-        expected += ["--reviewed-root", str(root / TREE)]
-    assert _line(result) == command(*expected)
+        expected = [*cli_argv(venv_dir(root)), "reports", "validate", str(target)]
+        assert _line(result) == command(*expected, "--reviewed-root", str(root / TREE))
+    else:
+        assert _line(result) == _dispatch(root / TREE)
     assert git(root / "repos/r", "rev-parse", WORK).strip() != head
 
 
@@ -363,7 +364,8 @@ def test_merge_lists_ignored_files_and_keeps_them_by_its_fix(root: Path) -> None
     wrong_branch = run(root, "merge", TREE, "--keep", "my notes.scratch")
     assert _line(wrong_branch) == command("git", "-C", str(rc), "switch", WORK)
     _fix(root, wrong_branch)
-    _fix(root, refused)
+    [keep] = [c for c in refused.stderr.split("`") if "--keep" in c]
+    _fix(root, subprocess.CompletedProcess([], 1, "", f"fix: {keep}\n"))
     assert read_text(rc / "my notes.scratch") == "keep me" and not tree.exists()
 
 

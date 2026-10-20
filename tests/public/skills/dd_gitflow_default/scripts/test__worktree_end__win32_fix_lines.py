@@ -11,7 +11,7 @@ from typing import Any
 import pytest
 
 from dadaia_workspace.core.skill_owner import load_owner
-from tests.helpers.oslib import command, detect
+from tests.helpers.oslib import command, detect, inline
 
 _WIN = detect("win32")
 
@@ -42,4 +42,7 @@ def test_an_unmerged_tree_is_named_by_a_command_line(
     monkeypatch.setattr(end, "git", lambda *a, **k: "2")
     with pytest.raises(end.Refusal) as refused:
         end.clean(tmp_path, "p", [], False)
-    assert refused.value.fix == command(*end.LAUNCH, "merge", str(tree), caps=_WIN)
+    assert refused.value.fix == (
+        f"Agent action: dispatch dd-code-reviewer on {tree} at its HEAD, then run "
+        f"`{inline(*end.LAUNCH, 'merge', str(tree), caps=_WIN)}`"
+    )

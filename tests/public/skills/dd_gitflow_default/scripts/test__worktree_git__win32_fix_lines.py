@@ -49,8 +49,10 @@ def test_ignored_files_are_kept_by_a_command_line(
     monkeypatch.setattr(end, "git", lambda *a, **k: "!! my%notes.scratch\0")
     with pytest.raises(end.Refusal) as refused:
         end._kept(tree, "merge", [], False)
-    assert refused.value.fix == command(
-        *end.LAUNCH, "merge", str(tree), "--keep", "my%notes.scratch", caps=_WIN
+    keep = inline(*end.LAUNCH, "merge", str(tree), "--keep", "my%notes.scratch", caps=_WIN)
+    drop = inline(*end.LAUNCH, "merge", str(tree), "--drop", caps=_WIN)
+    assert (
+        refused.value.fix == f"Agent action: keep them with `{keep}` or discard them with `{drop}`"
     )
 
 
