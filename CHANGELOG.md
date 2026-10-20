@@ -354,8 +354,7 @@ the section and the tag are written from the Conventional Commits, never by hand
 #### Operator actions pending
 - Merge the release PR when it appears on `main` — that merge IS promote, and it writes the
   next section of this file.
-- D1 (`CLAUDE_API_KEY` for the `security-review` check) and D3–D6 from candidate 9 are
-  unchanged and still open.
+- D3–D6 from candidate 9 are unchanged and still open.
 
 ### Candidate 9 — skills as a package, a public face
 
@@ -386,8 +385,7 @@ surface for a distribution concern" holds.
   removed.
 
 #### Operator actions pending
-- Create the `dadaia-skills` repository and its `SKILLS_REPO_TOKEN`; enable GitHub Pages from
-  `/docs` on `main`; submit the plugin to the Claude marketplace; make the launch posts.
+- Enable GitHub Pages from `/docs` on `main`; submit the plugin to the Claude marketplace; make the launch posts.
 
 ### Candidate 8 — one line, one harness (ADR 0020)
 
