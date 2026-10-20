@@ -82,7 +82,10 @@ def test_non_write_and_protected_matrix(
     write_text(tmp_path / ".dadaiaignore", "[protected]\nsecrets\n")
     for tree in ("0.5.0-rc1/j1", "scratch", "scratch/any", "x/y/z"):  # a linked worktree's root holds a .git file
         (tmp_path / "worktrees" / "a" / tree).mkdir(parents=True)
-        write_text(tmp_path / "worktrees" / "a" / tree / ".git", f"gitdir: {(tmp_path / 'repos/a/.git/worktrees/j1').as_posix()}\n")
+        admin = tmp_path / "repos/a/.git/worktrees" / tree.replace("/", "-")
+        admin.mkdir(parents=True)
+        write_text(admin / "gitdir", f"{(tmp_path / 'worktrees' / 'a' / tree / '.git').as_posix()}\n")
+        write_text(tmp_path / "worktrees" / "a" / tree / ".git", f"gitdir: {admin.as_posix()}\n")
     rooted = {k: v if k == "command" else str(tmp_path / v) for k, v in tool_input.items()}
     block = _spawn(tmp_path, {"tool_name": tool, "tool_input": rooted}).block_envelope()
     if want is None:

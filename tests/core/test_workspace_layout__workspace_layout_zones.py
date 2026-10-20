@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.core import workspace_layout as wl
-from tests.helpers.oslib import write_text
+from tests.helpers.oslib import link, write_text
 
 C, K = wl.Creator, wl.ZoneClass
 #: (name, class, creator, ttl seconds), in registry order.
@@ -100,9 +100,13 @@ def test_parse_dadaiaignore(text: str, expected: tuple[str, ...]) -> None:
     assert wl.parse_dadaiaignore(text) == (expected, (), ())
 
 
-def _linked(root: Path) -> str:
-    """The `.git` file git writes into a linked worktree of the workspace's repo `r`."""
-    return f"gitdir: {(root / 'repos/r/.git/worktrees/j1').as_posix()}\n"
+def _linked(root: Path, tree: Path) -> str:
+    """The `.git` file git writes into the linked worktree *tree* of the workspace's repo `r`, and
+    the back-pointer it keeps inside that repo's `.git`."""
+    admin = root / "repos/r/.git/worktrees" / tree.name
+    admin.mkdir(parents=True, exist_ok=True)
+    write_text(admin / "gitdir", f"{(tree / '.git').as_posix()}\n")
+    return f"gitdir: {admin.as_posix()}\n"
 
 
 def test_dadaiaignore_invalid_lines_and_segment_scope(tmp_path: Path) -> None:
@@ -113,7 +117,7 @@ def test_dadaiaignore_invalid_lines_and_segment_scope(tmp_path: Path) -> None:
     assert wl.parse_dadaiaignore(text) == (("*.png",), ("secrets",), invalid)
     tree = tmp_path / "worktrees" / "r" / "x" / "y"
     (tree / "src").mkdir(parents=True)
-    write_text(tree / ".git", _linked(tmp_path))
+    write_text(tree / ".git", _linked(tmp_path, tree))
 
     def pg(rel: str, *globs: str) -> str | None:
         return wl.protected_glob(tmp_path, rel, globs or ("secrets",))
@@ -138,7 +142,7 @@ def test_a_planted_git_entry_never_unanchors_a_multi_segment_glob(tmp_path: Path
     """A ``.git`` written below the real tree root adds an anchor and never removes the root."""
     tree = tmp_path / "worktrees" / "r" / "0.5.0-rc1" / "j1"
     (tree / "docs" / "data-master").mkdir(parents=True)
-    write_text(tree / ".git", _linked(tmp_path))
+    write_text(tree / ".git", _linked(tmp_path, tree))
     rel, globs = "worktrees/r/0.5.0-rc1/j1/docs/data-master/x.md", ("docs/data-master",)
     assert wl.protected_glob(tmp_path, rel, globs) == "docs/data-master"
     write_text(tree / "docs" / ".git", "")
@@ -174,16 +178,20 @@ def test_a_git_file_anchors_a_root_only_when_its_gitdir_is_a_worktree_of_this_wo
     tmp_path: Path,
 ) -> None:
     """Under `worktrees/<r>/`, `.git` anchors the root of a tree git linked from `<root>/repos/<r>/`;
-    a gitdir elsewhere, even named `worktrees/…`, or a symlinked `.git` anchors nothing and the glob
+    a gitdir elsewhere, even named `worktrees/…`, a gitdir git never wrote (no back-pointer to this
+    `.git`), or a symlinked `.git` anchors nothing and the glob
     fails closed at every depth."""
     rel = "worktrees/r/{}/src/secrets/k"
-    real, planted, linked = (tmp_path / "worktrees/r" / n for n in ("real", "planted", "linked"))
-    for tree in (real, planted, linked):
+    names = ("real", "planted", "linked", "fabricated")
+    real, planted, linked, fabricated = (tmp_path / "worktrees/r" / n for n in names)
+    for tree in (real, planted, linked, fabricated):
         (tree / "src").mkdir(parents=True)
-    write_text(real / ".git", _linked(tmp_path))
+    write_text(real / ".git", _linked(tmp_path, real))
     write_text(planted / ".git", "gitdir: /elsewhere/worktrees/x\n")
-    write_text(tmp_path / "pointer", _linked(tmp_path))
-    (linked / ".git").symlink_to(tmp_path / "pointer")
+    forged = (tmp_path / "repos/r/.git/worktrees/fabricated").as_posix()
+    write_text(fabricated / ".git", f"gitdir: {forged}\n")
+    write_text(tmp_path / "pointer", _linked(tmp_path, linked))
+    link(str(tmp_path / "pointer"), linked / ".git", is_dir=False)
 
     def pg(name: str) -> str | None:
         return wl.protected_glob(tmp_path, rel.format(name), ("secrets",))
@@ -191,3 +199,4 @@ def test_a_git_file_anchors_a_root_only_when_its_gitdir_is_a_worktree_of_this_wo
     assert pg("real") is None
     assert pg("planted") == "secrets"
     assert pg("linked") == "secrets"
+    assert pg("fabricated") == "secrets"
