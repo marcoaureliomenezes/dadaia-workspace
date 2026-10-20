@@ -2380,6 +2380,40 @@
       "milestone": "implemented",
       "sha": "53419057f",
       "text": "Candidate implemented at 53419057f; phase CLOSURE."
+    },
+    {
+      "ts": "2026-10-20T12:47:04Z",
+      "agent": "release.py memory",
+      "kind": "memory",
+      "text": "Memory reconciled over 0998cc5dd16dec782fc808798286cbe5418a5ba4..c888e0505228: 3 reviewed, 13 changed.",
+      "since": "0998cc5dd16dec782fc808798286cbe5418a5ba4",
+      "until": "c888e05052285a4b840525dae9ab798951525dce",
+      "reviewed": [
+        "agentic-entities",
+        "public-asset-distribution",
+        "consumer-agent-support"
+      ],
+      "changed": [
+        "agent-comms",
+        "agent-evals",
+        "pypi-distribution",
+        "spec-context-project",
+        "context-management",
+        "context-portability",
+        "specs-migration",
+        "workspace-doctor",
+        "workspace-init",
+        "bug-ledger",
+        "release-lifecycle",
+        "sdd-gate-v3",
+        "worktrees"
+      ]
+    },
+    {
+      "ts": "2026-10-20T12:48:30Z",
+      "agent": "dd-product-engineer",
+      "kind": "summary",
+      "text": "delivered: rc-20 'adoption' (SPEC FR1-FR7, FR9) in 10 jobs, all merged (48 job-file task rows): (1) FR1 R1, one relay of a child's refusal (_refusal.relay): release.py check's exit status alone decides and its own fix line is relayed through _refusal's one parser, _worktree_end's copy deleted; (2) FR2 R2, the push-gate fold leaves cli/commands/ci.py for features/chokepoints/fold.py, --message the subject of the commit holding a listed message, else of the last; (3) FR3 R3, one context reader for the skill scripts (_specs.context_row over context list --json, the registry read lazily, only on a miss), _git.context_repos's raw registry read and _stats._context deleted (ADR 0276, amends 0088: that read lifts the fence for the repo's own workspace root alone); (4) FR4 R4, scan_bundle leaves container.py for features/export/scan.py; (5) FR5 R5, the repo_live_status docstring reworded and ADR 0270's measured_by restored to its accepted text (36acddcff); (6) FR6 eval T3 discovery built (evals/tasks/t3-discovery: vague goal, wheelhouse-only install, code-only grader); (7) FR7 llms-full.txt and scripts/llms_full.py, the keywords cursor, devin, github-copilot and agent-skills, the README agent fast path, docs/index.md and docs/quickstart.md fixed and naming init --from, the quickstart's three blocks run as printed; (8) ADR 0274 (amends 0021): pyproject reads <release>rc<N> (0.5.0rc20), tests, evals and the release smoke install only the current build, the eval gate is candidate-only; (9) ADR 0275 (amends 0103): scope follows a git-linked worktree of this workspace, nothing rebinds; bugs: the 25 Origin bugs resolved and archived (994b5c53c): bug-skill-registry-reader-crashes-on-a-bad-row, check-failure-fix-line-names-findings-that-do-not-exist, clean-of-an-unmerged-lane-offers-only-merge, cli-library-skill-omits-pause-as-a-dist-writer, closure-check-raises-a-traceback-outside-git, closure-refusal-fix-line-points-at-a-phase-that-cannot-go-back, consumer-recipe-expects-stamp-two, dist-obstruction-check-misses-a-dangling-link, first-pass-fix-line-chains-five-steps, fix-cite-retires-the-older-same-subject-fix, fold-subject-is-the-oldest-folded-subject, gone-tree-merge-judges-the-upstream-not-the-merge, kept-refusal-offers-keep-only, memory-drift-reads-the-installed-feature-list, merge-scan-copies-the-denylist-precedence, migrate-reports-a-stamp-three-registry-as-stamp-two, orphan-row-judges-merge-against-the-checked-out-head, planted-git-file-anchors-the-workspace-root, push-gate-rewrite-help-says-one-commit, reachability-probe-overrides-the-users-ssh-command, red-separation-act-names-an-implementation-commit, red-separation-splits-paths-on-blanks, restored-tree-comes-back-unlocked, subagent-bind-rebinds-the-parent-session-across-contexts, verdict-refusal-fix-cannot-clear-after-a-sync; the same archive took 13 hotfix-lane and in-rc records, 10 resolved (windows-contract-coverage-runs-at-its-timeout, fix-line-tests-hand-spell-the-git-path-on-windows, export-hard-test-cannot-remove-read-only-git-objects-on-windows, damaged-pause-bundle-crashes-the-worker-on-windows, own-repo-name-is-refused-as-a-private-term, bugs-check-refuses-task-fixed-records, pyproject-keeps-the-published-version-after-a-deploy, tests-and-evals-install-a-published-release, context-reader-reads-the-cwd-workspace-for-a-non-repo, rc-merge-reads-the-context-registry-twice) and 3 superseded (check-relay-fix-line-spells-the-path-two-ways-on-windows, cross-context-agent-rebinds-the-whole-session, privacy-scan-refuses-a-context-naming-itself); goals (SPEC §2), read at c888e0505: (1) met: bugs.py status 1 open, mcp-on-main-is-vulnerable-to-session-exhaustion, every other Origin bug resolved and archived; (2) missed on R1, R2 and R4 (git diff --numstat per REBUILD commit, tests and specs excluded): R1 check relay +7 (292fc2f84 +3, 575ff377c +3, 9516135db +1; Job 1 whole +18); R2 +29 (f1f8671d2 +47, 26775e326 -18; fold.py +125, ci.py -96), recorded as measured by main-thread ruling; R3 met as AC3.3 words it, _git.py -11 and _stats.py -12, though its five REBUILD commits net +6 counting _specs.py, where the decider moved (0297a75a1 0, 6e59ecd05 +3, 902c574ed +4, bd8ec5ce2 +1, 53419057f -2); R4 +18 (02770493e; +19 for the job), reviewer-accepted as the module boundary; (3) met: ADR 0270's grep prints one line, features/spec_context/service.py:476, the RepoLiveStatus live read; (4) met by the Job 7 review at 9d3cdbb83: tests/e2e t3+t1+scripts 26 passed in 92.15 s, the image built on the candidate, the grader passing a hand-done workspace and failing an empty one; T3 has no baseline image since ADR 0274; (5) partly met: llms-full.txt committed and fresh (the contract test, 16 passed at c888e0505), the keywords hold the four names; missed: the GitHub topics hold 9 names, not cursor, devin, github-copilot or agent-skills (api.github.com repo read at closure), the main thread's closure act still to run; (6) met: none of SPEC §1's index, quickstart and README defects remain, docs/index.md's bare dadaia export spelled through the venv CLI in the memory commit; the Job 9 review ran tests/e2e/test_onboarding_journey.py with DADAIA_REQUIRE_UVX=1, 2 passed (83.9 s); (7) readout (verdict.py stats 0.5.0-rc20, read after the memory pass) beside rc-19's baseline and the target: metric 1 fix-induced 34/38 (89%) vs 15/18 (83%), target <= 20%, missed; metric 2 first-pass approval 7/22 (32%) vs 2/15 (13%), target >= 70%, missed; metric 4 closure duration n/a until the rc-20 PR merges vs n/a, target <= 4 h; metric 6 non-block commits after closure 0 vs 0, target 0, met; metric 7 memory drift 0 vs 0, target 0, met; metric 9 rebuild-due patches 34 vs 18, target 0, missed; oldest record 2026-10-10T23:48:22Z; rc-21 launch act (AC7.3, backlog launch-operator-acts): repoint Homepage at pyproject.toml:37 with its comment at :34-35, and gh repo edit --homepage, once the portfolio page is live; lesson: twice in rc-20, and once in rc-18, a medium test outside unit-fast went red on wt-rc past an APPROVED review (0297a75a1 -> test_an_rc_merge_reads_the_gitflow_once); reviews must run the touched test dirs, including the owner dirs found through the history of the touched lines; no new gate; operator batch (dd-manager-orchestration §2 step 4): this reconcile's intake items ride the main thread's batch; carried: mcp-on-main-is-vulnerable-to-session-exhaustion (operator ruling 'Register, resolve at promote (Recommended)', Dependabot #21 on main; feature/0.5.0 holds no mcp); backlog exits: adoption-and-discoverability, eval-t3-discovery (delivered 0.5.0)"
     }
   ]
 }
