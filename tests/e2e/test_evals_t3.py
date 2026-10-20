@@ -9,7 +9,7 @@ Owner: dd-sw-engineer-sr
 
 import pytest
 
-from tests.helpers.evals import HAND_T3, T3, image, reward, wheel
+from tests.helpers.evals import HAND_T3, ONBOARDED_T3, RENAMED_T3, T3, image, reward, wheel
 from tests.helpers.oslib import run
 
 VERSIONS = ("candidate",)
@@ -18,7 +18,10 @@ pytestmark = [pytest.mark.e2e, pytest.mark.slow, pytest.mark.timeout(600)]
 
 
 def _in_image(version: str, script: str):
-    return run(["docker", "run", "--rm", image(T3, version), "bash", "-c", script])
+    """Offline, so a route that reaches an index fails the row."""
+    return run(
+        ["docker", "run", "--rm", "--network", "none", image(T3, version), "bash", "-c", script]
+    )
 
 
 @pytest.mark.parametrize("version", VERSIONS)
@@ -31,23 +34,27 @@ def test_no_dadaia_is_on_path(version: str) -> None:
     assert _in_image(version, "command -v dadaia").returncode == 1
 
 
+@pytest.mark.parametrize(
+    "route",
+    [
+        "python3 -m venv /tmp/v && /tmp/v/bin/pip install -q dadaia-workspace >&2 && /tmp/v/bin/dadaia --version",
+        "python3 -m venv /tmp/u && /tmp/u/bin/pip install -q uv >&2"
+        " && /tmp/u/bin/uvx --from dadaia-workspace dadaia --version",
+    ],
+    ids=["pip", "uvx"],
+)
 @pytest.mark.parametrize("version", VERSIONS)
-def test_a_plain_install_resolves_the_lib_build(version: str) -> None:
-    want = wheel().name.split("-")[1]
-    done = _in_image(
-        version,
-        "python3 -m venv /tmp/v && /tmp/v/bin/pip install -q --no-index --find-links /opt/wheelhouse dadaia-workspace >&2"
-        " && /tmp/v/bin/dadaia --version",
-    )
+def test_a_plain_install_resolves_the_lib_build_offline(version: str, route: str) -> None:
+    done = _in_image(version, route)
     assert done.returncode == 0, done.stderr[-3000:]
-    assert want in done.stdout
+    assert wheel().name.split("-")[1] in done.stdout
 
 
 @pytest.mark.parametrize("version", VERSIONS)
-def test_the_grader_passes_a_hand_done_workspace(version: str) -> None:
-    assert reward(T3, version, HAND_T3) == "1"
-
-
-@pytest.mark.parametrize("version", VERSIONS)
-def test_the_grader_fails_an_empty_workspace(version: str) -> None:
-    assert reward(T3, version, "true") == "0"
+@pytest.mark.parametrize(
+    ("script", "want"),
+    [(HAND_T3, "1"), (RENAMED_T3, "1"), (ONBOARDED_T3, "0"), ("true", "0")],
+    ids=["hand-done", "context-named-otherwise", "no-backlog-entry", "empty"],
+)
+def test_the_grader_rewards_the_discovery(version: str, script: str, want: str) -> None:
+    assert reward(T3, version, script) == want
