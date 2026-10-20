@@ -1,17 +1,18 @@
 #!/usr/bin/env python3
 """`worktree.py new`: open and lock one canonical worktree by its name, on its parent's branch."""
 
-from __future__ import annotations  # noqa: I001
+from __future__ import annotations
 
 import json
 import shutil
 from pathlib import Path
 
 from _bugs_check import OPEN
+from _git import git
 from _grammar import STATE, candidate_number
 from _platform import act, command, is_link
 from _specs import check_release, parse
-from _worktree_git import flow_for, git, locked_add, not_a_name, reattach, work_version, work_versions  # fmt: skip
+from _worktree_git import flow_for, locked_add, not_a_name, reattach, work_version, work_versions
 from _worktree_names import (
     LAUNCH,
     LEVEL_FILE,
