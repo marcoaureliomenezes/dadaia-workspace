@@ -99,8 +99,8 @@ def _kept(tree: Path, verb: str, keep: list[str], drop: bool) -> list[str]:
 
 
 def _remove(into: Path, tree: Path, name: str, kept: list[str]) -> None:
-    """Copy *kept* into the repo *into* and drop the tree, its branch (on the remote too, when it
-    was pushed) and the folder it leaves empty."""
+    """Copy *kept* into the repo *into* and drop the tree (an absent one is pruned), its branch (on
+    the remote too, when it was pushed) and the folder it leaves empty."""
     for rel in kept:
         source, target = tree / rel, into / rel
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -121,7 +121,7 @@ def _remove(into: Path, tree: Path, name: str, kept: list[str]) -> None:
                 git_line(into, "push", fields[0], "--delete", branch(name)),
             ) from error
     git(into, "worktree", "unlock", str(tree), check=False)
-    git(into, "worktree", "remove", str(tree))
+    git(into, "worktree", *(("remove", str(tree)) if tree.exists() else ("prune",)))
     git(into, "branch", "-d", branch(name))
     _rmdir(tree, name)
 
@@ -450,17 +450,12 @@ def merge(root: Path, path: str, keep: list[str], drop: bool) -> str:
     repo, tree, name, onto = _target(root, path)
     into, ref = _into(repo, onto), branch(name)
     if not tree.exists():  # removed by an earlier run or by hand: only the branch may be left
-        git(into, "worktree", "unlock", str(tree), check=False)
-        git(into, "worktree", "prune")
-        if git(into, "branch", "--list", ref).strip():
-            try:
-                git(into, "branch", "-d", ref)
-            except RuntimeError as error:
-                raise Refusal(
-                    f"{ref} is unmerged: {error}",
-                    git_line(repo, "worktree", "add", str(tree), ref),
-                ) from error
-        _rmdir(tree, name)
+        if not git(repo, "for-each-ref", "--format=x", f"refs/heads/{ref}").strip():
+            _rmdir(tree, name)
+        elif git(repo, "for-each-ref", "--merged", onto, "--format=x", f"refs/heads/{ref}").strip():
+            _remove(into, tree, name, [])
+        else:
+            raise Refusal(f"{ref} is unmerged into {onto}", reattach(repo, tree, name))
         return f"{ref} merged into {onto}"
     for check in _kind_checks(root, repo, tree, name, onto, into):
         check()
