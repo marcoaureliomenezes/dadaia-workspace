@@ -22,7 +22,7 @@ from pathlib import Path
 import _worktree_names as names
 from _handoffs import REVIEWER, reviewer_records
 from _platform import act, command, git_inline, git_line, inline, run, venv_dir, venv_tool
-from _refusal import fix_of, without_fix
+from _refusal import relay, without_fix
 from _worktree_git import (
     cli,
     cli_words,
@@ -316,20 +316,19 @@ def _ledgers(root: Path, repo: Path, tree: Path, scripts: Callable[[Path], list[
         return
     for script in [s for rel in _LEDGERS for s in scripts(rel)]:
         argv = [sys.executable, str(script), "check", "--specs", str(tree / "specs")]
-        _refuse_red(script.name, run(argv, cwd=tree, env=scrubbed_env(), stdin=subprocess.DEVNULL), tree)  # fmt: skip
-    _refuse_red("dadaia doctor", cli(root, "doctor", "--specs-dir", str(tree / "specs"), tree=tree), tree)  # fmt: skip
+        _relay(script.name, run(argv, cwd=tree, env=scrubbed_env(), stdin=subprocess.DEVNULL), tree)  # fmt: skip
+    _relay("dadaia doctor", cli(root, "doctor", "--specs-dir", str(tree / "specs"), tree=tree), tree)  # fmt: skip
 
 
-def _refuse_red(name: str, done: subprocess.CompletedProcess[str], tree: Path) -> None:
+def _relay(name: str, done: subprocess.CompletedProcess[str], tree: Path) -> None:
     if done.returncode:
-        out = done.stdout + done.stderr
-        print(without_fix(out), end="")
-        raise Refusal(f"{name} check failed on {tree}", fix_of(out, act("agent", f"fix the findings above in {tree} and commit them")))  # fmt: skip
+        print(without_fix(done.stdout + done.stderr), end="")
+    relay(done, f"{name} check failed on {tree}", act("agent", f"fix the findings above in {tree} and commit them"))  # fmt: skip
 
 
 def _refuse_denylisted(root: Path, tree: Path, onto: str) -> None:
     """Refuse a tree whose `onto..HEAD` carries a denylisted term: the pre-push content matcher."""
-    _refuse_red("the denylist scan", cli(root, "ci", "push-gate-check", "--onto", onto, tree=tree), tree)  # fmt: skip
+    _relay("the denylist scan", cli(root, "ci", "push-gate-check", "--onto", onto, tree=tree), tree)  # fmt: skip
 
 
 def _series(tree: Path, work: str, tip: str) -> list[tuple[str, str]]:
