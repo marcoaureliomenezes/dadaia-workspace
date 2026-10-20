@@ -1,5 +1,6 @@
 """GitSubprocessClient — git operations via stdlib subprocess."""
 
+import os
 import subprocess
 from collections.abc import Sequence
 from pathlib import Path
@@ -91,11 +92,16 @@ class GitSubprocessClient:
         for (no terminal, no ssh password); an unsafe, unreachable or hanging url is `False`."""
         try:
             _refuse_unsafe_url(url)
+            ssh = (
+                os.environ.get("GIT_SSH_COMMAND")
+                or platform.run(["git", "config", "core.sshCommand"]).stdout.strip()
+                or "ssh"
+            )
             done = _run(
                 ["git", "ls-remote", "--heads", "--", url],
                 stdin="",
                 timeout=_PROBE_TIMEOUT_S,
-                env={"GIT_TERMINAL_PROMPT": "0", "GIT_SSH_COMMAND": "ssh -o BatchMode=yes"},
+                env={"GIT_TERMINAL_PROMPT": "0", "GIT_SSH_COMMAND": f"{ssh} -o BatchMode=yes"},
             )
         except (GitCloneError, subprocess.TimeoutExpired, OSError):
             return False
