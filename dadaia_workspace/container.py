@@ -1,22 +1,21 @@
 """Composition root — builds services with concrete infrastructure."""
 
 import logging
+from collections.abc import Iterable
 from functools import partial
 from pathlib import Path
-from typing import TYPE_CHECKING, NoReturn
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from dadaia_workspace.features.certification import CertificationResult
 
-from dadaia_workspace.core.cli_line import git_line
-from dadaia_workspace.core.exceptions import DadaiaError, GitSyncError
-from dadaia_workspace.core.models.git_scan import GitObjectReadError, GitRunError
-from dadaia_workspace.core.platform import act, write_text
+from dadaia_workspace.core.models.git_scan import ScannedObject
 from dadaia_workspace.core.workspace_resolver import not_initialized
 from dadaia_workspace.features.capabilities import distribution_version
 from dadaia_workspace.features.chokepoints.denylist_scan import BaselinePatternLike
 from dadaia_workspace.features.chokepoints.push_gate import read_failure_fix
-from dadaia_workspace.features.export.service import ExportService, new_scratch, scratch_fix
+from dadaia_workspace.features.export import scan
+from dadaia_workspace.features.export.service import ExportService
 from dadaia_workspace.features.migrate.state_v2 import execute_migration, plan_migration
 from dadaia_workspace.features.public.service import PublicAssetService
 from dadaia_workspace.features.reconcile import ReconcileResult
@@ -128,9 +127,6 @@ def scan_publish_candidates(repo: Path, rels: list[str], *, own: bool = False) -
     to commit, before any hook could see them.
     Read as the object reader reads a blob: undecodable bytes are scanned by path only.
     *own* drops the terms *repo*'s own name carries; off, no repo identity is read."""
-    from dadaia_workspace.core.models.git_scan import ScannedObject
-    from dadaia_workspace.features.chokepoints.denylist_scan import scan_objects
-
     objects = []
     for rel in rels:
         if (repo / rel).is_file():
@@ -139,94 +135,16 @@ def scan_publish_candidates(repo: Path, rels: list[str], *, own: bool = False) -
                 objects.append(ScannedObject(rel, "", data.decode("utf-8"), decodable=True))
             except UnicodeDecodeError:
                 objects.append(ScannedObject(rel, "", "", decodable=False))
-    outcome = scan_objects(
-        objects, load_denylist_terms(repo if own else None), load_denylist_baseline_patterns()
-    )
-    return {h.path: f"{h.source_layer} '{h.masked_term}' (line {h.line})" for h in outcome.hits}
+    return _findings(repo if own else None, objects)
 
 
-def scan_bundle(workspace_root: Path, bundle: Path, repo: Path) -> dict[str, str]:
-    """The pre-push matcher over the objects *bundle* adds to *repo*, as the push gate reads
-    them: git's own exit statuses tell the cases apart (`list-heads` fails: a damaged header;
-    `verify` fails: a missing prerequisite), a scratch bare repo borrows *repo*'s objects and
-    `origin` refs, and the bundle is unbundled there. Nothing is written into *repo*.
-    A failure raises `DadaiaError` relaying git's reason, with the act that clears its cause."""
+def _findings(terms_of: Path | None, objects: Iterable[ScannedObject]) -> dict[str, str]:
+    """One masked finding per offending path of *objects*; *terms_of*'s repo may name itself."""
     from dadaia_workspace.features.chokepoints.denylist_scan import scan_objects
 
-    # An open lane's bundle was written a moment ago: its damage is git's, never the operator's.
-    paused = bundle.is_relative_to(workspace_root / ".dadaia" / "dist")
-    damaged = (
-        act("operator", f"rule whether {bundle} is restored from a copy or discarded")
-        if paused
-        else git_line(repo, "fsck")
+    outcome = scan_objects(
+        objects, load_denylist_terms(terms_of), load_denylist_baseline_patterns()
     )
-
-    def refuse(why: str, fix: str) -> NoReturn:
-        raise DadaiaError(f"{bundle.name} cannot be scanned ({why})", fix=fix)
-
-    def git(cwd: Path, *args: str, why: str, fix: str) -> str:
-        try:
-            return GitSubprocessClient().git(cwd, *args)
-        except GitSyncError as exc:
-            refuse(f"{why}: {exc.message.partition(':\n')[2].strip()}", fix)
-        except (OSError, TimeoutError):
-            refuse("git could not run", read_failure_fix(GitRunError("git"), repo))
-
-    try:
-        bundle.open("rb").close()
-    except OSError as exc:
-        refuse(
-            type(exc).__name__, act("agent", f"make {bundle} readable, then run the export again")
-        )
-    heads = git(
-        repo, "bundle", "list-heads", str(bundle), why="its header is unreadable", fix=damaged
-    )
-    if not heads:
-        refuse("it holds no ref", damaged)
-    git(
-        repo,
-        "bundle",
-        "verify",
-        str(bundle),
-        why="its repo lacks a prerequisite",
-        fix=git_line(repo, "fetch", "origin"),
-    )
-    tmp = workspace_root / ".dadaia" / "tmp"
-    with new_scratch(tmp, "scan-") as name:
-        scratch, fsck = Path(name), git_line(repo, "fsck")
-        git(scratch, "init", "-q", "--bare", why="no scratch repo", fix=scratch_fix(tmp))
-        store = git(
-            repo,
-            "rev-parse",
-            "--path-format=absolute",
-            "--git-path",
-            "objects",
-            why="no repo",
-            fix=fsck,
-        )
-        try:
-            write_text(scratch / "objects" / "info" / "alternates", store + "\n")
-        except OSError as exc:
-            refuse(type(exc).__name__, scratch_fix(tmp))
-        git(
-            scratch,
-            "fetch",
-            "-q",
-            str(repo),
-            "+refs/remotes/origin/*:refs/remotes/origin/*",
-            why="no origin refs",
-            fix=fsck,
-        )
-        # verify never reads the pack body: a failed unbundle is the file's if it is a pause bundle.
-        unbundled = damaged if paused else scratch_fix(tmp)
-        git(scratch, "bundle", "unbundle", str(bundle), why="git refused it", fix=unbundled)
-        try:
-            found = GitSubprocessObjectReader().new_objects(scratch, heads.split()[0], "")
-            outcome = scan_objects(
-                found, load_denylist_terms(repo), load_denylist_baseline_patterns()
-            )
-        except GitObjectReadError as exc:
-            refuse(str(exc), read_failure_fix(exc, repo))
     return {h.path: f"{h.source_layer} '{h.masked_term}' (line {h.line})" for h in outcome.hits}
 
 
@@ -245,11 +163,13 @@ def build_doctor_service(
 
 def build_export_service(workspace_root: Path) -> ExportService:
     _guard_initialized(workspace_root)
-    return ExportService(
-        context_store=build_context_store(workspace_root),
-        workspace_root=workspace_root,
-        scan_bundle=partial(scan_bundle, workspace_root),
-    )
+
+    def scan_export(bundle: Path, repo: Path) -> dict[str, str]:
+        return scan.scan_bundle(
+            workspace_root, bundle, repo, partial(_findings, repo), read_failure_fix
+        )
+
+    return ExportService(build_context_store(workspace_root), workspace_root, scan_export)
 
 
 def reconcile_workspace(
