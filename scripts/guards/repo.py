@@ -502,6 +502,25 @@ def release_workflow_canon(tree: Tree) -> list[str]:
     ]
 
 
+_PKG_MAP = re.compile(
+    r'package map \(\d+ packages\)\s+```mermaid\n(?:(?!```).)*?pkgs\["([^"]*)"', re.S
+)
+
+
+def features_map_matches_architecture(tree: Tree) -> list[str]:
+    """Judge ARCHITECTURE.md's features package map against the tracked feature packages."""
+    node = _PKG_MAP.search(tree.read("specs/memory/ARCHITECTURE.md"))
+    mapped = {n.strip() for n in node[1].split("·")} if node else set()
+    live = {
+        p.split("/")[2]
+        for p in tree.tracked("dadaia_workspace/features")
+        if p.endswith("/__init__.py") and p.count("/") == 3
+    }
+    return [f"stale-node: {n} is no live package" for n in sorted(mapped - live)] + [
+        f"missing-node: {n} is absent from the map" for n in sorted(live - mapped)
+    ]
+
+
 _SECTIONS = {
     "ARCHITECTURE.md": (["Principles", "Tech Stack", "Structure"], "slop-code"),
     "QUALITY.md": (["Principles", "Test architecture", "Gates"], "slop-tests"),
@@ -775,7 +794,8 @@ def tests_mirror_the_package(tree: Tree) -> list[str]:
 _COPIED = (".github", ".gitignore", "specs/constitution.md", "specs/memory", "specs/ADRs",
            "pyproject.toml", "CHANGELOG.md", ".release-please-manifest.json",
            "release-please-config.json", "README.md", "llms.txt", "docs", "evals", "scripts/ci.py",
-           "specs/releases/*/_RELEASE.json", "specs/releases/*/rc-*/SPEC.md")  # fmt: skip
+           "specs/releases/*/_RELEASE.json", "specs/releases/*/rc-*/SPEC.md",
+           "dadaia_workspace/features/*/__init__.py")  # fmt: skip
 _ROGUE = (
     "on: push\njobs:\n  x:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: anthropics/a@v1\n"
 )
@@ -1192,6 +1212,10 @@ CHECKS: dict[str, Check] = {
             ),
             "atom-link": _edit(_Q, "\n## Gates", "\nSee [[sdd-gate-v3]].\n\n## Gates"),
         },
+    ),
+    "features-map-matches-architecture": (
+        features_map_matches_architecture,
+        {"stale-node": _edit(_A, 'pkgs["backlog', 'pkgs["ghost · backlog')},
     ),
     "adr-superseded-successor": (
         adr_superseded_successor,
