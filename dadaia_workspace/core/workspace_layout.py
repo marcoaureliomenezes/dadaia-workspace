@@ -273,16 +273,32 @@ def _matches(sub: str, pattern: str) -> bool:
     return len(parts) == len(globs) and all(map(fnmatch.fnmatch, parts, globs))
 
 
+def _gitdir(entry: Path) -> PurePath | None:
+    """The gitdir a regular, non-link ``.git`` file names, else ``None``."""
+    if not entry.is_file() or platform.is_link(entry):
+        return None
+    try:
+        return PurePath(platform.read_text(entry).removeprefix("gitdir:").strip())
+    except (OSError, platform.Undecodable):
+        return None
+
+
 def is_worktree_gitfile(entry: Path) -> bool:
     """A linked worktree's ``.git`` file: a regular file, not a link, whose gitdir sits in
     ``<common>/worktrees/``."""
-    if not entry.is_file() or platform.is_link(entry):
-        return False
-    try:
-        gitdir = platform.read_text(entry).removeprefix("gitdir:").strip()
-    except (OSError, platform.Undecodable):
-        return False
-    return PurePath(gitdir).parent.name == "worktrees"
+    gitdir = _gitdir(entry)
+    return gitdir is not None and gitdir.parent.name == "worktrees"
+
+
+def _anchors(root: Path, entry: Path) -> bool:
+    """A ``.git`` file whose gitdir sits in ``<root>/repos/<slug>/.git/worktrees/``."""
+    gitdir = _gitdir(entry)
+    return (
+        gitdir is not None
+        and len(gitdir.parents) > 3
+        and (gitdir.parent.name, gitdir.parents[1].name) == ("worktrees", ".git")
+        and gitdir.parents[3] in (root / "repos", root.resolve() / "repos")
+    )
 
 
 def protected_glob(root: Path, rel: str, protected: tuple[str, ...]) -> str | None:
@@ -301,7 +317,7 @@ def protected_glob(root: Path, rel: str, protected: tuple[str, ...]) -> str | No
         anchors = [
             k - 2
             for k in range(3, len(parts))
-            if is_worktree_gitfile(root.joinpath(*parts[:k], ".git"))
+            if _anchors(root, root.joinpath(*parts[:k], ".git"))
         ] or list(range(len(tail)))
     subs = ("/".join(tail[i : j + 1]) for i in anchors for j in range(i, len(tail)))
     return next((g for sub in subs for g in protected if _matches(sub, g)), None)
