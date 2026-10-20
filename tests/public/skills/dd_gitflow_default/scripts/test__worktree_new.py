@@ -16,10 +16,8 @@ import pytest
 
 from dadaia_workspace.core.cli_line import git_line, shell_line
 from dadaia_workspace.core.skill_owner import load_owner
-from tests.core.test_cli_line__fix_line_contract import fix_defect
-from tests.fixtures.harness_env import run_bash
 from tests.helpers import worktree_ws
-from tests.helpers.oslib import inline, link, read_text, run, write_text
+from tests.helpers.oslib import command, link, read_text, run, write_text
 from tests.helpers.skill_scripts import stage_skill_scripts
 from tests.helpers.worktree_ws import (
     NEW_JOB,
@@ -104,14 +102,16 @@ def test_a_job_after_closure_is_refused_with_a_fix_that_can_work(definition_root
     refused = _run(definition_root, "new", "r", NEW_JOB)
 
     assert (refused.returncode, refused.stdout) == (1, "")
-    [fix] = _fixes(refused)
-    release = worktree_ws.SCRIPT.parents[2] / "dd-release-implementation/scripts/release.py"
-    specs = definition_root / "worktrees/r" / RC / "specs"
-    stack = inline(sys.executable, str(release.resolve()), "new", "0.5.0", "--specs", str(specs))
-    assert fix == f"fix: Agent action: run {stack}"
-    assert not fix_defect(fix.removeprefix("fix: ")), fix
+    assert [f.removeprefix("fix: ") for f in _fixes(refused)] == [
+        f"{_script()} new r 0.5.0/rc-2/wt-rc"
+    ]
     assert not (definition_root / "worktrees/r" / NEW_JOB).exists()
-    run_bash(stack, cwd=definition_root, check=True)  # the act, run as printed, is not refused
+    rc_tree = definition_root / "worktrees/r" / RC
+    run_fix(definition_root, refused)  # the printed act, run as printed, is not refused
+    assert (definition_root / "worktrees/r/0.5.0/rc-2/wt-rc").is_dir()
+    assert _git(rc_tree, "status", "--porcelain") == ""
+    state = json.loads(read_text(rc_tree / "specs/releases/0.5.0/_RELEASE.json"))
+    assert state["phase"] == "CLOSURE"
 
 
 def test_a_main_tree_reads_the_phase_on_its_rcs_tree_not_the_work_branch(
@@ -562,8 +562,8 @@ def test_a_main_tree_is_refused_when_release_check_exits_non_zero_with_no_findin
     lines = refused.stderr.splitlines()
     assert lines[0] == "[error] release.py check exited 1", refused.stderr
     release = (tmp_path / "skills/dd-release-implementation/scripts/release.py").resolve()
-    check = inline(sys.executable, str(release), "check", "--specs", str(specs))
-    assert lines[1:] == [f"fix: Agent action: run {check}"], refused.stderr
+    check = command(sys.executable, str(release), "check", "--specs", str(specs))
+    assert lines[1:] == [f"fix: {check}"], refused.stderr
     assert not (root / "worktrees/r" / NEW_JOB).exists()
 
 

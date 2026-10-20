@@ -18,7 +18,7 @@ import pytest
 from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.skill_owner import load_owner
 from tests.fixtures.harness_env import suite_env
-from tests.helpers.oslib import inline, read_text, write_text
+from tests.helpers.oslib import command, read_text, write_text
 from tests.helpers.oslib import run as os_run
 from tests.helpers.skill_scripts import stage_skill_scripts
 from tests.helpers.worktree_ws import commit, fixes, git, make_workspace, patch_cli, run
@@ -883,8 +883,8 @@ def test_stats_refuses_a_release_check_that_exits_non_zero_with_no_finding(tmp_p
     lines = done.stderr.splitlines()
     assert lines[0] == "[error] release.py check exited 1", done.stderr
     release = (root / ".agents/skills/dd-release-implementation/scripts/release.py").resolve()
-    check = inline(sys.executable, str(release), "check", "--specs", str(specs))
-    assert lines[1:] == [f"fix: Agent action: run {check}"], done.stderr
+    check = command(sys.executable, str(release), "check", "--specs", str(specs))
+    assert lines[1:] == [f"fix: {check}"], done.stderr
 
 
 def test_stats_of_a_milestone_without_sha_reads_n_a(tmp_path: Path) -> None:
