@@ -10,7 +10,7 @@ from pathlib import Path
 from _bugs_check import OPEN
 from _grammar import STATE
 from _platform import act, command, is_link
-from _specs import check_release, parse, script
+from _specs import check_release, parse
 from _worktree_git import flow_for, git, not_a_name, reattach, work_version, work_versions
 from _worktree_names import (
     LAUNCH,
@@ -47,9 +47,6 @@ def _refuse_unopened_bug(main: Path, work: str, bug: str) -> None:
                       act("operator", f"confirm {what} (dd-bug-registration §2)"))  # fmt: skip
 
 
-_RELEASE = Path(__file__).resolve().parents[2] / "dd-release-implementation/scripts/release.py"
-
-
 def _refuse_unready(root: Path, main: Path, version: str, rc: str) -> None:
     """A main tree opens only while its release state, on the rc's tree, passes `release.py check` and is in IMPLEMENTATION; no state reads as not."""
     rc_name = f"{version}/{rc}/wt-rc"
@@ -62,12 +59,12 @@ def _refuse_unready(root: Path, main: Path, version: str, rc: str) -> None:
         check_release(rc_tree / "specs")
         phase = json.loads(state.read_text("utf-8")).get("phase")
     if phase != "IMPLEMENTATION":
-        fix = (  # a phase never goes back: past IMPLEMENTATION the way on is the next candidate
-            f"run {script(_RELEASE).inline('new', version, specs=rc_tree / 'specs')}"
-            if phase == "CLOSURE"
-            else f"reach phase IMPLEMENTATION in {STATE} on {branch(rc_name)} at {rc_tree} (release.py phase), then open its job again"
-        )  # fmt: skip
-        raise Refusal(f"a job needs release {version} in phase IMPLEMENTATION on {branch(rc_name)}", act("agent", fix))  # fmt: skip
+        nxt = f"{version}/rc-{int(rc.removeprefix('rc-')) + 1}/wt-rc"  # a phase never goes back: past IMPLEMENTATION the way on is the next candidate's own tree
+        fix = (command(*LAUNCH, "new", main.name, nxt) if phase == "CLOSURE"
+               else act("agent", f"reach phase IMPLEMENTATION in {STATE} on {branch(rc_name)} at {rc_tree} (release.py phase), then open its job again"))  # fmt: skip
+        raise Refusal(
+            f"a job needs release {version} in phase IMPLEMENTATION on {branch(rc_name)}", fix
+        )
 
 
 def absent_levels(root: Path, repo_name: str, name: str) -> list[tuple[Path, str]]:
