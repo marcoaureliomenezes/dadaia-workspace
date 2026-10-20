@@ -28,6 +28,7 @@ from _worktree_git import (
     cli_words,
     diff_sha256,
     dirty,
+    drop_steps,
     flow_for,
     git,
     not_a_name,
@@ -91,13 +92,9 @@ def _kept(tree: Path, verb: str, keep: list[str], drop: bool) -> list[str]:
     precious = _precious(tree)
     left = [p for p in precious if p not in keep]
     if left and not drop:
-        raise Refusal(
-            f"ignored files would be lost: {', '.join(left)}",
-            act(
-                "agent",
-                f"keep them with `{inline(*LAUNCH, verb, str(tree), '--keep', *precious)}` or discard them with `{inline(*LAUNCH, verb, str(tree), '--drop')}`",
-            ),  # fmt: skip
-        )
+        go = partial(inline, *LAUNCH, verb, str(tree))
+        offer = f"keep them with `{go('--keep', *precious)}` or discard them with `{go('--drop')}`"
+        raise Refusal(f"ignored files would be lost: {', '.join(left)}", act("agent", offer))  # fmt: skip
     return [p for p in precious if p in keep]
 
 
@@ -263,9 +260,8 @@ def _refuse_implementation_tests(tree: Path, onto: str, law: str) -> None:
     commits = git(tree, "rev-list", "--reverse", f"{onto}..HEAD").split()
     for commit in commits:
         subject = git(tree, "show", "-s", "--format=%s", commit).strip()
-        paths = git(tree, "diff-tree", "--no-commit-id", "--name-only", "-r", "-z", commit).split(
-            "\0"
-        )[:-1]
+        diff = git(tree, "diff-tree", "--no-commit-id", "--name-only", "-r", "-z", commit)
+        paths = diff.split("\0")[:-1]
         if subject.startswith("test("):
             if source := next((path for path in paths if not _is_test_path(path, declared)), None):
                 raise Refusal(
@@ -372,35 +368,37 @@ def _reviews(root: Path, shas: set[str]) -> list[tuple[bool, float, str, dict[st
     return found
 
 
+def _dispatch(tree: Path, at: str) -> str:
+    return f"dispatch {REVIEWER} on {tree} at {at}; its verdict.py run writes the verdict"
+
+
 def _check_approved(root: Path, tree: Path, work: str, name: str) -> None:
-    """The newest reviewer handoffs whose `reviewed_sha` is a candidate sha decide: each must
-    be a valid APPROVED whose `diff_sha256` is HEAD's. A candidate is a sha X of this branch's reflog
-    whose (patch-id, message) series over *work*..X equals HEAD's, in order; X == HEAD is the
-    degenerate case; the reflog's base (series []) matches only an empty branch. Newest is the
-    schema-required `produced_at`, across every candidate (a newer verdict on a carried-over sha
-    overrules an older one on HEAD); the file name never orders. A missing, unparseable or
-    offset-less `produced_at` ranks newest and refuses; handoffs tied on the newest moment all
-    decide, and the fix names the first in path order that is not a valid APPROVED."""
+    """The newest reviewer handoffs naming a candidate sha decide: each must be a valid APPROVED
+    whose `diff_sha256` is HEAD's. A candidate is HEAD or a sha of this branch's reflog whose
+    (patch-id, message) series over *work* equals HEAD's; newest is `produced_at`, a missing or
+    naive one ranks newest, and ties all decide."""
     head = git(tree, "rev-parse", "HEAD").strip()
     mine = _series(tree, work, head)
     reflog = {head, *git(tree, "reflog", "--format=%H", branch(name), check=False).split()}
     named = _reviews(root, {x for x in reflog if x == head or _series(tree, work, x) == mine})
     top = max((row[:2] for row in named), default=None)
     decided = sorted(row for row in named if row[:2] == top)
+    validate = partial(cli, root, "reports", "validate")
     invalid = next(
         (
             path
-            for unparsed, _, path, data in decided
-            if unparsed
-            or data.get("verdict") != "APPROVED"
-            or cli(root, "reports", "validate", path, "--reviewed-root", str(tree)).returncode
+            for unparsed, _, path, _ in decided
+            if unparsed or validate(path, "--reviewed-root", str(tree)).returncode
         ),
         None,
     )
     said = f"the newest {REVIEWER} handoff naming HEAD {head} or a sha of its patch and message series is not a valid APPROVED (the file comes from the reviewer's verdict)"  # fmt: skip
     if invalid:
         raise Refusal(said, command(*cli_words(root, "reports", "validate", invalid, "--reviewed-root", str(tree))))  # fmt: skip
-    dispatch = act("agent", f"dispatch {REVIEWER} on {tree} at HEAD {head}; its verdict.py run writes the verdict")  # fmt: skip
+    if rejected := next((row[2] for row in decided if row[3].get("verdict") != "APPROVED"), None):
+        rework = f"fix the findings of {rejected} and commit them in {tree}, then {_dispatch(tree, 'its new HEAD')}"  # fmt: skip
+        raise Refusal(said, act("agent", rework))
+    dispatch = act("agent", _dispatch(tree, f"HEAD {head}"))
     if not decided:
         raise Refusal(said, dispatch)
     want = diff_sha256(tree, work, head)
@@ -454,12 +452,13 @@ def merge(root: Path, path: str, keep: list[str], drop: bool) -> str:
     repo, tree, name, onto = _target(root, path)
     into, ref = _into(repo, onto), branch(name)
     if not tree.exists():  # removed by an earlier run or by hand: only the branch may be left
-        if not git(repo, "for-each-ref", "--format=x", f"refs/heads/{ref}").strip():
+        if not git(repo, "branch", "--list", ref).strip():
             _rmdir(tree, name)
-        elif git(repo, "for-each-ref", "--merged", onto, "--format=x", f"refs/heads/{ref}").strip():
-            _remove(into, tree, name, [])
-        else:
+        elif not drop_steps(repo, ref, onto):
             raise Refusal(f"{ref} is unmerged into {onto}", reattach(repo, tree, name))
+        else:
+            _on_target(into, onto)
+            _remove(into, tree, name, [])
         return f"{ref} merged into {onto}"
     for check in _kind_checks(root, repo, tree, name, onto, into):
         check()
@@ -481,13 +480,9 @@ def clean(root: Path, path: str, keep: list[str], drop: bool) -> str:
         raise Refusal(f"{tree} is not a worktree of ours", command(*LAUNCH, "list"))
     ahead = int(git(repo, "rev-list", "--count", f"{onto}..{branch(name)}"))
     if ahead:
-        raise Refusal(
-            f"{branch(name)} holds {ahead} unmerged commit(s)",
-            act(
-                "agent",
-                f"dispatch {REVIEWER} on {tree} at its HEAD, then run `{inline(*LAUNCH, 'merge', str(tree))}`",
-            ),  # fmt: skip
-        )
+        merge = inline(*LAUNCH, "merge", str(tree))
+        raise Refusal(f"{branch(name)} holds {ahead} unmerged commit(s)",
+                      act("agent", f"{_dispatch(tree, 'its HEAD')}, then run `{merge}`"))  # fmt: skip
     _refuse_dirty(tree)
     _remove(_into(repo, onto), tree, name, _kept(tree, "clean", keep, drop))
     return f"cleaned {tree}"

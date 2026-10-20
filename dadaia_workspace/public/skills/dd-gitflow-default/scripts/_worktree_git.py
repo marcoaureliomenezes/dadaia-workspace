@@ -17,7 +17,6 @@ from _git import git as git, parse_worktrees, scrubbed_env as scrubbed_env  # is
 from _grammar import SEMVER_RE, TAG_RE, sole_live
 from _ledger import denylist_file
 from _platform import act, cli_argv, command, git_inline, git_line, inline, is_link, venv_dir
-from _root import STATES
 from _specs import run_cli
 from _specs import workspace_of as workspace_of
 from _worktree_names import (
@@ -59,12 +58,8 @@ def cli(root: Path, *args: str, tree: Path | None = None) -> subprocess.Complete
     the run acts on that tree alone: its cwd, every root above it fenced, so the workspace's
     denylist file is handed over by the loader's own `$DADAIA_PRIVACY_DENYLIST` input."""
     fence = (
-        {
-            "DADAIA_FENCED_ROOTS": os.pathsep.join(map(str, tree.resolve().parents)),
-            "DADAIA_PRIVACY_DENYLIST": str(
-                denylist_file(root) or root / STATES / "privacy_denylist.json"
-            ),
-        }
+        {"DADAIA_FENCED_ROOTS": os.pathsep.join(map(str, tree.resolve().parents))}
+        | ({"DADAIA_PRIVACY_DENYLIST": str(file)} if (file := denylist_file(root)) else {})
         if tree
         else {}
     )
@@ -123,10 +118,14 @@ class SeveralWork(Refusal):
         self.text, self.keep = text, keep
 
 
+def _switch(repo: Path, high: str) -> str:
+    return f"run `{git_inline(repo, 'switch', high)}`"
+
+
 def drop_steps(repo: Path, low: str, high: str) -> list[str]:
-    """The act steps that delete branch *low* once it is merged into *high*: its upstream unset
-    when it has one, since git's `-d` judges an upstream rather than HEAD, then `-d`; empty when
-    *low* is not merged. At most two steps, never `-D`."""
+    """The act steps that delete branch *low* once it is merged into *high*: `high` checked out,
+    since `-d` judges the checkout, *low*'s upstream unset when it has one, then `-d`; empty when
+    *low* is not merged. Never `-D`."""
     merged = git(
         repo, "for-each-ref", "--merged", high, "--format=x%(upstream)", f"refs/heads/{low}"
     )
@@ -137,7 +136,7 @@ def drop_steps(repo: Path, low: str, high: str) -> list[str]:
         if merged.strip() != "x"
         else []
     )
-    return [*steps, f"run `{git_inline(repo, 'branch', '-d', low)}`"]
+    return [_switch(repo, high), *steps, f"run `{git_inline(repo, 'branch', '-d', low)}`"]
 
 
 def several_work(repo: Path, flow: dict[str, str], versions: list[str], ref: str = "refs/heads") -> tuple[str, str]:  # fmt: skip
@@ -146,8 +145,7 @@ def several_work(repo: Path, flow: dict[str, str], versions: list[str], ref: str
     if ref != "refs/heads":
         return ordered[-1], ""
     low, high = (f"{flow['work']}{ordered[i]}" for i in (0, -1))
-    drop = ", then ".join(drop_steps(repo, low, high)) or f"merge {low} into {high}"
-    return ordered[-1], f"run `{git_inline(repo, 'switch', high)}`, then {drop}"
+    return ordered[-1], ", then ".join(drop_steps(repo, low, high) or [_switch(repo, high), f"merge {low} into {high}"])  # fmt: skip
 
 
 def work_version(repo: Path, flow: dict[str, str], ref: str = "refs/heads") -> str:
@@ -256,9 +254,7 @@ def _absent(root: Path, repo: Path, flow: dict[str, str], held: set[str], found:
             # it) and a fix that waits on an agent
             if not name_of(ref):
                 if work and (steps := drop_steps(repo, ref, work)):
-                    if git(repo, "branch", "--show-current").strip() != work:
-                        steps = [f"run `{git_inline(repo, 'switch', work)}`", *steps]
-                    line = act("agent", ", then ".join(steps)) if len(steps) > 1 else git_line(repo, "branch", "-d", ref)  # fmt: skip
+                    line = act("agent", ", then ".join(steps))
                     row |= {"fix": line, "exit": line}
                 else:
                     row |= {"fix": act("agent", f"land or archive the wt/* branch {ref}, then close again"), "exit": ""}  # fmt: skip
