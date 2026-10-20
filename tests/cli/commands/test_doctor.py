@@ -350,15 +350,21 @@ def test_no_fix_line_deletes_a_record_without_recording_it(codes: str, fix: str 
     )
 
 
+def _plant_stale_feature_map(r: Path) -> None:
+    """The map names a package the live ``features/`` tree lacks; the rule is silent without that tree."""
+    _write(r / "dadaia_workspace" / "features" / "realpkg" / "__init__.py", "")
+    _append(
+        r / "specs" / "memory" / "ARCHITECTURE.md",
+        "\n### `dadaia_workspace/features` — package map (1 packages)\n\n"
+        '```mermaid\nflowchart LR\n  pkgs["ghostpkg"]\n```\n',
+    )
+
+
 #: `report-only` codes: WARNING-only by
 #: construction, and no fix line (their remedy is the operator's judgment).
 REPORT_ONLY: dict[str, Callable[[Path], None]] = {
     "SPEC-DOC-030": lambda r: (r / "specs" / "audits" / "Bad_Name").mkdir(parents=True),
-    "MEM-DRIFT-1": lambda r: _append(
-        r / "specs" / "memory" / "ARCHITECTURE.md",
-        "\n### `dadaia_workspace/features` — package map (1 packages)\n\n"
-        '```mermaid\nflowchart LR\n  pkgs["ghostpkg"]\n```\n',
-    ),
+    "MEM-DRIFT-1": _plant_stale_feature_map,
     "MEM-DRIFT-2": lambda r: _append(
         r / "specs" / "memory" / "QUALITY.md", "\nRun `dadaia no-such-verb`.\n"
     ),
