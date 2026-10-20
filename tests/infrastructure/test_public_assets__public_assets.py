@@ -250,6 +250,7 @@ def test_load_denylist_env_precedence_and_workspace_fallback(
         ("acme", False, ()),
         ("acme-site", False, ()),
         ("acme", True, ()),
+        ("acme-site", True, ()),
         ("other", False, (("acme", "r"),)),
         ("other", True, (("acme", "r"),)),
     ],

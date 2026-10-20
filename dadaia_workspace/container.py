@@ -138,7 +138,7 @@ def scan_publish_candidates(repo: Path, rels: list[str]) -> dict[str, str]:
                 objects.append(ScannedObject(rel, "", data.decode("utf-8"), decodable=True))
             except UnicodeDecodeError:
                 objects.append(ScannedObject(rel, "", "", decodable=False))
-    outcome = scan_objects(objects, load_denylist_terms(repo), load_denylist_baseline_patterns())
+    outcome = scan_objects(objects, load_denylist_terms(), load_denylist_baseline_patterns())
     return {h.path: f"{h.source_layer} '{h.masked_term}' (line {h.line})" for h in outcome.hits}
 
 
