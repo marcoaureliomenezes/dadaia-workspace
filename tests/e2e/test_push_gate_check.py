@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import json
 import os
-import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -20,6 +19,7 @@ import pytest
 
 from dadaia_workspace.core.cli_line import shell_line
 from dadaia_workspace.core.specs_version import CANONICAL_SPECS_VERSION
+from dadaia_workspace.features.spec_context import sweep
 from tests.fixtures.harness_env import suite_env
 from tests.helpers.oslib import make_readonly, run, write_text
 
@@ -144,7 +144,7 @@ def test_an_associated_repo_inherits_its_context_gitflow(tmp_path: Path) -> None
     # traceback.
     for fan in (main / ".git/objects").iterdir():  # git's read-only objects, as on Windows
         make_readonly(fan)
-    shutil.rmtree(main)
+    assert sweep.rmtree(main) is None
     result = _run_push_gate(infra, tmp_path, _push("feature/0.0.1", sha))
     assert result.returncode == 0 and result.stderr.count("WARNING") == 1, result.stderr
     _write_constitution(infra, _CUSTOM_BLOCK)  # its own constitution is read first
