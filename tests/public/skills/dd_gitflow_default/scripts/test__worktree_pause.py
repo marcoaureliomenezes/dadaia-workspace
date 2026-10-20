@@ -286,3 +286,16 @@ def test_list_shows_a_paused_tree_whose_exit_is_the_resume_line(root: Path, name
     assert Path(row["path"]) == tree
     assert row["exit"] == command(sys.executable, str(SCRIPT), "resume", str(tree))
     assert row["fix"] == ""
+
+
+_SKILL = (
+    Path(__file__).resolve().parents[5] / "dadaia_workspace/public/skills/dd-cli-library/SKILL.md"
+)
+
+
+def test_the_dist_writer_sentence_names_worktree_pause_and_resume() -> None:
+    """The skill's sentence listing what writes `.dadaia/dist/` names every verb that does."""
+    (sentence,) = [ln for ln in read_text(_SKILL).splitlines() if ".dadaia/dist/" in ln]
+
+    assert "`worktree pause`" in sentence
+    assert "`worktree resume`" in sentence
