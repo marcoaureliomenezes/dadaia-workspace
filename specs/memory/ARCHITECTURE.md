@@ -280,6 +280,8 @@ flowchart TB
 - 0274 — The code under development carries <release>rc<N>; tests, evals and release validate only the current build, never a published dadaia-workspace
 - 0275 — Amend ADR 0103: scope follows the linked tree a write lands in; a write inside a back-pointer-verified linked worktree of a registered repo is in scope for any session
 - 0276 — Amend ADR 0088: a skill's registry read of the repo's own workspace, found by position, lifts the fence for that one root
+- 0277 — The 0.5.0 eval gate is candidate-only, the release tag may differ from E by _RELEASE.json, and T3 is the 0.5.0 adoption readout in place of D1-D10
+- 0278 — Amend ADR 0273: an uncited resolved record's fix line is the one bugs.py archive act naming every missed id
 <!-- /dadaia:fixed adr-list -->
 
 <!-- dadaia:fixed slop-code -->
