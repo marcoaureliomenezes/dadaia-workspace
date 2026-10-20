@@ -32,9 +32,9 @@ from _worktree_names import (
 )
 
 
-def reattach(repo: Path, tree: Path, name: str, ref: str) -> str:
-    """The fix line that re-adds the removed tree *name* at *tree* on *ref*, locked as `new` locks it."""
-    return git_line(repo, "worktree", "add", "-f", "-f", "--lock", "--reason", f"{LOCK}{name}", str(tree), ref)  # fmt: skip
+def reattach(repo: Path, tree: Path, name: str) -> str:
+    """The fix line that re-adds the removed tree *name* at *tree* on its branch, locked as `new` locks it."""
+    return git_line(repo, "worktree", "add", "-f", "-f", "--lock", "--reason", f"{LOCK}{name}", str(tree), branch(name))  # fmt: skip
 
 
 def diff_sha256(tree: Path, work: str, tip: str) -> str:

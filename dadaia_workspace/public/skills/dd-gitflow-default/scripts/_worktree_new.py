@@ -53,7 +53,7 @@ def _refuse_unready(root: Path, main: Path, version: str, rc: str) -> None:
     rc_tree = tree_path(root, main.name, rc_name)
     state = rc_tree / "specs/releases" / version / STATE
     if not rc_tree.exists():  # removed by hand while its branch lives
-        raise Refusal(f"{rc_tree} does not exist", reattach(main, rc_tree, rc_name, branch(rc_name)))  # fmt: skip
+        raise Refusal(f"{rc_tree} does not exist", reattach(main, rc_tree, rc_name))  # fmt: skip
     phase = None
     if state.is_file():
         check_release(rc_tree / "specs")

@@ -36,7 +36,17 @@ from _worktree_git import (
     scrubbed_env,
     workspace_of,
 )
-from _worktree_names import LAUNCH, NAME_RE, Refusal, base_of, branch, kind_of, locate, tree_path
+from _worktree_names import (
+    LAUNCH,
+    NAME_RE,
+    Refusal,
+    base_of,
+    branch,
+    kind_of,
+    locate,
+    name_of,
+    tree_path,
+)
 
 #: The ledger and release checks a `backlog` or `rc` merge runs, in this order.
 _LEDGERS = (Path("dd-bug-resolution/scripts/bugs.py"), Path("dd-backlog-definition/scripts/backlog.py"),
@@ -421,7 +431,7 @@ def _into(repo: Path, onto: str) -> Path:
 def _kind_checks(root: Path, repo: Path, tree: Path, name: str, onto: str, into: Path) -> list[Callable[[], object]]:  # fmt: skip
     """The ordered checks a tree of this kind must pass to land, before `merge`'s ending checks."""
     if not into.exists():  # the parent's tree removed by hand
-        raise Refusal(f"{into} does not exist", reattach(repo, into, onto.removeprefix("wt/"), onto))  # fmt: skip
+        raise Refusal(f"{into} does not exist", reattach(repo, into, str(name_of(onto))))  # fmt: skip
     ancestor = partial(_check_ancestor, root, tree, onto)
     verdict = partial(_check_approved, root, tree, onto, name)
     job_gate = partial(_gate, tree, onto)
