@@ -792,12 +792,20 @@ def test_stats_of_a_candidate_without_a_release_folder_reads_every_metric_as_n_a
 _CHECK_FIX = (
     "fix: Agent action: {state} fails at the keys this finding names (specs/releases/AGENTS.md: "
     "release.py writes every _RELEASE.json field and ledger line) \u2014 revert the commit that "
-    "introduced it (`git -C {state.parent} log -p -- _RELEASE.json` lists them), or delete the "
+    "introduced it (`{finder}` lists them), or delete the "
     "line if you wrote it and it is still uncommitted, then redo the change through `release.py`"
 )
 
 
 _REL = "releases/0.5.0/_RELEASE.json:1"
+
+
+def _format_fix(fix: str, state: Path) -> str:
+    """*fix* with its `{state}` and the repo-spelled `{finder}` command filled in."""
+    finder = load_owner("dd-bug-resolution", "_platform").git_inline(
+        state.parent, "log", "-p", "--", "_RELEASE.json"
+    )
+    return fix.format(state=state, finder=finder)
 
 
 @pytest.mark.parametrize(
@@ -808,7 +816,7 @@ _REL = "releases/0.5.0/_RELEASE.json:1"
             "document is not valid JSON: Expecting property name enclosed in double quotes",
             "fix: Agent action: {state} fails at its JSON syntax (line 1) (specs/releases/AGENTS.md: "
             "release.py writes every _RELEASE.json field and ledger line) \u2014 revert the commit "
-            "that introduced it (`git -C {state.parent} log -p -- _RELEASE.json` lists them), or "
+            "that introduced it (`{finder}` lists them), or "
             "delete the line if you wrote it and it is still uncommitted, then redo the change "
             "through `release.py`",
         ),
@@ -830,7 +838,7 @@ def test_stats_of_an_unreadable_release_state_is_refused_with_one_fix_line(
     lines = done.stderr.splitlines()
     assert (done.returncode, done.stdout, len(lines)) == (1, "", 2), done.stderr
     assert lines[0] == f"[error] {_REL} {finding}", done.stderr
-    assert lines[1] == fix.format(state=state), done.stderr
+    assert lines[1] == _format_fix(fix, state), done.stderr
 
 
 @pytest.mark.parametrize(
@@ -858,7 +866,7 @@ def test_stats_of_a_log_entry_that_breaks_the_schema_is_refused_with_checks_find
     lines = done.stderr.splitlines()
     assert (done.returncode, done.stdout, len(lines)) == (1, "", 2), done.stdout + done.stderr
     assert lines[0] == f"[error] {_REL} {finding}", done.stderr
-    assert lines[1] == _CHECK_FIX.format(state=state), done.stderr
+    assert lines[1] == _format_fix(_CHECK_FIX, state), done.stderr
 
 
 def test_stats_refuses_a_release_check_that_exits_non_zero_with_no_finding(tmp_path: Path) -> None:

@@ -32,6 +32,8 @@ from tests.helpers.worktree_ws import fixes as _fixes
 from tests.helpers.worktree_ws import git as _git
 from tests.helpers.worktree_ws import run as _run
 
+_platform = load_owner("dd-bug-resolution", "_platform")
+
 RC = "0.5.0/rc-1/wt-rc"
 LANE = "0.5.0/wt-backlog-an-idea"
 
@@ -128,7 +130,7 @@ def test_a_main_tree_refuses_a_release_state_that_breaks_the_schema_with_checks_
         "[error] releases/0.5.0/_RELEASE.json:1 state.log[0] is missing required field 'ts'",
         f"fix: Agent action: {state} fails at the keys this finding names (specs/releases/AGENTS.md: "
         "release.py writes every _RELEASE.json field and ledger line) \u2014 revert the commit that "
-        f"introduced it (`git -C {state.parent} log -p -- _RELEASE.json` lists them), or delete the "
+        f"introduced it (`{_platform.git_inline(state.parent, 'log', '-p', '--', '_RELEASE.json')}` lists them), or delete the "
         "line if you wrote it and it is still uncommitted, then redo the change through `release.py`",
     ]
     assert not (definition_root / "worktrees/r" / NEW_JOB).exists()
