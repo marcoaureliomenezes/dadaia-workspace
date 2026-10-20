@@ -241,3 +241,20 @@ def test_load_denylist_env_precedence_and_workspace_fallback(
     assert load_privacy_terms() == (("from-env", "env"),)
     monkeypatch.delenv("DADAIA_PRIVACY_DENYLIST")
     assert load_privacy_terms() == (("from-file", "file"),)
+
+
+@pytest.mark.parametrize(
+    ("repo", "terms"), [("acme", ()), ("acme-site", ()), ("other", (("acme", "r"),))]
+)
+def test_the_pre_push_terms_drop_the_cwd_repos_own_name(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, repo: str, terms: tuple[tuple[str, str], ...]
+) -> None:
+    """A repo's name equal to or containing a term removes that term for that repo's scan only."""
+    states = tmp_path / "ws" / ".dadaia" / "states"
+    states.mkdir(parents=True)
+    write_text(states / "spec_contexts.json", "{}")
+    write_text(states / "privacy_denylist.json", json.dumps({"acme": "r"}))
+    (tmp_path / "ws" / "repos" / repo).mkdir(parents=True)
+    monkeypatch.delenv("DADAIA_PRIVACY_DENYLIST", raising=False)
+    monkeypatch.chdir(tmp_path / "ws" / "repos" / repo)
+    assert load_privacy_terms() == terms
