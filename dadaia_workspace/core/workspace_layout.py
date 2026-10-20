@@ -315,9 +315,7 @@ def protected_glob(root: Path, rel: str, protected: tuple[str, ...]) -> str | No
     anchors = [0]
     if zone == "worktree":
         anchors = [
-            k - 2
-            for k in range(3, len(parts))
-            if _anchors(root, root.joinpath(*parts[:k], ".git"))
+            k - 2 for k in range(3, len(parts)) if _anchors(root, root.joinpath(*parts[:k], ".git"))
         ] or list(range(len(tail)))
     subs = ("/".join(tail[i : j + 1]) for i in anchors for j in range(i, len(tail)))
     return next((g for sub in subs for g in protected if _matches(sub, g)), None)
