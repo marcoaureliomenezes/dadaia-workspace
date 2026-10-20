@@ -21,20 +21,28 @@ cd demo
 
 After the 3b first pass (below), publish and file the first entry in a backlog lane,
 the worktree `<v>/wt-backlog-<slug>` — only `context create` (the `--repo` clone) and the first `specs init` write
-`specs/` directly (ADR 0154):
+`specs/` directly (ADR 0154). `V` is the work branch's version, read from the repo:
 
 ```bash
+V=$(git -C "repos/$SLUG" branch --list 'feature/*' --format='%(refname:short)' | sed 's|^feature/||')
 .dadaia/.venv/bin/dadaia context baseline "$SLUG"
-B=$(.dadaia/.venv/bin/dadaia worktree new "$SLUG" 0.1.0/wt-backlog-my-first-idea | sed 's/^\[ok\] //')
+B=$(.dadaia/.venv/bin/dadaia worktree new "$SLUG" "$V/wt-backlog-my-first-idea" | sed 's/^\[ok\] //')
 python3 .agents/skills/dd-backlog-definition/scripts/backlog.py new my-first-idea \
   --specs "$B/specs" --title "What I want" --description "Why I want it"
 git -C "$B" commit -qam "chore(backlog): new my-first-idea"
 ```
 
 After an APPROVED `dd-code-reviewer` verdict, `.dadaia/.venv/bin/dadaia worktree merge "$B"` lands it
-on the work branch; the release is born the same way in its `<M.m.p>/rc-<N>/wt-rc` worktree,
-the rc's integration branch that its jobs' `job-<n>/wt-main` trees merge into:
-`release.py new 0.1.0 --specs "$R/specs" --origin backlog:my-first-idea`.
+on the work branch. The release is born in its `<M.m.p>/rc-<N>/wt-rc` worktree, the rc's
+integration branch that its jobs' `job-<n>/wt-main` trees merge into; the block keeps the
+default origin, because `--origin backlog:my-first-idea` names an entry that is not on the work
+branch until that merge lands:
+
+```bash
+V=$(git -C "repos/$SLUG" branch --list 'feature/*' --format='%(refname:short)' | sed 's|^feature/||')
+R=$(.dadaia/.venv/bin/dadaia worktree new "$SLUG" "$V/rc-1/wt-rc" | sed 's/^\[ok\] //')
+python3 .agents/skills/dd-release-implementation/scripts/release.py new "$V" --specs "$R/specs"
+```
 
 - **Level 1 — workspace.** `uvx dadaia-workspace init` provisions `demo/` with its own
   virtualenv; every later command runs through the workspace's CLI,
@@ -55,6 +63,9 @@ from the parent directory; it prints `upgraded A -> B`, `repaired -> B` when the
 build could not be read, or `already at A` when current. A venv whose python cannot start
 is refused with a fix that deletes `.dadaia/.venv` and reruns the init line.
 Then `.dadaia/.venv/bin/dadaia specs init --context <ctx>` refreshes the project's specs law.
+To carry a workspace to another machine, `.dadaia/.venv/bin/dadaia export` writes the artifact
+and `uvx dadaia-workspace init --from <artifact> <dir>` restores it (contexts come back DEAD;
+`context alive` clones them).
 
 ## 2. What the init line provisioned
 
@@ -114,7 +125,7 @@ lane.
 `release.py new` is one birth act, all or nothing: a `SPEC.md` stub in
 `specs/releases/<id>/rc-1/` plus `_RELEASE.json` in `DEFINITION` at the release root, refusing a second live
 release or a non-SemVer id with a `fix:` line; the stub opens with `## Bug window review`. From there, author
-`SPEC.md`, `PLAN.md` and one job file per job, `tasks/<job>.md`, in that `rc-<N>/`, `PLAN.md`
+`SPEC.md`, `PLAN.md` and one job file per job, `tasks/job<n>.md`, in that `rc-<N>/`, `PLAN.md`
 opening with the As-is review table (`unit | today | bugs | verdict | why`) and carrying the
 `## DAG` of jobs with waves and exact write sets; `release.py phase IMPLEMENTATION --sha <sha>` opens
 implementation once SPEC and PLAN carry `**Status:** Approved` and every job file is well formed.

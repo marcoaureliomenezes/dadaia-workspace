@@ -4,7 +4,7 @@ A local-first, spec-driven workspace that gives AI agents current context, a doc
 
 Start here:
 
-- [Quickstart](quickstart.md) — from `pip install` to a bound project, a backlog entry and a live release.
+- [Quickstart](quickstart.md) — from `uvx` to a bound project, a backlog entry and a live release.
 - [Positioning](positioning.md) — why your product repos never carry agent config, and how one law governs many projects.
 - [The bug loop](bug-loop.md) — register, RED test, fix, resolve with evidence and lineage.
 
@@ -47,12 +47,13 @@ What it rests on:
 
 A human drives it from a shell in three levels:
 `uvx dadaia-workspace init <dir> --harness <name> --repo <url>` provisions the
-workspace and its first project ALIVE (`context bind` binds),
+workspace and its first project ALIVE (`.dadaia/.venv/bin/dadaia context bind` binds),
 `.dadaia/.venv/bin/dadaia specs init --context <slug>` brings the project's `specs/`
-to the canon (cutting the work branch when the repo has none), the first pass fills memory in a backlog lane, `context baseline` publishes it, and
+to the canon (cutting the work branch when the repo has none), the first pass fills memory in a backlog lane, `.dadaia/.venv/bin/dadaia context baseline` publishes it, and
 `.dadaia/.venv/bin/dadaia doctor` prints the next step and every finding with one
 fix line; `.dadaia/.venv/bin/dadaia context create --main-repo <url>` adds the next
-project, and re-running the `uvx` init line upgrades the workspace.
+project, re-running the `uvx` init line upgrades the workspace, and
+`uvx dadaia-workspace init --from <artifact> <dir>` restores a workspace that `dadaia export` wrote.
 
 An agent reads the root `AGENTS.md` map — flow, roles, gate invariants, where things
 live, the index of every scoped law and skill — opens the scoped `AGENTS.md` of its
