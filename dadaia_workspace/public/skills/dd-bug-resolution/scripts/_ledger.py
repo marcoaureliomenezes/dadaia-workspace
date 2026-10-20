@@ -154,20 +154,10 @@ def replace(path: Path, text: str) -> None:
     _atomic.atomic_write(path, text, ensure_parent=True)
 
 
-def own_name(repo: Path) -> str:
-    """The name of the repository *repo* is a checkout of: the folder holding its git common
-    dir, lowercased; empty when *repo* is under no repository."""
-    try:
-        common = _git.git(repo, "rev-parse", "--path-format=absolute", "--git-common-dir")
-    except (RuntimeError, OSError):
-        return ""
-    return Path(common.strip()).parent.name.lower()
-
-
 def terms(root: Path | None, repo: Path | None = None) -> list[tuple[str, str]]:
     """The operator denylist, ONE loader: `$DADAIA_PRIVACY_DENYLIST`, else
     ``<root>/.dadaia/states/privacy_denylist.json``, minus every term the name of the scanned
-    *repo* (:func:`own_name`) equals or contains: a repo may name itself. Absent is empty; a present file
+    *repo*'s repository (the folder holding its git common dir) equals or contains: a repo may name itself. Absent is empty; a present file
     that is not one ``{"<term>": "<reason>"}`` object refuses — never read as no terms."""
     env = os.environ.get("DADAIA_PRIVACY_DENYLIST")
     for path in [
@@ -189,7 +179,7 @@ def terms(root: Path | None, repo: Path | None = None) -> list[tuple[str, str]]:
             )
             raise SystemExit(1)
         if raw:
-            own = own_name(repo) if repo else ""
+            own = _git.main_checkout(repo).name.lower() if repo else ""
             return [(str(t), str(r)) for t, r in raw.items() if not (t and t.lower() in own)]
     return []
 
