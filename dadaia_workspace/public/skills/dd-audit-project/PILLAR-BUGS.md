@@ -7,9 +7,7 @@ record whose `ts` or `closed_at` falls inside that window.
 
 ## Resolution evidence
 
-- Find a fix by its id line (`git log -E --grep '^(fix|refactor)\(bugs\): .*<id>'`; a group line lists several ids) and inspect it with
-  `git show <sha> --stat --patch`; the recorded sha is only a hint a rewrite may orphan. Report a
-  release-squash trail as coarse evidence instead of inventing attribution.
+- Find and inspect each fix as `dd-bug-resolution/LINEAGE.md` §Read persisted facts says.
 - Derive diff direction from the named commit's production numstat. Direction is an
   audit result.
 - Read the prior candidate's `SPEC.md` `## Bug window review` for the maturity verdict.
@@ -19,8 +17,8 @@ record whose `ts` or `closed_at` falls inside that window.
 
 - Recurrence is a later record sharing a recorded fix file with the earlier record,
   registered after the earlier record's resolution.
-- A fix-induced bug is a later record whose component names a file touched by the earlier
-  record's `fix_sha`, with `caused_by` naming that earlier bug.
+- A fix-induced bug is a later record whose component names a file in the earlier
+  record's `fix_files`, with `caused_by` naming that earlier bug.
 - A contradicted `caused_by: none` is a finding.
 
 ## The nine forensic metrics
@@ -37,7 +35,7 @@ value against the previous audit's `AUDIT.md`, from git history, where it was co
 | 5 | Hand-kept-list touch count | named fix commits touching the hand-kept files (below) |
 | 6 | Test-layer bug share | `component` starts with `tests/` |
 | 7 | Scanner-vs-prose recurrence | scanner-term symptom and a fix touching only docs/tests |
-| 8 | Sweep closures as `resolved` | resolved records whose `fix_sha` touches no production code |
+| 8 | Sweep closures as `resolved` | resolved records whose `fix_files` hold no production path |
 | 9 | REBUILD share | resolved records with `caused_by != none` whose named fix commit identifies a REBUILD |
 
 Metric 5's hand-kept files are those that list by hand what code could derive: ignore lists, digest or baseline ledgers, golden fixtures, literal name inventories.
