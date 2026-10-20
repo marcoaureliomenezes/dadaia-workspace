@@ -401,7 +401,8 @@ def test_merge_refuses_an_ignored_file_neither_kept_nor_dropped(root: Path, kind
     assert refused.returncode == 1
     [error] = _error_lines(refused)
     assert error.startswith("[error] ignored files would be lost: keep.scratch")
-    assert len(fixes(refused)) == 1
+    [fix] = fixes(refused)
+    assert "--keep" in fix and "--drop" in fix
 
 
 @pytest.mark.parametrize("kind", ["task", "job", "job-b", "rc", "backlog", "hotfix"])
@@ -430,9 +431,9 @@ def test_merge_without_a_verdict_refuses_with_only_the_verdict_message(root: Pat
 def test_clean_removes_only_an_empty_worktree_of_ours(root: Path) -> None:
     repo, tree = root / "repos/r", root / TREE
     commit(tree, "src/a.py")
-    assert _line(run(root, "clean", TREE)) == command(
-        sys.executable, str(SCRIPT), "merge", str(tree)
-    )
+    [fix] = fixes(run(root, "clean", TREE))
+    assert fix.startswith("fix: Agent action: ") and "dd-code-reviewer" in fix
+    assert command(sys.executable, str(SCRIPT), "merge", str(tree)) in fix
     git(tree, "reset", "-q", "--hard", WORK)
     assert run(root, "clean", TREE).returncode == 0 and not tree.exists()
     # ours is the canonical wt/ branch, locked or not; a tree on another is not
@@ -854,8 +855,12 @@ def test_an_implementation_commit_cannot_carry_a_test(root: Path, law: str, test
 
 @pytest.mark.parametrize(
     ("paths", "lands"),
-    [(("tests/test_a.py",), True), (("tests/test_a.py", "src/prod.py"), False)],
-    ids=["tests-only", "carries-source"],
+    [
+        (("tests/test_a.py",), True),
+        (("tests/my test.py",), True),
+        (("tests/test_a.py", "src/prod.py"), False),
+    ],
+    ids=["tests-only", "blank-in-name", "carries-source"],
 )
 def test_a_test_commit_lands_only_when_every_path_is_a_test(
     root: Path, paths: tuple[str, ...], lands: bool
@@ -876,7 +881,8 @@ def test_a_test_commit_lands_only_when_every_path_is_a_test(
     else:
         assert done.returncode == 1
         assert "src/prod.py" in done.stderr
-        assert len(fixes(done)) == 1
+        [fix] = fixes(done)
+        assert "implementation task" in fix and "implementation commit" not in fix
 
 
 def test_a_repo_without_a_tests_declaration_lands_a_source_only_task(root: Path) -> None:
