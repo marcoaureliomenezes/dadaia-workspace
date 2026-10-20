@@ -136,7 +136,8 @@ def test_merge_fast_forwards_removes_and_reruns(root: Path) -> None:
     commit(tree, "src/b.py")
     git(repo, "worktree", "remove", str(tree))  # interrupted: tree gone, its commit unmerged
     assert _line(run(root, "merge", TREE)) == command(
-        *("git", "-C", str(repo), "worktree", "add", str(tree), f"wt/{NEW_JOB}")
+        *("git", "-C", str(repo), "worktree", "add", "-f", "-f", "--lock"),
+        *("--reason", f"dadaia:{NEW_JOB}", str(tree), f"wt/{NEW_JOB}"),
     )
     assert git(repo, "branch", "--list", f"wt/{NEW_JOB}").strip()  # never -D
 
