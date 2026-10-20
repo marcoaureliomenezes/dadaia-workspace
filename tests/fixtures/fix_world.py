@@ -971,7 +971,7 @@ _REFUSALS: dict[str, tuple[Case | tuple[Case, ...] | Skip, ...]] = {
     "ci._repo_root": (Skip("the pre-push hook always runs inside the repo it pushes"),),
     "ci.push_gate_check": (Skip("the gate's refusal: its fix is a branch_policy/push_gate site"),),
     "ci._rewrite_unpublished": (
-        Skip("refuses a commit origin holds: test_reference_transaction__work_branch.py"),
+        Skip("only passes on fold's three refusals, each with its own Case"),
     ),
     "fold._fold": (
         Skip(
