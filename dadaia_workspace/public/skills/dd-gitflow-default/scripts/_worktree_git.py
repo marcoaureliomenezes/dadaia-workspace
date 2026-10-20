@@ -32,9 +32,14 @@ from _worktree_names import (
 )
 
 
+def locked_add(name: str, *opts: str) -> tuple[str, ...]:
+    """The git words that add tree *name* with *opts*, locked: the one spelling of the lock reason."""
+    return ("worktree", "add", *opts, "--lock", "--reason", f"{LOCK}{name}")
+
+
 def reattach(repo: Path, tree: Path, name: str) -> str:
     """The fix line that re-adds the removed tree *name* at *tree* on its branch, locked as `new` locks it."""
-    return git_line(repo, "worktree", "add", "-f", "-f", "--lock", "--reason", f"{LOCK}{name}", str(tree), branch(name))  # fmt: skip
+    return git_line(repo, *locked_add(name, "-f", "-f"), str(tree), branch(name))
 
 
 def diff_sha256(tree: Path, work: str, tip: str) -> str:
@@ -122,21 +127,22 @@ def _switch(repo: Path, high: str) -> str:
     return f"run `{git_inline(repo, 'switch', high)}`"
 
 
-def drop_steps(repo: Path, low: str, high: str) -> list[str]:
-    """The act steps that delete branch *low* once it is merged into *high*: `high` checked out,
-    since `-d` judges the checkout, *low*'s upstream unset when it has one, then `-d`; empty when
-    *low* is not merged. Never `-D`."""
+def drop_argv(repo: Path, low: str, high: str) -> list[list[str]]:
+    """The git argv that retire branch *low* once merged into *high*: *low*'s upstream unset when
+    it has one, then `-d`; empty when *low* is not merged. Never `-D`."""
     merged = git(
         repo, "for-each-ref", "--merged", high, "--format=x%(upstream)", f"refs/heads/{low}"
     )
     if not merged.strip():
         return []
-    steps = (
-        [f"run `{git_inline(repo, 'branch', '--unset-upstream', low)}`"]
-        if merged.strip() != "x"
-        else []
-    )
-    return [_switch(repo, high), *steps, f"run `{git_inline(repo, 'branch', '-d', low)}`"]
+    return [*([["branch", "--unset-upstream", low]] if merged.strip() != "x" else []), ["branch", "-d", low]]  # fmt: skip
+
+
+def drop_steps(repo: Path, low: str, high: str) -> list[str]:
+    """The act steps that delete branch *low* once merged into *high*: `high` checked out, since
+    `-d` judges the checkout, then each `drop_argv`; empty when *low* is not merged."""
+    argv = drop_argv(repo, low, high)
+    return [_switch(repo, high), *(f"run `{git_inline(repo, *a)}`" for a in argv)] if argv else []
 
 
 def several_work(repo: Path, flow: dict[str, str], versions: list[str], ref: str = "refs/heads") -> tuple[str, str]:  # fmt: skip

@@ -28,7 +28,7 @@ from _worktree_git import (
     cli_words,
     diff_sha256,
     dirty,
-    drop_steps,
+    drop_argv,
     flow_for,
     git,
     not_a_name,
@@ -98,9 +98,11 @@ def _kept(tree: Path, verb: str, keep: list[str], drop: bool) -> list[str]:
     return [p for p in precious if p in keep]
 
 
-def _remove(into: Path, tree: Path, name: str, kept: list[str]) -> None:
+def _remove(into: Path, tree: Path, onto: str, name: str, kept: list[str]) -> None:
     """Copy *kept* into the repo *into* and drop the tree (an absent one is pruned), its branch (on
     the remote too, when it was pushed) and the folder it leaves empty."""
+    if not (drops := drop_argv(into, branch(name), onto)):
+        raise Refusal(f"{branch(name)} is unmerged into {onto}", reattach(into, tree, name))
     for rel in kept:
         source, target = tree / rel, into / rel
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -122,7 +124,8 @@ def _remove(into: Path, tree: Path, name: str, kept: list[str]) -> None:
             ) from error
     git(into, "worktree", "unlock", str(tree), check=False)
     git(into, "worktree", *(("remove", str(tree)) if tree.exists() else ("prune",)))
-    git(into, "branch", "-d", branch(name))
+    for argv in drops:
+        git(into, *argv)
     _rmdir(tree, name)
 
 
@@ -456,11 +459,11 @@ def merge(root: Path, path: str, keep: list[str], drop: bool) -> str:
     if not tree.exists():  # removed by an earlier run or by hand: only the branch may be left
         if not git(repo, "branch", "--list", ref).strip():
             _rmdir(tree, name)
-        elif not drop_steps(repo, ref, onto):
+        elif not drop_argv(repo, ref, onto):
             raise Refusal(f"{ref} is unmerged into {onto}", reattach(repo, tree, name))
         else:
             _on_target(into, onto)
-            _remove(into, tree, name, [])
+            _remove(into, tree, onto, name, [])
         return f"{ref} merged into {onto}"
     for check in _kind_checks(root, repo, tree, name, onto, into):
         check()
@@ -472,7 +475,7 @@ def merge(root: Path, path: str, keep: list[str], drop: bool) -> str:
         _check_ancestor(root, tree, onto)  # moved while merge ran; else a stray the operator owns
         fix = act("agent", f"commit or remove the paths above in {into}")
         raise Refusal(f"fast-forward failed: {error}", fix) from error
-    _remove(into, tree, name, kept)
+    _remove(into, tree, onto, name, kept)
     return f"{ref} merged into {onto}"
 
 
@@ -486,5 +489,5 @@ def clean(root: Path, path: str, keep: list[str], drop: bool) -> str:
         raise Refusal(f"{branch(name)} holds {ahead} unmerged commit(s)",
                       act("agent", f"{_dispatch(tree, 'its HEAD')}, then run `{merge}`"))  # fmt: skip
     _refuse_dirty(tree)
-    _remove(_into(repo, onto), tree, name, _kept(tree, "clean", keep, drop))
+    _remove(_into(repo, onto), tree, onto, name, _kept(tree, "clean", keep, drop))
     return f"cleaned {tree}"
