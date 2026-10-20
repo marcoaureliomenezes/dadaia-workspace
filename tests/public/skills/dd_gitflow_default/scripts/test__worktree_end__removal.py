@@ -17,6 +17,7 @@ from tests.helpers.oslib import write_text
 from tests.helpers.worktree_ws import (
     NEW_JOB,
     approve,
+    commit,
     git,
     land,
     make_workspace,
@@ -223,3 +224,62 @@ def test_clean_leaves_a_folder_no_level_names_holding_only_an_agents_file(root: 
     write_text(root / "worktrees/r/foo/AGENTS.md", "x")
     assert run(root, "clean", f"worktrees/r/{NEW_JOB}").returncode == 0
     assert (root / "worktrees/r/foo/AGENTS.md").is_file()
+
+
+def _gone(root: Path) -> Path:
+    """The job tree removed by hand, its folder and branch left; the tree's path."""
+    tree = root / "worktrees/r" / NEW_JOB
+    git(root / "repos/r", "worktree", "remove", "-f", "-f", str(tree))
+    return tree
+
+
+def test_a_gone_tree_merged_behind_its_upstream_is_removed_with_its_pushed_branch(
+    root: Path,
+) -> None:
+    land(root, "src/a.py")
+    _push_to_a_remote(root)
+    land(root, "src/b.py")  # the branch moves past what the upstream holds
+    git(root / "worktrees/r" / RC, "merge", "-q", "--ff-only", BRANCH)
+    _gone(root)
+
+    merged = run(root, "merge", f"worktrees/r/{NEW_JOB}")
+
+    assert merged.returncode == 0, merged.stderr
+    assert git(root / "repos/r", "branch", "--list", BRANCH).strip() == ""
+    assert _on_the_remote(root) == ""
+
+
+def test_a_gone_tree_with_an_unmerged_branch_refuses_with_the_fix_that_restores_it_locked(
+    root: Path,
+) -> None:
+    land(root, "src/a.py")
+    tree = _gone(root)
+
+    refused = run(root, "merge", f"worktrees/r/{NEW_JOB}")
+
+    [fix] = [f for f in refused.stderr.splitlines() if f.startswith("fix: ")]
+    assert refused.returncode == 1 and " worktree add -f -f --lock " in fix, refused.stderr
+    run_fix(root, refused)
+    assert (tree / ".git").exists()
+    assert BRANCH in git(root / "repos/r", "branch", "--list", BRANCH)
+
+
+def test_a_merged_orphan_wt_branch_is_dropped_by_its_rows_fix_when_head_is_elsewhere(
+    root: Path,
+) -> None:
+    repo, ref = root / "repos/r", "wt/0.4.0-rc9/job-1"
+    commit(repo, "ahead.txt")  # the work branch moves past `main`
+    git(repo, "branch", ref)
+    git(repo, "checkout", "-q", "main")
+    [row] = [
+        r
+        for r in json.loads(run(root, "list", "--json").stdout)
+        if r["state"] == "orphan"
+        and r["path"] == str(root / "worktrees/r" / ref.removeprefix("wt/"))
+    ]
+    assert " branch -d " in row["fix"], row["fix"]
+
+    for step in row["fix"].split("`")[1::2] or [row["fix"]]:
+        run_fix(root, subprocess.CompletedProcess([], 1, "", f"fix: {step}\n"))
+
+    assert git(repo, "branch", "--list", ref).strip() == ""
