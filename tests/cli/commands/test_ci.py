@@ -307,8 +307,12 @@ def test_a_malformed_privacy_baseline_fails_the_gate_closed_with_one_fix_line(
 
 
 def test_push_gate_check_help_names_the_rewrite_remedy_and_its_contract() -> None:
-    result = _runner.invoke(app, ["ci", "push-gate-check", "--help"])
+    result = _runner.invoke(app, ["ci", "push-gate-check", "--help"], env={"COLUMNS": "400"})
     assert result.exit_code == 0, result.output
+    assert (
+        "Remedy: the subject of the commit holding a listed message, else of the last; "
+        "the other folded messages stay in the body."
+    ) in " ".join(result.output.split())
     assert (
         "Remedy for a refused push: --rewrite-from re-commits the whole unpublished range "
         "as one commit, or two when RED `test(` commits and others mix, "
