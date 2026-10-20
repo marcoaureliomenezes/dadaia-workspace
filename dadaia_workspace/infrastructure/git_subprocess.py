@@ -94,8 +94,8 @@ class GitSubprocessClient:
             _refuse_unsafe_url(url)
             ssh = (
                 os.environ.get("GIT_SSH_COMMAND")
-                or platform.run(["git", "config", "core.sshCommand"]).stdout.strip()
-                or "ssh"
+                or _run(["git", "config", "core.sshCommand"]).stdout.strip()
+                or platform.quote(os.environ.get("GIT_SSH", "ssh"))
             )
             done = _run(
                 ["git", "ls-remote", "--heads", "--", url],
