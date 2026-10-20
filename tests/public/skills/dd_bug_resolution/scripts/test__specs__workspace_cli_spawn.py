@@ -112,8 +112,8 @@ def test_context_repos_is_the_repo_and_the_existing_checkouts_its_context_associ
 ) -> None:
     specs = load_owner("dd-bug-resolution", "_specs")
     root = _answering(tmp_path)
-    assert specs.context_repos(root / "repos/r") == [root / "repos/r", root / "repos/a"]
-    assert specs.context_repos(root / "repos/q") == [root / "repos/q"]
+    assert list(specs.context_repos(root / "repos/r")) == [root / "repos/r", root / "repos/a"]
+    assert list(specs.context_repos(root / "repos/q")) == [root / "repos/q"]
 
 
 def test_context_repos_of_a_repo_with_no_workspace_or_no_cli_is_the_repo_alone(
@@ -121,12 +121,12 @@ def test_context_repos_of_a_repo_with_no_workspace_or_no_cli_is_the_repo_alone(
 ) -> None:
     specs = load_owner("dd-bug-resolution", "_specs")
     (repo := tmp_path / "bare/repos/r").mkdir(parents=True)
-    assert specs.context_repos(repo) == [repo]
+    assert list(specs.context_repos(repo)) == [repo]
     (root := tmp_path / "ws").mkdir()
     (root / ".dadaia/states").mkdir(parents=True)
     write_text(root / ".dadaia/states/spec_contexts.json", "{}")
     (repo := root / "repos/r").mkdir(parents=True)
-    assert specs.context_repos(repo) == [repo]
+    assert list(specs.context_repos(repo)) == [repo]
 
 
 def test_a_cli_that_runs_and_fails_refuses_with_its_own_fix_line(tmp_path: Path) -> None:
@@ -136,7 +136,7 @@ def test_a_cli_that_runs_and_fails_refuses_with_its_own_fix_line(tmp_path: Path)
         "#!python\nimport sys\nprint('[error] bad row', file=sys.stderr)\n"
         "print('fix: Agent action: repair the registry row', file=sys.stderr)\nsys.exit(1)\n",
     )
-    for ask in (lambda: specs.context_row(root, root / "repos/r"), lambda: specs.context_repos(root / "repos/r")):  # fmt: skip
+    for ask in (lambda: specs.context_row(root, root / "repos/r"), lambda: list(specs.context_repos(root / "repos/r"))):  # fmt: skip
         with pytest.raises(specs.Refusal) as refused:
             ask()
         assert refused.value.fix == "Agent action: repair the registry row"
@@ -161,7 +161,7 @@ def test_a_repo_nested_under_a_fenced_workspace_starts_no_cli_of_it(
     root = _workspace(tmp_path, f"#!python\nopen({str(log)!r}, 'a').write('x')\nprint('[]')\n")
     _init(probe := root / ".dadaia/tmp/probe/repos/r")
     monkeypatch.setenv("DADAIA_FENCED_ROOTS", str(root))
-    assert specs.context_repos(probe) == [probe]
+    assert list(specs.context_repos(probe)) == [probe]
     assert not log.exists()
 
 
@@ -174,5 +174,5 @@ def test_a_path_that_is_no_repository_starts_no_cli_of_the_workspace_it_is_run_f
     (loose := tmp_path / "loose").mkdir()
     monkeypatch.chdir(root)
     monkeypatch.setenv("DADAIA_FENCED_ROOTS", str(root))
-    assert specs.context_repos(loose) == [loose]
+    assert list(specs.context_repos(loose)) == [loose]
     assert not log.exists()

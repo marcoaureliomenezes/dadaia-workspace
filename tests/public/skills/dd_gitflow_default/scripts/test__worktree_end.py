@@ -604,10 +604,19 @@ def test_a_tree_whose_patch_context_changed_is_refused_on_its_old_verdict(
     assert git(repo, "rev-parse", WORK).strip() == work
 
 
-def test_an_rc_merge_reads_the_gitflow_once(tmp_path: Path) -> None:
+@pytest.mark.parametrize("resolved", [False, True], ids=["empty-ledger", "resolved-record"])
+def test_an_rc_merge_reads_the_gitflow_once(tmp_path: Path, resolved: bool) -> None:
     (root := tmp_path / "ws").mkdir()
     make_workspace(root)
-    git(root / "repos/r", "checkout", "-q", "feature/0.5.0")
+    git(repo := root / "repos/r", "checkout", "-q", "feature/0.5.0")
+    if resolved:  # its fix commit is in the repo itself: no sibling repo is asked about
+        git(repo, "commit", "-q", "--allow-empty", "-m", "fix(bugs): a-bug \u2014 the cause")
+        record = {"id": "a-bug", "ts": "2026-10-19T10:00:00Z", "reported_by": "t", "title": "t",
+                  "severity": "LOW", "component": "c", "context": "c", "symptom": "s",
+                  "repro": "r", "expected": "e", "status": "resolved", "cause": "the cause",
+                  "caused_by": "none", "closed_at": "2026-10-19T11:00:00Z", "solution": "s",
+                  "fix_sha": git(repo, "rev-parse", "HEAD").strip()}  # fmt: skip
+        commit(repo, "specs/bugs/BUGS.jsonl", json.dumps(record) + "\n")
     reads = tmp_path / "reads.log"
     patch_cli(
         root,
