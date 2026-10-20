@@ -527,14 +527,21 @@ PLANTS: dict[str, Callable[[Path], None]] = {
     "SPEC-DOC-046": _plant_legacy_state_name,
 }
 
+
+def _plant_stale_feature_map(root: Path) -> None:
+    """The repo's own features folder holds no `ghostpkg`, which the map names."""
+    (root / "dadaia_workspace" / "features").mkdir(parents=True)
+    _append(
+        root / "specs" / "memory" / "ARCHITECTURE.md",
+        "\n### `dadaia_workspace/features` — package map (1 packages)\n\n"
+        '```mermaid\nflowchart LR\n  pkgs["ghostpkg"]\n```\n',
+    )
+
+
 #: WARNING-only by construction, no fix line: their remedy is the operator's judgment.
 REPORT_ONLY: dict[str, Callable[[Path], None]] = {
     "SPEC-DOC-030": lambda r: (r / "specs" / "audits" / "Bad_Name").mkdir(parents=True),
-    "MEM-DRIFT-1": lambda r: _append(
-        r / "specs" / "memory" / "ARCHITECTURE.md",
-        "\n### `dadaia_workspace/features` — package map (1 packages)\n\n"
-        '```mermaid\nflowchart LR\n  pkgs["ghostpkg"]\n```\n',
-    ),
+    "MEM-DRIFT-1": _plant_stale_feature_map,
     "MEM-DRIFT-2": lambda r: _append(
         r / "specs" / "memory" / "QUALITY.md", "\nRun `dadaia no-such-verb`.\n"
     ),
