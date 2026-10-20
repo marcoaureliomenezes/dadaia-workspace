@@ -15,6 +15,7 @@ from typing import Any
 import pytest
 
 from dadaia_workspace.container import build_git_client, build_git_object_reader
+from dadaia_workspace.core.exceptions import DadaiaError
 from dadaia_workspace.features.chokepoints import Decision
 from tests.fixtures.real_git import PushRepo, git
 from tests.helpers.oslib import write_text
@@ -31,7 +32,13 @@ def repo(tmp_path: Path) -> PushRepo:
     return pushed
 
 
-def _rewrite(repo: PushRepo, oldest: str, message: str | None, listed: set[str]) -> Any:
+def _rewrite(
+    repo: PushRepo,
+    oldest: str,
+    message: str | None,
+    listed: set[str],
+    messages: set[str] | None = None,
+) -> Any:
     fold = importlib.import_module(_MODULE)
     return fold.rewrite_unpublished(
         repo.path,
@@ -39,7 +46,9 @@ def _rewrite(repo: PushRepo, oldest: str, message: str | None, listed: set[str])
         message,
         git=build_git_client(),
         reader=build_git_object_reader(),
-        decide=lambda _repo, _held: Decision(False, listed=frozenset(listed)),
+        decide=lambda _repo, _held: Decision(
+            False, listed=frozenset(listed), messages=frozenset(messages or ())
+        ),
     )
 
 
@@ -84,13 +93,37 @@ def test_a_mixed_range_makes_a_test_commit_then_the_rest(repo: PushRepo) -> None
     assert "leak" not in git(repo.path, "show", "HEAD:src/a.py")
 
 
+def _mixed(repo: PushRepo) -> tuple[str, str]:
+    fix = repo.commit({"src/a.py": f"x = '{_LEAK}'\n"}, "fix(x): the fix")
+    red = repo.commit({"tests/t.py": "assert True\n"}, "test(x): the red")
+    write_text(repo.path / "src/a.py", "x = ''\n")
+    return fix, red
+
+
+def _bodies(repo: PushRepo) -> list[str]:
+    return [git(repo.path, "log", "-1", "--format=%B", rev) for rev in ("HEAD~1", "HEAD")]
+
+
+def test_the_message_heads_every_group_holding_a_listed_message(repo: PushRepo) -> None:
+    fix, red = _mixed(repo)
+    _rewrite(repo, fix, "clean subject", {"src/a.py"}, {fix, red})
+    assert _bodies(repo) == ["clean subject", "clean subject"]
+
+
+def test_the_message_heads_the_last_group_when_none_holds_a_listed_message(
+    repo: PushRepo,
+) -> None:
+    fix, _ = _mixed(repo)
+    _rewrite(repo, fix, "clean subject", {"src/a.py"})
+    assert _bodies(repo) == ["test(x): the red", "clean subject\n\nfix(x): the fix"]
+
+
 def test_a_failed_fold_leaves_head_where_it_was(repo: PushRepo) -> None:
     oldest = _leak_then_other(repo)
     write_text(repo.path / "stray.txt", "x\n")
     git(repo.path, "add", "stray.txt")
     before = git(repo.path, "rev-parse", "HEAD")
-    fold = importlib.import_module(_MODULE)
-    with pytest.raises(fold.FoldRefusal) as refused:
+    with pytest.raises(DadaiaError) as refused:
         _rewrite(repo, oldest, None, {"leak.txt"})
     assert refused.value.fix
     assert git(repo.path, "rev-parse", "HEAD") == before
