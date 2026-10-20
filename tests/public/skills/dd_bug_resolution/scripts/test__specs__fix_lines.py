@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.core.skill_owner import load_owner
-from tests.helpers.oslib import command
+from tests.helpers.oslib import command, inline
 
 _K = load_owner("dd-bug-resolution", "_platform")
 _S = load_owner("dd-bug-resolution", "_specs")
@@ -87,8 +87,9 @@ def test_a_check_that_exits_one_with_no_fix_is_refused_with_the_check_command(
 ) -> None:
     refusal, spawns = _check_release(tmp_path, monkeypatch, "sys.exit(1)")
     assert isinstance(refusal, _S.Refusal) and spawns == 1
-    assert f"release.py check --specs {tmp_path / 'specs'}" in refusal.fix
-    assert "findings" not in refusal.fix
+    release = tmp_path / "skills/dd-release-implementation/scripts/release.py"
+    check = inline(sys.executable, str(release.resolve()), "check", "--specs", str(tmp_path / "specs"))  # fmt: skip
+    assert refusal.fix == f"Agent action: run {check}"
 
 
 @pytest.mark.medium

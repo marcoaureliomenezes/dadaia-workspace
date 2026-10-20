@@ -17,7 +17,7 @@ import pytest
 from dadaia_workspace.core.cli_line import git_line, shell_line
 from dadaia_workspace.core.skill_owner import load_owner
 from tests.helpers import worktree_ws
-from tests.helpers.oslib import link, read_text, run, write_text
+from tests.helpers.oslib import inline, link, read_text, run, write_text
 from tests.helpers.skill_scripts import stage_skill_scripts
 from tests.helpers.worktree_ws import (
     NEW_JOB,
@@ -555,8 +555,9 @@ def test_a_main_tree_is_refused_when_release_check_exits_non_zero_with_no_findin
     assert (refused.returncode, refused.stdout) == (1, "")
     lines = refused.stderr.splitlines()
     assert lines[0] == "[error] release.py check exited 1", refused.stderr
-    assert len(lines) == 2 and f"release.py check --specs {specs}" in lines[1], refused.stderr
-    assert "findings" not in lines[1], refused.stderr
+    release = (tmp_path / "skills/dd-release-implementation/scripts/release.py").resolve()
+    check = inline(sys.executable, str(release), "check", "--specs", str(specs))
+    assert lines[1:] == [f"fix: Agent action: run {check}"], refused.stderr
     assert not (root / "worktrees/r" / NEW_JOB).exists()
 
 
