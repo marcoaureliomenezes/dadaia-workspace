@@ -298,7 +298,7 @@ class TestQuickstartVerbatim:
     """The quickstart fixture's three bash blocks run as printed with only ``REPO_URL``
     set — the one other substitution points ``uvx`` at the built wheel instead of PyPI;
     the second files the first backlog entry in a ``backlog`` worktree, the third opens the
-    release candidate in its ``rc-1/wt-rc`` tree. The project's repo carries a version tag, so
+    release candidate in its ``wt-rc`` tree. The project's repo carries a version tag, so
     the work branch's version is read from the repo, never typed. The fixture is
     byte-equal to ``docs/quickstart.md`` (the ``workspace-quickstart-fixture`` guard)."""
 
