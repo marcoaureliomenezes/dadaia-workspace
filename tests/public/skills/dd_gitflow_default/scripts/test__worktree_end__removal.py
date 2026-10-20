@@ -9,10 +9,12 @@ import json
 import shutil
 import subprocess
 from pathlib import Path
+from typing import Any
 
 import pytest
 
 from dadaia_workspace.core.platform import quote
+from dadaia_workspace.core.skill_owner import load_owner
 from tests.helpers.oslib import command, write_text
 from tests.helpers.worktree_ws import (
     NEW_JOB,
@@ -305,3 +307,33 @@ def test_a_merged_orphan_wt_branch_is_dropped_by_its_rows_fix_when_head_is_elsew
         run_fix(root, subprocess.CompletedProcess([], 1, "", f"fix: {step}\n"))
 
     assert git(repo, "branch", "--list", ref).strip() == ""
+
+
+def _branch_argv_of_a_clean(root: Path, monkeypatch: pytest.MonkeyPatch) -> list[list[str]]:
+    end: Any = load_owner("dd-gitflow-default", "_worktree_end")
+    real, seen = end.git, []
+
+    def record(repo: Path, *args: str, **kw: Any) -> str:
+        if args[0] == "branch" and args[1] != "--show-current":
+            seen.append(list(args))
+        return real(repo, *args, **kw)
+
+    monkeypatch.setattr(end, "git", record)
+    end.clean(root, str(root / "worktrees/r" / NEW_JOB), [], False)
+    return seen
+
+
+def test_a_branch_with_an_upstream_is_unset_then_deleted(
+    root: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _push_to_a_remote(root)
+    assert _branch_argv_of_a_clean(root, monkeypatch) == [
+        ["branch", "--unset-upstream", BRANCH],
+        ["branch", "-d", BRANCH],
+    ]
+
+
+def test_a_branch_with_no_upstream_is_deleted_alone(
+    root: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    assert _branch_argv_of_a_clean(root, monkeypatch) == [["branch", "-d", BRANCH]]
