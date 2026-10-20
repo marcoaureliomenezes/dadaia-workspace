@@ -519,6 +519,49 @@ def _denylisted_no_context(world: World) -> str:
     return command
 
 
+def _rewrite(world: World, since: str) -> str:
+    return f"{fix_line(world.ws, 'ci', 'push-gate-check')} --rewrite-from {since}"
+
+
+def _rewrite_origin_holds(world: World) -> str:
+    """The oldest commit passed is one origin already holds."""
+    _denylisted(world)
+    return _rewrite(world, "HEAD~2")
+
+
+def _rewrite_the_oldest_unpublished(world: World) -> None:
+    """The act the fix names: pass the oldest commit origin lacks."""
+    _drop_term(world)
+    done = world.run(_rewrite(world, "HEAD~1"), world.repo)
+    assert done.returncode == 0, done.stdout + done.stderr
+
+
+def _rewrite_nothing_listed(world: World) -> str:
+    """The unpublished range carries no denylist or canon finding."""
+    _published(world)
+    world.deny()
+    world.commit("notes.md", "a b\n", branch="feature/1.0.0")
+    return _rewrite(world, "HEAD")
+
+
+def _rewrite_stray_edit(world: World) -> str:
+    """The working tree edits a tracked path the gate did not list."""
+    _denylisted(world)
+    write_text(world.repo / "more.md", "edited\n")
+    return _rewrite(world, "HEAD~1")
+
+
+def _revert_stray_edit(world: World) -> None:
+    world.git(world.repo, "checkout", "--", "more.md")
+
+
+def _folded(world: World) -> None:
+    """The range is one commit over origin's integration, holding both files."""
+    assert world.git(world.repo, "rev-list", "--count", "origin/develop..HEAD") == "1"
+    tree = world.git(world.repo, "ls-tree", "--name-only", "HEAD").split()
+    assert {"notes.md", "more.md"} <= set(tree)
+
+
 # ── baseline cases ───────────────────────────────────────────────────────────────────
 
 
@@ -927,13 +970,23 @@ _REFUSALS: dict[str, tuple[Case | tuple[Case, ...] | Skip, ...]] = {
     ),
     "ci._repo_root": (Skip("the pre-push hook always runs inside the repo it pushes"),),
     "ci.push_gate_check": (Skip("the gate's refusal: its fix is a branch_policy/push_gate site"),),
-    "ci._fold": (
+    "ci._rewrite_unpublished": (
+        Skip("refuses a commit origin holds: test_reference_transaction__work_branch.py"),
+    ),
+    "fold._fold": (
         Skip(
             "a group left with no message: test__worktree_end.py pins its one fix and the unchanged branch"
         ),
     ),
-    "ci._rewrite_unpublished": (
-        Skip("refuses a commit origin holds: test_reference_transaction__work_branch.py"),
+    "fold.rewrite_unpublished": (
+        Case(
+            _rewrite_origin_holds,
+            _clean_publish,
+            before=_rewrite_the_oldest_unpublished,
+            then=_COMMIT_PUSH,
+        ),
+        Case(_rewrite_nothing_listed, _work_pushed, then=_COMMIT_PUSH),
+        Case(_rewrite_stray_edit, _folded, before=_revert_stray_edit),
     ),
     "service.SpecContextService.show": (Case(_unknown_context, _cloned, before=_create),),
     "service.SpecContextService.alive": (
