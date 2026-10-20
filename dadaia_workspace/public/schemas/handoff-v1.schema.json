@@ -50,7 +50,7 @@
     },
     "reviewed_sha": {
       "type": "string",
-      "pattern": "^[0-9a-f]{40}$",
+      "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$",
       "description": "The commit a verdict judged; written only by the emitter's verdict.py."
     },
     "diff_sha256": {

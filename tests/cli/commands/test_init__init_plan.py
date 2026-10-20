@@ -13,6 +13,7 @@ from typer.testing import CliRunner
 
 from dadaia_workspace.cli.commands import init as init_cmd
 from dadaia_workspace.cli.main import app
+from dadaia_workspace.core.cli_line import shell_line
 from dadaia_workspace.core.platform import workspace_cli_path
 from tests.helpers.oslib import read_text
 
@@ -97,3 +98,37 @@ def test_non_tty_fix_line_repeats_the_repo_flags(tmp_path: Path, monkeypatch) ->
         "fix: uvx dadaia-workspace init myws --harness claude --repo https://h/m.git "
         "--associated-repo https://h/a.git --associated-repo https://h/b.git"
     )
+
+
+def test_the_plan_command_carries_from() -> None:
+    plan = init_cmd.InitPlan("ws", "claude", from_="a.json")
+
+    assert plan.command() == "uvx dadaia-workspace init ws --harness claude --from a.json"
+
+
+def test_non_tty_fix_line_repeats_from_and_adds_no_harness(tmp_path: Path, monkeypatch) -> None:
+    """A fix line never changes the run: the artifact names the harnesses, so the line adds none."""
+    monkeypatch.chdir(tmp_path)
+
+    result = _runner.invoke(app, ["init", "--from", "a.json"])
+
+    assert result.exit_code == 1, result.output
+    [fix] = [ln for ln in result.output.splitlines() if ln.startswith("fix: ")]
+    run = shell_line("uvx", "dadaia-workspace", "init", "--from", "a.json")
+    assert fix == (
+        f"fix: Agent action: run `{run}` with the new workspace's directory as its first argument"
+    )
+
+
+def test_from_with_repo_refuses_with_one_fix_line_and_scaffolds_nothing(
+    tmp_path: Path, monkeypatch
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    argv = ["init", "ws", "--harness", "claude", "--from", "a.json", "--repo", "https://h/m.git"]
+
+    result = _runner.invoke(app, argv)
+
+    assert result.exit_code == 1, result.output
+    [fix] = [ln for ln in result.output.splitlines() if ln.startswith("fix: ")]
+    assert fix == "fix: uvx dadaia-workspace init ws --harness claude --from a.json"
+    assert not list(tmp_path.iterdir())

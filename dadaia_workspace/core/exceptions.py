@@ -33,7 +33,7 @@ class InvalidContextNameError(DadaiaError, ValueError):
     """A context name or repo slug fails the ``CONTEXT_NAME_RE`` allowlist.
 
     Raised at ``SpecContextService.register``/``add_repo`` — the one place every registry
-    insert passes — so ``context create``, ``context repo add`` and ``dadaia import`` refuse
+    insert passes — so ``context create``, ``context repo add`` and ``init --from`` refuse
     the same names.
     """
 
@@ -109,7 +109,7 @@ class WorkspaceVenvBootstrapError(DadaiaError, RuntimeError):
     Inherits ``DadaiaError`` so the CLI entrypoint renders it as ONE operator-facing
     line: as a bare
     ``RuntimeError`` it slipped past ``cli/main``'s ``except DadaiaError`` and every
-    venv-bootstrap failure — ``init``, ``import``, ``certify``, ``reconcile`` alike —
+    venv-bootstrap failure — ``init``, ``certify``, ``reconcile`` alike —
     reached the operator as a raw traceback. ``RuntimeError`` is kept in the bases so
     existing ``except RuntimeError`` call sites keep working.
     """

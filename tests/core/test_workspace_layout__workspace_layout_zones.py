@@ -55,7 +55,7 @@ def test_derived_views_follow_the_registry() -> None:
     assert {z.name: z.canon for z in wl.zones_with_canon()} == {
         "states": frozenset(_SPEC_STATES_CANON),
         "sessions": frozenset({"*.json"}),
-        "dist": frozenset({"spec-contexts.json"}),
+        "dist": frozenset({"spec-contexts.json", "workspace-export.tar.gz"}),
     }
     assert [z.name for z in wl.walked_zones()] == [name for name, *_ in _SPEC_ZONES[:9]]
     assert wl.additive_prefixes() == (
@@ -108,7 +108,7 @@ def test_dadaiaignore_invalid_lines_and_segment_scope(tmp_path: Path) -> None:
     assert wl.parse_dadaiaignore(text) == (("*.png",), ("secrets",), invalid)
     tree = tmp_path / "worktrees" / "r" / "x" / "y"
     (tree / "src").mkdir(parents=True)
-    write_text(tree / ".git", "gitdir: elsewhere\n")
+    write_text(tree / ".git", "gitdir: ../main/.git/worktrees/j1\n")
 
     def pg(rel: str, *globs: str) -> str | None:
         return wl.protected_glob(tmp_path, rel, globs or ("secrets",))
@@ -133,8 +133,33 @@ def test_a_planted_git_entry_never_unanchors_a_multi_segment_glob(tmp_path: Path
     """A ``.git`` written below the real tree root adds an anchor and never removes the root."""
     tree = tmp_path / "worktrees" / "r" / "0.5.0-rc1" / "j1"
     (tree / "docs" / "data-master").mkdir(parents=True)
-    write_text(tree / ".git", "gitdir: elsewhere\n")
+    write_text(tree / ".git", "gitdir: ../main/.git/worktrees/j1\n")
     rel, globs = "worktrees/r/0.5.0-rc1/j1/docs/data-master/x.md", ("docs/data-master",)
     assert wl.protected_glob(tmp_path, rel, globs) == "docs/data-master"
     write_text(tree / "docs" / ".git", "")
     assert wl.protected_glob(tmp_path, rel, globs) == "docs/data-master"
+
+
+@pytest.mark.parametrize(
+    ("rel", "is_dir", "expected"),
+    [
+        (".dadaia/dist/spec-contexts.json", False, "canon"),
+        (".dadaia/dist/workspace-export.tar.gz", False, "canon"),
+        (".dadaia/dist/myrepo", True, "canon"),
+        (".dadaia/dist/myrepo/r.bundle", False, "canon"),
+        (".dadaia/dist/stray", True, "slop"),
+        (".dadaia/dist/stray.bundle", False, "slop"),
+    ],
+)
+def test_dist_admits_the_export_artifacts_and_registered_slug_folders(
+    rel: str, is_dir: bool, expected: str
+) -> None:
+    assert wl.verdict(rel, is_dir, (), ("myrepo",), ()) == expected
+
+
+def test_the_doctor_fix_never_moves_a_registered_repos_bundle() -> None:
+    """``--fix`` moves exactly the ``slop`` entries, so a bundle of a registered repo must not be one."""
+    assert (
+        wl.verdict(".dadaia/dist/myrepo/0.5.0/rc-1/wt-rc.bundle", False, (), ("myrepo",), ())
+        != "slop"
+    )

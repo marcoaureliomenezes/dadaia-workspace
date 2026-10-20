@@ -8,8 +8,8 @@ from dadaia_workspace.core.skill_owner import load_owner
 #: The kernel's context-name grammar, loaded from ``_grammar.py``.
 CONTEXT_NAME_RE = load_owner("dd-bug-resolution", "_grammar").CONTEXT_NAME_RE
 
-#: The `schema_version` `dadaia export` writes and `dadaia import` accepts.
-EXPORT_SCHEMA_VERSION = "spec-contexts-export-v1"
+#: The `schema_version` of both `dadaia export` artifacts.
+EXPORT_SCHEMA_VERSION = "export-v1"
 
 
 class ContextState(StrEnum):
@@ -39,7 +39,6 @@ class SpecContextProject:
     created_at: str
     alive_since: str | None = None
     dead_since: str | None = None
-    current_branch: str | None = None
     associated_repos: tuple[AssociatedRepo, ...] = ()
 
     def all_repos(self) -> tuple[AssociatedRepo, ...]:
@@ -57,7 +56,7 @@ class RepoLiveStatus:
     """One repo's on-disk presence and live checked-out branch.
 
     Produced by ``SpecContextService.repo_live_status`` and ``repos_live_status``; the
-    ``context show``, ``context list --json`` and export-branch refresh paths render it.
+    ``context show`` and ``context list --json`` render it.
     """
 
     slug: str

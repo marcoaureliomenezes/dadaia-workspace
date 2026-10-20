@@ -15,9 +15,9 @@ from typing import Any
 
 import _clock
 import _git
+import _jsonl
 from _backlog_schema import DISPOSITIONS
 from _backlog_store import SCRIPT, Items
-from _bugs_store import read_records
 from _platform import act, command, run
 from _refusal import Refusal, fix_of
 
@@ -29,11 +29,16 @@ _RELEASE = (
 
 def _origin_ids(spec: Path) -> list[str]:
     """The `backlog:` ids of *spec*'s first Origin line, as `release.py origin` prints them."""
-    done = run([sys.executable, str(_RELEASE), "origin", str(spec)], env=_git.scrubbed_env())
+    fix = command(sys.executable, str(_RELEASE), "origin", str(spec))
+    try:
+        done = run([sys.executable, str(_RELEASE), "origin", str(spec)], env=_git.scrubbed_env())
+    except OSError as exc:
+        raise Refusal(f"Origin unreadable: {exc}", fix) from exc
     if done.returncode:
         lines = done.stderr.splitlines()
-        fix = fix_of(done.stderr, command(sys.executable, str(_RELEASE), "origin", str(spec)))
-        raise Refusal(f"Origin unreadable: {lines[0] if lines else done.returncode}", fix)
+        raise Refusal(
+            f"Origin unreadable: {lines[0] if lines else done.returncode}", fix_of(done.stderr, fix)
+        )
     return [ln[len("backlog ") :] for ln in done.stdout.splitlines() if ln.startswith("backlog ")]
 
 
@@ -81,7 +86,13 @@ def _reason(specs: Path, slug: str, disposition: str, reason: str | None) -> Non
 def _bug(specs: Path, slug: str, disposition: str, reason: str | None) -> None:
     """The id of the BUGS.jsonl record the item is handed to, read by the bug skill's reader."""
     bugs = specs / "bugs" / "BUGS.jsonl"
-    ids = {record.get("id") for record in read_records(bugs)}
+    try:
+        ids = {record.get("id") for record in _jsonl.read(bugs)}
+    except _jsonl.LineError as exc:
+        raise Refusal(
+            f"{bugs.name}:{exc.number} {exc} — refusing to read a ledger this exit cannot read in full",
+            command("sed", "-n", f"{exc.number}p", str(bugs)),
+        ) from exc
     if reason not in ids:
         raise Refusal(
             f"--reason {reason!r} names no record of {bugs}: `to-bug` hands {slug!r} to a registered bug",

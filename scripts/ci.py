@@ -85,7 +85,7 @@ STAGE = ("lint", "typecheck", "guards", "unit-fast", "doctor")
 
 
 def plan(argv: list[str]) -> list[tuple[str, Step]]:
-    """``(job, step)`` in run order for *argv*: a level, else the named CI jobs, else all."""
+    """``(job, step)`` in run order: no argv or ``job`` runs STAGE, else the named jobs."""
     jobs = STAGE if argv in ([], ["job"]) else argv
     return [(job, step) for job in jobs for step in JOBS[job]]
 

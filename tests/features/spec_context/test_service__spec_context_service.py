@@ -81,9 +81,11 @@ def test_alive_clone_behavior_state_and_not_found(
 
     # No clone at all when the repo dir is already present before the first alive().
     (workspace_root / "repos" / "other-repo").mkdir(parents=True)
+    git(workspace_root, "init", "-q", "-b", "develop", str(workspace_root / "repos" / "other-repo"))
+    git(workspace_root / "repos" / "other-repo", "commit", "-q", "--allow-empty", "-m", "i")
     register_dead(service, "other", "other-repo", remote)
     service.alive("other")
-    assert list((workspace_root / "repos" / "other-repo").iterdir()) == []
+    assert [p.name for p in (workspace_root / "repos" / "other-repo").iterdir()] == [".git"]
 
     with pytest.raises(ContextNotFoundError):
         service.alive("ghost")
@@ -128,3 +130,31 @@ def test_dead_refuses_to_drop_a_stash_the_repo_holds(
     assert str(exc.value).endswith(
         f"fix: Operator action: pop or drop the 1 stash entry(ies) of {repo}"
     )
+
+
+def test_delete_refuses_while_the_owner_lists_a_paused_tree(
+    store: JsonContextStore, workspace_root: Path
+) -> None:
+    """A DEAD context whose repo has a paused tree in the owner's rows keeps its record; the refusal
+    is the owner's resume line."""
+    resume = "worktree.py resume <tree>"
+    paused = {"repo": "my-repo", "state": "paused", "path": "<tree>", "exit": resume}
+
+    def rows(_root: Path, _repos: object) -> tuple[list[dict[str, object]], str, str]:
+        return [paused], "", ""
+
+    service = SpecContextService(
+        context_store=store,
+        git_client=GitSubprocessClient(),
+        workspace_root=workspace_root,
+        install_hooks=lambda _repo: None,
+        secret_scan=scan_publish_candidates,
+        worktree_rows=rows,
+    )
+    register_dead(service, "proj", "my-repo", "https://github.com/org/my-repo")
+
+    with pytest.raises(ContextStateError, match="paused") as refused:
+        service.delete("proj")
+
+    assert str(refused.value).endswith(f"fix: {resume}")
+    assert store.get("proj") is not None

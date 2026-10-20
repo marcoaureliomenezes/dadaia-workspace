@@ -1,6 +1,7 @@
 """The eval scripts `evals/scripts/scan.py` and `compare.py`, run as
 a subprocess. scan exits 1 on a token, a missing path or `$SCAN_SECRET`'s value and 0 on a
-clean tree; compare blocks on a T1 or T2 drop, with the seven gate cases.
+clean tree; compare blocks when T1 < 3/3, T2 or T3 < 2/3, or a task at
+>= 2/3 on the baseline falls to <= 1/3; T3's baseline result is readout.
 
 Owner: dd-sw-engineer-sr
 """
@@ -20,7 +21,8 @@ pytestmark = pytest.mark.e2e
 
 _ROOT = Path(__file__).resolve().parents[2]
 _T1 = "t1-cold-onboarding"
-_T2 = "t2-seeded-bug"
+_T2 = "t2-block-list-bug"
+_T3 = "t3-discovery"
 # Composed at runtime: no token-shaped literal is tracked.
 _TOKEN = "sk-ant-" + "oat01-" + "PLANTED" * 6
 
@@ -65,29 +67,57 @@ def _job(root: Path, task: str, rewards: list[float]) -> None:
     for i, r in enumerate(rewards):
         d = root / f"{task}__{i}"
         d.mkdir(parents=True)
-        body = {"task_name": f"dadaia-evals/{task}", "verifier_result": {"rewards": {"reward": r}}}
+        body = {
+            "task_name": f"dadaia-workspace-evals/{task}",
+            "verifier_result": {"rewards": {"reward": r}},
+        }
         write_text(d / "result.json", json.dumps(body))
+
+
+_OTHER = "t4-other"
+_ALL = {_T1: [1, 1, 1], _T2: [1, 1, 1], _T3: [1, 1, 1]}
+_NONE = {_T1: [0, 0, 0], _T2: [0, 0, 0], _T3: [0, 0, 0]}
 
 
 @pytest.mark.parametrize(
     ("base", "cand", "expected"),
     [
-        ({_T1: [1, 1, 1], _T2: [1, 1, 0]}, {_T1: [1, 1, 1], _T2: [1, 0, 0]}, 1),
-        ({_T1: [0, 0, 0], _T2: [0, 0, 0]}, {_T1: [1, 1, 0], _T2: [0, 0, 0]}, 1),
-        ({_T1: [1, 1, 1], _T2: [1, 1, 1]}, {_T1: [1, 1, 1], _T2: [1]}, 1),
-        ({_T1: [1, 1, 1], _T2: [1, 1, 1]}, {_T1: [1, 1, 1]}, 1),
-        ({_T1: [1, 1, 1]}, {_T1: [1, 1, 0.5]}, 1),
-        ({_T2: [0, 0, 0]}, {_T2: [0, 0, 0]}, 1),
-        ({_T1: [1, 1, 0], _T2: [1, 0, 0]}, {_T1: [1, 1, 1], _T2: [0, 0, 0]}, 0),
+        ({**_ALL, _OTHER: [1, 1, 1]}, {**_ALL, _OTHER: [1, 0, 0]}, 1),
+        (_NONE, {**_ALL, _T1: [1, 1, 0]}, 1),
+        (_NONE, {**_ALL, _T1: [1, 1]}, 1),
+        (_NONE, {_T1: _ALL[_T1], _T3: _ALL[_T3]}, 1),
+        (_NONE, {**_ALL, _T1: [1, 1, 0.5]}, 1),
+        (_NONE, {_T2: _ALL[_T2], _T3: _ALL[_T3]}, 1),
+        (
+            {_T1: [1, 1, 0], _T2: [1, 0, 0], _T3: [1, 0, 0]},
+            {_T1: [1, 1, 1], _T2: [1, 1, 0], _T3: [1, 1, 0]},
+            0,
+        ),
+        ({_T1: [1, 1, 1], _T2: [0, 0, 0]}, {_T1: [1, 1, 1], _T2: [1, 0, 0], _T3: [1, 1, 1]}, 1),
+        ({_T1: [1, 1, 1], _T3: [0, 0, 0]}, {_T1: [1, 1, 1], _T2: [1, 1, 1], _T3: [1, 0, 0]}, 1),
+        (
+            {_T1: [1, 1, 1], _T2: [1, 1, 1], _T3: [1, 1, 1]},
+            {_T1: [1, 1, 1], _T2: [1, 1, 1], _T3: [1, 1, 0]},
+            0,
+        ),
+        (
+            {_T1: [1, 1, 1], _T2: [1, 1, 1], _T3: [0, 0, 0]},
+            {_T1: [1, 1, 1], _T2: [1, 1, 1], _T3: [1, 1, 0]},
+            0,
+        ),
     ],
     ids=[
-        "planted-drop",
+        "planted-drop-outside-the-floors",
         "t1-two-of-three",
         "missing-candidate-trial",
         "task-absent-from-candidate",
         "fractional-reward",
         "t1-absent",
-        "anything-else-is-readout",
+        "passing-candidate",
+        "t2-below-two-of-three",
+        "t3-below-two-of-three",
+        "t3-baseline-pass-is-readout",
+        "t3-baseline-fail-is-readout",
     ],
 )
 def test_compare_gate(

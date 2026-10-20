@@ -124,6 +124,153 @@ def test_init_with_the_work_branch_present_cuts_and_commits_nothing(repo: Path) 
     assert _git(repo, "branch", "--list", "feature/*").replace("*", "").split() == ["feature/0.1.0"]
 
 
+def test_init_in_a_linked_worktree_whose_work_branch_is_checked_out_elsewhere_is_a_no_op(
+    repo: Path, tmp_path: Path
+) -> None:
+    assert _runner.invoke(app, ["specs", "init", "--context", "c"]).exit_code == 0
+    tree = tmp_path / "linked"
+    _git(repo, "worktree", "add", "-q", "-b", "wt/x", str(tree))
+    head = _git(tree, "rev-parse", "HEAD")
+
+    result = _runner.invoke(app, ["specs", "init", "--specs-dir", str(tree / "specs")])
+
+    assert result.exit_code == 0, result.output
+    assert "already at pattern version 13 \u2014 no-op." in result.output
+    assert _git(tree, "rev-parse", "--abbrev-ref", "HEAD") == "wt/x"
+    assert _git(tree, "rev-parse", "HEAD") == head
+
+
+def test_init_leaves_a_canonical_tree_on_another_branch_where_it_is(repo: Path) -> None:
+    assert _runner.invoke(app, ["specs", "init", "--context", "c"]).exit_code == 0
+    _git(repo, "switch", "-q", "-c", "topic")
+
+    result = _runner.invoke(app, ["specs", "init", "--context", "c"])
+
+    assert result.exit_code == 0, result.output
+    assert _git(repo, "rev-parse", "--abbrev-ref", "HEAD") == "topic"
+
+
+def test_init_cuts_the_work_branch_from_origin_work_when_origin_has_it(
+    repo: Path, tmp_path: Path
+) -> None:
+    base = _git(repo, "rev-parse", "--abbrev-ref", "HEAD")
+    origin = tmp_path / "origin.git"
+    _git(tmp_path, "init", "-q", "--bare", str(origin))
+    _git(repo, "remote", "add", "origin", str(origin))
+    _git(repo, "checkout", "-q", "-b", "feature/0.1.0")
+    write_text(repo / "published.txt", "x\n")
+    _git(repo, "add", "published.txt")
+    _git(repo, "commit", "-q", "-m", "published work")
+    tip = _git(repo, "rev-parse", "HEAD")
+    _git(repo, "push", "-q", "origin", "feature/0.1.0")
+    _git(repo, "checkout", "-q", base)
+    _git(repo, "branch", "-q", "-D", "feature/0.1.0")
+
+    result = _runner.invoke(app, ["specs", "init", "--context", "c"])
+
+    assert result.exit_code == 0, result.output
+    assert _git(repo, "rev-parse", "--abbrev-ref", "HEAD") == "feature/0.1.0"
+    assert _git(repo, "rev-parse", "HEAD~1") == tip
+
+
+def test_init_without_origin_work_cuts_the_work_branch_from_the_integration_branch(
+    repo: Path,
+) -> None:
+    base = _git(repo, "rev-parse", "--abbrev-ref", "HEAD")
+    _git(repo, "checkout", "-q", "-b", "develop")
+    write_text(repo / "integrated.txt", "x\n")
+    _git(repo, "add", "integrated.txt")
+    _git(repo, "commit", "-q", "-m", "integrated work")
+    tip = _git(repo, "rev-parse", "HEAD")
+    _git(repo, "checkout", "-q", base)
+
+    result = _runner.invoke(app, ["specs", "init", "--context", "c"])
+
+    assert result.exit_code == 0, result.output
+    assert _git(repo, "rev-parse", "--abbrev-ref", "HEAD") == "feature/0.1.0"
+    assert _git(repo, "rev-parse", "HEAD~1") == tip
+
+
+def _origin(repo: Path, tmp_path: Path) -> None:
+    origin = tmp_path / "origin.git"
+    _git(tmp_path, "init", "-q", "--bare", str(origin))
+    _git(repo, "remote", "add", "origin", str(origin))
+
+
+def test_init_lands_on_origin_work_that_already_tracks_the_scaffold_and_reruns_clean(
+    repo: Path, tmp_path: Path
+) -> None:
+    base = _git(repo, "rev-parse", "--abbrev-ref", "HEAD")
+    _origin(repo, tmp_path)
+    assert _runner.invoke(app, ["specs", "init", "--context", "c"]).exit_code == 0
+    tip = _git(repo, "rev-parse", "HEAD")
+    _git(repo, "push", "-q", "origin", "feature/0.1.0")
+    _git(repo, "checkout", "-q", base)
+    _git(repo, "branch", "-q", "-D", "feature/0.1.0")
+
+    for _ in range(2):
+        result = _runner.invoke(app, ["specs", "init", "--context", "c"])
+
+        assert result.exit_code == 0, result.output
+        assert "[committed]" not in result.output
+        assert _git(repo, "rev-parse", "--abbrev-ref", "HEAD") == "feature/0.1.0"
+        assert _git(repo, "rev-parse", "HEAD") == tip
+        assert _git(repo, "status", "--porcelain") == ""
+
+
+def test_init_lands_on_an_integration_branch_that_already_tracks_the_scaffold(
+    repo: Path,
+) -> None:
+    base = _git(repo, "rev-parse", "--abbrev-ref", "HEAD")
+    assert _runner.invoke(app, ["specs", "init", "--context", "c"]).exit_code == 0
+    _git(repo, "branch", "-m", "feature/0.1.0", "develop")
+    tip = _git(repo, "rev-parse", "HEAD")
+    _git(repo, "checkout", "-q", base)
+
+    result = _runner.invoke(app, ["specs", "init", "--context", "c"])
+
+    assert result.exit_code == 0, result.output
+    assert _git(repo, "rev-parse", "--abbrev-ref", "HEAD") == "feature/0.1.0"
+    assert _git(repo, "rev-parse", "HEAD") == tip
+    assert _git(repo, "status", "--porcelain") == ""
+
+
+def test_init_cuts_from_origin_integration_when_only_origin_holds_it(
+    repo: Path, tmp_path: Path
+) -> None:
+    base = _git(repo, "rev-parse", "--abbrev-ref", "HEAD")
+    _origin(repo, tmp_path)
+    _git(repo, "checkout", "-q", "-b", "develop")
+    write_text(repo / "integrated.txt", "x\n")
+    _git(repo, "add", "integrated.txt")
+    _git(repo, "commit", "-q", "-m", "integrated work")
+    tip = _git(repo, "rev-parse", "HEAD")
+    _git(repo, "push", "-q", "origin", "develop")
+    _git(repo, "checkout", "-q", base)
+    _git(repo, "branch", "-q", "-D", "develop")
+
+    result = _runner.invoke(app, ["specs", "init", "--context", "c"])
+
+    assert result.exit_code == 0, result.output
+    assert _git(repo, "rev-parse", "--abbrev-ref", "HEAD") == "feature/0.1.0"
+    assert _git(repo, "rev-parse", "HEAD~1") == tip
+
+
+def test_init_commits_nothing_and_prints_no_committed_line_when_the_scaffold_is_already_in(
+    repo: Path,
+) -> None:
+    assert _runner.invoke(app, ["specs", "init", "--context", "c"]).exit_code == 0
+    _git(repo, "branch", "-m", "feature/0.1.0", "develop")
+    tip = _git(repo, "rev-parse", "HEAD")
+
+    result = _runner.invoke(app, ["specs", "init", "--context", "c"])
+
+    assert result.exit_code == 0, result.output
+    assert "[committed]" not in result.output
+    assert _git(repo, "rev-parse", "--abbrev-ref", "HEAD") == "feature/0.1.0"
+    assert _git(repo, "rev-parse", "HEAD") == tip
+
+
 def test_the_catalog_pair_is_written_by_its_one_generator(repo: Path) -> None:
     """The scaffold writes no catalog; `specs init` runs
     `memory.py catalog generate`, so the pair it leaves passes `memory.py check`."""

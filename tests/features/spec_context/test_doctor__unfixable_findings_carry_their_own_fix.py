@@ -31,7 +31,6 @@ def _ctx(name: str, slug: str, *, url: str = "", alive: bool = True) -> SpecCont
         repo_url=url,
         created_at="2026-01-01T00:00:00",
         alive_since="2026-06-01T00:00:00Z" if alive else None,
-        current_branch="main" if alive else None,
     )
 
 

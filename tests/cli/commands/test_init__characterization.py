@@ -25,7 +25,7 @@ def test_init_creates_the_literal_level_one_state(tmp_path: Path) -> None:
     expected_output = (
         (
             f"✓ Workspace {ws} (claude)\n"
-            "✓ 161 asset(s) installed\n"
+            "✓ 162 asset(s) installed\n"
             f"CLI: {cli}\n"
             "Sessions launch at the workspace root.\n"
             "Next (command step context): no ALIVE Spec Context — create one\n"
@@ -35,7 +35,7 @@ def test_init_creates_the_literal_level_one_state(tmp_path: Path) -> None:
         if PLATFORM.windows
         else (
             f"✓ Workspace {ws} (claude)\n"
-            "✓ 138 asset(s) installed\n"
+            "✓ 139 asset(s) installed\n"
             f"CLI: {cli}\n"
             "Sessions launch at the workspace root.\n"
             "Next (command step context): no ALIVE Spec Context — create one\n"
@@ -44,7 +44,7 @@ def test_init_creates_the_literal_level_one_state(tmp_path: Path) -> None:
         )
     )
     assert result.output == expected_output
-    expected_registry = b'{\n  "schema_version": "2",\n  "contexts": []\n}'
+    expected_registry = b'{\n  "schema_version": "3",\n  "contexts": []\n}'
     assert (ws / ".dadaia/states/spec_contexts.json").read_bytes() == expected_registry
     assert (ws / ".dadaia/states/harness_profile.json").read_bytes() == (
         b'{\n  "schema_version": "1",\n  "harnesses": [\n    "claude"\n  ]\n}'

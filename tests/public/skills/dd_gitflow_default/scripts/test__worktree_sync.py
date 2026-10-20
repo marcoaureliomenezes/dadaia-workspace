@@ -8,6 +8,8 @@ Size: MEDIUM (real git, tmp workspace).
 
 from __future__ import annotations
 
+import json
+import sys
 from pathlib import Path
 
 import pytest
@@ -27,6 +29,10 @@ from tests.helpers.worktree_ws import (
     run,
 )
 
+_BUGS = (
+    Path(__file__).resolve().parents[5]
+    / "dadaia_workspace/public/skills/dd-bug-resolution/scripts/bugs.py"
+)
 WORK = "feature/0.5.0"
 RC, LANE = "0.5.0/rc-1/wt-rc", "0.5.0/wt-backlog-x"
 CHAIN = [RC, NEW_JOB, NEW_TASK]  # each tree is cut from the one before; the first from WORK
@@ -69,6 +75,16 @@ def test_sync_rebases_the_tree_and_those_below_it_parents_first(root: Path) -> N
     for name in CHAIN:  # every tree keeps its own commit
         leaf = name.rsplit("/", 1)[1]
         assert read_text(root / "worktrees/r" / name / f"src/{leaf}.py") == "x = 1\n"
+
+
+def test_sync_keeps_a_commit_once_on_the_parent_and_later_removed_from_it(root: Path) -> None:
+    repo, rc = root / "repos/r", root / "worktrees/r" / RC
+    git(repo, "merge", "-q", "--ff-only", f"wt/{RC}")  # the work branch once held the tree's commit
+    git(repo, "reset", "-q", "--hard", "HEAD~1")  # and then lost it
+    _move_work(root)
+    assert run(root, "sync", str(rc)).returncode == 0
+    assert _holds(root, WORK, RC)
+    assert (rc / "src/wt-rc.py").is_file()
 
 
 def test_sync_skips_a_tree_that_holds_its_base(root: Path) -> None:
@@ -123,9 +139,11 @@ def test_sync_refuses_a_dirty_tree_and_touches_nothing_below_it(root: Path) -> N
     _move_work(root)
     write_text(job / "src/main.py", "edited\n")
     heads = git(job, "rev-parse", "HEAD"), git(task, "rev-parse", "HEAD")
+    rc_head = _heads(root)[0]
     refused = run(root, "sync", str(root / "worktrees/r" / RC))
     assert refused.returncode == 1 and str(job) in refused.stderr and len(fixes(refused)) == 1
     assert (git(job, "rev-parse", "HEAD"), git(task, "rev-parse", "HEAD")) == heads
+    assert _heads(root)[0] == rc_head
     assert read_text(job / "src/main.py") == "edited\n"
 
 
@@ -162,3 +180,36 @@ def test_after_a_lane_lands_sync_lets_the_release_tree_merge(root: Path) -> None
     assert run(root, "sync", str(rc)).returncode == 0
     landed = run(root, "merge", str(rc))
     assert landed.returncode == 0, landed.stderr
+
+
+def test_a_missing_tree_refuses_with_a_fix_that_runs(root: Path) -> None:
+    gone = root / "worktrees/r/0.5.0/rc-1/job-2/wt-main"
+    refused = run(root, "sync", str(gone))
+    assert refused.returncode == 1 and str(gone) in refused.stderr
+    [fix] = fixes(refused)
+    assert run_bash(fix.removeprefix("fix: "), cwd=root).returncode == 0
+
+
+def test_sync_of_a_lane_leaves_the_bug_it_resolved_fixed_with_no_ledger_step(root: Path) -> None:
+    lane = open_tree(root, LANE)
+    (lane / "src").mkdir(exist_ok=True)
+    (lane / "specs/bugs").mkdir(parents=True)
+    write_text(lane / "src/fix.py", "fixed = 1\n")
+    git(lane, "add", "src/fix.py")
+    git(lane, "commit", "-q", "-m", "fix(bugs): a-bug \u2014 the cause")
+    sha = git(lane, "rev-parse", "HEAD").strip()
+    record = {"id": "a-bug", "ts": "2026-10-19T10:00:00Z", "reported_by": "t", "title": "t",
+              "severity": "LOW", "component": "src/fix.py", "context": "c", "symptom": "s",
+              "repro": "r", "expected": "e", "status": "resolved", "cause": "the cause",
+              "caused_by": "none", "closed_at": "2026-10-19T11:00:00Z", "solution": "s",
+              "fix_sha": sha}  # fmt: skip
+    write_text(lane / "specs/bugs/BUGS.jsonl", json.dumps(record) + "\n")
+    git(lane, "add", "specs/bugs/BUGS.jsonl")
+    git(lane, "commit", "-q", "-m", "chore(bugs): resolve a-bug \u2014 the cause")
+    check = [sys.executable, str(_BUGS), "check", "--specs", str(lane / "specs")]
+    assert os_run(check).returncode == 0
+    _move_work(root)
+    assert run(root, "sync", str(lane)).returncode == 0
+    assert git(lane, "rev-parse", "HEAD~1").strip() != sha  # the rebase rewrote the cited commit
+    done = os_run(check)
+    assert done.returncode == 0, done.stdout + done.stderr

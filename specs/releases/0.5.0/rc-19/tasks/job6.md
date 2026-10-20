@@ -1,0 +1,30 @@
+# Job 6 — init --from; dadaia import deleted; the null-url bug (FR6, ADRs 0175 + 0272)
+
+**Status:** Draft
+
+Wave 4, waits on Job 5 (`container.py`, `docs/cli.md`, `export/service.py`, `test_export.py`). Paths are repository-relative to `repos/dadaia-workspace/`. Design and evidence: PLAN §1, §1.1, §2 and §3.
+
+- **Reader (T6).** `ExportService.read(path)` moves the artifact reader here from `import_/service.py`, not copied: envelope, `schema_version` check, record checks, and the one coercion, `repo_url` null to `""` (associated urls alike); `register` stays the one decider and its refusal becomes the `not replicated: no remote` line with one fix line (add a remote, then re-export). Any other `schema_version` refuses: re-export with the current dadaia-workspace.
+- **Hard (T7).** Members are validated before extraction against a pattern (the JSON, or `<slug>/<name>.bundle`; no absolute path, no `..`, no link) with `tarfile` `filter="data"`; bundles land in `.dadaia/dist/<repo>/<name>.bundle` after the contexts are registered DEAD, so the `dist` canon admits them (A1).
+- **init (T8).** `InitPlan` gains `from_`; `InitPlan.command` is the only builder of any fix line and carries `--from`; `--from` with `--repo` refuses with one fix line; the harness list resolves from one source order (flag, artifact, profile, prompt) and `svc.init` already takes a tuple. It registers through `register`, lists unreachable repos by `git ls-remote`, prints `context alive <ctx>` per context ALIVE in the artifact. The contract tests of the six init bugs stay green.
+- **Tests.** T4 moves the partitions the reader owns (slug validation through `register`, a record missing a field, the manifest path, the unknown-format refusal) from the import tests to `test_reader.py`; T5 deletes the rows that test only the verb ("Delete verb-only tests; move the rest"). Both commits are `test(...)` and name that ruling.
+- **Memory atoms.** AC6.5 lists atoms that cite `dadaia import` (`context-portability.md`, `context-management.md:44,46`, `catalog.json`, `index.md`). `release.py check` refuses `specs/memory` in a task's `W:`, and doctor reports a dead citation as a closure WARNING (`doctor_memory.py:255`), not a red; they move in the PE's closure memory pass (PLAN §3).
+
+**Gate law.** `verify:` `python scripts/ci.py job`, no change. Definition of done: that run, `tests/features`, `tests/cli`, `tests/test_container.py`, the own-diff self-check (removed asserts: only the T5 deletions).
+
+**Sweep greps.** `git grep -niE "dadaia import|import_|ImportService|build_import_service" -- dadaia_workspace/ tests scripts docs` prints nothing but the history words the T9 body lists; `git grep -n "str(record\[" -- dadaia_workspace/features/export` prints nothing.
+
+Tasks: 10 (7 sr, 3 jr). T1 to T4 REDs; T5 after T4; T6 after T1 and T3; T7 after T6; T8 after T2, T3 and T7; T9 after T5 and T8; T10 after T9.
+
+| task | who | AC | `W:` | outcome |
+|---|---|---|---|---|
+| J6.T1 | sr | AC6.1 | `tests/features/export/test_reader.py` | RED, unit, new file, `test(import-turns-a-null-repo-url-into-none): ...`: at the artifact reader, a context whose `repo_url` is null is listed `not replicated: no remote` with one fix line, never registered and never stored as `'None'`; a null associated url follows the same rule |
+| J6.T2 | sr | AC6.3, AC6.4 | `tests/features/export/test_reader.py`, `tests/cli/commands/test_init__init_plan.py` | RED, unit: any other `schema_version`, older or newer, refuses with the re-export line; `--from` with `--repo` refuses with one fix line; `InitPlan.command` carries `--from` |
+| J6.T3 | sr | AC6.2 | `tests/cli/commands/test_init__init_from.py` | RED, integration, new file: `init DIR --from` on a soft and on a hard artifact into a fresh workspace installs the named harnesses, registers the contexts DEAD, lists unreachable repos, prints `context alive` lines; then `context alive`, `worktree resume` (a lane whose base exists only locally included) and doctor report no finding; a hard member with an absolute path, `..` or a link refuses |
+| J6.T4 | sr | AC6.5 | `tests/features/export/test_reader.py`, `tests/cli/commands/test_help.py` | `test(...)` naming the operator's order: the reader-owned partitions of the import tests move into the reader tests; the help-tree pin asserts `import` absent |
+| J6.T5 | jr | AC6.5 | `tests/features/import_/test_service.py`, `tests/cli/commands/test_export.py`, `tests/cli/test_main__refusals_carry_a_fix.py`, `tests/test_container.py`, `tests/fakes.py` | `test(...)` naming the order: delete the verb-only rows and the `import` container pins; reword the `tests/fakes.py:76` docstring |
+| J6.T6 | sr | AC6.1, AC6.3 | `dadaia_workspace/features/export/service.py` | REBUILD: `read` above, moved from `import_`; owner T1, T2, T4 tests; net lines at most 0 against the reader it replaces |
+| J6.T7 | sr | AC6.2 | `dadaia_workspace/features/export/service.py` | hard member validation and extraction above; owner the T3 tests |
+| J6.T8 | sr | AC6.2, AC6.4 | `dadaia_workspace/cli/commands/init.py` | REBUILD of `InitPlan` and `_plan` for `--from`; owner T2 and T3 tests and the init fix-line family; `init.py` net lines above 0 are offset by T9 |
+| J6.T9 | jr | AC6.5 | `dadaia_workspace/features/import_/service.py`, `dadaia_workspace/features/import_/__init__.py`, `dadaia_workspace/cli/commands/import_.py`, `dadaia_workspace/cli/main.py`, `dadaia_workspace/container.py`, `dadaia_workspace/core/exceptions.py`, `dadaia_workspace/features/spec_context/service.py`, `dadaia_workspace/core/models/spec_context.py` | DELETE `features/import_/`, `cli/commands/import_.py`, its registration and `build_import_service`; reword the docstrings at `exceptions.py:36,112`, `service.py:269`, `spec_context.py:11`; net lines at most -150 |
+| J6.T10 | jr | AC6.5 | `docs/cli.md`, `dadaia_workspace/public/skills/dd-cli-library/SKILL.md`, `scripts/CONSUMER_VALIDATION_RECIPE.md` | regenerate `docs/cli.md` from the tree; `SKILL.md:28` and the verb index and the recipe stop naming `import`; no test |

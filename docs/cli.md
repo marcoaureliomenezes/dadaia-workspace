@@ -22,7 +22,7 @@
 
 ## dadaia doctor — Diagnose and repair workspace, specs and ledger compliance.
 
-## dadaia export — Write `.dadaia/dist/spec-contexts.json` — one record per spec context.
+## dadaia export — Write `.dadaia/dist/spec-contexts.json` — one record per spec context, read-only.
 
 ## dadaia harness — Register and inspect the workspace's agent runtimes (harnesses).
 - harness add — Register a harness and project its runtime set into this workspace.
@@ -31,9 +31,7 @@
 ## dadaia help — Derived help surfaces (docker-style; generated, never transcribed).
 - help tree — Print the compact CLI digest derived from the live command tree.
 
-## dadaia import — Register every context of an exported `spec-contexts.json` not known here as DEAD.
-
-## dadaia init — Bootstrap a dadaia workspace in DIR for one harness: .dadaia/, the law, and that harness's projection.
+## dadaia init — Bootstrap a dadaia workspace in DIR: .dadaia/, the law, and the projection of each harness (--harness, else the --from artifact's).
 
 ## dadaia migrate — Migration helpers for dadaia workspace and spec trees.
 

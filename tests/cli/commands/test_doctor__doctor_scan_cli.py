@@ -448,7 +448,6 @@ def test_a_context_run_neither_reports_nor_reaps_another_contexts_repo(workspace
                 created_at="2026-01-01T00:00:00",
                 alive_since="2026-06-01T00:00:00Z",
                 dead_since=None,
-                current_branch="main",
             )
         )
         (workspace / "repos" / name).mkdir()

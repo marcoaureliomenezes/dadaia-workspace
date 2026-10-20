@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import shutil
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -21,6 +22,7 @@ from tests.helpers.worktree_ws import (
     make_workspace,
     open_tree,
     run,
+    run_fix,
 )
 
 RC = "0.5.0/rc-1/wt-rc"
@@ -155,6 +157,43 @@ def test_an_orphan_whose_directory_survives_names_the_removal_and_following_it_e
     ] == []
 
 
+@pytest.mark.parametrize(
+    ("ref", "shape", "lacks"),
+    [
+        # refuses unmerged commits, never forces: branch -d, never -D
+        ("wt/0.4.0-rc9/job-1", lambda line, _path: " branch -d " in line, " -D "),
+        # lands its commits: the merge of its own path, never a branch -d
+        (
+            f"wt/{JOB2}",
+            lambda line, path: line.endswith(f"worktree.py merge {quote(path)}"),
+            " branch -d ",
+        ),
+    ],
+    ids=["old-grammar", "named"],
+)
+def test_a_wt_branch_with_no_tree_is_removed_by_its_rows_fix_line(
+    root: Path, ref: str, shape, lacks: str
+) -> None:
+    git(root / "repos/r", "branch", ref, "feature/0.5.0")
+    [row] = [
+        r
+        for r in json.loads(run(root, "list", "--json").stdout)
+        if r["state"] == "orphan"
+        and r["path"] == str(root / "worktrees/r" / ref.removeprefix("wt/"))
+    ]
+    assert row["fix"] and row["exit"] == row["fix"]
+    line = row["fix"].split("`")[-2] if "`" in row["fix"] else row["fix"]
+    assert shape(line, row["path"]), line
+    assert lacks not in line
+
+    run_fix(root, subprocess.CompletedProcess([], 1, "", f"fix: {line}\n"))
+
+    assert git(root / "repos/r", "branch", "--list", ref).strip() == ""
+    assert [
+        r for r in json.loads(run(root, "list", "--json").stdout) if r["state"] == "orphan"
+    ] == []
+
+
 def _push_upstream(root: Path, remote_name: str) -> Path:
     remote = root.parent / f"{remote_name}.git"
     git(root.parent, "init", "-q", "--bare", str(remote))
@@ -177,3 +216,10 @@ def test_a_refused_remote_delete_is_reported_with_its_fix_line(root: Path) -> No
     cleaned = run(root, "clean", f"worktrees/r/{NEW_JOB}")
     assert BRANCH in cleaned.stderr + cleaned.stdout
     assert "fix: " in cleaned.stderr + cleaned.stdout
+
+
+def test_clean_leaves_a_folder_no_level_names_holding_only_an_agents_file(root: Path) -> None:
+    (root / "worktrees/r/foo").mkdir()
+    write_text(root / "worktrees/r/foo/AGENTS.md", "x")
+    assert run(root, "clean", f"worktrees/r/{NEW_JOB}").returncode == 0
+    assert (root / "worktrees/r/foo/AGENTS.md").is_file()

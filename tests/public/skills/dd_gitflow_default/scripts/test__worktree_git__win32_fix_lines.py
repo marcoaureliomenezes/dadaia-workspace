@@ -80,7 +80,7 @@ def test_a_git_failure_reruns_through_inline(
 
     monkeypatch.setattr(cli, "merge", failing)
     assert cli.main(["merge", "a%b"]) == 1
-    rerun = inline(*cli.LAUNCH, "merge", "a%b", caps=_WIN)
+    rerun = inline(*cli.LAUNCH, "merge", str(Path("a%b").resolve()), caps=_WIN)
     assert (
         f"Agent action: clear the git failure above, then rerun {rerun}" in capsys.readouterr().err
     )

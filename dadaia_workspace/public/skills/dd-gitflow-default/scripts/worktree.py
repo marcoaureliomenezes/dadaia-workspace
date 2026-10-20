@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Canonical worktrees `worktrees/<repo>/<name>` on branch `wt/<name>`, stdlib
 only: `new` opens one, `merge` lands it after its checks, `clean` drops an empty one,
-`hash` prints a verdict's binding, `sync` rebases a tree and those below it, `list` reads ours from git.
+`hash` prints a verdict's binding, `sync` rebases a tree and those below it, `list` reads ours from git,
+`pause` bundles a lane or `wt-rc` tree and removes it, `resume` restores it from that bundle.
 """
 
 from __future__ import annotations
@@ -25,6 +26,7 @@ from _worktree_end import clean, digest, merge
 from _worktree_git import rows, workspace_of
 from _worktree_names import LAUNCH, Refusal
 from _worktree_new import new
+from _worktree_pause import pause, paused_rows, resume
 from _worktree_sync import sync
 
 __all__ = ["main"]
@@ -53,6 +55,10 @@ def main(argv: list[str] | None = None) -> int:
     verbs.add_parser(
         "sync", help="rebase a tree and the trees below it, parents first"
     ).add_argument("path")
+    verbs.add_parser("pause", help="bundle a lane or wt-rc tree, then remove it").add_argument(
+        "path"
+    )
+    verbs.add_parser("resume", help="recreate a paused tree from its bundle").add_argument("path")
     seal = verbs.add_parser("hash", help="the diff_sha256 binding a verdict carries for a sha")
     seal.add_argument("path")
     seal.add_argument("--sha", required=True)
@@ -71,6 +77,12 @@ def main(argv: list[str] | None = None) -> int:
         if args.verb == "sync":
             print(f"[ok] {sync(root, args.path)}")
             return 0
+        if args.verb == "pause":
+            print(f"[ok] {pause(root, args.path)}")
+            return 0
+        if args.verb == "resume":
+            print(f"[ok] {resume(root, args.path)}")
+            return 0
         if args.verb == "hash":
             print(digest(root, args.path, args.sha))
             return 0
@@ -78,12 +90,14 @@ def main(argv: list[str] | None = None) -> int:
             end_verb = merge if args.verb == "merge" else clean
             print(f"[ok] {end_verb(root, args.path, args.keep, args.drop)}")
             return 0
-        found = rows(root)
+        found = [*rows(root), *paused_rows(root)]
     except Refusal as refusal:
         report(refusal, refusal.fix)
         return 1
     except GitError as failure:  # no check named it: an agent act, then the same call
-        again = inline(*LAUNCH, *(sys.argv[1:] if argv is None else argv))
+        words = sys.argv[1:] if argv is None else argv
+        path = getattr(args, "path", None)
+        again = inline(*LAUNCH, *(str(Path(w).resolve()) if w == path else w for w in words))
         report(failure, act("agent", f"clear the git failure above, then rerun {again}"))
         return 1
     if args.json:

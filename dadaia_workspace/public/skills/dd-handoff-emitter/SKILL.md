@@ -52,4 +52,4 @@ validates.
 - `.dadaia/agentic/schemas/handoff-v1.schema.json` — field list, types, enums,
   patterns, `schema_version` posture.
 - `python3 .agents/skills/dd-handoff-emitter/scripts/verdict.py --help` — the verdict writer's flags.
-- `python3 .agents/skills/dd-handoff-emitter/scripts/verdict.py stats <M.m.p>-rc<N>` — the candidate's readout table: local metrics 1, 2, 4, 6, 7 and 9, each beside its target, and the oldest record read.
+- `python3 .agents/skills/dd-handoff-emitter/scripts/verdict.py stats <M.m.p>-rc<N>` — the candidate's readout table: local metrics 1, 2, 4, 6, 7 and 9, each beside its target, and the oldest record read; it refuses any release state `release.py check` refuses, so run it after the memory pass, since check refuses CLOSURE until that pass is recorded.

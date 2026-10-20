@@ -22,6 +22,7 @@ from typing import Any
 import pytest
 
 from dadaia_workspace.core.cli_line import fix_line, git_line, shell_line
+from dadaia_workspace.core.platform import quote
 from dadaia_workspace.infrastructure.ledger_scripts import (
     _PACKAGE_SKILLS,
     LEDGER_SCRIPTS,
@@ -156,7 +157,7 @@ def test_a_git_failure_no_check_named_ends_as_one_refusal(root: Path, verb: str)
     assert "[error]" in refused.stderr
     [fix] = fixes(refused)
     assert fix.startswith("fix: Agent action: clear the git failure above, then rerun ")
-    assert fix.endswith(f"worktree.py {verb} {TREE}")  # the rerun as given, never `list`
+    assert fix.endswith(f"worktree.py {verb} {quote(str(root / TREE))}")  # absolute, never `list`
 
 
 def test_a_dirty_tree_refuses_with_one_fix_that_commits_or_removes(root: Path) -> None:
@@ -168,7 +169,8 @@ def test_a_dirty_tree_refuses_with_one_fix_that_commits_or_removes(root: Path) -
     git(tree, "rm", "-q", "specs/releases/0.5.0/rc-1/PLAN.md")  # a staged deletion
     dirty = run(root, "merge", TREE)
     assert "uncommitted" in dirty.stderr
-    listing, then, *remove = fixes(dirty)[0].split("`")[1::2]  # Agent action: commit or remove
+    [dirty_fix] = fixes(dirty)  # Agent action: commit or remove
+    listing, then, *remove = dirty_fix.split("`")[1::2]
     assert [listing, then] == [  # the commit takes its own message
         git_line(tree, "status", "--short"),
         git_line(tree, "commit"),
@@ -193,7 +195,8 @@ def test_a_backlog_tree_lands_specs_only_through_the_ledger_checks(root: Path) -
     commit(tree, "RED-job", "")  # a file the job gate would fail on: never run here
     code = run(root, "merge", str(tree))
     assert "RED-job is code" in code.stderr
-    restore, then = fixes(code)[0].split("`")[1::2]  # Agent action: restore, commit
+    [code_fix] = fixes(code)  # Agent action: restore, commit
+    restore, then = code_fix.split("`")[1::2]
     run_bash(restore, check=True)  # runs as printed
     assert then == git_line(tree, "commit")
     git(tree, "commit", "-qm", "revert: RED-job")
@@ -530,6 +533,53 @@ def test_a_moved_work_branch_refuses_and_its_fix_rebase_keeps_only_an_identical_
         assert landed == work
 
 
+@pytest.mark.parametrize("how", ["amend-after-sync", "forged-synced-config"])
+def test_a_tree_whose_patch_context_changed_is_refused_on_its_old_verdict(
+    root: Path, how: str
+) -> None:
+    """The parent edits a line inside the reviewed hunk's context: a real `sync` then an amend
+    that moves the reviewed line, or a hand rebase with a `synced` config line forged for the
+    reviewed sha, each land code no verdict covers, so each refuses for review."""
+    repo, tree = root / "repos/r", root / TREE
+    lines = [f"l{i}\n" for i in range(30)]
+    commit(root / RC_TREE, "src/a.py", "".join(lines))
+    assert run(root, "sync", TREE).returncode == 0
+    reviewed = commit(tree, "src/a.py", "".join(lines[:6] + ["guard()\n"] + lines[6:]))
+    approve(root, reviewed, name=NEW_JOB)
+    edited = [*lines[:8], "edited\n", *lines[9:]]
+    work = commit(root / RC_TREE, "src/a.py", "".join(edited))
+    if how == "amend-after-sync":
+        assert run(root, "sync", TREE).returncode == 0
+        moved = [*edited[:26], "guard()\n", *edited[26:]]
+        write_text(tree / "src/a.py", "".join(moved))
+        git(tree, "commit", "-q", "--amend", "-C", "HEAD", "-a")
+    else:
+        git(tree, "rebase", "-q", WORK)
+        git(tree, "config", "--add", f"branch.wt/{NEW_JOB}.synced", reviewed)
+    refused = run(root, "merge", TREE)
+    assert refused.returncode == 1, refused.stdout
+    assert _line(refused) == command(*cli_argv(venv_dir(root)), "reports", "validate", "--all")
+    assert git(repo, "rev-parse", WORK).strip() == work
+
+
+def test_an_rc_merge_reads_the_gitflow_once(tmp_path: Path) -> None:
+    (root := tmp_path / "ws").mkdir()
+    make_workspace(root)
+    git(root / "repos/r", "checkout", "-q", "feature/0.5.0")
+    reads = tmp_path / "reads.log"
+    patch_cli(
+        root,
+        'if args[:2] == ["context", "list"]:\n',
+        f'if args[:2] == ["context", "list"]:\n    open({str(reads)!r}, "a").write("x")\n',
+    )
+    tree = open_tree(root, RC)
+    approve(root, commit(tree, "src/z.py"), name=RC)
+    reads.unlink(missing_ok=True)
+    merged = run(root, "merge", str(tree))
+    assert merged.returncode == 0, merged.stderr
+    assert reads.read_text() == "x"
+
+
 @pytest.mark.parametrize("red", [True, False], ids=["red-gate", "green-gate"])
 def test_the_job_gate_runs_scripts_ci_job_as_argv_on_the_head_it_lands(
     root: Path, red: bool
@@ -546,15 +596,16 @@ def test_the_job_gate_runs_scripts_ci_job_as_argv_on_the_head_it_lands(
     assert git(repo, "rev-parse", WORK).strip() == (work if red else head)
     assert (result.returncode, tree.exists()) == ((1, True) if red else (0, False))
     if red:
-        act, line, where = fixes(result)[0].split("`")
+        [result_fix] = fixes(result)
+        act, line, where = result_fix.split("`")
         assert act == "fix: Agent action: make "
         assert line == "python scripts/ci.py job"
         assert where == f" exit 0 in {tree} and commit the fix in a task of this job"
 
 
-def test_a_job_merge_needs_a_verdict_naming_its_ci_matrix_run(root: Path) -> None:
-    """No verdict refuses; an APPROVED verdict lands the job with or without a
-    remote CI run named — the repo's `verify:` line is the job gate (no host is assumed)."""
+def test_a_job_merge_needs_an_approved_verdict(root: Path) -> None:
+    """No verdict refuses with the `reports validate --all` fix; an APPROVED verdict lands the
+    job, and the merge re-run after a newer verdict lands too."""
     repo = root / "repos/r"
     head = land(root, "src/a.py")
     assert _line(run(root, "merge", TREE)) == command(
@@ -666,7 +717,8 @@ def test_an_rc_gate_red_from_the_work_branch_clears_through_a_hotfix_then_the_pr
     approve(root, commit(tree, "src/z.py"), name=RC)
     refused = run(root, "merge", str(tree))
     sync = inline(*cli_argv(venv_dir(root)), "worktree", "sync", str(tree))
-    assert refused.returncode == 1 and fixes(refused)[0].endswith(f"then `{sync}`")
+    [refused_fix] = fixes(refused)
+    assert refused.returncode == 1 and refused_fix.endswith(f"then `{sync}`")
     hotfix = root / "worktrees/r/0.5.0/wt-hotfix-some-bug"
     assert run(root, "new", "r", "0.5.0/wt-hotfix-some-bug").returncode == 0
     git(hotfix, "rm", "-q", "RED-job")
@@ -775,6 +827,33 @@ def test_an_implementation_commit_cannot_carry_a_test(root: Path, law: str, test
     assert git(job, "rev-parse", "HEAD").strip() != git(task, "rev-parse", "HEAD").strip()
 
 
+@pytest.mark.parametrize(
+    ("paths", "lands"),
+    [(("tests/test_a.py",), True), (("tests/test_a.py", "src/prod.py"), False)],
+    ids=["tests-only", "carries-source"],
+)
+def test_a_test_commit_lands_only_when_every_path_is_a_test(
+    root: Path, paths: tuple[str, ...], lands: bool
+) -> None:
+    commit(root / RC_TREE, "AGENTS.md", "verify: python scripts/ci.py job\n")
+    git(root / TREE, "merge", "-q", "--ff-only", WORK)
+    task = open_tree(root, NEW_TASK)
+    for rel in paths:
+        (task / rel).parent.mkdir(parents=True, exist_ok=True)
+        write_text(task / rel, "value = 1\n")
+        git(task, "add", rel)
+    git(task, "commit", "-qm", "test(J1.T1): red")
+
+    done = run(root, "merge", str(task))
+
+    if lands:
+        assert done.returncode == 0, done.stderr
+    else:
+        assert done.returncode == 1
+        assert "src/prod.py" in done.stderr
+        assert len(fixes(done)) == 1
+
+
 def test_a_repo_without_a_tests_declaration_lands_a_source_only_task(root: Path) -> None:
     job = root / TREE
     commit(root / RC_TREE, "AGENTS.md", "verify: python scripts/ci.py job\n")
@@ -802,6 +881,186 @@ def test_a_task_lands_on_its_main_tree_with_no_verdict_and_no_gate(root: Path) -
     assert "ci " not in landed.stdout and not task.exists()
     assert git(root / TREE, "rev-parse", "HEAD").strip() == sha
     assert git(root / "repos/r", "rev-parse", WORK).strip() != sha
+
+
+_TERM = "zorblaxquux"  # an operator term no baseline pattern matches
+
+
+def _real_denylist_gate(root: Path) -> None:
+    """The stub's one real verb: `ci push-gate-check`, the matcher and its remedy, from this checkout's source."""
+    patch_cli(
+        root,
+        "else:\n    sys.stdin.read()",
+        'elif args[:2] == ["ci", "push-gate-check"]:\n    import os, subprocess\n'
+        f'    sys.exit(subprocess.call([{sys.executable!r}, "-m", "dadaia_workspace", *args],'
+        f" env=dict(os.environ, PYTHONPATH={str(Path(__file__).parents[5])!r})))\n"
+        "else:\n    sys.stdin.read()",
+    )
+    write_text(
+        root / ".dadaia/states/spec_contexts.json", '{"contexts": []}'
+    )  # the real verb reads it
+    # the workspace's own operator term: the loader never falls through to the live instance's file
+    write_text(root / ".dadaia/states/privacy_denylist.json", f'{{"{_TERM}": "test"}}')
+
+
+def test_a_task_carrying_a_denylisted_literal_is_refused_then_lands_by_its_printed_fix(
+    root: Path,
+) -> None:
+    address = ".".join(["8"] * 4)  # a public IPv4 literal, spelled so this file holds none
+    _real_denylist_gate(root)
+    task = open_tree(root, NEW_TASK)
+    (task / "tests").mkdir()
+    for name, text in (("a", f'HOST = "{address}"\n'), ("b", "B = 1\n")):
+        write_text(task / f"tests/test_{name}.py", text)
+        git(task, "add", f"tests/test_{name}.py")
+        git(task, "commit", "-qm", f"test(J1.T1): red {name}")
+    onto = git(root / TREE, "rev-parse", "HEAD").strip()
+
+    refused = run(root, "merge", str(task))
+
+    assert refused.returncode == 1
+    shown = refused.stdout + refused.stderr  # the scan's findings, then the refusal
+    assert "tests/test_a.py" in shown and address not in shown
+    assert git(root / TREE, "rev-parse", "HEAD").strip() == onto
+    write_text(task / "tests/test_a.py", "HOST = None\n")  # the term removed, as the refusal says
+    _fix(root, refused)
+    landed = run(root, "merge", str(task))
+    assert landed.returncode == 0, landed.stderr
+    assert address not in git(root / TREE, "log", "-p", f"{onto}..HEAD")
+    messages = git(root / TREE, "log", "--format=%B", f"{onto}..HEAD")
+    assert "test(J1.T1): red a" in messages and "test(J1.T1): red b" in messages
+
+
+def test_a_task_carrying_an_operator_term_is_refused_under_the_merge_fence(root: Path) -> None:
+    _real_denylist_gate(root)
+    task = open_tree(root, NEW_TASK)
+    commit(task, "src/a.py", f"NOTE = '{_TERM}'\n")
+    git(task, "commit", "-q", "--amend", "-m", "fix(J1.T1): green")
+
+    refused = run(root, "merge", str(task))
+
+    assert refused.returncode == 1
+    shown = refused.stdout + refused.stderr
+    assert "src/a.py" in shown and _TERM not in shown
+    assert "operator denylist + baseline" in shown
+
+
+def test_a_red_then_green_task_lands_after_its_printed_fix_with_both_kinds_apart(
+    root: Path,
+) -> None:
+    address = ".".join(["8"] * 4)  # a public IPv4 literal, spelled so this file holds none
+    _real_denylist_gate(root)
+    task = open_tree(root, NEW_TASK)
+    (task / "tests").mkdir()
+    write_text(task / "tests/test_a.py", f'HOST = "{address}"\n')
+    git(task, "add", "tests/test_a.py")
+    git(task, "commit", "-qm", "test(J1.T1): red")
+    write_text(task / "src.py", "B = 1\n")
+    git(task, "add", "src.py")
+    git(task, "commit", "-qm", "fix(J1.T1): green")
+    onto = git(root / TREE, "rev-parse", "HEAD").strip()
+
+    refused = run(root, "merge", str(task))
+
+    assert refused.returncode == 1
+    write_text(task / "tests/test_a.py", "HOST = None\n")
+    _fix(root, refused)
+    landed = run(root, "merge", str(task))
+    assert landed.returncode == 0, landed.stderr
+    subjects = git(root / TREE, "log", "--reverse", "--format=%s", f"{onto}..HEAD").splitlines()
+    assert subjects == ["test(J1.T1): red", "fix(J1.T1): green"]
+    assert git(root / TREE, "show", "--format=", "--name-only", "HEAD").split() == ["src.py"]
+
+
+def _follow(root: Path, refused: subprocess.CompletedProcess[str], extra: str = "") -> Any:
+    """The refusal's one printed `fix:` line plus *extra* words, run as an agent would."""
+    (fix,) = fixes(refused)
+    env = suite_env(os.environ, Path.home(), overrides={"HOME": str(root), "GIT_CONFIG_NOSYSTEM": "1"})  # fmt: skip
+    return run_bash(f"{fix.removeprefix('fix: ')} {extra}", cwd=root, env=env, check=False)
+
+
+def _red_then(root: Path, address: str, green: str, *flags: str) -> Path:
+    """A task of a `test(` commit carrying *address*, then a `feat(` implementation commit."""
+    task = open_tree(root, NEW_TASK)
+    (task / "tests").mkdir()
+    write_text(task / "tests/test_a.py", f'HOST = "{address}"\n')
+    git(task, "add", "tests/test_a.py")
+    git(task, "commit", "-qm", "test(J1.T1): red")
+    write_text(task / "src.py", "B = 1\n")
+    git(task, "add", "src.py")
+    git(task, "commit", "-q", *flags, "-m", green)
+    return task
+
+
+def test_a_message_hit_on_the_implementation_lands_after_its_printed_fix_and_message(
+    root: Path,
+) -> None:
+    address = ".".join(["8"] * 4)  # a public IPv4 literal, spelled so this file holds none
+    _real_denylist_gate(root)
+    task = _red_then(root, address, f"feat(J1.T1): host {address}")
+    onto = git(root / TREE, "rev-parse", "HEAD").strip()
+
+    refused = run(root, "merge", str(task))
+    assert refused.returncode == 1
+    write_text(task / "tests/test_a.py", "HOST = None\n")
+    folded = _follow(root, refused, "--message 'feat(J1.T1): host'")
+
+    assert folded.returncode == 0, folded.stderr
+    landed = run(root, "merge", str(task))
+    assert landed.returncode == 0, landed.stderr
+    log = git(root / TREE, "log", "--reverse", "--format=%s", f"{onto}..HEAD").splitlines()
+    assert log == ["test(J1.T1): red", "feat(J1.T1): host"]
+    assert address not in git(root / TREE, "log", "-p", f"{onto}..HEAD")
+
+
+def test_a_fold_that_cannot_finish_changes_nothing_and_prints_one_fix(root: Path) -> None:
+    address = ".".join(["8"] * 4)
+    _real_denylist_gate(root)
+    task = _red_then(root, address, "", "--allow-empty-message")  # a group left with no message
+    head = git(task, "rev-parse", "HEAD")
+
+    refused = run(root, "merge", str(task))
+    assert refused.returncode == 1
+    write_text(task / "tests/test_a.py", "HOST = None\n")
+    stuck = _follow(root, refused)
+
+    assert stuck.returncode != 0
+    assert len([ln for ln in stuck.stderr.splitlines() if ln.startswith("fix: ")]) == 1
+    assert git(task, "rev-parse", "HEAD") == head
+    assert git(task, "status", "--porcelain").split() == ["M", "tests/test_a.py"]
+
+
+@pytest.mark.parametrize("kind", ["job", "rc"])
+def test_main_and_rc_merges_run_no_denylist_scan(root: Path, kind: str) -> None:
+    address = ".".join(["8"] * 4)
+    _real_denylist_gate(root)
+    if kind == "rc":  # the release tree lands on the repo, with no open job under it
+        git(root / "repos/r", "worktree", "remove", "-f", "-f", str(root / TREE))
+    tree, name = (root / TREE, NEW_JOB) if kind == "job" else (root / RC_TREE, RC)
+    approve(root, commit(tree, "src/a.py", f"HOST = '{address}'\n"), name=name)
+
+    landed = run(root, "merge", str(tree))
+
+    assert landed.returncode == 0, landed.stderr
+
+
+@pytest.mark.parametrize("kind", ["hotfix", "backlog"])
+def test_every_tree_kind_is_refused_for_a_denylisted_literal(root: Path, kind: str) -> None:
+    address = ".".join(["8"] * 4)
+    _real_denylist_gate(root)
+    tree = {
+        "hotfix": lambda: _hotfix(root),
+        "backlog": lambda: open_tree(root, BACKLOG),
+    }[kind]()
+    rel = "specs/a.md" if kind == "backlog" else "src/a.py"
+    commit(tree, rel, f"HOST {address}\n")
+
+    refused = run(root, "merge", str(tree))
+
+    assert refused.returncode == 1
+    shown = refused.stdout + refused.stderr
+    assert rel in shown and address not in shown
+    assert len(fixes(refused)) == 1
 
 
 def test_a_dirty_main_tree_refuses_its_tasks_merge(root: Path) -> None:
@@ -894,15 +1153,11 @@ def _plain_tree(root: Path, name: str) -> Path:
 
 
 @pytest.mark.parametrize("name", ["maintenance", "0.5.0-rc1/j1", "0.5.0-rc1/define"])
-@pytest.mark.parametrize("declared_verify", [True, False], ids=["verify-once", "no-verify"])
-def test_a_plain_tree_is_refused_by_merge_with_the_list_fix(
-    tmp_path: Path, declared_verify: bool, name: str
-) -> None:
+def test_a_plain_tree_is_refused_by_merge_with_the_list_fix(tmp_path: Path, name: str) -> None:
     root = make_workspace(tmp_path)
     repo = root / "repos/r"
     git(repo, "checkout", "-q", "feature/0.5.0")
-    law = "verify: python scripts/ci.py job\n" if declared_verify else "# local law\n"
-    commit(repo, "AGENTS.md", law)
+    commit(repo, "AGENTS.md", "verify: python scripts/ci.py job\n")
     tree = _plain_tree(root, name)
     head = commit(tree, "src/a.py")
     approve(root, head)
@@ -1023,3 +1278,14 @@ def test_an_unbalanced_quote_in_a_declared_line_is_one_refusal_with_one_fix(tmp_
     )
     assert refused.value.fix.endswith(f"then `{_sync_line(root, tree)}`")
     assert "\n" not in refused.value.fix
+
+
+def test_a_task_merge_reads_the_gitflow_once(root: Path, tmp_path: Path) -> None:
+    reads = tmp_path / "reads.log"
+    patch_cli(
+        root,
+        'if args[:2] == ["context", "list"]:\n',
+        f'if args[:2] == ["context", "list"]:\n    open({str(reads)!r}, "a").write("x")\n',
+    )
+    land(root, "src/a.py")
+    assert reads.read_text() == "x"

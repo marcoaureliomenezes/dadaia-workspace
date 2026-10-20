@@ -23,7 +23,6 @@ pytestmark = [
 
 _OPENED = "2026-10-09T10:00:00Z"
 _CLOSED = "2026-10-09T12:00:00Z"
-_FIX_SHA = "a" * 40
 
 
 def _open(bug_id: str) -> dict[str, object]:
@@ -119,7 +118,6 @@ def test_all_public_bug_verbs_pin_output_and_each_ledger_write(tmp_path: Path) -
         "repro": "python -m append",
         "expected": "Append succeeds",
         "correlates": [],
-        "fix_sha": None,
     }
     del appended["surface"]
     append = _run(
@@ -174,12 +172,14 @@ def test_all_public_bug_verbs_pin_output_and_each_ledger_write(tmp_path: Path) -
     )
     assert ledger.read_bytes() == after_append
 
+    _git(repo, "commit", "-q", "--allow-empty", "-m", "fix(bugs): to-resolve \u2014 Root cause")
+    fix_sha = run(["git", "rev-parse", "HEAD"], cwd=repo, env=suite_env(os.environ, repo), check=True).stdout.strip()  # fmt: skip
     resolved = {
         **resolved,
         "cause": "Root cause",
         "caused_by": "none",
         "closed_at": _CLOSED,
-        "fix_sha": _FIX_SHA,
+        "fix_sha": fix_sha,
         "solution": "Fixed once",
         "status": "resolved",
     }
@@ -194,8 +194,6 @@ def test_all_public_bug_verbs_pin_output_and_each_ledger_write(tmp_path: Path) -
         "none",
         "--solution",
         "Fixed once",
-        "--fix-sha",
-        _FIX_SHA,
         "--specs",
         str(specs),
         fixed_clock=True,

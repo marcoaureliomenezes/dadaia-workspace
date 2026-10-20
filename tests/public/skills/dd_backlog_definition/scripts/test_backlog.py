@@ -658,6 +658,20 @@ def test_the_backlog_seam_amnesties_a_term_origin_already_holds(
     assert ("field 'description' carries" in done.stderr) is refused
 
 
+def test_new_refuses_a_state_file_term_with_no_environment_variable(
+    script: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("DADAIA_PRIVACY_DENYLIST", raising=False)
+    (tmp_path / ".dadaia/states").mkdir(parents=True)
+    write_text(tmp_path / ".dadaia/states/spec_contexts.json", "{}")
+    write_text(tmp_path / ".dadaia/states/privacy_denylist.json", json.dumps({"zorblax": "client"}))
+    specs = _specs(tmp_path)
+    before = (specs / "backlog" / "BACKLOG.json").read_bytes()
+    done = _run(script, "new", "idea", "--specs", str(specs), "--description", "a zorblax leak")
+    assert done.returncode == 1 and "field 'description' carries" in done.stderr, done.stderr
+    assert (specs / "backlog" / "BACKLOG.json").read_bytes() == before
+
+
 def test_check_json_carries_one_object_per_finding(script: Path, tmp_path: Path) -> None:
     specs = _specs(
         tmp_path,

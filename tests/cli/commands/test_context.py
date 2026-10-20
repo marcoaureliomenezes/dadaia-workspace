@@ -94,8 +94,7 @@ def test_context_create_show_list_happy_lifecycle(workspace: Path) -> None:
 
     list_json = _runner.invoke(app, ["context", "list", "--json"])
     assert list_json.exit_code == 0, list_json.output
-    # `list --json` also carries `stored_branch` (the stored snapshot, distinct from
-    # the live-resolved `current_branch`) and `associated_repos` (full list).
+    # `list --json` also carries `associated_repos` (full list).
     assert json.loads(list_json.stdout) == [
         {
             "alive_since": None,
@@ -107,7 +106,6 @@ def test_context_create_show_list_happy_lifecycle(workspace: Path) -> None:
             "main_repo": "alpha",
             "repo_url": "https://x.test/alpha.git",
             "state": "dead",
-            "stored_branch": None,
             "gitflow": None,
         }
     ]

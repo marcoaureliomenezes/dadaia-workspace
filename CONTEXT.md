@@ -371,7 +371,7 @@ A file two same-wave jobs or two tasks would write; the PLAN adds an edge or rep
 A merged job's wall time from its last task commit to its pushed merge: gates, review, CI waits.
 
 **Hotfix**:
-A block-list bug's fix in its `<M.m.p>/wt-hotfix-<bug-id>` lane (bugs law §2), outside the DAG.
+A confirmed bug's fix, in code the work branch holds, in its `<M.m.p>/wt-hotfix-<bug-id>` lane (bugs law §2), outside the DAG.
 _Avoid_: hotfix/* branch, hotfix job
 
 **Reconciliation**:

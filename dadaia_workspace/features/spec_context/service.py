@@ -4,7 +4,6 @@ import contextlib
 import logging
 import re
 import shutil
-import sys
 from collections.abc import Callable, Collection
 from dataclasses import replace
 from enum import StrEnum
@@ -27,7 +26,7 @@ from dadaia_workspace.core.exceptions import (
     NotAGitRepositoryError,
     RepoUrlMissingError,
 )
-from dadaia_workspace.core.gitflow import Gitflow, work_branch
+from dadaia_workspace.core.gitflow import Gitflow, origin_work_branch, work_branch
 from dadaia_workspace.core.models.spec_context import (
     CONTEXT_NAME_RE,
     AssociatedRepo,
@@ -258,15 +257,11 @@ class SpecContextService:
             for dest in created:
                 sweep.rmtree(dest)
             raise
-        branch: str | None = None
-        with contextlib.suppress(Exception):
-            branch = self._git.current_branch(self._repo_path(main_slug))
-        ctx = replace(ctx, current_branch=branch)
         self._store.save(ctx)
         return ctx
 
     def register(self, ctx: SpecContextProject) -> SpecContextProject:
-        """Insert an already-built record (``dadaia import``) — validated exactly as
+        """Insert an already-built record (``init --from``) — validated exactly as
         ``create`` validates, nothing materialized."""
         self._validate(ctx)
         self._store.save(ctx)
@@ -377,7 +372,6 @@ class SpecContextService:
             created_at=ctx.created_at,
             alive_since=ctx.alive_since,
             dead_since=ctx.dead_since,
-            current_branch=ctx.current_branch,
             associated_repos=(*ctx.associated_repos, AssociatedRepo(slug=slug, url=repo_url)),
         )
         self._store.update(updated)
@@ -407,7 +401,6 @@ class SpecContextService:
             created_at=ctx.created_at,
             alive_since=ctx.alive_since,
             dead_since=ctx.dead_since,
-            current_branch=ctx.current_branch,
             associated_repos=tuple(r for r in ctx.associated_repos if r.slug != slug),
         )
         self._store.update(updated)
@@ -467,13 +460,13 @@ class SpecContextService:
     def repo_live_status(self, repo: AssociatedRepo) -> RepoLiveStatus:
         """THE single branch-resolution implementation.
 
-        `context show`, `context list --json` and the export branch refresh all resolve a repo's on-disk presence and live checked-out
+        `context show` and `context list --json` resolve a repo's on-disk presence and live checked-out
         branch through this ONE method — never a second ad hoc git-subprocess call
         at a CLI or feature boundary.
 
         A repo that is not cloned, or whose live git query fails, degrades to
         ``on_disk=False`` / ``current_branch=None`` rather than raising — every
-        caller here is a best-effort display/export surface.
+        caller here is a best-effort display surface.
         """
         repo_path = self._repo_path(repo.slug)
         on_disk = repo_path.exists() and self._git.is_git_root(repo_path)
@@ -528,24 +521,18 @@ class SpecContextService:
             self._store.update(filled)
             return filled
 
-        repo_slug = ctx.repo_slug
-        repo_path = self._repo_path(repo_slug)
-
-        actual_branch: str | None = None
-
-        if ctx.current_branch:
-            try:
-                self._git.checkout(repo_path, ctx.current_branch)
-            except Exception as exc:
-                print(
-                    f"WARNING: could not checkout branch {ctx.current_branch!r}: {exc}",
-                    file=sys.stderr,
-                )
-
+        repo_path = self._repo_path(ctx.repo_slug)
+        flow = self._git.gitflow(repo_path)[0]
+        branch = origin_work_branch(repo_path, flow) or flow.integration
         try:
-            actual_branch = self._git.current_branch(repo_path)
-        except Exception:
-            actual_branch = None
+            self._git.checkout(repo_path, branch)
+        except GitSyncError as exc:
+            retry = platform.inline(*cli_words(self._workspace_root, "context", "alive", name))
+            again = platform.inline("git", "-C", str(repo_path), "checkout", branch)
+            raise GitSyncError(
+                exc.message,
+                fix=act("agent", f"run `{again}` and resolve what it prints, then run `{retry}`"),
+            ) from None
 
         ctx_fresh = self.show(name)
         if ctx_fresh.state == ContextState.ALIVE:
@@ -555,7 +542,6 @@ class SpecContextService:
             state=ContextState.ALIVE,
             alive_since=clock.now_iso(),
             dead_since=None,
-            current_branch=actual_branch,
         )
         self._store.update(alive_ctx)
 
@@ -708,7 +694,9 @@ class SpecContextService:
                         "move " + ", ".join(str(path / rel) for rel in dirty) + " into a worktree",
                     ),
                 )
-            held = [r for r in trees if r["repo"] == slug and r["exit"]]  # the owner's exits
+            held = [
+                r for r in trees if r["repo"] == slug and r["exit"] and r.get("state") != "paused"
+            ]  # the owner's exits
             lost = [refix] if failed else [r["exit"] for r in held]
             lost += self._git.unrecoverable(path)
             if tree := sweep.linked_worktree(self._workspace_root, path):
@@ -757,11 +745,7 @@ class SpecContextService:
         # Phase 2 — sync every repo, then hold every repo: a push's gate reads the main
         # repo's gitflow, so no repo is held before all are pushed. NO-LOCKS races.
         present = [(slug, path) for slug, path in repo_paths if path.exists()]
-        branch_before_sync: str | None = None
         for slug, repo_path in present:
-            if slug == ctx.repo_slug:
-                with contextlib.suppress(Exception):
-                    branch_before_sync = self._git.current_branch(repo_path)
             # An unborn clone reaching here is clean (Phase 1); a born one has a remote.
             if self._git.is_git_root(repo_path) and self._git.has_commits(repo_path):
                 try:
@@ -786,7 +770,6 @@ class SpecContextService:
             created_at=ctx.created_at,
             alive_since=None,
             dead_since=clock.now_iso(),
-            current_branch=branch_before_sync,
             associated_repos=ctx.associated_repos,
         )
         self._store.update(dead_ctx)
@@ -801,6 +784,18 @@ class SpecContextService:
             raise ContextStateError(
                 f"Context '{name}' is active.",
                 fix=fix_line(self._workspace_root, "context", "dead", name),
+            )
+        rows, failed, refix = self._worktree_rows(
+            self._workspace_root, {r.slug for r in ctx.all_repos()}
+        )
+        if failed:
+            raise ContextStateError(
+                f"Context '{name}': {failed}; delete cannot see paused trees.", fix=refix
+            )
+        if paused := [r for r in rows if r.get("state") == "paused"]:
+            raise ContextStateError(
+                f"Context '{name}': {paused[0]['path']} is paused; delete would orphan its bundle.",
+                fix=paused[0]["exit"],
             )
         self._store.delete(name)
         # A session record pointing at a deleted context degrades to unbound via the

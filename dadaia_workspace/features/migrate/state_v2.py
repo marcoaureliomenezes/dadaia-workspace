@@ -1,4 +1,4 @@
-"""State-file migration: spec_contexts.json v1 → v2."""
+"""State-file migration: spec_contexts.json v1 rows to the current schema."""
 
 from __future__ import annotations
 
@@ -63,14 +63,13 @@ def plan_migration(store: JsonContextStore) -> MigrationPlan:
 
 
 def execute_migration(store: JsonContextStore, workspace_root: Path) -> None:
-    """Migrate the registry and its retired primary marker to schema v2."""
+    """Migrate the registry and its retired primary marker to the current schema."""
     states_dir = store.states_dir
     primary_file = states_dir / "primary_context.json"
     raw = store.read_raw() if store.exists() else None
     if raw is not None and parse_schema_version(raw, states_dir / "spec_contexts.json") < 2:
         store.replace_raw(
             {
-                "schema_version": "2",
                 "contexts": [
                     ctx
                     if ctx.get("state") not in LEGACY_STATES
@@ -82,7 +81,6 @@ def execute_migration(store: JsonContextStore, workspace_root: Path) -> None:
                         "created_at": ctx.get("created_at", ""),
                         "alive_since": ctx.get("activated_at"),
                         "dead_since": None,
-                        "current_branch": ctx.get("current_branch"),
                     }
                     for ctx in raw.get("contexts", [])
                 ],

@@ -62,7 +62,7 @@ def report(specs: Path, since: str, until: str = "HEAD") -> dict[str, Any]:
     """The worklist for the window *since*..*until* — the ONE decider every verb calls."""
     repo = specs.parent
     for bound in (since, until):  # usable = an ancestor of HEAD
-        if _git.reaches(repo, bound):
+        if bound == "HEAD" or _git.reaches(repo, bound):
             continue
         if cut := _cut(repo, f"{bound} is out of reach"):  # a cut is checked first
             raise cut

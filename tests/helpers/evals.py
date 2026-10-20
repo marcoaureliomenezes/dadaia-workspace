@@ -1,4 +1,4 @@
-"""Docker helpers for the evals graders' no-model rows (ported from dadaia-evals c075ed6).
+"""Docker helpers for the evals graders' no-model rows (ported from the retired evals repo, commit c075ed6).
 
 An image is the task's ``environment/`` plus a ``lib/`` layer written per run: a PyPI pin of the
 baseline, or this checkout's wheel (the one builder, ``_build_wheel``). A missing ``evals/tasks/<task>``
@@ -64,7 +64,7 @@ def image(task: str, version: str) -> str:
         else:
             req = f"dadaia-workspace=={version}"
         write_text(ctx / "lib" / "requirements.txt", req + "\n")
-        tag = f"dadaia-evals-{task}:{version}"
+        tag = f"dadaia-workspace-evals-{task}:{version}"
         sh("docker", "build", "-q", "-t", tag, str(ctx))
     return tag
 

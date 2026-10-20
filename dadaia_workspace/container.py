@@ -1,17 +1,22 @@
 """Composition root — builds services with concrete infrastructure."""
 
 import logging
+from functools import partial
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, NoReturn
 
 if TYPE_CHECKING:
     from dadaia_workspace.features.certification import CertificationResult
 
+from dadaia_workspace.core.cli_line import git_line
+from dadaia_workspace.core.exceptions import DadaiaError, GitSyncError
+from dadaia_workspace.core.models.git_scan import GitObjectReadError, GitRunError
+from dadaia_workspace.core.platform import act, write_text
 from dadaia_workspace.core.workspace_resolver import not_initialized
 from dadaia_workspace.features.capabilities import distribution_version
 from dadaia_workspace.features.chokepoints.denylist_scan import BaselinePatternLike
-from dadaia_workspace.features.export.service import ExportService
-from dadaia_workspace.features.import_.service import ImportService
+from dadaia_workspace.features.chokepoints.push_gate import read_failure_fix
+from dadaia_workspace.features.export.service import ExportService, new_scratch, scratch_fix
 from dadaia_workspace.features.migrate.state_v2 import execute_migration, plan_migration
 from dadaia_workspace.features.public.service import PublicAssetService
 from dadaia_workspace.features.reconcile import ReconcileResult
@@ -137,6 +142,89 @@ def scan_publish_candidates(repo: Path, rels: list[str]) -> dict[str, str]:
     return {h.path: f"{h.source_layer} '{h.masked_term}' (line {h.line})" for h in outcome.hits}
 
 
+def scan_bundle(workspace_root: Path, bundle: Path, repo: Path) -> dict[str, str]:
+    """The pre-push matcher over the objects *bundle* adds to *repo*, as the push gate reads
+    them: git's own exit statuses tell the cases apart (`list-heads` fails: a damaged header;
+    `verify` fails: a missing prerequisite), a scratch bare repo borrows *repo*'s objects and
+    `origin` refs, and the bundle is unbundled there. Nothing is written into *repo*.
+    A failure raises `DadaiaError` relaying git's reason, with the act that clears its cause."""
+    from dadaia_workspace.features.chokepoints.denylist_scan import scan_objects
+
+    # An open lane's bundle was written a moment ago: its damage is git's, never the operator's.
+    paused = bundle.is_relative_to(workspace_root / ".dadaia" / "dist")
+    damaged = (
+        act("operator", f"rule whether {bundle} is restored from a copy or discarded")
+        if paused
+        else git_line(repo, "fsck")
+    )
+
+    def refuse(why: str, fix: str) -> NoReturn:
+        raise DadaiaError(f"{bundle.name} cannot be scanned ({why})", fix=fix)
+
+    def git(cwd: Path, *args: str, why: str, fix: str) -> str:
+        try:
+            return GitSubprocessClient().git(cwd, *args)
+        except GitSyncError as exc:
+            refuse(f"{why}: {exc.message.partition(':\n')[2].strip()}", fix)
+        except (OSError, TimeoutError):
+            refuse("git could not run", read_failure_fix(GitRunError("git"), repo))
+
+    try:
+        bundle.open("rb").close()
+    except OSError as exc:
+        refuse(
+            type(exc).__name__, act("agent", f"make {bundle} readable, then run the export again")
+        )
+    heads = git(
+        repo, "bundle", "list-heads", str(bundle), why="its header is unreadable", fix=damaged
+    )
+    if not heads:
+        refuse("it holds no ref", damaged)
+    git(
+        repo,
+        "bundle",
+        "verify",
+        str(bundle),
+        why="its repo lacks a prerequisite",
+        fix=git_line(repo, "fetch", "origin"),
+    )
+    tmp = workspace_root / ".dadaia" / "tmp"
+    with new_scratch(tmp, "scan-") as name:
+        scratch, fsck = Path(name), git_line(repo, "fsck")
+        git(scratch, "init", "-q", "--bare", why="no scratch repo", fix=scratch_fix(tmp))
+        store = git(
+            repo,
+            "rev-parse",
+            "--path-format=absolute",
+            "--git-path",
+            "objects",
+            why="no repo",
+            fix=fsck,
+        )
+        try:
+            write_text(scratch / "objects" / "info" / "alternates", store + "\n")
+        except OSError as exc:
+            refuse(type(exc).__name__, scratch_fix(tmp))
+        git(
+            scratch,
+            "fetch",
+            "-q",
+            str(repo),
+            "+refs/remotes/origin/*:refs/remotes/origin/*",
+            why="no origin refs",
+            fix=fsck,
+        )
+        # verify never reads the pack body: a failed unbundle is the file's if it is a pause bundle.
+        unbundled = damaged if paused else scratch_fix(tmp)
+        git(scratch, "bundle", "unbundle", str(bundle), why="git refused it", fix=unbundled)
+        try:
+            found = GitSubprocessObjectReader().new_objects(scratch, heads.split()[0], "")
+            outcome = scan_objects(found, load_denylist_terms(), load_denylist_baseline_patterns())
+        except GitObjectReadError as exc:
+            refuse(str(exc), read_failure_fix(exc, repo))
+    return {h.path: f"{h.source_layer} '{h.masked_term}' (line {h.line})" for h in outcome.hits}
+
+
 def build_doctor_service(
     workspace_root: Path, *, rows: WorktreeRows = worktree_rows
 ) -> DoctorService:
@@ -154,13 +242,9 @@ def build_export_service(workspace_root: Path) -> ExportService:
     _guard_initialized(workspace_root)
     return ExportService(
         context_store=build_context_store(workspace_root),
-        git_client=GitSubprocessClient(),
         workspace_root=workspace_root,
+        scan_bundle=partial(scan_bundle, workspace_root),
     )
-
-
-def build_import_service(workspace_root: Path) -> ImportService:
-    return ImportService(build_spec_context_service(workspace_root))
 
 
 def reconcile_workspace(

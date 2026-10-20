@@ -331,7 +331,9 @@ def _release_drift(script: Path, repo: Path, state: dict[str, object]) -> dict[s
         "dd-release-implementation", script.parents[2] / "dd-release-implementation" / "scripts"
     )
     (repo / "specs" / "releases" / "9.9.9").mkdir(parents=True)
-    write_text(repo / "specs" / "releases" / "9.9.9" / "_RELEASE.json", json.dumps(state))
+    full = {"schema": "release-state-v1", "release": "9.9.9", "phase": "CLOSURE", "defined": None,
+            "implemented": None, "shipped": None, "log": [], **state}  # fmt: skip
+    write_text(repo / "specs" / "releases" / "9.9.9" / "_RELEASE.json", json.dumps(full))
     result = run([sys.executable, str(release / "release.py"), "drift", "--specs", str(repo / "specs"),
          "--json"], check=False, cwd=repo)  # fmt: skip
     assert result.returncode in (0, 1), result.stderr
@@ -345,7 +347,7 @@ def test_the_closure_window_opens_at_the_live_release_defined_sha(script: Path, 
     write_text(repo / "dadaia_workspace" / "features" / "alpha" / "core.py", "x = 2\n")
     _git(repo, "commit", "-aqm", "touch alpha")
 
-    report = _release_drift(script, repo, {"defined": {"sha": base}, "log": []})
+    report = _release_drift(script, repo, {"defined": {"sha": base, "ts": "2026-01-01T00:00:00Z"}})
 
     assert report["since"] == base
     assert [a["slug"] for a in report["atoms"]] == ["alpha"]  # type: ignore[union-attr]
@@ -358,7 +360,9 @@ def test_the_closure_window_opens_at_the_last_memory_entry_until(script: Path, r
     _git(repo, "add", "README.md")
     _git(repo, "commit", "-qm", "later")
     until = _git(repo, "rev-parse", "HEAD")
-    state = {"defined": {"sha": base}, "log": [{"kind": "memory", "since": base, "until": until}]}
+    state = {"defined": {"sha": base, "ts": "2026-01-01T00:00:00Z"},
+             "log": [{"ts": "2026-01-02T00:00:00Z", "agent": "a", "kind": "memory", "text": "m",
+                      "since": base, "until": until}]}  # fmt: skip
 
     assert _release_drift(script, repo, state)["since"] == until
 

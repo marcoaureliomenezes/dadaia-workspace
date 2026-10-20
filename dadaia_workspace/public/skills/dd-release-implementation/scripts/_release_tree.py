@@ -50,7 +50,7 @@ _POINTER = {
 _ACT = {
     "backlog": "backlog entry {i} already exited naming another release",
     "bugs": "resolve bug {i} (`bugs.py resolve {i}` "
-            "with --cause, --caused-by, --solution and --fix-sha)",
+            "with --cause, --caused-by and --solution)",
     "findings": "finding {i}'s audit closed without naming release {r}",
 }  # fmt: skip
 
@@ -126,8 +126,8 @@ def _window_findings(
         return [_findings.info(CODE, rel, head, message)]
     return [_findings.finding(CODE, rel, head, message,
             act("agent", f"open {spec} with `{BUG_WINDOW}` as its first `## ` heading, "
-            "reviewing the prior candidate's table and each resolved record's persisted "
-            "`fix_sha` with `git show` as `dd-bug-resolution/LINEAGE.md` defines"))]  # fmt: skip
+            "reviewing the prior candidate's table and each resolved record's fix, found by its "
+            "`fix(bugs)` or `refactor(bugs)` line, as `dd-bug-resolution/LINEAGE.md` defines"))]  # fmt: skip
 
 
 def _origin_row(
@@ -253,7 +253,7 @@ def _memory_findings(specs: Path) -> list[dict[str, Any]]:
     if live.state.get("phase") != "CLOSURE":
         return []
     stamp = str((live.state.get("implemented") or {}).get("ts") or "")
-    if any(isinstance(e, dict) and e.get("kind") == "memory" and str(e.get("ts")) >= stamp
+    if any(e.get("kind") == "memory" and str(e.get("ts")) >= stamp
            for e in live.state.get("log") or []):  # fmt: skip
         return []
     message = (f"release is in CLOSURE with no `kind: memory` log entry stamped at or after "

@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -15,7 +16,9 @@ import pytest
 
 from dadaia_workspace.core.cli_line import git_line, shell_line
 from dadaia_workspace.core.skill_owner import load_owner
+from tests.helpers import worktree_ws
 from tests.helpers.oslib import link, read_text, run, write_text
+from tests.helpers.skill_scripts import stage_skill_scripts
 from tests.helpers.worktree_ws import (
     NEW_JOB,
     NEW_TASK,
@@ -29,13 +32,18 @@ from tests.helpers.worktree_ws import fixes as _fixes
 from tests.helpers.worktree_ws import git as _git
 from tests.helpers.worktree_ws import run as _run
 
+_platform = load_owner("dd-bug-resolution", "_platform")
+
 RC = "0.5.0/rc-1/wt-rc"
 LANE = "0.5.0/wt-backlog-an-idea"
-#: The one fix of a main tree refused for the rc's phase.
-PHASE_FIX = (
-    "fix: Agent action: reach phase IMPLEMENTATION in _RELEASE.json on wt/0.5.0/rc-1/wt-rc"
-    " (release.py phase), then open its job again"
-)
+
+
+def phase_fix(root: Path) -> str:
+    """The one fix of a main tree refused for the rc's phase: it names the main repo's rc tree."""
+    return (
+        "fix: Agent action: reach phase IMPLEMENTATION in _RELEASE.json on wt/0.5.0/rc-1/wt-rc"
+        f" at {root / 'worktrees/r' / RC} (release.py phase), then open its job again"
+    )
 
 
 @pytest.fixture
@@ -79,7 +87,7 @@ def test_a_release_job_needs_the_implementation_phase(definition_root: Path) -> 
     refused = _run(definition_root, "new", "r", NEW_JOB)
 
     assert refused.returncode != 0
-    assert _fixes(refused) == [PHASE_FIX]
+    assert _fixes(refused) == [phase_fix(definition_root)]
     assert not (definition_root / "worktrees/r" / NEW_JOB).exists()
     assert _git(repo, "branch", "--list", f"wt/{NEW_JOB}").strip() == ""
 
@@ -100,6 +108,32 @@ def test_a_main_tree_reads_the_phase_on_its_rcs_tree_not_the_work_branch(
         0,
         f"[ok] {definition_root / 'worktrees/r' / NEW_JOB}\n",
     )
+
+
+def test_a_main_tree_refuses_a_release_state_that_breaks_the_schema_with_checks_finding(
+    definition_root: Path,
+) -> None:
+    """The phase is IMPLEMENTATION, yet a log entry lacks `ts`: `release.py check` refuses the rc's tree."""
+    _set_release(definition_root, "DEFINITION", plan="Draft")
+    assert _run(definition_root, "new", "r", RC).returncode == 0
+    rc_tree = definition_root / "worktrees/r" / RC
+    state = rc_tree / "specs/releases/0.5.0/_RELEASE.json"
+    doc = json.loads(read_text(state))
+    doc.update(phase="IMPLEMENTATION", log=[{"agent": "a", "kind": "note", "text": "t"}])
+    write_text(state, json.dumps(doc))
+    _git(rc_tree, "commit", "-qam", "implementation")
+
+    refused = _run(definition_root, "new", "r", NEW_JOB)
+
+    assert (refused.returncode, refused.stdout) == (1, "")
+    assert refused.stderr.splitlines() == [
+        "[error] releases/0.5.0/_RELEASE.json:1 state.log[0] is missing required field 'ts'",
+        f"fix: Agent action: {state} fails at the keys this finding names (specs/releases/AGENTS.md: "
+        "release.py writes every _RELEASE.json field and ledger line) \u2014 revert the commit that "
+        f"introduced it (`{_platform.git_inline(state.parent, 'log', '-p', '--', '_RELEASE.json')}` lists them), or delete the "
+        "line if you wrote it and it is still uncommitted, then redo the change through `release.py`",
+    ]
+    assert not (definition_root / "worktrees/r" / NEW_JOB).exists()
 
 
 def test_a_main_tree_needs_its_rcs_tree(root: Path) -> None:
@@ -273,7 +307,8 @@ def _word(path: Path) -> str:
 def test_a_task_needs_its_job_branch_and_the_sixth_task_opens(root: Path) -> None:
     """A task is cut from its main tree; the number of open tasks is not capped."""
     orphan = _run(root, "new", "r", NEW_TASK)
-    assert orphan.returncode == 1 and _fixes(orphan)[0].endswith(f"worktree.py new r {NEW_JOB}")
+    [orphan_fix] = _fixes(orphan)
+    assert orphan.returncode == 1 and orphan_fix.endswith(f"worktree.py new r {NEW_JOB}")
     assert _run(root, "new", "r", RC).returncode == 0
     assert _run(root, "new", "r", NEW_JOB).returncode == 0
     for task in range(1, 7):
@@ -325,7 +360,21 @@ def test_an_associated_job_reads_the_main_repos_spec(
         )  # the rc's own tree needs no release phase
     result = _run(root, "new", "a", NEW_JOB)
     assert (result.returncode, result.stdout.strip()) == (code, f"[ok] {root / out}" if out else "")
-    assert _fixes(result) == ([] if code == 0 else [PHASE_FIX])
+    assert _fixes(result) == ([] if code == 0 else [phase_fix(root)])
+
+
+def test_an_associated_jobs_phase_refusal_names_the_main_repos_rc_tree(root: Path) -> None:
+    associate(root, "Draft")
+    _set_release(root, "DEFINITION")
+    for repo in ("r", "a"):
+        assert _run(root, "new", repo, RC).returncode == 0
+
+    refused = _run(root, "new", "a", NEW_JOB)
+
+    assert refused.returncode == 1
+    [fix] = _fixes(refused)
+    assert str(root / "worktrees/r" / RC) in fix
+    assert str(root / "worktrees/a") not in fix
 
 
 def test_symlinked_worktrees_component_refuses(
@@ -432,6 +481,64 @@ def test_an_unreadable_release_state_refuses_a_job_and_creates_nothing(
     )
     assert len(_fixes(refused)) == 1
     assert _git(repo, "branch", "--list", f"wt/{NEW_JOB}").strip() == ""
+    assert not (root / "worktrees/r" / NEW_JOB).exists()
+
+
+def test_a_main_tree_reads_an_rc_without_a_release_state_as_not_implementation(
+    root: Path,
+) -> None:
+    """A new version's wt-rc exists before `release.py new`: it holds no state, so the job is
+    refused for its phase and nothing is created."""
+    assert _run(root, "new", "r", RC).returncode == 0
+    shutil.rmtree(root / "worktrees/r" / RC / "specs/releases/0.5.0")
+
+    refused = _run(root, "new", "r", NEW_JOB)
+
+    assert (refused.returncode, refused.stdout) == (1, "")
+    assert refused.stderr == (
+        "[error] a job needs release 0.5.0 in phase IMPLEMENTATION on wt/0.5.0/rc-1/wt-rc\n"
+        f"{phase_fix(root)}\n"
+    )
+    assert not (root / "worktrees/r" / NEW_JOB).exists()
+
+
+def test_a_main_tree_whose_rc_tree_was_removed_by_hand_is_refused_with_a_fix_that_restores_it(
+    root: Path,
+) -> None:
+    assert _run(root, "new", "r", RC).returncode == 0
+    rc_tree = root / "worktrees/r" / RC
+    shutil.rmtree(rc_tree)
+
+    refused = _run(root, "new", "r", NEW_JOB)
+
+    fix = git_line(root / "repos/r", "worktree", "add", "-f", "-f", str(rc_tree), f"wt/{RC}")
+    assert (refused.returncode, refused.stdout) == (1, "")
+    assert refused.stderr == f"[error] {rc_tree} does not exist\nfix: {fix}\n"
+    assert not (root / "worktrees/r" / NEW_JOB).exists()
+    run_fix(root, refused)
+    assert _run(root, "new", "r", NEW_JOB).returncode == 0
+
+
+def test_a_main_tree_is_refused_when_release_check_exits_non_zero_with_no_finding(
+    root: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The exit status decides: a `release.py check` that crashes is a refusal, never a pass."""
+    assert _run(root, "new", "r", RC).returncode == 0
+    staged = stage_skill_scripts("dd-gitflow-default", tmp_path / "skills/dd-gitflow-default/scripts")  # fmt: skip
+    write_text(
+        tmp_path / "skills/dd-release-implementation/scripts/release.py",
+        "import sys\nprint('Traceback (most recent call last):', file=sys.stderr)\nsys.exit(1)\n",
+    )
+    monkeypatch.setattr(worktree_ws, "SCRIPT", staged / "worktree.py")
+
+    refused = _run(root, "new", "r", NEW_JOB)
+
+    specs = root / "worktrees/r" / RC / "specs"
+    assert (refused.returncode, refused.stdout) == (1, "")
+    assert refused.stderr == (
+        "[error] release.py check exited 1\n"
+        f"fix: Agent action: fix the findings of release.py check on {specs}\n"
+    )
     assert not (root / "worktrees/r" / NEW_JOB).exists()
 
 

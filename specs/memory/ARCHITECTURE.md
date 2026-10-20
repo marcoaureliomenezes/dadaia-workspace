@@ -115,12 +115,12 @@ flowchart TB
 - `core/atomic_write.py`, `core/clock.py`, `core/frontmatter.py`, `core/platform.py` and `core/redaction.py` are typed doors over their kernel owners and import only `core.skill_owner` among the package's modules (ADR 0246).
 - `features/migrate` stamps `specs_pattern_version: 13` (`core/specs_version.CANONICAL_SPECS_VERSION`) or refuses; a tree below v6 is foreign, and `specs init --replace-foreign` moves it to `specs-bkp/` before the canon is scaffolded.
 
-### `dadaia_workspace/features` — package map (12 packages)
+### `dadaia_workspace/features` — package map (11 packages)
 
 ```mermaid
 flowchart TB
     subgraph features["dadaia_workspace/features"]
-      pkgs["backlog · capabilities · certification · chokepoints · export · import_ · migrate · public · reconcile · spec_context · specs · workspace"]
+      pkgs["backlog · capabilities · certification · chokepoints · export · migrate · public · reconcile · spec_context · specs · workspace"]
     end
     container["container.py"] --> features
     features --> core["core"]
@@ -216,7 +216,9 @@ flowchart TB
 - 0167 — Test architecture: the tests tree mirrors the package, size is a derived marker, asserts check exit code + effect + stable id, CONTEXT-MAP budget is measured live, meta-tests leave pytest for one CI job
 - 0169 — QUALITY P-18, P-19 and P-20 (size and complexity ceilings) are retired under ADR 0143; no ceiling comes back
 - 0170 — SKILL.md carries a soft and a hard line limit: soft 333 is a dadaia doctor WARNING whose fix line tells the agent to split the SKILL.md into its references/*.md and/or scripts/; hard 500, the Agent Skills format recommendation, stays a contract row; scope SKILL.md only
+- 0171 — The Spec Context Project stores no branch; context alive derives the checkout from the main repo's constitution gitflow
 - 0172 — context dead never commits: a dirty checkout is refused with a fix line; each sanctioned direct writer commits its own output in the act
+- 0175 — Workspace replication: export is read-only, soft (JSON, default) or hard (tar.gz with scanned bundles); init DIR --from <artifact> restores at the artifact's exact version; dadaia import is deleted
 - 0176 — Nine principles whose test leaves pytest keep a check: seven named checks of the one guard-script CI job, P-07 and P-28 their own tool; P-30 loses its false archive clause
 - 0178 — 0.5.0 publishes only after the operator reads a dadaia-evals gate verdict: a paired drop against 0.4.7 or T1 below 3/3 blocks; an evals/gate status required by approve waits for 0.5.1
 - 0181 — 0.5.0 candidate 8 retires or rewrites a named set of law lines, each by the acceptance criterion that owns it; every law-deleting commit of the candidate cites this record
@@ -270,6 +272,11 @@ flowchart TB
 - 0266 — A fix line's label is spelled by one producer, act(kind, text), beside command() in the skill kernel's _platform.py; call sites pass only the act text
 - 0267 — A bug record's surface is derived from the files its fix commit touched, never typed; append lists the earlier bugs whose fixes touched the same files
 - 0268 — The OS boundary admits one lint rule: ruff PLW1514 (a text open names its encoding), in the existing ruff step; still no guard and no gate
+- 0269 — The 0.5.0 eval gate runs in this repo's eval.yml on sha E; the promote PR head differs from E only by the _RELEASE.json record; T1 3/3, T2 and T3 at least 2/3 on the candidate
+- 0270 — Amend ADR 0171: context alive takes the highest work branch on its clone's origin through the one work-branch reader, every other caller staying local; no registry migration ships
+- 0271 — dadaia worktree pause bundles one clean lane or wt-rc tree and removes it; job and task trees are never paused; context dead is unchanged and keeps refusing every wt/*
+- 0272 — Amend ADR 0175: export always bundles and never probes visibility; hard carries the open lane and wt-rc trees with no snapshots zone; the artifact carries the export-v1 format; a context with no remote is listed unreplicable; init --from excludes --repo and installs every harness
+- 0273 — A resolved bug's fix is the commit HEAD reaches whose message carries its fix(bugs) or refactor(bugs) line; fix_sha is a write-once hint, never judged
 <!-- /dadaia:fixed adr-list -->
 
 <!-- dadaia:fixed slop-code -->

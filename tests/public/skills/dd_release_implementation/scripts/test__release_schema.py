@@ -5,17 +5,19 @@ exempt by location. Size: SMALL.
 
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 import sys
 from pathlib import Path
 
+import jsonschema
 import pytest
 
 from dadaia_workspace.core.release_state import RELEASE_ID_RE
 from dadaia_workspace.features.specs.canon import is_canon_path
 from tests.fixtures.harness_env import suite_env
-from tests.helpers.oslib import run, write_text
+from tests.helpers.oslib import read_text, run, write_text
 
 _REPO_ROOT = Path(__file__).resolve().parents[5]
 _SCRIPTS = _REPO_ROOT / "dadaia_workspace/public/skills/dd-release-implementation/scripts"
@@ -314,3 +316,18 @@ def test_the_shallow_check_answers_for_the_repo_given_not_for_git_dir(tmp_path: 
     out = _adds_under_foreign_git_env(a, shallow)
     assert out.returncode == 0, out.stderr
     assert out.stdout.strip() == "[['0.5.0', 'rc-1']]"
+
+
+@pytest.mark.parametrize("field", ["sha", "since", "until"])
+def test_a_log_entry_sha_field_accepts_a_64_hex_sha(field: str) -> None:
+    schema = json.loads(read_text(_SCRIPTS / "schemas/release-state-v1.schema.json"))
+    pattern = schema["properties"]["log"]["items"]["properties"][field]
+    jsonschema.validate("a" * 64, pattern)
+
+
+def test_the_shallow_check_asks_the_kernel_helper(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(_release_schema._git, "shallow", lambda _repo: True)
+    with pytest.raises(_release_schema.ShallowClone):
+        _release_schema.candidate_adds(tmp_path)

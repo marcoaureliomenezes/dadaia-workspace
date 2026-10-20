@@ -111,7 +111,7 @@ def releases(specs: Path) -> dict[str, tuple[_dt.datetime, _dt.datetime | None]]
 def candidate_adds(specs: Path) -> list[tuple[_dt.datetime, str, str]]:
     """Each candidate's birth as (instant, release, rc): a commit adding exactly one
     rc-<N>/SPEC.md whose status reads non-Approved; a shallow history is refused."""
-    if _git.git(specs, "rev-parse", "--is-shallow-repository", check=False).strip() == "true":
+    if _git.shallow(specs):
         raise ShallowClone(f"{specs} is in a shallow clone: a release candidate read from a cut history "
                            "would be stamped wrong for good")  # fmt: skip
     try:

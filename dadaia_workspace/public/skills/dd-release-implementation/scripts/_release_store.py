@@ -70,6 +70,8 @@ def live_release(specs: Path) -> Live:
         raise refusal from None
     release_dir = specs / "releases" / live
     state = read_state(release_dir / STATE)
+    if found := state_findings(json.dumps(state), f"releases/{live}/{STATE}", specs.resolve()):
+        raise Refusal(found[0]["message"], found[0]["fix"])  # readers never see a refused shape
     return Live(live, release_dir, state, current_candidate(release_dir, state))
 
 
@@ -77,7 +79,7 @@ def window_start(state: State) -> list[str]:
     """The memory window's start candidates, newest first: each memory entry's `until`,
     newest entry first, then `defined.sha`."""
     bounds = [str(e["until"]) for e in reversed(state.get("log") or [])
-              if isinstance(e, dict) and e.get("kind") == "memory" and e.get("until")]  # fmt: skip
+              if e.get("kind") == "memory" and e.get("until")]  # fmt: skip
     return bounds + [str(d) for d in [(state.get("defined") or {}).get("sha")] if d]
 
 

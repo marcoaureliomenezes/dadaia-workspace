@@ -31,7 +31,7 @@ SPEC_STUB = """\
 {bug_window}
 
 (Read the prior candidate's `## Bug window review`, then inspect each resolved record's
-persisted `fix_sha` with `git show` as `dd-bug-resolution/LINEAGE.md` defines.)
+fix, found by its `fix(bugs)` or `refactor(bugs)` line, as `dd-bug-resolution/LINEAGE.md` defines.)
 
 ## 1. Problem
 

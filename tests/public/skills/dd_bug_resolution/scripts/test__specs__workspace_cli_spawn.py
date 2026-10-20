@@ -60,3 +60,14 @@ def test_a_workspace_cli_that_cannot_run_refuses_with_the_install_fix(
     assert caller(tmp_path, capsys, monkeypatch) == command(
         "uvx", "dadaia-workspace", "init", str(tmp_path)
     )
+
+
+def test_run_cli_with_the_root_found_and_the_cli_missing_refuses_with_the_install_fix(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / ".dadaia/states").mkdir(parents=True)
+    write_text(tmp_path / ".dadaia/states/spec_contexts.json", "{}")
+    specs = load_owner("dd-bug-resolution", "_specs")
+    with pytest.raises(specs.Refusal) as refused:
+        specs.run_cli(tmp_path, "context", "list")
+    assert refused.value.fix == command("uvx", "dadaia-workspace", "init", str(tmp_path))

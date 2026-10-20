@@ -24,7 +24,7 @@
 - F-12 `$D reports validate <good>.handoff.json` → exit 0 for a document valid against `.dadaia/agentic/schemas/handoff-v1.schema.json`; a tampered copy → non-zero, names the failure.
 - F-14 `python3 $S/dd-cli-library/scripts/registry.py register --port <p> --project val`; re-register → exit 0; `--project other` on the same port → exit 1, names the owner.
 - F-15 `python3 $S/dd-spec-navigator/scripts/memory.py catalog generate --specs repos/vp/specs`; `$D doctor --specs-dir repos/vp/specs` → 0 errors, 0 warnings.
-- F-16 `$D export` → writes `.dadaia/dist/spec-contexts.json` only; in a new workspace `$D import <file>` → contexts DEAD; `$D context alive <slug>` clones; `$D doctor` → exit 0.
+- F-16 `$D export` → writes `.dadaia/dist/spec-contexts.json` only; in a new workspace `$D init ws2 --from <file>` → contexts DEAD; `$D context alive <slug>` clones; `$D doctor` → exit 0.
 - F-17 `$D migrate --dry-run` then `$D migrate -y` on a v1 `spec_contexts.json` → schema_version 2, a re-run prints nothing to do; `$D specs upgrade --specs-dir <old tree>` → nothing dropped, `$D doctor` 0 errors.
 - F-18 `unset DADAIA_BOOTSTRAP_PACKAGE`; `$D init ws --harness claude` → exit 0, no `ERROR:`/`Traceback`; `env -i PATH="$PATH" ws/.dadaia/.venv/bin/python -c "import importlib.metadata as m; print(m.version('dadaia-workspace'))"` prints the candidate version.
 - F-22 `--help` on every verb → purpose and usage; no raw traceback anywhere in the run.
@@ -35,7 +35,7 @@
 
 - R-02 `python3 $S/dd-backlog-definition/scripts/backlog.py new <slug> --specs <specs>`, fill its intents; `$D doctor --specs-dir <specs>` accepts every ref.
 - R-03 `$D specs init --specs-dir /tmp/r03/specs`; `$D doctor --specs-dir /tmp/r03/specs` → 0 errors, 0 warnings.
-- R-04 a legacy placeholder atom (a memory atom whose frontmatter keeps a template token such as `SLUG_PLACEHOLDER`): `$D doctor --fix --specs-dir <specs>` leaves the file byte for byte and exits 1 with `MEM-PLACEHOLDER-1`, not auto-fixable, its fix line naming fill or delete; `$D specs upgrade --specs-dir <specs>` leaves it too; a filled atom is never flagged.
+- R-04 a legacy placeholder atom (a memory atom whose frontmatter keeps a template token such as `SLUG_PLACEHOLDER`): `$D doctor --fix --specs-dir <specs>` leaves the file byte for byte and exits 1 with `MEM-PLACEHOLDER-1`, not auto-fixable, its fix line naming fill or delete only when slug and title are both tokens (`doctor_memory.py:53-56,96-99`), else the token replacement; `$D specs upgrade --specs-dir <specs>` leaves it too; a filled atom is never flagged.
 - R-06 `bugs.py append`, then `bugs.py resolve <id>` with its evidence flags, then `bugs.py status` → the record reads resolved; `bugs.py check --specs <specs>` → exit 0.
 - R-08 `export KIMI_CODE_HOME=<tmp>`; `$D init ws --harness kimi-code` → `.kimi-code/AGENTS.md` and four `dadaia-kimi-*` shims; the pre-gate shim blocks a root-law write with exit 2; `$D public doctor` → exit 0, a tampered shim flagged and healed by `$D public install`.
 - R-13 `python3 $S/dd-release-implementation/scripts/release.py new 0.1.0 --specs <specs>`; `backlog.py new`; `$D context create` → `$D context bind` → `$D specs init --context` → `$D context baseline` → `$D doctor` 0/0 after each; a gate never accepts what the doctor rejects.

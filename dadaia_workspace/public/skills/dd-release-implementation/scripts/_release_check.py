@@ -97,7 +97,7 @@ def _order_errors(entries: list[dict[str, Any]]) -> list[str]:
 
 def _log_errors(document: dict[str, Any]) -> list[str]:
     """Validate ordering and the lean current-candidate log while retaining history."""
-    entries = [entry for entry in document.get("log", []) if isinstance(entry, dict)]
+    entries = document.get("log", [])
     born = max(
         (index for index, entry in enumerate(entries) if _BIRTH.match(str(entry.get("text", "")))),
         default=len(entries),

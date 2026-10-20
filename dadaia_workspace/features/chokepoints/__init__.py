@@ -28,11 +28,12 @@ from dadaia_workspace.features.chokepoints.branch_policy import (
     PushRef,
     parse_push_stdin,
 )
-from dadaia_workspace.features.chokepoints.push_gate import push_gate_decision
+from dadaia_workspace.features.chokepoints.push_gate import content_decision, push_gate_decision
 
 __all__ = [
     "Decision",
     "PushRef",
     "parse_push_stdin",
+    "content_decision",
     "push_gate_decision",
 ]

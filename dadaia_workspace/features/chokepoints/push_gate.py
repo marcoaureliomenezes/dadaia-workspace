@@ -5,13 +5,14 @@ canon predicate and the :class:`ObjectSource` are injected by ``cli/commands/ci.
 from __future__ import annotations
 
 from collections.abc import Callable, Iterable, Iterator, Sequence
-from dataclasses import dataclass, replace
+from dataclasses import replace
 from pathlib import Path
 from typing import Protocol
 
 from dadaia_workspace.core.cli_line import fix_line, git_line, spell_fix
 from dadaia_workspace.core.gitflow import Gitflow
 from dadaia_workspace.core.models.git_scan import (
+    ZERO_SHA,
     GitObjectReadError,
     GitRunError,
     ScannedObject,
@@ -33,31 +34,16 @@ from dadaia_workspace.features.chokepoints.denylist_scan import (
     scan_objects,
 )
 
-__all__ = ["GateDecision", "push_gate_decision"]
+__all__ = ["content_decision", "push_gate_decision"]
 
-_DENYLIST_LAW = ".dadaia/AGENTS.md §3 — pre-push refuses a denylisted secret"
+_PUSH = "[pre-push]"
+_DENYLIST_LAW = ".dadaia/AGENTS.md §3, worktrees/AGENTS.md §2 — a denylisted secret is refused"
 _MAX_LISTED_HITS = 10
 _REWRITE = (
-    "Uncommit the unpublished range down to its oldest commit and re-commit it as one "
-    "(origin's history is never rewritten). Remove what is listed from the files first; when "
-    "the message carries it, append `--message` and the new text to the fix. Push after this command:"
+    "Uncommit the unpublished range down to its oldest commit and re-commit it as one commit, "
+    "two when RED test commits and others mix (origin's history is never rewritten). Remove what is listed from the files first; when "
+    "the message carries it, append `--message` and the new text to the fix; keep any `fix(bugs): …` line, `refactor(bugs): …` lines included. Then repeat the refused act:"
 )
-
-
-#: The path label the object reader gives a commit message body.
-_COMMIT_MESSAGE = "(commit message)"
-
-
-@dataclass(frozen=True)
-class GateDecision(Decision):
-    """A refusal on a denylist hit or a canon violation carries the *listed* paths it names
-    (a commit message is listed as such): what its remedy may touch."""
-
-    listed: frozenset[str] = frozenset()
-
-    @property
-    def message_listed(self) -> bool:
-        return _COMMIT_MESSAGE in self.listed
 
 
 class ObjectSource(Protocol):
@@ -67,36 +53,44 @@ class ObjectSource(Protocol):
         self, repo: Path, local_sha: str, remote_sha: str
     ) -> Iterable[ScannedObject]: ...
 
-    def unpublished(self, repo: Path, sha: str) -> list[str]: ...
+    def unpublished(self, repo: Path, sha: str, held: str = ZERO_SHA) -> list[str]: ...
 
     def remote_branch(self, repo: Path, branch: str) -> bool: ...
 
     def netted_specs(self, repo: Path, local_sha: str, remote_sha: str) -> list[str]: ...
 
 
-def _refusal(head: str, rows: Sequence[str] = (), noun: str = "", advice: str = "") -> str:
+def _refusal(
+    head: str, rows: Sequence[str] = (), noun: str = "", advice: str = "", tag: str = _PUSH
+) -> str:
     """The one pre-push refusal shape: head, rows capped at 10 plus a remainder count,
     then the advice when there is any."""
-    lines = [f"[pre-push] BLOCKED: {head}", *rows[:_MAX_LISTED_HITS]]
+    lines = [f"{tag} BLOCKED: {head}", *rows[:_MAX_LISTED_HITS]]
     if len(rows) > _MAX_LISTED_HITS:
         lines.append(f"  ... and {len(rows) - _MAX_LISTED_HITS} more offending {noun}.")
     return "\n".join([*lines, *([f"  {advice}"] if advice else [])])
 
 
-def _fail_closed(what: str) -> str:
-    return _refusal(f"{what} — a policy gate never skips what it cannot evaluate (fail closed).")
+def _fail_closed(what: str, tag: str = _PUSH) -> str:
+    return _refusal(
+        f"{what} — a policy gate never skips what it cannot evaluate (fail closed).", tag=tag
+    )
 
 
 def _notes(
-    decision: Decision, binaries: int, oversized: Sequence[OversizedNote], masker: PathMasker
+    decision: Decision,
+    binaries: int,
+    oversized: Sequence[OversizedNote],
+    masker: PathMasker,
+    tag: str,
 ) -> Decision:
     """Attach the skipped-binary count and the oversized-blob notes (path masked,
     CWE-532) as a warning, allow or refuse alike."""
     lines = [
-        f"[pre-push] {binaries} binary blob(s) skipped by the denylist scan (not text-decodable)."
+        f"{tag} {binaries} binary blob(s) skipped by the denylist scan (not text-decodable)."
     ] * (binaries > 0)
     lines += [
-        f"[pre-push] {masker.mask_path(n.path)} is {n.size_bytes} byte(s) — only its first "
+        f"{tag} {masker.mask_path(n.path)} is {n.size_bytes} byte(s) — only its first "
         f"{n.scanned_bytes} byte(s) were scanned by the denylist scan; the remainder was NOT "
         "scanned. Verify the rest by hand."
         for n in oversized
@@ -115,7 +109,7 @@ def _rewrite_fix(ref: PushRef, object_source: ObjectSource, repo: Path, fixes: G
     elif branch != ref.local_ref and branch != fixes.head:
         fix = git_line(fixes.repo, "switch", branch)
     else:
-        oldest = object_source.unpublished(repo, ref.local_sha)[-1]
+        oldest = object_source.unpublished(repo, ref.local_sha, ref.remote_sha)[-1]
         fix = fix_line(
             None, "ci", "push-gate-check", "--repo", fixes.repo, "--rewrite-from", oldest
         )
@@ -129,6 +123,7 @@ def _run_denylist_scan(
     terms: list[tuple[str, str]],
     patterns: list[BaselinePatternLike],
     masker: PathMasker,
+    tag: str,
 ) -> tuple[list[tuple[PushRef, Hit]], int, list[OversizedNote]] | Decision:
     """ONE streamed walk over every ref's new objects (deduplicated across refs; a
     materialized range measured ~129 MB): denylist hits and skip counts. A read failure
@@ -150,22 +145,26 @@ def _run_denylist_scan(
             oversized.extend(outcome.oversized_notes)
             hits.extend((ref, hit) for hit in outcome.hits)
     except GitObjectReadError as exc:
-        return _read_failure(exc, masker, repo)
+        return _read_failure(exc, masker, repo, tag)
     return hits, binaries, oversized
 
 
-def _read_failure(exc: GitObjectReadError, masker: PathMasker, repo: Path) -> Decision:
+def read_failure_fix(exc: GitObjectReadError, repo: Path) -> str:
+    """The one fix for a git-object read failure: git that could not run is not corruption, so no
+    fsck; any other read failure points git's own check at *repo*."""
+    if isinstance(exc, GitRunError):
+        return act("operator", "make git runnable here")
+    return git_line(repo, "fsck")
+
+
+def _read_failure(exc: GitObjectReadError, masker: PathMasker, repo: Path, tag: str) -> Decision:
     """A git read failure refuses (fail closed), its path masked."""
     masked = f" (path: {masker.mask_path(exc.path)})" if exc.path is not None else ""
     return Decision(
         allowed=False,
-        message=_fail_closed(f"reading the pushed-range git objects failed ({exc}{masked})")
+        message=_fail_closed(f"reading the pushed-range git objects failed ({exc}{masked})", tag)
         + "\n"
-        + spell_fix(
-            act("operator", "make git runnable here")  # not corruption: no fsck
-            if isinstance(exc, GitRunError)
-            else git_line(repo, "fsck")
-        ),
+        + spell_fix(read_failure_fix(exc, repo)),
     )
 
 
@@ -183,10 +182,8 @@ def push_gate_decision(
 ) -> Decision:
     """Decide a push, first refusal wins: a malformed stdin line (fail closed); branch
     policy over every non-deletion, non-tag ref (a principal/integration birth allowed
-    when origin holds no gitflow branch or it publishes nothing); then ONE walk over
-    every non-deletion ref's new objects (tags included) for the denylist scan, while
-    the specs/ canon scan (refused first) judges only the paths each ref nets in; an unreadable object store refuses. Every
-    capability is a required parameter: an unwired call site is a CLI defect, never a
+    when origin holds no gitflow branch or it publishes nothing); then
+    :func:`content_decision`. Every capability is a required parameter: an unwired call site is a CLI defect, never a
     bypass."""
     if malformed_lines > 0:
         return Decision(
@@ -208,10 +205,35 @@ def push_gate_decision(
     )
     if refusal := check_branch_policy(branch_refs, gitflow, fixes, births):
         return refusal
+    return content_decision(
+        refs,
+        object_source=object_source,
+        repo=repo,
+        canon_violations_fn=canon_violations_fn,
+        fixes=fixes,
+        denylist_terms=denylist_terms,
+        baseline_patterns=baseline_patterns,
+    )
+
+
+def content_decision(
+    refs: list[PushRef],
+    *,
+    object_source: ObjectSource,
+    repo: Path,
+    canon_violations_fn: Callable[[Sequence[str]], Sequence[str]],
+    fixes: GateFixes,
+    denylist_terms: Iterable[tuple[str, str]] = (),
+    baseline_patterns: Iterable[BaselinePatternLike] = (),
+    tag: str = _PUSH,
+) -> Decision:
+    """The content half of a push, no branch policy: ONE walk over every non-deletion ref's
+    new objects (tags included) for the denylist scan, while the specs/ canon scan (refused
+    first) judges only the paths each ref nets in; an unreadable object store refuses."""
     scan_refs = [r for r in refs if not r.is_deletion]
     terms, patterns = list(denylist_terms), list(baseline_patterns)  # one-shot iterables
     masker = PathMasker(terms, patterns)
-    scan = _run_denylist_scan(scan_refs, object_source, repo, terms, patterns, masker)
+    scan = _run_denylist_scan(scan_refs, object_source, repo, terms, patterns, masker, tag)
     if isinstance(scan, Decision):
         return scan
     hits, binaries, oversized = scan
@@ -224,10 +246,11 @@ def push_gate_decision(
             )
         ]
     except GitObjectReadError as exc:
-        return _read_failure(exc, masker, repo)
+        return _read_failure(exc, masker, repo, tag)
+    messages = frozenset[str]()
     if canon:
         message = _refusal(
-            f"the pushed range publishes {len(canon)} specs/ path(s) violating the v6 canon "
+            f"the range carries {len(canon)} specs/ path(s) violating the v6 canon "
             "(specs/AGENTS.md).",
             [
                 f"  {r.local_ref} -> {r.remote_ref}: specs/{p} — delete the path; "
@@ -235,13 +258,13 @@ def push_gate_decision(
                 for r, p in canon
             ],
             "path(s)",
+            tag=tag,
         )
         fix = _rewrite_fix(canon[0][0], object_source, repo, fixes)
         listed = frozenset(f"specs/{p}" for _, p in canon)
     elif hits:
         message = _refusal(
-            f"the pushed range publishes {len(hits)} object(s) carrying a denylisted term "
-            f"({_DENYLIST_LAW}).",
+            f"the range carries {len(hits)} object(s) with a denylisted term ({_DENYLIST_LAW}).",
             [
                 f"  {r.local_ref} -> {r.remote_ref}: {masker.mask_path(h.path)}:{h.line} "
                 f"(blob {h.sha[:12]}) — masked term '{h.masked_term}' ({h.source_layer})"
@@ -251,9 +274,11 @@ def push_gate_decision(
             "A test fixture that needs a secret shape composes it at runtime (string "
             "concatenation), never as a tracked literal. The range scope means "
             "already-published history never needs a rewrite.",
+            tag=tag,
         )
         fix = _rewrite_fix(hits[0][0], object_source, repo, fixes)
         listed = frozenset(h.path for _, h in hits)
+        messages = frozenset(h.sha for _, h in hits if h.path == "(commit message)")
     else:
         message = fix = ""
         listed = frozenset()
@@ -262,5 +287,7 @@ def push_gate_decision(
         message="[pre-push] branch policy + specs-canon scan + denylist scan passed; allow.",
     )
     if message:
-        decision = GateDecision(allowed=False, message=f"{message}\n{fix}", listed=listed)
-    return _notes(decision, binaries, oversized, masker)
+        decision = Decision(
+            allowed=False, message=f"{message}\n{fix}", listed=listed, messages=messages
+        )
+    return _notes(decision, binaries, oversized, masker, tag)

@@ -19,7 +19,9 @@ from dadaia_workspace import container
 from dadaia_workspace.cli.commands import ci
 from dadaia_workspace.cli.main import app
 from dadaia_workspace.core.cli_line import fix_line
+from dadaia_workspace.core.gitflow import Gitflow, SeveralWorkBranches
 from dadaia_workspace.core.specs_version import CANONICAL_SPECS_VERSION
+from dadaia_workspace.features.chokepoints.branch_policy import Decision
 from tests.helpers.oslib import run, write_text
 from tests.helpers.oslib import run as os_run
 
@@ -58,6 +60,31 @@ def test_push_gate_check_always_wires_a_real_object_source(monkeypatch, tmp_path
 
     assert result.exit_code == 1, result.output
     assert "leak.md:1" in result.output
+
+
+def test_onto_judges_the_content_of_a_range_on_a_branch_no_push_could_carry(
+    monkeypatch, tmp_path: Path
+) -> None:
+    """`--onto` refuses the denylisted blob of `<onto>..HEAD` on a task branch (never pushable),
+    and its rewrite fix starts at the range's own oldest commit, never below `<onto>`."""
+    repo = tmp_path / "repo"
+    base = _init_repo(repo)
+    os_run(["git", "switch", "-q", "-c", "wt/0.5.0/rc-1/job-1/wt-task-001"], cwd=repo, check=True)
+    shas = []
+    for rel, text in (("leak.md", "zz-synthetic-term\n"), ("more.md", "m\n")):
+        write_text(repo / rel, text)
+        os_run(["git", "add", "-A"], cwd=repo, check=True)
+        os_run(["git", "commit", "-q", "-m", f"add {rel}"], cwd=repo, check=True)
+        shas.append(_git(repo, "rev-parse", "HEAD"))
+    first = shas[0]
+    monkeypatch.setattr(ci, "_repo_root", lambda: repo)
+    monkeypatch.setattr(container, "load_denylist_terms", lambda: (("zz-synthetic-term", "t"),))
+
+    done = _runner.invoke(app, ["ci", "push-gate-check", "--onto", base])
+
+    assert done.exit_code == 1, done.output
+    assert "leak.md:1" in done.output and "zz-synthetic-term" not in done.output
+    assert f"--rewrite-from {first}" in done.output and base not in done.output.split("fix:")[-1]
 
 
 def _stamped_specs(repo: Path, version: int) -> str:
@@ -247,3 +274,37 @@ def test_a_malformed_privacy_baseline_fails_the_gate_closed_with_one_fix_line(
     assert [ln for ln in err.splitlines() if ln.startswith("fix:")] == [
         "fix: Agent action: reinstall the workspace"
     ]
+
+
+def test_push_gate_check_help_names_the_rewrite_remedy_and_its_contract() -> None:
+    result = _runner.invoke(app, ["ci", "push-gate-check", "--help"])
+    assert result.exit_code == 0, result.output
+    assert (
+        "Remedy for a refused push: --rewrite-from re-commits the whole unpublished range "
+        "as one commit, over edits and deletions of the paths the gate lists."
+    ) in " ".join(result.output.split())
+
+
+def test_a_decision_carries_its_listed_paths_even_when_it_lists_none() -> None:
+    decision = Decision(allowed=True)
+    assert decision.listed == frozenset()
+    assert decision.message_listed is False
+
+
+def test_several_work_branches_warn_and_keep_the_gate_on_the_kept_branch(
+    monkeypatch, tmp_path: Path, capsys
+) -> None:
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    flow = Gitflow("main", "dev", "feature/")
+    monkeypatch.setattr(ci, "_gitflow", lambda _r: (flow, None, "repo"))
+
+    def several(*_a: object) -> str:
+        raise SeveralWorkBranches("2 work branches", "run `x`, then run `y`", "0.2.0")
+
+    monkeypatch.setattr(ci, "work_branch", several)
+    _, fixes = ci._gate_inputs(repo, "HEAD")
+    assert fixes.work == "feature/0.2.0"
+    assert capsys.readouterr().err == (
+        "[pre-push] WARNING: 2 work branches\nhint: Agent action: run `x`, then run `y`\n"
+    )

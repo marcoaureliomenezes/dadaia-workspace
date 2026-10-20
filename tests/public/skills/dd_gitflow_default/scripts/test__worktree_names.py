@@ -7,6 +7,7 @@ functions, no git. Size: SMALL.
 from __future__ import annotations
 
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -116,3 +117,48 @@ def test_a_branch_is_wt_plus_the_path_and_name_of_inverts_it(name: str) -> None:
 @pytest.mark.parametrize("ref", ["feature/0.5.0", "wt/0.5.0-rc1/j1", "wt/scratch", "wt/0.5.0/rc-1"])
 def test_name_of_refuses_a_ref_that_is_no_tree_branch(ref: str) -> None:
     assert _fn("name_of")(ref) is None
+
+
+@pytest.mark.parametrize(
+    ("name", "levels"),
+    [
+        (TASK, [("0.5.0", "version"), ("0.5.0/rc-1", "rc"), ("0.5.0/rc-1/job-1", "job")]),
+        (MAIN, [("0.5.0", "version"), ("0.5.0/rc-1", "rc"), ("0.5.0/rc-1/job-1", "job")]),
+        (RC, [("0.5.0", "version"), ("0.5.0/rc-1", "rc")]),
+        (BACKLOG, [("0.5.0", "version")]),
+    ],
+)
+def test_level_folders_are_the_folders_a_name_sits_in_each_with_its_level_file(
+    tmp_path: Path, name: str, levels: list[tuple[str, str]]
+) -> None:
+    assert _fn("level_folders")(tmp_path, name) == [(tmp_path / rel, kind) for rel, kind in levels]
+
+
+@pytest.mark.parametrize(
+    ("rel", "files", "bare"),
+    [
+        ("0.5.0", ["AGENTS.md"], True),
+        ("0.5.0/rc-1", ["AGENTS.md"], True),
+        ("0.5.0/rc-1/job-1", ["AGENTS.md"], True),
+        ("0.5.0/rc-1/job-1", ["AGENTS.md", "note.txt"], False),
+        ("0.5.0/rc-1/job-1", [], False),
+        ("foo", ["AGENTS.md"], False),
+        ("0.5.0/foo", ["AGENTS.md"], False),
+        ("rc-1", ["AGENTS.md"], False),
+        ("0.5.0/rc-1/job-1/job-2", ["AGENTS.md"], False),
+    ],
+)
+def test_a_bare_level_folder_holds_only_its_file_and_is_named_for_its_depth(
+    tmp_path: Path, rel: str, files: list[str], bare: bool
+) -> None:
+    folder = tmp_path / rel
+    folder.mkdir(parents=True)
+    for file in files:
+        (folder / file).write_text("x")
+    assert _fn("is_bare_level")(tmp_path, folder) is bare
+
+
+@pytest.mark.parametrize("level", ["version", "rc", "job"])
+def test_a_level_file_runs_five_to_ten_lines(level: str) -> None:
+    text = (Path(_names.__file__).parent / "levels" / f"{level}.md").read_text(encoding="utf-8")
+    assert 5 <= len(text.splitlines()) <= 10

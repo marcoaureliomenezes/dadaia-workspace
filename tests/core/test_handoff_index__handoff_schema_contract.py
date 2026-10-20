@@ -231,16 +231,14 @@ def test_mutability_is_declared_per_property_and_the_rewrite_spares_the_core(
     kind: str, categories: set[str]
 ) -> None:
     """Every property carries ``x-mutability`` in its closed set; ``required`` is
-    every property but the write-once ones and `fix_sha`, absent until a resolve sets it; the governance rewrite touches no immutable-core field.
+    every property but the write-once ones, `fix_sha` and `surface`, absent until a resolve sets them, and `correlates`, absent from legacy records; the governance rewrite touches no immutable-core field.
     A finding's only mutable fields are disposition/release/reason."""
     properties = _schema(kind)["properties"]
     mutability = {name: spec["x-mutability"] for name, spec in properties.items()}
     assert set(mutability.values()) == categories
     required = set(_schema(kind)["required"])
-    unset_until_resolved = {"fix_sha", "surface"} if kind == "bug" else set()
-    assert (
-        required == {n for n, c in mutability.items() if c != "write-once"} - unset_until_resolved
-    )
+    optional = {"fix_sha", "surface", "correlates"} if kind == "bug" else set()
+    assert required == {n for n, c in mutability.items() if c != "write-once"} - optional
     assert not {n for n in _REWRITE[kind] if mutability[n] == "immutable-core"}
     if kind == "bug":
         assert mutability["fix_files"] == "write-once"
@@ -272,3 +270,9 @@ def test_the_surface_names_no_library_fact() -> None:
 def test_handoff_schema_verdict_enum_is_the_two_tokens() -> None:
     """The one verdict vocabulary (the public text rows live in test_public_source_hygiene)."""
     assert _schema("handoff")["properties"]["verdict"]["enum"] == ["APPROVED", "REJECTED"]
+
+
+def test_a_64_hex_reviewed_sha_validates_and_a_63_hex_one_is_refused() -> None:
+    validator = Draft202012Validator(_schema("handoff"))
+    assert list(validator.iter_errors({**_BASE["handoff"], "reviewed_sha": "a" * 64})) == []
+    assert list(validator.iter_errors({**_BASE["handoff"], "reviewed_sha": "a" * 63}))

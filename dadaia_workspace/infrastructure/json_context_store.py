@@ -20,8 +20,7 @@ from dadaia_workspace.core.models.spec_context import (
 from dadaia_workspace.core.platform import act
 from dadaia_workspace.core.workspace_layout import occupied
 
-_VERSION = 3
-_EMPTY_CONTEXTS = {"schema_version": "2", "contexts": []}
+SCHEMA_VERSION = 3
 
 # The keys every row carries: :func:`_from_dict` builds the model from them.
 ROW_KEYS = ("name", "state", "repo_slug", "repo_url", "created_at")
@@ -35,11 +34,11 @@ def parse_schema_version(data: dict, path: Path) -> int:  # type: ignore[type-ar
 
     A non-numeric or newer stamp raises."""
     raw = data.get("schema_version", data.get("version"))
-    text = str(_VERSION if raw is None else raw)
+    text = str(SCHEMA_VERSION if raw is None else raw)
     if isinstance(raw, bool) or not text.isdigit():
         problem = f"spec_contexts.json schema_version {raw!r} is not a number."
-        raise SchemaVersionError(problem, act("operator", f"set it to {_VERSION} in {path}"))
-    if int(text) > _VERSION:
+        raise SchemaVersionError(problem, act("operator", f"set it to {SCHEMA_VERSION} in {path}"))
+    if int(text) > SCHEMA_VERSION:
         problem = f"spec_contexts.json schema_version {text} is newer than this dadaia."
         raise SchemaVersionError(problem, act("agent", f"upgrade dadaia-workspace to read {path}"))
     legacy = any(c.get("state") in LEGACY_STATES for c in data.get("contexts", []))
@@ -73,7 +72,6 @@ def _to_dict(ctx: SpecContextProject) -> dict:  # type: ignore[type-arg]
         "created_at": ctx.created_at,
         "alive_since": ctx.alive_since,
         "dead_since": ctx.dead_since,
-        "current_branch": ctx.current_branch,
         "associated_repos": [{"slug": r.slug, "url": r.url} for r in ctx.associated_repos],
     }
 
@@ -87,7 +85,6 @@ def _from_dict(d: dict) -> SpecContextProject:  # type: ignore[type-arg]
         created_at=d["created_at"],
         alive_since=d.get("alive_since"),
         dead_since=d.get("dead_since"),
-        current_branch=d.get("current_branch"),
         associated_repos=tuple(
             AssociatedRepo(slug=r["slug"], url=r["url"]) for r in d.get("associated_repos") or []
         ),
@@ -106,11 +103,14 @@ class JsonContextStore:
         return cast("dict[str, Any]", json.loads(platform.read_text(self._path)))
 
     def replace_raw(self, data: dict) -> None:  # type: ignore[type-arg]
-        atomic_write(self._path, json.dumps(data, indent=2))
+        body = {"schema_version": str(SCHEMA_VERSION)} | {
+            k: v for k, v in data.items() if k != "schema_version"
+        }
+        atomic_write(self._path, json.dumps(body, indent=2))
 
     def seed_if_absent(self) -> None:
         if not occupied(self._path):
-            self.replace_raw(_EMPTY_CONTEXTS)
+            self.replace_raw({"contexts": []})
 
     def snapshot(self) -> bytes | None:
         return self._path.read_bytes() if self._path.is_file() else None

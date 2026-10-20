@@ -49,6 +49,16 @@ invocation's `--repo` and `--associated-repo` flags. It lays down:
 `init` deletes no projection; `.dadaia/.venv/bin/dadaia harness add <name>` adds a
 harness later and `.dadaia/.venv/bin/dadaia harness list` reads the roster.
 
+To move a workspace, `.dadaia/.venv/bin/dadaia export` writes
+`.dadaia/dist/spec-contexts.json` (every context, its repo urls and the harness roster),
+and `export --hard` writes `.dadaia/dist/workspace-export.tar.gz`, that JSON plus a
+secret-scanned bundle of each open lane and `wt-rc` tree and each paused one; export only
+reads the registry. `uvx dadaia-workspace init <dir> --from <artifact>` (never with
+`--repo`) installs every harness the artifact names, registers its contexts DEAD, lists a
+context with no remote as not replicated, places the bundles in `.dadaia/dist/` and prints
+`context alive <ctx>` for each context that was ALIVE; then `worktree resume` restores each
+bundled tree.
+
 ## Level 2 — the project
 
 A context — a Spec Context Project — is the unit of work: one canonical `specs/` tree
@@ -82,8 +92,8 @@ and the open worktrees once.
 `specs init` (3a) brings the main repo's `specs/` to the canon: an
 absent tree is scaffolded, a dadaia tree is upgraded and its missing files filled, and a
 foreign `specs/` is moved to `specs-bkp/` (`git mv`) after consent —
-`--replace-foreign` gives it without asking. On a repo with no work branch it cuts the
-local one and commits only the scaffold (the move included) on it; it never pushes. The
+`--replace-foreign` gives it without asking. On a repo with no work branch it first cuts the
+local one (from `origin/<work>`, else the integration branch) and commits only the scaffold (the move included) on it; it never pushes. The
 `dd-audit-project` first pass (3b) fills memory in the `wt-backlog-first-pass` lane and is done when memory holds real content (`.dadaia/.venv/bin/dadaia doctor --context <ctx>` exit 0), never by a
 stamp. `context baseline <ctx>` (3c) publishes the principal, integration and work
 branches; a re-run is a no-op.
@@ -123,7 +133,7 @@ After `context baseline`, each step writes inside a worktree that then merges in
 parent, all under `worktrees/<repo>/<M.m.p>/`: a `wt-backlog-<slug>` lane for step 1;
 the candidate's `rc-<N>/wt-rc`, its integration branch, for steps 2, 3, 4 and 6; a job's
 `rc-<N>/job-<n>/wt-main` and its `wt-task-<kkk>` trees from step 5. `.dadaia/.venv/bin/dadaia worktree <verb>`
-runs every worktree verb: `new`, `merge`, `sync`, `clean`, `hash`, `list`.
+runs every worktree verb: `new`, `merge`, `sync`, `clean`, `hash`, `list`, `pause`, `resume`.
 
 1. **Demand enters the backlog.** Only the operator creates demand;
    `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py new <slug> --relates <slugs>|none`
@@ -152,11 +162,11 @@ runs every worktree verb: `new`, `merge`, `sync`, `clean`, `hash`, `list`.
    `.dadaia/.venv/bin/dadaia worktree sync <wt-rc path>` rebases the rc and its trees,
    parents first.
 6. **Close the candidate.** The Reconciliation, as the last commits of the `wt-rc`:
-   `release.py phase CLOSURE --sha <sha>` (no job, task or lane tree open), the
+   `release.py phase CLOSURE --sha <sha>` (no `wt/*` tree or branch open but the `wt-rc`), the
    closure `log` entries, the disposition sweep (`backlog.py exit`, `audit.py
    disposition`/`close`, `bugs.py archive`), artifact GC, and last the memory
-   reconciliation with its derived docs; after CLOSURE only a block-list bug lands, through
-   the hotfix lane and `worktree sync`, and any other work opens the next candidate. Then the `wt-rc` merges into the work branch through the job gate plus
+   reconciliation with its derived docs; after CLOSURE a hotfix lane still reaches it by
+   `worktree sync`, in code only the `wt-rc` holds only a block-list bug lands, on the `wt-rc` itself, and any other work opens the next candidate. Then the `wt-rc` merges into the work branch through the job gate plus
    the ledger checks, and the work -> integration PR merges green.
 7. **Continue or promote.** Continue: `release.py new` with the same id stacks the next
    candidate, reopening `DEFINITION`. Promote: merge the integration branch into the
@@ -166,7 +176,7 @@ runs every worktree verb: `new`, `merge`, `sync`, `clean`, `hash`, `list`.
    in a backlog lane on that branch, then records the promote and moves the release
    folder to `_archive/`.
 
-A bug is registered once the operator confirms it; a block-list bug is fixed at once in
+A bug is registered once the operator confirms it; a bug in code the work branch holds is fixed in
 a `wt-hotfix-<bug-id>` lane — lineage, a RED new case, root-cause fix, GREEN, then `resolve` with the
 implementation sha. Any other bug becomes explicit candidate scope; ship refuses it while
 open unless the operator authorizes that exact id and the authorization is recorded.

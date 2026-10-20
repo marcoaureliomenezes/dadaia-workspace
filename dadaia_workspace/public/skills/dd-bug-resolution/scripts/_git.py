@@ -3,12 +3,14 @@
 
 from __future__ import annotations
 
+import json
 import os
-from collections.abc import Mapping
+import re
+from collections.abc import Iterable, Mapping
 from pathlib import Path
 
 from _grammar import SHA_RE
-from _platform import run
+from _platform import read_text, run
 
 #: `git rev-parse --local-env-vars` less the config injectors: what makes git answer for another repo. Identity, config and ssh are the caller's.
 _LOCAL = frozenset({
@@ -45,8 +47,19 @@ def shallow(repo: Path) -> bool:
     return git(repo, "rev-parse", "--is-shallow-repository", check=False).strip() == "true"
 
 
+def main_checkout(repo: Path) -> Path:
+    """The parent of the git common dir of *repo* (a linked worktree resolves to its main checkout); `Path(".")` when *repo* is no repository."""
+    try:
+        common = git(repo, "rev-parse", "--git-common-dir")
+    except GitError:
+        return Path(".")
+    return (repo / common.strip()).resolve().parent
+
+
 def reaches(repo: Path, sha: str) -> bool:
-    """Whether *sha* is an ancestor of the HEAD of *repo*."""
+    """Whether *sha*, a hex sha, is an ancestor of the HEAD of *repo*; git is never asked about anything else."""
+    if not SHA_RE.fullmatch(sha or ""):
+        return False
     try:
         git(repo, "merge-base", "--is-ancestor", sha, "HEAD")
     except GitError:
@@ -54,12 +67,60 @@ def reaches(repo: Path, sha: str) -> bool:
     return True
 
 
-def fix_files(repo: Path, sha: str) -> list[str] | None:
-    """The paths commit *sha* touched, or None unless *sha* is a hex sha that the HEAD of *repo* reaches."""
-    if not SHA_RE.fullmatch(sha or "") or not reaches(repo, sha):
-        return None
-    out = git(repo, "diff-tree", "--root", "--no-commit-id", "--name-only", "-r", "-z", sha)
-    return [p for p in out.split("\0") if p]
+#: A bug-fix line of a commit message: `fix(bugs): <id>[, <id>…] — …` or the REBUILD `refactor(bugs): …`.
+_FIX_LINE = re.compile(r"^(?:fix|refactor)\(bugs\): (.*?) — ", re.M)
+
+
+def context_repos(repo: Path) -> list[Path]:
+    """*repo* and the checkouts of the repos its bound context associates with it, as the workspace registry names them; never another context's checkout."""
+    main = main_checkout(repo)
+    try:
+        rows = json.loads(read_text(main.parent.parent / ".dadaia/states/spec_contexts.json"))[
+            "contexts"
+        ]
+    except (OSError, ValueError, KeyError, TypeError):
+        rows = []
+    beside = (main.parent / a["slug"] for r in rows if r.get("repo_slug") == main.name for a in r.get("associated_repos", []))  # fmt: skip
+    return [repo, *(p for p in beside if (p / ".git").exists())]
+
+
+def _canon(subject: str) -> str:
+    """A subject with git's `Reapply "S"` spelled as the `Revert "Revert "S""` it stands for."""
+    return f'Revert "Revert "{subject[9:]}"' if subject.startswith('Reapply "') else subject
+
+
+def fix_commit(repo: Path, ids: Iterable[str]) -> dict[str, tuple[Path, str]]:
+    """For each of *ids*, the repo and sha of the newest commit whose message holds a bug-fix line naming it (a group lists its ids separated by commas or blanks), that the HEAD of *repo*, else of a repo of `context_repos`, reaches; each repo is read in one `git log` and only while an id is missing. A commit the HEAD reverts is skipped: a commit subjected `Revert "<S>"` retires the older commit subjected `<S>`, and a retired revert registers nothing."""
+    wanted, found = set(ids), dict[str, tuple[Path, str]]()
+    for each in context_repos(repo):
+        if wanted <= found.keys():
+            break
+        retired = set()
+        for entry in git(each, "log", "--format=%x1e%H%x00%B", check=False).split("\x1e")[1:]:
+            sha, _, message = entry.partition("\0")
+            if (subject := _canon(message.partition("\n")[0])) in retired:
+                continue
+            if subject.startswith('Revert "'):
+                retired.add(_canon(subject[8:-1]))
+            for head in _FIX_LINE.findall(message):
+                for bug in re.split(r"[,\s]+", head):
+                    if bug in wanted:
+                        found.setdefault(bug, (each, sha))
+    return found
+
+
+def fix_files(repo: Path, shas: Iterable[str]) -> dict[str, list[str]]:
+    """The paths each of *shas*, commits of *repo*, touched, all read in one `diff-tree`."""
+    asked = set(shas)
+    found: dict[str, list[str]] = {}
+    files: list[str] = []
+    cmd = ("diff-tree", "--stdin", "--root", "--name-only", "-r", "-z")
+    for token in git(repo, *cmd, input="\n".join(asked) + "\n").split("\0") if asked else []:
+        if token in asked:
+            files = found.setdefault(token, [])
+        elif token:
+            files.append(token)
+    return found
 
 
 def parse_worktrees(text: str) -> list[dict[str, str]]:

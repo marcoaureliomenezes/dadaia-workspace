@@ -25,7 +25,6 @@ from dadaia_workspace.cli.commands import (
     help as help_cmd,
 )
 from dadaia_workspace.cli.commands.export import export
-from dadaia_workspace.cli.commands.import_ import import_workspace
 from dadaia_workspace.core.exceptions import DadaiaError
 from dadaia_workspace.core.platform import use_utf8_stdio
 from dadaia_workspace.infrastructure.provider_version import provider_version
@@ -66,7 +65,6 @@ def _root(
 # Top-level commands
 app.command(name="init", rich_help_panel="Management")(init.init)
 app.command(name="export", rich_help_panel="Management")(export)
-app.command(name="import", rich_help_panel="Management")(import_workspace)
 app.command(name="capabilities", rich_help_panel="Management")(capabilities.capabilities)
 app.command(name="certify", rich_help_panel="Management")(certify.certify)
 app.command(name="reconcile", rich_help_panel="Management")(reconcile.reconcile)

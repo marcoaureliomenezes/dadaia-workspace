@@ -85,8 +85,8 @@ def _drive(world: World, case: Case) -> None:
         assert fix not in seen, f"no progress — the same fix line again:\n{fix}"
         seen.append(fix)
         act = fix.startswith(("Agent action: ", "Operator action: "))
-        if case.before is not None and (act or step == 0):
-            case.before(world)
+        if act or step == 0:
+            case.play(world, fix)
         assert "<" not in fix.replace("<<", ""), f"a placeholder: {fix}"
         ran = None if act else world.run(fix, world.elsewhere)  # a fix line runs from any cwd
         assert ran is None or ran.returncode == 0, f"the fix does not run:\n{fix}\n{ran}"

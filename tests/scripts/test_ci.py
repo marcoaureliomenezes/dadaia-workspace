@@ -180,6 +180,11 @@ def test_pushes_use_linux_and_pull_requests_use_the_full_matrix() -> None:
     }
 
 
+def test_contract_coverage_cross_cap_is_45_minutes() -> None:
+    workflow = yaml.load(read_text(_REPO / ".github/workflows/ci.yml"), Loader=yaml.BaseLoader)
+    assert workflow["jobs"]["contract-coverage-cross"]["timeout-minutes"] == "45"
+
+
 def _words(line: str) -> list[str]:
     """A documented line's argv: split on blanks, a double quote groups one word (no kernel splitter
     serves a documented line: the gate's own is private to its script)."""

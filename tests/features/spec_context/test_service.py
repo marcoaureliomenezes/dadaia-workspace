@@ -58,6 +58,9 @@ def test_alive_leaves_a_preexisting_specs_tree_untouched_and_hooks_the_repo(
         secret_scan=scan_publish_candidates,
     )
     remote = seeded_remote(workspace_root.parent, "my-repo")
+    run_git(
+        workspace_root.parent / "seed-my-repo", "push", "-q", str(remote), "HEAD:refs/heads/develop"
+    )
     register_dead(svc, "proj", "my-repo", remote.as_uri())
     repo = clone(remote, workspace_root / "repos" / "my-repo")
     head = run_git(repo, "rev-parse", "HEAD")

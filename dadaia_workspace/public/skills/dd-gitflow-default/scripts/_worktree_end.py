@@ -3,7 +3,7 @@
 its gate, or drop an empty one — never with `--force` or `-D`, re-runnable after a stop. A task
 lands after test separation, unreviewed; a main tree, a rc (plus, in the main repo, the ledger checks) and a hotfix
 after their review and the job gate; a backlog tree lands `specs/` after its review and the ledger
-checks alone (an associated repo holds no `specs/`, so those checks skip). The job gate is the repo's own declared `verify:` line, run as one argv list."""
+checks alone (an associated repo holds no `specs/`, so those checks skip). The job gate is the repo's declared `verify:` line, run as one argv list."""
 
 from __future__ import annotations
 
@@ -14,11 +14,12 @@ import re
 import shutil
 import subprocess
 import sys
-from collections.abc import Callable, Iterator
+from collections.abc import Callable
 from datetime import datetime
 from functools import partial
 from pathlib import Path
 
+import _worktree_names as names
 from _handoffs import REVIEWER, reviewer_records
 from _platform import act, command, git_inline, git_line, inline, run, venv_dir, venv_tool
 from _refusal import fix_of, without_fix
@@ -37,12 +38,15 @@ from _worktree_git import (
 from _worktree_names import LAUNCH, NAME_RE, Refusal, base_of, branch, kind_of, locate, tree_path
 
 #: The ledger and release checks a `backlog` or `rc` merge runs, in this order.
-_LEDGERS = (("dd-bug-resolution", "bugs.py"), ("dd-backlog-definition", "backlog.py"),
-            ("dd-release-implementation", "release.py"))  # fmt: skip
+_LEDGERS = (Path("dd-bug-resolution/scripts/bugs.py"), Path("dd-backlog-definition/scripts/backlog.py"),
+            Path("dd-release-implementation/scripts/release.py"))  # fmt: skip
+#: The skills folder of the instance this script runs from, the fallback when a tree carries no ledger script.
+_INSTANCE_SKILLS = Path(__file__).resolve().parent.parent.parent
 
 
 def _target(root: Path, path: str) -> tuple[Path, Path, str, str]:
-    """(repo, tree, name, base branch) of `worktrees/<repo>/<name>`; the tree may be gone."""
+    """(repo, tree, name, base branch) of `worktrees/<repo>/<name>`; the tree may be gone. Only a
+    base that is the work branch reads the gitflow."""
     tree = Path(path).resolve()
     rel = tree.relative_to(root).as_posix() if tree.is_relative_to(root) else ""
     repo_name, name, tail = locate(rel) or ("", None, ())
@@ -51,7 +55,8 @@ def _target(root: Path, path: str) -> tuple[Path, Path, str, str]:
     if name is None or not NAME_RE.match(name):
         raise not_a_name(name or rel.split("/", 2)[-1])
     repo = root / "repos" / repo_name
-    return repo, tree, name, base_of(name, flow_for(root, repo)["work"])  # type: ignore[return-value]
+    work = "" if kind_of(name) in ("task", "main") else flow_for(root, repo)["work"]
+    return repo, tree, name, base_of(name, work)  # type: ignore[return-value]
 
 
 def _refuse_dirty(tree: Path) -> None:
@@ -67,18 +72,22 @@ def _refuse_dirty(tree: Path) -> None:
         )
 
 
-def _kept(tree: Path, verb: str, keep: list[str], drop: bool) -> list[str]:
-    """The ignored files to copy into the repo; refuses while one is neither kept nor dropped."""
+def _precious(tree: Path) -> list[str]:
+    """The ignored files of *tree* that are not disposable: a tool cache directory or a `*.pyc` is."""
     listing = git(tree, "status", "--porcelain", "-z", "--ignored=matching")
     ignored = [  # -z: a name with a blank arrives verbatim, never C-quoted; matching: one entry per directory
         line[3:].rstrip("/") for line in listing.split("\0") if line.startswith("!! ")
     ]
-    # disposable without asking: a tool cache directory or a *.pyc
-    precious = [
+    return [
         p
         for p in ignored
         if not (p.endswith(".pyc") or any("cache" in part for part in Path(p).parts))
     ]
+
+
+def _kept(tree: Path, verb: str, keep: list[str], drop: bool) -> list[str]:
+    """The ignored files to copy into the repo; refuses while one is neither kept nor dropped."""
+    precious = _precious(tree)
     left = [p for p in precious if p not in keep]
     if left and not drop:
         raise Refusal(
@@ -118,15 +127,14 @@ def _remove(into: Path, tree: Path, name: str, kept: list[str]) -> None:
 
 def _rmdir(tree: Path, name: str) -> None:
     """Drop the folders *tree* leaves empty, its level folders cascading outward; a folder holding
-    anything beyond its own AGENTS.md stops the cascade."""
-    for folder in list(tree.parents)[: max(len(name.split("/")) - 1, 1)]:
-        if not folder.is_dir():
-            continue
-        level = folder / "AGENTS.md"
-        if any(p != level for p in folder.iterdir()):
-            return
-        level.unlink(missing_ok=True)
-        folder.rmdir()
+    anything beyond its level file stops the cascade; an empty one is dropped too."""
+    home = tree.parents[name.count("/")]
+    for folder, _ in reversed(names.level_folders(home, name)):
+        if folder.is_dir():
+            if any(folder.iterdir()) and not names.is_bare_level(home, folder):
+                return
+            (folder / names.LEVEL_FILE).unlink(missing_ok=True)
+            folder.rmdir()
 
 
 def _undo(tree: Path, work: str, rel: str) -> str:
@@ -221,7 +229,8 @@ def _gate(tree: Path, work: str) -> None:
             case "rc":
                 sync = inline(*cli_words(root, "worktree", "sync", str(tree)))
                 tail = (
-                    "commit the fix in this worktree when a reconcile commit is at fault, or through a"
+                    "commit the fix in this worktree when a reconcile commit is at fault or only this release's job code fails"
+                    " (register that bug first, specs/bugs/AGENTS.md §2), or through a"
                     f" wt-hotfix lane when the work branch's verify: fails too, then `{sync}`"
                 )
             case _:
@@ -250,9 +259,17 @@ def _refuse_implementation_tests(tree: Path, onto: str, law: str) -> None:
     commits = git(tree, "rev-list", "--reverse", f"{onto}..HEAD").split()
     for commit in commits:
         subject = git(tree, "show", "-s", "--format=%s", commit).strip()
-        if subject.startswith("test("):
-            continue
         paths = git(tree, "diff-tree", "--no-commit-id", "--name-only", "-r", commit).split()
+        if subject.startswith("test("):
+            if source := next((path for path in paths if not _is_test_path(path, declared)), None):
+                raise Refusal(
+                    f"test commit {commit[:12]} touches source path {source}",
+                    act(
+                        "agent",
+                        f"move {source} to the implementation commit and keep this test commit tests-only",
+                    ),
+                )
+            continue
         if test := next((path for path in paths if _is_test_path(path, declared)), None):
             raise Refusal(
                 f"implementation commit {commit[:12]} touches test path {test}",
@@ -287,26 +304,32 @@ def _scaffold(tree: Path, name: str) -> None:
         )
 
 
-def _checks(root: Path, tree: Path) -> Iterator[tuple[str, subprocess.CompletedProcess[str]]]:
-    """Each ledger script's `check` on the tree, then the workspace doctor on its `specs/` — the
-    check the work branch's gates run — fenced to the tree."""
-    skills = Path(__file__).resolve().parents[2]
-    for skill, name in _LEDGERS:
-        argv = [sys.executable, str(skills / skill / "scripts" / name),
-                "check", "--specs", str(tree / "specs")]  # fmt: skip
-        yield name, run(argv, cwd=tree, env=scrubbed_env(), stdin=subprocess.DEVNULL)
-    yield "dadaia doctor", cli(root, "doctor", "--specs-dir", str(tree / "specs"), tree=tree)
+def _tracked(tree: Path, rel: Path) -> list[Path]:
+    """The copies of ledger script *rel* the tree tracks (its `verify:` ran them), else this instance's."""
+    held = git(tree, "ls-files", "-z", "--", f"*/{rel.as_posix()}").split("\0")
+    return [tree / h for h in held if h] or [_INSTANCE_SKILLS / rel]
 
 
-def _ledgers(root: Path, repo: Path, tree: Path) -> None:
-    """A rc or backlog merge's ledger gate: the ledger checks and the doctor on the tree, a red one relaying its own first `fix:` line; an associated repo holds no `specs/`, so it has none."""
+def _ledgers(root: Path, repo: Path, tree: Path, scripts: Callable[[Path], list[Path]]) -> None:  # fmt: skip
+    """`check` of each script *scripts* names per ledger, then the doctor; an associated repo has no `specs/`."""
     if flow_for(root, repo)["main"] != repo.name:
         return
-    for name, done in _checks(root, tree):
-        if done.returncode:
-            out = done.stdout + done.stderr
-            print(without_fix(out), end="")
-            raise Refusal(f"{name} check failed on {tree / 'specs'}", fix_of(out, act("agent", f"fix the findings above in {tree} and commit them")))  # fmt: skip
+    for script in [s for rel in _LEDGERS for s in scripts(rel)]:
+        argv = [sys.executable, str(script), "check", "--specs", str(tree / "specs")]
+        _refuse_red(script.name, run(argv, cwd=tree, env=scrubbed_env(), stdin=subprocess.DEVNULL), tree)  # fmt: skip
+    _refuse_red("dadaia doctor", cli(root, "doctor", "--specs-dir", str(tree / "specs"), tree=tree), tree)  # fmt: skip
+
+
+def _refuse_red(name: str, done: subprocess.CompletedProcess[str], tree: Path) -> None:
+    if done.returncode:
+        out = done.stdout + done.stderr
+        print(without_fix(out), end="")
+        raise Refusal(f"{name} check failed on {tree}", fix_of(out, act("agent", f"fix the findings above in {tree} and commit them")))  # fmt: skip
+
+
+def _refuse_denylisted(root: Path, tree: Path, onto: str) -> None:
+    """Refuse a tree whose `onto..HEAD` carries a denylisted term: the pre-push content matcher."""
+    _refuse_red("the denylist scan", cli(root, "ci", "push-gate-check", "--onto", onto, tree=tree), tree)  # fmt: skip
 
 
 def _series(tree: Path, work: str, tip: str) -> list[tuple[str, str]]:
@@ -397,22 +420,24 @@ def _into(repo: Path, onto: str) -> Path:
 
 
 def _kind_checks(root: Path, repo: Path, tree: Path, name: str, onto: str, into: Path) -> list[Callable[[], object]]:  # fmt: skip
-    """The ordered checks a tree of this kind must pass to land, before `merge`'s own ending checks."""
+    """The ordered checks a tree of this kind must pass to land, before `merge`'s ending checks."""
     if not into.exists():  # the parent's tree removed by hand
         raise Refusal(f"{into} does not exist", git_line(repo, "worktree", "add", "-f", "-f", str(into), onto))  # fmt: skip
     ancestor = partial(_check_ancestor, root, tree, onto)
     verdict = partial(_check_approved, root, tree, onto, name)
-    gate = [ancestor, verdict, partial(_gate, tree, onto)]
+    job_gate = partial(_gate, tree, onto)
+    gate = [ancestor, verdict, job_gate]
+    denylist = partial(_refuse_denylisted, root, tree, onto)
     children, scaffold = partial(_open_children, repo, name), partial(_scaffold, tree, name)
     ledgers, specs = partial(_ledgers, root, repo, tree), partial(_check_specs_only, tree, onto)
     tests = lambda: _refuse_implementation_tests(tree, onto, _target(root, str(into))[3])  # noqa: E731
     table: dict[str | None, list[Callable[[], object]]] = {
-        "task": [ancestor, tests, partial(_refuse_dirty, into)],
+        "task": [ancestor, tests, denylist, partial(_refuse_dirty, into)],
         "main": [children, scaffold, *gate],
-        "hotfix": [scaffold, *gate],
-        "backlog": [specs, ancestor, verdict, ledgers],
-        "rc": [children, *gate, ledgers],
-    }
+        "hotfix": [scaffold, ancestor, denylist, verdict, job_gate],
+        "backlog": [specs, ancestor, denylist, verdict, partial(ledgers, lambda rel: [_INSTANCE_SKILLS / rel])],
+        "rc": [children, *gate, partial(ledgers, partial(_tracked, tree))],
+    }  # fmt: skip
     return [partial(_refuse_dirty, tree), *table[kind_of(name)]]
 
 

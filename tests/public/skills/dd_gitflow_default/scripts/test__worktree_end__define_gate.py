@@ -1,6 +1,6 @@
-"""A backlog-lane merge runs the workspace
-doctor on its own `specs/` — the check the work branch's CI runs — fenced to the tree, so a tree
-the doctor refuses never lands. Size: MEDIUM (real git, tmp workspace, a stub CLI).
+"""A backlog-lane merge runs the workspace doctor on its own `specs/` — the check the work
+branch's CI runs — fenced to the tree, so a tree the doctor refuses never lands, and lands specs
+only; an rc merge runs the job gate. Size: MEDIUM (real git, tmp workspace, a stub CLI).
 """
 
 from __future__ import annotations
@@ -75,6 +75,7 @@ def test_an_rc_merge_runs_the_job_gate(tmp_path: Path) -> None:
     assert refused.returncode == 1 and "verify: exited 1" in refused.stderr
     assert fixes(refused) == [
         f"fix: Agent action: make `python scripts/ci.py job` exit 0 in {tree} and commit the fix"
-        " in this worktree when a reconcile commit is at fault, or through a wt-hotfix lane when"
+        " in this worktree when a reconcile commit is at fault or only this release's job code fails"
+        " (register that bug first, specs/bugs/AGENTS.md §2), or through a wt-hotfix lane when"
         f" the work branch's verify: fails too, then `{sync}`"
     ]

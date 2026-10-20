@@ -420,8 +420,8 @@ def _text_rows(rel: str) -> list[Callable[[str], object]]:
     """The scans a tracked text file's lines take, by where it ships: the law (the shipped
     surface, product memory, the glossary) names no retired verb; what ships names no
     `memory.py check` done criterion; consumer guidance no library toolchain;
-    `public/**/*.md` command lines spell the live CLI; a script's git fix goes through
-    `_platform.git_line`, never a hand-spelled unquoted `git -C {…}`."""
+    `public/**/*.md` command lines spell the live CLI; a script's or a test's git fix goes through
+    `_platform.git_line`, never a hand-spelled `git -C` with a braced path."""
     rows: list[Callable[[str], object]] = []
     if rel.startswith(("dadaia_workspace/public/", "specs/memory/")) or rel == "CONTEXT.md":
         rows.append(_DEAD_RELEASE_VOCABULARY.search)
@@ -431,7 +431,7 @@ def _text_rows(rel: str) -> list[Callable[[str], object]]:
         rows.append(re.compile("release-please").search)
     if rel.startswith("dadaia_workspace/public/") and rel.endswith(".md"):
         rows.append(lambda line: any(_bad_command(span) for span in _CODE_SPAN.findall(line)))
-    if rel.startswith("dadaia_workspace/public/") and rel.endswith(".py"):
+    if rel.endswith(".py") and rel.startswith(("dadaia_workspace/public/", "tests/")):
         rows.append(re.compile(r"git -C \{").search)
     return rows
 
@@ -456,11 +456,11 @@ def test_no_fix_or_shipped_line_bypasses_the_one_renderer() -> None:
     module and `public/skills` script, every doctor rule's `rule_fix`, and every tracked
     law, docs and shipped text file."""
     listed = run(["git", "ls-files", "-z", "--", "dadaia_workspace", "specs/memory",
-                             "CONTEXT.md", "docs"], cwd=_REPO_ROOT, check=True).stdout.split("\0")  # fmt: skip
+                             "CONTEXT.md", "docs", "tests"], cwd=_REPO_ROOT, check=True).stdout.split("\0")  # fmt: skip
     files = {rel: _REPO_ROOT / rel for rel in listed if rel and "_archive" not in rel}
-    code = {rel: ast.parse(read_text(p)) for rel, p in files.items() if rel.endswith(".py")}  # fmt: skip
+    code = {rel: ast.parse(read_text(p)) for rel, p in files.items() if rel.endswith(".py") and not rel.startswith("tests/")}  # fmt: skip
     texts = {rel: read_text(p) for rel, p in files.items()
-             if not rel.startswith(("dadaia_workspace/", "docs/")) or rel.startswith("dadaia_workspace/public/") or rel.endswith(".md")}  # fmt: skip
+             if not rel.startswith(("dadaia_workspace/", "docs/", "tests/")) or rel.startswith("dadaia_workspace/public/") or rel.endswith(".md") or (rel.startswith("tests/") and rel.endswith(".py"))}  # fmt: skip
     rendered = [
         f"{codes}: {fix}"
         for codes, rule in _every_doctor_rule()
@@ -509,10 +509,11 @@ def test_the_scans_bite() -> None:
         "`.dadaia/.venv/bin/dadaia doctor --context x` and a bare `dadaia`\n"
         "the `rc-archive` verb\n"
     )
-    script = 'fix = git_line(repo, "switch", work)\nfix = f"git -C {repo} switch {work}"\n'
+    script = 'fix = git_line(repo, "switch", work)\nfix = f"git -C ' + '{repo} switch {work}"\n'
     assert _text_sites({"dadaia_workspace/public/s.py": script}) == [
         "dadaia_workspace/public/s.py:2"
     ]
+    assert _text_sites({"tests/t.py": script}) == ["tests/t.py:2"]
     assert _text_sites({"dadaia_workspace/public/x.md": shipped}) == [
         f"dadaia_workspace/public/x.md:{n}" for n in (1, 2, 3, 5)
     ]

@@ -278,6 +278,7 @@ _PKG = Path(__file__).resolve().parents[2] / "dadaia_workspace"
 #: until it is classed here; a text built from a variable stays covered by its exact-line pin.
 _OPERATOR_ACTIONS = {
     ("cli/commands/context.py", "export DADAIA_SESSION_ID set to a stable id of your choice before opening the session"): "reach",
+    ("container.py", "rule whether {bundle} is restored from a copy or discarded"): "ruling",
     ("core/context_registry.py", "rewrite {path} as one {shape} object"): "protected",
     ("features/chokepoints/push_gate.py", "make git runnable here"): "reach",
     ("features/spec_context/doctor.py", "split {skill}/SKILL.md at its library source; this workspace holds none and never edits the projection"): "reach",
@@ -285,7 +286,7 @@ _OPERATOR_ACTIONS = {
     ("features/spec_context/gate_policy.py", "relaunch this session with DADAIA_CONTEXT={owner}"): "reach",
     ("features/spec_context/sweep.py", "remove {target}"): "reach",
     ("infrastructure/git_subprocess.py", "pop or drop the {stashes} stash entry(ies) of {path}"): "ruling",
-    ("infrastructure/json_context_store.py", "set it to {_VERSION} in {path}"): "protected",
+    ("infrastructure/json_context_store.py", "set it to {SCHEMA_VERSION} in {path}"): "protected",
     ("infrastructure/json_context_store.py", "add {', '.join(missing)} to that row of {path}"): "protected",
     ("public/skills/dd-backlog-definition/scripts/_backlog_exit.py", "confirm {slug} as a bug (dd-bug-registration §2)"): "ruling",
     ("public/skills/dd-bug-resolution/scripts/_ledger.py", "rewrite {path} as one JSON object mapping each term to its reason"): "protected",
@@ -385,8 +386,8 @@ def _chain(ws: Path, case: Case) -> str:
         assert fix not in seen, f"no progress — the same fix line again:\n{fix}"
         seen.append(fix)
         act = fix.startswith(_ACT_LABELS)
-        if case.before is not None and (act or step == 0):
-            case.before(world)
+        if act or step == 0:
+            case.play(world, fix)
         ran = None if act else world.run(fix, world.elsewhere)  # a fix line runs from any cwd
         assert ran is None or ran.returncode == 0, f"the fix does not run:\n{fix}\n{ran}"
         if case.replaces and step == 0:

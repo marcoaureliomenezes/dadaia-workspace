@@ -46,8 +46,8 @@ def test_init_creates_only_registry_init_zones_and_canon_seeds(
     assert not (workspace_root / ".codex").exists()
 
     spec_contexts_path = dadaia / "states" / "spec_contexts.json"
-    assert json.loads(read_text(spec_contexts_path)) == {"schema_version": "2", "contexts": []}
-    assert spec_contexts_path.read_bytes() == b'{\n  "schema_version": "2",\n  "contexts": []\n}'
+    assert json.loads(read_text(spec_contexts_path)) == {"schema_version": "3", "contexts": []}
+    assert spec_contexts_path.read_bytes() == b'{\n  "schema_version": "3",\n  "contexts": []\n}'
 
     registry_data = json.loads(read_text(dadaia / "states" / "server_registry.json"))
     assert registry_data["version"] == "1"

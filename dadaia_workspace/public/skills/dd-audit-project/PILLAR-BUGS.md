@@ -7,7 +7,8 @@ record whose `ts` or `closed_at` falls inside that window.
 
 ## Resolution evidence
 
-- Inspect a fix with `git show <fix_sha> --stat --patch`. Report a missing commit or a
+- Find a fix by its id line (`git log -E --grep '^(fix|refactor)\(bugs\): .*<id>'`; a group line lists several ids) and inspect it with
+  `git show <sha> --stat --patch`; the recorded sha is only a hint a rewrite may orphan. Report a
   release-squash trail as coarse evidence instead of inventing attribution.
 - Derive diff direction from the named commit's production numstat. Direction is an
   audit result.
@@ -31,7 +32,7 @@ value against the previous audit's `AUDIT.md`, from git history, where it was co
 |---|---|---|
 | 1 | Registrations per reporter | group records by `reported_by` |
 | 2 | Complete resolutions | resolved records satisfying the canonical resolution facts |
-| 3 | Fix-shape ratio | `net-negative / (net-neutral + net-positive)` from `git show --numstat <fix_sha>` on production paths |
+| 3 | Fix-shape ratio | `net-negative / (net-neutral + net-positive)` from `git show --numstat <sha>` of the fix found by its id line, on production paths |
 | 4 | Same-surface re-bug rate at 3d/14d | group by recorded fix files |
 | 5 | Hand-kept-list touch count | named fix commits touching the hand-kept files (below) |
 | 6 | Test-layer bug share | `component` starts with `tests/` |

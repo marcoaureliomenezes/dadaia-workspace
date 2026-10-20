@@ -402,3 +402,22 @@ def test_operator_globs_reads_a_non_utf8_ignore_file_as_no_pattern(tmp_path: Pat
     """Unreadable is no pattern, whatever the reason."""
     (tmp_path / ".dadaiaignore").write_bytes(b"caf\xe9\n")
     assert operator_globs(tmp_path) == ((), (), ())
+
+
+def test_a_planted_git_entry_never_switches_a_stray_tree_off_fail_closed(tmp_path: Path) -> None:
+    from dadaia_workspace.core.workspace_layout import protected_glob
+
+    rel = "worktrees/r/stray/z/docs/src/x"
+    (tmp_path / "worktrees" / "r" / "stray" / "z" / "docs" / "src").mkdir(parents=True)
+    assert protected_glob(tmp_path, rel, ("docs",)) == "docs"
+    write_text(tmp_path / "worktrees" / "r" / "stray" / "z" / "docs" / "src" / ".git", "")
+    assert protected_glob(tmp_path, rel, ("docs",)) == "docs"
+
+
+def test_a_spec_shape_hex_token_takes_a_sha1_and_a_sha256() -> None:
+    from dadaia_workspace.core.workspace_layout import CanonEntry
+
+    pattern = CanonEntry("bugs/<40hex>.json", "bugs").pattern
+    assert pattern.match("bugs/" + "a" * 40 + ".json")
+    assert pattern.match("bugs/" + "a" * 64 + ".json")
+    assert not pattern.match("bugs/" + "a" * 63 + ".json")

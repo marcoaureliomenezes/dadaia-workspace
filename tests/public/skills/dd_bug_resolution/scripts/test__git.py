@@ -160,3 +160,21 @@ def test_one_refusal_class_for_every_import_path() -> None:
     assert refusal.Refusal is load_owner("dd-bug-resolution", "_bugs_store").Refusal
     err = refusal.Refusal("m", "fix: x")
     assert (str(err), err.fix) == ("m", "fix: x")
+
+
+def test_main_checkout_of_a_linked_worktree_and_of_its_main_checkout_answer_alike(
+    tmp_path: Path,
+) -> None:
+    main = _repo(tmp_path / "A")
+    linked = tmp_path / "linked"
+    _sh("worktree", "add", "-q", "-b", "wt/x", str(linked), cwd=main)
+    main_checkout = load_owner("dd-bug-resolution", "_git").main_checkout
+    assert main_checkout(main) == main.resolve()
+    assert main_checkout(linked) == main.resolve()
+
+
+def test_main_checkout_of_a_path_that_is_no_repository_is_the_current_directory(
+    tmp_path: Path,
+) -> None:
+    main_checkout = load_owner("dd-bug-resolution", "_git").main_checkout
+    assert main_checkout(tmp_path) == Path(".")

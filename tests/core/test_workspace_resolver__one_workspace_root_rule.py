@@ -65,7 +65,7 @@ def test_migrate_runs_in_the_cli_own_workspace_from_any_cwd(
 
     assert result.exit_code == 0, result.output
     registry = json.loads(read_text(own / ".dadaia" / "states" / "spec_contexts.json"))
-    assert registry["schema_version"] == "2"
+    assert registry["schema_version"] == "3"
 
 
 def test_context_show_reads_name_registry_and_session_from_one_root(

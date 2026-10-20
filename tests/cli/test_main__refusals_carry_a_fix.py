@@ -64,7 +64,7 @@ def _bare_remote(tmp: Path) -> Path:
     write_text(seed / "README.md", "x")
     _git("add", "-A", cwd=seed)
     _git("commit", "-qm", "i", cwd=seed)
-    _git("push", "-q", str(bare), "main", cwd=seed)
+    _git("push", "-q", str(bare), "main", "main:develop", cwd=seed)
     return bare
 
 
@@ -142,12 +142,12 @@ def _dead_remote_gone(tmp: Path, monkeypatch: pytest.MonkeyPatch) -> Case:
     return root, ["context", "dead", "foo"]
 
 
-def _import_file(tmp: Path, text: str | None) -> Case:
-    root = _workspace(tmp)
-    f = root / "x.json"
+def _init_from(tmp: Path, text: str | None) -> Case:
+    tmp.mkdir(parents=True)
+    artifact = tmp / "spec-contexts.json"
     if text is not None:
-        write_text(f, text)
-    return root, ["import", str(f)]
+        write_text(artifact, text)
+    return tmp, ["init", str(tmp / "ws"), "--from", str(artifact)]
 
 
 def _init_venv_fails(tmp: Path, monkeypatch: pytest.MonkeyPatch) -> Case:
@@ -203,11 +203,11 @@ SITES: list[tuple[str, Callable[[Path, pytest.MonkeyPatch], Case]]] = [
     ("alive-git-failure", lambda t, m: _alive_clone_fails(t)),
     ("baseline-git-failure", lambda t, m: _baseline_remote_gone(t)),
     ("dead-git-failure", _dead_remote_gone),
-    ("import-missing-file", lambda t, m: _import_file(t, None)),
-    ("import-not-json", lambda t, m: _import_file(t, "not json")),
-    ("import-unknown-schema", lambda t, m: _import_file(t, json.dumps({"schema_version": 99, "contexts": []}))),
     ("reports-bare", lambda t, m: (_foo(t), ["reports", "validate"])),
     ("reports-missing-file", lambda t, m: (_foo(t), ["reports", "validate", "nope.handoff.json"])),
+    ("init-from-missing-file", lambda t, m: _init_from(t, None)),
+    ("init-from-not-json", lambda t, m: _init_from(t, "not json")),
+    ("init-from-unknown-format", lambda t, m: _init_from(t, json.dumps({"schema_version": "export-v0"}))),
     ("init-venv-failure", _init_venv_fails),
     ("specs-upgrade-two-tier", lambda t, m: _two_tier_architecture(t)),
     ("specs-init-malformed-constitution", lambda t, m: _malformed_constitution(t)),

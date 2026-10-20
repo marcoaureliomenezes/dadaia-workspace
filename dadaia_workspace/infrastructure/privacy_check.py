@@ -182,7 +182,10 @@ def check_public_privacy(
                                 f"public-privacy:{rel.as_posix()}: contains '{term}' ({reason})",
                             )
                         )
-            for value, source, reason in privacy_matches(text, denylist, baseline):
+            scanned = [
+                p for p in baseline if not (p.skip_paths and p.skip_paths.search(rel.as_posix()))
+            ]
+            for value, source, reason in privacy_matches(text, denylist, scanned):
                 kind = "contains" if source == "operator denylist" else "baseline match"
                 findings.append(
                     DoctorLine(
