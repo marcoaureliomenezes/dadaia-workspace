@@ -18,6 +18,7 @@ from dadaia_workspace.core.exceptions import DadaiaError, GitSyncError
 from dadaia_workspace.core.models.git_scan import GitObjectReadError
 from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
 from dadaia_workspace.core.platform import act
+from dadaia_workspace.features.spec_context import sweep
 from dadaia_workspace.infrastructure.git_objects import GitSubprocessObjectReader
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from tests.fixtures.harness_env import run_bash, suite_env
@@ -228,7 +229,7 @@ def test_a_pause_bundle_missing_its_prerequisites_refuses_with_fetch_and_then_ex
     bundle = _paused(root)
     for fan in (root / "repos/r/.git/objects").iterdir():  # git's read-only objects, as on Windows
         make_readonly(fan)
-    shutil.rmtree(root / "repos/r")
+    assert sweep.rmtree(root / "repos/r") is None
     git(root / "repos", "init", "-q", "r")
     git(repo := root / "repos/r", "remote", "add", "origin", str(tmp_path / "origin.git"))
 
