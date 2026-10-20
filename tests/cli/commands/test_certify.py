@@ -19,6 +19,7 @@ import typer.main
 
 from dadaia_workspace.cli.main import app
 from dadaia_workspace.features.certification import service
+from dadaia_workspace.infrastructure.json_context_store import SCHEMA_VERSION
 from tests.helpers.oslib import read_text, run
 
 _SOURCE = Path(service.__file__)
@@ -84,4 +85,5 @@ def test_every_recipe_certify_check_is_one_certify_runs() -> None:
 
 
 def test_the_recipe_expects_stamp_three_after_migrate() -> None:
+    assert SCHEMA_VERSION == 3, "bump the recipe's F-17 stamp with the store"
     assert "schema_version 3 after migrate" in _RECIPE

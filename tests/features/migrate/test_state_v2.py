@@ -37,10 +37,10 @@ def _write_v1(states_dir: Path, contexts: list[dict[str, Any]] | None = None) ->
     write_text(states_dir / "spec_contexts.json", json.dumps(data))
 
 
-def _write_v2(states_dir: Path) -> None:
-    """Write a v2 spec_contexts.json file."""
+def _write_v2(states_dir: Path, stamp: str = "2") -> None:
+    """Write a v2-shaped spec_contexts.json file carrying *stamp*."""
     data = {
-        "schema_version": "2",
+        "schema_version": stamp,
         "contexts": [
             {
                 "name": "my-ctx",
@@ -80,9 +80,10 @@ def test_plan_migration_detection_matrix(tmp_path: Path) -> None:
     assert plan.contexts_to_migrate[0]["old_state"] == "ativo"
     assert plan.contexts_to_migrate[0]["new_state"] == "alive"
     _, states_v2 = _workspace(tmp_path / "v2")
-    _write_v2(states_v2)
+    _write_v2(states_v2, "3")
     plan_v2 = plan_migration(JsonContextStore(states_v2))
     assert plan_v2.already_v2 is True
+    assert plan_v2.schema_version_before == "3"
     assert plan_v2.contexts_to_migrate == []
 
     _, states_none = _workspace(tmp_path / "none")
