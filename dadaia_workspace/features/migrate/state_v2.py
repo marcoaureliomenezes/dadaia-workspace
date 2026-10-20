@@ -33,9 +33,9 @@ def plan_migration(store: JsonContextStore) -> MigrationPlan:
         raise ValueError(str(not_initialized(states_dir.parent.parent)))
 
     raw = store.read_raw()
-    if parse_schema_version(raw, states_dir / "spec_contexts.json") >= 2:
+    if (version := parse_schema_version(raw, states_dir / "spec_contexts.json")) >= 2:
         return MigrationPlan(
-            schema_version_before="2",
+            schema_version_before=str(version),
             contexts_to_migrate=[],
             primary_context_exists=primary_file.exists(),
             already_v2=True,
@@ -54,7 +54,7 @@ def plan_migration(store: JsonContextStore) -> MigrationPlan:
     ]
 
     return MigrationPlan(
-        schema_version_before="1",
+        schema_version_before=str(version),
         contexts_to_migrate=contexts_to_migrate,
         primary_context_exists=primary_file.exists(),
         dirs_to_create=[".dadaia/sessions"],

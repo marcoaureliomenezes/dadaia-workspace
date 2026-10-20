@@ -1,6 +1,6 @@
 """CLI command group: ``dadaia migrate [subcommand]``.
 
-Bare ``dadaia migrate`` performs the state-file migration (spec_contexts.json v1 → v2).
+Bare ``dadaia migrate`` performs the state-file migration (spec_contexts.json to the current schema).
 
 Note: ``dadaia migrate memory-yaml`` is removed; ``.md`` is the canonical memory source.
 Note: ``dadaia migrate tree-v2`` is retired. A tree still below canonical uses
@@ -69,7 +69,7 @@ def migrate_state(
         help="Skip interactive confirmation prompt.",
     ),
 ) -> None:
-    """Migrate spec_contexts.json from schema v1 to v2.
+    """Migrate spec_contexts.json to the current schema.
 
     Without any subcommand, performs the state-file migration.
     """
