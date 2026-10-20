@@ -5,17 +5,19 @@ script prints through."""
 from __future__ import annotations
 
 import json
+import os
 import re
 import subprocess
 import sys
 from pathlib import Path
 from typing import Any
 
-from _git import scrubbed_env
+from _git import main_checkout, scrubbed_env
 from _jsonl import reinstall_fix
 from _ledger import parse as parse
 from _platform import act, cli_argv, cli_path, command, inline, run, venv_dir
 from _refusal import Refusal, relay, report
+from _root import STATES
 from _root import workspace_of as workspace_of
 
 CATALOG = "memory/product/catalog.json"
@@ -60,22 +62,23 @@ def run_cli(
 
 def context_row(root: Path, repo: Path) -> dict[str, Any] | None:
     """The `context list --json` row owning *repo* (main or associated; a checkout or a worktree of it), or None when no context owns it.
-    Raises `Refusal` with the CLI's own fix when the CLI fails; rows it cannot read name no owner; a registry read, so no fence applies."""
-    done = run_cli(root, "context", "list", "--json", env={k: v for k, v in scrubbed_env().items() if k != "DADAIA_FENCED_ROOTS"})  # fmt: skip
+    Raises `Refusal` with the CLI's own fix when the CLI fails; rows it cannot read name no owner. A registry read: the fence is lifted for *root* only."""
+    fence = [f for f in os.environ.get("DADAIA_FENCED_ROOTS", "").split(os.pathsep) if f and Path(f).resolve() != root.resolve()]  # fmt: skip
+    done = run_cli(root, "context", "list", "--json", env=scrubbed_env() | {"DADAIA_FENCED_ROOTS": os.pathsep.join(fence)})  # fmt: skip
     relay(done, "context list failed", reinstall_fix(root))
     try:
-        slug = repo.resolve().relative_to(root.resolve()).parts[1]
-        return next((r for r in json.loads(done.stdout) if slug in (r["main_repo"], *(a["slug"] for a in r["associated_repos"]))), None)  # fmt: skip
-    except (ValueError, TypeError, KeyError, IndexError):
+        return next((r for r in json.loads(done.stdout) if main_checkout(repo).name in (r["main_repo"], *(a["slug"] for a in r["associated_repos"]))), None)  # fmt: skip
+    except (ValueError, TypeError, KeyError):
         return None
 
 
 def context_repos(repo: Path) -> list[Path]:
-    """*repo* and the existing checkouts of the repos its context associates; *repo* alone with no workspace or no workspace CLI."""
-    root = workspace_of(repo, fenced=frozenset())
-    row = context_row(root, repo) if root and cli_path(root).exists() else None
-    beside = (root / "repos" / a["slug"] for a in (row or {}).get("associated_repos", []) if root)  # fmt: skip
-    return [repo, *(p for p in beside if p.resolve() != repo.resolve() and (p / ".git").exists())]
+    """*repo* and the existing checkouts of the repos its context associates; *repo* alone when the workspace beside its checkout holds no registry or no CLI."""
+    main = main_checkout(repo)
+    root = main.parent.parent
+    row = context_row(root, repo) if (root / STATES / "spec_contexts.json").is_file() and cli_path(root).exists() else None  # fmt: skip
+    beside = (main.parent / a["slug"] for a in (row or {}).get("associated_repos", []))
+    return [repo, *(p for p in beside if (p / ".git").exists())]
 
 
 _VERDICT = re.compile(r"(?:\S+ error |\[error\] )(.*)")
