@@ -169,11 +169,14 @@ def test_reachable_probes_with_the_url_after_the_options_end_and_nothing_to_prom
         seen.append({"args": args, **kw})
         return _result()
 
+    monkeypatch.delenv("GIT_SSH_COMMAND", raising=False)
+    monkeypatch.delenv("GIT_SSH", raising=False)
     monkeypatch.setattr(git_subprocess, "_run", run)
 
     assert GitSubprocessClient().reachable("https://example.invalid/o/r.git") is True
 
-    [call] = seen
+    [config, call] = seen
+    assert config["args"] == ["git", "config", "core.sshCommand"]
     assert call["args"] == ["git", "ls-remote", "--heads", "--", "https://example.invalid/o/r.git"]
     assert call["stdin"] == ""
     assert isinstance(call["timeout"], int | float)
