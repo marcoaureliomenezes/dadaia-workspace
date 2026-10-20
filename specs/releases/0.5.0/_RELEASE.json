@@ -2438,6 +2438,37 @@
       "milestone": "implemented",
       "sha": "3da9a1dac",
       "text": "Candidate implemented at 3da9a1dac; phase CLOSURE."
+    },
+    {
+      "ts": "2026-10-20T18:48:39Z",
+      "agent": "release.py memory",
+      "kind": "memory",
+      "text": "Memory reconciled over 0998cc5dd16dec782fc808798286cbe5418a5ba4..6d10dd9dd3d0: 11 reviewed, 8 changed.",
+      "since": "0998cc5dd16dec782fc808798286cbe5418a5ba4",
+      "until": "6d10dd9dd3d038267544d88d30990fc5d7f3e708",
+      "reviewed": [
+        "agent-comms",
+        "agentic-entities",
+        "public-asset-distribution",
+        "spec-context-project",
+        "consumer-agent-support",
+        "context-management",
+        "context-portability",
+        "specs-migration",
+        "workspace-init",
+        "audits-canon",
+        "sdd-gate-v3"
+      ],
+      "changed": [
+        "agent-evals",
+        "pypi-distribution",
+        "workspace-doctor",
+        "worktrees",
+        "agent-orchestration",
+        "release-lifecycle",
+        "product-vision",
+        "bug-ledger"
+      ]
     }
   ]
 }
