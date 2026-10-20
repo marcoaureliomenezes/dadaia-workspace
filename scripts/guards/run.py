@@ -196,7 +196,7 @@ def run_planted(mods: list[Any]) -> int:
             missed += bool(noise)
             print(f"{'NOISY' if noise else 'GREEN'} {cid} [control]: {(noise or [''])[0]}")
             for row, plant in plants.items():
-                hit = [v for v in _judge(mods, fn, plant) if v.startswith(f"{row}:")]
+                hit = [v for v in _judge(mods, fn, plant) if v.startswith(f"{row.split('#')[0]}:")]
                 missed += not hit
                 print(f"{'RED' if hit else 'MISSED'} {cid} [{row}]: {(hit or [''])[0]}")
     return 1 if missed else 0

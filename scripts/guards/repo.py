@@ -1077,6 +1077,18 @@ CHECKS: dict[str, Check] = {
             "published-dadaia-workspace-install": _file(
                 "tests/helpers/pin.py", 'REQ = "dadaia-workspace==1.2.3"\n'
             ),
+            "published-dadaia-workspace-install#unpinned": _file(
+                "tests/helpers/pin.py", 'CMD = "pip install dadaia-workspace"\n'
+            ),
+            "published-dadaia-workspace-install#tag": _file(
+                "tests/helpers/pin.py", 'CMD = "uvx dadaia-workspace@latest init x"\n'
+            ),
+            "published-dadaia-workspace-install#range": _file(
+                "tests/helpers/pin.py", 'CMD = "pip install \'dadaia-workspace>=0.4\'"\n'
+            ),
+            "published-dadaia-workspace-install#from": _file(
+                "tests/helpers/pin.py", 'CMD = "uvx --from dadaia-workspace dadaia init"\n'
+            ),
             "hand-computed-tag": _edit(
                 _RELEASE,
                 "      - run: pipx install",
@@ -1135,6 +1147,8 @@ CHECKS: dict[str, Check] = {
             ),
             "manifest-floor": _edit(".release-please-manifest.json", '"."', '"x": "1", "."'),
             "version-label": _re("pyproject.toml", r'(?m)^version = ".*"', 'version = "0.4.7"'),
+            # the release PR moved the manifest to the live id and left pyproject at the rc label
+            "version-shipped": _edit(".release-please-manifest.json", "0.4.7", "0.5.0"),
             "published-floor": _tag,
             "smoke-before-publish": _edit(
                 _RELEASE,
