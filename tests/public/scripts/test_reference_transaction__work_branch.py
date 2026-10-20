@@ -391,13 +391,14 @@ def test_the_rewrite_verb_refuses_a_remedy_that_also_adds_a_path(
     _assert_verb_refused(repo, done, oldest)
 
 
-def test_the_rewrite_verb_refuses_a_new_message_when_the_gate_lists_no_message(
+def test_the_rewrite_verb_takes_a_new_message_when_the_gate_lists_no_message(
     repo: _Repo, tmp_path: Path
 ) -> None:
     oldest, env = _leak(repo, tmp_path)
     write_text(repo.root / "leak.txt", "a\n")
     done = _verb(repo, oldest, "--message", "looks reviewed", env=env)
-    _assert_verb_refused(repo, done, oldest)
+    assert done.returncode == 0, done.stderr
+    assert repo.ok("log", "-1", "--format=%B", _WORK) == "looks reviewed\n\nleak"
 
 
 def test_the_rewrite_verb_removes_a_listed_term_and_clears_the_gate(

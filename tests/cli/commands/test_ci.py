@@ -311,7 +311,8 @@ def test_push_gate_check_help_names_the_rewrite_remedy_and_its_contract() -> Non
     assert result.exit_code == 0, result.output
     assert (
         "Remedy for a refused push: --rewrite-from re-commits the whole unpublished range "
-        "as one commit, over edits and deletions of the paths the gate lists."
+        "as one commit, or two when RED `test(` commits and others mix, "
+        "over edits and deletions of the paths the gate lists."
     ) in " ".join(result.output.split())
 
 
