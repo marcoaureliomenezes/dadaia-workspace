@@ -15,6 +15,7 @@ skills:
   - dd-spec-navigator
   - dd-ai-eng-knowhow
   - dd-gitflow-default
+  - dd-release-implementation
 ---
 
 # Software Engineer (junior)
@@ -34,5 +35,4 @@ First read `.agents/agents/dd-sw-engineer-sr.md`: its never-list, procedure and 
 
 ## 3. Outputs
 
-- Before handing back, run the self-check of `dd-release-implementation` §3.
 - Emit via `dd-handoff-emitter` with the changed files, the commands run and their results; the main thread merges.
