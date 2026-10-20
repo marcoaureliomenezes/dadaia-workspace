@@ -212,7 +212,7 @@ def test_the_bare_cli_detector_spares_the_venv_path_and_uvx_init() -> None:
     assert _bare_invocations("dadaia doctor --fix") == ["dadaia"]
     assert _bare_invocations("run dadaia-workspace init x") == ["dadaia-workspace"]
     assert _bare_invocations("/w/.dadaia/.venv/bin/dadaia context list") == []
-    assert _bare_invocations("uvx dadaia-workspace@latest init demo") == []
+    assert _bare_invocations("uvx dadaia-workspace init demo") == []
 
 
 def _cli_tree() -> dict[str, set[str]]:

@@ -1,8 +1,7 @@
 """T2 grader, on feature/0.1.0 since /opt/eval/base: a BUGS.jsonl record lands before the
 fix commit (the first touching slug.py); HEAD's tests fail on the pre-fix sha and pass on
 the fix; the suite is green at HEAD; every assertion node under tests/ at the base (`assert`,
-`assert*` / `raises` / `warns` calls) is still there at HEAD, unedited, wherever it moved.
-Reads only the record `id` of bug-record-v1, which 0.4.7 and the candidate share."""
+`assert*` / `raises` / `warns` calls) is still there at HEAD, unedited, wherever it moved."""
 
 import ast
 import json

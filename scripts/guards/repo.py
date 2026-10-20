@@ -63,7 +63,11 @@ _SKILLS_REPO = re.compile(
 # Both dated release headings: hand-written `## [x.y.z] — date`, release-please's `(date)`.
 # the one poetry floor: GHSA-2599-h6xx-hpxp (wheel path traversal), GHSA-73h3-mf4w-8647
 _POETRY_FLOOR = (2, 3, 4)
-_PUBLISHED = r"dadaia-workspace(==|@)[0-9$]|previous_release"
+# any pin, tag, range or bare requirement; `uvx dadaia-workspace init` and `--from <path>` stay legal
+_PUBLISHED = (
+    r"dadaia-workspace(==[0-9$]|@|[<>~]=)|(install|--from)[ ='\"]+dadaia-workspace([^-/._[:alnum:]]|$)"
+    r"|previous_release"
+)
 _POETRY_PIN = re.compile(r"poetry==(\d+(?:\.\d+)*)")
 _CHANGELOG_TOP = re.compile(
     r"^## \[(\d+\.\d+\.\d+)\](?:\([^)]*\))? (?:[-—] \d{4}-\d{2}-\d{2}|\(\d{4}-\d{2}-\d{2}\))\s*$",
@@ -436,8 +440,8 @@ def release_workflow_canon(tree: Tree) -> list[str]:
     top = _CHANGELOG_TOP.search(tree.read("CHANGELOG.md"))
     specs = tree.root / "specs"
     live, cand = live_release_id(specs), resolve_live_candidate(specs)
-    label = f"{live}{cand.name.replace('-', '')}" if live and cand else None
-    final = manifest["."] if live in (None, manifest["."]) else None
+    shipped = live in (None, manifest["."])
+    expected = manifest["."] if shipped else f"{live}{cand.name.replace('-', '')}" if cand else None
     tags = subprocess.run(
         ["git", "tag", "-l", "v*", "--sort=version:refname"],
         cwd=tree.root, capture_output=True, text=True, encoding="utf-8", errors="replace", check=False,
@@ -471,7 +475,8 @@ def release_workflow_canon(tree: Tree) -> list[str]:
         and "ci" in _needs(build),
         "no-pytest": not any("pytest" in yaml.safe_dump(job) for job in jobs.values()),
         "manifest-floor": set(manifest) == {"."},
-        "version-label": minted in (label, final),
+        "version-label": shipped or minted == expected,
+        "version-shipped": not shipped or minted == expected,
         # the floor is the last published tag (a shallow clone has none)
         "published-floor": not tags or tags[-1] == f"v{manifest['.']}",
         "minor-pre-major": config.get("bump-minor-pre-major") is True,
@@ -486,9 +491,8 @@ def release_workflow_canon(tree: Tree) -> list[str]:
         "version-equals-changelog": top is None or top.group(1) == manifest["."],
         "smoke-before-publish": "smoke-test" in _needs(jobs.get("publish", {})),
     }
-    hint = {
-        "version-label": f"pyproject.toml reads {minted}; fix: set pyproject.toml version to {label or final}"
-    }
+    pin = f"pyproject.toml reads {minted}; fix: set pyproject.toml version to {expected}"
+    hint = {"version-label": pin, "version-shipped": pin}
     return [
         f"{c}: {hint.get(c, 'release.yml / release-please / version clause broken')}"
         for c, ok in clauses.items()
@@ -1084,7 +1088,7 @@ CHECKS: dict[str, Check] = {
                 "tests/helpers/pin.py", 'CMD = "uvx dadaia-workspace@latest init x"\n'
             ),
             "published-dadaia-workspace-install#range": _file(
-                "tests/helpers/pin.py", 'CMD = "pip install \'dadaia-workspace>=0.4\'"\n'
+                "tests/helpers/pin.py", "CMD = \"pip install 'dadaia-workspace>=0.4'\"\n"
             ),
             "published-dadaia-workspace-install#from": _file(
                 "tests/helpers/pin.py", 'CMD = "uvx --from dadaia-workspace dadaia init"\n'
