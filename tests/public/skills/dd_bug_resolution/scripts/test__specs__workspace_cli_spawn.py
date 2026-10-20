@@ -170,7 +170,9 @@ def test_a_path_that_is_no_repository_starts_no_cli_of_the_workspace_it_is_run_f
 ) -> None:
     specs = load_owner("dd-bug-resolution", "_specs")
     log = tmp_path / "spawns"
-    root = _workspace(tmp_path / "ws", f"#!python\nopen({str(log)!r}, 'a').write('x')\nprint('[]')\n")
+    root = _workspace(
+        tmp_path / "ws", f"#!python\nopen({str(log)!r}, 'a').write('x')\nprint('[]')\n"
+    )
     (loose := tmp_path / "loose").mkdir()
     monkeypatch.chdir(root)
     monkeypatch.setenv("DADAIA_FENCED_ROOTS", str(root))
