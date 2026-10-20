@@ -25,7 +25,7 @@ of repeating it.
 ## Read persisted facts, inspect the named fix
 
 - A resolved record persists `cause`, `solution`, `caused_by` and `fix_sha`.
-- Inspect the fix with `git show <sha> --stat --patch`; `<sha>` is the commit whose `fix(bugs): <id>` or `refactor(bugs): <id>` line names the bug (`git log -E --grep '^(fix|refactor)\(bugs\): .*<id>'`; a group line lists several ids, and a commit HEAD reverts does not count), `fix_sha` only a hint. A release squash or a
+- Inspect the fix with `git show <sha> --stat --patch`; `<sha>` is the commit whose `fix(bugs): <id>` or `refactor(bugs): <id>` line names the bug (`git log -E --grep '^(fix|refactor)\(bugs\): .*<id>'`, then keep only a line naming `<id>` as a whole id after the colon; a group line lists several ids, and a commit HEAD reverts does not count), `fix_sha` only a hint. A release squash or a
   ledger-only commit isolates no implementation; report that coarse trail honestly.
 - Follow `caused_by` through live and archived records. It names the bug or task whose
   implementation wrote the lines this fix corrects; `none` means blame offered no
