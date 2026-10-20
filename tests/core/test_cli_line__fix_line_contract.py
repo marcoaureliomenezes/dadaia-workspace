@@ -278,7 +278,7 @@ _PKG = Path(__file__).resolve().parents[2] / "dadaia_workspace"
 #: until it is classed here; a text built from a variable stays covered by its exact-line pin.
 _OPERATOR_ACTIONS = {
     ("cli/commands/context.py", "export DADAIA_SESSION_ID set to a stable id of your choice before opening the session"): "reach",
-    ("container.py", "rule whether {bundle} is restored from a copy or discarded"): "ruling",
+    ("features/export/scan.py", "rule whether {bundle} is restored from a copy or discarded"): "ruling",
     ("core/context_registry.py", "rewrite {path} as one {shape} object"): "protected",
     ("features/chokepoints/push_gate.py", "make git runnable here"): "reach",
     ("features/spec_context/doctor.py", "split {skill}/SKILL.md at its library source; this workspace holds none and never edits the projection"): "reach",
