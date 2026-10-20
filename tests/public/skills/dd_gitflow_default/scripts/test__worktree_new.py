@@ -66,6 +66,8 @@ def _set_release(root: Path, phase: str, *, plan: str = "Approved") -> None:
     state["implemented"] = (
         {"sha": "abc1234", "ts": "2026-10-09T11:00:00Z"} if phase == "CLOSURE" else None
     )
+    if phase == "CLOSURE":  # closure's check wants its memory pass recorded
+        state["log"] = [{"ts": "2026-10-09T12:00:00Z", "agent": "a", "kind": "memory", "text": "t"}]
     write_text(state_path, json.dumps(state))
     _git(repo, "add", "specs/releases")
     _git(repo, "commit", "-qm", f"release {phase}")
@@ -90,6 +92,20 @@ def test_a_release_job_needs_the_implementation_phase(definition_root: Path) -> 
     assert _fixes(refused) == [phase_fix(definition_root)]
     assert not (definition_root / "worktrees/r" / NEW_JOB).exists()
     assert _git(repo, "branch", "--list", f"wt/{NEW_JOB}").strip() == ""
+
+
+def test_a_job_after_closure_is_refused_with_a_fix_that_can_work(definition_root: Path) -> None:
+    """Phase never goes back: the one fix is not the `phase IMPLEMENTATION` step that refuses."""
+    _set_release(definition_root, "CLOSURE")
+    assert _run(definition_root, "new", "r", RC).returncode == 0
+
+    refused = _run(definition_root, "new", "r", NEW_JOB)
+
+    assert (refused.returncode, refused.stdout) == (1, "")
+    [fix] = _fixes(refused)
+    assert "phase IMPLEMENTATION" not in fix, fix
+    assert "wt-hotfix" in fix or "release.py new" in fix, fix
+    assert not (definition_root / "worktrees/r" / NEW_JOB).exists()
 
 
 def test_a_main_tree_reads_the_phase_on_its_rcs_tree_not_the_work_branch(
