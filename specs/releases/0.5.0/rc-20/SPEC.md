@@ -4,7 +4,7 @@
 **Release ID:** 0.5.0
 **Owner:** dd-product-engineer
 **Opened:** 2026-10-19
-**Origin:** backlog:adoption-and-discoverability,eval-t3-discovery
+**Origin:** backlog:adoption-and-discoverability,eval-t3-discovery; bugs:bug-skill-registry-reader-crashes-on-a-bad-row,check-failure-fix-line-names-findings-that-do-not-exist,clean-of-an-unmerged-lane-offers-only-merge,cli-library-skill-omits-pause-as-a-dist-writer,closure-check-raises-a-traceback-outside-git,closure-refusal-fix-line-points-at-a-phase-that-cannot-go-back,consumer-recipe-expects-stamp-two,dist-obstruction-check-misses-a-dangling-link,first-pass-fix-line-chains-five-steps,fix-cite-retires-the-older-same-subject-fix,fold-subject-is-the-oldest-folded-subject,gone-tree-merge-judges-the-upstream-not-the-merge,kept-refusal-offers-keep-only,mcp-on-main-is-vulnerable-to-session-exhaustion,memory-drift-reads-the-installed-feature-list,merge-scan-copies-the-denylist-precedence,migrate-reports-a-stamp-three-registry-as-stamp-two,orphan-row-judges-merge-against-the-checked-out-head,planted-git-file-anchors-the-workspace-root,push-gate-rewrite-help-says-one-commit,reachability-probe-overrides-the-users-ssh-command,red-separation-act-names-an-implementation-commit,red-separation-splits-paths-on-blanks,restored-tree-comes-back-unlocked,subagent-bind-rebinds-the-parent-session-across-contexts,verdict-refusal-fix-cannot-clear-after-a-sync
 
 ---
 
@@ -101,13 +101,13 @@ Wave ranking, by the pick:
 
 - AC1.1 Every skill script that runs `release.py check` reaches it through one unit, and that unit spawns check once per call. Check's exit status alone decides pass or refuse. The refusal's message and fix line are the ones check printed, read by `_refusal`'s one parser, with no second regex over check's text (today `_specs.py:66`). Test: unit.
 - AC1.2 The contract tests of `stats-crashes-on-a-release-state-that-breaks-its-schema`, `check-relay-reads-a-pass-from-text-not-exit-status` and `rc-tree-absent-fix-line-does-not-clear-its-refusal`, and those of the three rc-19-window stats bugs, stay green and unloosened. Test: unit (existing).
-- AC1.3 Net lines <= 0 over `_stats.py`, `_worktree_new.py`, `_specs.py` and `_refusal.py`, tests excluded. Test: none; `git diff --numstat` is the evidence.
+- AC1.3 Net lines <= 0 over every file the REBUILD touches, new ones included: `_stats.py`, `_worktree_new.py`, `_specs.py`, `_refusal.py` and the fifth relay, `_worktree_end._refuse_red`; tests excluded. Test: none; `git diff --numstat` is the evidence.
 
 ### FR2 — the push-gate fold and content path have one owner (R2)
 
 - AC2.1 The fold (`_fold`, `_rewrite_unpublished`) and the content decision (`_content_decision`) leave `cli/commands/ci.py`, which keeps argument parsing and printing only. Their one owner is the feature that owns the push gate, and the PLAN names it from the as-is review. Every fix line still goes through the one renderer. Test: unit.
 - AC2.2 The contract tests of `denylist-scan-runs-only-at-pre-push`, `push-gate-rewrite-orphans-shas-cited-in-the-range`, `rewrite-remedy-fix-line-bypasses-the-one-renderer` and `worktree-sync-orphans-the-fix-sha-a-lanes-resolve-cites` stay green and unloosened. They cover these partitions: the fold either finishes or changes nothing; every folded message is kept; test separation survives the split; and main and rc merges are not scanned. Test: integration (existing).
-- AC2.3 Net lines <= 0 over `ci.py`, `push_gate.py` and the merge-scan call in `_worktree_end.py`, tests excluded. Test: none; `git diff --numstat`.
+- AC2.3 Net lines <= 0 over every file the REBUILD touches, new ones included: `ci.py`, `push_gate.py`, the new `features/chokepoints/fold.py` and the merge-scan call in `_worktree_end.py`; tests excluded. Test: none; `git diff --numstat`.
 
 ### FR3 — one decider of a repo's context, under the fix-cite rule (R3)
 
@@ -136,15 +136,15 @@ Wave ranking, by the pick:
 
 ### FR7 — adoption and discoverability (backlog `adoption-and-discoverability`)
 
-- AC7.1 `llms-full.txt` sits at the repo root. It holds the full text of every page `llms.txt` links in the repo, in `llms.txt`'s order, and one generator writes it. A contract test beside `test_the_cli_reference_is_the_committed_output_of_the_generator` fails when the file is stale, and `llms.txt` links it. Test: unit (contract).
+- AC7.1 `llms-full.txt` sits at the repo root. It holds the full text of every page `llms.txt` links in the repo, in `llms.txt`'s order, and one generator writes it. A contract test beside `test_the_cli_reference_is_the_committed_output_of_the_generator` fails when the file is stale, and `llms.txt` links it. The test excludes `CHANGELOG.md`, and the closure memory commit regenerates `llms-full.txt`. Test: unit (contract).
 - AC7.2 The keywords gain `cursor`, `devin`, `github-copilot` and `agent-skills`, and each one names something the README says (`pyproject.toml:11-13`). At closure, the main thread sets the GitHub topics to the keyword set. Test: none for the topics (`gh repo view` is the evidence); the README claim is doc text.
 - AC7.3 `Homepage` stays as it is. rc-20's closure summary names the rc-21 repoint: `pyproject.toml:37` and its comment at `:34-35`, plus `gh repo edit --homepage`, as one `launch-operator-acts` act. Test: none.
-- AC7.4 `docs/index.md` and `docs/quickstart.md` lose every defect §1 lists, and both name `init --from`. The quickstart's §1 runs as printed: both blocks, the rc tree and the version read from the repo. The test that already pins it, `test_the_quickstart_block_runs_as_printed`, is hardened in its home to cover the second block. These docs derive from memory, so the atoms change first, in the same commit (shape 9, `who: pe`). Test: E2E (the hardened journey).
+- AC7.4 `docs/index.md` and `docs/quickstart.md` lose every defect §1 lists, and both name `init --from`. The quickstart's §1 runs as printed: both blocks, the rc tree and the version read from the repo. The test that already pins it, `test_the_quickstart_block_runs_as_printed`, is hardened in its home to cover the second block. These docs derive from memory. Their atoms move in the PE's closure memory pass, as in rc-19, because `release.py check` refuses `specs/memory` in a task's `W:`. Test: E2E (the hardened journey).
 - AC7.5 README's agent section opens with a fast path of at most five lines: the install line, the `AGENTS.md` map, `doctor`, and `llms.txt` / `llms-full.txt`. Test: none, doc text; T3 is its proof.
 
 ### FR9 — the bug window
 
-- AC9.1 The operator confirmed 25 bugs on 2026-10-19: the 22 re-verified ones ("Register all 22, fix in rc-20 (Recommended)"), the Dependabot bug `mcp-on-main-is-vulnerable-to-session-exhaustion` ("Register, resolve at promote (Recommended)"), `windows-contract-coverage-runs-at-its-timeout` ("Register, raise cap in rc-20 (Recommended)") and `merge-scan-copies-the-denylist-precedence` ("Register, fix in rc-20 (Recommended)"). They are registered through the backlog lane `0.5.0/wt-backlog-rc20-bug-batch`, which lands before the PLAN, and they join the Origin `bugs:` once on this tree. They are not listed here as requirements; the PLAN assigns each one to a job. Test: none; `bugs.py status` is the evidence.
+- AC9.1 The operator confirmed 25 bugs on 2026-10-19: the 22 re-verified ones ("Register all 22, fix in rc-20 (Recommended)"), the Dependabot bug `mcp-on-main-is-vulnerable-to-session-exhaustion` ("Register, resolve at promote (Recommended)"), `windows-contract-coverage-runs-at-its-timeout` ("Register, raise cap in rc-20 (Recommended)") and `merge-scan-copies-the-denylist-precedence` ("Register, fix in rc-20 (Recommended)"). They were registered through the backlog lane `0.5.0/wt-backlog-rc20-bug-batch` before the PLAN. The Origin `bugs:` lists every bug open on this tree: these 25 minus the Windows timeout, plus the two found during definition, `subagent-bind-rebinds-the-parent-session-across-contexts` and `closure-refusal-fix-line-points-at-a-phase-that-cannot-go-back`, for 26. The bugs resolved in hotfix lanes on the work branch are not in the Origin: the Windows timeout, the three Windows test bugs and the own-name CRITICAL. They are not listed here as requirements; the PLAN assigns each one to a job. Test: none; `bugs.py status` is the evidence.
 - AC9.2 Each of them is fixed in rc-20 under `specs/bugs/AGENTS.md` §2, RED test first, because no rc closes with an open bug. The one exception is the Dependabot bug, which stays open in rc-20 and resolves at the 0.5.0 promote (`feature/0.5.0` already holds no `mcp`). Test: per bug, its RED.
 
 ### Replaces
@@ -157,8 +157,8 @@ Wave ranking, by the pick:
 
 ### Closure
 
-- Backlog exits, `delivered` `--release 0.5.0`: `adoption-and-discoverability` and `eval-t3-discovery`. Every Origin bug is resolved and archived, except the Dependabot bug (AC9.2).
-- The memory pass covers the atoms that cite the moved units (`sdd/bug-ledger.md` for R3, `platform/context-portability.md` for R4, `agent-evals.md` for T3, and the docs atoms for FR7), and `catalog.json`.
+- Backlog exits, `delivered` `--release 0.5.0`: `adoption-and-discoverability` and `eval-t3-discovery`. Every Origin bug is resolved and archived, except the Dependabot bug (AC9.2). The closure memory commit regenerates `llms-full.txt` (AC7.1).
+- The memory pass covers the atoms that cite the moved units (`sdd/bug-ledger.md` for R3, `platform/context-portability.md` for R4, `agent-evals.md` for T3, and the atoms behind `docs/index.md` and `docs/quickstart.md` for AC7.4), and `catalog.json`.
 
 ## 5. Constraints and risks
 
