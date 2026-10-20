@@ -5,6 +5,7 @@ bare origin, the real worktree scripts over a tmp workspace. Size: MEDIUM.
 
 from __future__ import annotations
 
+import json
 import os
 import shutil
 import tarfile
@@ -145,6 +146,23 @@ def test_a_secret_in_a_bundle_refuses_and_leaves_no_archive_and_no_ref(
     assert aws_key_shape() not in str(refused.value)
     assert not (root / ".dadaia/dist" / ARCHIVE).exists()
     assert _refs(root) == refs
+
+
+@pytest.mark.parametrize("text", ["r\n", "zebra\n"], ids=["own-repo-name", "other-term"])
+def test_a_repo_may_name_itself_in_a_bundle_but_no_other_term(
+    root: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, text: str
+) -> None:
+    write_text(tmp_path / "terms.json", json.dumps({"r": "own name", "zebra": "private"}))
+    monkeypatch.setenv("DADAIA_PRIVACY_DENYLIST", str(tmp_path / "terms.json"))
+    commit(open_tree(root, LANE), "specs/notes.md", text)
+
+    if text == "r\n":
+        assert f"r/{LANE}.bundle" in _members(_export(root))
+    else:
+        with pytest.raises(DadaiaError) as refused:
+            _export(root)
+        assert "specs/notes.md" in str(refused.value)
+        assert not (root / ".dadaia/dist" / ARCHIVE).exists()
 
 
 def test_a_worktree_outside_worktrees_is_not_carried_and_does_not_crash(root: Path) -> None:
