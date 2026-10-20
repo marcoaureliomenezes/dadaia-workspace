@@ -136,8 +136,9 @@ class Env:
             self._launchers[spec] = bin_dir / "dadaia-workspace"
         return self._launchers[spec]
 
-    def bare(self, name: str, specs: str = "none") -> str:
-        """A file:// bare repo ``<name>.git`` with one commit; *specs* seeds its tree."""
+    def bare(self, name: str, specs: str = "none", tag: str | None = None) -> str:
+        """A file:// bare repo ``<name>.git`` with one commit, tagged *tag* when given;
+        *specs* seeds its tree."""
         work = self.fixtures / f"src-{name}"
         (work / "app").mkdir(parents=True)
         write_text(work / "README.md", f"# {name}\n")
@@ -155,6 +156,8 @@ class Env:
         self.git("init", "-q", cwd=work)
         self.git("add", "-A", cwd=work)
         self.git("commit", "-qm", "init", cwd=work)
+        if tag:
+            self.git("tag", tag, cwd=work)
         bare = self.fixtures / f"{name}.git"
         self.git("clone", "-q", "--bare", str(work), str(bare), cwd=self.root)
         return f"file://{bare}"
@@ -292,15 +295,17 @@ def test_an_operator_journey_through_an_upgrade(env: Env, next_wheel: Path) -> N
 
 @pytest.mark.skipif(_UVX is None, reason="the quickstart block is a `uvx` line, run as printed")
 class TestQuickstartVerbatim:
-    """The quickstart fixture's two bash blocks run as printed with only ``REPO_URL``
+    """The quickstart fixture's three bash blocks run as printed with only ``REPO_URL``
     set — the one other substitution points ``uvx`` at the built wheel instead of PyPI;
-    the second files the first backlog entry in a ``backlog`` worktree. The fixture is
+    the second files the first backlog entry in a ``backlog`` worktree, the third opens the
+    release candidate in its ``rc-1/wt-rc`` tree. The project's repo carries a version tag, so
+    the work branch's version is read from the repo, never typed. The fixture is
     byte-equal to ``docs/quickstart.md`` (the ``workspace-quickstart-fixture`` guard)."""
 
     def test_the_quickstart_block_runs_as_printed(self, env: Env) -> None:
         text = read_text(_REPO_ROOT / "tests" / "fixtures" / "quickstart.md")
-        block, filing = re.findall(r"```bash\n(.*?)```", text, re.DOTALL)[:2]
-        url = env.bare("quick")
+        block, filing, birth = re.findall(r"```bash\n(.*?)```", text, re.DOTALL)[:3]
+        url = env.bare("quick", tag="v0.7.3")
         script, count = re.subn(r"^REPO_URL=.*$", f"REPO_URL={url}", block, flags=re.M)
         assert count == 1, block
         script = script.replace("uvx dadaia-workspace", f"uvx --from {env.wheel} dadaia-workspace")
@@ -308,8 +313,16 @@ class TestQuickstartVerbatim:
         assert done.returncode == 0, f"quickstart failed:\n{done.stdout}\n{done.stderr}"
         ws = Workspace(env, "demo")
         ws.assert_level_clean("quick", "quick", url)
-        done = env.run("bash", "-euo", "pipefail", "-c", f"SLUG=quick\n{filing}", cwd=ws.path)
-        assert done.returncode == 0, f"quickstart block 2 failed:\n{done.stdout}\n{done.stderr}"
-        wt = ws.path / "worktrees" / "quick" / "0.1.0" / "wt-backlog-my-first-idea"
+        version = "0.7.4"
+        for n, rest in enumerate((filing, birth), start=2):
+            done = env.run("bash", "-euo", "pipefail", "-c", f"SLUG=quick\n{rest}", cwd=ws.path)
+            assert done.returncode == 0, (
+                f"quickstart block {n} failed:\n{done.stdout}\n{done.stderr}"
+            )
+        wt = ws.path / "worktrees" / "quick" / version / "wt-backlog-my-first-idea"
         assert env.git("log", "-1", "--format=%s", cwd=wt) == "chore(backlog): new my-first-idea"
         assert "my-first-idea" in env.git("show", "HEAD:specs/backlog/BACKLOG.json", cwd=wt)
+        rc = ws.path / "worktrees" / "quick" / version / "rc-1" / "wt-rc"
+        candidate = rc / "specs" / "releases" / version
+        assert (candidate / "rc-1" / "SPEC.md").is_file()
+        assert (candidate / "_RELEASE.json").is_file()
