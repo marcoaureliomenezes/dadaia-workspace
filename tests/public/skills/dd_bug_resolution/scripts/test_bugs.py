@@ -1577,7 +1577,8 @@ def test_the_archive_act_check_prints_clears_a_record_a_task_commit_fixed(
     """A task-shaped fix commit cannot be re-worded once pushed: the printed act is the way out."""
     _ledger(tmp_path)
     sha = _commit_as(tmp_path, "fix(J1.T1): a-bug \u2014 c")
-    specs = _ledger(tmp_path, _resolved("a-bug", sha), _resolved("b-bug", sha))
+    still_open = {**_OPEN_RECORD, "id": "c-bug", "fix_sha": sha}  # archive refuses it: never judged
+    specs = _ledger(tmp_path, _resolved("a-bug", sha), _resolved("b-bug", sha), still_open)
     done = _run(script, "check", "--specs", str(specs))
     assert done.returncode == 1, done.stdout
     fixes = {ln for ln in done.stdout.splitlines() if ln.startswith("fix: ")}
