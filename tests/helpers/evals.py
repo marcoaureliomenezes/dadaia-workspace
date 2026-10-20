@@ -25,10 +25,10 @@ T3 = "t3-discovery"
 # The documented onboarding, typed by hand.
 _INIT = "dadaia init /workspace --harness claude --repo file:///srv/demo.git"
 HAND = {"candidate": f"{_INIT} && /workspace/.dadaia/.venv/bin/dadaia specs init --context demo"}
-# T3, candidate only, as an agent types it inside the image: pip resolves from the wheelhouse by the
-# image's own environment, the venv's dadaia is called by path, the entry goes in a real lane.
+# T3, candidate only, as typed inside the image: the lib wheel is installed by path, its
+# dependencies resolve from the image's own environment, the venv's dadaia is called by path, the entry goes in a real lane.
 _D = "/workspace/.dadaia/.venv/bin/dadaia"
-_ONBOARD = "python3 -m venv /tmp/v && /tmp/v/bin/pip install -q dadaia-workspace && /tmp/v/bin/dadaia init /workspace --harness claude"
+_ONBOARD = "python3 -m venv /tmp/v && /tmp/v/bin/pip install -q /lib/*.whl && /tmp/v/bin/dadaia init /workspace --harness claude"
 _FILE = (
     "python3 /workspace/.agents/skills/dd-backlog-definition/scripts/backlog.py new"
     " --title t --description d --provenance p try-it --specs"

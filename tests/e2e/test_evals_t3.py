@@ -37,7 +37,7 @@ def test_no_dadaia_is_on_path(version: str) -> None:
 @pytest.mark.parametrize(
     "route",
     [
-        "python3 -m venv /tmp/v && /tmp/v/bin/pip install -q dadaia-workspace >&2 && /tmp/v/bin/dadaia --version",
+        "python3 -m venv /tmp/v && /tmp/v/bin/pip install -q /lib/*.whl >&2 && /tmp/v/bin/dadaia --version",
         "python3 -m venv /tmp/u && /tmp/u/bin/pip install -q uv >&2"
         " && /tmp/u/bin/uvx --from /lib/*.whl dadaia --version",
     ],
