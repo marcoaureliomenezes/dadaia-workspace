@@ -7,6 +7,7 @@ the identity is the operator's own, never a fallback; a failed step carries git'
 import os
 import re
 import subprocess
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
@@ -281,35 +282,44 @@ def _stub_ssh(directory: Path, remote: Path) -> Path:
     return stub
 
 
+_MARKER = ["-o", "Marker=1"]
+
+
 @pytest.mark.parametrize(
-    ("source", "options"),
+    ("setup", "options", "on_path"),
     [
-        ("GIT_SSH_COMMAND", ["-o", "Marker=1"]),
-        ("core.sshCommand", ["-o", "Marker=1"]),
-        ("GIT_SSH", []),
-        (None, []),
+        (lambda mp, cfg, users, line: mp.setenv("GIT_SSH_COMMAND", line), _MARKER, False),
+        (
+            lambda mp, cfg, users, line: _git(
+                cfg.parent, "config", "--file", str(cfg), "core.sshCommand", line
+            ),
+            _MARKER,
+            False,
+        ),
+        (lambda mp, cfg, users, line: mp.setenv("GIT_SSH", str(users)), [], False),
+        (lambda mp, cfg, users, line: None, [], True),
     ],
+    ids=["GIT_SSH_COMMAND", "core.sshCommand", "GIT_SSH", "none"],
 )
 def test_reachable_runs_the_users_ssh_with_batch_mode(
-    source: str | None, options: list[str], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    setup: Callable[..., object],
+    options: list[str],
+    on_path: bool,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     remote = _repo(tmp_path / "remote")
     users = _stub_ssh(tmp_path / "users", remote)
-    on_path = _stub_ssh(tmp_path / "bin", remote)
-    monkeypatch.setenv("PATH", f"{on_path.parent}{os.pathsep}{os.environ['PATH']}")
+    path_stub = _stub_ssh(tmp_path / "bin", remote)
+    monkeypatch.setenv("PATH", f"{path_stub.parent}{os.pathsep}{os.environ['PATH']}")
     monkeypatch.delenv("GIT_SSH_COMMAND", raising=False)
     monkeypatch.delenv("GIT_SSH", raising=False)
     config = tmp_path / "gitconfig"
     write_text(config, f'[include]\n\tpath = "{_GIT_QUIET.as_posix()}"\n')
     monkeypatch.setenv("GIT_CONFIG_GLOBAL", str(config))
-    line = " ".join([head(norm_sep(str(users))), *options])
-    if source == "core.sshCommand":
-        _git(tmp_path, "config", "--file", str(config), source, line)
-    elif source:
-        monkeypatch.setenv(source, line if source == "GIT_SSH_COMMAND" else str(users))
+    setup(monkeypatch, config, users, " ".join([head(norm_sep(str(users))), *options]))
 
     assert GitSubprocessClient().reachable("ssh://host/repo") is True
 
-    ran = on_path if source is None else users
-    argv = read_text(Path(f"{ran}.argv")).split("\n")
+    argv = read_text(Path(f"{path_stub if on_path else users}.argv")).split("\n")
     assert argv[: len(options) + 2] == [*options, "-o", "BatchMode=yes"]

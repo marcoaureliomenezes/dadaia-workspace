@@ -80,11 +80,15 @@ def test_plan_migration_detection_matrix(tmp_path: Path) -> None:
     assert plan.contexts_to_migrate[0]["old_state"] == "ativo"
     assert plan.contexts_to_migrate[0]["new_state"] == "alive"
     _, states_v2 = _workspace(tmp_path / "v2")
-    _write_v2(states_v2, "3")
+    _write_v2(states_v2)
     plan_v2 = plan_migration(JsonContextStore(states_v2))
     assert plan_v2.already_v2 is True
-    assert plan_v2.schema_version_before == "3"
     assert plan_v2.contexts_to_migrate == []
+    _, states_now = _workspace(tmp_path / "now")
+    _write_v2(states_now, "3")
+    plan_now = plan_migration(JsonContextStore(states_now))
+    assert plan_now.already_v2 is True
+    assert plan_now.schema_version_before == "3"
 
     _, states_none = _workspace(tmp_path / "none")
     with pytest.raises(ValueError, match="fix: ") as refused:
