@@ -150,29 +150,20 @@ def test_the_text_names_the_kind_and_carries_one_fix_line(tmp_path: Path) -> Non
     assert head.startswith("Next (command step context): ") and fix == f"fix: {step.command}"
 
 
-def test_several_work_branches_make_the_first_pass_an_agent_step_with_the_refusals_fix(
+def test_several_work_branches_make_the_first_pass_the_refusals_own_fix(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    first = "run `x`, then run `y`"
+    first = "run `x`, then run `y`, then run `z`"
     several = SeveralWorkBranches("2 work branches", first, "0.2.0")
 
     def refuse(_s: object, _p: object) -> str:
         raise several
 
     monkeypatch.setattr(f"{_CLIENT}.work_version", refuse)
-    specs = _specs(tmp_path, "proj")
-    step = next_step(tmp_path, {"app": specs})
-    memory = specs / "memory"
-    pending = f"{memory / 'ARCHITECTURE.md'}, {memory / 'QUALITY.md'}, {memory / 'product'} (no atom)"
-    lane = fix_line(tmp_path, "worktree", "new", "proj", "0.2.0/wt-backlog-first-pass")
+    step = next_step(tmp_path, {"app": _specs(tmp_path, "proj")})
     assert step is not None and (step.id, step.kind) == ("first-pass", "agent")
-    assert step.command == (
-        f"Agent action: {first}, then open the lane {lane}, then run the dd-audit-project first pass in it — {pending}"
-    )
+    assert step.command == f"Agent action: {first}"
     assert step.text().count("fix:") == 1
-
-
-
 
 
 def test_the_context_create_step_renders_the_cli_words_inline(
