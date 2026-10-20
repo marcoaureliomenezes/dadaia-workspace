@@ -9,9 +9,9 @@ from pathlib import Path
 
 from _bugs_check import OPEN
 from _grammar import STATE
-from _platform import act, command, git_line, is_link
+from _platform import act, command, is_link
 from _specs import check_release, parse
-from _worktree_git import flow_for, git, not_a_name, work_version, work_versions
+from _worktree_git import flow_for, git, not_a_name, reattach, work_version, work_versions
 from _worktree_names import (
     LAUNCH,
     LEVEL_FILE,
@@ -53,7 +53,7 @@ def _refuse_unready(root: Path, main: Path, version: str, rc: str) -> None:
     rc_tree = tree_path(root, main.name, rc_name)
     state = rc_tree / "specs/releases" / version / STATE
     if not rc_tree.exists():  # removed by hand while its branch lives
-        raise Refusal(f"{rc_tree} does not exist", git_line(main, "worktree", "add", "-f", "-f", str(rc_tree), branch(rc_name)))  # fmt: skip
+        raise Refusal(f"{rc_tree} does not exist", reattach(main, rc_tree, rc_name, branch(rc_name)))  # fmt: skip
     phase = None
     if state.is_file():
         check_release(rc_tree / "specs")

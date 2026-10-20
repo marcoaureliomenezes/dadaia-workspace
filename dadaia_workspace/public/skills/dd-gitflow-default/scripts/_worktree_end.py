@@ -32,6 +32,7 @@ from _worktree_git import (
     git,
     not_a_name,
     ours,
+    reattach,
     scrubbed_env,
     workspace_of,
 )
@@ -421,7 +422,7 @@ def _into(repo: Path, onto: str) -> Path:
 def _kind_checks(root: Path, repo: Path, tree: Path, name: str, onto: str, into: Path) -> list[Callable[[], object]]:  # fmt: skip
     """The ordered checks a tree of this kind must pass to land, before `merge`'s ending checks."""
     if not into.exists():  # the parent's tree removed by hand
-        raise Refusal(f"{into} does not exist", git_line(repo, "worktree", "add", "-f", "-f", str(into), onto))  # fmt: skip
+        raise Refusal(f"{into} does not exist", reattach(repo, into, onto.removeprefix("wt/"), onto))  # fmt: skip
     ancestor = partial(_check_ancestor, root, tree, onto)
     verdict = partial(_check_approved, root, tree, onto, name)
     job_gate = partial(_gate, tree, onto)
