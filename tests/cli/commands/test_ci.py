@@ -53,7 +53,9 @@ def test_push_gate_check_always_wires_a_real_object_source(monkeypatch, tmp_path
     tip_sha = _git(repo, "rev-parse", "HEAD")
 
     monkeypatch.setattr(ci, "_repo_root", lambda: repo)
-    monkeypatch.setattr(container, "load_denylist_terms", lambda: (("zz-synthetic-term", "t"),))
+    monkeypatch.setattr(
+        container, "load_denylist_terms", lambda _repo=None: (("zz-synthetic-term", "t"),)
+    )
 
     result = _runner.invoke(
         app, ["ci", "push-gate-check"], input=f"refs/tags/v1 {tip_sha} refs/tags/v1 {_ZERO}\n"
@@ -79,7 +81,9 @@ def test_onto_judges_the_content_of_a_range_on_a_branch_no_push_could_carry(
         shas.append(_git(repo, "rev-parse", "HEAD"))
     first = shas[0]
     monkeypatch.setattr(ci, "_repo_root", lambda: repo)
-    monkeypatch.setattr(container, "load_denylist_terms", lambda: (("zz-synthetic-term", "t"),))
+    monkeypatch.setattr(
+        container, "load_denylist_terms", lambda _repo=None: (("zz-synthetic-term", "t"),)
+    )
 
     done = _runner.invoke(app, ["ci", "push-gate-check", "--onto", base])
 
@@ -167,7 +171,7 @@ def test_mode_line_distinguishes_operator_denylist_from_baseline_only(
 
     monkeypatch.setattr(ci, "_repo_root", lambda: repo)
 
-    monkeypatch.setattr(container, "load_denylist_terms", lambda: ())
+    monkeypatch.setattr(container, "load_denylist_terms", lambda _repo=None: ())
     baseline_only = _runner.invoke(
         app,
         ["ci", "push-gate-check"],
@@ -176,7 +180,9 @@ def test_mode_line_distinguishes_operator_denylist_from_baseline_only(
     assert "baseline only" in baseline_only.output
     assert "operator denylist + baseline" not in baseline_only.output
 
-    monkeypatch.setattr(container, "load_denylist_terms", lambda: (("zz-synthetic-term", "test"),))
+    monkeypatch.setattr(
+        container, "load_denylist_terms", lambda _repo=None: (("zz-synthetic-term", "test"),)
+    )
     with_operator = _runner.invoke(
         app,
         ["ci", "push-gate-check"],
@@ -202,7 +208,7 @@ def test_a_sibling_repo_name_that_is_an_english_word_does_not_block_the_push(
     tip_sha = run(["git", "rev-parse", "HEAD"], cwd=repo, check=True).stdout.strip()
 
     monkeypatch.setattr(ci, "_repo_root", lambda: repo)
-    monkeypatch.setattr(container, "load_denylist_terms", lambda: ())
+    monkeypatch.setattr(container, "load_denylist_terms", lambda _repo=None: ())
 
     result = _runner.invoke(
         app,
@@ -284,7 +290,7 @@ def test_a_malformed_privacy_baseline_fails_the_gate_closed_with_one_fix_line(
         )
 
     monkeypatch.setattr(privacy_check, "load_baseline", unreadable)
-    monkeypatch.setattr(container, "load_denylist_terms", lambda: ())
+    monkeypatch.setattr(container, "load_denylist_terms", lambda _repo=None: ())
     monkeypatch.setattr(ci, "_repo_root", lambda: tmp_path)
     monkeypatch.setattr("sys.argv", ["dadaia", "ci", "push-gate-check"])
 
