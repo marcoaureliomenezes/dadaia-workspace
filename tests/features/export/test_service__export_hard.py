@@ -226,6 +226,8 @@ def test_a_pause_bundle_missing_its_prerequisites_refuses_with_fetch_and_then_ex
     root: Path, tmp_path: Path
 ) -> None:
     bundle = _paused(root)
+    for fan in (root / "repos/r/.git/objects").iterdir():  # git's read-only objects, as on Windows
+        make_readonly(fan)
     shutil.rmtree(root / "repos/r")
     git(root / "repos", "init", "-q", "r")
     git(repo := root / "repos/r", "remote", "add", "origin", str(tmp_path / "origin.git"))
