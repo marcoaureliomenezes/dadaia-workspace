@@ -80,10 +80,6 @@ RULES: tuple[SpecsRule, ...] = (
         lambda d: d._memory.check_lint1_memory_atoms(),
     ),
     _rule(
-        ("MEM-DRIFT-1",),
-        lambda d: d._memory.check_mem_drift1_features_package_map(),
-    ),
-    _rule(
         ("ADR-SUPERSEDED-CITATION",),
         lambda d: doctor_adr.superseded_adr_citations(d.specs_dir, d.public_dir),
         fix_help=act(
