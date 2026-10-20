@@ -178,3 +178,15 @@ def test_main_checkout_of_a_path_that_is_no_repository_is_the_current_directory(
 ) -> None:
     main_checkout = load_owner("dd-bug-resolution", "_git").main_checkout
     assert main_checkout(tmp_path) == Path(".")
+
+
+def test_fix_commit_returns_the_older_of_two_same_subject_fixes_when_the_newer_is_reverted(
+    tmp_path: Path,
+) -> None:
+    repo, line = _repo(tmp_path / "R"), "fix(bugs): b1 — c"
+    ident = ["-c", "user.name=t", "-c", "user.email=t@t"]
+    for subject in (line, line, f'Revert "{line}"'):
+        _sh(*ident, "commit", "-q", "--allow-empty", "-m", subject, cwd=repo)
+    older = run(["git", "rev-parse", "HEAD~2"], cwd=repo, env=_clean(), check=True).stdout.strip()
+    found = load_owner("dd-bug-resolution", "_git").fix_commit(repo, ["b1"])
+    assert found == {"b1": (repo, older)}

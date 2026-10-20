@@ -718,6 +718,21 @@ def test_stats_counts_the_integration_line_merge_not_a_back_merge_into_the_work_
     assert "6 non-block commits after closure\t2\t0" in lines
 
 
+def test_stats_names_the_context_that_owns_the_repo_among_several(tmp_path: Path) -> None:
+    root = _stats_workspace(tmp_path)
+    decoy = '{"name": "x", "main_repo": "z", "associated_repos": [], "gitflow": {"integration": "main"}}, '  # fmt: skip
+    patch_cli(root, '[{"name": "c"', f"[{decoy}" + '{"name": "c"')
+    repo = root / "repos/r"
+    work = _dev_side_merge(repo, "2026-10-12T08:00:00Z")
+    git(repo, "commit", "-q", "--allow-empty", "-m", "feat(J1.T0): the closure")
+    closure = git(repo, "rev-parse", "HEAD").strip()
+    _log(root, [_born("2026-10-12T09:00:00Z"), _milestone("2026-10-12T11:00:00Z", "rc-99", "implemented", closure)])  # fmt: skip
+    _merge_at(repo, "dev", work, "2026-10-12T14:30:00Z")
+    done = _stats(root)
+    assert done.returncode == 0, done.stderr
+    assert "4 closure duration\t3.5 h\t<= 4 h" in done.stdout.splitlines()
+
+
 def test_stats_reads_closure_duration_as_n_a_when_no_integration_merge_holds_the_closure(
     tmp_path: Path,
 ) -> None:

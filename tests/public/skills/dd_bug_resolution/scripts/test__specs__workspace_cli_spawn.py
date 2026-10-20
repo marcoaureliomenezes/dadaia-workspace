@@ -13,7 +13,7 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.core.skill_owner import load_owner
-from tests.helpers.oslib import cli_path, command, write_text
+from tests.helpers.oslib import cli_path, command, stub_cli, write_text
 
 
 def _bound_fix(ws: Path, _capsys: pytest.CaptureFixture[str], _mp: pytest.MonkeyPatch) -> str:
@@ -71,3 +71,67 @@ def test_run_cli_with_the_root_found_and_the_cli_missing_refuses_with_the_instal
     with pytest.raises(specs.Refusal) as refused:
         specs.run_cli(tmp_path, "context", "list")
     assert refused.value.fix == command("uvx", "dadaia-workspace", "init", str(tmp_path))
+
+
+_ROWS = [
+    {"name": "c", "main_repo": "r", "associated_repos": [{"slug": "a"}, {"slug": "gone"}]},
+    {"name": "d", "main_repo": "z", "associated_repos": [{"slug": "y"}]},
+]
+
+
+def _workspace(root: Path, cli: str) -> Path:
+    """A workspace whose CLI runs *cli*, holding checkouts r, a (of context c), q (of none) and y (of d)."""
+    (cli_dir := cli_path(root).parent).mkdir(parents=True)
+    stub_cli(cli_dir, "dadaia", cli)
+    (root / ".dadaia/states").mkdir(parents=True)
+    write_text(root / ".dadaia/states/spec_contexts.json", "{}")
+    for slug in ("r", "a", "q", "y"):
+        (root / "repos" / slug / ".git").mkdir(parents=True)
+    return root
+
+
+def _answering(root: Path) -> Path:
+    return _workspace(root, f"#!python\nimport json\nprint(json.dumps({_ROWS!r}))\n")
+
+
+def test_context_row_answers_the_context_that_owns_a_main_or_associated_repo(
+    tmp_path: Path,
+) -> None:
+    specs = load_owner("dd-bug-resolution", "_specs")
+    root = _answering(tmp_path)
+    assert [(specs.context_row(root, root / "repos" / s) or {}).get("name") for s in ("r", "a", "q", "y")] == ["c", "c", None, "d"]  # fmt: skip
+
+
+def test_context_repos_is_the_repo_and_the_existing_checkouts_its_context_associates(
+    tmp_path: Path,
+) -> None:
+    specs = load_owner("dd-bug-resolution", "_specs")
+    root = _answering(tmp_path)
+    assert specs.context_repos(root / "repos/r") == [root / "repos/r", root / "repos/a"]
+    assert specs.context_repos(root / "repos/q") == [root / "repos/q"]
+
+
+def test_context_repos_of_a_repo_with_no_workspace_or_no_cli_is_the_repo_alone(
+    tmp_path: Path,
+) -> None:
+    specs = load_owner("dd-bug-resolution", "_specs")
+    (repo := tmp_path / "bare/repos/r").mkdir(parents=True)
+    assert specs.context_repos(repo) == [repo]
+    (root := tmp_path / "ws").mkdir()
+    (root / ".dadaia/states").mkdir(parents=True)
+    write_text(root / ".dadaia/states/spec_contexts.json", "{}")
+    (repo := root / "repos/r").mkdir(parents=True)
+    assert specs.context_repos(repo) == [repo]
+
+
+def test_a_cli_that_runs_and_fails_refuses_with_its_own_fix_line(tmp_path: Path) -> None:
+    specs = load_owner("dd-bug-resolution", "_specs")
+    root = _workspace(
+        tmp_path,
+        "#!python\nimport sys\nprint('[error] bad row', file=sys.stderr)\n"
+        "print('fix: Agent action: repair the registry row', file=sys.stderr)\nsys.exit(1)\n",
+    )
+    for ask in (lambda: specs.context_row(root, root / "repos/r"), lambda: specs.context_repos(root / "repos/r")):  # fmt: skip
+        with pytest.raises(specs.Refusal) as refused:
+            ask()
+        assert refused.value.fix == "Agent action: repair the registry row"

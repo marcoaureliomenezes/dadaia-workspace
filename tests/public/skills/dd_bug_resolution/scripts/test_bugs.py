@@ -1632,3 +1632,19 @@ def test_stats_reads_the_files_of_the_id_commit_for_a_record_without_fix_files(
     assert [ln for ln in done.stdout.splitlines() if ln.startswith("rebuild-due:")] == [
         "rebuild-due:cli/x.py\tb1,b2"
     ]
+
+
+def test_check_refuses_a_registry_the_workspace_cli_rejects_with_its_fix_line(
+    script: Path, tmp_path: Path
+) -> None:
+    (tmp_path / "ws").mkdir()
+    root = make_workspace(tmp_path / "ws")
+    write_text(root / ".dadaia/states/spec_contexts.json", json.dumps({"contexts": ["not-a-row"]}))
+    refusing = "#!python\nimport sys\nprint('[error] bad row', file=sys.stderr)\nprint('fix: Agent action: repair the registry row', file=sys.stderr)\nsys.exit(1)\n"  # fmt: skip
+    stub_cli(cli_path(root).parent, "dadaia", refusing)
+    specs = _ledger(root / "repos" / "r", {**_resolved("a-bug"), "fix_sha": "a" * 40})
+    done = _run(script, "check", "--specs", str(specs))
+    out = done.stdout + done.stderr
+    assert "Traceback" not in out and "AttributeError" not in out, out
+    assert done.returncode == 1, out
+    assert "fix: Agent action: repair the registry row" in out, out
