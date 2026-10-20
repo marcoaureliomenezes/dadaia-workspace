@@ -879,10 +879,11 @@ def test_stats_refuses_a_release_check_that_exits_non_zero_with_no_finding(tmp_p
           'print("Traceback (most recent call last):", file=sys.stderr)\nsys.exit(1)')  # fmt: skip
     done = _stats(root, "0.5.0-rc18")
     assert (done.returncode, done.stdout) == (1, ""), done.stderr
-    assert done.stderr == (
-        "[error] release.py check exited 1\n"
-        f"fix: Agent action: fix the findings of release.py check on {(root / 'repos/r/specs').resolve()}\n"
-    )
+    specs = (root / "repos/r/specs").resolve()
+    lines = done.stderr.splitlines()
+    assert lines[0] == "[error] release.py check exited 1", done.stderr
+    assert len(lines) == 2 and f"release.py check --specs {specs}" in lines[1], done.stderr
+    assert "findings" not in lines[1], done.stderr
 
 
 def test_stats_of_a_milestone_without_sha_reads_n_a(tmp_path: Path) -> None:

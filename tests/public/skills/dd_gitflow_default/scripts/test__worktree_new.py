@@ -511,11 +511,13 @@ def test_a_main_tree_whose_rc_tree_was_removed_by_hand_is_refused_with_a_fix_tha
 
     refused = _run(root, "new", "r", NEW_JOB)
 
-    fix = git_line(root / "repos/r", "worktree", "add", "-f", "-f", str(rc_tree), f"wt/{RC}")
+    fix = git_line(root / "repos/r", "worktree", "add", "-f", "-f", "--lock", "--reason",
+                   f"dadaia:{RC}", str(rc_tree), f"wt/{RC}")  # fmt: skip
     assert (refused.returncode, refused.stdout) == (1, "")
     assert refused.stderr == f"[error] {rc_tree} does not exist\nfix: {fix}\n"
     assert not (root / "worktrees/r" / NEW_JOB).exists()
     run_fix(root, refused)
+    assert f"locked dadaia:{RC}" in _git(root / "repos/r", "worktree", "list", "--porcelain").splitlines()  # fmt: skip
     assert _run(root, "new", "r", NEW_JOB).returncode == 0
 
 
@@ -535,10 +537,10 @@ def test_a_main_tree_is_refused_when_release_check_exits_non_zero_with_no_findin
 
     specs = root / "worktrees/r" / RC / "specs"
     assert (refused.returncode, refused.stdout) == (1, "")
-    assert refused.stderr == (
-        "[error] release.py check exited 1\n"
-        f"fix: Agent action: fix the findings of release.py check on {specs}\n"
-    )
+    lines = refused.stderr.splitlines()
+    assert lines[0] == "[error] release.py check exited 1", refused.stderr
+    assert len(lines) == 2 and f"release.py check --specs {specs}" in lines[1], refused.stderr
+    assert "findings" not in lines[1], refused.stderr
     assert not (root / "worktrees/r" / NEW_JOB).exists()
 
 
