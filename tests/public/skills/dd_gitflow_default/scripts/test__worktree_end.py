@@ -146,7 +146,32 @@ def test_a_task_whose_job_tree_is_gone_refuses_with_the_fix_that_restores_it(
     assert "[error]" in refused.stderr
     _fix(root, refused)
     assert (root / TREE).is_dir()
+    porcelain = git(root / "repos/r", "worktree", "list", "--porcelain").splitlines()
+    assert f"locked dadaia:{NEW_JOB}" in porcelain
     assert run(root, "merge", str(task)).returncode == 0
+
+
+def test_a_failing_tree_carried_release_check_at_a_rc_merge_prints_its_own_fix(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path
+    make_workspace(root)
+    git(root / "repos/r", "checkout", "-q", "feature/0.5.0")
+    tree = open_tree(root, RC)
+    for skill, name, body in (
+        ("dd-bug-resolution", "bugs.py", "sys.exit(0)"),
+        ("dd-backlog-definition", "backlog.py", "sys.exit(0)"),
+        (
+            "dd-release-implementation",
+            "release.py",
+            'print("[error] tree finding")\nprint("fix: Agent action: mend the tree")\nsys.exit(1)',
+        ),
+    ):
+        commit(tree, f"dadaia_workspace/public/skills/{skill}/scripts/{name}", f"import sys\n{body}\n")  # fmt: skip
+    approve(root, git(tree, "rev-parse", "HEAD").strip(), name=RC)
+    refused = run(root, "merge", str(tree))
+    assert refused.returncode == 1 and "Traceback" not in refused.stderr
+    assert _line(refused) == "Agent action: mend the tree"
 
 
 @pytest.mark.parametrize("verb", ["merge", "clean"])
