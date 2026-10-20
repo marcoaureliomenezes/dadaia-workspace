@@ -35,10 +35,6 @@ class Decision:
     listed: frozenset[str] = frozenset()
     messages: frozenset[str] = frozenset()
 
-    @property
-    def message_listed(self) -> bool:
-        return bool(self.messages)
-
 
 @dataclass(frozen=True)
 class PushRef:

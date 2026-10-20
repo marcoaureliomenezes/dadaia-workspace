@@ -102,7 +102,7 @@ class SeveralWorkBranches(DadaiaError):
 
     def __init__(self, message: str, text: str, keep: str) -> None:
         super().__init__(message, act("agent", text))
-        self.text, self.keep = text, keep
+        self.keep = keep
 
 
 def work_branch(repo: Path, flow: Gitflow, main: str) -> str:

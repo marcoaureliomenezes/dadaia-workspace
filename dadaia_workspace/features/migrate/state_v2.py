@@ -17,11 +17,11 @@ from dadaia_workspace.infrastructure.json_context_store import (
 class MigrationPlan:
     """Describes what the migration will do — produced in dry-run mode."""
 
-    schema_version_before: str
     contexts_to_migrate: list[dict]  # type: ignore[type-arg]
     primary_context_exists: bool
     dirs_to_create: list[str] = field(default_factory=list)
     already_v2: bool = False
+    schema_version_before: str = ""
 
 
 def plan_migration(store: JsonContextStore) -> MigrationPlan:
@@ -35,7 +35,6 @@ def plan_migration(store: JsonContextStore) -> MigrationPlan:
     raw = store.read_raw()
     if (version := parse_schema_version(raw, states_dir / "spec_contexts.json")) >= 2:
         return MigrationPlan(
-            schema_version_before=str(version),
             contexts_to_migrate=[],
             primary_context_exists=primary_file.exists(),
             already_v2=True,
