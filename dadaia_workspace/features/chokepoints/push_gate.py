@@ -7,7 +7,7 @@ from __future__ import annotations
 from collections.abc import Callable, Iterable, Iterator, Sequence
 from dataclasses import replace
 from pathlib import Path
-from typing import Protocol
+from typing import Any, Protocol
 
 from dadaia_workspace.core.cli_line import fix_line, git_line, spell_fix
 from dadaia_workspace.core.gitflow import Gitflow
@@ -291,3 +291,17 @@ def content_decision(
             allowed=False, message=f"{message}\n{fix}", listed=listed, messages=messages
         )
     return _notes(decision, binaries, oversized, masker, tag)
+
+
+def branch_range_decision(
+    repo: Path, branch: str | None, tip: str, held: str, **scan: Any
+) -> Decision:
+    """The content half over *branch* (HEAD when None) at *tip*, published over *held*; *scan*
+    is ``content_decision``'s object source, canon predicate, terms, patterns and tag."""
+    ref = f"refs/heads/{branch or 'HEAD'}"
+    return content_decision(
+        [PushRef(ref, tip, ref, held)],
+        repo=repo,
+        fixes=GateFixes(repo=str(repo), head=branch or ""),
+        **scan,
+    )

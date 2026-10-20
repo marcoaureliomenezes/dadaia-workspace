@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import subprocess
 import sys
-import tempfile
 from collections.abc import Callable, Iterable, Sequence
 from dataclasses import replace
 from pathlib import Path
@@ -19,16 +18,13 @@ from dadaia_workspace.cli._specs_resolution import (
 )
 from dadaia_workspace.core import platform
 from dadaia_workspace.core.cli_line import fix_line
-from dadaia_workspace.core.exceptions import GitSyncError
 from dadaia_workspace.core.gitflow import Gitflow, SeveralWorkBranches, work_branch
-from dadaia_workspace.core.models.git_scan import ZERO_SHA
 from dadaia_workspace.core.platform import act
 from dadaia_workspace.core.skill_owner import load_owner
 from dadaia_workspace.features.chokepoints.branch_policy import (
     HEADS_PREFIX,
     Decision,
     GateFixes,
-    PushRef,
     check_ref_policy,
     parse_push_stdin,
 )
@@ -84,122 +80,6 @@ def _gate_inputs(repo_root: Path, head: str) -> tuple[Gitflow, GateFixes]:
     cut = bool(git.git(repo_root, "for-each-ref", "--format=%(refname)", f"refs/heads/{work}"))
     fixes = GateFixes(repo=str(repo_root), work=work, cut=cut, head=head)
     return gitflow, fixes
-
-
-def _rewrite_unpublished(repo: Path, oldest: str, message: str | None) -> None:
-    """Re-commit the unpublished range of HEAD, from *oldest*, as one commit holding the
-    tracked working tree and every folded message in order. Runs only when the push gate
-    refuses that range on a denylist hit or a canon violation, and only over edits or
-    deletions of the paths the gate lists; *message*, allowed only when the gate lists a
-    commit message, goes first and replaces just the messages the gate lists. The git calls
-    carry the sanctioned-tool marker (``git_subprocess``): the ref gate passes them."""
-    from dadaia_workspace.container import build_git_client, build_git_object_reader
-
-    git = build_git_client()
-    tip = git.git(repo, "rev-parse", "HEAD")
-    try:
-        sha = git.git(repo, "rev-parse", "--verify", f"{oldest}^{{commit}}")
-    except GitSyncError:
-        sha = oldest
-    branch = git.current_branch(repo) or "HEAD"
-    held = git.git(repo, "for-each-ref", "--format=%(objectname)", f"refs/remotes/origin/{branch}")
-    decision = _content_decision(repo, held or ZERO_SHA, "[pre-push]")
-    listed = decision.listed
-    changed = git.git(repo, "diff", "--name-status", "--no-renames", "-z", tip).split("\0")
-    stray = sorted(
-        p
-        for st, p in zip(changed[::2], changed[1::2], strict=False)
-        if st not in ("M", "D") or p not in listed
-    )
-    refusal = None
-    if sha not in build_git_object_reader().unpublished(repo, tip):
-        refusal = (
-            f"cannot rewrite {oldest}: origin already holds it, or it is not in HEAD's history",
-            act(
-                "agent",
-                "pass the oldest commit origin does not hold, as the push gate's fix line names it",
-            ),
-        )
-    elif not listed:
-        refusal = (
-            "the push gate lists no denylist or canon finding in HEAD's unpublished range",
-            act(
-                "agent",
-                "land the change through a worktree; this remedy answers a push gate refusal only",
-            ),
-        )
-    elif stray:
-        refusal = (
-            f"the working tree changes paths the gate did not list: {', '.join(stray)}",
-            act("agent", "revert or unstage every path the gate did not list, and add no path"),
-        )
-    elif message and not decision.message_listed:
-        refusal = (
-            "the push gate lists no commit message, so the message stays",
-            act("agent", "run the remedy again without the message option"),
-        )
-    if refusal:
-        fail(*refusal)
-    _fold(repo, sha, tip, decision, message)
-
-
-def _fold(repo: Path, sha: str, tip: str, decision: Decision, message: str | None) -> None:
-    """Re-commit *sha*..*tip* of HEAD as one commit, or as two when RED `test(` commits and others
-    mix: a test commit of the paths they touch, then the rest, so the task test-separation check
-    and a hotfix's shape-3 test commit still hold. Every folded message is kept; *message*
-    replaces those the gate lists. Each tree and message is settled in a temporary index before
-    any ref moves, which then moves once."""
-    from dadaia_workspace.container import build_git_client
-
-    git = build_git_client()
-    log = git.git(repo, "log", "--reverse", "--format=%H%x00%B%x1e", tip, "--not", f"{sha}^@")
-    folded = [e.strip().partition("\0")[::2] for e in log.split("\x1e") if e.strip()]
-    replaced = set(decision.messages) if message else set()
-    every, red = {c for c, _ in folded}, {c for c, m in folded if m.startswith("test(")}
-    try:
-        parent = git.git(repo, "rev-parse", "--verify", f"{sha}^")
-    except GitSyncError:
-        parent = ""
-
-    def said(commits: set[str]) -> str:
-        lead = message if message and replaced & commits else ""
-        return "\n\n".join([lead or "", *(m for c, m in folded if c in commits - replaced)]).strip()
-
-    def names(*args: str) -> set[str]:
-        return set(filter(None, git.git(repo, *args, "-z").split("\0")))
-
-    with tempfile.TemporaryDirectory(prefix="fold-") as scratch:
-        env = {"GIT_INDEX_FILE": str(Path(scratch) / "index")}
-        git.git(repo, "read-tree", tip, env=env)
-        git.git(repo, "add", "-u", env=env)
-        final = git.git(repo, "write-tree", env=env)
-        groups: list[tuple[set[str] | None, set[str]]] = [(None, every)]
-        if parent and red and red != every:
-            reds = set().union(*(names("diff-tree", "--no-commit-id", "--name-only", "-r", "--no-renames", c) for c in red))  # fmt: skip
-            net = names("diff", "--name-only", "--no-renames", parent, tip)
-            groups = [(reds & net, red), (None, every - red)]
-        texts = [said(commits) for _, commits in groups]
-        if not all(texts):
-            fail(
-                f"a folded commit would carry no message ({sha[:12]}..{tip[:12]})",
-                act(
-                    "agent",
-                    f"re-commit the range by hand with a message: `{platform.inline('git', '-C', str(repo), 'reset', '--soft', sha)}`, then commit it",  # fmt: skip
-                ),
-            )
-        head = parent
-        for (paths, _), text in zip(groups, texts, strict=True):
-            tree = final
-            if paths is not None:
-                git.git(repo, "read-tree", parent, env=env)
-                kept = git.git(repo, "ls-tree", "-rz", final, "--", *sorted(paths), env={"GIT_LITERAL_PATHSPECS": "1"})  # fmt: skip
-                rows = {e.partition("\t")[2]: e.partition("\t")[0].split() for e in kept.split("\0") if e}  # fmt: skip
-                entries = [f"{rows[p][0]} {rows[p][2]}\t{p}" if p in rows else f"0 {ZERO_SHA}\t{p}" for p in sorted(paths)]  # fmt: skip
-                git.git(repo, "update-index", "-z", "--index-info", stdin="\0".join(entries) + "\0", env=env)  # fmt: skip
-                tree = git.git(repo, "write-tree", env=env)
-            head = git.git(repo, "commit-tree", tree, *(["-p", head] if head else []), "-m", text)
-        git.git(repo, "update-ref", "HEAD", head, tip)
-    git.git(repo, "reset", "-q")
 
 
 def _denylist(
@@ -269,23 +149,39 @@ def _content_decision(repo: Path, held: str, tag: str) -> Decision:
     """The push gate's content half over HEAD's branch published over *held*: what a branch no
     push could carry, a task's, still holds."""
     from dadaia_workspace.container import build_git_client, build_git_object_reader
-    from dadaia_workspace.features.chokepoints import content_decision
+    from dadaia_workspace.features.chokepoints import branch_range_decision
 
     git = build_git_client()
-    branch = git.current_branch(repo)
-    ref = f"refs/heads/{branch or 'HEAD'}"
-    terms, patterns = _denylist(tag, repo)
     tip = git.git(repo, "rev-parse", "HEAD")
-    return content_decision(
-        [PushRef(ref, tip, ref, held)],
+    terms, patterns = _denylist(tag, repo)
+    return branch_range_decision(
+        repo,
+        git.current_branch(repo),
+        tip,
+        held,
         object_source=build_git_object_reader(),
-        repo=repo,
         canon_violations_fn=_canon_fn(repo, tip, tag),
-        fixes=GateFixes(repo=str(repo), head=branch or ""),
         denylist_terms=terms,
         baseline_patterns=patterns,
         tag=tag,
     )
+
+
+def _rewrite_unpublished(repo: Path, oldest: str, message: str | None) -> None:
+    from dadaia_workspace.container import build_git_client, build_git_object_reader
+    from dadaia_workspace.features.chokepoints.fold import FoldRefusal, rewrite_unpublished
+
+    try:
+        rewrite_unpublished(
+            repo,
+            oldest,
+            message,
+            git=build_git_client(),
+            reader=build_git_object_reader(),
+            decide=lambda r, held: _content_decision(r, held, "[pre-push]"),
+        )
+    except FoldRefusal as refusal:
+        fail(str(refusal), refusal.fix)
 
 
 @app.command("push-gate-check")
@@ -316,7 +212,8 @@ def push_gate_check(
     bypass. No repo or context name is a term source.
 
     Remedy for a refused push: --rewrite-from re-commits the whole unpublished range as one
-    commit, over edits and deletions of the paths the gate lists.
+    commit, or two when RED `test(` commits and others mix, over edits and deletions of the
+    paths the gate lists.
 
     The merge gate of a worktree judges the same content with --onto, on a branch of any name.
     """
