@@ -464,9 +464,8 @@ class SpecContextService:
         branch through this ONE method — never a second ad hoc git-subprocess call
         at a CLI or feature boundary.
 
-        A repo that is not cloned, or whose live git query fails, degrades to
-        ``on_disk=False`` / ``current_branch=None`` rather than raising — every
-        caller here is a best-effort display surface.
+        A repo that is not cloned, or whose live git query fails, degrades to an absent repo
+        with no branch rather than raising — every caller here is a best-effort display surface.
         """
         repo_path = self._repo_path(repo.slug)
         on_disk = repo_path.exists() and self._git.is_git_root(repo_path)
