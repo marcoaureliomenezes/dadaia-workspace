@@ -215,6 +215,11 @@ def _plant_imports(files: int, per_file: int) -> Callable[[Path], Session]:
     return plant
 
 
+def _plant_low_timeout(root: Path) -> Session:
+    _write(root, "tests/unit/test_t.py", "@pytest.mark.timeout(15)\ndef test_t(): ...\n")
+    return CONTROL(root)
+
+
 def _plant_selector(root: Path) -> Session:
     session = CONTROL(root)
     _write(root, _CI, _REAL_CI.read_text("utf-8").replace("slow and not quarantine", "slow"))
@@ -240,6 +245,7 @@ CHECKS: dict[str, Check] = {
             "calibrated-ceiling": _session(
                 props={"calibration": {**CALIBRATION, "small win32 False": 10}, "push_gc": []}
             ),
+            "explicit-below-medium": _plant_low_timeout,
             "probe-broke": lambda root: {},
         },
     ),
