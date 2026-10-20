@@ -277,6 +277,7 @@ flowchart TB
 - 0271 — dadaia worktree pause bundles one clean lane or wt-rc tree and removes it; job and task trees are never paused; context dead is unchanged and keeps refusing every wt/*
 - 0272 — Amend ADR 0175: export always bundles and never probes visibility; hard carries the open lane and wt-rc trees with no snapshots zone; the artifact carries the export-v1 format; a context with no remote is listed unreplicable; init --from excludes --repo and installs every harness
 - 0273 — A resolved bug's fix is the commit HEAD reaches whose message carries its fix(bugs) or refactor(bugs) line; fix_sha is a write-once hint, never judged
+- 0274 — The code under development carries <release>rc<N>; tests, evals and release validate only the current build, never a published dadaia-workspace
 <!-- /dadaia:fixed adr-list -->
 
 <!-- dadaia:fixed slop-code -->
