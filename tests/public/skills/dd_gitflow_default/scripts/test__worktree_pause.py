@@ -212,6 +212,15 @@ def test_resume_creates_the_branch_through_the_cli_marker(root: Path) -> None:
     assert git(repo, "rev-parse", _branch(BACKLOG)).strip() == tip
 
 
+def test_a_resumed_tree_is_locked_as_new_locks_it(root: Path) -> None:
+    repo, tree = root / "repos/r", _lane(root)
+    assert run(root, "pause", str(tree)).returncode == 0
+
+    assert run(root, "resume", str(tree)).returncode == 0
+
+    assert f"locked dadaia:{BACKLOG}" in git(repo, "worktree", "list", "--porcelain").splitlines()
+
+
 def test_a_lane_whose_branch_was_pushed_resumes(root: Path) -> None:
     tree = open_tree(root, BACKLOG)
     commit(tree, "specs/a.md")
