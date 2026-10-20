@@ -40,7 +40,7 @@ Rationale: every context bug came from a second resolution path answering differ
 Measured by: `poetry run python scripts/guards/run.py` prints `PASS ignore-cap` — `scripts/guards/slop.py`'s `IGNORE_EDGES` is the cap's one numeric home.
 Rationale: a pinned exception list turns every new suppression into a reviewable diff.
 
-### P-11 · We keep `core` file-I/O pure outside an authorized set of eight modules; new file I/O enters `core` only by joining that set on purpose.
+### P-11 · We keep `core` file-I/O pure outside an authorized set of seven modules; new file I/O enters `core` only by joining that set on purpose.
 Measured by: `pytest 'tests/core/test_atomic_write__core_file_io_purity.py::test_each_question_has_one_owner[core-file-io-purity]'` (AST walk; every authorized stem must exist).
 Rationale: joining the set is legal; arriving there unnoticed is not.
 
@@ -48,8 +48,8 @@ Rationale: joining the set is legal; arriving there unnoticed is not.
 Measured by: `pytest tests/core/test_atomic_write__core_file_io_purity.py -k never_imports_the_container` (`test_importing_a_hook_never_imports_the_container` over five hook modules, and `test_gate_resolution_path_never_imports_the_container` over the executed gate path, each with `container` absent from `sys.modules`).
 Rationale: the composition graph costs seconds of import time per gated tool call.
 
-### P-13 · We keep the architecture diagrams derived from live code: every diagrammed class, view module and feature package is introspected against the live tree.
-Measured by: `dadaia doctor` — `specs`-section rule `MEM-DRIFT-1` (`features/specs/doctor_memory.py`), one WARNING per package the map and the live tree disagree on.
+### P-13 · We keep the architecture diagrams derived from live code: the features package map names exactly the live feature packages.
+Measured by: `poetry run python scripts/guards/run.py` prints `PASS features-map-matches-architecture` — `scripts/guards/repo.py`'s `features_map_matches_architecture`, one violation per package the map and the tracked tree disagree on.
 Rationale: a diagram nobody checks is the first artifact to lie.
 
 ### P-14 · We keep the release-state reader pure: `core/release_state.py` parses and serializes already-read text and performs no file I/O.

@@ -27,8 +27,8 @@ Every field PyPI renders has exactly one home:
   `tests/contract/test_docs_derived_from_memory.py`.
 - **The long description** — `README.md` itself (`readme = "README.md"`), derived like
   every other document; every README link is absolute, so it resolves on the PyPI page.
-- **The links** — `[tool.poetry.urls]`: `Homepage`, `Repository`, `Documentation` (the
-  repository's `docs/` folder), `Changelog` and `Issues`.
+- **The links** — `[tool.poetry.urls]`: `Homepage` (the author's project page), `Repository`,
+  `Documentation` (the repository's `docs/` folder), `Changelog` and `Issues`.
 - **The keywords** — every keyword names something the README says.
 - **The classifiers** — the `Development Status` stays `3 - Alpha` until a released
   wheel passes the consumer-validation recipe.

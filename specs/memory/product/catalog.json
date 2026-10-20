@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-20T12:46:27Z",
+  "generated_at": "2026-10-20T18:48:19Z",
   "features": [
     {
       "rank": 1,
@@ -43,7 +43,7 @@
         "dispatch",
         "sdd"
       ],
-      "token_estimate": 1035,
+      "token_estimate": 1029,
       "depends_on": [
         "bug-ledger",
         "worktrees",
@@ -106,7 +106,7 @@
         "release-gate",
         "distribution"
       ],
-      "token_estimate": 664,
+      "token_estimate": 688,
       "depends_on": [
         "pypi-distribution",
         "QUALITY",
@@ -178,7 +178,7 @@
         "release",
         "packaging"
       ],
-      "token_estimate": 1615,
+      "token_estimate": 1621,
       "depends_on": [
         "release-lifecycle",
         "QUALITY",
@@ -380,7 +380,7 @@
         "paradigm",
         "pillars"
       ],
-      "token_estimate": 779,
+      "token_estimate": 784,
       "depends_on": [
         "context-management",
         "worktrees",
@@ -656,7 +656,7 @@
         "compliance",
         "privacy"
       ],
-      "token_estimate": 3758,
+      "token_estimate": 3729,
       "depends_on": [
         "public-asset-distribution",
         "sdd-gate-v3",
@@ -794,7 +794,7 @@
         "lineage",
         "resolution"
       ],
-      "token_estimate": 1978,
+      "token_estimate": 2002,
       "depends_on": [
         "cross-platform-portability",
         "public-asset-distribution",
@@ -824,7 +824,7 @@
         "state",
         "closure"
       ],
-      "token_estimate": 1655,
+      "token_estimate": 1665,
       "depends_on": [
         "agent-orchestration",
         "worktrees",
@@ -893,7 +893,7 @@
         "merge",
         "review"
       ],
-      "token_estimate": 2967,
+      "token_estimate": 2990,
       "depends_on": [
         "context-management",
         "sdd-gate-v3",

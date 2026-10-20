@@ -30,9 +30,9 @@ The main thread is the operator's session and the only dispatcher. It owns intak
 
 - The main thread dispatches by the job file's `who` column: `sr` to `dd-sw-engineer-sr`, `jr` to `dd-sw-engineer-jr`, `pe` and `cr` to the owning persona; research goes to `dd-researcher`. The definition's reviewer judges each `who` against the shape rule.
 - A REJECTED verdict whose finding names a `jr` task re-dispatches that task to `dd-sw-engineer-sr`.
-- An implementation dispatch needs an approved candidate in `IMPLEMENTATION` whose job files pass `release.py check`; a bug fix needs only its open bug, worked in the tree the bugs law names (a hotfix lane, or the `wt-rc` after CLOSURE for code only it holds) ([[bug-ledger]]).
+- An implementation dispatch needs an approved candidate in `IMPLEMENTATION` whose job files pass `release.py check`; a `wt-hotfix` lane, or a block-list fix on a closed `wt-rc` for code only that rc holds, needs only its open bug ([[bug-ledger]]).
 - The task is the implementation dispatch unit. A behavior begins with a RED-test dispatch and continues in a fresh implementation dispatch that cannot touch test paths ([[worktrees]]).
-- Before every hand-back an implementer runs one self-check, stated once in `dd-release-implementation` and pointed to by both engineer personas: the repo's `verify:` line, the test directories the change reaches, and a read of its own diff for removed assertions, newly skipped tests, hand-typed fix-line labels, platform literals in assertions and the job's sweep greps; it hands back with no process of its own still running. When a task's work merges or its hand-back is checked, the main thread stops every agent of that task still running.
+- Before every hand-back an implementer runs one self-check, stated once in `dd-release-implementation`, a skill both engineer personas carry: the repo's `verify:` line, the test directories the change reaches, and a read of its own diff for removed assertions, newly skipped tests, hand-typed fix-line labels, platform literals in assertions and the job's sweep greps; it hands back with no process of its own still running. When a task's work merges or its hand-back is checked, the main thread stops every agent of that task still running.
 - Jobs and tasks may run concurrently only where the approved PLAN and exact write sets permit it. Git exposes races; no agent acquires a lock.
 - No runtime advances the lifecycle. `_RELEASE.json`, approved definition documents, job files, worktrees, commits and handoffs are the evidence ([[release-lifecycle]]).
 - Only the main thread opens and merges canonical worktrees. A leaf works inside the path it receives and returns a validated handoff.
@@ -43,7 +43,7 @@ The main thread is the operator's session and the only dispatcher. It owns intak
 
 - Every open question goes to `dd-grill-me` before launch, one question at a time, with the stage reference that fits it: before a backlog entry, before a candidate SPEC, when a decision may be an ADR, and after the PLAN.
 - After launch the main thread asks the operator nothing: it decides by law, ADRs and rulings, logs an unruled choice with the grill's agent-default label, and keeps independent tasks running.
-- An act the law reserves to the operator, and every bug proposal, waits for the closure summary as one batch; a block-list bug is put to the operator at once, since it stops every merge ([[release-lifecycle]], [[bug-ledger]]).
+- An act the law reserves to the operator, and every bug proposal, waits for the closure report to the operator as one batch; a block-list bug is put to the operator at once, since it stops every merge ([[release-lifecycle]], [[bug-ledger]]).
 
 ## Models and privilege
 
