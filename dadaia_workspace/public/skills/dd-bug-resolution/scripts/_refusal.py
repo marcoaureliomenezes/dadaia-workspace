@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import re
 import subprocess
 import sys
 from typing import TextIO
@@ -27,6 +28,11 @@ def spell_fix(fix: str) -> str:
 def fix_of(text: str, default: str = "") -> str:
     """The first `fix:` line of a child script's *text*, else *default*: the one parser."""
     return next((ln[len(FIX) :] for ln in text.splitlines() if ln.startswith(FIX)), default)
+
+
+def said(text: str, default: str) -> str:
+    """The message of the first `[error] …` or `<CODE> error …` line of a child's *text*, else *default*."""
+    return next((m[1] for ln in text.splitlines() if (m := re.match(r"(?:\S+ error |\[error\] )(.*)", ln))), default)  # fmt: skip
 
 
 def relay(done: subprocess.CompletedProcess[str], message: str, fix: str) -> None:

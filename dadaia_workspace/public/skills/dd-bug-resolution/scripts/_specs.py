@@ -6,7 +6,6 @@ from __future__ import annotations
 
 import json
 import os
-import re
 import subprocess
 import sys
 from collections.abc import Iterator
@@ -17,7 +16,7 @@ from _git import main_checkout, scrubbed_env
 from _jsonl import reinstall_fix
 from _ledger import parse as parse
 from _platform import act, cli_argv, cli_path, command, inline, run, venv_dir
-from _refusal import Refusal, relay, report
+from _refusal import Refusal, relay, report, said
 from _root import STATES, fenced_roots
 from _root import workspace_of as workspace_of
 
@@ -84,15 +83,11 @@ def context_repos(repo: Path) -> Iterator[Path]:
     yield from (p for p in beside if (p / ".git").exists())
 
 
-_VERDICT = re.compile(r"(?:\S+ error |\[error\] )(.*)")
-
-
 def check_release(specs: Path) -> None:
     """Runs `release.py check` once and relays it: a non-zero exit raises `Refusal`."""
     check = script(Path(__file__).resolve().parents[2] / "dd-release-implementation/scripts/release.py")  # fmt: skip
     done = run([*check, "check", "--specs", str(specs)], env=scrubbed_env())
-    said = next((m[1] for ln in (done.stdout + done.stderr).splitlines() if (m := _VERDICT.match(ln))), "")  # fmt: skip
-    relay(done, said or f"release.py check exited {done.returncode}", check("check", specs=specs))  # fmt: skip
+    relay(done, said(done.stdout + done.stderr, f"release.py check exited {done.returncode}"), check("check", specs=specs))  # fmt: skip
 
 
 def _bound_fix(here: Path, rerun: Script, ledger: str | None) -> tuple[str, str]:
