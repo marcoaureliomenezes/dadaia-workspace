@@ -1,0 +1,1114 @@
+# README.md
+
+# dadaia-workspace
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/marcoaureliomenezes/dadaia-workspace/blob/main/LICENSE)
+[![PyPI](https://img.shields.io/pypi/v/dadaia-workspace)](https://pypi.org/project/dadaia-workspace/)
+
+A local-first, spec-driven workspace that gives AI agents current context, a document-governed lifecycle, visible concurrency and anti-slop boundaries.
+
+A workspace is one folder. You open an agent session at its root. Your projects live in
+repos inside it, and the governance — `AGENTS.md`, `.agents/`, `.dadaia/` — sits outside
+every repo. One workspace holds many projects and a project many repos; it is never a
+monorepo. Each project is a context: its **main repo** is the repo where `specs/` lives,
+its **associated repos** are the others it owns.
+
+## What it is and principles
+
+dadaia-workspace is the operating environment around repositories developed with AI
+agents. Its unit is the context: one main repo, where `specs/` lives, plus its
+associated repos; a single-repo context is the minimal case. Eight pillars:
+
+- **Current context** — agents bind explicitly and receive only the relevant project,
+  memory, release and task state.
+- **Documents are the lifecycle** — backlog, SPEC, PLAN, the job files, `_RELEASE.json` and
+  `BUGS.jsonl` carry ordered work; no runtime drives agents through steps.
+- **Deterministic boundaries** — path class, bind scope, root hygiene and
+  the push gate are mechanical, each refusal carrying one fix line; what cannot
+  be mechanical is written as law.
+- **Visible concurrency** — sessions may race, git exposes the overlap, and nothing
+  waits on a lock.
+- **Features preserve futures** — features and fixes spend options when coupling grows;
+  delivery alternates with deletion, simplification or decoupling, and a capability
+  exists only while it earns its maintenance cost.
+- **No slop** — runtime state, reports, handoffs, caches, projections and temporary
+  files have canonical homes and never leak into repositories.
+- **Six entry harnesses** — Claude Code, Codex, Kimi Code, Cursor, Devin and GitHub
+  Copilot, one registry record each; public assets originate once, and installation
+  refreshes staging before native or projected consumption.
+- **Evidence, never prose** — success is evidenced by reviews, task commits, commands
+  and artifacts.
+
+Two usage paths follow — a human drives it from a shell, an agent reads the root
+`AGENTS.md` map — and both read one truth: every section below is reconciled from
+named product memory.
+
+## A human installs and uses it
+
+```bash
+uvx dadaia-workspace init demo --harness claude --repo <clone url>   # level 1 + 2
+cd demo
+.dadaia/.venv/bin/dadaia specs init --context <slug>                 # level 3
+.dadaia/.venv/bin/dadaia doctor --context <slug>   # findings, each with one fix line
+```
+
+Onboarding has three levels. **Workspace:** `uvx dadaia-workspace init <dir> --harness
+<name>` (or `pip install dadaia-workspace`, which installs one CLI under two names,
+`dadaia` and `dadaia-workspace`) provisions `.dadaia/.venv`, the `.dadaia/` zones,
+`.agents/skills` and the named harness's projection, seeds the state documents without
+overwriting them, and (unless `--skip-assets`) stages and installs the public assets —
+the one writer of every hook wiring. The wheel ships the full public asset tree, and
+`init` resolves the workspace venv's dependencies from PyPI, so it needs network
+access. Every later command runs through the workspace's own CLI,
+`.dadaia/.venv/bin/dadaia`. **Project:** `--repo <url>` (plus repeatable
+`--associated-repo <url>`) clones the repo into `repos/<slug>/`, installs the pre-push
+and reference-transaction hooks and makes the context ALIVE (only `context bind` binds); a later project is
+`.dadaia/.venv/bin/dadaia context create --main-repo <url> [--associated-repo <url>]`.
+**Specs:** `.dadaia/.venv/bin/dadaia specs init --context <slug>` brings the repo's
+`specs/` to the canon, moving a foreign tree to `specs-bkp/` after consent, and on a repo
+with no work branch cuts the local one and commits the scaffold on it; the
+`dd-audit-project` first pass fills memory in the `wt-backlog-first-pass` lane (done by real content, never a stamp) and
+`.dadaia/.venv/bin/dadaia context baseline <slug>` publishes it. `doctor` prints each
+next step with its `fix:` line.
+
+**Upgrade:** re-run the `uvx dadaia-workspace init <dir> --harness <name>` line; it
+prints `upgraded A -> B`, `repaired -> B` (an unreadable venv build), or `already at A`;
+a venv whose python cannot start is refused with a fix that deletes `.dadaia/.venv` and
+reruns init; then
+`.dadaia/.venv/bin/dadaia specs init --context <ctx>` refreshes each project's specs law.
+`.dadaia/.venv/bin/dadaia harness add <name>` adds a harness later.
+
+**Move:** `.dadaia/.venv/bin/dadaia export` writes the workspace's contexts and harnesses
+to `.dadaia/dist/spec-contexts.json` (`--hard`: a tar.gz adding a secret-scanned bundle of
+the unpushed lane and `wt-rc` work); `uvx dadaia-workspace init <dir> --from <artifact>`
+replicates it, every context DEAD until its printed `context alive` line runs.
+
+`.dadaia/.venv/bin/dadaia context bind <ctx>` writes one session record (context,
+runtime, pid, `bound_at`, `bind_id`, `last_seen_at`) under the session id the environment carries and acquires
+nothing. The bind's scope is the context's main repo plus its associated repos, and it
+drives the injection of `constitution.md`, the tech stack and the memory catalog digest
+into the session.
+
+`.dadaia/.venv/bin/dadaia doctor` is the one instance validator. Three sections run in fixed order —
+`workspace`, `specs`, `ledgers` — each finding one `<CODE> <verdict> <message>` line,
+every error-class finding with one fix line (a command, an `Agent action: <one act>`, or an `Operator action: <one act>` for what only the human may do)
+and exit 1; there is no score.
+`--json` mirrors the run; `--fix` is the reaper: it moves slop to `.dadaia/reaped/`;
+a TTL expiry acts by zone class, an OUTPUT entry held, an EPHEMERAL one deleted.
+
+## An agent reads AGENTS.md and uses it
+
+Fast path for multi-agent, spec-driven development: `uvx dadaia-workspace init <dir> --harness <name>` installs the workspace for Claude Code,
+Codex, Kimi Code, Cursor, Devin or GitHub Copilot, with its agent skills under `.agents/skills`.
+Read the root `AGENTS.md` map, then run `.dadaia/.venv/bin/dadaia doctor`.
+Model-readable indexes: `llms.txt` lists the pages, and `llms-full.txt` holds their full text.
+
+The always-on law is the root `AGENTS.md` map; every governed area carries its own
+scoped `AGENTS.md`, and every `dd-` skill touching an area opens that file first. The
+map, the scoped files, `.agents/skills/dd-*` and `.agents/agents/dd-*.md` are authored
+once. Codex, Kimi Code, Cursor, Devin and GitHub Copilot read `.agents/skills`
+natively; Claude Code reaches skills and personas through per-entry symlinks. A harness
+differs only in serialization — event names, hook file, answer shape — and adds no
+behaviour.
+
+The gate is one PreToolUse pre-gate: root whitelist then SDD gate, first block wins;
+what it blocks, its path classes and every fail-open path are
+stated once, in the root `AGENTS.md` §3.
+Every BLOCK carries exactly one `fix:` line, and a contract test feeds each fix back
+through the gate asserting ALLOW. No lease, lock or wait path exists; the gate reads no
+`_RELEASE.json`.
+
+Work runs as candidates inside one live release: a picked set, an as-is review of every
+unit it touches, a grill, SPEC, a PLAN drawing a DAG of jobs and one job file per job; the candidate lives on its `wt-rc` worktree, each task runs in its own worktree and
+lands on its job's `wt-main` after its gate, each job lands on the `wt-rc` only after the reviewer's `APPROVED`, then the
+Reconciliation closes it — disposition sweep, then memory reconciliation last; after CLOSURE a hotfix still syncs in, and in code only the `wt-rc` holds only a block-list bug lands — the `wt-rc` lands on the work branch and the work -> integration merge follows; `.dadaia/.venv/bin/dadaia worktree <verb>` runs every worktree verb (branch names: the constitution's `gitflow:`). The
+ledger scripts under `.agents/skills/*/scripts/` (`bugs.py`, `backlog.py`,
+`release.py`, `audit.py`) are each record's one writer. A bug is proposed to the
+operator and registered only after confirmation; a bug in code the work branch holds is fixed in a
+`wt-hotfix-<bug-id>` lane with a RED test, a block-list bug in code only the `wt-rc` holds after CLOSURE on that `wt-rc`, while any other bug becomes explicit candidate scope. Ship
+may carry an open bug only with the operator's exact recorded authorization. Completed work leaves as a `handoff-v1` record, validated by
+`.dadaia/.venv/bin/dadaia reports validate`.
+
+## Documentation
+
+The documentation is the repository's [docs folder](https://github.com/marcoaureliomenezes/dadaia-workspace/tree/main/docs):
+
+- [Quickstart](https://github.com/marcoaureliomenezes/dadaia-workspace/blob/main/docs/quickstart.md) — install to a bound project, a backlog entry and a
+  live release; [positioning](https://github.com/marcoaureliomenezes/dadaia-workspace/blob/main/docs/positioning.md) — why product repos carry no agent
+  config.
+- [The bug loop](https://github.com/marcoaureliomenezes/dadaia-workspace/blob/main/docs/bug-loop.md) — register, RED, fix, resolve;
+  [what the bug ledger taught](https://github.com/marcoaureliomenezes/dadaia-workspace/blob/main/docs/bug-ledger-lessons.md) — measuring the ledger and
+  the fix-chain lesson.
+- [CLI reference](https://github.com/marcoaureliomenezes/dadaia-workspace/blob/main/docs/cli.md) · [concepts](https://github.com/marcoaureliomenezes/dadaia-workspace/blob/main/docs/concepts.md) ·
+  [getting started](https://github.com/marcoaureliomenezes/dadaia-workspace/blob/main/docs/getting-started.md) · [distribution](https://github.com/marcoaureliomenezes/dadaia-workspace/blob/main/docs/distribution.md)
+
+## Links
+
+- GitHub — <https://github.com/marcoaureliomenezes/dadaia-workspace>
+- PyPI — <https://pypi.org/project/dadaia-workspace/>
+- Agent index — [`llms.txt`](https://github.com/marcoaureliomenezes/dadaia-workspace/blob/main/llms.txt)
+- Changelog — [`CHANGELOG.md`](https://github.com/marcoaureliomenezes/dadaia-workspace/blob/main/CHANGELOG.md)
+
+# dadaia_workspace/public/data/AGENTS.md
+
+> **AI agent rules.** This file is generated from
+> `dadaia_workspace/public/data/AGENTS.md` by `public install`.
+> Do not put project-specific instructions here. Put them in a scoped
+> `AGENTS.md` / `CLAUDE.md` inside the repo or directory they govern.
+
+# dadaia-workspace — the map
+
+- Simplicity and lightness are the first law, never above an operator order, the test rule, or security and privacy. The lightest solution that works wins: every gate, step, file and line must earn its place, and a heavier option is chosen only when a lighter one was tried and failed.
+- One workspace folder; the agent session launches at its root, always.
+- Projects live in `repos/<slug>/`; governance (`AGENTS.md`, `.agents/`, `.dadaia/`) lives outside every repo.
+- A project is a **context**: one **main repo** (where `specs/` lives) plus **associated repos**; never a monorepo.
+- Two rule-file kinds exist: this map and the scoped `AGENTS.md` per governed area (§5); nothing else is law.
+- A scoped file is the system of record for its area and takes precedence there — open it before acting in that area.
+
+## 1. The flow
+
+- Classify every demand: Arm A (feature) or Arm B (bug); state the arm before acting.
+- Arm A: `demand -> backlog -> as-is review -> release candidate (SPEC/PLAN/job files) -> implementation + review -> memory -> closure -> promote by merging the release PR`.
+- Arm B: `propose -> operator confirms -> register -> lowest-level RED test -> root-cause fix -> GREEN -> resolved`.
+- Test: does the tool break its own contract? Yes -> Arm B. No -> Arm A.
+- A feature enters only through the backlog or an operator demand recorded in the SPEC `Origin`; a confirmed bug is fixed per `specs/bugs/AGENTS.md` §2.
+- A test, or an existing assert, is removed or skipped only on the operator's order.
+- Every change minimizes code: DELETE → REBUILD → UPDATE → KEEP → ADD last; verbosity is a defect; documented behavior still works; tests assert behavior not text, mock only boundaries, expect literals; a docstring states only its unit's contract (inputs, output, raises, side effects); no bug id, ADR, FR, AC, task id, candidate, review round or audit id appears in a docstring or comment.
+- A fix hardens the contract test in that contract's one home: it tightens an assert or adds the missing partition and never loosens one, a new case is written only when no contract test covers the partition, and the reviewer reverts the fix and confirms the hardened test goes red.
+- A failing old test is a question: outside a fix, an assert is moved or narrowed, or a guard's reach narrowed, only with the main thread's ruling named in a `test(...)` commit, and a product-contract change also needs the operator.
+- Inventory existing gates and tools first; a new gate, lock, repo, layer or review round states what it buys and names the heavier one it deletes.
+- A requirement applied to every task, job or deletion is a gate, states its measured cost per run, and that cost never exceeds one run of the job's `verify:` gate as it stood before the change, without the operator's ruling.
+- The `verify:` line and the merge checks are gates: a change to one states its measured cost against the line it replaces, never against itself, and needs the operator's ruling; no step reruns a check the merge runs; a heavier gate is never the recommended option.
+- Non-blocking findings go to the main thread's intake report (`dd-backlog-definition`).
+- The SDD documents (`specs/releases/AGENTS.md`) are the record of progress; numbers, durations and dates are measured or read from a named source, and law text holds no dated snapshot value.
+
+## 2. Who does what
+
+| Work | Owner |
+|---|---|
+| Intake, grill, dispatch, the review checkpoint, gates | the main thread (the operator's session) |
+| Backlog, SPEC, the product-memory pass at closure | `dd-product-engineer` |
+| The as-is review, PLAN, job files, production code and tests for new behaviour | `dd-sw-engineer-sr` |
+| Tasks fully stated by their AC and `W:` | `dd-sw-engineer-jr` |
+| Read-only findings, each a `path:line` or URL | `dd-researcher` |
+| Three-axis review + six lenses (architecture, security, QA, product, audit, AI surface) | `dd-code-reviewer` |
+
+- Only the operator accepts an ADR (`specs/ADRs/AGENTS.md` §2).
+- Every agent but `dd-researcher` invokes `dd-ai-eng-knowhow` for harness literacy; an AI-entity change follows its AUTHORING contract.
+
+## 3. What is enforced
+
+- One PreToolUse gate blocks: a file-tool write (`Write`, `Edit`, `MultiEdit`, `apply_patch`) creating a new entry at the root, `.dadaia/`, a closed-canon zone or the first level of `repos/`, `worktrees/` per §4 (root_whitelist); a file-tool write (those or `NotebookEdit`) to a PROTECTED path (PROTECTED); a file-tool write (those or `NotebookEdit`) out of the bound scope (out-of-scope); a file-tool write under `repos/<slug>/` outside `specs/audits/`, since `repos/` is merge-only: `specs/audits/` is written directly, the rest by worktree merge, and only `context create` and a repo's first `specs init` write `specs/` directly (_MERGE_ONLY_MESSAGE).
+- The gate fails open on: a pre-gate past 10 s (TOOL_TIMEOUT_S); an id-less unbound session under `worktrees/<r>/` (gate_policy); a policy that raises (`pre_gate`); an unreadable payload (`read_stdin_json`); an unreadable registry, judging nothing below `repos/`, `worktrees/`, so only the merge-only block holds there (registered_slugs).
+- The Bash hook wrapper accepts the workspace venv's POSIX or Windows Python; when neither is executable, it warns and exits 0, and each context-injection lane prints the reinstall `fix: Agent action:` line.
+- Path classes: ADDITIVE (`.dadaia/AGENTS.md`'s output and ephemeral zones) writable; PROTECTED (projected law files and hook wiring, `.dadaia/states`, `hooks`, `agentic`, `sessions`, `.dadaiaignore` and its `[protected]` globs) blocked; the rest MUTATING.
+- Every BLOCK carries exactly one fix line: `fix: <command>`, `fix: Agent action: <one act>` for an act an agent performs (one act may chain up to three steps with `, then`), or `fix: Operator action: <one act>` only for an ADR acceptance, a secret, a `.dadaiaignore` or PROTECTED edit, a ruling the law names, or an act outside the agents' reach (relaunching the session); a BLOCK whose fix is itself blocked is a Stall, CRITICAL.
+- Git chokepoints (branch contract and scope: `dd-gitflow-default` §2a): pre-push: `.dadaia/AGENTS.md` §3; `.dadaia/.venv/bin/dadaia worktree merge` refuses a `wt-main`, `wt-rc`, hotfix or backlog tree without a valid APPROVED verdict bound to its diff, and a `wt-main`, `wt-rc` or hotfix tree whose `verify:` does not exit 0 (`worktrees/AGENTS.md` §2); the PR gate is discipline (`dd-gitflow-default` §3b).
+- The binding: `.dadaia/.venv/bin/dadaia context show --json`. The gate reads no SDD artifact.
+- Common behaviour lives in skills and `AGENTS.md`; a persona or hook carries only the surface its harness cannot do without; a harness fact lives in one registry row.
+
+## 4. Where things are written
+
+- Root holds only: `<!-- root -->`; any other entry, the operator's included, needs a pattern in `.dadaiaignore`, which only the operator edits.
+- Temp: `.dadaia/tmp/<agent>/<YYYYMMDD>/`; handoffs: `.dadaia/handoff/<context>/`; HTML reports: `.dadaia/reports/<context>/`; worktrees: `worktrees/<repo>/<v>/…`; caches: `.dadaia/tmp/<tool>-cache/` (absolute, harness env); anything an MCP server needs: `.dadaia/mcps/<server>/`.
+- A repo tree carries source and its own artifacts only — never `.dadaia/`; caches redirect by configuration (`repos/<slug>/AGENTS.md`); unexplained files are presumed yours, uncommitted work not yours is never discarded or restored, and no infrastructure is probed on a guess.
+- Credentials live outside the workspace, in the operator's own file: never create, copy, persist, commit, print or report a secret, anywhere; the operator sets a secret from a real terminal, a job that uses it verifies it (never its name), and text is scrubbed before commit, not only at push, with generic names in review and QA text.
+- Register every dev server through `dd-cli-library`.
+
+## 5. Scoped law — open before acting there
+
+| Area | File | Governs |
+|---|---|---|
+| specs tree | `specs/AGENTS.md` | canon, status tokens, load order, artifact authority |
+| releases | `specs/releases/AGENTS.md` | candidates, phases, tasks, promote |
+| backlog | `specs/backlog/AGENTS.md` | demand queue, `exit`, dispositions |
+| bugs | `specs/bugs/AGENTS.md` | what a bug is, propose/confirm, records, resolution |
+| memory | `specs/memory/AGENTS.md` | product truth, atoms, ownership |
+| ADRs | `specs/ADRs/AGENTS.md` | decisions.jsonl, acceptance |
+| audits | `specs/audits/AGENTS.md` | three pillars, remediation release |
+| runtime | `.dadaia/AGENTS.md` | zones, doctor, reprojection, chokepoints |
+| handoff | `.dadaia/handoff/AGENTS.md` | emission, schema, ack |
+| tmp / states | `.dadaia/tmp/AGENTS.md`, `.dadaia/states/AGENTS.md` | TTL, state files |
+| a repo | `repos/<slug>/AGENTS.md` | clean tree, caches, tests |
+| worktrees | `worktrees/AGENTS.md` | the rc hierarchy and lanes, two gates, one review, one venv |
+
+## 6. Skills — `.agents/skills/dd-*`
+
+| Skill | Use it for |
+|---|---|
+| `dd-grill-me` | the mandatory questioning session before any SPEC |
+| `dd-backlog-definition` | curating the backlog from operator demand |
+| `dd-release-definition` | SPEC -> PLAN -> job files for a candidate |
+| `dd-release-implementation` | tasks, push green, closure order |
+| `dd-code-review` | three axes, six lenses, slop detection |
+| `dd-bug-registration`, `dd-bug-resolution` | Arm B end to end |
+| `dd-gitflow-default` | branches, PRs, commit shapes |
+| `dd-handoff-emitter` | machine-readable completion records |
+| `dd-audit-project` | the periodic three-pillar audit |
+| `dd-spec-navigator` | finding truth in `specs/` |
+| `dd-cli-library` | the `dadaia` verbs, skill scripts, dev servers |
+| `dd-ai-eng-knowhow` | harness literacy and AI-entity authoring |
+| `dd-manager-orchestration` | dispatching the five roles |
+
+- Language: operator preference, default English. Tone: direct, concise, operational.
+
+## 7. Onboarding — three levels
+
+- Level 1 workspace: `uvx dadaia-workspace init [DIR]`; re-running it on an existing workspace is the upgrade.
+- Level 2 context: `.dadaia/.venv/bin/dadaia context create <name> --main-repo <url> [--associated-repo <url>]...` clones, hooks and marks ALIVE; only `.dadaia/.venv/bin/dadaia context bind <ctx>` binds a session.
+- Level 3 specs: 3a `.dadaia/.venv/bin/dadaia specs init --context <ctx>`; 3b the `dd-audit-project` first pass, done when memory holds real content (never a stamp); 3c `.dadaia/.venv/bin/dadaia context baseline <ctx>` publishes.
+- Read the next step from `.dadaia/.venv/bin/dadaia doctor` (`ONBOARDING`) and SessionStart print it with its `fix:` line.
+
+# docs/cli.md
+
+# dadaia CLI digest (derived from the live command tree; authoritative help: `dadaia <group> --help`)
+
+## dadaia capabilities — Describe public dadaia-workspace features supported by this installation.
+
+## dadaia certify — Certify assembled public features in a disposable local workspace.
+
+## dadaia ci — Git-hook chokepoints: the pre-push and ref gates and their installer.
+- ci install-hook — Install the pre-push and reference-transaction gates.
+- ci push-gate-check — Pre-push gate: branch policy by the project gitflow + the range-scoped denylist scan.
+- ci ref-gate-check — Reference-transaction gate: a work-branch update must land on origin's sha.
+
+## dadaia context — Manage Spec Context Projects.
+- context alive — Transition a context to ALIVE; clone repo if absent. Idempotent if already ALIVE.
+- context baseline — Publish the project's main repo, append-only: adopt what origin holds, or give an
+- context bind — Bind this shell session to a context.
+- context create — Clone (or adopt) every repo, install the pre-push and reference-transaction hooks, make the context ALIVE —
+- context dead — Transition a context to DEAD: push what is committed, hold each repo in reaped/.
+- context delete — Delete a context. Context must be dead.
+- context list — List all Spec Context Projects.
+- context repo <add, remove> — Manage a context's associated repos (main repo excluded).
+- context show — Show details of a context.
+
+## dadaia doctor — Diagnose and repair workspace, specs and ledger compliance.
+
+## dadaia export — Write `.dadaia/dist/spec-contexts.json` — one record per spec context, read-only.
+
+## dadaia harness — Register and inspect the workspace's agent runtimes (harnesses).
+- harness add — Register a harness and project its runtime set into this workspace.
+- harness list — Show the harnesses registered in this workspace's profile.
+
+## dadaia help — Derived help surfaces (docker-style; generated, never transcribed).
+- help tree — Print the compact CLI digest derived from the live command tree.
+
+## dadaia init — Bootstrap a dadaia workspace in DIR: .dadaia/, the law, and the projection of each harness (--harness, else the --from artifact's).
+
+## dadaia migrate — Migration helpers for dadaia workspace and spec trees.
+
+## dadaia public — Manage distributed public agent assets.
+- public doctor — Diagnose drift between package source, staging, and runtime projections.
+- public install — Stage the packaged public assets, then install them into runtime projections.
+
+## dadaia reconcile — Reconcile state and projections after installing an exact candidate wheel.
+
+## dadaia reports — Validate agent handoff reports.
+- reports validate — Validate one or more agent handoff JSON files.
+
+## dadaia specs — SDD release-lifecycle structural checks and helpers.
+- specs init — Bring a repo's specs/ to the canon, committing only the scaffold on a new work branch.
+- specs upgrade — Upgrade a specs/ tree to the canonical pattern version.
+
+## dadaia worktree — Run a worktree verb of the installed dd-gitflow-default `worktree.py`.
+
+# docs/concepts.md
+
+# Concepts
+
+Seven terms, one section each. Their canonical meanings live in
+[`CONTEXT.md`](../CONTEXT.md); workspace law lives in
+`dadaia_workspace/public/data/AGENTS.md`, and the walkthrough is
+[getting started](getting-started.md).
+
+## Context
+
+A *context* is one canonical `specs/` tree owned by one main repository: the unit for
+memory, backlog, bugs, releases, reports and handoffs. Associated repositories own
+production source only. The registry holds each context ALIVE or DEAD, and a repository
+slug belongs to one context.
+
+Resolution proceeds from caller-supplied context, to `DADAIA_CONTEXT`, to the session
+record, to the repository containing the current directory. The session's bind names the
+context and all its repository slugs; an unbound session owns nothing. Binding also
+triggers memory injection.
+
+## Release and candidate
+
+Exactly one *release* is live under `specs/releases/<M.m.p>/`. It has open scope and grows
+through closed-scope *candidates*. Each `rc-<N>/` holds `SPEC.md`, `PLAN.md` and
+`tasks/job<n>.md`; the highest numbered candidate is live. `_RELEASE.json` is the release's
+one mutable state document: `phase`, the three milestones and an append-only `log` whose
+new entries are `milestone`, `note`, `summary` or closure `memory`.
+
+Every SPEC begins with one `**Origin:**` line: `operator-demand`, or the canonical
+backlog/bugs/findings clauses. `release.py check` traces those ids through the closure
+summary. Release ids are bare SemVer and move only at an operator-approved deploy.
+
+## The flow
+
+Every demand takes one of two arms. Arm A moves through backlog or operator demand,
+as-is review, grill, approved SPEC/PLAN/job files, test-first tasks, one review per job,
+reconciliation, the work-to-integration merge and the promote-or-continue choice. Jobs
+and tasks are the only implementation levels.
+
+Arm B proposes and registers a confirmed bug, establishes lineage, lands a lowest-level
+RED case, fixes the owning seam, proves GREEN and resolves the record with `cause`,
+`solution`, `caused_by` and `fix_sha`, plus the fix's `fix_files`. A bug in code the work branch holds uses a hotfix lane; after CLOSURE a
+block-list bug in code only the `wt-rc` holds is fixed on that `wt-rc`; other bugs enter
+approved candidate scope. Documents record the flow; there is no in-repository flow engine.
+
+## The gate
+
+The pre-tool gate evaluates the root whitelist and SDD gate in that order. The root
+`AGENTS.md` defines protected, additive and mutating paths plus every fail-open case. Git
+chokepoints independently enforce branch names, canonical specs and privacy. Every BLOCK
+carries one executable `fix:` line or one operator act.
+
+## Memory
+
+*Memory* is current product truth: `specs/memory/product/**`, `ARCHITECTURE.md` and
+`QUALITY.md`. A bound session receives the constitution, technical bootstrap, catalog
+digest and open worktrees. Candidate closure runs drift, reconciles every affected atom,
+writes a `memory` entry per pass and regenerates the catalog. Memory contains no
+release history.
+
+## Bugs and backlog
+
+`specs/bugs/BUGS.jsonl` holds one record per bug, appended once. New records use
+`open | resolved | superseded | rejected`; resolution persists `cause`, `solution`,
+`caused_by`, `fix_sha` and `fix_files`, all derived from the fix commit that carries the bug's
+`fix(bugs)` or `refactor(bugs)` id line (the sha a hint), while git supplies the implementation diff. The next SPEC's
+bug-window review owns maturity, and the closure summary owns delivered and carried scope.
+
+`specs/backlog/BACKLOG.json` is the operator's active demand queue. An entry is created by
+`backlog.py new`, picked through a SPEC Origin clause and removed exactly once by
+`backlog.py exit`, which appends its terminal history record.
+
+## Audits
+
+An *audit* is the full-tree inspection lane. A live audit directory holds `AUDIT.md` and
+`FINDINGS.jsonl`; its three pillars are bug history, spec compliance and memory drift over
+the window since the newest archived audit. The bug pillar reports nine forensic metrics.
+An audit generates at most one remediation release. `audit.py disposition` moves each
+finding to `resolved`, `superseded` or `rejected`; `audit.py close` refuses while any
+finding is open, then appends one audit-history record and removes the live directory.
+
+# docs/distribution.md
+
+# Distribution
+
+Where dadaia-workspace is published and what each channel carries.
+
+## Channels
+
+| channel | artifact | how it is published |
+|---|---|---|
+| PyPI | the wheel; `README.md` is the long description and `pyproject.toml` the metadata | `.github/workflows/release.yml`: merging the release PR creates the tag, and the publish jobs, gated on `release_created` and on the operator's `release-gate` approval, upload under OIDC trusted publishing |
+| GitHub repository | the repository description, topics and homepage | set from the same tagline and keywords as `pyproject.toml` |
+| Repository root | `llms.txt` — an index whose every line links to a derived document, the law, the CLI reference or the memory catalog | committed and reconciled from product memory |
+| Docs | the repository's `docs/` folder on `main`, with no build toolchain or site | every page reconciled from product memory |
+
+## The PyPI metadata contract
+
+Every field PyPI renders has exactly one home:
+
+- **The number** — `pyproject.toml`'s `version` and `.release-please-manifest.json`
+  carry the last published number, the floor release-please bumps from; the number
+  proposed next lives only in the open release PR, and nothing else states a version.
+  A `v<version>` tag exists only for a number release-please released.
+- **The summary** — `pyproject.toml`'s `description`, the tagline, byte-equal to the
+  README's first non-badge paragraph and to `llms.txt`'s `> ` line, pinned by
+  `tests/contract/test_docs_derived_from_memory.py`.
+- **The long description** — `README.md` itself (`readme = "README.md"`), derived like
+  every other document; every README link is absolute, so it resolves on the PyPI page.
+- **The links** — `[tool.poetry.urls]`: `Homepage`, `Repository`, `Documentation` (the
+  repository's `docs/` folder), `Changelog` and `Issues`.
+- **The keywords** — every keyword names something the README says.
+- **The classifiers** — the `Development Status` stays `3 - Alpha` until a released
+  wheel passes the consumer-validation recipe.
+
+## What the wheel carries
+
+The wheel ships `dadaia_workspace/` with the full `public/` tree (`.dadaia/.venv/bin/dadaia init` still
+resolves the workspace venv's dependencies from PyPI). It does not ship the
+consumer-validation recipe: that lives in `scripts/CONSUMER_VALIDATION_RECIPE.md`, the
+developer's matrix run against every candidate wheel before a deploy. It installs one CLI under two console-script
+names, `dadaia` and `dadaia-workspace`. Consumer-validation candidate wheels are
+throwaway and never mint a published version; a venv bootstrap installs the running
+distribution itself, and `DADAIA_BOOTSTRAP_PACKAGE=<wheel>` makes it install a named
+candidate wheel instead. Withholding the
+`release-gate` approval leaves the tag and the `CHANGELOG.md` section without an
+upload, and the number is never reused.
+
+# docs/getting-started.md
+
+# Getting started
+
+From a bare machine to a first candidate. Every step names what it creates on disk;
+the terms are defined in [concepts](concepts.md) and in [`CONTEXT.md`](../CONTEXT.md).
+
+## Install
+
+```bash
+uvx dadaia-workspace init <dir> --harness claude --repo <url>
+```
+
+Onboarding has three levels — workspace, project, specs — and the first two are this
+one line (needs uv; `pip install dadaia-workspace` into any venv gives the same `init`,
+under two console-script names, `dadaia` and `dadaia-workspace`). The wheel ships
+`dadaia_workspace/` with the full public asset tree; `init` resolves the workspace
+venv's dependencies from PyPI, so it needs network access. From then on every command
+runs through the workspace's own CLI, `.dadaia/.venv/bin/dadaia`, which `init` prints
+by its absolute path.
+
+**Upgrade:** re-run the same `uvx dadaia-workspace init <dir> --harness <name>` line;
+it prints `upgraded A -> B`, `repaired -> B` when the venv's build could not be read, or
+`already at A` when the workspace is current. A venv whose python cannot start is refused
+with a fix that deletes `.dadaia/.venv` and reruns the init line. The upgrade
+never writes a project repo: `.dadaia/.venv/bin/dadaia specs init --context <ctx>` then
+refreshes each project's specs law.
+
+## Level 1 — the workspace
+
+`uvx dadaia-workspace init <dir> --harness claude|codex|kimi-code|cursor|devin|copilot
+[--repo <url>] [--associated-repo <url>]… [--skip-assets]` is the only verb that works
+on an empty directory. `<dir>` is created if absent, refused with one `fix:` line if it
+holds a foreign tree, never resolved from the cwd; every `fix:` line repeats the
+invocation's `--repo` and `--associated-repo` flags. It lays down:
+
+- `.dadaia/.venv`, every `.dadaia/` zone whose creator is init or install, and
+  `.agents/skills`; the harness's own directory comes from its projection. The tree is
+  a view of `dadaia_workspace/core/workspace_layout.py`.
+- `.dadaia/states/spec_contexts.json` and `.dadaia/states/server_registry.json` as
+  empty documents, never overwriting existing data, and
+  `.dadaia/states/harness_profile.json`, the harness roster; a re-init with another
+  harness merges into it, never narrowing it.
+- An absent root `.dadaiaignore`, seeded from the legacy
+  `states/instance_exceptions.txt` or a comment-only template, and an absent `prompt.md`,
+  empty; each is the operator's file from then on.
+- Unless `--skip-assets`, the staged and installed public assets — the one writer of
+  every hook wiring. With `--skip-assets` the output warns that the workspace is
+  ungated until `.dadaia/.venv/bin/dadaia public install` runs.
+
+`init` deletes no projection; `.dadaia/.venv/bin/dadaia harness add <name>` adds a
+harness later and `.dadaia/.venv/bin/dadaia harness list` reads the roster.
+
+To move a workspace, `.dadaia/.venv/bin/dadaia export` writes
+`.dadaia/dist/spec-contexts.json` (every context, its repo urls and the harness roster),
+and `export --hard` writes `.dadaia/dist/workspace-export.tar.gz`, that JSON plus a
+secret-scanned bundle of each open lane and `wt-rc` tree and each paused one; export only
+reads the registry. `uvx dadaia-workspace init <dir> --from <artifact>` (never with
+`--repo`) installs every harness the artifact names, registers its contexts DEAD, lists a
+context with no remote as not replicated, places the bundles in `.dadaia/dist/` and prints
+`context alive <ctx>` for each context that was ALIVE; then `worktree resume` restores each
+bundled tree.
+
+## Level 2 — the project
+
+A context — a Spec Context Project — is the unit of work: one canonical `specs/` tree
+owned by one main repository, optionally spanning associated repositories that live and
+die with it. Specs, bind, memory, releases and backlog resolve only from the main repo.
+`init --repo <url>` creates the first one; every later one is one step:
+
+```bash
+.dadaia/.venv/bin/dadaia context create --main-repo <url> [--associated-repo <url>]
+.dadaia/.venv/bin/dadaia context show <ctx> --json   # the repo set
+```
+
+`context create` clones (or adopts) every repo, installs the pre-push and reference-transaction hooks and makes
+the context ALIVE — it never binds; on failure nothing is left behind. The name
+defaults to the main repo's slug. `bind` writes exactly one record,
+`.dadaia/sessions/<session-id>.json` (context, runtime, pid, `bound_at`, `bind_id`, `last_seen_at`), and acquires
+nothing; the session id comes from the environment only, and a session without a
+harness-native id exports `DADAIA_SESSION_ID` before it binds. The bind's scope
+is the context's main repo plus its associated repos; a MUTATING file-tool write into a
+repo outside it is refused with the bind that would allow it, and agents write a repo
+only inside its worktrees. After a bind, the ctx-inject hook injects the context header,
+`constitution.md`, `ARCHITECTURE.md`'s `## Tech Stack` section, the memory catalog digest
+and the open worktrees once.
+
+## Level 3 — the specs
+
+```bash
+.dadaia/.venv/bin/dadaia specs init --context <ctx> [--replace-foreign]
+```
+
+`specs init` (3a) brings the main repo's `specs/` to the canon: an
+absent tree is scaffolded, a dadaia tree is upgraded and its missing files filled, and a
+foreign `specs/` is moved to `specs-bkp/` (`git mv`) after consent —
+`--replace-foreign` gives it without asking. On a repo with no work branch it first cuts the
+local one (from `origin/<work>`, else the integration branch) and commits only the scaffold (the move included) on it; it never pushes. The
+`dd-audit-project` first pass (3b) fills memory in the `wt-backlog-first-pass` lane and is done when memory holds real content (`.dadaia/.venv/bin/dadaia doctor --context <ctx>` exit 0), never by a
+stamp. `context baseline <ctx>` (3c) publishes the principal, integration and work
+branches; a re-run is a no-op.
+
+## Check compliance — `doctor`
+
+```bash
+.dadaia/.venv/bin/dadaia doctor --context <ctx> [--json] [--fix] [--redact]
+```
+
+`doctor` is the one instance validator, and three sections run in fixed order:
+`workspace` (the root, the harness dirs, the `.dadaia/` zones, every ALIVE repo tree —
+only the scoped context's when the run is scoped — the installed git hook), `specs` (the rules over one `specs/` tree) and `ledgers` (the
+backlog document, the ADR ledger and the ledger scripts' own `check`).
+
+The `specs` and `ledgers` tree resolves from `--context`, `--specs-dir` or the bound
+context; with none, those sections are empty and `workspace` still runs. With no
+instance around — CI over a checkout — `.dadaia/.venv/bin/dadaia doctor --specs-dir specs`
+runs the two tree sections; any other run outside a workspace exits 1 with the one
+workspace-not-found error.
+
+Every printed finding is one `<CODE> <verdict> <message>` line, every error-class
+finding carries one fix line (a command, an
+`Agent action: <one act>`, or an `Operator action: <one act>` for what only the human may do), and any error-class finding exits 1. There
+is no score: the findings and the exit code are the run. `--json` mirrors it,
+`--redact` masks every foreign context name and repo slug, and `--fix` is the reaper —
+it moves slop to `.dadaia/reaped/<YYYYMMDD>/` under a 7-day hold; a TTL expiry acts by
+zone class, an OUTPUT entry held, an EPHEMERAL one deleted.
+
+## Run the first candidate
+
+A candidate is one closed-scope cycle inside the live release. Nothing drives it: the
+documents are the state, the ledger scripts move the records, and the job files and
+task commits are the trace.
+
+After `context baseline`, each step writes inside a worktree that then merges into its
+parent, all under `worktrees/<repo>/<M.m.p>/`: a `wt-backlog-<slug>` lane for step 1;
+the candidate's `rc-<N>/wt-rc`, its integration branch, for steps 2, 3, 4 and 6; a job's
+`rc-<N>/job-<n>/wt-main` and its `wt-task-<kkk>` trees from step 5. `.dadaia/.venv/bin/dadaia worktree <verb>`
+runs every worktree verb: `new`, `merge`, `sync`, `clean`, `hash`, `list`, `pause`, `resume`.
+
+1. **Demand enters the backlog.** Only the operator creates demand;
+   `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py new <slug> --relates <slugs>|none`
+   appends one `active[]` entry born `idea`, and every later status binds `intents[]` that resolve to a code, catalog, doc or invariant anchor.
+2. **Birth the release.**
+   `python3 .agents/skills/dd-release-implementation/scripts/release.py new <M.m.p>`
+   writes a `SPEC.md` stub in `specs/releases/<M.m.p>/rc-<N>/` and `_RELEASE.json` in
+   `DEFINITION` at the release root, all or nothing, refusing a second live release.
+3. **Define the candidate.** The picked set; the as-is review — one row per unit the
+   set touches, `unit | today | bugs | verdict | why`, the As-is verdict DELETE,
+   REBUILD, UPDATE or KEEP, then ADD only for what no unit can carry; the mandatory
+   grill; then `SPEC.md` (its `Replaces` naming what DELETE/REBUILD rows remove),
+   `PLAN.md` (opening with that table as §1, then the job DAG with waves and exact `W:` sets) and
+   one job file per job, `tasks/job<n>.md`, in that `rc-<N>/`, as the first commits of
+   the `wt-rc`, cut from the work branch (`<work>M.m.p`; the names are the
+   `gitflow:` block of `specs/constitution.md`).
+4. **Open implementation.** `release.py phase IMPLEMENTATION --sha <sha>` requires
+   `SPEC.md` and `PLAN.md` `**Status:** Approved`, PLAN's `## DAG` with wave and exact
+   `W:` sets, and lean job files containing task id, AC and exact `W:`, then stamps `defined`.
+5. **Run the jobs.** Each job opens its `wt-main` by `.dadaia/.venv/bin/dadaia worktree new`
+   once the `wt-rc` reads `IMPLEMENTATION`. Each behavior gets two task worktrees: the
+   first commits its acceptance test RED; a fresh second task implements without
+   touching a test path. Task merge into `wt-main` checks hygiene and that separation.
+   Job merge into `wt-rc` runs the tracked `verify:` once and requires the reviewer's
+   one `APPROVED`, bound to the exact diff. When a lane lands meanwhile,
+   `.dadaia/.venv/bin/dadaia worktree sync <wt-rc path>` rebases the rc and its trees,
+   parents first.
+6. **Close the candidate.** The Reconciliation, as the last commits of the `wt-rc`:
+   `release.py phase CLOSURE --sha <sha>` (no `wt/*` tree or branch open but the `wt-rc`), the
+   closure `log` entries, the disposition sweep (`backlog.py exit`, `audit.py
+   disposition`/`close`, `bugs.py archive`), artifact GC, and last the memory
+   reconciliation with its derived docs; after CLOSURE a hotfix lane still reaches it by
+   `worktree sync`, in code only the `wt-rc` holds only a block-list bug lands, on the `wt-rc` itself, and any other work opens the next candidate. Then the `wt-rc` merges into the work branch through the job gate plus
+   the ledger checks, and the work -> integration PR merges green.
+7. **Continue or promote.** Continue: `release.py new` with the same id stacks the next
+   candidate, reopening `DEFINITION`. Promote: merge the integration branch into the
+   principal by PR — that merge is the deploy. The old work tip is tagged
+   `archive/<work-branch>` and the work branch is renamed to the next release id
+   (`git branch -m`, then `git push -u`), never cut anew; `release.py ship --sha <sha>`,
+   in a backlog lane on that branch, then records the promote and moves the release
+   folder to `_archive/`.
+
+A bug is registered once the operator confirms it; a bug in code the work branch holds is fixed in
+a `wt-hotfix-<bug-id>` lane — lineage, a RED new case, root-cause fix, GREEN, then `resolve` with the
+implementation sha. Any other bug becomes explicit candidate scope; ship refuses it while
+open unless the operator authorizes that exact id and the authorization is recorded.
+
+# specs/memory/product/index.md
+
+# Memory Catalog — dadaia-workspace
+
+> Generated automatically from `specs/memory/product/<area>/*.md` frontmatter.
+> The catalog section below is refreshed by `.agents/skills/dd-spec-navigator/scripts/memory.py catalog generate`; other
+> sections of this file are preserved verbatim.
+
+## Feature catalog
+
+### agents
+
+| slug | title | tldr |
+|------|-------|------|
+| `agent-comms` | agent-comms | The handoff-v1 JSON contract agents emit, its validator behind `dadaia reports validate`, and ack-on-consume deletion with a one-day TTL. |
+| `agent-orchestration` | agent-orchestration | Five dd- personas are leaf workers dispatched by the main thread; SDD documents, worktrees and handoffs carry the work, never an orchestration runtime. |
+| `agentic-entities` | agentic-entities | One registry names five personas, five deterministic behaviors and two abstract rules; a behavior map assigns each shipped skill and scoped law to an owner. |
+
+### distribution
+
+| slug | title | tldr |
+|------|-------|------|
+| `agent-evals` | agent-evals | The library's own agent evals — two graded tasks run on the candidate wheel and a PyPI baseline by one dispatch-or-schedule workflow. |
+| `public-asset-distribution` | public-asset-distribution | Public install stages packaged assets and projects shared law, agents, skills and every registered harness; public doctor reports projection drift. |
+| `pypi-distribution` | pypi-distribution | The PyPI package on one version axis, two console-script names, the OIDC pipeline, the wheel contract and the derived docs. |
+
+### harness
+
+| slug | title | tldr |
+|------|-------|------|
+| `harness-claude-code` | harness-claude-code | Entry harness with native sub-agent dispatch; reads the root AGENTS.md map natively and reaches skills and personas through per-entry symlinks into .agents/. |
+| `harness-codex` | harness-codex | Entry harness on the Codex CLI: native AGENTS.md chain and .agents/skills; .codex/ carries config, hooks, the command policy and persona TOML. |
+| `harness-copilot` | harness-copilot | Entry harness on GitHub Copilot CLI — native root AGENTS.md and .agents/skills; .github/ carries agent transcodes and two hook files, bootstrap at start. |
+| `harness-cursor` | harness-cursor | Entry harness on Cursor — native root AGENTS.md and .agents/skills; .cursor/hooks.json gates every tool, injects and reaps at start; persona symlinks. |
+| `harness-devin` | harness-devin | Entry harness on the Devin CLI — native AGENTS.md, .agents/skills and .agents/agents; its one file, .devin/hooks.v1.json, wires gate, injection and reaper. |
+| `harness-kimi-code` | harness-kimi-code | Entry harness with an empty projection: reads root AGENTS.md, .agents/skills and .agents/agents natively; user-level hook shims; DADAIA_CONTEXT binds. |
+
+### philosophy
+
+| slug | title | tldr |
+|------|-------|------|
+| `product-vision` | product-vision | One workspace keeps project repositories inside it and governance outside; each context spans one main repository and any associated repositories. |
+| `spec-context-project` | spec-context-project | One canonical specs tree owned by one main repository, optionally spanning associated repos, bound per session and safe for visible concurrent work. |
+
+### platform
+
+| slug | title | tldr |
+|------|-------|------|
+| `capabilities` | capabilities | dadaia capabilities [--json] prints the installed contract: distribution and specs pattern versions, status tokens, the live verbs and harnesses. |
+| `consumer-agent-support` | Consumer validation gate | A consumer-side agent running the developer's recipe on a real workspace is the release gate; no wheel publishes until every statement reports PASS. |
+| `context-management` | context-management | ALIVE/DEAD registry of a main repo plus associated repos; create clones, hooks and ALIVEs; only context bind binds, by env session id, naming the scope. |
+| `context-portability` | context-portability | dadaia export writes one export-v1 artifact, soft JSON or a hard tar.gz adding the unpushed lane and wt-rc work; init DIR --from <artifact> replicates it. |
+| `cross-platform-portability` | cross-platform-portability | Linux, macOS and Windows through one OS boundary, the kernel's _platform.py, deciding every host fact; core/platform.py is the package's door to it. |
+| `server-registry` | server-registry | Dev-server port registry with TTL and PID tracking so parallel sessions never collide — one stdlib skill script over one JSON state file; no CLI verb. |
+| `specs-migration` | specs-migration | specs init establishes canon and gitflow; specs upgrade reaches pattern 13; migrate brings a schema 1 context registry to the store's schema 3. |
+| `workspace-doctor` | workspace-doctor | dadaia doctor, the one compliance check — workspace, specs, ledgers; one line per finding, exit 1 with a fix line; --fix holds slop, expiry acts by zone class. |
+| `workspace-init` | workspace-init | Level 1 — uvx dadaia-workspace init [DIR] provisions venv, zones, law, harnesses; re-init upgrades; --repo adds level 2; --from replicates an export. |
+
+### sdd
+
+| slug | title | tldr |
+|------|-------|------|
+| `audits-canon` | audits-canon | An audit runs bug-history, spec-compliance and memory-drift pillars over one measured window and stores schema-valid findings until terminal disposition. |
+| `backlog-ledger` | backlog-ledger | The operator's demand queue: BACKLOG.json active[] plus one histo record per exit; backlog.py writes it, dadaia doctor judges bound subjects. |
+| `bug-ledger` | bug-ledger | BUGS.jsonl stores one lean record per confirmed defect; a resolved bug's fix is the commit carrying its fix(bugs) or refactor(bugs) id line. |
+| `release-lifecycle` | release-lifecycle | One live release grows through closed-scope candidates; _RELEASE.json holds current phase, milestones and a lean append-only narrative. |
+| `sdd-gate-v3` | sdd-gate-v3 | No-lock enforcement — root-entry hygiene and SDD write policy before tools; branch, canon and privacy checks at push; a ref gate on raw ref moves. |
+| `worktrees` | worktrees | Trees nest under worktrees/<repo>/<v>/ (wt-rc, wt-main, wt-task, backlog and hotfix lanes); each merges into its parent after its gate; a lane or wt-rc pauses. |
+
+# docs/index.md
+
+# dadaia-workspace
+
+A local-first, spec-driven workspace that gives AI agents current context, a document-governed lifecycle, visible concurrency and anti-slop boundaries.
+
+Start here:
+
+- [Quickstart](quickstart.md) — from `uvx` to a bound project, a backlog entry and a live release.
+- [Positioning](positioning.md) — why your product repos never carry agent config, and how one law governs many projects.
+- [The bug loop](bug-loop.md) — register, RED test, fix, resolve with evidence and lineage.
+
+Reference: [concepts](concepts.md) · [getting started](getting-started.md) · [CLI](cli.md) · [distribution](distribution.md).
+
+Repository: <https://github.com/marcoaureliomenezes/dadaia-workspace>
+
+## What it is
+
+dadaia-workspace is the operating environment around repositories developed with AI
+agents, and its unit is the context.
+
+A workspace is one folder. The agent session launches at its root, always. Projects
+live in repos inside it (`repos/<slug>/`), which take agent work only as merges from
+their worktree hierarchy under `worktrees/<repo>/<M.m.p>/`, and the governance — the root `AGENTS.md`
+map, the scoped `AGENTS.md` files, `.agents/skills`, `.agents/agents`, `.dadaia/` —
+lives outside every repo. A project is a context: one main repo, where `specs/` lives,
+plus its associated repos. A workspace holds many contexts and a context many repos; it
+is never a monorepo, and a single-repo context is the minimal case.
+
+What it rests on:
+
+- Current context — agents bind explicitly and receive only the relevant project,
+  memory, release and task state.
+- Documents are the lifecycle — backlog, SPEC, PLAN, the job files, `_RELEASE.json` and
+  `BUGS.jsonl` carry ordered work; no runtime drives agents through steps.
+- Deterministic boundaries — path class, bind scope, root hygiene and
+  the push gate are mechanical, each refusal carrying one fix line; what
+  cannot be mechanical is written as law.
+- Visible concurrency — sessions may race, git exposes the overlap, and nothing waits
+  on a lock.
+- Features and fixes spend future options when they add coupling, so delivery alternates
+  with deletion, simplification or decoupling. Mechanisms without a current demand are
+  removed, and runtime state, reports, handoffs, caches, projections and temporary files
+  have canonical homes.
+- Success is evidenced by reviews, task commits, commands and artifacts, never
+  inferred from prose.
+
+## Two ways in
+
+A human drives it from a shell in three levels:
+`uvx dadaia-workspace init <dir> --harness <name> --repo <url>` provisions the
+workspace and its first project ALIVE (`.dadaia/.venv/bin/dadaia context bind` binds),
+`.dadaia/.venv/bin/dadaia specs init --context <slug>` brings the project's `specs/`
+to the canon (cutting the work branch when the repo has none), the first pass fills memory in a backlog lane, `.dadaia/.venv/bin/dadaia context baseline` publishes it, and
+`.dadaia/.venv/bin/dadaia doctor` prints the next step and every finding with one
+fix line; `.dadaia/.venv/bin/dadaia context create --main-repo <url>` adds the next
+project, re-running the `uvx` init line upgrades the workspace, and
+`uvx dadaia-workspace init --from <artifact> <dir>` restores a workspace that `dadaia export` wrote.
+
+An agent reads the root `AGENTS.md` map — flow, roles, gate invariants, where things
+live, the index of every scoped law and skill — opens the scoped `AGENTS.md` of its
+area, and works inside the gate, the ledger scripts and the handoff contract;
+`llms.txt` at the repository root is its index.
+
+Claude Code, Codex, Kimi Code, Cursor, Devin and GitHub Copilot are the entry
+harnesses, one registry record each. The same canonical rules reach every harness
+through one authored set, read natively or through per-entry symlinks. Both paths read
+one truth: every page here is reconciled from named product memory.
+
+# docs/quickstart.md
+
+# Quickstart
+
+A bare machine to a workspace whose first project is cloned and ALIVE (a session binds
+it with `context bind`), its `specs/` on the canon, compliance checked, one backlog entry filed and one release
+live. Terms are defined in [concepts](concepts.md); the long walkthrough is
+[getting started](getting-started.md).
+
+## 1. The three levels in one block
+
+Set `REPO_URL` to your repository's clone URL; everything else runs as printed (needs
+uv and network access):
+
+```bash
+REPO_URL=https://github.com/<you>/<your-repo>.git
+SLUG=$(basename "$REPO_URL" .git)
+uvx dadaia-workspace init demo --harness claude --repo "$REPO_URL"
+cd demo
+.dadaia/.venv/bin/dadaia specs init --context "$SLUG"
+.dadaia/.venv/bin/dadaia doctor --context "$SLUG"
+```
+
+After the 3b first pass (below), publish and file the first entry in a backlog lane,
+the worktree `<v>/wt-backlog-<slug>` — only `context create` (the `--repo` clone) and the first `specs init` write
+`specs/` directly (ADR 0154). `V` is the work branch's version, read from the repo:
+
+```bash
+V=$(git -C "repos/$SLUG" branch --list 'feature/*' --format='%(refname:short)' | sed 's|^feature/||')
+.dadaia/.venv/bin/dadaia context baseline "$SLUG"
+B=$(.dadaia/.venv/bin/dadaia worktree new "$SLUG" "$V/wt-backlog-my-first-idea" | sed 's/^\[ok\] //')
+python3 .agents/skills/dd-backlog-definition/scripts/backlog.py new my-first-idea \
+  --specs "$B/specs" --title "What I want" --description "Why I want it"
+git -C "$B" commit -qam "chore(backlog): new my-first-idea"
+```
+
+After an APPROVED `dd-code-reviewer` verdict, `.dadaia/.venv/bin/dadaia worktree merge "$B"` lands it
+on the work branch. The release is born in its `<M.m.p>/rc-<N>/wt-rc` worktree, the rc's
+integration branch that its jobs' `job-<n>/wt-main` trees merge into; the block keeps the
+default origin, because `--origin backlog:my-first-idea` names an entry that is not on the work
+branch until that merge lands:
+
+```bash
+V=$(git -C "repos/$SLUG" branch --list 'feature/*' --format='%(refname:short)' | sed 's|^feature/||')
+R=$(.dadaia/.venv/bin/dadaia worktree new "$SLUG" "$V/rc-1/wt-rc" | sed 's/^\[ok\] //')
+python3 .agents/skills/dd-release-implementation/scripts/release.py new "$V" --specs "$R/specs"
+```
+
+- **Level 1 — workspace.** `uvx dadaia-workspace init` provisions `demo/` with its own
+  virtualenv; every later command runs through the workspace's CLI,
+  `.dadaia/.venv/bin/dadaia`, which `init` prints by its absolute path.
+- **Level 2 — project.** `--repo` clones the repo into `repos/<slug>/`, installs the
+  pre-push and reference-transaction hooks and makes the context (named after the slug) ALIVE; only `context bind`
+  binds a session (§3).
+- **Level 3 — specs.** 3a `specs init` brings the repo's `specs/` to the canon and, on a
+  repo with no work branch, cuts the local one and commits only the scaffold on it; a foreign
+  `specs/` is refused until `--replace-foreign` moves it to `specs-bkp/` (to
+  `specs-bkp/<UTC>/` when a backup already exists).
+  3b the `dd-audit-project` first pass fills memory in the `wt-backlog-first-pass` lane — done when it holds real content,
+  never by a stamp. 3c `context baseline <slug>` publishes the specs. `doctor` prints the
+  next pending step with its `fix:` line at every point.
+
+**Upgrade:** re-run the same `uvx dadaia-workspace init demo --harness claude` line
+from the parent directory; it prints `upgraded A -> B`, `repaired -> B` when the venv's
+build could not be read, or `already at A` when current. A venv whose python cannot start
+is refused with a fix that deletes `.dadaia/.venv` and reruns the init line.
+Then `.dadaia/.venv/bin/dadaia specs init --context <ctx>` refreshes the project's specs law.
+To carry a workspace to another machine, `.dadaia/.venv/bin/dadaia export` writes the artifact
+and `uvx dadaia-workspace init --from <artifact> <dir>` restores it (contexts come back DEAD;
+`context alive` clones them).
+
+## 2. What the init line provisioned
+
+`--harness` names one registered harness: `claude` | `codex` | `kimi-code` | `cursor` |
+`devin` | `copilot`. The directory is required and a directory holding a foreign tree
+is refused with one `fix:` line.
+
+- `.dadaia/.venv`, the `.dadaia/` zones init and install create, `.agents/skills`, and
+  the named harness's projection.
+- the seeded state documents, the harness roster and an absent root `.dadaiaignore`
+  and `prompt.md` (the operator's files), never overwriting existing data.
+- the staged and installed public assets, the one writer of every hook wiring;
+  `--skip-assets` leaves the workspace ungated until
+  `.dadaia/.venv/bin/dadaia public install` runs, and the output says so.
+- with `--repo <url>` (and any repeatable `--associated-repo <url>`), the project
+  cloned and ALIVE, and the pre-push and reference-transaction hooks installed — never bound.
+
+Without `--repo`, a later project is one step:
+`.dadaia/.venv/bin/dadaia context create --main-repo <url> [--associated-repo <url>]`
+clones every repo, installs the hook and makes the context ALIVE; `context bind` binds.
+
+## 3. The bind
+
+```bash
+.dadaia/.venv/bin/dadaia context bind <your-repo>
+.dadaia/.venv/bin/dadaia context show <your-repo> --json
+```
+
+`bind` writes one record, `.dadaia/sessions/<session-id>.json` (context, runtime, pid,
+`bound_at`, `bind_id`, `last_seen_at`), and acquires nothing; the gate and the bind read the session id from the
+environment only. The bind names the session's scope — the
+context's main repo plus its associated repos — and the bound context's memory is
+injected once into the session. The bind is read from the session's own record when it has an
+id, else `DADAIA_CONTEXT`, never the cwd: sitting inside a repository is not a binding.
+
+## 4. Compliance
+
+`doctor` is the one instance validator; three sections run in fixed order —
+`workspace`, `specs`, `ledgers`. Every finding prints as one `<CODE> <verdict>
+<message>` line, every error-class finding carries one fix line (a command, an
+`Agent action: <one act>`, or an `Operator action: <one act>` for what only the human may do), and any
+error-class finding exits 1. There is no score: the findings and the exit code are the
+run. `--fix` moves slop to `.dadaia/reaped/`; a TTL expiry acts by zone class, an OUTPUT
+entry held, an EPHEMERAL one deleted.
+
+## 5. The first backlog entry
+
+`backlog.py new` appends one entry, born `idea`, to `specs/backlog/BACKLOG.json`'s
+`active[]` — the operator's demand queue; from the workspace root `--specs` names the
+context's specs tree, since no `specs/` sits at or above the cwd. The script is the
+document's one writer and validator: every write validates the bytes it is about to
+commit. Only the operator creates demand, and the document is written in a `<v>/wt-backlog-<slug>`
+lane.
+
+## 6. The first release
+
+`release.py new` is one birth act, all or nothing: a `SPEC.md` stub in
+`specs/releases/<id>/rc-1/` plus `_RELEASE.json` in `DEFINITION` at the release root, refusing a second live
+release or a non-SemVer id with a `fix:` line; the stub opens with `## Bug window review`. From there, author
+`SPEC.md`, `PLAN.md` and one job file per job, `tasks/job<n>.md`, in that `rc-<N>/`, `PLAN.md`
+opening with the As-is review table (`unit | today | bugs | verdict | why`) and carrying the
+`## DAG` of jobs with waves and exact write sets; `release.py phase IMPLEMENTATION --sha <sha>` opens
+implementation once SPEC and PLAN carry `**Status:** Approved` and every job file is well formed.
+
+Next: [positioning](positioning.md) for why this shape, [the bug loop](bug-loop.md)
+for the path a defect takes.
+
+# docs/positioning.md
+
+# Positioning
+
+Your product repositories never carry agent configuration. One law governs many
+projects.
+
+## The paradigm
+
+A workspace is one folder, and the agent session launches at its root, always.
+Projects live in repos inside it — `repos/<slug>/` — which take agent work only as
+merges from their worktree hierarchy under `worktrees/<repo>/<M.m.p>/`. Governance lives outside every
+repo: the root `AGENTS.md` map, the scoped `AGENTS.md` files, `.agents/skills`,
+`.agents/agents` and `.dadaia/` sit above them all.
+
+That inversion is the whole position. A repository is a repository: production source,
+its own history, its own CI. What steers an agent — law, skills, personas, hooks,
+memory, releases, backlog, bugs — is workspace state, not repository content.
+
+A workspace holds many contexts and a context many repos. It is never a monorepo, and a
+single-repo context is the minimal case of the multi-repo one.
+
+## The unit is the context
+
+A context — a Spec Context Project — is one canonical `specs/` tree owned by one main
+repository: the unit for memory, backlog, bugs, releases, reports and handoffs. A
+product spanning several repositories is still one project: the context carries
+associated repositories, added by `.dadaia/.venv/bin/dadaia context repo add` and removed by
+`.dadaia/.venv/bin/dadaia context repo remove`, which live and die with it.
+
+The asymmetry is deliberate:
+
+- the main repository owns production source **and** `specs/`;
+- an associated repository owns production source only;
+- specs, bind, memory, releases and backlog resolve from the main repo alone — an
+  associated repo's own `specs/` is never read.
+
+`.dadaia/.venv/bin/dadaia context bind <ctx>` selects a context and nothing else, changing only the
+record of the caller's environment session id; a session without a harness-native id
+exports `DADAIA_SESSION_ID` before it binds, or carries the binding in `DADAIA_CONTEXT`.
+The bind carries a scope — the main repo plus its associated repos — and a MUTATING
+file-tool write into a repo outside it is refused, naming the bind that would allow it;
+an unbound session with an id owns no repo. A repo checkout receives only merges: agents
+write a repo inside its worktrees and land each on its parent by
+`.dadaia/.venv/bin/dadaia worktree merge`, audits aside.
+
+## Ten repositories, one law
+
+A team with ten repositories does not maintain ten copies of anything:
+
+- **Zero agent config in a product repo.** Governance lives outside every repository,
+  and every project in the workspace is governed by that one set.
+- **One authored set, every harness.** Claude Code, Codex, Kimi Code, Cursor, Devin and
+  GitHub Copilot are entry harnesses over the same canonical rules: public assets
+  originate once, installation refreshes their staging, and each harness reads them
+  natively or through its projection.
+- **One project, however many repos.** Ten repositories can be one context or ten
+  contexts. The specs tree follows the product, and the repositories it spans are
+  declared as its associated repos.
+- **Boundaries are mechanical.** Path class, bind scope, root hygiene and
+  the push gate refuse mechanically, each refusal carrying one fix line. No
+  phase and no mode is enforced.
+- **Concurrency stays visible.** Concurrent sessions never block each other; overlap
+  surfaces through git, and nothing waits on a lock.
+
+The consequence for a reviewer: everything that steers the agents is in one tree, so
+changing how ten projects are governed is one diff, and reading how they are governed
+is one place.
+
+See [concepts](concepts.md) for the vocabulary and [quickstart](quickstart.md) for the
+first steps.
+
+# docs/bug-loop.md
+
+# The bug loop
+
+Register → RED → fix → resolve. A confirmed bug in code the work branch holds uses a hotfix lane;
+after CLOSURE a block-list bug in code only the `wt-rc` holds is fixed on that `wt-rc`;
+other bugs enter the approved release scope through its ordinary job structure.
+
+## 1. Register — ask first
+
+A bug is a merged change that reproducibly breaks a documented contract; a failure inside
+an unmerged worktree is rework. Registration starts with a proposal naming the violated
+contract, one reproducing command already run, why the failure is not agent error and its
+severity. `append` runs only after the operator confirms.
+
+```bash
+python3 .agents/skills/dd-bug-resolution/scripts/bugs.py append \
+  --bug-id doctor-exits-zero-with-errors --reported-by dd-sw-engineer-sr \
+  --title "doctor exits 0 while reporting error findings" \
+  --severity HIGH --component "cli/commands/doctor.py#run" \
+  --context demo --symptom "…" --repro "…" --expected "…" --correlates none
+```
+
+The ledger holds one record per bug, keyed by id. `append` prints each earlier bug whose
+recorded fix files lie under a path the `component` names, with the REBUILD due on that
+path, opens the record, refuses a duplicate id or a `component` naming no tracked path, and
+requires `--correlates` as ledger or archive ids (repeated or comma-separated), or `none`;
+`update --set correlates=<a>,<b>` records a correlate found later. `component` is precise free text; its tracked paths
+are the bug's files. Every supplied value passes the same privacy check used by the push gate.
+
+Not a bug: an agent mistake, wrong usage, an environment limit, designed validation, law
+ambiguity or a missing feature.
+
+## 2. Lineage, then RED
+
+Read at most the 20 most recent records sharing the bug's recorded fix files or component since the
+newest archived audit. Inspect each prior fix, the commit whose `fix(bugs): <id>` or
+`refactor(bugs): <id>` line names its bug (the recorded `fix_sha` is only a hint), and blame the production
+lines the new fix replaces. End with `caused_by: <bug-id> | <task-id> | none`; use `none`
+only when blame offers no candidate.
+
+Two or more prior fixes on the touched module require a REBUILD that keeps the regression
+tests. Then add the lowest-level case that fails for the real cause before production code
+moves. Existing assertions remain contract evidence.
+
+## 3. Fix at the owning seam
+
+Replace the faulty path and let the RED case turn GREEN. Prefer deletion and locality over
+a wrapper around the old behavior. The fix commit's `fix(bugs): <id>` line (a REBUILD's `refactor(bugs): <id>`) is its cite, so a
+rebase or sync that keeps the message keeps the fix found; `resolve` derives `fix_sha` and `fix_files` from it; its production numstat is the source for any later diff-direction analysis.
+
+## 4. Resolve with persisted facts
+
+```bash
+python3 .agents/skills/dd-bug-resolution/scripts/bugs.py resolve <bug-id> \
+  --cause "…" --caused-by none --solution "…"
+```
+
+- `resolve` requires `cause`, `caused_by` and `solution`, derives `fix_sha`, then stamps
+  `status: resolved` and `closed_at`.
+- `caused_by` names a live or archived bug, a known release task, or `none`; `check`
+  refuses a dangling link or loop.
+- `supersede --by` and `reject --reason` are the other terminal transitions.
+- `update <id> --set field=value` uses the schema's mutability classes and cannot replace
+  transition-owned state.
+- Every write validates the candidate bytes before atomic replacement, so refusal leaves
+  both ledger files unchanged.
+
+`bugs.py archive <ids…>` moves exactly the named terminal records into
+`specs/bugs/_archive/bugs_histo.jsonl`. The archive retains historical record shapes as
+readable history; new writes use the lean schema.
+
+# docs/bug-ledger-lessons.md
+
+# What the bug ledger taught
+
+Every bug is one record in `specs/bugs/BUGS.jsonl`, appended once and keyed by id. The
+record keeps product facts: where the defect appeared, what contract failed and, after
+resolution, its `cause`, `solution`, `caused_by` and `fix_sha`. Git remains the history
+of that line and the authority for the implementation diff.
+
+`caused_by` turns the ledger into a navigable history. Follow it and bug families appear:
+each link says which prior bug or task wrote the lines corrected by the later fix. Inspect
+the fix commit, found by its `fix(bugs)` or `refactor(bugs)` id line, to see what actually changed.
+
+## Measuring the ledger
+
+The ledger verbs report current counts without copying them into prose:
+
+```bash
+python3 .agents/skills/dd-bug-resolution/scripts/bugs.py stats
+python3 .agents/skills/dd-bug-resolution/scripts/bugs.py status --all
+```
+
+Current bug status is `open | resolved | superseded | rejected`. A terminal status is
+written only by its transition. `resolve` requires the diagnosed cause, implemented
+solution, lineage link and 40-hex fix sha; `supersede` names the replacement; `reject`
+records the reason. A reopen is a new record.
+
+Candidate maturity is not stored on the bug. The next candidate's `SPEC.md`
+`## Bug window review` records KEEP or REBUILD: one KEEP leaves the first-level window;
+a REBUILD leaves after its tested replacement and a following candidate with no child
+bug. The release summary owns delivered, carried and backlog-exit scope.
+
+## Lesson 1 — a per-caller fix breeds the next caller's bug
+
+When a guard lives at only the caller that was caught, the next unguarded caller becomes
+the next bug. The structure that ends the family is one deep module every writer uses.
+The context registry is the example: `create`, `repo add` and import share one ownership
+check, and `INV-6` reports a slug owned by more than one context.
+
+## Lesson 2 — a per-measurement exclusion breeds another measurement bug
+
+When each measurement walks the tree independently, each acquires its own exclusions.
+One enumeration restores locality: guard checks operate on the same tracked-file set, so
+scratch output is outside the measurement by construction.
+
+## Lesson 3 — a derived cache breeds an environment-specific bug
+
+A ledger field that caches a fact available from git becomes wrong wherever history has a
+different shape, especially in a shallow checkout. Find the fix by its id line, with the
+write-once `fix_sha` only a hint a rewrite may orphan; derive numstat, direction and maturity
+from that commit and the bug-window review when needed.
+
+## Standing order
+
+- Read the matching ledger history before proposing a fix. Inspect at most the 20 most
+  recent records and their named fix commits.
+- Use `caused_by: <bug-id> | <task-id> | none`; choose `none` only when blame offers no
+  candidate. Two prior fixes on the touched module require a REBUILD.
+- Prefer a deletion-shaped fix. If the production diff grows, route it through the
+  architecture lens.
+- Derive the bug-surface delta from `git show` of the fix commit, found by its `fix(bugs)` or `refactor(bugs)` id line, and report it in review evidence.
+- Keep one home per definition and let ratchets move downward.
+- Treat an eval BLOCK as a contract failure to diagnose, not a verdict to waive.
+
+Next: [the bug loop](bug-loop.md), or start at the [quickstart](quickstart.md).
+
