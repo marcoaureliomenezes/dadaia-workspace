@@ -15,6 +15,7 @@ from pathlib import Path
 
 from _git import git as git, parse_worktrees, scrubbed_env as scrubbed_env  # isort: skip
 from _grammar import SEMVER_RE, TAG_RE, sole_live
+from _ledger import denylist_file
 from _platform import act, cli_argv, command, git_inline, git_line, inline, is_link, venv_dir
 from _root import STATES
 from _specs import run_cli
@@ -57,13 +58,12 @@ def cli(root: Path, *args: str, tree: Path | None = None) -> subprocess.Complete
     """One read-only run of the workspace CLI — the owner of every package grammar. With *tree*
     the run acts on that tree alone: its cwd, every root above it fenced, so the workspace's
     denylist file is handed over by the loader's own `$DADAIA_PRIVACY_DENYLIST` input."""
-    # the loader's own order: the variable's file when it exists, else the workspace's
-    held = (os.environ.get("DADAIA_PRIVACY_DENYLIST"), str(root / STATES / "privacy_denylist.json"))
-    denylist = next((p for p in held if p and Path(p).exists()), held[1])
     fence = (
         {
             "DADAIA_FENCED_ROOTS": os.pathsep.join(map(str, tree.resolve().parents)),
-            "DADAIA_PRIVACY_DENYLIST": denylist,
+            "DADAIA_PRIVACY_DENYLIST": str(
+                denylist_file(root) or root / STATES / "privacy_denylist.json"
+            ),
         }
         if tree
         else {}
@@ -240,11 +240,13 @@ def _strays(home: Path, folder: Path, listed: set[Path], ancestors: set[Path]) -
     return out
 
 
-def _absent(root: Path, repo: Path, held: set[str], found: list[dict[str, object]]) -> list[dict[str, object]]:  # fmt: skip
+def _absent(root: Path, repo: Path, flow: dict[str, str], held: set[str], found: list[dict[str, object]]) -> list[dict[str, object]]:  # fmt: skip
     """The leftovers git does not list: a `wt/*` branch with no tree (`orphan`), and each stray
     folder under `worktrees/<repo>/` (`unregistered`), one row per path whose removal is its fix."""
     out = []
     home = tree_path(root, repo.name)
+    live = work_versions(repo, flow)  # the one live work branch judges a merged orphan
+    work = f"{flow['work']}{live[0]}" if len(live) == 1 else ""
     for ref in git(repo, "for-each-ref", "--format=%(refname:short)", "refs/heads/wt/").split():
         if f"refs/heads/{ref}" not in held:
             name = ref.removeprefix("wt/")
@@ -253,7 +255,9 @@ def _absent(root: Path, repo: Path, held: set[str], found: list[dict[str, object
             # commits of its own has no exit (the unpublished-branch rule of `context dead` owns
             # it) and a fix that waits on an agent
             if not name_of(ref):
-                if steps := drop_steps(repo, ref, "HEAD"):
+                if work and (steps := drop_steps(repo, ref, work)):
+                    if git(repo, "branch", "--show-current").strip() != work:
+                        steps = [f"run `{git_inline(repo, 'switch', work)}`", *steps]
                     line = act("agent", ", then ".join(steps)) if len(steps) > 1 else git_line(repo, "branch", "-d", ref)  # fmt: skip
                     row |= {"fix": line, "exit": line}
                 else:
@@ -279,7 +283,7 @@ def _repo_rows(root: Path, repo: Path, flow: dict[str, str]) -> list[dict[str, o
             out.append(_row(repo, path, "orphan", name=name, kind=kind_of(name)))
         else:
             out.append(_ours(repo, flow, name, path))
-    return out + _absent(root, repo, {t.get("branch", "") for t in trees}, out)
+    return out + _absent(root, repo, flow, {t.get("branch", "") for t in trees}, out)
 
 
 def _unregistered(repo: Path, trees: list[dict[str, str]]) -> list[dict[str, object]]:
