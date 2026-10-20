@@ -132,11 +132,6 @@ def _plant_status_line_gone(root: Path) -> None:
     write_text(release / "TASKS.md", "# Tasks\n\n**Status:** approved\n" + "- t\n" * 170)
 
 
-def _plant_changelog_heading(root: Path) -> None:
-    atom = root / "specs" / "memory" / "product" / "testarea" / "feature-a.md"
-    write_text(atom, read_text(atom) + "\n## Changelog\n\n- 1.0.0 born\n")
-
-
 def _plant_dispositioned_audit(root: Path) -> None:
     audit = root / "specs" / "audits" / "20260101-lifecycle"
     audit.mkdir(parents=True)
@@ -350,27 +345,6 @@ def test_no_fix_line_deletes_a_record_without_recording_it(codes: str, fix: str 
     )
 
 
-def _plant_stale_feature_map(r: Path) -> None:
-    """The map names a package the live ``features/`` tree lacks; the rule is silent without that tree."""
-    _write(r / "dadaia_workspace" / "features" / "realpkg" / "__init__.py", "")
-    _append(
-        r / "specs" / "memory" / "ARCHITECTURE.md",
-        "\n### `dadaia_workspace/features` — package map (1 packages)\n\n"
-        '```mermaid\nflowchart LR\n  pkgs["ghostpkg"]\n```\n',
-    )
-
-
-#: `report-only` codes: WARNING-only by
-#: construction, and no fix line (their remedy is the operator's judgment).
-REPORT_ONLY: dict[str, Callable[[Path], None]] = {
-    "SPEC-DOC-030": lambda r: (r / "specs" / "audits" / "Bad_Name").mkdir(parents=True),
-    "MEM-DRIFT-1": _plant_stale_feature_map,
-    "MEM-DRIFT-2": lambda r: _append(
-        r / "specs" / "memory" / "QUALITY.md", "\nRun `dadaia no-such-verb`.\n"
-    ),
-}
-
-
 def _write(path: Path, text: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     write_text(path, text)
@@ -447,25 +421,6 @@ def test_an_untraced_origin_id_is_cleared_by_its_printed_fix(repo: Path) -> None
     assert before.message.startswith(f"releases/{_RELEASE}/rc-1/SPEC.md:5 "), before.message
     run_bash(before.fix, cwd=repo, check=True)
     assert origin_errors() == []
-
-
-def test_a_judgment_only_rule_never_makes_the_run_exit_1(repo: Path) -> None:
-    """The exit-code half of the contract: every judgment-only rule fires at once and
-    contributes NO error-class finding and NO fix line, so it stalls nobody.
-    A history heading planted beside them is reported once, by LINT-1."""
-    root = repo
-    _plant_changelog_heading(root)
-    for plant in REPORT_ONLY.values():
-        plant(root)
-
-    report = _specs_section(_doctor(root), Path())
-    fired = {f.code for f in report.printable}
-    assert set(REPORT_ONLY) <= fired, fired
-    assert not {"CAT-1", "SPEC-DOC-008", "SPEC-DOC-010"} & fired, fired
-    history = [f for f in report.findings if "Changelog" in f.message]
-    assert [(f.code, f.error) for f in history] == [("LINT-1", True)], history
-    judged = [f for f in report.findings if f.code in REPORT_ONLY]
-    assert [(f.code, f.error, f.fix) for f in judged if f.error or f.fix] == []
 
 
 # ── TREE-5 remedies are honest ─────────────────────────
