@@ -188,5 +188,5 @@ def test_fix_commit_returns_the_older_of_two_same_subject_fixes_when_the_newer_i
     for subject in (line, line, f'Revert "{line}"'):
         _sh(*ident, "commit", "-q", "--allow-empty", "-m", subject, cwd=repo)
     older = run(["git", "rev-parse", "HEAD~2"], cwd=repo, env=_clean(), check=True).stdout.strip()
-    found = load_owner("dd-bug-resolution", "_git").fix_commit(repo, ["b1"])
+    found = load_owner("dd-bug-resolution", "_git").fix_commit([repo], ["b1"])
     assert found == {"b1": (repo, older)}

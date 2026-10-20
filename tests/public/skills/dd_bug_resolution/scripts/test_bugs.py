@@ -1392,7 +1392,7 @@ def test_fix_commit_hands_git_no_id(tmp_path: Path, monkeypatch: pytest.MonkeyPa
     _fix_commit(tmp_path, "cli/x.py", _FIXED)
     trace, env = _traced(tmp_path)
     monkeypatch.setenv("GIT_TRACE", env["GIT_TRACE"])
-    assert load_owner("dd-bug-resolution", "_git").fix_commit(tmp_path, ["--output=x"]) == {}
+    assert load_owner("dd-bug-resolution", "_git").fix_commit([tmp_path], ["--output=x"]) == {}
     assert not any("--output=x" in ln for ln in _trace_lines(trace))
 
 
