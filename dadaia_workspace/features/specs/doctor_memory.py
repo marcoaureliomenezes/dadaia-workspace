@@ -69,15 +69,6 @@ def _mermaid_block_after_heading(text: str, heading_end: int) -> str | None:
     return block_match.group(1) if block_match else None
 
 
-def _live_feature_package_names() -> set[str]:
-    # The namespace package's empty __init__ loads no sibling: no cross-feature edge.
-    import importlib
-    import pkgutil
-
-    pkg = importlib.import_module("dadaia_workspace.features")
-    return {name for _finder, name, ispkg in pkgutil.iter_modules(pkg.__path__) if ispkg}
-
-
 class MemoryValidator:
     def __init__(self, specs_dir: Path) -> None:
         self.specs_dir = specs_dir
@@ -270,7 +261,8 @@ class MemoryValidator:
         """MEM-DRIFT-1: one WARNING per stale or missing node of ARCHITECTURE.md's features
         package map vs the live tree; silent when the map is absent."""
         architecture_md = self.specs_dir / "memory" / "ARCHITECTURE.md"
-        if not architecture_md.is_file():
+        features = self.specs_dir.parent / "dadaia_workspace" / "features"
+        if not architecture_md.is_file() or not features.is_dir():
             return []
         text = platform.read_text(architecture_md)
         heading = _FEATURES_PKG_MAP_HEADING_RE.search(text)
@@ -279,7 +271,7 @@ class MemoryValidator:
         if pkgs_match is None:
             return []
         declared = {tok.strip() for tok in pkgs_match.group(1).split("·") if tok.strip()}
-        live = _live_feature_package_names()
+        live = {p.name for p in features.iterdir() if (p / "__init__.py").is_file()}
         stale = "ARCHITECTURE.md features package map names '{}' but dadaia_workspace/features"
         stale += " has no such live package — update the diagram (memory drift)."
         missing = "dadaia_workspace/features/{} is a live package not named in ARCHITECTURE.md's"
