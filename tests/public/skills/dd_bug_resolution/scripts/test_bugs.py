@@ -722,7 +722,7 @@ def test_check_reports_a_record_no_commit_cites_and_runs_no_git_on_its_fix_sha(
     script: Path, tmp_path: Path, sha: str
 ) -> None:
     sha = sha.format(planted=tmp_path / "planted")
-    specs = _ledger(tmp_path, {**_OPEN_RECORD, "fix_sha": sha})
+    specs = _ledger(tmp_path, _resolved("a-bug", sha))
     trace, env = _traced(tmp_path)
     done = _run(script, "check", "--specs", str(specs), env=env)
     assert done.returncode == 1 and "'a-bug' fix_sha" in done.stdout + done.stderr
