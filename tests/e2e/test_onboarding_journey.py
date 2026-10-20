@@ -11,10 +11,10 @@ crosses — uvx's own environment, the workspace venv provisioning, the clone, t
 the specs scaffold, doctor — is crossed by REAL child processes; no in-process runner
 reaches them.
 
-Layout — ONE workspace carries the journey: born on the previous release (level 1),
-upgraded by re-init, then levels 2 and 3 — a real workspace venv is the journey's cost, so
-it is paid once. The current wheel's fresh level 1 is ``test_one_line_bootstrap``'s. After every
-level doctor reports 0 errors and the user repo's HEAD equals its remote's.
+Layout — ONE workspace carries the journey: born on this checkout's wheel (level 1), upgraded
+by re-init with the same code rebuilt under the next ``rc`` label, then levels 2 and 3 — a real
+workspace venv is the journey's cost, so it is paid once. Only builds of this checkout are
+installed. After every level doctor reports 0 errors and the user repo's HEAD equals its remote's.
 
 Real venvs are built here by CHILD processes (``uvx`` and ``init``);
 ``tests/conftest.py``'s ``_no_real_venv_in_tests`` backstop is an in-process monkeypatch
@@ -40,10 +40,10 @@ import pytest
 
 from dadaia_workspace.core.platform import PLATFORM
 from tests.conftest import GIT_QUIET_INCLUDE
+from tests.e2e.test_one_line_bootstrap import _build_wheel
 from tests.fixtures.harness_env import suite_env
 from tests.helpers.oslib import read_text, write_text
 from tests.helpers.oslib import run as os_run
-from tests.helpers.previous_release import previous_release, published_releases
 
 _UVX = shutil.which("uvx")
 
@@ -64,8 +64,12 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 _SOURCE_VERSION: str = tomllib.loads(read_text(_REPO_ROOT / "pyproject.toml"))["tool"]["poetry"][
     "version"
 ]
-# Local version segment: the built wheel differs from the last PyPI release.
-_E2E_VERSION = f"{_SOURCE_VERSION}+e2e"
+# The upgrade's target: the same code under the next label.
+_NEXT_VERSION = (
+    re.sub(r"rc(\d+)$", lambda m: f"rc{int(m[1]) + 1}", _SOURCE_VERSION)
+    if "rc" in _SOURCE_VERSION
+    else f"{_SOURCE_VERSION}.post1"
+)
 
 
 # ── the harness ──────────────────────────────────────────────────────────────────
@@ -192,42 +196,32 @@ class Workspace:
 # ── fixtures ─────────────────────────────────────────────────────────────────────
 
 
-@pytest.fixture(scope="module")
-def wheel(tmp_path_factory: pytest.TempPathFactory) -> Path:
-    """This checkout built offline at ``<version>+e2e``."""
-    root = tmp_path_factory.mktemp("wheel")
+def _wheel(root: Path, version: str) -> Path:
+    """This checkout built offline, its pyproject version replaced by *version*."""
     source = root / "src"
     source.mkdir()
     shutil.copy2(_REPO_ROOT / "README.md", source / "README.md")
     pyproject = read_text(_REPO_ROOT / "pyproject.toml")
-    pyproject = pyproject.replace(
-        f'version = "{_SOURCE_VERSION}"', f'version = "{_E2E_VERSION}"', 1
+    write_text(
+        source / "pyproject.toml",
+        pyproject.replace(f'version = "{_SOURCE_VERSION}"', f'version = "{version}"', 1),
     )
-    write_text(source / "pyproject.toml", pyproject)
     shutil.copytree(
         _REPO_ROOT / "dadaia_workspace",
         source / "dadaia_workspace",
         ignore=shutil.ignore_patterns("__pycache__"),
     )
-    dist = root / "dist"
-    os_run(
-        [
-            str(Path(sys.executable).parent / "pip"),
-            "wheel",
-            "--quiet",
-            "--no-deps",
-            "--no-build-isolation",
-            "--wheel-dir",
-            str(dist),
-            str(source),
-        ],
-        check=True,
-        timeout=_TIMEOUT,
-        env=suite_env(os.environ, Path.home()) | {"PIP_NO_INDEX": "1"},
-    )
-    (built,) = dist.glob("dadaia_workspace-*.whl")
-    assert "+e2e" in built.name, built.name
-    return built
+    return _build_wheel(source, root / "dist")
+
+
+@pytest.fixture(scope="module")
+def wheel(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    return _wheel(tmp_path_factory.mktemp("wheel"), _SOURCE_VERSION)
+
+
+@pytest.fixture(scope="module")
+def next_wheel(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    return _wheel(tmp_path_factory.mktemp("next"), _NEXT_VERSION)
 
 
 @pytest.fixture
@@ -235,39 +229,35 @@ def env(tmp_path: Path, wheel: Path) -> Env:
     return Env(tmp_path, wheel)
 
 
-# ── one operator's journey: born on the previous release, upgraded, then levels 2 and 3 ──
+# ── one operator's journey: born on this build, upgraded to the next label, then levels 2 and 3 ──
 
 
-def test_an_operator_journey_from_the_previous_release(env: Env) -> None:
-    """Level 1 is ``init --repo`` on the previous PyPI release; re-``init`` with the ``+e2e``
-    wheel is the upgrade On that workspace, level 2: a failed ``context
+def test_an_operator_journey_through_an_upgrade(env: Env, next_wheel: Path) -> None:
+    """Level 1 is ``init --repo`` on this checkout's wheel; re-``init`` with the same code under
+    the next label is the upgrade. On that workspace, level 2: a failed ``context
     create`` leaves nothing, its retry and a second project with an associated
     repo clone clean; the guidance names level 3; level 3 ``specs init``. Clean after
-    every level. The current wheel's own level 1 is ``test_one_line_bootstrap``'s."""
+    every level. A fresh level 1 is ``test_one_line_bootstrap``'s."""
     green = env.bare("green")
     ws = Workspace(env, "up")
-    previous = previous_release(_SOURCE_VERSION, published_releases())
-    born = env.uvx(
-        "init", "up", "--harness", "claude", "--repo", green,
-        source=f"dadaia-workspace=={previous}",
-    )  # fmt: skip
+    born = env.uvx("init", "up", "--harness", "claude", "--repo", green)
     assert born.returncode == 0, f"{born.stdout}\n{born.stderr}"
     # The upgrade must not move the user repo's HEAD.
     repo = ws.path / "repos" / "green"
     head = env.git("rev-parse", "HEAD", cwd=repo)
-    done = env.uvx("init", "up")  # no --harness needed
+    done = env.uvx("init", "up", source=str(next_wheel))  # no --harness needed
     assert done.returncode == 0, f"{done.stdout}\n{done.stderr}"
-    assert f"upgraded {previous} -> {_E2E_VERSION}" in done.stdout, done.stdout
+    assert f"upgraded {_SOURCE_VERSION} -> {_NEXT_VERSION}" in done.stdout, done.stdout
     version = ws.dadaia("--version")
-    assert _E2E_VERSION in version.stdout, version.stdout
+    assert _NEXT_VERSION in version.stdout, version.stdout
     # The upgrade never writes a user repo; level 3 commits only the scaffold on the work branch.
     refreshed = ws.dadaia("specs", "init", "--context", "green")
     assert refreshed.returncode == 0, f"{refreshed.stdout}\n{refreshed.stderr}"
     ws.doctor_json("green")
     assert env.git("rev-parse", "HEAD~1", cwd=repo) == head
     assert env.git("log", "-1", "--format=%s", cwd=repo) == "chore: scaffold the dadaia specs"
-    again = env.uvx("init", "up")
-    assert again.returncode == 0 and f"already at {_E2E_VERSION}" in again.stdout
+    again = env.uvx("init", "up", source=str(next_wheel))
+    assert again.returncode == 0 and f"already at {_NEXT_VERSION}" in again.stdout
 
     bad = f"file://{env.fixtures / 'nothere.git'}"
     failed = ws.dadaia("context", "create", "retry", "--main-repo", bad)

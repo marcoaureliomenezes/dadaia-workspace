@@ -1,7 +1,6 @@
 """The eval scripts `evals/scripts/scan.py` and `compare.py`, run as
 a subprocess. scan exits 1 on a token, a missing path or `$SCAN_SECRET`'s value and 0 on a
-clean tree; compare blocks when T1 < 3/3, T2 or T3 < 2/3, or a task at
->= 2/3 on the baseline falls to <= 1/3; T3's baseline result is readout.
+clean tree; compare blocks when T1 < 3/3 or T2 or T3 < 2/3.
 
 Owner: dd-sw-engineer-sr
 """
@@ -74,40 +73,22 @@ def _job(root: Path, task: str, rewards: list[float]) -> None:
         write_text(d / "result.json", json.dumps(body))
 
 
-_OTHER = "t4-other"
 _ALL = {_T1: [1, 1, 1], _T2: [1, 1, 1], _T3: [1, 1, 1]}
-_NONE = {_T1: [0, 0, 0], _T2: [0, 0, 0], _T3: [0, 0, 0]}
 
 
 @pytest.mark.parametrize(
-    ("base", "cand", "expected"),
+    ("cand", "expected"),
     [
-        ({**_ALL, _OTHER: [1, 1, 1]}, {**_ALL, _OTHER: [1, 0, 0]}, 1),
-        (_NONE, {**_ALL, _T1: [1, 1, 0]}, 1),
-        (_NONE, {**_ALL, _T1: [1, 1]}, 1),
-        (_NONE, {_T1: _ALL[_T1], _T3: _ALL[_T3]}, 1),
-        (_NONE, {**_ALL, _T1: [1, 1, 0.5]}, 1),
-        (_NONE, {_T2: _ALL[_T2], _T3: _ALL[_T3]}, 1),
-        (
-            {_T1: [1, 1, 0], _T2: [1, 0, 0], _T3: [1, 0, 0]},
-            {_T1: [1, 1, 1], _T2: [1, 1, 0], _T3: [1, 1, 0]},
-            0,
-        ),
-        ({_T1: [1, 1, 1], _T2: [0, 0, 0]}, {_T1: [1, 1, 1], _T2: [1, 0, 0], _T3: [1, 1, 1]}, 1),
-        ({_T1: [1, 1, 1], _T3: [0, 0, 0]}, {_T1: [1, 1, 1], _T2: [1, 1, 1], _T3: [1, 0, 0]}, 1),
-        (
-            {_T1: [1, 1, 1], _T2: [1, 1, 1], _T3: [1, 1, 1]},
-            {_T1: [1, 1, 1], _T2: [1, 1, 1], _T3: [1, 1, 0]},
-            0,
-        ),
-        (
-            {_T1: [1, 1, 1], _T2: [1, 1, 1], _T3: [0, 0, 0]},
-            {_T1: [1, 1, 1], _T2: [1, 1, 1], _T3: [1, 1, 0]},
-            0,
-        ),
+        ({**_ALL, _T1: [1, 1, 0]}, 1),
+        ({**_ALL, _T1: [1, 1]}, 1),
+        ({_T1: _ALL[_T1], _T3: _ALL[_T3]}, 1),
+        ({**_ALL, _T1: [1, 1, 0.5]}, 1),
+        ({_T2: _ALL[_T2], _T3: _ALL[_T3]}, 1),
+        ({_T1: [1, 1, 1], _T2: [1, 1, 0], _T3: [1, 1, 0]}, 0),
+        ({**_ALL, _T2: [1, 0, 0]}, 1),
+        ({**_ALL, _T3: [1, 0, 0]}, 1),
     ],
     ids=[
-        "planted-drop-outside-the-floors",
         "t1-two-of-three",
         "missing-candidate-trial",
         "task-absent-from-candidate",
@@ -116,17 +97,9 @@ _NONE = {_T1: [0, 0, 0], _T2: [0, 0, 0], _T3: [0, 0, 0]}
         "passing-candidate",
         "t2-below-two-of-three",
         "t3-below-two-of-three",
-        "t3-baseline-pass-is-readout",
-        "t3-baseline-fail-is-readout",
     ],
 )
-def test_compare_gate(
-    tmp_path: Path,
-    base: dict[str, list[float]],
-    cand: dict[str, list[float]],
-    expected: int,
-) -> None:
-    for side, tasks in (("base", base), ("cand", cand)):
-        for task, rewards in tasks.items():
-            _job(tmp_path / side, task, rewards)
-    assert _run("compare.py", tmp_path / "base", tmp_path / "cand") == expected
+def test_compare_gate(tmp_path: Path, cand: dict[str, list[float]], expected: int) -> None:
+    for task, rewards in cand.items():
+        _job(tmp_path, task, rewards)
+    assert _run("compare.py", tmp_path) == expected

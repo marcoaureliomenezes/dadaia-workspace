@@ -1,7 +1,7 @@
 """Docker helpers for the evals graders' no-model rows (ported from the retired evals repo, commit c075ed6).
 
-An image is the task's ``environment/`` plus a ``lib/`` layer written per run: a PyPI pin of the
-baseline, or this checkout's wheel (the one builder, ``_build_wheel``). A missing ``evals/tasks/<task>``
+An image is the task's ``environment/`` plus a ``lib/`` layer written per run: this checkout's
+wheel (the one builder, ``_build_wheel``); no published dadaia-workspace is ever installed. A missing ``evals/tasks/<task>``
 or a missing ``docker`` fails the row by ``AssertionError``; nothing here skips.
 """
 
@@ -17,17 +17,13 @@ from tests.e2e.test_one_line_bootstrap import _build_wheel
 from tests.helpers.oslib import run, write_text
 
 ROOT = Path(__file__).resolve().parents[2]
-BASELINE = "0.4.7"
-VERSIONS = (BASELINE, "candidate")
+VERSIONS = ("candidate",)
 T1 = "t1-cold-onboarding"
 T2 = "t2-block-list-bug"
 
-# Each version's documented onboarding, typed by hand.
+# The documented onboarding, typed by hand.
 _INIT = "dadaia init /workspace --harness claude --repo file:///srv/demo.git"
-HAND = {
-    BASELINE: _INIT,
-    "candidate": f"{_INIT} && /workspace/.dadaia/.venv/bin/dadaia specs init --context demo",
-}
+HAND = {"candidate": f"{_INIT} && /workspace/.dadaia/.venv/bin/dadaia specs init --context demo"}
 
 
 def sh(*cmd: str) -> str:
@@ -52,18 +48,14 @@ def wheel() -> Path:
 
 @functools.cache
 def image(task: str, version: str) -> str:
-    """``evals/tasks/<task>/environment`` built with the lib layer: a PyPI pin, or "candidate"."""
+    """``evals/tasks/<task>/environment`` built with this checkout's wheel as its lib layer."""
     src = task_dir(task) / "environment"
     with tempfile.TemporaryDirectory() as d:
         ctx = Path(d) / "environment"
         shutil.copytree(src, ctx)
         (ctx / "lib").mkdir()
-        if version == "candidate":
-            shutil.copy(wheel(), ctx / "lib")
-            req = f"/lib/{wheel().name}"
-        else:
-            req = f"dadaia-workspace=={version}"
-        write_text(ctx / "lib" / "requirements.txt", req + "\n")
+        shutil.copy(wheel(), ctx / "lib")
+        write_text(ctx / "lib" / "requirements.txt", f"/lib/{wheel().name}\n")
         tag = f"dadaia-workspace-evals-{task}:{version}"
         sh("docker", "build", "-q", "-t", tag, str(ctx))
     return tag

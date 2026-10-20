@@ -1,4 +1,4 @@
-"""T2 block-list: on each version the grader passes the planted correct fix and
+"""T2 block-list: on this checkout's wheel the grader passes the planted correct fix and
 fails the planted assert-rewriting one,
 and a removed or edited assertion in any form (``tests/fixtures/evals/t2/``).
 

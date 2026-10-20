@@ -111,7 +111,7 @@ jobs:
   publish:
     name: Publish to PyPI (OIDC trusted publishing)
     runs-on: ubuntu-latest
-    needs: [release-please, build, approve]
+    needs: [release-please, build, approve, smoke-test]
     if: needs.release-please.outputs.release_created == 'true'
     environment: pypi
     # The tag already exists — release-please minted it — so this job never writes
@@ -129,43 +129,27 @@ jobs:
       - uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b  # v1.14.0
 
   smoke-test:
-    name: Install from PyPI + smoke run
+    name: Smoke run on the built wheel
     runs-on: ubuntu-latest
-    needs: [release-please, build, publish]
+    needs: [release-please, build]
     if: needs.release-please.outputs.release_created == 'true'
     permissions:
       contents: read
     timeout-minutes: 10
-    env:
-      VERSION: ${{ needs.build.outputs.version }}
     steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
+        with:
+          name: dist-${{ needs.build.outputs.version }}
+          path: dist/
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
         with:
           python-version: "3.12"
-      - name: Wait for the published version to appear on PyPI
-        # A fixed sleep is a guess in both directions: too short and the install below
-        # fails on a release that was fine, too long and every release pays for the
-        # worst case. Poll the index for the exact version instead, and say which one
-        # never arrived.
-        run: |
-          for _ in $(seq 1 10); do
-            if pip download --no-deps --no-cache-dir \
-                "dadaia-workspace==$VERSION" -d "$RUNNER_TEMP/pypi-probe"; then
-              exit 0
-            fi
-            sleep 30
-          done
-          echo "::error::dadaia-workspace==$VERSION did not appear on PyPI within 5 minutes."
-          exit 1
-      - name: pip install released version
-        run: pip install "dadaia-workspace==$VERSION"
-      - name: dadaia --help
-        run: dadaia --help
       - run: pipx install uv==0.11.16
-      - name: Greenfield from PyPI (init --repo + specs init + doctor)
-        # AC8.3: the published wheel walks the three levels over a file:// bare repo
+      - name: Greenfield from the wheel (init --repo + specs init + doctor)
+        # AC8.3: the built wheel walks the three levels over a file:// bare repo
         # created here; the runner temp dir keeps it portable (no hardcoded /tmp).
         run: |
+          whl=$(ls "$GITHUB_WORKSPACE"/dist/*.whl)
           git config --global user.name smoke
           git config --global user.email smoke@example.invalid
           git config --global init.defaultBranch main
@@ -174,7 +158,7 @@ jobs:
           git -C "$src" init -q && git -C "$src" add -A && git -C "$src" commit -qm init
           git clone -q --bare "$src" "$RUNNER_TEMP/smoke.git"
           cd "$RUNNER_TEMP"
-          uvx "dadaia-workspace==$VERSION" init smoke-ws --harness claude \
+          uvx --from "$whl" dadaia-workspace init smoke-ws --harness claude \
             --repo "file://$RUNNER_TEMP/smoke.git"
           cd smoke-ws
           .dadaia/.venv/bin/dadaia specs init --context smoke

@@ -26,7 +26,11 @@ sys.path.insert(0, str(ROOT))
 from run import _CI, tracked  # noqa: E402
 
 from dadaia_workspace.core.fixed_sections import authored_text, extract_fixed_section  # noqa: E402
-from dadaia_workspace.core.gitflow import read_gitflow  # noqa: E402
+from dadaia_workspace.core.gitflow import (  # noqa: E402
+    live_release_id,
+    read_gitflow,
+    resolve_live_candidate,
+)
 from dadaia_workspace.core.specs_version import state as specs_state  # noqa: E402
 from dadaia_workspace.features.specs.canon import CANON  # noqa: E402
 from dadaia_workspace.infrastructure.ledger_scripts import load_owner  # noqa: E402
@@ -59,6 +63,7 @@ _SKILLS_REPO = re.compile(
 # Both dated release headings: hand-written `## [x.y.z] — date`, release-please's `(date)`.
 # the one poetry floor: GHSA-2599-h6xx-hpxp (wheel path traversal), GHSA-73h3-mf4w-8647
 _POETRY_FLOOR = (2, 3, 4)
+_PUBLISHED = r"dadaia-workspace(==|@)[0-9$]|previous_release"
 _POETRY_PIN = re.compile(r"poetry==(\d+(?:\.\d+)*)")
 _CHANGELOG_TOP = re.compile(
     r"^## \[(\d+\.\d+\.\d+)\](?:\([^)]*\))? (?:[-—] \d{4}-\d{2}-\d{2}|\(\d{4}-\d{2}-\d{2}\))\s*$",
@@ -380,13 +385,35 @@ def workflow_never_rules(tree: Tree) -> list[str]:
         # the action mints the tag, never workflow arithmetic
         "hand-computed-tag": [line for line in release_runs if "git tag " in line],
         "hand-listed-tags": [line for line in release_runs if "git ls-remote --tags" in line],
+        # only the build under test is installed; third-party dependencies still resolve from PyPI
+        "published-dadaia-workspace-install": subprocess.run(
+            [
+                "git",
+                "grep",
+                "-nIE",
+                _PUBLISHED,
+                "--",
+                ".github",
+                "tests",
+                "evals",
+                "scripts",
+                ":!scripts/guards/repo.py",
+            ],
+            cwd=tree.root,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            check=False,
+        ).stdout.splitlines(),  # fmt: skip
     }
     return [f"{rule}: {hits}" for rule, hits in never.items() if hits]
 
 
 def release_workflow_canon(tree: Tree) -> list[str]:
     """The main-only pinned release-please, the one gated publish chain, the manifest
-    floor and patch rule, and the pyproject version equal to the CHANGELOG's top section."""
+    floor and patch rule, the CHANGELOG's top section equal to the manifest, and the pyproject
+    version either the live release's newest ``rc`` label or the number release-please wrote."""
     doc = _yaml(tree, _RELEASE)
     on, jobs = _on(doc), _jobs(doc)
     rp, build = jobs.get("release-please", {}), jobs.get("build", {})
@@ -407,6 +434,10 @@ def release_workflow_canon(tree: Tree) -> list[str]:
     sections = {e["type"]: e for e in config.get("changelog-sections") or []}
     minted = tomllib.loads(tree.read("pyproject.toml"))["tool"]["poetry"]["version"]
     top = _CHANGELOG_TOP.search(tree.read("CHANGELOG.md"))
+    specs = tree.root / "specs"
+    live, cand = live_release_id(specs), resolve_live_candidate(specs)
+    label = f"{live}{cand.name.replace('-', '')}" if live and cand else None
+    final = manifest["."] if live in (None, manifest["."]) else None
     tags = subprocess.run(
         ["git", "tag", "-l", "v*", "--sort=version:refname"],
         cwd=tree.root, capture_output=True, text=True, encoding="utf-8", errors="replace", check=False,
@@ -439,7 +470,8 @@ def release_workflow_canon(tree: Tree) -> list[str]:
         "ci-gated-build": jobs.get("ci", {}).get("uses") == "./.github/workflows/ci.yml"
         and "ci" in _needs(build),
         "no-pytest": not any("pytest" in yaml.safe_dump(job) for job in jobs.values()),
-        "manifest-floor": set(manifest) == {"."} and minted == manifest["."],
+        "manifest-floor": set(manifest) == {"."},
+        "version-label": minted in (label, final),
         # the floor is the last published tag (a shallow clone has none)
         "published-floor": not tags or tags[-1] == f"v{manifest['.']}",
         "minor-pre-major": config.get("bump-minor-pre-major") is True,
@@ -451,10 +483,14 @@ def release_workflow_canon(tree: Tree) -> list[str]:
         "changelog-sections": {"feat", "fix", "refactor", "docs", "ci", "test", "chore"}
         <= set(sections),
         "changelog-dated": top is not None,
-        "version-equals-changelog": top is None or top.group(1) == minted,
+        "version-equals-changelog": top is None or top.group(1) == manifest["."],
+        "smoke-before-publish": "smoke-test" in _needs(jobs.get("publish", {})),
+    }
+    hint = {
+        "version-label": f"pyproject.toml reads {minted}; fix: set pyproject.toml version to {label or final}"
     }
     return [
-        f"{c}: release.yml / release-please / version clause broken"
+        f"{c}: {hint.get(c, 'release.yml / release-please / version clause broken')}"
         for c, ok in clauses.items()
         if not ok
     ]
@@ -1028,8 +1064,8 @@ CHECKS: dict[str, Check] = {
             "tag-push-trigger": _workflow("      - run: echo\n", "{push: {tags: [v*]}}"),
             "publishing-job-without-the-release-gate": _edit(
                 _RELEASE,
-                "    needs: [release-please, build, approve]\n",
-                "    needs: [build, approve]\n",
+                "    needs: [release-please, build, approve, smoke-test]\n",
+                "    needs: [build, approve, smoke-test]\n",
             ),
             "publishing-job-ungated": _edit(_RELEASE, f"    if: {_GATE}\n", "    if: always()\n"),
             "hand-listed-tags": _edit(
@@ -1100,6 +1136,11 @@ CHECKS: dict[str, Check] = {
             "manifest-floor": _edit(".release-please-manifest.json", '"."', '"x": "1", "."'),
             "version-label": _re("pyproject.toml", r'(?m)^version = ".*"', 'version = "0.4.7"'),
             "published-floor": _tag,
+            "smoke-before-publish": _edit(
+                _RELEASE,
+                "    needs: [release-please, build, approve, smoke-test]\n",
+                "    needs: [release-please, build, approve]\n",
+            ),
             "patch-below-one": _edit(
                 "release-please-config.json",
                 '"bump-patch-for-minor-pre-major": true',

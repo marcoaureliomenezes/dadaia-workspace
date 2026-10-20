@@ -4,11 +4,6 @@ name: eval
 # The guard no-model-api-in-ci (scripts/guards/repo.py) judges every line of it.
 on:
   workflow_dispatch:
-    inputs:
-      baseline:
-        description: dadaia-workspace release the baseline run installs from PyPI (default 0.4.7)
-        required: false
-        type: string
   schedule:
     - cron: '0 6 * * 1'
 permissions:
@@ -21,7 +16,6 @@ jobs:
     runs-on: ubuntu-24.04
     environment: evals
     env:
-      BASELINE: ${{ inputs.baseline || '0.4.7' }}
       CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
       CLAUDE_FORCE_OAUTH: "1"
       SCAN_SECRET: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
@@ -33,16 +27,9 @@ jobs:
       - run: pipx install harbor==0.23.0
       # The candidate is this checkout: the dispatched ref, or main on the schedule.
       - name: Build the candidate wheel
-        run: |
-          v=$(python3 -c 'import json; print(json.load(open("release-please-config.json"))["packages"]["."].get("release-as", ""))')
-          if [ -n "$v" ]; then poetry version "$v"; fi
-          poetry build -f wheel
-      # environment/lib/ is each image's last layer: requirements.txt names a pinned PyPI
-      # release, or the wheel beside it. Written per run, never committed.
-      - name: Run on the baseline release
-        run: |
-          for t in evals/tasks/*/; do mkdir -p "$t/environment/lib"; echo "dadaia-workspace==$BASELINE" > "$t/environment/lib/requirements.txt"; done
-          harbor run -p evals/tasks -a claude-code -m anthropic/claude-sonnet-5 --ak version=$CLAUDE_CODE_VERSION -k 3 -n 2 -o evals/jobs/base
+        run: poetry build -f wheel
+      # environment/lib/ is each image's last layer: the wheel and the requirements.txt naming it.
+      # Written per run, never committed.
       - name: Run on the candidate wheel
         run: |
           w=$(ls dist/*.whl)
@@ -50,7 +37,7 @@ jobs:
           harbor run -p evals/tasks -a claude-code -m anthropic/claude-sonnet-5 --ak version=$CLAUDE_CODE_VERSION -k 3 -n 2 -o evals/jobs/cand
       - name: Compare
         id: compare
-        run: python3 evals/scripts/compare.py evals/jobs/base evals/jobs/cand > evals/summary.md
+        run: python3 evals/scripts/compare.py evals/jobs/cand > evals/summary.md
         continue-on-error: true
       - run: python3 evals/scripts/scan.py evals/jobs evals/summary.md
       - run: cat evals/summary.md >> "$GITHUB_STEP_SUMMARY"
