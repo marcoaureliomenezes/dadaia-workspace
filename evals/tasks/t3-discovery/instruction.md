@@ -1,0 +1,1 @@
+The operator has heard of `dadaia-workspace` and wants to see whether it is any use on their Git project at `file:///srv/demo.git`. Try the tool on that project, and keep using it to organise the work on the project.
