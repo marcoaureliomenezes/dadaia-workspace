@@ -16,6 +16,8 @@ import pytest
 
 from dadaia_workspace.core.cli_line import git_line, shell_line
 from dadaia_workspace.core.skill_owner import load_owner
+from tests.core.test_cli_line__fix_line_contract import fix_defect
+from tests.fixtures.harness_env import run_bash
 from tests.helpers import worktree_ws
 from tests.helpers.oslib import inline, link, read_text, run, write_text
 from tests.helpers.skill_scripts import stage_skill_scripts
@@ -103,9 +105,13 @@ def test_a_job_after_closure_is_refused_with_a_fix_that_can_work(definition_root
 
     assert (refused.returncode, refused.stdout) == (1, "")
     [fix] = _fixes(refused)
-    assert "phase IMPLEMENTATION" not in fix, fix
-    assert "wt-hotfix" in fix or "release.py new" in fix, fix
+    release = worktree_ws.SCRIPT.parents[2] / "dd-release-implementation/scripts/release.py"
+    specs = definition_root / "worktrees/r" / RC / "specs"
+    stack = inline(sys.executable, str(release.resolve()), "new", "0.5.0", "--specs", str(specs))
+    assert fix == f"fix: Agent action: run {stack}"
+    assert not fix_defect(fix.removeprefix("fix: ")), fix
     assert not (definition_root / "worktrees/r" / NEW_JOB).exists()
+    run_bash(stack, cwd=definition_root, check=True)  # the act, run as printed, is not refused
 
 
 def test_a_main_tree_reads_the_phase_on_its_rcs_tree_not_the_work_branch(
