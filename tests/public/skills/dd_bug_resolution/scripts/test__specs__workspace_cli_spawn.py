@@ -163,3 +163,16 @@ def test_a_repo_nested_under_a_fenced_workspace_starts_no_cli_of_it(
     monkeypatch.setenv("DADAIA_FENCED_ROOTS", str(root))
     assert specs.context_repos(probe) == [probe]
     assert not log.exists()
+
+
+def test_a_path_that_is_no_repository_starts_no_cli_of_the_workspace_it_is_run_from(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    specs = load_owner("dd-bug-resolution", "_specs")
+    log = tmp_path / "spawns"
+    root = _workspace(tmp_path / "ws", f"#!python\nopen({str(log)!r}, 'a').write('x')\nprint('[]')\n")
+    (loose := tmp_path / "loose").mkdir()
+    monkeypatch.chdir(root)
+    monkeypatch.setenv("DADAIA_FENCED_ROOTS", str(root))
+    assert specs.context_repos(loose) == [loose]
+    assert not log.exists()
