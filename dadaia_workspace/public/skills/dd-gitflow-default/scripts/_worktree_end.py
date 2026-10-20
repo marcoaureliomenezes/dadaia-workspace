@@ -93,7 +93,10 @@ def _kept(tree: Path, verb: str, keep: list[str], drop: bool) -> list[str]:
     if left and not drop:
         raise Refusal(
             f"ignored files would be lost: {', '.join(left)}",
-            command(*LAUNCH, verb, str(tree), "--keep", *precious),
+            act(
+                "agent",
+                f"keep them with `{inline(*LAUNCH, verb, str(tree), '--keep', *precious)}` or discard them with `{inline(*LAUNCH, verb, str(tree), '--drop')}`",
+            ),  # fmt: skip
         )
     return [p for p in precious if p in keep]
 
@@ -260,14 +263,16 @@ def _refuse_implementation_tests(tree: Path, onto: str, law: str) -> None:
     commits = git(tree, "rev-list", "--reverse", f"{onto}..HEAD").split()
     for commit in commits:
         subject = git(tree, "show", "-s", "--format=%s", commit).strip()
-        paths = git(tree, "diff-tree", "--no-commit-id", "--name-only", "-r", commit).split()
+        paths = git(tree, "diff-tree", "--no-commit-id", "--name-only", "-r", "-z", commit).split(
+            "\0"
+        )[:-1]
         if subject.startswith("test("):
             if source := next((path for path in paths if not _is_test_path(path, declared)), None):
                 raise Refusal(
                     f"test commit {commit[:12]} touches source path {source}",
                     act(
                         "agent",
-                        f"move {source} to the implementation commit and keep this test commit tests-only",
+                        f"move {source} to the implementation task and keep this test commit tests-only",
                     ),
                 )
             continue
@@ -392,16 +397,15 @@ def _check_approved(root: Path, tree: Path, work: str, name: str) -> None:
         ),
         None,
     )
-    if invalid or not decided:
-        raise Refusal(
-            f"the newest {REVIEWER} handoff naming HEAD {head} or a sha of its patch and message"
-            " series is not a valid APPROVED (the file comes from the reviewer's verdict)",
-            command(*cli_words(root, "reports", "validate", *((invalid, "--reviewed-root", str(tree)) if invalid else ("--all",))))
-        )  # fmt: skip
+    said = f"the newest {REVIEWER} handoff naming HEAD {head} or a sha of its patch and message series is not a valid APPROVED (the file comes from the reviewer's verdict)"  # fmt: skip
+    if invalid:
+        raise Refusal(said, command(*cli_words(root, "reports", "validate", invalid, "--reviewed-root", str(tree))))  # fmt: skip
+    dispatch = act("agent", f"dispatch {REVIEWER} on {tree} at HEAD {head}; its verdict.py run writes the verdict")  # fmt: skip
+    if not decided:
+        raise Refusal(said, dispatch)
     want = diff_sha256(tree, work, head)
     if any(row[3].get("diff_sha256") != want for row in decided):
-        raise Refusal(f"no {REVIEWER} verdict binds the diff {head} lands",
-                      act("agent", f"dispatch {REVIEWER} on {tree} at HEAD {head}; its verdict.py run writes the verdict"))  # fmt: skip
+        raise Refusal(f"no {REVIEWER} verdict binds the diff {head} lands", dispatch)
 
 
 def digest(root: Path, path: str, sha: str) -> str:
@@ -479,7 +483,10 @@ def clean(root: Path, path: str, keep: list[str], drop: bool) -> str:
     if ahead:
         raise Refusal(
             f"{branch(name)} holds {ahead} unmerged commit(s)",
-            command(*LAUNCH, "merge", str(tree)),
+            act(
+                "agent",
+                f"dispatch {REVIEWER} on {tree} at its HEAD, then run `{inline(*LAUNCH, 'merge', str(tree))}`",
+            ),  # fmt: skip
         )
     _refuse_dirty(tree)
     _remove(_into(repo, onto), tree, name, _kept(tree, "clean", keep, drop))
