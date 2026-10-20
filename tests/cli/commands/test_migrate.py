@@ -9,6 +9,8 @@ import pytest
 from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app
+from dadaia_workspace.features.migrate.state_v2 import plan_migration
+from dadaia_workspace.infrastructure.json_context_store import SCHEMA_VERSION, JsonContextStore
 from tests.helpers.oslib import read_text, write_text
 
 _runner = CliRunner()
@@ -29,3 +31,14 @@ def test_migrate_prints_the_stamp_the_registry_carries_after_it(
     stamp = json.loads(read_text(path))["schema_version"]
     assert f"→ '{stamp}'" in preview.output, preview.output
     assert f"is now at schema_version {stamp}." in done.output, done.output
+
+
+def test_a_registry_at_the_current_stamp_is_reported_at_that_stamp(tmp_path: Path) -> None:
+    states = tmp_path / ".dadaia" / "states"
+    states.mkdir(parents=True)
+    write_text(
+        states / "spec_contexts.json",
+        json.dumps({"schema_version": str(SCHEMA_VERSION), "contexts": []}),
+    )
+
+    assert plan_migration(JsonContextStore(states)).schema_version_before == str(SCHEMA_VERSION)
