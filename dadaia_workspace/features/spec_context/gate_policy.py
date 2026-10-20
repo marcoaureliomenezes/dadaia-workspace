@@ -123,7 +123,8 @@ def evaluate(
     PROTECTED blocks first (fail-closed). A MUTATING write into an owned repo outside the
     bind's *repos* is refused with ``context bind <owner>`` — an unbound session with an id
     owns nothing; an id-less one bound by env is told to relaunch; an id-less
-    unbound one is the declared gap. Then every write in zone ``repo`` is
+    unbound one is the declared gap, unless the write lands inside a git-linked worktree of
+    this workspace (scope follows the tree, never a rebind). Then every write in zone ``repo`` is
     refused with the ``dadaia worktree list`` fix. Everything else ALLOWS.
     """
     cls, hit = classify_path(rel_path, projected, protected, root=root)
@@ -134,7 +135,15 @@ def evaluate(
         return Decision.BLOCK, message + spell_fix(fix)
     if cls == PathClass.ADDITIVE or repo is None:
         return Decision.ALLOW, ""
-    if owner is not None and repo not in repos and (context is not None or has_id):
+    in_linked_tree = zone == "worktree" and workspace_layout.linked_tree_depths(
+        Path(root), rel_path.replace("\\", "/").strip("/").split("/")
+    )
+    if (
+        owner is not None
+        and repo not in repos
+        and (context is not None or has_id)
+        and not in_linked_tree
+    ):
         message = _SCOPE_MESSAGE.format(
             rel_path=rel_path,
             repo=repo,

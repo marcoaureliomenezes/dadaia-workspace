@@ -308,6 +308,12 @@ def _anchors(root: Path, entry: Path) -> bool:
     return Path(back).resolve() == entry.resolve()
 
 
+def linked_tree_depths(root: Path, parts: list[str]) -> list[int]:
+    """The depths (in *parts*, workspace-relative) of every ancestor below ``worktrees/<r>``
+    holding a ``.git`` file that git linked from a repo of this workspace (``_anchors``)."""
+    return [k for k in range(3, len(parts)) if _anchors(root, root.joinpath(*parts[:k], ".git"))]
+
+
 def protected_glob(root: Path, rel: str, protected: tuple[str, ...]) -> str | None:
     """The protected glob a prefix of the repo-relative part of *rel* (workspace-relative, under
     *root*) matches, else ``None``. Under ``repos/<r>/`` the root is the repo; under
@@ -321,9 +327,7 @@ def protected_glob(root: Path, rel: str, protected: tuple[str, ...]) -> str | No
     tail = parts[2:]
     anchors = [0]
     if zone == "worktree":
-        anchors = [
-            k - 2 for k in range(3, len(parts)) if _anchors(root, root.joinpath(*parts[:k], ".git"))
-        ] or list(range(len(tail)))
+        anchors = [k - 2 for k in linked_tree_depths(root, parts)] or list(range(len(tail)))
     subs = ("/".join(tail[i : j + 1]) for i in anchors for j in range(i, len(tail)))
     return next((g for sub in subs for g in protected if _matches(sub, g)), None)
 
