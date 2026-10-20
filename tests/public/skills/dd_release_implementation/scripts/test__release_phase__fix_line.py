@@ -187,3 +187,17 @@ def test_the_closure_spares_the_row_of_the_tree_it_runs_from(
     row = _row(str(closing.parent), kind=kind)
     monkeypatch.setattr(_PHASE, "_worktree_rows", lambda _root: [row])
     assert _PHASE._refuse_open_worktrees(closing.resolve()) is None
+
+
+def test_the_closure_outside_any_git_checkout_refuses_with_one_fix_line(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("DADAIA_FENCED_ROOTS", raising=False)
+    (tmp_path / ".dadaia/states").mkdir(parents=True)
+    (tmp_path / ".dadaia/states/spec_contexts.json").write_text("{}", encoding="utf-8")
+    specs = tmp_path / "repos/r/specs"
+    specs.mkdir(parents=True)
+    with pytest.raises(_PHASE.Refusal) as refused:
+        _PHASE._refuse_open_worktrees(specs.resolve())
+    assert refused.value.fix.startswith("Agent action: ")
+    assert "\n" not in refused.value.fix
