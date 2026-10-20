@@ -31,10 +31,10 @@ classifiers = [
     "Operating System :: Microsoft :: Windows",
 ]
 
-# What PyPI renders beside the long description. Homepage is the PyPI project page;
+# What PyPI renders beside the long description. Homepage is the author's project page;
 # Documentation is the repository's docs/ folder (no separate site is published).
 [tool.poetry.urls]
-Homepage = "https://pypi.org/project/dadaia-workspace/"
+Homepage = "https://marco-menezes.com/projetos/dadaia-workspace"
 Repository = "https://github.com/marcoaureliomenezes/dadaia-workspace"
 Documentation = "https://github.com/marcoaureliomenezes/dadaia-workspace/tree/main/docs"
 Changelog = "https://github.com/marcoaureliomenezes/dadaia-workspace/blob/main/CHANGELOG.md"
