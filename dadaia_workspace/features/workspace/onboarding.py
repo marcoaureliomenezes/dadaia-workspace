@@ -89,8 +89,13 @@ def _first_pass_fix(c: _Ctx) -> str:
         version = GitSubprocessClient().work_version(repo)
     except SeveralWorkBranches as several:
         return several.fix
-    lane = platform.inline(*cli_words(c.root, "worktree", "new", repo.name, f"{version}/wt-backlog-first-pass"))  # fmt: skip
-    return act("agent", f"open the lane {lane}, then run the dd-audit-project first pass in it — {', '.join(_first_pass(c))}")  # fmt: skip
+    lane = platform.inline(
+        *cli_words(c.root, "worktree", "new", repo.name, f"{version}/wt-backlog-first-pass")
+    )
+    return act(
+        "agent",
+        f"open the lane {lane}, then run the dd-audit-project first pass in it — {', '.join(_first_pass(c))}",
+    )
 
 
 _Pending = Callable[[_Ctx], str | None]
