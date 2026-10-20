@@ -111,3 +111,42 @@ def test_evaluate_decides_allow_or_block_with_one_fix(path: str, kwargs: dict[st
     else:
         assert message.splitlines()[-1] == fix and "&&" not in message
         assert "protected" not in kwargs or "'secrets'" in message and "<agent>/<YYYYMMDD>/" in message
+
+
+def _linked_tree(root: Path, repo: str, name: str, *, backpointer: bool = True, fabricated: bool = False) -> str:
+    """A tree under ``worktrees/<repo>/``; its ``.git`` file is git's own shape, or a planted one."""
+    tree = root / "worktrees" / repo / "0.5.0" / name
+    tree.mkdir(parents=True)
+    gitdir = root / ("elsewhere" if fabricated else f"repos/{repo}/.git") / "worktrees" / name
+    gitdir.mkdir(parents=True)
+    (tree / ".git").write_text(f"gitdir: {gitdir}\n")
+    if backpointer:
+        (gitdir / "gitdir").write_text(f"{tree / '.git'}\n")
+    return f"worktrees/{repo}/0.5.0/{name}/src/x.py"
+
+
+def _bind(session: str) -> dict[str, object]:
+    return _A if session == "bound-to-a" else {"context": None, "repos": frozenset()}
+
+
+@pytest.mark.parametrize("session", ["bound-to-a", "id-and-no-bind"])
+def test_a_write_in_a_linked_tree_of_another_context_is_in_scope(session: str, tmp_path: Path) -> None:
+    kwargs = _bind(session)
+    own = _linked_tree(tmp_path, "ctx-a", "rc-a")
+    other = _linked_tree(tmp_path, "ctx-b", "rc-b")
+    assert evaluate(other, root=tmp_path, **_at("worktree", "ctx-b", **kwargs))[0] == Decision.ALLOW  # type: ignore[arg-type]
+    assert evaluate(own, root=tmp_path, **_at("worktree", "ctx-a", **_A))[0] == Decision.ALLOW  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize("planted", ["fabricated-gitdir", "no-backpointer", "no-gitfile"])
+def test_a_tree_that_git_did_not_link_grants_no_scope(planted: str, tmp_path: Path) -> None:
+    if planted == "no-gitfile":
+        (tmp_path / "worktrees/ctx-b/0.5.0/plain").mkdir(parents=True)
+        path = "worktrees/ctx-b/0.5.0/plain/src/x.py"
+    else:
+        path = _linked_tree(
+            tmp_path, "ctx-b", "rc-b", backpointer=planted != "no-backpointer", fabricated=planted == "fabricated-gitdir"
+        )
+    decision, message = evaluate(path, root=tmp_path, **_at("worktree", "ctx-b", **_A))  # type: ignore[arg-type]
+    assert decision == Decision.BLOCK
+    assert message.splitlines()[-1] == f"fix: {cli_path(tmp_path)} context bind ctx-b"
