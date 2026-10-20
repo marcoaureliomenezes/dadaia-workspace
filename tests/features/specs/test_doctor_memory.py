@@ -206,6 +206,43 @@ def test_mem_drift1_real_live_introspection_returns_package_names() -> None:
     assert "specs" in live and all(isinstance(name, str) and name for name in live)
 
 
+def _tree(tmp_path: Path, mapped: tuple[str, ...], own: tuple[str, ...] | None) -> Path:
+    """The specs dir of a repo whose ARCHITECTURE.md maps *mapped* and whose own
+    `dadaia_workspace/features/` holds the packages *own* (no such folder when `None`)."""
+    specs = tmp_path / "repo" / "specs"
+    (specs / "memory").mkdir(parents=True)
+    write_text(specs / "memory" / "ARCHITECTURE.md", _architecture_md(mapped))
+    features = tmp_path / "repo" / "dadaia_workspace" / "features"
+    for pkg in own or ():
+        (features / pkg).mkdir(parents=True)
+        write_text(features / pkg / "__init__.py", "")
+    if own is not None:
+        features.mkdir(parents=True, exist_ok=True)
+    return specs
+
+
+@pytest.mark.parametrize(
+    ("mapped", "own", "expected"),
+    [
+        pytest.param(("alpha", "beta"), ("alpha", "beta"), [], id="own-folder-matches-its-map"),
+        pytest.param(("alpha", "beta"), None, [], id="no-own-folder-no-list-no-finding"),
+        pytest.param(
+            ("alpha", "gone"),
+            ("alpha", "extra"),
+            ["'gone'", "dadaia_workspace/features/extra"],
+            id="own-folder-disagrees",
+        ),
+    ],
+)
+def test_mem_drift1_reads_the_trees_own_features_folder(
+    tmp_path: Path, mapped: tuple[str, ...], own: tuple[str, ...] | None, expected: list[str]
+) -> None:
+    issues = MemoryValidator(_tree(tmp_path, mapped, own)).check_mem_drift1_features_package_map()
+
+    assert [issue.code for issue in issues] == ["MEM-DRIFT-1"] * len(expected)
+    assert all(needle in issue.message for issue, needle in zip(issues, expected, strict=True))
+
+
 def test_unfilled_placeholder_atom_is_reported_with_the_fill_or_delete_line(tmp_path: Path) -> None:
     specs = _make_specs_with_memory(tmp_path)
     atom = specs / "memory" / "product" / "a" / "x.md"
