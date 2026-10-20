@@ -77,11 +77,9 @@ def _canon(subject: str) -> str:
 
 
 def fix_commit(repos: Iterable[Path], ids: Iterable[str]) -> dict[str, tuple[Path, str]]:
-    """For each of *ids*, the repo and sha of the newest commit whose message holds a bug-fix line naming it (a group lists its ids separated by commas or blanks), that the HEAD of a repo of *repos* reaches; each repo is read in one `git log` and only while an id is missing. A commit subjected `Revert "<S>"` retires exactly one older commit subjected `<S>`, the nearest, and a retired revert registers nothing."""
+    """For each of *ids*, the repo and sha of the newest commit whose message holds a bug-fix line naming it (a group lists its ids separated by commas or blanks), that the HEAD of a repo of *repos* reaches; each repo is pulled and read in one `git log` only while an id is missing. A commit subjected `Revert "<S>"` retires exactly one older commit subjected `<S>`, the nearest, and a retired revert registers nothing."""
     wanted, found = set(ids), dict[str, tuple[Path, str]]()
-    for each in repos:
-        if wanted <= found.keys():
-            break
+    for each in repos if wanted else ():
         retired = Counter[str]()
         for entry in git(each, "log", "--format=%x1e%H%x00%B", check=False).split("\x1e")[1:]:
             sha, _, message = entry.partition("\0")
@@ -95,6 +93,8 @@ def fix_commit(repos: Iterable[Path], ids: Iterable[str]) -> dict[str, tuple[Pat
                 for bug in re.split(r"[,\s]+", head):
                     if bug in wanted:
                         found.setdefault(bug, (each, sha))
+        if wanted <= found.keys():  # after the body: the next repo is not even pulled
+            break
     return found
 
 

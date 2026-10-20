@@ -9,6 +9,7 @@ import os
 import re
 import subprocess
 import sys
+from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
@@ -72,14 +73,15 @@ def context_row(root: Path, repo: Path) -> dict[str, Any] | None:
         return None
 
 
-def context_repos(repo: Path) -> list[Path]:
-    """*repo* and the existing checkouts of the repos its context associates; *repo* alone when the workspace beside its checkout holds no registry or no CLI."""
-    if (main := main_checkout(repo)) == Path("."):  # no repository: no workspace beside it
-        return [repo]
+def context_repos(repo: Path) -> Iterator[Path]:
+    """*repo*, then the existing checkouts of the repos its context associates; the workspace beside its checkout is read only when the second is pulled, and *repo* stays alone when it is no repository or that workspace holds no registry or no CLI."""
+    yield repo
+    if (main := main_checkout(repo)) == Path("."):
+        return
     root = main.parent.parent
     row = context_row(root, repo) if (root / STATES / "spec_contexts.json").is_file() and cli_path(root).exists() else None  # fmt: skip
     beside = (main.parent / a["slug"] for a in (row or {}).get("associated_repos", []))
-    return [repo, *(p for p in beside if (p / ".git").exists())]
+    yield from (p for p in beside if (p / ".git").exists())
 
 
 _VERDICT = re.compile(r"(?:\S+ error |\[error\] )(.*)")
