@@ -53,7 +53,7 @@ to the canon (cutting the work branch when the repo has none), the first pass fi
 `.dadaia/.venv/bin/dadaia doctor` prints the next step and every finding with one
 fix line; `.dadaia/.venv/bin/dadaia context create --main-repo <url>` adds the next
 project, re-running the `uvx` init line upgrades the workspace, and
-`uvx dadaia-workspace init --from <artifact> <dir>` restores a workspace that `dadaia export` wrote.
+`uvx dadaia-workspace init --from <artifact> <dir>` restores a workspace that `.dadaia/.venv/bin/dadaia export` wrote.
 
 An agent reads the root `AGENTS.md` map — flow, roles, gate invariants, where things
 live, the index of every scoped law and skill — opens the scoped `AGENTS.md` of its

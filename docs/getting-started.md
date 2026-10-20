@@ -78,8 +78,9 @@ defaults to the main repo's slug. `bind` writes exactly one record,
 nothing; the session id comes from the environment only, and a session without a
 harness-native id exports `DADAIA_SESSION_ID` before it binds. The bind's scope
 is the context's main repo plus its associated repos; a MUTATING file-tool write into a
-repo outside it is refused with the bind that would allow it, and agents write a repo
-only inside its worktrees. After a bind, the ctx-inject hook injects the context header,
+repo outside it is refused with the bind that would allow it, unless the write lands in a
+worktree git linked from a repo of this workspace, and agents write a repo only inside its
+worktrees. After a bind, the ctx-inject hook injects the context header,
 `constitution.md`, `ARCHITECTURE.md`'s `## Tech Stack` section, the memory catalog digest
 and the open worktrees once.
 

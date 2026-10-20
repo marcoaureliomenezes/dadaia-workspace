@@ -38,7 +38,8 @@ record of the caller's environment session id; a session without a harness-nativ
 exports `DADAIA_SESSION_ID` before it binds, or carries the binding in `DADAIA_CONTEXT`.
 The bind carries a scope — the main repo plus its associated repos — and a MUTATING
 file-tool write into a repo outside it is refused, naming the bind that would allow it;
-an unbound session with an id owns no repo. A repo checkout receives only merges: agents
+an unbound session with an id owns no repo; a write inside a worktree git linked from a repo
+of this workspace is in scope whatever the bind. A repo checkout receives only merges: agents
 write a repo inside its worktrees and land each on its parent by
 `.dadaia/.venv/bin/dadaia worktree merge`, audits aside.
 
