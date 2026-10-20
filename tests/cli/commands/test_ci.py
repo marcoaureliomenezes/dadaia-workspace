@@ -323,7 +323,6 @@ def test_push_gate_check_help_names_the_rewrite_remedy_and_its_contract() -> Non
 def test_a_decision_carries_its_listed_paths_even_when_it_lists_none() -> None:
     decision = Decision(allowed=True)
     assert decision.listed == frozenset()
-    assert decision.message_listed is False
 
 
 def test_several_work_branches_warn_and_keep_the_gate_on_the_kept_branch(

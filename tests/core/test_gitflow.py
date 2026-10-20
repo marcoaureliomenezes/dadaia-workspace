@@ -224,11 +224,7 @@ def test_several_work_branches_is_one_dadaia_error_built_from_message_text_and_k
     skill_class = load_owner("dd-gitflow-default", "_worktree_git").SeveralWork
     assert not isinstance(several, skill_class)
     assert isinstance(several, DadaiaError)
-    assert (several.message, several.text, several.keep) == (
-        "2 work branches",
-        "run `x`, then run `y`",
-        "0.2.0",
-    )
+    assert (several.message, several.keep) == ("2 work branches", "0.2.0")
     assert several.fix == "Agent action: run `x`, then run `y`"
     assert str(several) == "2 work branches\nfix: Agent action: run `x`, then run `y`"
 

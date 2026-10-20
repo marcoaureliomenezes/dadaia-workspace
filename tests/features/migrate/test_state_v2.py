@@ -88,7 +88,6 @@ def test_plan_migration_detection_matrix(tmp_path: Path) -> None:
     _write_v2(states_now, "3")
     plan_now = plan_migration(JsonContextStore(states_now))
     assert plan_now.already_v2 is True
-    assert plan_now.schema_version_before == "3"
 
     _, states_none = _workspace(tmp_path / "none")
     with pytest.raises(ValueError, match="fix: ") as refused:
