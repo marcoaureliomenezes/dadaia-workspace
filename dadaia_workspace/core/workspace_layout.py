@@ -291,14 +291,21 @@ def is_worktree_gitfile(entry: Path) -> bool:
 
 
 def _anchors(root: Path, entry: Path) -> bool:
-    """A ``.git`` file whose gitdir sits in ``<root>/repos/<slug>/.git/worktrees/``."""
+    """A ``.git`` file whose gitdir sits in ``<root>/repos/<slug>/.git/worktrees/`` and whose
+    ``gitdir`` back-pointer, written by git inside that repo, names this very file."""
     gitdir = _gitdir(entry)
-    return (
+    if not (
         gitdir is not None
         and len(gitdir.parents) > 3
         and (gitdir.parent.name, gitdir.parents[1].name) == ("worktrees", ".git")
         and gitdir.parents[3] in (root / "repos", root.resolve() / "repos")
-    )
+    ):
+        return False
+    try:
+        back = platform.read_text(Path(gitdir) / "gitdir").strip()
+    except (OSError, platform.Undecodable):
+        return False
+    return Path(back).resolve() == entry.resolve()
 
 
 def protected_glob(root: Path, rel: str, protected: tuple[str, ...]) -> str | None:
