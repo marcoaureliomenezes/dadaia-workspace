@@ -403,3 +403,24 @@ def test_the_several_work_act_reads_the_merged_state_and_upstream_in_one_git_rea
 
     assert len(reads) == 1, reads
     assert text.count("`") == 6 and "--unset-upstream" in text and "branch -d" in text
+
+
+def test_the_child_cli_is_handed_the_denylist_file_the_loader_reads(
+    root: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    owner = load_owner("dd-gitflow-default", "_worktree_git")
+    workspace = root / ".dadaia/states/privacy_denylist.json"
+    write_text(workspace, '{"zorblax": "private"}')
+    write_text(root / "empty.json", "{}")
+    monkeypatch.setenv("DADAIA_PRIVACY_DENYLIST", str(root / "empty.json"))  # exists, holds no term
+    seen: list[dict[str, str]] = []
+
+    def spawn(_root: Path, *_args: str, env: dict[str, str], **_kw: Any) -> subprocess.CompletedProcess[str]:  # fmt: skip
+        seen.append(env)
+        return subprocess.CompletedProcess([], 0, "", "")
+
+    monkeypatch.setattr(owner, "run_cli", spawn)
+
+    owner.cli(root, "doctor", tree=root / "worktrees/r/tree")
+
+    assert [e["DADAIA_PRIVACY_DENYLIST"] for e in seen] == [str(workspace)]

@@ -345,3 +345,38 @@ def test_an_empty_term_still_refuses_in_a_repo_that_names_itself(
     monkeypatch.setenv("DADAIA_PRIVACY_DENYLIST", str(tmp_path / "terms.json"))
     run(["git", "init", "-q", str(tmp_path / "acme")])
     assert _ledger_module().terms(None, tmp_path / "acme") == [("", "r")]
+
+
+@pytest.mark.parametrize(
+    ("env", "workspace", "named"),
+    [
+        ('{"zorblax": "r"}', '{"other": "r"}', "env"),
+        ("{}", '{"other": "r"}', "workspace"),
+        (None, '{"other": "r"}', "workspace"),
+        ("{}", "{}", None),
+        (None, None, None),
+    ],
+    ids=["env-holds-terms", "empty-env-falls-through", "no-env", "no-terms", "no-files"],
+)
+def test_the_denylist_file_is_the_one_the_loader_read_terms_from(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    env: str | None,
+    workspace: str | None,
+    named: str | None,
+) -> None:
+    _workspace(tmp_path)
+    files = {
+        "env": tmp_path / "terms.json",
+        "workspace": tmp_path / ".dadaia/states/privacy_denylist.json",
+    }
+    for name, text in (("env", env), ("workspace", workspace)):
+        if text is not None:
+            write_text(files[name], text)
+    monkeypatch.delenv("DADAIA_PRIVACY_DENYLIST", raising=False)
+    if env is not None:
+        monkeypatch.setenv("DADAIA_PRIVACY_DENYLIST", str(files["env"]))
+
+    got = _ledger_module().denylist_file(tmp_path)
+
+    assert got == (files[named] if named else None)
