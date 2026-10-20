@@ -18,7 +18,6 @@ from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.features.specs import doctor_memory
 from dadaia_workspace.features.specs.doctor_memory import MemoryValidator
 from dadaia_workspace.features.specs.doctor_types import finding_path
 from tests.helpers.oslib import write_text
@@ -180,7 +179,6 @@ def _architecture_md(pkgs: tuple[str, ...]) -> str:
 )
 def test_mem_drift1_table(
     tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
     architecture: str | None,
     live: set[str],
     needle: str | None,
@@ -189,7 +187,9 @@ def test_mem_drift1_table(
     (specs / "memory").mkdir(parents=True)
     if architecture is not None:
         write_text(specs / "memory" / "ARCHITECTURE.md", architecture)
-    monkeypatch.setattr(doctor_memory, "_live_feature_package_names", lambda: live)
+    for pkg in live:
+        (tmp_path / "dadaia_workspace" / "features" / pkg).mkdir(parents=True)
+        write_text(tmp_path / "dadaia_workspace" / "features" / pkg / "__init__.py", "")
 
     issues = MemoryValidator(specs).check_mem_drift1_features_package_map()
 
@@ -201,9 +201,19 @@ def test_mem_drift1_table(
         assert needle in issue.message
 
 
-def test_mem_drift1_real_live_introspection_returns_package_names() -> None:
-    live = doctor_memory._live_feature_package_names()
-    assert "specs" in live and all(isinstance(name, str) and name for name in live)
+def test_mem_drift1_lists_only_the_packages_of_the_trees_own_features_folder(
+    tmp_path: Path,
+) -> None:
+    specs = tmp_path / "specs"
+    (specs / "memory").mkdir(parents=True)
+    write_text(specs / "memory" / "ARCHITECTURE.md", _architecture_md(("panel",)))
+    features = tmp_path / "dadaia_workspace" / "features"
+    (features / "panel").mkdir(parents=True)
+    write_text(features / "panel" / "__init__.py", "")
+    (features / "plain_dir").mkdir()
+    write_text(features / "module.py", "")
+
+    assert MemoryValidator(specs).check_mem_drift1_features_package_map() == []
 
 
 def _tree(tmp_path: Path, mapped: tuple[str, ...], own: tuple[str, ...] | None) -> Path:
