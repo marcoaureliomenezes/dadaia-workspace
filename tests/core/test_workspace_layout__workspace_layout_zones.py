@@ -100,6 +100,11 @@ def test_parse_dadaiaignore(text: str, expected: tuple[str, ...]) -> None:
     assert wl.parse_dadaiaignore(text) == (expected, (), ())
 
 
+def _linked(root: Path) -> str:
+    """The `.git` file git writes into a linked worktree of the workspace's repo `r`."""
+    return f"gitdir: {(root / 'repos/r/.git/worktrees/j1').as_posix()}\n"
+
+
 def test_dadaiaignore_invalid_lines_and_segment_scope(tmp_path: Path) -> None:
     """``!``, ``**``, an absolute path or ``..`` is invalid, never a pattern; ``*``
     stays inside one segment, so a root pattern admits nothing below the root."""
@@ -108,7 +113,7 @@ def test_dadaiaignore_invalid_lines_and_segment_scope(tmp_path: Path) -> None:
     assert wl.parse_dadaiaignore(text) == (("*.png",), ("secrets",), invalid)
     tree = tmp_path / "worktrees" / "r" / "x" / "y"
     (tree / "src").mkdir(parents=True)
-    write_text(tree / ".git", "gitdir: ../main/.git/worktrees/j1\n")
+    write_text(tree / ".git", _linked(tmp_path))
 
     def pg(rel: str, *globs: str) -> str | None:
         return wl.protected_glob(tmp_path, rel, globs or ("secrets",))
@@ -133,7 +138,7 @@ def test_a_planted_git_entry_never_unanchors_a_multi_segment_glob(tmp_path: Path
     """A ``.git`` written below the real tree root adds an anchor and never removes the root."""
     tree = tmp_path / "worktrees" / "r" / "0.5.0-rc1" / "j1"
     (tree / "docs" / "data-master").mkdir(parents=True)
-    write_text(tree / ".git", "gitdir: ../main/.git/worktrees/j1\n")
+    write_text(tree / ".git", _linked(tmp_path))
     rel, globs = "worktrees/r/0.5.0-rc1/j1/docs/data-master/x.md", ("docs/data-master",)
     assert wl.protected_glob(tmp_path, rel, globs) == "docs/data-master"
     write_text(tree / "docs" / ".git", "")
@@ -163,3 +168,26 @@ def test_the_doctor_fix_never_moves_a_registered_repos_bundle() -> None:
         wl.verdict(".dadaia/dist/myrepo/0.5.0/rc-1/wt-rc.bundle", False, (), ("myrepo",), ())
         != "slop"
     )
+
+
+def test_a_git_file_anchors_a_root_only_when_its_gitdir_is_a_worktree_of_this_workspace(
+    tmp_path: Path,
+) -> None:
+    """Under `worktrees/<r>/`, `.git` anchors the root of a tree git linked from `<root>/repos/<r>/`;
+    a gitdir elsewhere, even named `worktrees/…`, or a symlinked `.git` anchors nothing and the glob
+    fails closed at every depth."""
+    rel = "worktrees/r/{}/src/secrets/k"
+    real, planted, linked = (tmp_path / "worktrees/r" / n for n in ("real", "planted", "linked"))
+    for tree in (real, planted, linked):
+        (tree / "src").mkdir(parents=True)
+    write_text(real / ".git", _linked(tmp_path))
+    write_text(planted / ".git", "gitdir: /elsewhere/worktrees/x\n")
+    write_text(tmp_path / "pointer", _linked(tmp_path))
+    (linked / ".git").symlink_to(tmp_path / "pointer")
+
+    def pg(name: str) -> str | None:
+        return wl.protected_glob(tmp_path, rel.format(name), ("secrets",))
+
+    assert pg("real") is None
+    assert pg("planted") == "secrets"
+    assert pg("linked") == "secrets"
