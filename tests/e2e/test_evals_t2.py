@@ -9,7 +9,7 @@ Owner: dd-sw-engineer-sr
 
 import pytest
 
-from tests.helpers.evals import ROOT, T2, VERSIONS, reward
+from tests.helpers.evals import ROOT, T2, VERSIONS, image, reward, sh
 from tests.helpers.oslib import read_text
 
 pytestmark = [pytest.mark.e2e, pytest.mark.slow, pytest.mark.timeout(600)]
@@ -20,6 +20,11 @@ _PLANTS = ROOT / "tests" / "fixtures" / "evals" / "t2"
 def _planted(version: str, *plants: str) -> str:
     script = "\n".join(read_text(_PLANTS / f"{p}.sh") for p in plants)
     return reward(T2, version, script)
+
+
+@pytest.mark.parametrize("version", VERSIONS)
+def test_the_built_environment_holds_specs_before_any_fix(version: str) -> None:
+    sh("docker", "run", "--rm", image(T2, version), "test", "-d", "/workspace/repos/demo/specs")
 
 
 @pytest.mark.parametrize("version", VERSIONS)

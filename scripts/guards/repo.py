@@ -1093,6 +1093,12 @@ CHECKS: dict[str, Check] = {
             "published-dadaia-workspace-install#from": _file(
                 "tests/helpers/pin.py", 'CMD = "uvx --from dadaia-workspace dadaia init"\n'
             ),
+            "published-dadaia-workspace-install#fstring": _file(
+                "tests/helpers/pin.py", 'REQ = f"dadaia-workspace=={version}"\n'
+            ),
+            "published-dadaia-workspace-install#argv": _file(
+                "tests/helpers/pin.py", 'CMD = ["pip", "install", "dadaia-workspace"]\n'
+            ),
             "hand-computed-tag": _edit(
                 _RELEASE,
                 "      - run: pipx install",
