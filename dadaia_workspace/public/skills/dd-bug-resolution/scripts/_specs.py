@@ -5,6 +5,7 @@ script prints through."""
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -56,11 +57,14 @@ def run_cli(
         raise Refusal(f"the workspace CLI cannot start: {error}", reinstall_fix(root)) from error
 
 
+_VERDICT = re.compile(r"(?:\S+ error |\[error\] )(.*)")
+
+
 def check_release(specs: Path) -> None:
     """Runs `release.py check` once and relays it: a non-zero exit raises `Refusal`."""
     check = script(Path(__file__).resolve().parents[2] / "dd-release-implementation/scripts/release.py")  # fmt: skip
     done = run([*check, "check", "--specs", str(specs)], env=scrubbed_env())
-    said = next((ln.partition(" error ")[2] for ln in (done.stdout + done.stderr).splitlines() if " error " in ln), "")  # fmt: skip
+    said = next((m[1] for ln in (done.stdout + done.stderr).splitlines() if (m := _VERDICT.match(ln))), "")  # fmt: skip
     relay(done, said or f"release.py check exited {done.returncode}", act("agent", f"run {check.inline('check', specs=specs)}"))  # fmt: skip
 
 
