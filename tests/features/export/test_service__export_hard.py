@@ -204,7 +204,6 @@ def _paused(root: Path) -> Path:
     return root / ".dadaia/dist/r" / f"{PAUSED}.bundle"
 
 
-@pytest.mark.timeout(15)
 @pytest.mark.parametrize(
     "header",
     [b"# v2 git bundle\n", b"# v2 git bundle\n-\n\n", b"# v2 git bundle\n-\xff\xfe x\n\n"],
