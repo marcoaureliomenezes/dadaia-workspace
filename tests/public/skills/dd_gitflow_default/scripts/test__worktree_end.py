@@ -87,6 +87,12 @@ def _run_printed(
     return run(root, "sync", str(tree))
 
 
+def _dispatch(tree: Path) -> str:
+    """The one dispatch act a verdict refusal prints for *tree* at its HEAD."""
+    head = git(tree, "rev-parse", "HEAD").strip()
+    return f"Agent action: dispatch dd-code-reviewer on {tree} at HEAD {head}; its verdict.py run writes the verdict"  # fmt: skip
+
+
 def _hotfix(root: Path) -> Path:
     """A hotfix tree of an open bug the work branch holds."""
     ledger = '{"id": "some-bug", "status": "open"}\n'
@@ -482,7 +488,6 @@ def test_a_verdict_carries_over_only_an_identical_patch_and_message_series(root:
     approve(root, approved := git(tree, "rev-parse", "HEAD").strip())
     commit(root / RC_TREE, "src/z.py")
     git(repo, "config", "color.ui", "always")
-    refusal = command(*cli_argv(venv_dir(root)), "reports", "validate", "--all")
     work = git(repo, "rev-parse", WORK)
     for change in (
         [("rm", "-q", "src/a.py"), ("commit", "-q", "--amend", "-C", "HEAD")],  # same message
@@ -498,7 +503,7 @@ def test_a_verdict_carries_over_only_an_identical_patch_and_message_series(root:
         for step in change:
             git(tree, *step)
         git(tree, "rebase", "-q", WORK)
-        assert _line(run(root, "merge", TREE)) == refusal, change
+        assert _line(run(root, "merge", TREE)) == _dispatch(tree), change
         assert git(repo, "rev-parse", WORK) == work
     git(repo, "config", "diff.ignoreSubmodules", "all")  # a gitlink change shows no diff
     git(tree, "reset", "-q", "--hard", approved)
@@ -516,7 +521,7 @@ def test_a_verdict_carries_over_only_an_identical_patch_and_message_series(root:
         if sha == approved:
             approve(root, git(tree, "rev-parse", "HEAD").strip())
     git(tree, "rebase", "-q", WORK)
-    assert _line(run(root, "merge", TREE)) == refusal
+    assert _line(run(root, "merge", TREE)) == _dispatch(tree)
     assert git(repo, "rev-parse", WORK) == work
     git(tree, "reset", "-q", "--hard", approved)
     work = commit(root / RC_TREE, "src/a.py", "theirs\n") + "\n"
@@ -525,7 +530,7 @@ def test_a_verdict_carries_over_only_an_identical_patch_and_message_series(root:
     write_text(tree / "src/a.py", "resolved\n")
     git(tree, "add", "src/a.py")
     git(tree, "-c", "core.editor=true", "rebase", "--continue")
-    assert _line(run(root, "merge", TREE)) == refusal
+    assert _line(run(root, "merge", TREE)) == _dispatch(tree)
     assert git(repo, "rev-parse", WORK) == work
 
 
@@ -555,7 +560,7 @@ def test_a_moved_work_branch_refuses_and_its_fix_rebase_keeps_only_an_identical_
         assert result.returncode == 0, result.stderr
         assert git(repo, "rev-parse", f"{WORK}~").strip() == work != landed
     else:
-        assert _line(result) == command(*cli_argv(venv_dir(root)), "reports", "validate", "--all")
+        assert _line(result) == _dispatch(tree)
         assert landed == work
 
 
@@ -584,7 +589,7 @@ def test_a_tree_whose_patch_context_changed_is_refused_on_its_old_verdict(
         git(tree, "config", "--add", f"branch.wt/{NEW_JOB}.synced", reviewed)
     refused = run(root, "merge", TREE)
     assert refused.returncode == 1, refused.stdout
-    assert _line(refused) == command(*cli_argv(venv_dir(root)), "reports", "validate", "--all")
+    assert _line(refused) == _dispatch(tree)
     assert git(repo, "rev-parse", WORK).strip() == work
 
 
@@ -630,13 +635,11 @@ def test_the_job_gate_runs_scripts_ci_job_as_argv_on_the_head_it_lands(
 
 
 def test_a_job_merge_needs_an_approved_verdict(root: Path) -> None:
-    """No verdict refuses with the `reports validate --all` fix; an APPROVED verdict lands the
+    """No verdict refuses with the dispatch fix; an APPROVED verdict lands the
     job, and the merge re-run after a newer verdict lands too."""
     repo = root / "repos/r"
     head = land(root, "src/a.py")
-    assert _line(run(root, "merge", TREE)) == command(
-        *cli_argv(venv_dir(root)), "reports", "validate", "--all"
-    )
+    assert _line(run(root, "merge", TREE)) == _dispatch(root / TREE)
     approve(root, head)
     landed = run(root, "merge", TREE)
     assert landed.returncode == 0, landed.stderr
@@ -1135,9 +1138,7 @@ def test_a_hotfix_lands_on_the_work_branch_only_through_a_verdict_and_the_job_ga
     head = commit(tree, "RED-job", "")
     work = git(repo, "rev-parse", "feature/0.5.0").strip()
 
-    assert _line(run(root, "merge", str(tree))) == command(
-        *cli_argv(venv_dir(root)), "reports", "validate", "--all"
-    )
+    assert _line(run(root, "merge", str(tree))) == _dispatch(tree)
     approve(root, head)
     red = run(root, "merge", str(tree))
 
