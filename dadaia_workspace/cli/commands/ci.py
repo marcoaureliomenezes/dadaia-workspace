@@ -18,6 +18,7 @@ from dadaia_workspace.cli._specs_resolution import (
 )
 from dadaia_workspace.core import platform
 from dadaia_workspace.core.cli_line import fix_line
+from dadaia_workspace.core.exceptions import DadaiaError
 from dadaia_workspace.core.gitflow import Gitflow, SeveralWorkBranches, work_branch
 from dadaia_workspace.core.platform import act
 from dadaia_workspace.core.skill_owner import load_owner
@@ -25,6 +26,7 @@ from dadaia_workspace.features.chokepoints.branch_policy import (
     HEADS_PREFIX,
     Decision,
     GateFixes,
+    PushRef,
     check_ref_policy,
     parse_push_stdin,
 )
@@ -149,18 +151,19 @@ def _content_decision(repo: Path, held: str, tag: str) -> Decision:
     """The push gate's content half over HEAD's branch published over *held*: what a branch no
     push could carry, a task's, still holds."""
     from dadaia_workspace.container import build_git_client, build_git_object_reader
-    from dadaia_workspace.features.chokepoints import branch_range_decision
+    from dadaia_workspace.features.chokepoints import content_decision
 
     git = build_git_client()
+    branch = git.current_branch(repo)
+    ref = f"refs/heads/{branch or 'HEAD'}"
     tip = git.git(repo, "rev-parse", "HEAD")
     terms, patterns = _denylist(tag, repo)
-    return branch_range_decision(
-        repo,
-        git.current_branch(repo),
-        tip,
-        held,
+    return content_decision(
+        [PushRef(ref, tip, ref, held)],
         object_source=build_git_object_reader(),
+        repo=repo,
         canon_violations_fn=_canon_fn(repo, tip, tag),
+        fixes=GateFixes(repo=str(repo), head=branch or ""),
         denylist_terms=terms,
         baseline_patterns=patterns,
         tag=tag,
@@ -169,7 +172,7 @@ def _content_decision(repo: Path, held: str, tag: str) -> Decision:
 
 def _rewrite_unpublished(repo: Path, oldest: str, message: str | None) -> None:
     from dadaia_workspace.container import build_git_client, build_git_object_reader
-    from dadaia_workspace.features.chokepoints.fold import FoldRefusal, rewrite_unpublished
+    from dadaia_workspace.features.chokepoints.fold import rewrite_unpublished
 
     try:
         rewrite_unpublished(
@@ -180,8 +183,8 @@ def _rewrite_unpublished(repo: Path, oldest: str, message: str | None) -> None:
             reader=build_git_object_reader(),
             decide=lambda r, held: _content_decision(r, held, "[pre-push]"),
         )
-    except FoldRefusal as refusal:
-        fail(str(refusal), refusal.fix)
+    except DadaiaError as refusal:
+        fail(refusal)
 
 
 @app.command("push-gate-check")
@@ -190,7 +193,11 @@ def push_gate_check(
         None, "--rewrite-from", help="Remedy: re-commit the unpublished range from this commit."
     ),
     repo: Path | None = typer.Option(None, "--repo", help="Remedy target. Default: cwd's repo."),
-    message: str | None = typer.Option(None, "--message", help="Remedy: the one commit's message."),
+    message: str | None = typer.Option(
+        None,
+        "--message",
+        help="Remedy: the subject of the commit holding a listed message, else of the last; the other folded messages stay in the body.",
+    ),
     onto: str | None = typer.Option(
         None,
         "--onto",

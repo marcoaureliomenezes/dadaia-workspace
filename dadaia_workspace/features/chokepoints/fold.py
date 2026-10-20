@@ -8,18 +8,11 @@ from pathlib import Path
 from typing import Any
 
 from dadaia_workspace.core import platform
-from dadaia_workspace.core.exceptions import GitSyncError
+from dadaia_workspace.core.exceptions import DadaiaError, GitSyncError
 from dadaia_workspace.core.models.git_scan import ZERO_SHA
 from dadaia_workspace.core.platform import act
 from dadaia_workspace.features.chokepoints.branch_policy import Decision
-
-
-class FoldRefusal(Exception):
-    """A refused remedy: the message, and *fix*, its one fix line."""
-
-    def __init__(self, message: str, fix: str) -> None:
-        super().__init__(message)
-        self.fix = fix
+from dadaia_workspace.features.chokepoints.push_gate import ObjectSource
 
 
 def rewrite_unpublished(
@@ -28,13 +21,13 @@ def rewrite_unpublished(
     message: str | None,
     *,
     git: Any,
-    reader: Any,
+    reader: ObjectSource,
     decide: Callable[[Path, str], Decision],
 ) -> None:
     """Re-commit HEAD's unpublished range from *oldest* as one commit (two when RED `test(` commits
     and others mix), holding the tracked tree and every folded message. Runs only over edits or
     deletions of the paths ``decide(repo, held)`` lists; *message* is the subject and replaces just
-    the messages the decision lists. Raises FoldRefusal, changing nothing, when it cannot."""
+    the messages the decision lists. Raises DadaiaError, changing nothing, when it cannot."""
     tip = git.git(repo, "rev-parse", "HEAD")
     try:
         sha = git.git(repo, "rev-parse", "--verify", f"{oldest}^{{commit}}")
@@ -50,7 +43,7 @@ def rewrite_unpublished(
         if st not in ("M", "D") or p not in decision.listed
     )
     if sha not in reader.unpublished(repo, tip):
-        raise FoldRefusal(
+        raise DadaiaError(
             f"cannot rewrite {oldest}: origin already holds it, or it is not in HEAD's history",
             act(
                 "agent",
@@ -58,7 +51,7 @@ def rewrite_unpublished(
             ),
         )
     if not decision.listed:
-        raise FoldRefusal(
+        raise DadaiaError(
             "the push gate lists no denylist or canon finding in HEAD's unpublished range",
             act(
                 "agent",
@@ -66,7 +59,7 @@ def rewrite_unpublished(
             ),
         )
     if stray:
-        raise FoldRefusal(
+        raise DadaiaError(
             f"the working tree changes paths the gate did not list: {', '.join(stray)}",
             act("agent", "revert or unstage every path the gate did not list, and add no path"),
         )
@@ -77,7 +70,7 @@ def _fold(
     repo: Path, sha: str, tip: str, decision: Decision, message: str | None, git: Any
 ) -> None:
     """Re-commit *sha*..*tip* as a test commit of the paths RED `test(` commits touch, then the
-    rest, or as one. *message* heads the commit holding a listed message, else the last. All is
+    rest, or as one. *message* heads every commit holding a listed message, else the last. All is
     settled in a temporary index before the one ref move."""
     log = git.git(repo, "log", "--reverse", "--format=%H%x00%B%x1e", tip, "--not", f"{sha}^@")
     folded = [e.strip().partition("\0")[::2] for e in log.split("\x1e") if e.strip()]
@@ -101,15 +94,16 @@ def _fold(
             reds = set().union(*(names("diff-tree", "--no-commit-id", "--name-only", "-r", "--no-renames", c) for c in red))  # fmt: skip
             net = names("diff", "--name-only", "--no-renames", parent, tip)
             groups = [(reds & net, red), (None, every - red)]
-        lead = next((i for i, (_, cs) in enumerate(groups) if replaced & cs), len(groups) - 1)
+        heads = [bool(replaced & cs) for _, cs in groups]
+        heads[-1] |= not any(heads)
         texts = [
             "\n\n".join(
-                [message or "" if i == lead else "", *(m for c, m in folded if c in cs - replaced)]
-            ).strip()
-            for i, (_, cs) in enumerate(groups)
+                [message or "" if h else "", *(m for c, m in folded if c in cs - replaced)]
+            ).strip()  # fmt: skip
+            for (_, cs), h in zip(groups, heads, strict=True)
         ]
         if not all(texts):
-            raise FoldRefusal(
+            raise DadaiaError(
                 f"a folded commit would carry no message ({sha[:12]}..{tip[:12]})",
                 act(
                     "agent",
