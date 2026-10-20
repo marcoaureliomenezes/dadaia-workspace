@@ -634,7 +634,7 @@ def onboarding_journey_uv(tree: Tree) -> list[str]:
     e2e, smoke = texts("ci.yml", "e2e-python"), texts("release.yml", "smoke-test")
     steps = tree.ci_jobs().get("e2e-python", [])
     needles = (
-        'uvx "dadaia-workspace==$VERSION" init',
+        'uvx --from "$whl" dadaia-workspace init',
         "--repo",
         "specs init --context",
         "doctor --context",
@@ -732,7 +732,8 @@ def tests_mirror_the_package(tree: Tree) -> list[str]:
 
 _COPIED = (".github", ".gitignore", "specs/constitution.md", "specs/memory", "specs/ADRs",
            "pyproject.toml", "CHANGELOG.md", ".release-please-manifest.json",
-           "release-please-config.json", "README.md", "llms.txt", "docs", "evals", "scripts/ci.py")  # fmt: skip
+           "release-please-config.json", "README.md", "llms.txt", "docs", "evals", "scripts/ci.py",
+           "specs/releases/*/_RELEASE.json", "specs/releases/*/rc-*/SPEC.md")  # fmt: skip
 _ROGUE = (
     "on: push\njobs:\n  x:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: anthropics/a@v1\n"
 )
@@ -1037,6 +1038,9 @@ CHECKS: dict[str, Check] = {
                 "      - run: git ls-remote --tags o\n      - run: pipx install",
             ),
             "needs-an-undefined-job": _edit(_RELEASE, "", _GATED_JOB),
+            "published-dadaia-workspace-install": _file(
+                "tests/helpers/pin.py", 'REQ = "dadaia-workspace==1.2.3"\n'
+            ),
             "hand-computed-tag": _edit(
                 _RELEASE,
                 "      - run: pipx install",
@@ -1093,7 +1097,8 @@ CHECKS: dict[str, Check] = {
             "ci-gated-build": _edit(
                 _RELEASE, "    needs: [release-please, ci]\n", "    needs: [release-please]\n"
             ),
-            "manifest-floor": _edit(".release-please-manifest.json", '": "', '": "9'),
+            "manifest-floor": _edit(".release-please-manifest.json", '"."', '"x": "1", "."'),
+            "version-label": _re("pyproject.toml", r'(?m)^version = ".*"', 'version = "0.4.7"'),
             "published-floor": _tag,
             "patch-below-one": _edit(
                 "release-please-config.json",
