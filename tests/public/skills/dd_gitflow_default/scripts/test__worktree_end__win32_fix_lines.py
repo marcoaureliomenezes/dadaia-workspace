@@ -43,6 +43,6 @@ def test_an_unmerged_tree_is_named_by_a_command_line(
     with pytest.raises(end.Refusal) as refused:
         end.clean(tmp_path, "p", [], False)
     assert refused.value.fix == (
-        f"Agent action: dispatch dd-code-reviewer on {tree} at its HEAD, then run "
-        f"`{inline(*end.LAUNCH, 'merge', str(tree), caps=_WIN)}`"
+        f"Agent action: dispatch dd-code-reviewer on {tree} at its HEAD; its verdict.py run writes"
+        f" the verdict, then run `{inline(*end.LAUNCH, 'merge', str(tree), caps=_WIN)}`"
     )

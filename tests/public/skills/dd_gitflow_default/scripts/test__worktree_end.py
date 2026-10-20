@@ -323,11 +323,17 @@ def test_merge_needs_a_valid_approval_of_the_exact_head(
     result = run(root, "merge", TREE)
     head = git(root / TREE, "rev-parse", "HEAD").strip()
     assert result.returncode == 1 and head in result.stderr
-    if named:
-        expected = [*cli_argv(venv_dir(root)), "reports", "validate", str(target)]
-        assert _line(result) == command(*expected, "--reviewed-root", str(root / TREE))
+    tree = root / TREE
+    if not named:
+        assert _line(result) == _dispatch(tree)
+    elif valid and verdict == "REJECTED" and at.endswith("Z"):  # a naive instant is unparsed
+        assert _line(result) == (
+            f"Agent action: fix the findings of {target} and commit them in {tree}, then dispatch"
+            f" dd-code-reviewer on {tree} at its new HEAD; its verdict.py run writes the verdict"
+        )
     else:
-        assert _line(result) == _dispatch(root / TREE)
+        expected = [*cli_argv(venv_dir(root)), "reports", "validate", str(target)]
+        assert _line(result) == command(*expected, "--reviewed-root", str(tree))
     assert git(root / "repos/r", "rev-parse", WORK).strip() != head
 
 
@@ -441,8 +447,10 @@ def test_clean_removes_only_an_empty_worktree_of_ours(root: Path) -> None:
     repo, tree = root / "repos/r", root / TREE
     commit(tree, "src/a.py")
     [fix] = fixes(run(root, "clean", TREE))
-    assert fix.startswith("fix: Agent action: ") and "dd-code-reviewer" in fix
-    assert command(sys.executable, str(SCRIPT), "merge", str(tree)) in fix
+    assert fix == (
+        f"fix: Agent action: dispatch dd-code-reviewer on {tree} at its HEAD; its verdict.py run"
+        f" writes the verdict, then run `{inline(sys.executable, str(SCRIPT), 'merge', str(tree))}`"
+    )
     git(tree, "reset", "-q", "--hard", WORK)
     assert run(root, "clean", TREE).returncode == 0 and not tree.exists()
     # ours is the canonical wt/ branch, locked or not; a tree on another is not

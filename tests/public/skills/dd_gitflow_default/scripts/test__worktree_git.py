@@ -15,8 +15,7 @@ from typing import Any
 
 import pytest
 
-from dadaia_workspace.core.cli_line import git_line
-from dadaia_workspace.core.platform import quote
+from dadaia_workspace.core.platform import git_inline, quote
 from dadaia_workspace.core.skill_owner import load_owner
 from tests.fixtures.harness_env import run_bash
 from tests.helpers.oslib import link, write_text
@@ -189,7 +188,11 @@ def test_an_off_grammar_orphan_branch_has_an_exit_only_when_git_branch_d_runs(
             "",
         )
         if ahead
-        else (git_line(repo, "branch", "-d", "wt/stray"),) * 2
+        else (
+            f"Agent action: run `{git_inline(repo, 'switch', tip)}`, "
+            f"then run `{git_inline(repo, 'branch', '-d', 'wt/stray')}`",
+        )
+        * 2
     )
 
 
