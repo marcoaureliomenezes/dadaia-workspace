@@ -79,6 +79,11 @@ _ROWS = [
 ]
 
 
+def _init(repo: Path) -> None:
+    repo.mkdir(parents=True)
+    subprocess.run(["git", "init", "-q", str(repo)], check=True)
+
+
 def _workspace(root: Path, cli: str) -> Path:
     """A workspace whose CLI runs *cli*, holding checkouts r, a (of context c), q (of none) and y (of d)."""
     (cli_dir := cli_path(root).parent).mkdir(parents=True)
@@ -86,7 +91,7 @@ def _workspace(root: Path, cli: str) -> Path:
     (root / ".dadaia/states").mkdir(parents=True)
     write_text(root / ".dadaia/states/spec_contexts.json", "{}")
     for slug in ("r", "a", "q", "y"):
-        (root / "repos" / slug / ".git").mkdir(parents=True)
+        _init(root / "repos" / slug)
     return root
 
 
@@ -135,3 +140,26 @@ def test_a_cli_that_runs_and_fails_refuses_with_its_own_fix_line(tmp_path: Path)
         with pytest.raises(specs.Refusal) as refused:
             ask()
         assert refused.value.fix == "Agent action: repair the registry row"
+
+
+def test_context_row_names_a_linked_worktree_by_its_checkout_wherever_it_sits(
+    tmp_path: Path,
+) -> None:
+    specs = load_owner("dd-bug-resolution", "_specs")
+    root = _answering(tmp_path)
+    git = ["git", "-C", str(root / "repos/r"), "-c", "user.name=t", "-c", "user.email=t@t"]
+    subprocess.run([*git, "commit", "-q", "--allow-empty", "-m", "c"], check=True)
+    subprocess.run([*git, "worktree", "add", "-q", str(tree := root / ".dadaia/tmp/scratch")], check=True)  # fmt: skip
+    assert (specs.context_row(root, tree) or {}).get("name") == "c"
+
+
+def test_a_repo_nested_under_a_fenced_workspace_starts_no_cli_of_it(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    specs = load_owner("dd-bug-resolution", "_specs")
+    log = tmp_path / "spawns"
+    root = _workspace(tmp_path, f"#!python\nopen({str(log)!r}, 'a').write('x')\nprint('[]')\n")
+    _init(probe := root / ".dadaia/tmp/probe/repos/r")
+    monkeypatch.setenv("DADAIA_FENCED_ROOTS", str(root))
+    assert specs.context_repos(probe) == [probe]
+    assert not log.exists()

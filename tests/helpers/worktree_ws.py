@@ -39,6 +39,11 @@ _CLI = """#!python
 import json, sys
 args = sys.argv[1:]
 if args[:2] == ["context", "list"]:
+    import os
+    fenced = [os.path.realpath(p) for p in os.environ.get("DADAIA_FENCED_ROOTS", "").split(os.pathsep) if p]
+    if os.path.realpath(os.getcwd()) in fenced:
+        print("[error] the workspace root is fenced", file=sys.stderr)
+        sys.exit(1)
     print({rows!r})
 elif args[:2] == ["reports", "validate"]:
     sys.exit(0 if "schema_version" in json.load(open(args[2])) else 1)
