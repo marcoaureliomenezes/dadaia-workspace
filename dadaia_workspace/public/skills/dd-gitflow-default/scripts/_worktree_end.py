@@ -383,12 +383,14 @@ def _check_approved(root: Path, tree: Path, work: str, name: str) -> None:
     named = _reviews(root, {x for x in reflog if x == head or _series(tree, work, x) == mine})
     top = max((row[:2] for row in named), default=None)
     decided = sorted(row for row in named if row[:2] == top)
-    validate = partial(cli, root, "reports", "validate")
     invalid = next(
         (
             path
             for unparsed, _, path, _ in decided
-            if unparsed or validate(path, "--reviewed-root", str(tree)).returncode
+            if unparsed
+            or cli(
+                root, "reports", "validate", path, "--reviewed-root", str(tree)
+            ).returncode  # fmt: skip
         ),
         None,
     )
@@ -396,7 +398,7 @@ def _check_approved(root: Path, tree: Path, work: str, name: str) -> None:
     if invalid:
         raise Refusal(said, command(*cli_words(root, "reports", "validate", invalid, "--reviewed-root", str(tree))))  # fmt: skip
     if rejected := next((row[2] for row in decided if row[3].get("verdict") != "APPROVED"), None):
-        rework = f"fix the findings of {rejected} and commit them in {tree}, then {_dispatch(tree, 'its new HEAD')}"  # fmt: skip
+        rework = f"fix the findings of {rejected}, then {_dispatch(tree, 'its new HEAD')}"  # fmt: skip
         raise Refusal(said, act("agent", rework))
     dispatch = act("agent", _dispatch(tree, f"HEAD {head}"))
     if not decided:
