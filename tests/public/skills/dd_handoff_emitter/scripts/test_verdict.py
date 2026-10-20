@@ -115,9 +115,12 @@ def test_a_verdict_for_a_sha_a_later_commit_left_behind_is_refused_by_the_merge(
 ) -> None:
     root, tree, old = _workspace(tmp_path)
     assert _verdict(root, tree, sha=old).returncode == 0
-    commit(tree, "specs/later", "x\n")
+    head = commit(tree, "specs/later", "x\n")
     refused = run(root, "merge", str(tree))
-    assert refused.returncode != 0 and "reports validate" in refused.stderr
+    assert refused.returncode != 0
+    assert (
+        f"fix: Agent action: dispatch dd-code-reviewer on {tree} at HEAD {head}; " in refused.stderr
+    )
 
 
 _OWNED = "stdin sets keys verdict.py owns: "
