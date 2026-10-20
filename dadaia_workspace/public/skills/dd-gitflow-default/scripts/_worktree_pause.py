@@ -10,8 +10,8 @@ from pathlib import Path
 from _git import GitError
 from _platform import act, command
 from _worktree_end import _open_children, _precious, _refuse_dirty, _rmdir, _target
-from _worktree_git import _row, git, ours
-from _worktree_names import LAUNCH, LOCK, Refusal, branch, kind_of, tree_path
+from _worktree_git import _row, git, locked_add, ours
+from _worktree_names import LAUNCH, Refusal, branch, kind_of, tree_path
 from _worktree_new import absent_levels, write_level_files
 
 
@@ -94,7 +94,7 @@ def resume(root: Path, path: str) -> str:
     made = absent_levels(root, repo.name, name)
     git(repo, "fetch", "-q", str(bundle), f"{ref}:{ref}")
     try:
-        git(repo, "worktree", "add", "-q", "--lock", "--reason", f"{LOCK}{name}", str(tree), ref)
+        git(repo, *locked_add(name, "-q"), str(tree), ref)
     except GitError:
         git(repo, "update-ref", "-d", f"refs/heads/{ref}")
         raise

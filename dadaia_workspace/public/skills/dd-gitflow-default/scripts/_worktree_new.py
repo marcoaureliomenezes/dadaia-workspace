@@ -1,21 +1,20 @@
 #!/usr/bin/env python3
 """`worktree.py new`: open and lock one canonical worktree by its name, on its parent's branch."""
 
-from __future__ import annotations
+from __future__ import annotations  # noqa: I001
 
 import json
 import shutil
 from pathlib import Path
 
 from _bugs_check import OPEN
-from _grammar import STATE
+from _grammar import STATE, candidate_number
 from _platform import act, command, is_link
 from _specs import check_release, parse
-from _worktree_git import flow_for, git, not_a_name, reattach, work_version, work_versions
+from _worktree_git import flow_for, git, locked_add, not_a_name, reattach, work_version, work_versions  # fmt: skip
 from _worktree_names import (
     LAUNCH,
     LEVEL_FILE,
-    LOCK,
     NAME_RE,
     Refusal,
     base_of,
@@ -59,7 +58,7 @@ def _refuse_unready(root: Path, main: Path, version: str, rc: str) -> None:
         check_release(rc_tree / "specs")
         phase = json.loads(state.read_text("utf-8")).get("phase")
     if phase != "IMPLEMENTATION":
-        nxt = f"{version}/rc-{int(rc.removeprefix('rc-')) + 1}/wt-rc"  # a phase never goes back: past IMPLEMENTATION the way on is the next candidate's own tree
+        nxt = f"{version}/rc-{candidate_number([rc]) + 1}/wt-rc"  # a phase never goes back: past IMPLEMENTATION the way on is the next candidate's own tree
         fix = (command(*LAUNCH, "new", main.name, nxt) if phase == "CLOSURE"
                else act("agent", f"reach phase IMPLEMENTATION in {STATE} on {branch(rc_name)} at {rc_tree} (release.py phase), then open its job again"))  # fmt: skip
         raise Refusal(
@@ -100,7 +99,6 @@ def new(root: Path, repo_name: str, name: str) -> Path:
     if git(repo, "branch", "--list", branch(name)).strip():
         raise Refusal(f"{branch(name)} exists", command(*LAUNCH, "list"))
     made = absent_levels(root, repo_name, name)
-    git(repo, "worktree", "add", "-q", "--lock", "--reason", f"{LOCK}{name}", "-b", branch(name),
-        str(tree), start)  # fmt: skip
+    git(repo, *locked_add(name, "-q", "-b", branch(name)), str(tree), start)
     write_level_files(made)
     return tree
