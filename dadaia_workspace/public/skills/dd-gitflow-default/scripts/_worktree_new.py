@@ -59,8 +59,12 @@ def _refuse_unready(root: Path, main: Path, version: str, rc: str) -> None:
         check_release(rc_tree / "specs")
         phase = json.loads(state.read_text("utf-8")).get("phase")
     if phase != "IMPLEMENTATION":
-        raise Refusal(f"a job needs release {version} in phase IMPLEMENTATION on {branch(rc_name)}",
-                      act("agent", f"reach phase IMPLEMENTATION in {STATE} on {branch(rc_name)} at {rc_tree} (release.py phase), then open its job again"))  # fmt: skip
+        fix = (  # a phase never goes back: past IMPLEMENTATION the way on is a hotfix lane or the next candidate
+            f"release {version} is closed to jobs: open a wt-hotfix-<bug> lane for a registered bug, or start the next candidate with release.py new <id>"
+            if phase == "CLOSURE"
+            else f"reach phase IMPLEMENTATION in {STATE} on {branch(rc_name)} at {rc_tree} (release.py phase), then open its job again"
+        )  # fmt: skip
+        raise Refusal(f"a job needs release {version} in phase IMPLEMENTATION on {branch(rc_name)}", act("agent", fix))  # fmt: skip
 
 
 def absent_levels(root: Path, repo_name: str, name: str) -> list[tuple[Path, str]]:
