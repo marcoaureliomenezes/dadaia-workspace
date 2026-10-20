@@ -44,6 +44,7 @@ git add . && git commit -qm "feat: slug" && git clone -q --bare . /srv/demo.git 
 
 dadaia init /workspace --harness claude --repo file:///srv/demo.git
 cd /workspace/repos/demo
+/workspace/.dadaia/.venv/bin/dadaia specs init --context demo
 git add -A && { git diff --cached --quiet || git commit -qm "chore(specs): onboard demo"; }
 git switch -qC feature/0.1.0
 git switch -qc strip-punctuation

@@ -63,9 +63,11 @@ _SKILLS_REPO = re.compile(
 # Both dated release headings: hand-written `## [x.y.z] — date`, release-please's `(date)`.
 # the one poetry floor: GHSA-2599-h6xx-hpxp (wheel path traversal), GHSA-73h3-mf4w-8647
 _POETRY_FLOOR = (2, 3, 4)
-# any pin, tag, range or bare requirement; `uvx dadaia-workspace init` and `--from <path>` stay legal
+# a pin (literal or f-string), tag, range or bare name after install/download/add/--from/--with, as
+# a shell word or an argv item; out of reach: a flag between the verb and the name, `dadaia_workspace`.
+# `uvx dadaia-workspace init` and `--from <path>` stay legal
 _PUBLISHED = (
-    r"dadaia-workspace(==[0-9$]|@|[<>~]=)|(install|--from)[ ='\"]+dadaia-workspace([^-/._[:alnum:]]|$)"
+    r"dadaia-workspace(==[0-9${]|@|[<>~]=)|(install|download|add|--from|--with)[ ='\",]+dadaia-workspace([^-/._[:alnum:]]|$)"
     r"|previous_release"
 )
 _POETRY_PIN = re.compile(r"poetry==(\d+(?:\.\d+)*)")

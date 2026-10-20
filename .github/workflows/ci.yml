@@ -292,7 +292,7 @@ jobs:
           key: poetry-${{ runner.os }}-${{ hashFiles('poetry.lock') }}
       - name: Install
         run: poetry install --no-interaction --no-ansi --with dev
-      # The onboarding journey drives `uvx --from <wheel>` (AC8.3).
+      # The onboarding journey drives `uvx --from <wheel>`.
       - name: Install uv
         run: pipx install uv==0.11.16
       - name: e2e-python

@@ -188,7 +188,7 @@ def _judge(mods: list[Any], fn: Callable[[Tree], list[str]], plant: Plant) -> li
 
 def run_planted(mods: list[Any]) -> int:
     """Each module's ``CONTROL`` must leave every check green; each plant must turn its
-    check red on the sub-rule the row names."""
+    check red on the sub-rule the row names; a ``#suffix`` on a row names a variant of it."""
     missed = 0
     for mod in mods:
         for cid, (fn, plants) in mod.CHECKS.items():
