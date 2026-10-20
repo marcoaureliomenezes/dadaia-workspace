@@ -10,6 +10,7 @@ Pins two composition-root guarantees:
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import pytest
@@ -85,6 +86,29 @@ def test_onto_judges_the_content_of_a_range_on_a_branch_no_push_could_carry(
     assert done.exit_code == 1, done.output
     assert "leak.md:1" in done.output and "zz-synthetic-term" not in done.output
     assert f"--rewrite-from {first}" in done.output and base not in done.output.split("fix:")[-1]
+
+
+@pytest.mark.parametrize(("name", "code"), [("acme-site", 0), ("other", 1)])
+def test_onto_judges_the_scanned_repo_by_its_own_name_from_outside_it_fenced(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, name: str, code: int
+) -> None:
+    """`--repo R --onto` drops the terms R's name carries whatever the cwd, fenced as the merge scan
+    runs it; a repo whose name carries none is still refused."""
+    repo = tmp_path / name
+    base = _init_repo(repo)
+    write_text(repo / "n.md", "acme\n")
+    os_run(["git", "add", "-A"], cwd=repo, check=True)
+    os_run(["git", "commit", "-q", "-m", "add n"], cwd=repo, check=True)
+    write_text(tmp_path / "terms.json", '{"acme": "r"}')
+    outside = tmp_path / "elsewhere"
+    outside.mkdir()
+    monkeypatch.chdir(outside)
+    monkeypatch.setenv("DADAIA_PRIVACY_DENYLIST", str(tmp_path / "terms.json"))
+    monkeypatch.setenv("DADAIA_FENCED_ROOTS", os.pathsep.join(map(str, outside.resolve().parents)))
+
+    done = _runner.invoke(app, ["ci", "push-gate-check", "--repo", str(repo), "--onto", base])
+
+    assert done.exit_code == code, done.output
 
 
 def _stamped_specs(repo: Path, version: int) -> str:
