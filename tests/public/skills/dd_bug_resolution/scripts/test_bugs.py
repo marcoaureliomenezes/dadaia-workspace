@@ -30,6 +30,7 @@ from tests.helpers.oslib import (
     is_executable,
     read_text,
     run,
+    run_line,
     stub_cli,
     write_text,
 )
@@ -199,7 +200,7 @@ def test_check_refuses_a_record_whose_fix_commit_lost_its_id_line(
     assert "\nfix: " in done.stdout
 
 
-def test_the_uncited_fix_fix_line_is_one_act_naming_the_literal_id_line(
+def test_the_uncited_fix_fix_line_is_the_archive_act_naming_the_id(
     script: Path, tmp_path: Path
 ) -> None:
     specs = _ledger(tmp_path)
@@ -209,8 +210,7 @@ def test_the_uncited_fix_fix_line_is_one_act_naming_the_literal_id_line(
     _ledger(tmp_path, resolved)
     run([*git, "commit", "-q", "--allow-empty", "-m", "base"], check=True)
     fix = _run(script, "check", "--specs", str(specs)).stdout.splitlines()[-1]
-    assert fix.startswith("fix: Agent action: ") and "<" not in fix, fix
-    assert "fix(bugs): a-bug \u2014 \u2026" in fix, fix
+    assert fix == f"fix: {_archive_act(script, specs, 'a-bug')}", fix
 
 
 @pytest.mark.parametrize(("ids", "depth", "code"), [
@@ -1475,6 +1475,10 @@ def _commit_as(root: Path, message: str, path: str = "cli/x.py") -> str:
     return run([*git, "rev-parse", "HEAD"], check=True).stdout.strip()
 
 
+def _archive_act(script: Path, specs: Path, *ids: str) -> str:
+    return shell_line(sys.executable, str(script), "archive", *ids, "--specs", str(specs))
+
+
 def _resolved(bug_id: str, sha: str = "a" * 40) -> dict[str, object]:
     return {**_OPEN_RECORD, "id": bug_id, "status": "resolved", "closed_at": "2026-09-21T10:00:00Z",
             "cause": "c", "solution": "s", "caused_by": "none", "fix_sha": sha}  # fmt: skip
@@ -1564,7 +1568,23 @@ def test_check_refuses_a_record_no_commit_of_head_cites_with_one_fix_line(
     assert done.returncode == 1, done.stdout
     assert done.stdout.count("LEDGER-BUGS-SCHEMA") == 1 and "bugs/BUGS.jsonl:1" in done.stdout
     [fix] = [ln for ln in done.stdout.splitlines() if ln.startswith("fix: ")]
-    assert fix.startswith("fix: Agent action: ") and "fix(bugs): a-bug \u2014 " in fix, fix
+    assert fix == f"fix: {_archive_act(script, specs, 'a-bug')}", fix
+
+
+def test_the_archive_act_check_prints_clears_a_record_a_task_commit_fixed(
+    script: Path, tmp_path: Path
+) -> None:
+    """A task-shaped fix commit cannot be re-worded once pushed: the printed act is the way out."""
+    _ledger(tmp_path)
+    sha = _commit_as(tmp_path, "fix(J1.T1): a-bug \u2014 c")
+    specs = _ledger(tmp_path, _resolved("a-bug", sha), _resolved("b-bug", sha))
+    done = _run(script, "check", "--specs", str(specs))
+    assert done.returncode == 1, done.stdout
+    fixes = {ln for ln in done.stdout.splitlines() if ln.startswith("fix: ")}
+    assert fixes == {f"fix: {_archive_act(script, specs, 'a-bug', 'b-bug')}"}, done.stdout
+    act = run_line(next(iter(fixes))[5:], check=False)
+    assert act.returncode == 0, act.stdout + act.stderr
+    assert _run(script, "check", "--specs", str(specs)).returncode == 0
 
 
 def test_resolve_records_the_sha_and_files_of_the_id_commit(script: Path, tmp_path: Path) -> None:
