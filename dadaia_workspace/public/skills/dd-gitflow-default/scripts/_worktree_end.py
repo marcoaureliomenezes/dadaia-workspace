@@ -332,7 +332,8 @@ def _ledgers(root: Path, repo: Path, tree: Path, scripts: Callable[[Path], list[
 
 
 def _relay(name: str, done: subprocess.CompletedProcess[str], tree: Path) -> None:
-    print(without_fix(done.stdout + done.stderr), end="")
+    if done.returncode:
+        print(without_fix(done.stdout + done.stderr), end="")
     relay(done, f"{name} check failed on {tree}", act("agent", f"fix the findings above in {tree} and commit them"))  # fmt: skip
 
 

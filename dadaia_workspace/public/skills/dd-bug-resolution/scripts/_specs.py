@@ -65,7 +65,7 @@ def check_release(specs: Path) -> None:
     check = script(Path(__file__).resolve().parents[2] / "dd-release-implementation/scripts/release.py")  # fmt: skip
     done = run([*check, "check", "--specs", str(specs)], env=scrubbed_env())
     said = next((m[1] for ln in (done.stdout + done.stderr).splitlines() if (m := _VERDICT.match(ln))), "")  # fmt: skip
-    relay(done, said or f"release.py check exited {done.returncode}", act("agent", f"run {check.inline('check', specs=specs)}"))  # fmt: skip
+    relay(done, said or f"release.py check exited {done.returncode}", check("check", specs=specs))  # fmt: skip
 
 
 def _bound_fix(here: Path, rerun: Script, ledger: str | None) -> tuple[str, str]:
