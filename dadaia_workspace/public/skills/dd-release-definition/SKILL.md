@@ -18,7 +18,7 @@ description: >
 3. Read `specs/backlog/BACKLOG.json`'s `active[]`; audit each entry before scheduling it (gain, cost, trade-offs, product fit, no new gate, no layer on an existing feature) and take open doubts to the grill.
 4. Each undispositioned `specs/audits/**` finding enters the SPEC's Origin as `findings:<id>`.
 5. Name the SPEC's `**Origin:**` per `specs/releases/AGENTS.md` §2.
-6. Write the SPEC's `## Bug window review`: list the resolved bugs' ids in `<specs-dir>/bugs/BUGS.jsonl`, find each fix by its id line (`git log -E --grep '^(fix|refactor)\(bugs\): .*<id>'`; a group line lists several ids), then `git show` each (the recorded sha is a hint) and compare that fix against the overfitting patterns — an assert or test the fix changed; a special case on a test value; a new branch, flag or second path; a reach into another feature; deleted functionality; ≥ 2 fixes on the unit.
+6. Write the SPEC's `## Bug window review`: list the resolved bugs' ids in `<specs-dir>/bugs/BUGS.jsonl`, find and inspect each fix as `dd-bug-resolution/LINEAGE.md` §Read persisted facts says, and compare that fix against the overfitting patterns — an assert or test the fix changed; a special case on a test value; a new branch, flag or second path; a reach into another feature; deleted functionality; ≥ 2 fixes on the unit.
 7. Give each fix KEEP or REBUILD; a REBUILD reworks the fix's code and what surrounds it, and keeps the contract tests its fixes hardened.
 
 ## 2. As-is review
