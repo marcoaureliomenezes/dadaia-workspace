@@ -4,6 +4,7 @@ A mismatched upstream pushes by explicit refspec; commit_paths ignores pre-stage
 the identity is the operator's own, never a fallback; a failed step carries git's stdout.
 """
 
+import os
 import re
 import subprocess
 from pathlib import Path
@@ -16,7 +17,7 @@ from dadaia_workspace.core.gitflow import SeveralWorkBranches
 from dadaia_workspace.core.skill_owner import load_owner
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from tests.conftest import _GIT_QUIET
-from tests.helpers.oslib import run, run_line, write_text
+from tests.helpers.oslib import read_text, run, run_line, write_text
 
 pytestmark = pytest.mark.slow
 
@@ -257,3 +258,41 @@ def test_the_several_work_branches_fix_runs_and_clears_the_refusal(
             break
     assert passes == (1 if merged else 2)
     assert client.work_version(repo) == "0.2.0"
+
+
+def _stub_ssh(directory: Path) -> Path:
+    """An `ssh` that records its argv, then runs the remote command locally."""
+    directory.mkdir(parents=True)
+    stub = directory / "ssh"
+    write_text(
+        stub,
+        '#!/bin/sh\nprintf "%s\\n" "$@" > "$0.argv"\nfor last; do :; done\nexec sh -c "$last"\n',
+    )
+    stub.chmod(0o755)
+    return stub
+
+
+@pytest.mark.parametrize("source", ["env", "config", "none"])
+def test_reachable_runs_the_users_ssh_command_with_batch_mode(
+    source: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    remote = _repo(tmp_path / "remote")
+    users = _stub_ssh(tmp_path / "users")
+    path_stub = _stub_ssh(tmp_path / "bin")
+    monkeypatch.setenv("PATH", f"{path_stub.parent}{os.pathsep}{os.environ['PATH']}")
+    monkeypatch.delenv("GIT_SSH_COMMAND", raising=False)
+    monkeypatch.delenv("GIT_SSH", raising=False)
+    config = tmp_path / "gitconfig"
+    write_text(config, f"[include]\n\tpath = {_GIT_QUIET.as_posix()}\n")
+    monkeypatch.setenv("GIT_CONFIG_GLOBAL", str(config))
+    command = f"{users} -o Marker=1"
+    if source == "env":
+        monkeypatch.setenv("GIT_SSH_COMMAND", command)
+    elif source == "config":
+        _git(tmp_path, "config", "--file", str(config), "core.sshCommand", command)
+
+    assert GitSubprocessClient().reachable(f"ssh://host{remote.as_posix()}") is True
+
+    ran, expected = (path_stub, []) if source == "none" else (users, ["-o", "Marker=1"])
+    argv = read_text(Path(f"{ran}.argv")).split("\n")
+    assert argv[: len(expected) + 2] == [*expected, "-o", "BatchMode=yes"]
