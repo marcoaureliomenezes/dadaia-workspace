@@ -96,6 +96,11 @@ a TTL expiry acts by zone class, an OUTPUT entry held, an EPHEMERAL one deleted.
 
 ## An agent reads AGENTS.md and uses it
 
+Fast path for multi-agent, spec-driven development: `uvx dadaia-workspace init <dir> --harness <name>` installs the workspace for Claude Code,
+Codex, Kimi Code, Cursor, Devin or GitHub Copilot, with its agent skills under `.agents/skills`.
+Read the root `AGENTS.md` map, then run `.dadaia/.venv/bin/dadaia doctor`.
+Model-readable indexes: `llms.txt` lists the pages, and `llms-full.txt` holds their full text.
+
 The always-on law is the root `AGENTS.md` map; every governed area carries its own
 scoped `AGENTS.md`, and every `dd-` skill touching an area opens that file first. The
 map, the scoped files, `.agents/skills/dd-*` and `.agents/agents/dd-*.md` are authored
