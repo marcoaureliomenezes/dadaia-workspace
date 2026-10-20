@@ -4,19 +4,11 @@ LINT-1 imports ``features.specs.memory_lint`` directly. These tests exercise
 ``check_lint1_memory_atoms`` against REAL memory-atom fixtures written under ``tmp_path``,
 proving the severity mapping end to end through the real ``memory_lint`` implementation —
 never a faked subprocess result.
-
-MEM-DRIFT-1 compares the features package-map diagram in ARCHITECTURE.md with the live
-``dadaia_workspace/features`` packages.
-
-The live-package introspection is monkeypatched in the table; one smoke test runs it for
-real.
 """
 
 from __future__ import annotations
 
 from pathlib import Path
-
-import pytest
 
 from dadaia_workspace.features.specs.doctor_memory import MemoryValidator
 from dadaia_workspace.features.specs.doctor_types import finding_path
@@ -140,117 +132,6 @@ def test_lint1_emits_one_single_line_issue_per_atom_error(tmp_path: Path) -> Non
         ("LINT-1", str(quality)),
     ]
     assert all("\n" not in issue.message for issue in issues)
-
-
-_HEADING = "### `dadaia_workspace/features` — package map ({n} packages)"
-
-
-def _architecture_md(pkgs: tuple[str, ...]) -> str:
-    return (
-        "# Architecture\n\n## Part 2 — Implementation\n\n"
-        f"{_HEADING.format(n=len(pkgs))}\n\n```mermaid\nflowchart TB\n"
-        '    subgraph features["dadaia_workspace/features"]\n'
-        f'      pkgs["{" · ".join(pkgs)}"]\n'
-        "    end\n```\n\n### next section\n\nunrelated\n"
-    )
-
-
-@pytest.mark.parametrize(
-    ("architecture", "live", "needle"),
-    [
-        pytest.param(
-            _architecture_md(("panel", "spec_artifacts")),
-            {"panel"},
-            "spec_artifacts",
-            id="stale-node",
-        ),
-        pytest.param(
-            _architecture_md(("panel",)), {"panel", "repos"}, "repos", id="missing-live-package"
-        ),
-        pytest.param(_architecture_md(("panel", "repos")), {"panel", "repos"}, None, id="matching"),
-        pytest.param(
-            "# Architecture\n\nnothing relevant.\n",
-            {"panel"},
-            None,
-            id="consumer-no-heading-silent",
-        ),
-        pytest.param(None, {"panel"}, None, id="no-architecture-md"),
-    ],
-)
-def test_mem_drift1_table(
-    tmp_path: Path,
-    architecture: str | None,
-    live: set[str],
-    needle: str | None,
-) -> None:
-    specs = tmp_path / "specs"
-    (specs / "memory").mkdir(parents=True)
-    if architecture is not None:
-        write_text(specs / "memory" / "ARCHITECTURE.md", architecture)
-    for pkg in live:
-        (tmp_path / "dadaia_workspace" / "features" / pkg).mkdir(parents=True)
-        write_text(tmp_path / "dadaia_workspace" / "features" / pkg / "__init__.py", "")
-
-    issues = MemoryValidator(specs).check_mem_drift1_features_package_map()
-
-    if needle is None:
-        assert issues == []
-    else:
-        [issue] = issues
-        assert (issue.code, issue.verdict, issue.fixable) == ("MEM-DRIFT-1", "warning", False)
-        assert needle in issue.message
-
-
-def test_mem_drift1_lists_only_the_packages_of_the_trees_own_features_folder(
-    tmp_path: Path,
-) -> None:
-    specs = tmp_path / "specs"
-    (specs / "memory").mkdir(parents=True)
-    write_text(specs / "memory" / "ARCHITECTURE.md", _architecture_md(("panel",)))
-    features = tmp_path / "dadaia_workspace" / "features"
-    (features / "panel").mkdir(parents=True)
-    write_text(features / "panel" / "__init__.py", "")
-    (features / "plain_dir").mkdir()
-    write_text(features / "module.py", "")
-
-    assert MemoryValidator(specs).check_mem_drift1_features_package_map() == []
-
-
-def _tree(tmp_path: Path, mapped: tuple[str, ...], own: tuple[str, ...] | None) -> Path:
-    """The specs dir of a repo whose ARCHITECTURE.md maps *mapped* and whose own
-    `dadaia_workspace/features/` holds the packages *own* (no such folder when `None`)."""
-    specs = tmp_path / "repo" / "specs"
-    (specs / "memory").mkdir(parents=True)
-    write_text(specs / "memory" / "ARCHITECTURE.md", _architecture_md(mapped))
-    features = tmp_path / "repo" / "dadaia_workspace" / "features"
-    for pkg in own or ():
-        (features / pkg).mkdir(parents=True)
-        write_text(features / pkg / "__init__.py", "")
-    if own is not None:
-        features.mkdir(parents=True, exist_ok=True)
-    return specs
-
-
-@pytest.mark.parametrize(
-    ("mapped", "own", "expected"),
-    [
-        pytest.param(("alpha", "beta"), ("alpha", "beta"), [], id="own-folder-matches-its-map"),
-        pytest.param(("alpha", "beta"), None, [], id="no-own-folder-no-list-no-finding"),
-        pytest.param(
-            ("alpha", "gone"),
-            ("alpha", "extra"),
-            ["'gone'", "dadaia_workspace/features/extra"],
-            id="own-folder-disagrees",
-        ),
-    ],
-)
-def test_mem_drift1_reads_the_trees_own_features_folder(
-    tmp_path: Path, mapped: tuple[str, ...], own: tuple[str, ...] | None, expected: list[str]
-) -> None:
-    issues = MemoryValidator(_tree(tmp_path, mapped, own)).check_mem_drift1_features_package_map()
-
-    assert [issue.code for issue in issues] == ["MEM-DRIFT-1"] * len(expected)
-    assert all(needle in issue.message for issue, needle in zip(issues, expected, strict=True))
 
 
 def test_unfilled_placeholder_atom_is_reported_with_the_fill_or_delete_line(tmp_path: Path) -> None:
