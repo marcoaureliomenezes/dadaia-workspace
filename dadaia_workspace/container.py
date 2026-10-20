@@ -70,7 +70,7 @@ def build_spec_context_service(
         git_client=GitSubprocessClient(),
         workspace_root=workspace_root,
         install_hooks=install_git_hooks,
-        secret_scan=scan_publish_candidates,
+        secret_scan=partial(scan_publish_candidates, own=True),
         worktree_rows=rows,
     )
 
@@ -123,10 +123,11 @@ def load_denylist_baseline_patterns() -> tuple[BaselinePatternLike, ...]:
     return load_baseline_patterns()
 
 
-def scan_publish_candidates(repo: Path, rels: list[str]) -> dict[str, str]:
+def scan_publish_candidates(repo: Path, rels: list[str], *, own: bool = False) -> dict[str, str]:
     """The pre-push matcher, in-process, over the files baseline is about
     to commit, before any hook could see them.
-    Read as the object reader reads a blob: undecodable bytes are scanned by path only."""
+    Read as the object reader reads a blob: undecodable bytes are scanned by path only.
+    *own* drops the terms *repo*'s own name carries; off, no repo identity is read."""
     from dadaia_workspace.core.models.git_scan import ScannedObject
     from dadaia_workspace.features.chokepoints.denylist_scan import scan_objects
 
@@ -138,7 +139,9 @@ def scan_publish_candidates(repo: Path, rels: list[str]) -> dict[str, str]:
                 objects.append(ScannedObject(rel, "", data.decode("utf-8"), decodable=True))
             except UnicodeDecodeError:
                 objects.append(ScannedObject(rel, "", "", decodable=False))
-    outcome = scan_objects(objects, load_denylist_terms(), load_denylist_baseline_patterns())
+    outcome = scan_objects(
+        objects, load_denylist_terms(repo if own else None), load_denylist_baseline_patterns()
+    )
     return {h.path: f"{h.source_layer} '{h.masked_term}' (line {h.line})" for h in outcome.hits}
 
 
