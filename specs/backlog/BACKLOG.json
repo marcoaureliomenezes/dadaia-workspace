@@ -132,31 +132,6 @@
       ]
     },
     {
-      "id": "adoption-and-discoverability",
-      "title": "Adoption and discoverability for humans and agents: llms.txt, PyPI/GitHub metadata, README fast path, onboarding review, the portfolio page",
-      "opened": "2026-10-18",
-      "status": "idea",
-      "description": "0.5.0 ships only once humans and agents can find, install and onboard dadaia-workspace. Deliver: (1) llms.txt and llms-full.txt generated from docs/; (2) the PyPI and GitHub metadata audited: description, keywords, project URLs and homepage pointing to the portfolio page, repo topics; (3) a README fast path for humans and for agents; (4) an onboarding review (the three onboarding levels read and run cold). The dadaia-workspace page on the operator's portfolio (its own spec context, the projects section of the operator's site) is built in that context, not here; its being live, with the pyproject and GitHub homepage pointing to it, gates the 0.5.0 promote. Supersedes docs-site-zensical-pages (no Zensical, no GitHub Pages site). Taken by rc-20 (adoption), the portfolio page in parallel.",
-      "provenance": "grill roadmap-050 (.dadaia/reports/dadaia-workspace/grill/roadmap-050.md), operator 2026-10-18: Q1 'to ship the 0.5.0 the minimal gates are the work and backlog related with documentation and how to maximaze ou discoverability and of course adoption ... for humans and agents. of course, auso the evals, the onboarding'; Q2 'only for the website. use my own [portfolio] ... there goes the part of \"website\" that we would need here'; Q3 'Gate: page live first (Recommended)'; Q4 'entrypoints and proof'; Q7 rc-20 adoption.",
-      "relates": [
-        "docs-site-zensical-pages",
-        "launch-operator-acts",
-        "promote-gate-050"
-      ]
-    },
-    {
-      "id": "eval-t3-discovery",
-      "title": "Eval T3 discovery: an agent with only a vague goal discovers, installs, fully onboards and keeps using dadaia-workspace alone",
-      "opened": "2026-10-18",
-      "status": "idea",
-      "description": "A third eval, the adoption proof. The agent gets only a vague goal (try dadaia-workspace) and must discover it, find how to install it, run the full onboarding and keep using it, alone. The operator proposed a specific third-party agent (named in the grill report); T3's own grill picks the agent and confirms Harbor can run it, falling back to Claude Code with the same vague goal. Graded like T1/T2 (code-only grader). Taken by rc-20 (built); run at rc-21 with T1 and T2, recorded for the promote.",
-      "provenance": "grill roadmap-050 (.dadaia/reports/dadaia-workspace/grill/roadmap-050.md), operator 2026-10-18: Q4 'we have 2 evals, 1 running [an agent] we a vague description about what it needs to do, and a instruction to test dadaia-workspace. and the agent alone is capable of discovering, get how to install, how to do the full onboarding and continue to using'; Q6 'T1+T2 Claude, + discovery T3 (Recommended)'; Q7 rc-20 adoption, rc-21 T1+T2+T3 run and recorded.",
-      "relates": [
-        "adoption-and-discoverability",
-        "evals-functional"
-      ]
-    },
-    {
       "id": "rc18-review-loose-ends",
       "title": "rc-18 review loose ends: the readout, ledger refusals, worktree fix lines, the census, test folds, the ledger-append conflict",
       "opened": "2026-10-18",
