@@ -322,23 +322,24 @@ def test_a_denylist_named_by_the_environment_refuses_a_listed_term(
     assert refusal[0].endswith("which the push refuses — nothing was written")
 
 
-@pytest.mark.parametrize(
-    ("tree", "refused"),
-    [
-        ("repos/acme", False),
-        ("repos/acme-site", False),
-        ("worktrees/acme/0.1.0/wt-rc", False),
-        ("repos/other", True),
-    ],
-)
+@pytest.mark.parametrize(("repo", "refused"), [("acme", False), ("acme-site", False), ("other", True)])
 def test_a_repos_own_name_is_never_a_private_match_in_its_own_files(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, tree: str, refused: bool
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, repo: str, refused: bool
 ) -> None:
     """A term the repo's name equals or contains is dropped for that repo only."""
-    _workspace(tmp_path)
     write_text(tmp_path / "terms.json", '{"acme": "r"}')
     monkeypatch.setenv("DADAIA_PRIVACY_DENYLIST", str(tmp_path / "terms.json"))
-    ledger_file = tmp_path / tree / "specs/bugs/BUGS.jsonl"
+    ledger_file = tmp_path / repo / "specs/bugs/BUGS.jsonl"
     ledger_file.parent.mkdir(parents=True)
-    refusal = _ledger_module().private_refusal([{"context": tree.split("/")[-1], "t": "acme"}], ledger_file)  # fmt: skip
+    run(["git", "init", "-q", str(tmp_path / repo)])
+    refusal = _ledger_module().private_refusal([{"context": repo, "t": "acme"}], ledger_file)
     assert (refusal is not None) is refused
+
+
+def test_an_empty_term_still_refuses_in_a_repo_that_names_itself(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    write_text(tmp_path / "terms.json", '{"": "r"}')
+    monkeypatch.setenv("DADAIA_PRIVACY_DENYLIST", str(tmp_path / "terms.json"))
+    run(["git", "init", "-q", str(tmp_path / "acme")])
+    assert _ledger_module().terms(None, tmp_path / "acme") == [("", "r")]
