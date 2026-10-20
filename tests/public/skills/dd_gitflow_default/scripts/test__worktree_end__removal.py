@@ -13,7 +13,7 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.core.platform import quote
-from tests.helpers.oslib import write_text
+from tests.helpers.oslib import command, write_text
 from tests.helpers.worktree_ws import (
     NEW_JOB,
     approve,
@@ -244,6 +244,28 @@ def test_a_gone_tree_merged_behind_its_upstream_is_removed_with_its_pushed_branc
 
     merged = run(root, "merge", f"worktrees/r/{NEW_JOB}")
 
+    assert merged.returncode == 0, merged.stderr
+    assert git(root / "repos/r", "branch", "--list", BRANCH).strip() == ""
+    assert _on_the_remote(root) == ""
+
+
+def test_a_gone_tree_whose_parent_is_off_its_branch_keeps_the_pushed_branch_until_switched(
+    root: Path,
+) -> None:
+    rc = root / "worktrees/r" / RC
+    land(root, "src/a.py")
+    git(rc, "merge", "-q", "--ff-only", BRANCH)
+    _push_to_a_remote(root)
+    git(rc, "switch", "-q", "-c", "elsewhere")
+    _gone(root)
+
+    refused = run(root, "merge", f"worktrees/r/{NEW_JOB}")
+
+    fix = [f for f in refused.stderr.splitlines() if f.startswith("fix: ")]
+    assert refused.returncode == 1 and fix == [f"fix: {command('git', '-C', str(rc), 'switch', f'wt/{RC}')}"]  # fmt: skip
+    assert _on_the_remote(root)
+    run_fix(root, refused)
+    merged = run(root, "merge", f"worktrees/r/{NEW_JOB}")
     assert merged.returncode == 0, merged.stderr
     assert git(root / "repos/r", "branch", "--list", BRANCH).strip() == ""
     assert _on_the_remote(root) == ""

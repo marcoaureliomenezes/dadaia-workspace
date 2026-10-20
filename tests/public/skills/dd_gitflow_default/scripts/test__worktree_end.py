@@ -328,7 +328,7 @@ def test_merge_needs_a_valid_approval_of_the_exact_head(
         assert _line(result) == _dispatch(tree)
     elif valid and verdict == "REJECTED" and at.endswith("Z"):  # a naive instant is unparsed
         assert _line(result) == (
-            f"Agent action: fix the findings of {target} and commit them in {tree}, then dispatch"
+            f"Agent action: fix the findings of {target}, then dispatch"
             f" dd-code-reviewer on {tree} at its new HEAD; its verdict.py run writes the verdict"
         )
     else:
