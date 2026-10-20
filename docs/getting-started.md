@@ -147,7 +147,7 @@ runs every worktree verb: `new`, `merge`, `sync`, `clean`, `hash`, `list`, `paus
    REBUILD, UPDATE or KEEP, then ADD only for what no unit can carry; the mandatory
    grill; then `SPEC.md` (its `Replaces` naming what DELETE/REBUILD rows remove),
    `PLAN.md` (opening with that table as §1, then the job DAG with waves and exact `W:` sets) and
-   one job file per job, `tasks/<job>.md`, in that `rc-<N>/`, as the first commits of
+   one job file per job, `tasks/job<n>.md`, in that `rc-<N>/`, as the first commits of
    the `wt-rc`, cut from the work branch (`<work>M.m.p`; the names are the
    `gitflow:` block of `specs/constitution.md`).
 4. **Open implementation.** `release.py phase IMPLEMENTATION --sha <sha>` requires

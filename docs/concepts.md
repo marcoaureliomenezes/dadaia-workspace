@@ -21,7 +21,7 @@ triggers memory injection.
 
 Exactly one *release* is live under `specs/releases/<M.m.p>/`. It has open scope and grows
 through closed-scope *candidates*. Each `rc-<N>/` holds `SPEC.md`, `PLAN.md` and
-`tasks/<job>.md`; the highest numbered candidate is live. `_RELEASE.json` is the release's
+`tasks/job<n>.md`; the highest numbered candidate is live. `_RELEASE.json` is the release's
 one mutable state document: `phase`, the three milestones and an append-only `log` whose
 new entries are `milestone`, `note`, `summary` or closure `memory`.
 
