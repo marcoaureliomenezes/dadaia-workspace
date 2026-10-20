@@ -135,8 +135,7 @@ def drop_argv(repo: Path, low: str, high: str) -> list[list[str]]:
 
 def drop_steps(repo: Path, low: str, high: str) -> list[str]:
     """The act steps that retire *low* once merged into *high*: `high` checked out (`-d` judges the checkout), then each `drop_argv`."""
-    argv = drop_argv(repo, low, high)
-    return [_switch(repo, high), *(f"run `{git_inline(repo, *a)}`" for a in argv)] if argv else []
+    return [_switch(repo, high), *(f"run `{git_inline(repo, *a)}`" for a in argv)] if (argv := drop_argv(repo, low, high)) else []  # fmt: skip
 
 
 def several_work(repo: Path, flow: dict[str, str], versions: list[str], ref: str = "refs/heads") -> tuple[str, str]:  # fmt: skip
