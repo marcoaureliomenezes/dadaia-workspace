@@ -20,10 +20,28 @@ ROOT = Path(__file__).resolve().parents[2]
 VERSIONS = ("candidate",)
 T1 = "t1-cold-onboarding"
 T2 = "t2-block-list-bug"
+T3 = "t3-discovery"
 
 # The documented onboarding, typed by hand.
 _INIT = "dadaia init /workspace --harness claude --repo file:///srv/demo.git"
 HAND = {"candidate": f"{_INIT} && /workspace/.dadaia/.venv/bin/dadaia specs init --context demo"}
+# T3, candidate only, as an agent types it inside the image: pip resolves from the wheelhouse by the
+# image's own environment, the venv's dadaia is called by path, the entry goes in a real lane.
+_D = "/workspace/.dadaia/.venv/bin/dadaia"
+_ONBOARD = "python3 -m venv /tmp/v && /tmp/v/bin/pip install -q dadaia-workspace && /tmp/v/bin/dadaia init /workspace --harness claude"
+_FILE = (
+    "python3 /workspace/.agents/skills/dd-backlog-definition/scripts/backlog.py new"
+    " --title t --description d --provenance p try-it --specs"
+)
+ONBOARDED_T3 = f"{_ONBOARD} --repo file:///srv/demo.git && {_D} specs init --context demo"
+RENAMED_T3 = (
+    f"{_ONBOARD} && {_D} context create myproj --main-repo file:///srv/demo.git"
+    f" && {_D} specs init --context myproj && {_FILE} /workspace/repos/demo/specs"
+)
+HAND_T3 = (
+    f"{ONBOARDED_T3} && {_D} worktree new demo 0.1.0/wt-backlog-x"
+    f" && {_FILE} /workspace/worktrees/demo/0.1.0/wt-backlog-x/specs"
+)
 
 
 def sh(*cmd: str) -> str:
