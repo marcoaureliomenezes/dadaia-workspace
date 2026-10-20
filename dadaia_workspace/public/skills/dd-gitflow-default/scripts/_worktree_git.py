@@ -128,19 +128,13 @@ def _switch(repo: Path, high: str) -> str:
 
 
 def drop_argv(repo: Path, low: str, high: str) -> list[list[str]]:
-    """The git argv that retire branch *low* once merged into *high*: *low*'s upstream unset when
-    it has one, then `-d`; empty when *low* is not merged. Never `-D`."""
-    merged = git(
-        repo, "for-each-ref", "--merged", high, "--format=x%(upstream)", f"refs/heads/{low}"
-    )
-    if not merged.strip():
-        return []
-    return [*([["branch", "--unset-upstream", low]] if merged.strip() != "x" else []), ["branch", "-d", low]]  # fmt: skip
+    """The git argv that retire *low* once merged into *high*: upstream unset if any, then `-d`; empty when unmerged."""
+    merged = git(repo, "for-each-ref", "--merged", high, "--format=x%(upstream)", f"refs/heads/{low}").strip()  # fmt: skip
+    return [*([["branch", "--unset-upstream", low]] if merged != "x" else []), ["branch", "-d", low]] if merged else []  # fmt: skip
 
 
 def drop_steps(repo: Path, low: str, high: str) -> list[str]:
-    """The act steps that delete branch *low* once merged into *high*: `high` checked out, since
-    `-d` judges the checkout, then each `drop_argv`; empty when *low* is not merged."""
+    """The act steps that retire *low* once merged into *high*: `high` checked out (`-d` judges the checkout), then each `drop_argv`."""
     argv = drop_argv(repo, low, high)
     return [_switch(repo, high), *(f"run `{git_inline(repo, *a)}`" for a in argv)] if argv else []
 
