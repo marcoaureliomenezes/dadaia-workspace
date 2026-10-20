@@ -131,7 +131,7 @@ Wave ranking, by the pick:
 
 ### FR8 — the portfolio prod deploy before the promote (roadmap Q3: "Gate: page live first (Recommended)")
 
-- AC8.1 After E, the portfolio's claim table, which pins `2059b779e`, is re-checked against E in the the portfolio site's own lane. A mismatch is corrected there (main-thread ruling: "Portfolio claim table re-checked against E; prod deploy right before the promote"). Test: none in this repo.
+- AC8.1 After E, the portfolio's claim table, which pins `2059b779e`, is re-checked against E in the portfolio site's own lane. A mismatch is corrected there (main-thread ruling: "Portfolio claim table re-checked against E; prod deploy right before the promote"). Test: none in this repo.
 - AC8.2 The operator approves the portfolio site's develop → main deploy. Before the dadaia-workspace promote PR merges, `https://marco-menezes.com/projetos/dadaia-workspace` serves the dadaia-workspace page. Test: none; an HTTP read is the evidence.
 
 ### FR9 — the promote sequence (`dd-gitflow-default` §2 steps 8-11; ADRs 0178, 0242, 0269, 0277)
