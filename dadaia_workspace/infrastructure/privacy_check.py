@@ -85,10 +85,10 @@ def _load_privacy_baseline() -> tuple[BaselinePattern, ...]:
 def load_privacy_terms() -> tuple[tuple[str, str], ...]:
     """The operator denylist, loaded through the ledger reader: ``_ledger.terms`` rooted at
     ``_ledger.workspace_of`` the cwd (the ledger seam passes its ``--specs``), else the
-    workspace owning this venv. ``$DADAIA_PRIVACY_DENYLIST`` loads
+    workspace owning this venv, minus the terms the cwd repo's own name carries. ``$DADAIA_PRIVACY_DENYLIST`` loads
     even outside any workspace."""
     ledger = load_owner("dd-bug-resolution", "_ledger")
-    return tuple(ledger.terms(ledger.workspace_of(Path.cwd()) or own_workspace_root()))
+    return tuple(ledger.terms(ledger.workspace_of(Path.cwd()) or own_workspace_root(), Path.cwd()))
 
 
 def load_baseline_patterns() -> tuple[_BaselinePattern, ...]:
