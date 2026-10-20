@@ -18,7 +18,7 @@ import _jsonl
 import _ledger
 from _grammar import HISTORICAL_TASK_RE, TASK_ID_RE
 from _platform import act, git_line, read_text
-from _specs import script
+from _specs import context_repos, script
 
 CODE = "LEDGER-BUGS-SCHEMA"
 LEDGER = "bugs/BUGS.jsonl"
@@ -196,8 +196,8 @@ def plain_ids(text: str) -> frozenset[str]:
 def _uncited(specs: Path, text: str) -> list[dict[str, Any]]:
     """The live resolved records that carry a `fix_sha` and whose id line no commit of the main repo or a repo beside it reaches from its HEAD, one finding each, every one fixed by the one archive of all the misses; where a repo is a shallow clone a miss cannot be judged, so the misses are one finding for the cut. The sha is a hint, never judged."""
     held = {str(r["id"]): (n, r["fix_sha"]) for n, r, why in _jsonl.walk(text) if not why and isinstance(r, dict) and r.get("status") == "resolved" and r.get("fix_sha")}  # fmt: skip
-    found = _git.fix_commit(specs.parent, held)
-    repos = _git.context_repos(specs.parent)
+    repos = context_repos(specs.parent)
+    found = _git.fix_commit(repos, held)
     missed = [i for i in held if i not in found]
     if missed and (cut := next((p for p in repos if _git.shallow(p)), None)):
         return [_findings.finding(CODE, LEDGER, held[missed[0]][0], "the clone is shallow: its misses cannot be judged", git_line(cut, "fetch", "--unshallow"))]  # fmt: skip

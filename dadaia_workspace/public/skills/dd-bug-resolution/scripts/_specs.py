@@ -9,6 +9,7 @@ import re
 import subprocess
 import sys
 from pathlib import Path
+from typing import Any
 
 from _git import scrubbed_env
 from _jsonl import reinstall_fix
@@ -55,6 +56,26 @@ def run_cli(
         return run([str(workspace_cli(root)), *args], cwd=cwd or root, env=env, stdin=stdin)
     except OSError as error:
         raise Refusal(f"the workspace CLI cannot start: {error}", reinstall_fix(root)) from error
+
+
+def context_row(root: Path, repo: Path) -> dict[str, Any] | None:
+    """The `context list --json` row owning *repo* (main or associated; a checkout or a worktree of it), or None when no context owns it.
+    Raises `Refusal` with the CLI's own fix when the CLI fails; rows it cannot read name no owner; a registry read, so no fence applies."""
+    done = run_cli(root, "context", "list", "--json", env={k: v for k, v in scrubbed_env().items() if k != "DADAIA_FENCED_ROOTS"})  # fmt: skip
+    relay(done, "context list failed", reinstall_fix(root))
+    try:
+        slug = repo.resolve().relative_to(root.resolve()).parts[1]
+        return next((r for r in json.loads(done.stdout) if slug in (r["main_repo"], *(a["slug"] for a in r["associated_repos"]))), None)  # fmt: skip
+    except (ValueError, TypeError, KeyError, IndexError):
+        return None
+
+
+def context_repos(repo: Path) -> list[Path]:
+    """*repo* and the existing checkouts of the repos its context associates; *repo* alone with no workspace or no workspace CLI."""
+    root = workspace_of(repo, fenced=frozenset())
+    row = context_row(root, repo) if root and cli_path(root).exists() else None
+    beside = (root / "repos" / a["slug"] for a in (row or {}).get("associated_repos", []) if root)  # fmt: skip
+    return [repo, *(p for p in beside if p.resolve() != repo.resolve() and (p / ".git").exists())]
 
 
 _VERDICT = re.compile(r"(?:\S+ error |\[error\] )(.*)")

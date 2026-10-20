@@ -10,10 +10,10 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from _git import git, main_checkout, scrubbed_env
+from _git import git, scrubbed_env
 from _handoffs import reviewer_records
 from _platform import run
-from _specs import check_release, run_cli
+from _specs import check_release, context_row
 
 _FREE = ("docs(memory)", "chore(release)", "chore(backlog)", "chore(bugs)", "docs(adr)", "chore(adrs)")  # fmt: skip
 NA = "n/a"
@@ -55,19 +55,6 @@ def _window(state: dict[str, Any], rc: str) -> tuple[str, str, str, str | None, 
     return max(born, default=first), max(before, default=""), done["ts"], done.get("sha"), newest
 
 
-def _context(root: Path, repo: Path) -> tuple[str, str] | None:
-    """(context name, integration branch) of the context that owns *repo*, named by the parent
-    of its git common dir, so a worktree and its main checkout answer alike."""
-    slug = main_checkout(repo).name
-    done = run_cli(root, "context", "list", "--json", env=scrubbed_env())
-    try:
-        rows = json.loads(done.stdout)
-        row = next(r for r in rows if r.get("gitflow") and slug in (r["main_repo"], *(a["slug"] for a in r["associated_repos"])))  # fmt: skip
-        return str(row["name"]), str(row["gitflow"]["integration"])
-    except (ValueError, StopIteration, TypeError, KeyError):
-        return None
-
-
 def _merge(repo: Path, branch: str, sha: str) -> list[str]:
     """[sha, committer date] of the first merge on *branch*'s first-parent line that holds *sha*, or []."""
     holds = set(git(repo, "rev-list", "--ancestry-path", f"{sha}..{branch}", check=False).split())
@@ -95,7 +82,8 @@ def table(root: Path, specs: Path, rc: str) -> str:
     vals = [NA] * 6
     if window:
         birth, prior, end, sha, newest = window
-        name, integration = _context(root, repo) or (None, None)
+        row = context_row(root, repo) or {}
+        name, integration = row.get("name"), (row.get("gitflow") or {}).get("integration")
         trees: dict[str, list[tuple[str, str]]] = {}
         for _path, data in reviewer_records(root):
             if data.get("context") != name:

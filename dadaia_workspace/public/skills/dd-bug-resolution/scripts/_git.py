@@ -3,14 +3,14 @@
 
 from __future__ import annotations
 
-import json
 import os
 import re
+from collections import Counter
 from collections.abc import Iterable, Mapping
 from pathlib import Path
 
 from _grammar import SHA_RE
-from _platform import read_text, run
+from _platform import run
 
 #: `git rev-parse --local-env-vars` less the config injectors: what makes git answer for another repo. Identity, config and ssh are the caller's.
 _LOCAL = frozenset({
@@ -71,37 +71,26 @@ def reaches(repo: Path, sha: str) -> bool:
 _FIX_LINE = re.compile(r"^(?:fix|refactor)\(bugs\): (.*?) — ", re.M)
 
 
-def context_repos(repo: Path) -> list[Path]:
-    """*repo* and the checkouts of the repos its bound context associates with it, as the workspace registry names them; never another context's checkout."""
-    main = main_checkout(repo)
-    try:
-        rows = json.loads(read_text(main.parent.parent / ".dadaia/states/spec_contexts.json"))[
-            "contexts"
-        ]
-    except (OSError, ValueError, KeyError, TypeError):
-        rows = []
-    beside = (main.parent / a["slug"] for r in rows if r.get("repo_slug") == main.name for a in r.get("associated_repos", []))  # fmt: skip
-    return [repo, *(p for p in beside if (p / ".git").exists())]
-
-
 def _canon(subject: str) -> str:
     """A subject with git's `Reapply "S"` spelled as the `Revert "Revert "S""` it stands for."""
     return f'Revert "Revert "{subject[9:]}"' if subject.startswith('Reapply "') else subject
 
 
-def fix_commit(repo: Path, ids: Iterable[str]) -> dict[str, tuple[Path, str]]:
-    """For each of *ids*, the repo and sha of the newest commit whose message holds a bug-fix line naming it (a group lists its ids separated by commas or blanks), that the HEAD of *repo*, else of a repo of `context_repos`, reaches; each repo is read in one `git log` and only while an id is missing. A commit the HEAD reverts is skipped: a commit subjected `Revert "<S>"` retires the older commit subjected `<S>`, and a retired revert registers nothing."""
+def fix_commit(repos: Iterable[Path], ids: Iterable[str]) -> dict[str, tuple[Path, str]]:
+    """For each of *ids*, the repo and sha of the newest commit whose message holds a bug-fix line naming it (a group lists its ids separated by commas or blanks), that the HEAD of a repo of *repos* reaches; each repo is read in one `git log` and only while an id is missing. A commit subjected `Revert "<S>"` retires exactly one older commit subjected `<S>`, the nearest, and a retired revert registers nothing."""
     wanted, found = set(ids), dict[str, tuple[Path, str]]()
-    for each in context_repos(repo):
+    for each in repos:
         if wanted <= found.keys():
             break
-        retired = set()
+        retired = Counter[str]()
         for entry in git(each, "log", "--format=%x1e%H%x00%B", check=False).split("\x1e")[1:]:
             sha, _, message = entry.partition("\0")
-            if (subject := _canon(message.partition("\n")[0])) in retired:
+            subject = _canon(message.partition("\n")[0])
+            if retired[subject]:
+                retired[subject] -= 1
                 continue
             if subject.startswith('Revert "'):
-                retired.add(_canon(subject[8:-1]))
+                retired[_canon(subject[8:-1])] += 1
             for head in _FIX_LINE.findall(message):
                 for bug in re.split(r"[,\s]+", head):
                     if bug in wanted:

@@ -22,7 +22,7 @@ from _bugs_store import Refusal, archived_plain_ids, commit, history, read_recor
 from _git import GitError, fix_commit, fix_files, git
 from _platform import act, use_utf8_stdio
 from _refusal import report
-from _specs import find_specs, refuse
+from _specs import context_repos, find_specs, refuse
 
 _OPTIONS: dict[str, tuple[str, ...]] = {
     "append": (
@@ -169,7 +169,7 @@ def _write(args: argparse.Namespace, specs: Path) -> int:
         return 0
     values = _jsonl.values(args, _OPTIONS[args.verb])
     if args.verb == "resolve":
-        found = fix_commit(specs.parent, [args.bug_id])
+        found = fix_commit(context_repos(specs.parent), [args.bug_id])
         if args.bug_id not in found:
             raise Refusal(
                 f"no commit of HEAD holds the line `fix(bugs): {args.bug_id} — …`",
@@ -187,14 +187,14 @@ def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     reads = args.verb in ("check", "status", "stats")
     specs = find_specs(args.specs, ledger=None if reads else f"specs/{LEDGER}")
-    if args.verb == "check":
-        findings = check(specs)
-        if args.json:
-            print(json.dumps(findings, indent=2))
-        else:
-            _findings.print_text(findings)
-        return 1 if findings else 0
     try:
+        if args.verb == "check":
+            findings = check(specs)
+            if args.json:
+                print(json.dumps(findings, indent=2))
+            else:
+                _findings.print_text(findings)
+            return 1 if findings else 0
         if args.verb in ("status", "stats"):
             return _read(args, specs)
         return _archive(args, specs) if args.verb == "archive" else _write(args, specs)

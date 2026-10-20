@@ -18,7 +18,7 @@ from _bugs_check import OPEN, TERMINAL, load_schema
 from _bugs_store import Records, Refusal, by_id
 from _clock import now_iso as now_iso
 from _git import fix_commit, fix_files
-from _specs import choice, script
+from _specs import choice, context_repos, script
 
 _MUTABILITY = {k: v["x-mutability"] for k, v in load_schema()["properties"].items()}
 _OBJECTS = frozenset(k for k, v in load_schema()["properties"].items() if v.get("type") == "object")
@@ -35,7 +35,9 @@ _SCRIPT = script(Path(__file__).parent / "bugs.py")
 def by_file(records: Records, repo: Path) -> dict[str, dict[str, str]]:
     """Each path some record fixed, with the id -> fix sha of the records that fixed it, by id; a record without
     `fix_files` is read from its id commit, all of them in one `diff-tree` of *repo*."""
-    commits = fix_commit(repo, [str(r["id"]) for r in records if not r.get("fix_files")])
+    commits = fix_commit(
+        context_repos(repo), [str(r["id"]) for r in records if not r.get("fix_files")]
+    )
     touched: dict[str, list[str]] = {}
     for each in {at for at, _ in commits.values()}:
         touched |= fix_files(each, [sha for at, sha in commits.values() if at == each])
