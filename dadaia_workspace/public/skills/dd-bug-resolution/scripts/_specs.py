@@ -17,7 +17,7 @@ from _jsonl import reinstall_fix
 from _ledger import parse as parse
 from _platform import act, cli_argv, cli_path, command, inline, run, venv_dir
 from _refusal import Refusal, relay, report
-from _root import STATES
+from _root import STATES, fenced_roots
 from _root import workspace_of as workspace_of
 
 CATALOG = "memory/product/catalog.json"
@@ -63,8 +63,8 @@ def run_cli(
 def context_row(root: Path, repo: Path) -> dict[str, Any] | None:
     """The `context list --json` row owning *repo* (main or associated; a checkout or a worktree of it), or None when no context owns it.
     Raises `Refusal` with the CLI's own fix when the CLI fails; rows it cannot read name no owner. A registry read: the fence is lifted for *root* only."""
-    fence = [f for f in os.environ.get("DADAIA_FENCED_ROOTS", "").split(os.pathsep) if f and Path(f).resolve() != root.resolve()]  # fmt: skip
-    done = run_cli(root, "context", "list", "--json", env=scrubbed_env() | {"DADAIA_FENCED_ROOTS": os.pathsep.join(fence)})  # fmt: skip
+    fence = os.pathsep.join(map(str, fenced_roots() - {root.resolve()}))
+    done = run_cli(root, "context", "list", "--json", env=scrubbed_env() | {"DADAIA_FENCED_ROOTS": fence})  # fmt: skip
     relay(done, "context list failed", reinstall_fix(root))
     try:
         return next((r for r in json.loads(done.stdout) if main_checkout(repo).name in (r["main_repo"], *(a["slug"] for a in r["associated_repos"]))), None)  # fmt: skip
@@ -74,7 +74,8 @@ def context_row(root: Path, repo: Path) -> dict[str, Any] | None:
 
 def context_repos(repo: Path) -> list[Path]:
     """*repo* and the existing checkouts of the repos its context associates; *repo* alone when the workspace beside its checkout holds no registry or no CLI."""
-    main = main_checkout(repo)
+    if (main := main_checkout(repo)) == Path("."):  # no repository: no workspace beside it
+        return [repo]
     root = main.parent.parent
     row = context_row(root, repo) if (root / STATES / "spec_contexts.json").is_file() and cli_path(root).exists() else None  # fmt: skip
     beside = (main.parent / a["slug"] for a in (row or {}).get("associated_repos", []))
