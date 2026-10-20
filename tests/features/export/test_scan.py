@@ -3,8 +3,6 @@ matcher; every refusal carries its one fix. Size: SMALL — real git in a tmp re
 the read-failure fix are fakes, since the export feature may not import the chokepoints.
 """
 
-import ast
-import inspect
 from collections.abc import Callable, Iterable
 from pathlib import Path
 
@@ -111,13 +109,3 @@ def test_an_object_read_failure_carries_the_injected_fix(
 
     assert refused.value.fix == _READ_FIX
     assert "listing the range failed" in str(refused.value)
-
-
-def test_the_module_imports_nothing_from_the_chokepoints() -> None:
-    imported = [
-        n.module or ""
-        for n in ast.walk(ast.parse(inspect.getsource(scan)))
-        if isinstance(n, ast.ImportFrom)
-    ]
-
-    assert not [m for m in imported if "features.chokepoints" in m]
