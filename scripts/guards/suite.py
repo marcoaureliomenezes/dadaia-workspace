@@ -39,6 +39,7 @@ CALIBRATION = {
 
 _RUN_PYTEST = re.compile(r"^\s*(?:-\s*)?run:\s*(.*\bpytest\s.*)$", re.M)
 _SELECTOR = re.compile(r"""-m\s+(["'])(.*?)\1""")
+_LOW_TIMEOUT = re.compile(r"mark\.timeout\((\d+)\)")
 _REAL_CI = Path(__file__).resolve().parents[2] / _CI
 
 PROBE = (
@@ -128,6 +129,13 @@ def tier_timeout(tree: Tree) -> list[str]:
     out = []
     if s.get("explicit") != 45:
         out.append(f"explicit-kept: a planted timeout(45) became {s.get('explicit')}")
+    for p in tree.tracked("tests"):
+        if p.endswith(".py"):
+            for n in _LOW_TIMEOUT.findall(tree.read(p)):
+                if int(n) < TIER_SECONDS["medium"]:
+                    out.append(
+                        f"explicit-below-medium: {p} sets timeout({n}), bypassing the calibration"
+                    )
     wrong = {t: tiers.get(t) for t in TIER_SECONDS if tiers.get(t) != TIER_SECONDS[t] * factor}
     if wrong:
         out.append(f"four-tiers: {wrong} differ from {TIER_SECONDS} (x{factor})")
