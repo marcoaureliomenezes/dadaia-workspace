@@ -4,6 +4,7 @@ a bundle of each open lane and `wt-rc` tree and each pause bundle)."""
 
 import io
 import json
+import os
 import re
 import tarfile
 from collections.abc import Callable
@@ -108,7 +109,7 @@ def _members(
 
 def _free(dist: Path, bundles: list[tarfile.TarInfo]) -> None:
     """Refuses the first bundle that already sits in *dist*: a file there can be the only copy."""
-    if taken := next((dist / m.name for m in bundles if (dist / m.name).exists()), None):
+    if taken := next((dist / m.name for m in bundles if os.path.lexists(dist / m.name)), None):
         raise _refuse(
             f"{taken} already exists.", act("agent", f"move {taken} out of {dist}, then run again")
         )
