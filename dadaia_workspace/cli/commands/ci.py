@@ -202,11 +202,13 @@ def _fold(repo: Path, sha: str, tip: str, decision: Decision, message: str | Non
     git.git(repo, "reset", "-q")
 
 
-def _denylist(tag: str) -> tuple[tuple[tuple[str, str], ...], tuple[BaselinePatternLike, ...]]:
+def _denylist(
+    tag: str, repo: Path
+) -> tuple[tuple[tuple[str, str], ...], tuple[BaselinePatternLike, ...]]:
     """The operator terms and the baseline patterns, the scan mode on stderr."""
     from dadaia_workspace.container import load_denylist_baseline_patterns, load_denylist_terms
 
-    terms, patterns = load_denylist_terms(), load_denylist_baseline_patterns()
+    terms, patterns = load_denylist_terms(repo), load_denylist_baseline_patterns()
     mode = (
         "operator denylist + baseline"
         if terms
@@ -239,7 +241,7 @@ def _gate_decision(repo_root: Path, read_refs: Callable[[], str]) -> Decision:
     from dadaia_workspace.container import build_git_client, build_git_object_reader
     from dadaia_workspace.features.chokepoints import push_gate_decision
 
-    terms, patterns = _denylist("[pre-push]")
+    terms, patterns = _denylist("[pre-push]", repo_root)
     refs, malformed = parse_push_stdin(read_refs())
     sha = next((r.local_sha for r in refs if not r.is_deletion), "HEAD")
     canon_fn = _canon_fn(repo_root, sha, "[pre-push]")
@@ -272,7 +274,7 @@ def _content_decision(repo: Path, held: str, tag: str) -> Decision:
     git = build_git_client()
     branch = git.current_branch(repo)
     ref = f"refs/heads/{branch or 'HEAD'}"
-    terms, patterns = _denylist(tag)
+    terms, patterns = _denylist(tag, repo)
     tip = git.git(repo, "rev-parse", "HEAD")
     return content_decision(
         [PushRef(ref, tip, ref, held)],

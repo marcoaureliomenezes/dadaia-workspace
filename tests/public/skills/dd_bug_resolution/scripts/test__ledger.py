@@ -322,7 +322,9 @@ def test_a_denylist_named_by_the_environment_refuses_a_listed_term(
     assert refusal[0].endswith("which the push refuses — nothing was written")
 
 
-@pytest.mark.parametrize(("repo", "refused"), [("acme", False), ("acme-site", False), ("other", True)])
+@pytest.mark.parametrize(
+    ("repo", "refused"), [("acme", False), ("acme-site", False), ("other", True)]
+)
 def test_a_repos_own_name_is_never_a_private_match_in_its_own_files(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, repo: str, refused: bool
 ) -> None:

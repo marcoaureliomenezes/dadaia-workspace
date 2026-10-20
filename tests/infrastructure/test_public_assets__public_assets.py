@@ -255,7 +255,10 @@ def test_load_denylist_env_precedence_and_workspace_fallback(
     ],
 )
 def test_the_scanned_repos_own_name_drops_the_terms_it_carries(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, repo: str, fenced: bool,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    repo: str,
+    fenced: bool,
     terms: tuple[tuple[str, str], ...],
 ) -> None:
     """The name is the checkout's repository, never its folder: a worktree of `repo` placed under
@@ -265,7 +268,22 @@ def test_the_scanned_repos_own_name_drops_the_terms_it_carries(
     home = tmp_path / "ws" / "repos" / repo
     home.mkdir(parents=True)
     run(["git", "init", "-q", str(home)])
-    run(["git", "-C", str(home), "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "--allow-empty", "-m", "x"])
+    run(
+        [
+            "git",
+            "-C",
+            str(home),
+            "-c",
+            "user.name=t",
+            "-c",
+            "user.email=t@t",
+            "commit",
+            "-q",
+            "--allow-empty",
+            "-m",
+            "x",
+        ]
+    )
     tree = tmp_path / "ws" / "worktrees" / "acme" / "wt"
     run(["git", "-C", str(home), "worktree", "add", "-q", str(tree)])
     if fenced:

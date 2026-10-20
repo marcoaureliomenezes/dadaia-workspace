@@ -154,20 +154,20 @@ def replace(path: Path, text: str) -> None:
     _atomic.atomic_write(path, text, ensure_parent=True)
 
 
-def _own_name(root: Path | None, at: Path | None) -> str:
-    """The name of the repo holding *at* (`repos/<name>/…` or `worktrees/<name>/…` under *root*);
-    empty when *at* sits elsewhere."""
+def own_name(repo: Path) -> str:
+    """The name of the repository *repo* is a checkout of: the folder holding its git common
+    dir, lowercased; empty when *repo* is under no repository."""
     try:
-        top, name, *_ = at.resolve().relative_to(root.resolve()).parts  # type: ignore[union-attr]
-    except (AttributeError, ValueError):
+        common = _git.git(repo, "rev-parse", "--path-format=absolute", "--git-common-dir")
+    except (RuntimeError, OSError):
         return ""
-    return name.lower() if top in ("repos", "worktrees") else ""
+    return Path(common.strip()).parent.name.lower()
 
 
-def terms(root: Path | None, at: Path | None = None) -> list[tuple[str, str]]:
+def terms(root: Path | None, repo: Path | None = None) -> list[tuple[str, str]]:
     """The operator denylist, ONE loader: `$DADAIA_PRIVACY_DENYLIST`, else
-    ``<root>/.dadaia/states/privacy_denylist.json``, minus every term the name of the repo
-    holding *at* equals or contains (a repo may name itself). Absent is empty; a present file
+    ``<root>/.dadaia/states/privacy_denylist.json``, minus every term the name of the scanned
+    *repo* (:func:`own_name`) equals or contains: a repo may name itself. Absent is empty; a present file
     that is not one ``{"<term>": "<reason>"}`` object refuses — never read as no terms."""
     env = os.environ.get("DADAIA_PRIVACY_DENYLIST")
     for path in [
@@ -189,8 +189,8 @@ def terms(root: Path | None, at: Path | None = None) -> list[tuple[str, str]]:
             )
             raise SystemExit(1)
         if raw:
-            own = _own_name(root, at)
-            return [(str(t), str(r)) for t, r in raw.items() if str(t).lower() not in own]
+            own = own_name(repo) if repo else ""
+            return [(str(t), str(r)) for t, r in raw.items() if not (t and t.lower() in own)]
     return []
 
 
@@ -219,7 +219,7 @@ def private_refusal(records: Iterable[dict[str, Any]], path: Path) -> tuple[str,
     match the published text of *path* (the ledger file) does not already carry — else
     ``None``; terms and published text are read once per write, from the workspace holding
     *path*, whatever the cwd."""
-    found, patterns = terms(workspace_of(path), path), _privacy.load_baseline()
+    found, patterns = terms(workspace_of(path), path.parent), _privacy.load_baseline()
     published = _privacy.published_matches(_published_text(path), found, patterns)
     for key, value in (item for record in records for item in record.items()):
         text = json.dumps(value, ensure_ascii=False)

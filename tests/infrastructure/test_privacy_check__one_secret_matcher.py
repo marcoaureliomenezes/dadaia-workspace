@@ -29,6 +29,9 @@ from dadaia_workspace.infrastructure.privacy_check import (
 )
 from tests.helpers.oslib import write_text
 
+#: the publish side asks git for the scanned repository's name
+pytestmark = pytest.mark.medium
+
 _DASHES = "-" * 5
 _TERM = "zz" + "fixtureterm"
 _V = "hunter2" + "Xq9zL"
