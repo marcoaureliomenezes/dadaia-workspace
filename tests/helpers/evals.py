@@ -38,6 +38,11 @@ RENAMED_T3 = (
     f"{_ONBOARD} && {_D} context create myproj --main-repo file:///srv/demo.git"
     f" && {_D} specs init --context myproj && {_FILE} /workspace/repos/demo/specs"
 )
+SPEC_T3 = (
+    f"{ONBOARDED_T3} && {_D} worktree new demo 0.1.0/rc-1/wt-rc"
+    " && python3 /workspace/.agents/skills/dd-release-implementation/scripts/release.py new 0.1.0"
+    " --specs /workspace/worktrees/demo/0.1.0/rc-1/wt-rc/specs"
+)
 HAND_T3 = (
     f"{ONBOARDED_T3} && {_D} worktree new demo 0.1.0/wt-backlog-x"
     f" && {_FILE} /workspace/worktrees/demo/0.1.0/wt-backlog-x/specs"
