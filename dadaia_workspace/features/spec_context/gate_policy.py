@@ -14,7 +14,7 @@ The gate reads no SDD artifact; memory authorship is never gated.
 
 from __future__ import annotations
 
-import re
+import shlex
 from collections.abc import Callable
 from enum import Enum
 from itertools import chain
@@ -165,13 +165,29 @@ def evaluate(
     return Decision.ALLOW, ""
 
 
-_WRITER = re.compile(r"\s*(?:\S*python\S*\s+(?:-\S+\s+)*)?\S*verdict\.py(?=\s)", re.IGNORECASE)
-_FLAG = re.compile(r"\s--verdict(?:=|\s|$)")
+_CONTROL = ";&|()\n"
+
+
+def _runs_writer(words: list[str]) -> bool:
+    return any(
+        (w.lower().endswith("verdict.py") or (w.lower() == "verdict" and words[i - 1] == "-m"))
+        and any(x == "--verdict" or x.startswith("--verdict=") for x in words[i + 1 :])
+        for i, w in enumerate(words)
+    )
 
 
 def _runs_verdict_writer(command: str) -> bool:
-    """Whether any one shell command in *command* runs ``verdict.py`` with ``--verdict``."""
-    return any(_WRITER.match(part) and _FLAG.search(part) for part in re.split(r"[;&|\n]", command))
+    """Whether a shell command in *command* names the writer script (or ``-m verdict``) and
+    then ``--verdict``; text the shell lexer cannot parse is judged by both names appearing."""
+    lexer = shlex.shlex(command.replace("\\\n", ""), posix=True, punctuation_chars=_CONTROL)
+    lexer.whitespace, lexer.whitespace_split = " \t\r", True
+    try:
+        words = [*lexer, ";"]
+    except ValueError:
+        lowered = command.lower()
+        return "verdict.py" in lowered and "--verdict" in lowered
+    ends = [i for i, w in enumerate(words) if set(w) <= set(_CONTROL)]
+    return any(_runs_writer(words[a + 1 : b]) for a, b in zip([-1, *ends], ends, strict=False))
 
 
 def verdict_act(command: str, *, key: str | None, subagent: str | None) -> str | None:
