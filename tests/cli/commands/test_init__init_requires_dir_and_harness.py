@@ -14,6 +14,7 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
+from dadaia_workspace.cli.commands import init as init_cmd
 from dadaia_workspace.cli.main import app
 from dadaia_workspace.core import platform
 from dadaia_workspace.core.platform import inline, quote
@@ -125,6 +126,24 @@ def test_init_foreign_fix_line_names_the_named_folder_for_a_path_with_a_blank(
     assert _the_fix(result.output) == (
         f"Operator action: empty {quote(named)} or name another empty folder for the workspace, then run {again}"
     )
+
+
+@pytest.mark.parametrize("host", ["linux", "win32"])
+def test_init_without_dir_off_a_terminal_prints_one_label_for_an_unsafe_flag_value(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, host: str
+) -> None:
+    """The missing-DIR act spells the command inline, so a value with no safe spelling adds no second label."""
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(init_cmd, "_interactive", lambda: False)
+    monkeypatch.setattr(platform, "PLATFORM", platform.Capabilities.detect(host))
+
+    result = _runner.invoke(app, ["init", "--from", "a$b.json"])
+
+    assert result.exit_code == 1, result.output
+    again = inline("uvx", "dadaia-workspace", "init", "--from", "a$b.json")
+    assert _the_fix(result.output).count("action:") == 1
+    assert _the_fix(result.output).startswith("Agent action: run ")
+    assert again in _the_fix(result.output)
 
 
 def test_init_creates_the_named_dir_and_is_idempotent(tmp_path: Path, monkeypatch) -> None:
