@@ -428,8 +428,6 @@ def _into(repo: Path, onto: str) -> Path:
 
 def _kind_checks(root: Path, repo: Path, tree: Path, name: str, onto: str, into: Path) -> list[Callable[[], object]]:  # fmt: skip
     """The ordered checks a tree of this kind must pass to land, before `merge`'s ending checks."""
-    if not into.exists():  # the parent's tree removed by hand
-        raise Refusal(f"{into} does not exist", reattach(repo, into, str(names.name_of(onto))))  # fmt: skip
     ancestor = partial(_check_ancestor, root, tree, onto)
     verdict = partial(_check_approved, root, tree, onto, name)
     job_gate = partial(_gate, tree, onto)
@@ -456,6 +454,8 @@ def _on_target(into: Path, onto: str) -> None:
 def merge(root: Path, path: str, keep: list[str], drop: bool) -> str:
     repo, tree, name, onto = _target(root, path)
     into, ref = _into(repo, onto), branch(name)
+    if not into.exists():  # the parent's tree removed by hand
+        raise Refusal(f"{into} does not exist", reattach(repo, into, str(names.name_of(onto))))  # fmt: skip
     if not tree.exists():  # removed by an earlier run or by hand: only the branch may be left
         if not git(repo, "branch", "--list", ref).strip():
             _rmdir(tree, name)
