@@ -73,9 +73,9 @@ def _bootstrap_fails(tmp: Path, mp: pytest.MonkeyPatch) -> Path:
     pytest.param(["init", "--harness", "claude"], None, 1, None, [], id="no-dir-never-targets-cwd"),
     *[pytest.param(["init", "demo", "--harness", v], None, 2, None, ["claude", v], id=f"meta-or-unknown-{v}") for v in ("all", "claude,codex", "zzz")],
     pytest.param(["init", "demo", "--harness", "claude"], _foreign, 1, None, [], id="foreign-tree-never-scaffolded-over"),
-    pytest.param(["init", ".", "--harness", "claude"], _foreign_cwd, 1, "Agent action: move README.md out of {tmp}/proj, then run uvx dadaia-workspace init {tmp}/proj --harness claude", ["README.md"],
+    pytest.param(["init", ".", "--harness", "claude"], _foreign_cwd, 1, "Operator action: empty {tmp}/proj or name another empty folder for the workspace, then run uvx dadaia-workspace init {tmp}/proj --harness claude", ["README.md"],
                  id="init-foreign-tree-fix-line-unrunnable-sibling-from-the-resolved-path"),
-    pytest.param(["init", "/", "--harness", "claude"], None, 1, "Agent action: move ", [" out of /, then run uvx dadaia-workspace init / --harness claude"],
+    pytest.param(["init", "/", "--harness", "claude"], None, 1, "Operator action: empty {root} or name another empty folder for the workspace, then run uvx dadaia-workspace init {root} --harness claude", [],
                  id="init-root-dir-crashes-deriving-sibling-fix"),
     pytest.param(["init", "demo", "--harness", "claude"], _bootstrap_fails, 1, None, ["DADAIA_BOOTSTRAP_PACKAGE"], id="validation-028-bootstrap-error-clean-exit"),
 ])
@@ -110,14 +110,18 @@ def test_init_foreign_fix_line_names_the_named_folder_for_a_path_with_a_blank(
     proj = tmp_path / "my dir" / "proj"
     proj.mkdir(parents=True)
     write_text(proj / "README.md", "mine")
+    write_text(proj / "my notes.txt", "mine")
     monkeypatch.chdir(proj)
 
     result = _runner.invoke(app, ["init", ".", "--harness", "claude", "--repo", "https://h/a b.git"])
 
     assert result.exit_code == 1, result.output
+    assert "README.md, 'my notes.txt'" in result.output
     named = str(proj.resolve())
     again = inline("uvx", "dadaia-workspace", "init", named, "--harness", "claude", "--repo", "https://h/a b.git")
-    assert _the_fix(result.output) == f"Agent action: move README.md out of {named}, then run {again}"
+    assert _the_fix(result.output) == (
+        f"Operator action: empty {inline(named)} or name another empty folder for the workspace, then run {again}"
+    )
 
 
 def test_init_creates_the_named_dir_and_is_idempotent(tmp_path: Path, monkeypatch) -> None:
