@@ -15,7 +15,7 @@ import pytest
 from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app
-from dadaia_workspace.core.cli_line import shell_line
+from dadaia_workspace.core.platform import inline
 from dadaia_workspace.infrastructure import python_env as pe
 from tests.helpers import oslib
 from tests.helpers.oslib import read_text, write_text
@@ -73,7 +73,7 @@ def _bootstrap_fails(tmp: Path, mp: pytest.MonkeyPatch) -> Path:
     pytest.param(["init", "--harness", "claude"], None, 1, None, [], id="no-dir-never-targets-cwd"),
     *[pytest.param(["init", "demo", "--harness", v], None, 2, None, ["claude", v], id=f"meta-or-unknown-{v}") for v in ("all", "claude,codex", "zzz")],
     pytest.param(["init", "demo", "--harness", "claude"], _foreign, 1, None, [], id="foreign-tree-never-scaffolded-over"),
-    pytest.param(["init", ".", "--harness", "claude"], _foreign_cwd, 1, "uvx dadaia-workspace init {tmp}/proj-workspace --harness claude", [],
+    pytest.param(["init", ".", "--harness", "claude"], _foreign_cwd, 1, "Agent action: move README.md out of {tmp}/proj, then run uvx dadaia-workspace init {tmp}/proj --harness claude", ["README.md"],
                  id="init-foreign-tree-fix-line-unrunnable-sibling-from-the-resolved-path"),
     pytest.param(["init", "/", "--harness", "claude"], None, 1, "uvx dadaia-workspace init {root}dadaia-workspace --harness claude", [],
                  id="init-root-dir-crashes-deriving-sibling-fix"),
@@ -103,10 +103,10 @@ def test_init_refuses_meta_and_unknown_harness_values(
         assert read_text(tmp_path / "demo" / "somebody-elses-file.txt") == "keep me"
 
 
-def test_init_sibling_fix_line_is_spelled_by_the_kernel_for_a_path_with_a_blank(
+def test_init_foreign_fix_line_names_the_named_folder_for_a_path_with_a_blank(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The printed sibling command is the kernel's spelling, so a blank in the path stays one argument."""
+    """The printed act is the kernel's spelling of init on the named folder, so a blank stays one argument."""
     proj = tmp_path / "my dir" / "proj"
     proj.mkdir(parents=True)
     write_text(proj / "README.md", "mine")
@@ -115,10 +115,9 @@ def test_init_sibling_fix_line_is_spelled_by_the_kernel_for_a_path_with_a_blank(
     result = _runner.invoke(app, ["init", ".", "--harness", "claude", "--repo", "https://h/a b.git"])
 
     assert result.exit_code == 1, result.output
-    sibling = str(proj.resolve().parent / "proj-workspace")
-    assert _the_fix(result.output) == shell_line(
-        "uvx", "dadaia-workspace", "init", sibling, "--harness", "claude", "--repo", "https://h/a b.git"
-    )
+    named = str(proj.resolve())
+    again = inline("uvx", "dadaia-workspace", "init", named, "--harness", "claude", "--repo", "https://h/a b.git")
+    assert _the_fix(result.output) == f"Agent action: move README.md out of {named}, then run {again}"
 
 
 def test_init_creates_the_named_dir_and_is_idempotent(tmp_path: Path, monkeypatch) -> None:
