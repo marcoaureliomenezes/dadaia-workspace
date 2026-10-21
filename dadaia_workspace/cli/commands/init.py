@@ -163,14 +163,43 @@ def init(
     ),
 ) -> None:
     """Bootstrap a dadaia workspace in DIR: .dadaia/, the law, and the projection of each harness (--harness, else the --from artifact's)."""
-    # Every refusal happens BEFORE any output or filesystem write, so a rejected
-    # invocation leaves nothing behind (no partial workspace, no leaked payload).
+    plan, root, artifact, chosen = _resolve(directory, harness, repo, tuple(associated_repo), from_)
+    _require_fit_root(root, plan)
+    root.mkdir(parents=True, exist_ok=True)
+
+    svc = container.build_workspace_service(root)
+    try:
+        before, after, action = svc.venv_change(root)
+        installed = svc.init(root, skip_assets=skip_assets, harnesses=chosen, template=template)
+    except WorkspaceVenvBootstrapError as exc:
+        cli = workspace_cli_path(root)  # the venv's own init only where the venv exists
+        runner = (str(cli), "init") if cli.is_file() else _INIT
+        fail(exc, plan.command(root, runner))
+
+    _announce(root, chosen, installed, skip_assets)
+    if action in ("upgrade", "repair"):
+        _reconcile_upgrade(root, action, before, after)
+    elif before is not None:
+        console.print(f"already at {before}", markup=False, highlight=False)
+
+    if artifact:
+        _restore(root, artifact, Path(plan.from_).expanduser())
+    else:
+        print_next_step(root, _create_context(root, plan) if plan.repo else None)
+
+
+def _resolve(
+    directory: str, harness: str, repo: str, associated: tuple[str, ...], from_: str
+) -> tuple[InitPlan, Path, Artifact | None, tuple[str, ...]]:
+    """The plan, its root, the artifact and the harnesses to scaffold. Every refusal happens
+    BEFORE any output or filesystem write, so a rejected invocation leaves nothing behind (no
+    partial workspace, no leaked payload)."""
     if from_ and repo:
         fail(
             "--from restores an artifact's contexts; it cannot be combined with --repo.",
             InitPlan(directory, harness, from_=from_).command(),
         )
-    plan = _plan(directory, harness, repo, tuple(associated_repo), from_)
+    plan = _plan(directory, harness, repo, associated, from_)
     try:
         if plan.harness:
             plan = replace(plan, harness=harness_registry.parse_harness_name(plan.harness))
@@ -184,7 +213,11 @@ def init(
             "the artifact names no harness.",
             replace(plan, harness=harness_registry.L1_ENTRY_HARNESSES[0]).command(),
         )
+    return plan, root, artifact, chosen
 
+
+def _require_fit_root(root: Path, plan: InitPlan) -> None:
+    """Refuse a *root* that is a file, or a non-empty folder that is not a dadaia workspace."""
     if root.exists() and not root.is_dir():
         fail(
             f"'{root}' is not a directory.",
@@ -202,17 +235,9 @@ def init(
                 f"then run {plan.command(root, render=inline)}",
             ),
         )
-    root.mkdir(parents=True, exist_ok=True)
 
-    svc = container.build_workspace_service(root)
-    try:
-        before, after, action = svc.venv_change(root)
-        installed = svc.init(root, skip_assets=skip_assets, harnesses=chosen, template=template)
-    except WorkspaceVenvBootstrapError as exc:
-        cli = workspace_cli_path(root)  # the venv's own init only where the venv exists
-        runner = (str(cli), "init") if cli.is_file() else _INIT
-        fail(exc, plan.command(root, runner))
 
+def _announce(root: Path, chosen: tuple[str, ...], installed: list[str], skip_assets: bool) -> None:
     console.print(
         f"[green]✓[/green] Workspace {root} ({', '.join(chosen)})", highlight=False, soft_wrap=True
     )
@@ -226,16 +251,6 @@ def init(
         console.print(f"[green]✓[/green] {len(installed)} asset(s) installed", highlight=False)
     console.print(f"CLI: {workspace_cli_path(root)}", markup=False, highlight=False, soft_wrap=True)
     console.print(_LAW_NOTE, markup=False, soft_wrap=True)
-
-    if action in ("upgrade", "repair"):
-        _reconcile_upgrade(root, action, before, after)
-    elif before is not None:
-        console.print(f"already at {before}", markup=False, highlight=False)
-
-    if artifact:
-        _restore(root, artifact, Path(plan.from_).expanduser())
-    else:
-        print_next_step(root, _create_context(root, plan) if plan.repo else None)
 
 
 def _read(source: str, root: Path) -> Artifact:
