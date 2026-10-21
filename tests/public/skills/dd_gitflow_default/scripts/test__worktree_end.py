@@ -193,6 +193,13 @@ def test_a_finished_task_merge_reruns_clean_after_its_job_landed(root: Path) -> 
     assert rerun.returncode == 0, rerun.stderr
 
 
+def test_merge_of_a_path_with_no_tree_and_no_branch_claims_no_merge_and_exits_0(root: Path) -> None:
+    result = run(root, "merge", str(root / f"worktrees/r/{NEW_TASK}"))
+    assert result.returncode == 0, result.stderr
+    assert "merged" not in result.stdout
+    assert "nothing left to merge at" in result.stdout
+
+
 def test_clean_of_a_task_with_its_job_tree_gone_refuses_with_the_fix_that_restores_it(
     root: Path,
 ) -> None:
