@@ -29,3 +29,22 @@ def test_commits_writing_only_audits_are_not_non_block_work(tmp_path: Path) -> N
     _commit(tmp_path, "feat(J1.T1): mixed", "specs/audits/c.md", "src/x.py")
     _commit(tmp_path, "feat(J1.T2): no files")
     assert _stats._after_closure(tmp_path, closure, "HEAD") == "2"
+
+
+def test_a_code_file_moved_into_audits_is_work(tmp_path: Path) -> None:
+    git(tmp_path, "init", "-q")
+    _commit(tmp_path, "feat(J1.T1): code " * 20, "src/x.py")
+    closure = git(tmp_path, "rev-parse", "HEAD").strip()
+    (tmp_path / "specs/audits").mkdir(parents=True)
+    git(tmp_path, "mv", "src/x.py", "specs/audits/x.py")
+    git(tmp_path, "commit", "-q", "-m", "feat(J1.T2): move")
+    assert _stats._after_closure(tmp_path, closure, "HEAD") == "1"
+
+
+def test_audit_paths_with_a_space_or_a_non_ascii_byte_are_not_work(tmp_path: Path) -> None:
+    git(tmp_path, "init", "-q")
+    _commit(tmp_path, "docs(memory): closure")
+    closure = git(tmp_path, "rev-parse", "HEAD").strip()
+    _commit(tmp_path, "docs(audits): spaced", "specs/audits/a b.md")
+    _commit(tmp_path, "docs(audits): accented", "specs/audits/açao.md")
+    assert _stats._after_closure(tmp_path, closure, "HEAD") == "0"
