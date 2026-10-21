@@ -188,17 +188,18 @@ def init(
     if root.exists() and not root.is_dir():
         fail(
             f"'{root}' is not a directory.",
-            plan.command(root.parent / ((root.name or "dadaia") + "-workspace")),
+            plan.command(root.parent / (root.name + "-workspace")),
         )
     # A directory that already holds `.dadaia/` is THIS workspace (a re-run, idempotent);
     # anything else non-empty is a foreign tree and is never scaffolded over.
     foreign = sorted(p.name for p in root.iterdir()) if root.is_dir() else []
     if foreign and not (root / ".dadaia").is_dir():
-        names = ", ".join(foreign)
         fail(
-            f"'{root}' already holds a foreign tree (not a dadaia workspace): {names}.",
+            f"'{root}' already holds a foreign tree (not a dadaia workspace): {', '.join(map(inline, foreign))}.",
             act(
-                "agent", f"move {names} out of {root}, then run {plan.command(root, render=inline)}"
+                "operator",
+                f"empty {inline(str(root))} or name another empty folder for the workspace, "
+                f"then run {plan.command(root, render=inline)}",
             ),
         )
     root.mkdir(parents=True, exist_ok=True)
