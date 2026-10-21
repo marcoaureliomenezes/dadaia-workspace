@@ -282,6 +282,7 @@ flowchart TB
 - 0276 — Amend ADR 0088: a skill's registry read of the repo's own workspace, found by position, lifts the fence for that one root
 - 0277 — The 0.5.0 eval gate is candidate-only, the release tag may differ from E by _RELEASE.json, and T3 is the 0.5.0 adoption readout in place of D1-D10
 - 0278 — Amend ADR 0273: an uncited resolved record's fix line is the one bugs.py archive act naming every missed id
+- 0279 — Only the dispatched dd-code-reviewer writes a verdict: verdicts live in the PROTECTED states zone, and the pre-gate judges the one Bash act that writes one where the harness names the subagent
 <!-- /dadaia:fixed adr-list -->
 
 <!-- dadaia:fixed slop-code -->
