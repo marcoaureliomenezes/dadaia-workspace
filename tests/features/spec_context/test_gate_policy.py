@@ -193,6 +193,7 @@ def test_a_verdict_run_is_refused_unless_the_harness_names_the_reviewer(
         "echo verdict.py && echo --verdict",
         "grep -n 'x; python3 verdict.py --verdict' notes.md",
         "git commit -m 'docs\n\npython3 verdict.py /t --verdict APPROVED'",
+        "cmd 2>&1 | grep -- --verdict",
     ],
 )
 def test_a_command_that_writes_no_verdict_is_never_judged(command: str) -> None:
@@ -226,6 +227,11 @@ def test_a_command_that_writes_no_verdict_is_never_judged(command: str) -> None:
         _VERDICT_RUN.replace(" /t", "\t/t"),
         "python3 -m verdict /t --sha a --context c --slug s --verdict APPROVED --reason r",
         _VERDICT_RUN + " 'unbalanced",
+        _VERDICT_RUN.replace("--verdict", "2>&1 --verdict"),
+        _VERDICT_RUN.replace("--verdict", "&>log --verdict"),
+        _VERDICT_RUN.replace("--verdict", ">&2 --verdict"),
+        _VERDICT_RUN.replace("--verdict", "--reason see-x/y#L10 --verdict"),
+        "python3 -mverdict /t --sha a --context c --slug s --verdict APPROVED --reason r",
     ],
 )
 def test_a_command_that_runs_the_writer_with_the_flag_is_refused_in_any_shell_position(
