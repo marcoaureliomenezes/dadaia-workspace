@@ -58,7 +58,7 @@ class InitPlan:
     ) -> str:
         """The ``init`` invocation that runs this plan — every flag it carries, so a
         ``fix:`` line built from it never drops a level (*directory* overrides DIR);
-        *render* spells it as a line, or as text inside an ``Agent action:`` sentence."""
+        *render* spells it as a line, or as inline text inside an act sentence."""
         target = str(self.directory if directory is None else directory)
         flags = [("--harness", self.harness)] if self.harness else []
         flags += [("--from", self.from_)] if self.from_ else []
