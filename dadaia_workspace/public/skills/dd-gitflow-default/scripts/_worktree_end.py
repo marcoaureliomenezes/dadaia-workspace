@@ -101,7 +101,7 @@ def _kept(tree: Path, verb: str, keep: list[str], drop: bool) -> list[str]:
 def _remove(repo: Path, tree: Path, onto: str, name: str, kept: list[str]) -> None:
     """Copy *kept* into the checkout of *onto* (of *repo*) and drop the tree (an absent one is pruned), its branch (on
     the remote too, when it was pushed) and the folder it leaves empty."""
-    if not (drops := drop_argv(into := _into(repo, onto), branch(name), onto)):
+    if not (drops := drop_argv(into := _parent(repo, onto), branch(name), onto)):
         raise Refusal(f"{branch(name)} is unmerged into {onto}", reattach(repo, tree, name))
     for rel in kept:
         source, target = tree / rel, into / rel
@@ -426,6 +426,13 @@ def _into(repo: Path, onto: str) -> Path:
     return tree_path(repo.parents[1], repo.name, name) if onto.startswith("wt/") else repo
 
 
+def _parent(repo: Path, onto: str) -> Path:
+    """The checkout *onto* is checked out in; a Refusal when the parent's tree was removed by hand."""
+    if not (into := _into(repo, onto)).exists():
+        raise Refusal(f"{into} does not exist", reattach(repo, into, str(names.name_of(onto))))  # fmt: skip
+    return into
+
+
 def _kind_checks(root: Path, repo: Path, tree: Path, name: str, onto: str, into: Path) -> list[Callable[[], object]]:  # fmt: skip
     """The ordered checks a tree of this kind must pass to land, before `merge`'s ending checks."""
     ancestor = partial(_check_ancestor, root, tree, onto)
@@ -453,15 +460,14 @@ def _on_target(into: Path, onto: str) -> None:
 
 def merge(root: Path, path: str, keep: list[str], drop: bool) -> str:
     repo, tree, name, onto = _target(root, path)
-    into, ref = _into(repo, onto), branch(name)
-    if not into.exists():  # the parent's tree removed by hand
-        raise Refusal(f"{into} does not exist", reattach(repo, into, str(names.name_of(onto))))  # fmt: skip
-    if not tree.exists():  # removed by an earlier run or by hand: only the branch may be left
-        if not git(repo, "branch", "--list", ref).strip():
-            _rmdir(tree, name)
-        else:
-            _on_target(into, onto)
-            _remove(repo, tree, onto, name, [])
+    ref = branch(name)
+    if not tree.exists() and not git(repo, "branch", "--list", ref).strip():
+        _rmdir(tree, name)
+        return f"{ref} merged into {onto}"
+    into = _parent(repo, onto)
+    if not tree.exists():  # only the branch is left
+        _on_target(into, onto)
+        _remove(repo, tree, onto, name, [])
         return f"{ref} merged into {onto}"
     for check in _kind_checks(root, repo, tree, name, onto, into):
         check()
