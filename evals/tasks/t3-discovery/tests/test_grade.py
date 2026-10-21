@@ -25,16 +25,14 @@ def dadaia(*args):
 
 
 def clean(script, specs):
-    failed, findings = run(sys.executable, script, "check", "--specs", specs, "--json")
-    return not (failed or findings)
+    cmd = (sys.executable, script, "check", "--specs", specs)
+    return subprocess.run(cmd, capture_output=True).returncode == 0
 
 
 def filled(specs):
-    """The specs tree enters work by an active backlog entry or by a SPEC, each judged by its checker."""
-    if (
-        clean(BACKLOG, specs)
-        and json.loads(Path(specs, "backlog/BACKLOG.json").read_text(encoding="utf-8"))["active"]
-    ):
+    """The specs tree enters work by an active backlog entry or by a SPEC, each judged by its checker's exit."""
+    backlog = Path(specs, "backlog/BACKLOG.json")
+    if clean(BACKLOG, specs) and json.loads(backlog.read_text(encoding="utf-8"))["active"]:
         return True
     return any(Path(specs, "releases").glob("*/rc-*/SPEC.md")) and clean(RELEASE, specs)
 
