@@ -23,7 +23,7 @@ def evaluate_payload(payload: dict[str, object]) -> str | None:
     if not raw_paths:
         return None
     anchor = invocation.resolve_root(cwd=Path.cwd(), target_path=None)
-    agent = _common.subagent(payload) or "main-thread"
+    agent = _common.subagent(payload, _common.subagent_key()) or "main-thread"
     return next(filter(None, (_root_violation(anchor, p, agent) for p in raw_paths)), None)
 
 

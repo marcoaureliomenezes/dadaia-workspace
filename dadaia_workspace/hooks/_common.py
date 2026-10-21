@@ -5,11 +5,13 @@ from __future__ import annotations
 
 import contextlib
 import json
+import os
 import re
 import sys
 from typing import Any
 
 from dadaia_workspace.core import platform
+from dadaia_workspace.core.harness_registry import HARNESS_RECORDS
 
 WRITE_TOOLS = frozenset({"Write", "write_file", "Edit", "edit_file", "MultiEdit", "NotebookEdit"})
 WRITE_TOOLS |= {"apply_patch"}
@@ -46,9 +48,15 @@ def claude_payload(payload: dict[str, Any]) -> dict[str, Any]:
 _NAME_RE = re.compile(r"[A-Za-z0-9._-]+")
 
 
-def subagent(payload: dict[str, Any], key: str = "agent_type") -> str | None:
+def subagent_key() -> str | None:
+    """The payload key naming a running subagent in this hook's harness (its registry row)."""
+    record = HARNESS_RECORDS.get(os.environ.get("DADAIA_RUNTIME", ""))
+    return record.subagent_key if record else None
+
+
+def subagent(payload: dict[str, Any], key: str | None) -> str | None:
     """The subagent name the payload's *key* carries when it is a plain name, else ``None``."""
-    raw = payload.get(key)
+    raw = payload.get(key) if key else None
     return (
         raw if isinstance(raw, str) and _NAME_RE.fullmatch(raw) and raw not in (".", "..") else None
     )

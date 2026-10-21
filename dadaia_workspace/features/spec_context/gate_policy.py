@@ -165,7 +165,13 @@ def evaluate(
     return Decision.ALLOW, ""
 
 
-_VERDICT_RUN = re.compile(r"verdict\.py\b.*--verdict\b", re.DOTALL)
+_WRITER = re.compile(r"\s*(?:\S*python\S*\s+(?:-\S+\s+)*)?\S*verdict\.py(?=\s)", re.IGNORECASE)
+_FLAG = re.compile(r"\s--verdict(?:=|\s|$)")
+
+
+def _runs_verdict_writer(command: str) -> bool:
+    """Whether any one shell command in *command* runs ``verdict.py`` with ``--verdict``."""
+    return any(_WRITER.match(part) and _FLAG.search(part) for part in re.split(r"[;&|\n]", command))
 
 
 def verdict_act(command: str, *, key: str | None, subagent: str | None) -> str | None:
@@ -173,7 +179,7 @@ def verdict_act(command: str, *, key: str | None, subagent: str | None) -> str |
     names a running subagent under payload *key* (``None``: it gives no identity), reports
     *subagent* (``None``: the main thread) other than the reviewer; else ``None``."""
     reviewer = load_owner("dd-bug-resolution", "_handoffs").REVIEWER
-    if key is None or subagent == reviewer or not _VERDICT_RUN.search(command):
+    if key is None or subagent == reviewer or not _runs_verdict_writer(command):
         return None
     dispatch = f"dispatch {reviewer} on the tree to judge; its verdict.py run writes the verdict"
     return f"[GATE] Only the dispatched {reviewer} writes a verdict.\n" + spell_fix(

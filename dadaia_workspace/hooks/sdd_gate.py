@@ -74,11 +74,10 @@ def _evaluate_target(workspace: Path | None, raw_path: str) -> tuple[gate_policy
 
 def _verdict_block(payload: dict[str, object]) -> str | None:
     """The block reason for a Bash call that writes a verdict outside the reviewer, else ``None``."""
-    record = HARNESS_RECORDS.get(os.environ.get("DADAIA_RUNTIME", ""))
-    key = record.subagent_key if record else None
+    key = _common.subagent_key()
     tool_input = payload.get("tool_input")
     command = tool_input.get("command") if isinstance(tool_input, dict) else None
-    who = _common.subagent(payload, key) if key else None
+    who = _common.subagent(payload, key)
     return gate_policy.verdict_act(str(command or ""), key=key, subagent=who)
 
 
