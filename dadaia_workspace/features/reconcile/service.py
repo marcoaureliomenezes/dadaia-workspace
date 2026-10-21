@@ -9,9 +9,9 @@ from pathlib import Path
 from typing import Any
 
 from dadaia_workspace.core import platform
-from dadaia_workspace.core.platform import act
 from dadaia_workspace.core.atomic_write import atomic_write
 from dadaia_workspace.core.cli_line import cli_words
+from dadaia_workspace.core.platform import act
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
 from dadaia_workspace.infrastructure.provider_version import provider_version
 
