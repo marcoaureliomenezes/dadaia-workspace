@@ -38,10 +38,15 @@ RENAMED_T3 = (
     f"{_ONBOARD} && {_D} context create myproj --main-repo file:///srv/demo.git"
     f" && {_D} specs init --context myproj && {_FILE} /workspace/repos/demo/specs"
 )
-SPEC_T3 = (
-    f"{ONBOARDED_T3} && {_D} worktree new demo 0.1.0/rc-1/wt-rc"
-    " && python3 /workspace/.agents/skills/dd-release-implementation/scripts/release.py new 0.1.0"
-    " --specs /workspace/worktrees/demo/0.1.0/rc-1/wt-rc/specs"
+_RC = "/workspace/worktrees/demo/0.1.0/rc-1/wt-rc/specs"
+_RUN = "python3 /workspace/.agents/skills"
+_NEW = f"{_RUN}/dd-release-implementation/scripts/release.py new 0.1.0 --specs {_RC}"
+_RC_TREE = f"{ONBOARDED_T3} && {_D} worktree new demo 0.1.0/rc-1/wt-rc"
+SPEC_T3 = f"{_RC_TREE} && {_NEW}"
+TRACED_T3 = (
+    f"{_RC_TREE} && {_FILE} {_RC} && {_NEW} --origin backlog:try-it"
+    f" && {_RUN}/dd-backlog-definition/scripts/backlog.py exit try-it"
+    f" --disposition delivered --release 0.1.0 --specs {_RC}"
 )
 HAND_T3 = (
     f"{ONBOARDED_T3} && {_D} worktree new demo 0.1.0/wt-backlog-x"

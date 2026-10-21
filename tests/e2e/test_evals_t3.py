@@ -16,6 +16,7 @@ from tests.helpers.evals import (
     ROOT,
     SPEC_T3,
     T3,
+    TRACED_T3,
     image,
     reward,
     wheel,
@@ -63,8 +64,22 @@ def test_a_plain_install_resolves_the_lib_build_offline(version: str, route: str
 @pytest.mark.parametrize("version", VERSIONS)
 @pytest.mark.parametrize(
     ("script", "want"),
-    [(HAND_T3, "1"), (RENAMED_T3, "1"), (SPEC_T3, "1"), (ONBOARDED_T3, "0"), ("true", "0")],
-    ids=["hand-done", "context-named-otherwise", "operator-demand-spec", "no-entry", "empty"],
+    [
+        (HAND_T3, "1"),
+        (RENAMED_T3, "1"),
+        (SPEC_T3, "1"),
+        (TRACED_T3, "1"),
+        (ONBOARDED_T3, "0"),
+        ("true", "0"),
+    ],
+    ids=[
+        "hand-done",
+        "context-named-otherwise",
+        "operator-demand-spec",
+        "backlog-origin-traced",
+        "no-entry",
+        "empty",
+    ],
 )
 def test_the_grader_rewards_the_discovery(version: str, script: str, want: str) -> None:
     assert reward(T3, version, script) == want
