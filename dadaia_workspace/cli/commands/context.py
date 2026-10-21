@@ -222,6 +222,23 @@ def list_all(
     console.print(table)
 
 
+def _print_details(data: dict[str, Any]) -> None:
+    for label, key in (
+        *(("Name", "name"), ("State", "state"), ("Main repo", "main_repo")),
+        *(("Repo URL", "repo_url"), ("Branch", "current_branch"), ("Created", "created_at")),
+        *(("Alive since", "alive_since"), ("Dead since", "dead_since")),
+    ):
+        console.print(f"[bold]{label + ':':<13}[/bold] {data[key] or '—'}", highlight=False)
+    if data["associated_repos"]:
+        table = Table(title="Associated repos")
+        for column in ("Slug", "URL", "On disk", "Branch"):
+            table.add_column(column)
+        for r in data["associated_repos"]:
+            on_disk = "yes" if r["on_disk"] else "no"
+            table.add_row(r["slug"], r["url"] or "—", on_disk, r["current_branch"] or "—")
+        console.print(table)
+
+
 @app.command()
 def show(
     name: str | None = typer.Argument(None, help="Context name"),
@@ -260,20 +277,7 @@ def show(
         msg = f"Context '{name}' not found." if name else "No active context."
         console.print(f"[dim]{msg}[/dim]")
         return
-    for label, key in (
-        *(("Name", "name"), ("State", "state"), ("Main repo", "main_repo")),
-        *(("Repo URL", "repo_url"), ("Branch", "current_branch"), ("Created", "created_at")),
-        *(("Alive since", "alive_since"), ("Dead since", "dead_since")),
-    ):
-        console.print(f"[bold]{label + ':':<13}[/bold] {data[key] or '—'}", highlight=False)
-    if data["associated_repos"]:
-        table = Table(title="Associated repos")
-        for column in ("Slug", "URL", "On disk", "Branch"):
-            table.add_column(column)
-        for r in data["associated_repos"]:
-            on_disk = "yes" if r["on_disk"] else "no"
-            table.add_row(r["slug"], r["url"] or "—", on_disk, r["current_branch"] or "—")
-        console.print(table)
+    _print_details(data)
 
 
 @app.command()
