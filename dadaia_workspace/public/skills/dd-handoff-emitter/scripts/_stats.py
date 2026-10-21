@@ -66,10 +66,13 @@ def _merge(repo: Path, branch: str, sha: str) -> list[str]:
 def _after_closure(repo: Path, sha: str | None, tip: str) -> str:
     if not sha:
         return NA
-    raw = git(repo, "log", "--no-merges", "--format=%x00%s%n%b", f"{sha}..{tip}", check=False)
-    commits = [c for c in raw.split("\0") if c.strip()]
-    keep = [c for c in commits if not c.startswith(_FREE) and not re.search(r"^block:", c, re.M)]
-    return str(len(keep))
+    raw = git(repo, "log", "--no-merges", "--name-only", "--format=%x00%s%n%b%x01", f"{sha}..{tip}", check=False)  # fmt: skip
+    keep = 0
+    for text, _, tail in (c.partition("\x01") for c in raw.split("\0") if c.strip()):
+        files = tail.split()
+        audit = files and all(f.startswith("specs/audits/") for f in files)
+        keep += not (audit or text.startswith(_FREE) or re.search(r"^block:", text, re.M))
+    return str(keep)
 
 
 def table(root: Path, specs: Path, rc: str) -> str:
