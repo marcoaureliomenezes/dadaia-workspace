@@ -348,26 +348,36 @@ def verdict(
     slugs: dict[str, Collection[str]] = {"repos": repos, "worktrees": {*worktrees, "AGENTS.md"}}
     parts = rel.strip("/").split("/")
     for depth, name in enumerate(parts):
-        directory = is_dir or depth < len(parts) - 1
-        allowed: Collection[str]
-        if depth == 0:
-            allowed = ROOT_ALLOWED_DIRS if directory else ROOT_ALLOWED_FILES
-        elif depth == 1 and parts[0] == ".dadaia":
-            allowed = zone_names() if directory else DADAIA_ROOT_FILES
-        elif depth == 2 and parts[0] == ".dadaia":
-            zone = next((z for z in DADAIA_ZONES if z.name == parts[1]), None)
-            if zone is None or zone.canon is None:
-                return "canon"
-            allowed = {*zone.canon, *repos} if zone.name == "dist" else zone.canon
-        elif depth == 1 and parts[0] in slugs:
-            allowed = slugs[parts[0]]
-        else:
+        allowed = _allowed(parts, depth, is_dir or depth < len(parts) - 1, slugs, repos)
+        if allowed is None:
             return "canon"
         if any(fnmatch.fnmatch(name, a) for a in allowed):
             continue
         excepted = any(_matches("/".join(parts[: depth + 1]), g) for g in globs)
         return "operator" if excepted else "slop"
     return "canon"
+
+
+def _allowed(
+    parts: list[str],
+    depth: int,
+    directory: bool,
+    slugs: dict[str, Collection[str]],
+    repos: Collection[str],
+) -> Collection[str] | None:
+    """The names *parts*[*depth*] may take at a judged level, or ``None`` below an open one."""
+    if depth == 0:
+        return ROOT_ALLOWED_DIRS if directory else ROOT_ALLOWED_FILES
+    if depth == 1 and parts[0] == ".dadaia":
+        return zone_names() if directory else DADAIA_ROOT_FILES
+    if depth == 2 and parts[0] == ".dadaia":
+        zone = next((z for z in DADAIA_ZONES if z.name == parts[1]), None)
+        if zone is None or zone.canon is None:
+            return None
+        return {*zone.canon, *repos} if zone.name == "dist" else zone.canon
+    if depth == 1 and parts[0] in slugs:
+        return slugs[parts[0]]
+    return None
 
 
 def zone_names() -> frozenset[str]:
