@@ -117,6 +117,17 @@
         "worktree-layout-per-context",
         "bug-stats-hotspots-and-age"
       ]
+    },
+    {
+      "id": "keep-verdict-across-sync",
+      "title": "A reviewer's verdict survives a worktree sync when the lane's own reviewed patch is unchanged",
+      "opened": "2026-10-21",
+      "status": "idea",
+      "description": "Target 0.6.0. Arm A, not a bug: today's contract is designed and holds. worktrees/AGENTS.md \u00a72 accepts only the equivalent reviewed patch series with a matching diff_sha256, and specs/memory/product/sdd/worktrees.md:34 says a tree whose patch context a sync changed needs a fresh verdict and no verdict is rebound. Cost measured in the rc-22 lanes on 2026-10-21: each merge onto the work branch forced a sync of the sibling lanes, then a reviewer re-verdict on every lane whose diff context moved; at least 8 re-verdicts that day, about 1 to 4 minutes of reviewer time each (read from the reviewer hand-backs' durations). Adjacent BUGS.jsonl appends also made syncs conflict, and the main thread rebuilt 3 lanes (the ledger-append conflict is rc18-review-loose-ends item 8). Gain: fewer review round-trips. Trade-off: the verdict gate is the review trust boundary the operator closed in rc-22 (Q5), so loosening its binding is a security surface. Constraint on any design: the verdict stays bound to the lane's reviewed patch and never covers code the reviewer did not judge; a sync that changes the lane's own patch still needs a fresh verdict. History the grill must weigh: rc-18 AC4.7 built a manual verdict rebind and the operator dropped it ('Drop the rebind (Recommended)'), so the rebind was reverted (rc-18 SPEC AC4.7 ruling). Design left open for the grill. No new gate.",
+      "provenance": "Operator demand 2026-10-21, grill Q15 on keeping a reviewer's verdict across a worktree sync when the lane's own patch is unchanged: \"Backlog do 0.6.0 (Recommended)\"",
+      "relates": [
+        "rc18-review-loose-ends"
+      ]
     }
   ]
 }
