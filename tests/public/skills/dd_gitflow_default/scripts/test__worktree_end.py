@@ -158,6 +158,21 @@ def test_a_task_whose_job_tree_is_gone_refuses_with_the_fix_that_restores_it(
     assert run(root, "merge", str(task)).returncode == 0
 
 
+def test_a_gone_task_with_its_job_tree_gone_refuses_with_the_fix_that_restores_the_job_tree(
+    root: Path,
+) -> None:
+    task = open_tree(root, NEW_TASK)
+    commit(task, "src/a.py")
+    shutil.rmtree(task)  # the branch survives
+    shutil.rmtree(root / TREE)
+    refused = run(root, "merge", str(task))
+    assert refused.returncode == 1 and "fatal" not in refused.stderr
+    assert _line(refused) == command(
+        *("git", "-C", str(root / "repos/r"), "worktree", "add", "-f", "-f", "--lock"),
+        *("--reason", f"dadaia:{NEW_JOB}", str(root / TREE), f"wt/{NEW_JOB}"),
+    )
+
+
 def test_a_failing_tree_carried_release_check_at_a_rc_merge_prints_its_own_fix(
     tmp_path: Path,
 ) -> None:
