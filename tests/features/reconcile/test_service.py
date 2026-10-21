@@ -88,7 +88,9 @@ def test_version_mismatch_is_read_only(tmp_path: Path) -> None:
     )
     assert result.ok is False
     assert result.rollback_required is False
-    assert result.fix.startswith("Agent action: install dadaia-workspace 9.9.9, then run ")
+    assert result.fix.startswith(
+        "Agent action: install the exact provider version 9.9.9, then run "
+    )
     assert (workspace / ".dadaia" / "states" / "spec_contexts.json").read_bytes() == before
 
 
