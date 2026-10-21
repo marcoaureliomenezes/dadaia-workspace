@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from dadaia_workspace.core import platform
+from dadaia_workspace.core.platform import act
 from dadaia_workspace.core.atomic_write import atomic_write
 from dadaia_workspace.core.cli_line import cli_words
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
@@ -52,7 +53,7 @@ def reconcile_workspace(
         )
 
     rerun = platform.inline(*cli_words(None, "reconcile", "--expect-version", expected_version))
-    install_first = platform.act(
+    install_first = act(
         "agent", f"install the exact provider version {expected_version}, then run {rerun}"
     )
     if actual != expected_version:
@@ -114,11 +115,10 @@ def reconcile_workspace(
         atomic_write(primary, primary_snapshot)
         if projections_started:
             install = platform.inline(*cli_words(None, "public", "install"))
-            fix = platform.act(
-                "agent", f"reinstall the previous exact provider version, then run {install}"
-            )
+            advice = f"reinstall the previous exact provider version, then run {install}"
         else:
-            fix = platform.act("agent", f"resolve the error above, then run {rerun}")
+            advice = f"resolve the error above, then run {rerun}"
+        fix = act("agent", advice)
         return failed(str(exc), fix, tuple(steps), projections_started)
 
     return ReconcileResult(True, expected_version, actual, tuple(steps))
@@ -149,13 +149,13 @@ def _ownership_preflight(workspace_root: Path) -> tuple[str, str] | None:
             return (
                 f"{path} is owned by '{owner[1]}' (uid {owner[0]}), not by the current user "
                 f"(uid {uid}) — reconcile cannot write projections there.",
-                platform.act("agent", f"run {repair}"),
+                act("agent", f"run {repair}"),
             )
         if not platform.can_write(path):
             return (
                 f"{path} is not writable by the current user (mode {stat.filemode(path.stat().st_mode)}) — "
                 "reconcile cannot write projections there.",
-                platform.act("agent", f"make {path} writable by the current user"),
+                act("agent", f"make {path} writable by the current user"),
             )
         return None
 
