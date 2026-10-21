@@ -463,7 +463,7 @@ def merge(root: Path, path: str, keep: list[str], drop: bool) -> str:
     ref = branch(name)
     if not tree.exists() and not git(repo, "branch", "--list", ref).strip():
         _rmdir(tree, name)
-        return f"{ref} merged into {onto}"
+        return f"nothing left to merge at {tree}"
     into = _parent(repo, onto)
     if not tree.exists():  # only the branch is left
         _on_target(into, onto)
