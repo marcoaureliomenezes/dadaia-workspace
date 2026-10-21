@@ -1,6 +1,7 @@
 """dadaia init command — one plan, one directory, one or more harnesses."""
 
 import sys
+from collections.abc import Callable
 from dataclasses import dataclass, replace
 from pathlib import Path
 
@@ -21,7 +22,7 @@ from dadaia_workspace.core.exceptions import (
     WorkspaceVenvBootstrapError,
 )
 from dadaia_workspace.core.model_registry import TEMPLATES
-from dadaia_workspace.core.platform import act, workspace_cli_path
+from dadaia_workspace.core.platform import act, inline, workspace_cli_path
 from dadaia_workspace.features.export.service import Artifact, ExportService
 from dadaia_workspace.features.spec_context.service import slug_from_url
 
@@ -36,6 +37,9 @@ _INIT = ("uvx", "dadaia-workspace", "init")
 reconcile_workspace = container.reconcile_workspace
 
 
+_Render = Callable[..., str]
+
+
 @dataclass(frozen=True)
 class InitPlan:
     """Everything one ``init`` run does — filled by flags, or by prompts on a TTY."""
@@ -46,15 +50,21 @@ class InitPlan:
     associated: tuple[str, ...] = ()
     from_: str = ""
 
-    def command(self, directory: object = None, runner: tuple[str, ...] = _INIT) -> str:
+    def command(
+        self,
+        directory: object = None,
+        runner: tuple[str, ...] = _INIT,
+        render: _Render = shell_line,
+    ) -> str:
         """The ``init`` invocation that runs this plan — every flag it carries, so a
-        ``fix:`` line built from it never drops a level (*directory* overrides DIR)."""
+        ``fix:`` line built from it never drops a level (*directory* overrides DIR);
+        *render* spells it as a line, or as text inside an ``Agent action:`` sentence."""
         target = str(self.directory if directory is None else directory)
         flags = [("--harness", self.harness)] if self.harness else []
         flags += [("--from", self.from_)] if self.from_ else []
         flags += [("--repo", self.repo)] if self.repo else []
         flags += [("--associated-repo", url) for url in self.associated]
-        return shell_line(*runner, *filter(None, [target]), *sum(flags, ()))
+        return render(*runner, *filter(None, [target]), *sum(flags, ()))
 
 
 def _interactive() -> bool:
@@ -175,13 +185,22 @@ def init(
             replace(plan, harness=harness_registry.L1_ENTRY_HARNESSES[0]).command(),
         )
 
-    sibling_fix = plan.command(root.parent / ((root.name or "dadaia") + "-workspace"))
     if root.exists() and not root.is_dir():
-        fail(f"'{root}' is not a directory.", sibling_fix)
+        fail(
+            f"'{root}' is not a directory.",
+            plan.command(root.parent / ((root.name or "dadaia") + "-workspace")),
+        )
     # A directory that already holds `.dadaia/` is THIS workspace (a re-run, idempotent);
     # anything else non-empty is a foreign tree and is never scaffolded over.
-    if root.is_dir() and any(root.iterdir()) and not (root / ".dadaia").is_dir():
-        fail(f"'{root}' already holds a foreign tree (not a dadaia workspace).", sibling_fix)
+    foreign = sorted(p.name for p in root.iterdir()) if root.is_dir() else []
+    if foreign and not (root / ".dadaia").is_dir():
+        names = ", ".join(foreign)
+        fail(
+            f"'{root}' already holds a foreign tree (not a dadaia workspace): {names}.",
+            act(
+                "agent", f"move {names} out of {root}, then run {plan.command(root, render=inline)}"
+            ),
+        )
     root.mkdir(parents=True, exist_ok=True)
 
     svc = container.build_workspace_service(root)
