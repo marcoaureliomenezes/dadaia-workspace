@@ -7,7 +7,9 @@ import json
 import typer
 
 from dadaia_workspace import container
-from dadaia_workspace.core.cli_line import fix_line
+from dadaia_workspace.cli._fail import fail
+from dadaia_workspace.core import platform
+from dadaia_workspace.core.cli_line import cli_words
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 
 
@@ -31,12 +33,12 @@ def reconcile(
         for step in result.steps:
             typer.echo(f"  [ok] {step}")
     else:
-        typer.echo(f"[error] reconciliation failed: {result.error}", err=True)
+        fix = ""
         if result.rollback_required:
-            typer.echo(
-                "[rollback-required] reinstall the previous exact provider version, then run "
-                f"its matching '{fix_line(None, 'public', 'install')}'.",
-                err=True,
+            install = platform.inline(*cli_words(None, "public", "install"))
+            fix = platform.act(
+                "agent", f"reinstall the previous exact provider version, then run {install}"
             )
+        fail(result.error, fix)
     if not result.ok:
         raise typer.Exit(1)
