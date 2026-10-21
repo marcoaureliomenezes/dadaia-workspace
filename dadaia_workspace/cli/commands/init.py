@@ -22,7 +22,7 @@ from dadaia_workspace.core.exceptions import (
     WorkspaceVenvBootstrapError,
 )
 from dadaia_workspace.core.model_registry import TEMPLATES
-from dadaia_workspace.core.platform import act, inline, workspace_cli_path
+from dadaia_workspace.core.platform import act, inline, quote, workspace_cli_path
 from dadaia_workspace.features.export.service import Artifact, ExportService
 from dadaia_workspace.features.spec_context.service import slug_from_url
 
@@ -195,10 +195,10 @@ def init(
     foreign = sorted(p.name for p in root.iterdir()) if root.is_dir() else []
     if foreign and not (root / ".dadaia").is_dir():
         fail(
-            f"'{root}' already holds a foreign tree (not a dadaia workspace): {', '.join(map(inline, foreign))}.",
+            f"'{root}' already holds a foreign tree (not a dadaia workspace): {', '.join(map(quote, foreign))}.",
             act(
                 "operator",
-                f"empty {inline(str(root))} or name another empty folder for the workspace, "
+                f"empty {quote(str(root))} or name another empty folder for the workspace, "
                 f"then run {plan.command(root, render=inline)}",
             ),
         )
