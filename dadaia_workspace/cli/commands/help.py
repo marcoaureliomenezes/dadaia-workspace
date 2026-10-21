@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import typer
 
+from dadaia_workspace.cli._fail import fail
 from dadaia_workspace.core.cli_line import fix_line
+from dadaia_workspace.core.platform import act
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 
 app = typer.Typer(help="Derived help surfaces (docker-style; generated, never transcribed).")
@@ -33,7 +35,11 @@ def tree(
     if digest:
         path = write_digest(resolve_workspace_root())
         if path is None:
-            typer.echo("[error] digest could not be written", err=True)
-            raise typer.Exit(1)
+            fail(
+                "digest could not be written",
+                act(
+                    "agent", "make .dadaia/agentic writable by the current user, then run it again"
+                ),
+            )
         typer.echo(f"[ok] digest written: {path}")
     typer.echo(render_digest(), nl=False)
