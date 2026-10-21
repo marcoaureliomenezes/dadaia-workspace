@@ -173,7 +173,12 @@ def test_a_gone_task_with_its_job_tree_gone_refuses_with_the_fix_that_restores_t
     )
     _fix(root, refused)
     assert (root / TREE).is_dir()
-    assert str(root / TREE) not in run(root, "merge", str(task)).stderr.split("fix:")[0]
+    assert _line(
+        run(root, "merge", str(task))
+    ) == command(  # the job tree is back: the task's own refusal
+        *("git", "-C", str(root / "repos/r"), "worktree", "add", "-f", "-f", "--lock"),
+        *("--reason", f"dadaia:{NEW_TASK}", str(task), f"wt/{NEW_TASK}"),
+    )
 
 
 def test_a_finished_task_merge_reruns_clean_after_its_job_landed(root: Path) -> None:
