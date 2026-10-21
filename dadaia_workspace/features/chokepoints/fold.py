@@ -66,6 +66,40 @@ def rewrite_unpublished(
     _fold(repo, sha, tip, decision, message, git)
 
 
+def _names(git: Any, repo: Path, *args: str) -> set[str]:
+    return set(filter(None, git.git(repo, *args, "-z").split("\0")))
+
+
+def _groups(
+    git: Any, repo: Path, folded: list[tuple[str, str]], parent: str, tip: str
+) -> list[tuple[set[str] | None, set[str]]]:
+    """The commits to write, each as `(paths it keeps or None for all, commits it folds)`: the
+    RED `test(` commits and the paths they touch first, then the rest; one group when no RED."""
+    every, red = {c for c, _ in folded}, {c for c, m in folded if m.startswith("test(")}
+    if not (parent and red and red != every):
+        return [(None, every)]
+    reds = set().union(*(_names(git, repo, "diff-tree", "--no-commit-id", "--name-only", "-r", "--no-renames", c) for c in red))  # fmt: skip
+    net = _names(git, repo, "diff", "--name-only", "--no-renames", parent, tip)
+    return [(reds & net, red), (None, every - red)]
+
+
+def _texts(
+    folded: list[tuple[str, str]],
+    groups: list[tuple[set[str] | None, set[str]]],
+    replaced: set[str],
+    message: str | None,
+) -> list[str]:
+    """One message per group: *message* heads the group holding a replaced message, else the last."""
+    heads = [bool(replaced & cs) for _, cs in groups]
+    heads[-1] |= not any(heads)
+    return [
+        "\n\n".join(
+            [message or "" if h else "", *(m for c, m in folded if c in cs - replaced)]
+        ).strip()  # fmt: skip
+        for (_, cs), h in zip(groups, heads, strict=True)
+    ]
+
+
 def _fold(
     repo: Path, sha: str, tip: str, decision: Decision, message: str | None, git: Any
 ) -> None:
@@ -74,34 +108,18 @@ def _fold(
     settled in a temporary index before the one ref move."""
     log = git.git(repo, "log", "--reverse", "--format=%H%x00%B%x1e", tip, "--not", f"{sha}^@")
     folded = [e.strip().partition("\0")[::2] for e in log.split("\x1e") if e.strip()]
-    replaced = set(decision.messages) if message else set()
-    every, red = {c for c, _ in folded}, {c for c, m in folded if m.startswith("test(")}
     try:
         parent = git.git(repo, "rev-parse", "--verify", f"{sha}^")
     except GitSyncError:
         parent = ""
-
-    def names(*args: str) -> set[str]:
-        return set(filter(None, git.git(repo, *args, "-z").split("\0")))
 
     with tempfile.TemporaryDirectory(prefix="fold-") as scratch:
         env = {"GIT_INDEX_FILE": str(Path(scratch) / "index")}
         git.git(repo, "read-tree", tip, env=env)
         git.git(repo, "add", "-u", env=env)
         final = git.git(repo, "write-tree", env=env)
-        groups: list[tuple[set[str] | None, set[str]]] = [(None, every)]
-        if parent and red and red != every:
-            reds = set().union(*(names("diff-tree", "--no-commit-id", "--name-only", "-r", "--no-renames", c) for c in red))  # fmt: skip
-            net = names("diff", "--name-only", "--no-renames", parent, tip)
-            groups = [(reds & net, red), (None, every - red)]
-        heads = [bool(replaced & cs) for _, cs in groups]
-        heads[-1] |= not any(heads)
-        texts = [
-            "\n\n".join(
-                [message or "" if h else "", *(m for c, m in folded if c in cs - replaced)]
-            ).strip()  # fmt: skip
-            for (_, cs), h in zip(groups, heads, strict=True)
-        ]
+        groups = _groups(git, repo, folded, parent, tip)
+        texts = _texts(folded, groups, set(decision.messages) if message else set(), message)
         if not all(texts):
             raise DadaiaError(
                 f"a folded commit would carry no message ({sha[:12]}..{tip[:12]})",
