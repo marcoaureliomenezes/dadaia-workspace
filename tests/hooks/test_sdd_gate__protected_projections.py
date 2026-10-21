@@ -11,6 +11,7 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.hooks import sdd_gate
+from tests.fixtures.harness_env import claude_hook_env, run_hook_subprocess
 from tests.helpers.oslib import write_text
 
 _BUG = "agentic-projections-agent-writable"
@@ -60,13 +61,17 @@ _VERDICT_RUN = "python3 .agents/skills/dd-handoff-emitter/scripts/verdict.py /t 
 _STATS = "python3 .agents/skills/dd-handoff-emitter/scripts/verdict.py stats 0.5.0-rc22"
 
 
-def _bash(command: str, **over: object) -> str | None:
-    return sdd_gate.evaluate_payload(
-        {"tool_name": "Bash", "tool_input": {"command": command}, **over}
-    )
+def _bash(ws: Path, runtime: str | None, command: str, over: dict[str, object]) -> str | None:
+    """The block reason the real hook prints for a Bash call under harness *runtime*."""
+    env = claude_hook_env(ws, extra={"DADAIA_RUNTIME": runtime} if runtime else None)
+    payload = {"tool_name": "Bash", "tool_input": {"command": command}, **over}
+    done = run_hook_subprocess("sdd_gate", payload, env)
+    assert done.returncode == 0, done.stderr
+    block = done.block_envelope()
+    return None if block is None else str(block["reason"])
 
 
-@pytest.mark.small
+@pytest.mark.medium
 @pytest.mark.parametrize(
     ("runtime", "command", "over", "blocked"),
     [
@@ -82,14 +87,12 @@ def _bash(command: str, **over: object) -> str | None:
     ],
 )
 def test_the_main_thread_cannot_run_the_verdict_writer_where_the_harness_names_subagents(
+    tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     runtime: str | None,
     command: str,
     over: dict[str, object],
     blocked: bool,
 ) -> None:
-    if runtime is None:
-        monkeypatch.delenv("DADAIA_RUNTIME", raising=False)
-    else:
-        monkeypatch.setenv("DADAIA_RUNTIME", runtime)
-    assert (_bash(command, **over) is not None) is blocked
+    reason = _bash(_workspace(tmp_path, monkeypatch), runtime, command, over)
+    assert (reason is not None) is blocked

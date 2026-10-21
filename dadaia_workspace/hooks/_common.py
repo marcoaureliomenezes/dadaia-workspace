@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import contextlib
 import json
+import re
 import sys
 from typing import Any
 
@@ -39,6 +40,18 @@ def claude_payload(payload: dict[str, Any]) -> dict[str, Any]:
     tool_input = payload.get("tool_input") or args
     tool_input = tool_input if isinstance(tool_input, dict) else payload
     return {**payload, "tool_name": _TOOL_ALIASES.get(name.lower(), name), "tool_input": tool_input}
+
+
+#: One path segment: no separator; `.` and `..` refused beside it (CWE-22).
+_NAME_RE = re.compile(r"[A-Za-z0-9._-]+")
+
+
+def subagent(payload: dict[str, Any], key: str = "agent_type") -> str | None:
+    """The subagent name the payload's *key* carries when it is a plain name, else ``None``."""
+    raw = payload.get(key)
+    return (
+        raw if isinstance(raw, str) and _NAME_RE.fullmatch(raw) and raw not in (".", "..") else None
+    )
 
 
 def is_write_tool(name: str) -> bool:

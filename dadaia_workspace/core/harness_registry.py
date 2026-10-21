@@ -60,12 +60,15 @@ class HarnessRecord:
             the user level).
         agent_transcode: how it consumes the authored persona set.
         hooks: the format its hook registration serializes into.
+        subagent_key: the key of its pre-tool payload that names the running subagent, or
+            ``None`` when it gives no identity.
     """
 
     name: str
     directory: str | None
     agent_transcode: AgentTranscode
     hooks: HookFormat
+    subagent_key: str | None
 
 
 #: The registry. Insertion order IS the canonical order (``init --harness`` and the
@@ -78,36 +81,42 @@ HARNESS_RECORDS: dict[str, HarnessRecord] = {
             directory=".claude",
             agent_transcode=AgentTranscode.CLAUDE_MD_SYMLINK,
             hooks=HookFormat.CLAUDE_SETTINGS,
+            subagent_key="agent_type",
         ),
         HarnessRecord(
             name="codex",
             directory=".codex",
             agent_transcode=AgentTranscode.CODEX_TOML,
             hooks=HookFormat.CODEX_HOOKS,
+            subagent_key=None,
         ),
         HarnessRecord(
             name="kimi-code",
             directory=None,
             agent_transcode=AgentTranscode.NONE,
             hooks=HookFormat.KIMI_HOOKS,
+            subagent_key=None,
         ),
         HarnessRecord(
             name="cursor",
             directory=".cursor",
             agent_transcode=AgentTranscode.CURSOR_MD,
             hooks=HookFormat.CURSOR_HOOKS,
+            subagent_key=None,
         ),
         HarnessRecord(
             name="devin",
             directory=".devin",
             agent_transcode=AgentTranscode.DEVIN_MD,
             hooks=HookFormat.DEVIN_HOOKS,
+            subagent_key=None,
         ),
         HarnessRecord(
             name="copilot",
             directory=".github",
             agent_transcode=AgentTranscode.COPILOT_AGENT_MD,
             hooks=HookFormat.COPILOT_HOOKS,
+            subagent_key=None,
         ),
     )
 }

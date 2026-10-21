@@ -228,17 +228,21 @@ def approve(
     """The reviewer's verdict as `verdict.py` writes it: a handoff naming *sha*, its diff bound over
     the base of tree *name* (the work branch with no *name*), emitted *at*."""
     file = f"2026-10-02{at.replace(':', '')}-dd-code-reviewer-{sha[:8]}-{verdict}.handoff.json"
-    handoff = root / ".dadaia/handoff/c" / file
+    handoff = root / ".dadaia/states/verdicts/c" / file
     handoff.parent.mkdir(parents=True, exist_ok=True)
     body = {
         "agent": "dd-code-reviewer",
+        "context": "c",
         "verdict": verdict,
+        "verdict_reason": "r",
         "scope": f"wt/{name or NEW_JOB}@{sha}",
         "reviewed_sha": sha,
         "diff_sha256": diff_hash(root, sha, name, repo),
         "produced_at": f"2026-10-02{at}",
     }
-    write_text(handoff, json.dumps({**body, **({"schema_version": "1.2"} if valid else {})}))
+    write_text(
+        handoff, json.dumps({**body, **({"schema_version": "handoff-v1.2"} if valid else {})})
+    )
     return handoff
 
 

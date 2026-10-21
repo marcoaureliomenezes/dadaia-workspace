@@ -3,17 +3,18 @@
 Races between sessions are never prevented; there is no session mode. Protected CLI session records remain fail-closed against
 file-tool writes.
 
-**The gate blocks three things.** A PROTECTED write (CLI-owned session
+**The gate blocks four things.** A PROTECTED write (CLI-owned session
 records and projected law files); a MUTATING write out of the bind's scope or under
-``repos/<r>/`` outside ``specs/audits/``; and — in
-``hooks/root_whitelist`` — a new workspace-root entry. There is no
-fourth block and no path class beyond ``ADDITIVE``/``MUTATING``/``PROTECTED``.
+``repos/<r>/`` outside ``specs/audits/``; in ``hooks/root_whitelist`` a new workspace-root
+entry; and a verdict write by anyone but the reviewer (:func:`verdict_act`, the one Bash act
+judged). There is no path class beyond ``ADDITIVE``/``MUTATING``/``PROTECTED``.
 
 The gate reads no SDD artifact; memory authorship is never gated.
 """
 
 from __future__ import annotations
 
+import re
 from collections.abc import Callable
 from enum import Enum
 from itertools import chain
@@ -22,8 +23,9 @@ from pathlib import Path, PurePath
 from dadaia_workspace.core import workspace_layout
 from dadaia_workspace.core.cli_line import fix_line, mkdir_line, spell_fix
 from dadaia_workspace.core.platform import act
+from dadaia_workspace.core.skill_owner import load_owner
 
-__all__ = ["Decision", "PathClass", "classify_path", "evaluate"]
+__all__ = ["Decision", "PathClass", "classify_path", "evaluate", "verdict_act"]
 
 # Derived from the zone registry (OUTPUT + EPHEMERAL zones) — never a second literal.
 _ADDITIVE_DADAIA_PREFIXES: tuple[str, ...] = workspace_layout.additive_prefixes()
@@ -161,3 +163,19 @@ def evaluate(
         message = _MERGE_ONLY_MESSAGE.format(rel_path=rel_path, repo=repo)
         return Decision.BLOCK, message + spell_fix(fix_line(root, "worktree", "list"))
     return Decision.ALLOW, ""
+
+
+_VERDICT_RUN = re.compile(r"verdict\.py\b.*--verdict\b", re.DOTALL)
+
+
+def verdict_act(command: str, *, key: str | None, subagent: str | None) -> str | None:
+    """The block message when *command* runs ``verdict.py … --verdict`` and the harness, which
+    names a running subagent under payload *key* (``None``: it gives no identity), reports
+    *subagent* (``None``: the main thread) other than the reviewer; else ``None``."""
+    reviewer = load_owner("dd-bug-resolution", "_handoffs").REVIEWER
+    if key is None or subagent == reviewer or not _VERDICT_RUN.search(command):
+        return None
+    dispatch = f"dispatch {reviewer} on the tree to judge; its verdict.py run writes the verdict"
+    return f"[GATE] Only the dispatched {reviewer} writes a verdict.\n" + spell_fix(
+        act("agent", dispatch)
+    )

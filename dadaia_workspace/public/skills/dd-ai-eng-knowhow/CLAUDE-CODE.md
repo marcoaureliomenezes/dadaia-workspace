@@ -113,7 +113,7 @@ A decision surface, not a doc mirror — official docs are an on-demand index at
 | anything else | JavaScript regex (e.g. `^Notebook`, `mcp__.*`) |
 
 - Gotcha: an empty matcher fires on every tool (`Read`, `Grep`, `Glob`, `WebFetch`, `TaskCreate` too).
-- Scope write-gates to `Edit|Write|MultiEdit|NotebookEdit`.
+- Scope a gate to the tools it judges: `Edit|Write|MultiEdit|NotebookEdit`, and `Bash` only for the one command it judges.
 - Inject full static context once (session-keyed sentinel), never every prompt.
 - `UserPromptSubmit` may fire every prompt but must stay a silent no-op after the first injection, until the session's bind changes or it compacts.
 - PreToolUse is a guardrail, not a hard boundary — a script that writes files itself can slip past it.

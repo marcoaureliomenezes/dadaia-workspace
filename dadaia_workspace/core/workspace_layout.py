@@ -180,6 +180,7 @@ STATES_CANON: frozenset[str] = frozenset(
         "agent_model_policy.json.last-good.json",
         "privacy_denylist.json",
         "harness_profile.json",
+        "verdicts",
         "AGENTS.md",
     }
 )

@@ -361,8 +361,8 @@ def _moment(data: dict[str, object]) -> float | None:
 
 
 def _reviews(root: Path, shas: set[str]) -> list[tuple[bool, float, str, dict[str, object]]]:
-    """(unparsed, moment, path, data) of every reviewer handoff naming one of *shas*, read from the
-    handoff zone and from the reaper's hold of it; an unreadable file names no sha and is skipped."""
+    """(unparsed, moment, path, data) of every verdict naming one of *shas*; an unreadable file
+    names no sha and is skipped."""
     found = []
     for handoff, data in reviewer_records(root):
         if str(data.get("reviewed_sha")) in shas:

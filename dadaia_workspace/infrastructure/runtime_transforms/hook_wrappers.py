@@ -130,7 +130,7 @@ HOOK_DIALECTS: dict[HookFormat, HookDialect] = {
             HookFileSpec(
                 "settings.json",
                 (
-                    ("PreToolUse", "pre-gate", "Edit|Write|MultiEdit|NotebookEdit"),
+                    ("PreToolUse", "pre-gate", "Edit|Write|MultiEdit|NotebookEdit|Bash"),
                     ("PostToolUse", "post-gate", "*"),
                     ("UserPromptSubmit", "ctx-inject", ""),
                     *(
@@ -147,7 +147,7 @@ HOOK_DIALECTS: dict[HookFormat, HookDialect] = {
     ),
     HookFormat.KIMI_HOOKS: HookDialect(
         lanes=(
-            replace(_GATE, env=(_KIMI,)),
+            _GATE,
             replace(_POST, env=(_KIMI,)),
             replace(_CTX, env=(_KIMI,)),
             HookLane(
@@ -372,6 +372,8 @@ def hook_wrapper_contents(
     answer = dialect.answer
     wrappers: dict[str, str] = {}
     for lane in dialect.lanes:
+        if lane.decides:  # the gate finds its harness record by this label
+            lane = replace(lane, env=(*lane.env, ("DADAIA_RUNTIME", record.name)))
         name = wrapper_name(record, lane.name, caps)
         if _runs_cmd(dialect, caps):
             wrappers[name] = _cmd_script(lane, dialect)

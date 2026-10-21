@@ -133,7 +133,7 @@ def _run(argv: list[str]) -> int:
         **body,
     }
     root = Path(bound["root"])
-    out = root / ".dadaia/handoff" / args.context
+    out = root / ".dadaia/states/verdicts" / args.context
     out.mkdir(parents=True, exist_ok=True)
     target = out / f"{now.replace(':', '')}-{REVIEWER}-{args.slug}.handoff.json"
     try:

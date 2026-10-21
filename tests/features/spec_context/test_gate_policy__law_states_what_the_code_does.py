@@ -92,6 +92,10 @@ def _block_rows(tmp: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, bool]:
         "out-of-scope": gate_policy.evaluate("worktrees/b/w/x.py", root=PurePath("/ws"), **away)[0]
         == gate_policy.Decision.BLOCK,
         "_MERGE_ONLY_MESSAGE": write("bad", "repos/r/src/x.py", sdd_gate) is not None,
+        "verdict_act": gate_policy.verdict_act(
+            "verdict.py t --verdict APPROVED", key="agent_type", subagent=None
+        )
+        is not None,
     }
 
 

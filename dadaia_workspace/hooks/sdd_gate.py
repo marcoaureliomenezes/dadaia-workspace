@@ -1,6 +1,6 @@
 """PreToolUse SDD gate: resolves ONE Invocation and the target's ``scope()`` per write
-target and delegates the verdict to :mod:`gate_policy`. The gate reads no
-``_RELEASE.json``."""
+target and delegates the verdict to :mod:`gate_policy`; a Bash call is judged only as a verdict
+write. The gate reads no ``_RELEASE.json``."""
 
 from __future__ import annotations
 
@@ -72,9 +72,22 @@ def _evaluate_target(workspace: Path | None, raw_path: str) -> tuple[gate_policy
     )
 
 
+def _verdict_block(payload: dict[str, object]) -> str | None:
+    """The block reason for a Bash call that writes a verdict outside the reviewer, else ``None``."""
+    record = HARNESS_RECORDS.get(os.environ.get("DADAIA_RUNTIME", ""))
+    key = record.subagent_key if record else None
+    tool_input = payload.get("tool_input")
+    command = tool_input.get("command") if isinstance(tool_input, dict) else None
+    who = _common.subagent(payload, key) if key else None
+    return gate_policy.verdict_act(str(command or ""), key=key, subagent=who)
+
+
 def evaluate_payload(payload: dict[str, object]) -> str | None:
-    """The first BLOCK reason over EVERY write target, else ``None``; no parseable target allows."""
+    """The first BLOCK reason over EVERY write target (and a Bash verdict write), else ``None``;
+    no parseable target allows."""
     name = str(payload.get("tool_name") or "")
+    if name == "Bash":
+        return _verdict_block(payload)
     if not _common.is_write_tool(name):
         return None
     raw_paths = _common.target_paths(payload)

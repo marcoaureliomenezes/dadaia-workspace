@@ -112,7 +112,7 @@ def test_merge_fast_forwards_removes_and_reruns(root: Path) -> None:
     rejected = approve(
         root, sha, verdict="REJECTED", at="T09:00:00Z"
     )  # the newer APPROVED overrules
-    (other := root / ".dadaia/handoff/z").mkdir()  # another context and a non-UTC name:
+    (other := root / ".dadaia/states/verdicts/z").mkdir()  # another context and a non-UTC name:
     rejected.rename(other / "a.handoff.json")  # produced_at orders, never the path
     approve(root, sha)
     result = run(root, "merge", TREE)
@@ -311,7 +311,7 @@ def test_merge_needs_a_valid_approval_of_the_exact_head(
     ).stdout.strip()
     if older:  # the newest produced_at decides, never a name sorting last
         approve(root, head, verdict=older, at="T09:00:00Z").rename(
-            root / ".dadaia/handoff/c/v.handoff.json"
+            root / ".dadaia/states/verdicts/c/v.handoff.json"
         )
     target = (
         approve(root, head, verdict=verdict, valid=valid, at=at)
