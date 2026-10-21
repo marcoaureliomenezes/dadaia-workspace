@@ -278,6 +278,7 @@ _PKG = Path(__file__).resolve().parents[2] / "dadaia_workspace"
 #: the agents' reach). An f-string spells each value as `{source}`. A new or changed text fails
 #: until it is classed here; a text built from a variable stays covered by its exact-line pin.
 _OPERATOR_ACTIONS = {
+    ("cli/commands/init.py", "empty {quote(str(root))} or name another empty folder for the workspace, then run {plan.command(root, render=inline)}"): "ruling",
     ("cli/commands/context.py", "export DADAIA_SESSION_ID set to a stable id of your choice before opening the session"): "reach",
     ("features/export/scan.py", "rule whether {bundle} is restored from a copy or discarded"): "ruling",
     ("core/context_registry.py", "rewrite {path} as one {shape} object"): "protected",
