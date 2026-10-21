@@ -47,7 +47,9 @@ def root(tmp_path: Path) -> Path:
 
 def _hand(root: Path, scope_sha: str, **fields: str) -> None:
     """A valid APPROVED a hand wrote: `scope` names *scope_sha*, *fields* ride beside it."""
-    handoff = root / ".dadaia/handoff/c/2026-10-02T100000Z-dd-code-reviewer-hand.handoff.json"
+    handoff = (
+        root / ".dadaia/states/verdicts/c/2026-10-02T100000Z-dd-code-reviewer-hand.handoff.json"
+    )
     handoff.parent.mkdir(parents=True, exist_ok=True)
     write_text(
         handoff,
@@ -70,6 +72,14 @@ def _refusal(root: Path, result: subprocess.CompletedProcess[str], head: str) ->
                 " its verdict.py run writes the verdict")  # fmt: skip
     assert result.returncode == 1 and fixes(result) == [dispatch], result.stderr
     assert git(root / "repos/r", "rev-parse", f"wt/{RC}").strip() != head
+
+
+def test_a_valid_verdict_placed_by_hand_in_the_handoff_zone_is_no_verdict(root: Path) -> None:
+    head = land(root, "src/a.py")
+    made = approve(root, head)
+    (zone := root / ".dadaia/handoff/c").mkdir(parents=True, exist_ok=True)
+    made.rename(zone / made.name)
+    _refusal(root, run(root, "merge", TREE), head)
 
 
 @pytest.mark.parametrize("fields", ["hand", "no-hash", "other-range", "outside"])

@@ -21,7 +21,7 @@ from tests.fixtures.harness_env import suite_env
 from tests.helpers.oslib import command, read_text, write_text
 from tests.helpers.oslib import run as os_run
 from tests.helpers.skill_scripts import stage_skill_scripts
-from tests.helpers.worktree_ws import commit, fixes, git, make_workspace, patch_cli, run
+from tests.helpers.worktree_ws import approve, commit, fixes, git, make_workspace, patch_cli, run
 
 PKG = Path(__file__).resolve().parents[5] / "dadaia_workspace"
 SKILL = "dd-handoff-emitter"
@@ -42,6 +42,7 @@ RESERVED = (
     "schema_version",
 )
 RED = "reviewer-emits-own-verdict (ADR 0218)"
+VERDICTS = ".dadaia/states/verdicts"
 
 
 def _workspace(tmp_path: Path) -> tuple[Path, Path, str]:
@@ -86,7 +87,7 @@ def _verdict(
 
 
 def _written(root: Path) -> list[Path]:
-    return sorted((root / ".dadaia/handoff").glob("**/*.handoff.json"))
+    return sorted((root / VERDICTS).glob("**/*.handoff.json"))
 
 
 def test_a_verdict_binds_the_head_it_judged_and_the_merge_lands_on_it(tmp_path: Path) -> None:
@@ -94,7 +95,7 @@ def test_a_verdict_binds_the_head_it_judged_and_the_merge_lands_on_it(tmp_path: 
     done = _verdict(root, tree, sha=head)
     assert done.returncode == 0, done.stderr
     (path,) = _written(root)
-    assert path.parent == root / ".dadaia/handoff/c" and path.name.endswith(
+    assert path.parent == root / VERDICTS / "c" and path.name.endswith(
         "-dd-code-reviewer-s.handoff.json"
     )
     body = json.loads(read_text(path))
@@ -180,7 +181,7 @@ def test_a_slug_that_climbs_out_is_refused_and_writes_nothing(tmp_path: Path) ->
     root, tree, head = _workspace(tmp_path)
     refused = _verdict(root, tree, sha=head, slug="../x")
     assert refused.returncode != 0 and refused.stderr
-    assert _written(root) == [] and not (root / ".dadaia/handoff/x").exists()
+    assert _written(root) == [] and not (root / VERDICTS / "x").exists()
 
 
 def _tree_files(top: Path) -> set[Path]:
@@ -215,7 +216,7 @@ def test_a_context_the_core_grammar_accepts_receives_its_verdict(tmp_path: Path,
     done = _verdict(root, tree, sha=head, **{"--context": ctx})
     assert done.returncode == 0, done.stderr
     (path,) = _written(root)
-    assert path.parent == root / ".dadaia/handoff" / ctx
+    assert path.parent == root / VERDICTS / ctx
 
 
 @pytest.mark.parametrize("stdin", ["[1]", "3", "null", '"s"'])
@@ -234,7 +235,7 @@ def test_a_non_object_json_is_refused_with_text_and_no_traceback(
 
 def test_a_verdict_in_a_second_already_taken_never_overwrites_the_first(tmp_path: Path) -> None:
     root, tree, head = _workspace(tmp_path)
-    out = root / ".dadaia/handoff/c"
+    out = root / VERDICTS / "c"
     out.mkdir(parents=True)
     now = datetime.now(UTC)
     taken = [
@@ -284,8 +285,6 @@ def _record(
     verdict: str,
     at: str,
     *,
-    hold: bool = False,
-    agent: str = "dd-code-reviewer",
     minute: str = "2026-10-12T10:00",
     context: str = "c",
 ) -> None:
@@ -293,7 +292,7 @@ def _record(
     produced = f"{minute}:{at}Z"
     body = {
         "schema_version": "handoff-v1.2",
-        "agent": agent,
+        "agent": "dd-code-reviewer",
         "context": context,
         "produced_at": produced,
         "verdict": verdict,
@@ -305,11 +304,9 @@ def _record(
     }
     schema = json.loads(read_text(PKG / "public/schemas/handoff-v1.schema.json"))
     jsonschema.validate(body, schema)
-    base = root / (
-        f".dadaia/reaped/x/.dadaia/handoff/{context}" if hold else f".dadaia/handoff/{context}"
-    )
+    base = root / VERDICTS / context
     base.mkdir(parents=True, exist_ok=True)
-    name = f"{produced.replace(':', '')}-{agent}-{verdict}-{scope.replace('/', '_')}.handoff.json"
+    name = f"{produced.replace(':', '')}-dd-code-reviewer-{verdict}-{scope.replace('/', '_')}.handoff.json"
     write_text(base / name, json.dumps(body, indent=2) + "\n")
 
 
@@ -437,10 +434,9 @@ def test_stats_prints_the_local_metric_table_over_the_candidate_window(tmp_path:
     _record(root, f"wt/0.5.0/rc-99/job-3/wt-main{sha}", "APPROVED", "03")
     _record(root, f"wt/0.5.0/rc-99/job-3/wt-main{sha}", "REJECTED", "01")
     _record(root, f"wt/0.5.0/rc-99/job-1/wt-main{sha}", "APPROVED", "01")
-    _record(root, f"wt/0.5.0/wt-backlog-notes{sha}", "APPROVED", "01", hold=True)
+    _record(root, f"wt/0.5.0/wt-backlog-notes{sha}", "APPROVED", "01")
     _record(root, f"wt/0.5.0/free-tree{sha}", "REJECTED", "01")
     _record(root, f"wt/0.5.0/wt-hotfix-old{sha}", "REJECTED", "01", minute="2026-10-09T10:00")
-    _record(root, f"wt/0.5.0/rc-99/job-4/wt-main{sha}", "REJECTED", "01", agent="dd-sw-engineer-sr")
     _record(root, f"wt/0.5.0/rc-99/job-9/wt-main{sha}", "APPROVED", "01", context="other")
     _stub(root, "dd-bug-resolution", "bugs.py",
           'assert sys.argv[1] == "stats"\nprint("total\\t9")\nprint("closed\\t4\\nfix-induced\\t1\\nrebuild-due\\t1")\nprint("rebuild-due:a.py\\ta,z")\nprint("rebuild-due:b.py\\te,w")')  # fmt: skip
@@ -1054,3 +1050,19 @@ def test_a_workspace_without_its_cli_is_refused_with_the_install_fix_line(tmp_pa
     assert refused.returncode == 1
     assert refused.stderr.startswith("[error] no workspace CLI\nfix: uvx dadaia-workspace init ")
     assert refused.stderr.count("fix:") == 1 and _written(root) == []
+
+
+def test_the_approve_helper_writes_what_verdict_py_writes(tmp_path: Path) -> None:
+    root, tree, head = _workspace(tmp_path)
+    done = _verdict(root, tree, sha=head)
+    assert done.returncode == 0, done.stderr
+    real = Path(done.stdout.strip())
+    made = approve(root, head, name="0.5.0/wt-backlog-notes")
+    got, want = json.loads(read_text(made)), json.loads(read_text(real))
+    assert set(got) == set(want) - set(BODY)
+    assert {
+        k: got[k] for k in ("schema_version", "agent", "scope", "reviewed_sha", "diff_sha256")
+    } == {k: want[k] for k in ("schema_version", "agent", "scope", "reviewed_sha", "diff_sha256")}
+    assert re.fullmatch(r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ", got["produced_at"])
+    assert made.parent == real.parent
+    assert re.fullmatch(r"\d{4}-\d\d-\d\dT\d{6}Z-dd-code-reviewer-.+\.handoff\.json", made.name)

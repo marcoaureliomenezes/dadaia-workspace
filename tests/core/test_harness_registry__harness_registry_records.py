@@ -32,6 +32,17 @@ def test_every_record_carries_a_directory_an_agent_transcode_and_a_hook_derivati
         assert record.hooks is not None
 
 
+def test_only_claude_names_the_payload_key_of_a_subagent() -> None:
+    assert {name: record.subagent_key for name, record in HARNESS_RECORDS.items()} == {
+        "claude": "agent_type",
+        "codex": None,
+        "kimi-code": None,
+        "cursor": None,
+        "devin": None,
+        "copilot": None,
+    }
+
+
 def test_the_legacy_constants_derive_from_the_record_table() -> None:
     assert tuple(HARNESS_RECORDS) == L1_ENTRY_HARNESSES
     assert {

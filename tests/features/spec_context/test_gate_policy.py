@@ -12,6 +12,7 @@ from pathlib import Path, PurePosixPath
 import pytest
 
 from dadaia_workspace.core.cli_line import mkdir_line
+from dadaia_workspace.features.spec_context import gate_policy
 from dadaia_workspace.features.spec_context.gate_policy import (
     Decision,
     PathClass,
@@ -150,3 +151,41 @@ def test_a_tree_that_git_did_not_link_grants_no_scope(planted: str, tmp_path: Pa
     decision, message = evaluate(path, root=tmp_path, **_at("worktree", "ctx-b", **_A))  # type: ignore[arg-type]
     assert decision == Decision.BLOCK
     assert message.splitlines()[-1] == f"fix: {cli_path(tmp_path)} context bind ctx-b"
+
+
+_VERDICT_RUN = "python3 .agents/skills/dd-handoff-emitter/scripts/verdict.py /t --sha a --context c --slug s --verdict APPROVED --reason r"
+_DISPATCH = "fix: Agent action: dispatch dd-code-reviewer on the tree to judge; its verdict.py run writes the verdict"
+
+
+@pytest.mark.parametrize(
+    ("key", "who", "blocked"),
+    [
+        ("agent_type", None, True),
+        ("agent_type", "dd-sw-engineer-sr", True),
+        ("agent_type", "dd-code-reviewer", False),
+        (None, None, False),
+        (None, "dd-sw-engineer-sr", False),
+    ],
+)
+def test_a_verdict_run_is_refused_unless_the_harness_names_the_reviewer(
+    key: str | None, who: str | None, blocked: bool
+) -> None:
+    reason = gate_policy.verdict_act(_VERDICT_RUN, key=key, subagent=who)
+    assert (reason is not None) is blocked
+    if reason is not None:
+        assert reason.splitlines()[-1] == _DISPATCH
+        assert sum(line.startswith("fix: ") for line in reason.splitlines()) == 1
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        "ls",
+        "python3 .agents/skills/dd-handoff-emitter/scripts/verdict.py stats 0.5.0-rc22",
+        "python3 .agents/skills/dd-handoff-emitter/scripts/verdict.py --help",
+        "cat .agents/skills/dd-handoff-emitter/scripts/verdict.py",
+        "git commit -m 'verdict APPROVED'",
+    ],
+)
+def test_a_command_that_writes_no_verdict_is_never_judged(command: str) -> None:
+    assert gate_policy.verdict_act(command, key="agent_type", subagent=None) is None

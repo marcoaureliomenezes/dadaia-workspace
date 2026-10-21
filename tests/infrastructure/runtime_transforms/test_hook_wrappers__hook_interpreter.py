@@ -230,6 +230,19 @@ def test_kimi_on_windows_gets_a_cmd_wrapper_whose_literal_is_pinned() -> None:
     assert "echo dadaia: no workspace venv at %ROOT%\\.dadaia\\.venv - the gate is off.\r\n" in told
 
 
+@pytest.mark.parametrize("harness", sorted(HARNESS_RECORDS))
+def test_every_pre_gate_wrapper_names_its_harness_to_the_gate(harness: str) -> None:
+    """The gate finds its harness record by the label its own wrapper exports."""
+    record = HARNESS_RECORDS[harness]
+    body = hook_wrapper_contents(record, Capabilities.detect("linux"))[wrapper_name(record, "pre-gate")]  # fmt: skip
+    assert f'DADAIA_RUNTIME="{harness}"\nexport DADAIA_RUNTIME\n' in body
+
+
+def test_claude_hands_the_gate_a_bash_call_too() -> None:
+    (pre,) = claude_hooks()["hooks"]["PreToolUse"]
+    assert pre["matcher"] == "Edit|Write|MultiEdit|NotebookEdit|Bash"
+
+
 @pytest.mark.parametrize(
     ("home", "command"),
     [
