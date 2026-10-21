@@ -10,7 +10,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from _git import git, scrubbed_env
+from _git import fix_files, git, scrubbed_env
 from _handoffs import reviewer_records
 from _platform import run
 from _specs import check_release, context_row
@@ -66,13 +66,10 @@ def _merge(repo: Path, branch: str, sha: str) -> list[str]:
 def _after_closure(repo: Path, sha: str | None, tip: str) -> str:
     if not sha:
         return NA
-    raw = git(repo, "log", "--no-merges", "--name-only", "--format=%x00%s%n%b%x01", f"{sha}..{tip}", check=False)  # fmt: skip
-    keep = 0
-    for text, _, tail in (c.partition("\x01") for c in raw.split("\0") if c.strip()):
-        files = tail.split()
-        audit = files and all(f.startswith("specs/audits/") for f in files)
-        keep += not (audit or text.startswith(_FREE) or re.search(r"^block:", text, re.M))
-    return str(keep)
+    raw = git(repo, "log", "--no-merges", "--format=%H%x00%B%x01", f"{sha}..{tip}", check=False)
+    entries = [c.strip().partition("\0") for c in raw.split("\x01") if c.strip()]
+    files = fix_files(repo, [h for h, _, _ in entries])
+    return str(sum(not ((f := files.get(h)) and all(p.startswith("specs/audits/") for p in f) or text.startswith(_FREE) or re.search(r"^block:", text, re.M)) for h, _, text in entries))  # fmt: skip
 
 
 def table(root: Path, specs: Path, rc: str) -> str:
