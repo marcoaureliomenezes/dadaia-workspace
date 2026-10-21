@@ -75,7 +75,7 @@ def _bootstrap_fails(tmp: Path, mp: pytest.MonkeyPatch) -> Path:
     pytest.param(["init", "demo", "--harness", "claude"], _foreign, 1, None, [], id="foreign-tree-never-scaffolded-over"),
     pytest.param(["init", ".", "--harness", "claude"], _foreign_cwd, 1, "Agent action: move README.md out of {tmp}/proj, then run uvx dadaia-workspace init {tmp}/proj --harness claude", ["README.md"],
                  id="init-foreign-tree-fix-line-unrunnable-sibling-from-the-resolved-path"),
-    pytest.param(["init", "/", "--harness", "claude"], None, 1, "uvx dadaia-workspace init {root}dadaia-workspace --harness claude", [],
+    pytest.param(["init", "/", "--harness", "claude"], None, 1, "Agent action: move ", [" out of /, then run uvx dadaia-workspace init / --harness claude"],
                  id="init-root-dir-crashes-deriving-sibling-fix"),
     pytest.param(["init", "demo", "--harness", "claude"], _bootstrap_fails, 1, None, ["DADAIA_BOOTSTRAP_PACKAGE"], id="validation-028-bootstrap-error-clean-exit"),
 ])
