@@ -188,6 +188,8 @@ def test_a_verdict_run_is_refused_unless_the_harness_names_the_reviewer(
         "git log -p .agents/skills/dd-handoff-emitter/scripts/verdict.py | grep -- --verdict",
         "grep -n -- --verdict .agents/skills/dd-handoff-emitter/scripts/verdict.py; ls",
         "echo verdict.py && echo --verdict",
+        "grep -n 'x; python3 verdict.py --verdict' notes.md",
+        "git commit -m 'docs\n\npython3 verdict.py /t --verdict APPROVED'",
     ],
 )
 def test_a_command_that_writes_no_verdict_is_never_judged(command: str) -> None:
@@ -203,6 +205,24 @@ def test_a_command_that_writes_no_verdict_is_never_judged(command: str) -> None:
         f"cd /t && {_VERDICT_RUN}",
         f"ls | {_VERDICT_RUN}",
         f"echo ok; {_VERDICT_RUN}\n",
+        _VERDICT_RUN.replace("python3 ", "python3 -X utf8 "),
+        _VERDICT_RUN.replace("python3 ", "python3 -W ignore "),
+        _VERDICT_RUN.replace("python3 ", "uv run python "),
+        _VERDICT_RUN.replace("python3 ", "uv run "),
+        _VERDICT_RUN.replace("python3 ", "env FOO=1 python3 "),
+        _VERDICT_RUN.replace("python3 ", "FOO=1 python3 "),
+        _VERDICT_RUN.replace("python3 ", "time python3 "),
+        _VERDICT_RUN.replace("python3 ", "timeout 60 python3 "),
+        _VERDICT_RUN.replace("python3 ", "py -3 ").replace("/", "\\"),
+        _VERDICT_RUN.replace("python3 ", '"C:\\Program Files\\Python312\\python.exe" '),
+        _VERDICT_RUN.replace(" /t --sha a ", " /t \\\n  --sha a \\\n  "),
+        _VERDICT_RUN.replace("--context", "--reason 'a; b' --context"),
+        _VERDICT_RUN.replace("--context", "--reason 'R&D' --context"),
+        "{ " + _VERDICT_RUN + "; }",
+        "(" + _VERDICT_RUN + ")",
+        _VERDICT_RUN.replace(" /t", "\t/t"),
+        "python3 -m verdict /t --sha a --context c --slug s --verdict APPROVED --reason r",
+        _VERDICT_RUN + " 'unbalanced",
     ],
 )
 def test_a_command_that_runs_the_writer_with_the_flag_is_refused_in_any_shell_position(
