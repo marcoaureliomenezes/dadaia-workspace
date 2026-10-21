@@ -166,11 +166,41 @@ def test_a_gone_task_with_its_job_tree_gone_refuses_with_the_fix_that_restores_t
     shutil.rmtree(task)  # the branch survives
     shutil.rmtree(root / TREE)
     refused = run(root, "merge", str(task))
-    assert refused.returncode == 1 and "fatal" not in refused.stderr
+    assert refused.returncode == 1 and "[error]" in refused.stderr
     assert _line(refused) == command(
         *("git", "-C", str(root / "repos/r"), "worktree", "add", "-f", "-f", "--lock"),
         *("--reason", f"dadaia:{NEW_JOB}", str(root / TREE), f"wt/{NEW_JOB}"),
     )
+    _fix(root, refused)
+    assert (root / TREE).is_dir()
+    assert str(root / TREE) not in run(root, "merge", str(task)).stderr.split("fix:")[0]
+
+
+def test_a_finished_task_merge_reruns_clean_after_its_job_landed(root: Path) -> None:
+    task = open_tree(root, NEW_TASK)
+    commit(task, "src/a.py")
+    assert run(root, "merge", str(task)).returncode == 0
+    git(root / "repos/r", "worktree", "remove", "-f", "-f", str(root / TREE))
+    git(
+        root / "repos/r", "branch", "-D", f"wt/{NEW_JOB}"
+    )  # the job landed: parent tree and branch gone
+    rerun = run(root, "merge", str(task))
+    assert rerun.returncode == 0, rerun.stderr
+
+
+def test_clean_of_a_task_with_its_job_tree_gone_refuses_with_the_fix_that_restores_it(
+    root: Path,
+) -> None:
+    task = open_tree(root, NEW_TASK)
+    shutil.rmtree(root / TREE)
+    refused = run(root, "clean", str(task))
+    assert refused.returncode == 1 and "[error]" in refused.stderr
+    assert _line(refused) == command(
+        *("git", "-C", str(root / "repos/r"), "worktree", "add", "-f", "-f", "--lock"),
+        *("--reason", f"dadaia:{NEW_JOB}", str(root / TREE), f"wt/{NEW_JOB}"),
+    )
+    _fix(root, refused)
+    assert run(root, "clean", str(task)).returncode == 0 and not task.exists()
 
 
 def test_a_failing_tree_carried_release_check_at_a_rc_merge_prints_its_own_fix(
