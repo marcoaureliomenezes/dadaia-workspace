@@ -206,10 +206,11 @@ def test_reconcile_ownership_preflight_names_owner_and_repair(tmp_path: Path) ->
 
     agentic = tmp_path / ".dadaia" / "agentic"
     make_readonly(agentic)
-    error = _ownership_preflight(tmp_path)
-    assert error is not None
+    problem = _ownership_preflight(tmp_path)
+    assert problem is not None
+    error, fix = problem
     if "owned by" in error:
-        assert "chown" in error
+        assert "chown" in fix
     else:
         assert "not writable" in error
     make_writable(agentic)

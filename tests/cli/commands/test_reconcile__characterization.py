@@ -60,34 +60,3 @@ def test_reconcile_reports_every_step_and_persists_the_v2_registry(
     }
     expected_registry = b'{\n  "schema_version": "3",\n  "contexts": []\n}'
     assert registry.read_bytes() == expected_registry
-
-
-def test_failed_reconcile_with_rollback_prints_error_then_one_agent_fix_line(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    from dadaia_workspace import container
-    from dadaia_workspace.core import platform
-    from dadaia_workspace.core.cli_line import cli_words
-    from dadaia_workspace.features.reconcile.service import ReconcileResult
-
-    failed = ReconcileResult(
-        ok=False,
-        expected_version="1",
-        actual_version="2",
-        steps=(),
-        error="projection failed",
-        rollback_required=True,
-    )
-    monkeypatch.setattr(container, "reconcile_workspace", lambda *_a, **_k: failed)
-    monkeypatch.chdir(tmp_path)
-    (tmp_path / ".dadaia" / "states").mkdir(parents=True)
-    (tmp_path / ".dadaia" / "states" / "spec_contexts.json").write_text("{}")
-
-    result = CliRunner().invoke(app, ["reconcile", "--expect-version", "1"], terminal_width=200)
-
-    install = platform.inline(*cli_words(None, "public", "install"))
-    assert result.exit_code == 1
-    assert result.stderr.splitlines() == [
-        "Error: projection failed",
-        f"fix: Agent action: reinstall the previous exact provider version, then run {install}",
-    ]

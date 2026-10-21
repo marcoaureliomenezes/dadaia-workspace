@@ -22,6 +22,7 @@ from dadaia_workspace import container
 from dadaia_workspace.cli import main
 from dadaia_workspace.core.exceptions import WorkspaceVenvBootstrapError
 from dadaia_workspace.core.platform import PLATFORM
+from dadaia_workspace.features.capabilities import distribution_version
 from dadaia_workspace.features.migrate.upgrade import _RETIRED_PART_HEADING
 from tests.fakes import no_worktree_rows, seed_dead_context
 from tests.helpers.oslib import link, read_text, run, write_text
@@ -193,7 +194,26 @@ def _symlinked_specs_dir(tmp: Path, live: bool) -> Case:
     return tmp, ["specs", "init", "--specs-dir", str(tmp / "link")]
 
 
-# (id, builder(tmp, monkeypatch) -> (cwd, argv)) — the 19 measured sites.
+class _InstallFails:
+    verdict = None
+
+    def stage(self, root: Path) -> None: ...
+
+    def install(self, root: Path, **kwargs: Any) -> None:
+        raise RuntimeError("install failed")
+
+
+def _reconcile_rollback(tmp: Path, monkeypatch: pytest.MonkeyPatch) -> Case:
+    monkeypatch.setattr(container, "build_public_service", _InstallFails)
+    return _workspace(tmp), ["reconcile", "--expect-version", distribution_version()]
+
+
+def _digest_unwritable(tmp: Path, monkeypatch: pytest.MonkeyPatch) -> Case:
+    monkeypatch.setattr("dadaia_workspace.cli.help_digest.write_digest", lambda root: None)
+    return _workspace(tmp), ["help", "tree", "--digest"]
+
+
+# (id, builder(tmp, monkeypatch) -> (cwd, argv)) — the measured sites.
 SITES: list[tuple[str, Callable[[Path, pytest.MonkeyPatch], Case]]] = [
     ("repo-add-invalid-slug", lambda t, m: _repo_add(t, "not a slug", "--url", "https://x.test/a.git")),
     ("repo-add-different-url", lambda t, m: _repo_add_other_url(t)),
@@ -214,6 +234,9 @@ SITES: list[tuple[str, Callable[[Path, pytest.MonkeyPatch], Case]]] = [
     ("specs-init-dangling-symlink-root", lambda t, m: _symlinked_specs_dir(t, live=False)),
     ("specs-init-live-symlink-root", lambda t, m: _symlinked_specs_dir(t, live=True)),
     ("specs-upgrade-unresolved-specs-dir", lambda t, m: (_workspace(t), ["specs", "upgrade"])),
+    ("reconcile-version-mismatch", lambda t, m: (_workspace(t), ["reconcile", "--expect-version", "0.0.0"])),
+    ("reconcile-rollback", _reconcile_rollback),
+    ("help-digest-unwritable", _digest_unwritable),
 ]  # fmt: skip
 
 
