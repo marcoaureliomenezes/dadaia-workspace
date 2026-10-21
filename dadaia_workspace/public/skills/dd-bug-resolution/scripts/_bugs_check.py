@@ -80,20 +80,8 @@ def tasks(root: Path) -> set[str]:
     }
 
 
-def findings_for(
-    text: str, rel: str = LEDGER, archived: str = "", root: Path = _ledger.SPECS
-) -> list[dict[str, Any]]:
-    """Every finding the ledger *text* carries — the ONE validation path, run both by
-    ``check`` over the committed file and by every write over its own candidate bytes.
-    Lineage: a `caused_by` names a record of *text* or of the archive text *archived*, or a task
-    a `TASKS.md` under *root*`/releases/` carries, and never loops. An id holds at most one plain
-    record across *text* and *archived*; a pre-v6 event line is not a record."""
-    schema = load_schema()
-    lines: dict[int, list[str]] = {}
-    fixes: dict[int, str] = {}  # a line a governance verb clears
-    seen: dict[str, int] = {}
-    links: dict[str, object] = {}
-    legacy_ids: set[str] = set()
+def _archive_twice(archived: str, root: Path) -> tuple[dict[str, int], list[dict[str, Any]]]:
+    """The first line of each plain archive id, and a finding for every later repeat."""
     plain: dict[str, int] = {}
     twice: list[dict[str, Any]] = []
     for number, record in _archive_lines(archived, events=False):
@@ -103,6 +91,18 @@ def findings_for(
                 f"duplicate record id {record['id']!r} (first archived at line {first})",
                 _ledger.unwritten(root / HISTO, number, "`bugs.py archive`", _LAW),
             ))  # fmt: skip
+    return plain, twice
+
+
+def _record_lines(
+    text: str, plain: dict[str, int], lines: dict[int, list[str]]
+) -> tuple[dict[str, int], dict[str, object], set[str]]:
+    """Walk the ledger *text* once: add each line's schema, invariant and duplicate messages to
+    *lines*; return the first line of each id, each id's `caused_by`, and the legacy ids."""
+    schema = load_schema()
+    seen: dict[str, int] = {}
+    links: dict[str, object] = {}
+    legacy_ids: set[str] = set()
 
     def add(line: int, message: str) -> None:
         lines.setdefault(line, []).append(message)
@@ -125,6 +125,20 @@ def findings_for(
         links.setdefault(record["id"], record["caused_by"])
         if record.keys() >= _LEGACY_MARKERS:
             legacy_ids.add(record["id"])
+    return seen, links, legacy_ids
+
+
+def _lineage(
+    seen: dict[str, int],
+    links: dict[str, object],
+    legacy_ids: set[str],
+    archived: str,
+    root: Path,
+    lines: dict[int, list[str]],
+    fixes: dict[int, str],
+) -> None:
+    """Add to *lines* and *fixes* a finding for each `caused_by` that names no record or task
+    or closes a loop."""
     known = {
         None,
         "none",
@@ -141,13 +155,28 @@ def findings_for(
             at = links[str(at)]
         if target not in known or at == bug_id:
             why = f"forms a cycle: {' -> '.join(chain)}" if at == bug_id else "names no record"
-            add(seen[bug_id], f"{bug_id!r} caused_by {why}")
+            lines.setdefault(seen[bug_id], []).append(f"{bug_id!r} caused_by {why}")
             bugs = script(Path(__file__).with_name("bugs.py"))
             fixes[seen[bug_id]] = (  # a cycle's wrong link is a judgement; a dangling one is not
                 act("agent", f"decide which of {', '.join(chain)} names the wrong cause and "
                     f"set its caused_by to the real cause's id, or none, through `{bugs.inline('update', specs=root)}` ({_LAW})") if at == bug_id
                 else bugs("update", bug_id, "--set", "caused_by=none", specs=root)
             )  # fmt: skip
+
+
+def findings_for(
+    text: str, rel: str = LEDGER, archived: str = "", root: Path = _ledger.SPECS
+) -> list[dict[str, Any]]:
+    """Every finding the ledger *text* carries — the ONE validation path, run both by
+    ``check`` over the committed file and by every write over its own candidate bytes.
+    Lineage: a `caused_by` names a record of *text* or of the archive text *archived*, or a task
+    a `TASKS.md` under *root*`/releases/` carries, and never loops. An id holds at most one plain
+    record across *text* and *archived*; a pre-v6 event line is not a record."""
+    lines: dict[int, list[str]] = {}
+    fixes: dict[int, str] = {}  # a line a governance verb clears
+    plain, twice = _archive_twice(archived, root)
+    seen, links, legacy_ids = _record_lines(text, plain, lines)
+    _lineage(seen, links, legacy_ids, archived, root, lines, fixes)
     return [
         _findings.finding(CODE, rel, n, "; ".join(m),
                         fixes.get(n) or _ledger.unwritten(root / rel, n, _VERBS, _LAW))

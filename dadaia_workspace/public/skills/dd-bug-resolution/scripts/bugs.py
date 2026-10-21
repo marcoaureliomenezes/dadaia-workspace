@@ -8,6 +8,7 @@ import json
 import sys
 from collections import Counter
 from pathlib import Path
+from typing import Any
 
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -91,30 +92,40 @@ def _ordinal(n: int) -> str:
 def _read(args: argparse.Namespace, specs: Path) -> int:
     records = read_records(specs / LEDGER)
     if args.verb == "stats":
-        print(f"total\t{len(records)}")
-        for label, values in (
-            ("status", [r["status"] for r in records]),
-            ("severity", [r["severity"] for r in records if r.get("severity")]),
-        ):
-            for value, count in sorted(Counter(values).items()):
-                print(f"{label}:{value}\t{count}")
-        past = history(specs)
-        due = {path: list(m) for path, m in wr.by_file(past, specs.parent).items() if len(set(m.values())) > 1}  # fmt: skip
-        for path, ids in due.items():
-            print(f"rebuild-due:{path}\t{','.join(ids)}")
-        if args.closed_after or args.closed_until:
-            closed = [r for r in past if str(r.get("closed_at") or "") > (args.closed_after or "")
-                      and (not args.closed_until or str(r["closed_at"]) <= args.closed_until)]  # fmt: skip
-            shut = {str(r["id"]) for r in closed}
-            print(f"closed\t{len(shut)}")
-            print(f"fix-induced\t{sum(r.get('caused_by') not in (None, 'none') for r in closed)}")
-            print(f"rebuild-due\t{len(shut & {i for v in due.values() for i in v})}")
+        _stats(args, records, specs)
         return 0
     selected = [r for r in records if args.include_closed or r.get("status") == OPEN]
     for record in sorted(selected, key=lambda r: str(r["id"])):
         print(f"{record['id']}\t{record['status']}\t{record.get('severity') or '-'}")
     print(f"[ok] {len(selected)} {'all' if args.include_closed else 'open'} bug(s).")
     return 0
+
+
+def _stats(args: argparse.Namespace, records: list[dict[str, Any]], specs: Path) -> None:
+    print(f"total\t{len(records)}")
+    for label, values in (
+        ("status", [r["status"] for r in records]),
+        ("severity", [r["severity"] for r in records if r.get("severity")]),
+    ):
+        for value, count in sorted(Counter(values).items()):
+            print(f"{label}:{value}\t{count}")
+    past = history(specs)
+    due = {path: list(m) for path, m in wr.by_file(past, specs.parent).items() if len(set(m.values())) > 1}  # fmt: skip
+    for path, ids in due.items():
+        print(f"rebuild-due:{path}\t{','.join(ids)}")
+    if args.closed_after or args.closed_until:
+        _closed_window(past, due, args.closed_after, args.closed_until)
+
+
+def _closed_window(
+    past: list[dict[str, Any]], due: dict[str, list[str]], after: str | None, until: str | None
+) -> None:
+    closed = [r for r in past if str(r.get("closed_at") or "") > (after or "")
+              and (not until or str(r["closed_at"]) <= until)]  # fmt: skip
+    shut = {str(r["id"]) for r in closed}
+    print(f"closed\t{len(shut)}")
+    print(f"fix-induced\t{sum(r.get('caused_by') not in (None, 'none') for r in closed)}")
+    print(f"rebuild-due\t{len(shut & {i for v in due.values() for i in v})}")
 
 
 def _archive(args: argparse.Namespace, specs: Path) -> int:
