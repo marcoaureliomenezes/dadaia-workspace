@@ -994,10 +994,12 @@ _REFUSALS: dict[str, tuple[Case | tuple[Case, ...] | Skip, ...]] = {
         Case(_alive_remote_gone, _cloned, before=_remote_back),
         Case(_alive_no_integration, _cloned, before=_origin_gains_develop),
     ),
-    "service.SpecContextService.baseline": (
+    "service.SpecContextService._publishable_repo": (
         Case(_no_checkout, _cloned),
         Case(_no_identity, _baseline_done, before=_identity),
         Case(_never_onboarded, _baseline_done),
+    ),
+    "service.SpecContextService.baseline": (
         Case(_baseline_denylisted, _baseline_done, before=_drop_draft_term, then=_BASELINE_AGAIN),
     ),
     "service.SpecContextService._refuse_principal_absent": (
@@ -1006,7 +1008,7 @@ _REFUSALS: dict[str, tuple[Case | tuple[Case, ...] | Skip, ...]] = {
     "service.SpecContextService._require_publishable": (
         Case(_secret_draft, _baseline_done, before=_drop_secret),
     ),
-    "service.SpecContextService._dead_preflight": (
+    "service.SpecContextService._refuse_unsafe_repo": (
         (
             Case(_untracked, _dead_done, before=_discard_notes),
             Case(_two_untracked, _dead_done, before=_discard_what_the_fix_names),
@@ -1017,6 +1019,8 @@ _REFUSALS: dict[str, tuple[Case | tuple[Case, ...] | Skip, ...]] = {
             Case(_commits_no_remote, _dead_done, before=_origin),
             Case(_stashed, _dead_done, before=_play_stash_act),
         ),
+    ),
+    "service.SpecContextService._refuse_off_work": (
         (
             Case(_dirty_on_integration, _dead_via_work),
             Case(_associated_on_integration, _associated_dead),
