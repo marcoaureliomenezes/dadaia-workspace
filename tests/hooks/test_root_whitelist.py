@@ -46,9 +46,11 @@ def _ws(tmp_path: Path, registry: str = REGISTRY) -> Path:
     return tmp_path
 
 
-def _run(tmp_path: Path, payload: dict[str, Any]) -> tuple[str, dict[str, Any] | None]:
+def _run(
+    tmp_path: Path, payload: dict[str, Any], *, runtime: str | None = "claude"
+) -> tuple[str, dict[str, Any] | None]:
     """Invoke root_whitelist as a subprocess; return (stdout, parsed block envelope)."""
-    env = claude_hook_env(tmp_path)
+    env = claude_hook_env(tmp_path, extra={"DADAIA_RUNTIME": runtime} if runtime else None)
     result = run_hook_subprocess("root_whitelist", payload, env)
     assert result.returncode == 0, result.stderr
     return result.stdout, result.block_envelope()
@@ -203,3 +205,16 @@ def test_the_gate_judges_creation_only(
 
     (ws / entry).mkdir() if entry.endswith("/") else write_text(ws / entry, "")
     assert _run(tmp_path, payload) == ("", None)
+
+
+def test_a_payload_names_its_subagent_only_under_the_key_its_registry_row_declares(
+    tmp_path: Path,
+) -> None:
+    payload = {
+        "tool_name": "Write",
+        "tool_input": {"file_path": str(tmp_path / "junk.txt")},
+        "agent_type": "dd-sw-engineer-sr",
+    }
+    _out, block = _run(_ws(tmp_path), payload, runtime=None)
+    assert block is not None
+    assert "/.dadaia/tmp/main-thread/" in block["reason"].rsplit("fix: ", 1)[1]

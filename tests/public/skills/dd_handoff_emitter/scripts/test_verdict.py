@@ -1066,3 +1066,16 @@ def test_the_approve_helper_writes_what_verdict_py_writes(tmp_path: Path) -> Non
     assert re.fullmatch(r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ", got["produced_at"])
     assert made.parent == real.parent
     assert re.fullmatch(r"\d{4}-\d\d-\d\dT\d{6}Z-dd-code-reviewer-.+\.handoff\.json", made.name)
+
+
+@pytest.mark.parametrize("flag", [["--verd", "APPROVED"], ["--verdi=APPROVED"]])
+def test_a_prefix_of_the_verdict_flag_is_refused_and_writes_nothing(
+    tmp_path: Path, flag: list[str]
+) -> None:
+    root, tree, head = _workspace(tmp_path)
+    script = root / ".agents/skills" / SKILL / "scripts/verdict.py"
+    argv = [sys.executable, str(script), str(tree), "--sha", head, "--context", "c", "--slug", "s"]
+    refused = os_run([*argv, *flag, "--reason", "r"], cwd=root, input=json.dumps(BODY))
+    assert refused.returncode == 2
+    assert "the following arguments are required: --verdict" in refused.stderr
+    assert _written(root) == []

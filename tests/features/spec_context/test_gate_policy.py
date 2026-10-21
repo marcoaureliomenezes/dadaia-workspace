@@ -185,7 +185,27 @@ def test_a_verdict_run_is_refused_unless_the_harness_names_the_reviewer(
         "python3 .agents/skills/dd-handoff-emitter/scripts/verdict.py --help",
         "cat .agents/skills/dd-handoff-emitter/scripts/verdict.py",
         "git commit -m 'verdict APPROVED'",
+        "git log -p .agents/skills/dd-handoff-emitter/scripts/verdict.py | grep -- --verdict",
+        "grep -n -- --verdict .agents/skills/dd-handoff-emitter/scripts/verdict.py; ls",
+        "echo verdict.py && echo --verdict",
     ],
 )
 def test_a_command_that_writes_no_verdict_is_never_judged(command: str) -> None:
     assert gate_policy.verdict_act(command, key="agent_type", subagent=None) is None
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        _VERDICT_RUN.replace("--verdict APPROVED", "--verdict=APPROVED"),
+        _VERDICT_RUN.replace("verdict.py", "Verdict.py"),
+        _VERDICT_RUN.replace("python3 ", ""),
+        f"cd /t && {_VERDICT_RUN}",
+        f"ls | {_VERDICT_RUN}",
+        f"echo ok; {_VERDICT_RUN}\n",
+    ],
+)
+def test_a_command_that_runs_the_writer_with_the_flag_is_refused_in_any_shell_position(
+    command: str,
+) -> None:
+    assert gate_policy.verdict_act(command, key="agent_type", subagent=None) is not None
