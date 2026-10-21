@@ -1,6 +1,7 @@
 """T3 grader: /workspace onboards file:///srv/demo.git (one ALIVE context, its specs initialized,
-`dadaia doctor` with no error) and the repo's own backlog, or a lane tree's, passes the library's
-backlog check with an active entry. Reads only the verbs and fields the candidate offers."""
+`dadaia doctor` with no error) and the repo's own specs, or a lane tree's, show work entered: a
+backlog that passes the library's check with an active entry, or a release candidate whose SPEC
+passes the library's release check. Reads only the verbs and fields the candidate offers."""
 
 import json
 import subprocess
@@ -11,6 +12,7 @@ URL = "file:///srv/demo.git"
 WORKSPACE = Path("/workspace")
 DADAIA = WORKSPACE / ".dadaia/.venv/bin/dadaia"
 BACKLOG = WORKSPACE / ".agents/skills/dd-backlog-definition/scripts/backlog.py"
+RELEASE = WORKSPACE / ".agents/skills/dd-release-implementation/scripts/release.py"
 
 
 def run(*cmd):
@@ -22,14 +24,19 @@ def dadaia(*args):
     return run(DADAIA, *args, "--json")
 
 
+def clean(script, specs):
+    failed, findings = run(sys.executable, script, "check", "--specs", specs, "--json")
+    return not (failed or findings)
+
+
 def filled(specs):
-    """The backlog under `specs` passes the library's check and holds an active entry."""
-    failed, findings = run(sys.executable, BACKLOG, "check", "--specs", specs, "--json")
-    if failed or findings:
-        return False
-    return bool(
-        json.loads(Path(specs, "backlog/BACKLOG.json").read_text(encoding="utf-8"))["active"]
-    )
+    """The specs tree enters work by an active backlog entry or by a SPEC, each judged by its checker."""
+    if (
+        clean(BACKLOG, specs)
+        and json.loads(Path(specs, "backlog/BACKLOG.json").read_text(encoding="utf-8"))["active"]
+    ):
+        return True
+    return any(Path(specs, "releases").glob("*/rc-*/SPEC.md")) and clean(RELEASE, specs)
 
 
 def problems():
@@ -55,7 +62,7 @@ def problems():
         *(Path(w["path"], "specs") for w in dadaia("worktree", "list")[1] if w["repo"] == repo),
     ]
     if not any(filled(t) for t in trees):
-        errors.append("no valid backlog entry")
+        errors.append("no valid backlog entry or SPEC")
     return errors
 
 

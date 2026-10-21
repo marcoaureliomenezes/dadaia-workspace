@@ -9,7 +9,17 @@ Owner: dd-sw-engineer-sr
 
 import pytest
 
-from tests.helpers.evals import HAND_T3, ONBOARDED_T3, RENAMED_T3, ROOT, SPEC_T3, T3, image, reward, wheel
+from tests.helpers.evals import (
+    HAND_T3,
+    ONBOARDED_T3,
+    RENAMED_T3,
+    ROOT,
+    SPEC_T3,
+    T3,
+    image,
+    reward,
+    wheel,
+)
 from tests.helpers.oslib import run
 
 VERSIONS = ("candidate",)
