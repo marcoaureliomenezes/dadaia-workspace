@@ -1,7 +1,7 @@
 {
   "schema": "release-state-v1",
   "release": "0.5.0",
-  "phase": "CLOSURE",
+  "phase": "DEFINITION",
   "defined": {
     "sha": "c4e6d7782",
     "ts": "2026-10-20T16:02:39Z"
@@ -2475,6 +2475,12 @@
       "agent": "dd-product-engineer",
       "kind": "summary",
       "text": "delivered: rc-21 'prove and ship' (SPEC FR1-FR5, FR7 AC7.1, FR10, FR11) in 5 jobs, all merged at 3da9a1dac: (1) FR1 and FR10 law gaps: dd-gitflow-default §3a rows for a test-change fix, a code revert and a format-only commit, the wt-main archive row, the rc version-label commit in the repo AGENTS.md, block-list item (1) also red when a merge would turn the work branch's CI red, canon digests re-pinned, CHANGELOG pending actions trimmed; (2) FR2 the REBUILD pack, net source 0 (git diff --numstat over the J2 commits, tests and specs excluded: +58 -58): locked_add the one locked re-add, drop_argv the one merged-branch drop behind drop_steps and _worktree_end._remove (which holds the one unmerged refusal), _refusal.said the one child-message parser, the rc number read through candidate_number; (3) FR3 the four deletions, net source -24 (+30 -54): the duplicate judgment-only doctor test, the export AST grep, message_listed, SeveralWorkBranches.text and the already-current schema_version_before, and MEM-DRIFT-1 out of the shipped doctor into the repo guard features-map-matches-architecture; (4) FR7 AC7.1 the PyPI Homepage is https://marco-menezes.com/projetos/dadaia-workspace; (5) FR5 the agentic scorecard: 12 + 2 cells fixed, final round 2 every cell >= 9 from both judges; FR4: the 29 Origin audit findings of 20260930-structural-convergence dispositioned; FR11 ADRs 0277 and 0278 proposed at the define; measured_by repairs of ADRs 0103 and 0113 (864203e8e); memory pass 11 reviewed, 8 changed (6d10dd9dd); carried: mcp-on-main-is-vulnerable-to-session-exhaustion (CRITICAL, Dependabot on main; operator ruling 'Keep: resolve at promote, carried'); backlog exits: promote-gate-050, launch-operator-acts (delivered 0.5.0)"
+    },
+    {
+      "ts": "2026-10-21T00:28:07Z",
+      "agent": "release.py new",
+      "kind": "note",
+      "text": "Candidate born on 0.5.0 (prior candidate closed at 3da9a1dac)"
     }
   ]
 }
