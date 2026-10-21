@@ -15,7 +15,8 @@ import pytest
 from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app
-from dadaia_workspace.core.platform import inline
+from dadaia_workspace.core import platform
+from dadaia_workspace.core.platform import inline, quote
 from dadaia_workspace.infrastructure import python_env as pe
 from tests.helpers import oslib
 from tests.helpers.oslib import read_text, write_text
@@ -103,8 +104,9 @@ def test_init_refuses_meta_and_unknown_harness_values(
         assert read_text(tmp_path / "demo" / "somebody-elses-file.txt") == "keep me"
 
 
+@pytest.mark.parametrize("host", ["linux", "win32"])
 def test_init_foreign_fix_line_names_the_named_folder_for_a_path_with_a_blank(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, host: str
 ) -> None:
     """The printed act is the kernel's spelling of init on the named folder, so a blank stays one argument."""
     proj = tmp_path / "my dir" / "proj"
@@ -112,15 +114,16 @@ def test_init_foreign_fix_line_names_the_named_folder_for_a_path_with_a_blank(
     write_text(proj / "README.md", "mine")
     write_text(proj / "my notes.txt", "mine")
     monkeypatch.chdir(proj)
+    monkeypatch.setattr(platform, "PLATFORM", platform.Capabilities.detect(host))
 
     result = _runner.invoke(app, ["init", ".", "--harness", "claude", "--repo", "https://h/a b.git"])
 
     assert result.exit_code == 1, result.output
-    assert "README.md, 'my notes.txt'" in result.output
+    assert f"README.md, {quote('my notes.txt')}" in result.output
     named = str(proj.resolve())
     again = inline("uvx", "dadaia-workspace", "init", named, "--harness", "claude", "--repo", "https://h/a b.git")
     assert _the_fix(result.output) == (
-        f"Operator action: empty {inline(named)} or name another empty folder for the workspace, then run {again}"
+        f"Operator action: empty {quote(named)} or name another empty folder for the workspace, then run {again}"
     )
 
 
