@@ -42,6 +42,7 @@ from dadaia_workspace.features.specs.citations import (
 )
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from tests.fixtures.stores import context_store
+from tests.helpers.cli_root import live_root
 from tests.helpers.oslib import Undecodable, read_text, write_text
 from tests.helpers.scan_population import assert_populated
 
@@ -282,7 +283,7 @@ _REAL_CHECKS: dict[str, Callable[[], list[Any]]] = {
     ),
     "every-cited-path-exists": lambda: _real_dead_path_citations(),
     "every-cited-dadaia-verb-exists": lambda: dead_verb_citations_in_tree(
-        _PUBLIC, _REPO_ROOT, command_paths()
+        _PUBLIC, _REPO_ROOT, command_paths(live_root())
     ),
     "every-skill-body-pointer-resolves": lambda: dead_body_pointers_in_tree(
         (_SKILLS_DIR, _AGENTS_DIR), _PUBLIC, _REPO_ROOT
@@ -566,7 +567,7 @@ def test_a_planted_dead_citation_turns_red(tmp_path: Path, body: str, token: str
     repo = _fixture_skill(tmp_path, body)
     public = repo / "dadaia_workspace" / "public"
     violations = dead_path_citations_in_tree(public, repo) + dead_verb_citations_in_tree(
-        public, repo, command_paths()
+        public, repo, command_paths(live_root())
     )
     assert len(violations) == 1 and token in violations[0], violations
     assert violations[0].startswith("dadaia_workspace/public/skills/fixture-skill/SKILL.md:1:")
@@ -676,7 +677,7 @@ def _self_invoked_verb_paths() -> list[tuple[str, tuple[str, ...]]]:
 
 def test_every_self_invoked_dadaia_verb_exists() -> None:
     """The longest literal prefix of every argv the package runs resolves to a LEAF verb."""
-    paths = set(command_paths())
+    paths = set(command_paths(live_root()))
     leaves = {p for p in paths if not any(q[: len(p)] == p and len(q) > len(p) for q in paths)}
     invocations = _self_invoked_verb_paths()
     assert invocations, "the AST walk found no self-invoked dadaia argv — mis-rooted scan?"

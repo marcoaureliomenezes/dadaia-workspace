@@ -87,6 +87,7 @@ from tests.fixtures.harness_env import git_bash, run_bash, suite_env
 from tests.fixtures.real_git import PushRepo
 from tests.fixtures.stores import own_venv_python, own_venv_workspace
 from tests.helpers import oslib, worktree_ws
+from tests.helpers.cli_root import live_root
 from tests.helpers.oslib import link, read_text, stub_cli, venv_tool, write_text
 from tests.helpers.oslib import run as os_run
 
@@ -613,7 +614,7 @@ def _clears(
     plant: Callable[[Path], None],
     code: str,
     only: Callable[[str], bool] = bool,
-    then: Callable[[Path], None] = lambda root: None,
+    then: Callable[[Path], None] = lambda *_: None,
 ) -> str:
     """Plants the finding, runs its printed fix, and requires the finding gone with no new error;
     returns the fix line."""
@@ -623,7 +624,9 @@ def _clears(
     assert first, f"{code}: the fixture did not make the rule fire"
     if code == "TREE-3":  # one finding for one fact
         assert [f["code"] for f in before if "memory/QUALITY.md" in f["message"]] == ["TREE-3"]
-    dead = dead_verb_citations(f"`{first['message']}`", rel=code, command_paths=command_paths())
+    dead = dead_verb_citations(
+        f"`{first['message']}`", rel=code, command_paths=command_paths(live_root())
+    )
     assert not dead, f"{code}: the finding cites a verb that does not exist: {dead}"
     done = run_bash(first["fix"], cwd=root, check=False)
     after = _keys(_findings(root))

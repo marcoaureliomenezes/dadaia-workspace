@@ -142,7 +142,9 @@ def _ledgers_section(
 # ── composition ─────────────────────────────────────────────────────────────────
 
 
-def _build_specs_doctor(specs_dir: Path | None, public_dir: str | None) -> SpecsDoctor | None:
+def _build_specs_doctor(
+    specs_dir: Path | None, public_dir: str | None, root: object
+) -> SpecsDoctor | None:
     """A workspace with no specs tree has no specs doctor."""
     if specs_dir is None or state(specs_dir)[0] in NO_TREE:
         return None
@@ -155,7 +157,7 @@ def _build_specs_doctor(specs_dir: Path | None, public_dir: str | None) -> Specs
         repo_root=specs_dir.parent,
         # The Typer walk, done here and handed in as plain data;
         # `features` never imports `cli`.
-        command_paths=command_paths(),
+        command_paths=command_paths(root),
     )
 
 
@@ -257,6 +259,7 @@ def _render_for(workspace_root: Path | None, *, redact: bool) -> Callable[[str],
 
 @app.callback(invoke_without_command=True)
 def doctor(
+    ctx: typer.Context,
     specs_dir: str | None = typer.Option(
         None,
         "--specs-dir",
@@ -304,7 +307,7 @@ def doctor(
 ) -> None:
     """Report workspace, specs and ledger compliance; optionally repair."""
     workspace_root, service, scope, target = _resolve_run(specs_dir, context)
-    specs_doctor = _build_specs_doctor(target, public_dir)
+    specs_doctor = _build_specs_doctor(target, public_dir, ctx.find_root().command)
 
     fixed = _apply_fixes(service, specs_doctor, scope, fix=fix, expired_only=expired_only)
     render = _render_for(workspace_root, redact=redact)

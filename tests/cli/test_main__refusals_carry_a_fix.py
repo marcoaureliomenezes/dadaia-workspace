@@ -209,7 +209,7 @@ def _reconcile_rollback(tmp: Path, monkeypatch: pytest.MonkeyPatch) -> Case:
 
 
 def _digest_unwritable(tmp: Path, monkeypatch: pytest.MonkeyPatch) -> Case:
-    monkeypatch.setattr("dadaia_workspace.cli.help_digest.write_digest", lambda root: None)
+    monkeypatch.setattr("dadaia_workspace.cli.commands.help.write_digest", lambda *_: None)
     return _workspace(tmp), ["help", "tree", "--digest"]
 
 

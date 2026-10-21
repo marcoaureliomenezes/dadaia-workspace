@@ -58,6 +58,7 @@ from tests.features.specs.test_doctor import _make_clean_specs_tree
 from tests.fixtures.harness_env import run_bash, suite_env
 from tests.fixtures.stores import context_store
 from tests.helpers import worktree_ws
+from tests.helpers.cli_root import live_root
 from tests.helpers.oslib import link, read_text, run, write_text
 from tests.helpers.oslib import read_text as os_read_text
 from tests.helpers.oslib import write_text as os_write_text
@@ -227,7 +228,7 @@ def repo(tmp_path: Path, clean_repo: Path) -> Path:
 
 def _doctor(root: Path) -> SpecsDoctor:
     """The specs doctor the CLI builds for *root* (templates, public tree, repo root)."""
-    doctor = _build_specs_doctor(root / "specs", None)
+    doctor = _build_specs_doctor(root / "specs", None, live_root())
     assert doctor is not None
     return doctor
 
@@ -269,7 +270,9 @@ def test_the_fix_line_clears_the_finding_it_was_stamped_on(
         v
         for issue in before
         for line in issue.message.splitlines()
-        for v in dead_verb_citations(f"`{line}`", rel=code, command_paths=command_paths())
+        for v in dead_verb_citations(
+            f"`{line}`", rel=code, command_paths=command_paths(live_root())
+        )
     ]
     assert not dead, f"{code}: the finding cites a verb that does not exist: {dead}"
 

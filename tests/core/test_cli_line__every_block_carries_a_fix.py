@@ -21,6 +21,7 @@ from dadaia_workspace.core.fixed_sections import authored_text
 from dadaia_workspace.core.gitflow import DEFAULT
 from dadaia_workspace.core.skill_owner import load_owner
 from tests.core.test_cli_line__fix_line_contract import fix_defect as _defect
+from tests.helpers.cli_root import live_root
 from tests.helpers.oslib import read_text, run
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -317,7 +318,7 @@ def _code_sites(trees: dict[str, ast.Module]) -> list[str]:
 
     # `ast.walk` once per subtree for this call: the scan re-reads each module and `def`.
     _walk: Callable[[Any], tuple[Any, ...]] = functools.cache(lambda n: tuple(ast.walk(n)))
-    verbs = "|".join(sorted({path[0] for path in command_paths() if path}))
+    verbs = "|".join(sorted({path[0] for path in command_paths(live_root()) if path}))
     instruction = re.compile(rf"(?:['`]|\$\(|\b[Rr]e-?run:? |\b[Rr]un:? |\bwith |\buntil |\bthen )dadaia ({verbs})\b")  # fmt: skip
 
     def fix_params(owners: Any) -> dict[str, int]:

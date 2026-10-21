@@ -8,10 +8,12 @@ import typer
 
 from dadaia_workspace import container
 from dadaia_workspace.cli._fail import fail
+from dadaia_workspace.cli.help_digest import write_digest
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 
 
 def reconcile(
+    ctx: typer.Context,
     expect_version: str = typer.Option(
         ..., "--expect-version", help="Exact installed dadaia-workspace version to certify."
     ),
@@ -24,9 +26,9 @@ def reconcile(
     if json_output:
         typer.echo(json.dumps(payload, sort_keys=True))
     elif result.ok:
-        from dadaia_workspace.cli.help_digest import write_digest
-
-        write_digest(workspace_root)  # derived help digest rider; fail-soft
+        write_digest(
+            workspace_root, ctx.find_root().command
+        )  # derived help digest rider; fail-soft
         typer.echo(f"[ok] reconciled dadaia-workspace {result.actual_version}")
         for step in result.steps:
             typer.echo(f"  [ok] {step}")

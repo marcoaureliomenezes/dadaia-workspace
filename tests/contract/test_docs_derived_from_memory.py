@@ -9,6 +9,7 @@ from pathlib import Path
 from dadaia_workspace.cli.help_digest import command_paths, render_digest
 from dadaia_workspace.core.fixed_sections import authored_text
 from dadaia_workspace.features.specs.citations import dead_citations
+from tests.helpers.cli_root import live_root
 from tests.helpers.oslib import read_text
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -85,7 +86,7 @@ def test_the_cli_reference_is_the_committed_output_of_the_generator() -> None:
     line included; regenerate with `dadaia help tree > docs/cli.md`."""
     committed = read_text(_DOCS_DIR / "cli.md")
 
-    assert committed == render_digest(), (
+    assert committed == render_digest(live_root()), (
         "docs/cli.md drifted from the live command tree — "
         "regenerate: dadaia help tree > docs/cli.md"
     )
@@ -141,7 +142,7 @@ def test_no_derived_document_cites_a_dead_verb_or_path() -> None:
     """The same finders that keep `public/**` and `specs/memory/**` honest: a backticked
     `dadaia <verb>` absent from the live command tree, or a `specs/`/`dadaia_workspace/`/
     `.github/` path absent from the checkout, is dead the day it is written."""
-    paths = command_paths()
+    paths = command_paths(live_root())
     violations = [
         v
         for doc in [*_derived_docs(), _DOCS_DIR / "cli.md"]

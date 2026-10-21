@@ -21,6 +21,7 @@ from dadaia_workspace.features.specs.citations import (
     memory_citation_violations,
 )
 from dadaia_workspace.features.specs.doctor_memory import MemoryValidator
+from tests.helpers.cli_root import live_root
 from tests.helpers.oslib import link, write_text
 
 _TREE: frozenset[tuple[str, ...]] = frozenset({(), ("doctor",), ("context",), ("context", "bind")})
@@ -155,6 +156,8 @@ def test_a_word_after_a_leaf_command_is_its_argument(citation: str, dead: bool) 
 def test_the_live_tree_as_a_plain_set(citation: str, dead: bool) -> None:
     from dadaia_workspace.cli.help_digest import command_paths
 
-    found = dead_verb_citations(f"`{citation}`", rel="x.md", command_paths=set(command_paths()))
+    found = dead_verb_citations(
+        f"`{citation}`", rel="x.md", command_paths=set(command_paths(live_root()))
+    )
 
     assert bool(found) is dead
