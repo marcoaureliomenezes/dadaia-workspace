@@ -46,7 +46,7 @@ _LEDGERS = (Path("dd-bug-resolution/scripts/bugs.py"), Path("dd-backlog-definiti
 _INSTANCE_SKILLS = Path(__file__).resolve().parent.parent.parent
 
 
-def _target(root: Path, path: str) -> tuple[Path, Path, str, str]:
+def target(root: Path, path: str) -> tuple[Path, Path, str, str]:
     """(repo, tree, name, base branch) of `worktrees/<repo>/<name>`; the tree may be gone. Only a
     base that is the work branch reads the gitflow."""
     tree = Path(path).resolve()
@@ -61,7 +61,7 @@ def _target(root: Path, path: str) -> tuple[Path, Path, str, str]:
     return repo, tree, name, base_of(name, work)  # type: ignore[return-value]
 
 
-def _refuse_dirty(tree: Path) -> None:
+def refuse_dirty(tree: Path) -> None:
     if dirty(tree):
         raise Refusal(
             f"{tree} has uncommitted changes",
@@ -74,7 +74,7 @@ def _refuse_dirty(tree: Path) -> None:
         )
 
 
-def _precious(tree: Path) -> list[str]:
+def precious(tree: Path) -> list[str]:
     """The ignored files of *tree* that are not disposable: a tool cache directory or a `*.pyc` is."""
     listing = git(tree, "status", "--porcelain", "-z", "--ignored=matching")
     ignored = [  # -z: a name with a blank arrives verbatim, never C-quoted; matching: one entry per directory
@@ -89,13 +89,13 @@ def _precious(tree: Path) -> list[str]:
 
 def _kept(tree: Path, verb: str, keep: list[str], drop: bool) -> list[str]:
     """The ignored files to copy into the repo; refuses while one is neither kept nor dropped."""
-    precious = _precious(tree)
-    left = [p for p in precious if p not in keep]
+    ignored = precious(tree)
+    left = [p for p in ignored if p not in keep]
     if left and not drop:
         go = partial(inline, *LAUNCH, verb, str(tree))
-        offer = f"keep them with `{go('--keep', *precious)}` or discard them with `{go('--drop')}`"
+        offer = f"keep them with `{go('--keep', *ignored)}` or discard them with `{go('--drop')}`"
         raise Refusal(f"ignored files would be lost: {', '.join(left)}", act("agent", offer))  # fmt: skip
-    return [p for p in precious if p in keep]
+    return [p for p in ignored if p in keep]
 
 
 def _remove(repo: Path, tree: Path, onto: str, name: str, kept: list[str]) -> None:
@@ -104,12 +104,12 @@ def _remove(repo: Path, tree: Path, onto: str, name: str, kept: list[str]) -> No
     if not (drops := drop_argv(into := _parent(repo, onto), branch(name), onto)):
         raise Refusal(f"{branch(name)} is unmerged into {onto}", reattach(repo, tree, name))
     for rel in kept:
-        source, target = tree / rel, into / rel
-        target.parent.mkdir(parents=True, exist_ok=True)
+        source, dest = tree / rel, into / rel
+        dest.parent.mkdir(parents=True, exist_ok=True)
         if source.is_dir():
-            shutil.copytree(source, target, dirs_exist_ok=True)
+            shutil.copytree(source, dest, dirs_exist_ok=True)
         else:
-            shutil.copy2(source, target)
+            shutil.copy2(source, dest)
     held = f"refs/heads/{branch(name)}"  # its upstream remote, when it has one that still holds it
     fields = git(
         into, "for-each-ref", "--format=%(upstream:remotename) %(upstream:track)", held
@@ -126,10 +126,10 @@ def _remove(repo: Path, tree: Path, onto: str, name: str, kept: list[str]) -> No
     git(into, "worktree", *(("remove", str(tree)) if tree.exists() else ("prune",)))
     for argv in drops:
         git(into, *argv)
-    _rmdir(tree, name)
+    rmdir(tree, name)
 
 
-def _rmdir(tree: Path, name: str) -> None:
+def rmdir(tree: Path, name: str) -> None:
     """Drop the folders *tree* leaves empty, its level folders cascading outward; a folder holding
     anything beyond its level file stops the cascade; an empty one is dropped too."""
     home = tree.parents[name.count("/")]
@@ -155,7 +155,7 @@ def _check_specs_only(tree: Path, work: str) -> None:
                           "code lands through a job", _undo(tree, work, rel))  # fmt: skip
 
 
-def _check_ancestor(root: Path, tree: Path, work: str) -> None:
+def check_ancestor(root: Path, tree: Path, work: str) -> None:
     """*work* must be an ancestor of HEAD: `merge` lands HEAD as it is, never rebased."""
     try:
         git(tree, "merge-base", "--is-ancestor", work, "HEAD")
@@ -285,7 +285,7 @@ def _refuse_implementation_tests(tree: Path, onto: str, law: str) -> None:
             )
 
 
-def _open_children(repo: Path, name: str) -> None:
+def open_children(repo: Path, name: str) -> None:
     """A rc or main tree lands only with none of the trees below its folder open."""
     folder = name.rpartition("/")[0] + "/"
     for row in ours(repo):
@@ -413,7 +413,7 @@ def _check_approved(root: Path, tree: Path, work: str, name: str) -> None:
 
 def digest(root: Path, path: str, sha: str) -> str:
     """The binding a verdict carries for *sha* of a worktree, as one JSON object."""
-    _, tree, name, onto = _target(root, path)
+    _, tree, name, onto = target(root, path)
     if git(tree, "rev-parse", "--verify", "--quiet", f"{sha}^{{commit}}", check=False).strip() != sha:  # fmt: skip
         raise Refusal(f"{sha} is not a commit sha of {tree}", act("agent", f"pass a 40-hex commit of {tree}"))  # fmt: skip
     scope = f"{branch(name)}@{git(tree, 'rev-parse', 'HEAD').strip()}"
@@ -435,22 +435,22 @@ def _parent(repo: Path, onto: str) -> Path:
 
 def _kind_checks(root: Path, repo: Path, tree: Path, name: str, onto: str, into: Path) -> list[Callable[[], object]]:  # fmt: skip
     """The ordered checks a tree of this kind must pass to land, before `merge`'s ending checks."""
-    ancestor = partial(_check_ancestor, root, tree, onto)
+    ancestor = partial(check_ancestor, root, tree, onto)
     verdict = partial(_check_approved, root, tree, onto, name)
     job_gate = partial(_gate, tree, onto)
     gate = [ancestor, verdict, job_gate]
     denylist = partial(_refuse_denylisted, root, tree, onto)
-    children, scaffold = partial(_open_children, repo, name), partial(_scaffold, tree, name)
+    children, scaffold = partial(open_children, repo, name), partial(_scaffold, tree, name)
     ledgers, specs = partial(_ledgers, root, repo, tree), partial(_check_specs_only, tree, onto)
-    tests = lambda: _refuse_implementation_tests(tree, onto, _target(root, str(into))[3])  # noqa: E731
+    tests = lambda: _refuse_implementation_tests(tree, onto, target(root, str(into))[3])  # noqa: E731
     table: dict[str | None, list[Callable[[], object]]] = {
-        "task": [ancestor, tests, denylist, partial(_refuse_dirty, into)],
+        "task": [ancestor, tests, denylist, partial(refuse_dirty, into)],
         "main": [children, scaffold, *gate],
         "hotfix": [scaffold, ancestor, denylist, verdict, job_gate],
         "backlog": [specs, ancestor, denylist, verdict, partial(ledgers, lambda rel: [_INSTANCE_SKILLS / rel])],
         "rc": [children, *gate, partial(ledgers, partial(_tracked, tree))],
     }  # fmt: skip
-    return [partial(_refuse_dirty, tree), *table[kind_of(name)]]
+    return [partial(refuse_dirty, tree), *table[kind_of(name)]]
 
 
 def _on_target(into: Path, onto: str) -> None:
@@ -459,11 +459,10 @@ def _on_target(into: Path, onto: str) -> None:
 
 
 def merge(root: Path, path: str, keep: list[str], drop: bool) -> str:
-    repo, tree, name, onto = _target(root, path)
+    repo, tree, name, onto = target(root, path)
     ref = branch(name)
     if not tree.exists() and not git(repo, "branch", "--list", ref).strip():
-        _rmdir(tree, name)
-        return f"nothing left to merge at {tree}"
+        raise Refusal(f"{tree} has no tree and no branch {ref}", command(*LAUNCH, "new", repo.name, name))  # fmt: skip
     into = _parent(repo, onto)
     if not tree.exists():  # only the branch is left
         _on_target(into, onto)
@@ -476,7 +475,7 @@ def merge(root: Path, path: str, keep: list[str], drop: bool) -> str:
     try:
         git(into, "merge", "-q", "--ff-only", ref)
     except RuntimeError as error:
-        _check_ancestor(root, tree, onto)  # moved while merge ran; else a stray the operator owns
+        check_ancestor(root, tree, onto)  # moved while merge ran; else a stray the operator owns
         fix = act("agent", f"commit or remove the paths above in {into}")
         raise Refusal(f"fast-forward failed: {error}", fix) from error
     _remove(repo, tree, onto, name, kept)
@@ -484,7 +483,7 @@ def merge(root: Path, path: str, keep: list[str], drop: bool) -> str:
 
 
 def clean(root: Path, path: str, keep: list[str], drop: bool) -> str:
-    repo, tree, name, onto = _target(root, path)
+    repo, tree, name, onto = target(root, path)
     if not any(Path(row["path"]).resolve() == tree for row in ours(repo)):
         raise Refusal(f"{tree} is not a worktree of ours", command(*LAUNCH, "list"))
     ahead = int(git(repo, "rev-list", "--count", f"{onto}..{branch(name)}"))
@@ -492,6 +491,6 @@ def clean(root: Path, path: str, keep: list[str], drop: bool) -> str:
         merge = inline(*LAUNCH, "merge", str(tree))
         raise Refusal(f"{branch(name)} holds {ahead} unmerged commit(s)",
                       act("agent", f"{_dispatch(tree, 'its HEAD')}, then run `{merge}`"))  # fmt: skip
-    _refuse_dirty(tree)
+    refuse_dirty(tree)
     _remove(repo, tree, onto, name, _kept(tree, "clean", keep, drop))
     return f"cleaned {tree}"

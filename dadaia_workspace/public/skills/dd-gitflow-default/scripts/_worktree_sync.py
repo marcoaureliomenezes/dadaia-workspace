@@ -8,14 +8,14 @@ from collections import deque
 from pathlib import Path
 
 from _platform import act, command, git_inline, inline
-from _worktree_end import _check_ancestor, _refuse_dirty, _target
+from _worktree_end import check_ancestor, refuse_dirty, target
 from _worktree_git import cli_words, flow_for, git, ours
 from _worktree_names import LAUNCH, Refusal, base_of, branch
 
 
 def _cascade(root: Path, path: str) -> list[tuple[Path, str]]:
     """(tree, base) of the tree at *path* then of each open tree whose base chain leads to it."""
-    repo, tree, name, onto = _target(root, path)
+    repo, tree, name, onto = target(root, path)
     if not tree.exists():
         raise Refusal(f"{tree} does not exist", command(*LAUNCH, "list"))
     work = flow_for(root, repo)["work"]
@@ -35,7 +35,7 @@ def _cascade(root: Path, path: str) -> list[tuple[Path, str]]:
 
 def _holds(root: Path, tree: Path, base: str) -> bool:
     try:
-        _check_ancestor(root, tree, base)
+        check_ancestor(root, tree, base)
     except Refusal:
         return False
     return True
@@ -56,7 +56,7 @@ def _fork(tree: Path, key: str, base: str) -> str:
 def sync(root: Path, path: str) -> str:
     order = _cascade(root, path)
     for tree, _ in order:  # a dirty tree stops the cascade before any tree moves
-        _refuse_dirty(tree)
+        refuse_dirty(tree)
     keys = {
         tree: "branch." + git(tree, "symbolic-ref", "--short", "HEAD").strip() for tree, _ in order
     }

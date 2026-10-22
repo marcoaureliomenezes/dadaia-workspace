@@ -47,7 +47,7 @@ v38* infrastructure/projection.py:_clear parity:tests/infrastructure/test_public
 v38* infrastructure/public_assets.py:_prune_empty_dirs parity:tests/infrastructure/test_public_assets__install_ledger_reconciliation.py
 v38* infrastructure/public_assets.py:_reconcile_install_ledger parity:tests/infrastructure/test_public_assets__install_ledger_reconciliation.py
 v38* infrastructure/public_assets.py:stage parity:tests/infrastructure/test_public_assets__staged_assets_have_consumers.py
-v38 public/skills/dd-gitflow-default/scripts/_worktree_end.py:_rmdir parity:tests/public/skills/dd_gitflow_default/scripts/test__worktree_end__removal.py
+v38 public/skills/dd-gitflow-default/scripts/_worktree_end.py:rmdir parity:tests/public/skills/dd_gitflow_default/scripts/test__worktree_end__removal.py
 v38 public/skills/dd-gitflow-default/scripts/_worktree_pause.py:write_bundle parity:tests/public/skills/dd_gitflow_default/scripts/test__worktree_pause.py
 v38 public/skills/dd-gitflow-default/scripts/_worktree_pause.py:resume parity:tests/public/skills/dd_gitflow_default/scripts/test__worktree_pause.py
 v38* public/skills/dd-release-implementation/scripts/_release_new.py:new_release parity:tests/public/skills/dd_release_implementation/scripts/test_release.py
@@ -686,13 +686,13 @@ _PLANTS: dict[str, dict[str, Plant]] = {
         "absent-at-birth": _plant(_born_package_row),
         "skill-row-no-test": _edit(
             SELF,
-            "_worktree_end.py:_rmdir parity:tests/public/skills/dd_gitflow_default/scripts/test__worktree_end__removal.py",
-            "_worktree_end.py:_rmdir zz-open-bug",
+            "_worktree_end.py:rmdir parity:tests/public/skills/dd_gitflow_default/scripts/test__worktree_end__removal.py",
+            "_worktree_end.py:rmdir zz-open-bug",
         ),
         "no-test-file": _edit(
             SELF,
-            "_worktree_end.py:_rmdir parity:tests/public",
-            "_worktree_end.py:_rmdir parity:tests/zz/public",
+            "_worktree_end.py:rmdir parity:tests/public",
+            "_worktree_end.py:rmdir parity:tests/zz/public",
         ),
     },
     "v39": {
