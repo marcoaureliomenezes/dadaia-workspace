@@ -20,7 +20,7 @@ axes are reported side by side with equal weight, so no axis hides another's fin
 1. Inside a dadaia workspace, open `specs/memory/AGENTS.md` (the area's scoped law) and follow it — the diff is
    judged against current product truth.
 2. Reviewing a PR, branch or commit range before the candidate's PR.
-3. An architecture or audit verdict needs the Bug-surface axis (§4).
+3. An architecture or audit verdict needs Axis 3 — Bug-surface.
 
 ## 2. Axis 1 — Standards
 
@@ -35,16 +35,16 @@ axes are reported side by side with equal weight, so no axis hides another's fin
 
 ## 3. Axis 2 — Spec
 
-- Read `<specs-dir>/releases/<v>/rc-<N>/SPEC.md` (`**Status:** Approved`) and the job's `rc-<N>/tasks/job<n>.md`.
+- Read the candidate's SPEC (`**Status:** Approved`) and the unit's job file (`dd-release-definition` §The job file — tasks).
 - Does the diff do what they say — nothing more, nothing less?
 - Scope growth beyond the task's declared write set is a finding, even when the code is good.
-- A shape-11 `docs(law)` commit (`dd-gitflow-default` §3a) outside the job's `W:` is accepted only when its body cites the finding and names the file.
+- A shape-11 `docs(law)` commit (`dd-gitflow-default` §Commit shapes — each write in its own shape) outside the job's `W:` is accepted only when its body cites the finding and names the file.
 - Acceptance criteria without corresponding evidence (test/assertion) is a finding.
-- Read `rc-<N>/PLAN.md` §1 (As-is review) beside the SPEC and job files: a DELETE or REBUILD unit the range leaves unchanged is HIGH.
+- Read the PLAN's As-is review beside the SPEC and job files: a DELETE or REBUILD unit the range leaves unchanged is HIGH.
 - A KEEP unit the range grew is a finding.
-- A SPEC, PLAN or job file breaking the root map §1 gate-cost clause is REJECTED.
-- A worktree's (`worktrees/AGENTS.md`) commits follow the `dd-gitflow-default` §3a rows of what they write.
-- The reviewer of a `wt-rc` tree (its define commits) judges each job-file `who` column against the shape rule in `.agents/skills/dd-release-definition/SKILL.md` §5.
+- A SPEC, PLAN or job file breaking the root map §The flow gate-cost clause is REJECTED.
+- A worktree's (`worktrees/AGENTS.md`) commits follow the commit-shape rows of `dd-gitflow-default` §Commit shapes — each write in its own shape.
+- The reviewer of a `wt-rc` tree (its define commits) judges each job-file `who` column against the shape rule in `.agents/skills/dd-release-definition/SKILL.md` §The job file — tasks.
 
 ## 4. Axis 3 — Bug-surface
 
@@ -53,13 +53,13 @@ axes are reported side by side with equal weight, so no axis hides another's fin
 - The operator's rule applied as a review axis: a diff that GROWS the feature is a stop —
   a branch, flag, special case, second code path or cross-feature reach-in added by a fix
   is a layer; name it and recommend the replace-don't-layer shape instead.
-- A fix whose `caused_by` names a commit: inspect it (LINEAGE §Read persisted facts); a `fix(bugs)` label where `specs/bugs/AGENTS.md` §2 requires a REBUILD is REJECTED.
+- A fix whose `caused_by` is not `none` names a bug or task: inspect the fix of that bug or task (LINEAGE §Read persisted facts); a `fix(bugs)` label where `specs/bugs/AGENTS.md` §Resolution requires a REBUILD is REJECTED.
 
 ## 4a. The root-cause and approval bars
 
 - A fix qualifies only when it reproduces the failure on the executed path, tests for the real reason, fixes the cause and proves it green — a workaround or symptom patch is a finding.
-- The verdict is the enum `APPROVED`/`REJECTED`: on a worktree, written by `verdict.py` (`worktrees/AGENTS.md` §2); on a PR, returned as text the main thread quotes (`dd-gitflow-default` §3b).
-- The first review of a fix sweeps the fixed pattern across the context's repos and states the grep with its hit count; a net-positive fix states its reason, else it is a finding; a verdict whose evidence lacks the implementer's run of the tests the change reaches (`dd-release-implementation` §3) is REJECTED.
+- The verdict is the enum `APPROVED`/`REJECTED`: on a worktree per `worktrees/AGENTS.md` §Merges, gates, review; on a PR per `dd-gitflow-default` §The PR gate.
+- The first review of a fix sweeps the fixed pattern across the context's repos and states the grep with its hit count; a net-positive fix states its reason, else it is a finding; a verdict whose evidence lacks the implementer's run of the tests the change reaches (`dd-release-implementation` §Done when) is REJECTED.
 - A green internal gate that diverges from real consumer behavior is itself a bug.
 - A reviewer probe runs in scratch only: a copy of the context, with the live workspace root listed in `DADAIA_FENCED_ROOTS`; an explicit `--specs` path bypasses that fence, so every explicit path must point into the copy; never `doctor --fix`. A probe that reaches the live workspace is a finding.
 
@@ -73,9 +73,9 @@ axes are reported side by side with equal weight, so no axis hides another's fin
 
 One reviewer, six checklists applied on every verdict; the engineer anticipates them.
 
-- **Architecture** — root cause named; the diff shrinks or keeps the feature; per PLAN §1.1 row, every `deleted` gone and every `consults` calls the authority (S4/S5/S10); a duplicated decider is flagged on the first pass; no component imports another's internals or forms a cycle, it reaches the other by running its entry point.
+- **Architecture** — root cause named; the diff shrinks or keeps the feature; per the PLAN's Authorities row, every `deleted` gone and every `consults` calls the authority (S4/S5/S10); a duplicated decider is flagged on the first pass; no component imports another's internals or forms a cycle, it reaches the other by running its entry point.
 - **Security** — OWASP top 10, secrets, dependency CVEs (the ecosystem's dependency audit), CWE id per finding.
-- **QA** — every acceptance scenario has evidence; the pyramid holds; tests keep the root map §1 basics; a deleted test, or a removed or skipped assert, is HIGH, REJECTED, unless the operator ordered it (root map §1); a loosened assert, or a fix without its revert-check evidence, is HIGH, verdict REJECTED; the `SLOP.md` S3 signals are QA-lens items.
+- **QA** — every acceptance scenario has evidence; the pyramid holds; tests keep the root map §The flow basics; a deleted test, or a removed or skipped assert, is HIGH, REJECTED, unless the operator ordered it (root map §The flow); a loosened assert, or a fix without its revert-check evidence, is HIGH, verdict REJECTED; the `SLOP.md` S3 signals are QA-lens items.
 - **QA, platform and claims** — the diff holds on Windows, platform facts read from one module; each negative claim in a verdict carries its grep and hit count; a new assert holds no platform literal and a child process copies the parent's env; the verdict names its platform proof.
 - **QA, visual and format** — a visual change is judged by the implementer's screenshot, framed on the reported symptom and taken after a server restart and a cache clear, which the reviewer checks against each layer that renders there; a changed grammar, format, stamp, fix line or public name is grepped across every repo of the context, and each consumer it breaks is HIGH.
 - **Product** — the diff matches SPEC scope; memory atoms still tell the truth (`.agents/skills/dd-release-implementation/MEMORY-UPDATE.md`).

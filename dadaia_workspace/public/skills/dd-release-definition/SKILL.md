@@ -2,7 +2,7 @@
 name: dd-release-definition
 description: >
   Define the live release's next closed-scope candidate from bugs, backlog items and audit findings:
-  pick the set, the As-is review (PLAN §1), the SPEC, the PLAN's job DAG and the rc-<N>/tasks/job<n>.md
+  pick the set, the As-is review, the SPEC, the PLAN's job DAG and the rc-<N>/tasks/job<n>.md
   job files. Use when drafting a candidate in its `wt-rc` or writing its SPEC, PLAN or a job file.
   The grill is the main thread's dd-grill-me; implementing tasks is dd-release-implementation's.
 ---
@@ -17,20 +17,20 @@ description: >
 2. Inspect `specs/bugs/BUGS.jsonl` via `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py status`/`stats`, each with `--specs <specs-dir>`; read the prior candidate's `## Bug window review` and the ledger slice of `.agents/skills/dd-bug-resolution/LINEAGE.md` §The window and §The filter.
 3. Read `specs/backlog/BACKLOG.json`'s `active[]`; audit each entry before scheduling it (gain, cost, trade-offs, product fit, no new gate, no layer on an existing feature) and take open doubts to the grill.
 4. Each undispositioned `specs/audits/**` finding enters the SPEC's Origin as `findings:<id>`.
-5. Name the SPEC's `**Origin:**` per `specs/releases/AGENTS.md` §2.
+5. Name the SPEC's `**Origin:**` per `specs/releases/AGENTS.md` §Authoring rules.
 6. Write the SPEC's `## Bug window review`: list the resolved bugs' ids in `<specs-dir>/bugs/BUGS.jsonl`, find and inspect each fix as `dd-bug-resolution/LINEAGE.md` §Read persisted facts says, and compare that fix against the overfitting patterns — an assert or test the fix changed; a special case on a test value; a new branch, flag or second path; a reach into another feature; deleted functionality.
-7. Give each fix KEEP or REBUILD; a fix judged REBUILD is a confirmed bug of that fix: it is registered (Arm B) and rebuilt in its own lane under `specs/bugs/AGENTS.md` §2, never a task of the next rc's Job 1. The section schedules no work.
+7. Give each fix KEEP or REBUILD; a fix judged REBUILD is proposed as a bug (Arm B, `specs/bugs/AGENTS.md` §What a bug is); once the operator confirms it, it is rebuilt in its own lane under `specs/bugs/AGENTS.md` §Resolution. The window review judges and never schedules.
 
 ## 2. As-is review
 
 - `dd-sw-engineer-sr` runs it read-only, dispatched after the pick and before the grill.
 - The pick ranks its set into waves: law, skills and dev loop; shared foundation; features and bugs; promote-facing.
-- Read every unit the picked set touches and its ledger slice (its history per `dd-bug-resolution/LINEAGE.md` §The filter); the table rides the handoff into the grill and lands as PLAN §1.
-- One row per touched unit, columns `unit | today | bugs | verdict | why`; DELETE vs KEEP is the deletion test (`dd-code-review` SLOP.md); a duplicated decider lists every copy with `path:line`, and a repro where the copies diverge; verdicts follow the root map §1 work order, ADD only for what no unit can carry (`today` `—`, `why` says why).
-- REBUILD is mandatory when `bugs.py` reports it due (`dd-bug-resolution/LINEAGE.md` §The filter), the demand changes its fundamental behaviour, the change would need a flag, branch, special case or second path, or its contract contradicts the demand; the engineer and the reviewer judge these triggers.
-- §1.1 Authorities: one row per touched question, one authority each; `consults` call it, `deleted` leave with the row's bug.
+- Read every unit the picked set touches and its ledger slice (its history per `dd-bug-resolution/LINEAGE.md` §The filter); the table rides the handoff into the grill and lands as the PLAN's As-is review.
+- One row per touched unit, columns `unit | today | bugs | verdict | why`; DELETE vs KEEP is the deletion test (`dd-code-review` SLOP.md); a duplicated decider lists every copy with `path:line`, and a repro where the copies diverge; verdicts follow the root map §The flow work order, ADD only for what no unit can carry (`today` `—`, `why` says why).
+- REBUILD is mandatory when `bugs.py` reports it due (`dd-bug-resolution/LINEAGE.md` §The filter), the demand changes its fundamental behaviour, the change would need a layer (`dd-code-review` SLOP.md S5), or its contract contradicts the demand; the engineer and the reviewer judge these triggers.
+- Authorities: one row per touched question, one authority each; `consults` call it, `deleted` leave with the row's bug.
 - A row that REBUILDs or DELETEs a grammar, format, public name or fix line names its consumers; a read-only `dd-researcher` pre-mortem precedes the SPEC approval and the PLAN answers each hit.
-- The PLAN §1 skeleton:
+- The As-is review skeleton:
 
 ```markdown
 ## 1. As-is review
@@ -59,9 +59,9 @@ Before the SPEC or any ADR, the main thread runs `dd-grill-me` on the picked set
 ## 4. Author the SPEC, PLAN and job files
 
 1. Author the SPEC (Draft) after the grill: the picked set, its acceptance, every `superseded_by` link.
-2. Definition runs in the rc's `wt-rc` tree, its first commits (`worktrees/AGENTS.md` §1); the files' place is the releases law's.
-3. Commit shape 5 (`dd-gitflow-default` §3a); after the operator approves SPEC and PLAN, `release.py phase IMPLEMENTATION --sha <sha>` sets `defined` (`dd-release-implementation`'s `RELEASE-EVENTS.md`).
-4. SPEC states the pick's wave ranking unprompted; SPEC says what; PLAN opens with §1 As-is review (§2) and draws the rc's DAG of jobs — Job 1 first (the reconcile is the `wt-rc`'s last commits, `dd-release-implementation`'s `RC-FLOW.md` step 4), an edge where one job needs another's merge; SPEC carries `Replaces` — one bullet per current behaviour a DELETE/REBUILD row removes, or `none` with its reason.
+2. Definition runs in the rc's `wt-rc` tree, its first commits (`worktrees/AGENTS.md` §The tree); the files' place is the releases law's.
+3. Commit shape 5 (`dd-gitflow-default` §Commit shapes — each write in its own shape); after the operator approves SPEC and PLAN, `release.py phase IMPLEMENTATION --sha <sha>` sets `defined` (`dd-release-implementation`'s `RELEASE-EVENTS.md`).
+4. SPEC states the pick's wave ranking unprompted; SPEC says what; PLAN opens with the As-is review (this skill's As-is review) and draws the rc's DAG of jobs — Job 1 first (the reconcile is the `wt-rc`'s last commits, `dd-release-implementation`'s `RC-FLOW.md` step 4), an edge where one job needs another's merge; SPEC carries `Replaces` — one bullet per current behaviour a DELETE/REBUILD row removes, or `none` with its reason.
 5. SPEC in the repo's existing domain names; only FR, AC and `J<n>.T<k>` numbered; each AC names its test level (unit, integration, E2E, or no test with its reason); sizes per the releases law.
 6. After the PLAN, only for a technical decision past the threshold, run `dd-grill-me` with its `references/plan.md`.
 
@@ -70,7 +70,7 @@ Before the SPEC or any ADR, the main thread runs `dd-grill-me` on the picked set
 - One file per job, `rc-<N>/tasks/job<n>.md`, its PLAN DAG row `Job <n>`, which names the job's wave and complete `W:` set.
 - Every job file carries a task table. Each task has id `J<n>.T<k>`, `who`, its AC, exact `W:`, owner test file and RED tests; one owner, one session (~1 h), ~100 new code lines.
 - `who` names the dispatched role: `sr` or `jr`; `pe` or `cr` for a task another persona owns. `jr`: the outcome is fully stated by its AC and `W:`; `sr`: new behaviour, design choice, root cause, RED test of a new contract, PLAN, job files, as-is review.
-- A behavior is two tasks, its RED test then its implementation, each its own dispatch and `wt-task-<kkk>` tree (`worktrees/AGENTS.md` §1).
+- A behavior is two tasks, its RED test then its implementation, each its own dispatch and `wt-task-<kkk>` tree (`worktrees/AGENTS.md` §The tree).
 - A task is `running` while its task worktree exists. A cancelled task keeps its row and reason.
 - DELETE/REBUILD tasks precede ADD tasks; a task with no statable AC is folded, or goes back to the SPEC.
 
@@ -90,9 +90,9 @@ Before the SPEC or any ADR, the main thread runs `dd-grill-me` on the picked set
 ## 7. Done when
 
 - Picked set recorded; the `dd-grill-me` session completed and emitted.
-- PLAN §1 gives every touched unit one verdict and every touched question one §1.1 authority; SPEC authored from the refined set, `Replaces` present, `**Origin:**` declared.
+- The As-is review gives every touched unit one verdict and every touched question one Authorities row; SPEC authored from the refined set, `Replaces` present, `**Origin:**` declared.
 - Every approved requirement maps into the PLAN's DAG and >=1 job-file task.
-- `python3 .agents/skills/dd-release-implementation/scripts/release.py check --specs <specs-dir>` exits 0 (Origin line, DAG, wave `W:` overlaps, each DAG `W:` equal to its job-file union).
+- `python3 .agents/skills/dd-release-implementation/scripts/release.py check --specs <specs-dir>` exits 0.
 - Every unresolved gap rides the handoff to the main thread's operator-gated intake, the backlog's one entry path.
 
 ## 8. References
