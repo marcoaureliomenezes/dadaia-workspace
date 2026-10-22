@@ -14,19 +14,11 @@ from typing import Any
 
 import _clock
 import _git
-from _grammar import SHA_RE, STATE
+from _grammar import APPROVED, SHA_RE, STATE, extract_status
 from _platform import act, command, read_text, run
 from _refusal import Refusal, fix_of
 from _release_check import candidate_errors
-from _release_schema import (
-    APPROVED,
-    CANDIDATE_DOCS,
-    CLOSURE,
-    DEFINITION,
-    IMPLEMENTATION,
-    PHASES,
-    extract_status,
-)
+from _release_schema import CANDIDATE_DOCS, CLOSURE, DEFINITION, IMPLEMENTATION, PHASES
 from _release_store import SCRIPT, Live, State, at_head, commit, live_release
 from _specs import choice
 

@@ -33,6 +33,7 @@ from dadaia_workspace.core.gitflow import (  # noqa: E402
 )
 from dadaia_workspace.core.specs_version import state as specs_state  # noqa: E402
 from dadaia_workspace.features.specs.canon import CANON  # noqa: E402
+from dadaia_workspace.features.specs.memory_canon import is_forbidden_memory_heading  # noqa: E402
 from dadaia_workspace.infrastructure.ledger_scripts import load_owner  # noqa: E402
 
 if TYPE_CHECKING:
@@ -63,13 +64,12 @@ _SKILLS_REPO = re.compile(
 # Both dated release headings: hand-written `## [x.y.z] — date`, release-please's `(date)`.
 # the one poetry floor: GHSA-2599-h6xx-hpxp (wheel path traversal), GHSA-73h3-mf4w-8647
 _POETRY_FLOOR = (2, 3, 4)
-# a pin (literal or f-string), tag, range or bare name after install/download/add/--from/--with, as
-# a shell word or an argv item; out of reach: a flag between the verb and the name, `dadaia_workspace`.
-# `uvx dadaia-workspace init` and `--from <path>` stay legal
-_PUBLISHED = (
-    r"dadaia-workspace(==[0-9${]|@|[<>~]=)|(install|download|add|--from|--with)[ ='\",]+dadaia-workspace([^-/._[:alnum:]]|$)"
-    r"|previous_release"
-)
+# the name under PEP 503 normalisation, pinned (`==`, `@`, a range) or named after
+# install/download/add/--from/--with (flags between allowed); `uvx dadaia-workspace init`,
+# `--from <path>` and the import name stay legal
+_NAME_TOKEN = re.compile(r"[A-Za-z0-9][\w.-]*")
+_SPECIFIER = re.compile(r"==[0-9${]|@|[<>~!]=?")
+_AFTER_VERB = re.compile(r"(?:install|download|add|--from|--with)(?:[ ='\",]+-\S+)*[ ='\",]+$")
 _POETRY_PIN = re.compile(r"poetry==(\d+(?:\.\d+)*)")
 _CHANGELOG_TOP = re.compile(
     r"^## \[(\d+\.\d+\.\d+)\](?:\([^)]*\))? (?:[-—] \d{4}-\d{2}-\d{2}|\(\d{4}-\d{2}-\d{2}\))\s*$",
@@ -392,28 +392,32 @@ def workflow_never_rules(tree: Tree) -> list[str]:
         "hand-computed-tag": [line for line in release_runs if "git tag " in line],
         "hand-listed-tags": [line for line in release_runs if "git ls-remote --tags" in line],
         # only the build under test is installed; third-party dependencies still resolve from PyPI
-        "published-dadaia-workspace-install": subprocess.run(
-            [
-                "git",
-                "grep",
-                "-nIE",
-                _PUBLISHED,
-                "--",
-                ".github",
-                "tests",
-                "evals",
-                "scripts",
-                ":!scripts/guards/repo.py",
-            ],
-            cwd=tree.root,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            check=False,
-        ).stdout.splitlines(),  # fmt: skip
+        "published-dadaia-workspace-install": _published_installs(tree.root),
     }
     return [f"{rule}: {hits}" for rule, hits in never.items() if hits]
+
+
+def _published_installs(root: Path) -> list[str]:
+    """``file:line: text`` of every line that installs the published package or names a previous release."""
+    candidates = subprocess.run(
+        ["git", "grep", "-nIiE", r"dadaia[-_.]+workspace|previous_release", "--",
+         ".github", "tests", "evals", "scripts", ":!scripts/guards/repo.py"],
+        cwd=root, capture_output=True, text=True, encoding="utf-8", errors="replace", check=False,
+    ).stdout.splitlines()  # fmt: skip
+
+    def hit(line: str) -> bool:
+        if "previous_release" in line:
+            return True
+        for m in _NAME_TOKEN.finditer(line):
+            if re.sub(r"[-_.]+", "-", m.group()).lower() != "dadaia-workspace":
+                continue
+            if line[m.end() : m.end() + 1] == "/":
+                continue
+            if _SPECIFIER.match(line, m.end()) or _AFTER_VERB.search(line[: m.start()]):
+                return True
+        return False
+
+    return [c for c in candidates if hit(c.split(":", 2)[2])]
 
 
 def release_workflow_canon(tree: Tree) -> list[str]:
@@ -526,7 +530,7 @@ _SECTIONS = {
     "QUALITY.md": (["Principles", "Test architecture", "Gates"], "slop-tests"),
 }
 _TOP = re.compile(r"^## (.+?)\s*$", re.M)
-_HISTORY = re.compile(r"^#{1,6}\s*(Changelog|History|Hist[oó]rico|Versions)\b", re.M | re.I)
+_HEADING = re.compile(r"^#{1,6}\s*(.+?)\s*$", re.M)
 _PRINCIPLE = re.compile(r"^### P-(\d{2}) ·.*$", re.M)
 _BLOCK_END = re.compile(r"^(?:### P-\d{2} ·|## )", re.M)
 _MEASURED = re.compile(r"^Measured by: .+$", re.M)
@@ -552,7 +556,9 @@ def memory_canonical_shape(tree: Tree) -> list[str]:
             out.append(f"section-order: {name} has {heads}")
         if not extract_fixed_section(text, fixed):
             out.append(f"fixed-block: {name} lost `{fixed}`")
-        if m := _HISTORY.search(text):
+        if m := next(
+            (m for m in _HEADING.finditer(text) if is_forbidden_memory_heading(m[1])), None
+        ):
             out.append(f"history-heading: {name} carries {m.group(0)!r}")
         start = text.find("## Principles")
         end = (

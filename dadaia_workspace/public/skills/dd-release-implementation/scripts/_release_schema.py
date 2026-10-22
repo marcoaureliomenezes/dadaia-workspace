@@ -11,7 +11,15 @@ from pathlib import Path
 from typing import Any
 
 import _git
-from _grammar import STATE, STATUS_RE, TASK_ID_RE, candidate_dir, candidate_number, sole_live
+from _grammar import (
+    APPROVED,
+    STATE,
+    TASK_ID_RE,
+    candidate_dir,
+    candidate_number,
+    extract_status,
+    sole_live,
+)
 from _ledger import load_schema
 from _platform import act, read_text
 
@@ -29,7 +37,6 @@ TRIO_PHASES = frozenset(PHASES[1:])
 MEMORY_WRITE = "writes specs/memory"
 #: A release ships `delivered` — the one histo disposition this ledger writes.
 DELIVERED = "delivered"
-APPROVED = "Approved"
 #: The Origin clause kinds, each at most once on the line.
 ORIGIN_KINDS = ("backlog", "bugs", "findings")
 _ORIGIN_RE = re.compile(r"^\*\*Origin:\*\*[ \t]*(.*?)[ \t]*$", re.MULTILINE)
@@ -55,12 +62,6 @@ def closure_summary(state: dict[str, Any]) -> dict[str, str]:
             fields = found.groupdict() if found else {}
             return {name: "" if text == "none" else text for name, text in fields.items()}
     return {}
-
-
-def extract_status(text: str) -> str | None:
-    """The ``**Status:**`` token a SPEC, PLAN or job document carries, or ``None``."""
-    match = STATUS_RE.search(text)
-    return match.group(1) if match else None
 
 
 class ShallowClone(ValueError):
