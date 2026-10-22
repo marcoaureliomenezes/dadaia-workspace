@@ -1761,3 +1761,36 @@ def test_resolve_takes_a_bare_task_id_only_one_candidate_carries(
     done = _run(script, *_resolve_argv(caused_by="J2.T1"), "--specs", str(specs))
     assert done.returncode == 0, done.stderr
     assert _records(specs)[0]["caused_by"] == "J2.T1"
+
+
+def test_resolve_takes_the_candidate_qualified_form_of_an_ambiguous_task_id(
+    script: Path, tmp_path: Path
+) -> None:
+    specs = _ledger(tmp_path, _OPEN_RECORD)
+    _two_candidates(specs)
+    _fix_commit(tmp_path, "cli/x.py", _FIXED)
+    done = _run(script, *_resolve_argv(caused_by="0.5.0-rc9/J1.T3"), "--specs", str(specs))
+    assert done.returncode == 0, done.stderr
+    assert _records(specs)[0]["caused_by"] == "0.5.0-rc9/J1.T3"
+    assert _run(script, "check", "--specs", str(specs)).returncode == 0
+
+
+def test_a_bare_ambiguous_task_id_already_in_a_ledger_still_passes_check(
+    script: Path, tmp_path: Path
+) -> None:
+    specs = _ledger(tmp_path, {**_OPEN_RECORD, "caused_by": "J1.T3"})
+    _two_candidates(specs)
+    assert _run(script, "check", "--specs", str(specs)).returncode == 0
+
+
+def test_open_ids_and_standing_read_the_live_ledger_and_the_archive(tmp_path: Path) -> None:
+    store = load_owner("dd-bug-resolution", "_bugs_store")
+    rejected = {**_OPEN_RECORD, "id": "r-bug", "status": "rejected", "closed_at": "2026-09-21"}
+    legacy = {**_closed("old"), "resolved_release": "0.4.0"}
+    specs = _ledger(tmp_path, _OPEN_RECORD, rejected, {**_OPEN_RECORD, "id": "s", "superseded_by": "old"})
+    _archived(specs, legacy)
+    assert store.open_ids(specs) == ["a-bug", "s"]
+    got = [store.standing(specs, i, "0.4.0") for i in ("a-bug", "r-bug", "old", "s", "nope")]
+    assert got[:4] == ["untraced", "traced", "traced", "traced"]
+    assert got[4].startswith("names no record")
+    assert store.standing(specs, "old", "0.5.0") == "untraced"
