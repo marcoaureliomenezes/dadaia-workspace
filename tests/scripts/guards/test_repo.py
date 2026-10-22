@@ -54,7 +54,9 @@ def test_the_published_install_rule_catches_every_spelling_of_the_name(
     monkeypatch: pytest.MonkeyPatch, line: str
 ) -> None:
     run, repo = _guards(monkeypatch)
-    found = run._judge([], repo.release_workflow_canon, repo._file("tests/helpers/pin.py", line))
+    found = run._judge(
+        [], repo.CHECKS["workflow-never-rules"][0], repo._file("tests/helpers/pin.py", line)
+    )
     assert [v for v in found if v.startswith("published-dadaia-workspace-install:")]
 
 
@@ -66,7 +68,9 @@ def test_the_published_install_rule_leaves_the_import_name_and_a_local_build(
     text = (
         f"import {_SNAKE}\nCMD = 'python -m {_SNAKE}.cli'\nW = 'uvx --from ./dist/x.whl dadaia'\n"
     )
-    found = run._judge([], repo.release_workflow_canon, repo._file("tests/helpers/pin.py", text))
+    found = run._judge(
+        [], repo.CHECKS["workflow-never-rules"][0], repo._file("tests/helpers/pin.py", text)
+    )
     assert [v for v in found if v.startswith("published-dadaia-workspace-install:")] == []
 
 
