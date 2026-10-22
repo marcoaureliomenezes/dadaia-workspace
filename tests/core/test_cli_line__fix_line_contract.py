@@ -630,6 +630,8 @@ def _clears(
     )
     assert not dead, f"{code}: the finding cites a verb that does not exist: {dead}"
     done = run_bash(first["fix"], cwd=root, check=False)
+    _tree_git(root, "add", "-A")  # the gates and GITFLOW-1 read what is committed
+    _tree_git(root, "commit", "-qm", "fix", "--allow-empty")
     after = _keys(_findings(root))
     assert (first["code"], first["message"], first["verdict"] == "error") not in after, (
         f"{code}: survives\n{first['fix']}\n{done.stderr}"
