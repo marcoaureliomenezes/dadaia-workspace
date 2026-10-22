@@ -17,7 +17,7 @@ release state.
 | Kind | Writer | Completion criterion |
 |---|---|---|
 | `note` | `release.py new`, or the agent recording an operator authorization verbatim | The entry holds one fact that belongs to no typed entry. |
-| `milestone` | `release.py phase` | `{candidate, milestone, sha}` matches the transition. |
+| `milestone` | `release.py phase` | `{candidate, milestone}` matches the transition. |
 | `summary` | `dd-product-engineer`, Read-then-Edit | `release.py check` fullmatches its text, one line, against `delivered: …; carried: …; backlog exits: …`; each field is non-empty, `none` standing for an empty one. The last one at or after `defined.ts` is the closure summary. |
 | `memory` | `release.py memory` | The latest `memory` entry governs and carries `{since, until, reviewed, changed}`. |
 
@@ -36,6 +36,6 @@ A milestone or memory-window bound is found from its commit subject line, as a f
 | Milestone | Command | Written shape |
 |---|---|---|
 | candidate birth | `release.py new <id>` | `phase: DEFINITION` plus a `note` |
-| definition | `release.py phase IMPLEMENTATION --sha <sha>` | `defined: {sha, ts}` plus a `milestone` |
-| implementation | `release.py phase CLOSURE --sha <sha>` | `implemented: {sha, ts}` plus a `milestone` |
-| ship | `release.py ship --sha <sha> [--pr <n>]` | `shipped: {sha, pr, ts}`, then archive |
+| definition | `release.py phase IMPLEMENTATION` | `defined: {ts}` plus a `milestone` |
+| implementation | `release.py phase CLOSURE` | `implemented: {ts}` plus a `milestone` |
+| ship | `release.py ship [--pr <n>]` | `shipped: {pr, ts}`, then archive |

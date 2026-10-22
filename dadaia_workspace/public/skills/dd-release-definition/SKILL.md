@@ -60,7 +60,7 @@ Before the SPEC or any ADR, the main thread runs `dd-grill-me` on the picked set
 
 1. Author the SPEC (Draft) after the grill: the picked set, its acceptance, every `superseded_by` link.
 2. Definition runs in the rc's `wt-rc` tree, its first commits (`worktrees/AGENTS.md` §The tree); the files' place is the releases law's.
-3. Commit shape 5 (`dd-gitflow-default` §Commit shapes — each write in its own shape); after the operator approves SPEC and PLAN, `release.py phase IMPLEMENTATION --sha <sha>` sets `defined` (`dd-release-implementation`'s `RELEASE-EVENTS.md`).
+3. Commit shape 5 (`dd-gitflow-default` §Commit shapes — each write in its own shape); after the operator approves SPEC and PLAN, `release.py phase IMPLEMENTATION` sets `defined` (`dd-release-implementation`'s `RELEASE-EVENTS.md`).
 4. SPEC states the pick's wave ranking unprompted; SPEC says what; PLAN opens with the As-is review (this skill's As-is review) and draws the rc's DAG of jobs — Job 1 first (the reconcile is the `wt-rc`'s last commits, `dd-release-implementation`'s `RC-FLOW.md` step 4), an edge where one job needs another's merge; SPEC carries `Replaces` — one bullet per current behaviour a DELETE/REBUILD row removes, or `none` with its reason.
 5. SPEC in the repo's existing domain names; only FR, AC and `J<n>.T<k>` numbered; each AC names its test level (unit, integration, E2E, or no test with its reason); sizes per the releases law.
 6. After the PLAN, only for a technical decision past the threshold, run `dd-grill-me` with its `references/plan.md`.
