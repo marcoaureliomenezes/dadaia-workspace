@@ -419,8 +419,23 @@ def _denylisted(world: World) -> str:
     return "git push -q origin feature/1.0.0"
 
 
-def _drop_term(world: World) -> None:
+def _reword(world: World, repo: Path, base: str, *paths: str) -> None:
+    """The hand reword a refusal's Agent action names, as the fixture models the agent: the
+    unpublished range since *base* becomes one commit holding the edited *paths*."""
+    world.git(repo, "reset", "-q", "--soft", base)
+    if paths:
+        world.git(repo, "add", *paths)
+    world.git(repo, "commit", "-q", "-m", "clean")
+
+
+def _reword_denylisted(world: World) -> None:
     write_text(world.repo / "notes.md", "a b\n")
+    _reword(world, world.repo, "origin/develop", "notes.md")
+
+
+def _reword_advanced(world: World) -> None:
+    write_text(world.repo / "notes.md", "a b\n")
+    _reword(world, world.repo, "origin/feature/1.0.0", "notes.md")
 
 
 #: The operator's push after the fix is applied: push it again.
@@ -445,7 +460,10 @@ def _denylisted_not_checked_out(world: World) -> str:
 
 
 #: The operator's edit happens on the refused branch, after the switch.
-_CLEAN_COMMIT_PUSH = f"printf 'a b\\n' > notes.md && {_COMMIT_PUSH}"
+_CLEAN_COMMIT_PUSH = (
+    "printf 'a b\\n' > notes.md && git add notes.md && git reset -q --soft origin/develop"
+    f" && git commit -q -m clean && {_COMMIT_PUSH}"
+)
 
 
 def _denylisted_advanced_integration(world: World) -> str:
@@ -483,6 +501,7 @@ def _non_canon(world: World) -> str:
 
 def _rm_junk(world: World) -> None:
     world.git(world.repo, "rm", "-q", "specs/junk.md")
+    _reword(world, world.repo, "origin/develop")
 
 
 def _no_junk(world: World) -> None:
@@ -503,7 +522,9 @@ def _denylisted_in_a_worktree(world: World) -> str:
 
 
 def _drop_worktree_term(world: World) -> None:
-    write_text(world.repo / ".claude" / "worktrees" / "agent-x" / "notes.md", "a b\n")
+    wt = world.repo / ".claude" / "worktrees" / "agent-x"
+    write_text(wt / "notes.md", "a b\n")
+    _reword(world, wt, "origin/develop", "notes.md")
 
 
 def _worktree_clean(world: World) -> None:
@@ -557,10 +578,15 @@ def _baseline_denylisted(world: World) -> list[str]:
 
 
 def _drop_draft_term(world: World) -> None:
+    """Nothing is published yet, so the unpublished range is the whole history: the reword
+    squashes it into one root commit holding the edited tree."""
     write_text(world.repo / "AGENTS.md", "a\n")
+    world.git(world.repo, "add", "AGENTS.md")
+    root = world.git(world.repo, "commit-tree", world.git(world.repo, "write-tree"), "-m", "clean")
+    world.git(world.repo, "update-ref", "HEAD", root)
 
 
-#: The refusal's documented step after its fix, the rewrite verb: the publish again.
+#: The refusal's documented step after its fix: the publish again.
 _BASELINE_AGAIN = _repo_cli("context", "baseline", "proj")
 
 
@@ -829,6 +855,8 @@ def _dead_clean_detached(world: World) -> list[str]:
 
 def _drop_readme_term(world: World) -> None:
     write_text(world.repo / "README.md", "a\n")
+    world.git(world.repo, "add", "README.md")
+    world.git(world.repo, "commit", "-q", "--amend", "--no-edit")
 
 
 def _work_ahead_of_origin(world: World) -> str:
@@ -896,21 +924,23 @@ _REFUSALS: dict[str, tuple[Case | tuple[Case, ...] | Skip, ...]] = {
             Case(_work_forced, _tree_opened, before=_open_a_tree, replaces=True),
         ),
     ),
-    "push_gate._rewrite_fix": (
+    "push_gate._refusal_fix": (
         (
             Case(_denylisted_not_checked_out, _clean_publish, then=_CLEAN_COMMIT_PUSH),
-            Case(_denylisted, _clean_publish, before=_drop_term, then=_COMMIT_PUSH),
+            Case(_denylisted, _clean_publish, before=_reword_denylisted, then=_COMMIT_PUSH),
             Case(
                 _denylisted_in_a_worktree,
                 _worktree_clean,
                 before=_drop_worktree_term,
                 then="git -C .claude/worktrees/agent-x push -q origin feature/1.0.0",
             ),
-            Case(_denylisted_no_context, _clean_publish, before=_drop_term, then=_COMMIT_PUSH),
+            Case(
+                _denylisted_no_context, _clean_publish, before=_reword_denylisted, then=_COMMIT_PUSH
+            ),
             Case(
                 _denylisted_advanced_integration,
                 _nothing_reverted,
-                before=_drop_term,
+                before=_reword_advanced,
                 then="git push -q origin feature/1.0.1",
             ),
             Case(_non_canon, _no_junk, before=_rm_junk, then=_COMMIT_PUSH),
