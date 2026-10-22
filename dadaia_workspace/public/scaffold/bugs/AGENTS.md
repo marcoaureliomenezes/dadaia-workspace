@@ -24,7 +24,7 @@ Scope: this file governs only `specs/bugs/`.
 - Every other confirmed bug becomes explicit candidate scope. Ship refuses an open bug unless
   the operator authorizes that exact id; the authorization is recorded verbatim and the bug remains open for the next candidate.
 - A fix whose `caused_by` names a culprit, a bug's fix or a feature task, or that lands on a unit already fixed in the window, is the REBUILD of that unit in the same lane, keeping its tests, under `refactor(bugs): <id> — REBUILD <unit>`; review refuses a `fix(bugs)` label there.
-- Close with the fix: `bugs.py resolve`, with the flags `dd-bug-resolution` Phase 6 names; a record's fix is the newest commit HEAD reaches whose message holds a line `fix(bugs): <id> — …` (a group lists its ids) or `refactor(bugs): <id> — …`, and `fix_sha` is its write-once hint.
+- Close with the fix: `bugs.py resolve`, with the flags `dd-bug-resolution` Phase 6 names; a record's fix is the newest commit HEAD reaches and does not revert, whose message holds a line `fix(bugs): <id> — …` (a group lists its ids) or `refactor(bugs): <id> — …`, and `fix_sha` is its write-once hint.
 - Lineage before any fix: `dd-bug-resolution/LINEAGE.md`.
 - Commit exactly what the fix touched, never a blanket `-A`; a net-positive diff is judged by `dd-code-review` §6's Architecture lens at review.
 
@@ -38,7 +38,7 @@ Scope: this file governs only `specs/bugs/`.
 ## 4. Authoring rules
 
 - Register a new bug with `bugs.py append --bug-id <slug> --title ... --severity ...` and the remaining required flags.
-- Every record change is one governance verb: `bugs.py append|update|resolve|supersede|reject|archive`.
+- Every record change is one governance verb; `bugs.py --help` lists them.
 - `status` and `closed_at` change only through the three terminal transitions (`resolve`, `supersede`, `reject`), never through `--set`.
 
 ## 5. Duties this ledger carries, and where each lives

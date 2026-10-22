@@ -3,7 +3,7 @@
 Scope: this file governs only `specs/releases/`.
 
 - `RELEASE_PY` below is `python3 .agents/skills/dd-release-implementation/scripts/release.py` — the writer of every `_RELEASE.json` field; only `summary` and an authorization `note` are hand-written (`dd-release-implementation`'s `RELEASE-EVENTS.md`).
-- `phase` moves only by `RELEASE_PY new` (DEFINITION) and `RELEASE_PY phase`, the `defined`/`implemented` milestones only by `RELEASE_PY phase`; `shipped` only by `RELEASE_PY ship`.
+- `phase` and each milestone move only by a `RELEASE_PY` verb (`--help` lists them).
 
 - Exactly ONE live release directory, ever: a bare SemVer id, created only by `RELEASE_PY new <id>`,
   which writes the next `rc-<N>/SPEC.md` + `_RELEASE.json` (DEFINITION) in one transaction and refuses a second one.

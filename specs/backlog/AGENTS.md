@@ -2,7 +2,7 @@
 
 Scope: this file governs only `specs/backlog/`.
 
-- `BACKLOG_PY` is `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py`: `new` creates an entry, `exit` removes it and appends its history, and `check` validates both files; live-entry curation is §2.
+- `BACKLOG_PY` is `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py`; its `--help` lists the verbs; live-entry curation is §2.
 - The backlog is the operator's demand queue: only the operator creates demand, `dd-product-engineer` curates `active[]`.
 - An entry materializes only through the main thread's operator-facing intake report; an operator-ratified in-release deferral already counts as intake.
 - The backlog is a single JSON document: `specs/backlog/BACKLOG.json`, `{schema: "backlog-v1", active: [...]}`.
@@ -11,8 +11,7 @@ Scope: this file governs only `specs/backlog/`.
 
 ## 1. The document, plus its histo
 
-- Fields: `{id, ts, disposition, release, reason, summary, entry}`.
-- One record per slug, ever — a duplicate exit is structurally impossible.
+- Fields: the schema. One record per slug, ever — a duplicate exit is structurally impossible.
 
 ## 2. Authoring rules
 
