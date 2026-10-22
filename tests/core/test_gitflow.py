@@ -65,7 +65,7 @@ def test_the_sole_live_release_is_the_kernels_and_several_refuse_there(tmp_path:
 
 
 def test_resolve_live_candidate_names_the_candidate_release_py_names(tmp_path: Path) -> None:
-    """A milestone makes rc-1 the live candidate; the empty rc-2 folder is not."""
+    """A milestone makes the first candidate the live one; the empty folder after it is not."""
     release = tmp_path / "releases" / "0.5.0"
     (release / "rc-1").mkdir(parents=True)
     (release / "rc-2").mkdir()

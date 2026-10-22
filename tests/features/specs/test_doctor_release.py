@@ -139,7 +139,7 @@ def test_a_legacy_next_dir_is_not_live_and_new_refuses(tmp_path: Path) -> None:
 
 
 def test_doctor_names_the_candidate_release_py_names(tmp_path: Path) -> None:
-    """A milestone makes rc-1 the live candidate; the empty rc-2 folder is not, for doctor or script."""
+    """A milestone makes the first candidate the live one; the empty folder after it is not, for doctor or script."""
     milestone = {"ts": "2026-09-21T10:00:00Z", "agent": "release.py", "kind": "milestone",
                  "candidate": "rc-1", "milestone": "implemented", "sha": "0000002", "text": "rc-1 implemented."}  # fmt: skip
     specs = _specs(tmp_path, "IMPLEMENTATION", [milestone])
