@@ -1,15 +1,7 @@
 """Typed harness identity registry — ``core/harness_registry.py``.
 
-The **code embodiment** of the agent-runtime roster that ``specs/memory/tech-stack.md``
-("Agent runtimes") documents as the single source of truth. One
-:class:`HarnessRecord` per harness is the whole registry: every other constant here
-(:data:`L1_ENTRY_HARNESSES`, :data:`HARNESS_PROJECTION_DIRS`,
-:data:`PROJECTION_TARGETS`) and every projection rule in
-``infrastructure/projection_rules.py`` derives from it, so a harness fact is stated
-once and a per-harness ``if`` has nowhere to live.
-
-Layering: a pure ``core`` leaf — **stdlib only, no upward import** (import-linter clean).
-Consumed downward by ``infrastructure`` / ``features`` / ``cli``.
+Inputs: none. Output: ``HARNESS_RECORDS``, one :class:`HarnessRecord` per Layer-1 entry
+harness, and the constants derived from it. Side effects: none; stdlib only.
 """
 
 from __future__ import annotations

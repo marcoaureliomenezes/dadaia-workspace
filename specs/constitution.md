@@ -22,12 +22,12 @@ Definitions are pointers, not rules — each term is defined once, in the atom n
 |---|---|
 | Vision · layout and module map | [[product-vision]] · [[architecture]] |
 | **Spec Context Project** — one canonical specs folder bound to one repository | [[spec-context-project]] |
-| **Entry harness** — the coding harness a human launches, and the roster of them | [[tech-stack]] Part 2 › Snapshot |
+| **Entry harness** — the coding harness a human launches, and the roster of them | `dadaia_workspace/core/harness_registry.py` |
 | **Harness isolation** — a workspace installed for any subset of the roster | the `specs/memory/product/harness/` atoms |
 | **Agentic entity** — Persona, Deterministic Behavior, Abstract Rule, universal surface | [[agentic-entities]], registry `dadaia_workspace/public/entities/registry.json` |
 
-The harness roster is enumerated in exactly one memory atom, set-equal to
-`dadaia_workspace/core/harness_registry.py`; this constitution never enumerates it.
+The harness roster is enumerated in exactly one place, `dadaia_workspace/core/harness_registry.py`;
+this constitution never enumerates it.
 
 ## 2. The Operational-Change Lane
 
