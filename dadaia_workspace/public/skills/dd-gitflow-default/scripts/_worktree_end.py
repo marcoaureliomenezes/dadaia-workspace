@@ -42,7 +42,7 @@ from _worktree_names import LAUNCH, NAME_RE, Refusal, base_of, branch, kind_of, 
 #: The ledger and release checks a `backlog` or `rc` merge runs, in this order.
 _LEDGERS = (Path("dd-bug-resolution/scripts/bugs.py"), Path("dd-backlog-definition/scripts/backlog.py"),
             Path("dd-release-implementation/scripts/release.py"))  # fmt: skip
-#: The skills folder of the instance this script runs from, the fallback when a tree carries no ledger script.
+#: The skills folder of the instance this script runs from: the only ledger scripts a merge runs.
 _INSTANCE_SKILLS = Path(__file__).resolve().parent.parent.parent
 
 
@@ -219,12 +219,12 @@ def _gate(tree: Path, work: str) -> None:
     env = scrubbed_env()
     env["PATH"] = os.pathsep.join([str(venv_tool(venv_dir(root), "python").parent), env.get("PATH", "")])  # fmt: skip
     try:
-        done = subprocess.run(argv, cwd=tree, env=env, stdin=subprocess.DEVNULL,
-                              stderr=subprocess.STDOUT)  # fmt: skip
+        done = run(argv, cwd=tree, env=env, stdin=subprocess.DEVNULL)
     except OSError as error:
         raise Refusal(f"{key} {' '.join(argv)!r} cannot start: {error}",
                       _land_line(tree, work, f"make the {key} line of AGENTS.md on {work} one argv list that starts"
                                        " (no shell: no VAR=value prefix, no sh -c)")) from error  # fmt: skip
+    print(done.stdout + done.stderr, end="")
     if done.returncode:
         name = (locate(tree.relative_to(root).as_posix()) or ("", ""))[1]
         match kind_of(name or ""):
@@ -250,7 +250,7 @@ def _is_test_path(path: str, globs: list[str]) -> bool:
         return any(fnmatch.fnmatchcase(path, glob) for glob in globs)
     *folders, name = Path(path).parts
     return not any(f.startswith(".") for f in folders) and (
-        path.startswith("tests/")
+        "tests" in folders
         or name.startswith("test_")
         or fnmatch.fnmatchcase(name, "*_test.*")
         or fnmatch.fnmatchcase(name, "*.spec.*")
@@ -309,26 +309,27 @@ def _scaffold(tree: Path, name: str) -> None:
         )
 
 
-def _tracked(tree: Path, rel: Path) -> list[Path]:
-    """The copies of ledger script *rel* the tree tracks (its `verify:` ran them), else this instance's."""
-    held = git(tree, "ls-files", "-z", "--", f"*/{rel.as_posix()}").split("\0")
-    return [tree / h for h in held if h] or [_INSTANCE_SKILLS / rel]
-
-
-def _ledgers(root: Path, repo: Path, tree: Path, scripts: Callable[[Path], list[Path]]) -> None:  # fmt: skip
-    """`check` of each script *scripts* names per ledger, then the doctor; an associated repo has no `specs/`."""
+def _ledgers(root: Path, repo: Path, tree: Path) -> None:
+    """`check` of each of this instance's ledger scripts, then the doctor; an associated repo has no `specs/`."""
     if flow_for(root, repo)["main"] != repo.name:
         return
-    for script in [s for rel in _LEDGERS for s in scripts(rel)]:
-        argv = [sys.executable, str(script), "check", "--specs", str(tree / "specs")]
-        _relay(script.name, run(argv, cwd=tree, env=scrubbed_env(), stdin=subprocess.DEVNULL), tree)  # fmt: skip
+    for rel in _LEDGERS:
+        argv = [
+            sys.executable,
+            str(_INSTANCE_SKILLS / rel),
+            "check",
+            "--specs",
+            str(tree / "specs"),
+        ]
+        _relay(rel.name, run(argv, cwd=tree, env=scrubbed_env(), stdin=subprocess.DEVNULL), tree)  # fmt: skip
     _relay("dadaia doctor", cli(root, "doctor", "--specs-dir", str(tree / "specs"), tree=tree), tree)  # fmt: skip
 
 
 def _relay(name: str, done: subprocess.CompletedProcess[str], tree: Path) -> None:
     if done.returncode:
         print(without_fix(done.stdout + done.stderr), end="")
-    relay(done, f"{name} check failed on {tree}", act("agent", f"fix the findings above in {tree} and commit them"))  # fmt: skip
+    fix = act("agent", f"make `{inline(*done.args)}` exit 0 in {tree}, fixing what it reports, and commit")  # fmt: skip
+    relay(done, f"{name} check failed on {tree}", fix)
 
 
 def _refuse_denylisted(root: Path, tree: Path, onto: str) -> None:
@@ -447,8 +448,8 @@ def _kind_checks(root: Path, repo: Path, tree: Path, name: str, onto: str, into:
         "task": [ancestor, tests, denylist, partial(refuse_dirty, into)],
         "main": [children, scaffold, *gate],
         "hotfix": [scaffold, ancestor, denylist, verdict, job_gate],
-        "backlog": [specs, ancestor, denylist, verdict, partial(ledgers, lambda rel: [_INSTANCE_SKILLS / rel])],
-        "rc": [children, *gate, partial(ledgers, partial(_tracked, tree))],
+        "backlog": [specs, ancestor, denylist, verdict, ledgers],
+        "rc": [children, *gate, ledgers],
     }  # fmt: skip
     return [partial(refuse_dirty, tree), *table[kind_of(name)]]
 
