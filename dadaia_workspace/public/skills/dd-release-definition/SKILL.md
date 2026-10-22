@@ -19,7 +19,7 @@ description: >
 4. Each undispositioned `specs/audits/**` finding enters the SPEC's Origin as `findings:<id>`.
 5. Name the SPEC's `**Origin:**` per `specs/releases/AGENTS.md` §2.
 6. Write the SPEC's `## Bug window review`: list the resolved bugs' ids in `<specs-dir>/bugs/BUGS.jsonl`, find and inspect each fix as `dd-bug-resolution/LINEAGE.md` §Read persisted facts says, and compare that fix against the overfitting patterns — an assert or test the fix changed; a special case on a test value; a new branch, flag or second path; a reach into another feature; deleted functionality.
-7. Give each fix KEEP or REBUILD; a REBUILD reworks the fix's code and what surrounds it, and keeps the contract tests its fixes hardened.
+7. Give each fix KEEP or REBUILD; a fix judged REBUILD is a confirmed bug of that fix: it is registered (Arm B) and rebuilt in its own lane under `specs/bugs/AGENTS.md` §2, never a task of the next rc's Job 1. The section schedules no work.
 
 ## 2. As-is review
 
@@ -37,7 +37,7 @@ description: >
 
 | unit | today | bugs | verdict | why |
 |---|---|---|---|---|
-| `features/x/service.py` `run` | what it does today | 2 (`bug-a`, `bug-b`) | REBUILD | two prior fixes on this unit |
+| `features/x/service.py` `run` | what it does today | 2 (`bug-a`, `bug-b`) | REBUILD | `bug-b` is a child bug after the unit's last REBUILD |
 
 ### 1.1 Authorities
 

@@ -35,7 +35,7 @@ stays open.
 
 ## Milestones
 
-A milestone or memory-window bound is found from its commit subject line, as a fix is (`dd-bug-resolution/LINEAGE.md` §Read persisted facts); a stored sha is a hint a history rewrite can orphan.
+A milestone or memory-window bound is found from its commit subject line, as a fix is (`specs/bugs/AGENTS.md` §2); a stored sha is a hint a history rewrite can orphan.
 
 | Milestone | Command | Written shape |
 |---|---|---|
