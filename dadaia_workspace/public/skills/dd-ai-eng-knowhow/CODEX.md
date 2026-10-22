@@ -22,7 +22,7 @@ A protocol reference, not a doc mirror — the links in "Official reference inde
 - Put a rule at the narrowest scope where it is true everywhere beneath that point.
 - Keep the root file a global contract, not an encyclopedia — push specifics to the owning directory.
 - When the same mistake recurs twice, update the correctly-scoped AGENTS.md, not a one-off prompt.
-- Which scoped files are projections and which are the project's own: the root map, "Scoped law — open before acting there".
+- Which scoped files are projections and which are the project's own: `.dadaia/AGENTS.md` (manifest projections).
 - Never put long repeatable workflow into AGENTS.md — that is a skill's job.
 
 ---
