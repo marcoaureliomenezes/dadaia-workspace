@@ -20,6 +20,7 @@ sys.path[:0] = [
 ]
 
 from _git import GitError
+from _jsonl import reinstall_fix
 from _platform import act, inline, use_utf8_stdio
 from _refusal import report, spell_fix
 from _worktree_end import clean, digest, merge
@@ -69,7 +70,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if (root := workspace_of(Path.cwd(), Path(__file__))) is None:  # projected inside one
             raise Refusal(
-                "no workspace root above the cwd or this script", "uvx dadaia-workspace init"
+                "no workspace root above the cwd or this script", reinstall_fix(Path.cwd())
             )
         if args.verb == "new":
             print(f"[ok] {new(root, args.repo, args.name)}")

@@ -21,6 +21,7 @@ from pathlib import Path
 
 import _worktree_names as names
 from _handoffs import REVIEWER, reviewer_records
+from _jsonl import reinstall_fix
 from _platform import act, command, git_inline, git_line, inline, run, venv_dir, venv_tool
 from _refusal import relay, without_fix
 from _worktree_git import (
@@ -169,9 +170,7 @@ def check_ancestor(root: Path, tree: Path, work: str) -> None:
 def _workspace(tree: Path) -> Path:
     """The workspace owning *tree*; none owns it is a refusal."""
     if (root := workspace_of(tree)) is None:
-        raise Refusal(
-            f"no workspace owns {tree}", act("agent", "run this merge inside its workspace")
-        )
+        raise Refusal(f"no workspace owns {tree}", reinstall_fix(tree))
     return root
 
 
@@ -416,7 +415,7 @@ def digest(root: Path, path: str, sha: str) -> str:
     """The binding a verdict carries for *sha* of a worktree, as one JSON object."""
     _, tree, name, onto = target(root, path)
     if git(tree, "rev-parse", "--verify", "--quiet", f"{sha}^{{commit}}", check=False).strip() != sha:  # fmt: skip
-        raise Refusal(f"{sha} is not a commit sha of {tree}", act("agent", f"pass a 40-hex commit of {tree}"))  # fmt: skip
+        raise Refusal(f"{sha} is not a commit sha of {tree}", act("agent", f"pass a 40-hex commit of {tree}, as `{git_inline(tree, 'rev-parse', 'HEAD')}` prints"))  # fmt: skip
     scope = f"{branch(name)}@{git(tree, 'rev-parse', 'HEAD').strip()}"
     return json.dumps({"root": str(root), "scope": scope, "reviewed_sha": sha, "diff_sha256": diff_sha256(tree, onto, sha)})  # fmt: skip
 
