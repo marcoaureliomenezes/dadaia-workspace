@@ -1731,7 +1731,7 @@ def test_a_fix_sha_only_record_whose_id_commit_exists_passes_check(
 
 
 def _two_candidates(specs: Path) -> None:
-    """`J1.T3` heads a task row in rc-9 and in rc-10; `J2.T1` only in rc-10."""
+    """One task id heads a task row in two candidates; another only in the second."""
     for number, ids in ((9, ["J1.T3"]), (10, ["J1.T3", "J2.T1"])):
         job = specs / "releases" / "0.5.0" / f"rc-{number}" / "tasks" / "job1.md"
         job.parent.mkdir(parents=True)
