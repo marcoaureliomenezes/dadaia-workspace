@@ -3,12 +3,15 @@ stale selection."""
 
 from __future__ import annotations
 
+import datetime as dt
 from datetime import UTC, datetime
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
 from dadaia_workspace.core import session_store as si
+from dadaia_workspace.core.skill_owner import load_owner
 from tests.helpers.oslib import read_text, write_text
 from tests.helpers.oslib import write_text as os_write_text
 
@@ -138,3 +141,22 @@ def test_naive_heartbeat_reads_as_utc_in_any_zone(monkeypatch: pytest.MonkeyPatc
     finally:
         monkeypatch.undo()
         tzset()
+
+
+class _KernelNow(dt.datetime):
+    """The kernel clock frozen at 2026-10-11T03:04:05Z."""
+
+    @classmethod
+    def now(cls, tz: dt.tzinfo | None = None) -> _KernelNow:
+        return cls(2026, 10, 11, 3, 4, 5, tzinfo=tz)
+
+
+def _freeze_kernel_clock(monkeypatch: pytest.MonkeyPatch) -> None:
+    kernel = load_owner("dd-bug-resolution", "_clock")
+    monkeypatch.setattr(kernel, "_dt", SimpleNamespace(datetime=_KernelNow, UTC=dt.UTC))
+
+
+def test_is_live_without_a_clock_reads_the_kernel_clock(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A heartbeat one minute old on the kernel clock is live; the wall clock says it is dead."""
+    _freeze_kernel_clock(monkeypatch)
+    assert si.is_live({si.SESSION_HEARTBEAT_FIELD: "2026-10-11T03:03:00Z"})

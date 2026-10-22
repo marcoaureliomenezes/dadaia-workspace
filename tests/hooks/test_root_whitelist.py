@@ -17,17 +17,21 @@ below as a named parametrized row, including the first-path-component block.
 
 from __future__ import annotations
 
+import datetime as dt
 import json
 import os
 from datetime import UTC, datetime
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
 
 from dadaia_workspace.core.cli_line import mkdir_line
+from dadaia_workspace.core.skill_owner import load_owner
 from dadaia_workspace.core.workspace_layout import DADAIAIGNORE
 from dadaia_workspace.core.workspace_resolver import FENCE_ENV
+from dadaia_workspace.hooks import root_whitelist
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from tests.fixtures.harness_env import claude_hook_env, run_hook_subprocess
 from tests.fixtures.stores import context_store
@@ -218,3 +222,30 @@ def test_a_payload_names_its_subagent_only_under_the_key_its_registry_row_declar
     _out, block = _run(_ws(tmp_path), payload, runtime=None)
     assert block is not None
     assert "/.dadaia/tmp/main-thread/" in block["reason"].rsplit("fix: ", 1)[1]
+
+
+class _KernelNow(dt.datetime):
+    """The kernel clock frozen at 2026-10-11T03:04:05Z."""
+
+    @classmethod
+    def now(cls, tz: dt.tzinfo | None = None) -> _KernelNow:
+        return cls(2026, 10, 11, 3, 4, 5, tzinfo=tz)
+
+
+def _freeze_kernel_clock(monkeypatch: pytest.MonkeyPatch) -> None:
+    kernel = load_owner("dd-bug-resolution", "_clock")
+    monkeypatch.setattr(kernel, "_dt", SimpleNamespace(datetime=_KernelNow, UTC=dt.UTC))
+
+
+def test_the_block_names_the_temp_day_of_the_kernel_clock(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The temp day in the block's fix is stamped by the one UTC clock, not a second one."""
+    _freeze_kernel_clock(monkeypatch)
+    _ws(tmp_path)
+    monkeypatch.chdir(tmp_path)
+    reason = root_whitelist.evaluate_payload(
+        {"tool_name": "Write", "tool_input": {"file_path": str(tmp_path / "junk.txt")}}
+    )
+    day = tmp_path.resolve() / ".dadaia" / "tmp" / "main-thread" / "20261011"
+    assert reason is not None and mkdir_line(day) in reason
