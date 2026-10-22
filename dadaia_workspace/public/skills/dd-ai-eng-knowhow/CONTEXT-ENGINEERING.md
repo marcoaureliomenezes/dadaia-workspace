@@ -1,13 +1,10 @@
 # CONTEXT-ENGINEERING.md — Authoring and Auditing the AI-Entity Surface
 
-Sections: 1. Token Economy; 2. Instruction Hierarchy and Attention Ordering; 3. Persona-Consistency Invariants; 4. Model-Tier Selection Decision Protocol; 5. Recursive Scope-Drift Detection; Applying this file.
 Sibling of [`SKILL.md`](SKILL.md) (`dd-ai-eng-knowhow`, authoring depth).
 Persona files, skills, and rules are themselves prompts — every shipped line is paid for in tokens by every downstream invocation.
 The craft: maximize behavior-change-per-token under a hard context budget, keeping every persona's shared structure consistent.
 
-- Five disciplines, ordered by how often you reach for them: token economy, instruction hierarchy.
-- Disciplines (continued): consistency invariants, tier selection, scope-drift detection.
-- Apply them in that order when authoring; review someone else's change safety first, in the order set under "Applying this file".
+- Five disciplines, ordered by how often you reach for them: token economy, instruction hierarchy, consistency invariants, tier selection, scope-drift detection.
 
 ---
 
@@ -40,9 +37,8 @@ cost(file) = tokens(file) x invocations(file) x unit_price(tier)
 - "First... then... however... unless..." prose is almost always a table in disguise — convert it.
 - Inline content only if: short (<=~3 lines), needed on essentially every invocation, and changes behavior at the point of reading.
 - Otherwise link to the canonical source and carry only a one-line orientation pointer.
-- Shared protocol is authored once, referenced everywhere.
 - Restating shared protocol in N personas multiplies lifetime cost by N and drifts N ways.
-- Smell: the same paragraph appears verbatim in two or more files — a missing link or a missing skill (see §5).
+- Smell: the same paragraph appears verbatim in two or more files — a missing link or a missing skill (see Recursive Scope-Drift Detection).
 - Token estimation for audits: `tokens ~= words x 1.33` (English), `tokens ~= words x 1.20` (Portuguese).
 - Compute via `wc -w` on the file body, multiply by rate, multiply by invocation frequency for lifetime-cost.
 
@@ -79,12 +75,12 @@ Audit protocol — detecting order drift:
 
 ## 3. Persona-Consistency Invariants
 
-Four invariants MUST hold across the full personas (reviewer, product engineer, sr); the lighter `dd-researcher` and `dd-sw-engineer-jr` are exempt from I2 and I3, and I4 binds every agent but `dd-researcher`. An inconsistency is an AI-surface lens finding (`dd-code-review` §6).
+Four invariants MUST hold across the full personas (reviewer, product engineer, sr); the lighter `dd-researcher` and `dd-sw-engineer-jr` are exempt from I2 and I3, and I4 binds every agent but `dd-researcher`. An inconsistency is an AI-surface lens finding (`dd-code-review`, The six lenses).
 
 | # | Invariant | What must match |
 |---|---|---|
 | I1 | Frontmatter schema | Shared core keys and order match; role-specific extensions follow the core; no `tier`/`model` frontmatter key |
-| I2 | Body section order | The canonical five-section spine of §2 |
+| I2 | Body section order | The canonical five-section spine of Instruction Hierarchy and Attention Ordering |
 | I3 | `[SCOPE ERROR]` block format | Opener, one-line identity, explicit redirect per foreign domain |
 | I4 | Handoff JSON contract | All agents emit via `dd-handoff-emitter` against the same schema version |
 
@@ -95,7 +91,7 @@ Four invariants MUST hold across the full personas (reviewer, product engineer, 
 Detection method:
 
 1. I1: `grep -n '^[a-z_]*:' <persona>.md`, diff the key list against the on-disk reference (re-derive if the schema changes).
-2. I2: run the §2 audit protocol.
+2. I2: run the audit protocol of Instruction Hierarchy and Attention Ordering.
 3. I3: `grep -A12 '\[SCOPE ERROR\]' <persona>.md`; verify opener, one-line identity, and a correct redirect per domain.
 4. I4: confirm `dd-handoff-emitter` is in the skills list and the report section cites the current schema.
 
@@ -121,8 +117,7 @@ Fix protocol:
 | Volume | Occasional -> high-frequency / bulk |
 
 - The dominant task drives the tier — not the easiest or the rarest.
-- Tier aliases are each `TIER_CODEX` key in `core/model_registry.py` — never hand-maintain a copy that can drift.
-- Current model ids come from `core/model_registry.py`, never hand-copied: Codex ids from `TIER_CODEX`; Claude resolves the alias itself. Reasoning effort is the template cell's effort.
+- Tier aliases and Codex model ids come from `core/model_registry.py` (`TIER_CODEX`), never hand-copied; Claude resolves the alias itself. Reasoning effort is the template cell's effort.
 - The tiering axis is (model x effort): on Claude the alias and `effort:`; on Codex the `TIER_CODEX` id and `model_reasoning_effort`.
 - Quote the template cell (alias + effort), and on Codex its `TIER_CODEX` id, when recommending a move; take the price from the provider's published table, never from memory.
 - Move up a tier only when depth/breadth/error-cost are all high; move down only when the task is mechanical and high-volume.
@@ -172,14 +167,14 @@ Re-verify topology invariants whenever: `tools` changes (esp. adding `Agent`), o
 Re-verify topology invariants also when a `[SCOPE ERROR]` redirect set changes.
 
 - Skill-extraction trigger: when two or more personas restate the same protocol, extract it into `public/skills/<name>/SKILL.md`.
-- Replace every inline copy with a one-line reference — a skill loads once and is referenced; inline content loads N times and drifts N ways.
+- Replace every inline copy with a one-line reference to its one owner — a skill loads once; inline content loads N times.
 - This is the highest-leverage move when an efficiency audit finds repeated context across personas.
 
 ---
 
 ## Applying this file
 
-- Authoring a new persona/skill/rule: walk §1 (cheapest layer) -> §2 (spine) -> §3 (invariants) -> §4 (tier) -> §5 (drift).
-- Reviewing someone else's AI-entity change: walk §5 first, then §3, §2, §1, §4.
-- Auditing the fleet (efficiency report): §1 ranks files by lifetime cost, §2/§3 find structural drift.
-- Auditing (continued): §4 recommends tier moves, §5 recommends deduplication.
+- Authoring a new persona/skill/rule: walk Token Economy (cheapest layer) -> Instruction Hierarchy and Attention Ordering (spine) -> Persona-Consistency Invariants -> Model-Tier Selection Decision Protocol -> Recursive Scope-Drift Detection (drift).
+- Reviewing someone else's AI-entity change: walk Recursive Scope-Drift Detection first, then Persona-Consistency Invariants, Instruction Hierarchy and Attention Ordering, Token Economy, Model-Tier Selection Decision Protocol.
+- Auditing the fleet (efficiency report): Token Economy ranks files by lifetime cost; Instruction Hierarchy and Persona-Consistency Invariants find structural drift.
+- Auditing (continued): Model-Tier Selection Decision Protocol recommends tier moves; Recursive Scope-Drift Detection recommends deduplication.
