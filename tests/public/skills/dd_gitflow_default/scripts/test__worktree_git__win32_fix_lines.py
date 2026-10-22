@@ -62,7 +62,9 @@ def test_a_red_gate_names_its_argv_through_inline(
     end, tree = _mod("_worktree_end"), tmp_path / "worktrees" / "r" / "x"
     monkeypatch.setattr(end, "_declared_argv", lambda *a: ["python", "a%b.py"])
     monkeypatch.setattr(end, "workspace_of", lambda _tree: tmp_path)
-    monkeypatch.setattr(end.subprocess, "run", lambda *a, **k: SimpleNamespace(returncode=1))
+    monkeypatch.setattr(
+        end, "run", lambda *a, **k: SimpleNamespace(returncode=1, stdout="", stderr="")
+    )
     with pytest.raises(end.Refusal) as refused:
         end._gate(tree, "work")
     assert refused.value.fix == (
