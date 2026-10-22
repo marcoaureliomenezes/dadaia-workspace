@@ -14,6 +14,7 @@ def test_an_uninstalled_script_is_one_finding_carrying_the_owners_projected_act(
 ) -> None:
     """A script that cannot run is one error finding per ledger whose fix is the owner's act
     for a projected file, taken from the specs' own workspace."""
+    (tmp_path / ".dadaia" / "states").mkdir(parents=True)
     write_text(tmp_path / ".dadaia" / "states" / "spec_contexts.json", "{}")
     specs = tmp_path / "specs"
     specs.mkdir()

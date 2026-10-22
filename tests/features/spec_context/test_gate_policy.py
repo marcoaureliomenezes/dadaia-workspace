@@ -235,6 +235,7 @@ def test_a_command_that_runs_the_writer_with_the_flag_is_refused_in_any_shell_po
 
 
 def test_the_law_floor_fix_is_the_owners_projected_act_of_its_workspace(tmp_path: Path) -> None:
+    (tmp_path / ".dadaia" / "states").mkdir(parents=True)
     write_text(tmp_path / ".dadaia" / "states" / "spec_contexts.json", "{}")
     want = load_owner("dd-bug-resolution", "_jsonl").reinstall_fix(tmp_path, projected=True)
     _, message = evaluate("AGENTS.md", root=tmp_path)

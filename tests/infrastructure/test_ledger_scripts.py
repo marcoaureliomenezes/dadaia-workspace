@@ -151,6 +151,8 @@ def test_an_uninstalled_worktree_script_is_re_projected_from_its_workspace(
     """The owner's projected act for the workspace given, not the running CLI's venv."""
     from dadaia_workspace.infrastructure import ledger_scripts
 
+    (tmp_path / ".dadaia" / "states").mkdir(parents=True)
+
     write_text(tmp_path / ".dadaia" / "states" / "spec_contexts.json", "{}")
     monkeypatch.setattr(ledger_scripts, "_PACKAGE_SKILLS", tmp_path / "package")
 

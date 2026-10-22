@@ -79,6 +79,7 @@ _INIT_ACT = "Agent action: run `uvx dadaia-workspace init` with the workspace's 
 def test_a_projected_file_is_re_projected_by_public_install(tmp_path: Path) -> None:
     """The owner holds one act per file class: a shipped file is reinstalled by `init`, a
     projected one re-projected by the workspace CLI's `public install`."""
+    (tmp_path / ".dadaia" / "states").mkdir(parents=True)
     write_text(tmp_path / ".dadaia" / "states" / "spec_contexts.json", "{}")
     owner = load_owner("dd-bug-resolution", "_jsonl")
     inside = tmp_path / "specs"

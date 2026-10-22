@@ -50,5 +50,7 @@ def test_a_blocking_line_without_a_fix_is_remedied_by_the_owners_projected_act(
         "Agent action: run `uvx dadaia-workspace init` with the workspace's directory as its first argument"
     )
 
+    (tmp_path / ".dadaia" / "states").mkdir(parents=True)
+
     write_text(tmp_path / ".dadaia" / "states" / "spec_contexts.json", "{}")
     assert svc.verdict(tmp_path)[1] == fix_line(tmp_path.resolve(), "public", "install")

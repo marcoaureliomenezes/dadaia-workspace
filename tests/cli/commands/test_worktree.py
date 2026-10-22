@@ -71,6 +71,7 @@ def test_help_lists_the_verbs(
 
 
 def test_no_installed_script_refuses_with_the_install_fix(workspace: Path) -> None:
+    (workspace / ".dadaia" / "states").mkdir(parents=True)
     write_text(workspace / ".dadaia" / "states" / "spec_contexts.json", "{}")
     result = CliRunner().invoke(app, ["worktree", "list"])
     assert result.exit_code != 0
