@@ -233,3 +233,40 @@ def test_a_runner_planted_in_the_repo_is_never_run_ahead_of_the_workspace_venv(r
     assert done.returncode != 0
     assert f"fix: {oslib.command(str(repo.stub), 'worktree', 'new', 'repo', 'x')}" in done.stderr
     assert not marker.exists()
+
+
+@pytest.mark.parametrize("code", [1, 2])
+def test_a_faulting_runner_does_not_open_the_work_branch(tmp_path: Path, code: int) -> None:
+    """With the module importable, a runner that cannot answer is no reason to let a raw commit
+    move the work branch: the shipped script refuses it and never warns-and-passes."""
+    ws = tmp_path / "ws"
+    fake_venv(ws, cli=f"#!python\nimport sys\nsys.exit({code})\n", pth=True)
+    origin, root = tmp_path / "origin.git", ws / "repo"
+    root.mkdir()
+    env = {k: v for k, v in os.environ.items() if k != "DADAIA_WT"}
+    for args in (
+        ["init", "-q", "--bare", str(origin)],
+        ["init", "-q", "-b", "main", str(root)],
+    ):
+        assert run(["git", *args], env=env, timeout=60).returncode == 0
+    for args in (
+        ["config", "user.email", _EMAIL],
+        ["config", "user.name", "Test"],
+        ["commit", "-q", "--allow-empty", "-m", "init"],
+        ["remote", "add", "origin", str(origin)],
+        ["checkout", "-q", "-b", "feature/0.5.0"],
+        ["push", "-q", "-u", "origin", "feature/0.5.0"],
+    ):
+        assert run(["git", "-C", str(root), *args], env=env, timeout=60).returncode == 0
+    hook = root / ".git" / "hooks" / "reference-transaction"
+    shutil.copy(_SCRIPT, hook)
+    make_executable(hook)
+    before = run(["git", "-C", str(root), "rev-parse", "HEAD"]).stdout.strip()
+    done = run(
+        ["git", "-C", str(root), "commit", "-q", "--allow-empty", "-m", "raw"], env=env, timeout=60
+    )
+    after = run(["git", "-C", str(root), "rev-parse", "HEAD"]).stdout.strip()
+    assert done.returncode != 0
+    assert "[ref-gate] BLOCKED" in done.stderr, done.stderr
+    assert "update allowed" not in done.stderr
+    assert after == before

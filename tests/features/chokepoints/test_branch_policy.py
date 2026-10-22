@@ -349,3 +349,11 @@ def test_the_facts_are_not_read_for_a_move_onto_origins_sha() -> None:
         raise AssertionError("read")
 
     assert _ref_policy([_LINE], DEFAULT, {_WORK_REF: _B}, unreadable).allowed
+
+
+def test_a_fault_that_is_not_git_s_propagates_out_of_the_policy() -> None:
+    def broken(old: str, new: str) -> tuple[bool, list[str]]:
+        raise OSError("disk gone")
+
+    with pytest.raises(OSError, match="disk gone"):
+        _ref_policy([_LINE], DEFAULT, {_WORK_REF: _C1}, broken)
