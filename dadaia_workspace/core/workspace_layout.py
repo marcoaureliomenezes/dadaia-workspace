@@ -11,11 +11,12 @@ from collections.abc import Callable, Collection
 from dataclasses import dataclass
 from enum import StrEnum
 from functools import cached_property
-from pathlib import Path, PurePath, PurePosixPath
+from pathlib import Path, PurePosixPath
 from typing import Literal
 
 from dadaia_workspace.core import invocation, platform
 from dadaia_workspace.core.harness_registry import HARNESS_PROJECTION_DIRS
+from dadaia_workspace.core.linked_tree import linked_tree_depths
 from dadaia_workspace.core.release_state import CANDIDATE_RE, RELEASE_ID_RE
 
 __all__ = [
@@ -272,47 +273,6 @@ def _matches(sub: str, pattern: str) -> bool:
     """*pattern* matches the root-relative *sub* segment by segment (``*`` never crosses ``/``)."""
     parts, globs = sub.split("/"), pattern.split("/")
     return len(parts) == len(globs) and all(map(fnmatch.fnmatch, parts, globs))
-
-
-def _gitdir(entry: Path) -> PurePath | None:
-    """The gitdir a regular, non-link ``.git`` file names, else ``None``."""
-    if not entry.is_file() or platform.is_link(entry):
-        return None
-    try:
-        return PurePath(platform.read_text(entry).removeprefix("gitdir:").strip())
-    except (OSError, platform.Undecodable):
-        return None
-
-
-def is_worktree_gitfile(entry: Path) -> bool:
-    """A linked worktree's ``.git`` file: a regular file, not a link, whose gitdir sits in
-    ``<common>/worktrees/``."""
-    gitdir = _gitdir(entry)
-    return gitdir is not None and gitdir.parent.name == "worktrees"
-
-
-def _anchors(root: Path, entry: Path) -> bool:
-    """A ``.git`` file whose gitdir sits in ``<root>/repos/<slug>/.git/worktrees/`` and whose
-    ``gitdir`` back-pointer, written by git inside that repo, names this very file."""
-    gitdir = _gitdir(entry)
-    if not (
-        gitdir is not None
-        and len(gitdir.parents) > 3
-        and (gitdir.parent.name, gitdir.parents[1].name) == ("worktrees", ".git")
-        and gitdir.parents[3] in (root / "repos", root.resolve() / "repos")
-    ):
-        return False
-    try:
-        back = platform.read_text(Path(gitdir) / "gitdir").strip()
-    except (OSError, platform.Undecodable):
-        return False
-    return Path(back).resolve() == entry.resolve()
-
-
-def linked_tree_depths(root: Path, parts: list[str]) -> list[int]:
-    """The depths (in *parts*, workspace-relative) of every ancestor below ``worktrees/<r>``
-    holding a ``.git`` file that git linked from a repo of this workspace (``_anchors``)."""
-    return [k for k in range(3, len(parts)) if _anchors(root, root.joinpath(*parts[:k], ".git"))]
 
 
 def protected_glob(root: Path, rel: str, protected: tuple[str, ...]) -> str | None:

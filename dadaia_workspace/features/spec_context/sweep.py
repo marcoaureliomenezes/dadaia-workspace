@@ -31,8 +31,9 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from dadaia_workspace.core import clock, platform
+from dadaia_workspace.core.linked_tree import is_worktree_gitfile
 from dadaia_workspace.core.platform import act
-from dadaia_workspace.core.workspace_layout import is_worktree_gitfile, occupied
+from dadaia_workspace.core.workspace_layout import occupied
 
 __all__ = [
     "Skipped",
