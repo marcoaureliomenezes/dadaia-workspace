@@ -121,7 +121,7 @@ def test_merge_fast_forwards_removes_and_reruns(root: Path) -> None:
     assert git(repo, "rev-parse", WORK).strip() == sha  # HEAD as approved
     assert not tree.exists()
     assert git(repo, "branch", "--list", "wt/*", "--format=%(refname:short)").split() == [WORK]
-    assert run(root, "merge", TREE).returncode == 0  # a finished merge re-runs clean
+    assert run(root, "merge", TREE).returncode == 1  # a finished merge's rerun is never success
     assert run(root, "new", "r", NEW_JOB).returncode == 0
     shutil.rmtree(tree)  # the dadaia:-locked tree deleted by hand: an orphan, its exit clears it
     rows = json.loads(run(root, "list", "--json").stdout)
@@ -716,7 +716,7 @@ def test_the_job_gate_runs_scripts_ci_job_as_argv_on_the_head_it_lands(
 
 def test_a_job_merge_needs_an_approved_verdict(root: Path) -> None:
     """No verdict refuses with the dispatch fix; an APPROVED verdict lands the
-    job, and the merge re-run after a newer verdict lands too."""
+    job, and the merge re-run after it refuses: nothing is left to land."""
     repo = root / "repos/r"
     head = land(root, "src/a.py")
     assert _line(run(root, "merge", TREE)) == _dispatch(root / TREE)
@@ -724,7 +724,7 @@ def test_a_job_merge_needs_an_approved_verdict(root: Path) -> None:
     landed = run(root, "merge", TREE)
     assert landed.returncode == 0, landed.stderr
     approve(root, head, at="T11:00:00Z")
-    assert run(root, "merge", TREE).returncode == 0
+    assert run(root, "merge", TREE).returncode == 1
     assert git(repo, "rev-parse", WORK).strip() == head
 
 
