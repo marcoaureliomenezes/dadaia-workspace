@@ -18,7 +18,7 @@ CANDIDATE_RE = re.compile(r"^rc-([1-9][0-9]*)$")
 CONTEXT_NAME_RE = re.compile(r"[A-Za-z0-9_-]+")
 TAG_RE = re.compile(r"^v?(\d+)\.(\d+)\.(\d+)$")
 TASK_ID_RE = re.compile(r"^J[1-9][0-9]*(?:\.S[1-9][0-9]*)?\.T[1-9][0-9]*$")
-#: A task id as `caused_by` may name it, current or from a closed release (`T-050-95`, `JB.S4.T2`).
+#: A task id as `caused_by` may name it: the current grammar or a closed release's.
 TASK_ID_ANY_RE = re.compile(
     r"(?:T-[0-9]+-[0-9]+[A-Z]?|J(?:[1-9][0-9]*|[A-Z])(?:\.S[1-9][0-9]*)?\.T[1-9][0-9]*)\b"
 )
