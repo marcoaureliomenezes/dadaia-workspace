@@ -26,7 +26,7 @@ The branch contract by role; the names are `specs/constitution.md`'s `gitflow:` 
 8. Candidate closure, on the operator's explicit order (publication): open one work → integration PR and merge it green; before that order, "finish" means merged into the work branch.
 9. After the merge, the main thread asks the operator one question: **promote or continue?** — and, for promote, the next release `<id>` or none. Continue = the next candidate's `python3 .agents/skills/dd-release-implementation/scripts/release.py new <id>`; promote = step 10.
 10. Promote: open the PR integration → principal (the reviewer's `APPROVED` on the integration tip, §3b); its merge is the deploy.
-11. After the promote PR merges, tag the work tip as `archive/<work-name>`; once the next release `<id>` is named (step 9), rename the work branch, never cut a new one: `git -C <repo> branch -m <work><old> <work><id>` (and its remote ref, when one exists: `git -C <repo> push -u origin <work><id> :<work><old>`). On it a `wt-backlog-<slug>` lane runs `python3 .agents/skills/dd-release-implementation/scripts/release.py ship --sha <sha>`, then `release.py new <id>` in the new candidate's `wt-rc`. Until then work continues on the old-named branch; the rename carries every commit, the ship included, to the next work → integration PR.
+11. After the promote PR merges, tag the work tip as `archive/<work-name>`; once the next release `<id>` is named (step 9), rename the work branch, never cut a new one: `git -C <repo> branch -m <work><old> <work><id>` (and its remote ref, when one exists: `git -C <repo> push -u origin <work><id> :<work><old>`). On it a `wt-backlog-<slug>` lane ships the release, its carry owned by `dd-release-implementation/RELEASE-EVENTS.md`, then the new candidate starts in its `wt-rc` (step 9). Until then work continues on the old-named branch; the rename carries every commit, the ship included, to the next work → integration PR.
 12. A `.dadaia/.venv/bin/dadaia worktree` tree and its branch complete under `worktrees/AGENTS.md` §2, which owns their merge and cleanup lifecycle.
 
 - Rewriting the pushed history of, or force-pushing, the work branch or a branch that advances only by PR is refused unless the operator authorizes that act in its own turn.
@@ -71,7 +71,7 @@ The branch contract by role; the names are `specs/constitution.md`'s `gitflow:` 
 | 10 | `wt-rc` (define, reconcile), a `wt-backlog-<slug>` lane on the next work branch (§2 step 11, `ship`) | Release state: `specs/releases/<v>/_RELEASE.json` and `specs/releases/_archive/**`, only when [`RELEASE-EVENTS.md`](../dd-release-implementation/RELEASE-EVENTS.md) requires a current entry | `chore(release): …` |
 | 11 | the job tree that found the defect (`wt-main`) | Pure law or doc text that no program prints (a fix line, `--help` or a schema stays Arm B, shape 3): the file it corrects; no `BUGS.jsonl` record | `docs(law): <what>`; the body cites the finding; one review |
 | 12 | a `wt-task-<kkk>` or `wt-hotfix` tree | Code revert: the culprit commit's paths, put back | `Revert "<subject>"`; body `This reverts commit <sha>.` |
-| 13 | a `wt-task-<kkk>` or `wt-hotfix` tree | Format-only commit: shape 6's `style(<id>): …`, never a `fix(bugs)` or `refactor(bugs)` line, since a record's cited fix is the newest commit holding such a line | `style(<id>): …` |
+| 13 | a `wt-task-<kkk>` or `wt-hotfix` tree | Format-only commit: shape 6's `style(<id>): …`, never a `fix(bugs)` or `refactor(bugs)` line, since a record's fix is the newest id-line commit (`dd-bug-resolution/LINEAGE.md` §The filter) | `style(<id>): …` |
 
 ## 3b. The PR gate
 
@@ -81,11 +81,11 @@ The branch contract by role; the names are `specs/constitution.md`'s `gitflow:` 
 ## 4. Done when
 
 - Current branches match §2a, and every commit since the work branch's cut, `specs/audits/**` commits aside, matches one §3a row.
-- After a work → integration PR: the repo's `verify:` line passed, the reviewer's `APPROVED` verdict names the PR head, and the PR merged.
+- After a work → integration PR: §3b holds and the PR merged.
 - After promotion: the `archive/<work-name>` tag resolves to the former work tip, once the next release is named the work branch carries its name and its first merge records the principal merge as `shipped` in the archived state.
 
 ## 5. References
 
-- Run `.dadaia/.venv/bin/dadaia worktree --help` (verbs `new`, `merge`, `sync`, `clean`, `hash`, `list`, `pause`, `resume`); run it, never read its source; the rules: `worktrees/AGENTS.md`.
+- `.dadaia/.venv/bin/dadaia worktree --help` lists the verbs; run it, never read its source; the rules: `worktrees/AGENTS.md`.
 - [`CICD-AUTOMATION.md`](CICD-AUTOMATION.md) — optional: plug your own pipeline into the repo's `verify:` lines.
 - Chokepoints: `.dadaia/AGENTS.md` §3 and `worktrees/AGENTS.md`; every other rule here is discipline upheld by agents and reviewers.

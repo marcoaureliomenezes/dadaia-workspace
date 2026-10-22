@@ -22,8 +22,7 @@ compatibility: Standalone Agent Skill; the full lifecycle lives in a dadaia-work
 
 ## 2. The method — seven phases, each gated
 
-**Phase 0 — Lineage.** Read the prior fixes to the same
-files or `component` in the bounded window ([`LINEAGE.md`](LINEAGE.md)); inspect every prior fix as [`LINEAGE.md`](LINEAGE.md) §Read persisted facts says; whether this fix is a REBUILD is `specs/bugs/AGENTS.md` §2's;
+**Phase 0 — Lineage.** Read the unit's prior fixes in the bounded window, found by the id-line query of [`LINEAGE.md`](LINEAGE.md) §The filter; inspect every prior fix as [`LINEAGE.md`](LINEAGE.md) §Read persisted facts says; whether this fix is a REBUILD is `specs/bugs/AGENTS.md` §2's;
 grep every decider of the same fact and name its one owner before any fix;
 carry the link to Phase 6 (`resolve --caused-by`; `update` repairs);
 echo the `caused_by:`/`evidence:`/`prior diffs read:`/`rebuild:` block in the fix commit body; a REBUILD names its unit in `rebuild:`, never `rebuild: none`.

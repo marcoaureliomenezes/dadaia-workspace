@@ -26,9 +26,9 @@ Also input: `.dadaia/.venv/bin/dadaia doctor --context <ctx> --json` at HEAD.
 ## `_RELEASE.json` milestone completeness
 
 1. For every release whose `_RELEASE.json` the window's commits touch, confirm the three canonical milestones.
-2. Milestones: `defined` (SPEC `Approved`), `implemented` (`release.py phase CLOSURE`), `shipped` (merge to the principal branch of the constitution's `gitflow:`).
-3. Confirm each carries a `sha` (and, where applicable, a `pr`).
-4. Flag a release with a `shipped` milestone but no `defined`/`implemented` milestone — the chain has a gap.
+2. The three milestones and the fields each writes: `dd-release-implementation/RELEASE-EVENTS.md` §Milestones.
+3. Confirm each carries the fields that table gives it.
+4. Flag a release with a `shipped` milestone but a missing earlier one — the chain has a gap.
 5. For an archived release, check the same from `releases/_archive/<v>/_RELEASE.json`.
 
 ## SPEC provenance and the one exit

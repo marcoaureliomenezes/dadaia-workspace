@@ -7,7 +7,7 @@ description: >
 
 # dd-bug-registration
 
-> `dd-product-engineer` and `dd-sw-engineer-sr` register; every other agent, the reviewer included (in its verdict's `findings`), returns the proposal to the main thread; the propose/confirm rule lives in `specs/bugs/AGENTS.md` §1. Fixing a registered bug is dd-bug-resolution's.
+> Who writes `bugs/**`: `specs/AGENTS.md` §4; the propose/confirm rule: `specs/bugs/AGENTS.md` §1. Fixing a registered bug is dd-bug-resolution's.
 
 ## 1. When
 
@@ -37,7 +37,7 @@ description: >
    ```
 2. `--component` is the path of the failing component; siblings come from the fix files the ledger records, so no surface is typed.
 3. `--correlates`: search `specs/bugs/BUGS.jsonl` and `specs/bugs/_archive/bugs_histo.jsonl` for the component path and the symptom, and list every hit; `none` only when both searches are empty.
-4. Stage `BUGS.jsonl` and commit `chore(bugs): report <id>` in a tree shape 1 of `dd-gitflow-default` §3a names.
+4. Stage `BUGS.jsonl` and commit it in the tree and message of shape 1 of `dd-gitflow-default` §3a.
 5. A bug belongs to the context whose tooling broke: its own `specs/bugs/`, plus an
    upstream report when the broken tool is someone else's.
 6. Hand the fix to `dd-bug-resolution` once the record exists.
