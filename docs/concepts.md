@@ -15,8 +15,9 @@ heading *Context, scope and races*.
 
 A *release* is one SemVer line under `specs/releases/<M.m.p>/`, and its *candidates*
 (`rc-<N>/`) are closed-scope steps through it; the highest candidate is live. The release
-state, the SPEC `Origin` line and the release ids are owned by
-`dadaia_workspace/public/skills/dd-release-implementation/RELEASE-EVENTS.md`.
+state is owned by
+`dadaia_workspace/public/skills/dd-release-implementation/RELEASE-EVENTS.md`; the SPEC `Origin` line
+and the release ids by `dadaia_workspace/public/scaffold/releases/AGENTS.md` (Authoring rules).
 
 ## The flow
 
