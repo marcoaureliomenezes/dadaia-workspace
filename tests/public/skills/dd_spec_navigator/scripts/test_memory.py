@@ -171,6 +171,27 @@ def test_a_drifted_pair_names_the_generator_as_its_fix(
     assert _run(script, "check", "--specs", str(specs)).returncode == 0
 
 
+def test_a_specs_tree_without_product_names_the_cross_shell_mkdir_by_absolute_path(
+    script: Path, tmp_path: Path
+) -> None:
+    """Both the generator's refusal and `check`'s finding carry the interpreter mkdir act with the
+    absolute product folder, and running that line creates it."""
+    bare = tmp_path / "bare" / "specs"
+    (bare / "memory").mkdir(parents=True)
+    product = bare / "memory" / "product"
+
+    refusal = _run(script, "catalog", "generate", "--specs", str(bare))
+    (finding,) = json.loads(_run(script, "check", "--specs", str(bare), "--json").stdout)
+
+    assert refusal.returncode == 1
+    for fix in (finding["fix"], refusal.stderr.split("fix: ", 1)[1].strip()):
+        assert fix.endswith(f" {product}")
+        assert not fix.startswith(("mkdir", "Agent action"))
+        assert run([git_bash(), "-c", fix], cwd=tmp_path).returncode == 0
+        assert product.is_dir()
+        product.rmdir()
+
+
 @pytest.mark.parametrize(
     ("line", "verdict"),
     [

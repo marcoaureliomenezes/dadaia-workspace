@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
 import sys
@@ -231,3 +232,33 @@ def test_act_of_any_other_kind_raises(kind: str) -> None:
 def test_command_with_an_unspellable_word_is_the_agent_act_of_its_text() -> None:
     line = K.command("python", "/s/w.py", "$x", caps=WIN)
     assert line == K.act("agent", "run python /s/w.py $x, quoting $x for your shell")
+
+
+def test_mkdir_line_is_the_interpreter_act_with_the_path_as_its_own_word(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    code = "import pathlib, sys; pathlib.Path(sys.argv[1]).mkdir(parents=True, exist_ok=True)"
+    monkeypatch.setattr(sys, "executable", "/usr/bin/python3")
+    assert K.mkdir_line(Path("/w/a b"), POSIX) == f"/usr/bin/python3 -c '{code}' '/w/a b'"
+    monkeypatch.setattr(sys, "executable", "C:/py/python.exe")
+    assert K.mkdir_line(Path("/w/a b"), WIN) == f'C:/py/python.exe -c "{code}" "/w/a b"'
+
+
+@pytest.mark.medium
+def test_mkdir_line_makes_the_directory_and_its_parents_twice_over(tmp_path: Path) -> None:
+    made = tmp_path / "it's here" / "deep"
+    for _ in range(2):
+        done = oslib.run([git_bash(), "-c", K.mkdir_line(made)])
+        assert (done.returncode, made.is_dir()) == (0, True), done.stderr
+
+
+@pytest.mark.medium
+def test_passthrough_hands_the_child_our_streams_and_returns_its_exit_code(
+    tmp_path: Path, capfd: pytest.CaptureFixture[str]
+) -> None:
+    code = (
+        "import os, sys; print(os.getcwd()); print(os.environ['K'], file=sys.stderr); sys.exit(3)"
+    )
+    status = K.passthrough([sys.executable, "-c", code], cwd=tmp_path, env={**os.environ, "K": "v"})
+    out, err = capfd.readouterr()
+    assert (status, out.strip(), err.strip()) == (3, str(tmp_path.resolve()), "v")

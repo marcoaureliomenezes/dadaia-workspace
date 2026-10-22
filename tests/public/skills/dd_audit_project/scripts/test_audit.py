@@ -198,3 +198,16 @@ def test_the_doctor_neither_folds_findings_nor_recommends_close() -> None:
     assert not [r.codes for r in RULES if "close" in str(r.fix_help)]
     specs_src = Path(__file__).resolve().parents[5] / "dadaia_workspace" / "features" / "specs"
     assert not [p for p in specs_src.glob("*.py") if "from_dict" in read_text(p)]
+
+
+def test_an_unknown_finding_refusal_greps_the_findings_file_by_its_absolute_path(
+    script: Path, specs: Path
+) -> None:
+    findings = specs / "audits" / _AUDIT / "FINDINGS.jsonl"
+    result = _run(
+        script, "disposition", _AUDIT, f"{_AUDIT}-F099", "--disposition", "rejected",
+        "--reason", "r", "--specs", str(specs),
+    )  # fmt: skip
+    assert result.returncode == 1
+    assert result.stderr.count("fix: ") == 1
+    assert f"fix: grep {_AUDIT}-F099 {findings}\n" in result.stderr
