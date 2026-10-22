@@ -9,13 +9,18 @@ from __future__ import annotations
 import re
 from collections.abc import Iterator
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 import pytest
 
+from dadaia_workspace.core.models.doctor_report import DoctorStatus
 from dadaia_workspace.core.models.git_scan import ScannedObject
 from dadaia_workspace.features.chokepoints.denylist_scan import _first_match, scan_objects
-from dadaia_workspace.infrastructure.privacy_check import load_baseline_patterns
+from dadaia_workspace.infrastructure.privacy_check import (
+    check_public_privacy,
+    load_baseline_patterns,
+)
 
 _TERM = "zz-secret-term"
 _TERMS = ((_TERM, "synthetic"),)
@@ -181,3 +186,25 @@ def test_binary_and_oversized_objects(obj: ScannedObject, hits: int, binary: int
     assert len(outcome.hits) == hits
     assert outcome.skipped_binary_count == binary
     assert [(n.path, n.size_bytes, n.scanned_bytes) for n in outcome.oversized_notes] == notes
+
+
+_HOST = "box" + ".local"
+
+
+@pytest.mark.parametrize(
+    "path",
+    ["package-lock.json", "sub/dir/package-lock.json", "notes.json", "poetry.lock", "sub/dir/uv.lock"],
+)
+def test_the_scan_and_the_public_doctor_exclude_the_same_paths(tmp_path: Path, path: str) -> None:
+    """One path, one verdict: a file holding an address and an internal host is refused by
+    the push-range scan exactly when the public doctor refuses it."""
+    text = f'{{"v": "{_IPV4}", "h": "{_HOST}"}}\n'
+    scan = scan_objects([_obj(text, path=path)], terms=(), patterns=load_baseline_patterns())
+
+    public = tmp_path / "lib" / "dadaia_workspace" / "public"
+    target = public / path
+    target.parent.mkdir(parents=True)
+    target.write_text(text, encoding="utf-8")
+    doctor = check_public_privacy(public, lambda d: [p for p in d.rglob("*") if p.is_file()])
+
+    assert any(line.status is DoctorStatus.ERROR for line in doctor) is bool(scan.hits)

@@ -11,6 +11,7 @@ Two failure modes stay closed:
 
 from __future__ import annotations
 
+import json
 import re
 import shutil
 import sys
@@ -21,7 +22,10 @@ from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.infrastructure.privacy_check import PORTUGUESE_CONTROL_TERMS
+from dadaia_workspace.infrastructure.privacy_check import (
+    PORTUGUESE_CONTROL_TERMS,
+    load_privacy_terms,
+)
 from tests.fixtures.real_git import git
 from tests.helpers.oslib import Undecodable, read_text, run, write_text
 from tests.helpers.privacy_fixtures import internal_host, private_ip
@@ -356,3 +360,44 @@ def test_a_lock_file_skips_only_the_pattern_naming_its_path(tmp_path: Path) -> N
     write_text(public / "notes.json", f'{{"v": "{private_ip()}"}}\n')
     [line] = check_public_privacy(public, lambda d: d.iterdir())
     assert line.status is DoctorStatus.ERROR and "notes.json" in line.text
+
+
+def _workspace_with_terms(root: Path, terms: dict[str, str]) -> Path:
+    states = root / ".dadaia" / "states"
+    states.mkdir(parents=True)
+    write_text(states / "spec_contexts.json", "{}")
+    write_text(states / "privacy_denylist.json", json.dumps(terms))
+    return root
+
+
+def _repo_in(workspace: Path, name: str) -> Path:
+    repo = workspace / "repos" / name
+    repo.mkdir(parents=True)
+    run(["git", "init", "-q", str(repo)])
+    return repo
+
+
+def test_the_denylist_of_a_scanned_path_is_its_own_workspaces_not_the_cwds(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Scanning a repo of workspace B from workspace A's cwd applies B's terms only."""
+    monkeypatch.delenv("DADAIA_PRIVACY_DENYLIST", raising=False)
+    cwd_ws = _workspace_with_terms(tmp_path / "wsa", {"zzcwdterm": "a"})
+    repo = _repo_in(_workspace_with_terms(tmp_path / "wsb", {"zzplantedterm": "b"}), "app")
+    monkeypatch.chdir(cwd_ws)
+
+    assert load_privacy_terms(repo) == (("zzplantedterm", "b"),)
+
+
+def test_a_repo_named_like_its_workspace_keeps_its_workspaces_terms(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The own-name drop never erases a term the workspace's denylist holds."""
+    monkeypatch.delenv("DADAIA_PRIVACY_DENYLIST", raising=False)
+    workspace = _workspace_with_terms(
+        tmp_path / "zzplantedws", {"zzplantedws": "r", "zzother": "o"}
+    )
+    repo = _repo_in(workspace, "zzplantedws")
+    monkeypatch.chdir(workspace)
+
+    assert load_privacy_terms(repo) == (("zzplantedws", "r"), ("zzother", "o"))
