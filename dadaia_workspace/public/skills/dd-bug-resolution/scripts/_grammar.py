@@ -18,9 +18,9 @@ CANDIDATE_RE = re.compile(r"^rc-([1-9][0-9]*)$")
 CONTEXT_NAME_RE = re.compile(r"[A-Za-z0-9_-]+")
 TAG_RE = re.compile(r"^v?(\d+)\.(\d+)\.(\d+)$")
 TASK_ID_RE = re.compile(r"^J[1-9][0-9]*(?:\.S[1-9][0-9]*)?\.T[1-9][0-9]*$")
-#: The head of a closed release's task line (a checklist item or a table cell), read by lineage only.
-HISTORICAL_TASK_RE = re.compile(
-    r"^(?:- \[.\]\s*|\|\s*)\**(T-[0-9]+-[0-9]+[A-Z]?|J[A-Z]\.S[1-9][0-9]*\.T[1-9][0-9]*)\b"
+#: A task id as `caused_by` may name it, current or from a closed release (`T-050-95`, `JB.S4.T2`).
+TASK_ID_ANY_RE = re.compile(
+    r"(?:T-[0-9]+-[0-9]+[A-Z]?|J(?:[1-9][0-9]*|[A-Z])(?:\.S[1-9][0-9]*)?\.T[1-9][0-9]*)\b"
 )
 #: Line-anchored, first match anywhere: a bullet, blockquote or quoted mid-line never counts.
 STATUS_RE = re.compile(r"^\*\*Status:\*\*\s*(.+?)\s*$", re.MULTILINE)

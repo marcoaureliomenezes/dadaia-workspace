@@ -8,6 +8,7 @@ commit, so a writer/validator disagreement is unrepresentable. The schema is
 
 from __future__ import annotations
 
+import re
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
@@ -16,7 +17,7 @@ import _findings
 import _git
 import _jsonl
 import _ledger
-from _grammar import HISTORICAL_TASK_RE, TASK_ID_RE
+from _grammar import CANDIDATE_RE, TASK_ID_ANY_RE
 from _platform import act, git_line, read_text
 from _specs import context_repos, script
 
@@ -68,23 +69,39 @@ def invariant_errors(record: dict[str, Any]) -> Iterator[str]:
         yield f"record {record['id']!r} closed_at={closed_at!r} precedes its filing date ts={ts!r}"
 
 
-def tasks(root: Path) -> set[str]:
-    """The ids under *root*`/releases/` (`_archive/` included) in every `TASKS.md` and
-    `tasks/*.md`: the id at the head of each checklist item or table cell, in either grammar,
-    plus every table cell that is a current-grammar id."""
-    files = [*root.glob("releases/**/TASKS.md"), *root.glob("releases/**/tasks/*.md")]
-    lines = [ln for file in files for ln in read_text(file).splitlines()]
-    found = {m[1] for ln in lines if (m := HISTORICAL_TASK_RE.match(ln))}
-    return found | {
-        c for ln in lines for p in ln.split("|") if TASK_ID_RE.fullmatch(c := p.strip())
-    }
+def tasks(root: Path) -> dict[str, list[str]]:
+    """Each task id under *root*`/releases/` (`_archive/` included) that heads a checklist item
+    or fills a table cell of a `TASKS.md` or `tasks/*.md`, with the `<M.m.p>-rc<N>/<id>` form of
+    every candidate that carries it."""
+    found: dict[str, set[str]] = {}
+    for file in [*root.glob("releases/**/TASKS.md"), *root.glob("releases/**/tasks/*.md")]:
+        parts = file.relative_to(root / "releases").parts
+        rc = next((i for i, p in enumerate(parts) if CANDIDATE_RE.match(p)), 0)
+        where = f"{parts[rc - 1]}-{parts[rc].replace('-', '')}/" if rc else ""
+        for line in read_text(file).splitlines():
+            item = re.match(r"- \[.\]\s*", line)
+            cells = (
+                line.split("|") if line.startswith("|") else [line[item.end() :]] if item else []
+            )
+            for cell in cells:
+                if m := TASK_ID_ANY_RE.match(cell.strip().lstrip("*")):
+                    found.setdefault(m[0], set()).update([f"{where}{m[0]}"] if where else [])
+    return {task: sorted(forms) for task, forms in found.items()}
+
+
+def ambiguous(root: Path, target: str) -> list[str]:
+    """The candidate-qualified forms of the bare task id *target* when several candidates carry it, else none."""
+    forms = tasks(root).get(target, [])
+    return forms if len(forms) > 1 else []
 
 
 def _archive_twice(archived: str, root: Path) -> tuple[dict[str, int], list[dict[str, Any]]]:
     """The first line of each plain archive id, and a finding for every later repeat."""
     plain: dict[str, int] = {}
     twice: list[dict[str, Any]] = []
-    for number, record in _archive_lines(archived, events=False):
+    for number, record, legacy in archive_records(archived):
+        if legacy:
+            continue
         if (first := plain.setdefault(str(record["id"]), number)) != number:
             twice.append(_findings.finding(
                 CODE, HISTO, number,
@@ -143,8 +160,8 @@ def _lineage(
         None,
         "none",
         *links,
-        *(str(r["id"]) for r in archived_records(archived)),
-        *tasks(root),
+        *(str(r["id"]) for _, r, _ in archive_records(archived)),
+        *(t for task, forms in tasks(root).items() for t in (task, *forms)),
     }
     for bug_id, target in links.items():
         if bug_id in legacy_ids:
@@ -199,27 +216,18 @@ def histo_findings(text: str, root: Path = _ledger.SPECS) -> list[dict[str, Any]
     )  # fmt: skip
 
 
-def _archive_lines(text: str, events: bool = True) -> Iterator[tuple[int, dict[str, Any]]]:
-    """The `(line, record)` pairs of the archive *text*: a plain line is a record, an event line
-    contributes its `data` when *events*; a line with no `id` or an unreadable one is
-    `histo_findings`' to name."""
+def archive_records(text: str) -> list[tuple[int, dict[str, Any], bool]]:
+    """The `(line, record, legacy)` of each archive line of *text* that names an id: a line
+    holding `event` and a `data` object is a legacy event line and yields its `data`; any other
+    line is a record. A line with no `id` or an unreadable one is `histo_findings`' to name."""
+    found = []
     for number, record, why in _jsonl.walk(text):
         if why or not isinstance(record, dict):
             continue
-        if events and "event" in record and isinstance(record.get("data"), dict):
-            record = record["data"]
-        if "id" in record:
-            yield number, record
-
-
-def archived_records(text: str) -> list[dict[str, Any]]:
-    """The records of the archive *text*, event lines' `data` included."""
-    return [record for _, record in _archive_lines(text)]
-
-
-def plain_ids(text: str) -> frozenset[str]:
-    """The ids of the archive *text*'s plain records: the ids no new record may take."""
-    return frozenset(str(record["id"]) for _, record in _archive_lines(text, events=False))
+        legacy = "event" in record and isinstance(record.get("data"), dict)
+        if "id" in (kept := record["data"] if legacy else record):
+            found.append((number, kept, legacy))
+    return found
 
 
 def _uncited(specs: Path, text: str) -> list[dict[str, Any]]:
