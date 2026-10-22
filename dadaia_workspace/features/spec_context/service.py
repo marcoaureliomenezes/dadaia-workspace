@@ -11,7 +11,7 @@ from functools import partial
 from pathlib import Path
 from typing import Any, Protocol
 
-from dadaia_workspace.core import clock, platform, workspace_layout
+from dadaia_workspace.core import clock, linked_tree, platform, workspace_layout
 from dadaia_workspace.core.cli_line import cli_words, fix_line, git_line, shell_line
 from dadaia_workspace.core.exceptions import (
     AssociatedRepoConflictError,
@@ -93,8 +93,7 @@ class DeadUnpushedCommitsError(DadaiaError):
 def _worktree_git_dir(tree: Path) -> Path:
     """The common git dir a move of linked worktree *tree* runs from — Windows refuses to
     rename a process's cwd, so never *tree* itself."""
-    gitdir = platform.read_text(tree / ".git").removeprefix("gitdir:").strip()
-    return (tree / gitdir).parents[1]
+    return (tree / (linked_tree.gitdir(tree / ".git") or "")).parents[1]
 
 
 def _require_allowlisted(label: str, value: str) -> None:
@@ -349,7 +348,9 @@ class SpecContextService:
         ctx = self.show(name)
         if slug == ctx.repo_slug:  # the main repo is already in all_repos()
             return ctx, False
-        add = fix_line(self._workspace_root, "context", "repo", "add", name, slug, "--url")
+        add = platform.inline(
+            *cli_words(self._workspace_root, "context", "repo", "add", name, slug, "--url")
+        )
         self._refuse_slug(
             name, slug, repo_url, act("agent", f"run `{add}` with the repo's clone URL")
         )
@@ -729,7 +730,7 @@ class SpecContextService:
         lost = [refix] if failed else [r["exit"] for r in held]
         lost += self._git.unrecoverable(path)
         if tree := sweep.linked_worktree(self._workspace_root, path):
-            move = git_line(_worktree_git_dir(tree), "worktree", "move", str(tree))
+            move = platform.git_inline(_worktree_git_dir(tree), "worktree", "move", str(tree))
             lost.append(
                 act("agent", f"choose a directory to keep {tree} in and run `{move}` with it")
             )
@@ -786,7 +787,7 @@ class SpecContextService:
         for slug, repo_path in present:
             done = sweep.hold(self._workspace_root, repo_path, f"repos/{slug}")
             if isinstance(done, sweep.Skipped):  # the refusal, not success: nothing to hold is fine
-                again = fix_line(self._workspace_root, "context", "dead", name)
+                again = platform.inline(*cli_words(self._workspace_root, "context", "dead", name))
                 raise ContextStateError(
                     f"Context '{name}' stays ALIVE: {done}",
                     fix=act("agent", f"free {repo_path} for the move, then run `{again}`"),

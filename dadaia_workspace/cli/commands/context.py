@@ -19,7 +19,7 @@ from dadaia_workspace.cli._specs_resolution import (
 )
 from dadaia_workspace.cli.redact import build_context_redactor
 from dadaia_workspace.core import clock, session_store
-from dadaia_workspace.core.cli_line import fix_line
+from dadaia_workspace.core.cli_line import cli_words, fix_line, shell_line
 from dadaia_workspace.core.exceptions import (
     AssociatedRepoConflictError,
     AssociatedRepoNotFoundError,
@@ -37,7 +37,7 @@ from dadaia_workspace.core.models.spec_context import (
     ContextState,
     SpecContextProject,
 )
-from dadaia_workspace.core.platform import act
+from dadaia_workspace.core.platform import act, inline
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.spec_context.service import (
     SpecContextService,
@@ -127,14 +127,15 @@ def create_fix(root: Path, error: Exception, name: str | None, urls: list[str]) 
     if isinstance(error, ContextAlreadyExistsError):
         name = None
     flags = [arg for u in urls[1:] for arg in ("--associated-repo", u)]
-    fix = fix_line(
+    words = cli_words(
         root, "context", "create", *([name] if name else []), "--main-repo", urls[0], *flags
     )
+    fix = inline(*words)
     if isinstance(error, ContextAlreadyExistsError):
         return act("agent", f"choose a context name no context holds and run `{fix}` with it")
     if isinstance(error, GitCloneError):
         return act("agent", f"run `{fix}` with a reachable clone URL in place of {error.url}")
-    return fix
+    return shell_line(*words)
 
 
 @app.command()

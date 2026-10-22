@@ -1,7 +1,6 @@
 """dadaia init command — one plan, one directory, one or more harnesses."""
 
 import sys
-from collections.abc import Callable
 from dataclasses import dataclass, replace
 from pathlib import Path
 
@@ -37,9 +36,6 @@ _INIT = ("uvx", "dadaia-workspace", "init")
 reconcile_workspace = container.reconcile_workspace
 
 
-_Render = Callable[..., str]
-
-
 @dataclass(frozen=True)
 class InitPlan:
     """Everything one ``init`` run does — filled by flags, or by prompts on a TTY."""
@@ -50,21 +46,19 @@ class InitPlan:
     associated: tuple[str, ...] = ()
     from_: str = ""
 
-    def command(
-        self,
-        directory: object = None,
-        runner: tuple[str, ...] = _INIT,
-        render: _Render = shell_line,
-    ) -> str:
+    def words(self, directory: object = None, runner: tuple[str, ...] = _INIT) -> tuple[str, ...]:
         """The ``init`` invocation that runs this plan — every flag it carries, so a
-        ``fix:`` line built from it never drops a level (*directory* overrides DIR);
-        *render* spells it as a line, or as inline text inside an act sentence."""
+        ``fix:`` line built from it never drops a level (*directory* overrides DIR)."""
         target = str(self.directory if directory is None else directory)
         flags = [("--harness", self.harness)] if self.harness else []
         flags += [("--from", self.from_)] if self.from_ else []
         flags += [("--repo", self.repo)] if self.repo else []
         flags += [("--associated-repo", url) for url in self.associated]
-        return render(*runner, *filter(None, [target]), *sum(flags, ()))
+        return (*runner, *filter(None, [target]), *sum(flags, ()))
+
+    def command(self, directory: object = None, runner: tuple[str, ...] = _INIT) -> str:
+        """:meth:`words` as one finished command line."""
+        return shell_line(*self.words(directory, runner))
 
 
 def _interactive() -> bool:
@@ -110,7 +104,7 @@ def _plan(
             if directory
             else act(
                 "agent",
-                f"run `{plan.command()}` with the new workspace's directory as its first argument",
+                f"run `{inline(*plan.words())}` with the new workspace's directory as its first argument",
             ),
         )
     directory = directory or str(Path.cwd() / typer.prompt("Workspace name"))
@@ -232,7 +226,7 @@ def _require_fit_root(root: Path, plan: InitPlan) -> None:
             act(
                 "operator",
                 f"empty {quote(str(root))} or name another empty folder for the workspace, "
-                f"then run {plan.command(root, render=inline)}",
+                f"then run {inline(*plan.words(root))}",
             ),
         )
 
