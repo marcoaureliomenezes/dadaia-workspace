@@ -379,7 +379,7 @@ def test_a_write_over_an_unreadable_line_refuses_naming_it(
     done = _run(script, "update", "a-bug", "--set", "caused_by=none", "--specs", str(specs))
     assert done.returncode == 1
     assert "BUGS.jsonl:2" in done.stderr and "cannot read in full" in done.stderr
-    assert f"sed -n '2p' {ledger}" in done.stderr
+    assert command("sed", "-n", "2p", str(ledger)) in done.stderr
 
 
 _APPEND = ["append", "--bug-id", "x", "--title", "t", "--severity", "LOW",
