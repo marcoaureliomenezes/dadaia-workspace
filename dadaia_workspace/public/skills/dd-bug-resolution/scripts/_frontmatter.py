@@ -21,7 +21,7 @@ from typing import Any, NamedTuple
 
 from _platform import decode
 
-__all__ = ["NotAMapping", "parse", "split"]
+__all__ = ["NotAMapping", "key_spans", "parse", "split"]
 
 _SPLIT = re.compile(r"\A---[ \t]*\n(.*?)\n---[ \t]*\n?", re.DOTALL)
 _KEY = re.compile(r"([A-Za-z_][A-Za-z0-9_.-]*):(?: +(.*))?$")
@@ -48,6 +48,22 @@ def split(text: str) -> tuple[str, str] | None:
     text = decode(text.encode())  # callers pass read_text output; a lone surrogate would raise
     match = _SPLIT.match(text)
     return (match.group(1), text[match.end() :]) if match else None
+
+
+def key_spans(block: str) -> list[tuple[str | None, list[str]]]:
+    """The lines of a *block* grouped by top-level key: ``(key, lines)`` where the lines are the
+    key line plus every following indented, ``-`` or blank line; continuation lines before the
+    first key have the key ``None``. The lines rejoin with ``\n`` to the block."""
+    spans: list[tuple[str | None, list[str]]] = []
+    for line in block.split("\n"):
+        if line[:1] in (" ", "\t", "-") or not line.strip():
+            if spans:
+                spans[-1][1].append(line)
+            else:
+                spans.append((None, [line]))
+        else:
+            spans.append((line.split(":", 1)[0], [line]))
+    return spans
 
 
 def _fail(number: int, why: str) -> ValueError:

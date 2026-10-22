@@ -39,6 +39,7 @@ __all__ = [
 Role = Literal["principal", "integration", "work"]
 
 _grammar = load_owner("dd-bug-resolution", "_grammar")
+_key_spans = load_owner("dd-bug-resolution", "_frontmatter").key_spans
 _VERSION_RE = _grammar.SEMVER_RE
 candidate_number = _grammar.candidate_number
 candidate_dir = _grammar.candidate_dir
@@ -227,15 +228,12 @@ def merge_frontmatter(
     constitution = constitution_path(specs_dir)
     text = platform.read_text(constitution) if constitution.exists() else ""
     parts = split(text)
-    lines = parts[0].split("\n") if parts else []
     kept: list[str] = []
-    skipping = False
-    for line in lines:
-        if skipping and (line[:1] in (" ", "\t", "-") or not line.strip()):
-            continue
-        key = line.split(":", 1)[0]
-        skipping = ":" in line and key in updates
-        kept.append(f"{key}: {updates.pop(key)}" if skipping else line)
+    for key, lines in _key_spans(parts[0]) if parts else []:
+        if key in updates:
+            kept.append(f"{key}: {updates.pop(key)}")
+        else:
+            kept.extend(lines)
     kept.extend(f"{key}: {value}" for key, value in updates.items())
     platform.write_text(
         constitution, "---\n" + "\n".join(kept) + "\n---\n" + (parts[1] if parts else text)
