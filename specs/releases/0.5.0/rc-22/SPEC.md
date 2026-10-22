@@ -4,179 +4,202 @@
 **Release ID:** 0.5.0
 **Owner:** dd-product-engineer
 **Opened:** 2026-10-21
-**Origin:** bugs:merge-accepts-a-verdict-written-by-the-merger,t3-grader-requires-an-active-backlog-entry,init-over-a-folder-with-a-venv-fix-line-names-another-folder,merge-of-a-gone-tree-with-its-parent-gone-prints-a-generic-fix-line,reconcile-rollback-advice-is-prose-not-a-fix-line,code-breaks-the-constitution-complexity-and-import-cycle-law,stats-counts-audit-commits-as-non-block-work-after-closure
+**Origin:** bugs:init-no-terminal-fix-line-nests-one-act-label-inside-another,mcp-on-main-is-vulnerable-to-session-exhaustion,verdict-act-gate-lexer-lets-an-ampersand-redirection-or-a-midword-hash-hide-the-writer,verdict-act-gate-lexer-misses-the-module-name-attached-to-dash-m,merge-accepts-a-verdict-written-by-the-merger,t3-grader-requires-an-active-backlog-entry,init-over-a-folder-with-a-venv-fix-line-names-another-folder,merge-of-a-gone-tree-with-its-parent-gone-prints-a-generic-fix-line,reconcile-rollback-advice-is-prose-not-a-fix-line,code-breaks-the-constitution-complexity-and-import-cycle-law,stats-counts-audit-commits-as-non-block-work-after-closure,verdict-act-gate-regex-misses-spellings-and-refuses-reads,stats-reads-closure-files-by-whitespace-split-with-renames,reconcile-service-calls-act-through-an-attribute,init-fix-line-text-breaks-two-fix-line-contract-tests,merge-of-a-path-with-no-tree-and-no-branch-claims-merged; findings:20261022-bug-history-and-single-source-F001,20261022-bug-history-and-single-source-F002,20261022-bug-history-and-single-source-F003,20261022-bug-history-and-single-source-F004,20261022-bug-history-and-single-source-F005,20261022-bug-history-and-single-source-F006,20261022-bug-history-and-single-source-F007,20261022-bug-history-and-single-source-F008,20261022-bug-history-and-single-source-F009,20261022-bug-history-and-single-source-F010,20261022-bug-history-and-single-source-F011,20261022-bug-history-and-single-source-F012,20261022-bug-history-and-single-source-F013,20261022-bug-history-and-single-source-F014,20261022-bug-history-and-single-source-F015,20261022-bug-history-and-single-source-F016,20261022-bug-history-and-single-source-F017,20261022-bug-history-and-single-source-F018,20261022-bug-history-and-single-source-F019,20261022-bug-history-and-single-source-F020,20261022-bug-history-and-single-source-F021,20261022-bug-history-and-single-source-F022,20261022-bug-history-and-single-source-F023,20261022-bug-history-and-single-source-F024,20261022-bug-history-and-single-source-F025,20261022-bug-history-and-single-source-F026,20261022-bug-history-and-single-source-F027,20261022-bug-history-and-single-source-F028,20261022-bug-history-and-single-source-F029,20261022-bug-history-and-single-source-F030,20261022-bug-history-and-single-source-F031,20261022-bug-history-and-single-source-F032,20261022-bug-history-and-single-source-F033,20261022-bug-history-and-single-source-F034,20261022-bug-history-and-single-source-F035,20261022-bug-history-and-single-source-F036,20261022-bug-history-and-single-source-F037,20261022-bug-history-and-single-source-F038,20261022-bug-history-and-single-source-F039,20261022-bug-history-and-single-source-F040,20261022-bug-history-and-single-source-F041,20261022-bug-history-and-single-source-F042,20261022-bug-history-and-single-source-F043,20261022-bug-history-and-single-source-F044,20261022-bug-history-and-single-source-F045,20261022-bug-history-and-single-source-F046,20261022-bug-history-and-single-source-F047,20261022-bug-history-and-single-source-F048,20261022-bug-history-and-single-source-F049,20261022-bug-history-and-single-source-F050,20261022-bug-history-and-single-source-F051,20261022-bug-history-and-single-source-F052,20261022-bug-history-and-single-source-F053,20261022-bug-history-and-single-source-F054,20261022-bug-history-and-single-source-F055,20261022-bug-history-and-single-source-F056
 
 ---
 
 ## Bug window review
 
-**Window:** the records closed between rc-21's birth (2026-10-20T15:14:19Z) and rc-22's birth (2026-10-21T00:28:07Z, `_RELEASE.json` log): one, `t3-instruction-omits-backlog-demand` (MEDIUM, `caused_by: J7.T3`, closed 16:44:45Z), read in `BUGS.jsonl` and `_archive/bugs_histo.jsonl` at `a01772b95`. rc-21's table covers the earlier closures; the lanes resolved after rc-22's birth are rc-23's window. Two rc-21 KEEP rows gained a child and are re-judged, and the verdict gate's fix chain is read beside them because FR1's record names its predecessor (as-is §2). Each fix is found by its id line and read with `git show --numstat`, tests and specs excluded.
+**Window:** every record closed after rc-21's birth (2026-10-20T15:14:19Z, `_RELEASE.json` log), read in `BUGS.jsonl` and `_archive/bugs_histo.jsonl` at `aa4c77ac0`: 13 resolved, 1 superseded. Each fix is found by its id line (`git log -E --grep '^(fix|refactor)\(bugs\): …<id>'`). The verdict and its evidence are the audit's per-bug judgement (`20261022-bug-history-and-single-source`, batches A–D at `6009dabc2`); this table does not re-audit. `F<nnn>` below is `20261022-bug-history-and-single-source-F<nnn>`.
 
-| fix (ids) | commit(s) | unit | net src | verdict | reason |
-|---|---|---|---|---|---|
-| t3-instruction-omits-backlog-demand | `7c6a13c59` | `evals/tasks/t3-discovery/instruction.md` | +1 / -1 (text) | REBUILD (FR2) | The fix edited the grader's input to fit an unchanged grader. Its child (FR2's bug) came on the next eval: the grader states the law's entry rule more narrowly than the law. The REBUILD target is the grader. The instruction stays (main-thread ruling: "KEEP the instruction, its text-asserting test goes to 0.6.0 intake"). |
-| rc-21 merge-gate refusals (8 ids) | `1ec2d8ef2`, `bc8ef6d08`, `e42f8c2b9` | `_worktree_end.py` `merge` | -4, -16, +7 | REBUILD of `merge`'s head (FR4) | rc-21 said KEEP. FR4's bug shows that `merge` has two entry paths and only the present-tree path checks the parent tree. |
-| bugs-check-refuses-task-fixed-records, rc-merge-reads-the-context-registry-twice | `c50735192`, `902c574ed` | `_bugs_check.findings_for` | 0, +2 | REBUILD (FR6) | These are the "one more child" that rc-21's KEEP row warned about. The unit has 15 records and radon grade D. |
-| merge-gate-accepts-verdict-written-by-the-merger, worktree-merge-first-approved-overrides-newer-rejected, verdict-ttl-shorter-than-merge-window | `cb5cc3fde` + `38d544309`, `b4995b57f`, J10.S2.T2 (`985b7be13`) | `_handoffs.reviewer_records`, `_worktree_end._moment` | — | REBUILD (FR1, ADR 0279) | All three are symptom patches of one cause: the gate trusts a file in a zone every agent can write, and the order comes from a field the writer chooses. The reaper-hold glob widened that zone. |
+| fix (ids) | newest fix commit | audit class, quality | verdict | where |
+|---|---|---|---|---|
+| t3-instruction-omits-backlog-demand | `7c6a13c59` | text-only, 5 | KEEP the instruction (main-thread ruling "KEEP the instruction, its text-asserting test goes to 0.6.0 intake"); the grader is the REBUILD target | FR13 |
+| t3-grader-requires-an-active-backlog-entry | `5fe06d62f` | structural, 4: a bare `release.py new` stub passes | REBUILD | FR13 (F026) |
+| merge-accepts-a-verdict-written-by-the-merger, verdict-act-gate-regex-misses-spellings-and-refuses-reads | `356da1cda`, `2632edd92` | symptom patch, 4 and 3: one command spelling judged | REBUILD `gate_policy.verdict_act` | FR7 (F016) |
+| init-over-a-folder-with-a-venv-fix-line-names-another-folder, init-fix-line-text-breaks-two-fix-line-contract-tests | `c3bd83228`, `bd867f57f` | bolt-on (`render=` switch), 4; text-only with an allow-list row, 5; REBUILD label overclaimed | REBUILD fix-line production | FR8 (F015) |
+| merge-of-a-gone-tree-with-its-parent-gone-prints-a-generic-fix-line, merge-of-a-path-with-no-tree-and-no-branch-claims-merged, merge-of-a-never-opened-tree-claims-merged (superseded) | `cac2ec646`, `13f7f79a9`, — | structural, 7, but `caused_by: none` is wrong; text-only after the pin; no fix | REBUILD the head of `merge` | FR6 (F013) |
+| reconcile-rollback-advice-is-prose-not-a-fix-line, reconcile-service-calls-act-through-an-attribute | `2ea8f2c4f`, `76183f983` | structural, 7, residual special case and a fix that misnames a cause; a rename labelled REBUILD, 6 | REBUILD the reconcile result | FR11 |
+| code-breaks-the-constitution-complexity-and-import-cycle-law | `a53675d24` (7 commits) | structural, 6, net +114 | KEEP | — |
+| stats-counts-audit-commits-as-non-block-work-after-closure, stats-reads-closure-files-by-whitespace-split-with-renames | `102d7ca9a`, `94534a576` | bolt-on, then a deletion, 8 | KEEP the one reader; the stored-sha read is REBUILD | FR10 (F008) |
 
-**Overfitting check:** `7c6a13c59` special-cases a test value (it hands the agent the exact work the grader needs). `tests/e2e/test_evals_t3.py::test_the_instruction_gives_the_operator_work_and_names_the_workspace` asserts instruction text. It goes to the 0.6.0 intake, since a test leaves only on the operator's order. No fix in the window changed an assert.
+**Overfitting check:** `7c6a13c59` hands the agent the work the grader needs, and T3's grader was loosened twice after a 0/3 (F026). `3cfe9443e` added an allow-list row to a guard. No fix in the window changed an assert. Three `caused_by` values are wrong (`t3-grader…`, `merge-of-a-gone-tree…`, `stats-counts…`); F029 owns that class.
 
 ## 1. Problem
 
 The operator's words:
 
-- Grill, 2026-10-20 (handoff `2026-10-20T231549Z-main-thread-grill-evals-promote`):
-  - Q3 self-approval: "Bloqueia o 0.5.0".
-  - Q4: "Confirmo: bug CRITICAL (Recommended)".
-  - Q5: "Fechar o que a ferramenta controla (Recommended)".
-  - Q6: all four proposals, "Grader T3 vs lei (Recommended)", "init: fix line errada", "Propostas a, b, d do fechamento" and "Proposta c (radon D)".
-  - Q1: "Readout Codex local em E (Recommended)".
-  - Q2: "Gate binário + nota por checkpoints (Recommended)".
+- 2026-10-21, the suspension (`AUDIT.md` Origin): "full audit on all the bugs after rc15 … I cannot trust about deploying this version"; "mapping places where we have repeated code or text … we need a unique source of truth"; and a definition of slop.
+- Grill 2026-10-22 (handoff `2026-10-22T064642Z-main-thread-grill-remediation`):
+  - R1: "Reescopar o rc-22 (Recommended)".
+  - R2: "Definir em SLOP.md, casa única (Recommended)".
+  - R3: "As 5, numa ADR só (Recommended)".
+  - R4: "Medido + re-auditoria (Recommended)".
+  - R5: "Corrigir os graders (Recommended)".
   - Summary: "Confirmo, segue (Recommended)".
-- Grill round 2, 2026-10-21 (handoff `…-grill-evals-promote-r2`):
-  - Q7: "Mover para .dadaia/states (Recommended)".
-  - Q8: "Aceito a ADR (Recommended)".
-  - Q9: "Recusa + fix certa (Recommended)".
-  - Q10: "Sem RED; caracterização guarda (Recommended)".
-- Q11, 2026-10-21 (main-thread intake): "Operator action: esvaziar ou outra pasta (Recommended)". Init's foreign-tree fix line is `Operator action: empty <folder> or name another empty folder for the workspace, then run init on it`, the same for every folder. It refines Q9's "move them out, then run init on the same folder".
-- Main-thread ruling (logged): "Any confirmed bug in code the work branch holds takes a <v>/wt-hotfix-<bug-id> lane".
 
-Gaps, measured on `114b632b3` (the rc-21 E; eval report https://claude.ai/artifact/VvmTFaNpdAJ4pQamJygW26 and the grill handoff's findings):
+The gap is the audit: 56 findings, its five structural causes (`AUDIT.md` §1.7) and its two single-source passes (§1.5, §2.2). This SPEC cites them by id and never restates them.
 
-- In 3 of 18 Claude trials (T3 Rx3W9vi, T3 TbQpmBP, T2 ENMsbbD) and 2 of 9 Codex trials, the implementing main thread ran `verdict.py --verdict APPROVED` itself, and the merge accepted it. The gate trusts the `agent` field of any file under `.dadaia/handoff/` (an ADDITIVE zone) and orders verdicts by a `produced_at` the writer chooses.
-- Codex's T3 SPEC+PLAN with `Origin operator-demand` (`release.py check` green) scored 0/3; every T3 Claude trial of run 39462036716 met init's sibling fix line. The other four bugs are rc-21's closure proposals (a)-(d); each FR's repro states its gap.
-- The scorecard last passed at `b411e7a6e` (rc-21 round 2). Every lane that touches `dadaia_workspace/public/**` leaves that pass stale.
-
-## 2. Measurable goals
+## 2. Measurable goals (the exit, R4)
 
 | # | goal | target | source |
 |---|---|---|---|
-| 1 | the seven Origin bugs | each `resolved`, its fix commit found by its id line; only the carried mcp record open | `bugs.py status --specs specs`, `bugs.py check` |
-| 2 | self-approval on the Claude lane | 0 merges on a verdict the main thread wrote (baseline 3 of 18 trials) | the checkpoint scorer's self-approve flag on the gating run (FR9) |
-| 3 | constitution §5 item 3 | `radon cc -s -n D dadaia_workspace` prints nothing (baseline 9 functions); `lint-imports` keeps every contract, the new `help_digest` → `cli.main` one included | radon 6.0.1 in the workspace venv; `scripts/ci.py job` |
-| 4 | agentic scorecard | every cell >= 9 from both judges at the frozen tip | `.dadaia/reports/dadaia-workspace/agentic-scorecard/<UTC>/` |
-| 5 | evals on E | T1 3/3, T2 >= 2/3, T3 >= 2/3, `compare.py` prints `non-blocking` | the `eval.yml` job summary (ADR 0277) |
-| 6 | Codex readout on E | T1-T3 at k=3, recorded as readout (baseline at `114b632b3`: T1 3/3, T2 3/3, T3 0/3; checkpoint means 100, 100, 74) | the local harbor run; a `_RELEASE.json` note |
-| 7 | E is the evaluated tree | `git diff --name-only E..<promote PR head>` lists only `specs/releases/0.5.0/_RELEASE.json` | git |
-| 8 | readout metrics 1, 2, 4, 6, 7, 9 | each read beside rc-21's (2/2 (100%), 5/7 (71%), n/a, 4, 0, 0) and its target (<= 20%, >= 70%, <= 4 h, 0, 0, 0); rc-21's metric 6 drops by its three `chore(audits)` commits | `verdict.py stats 0.5.0-rc21` read at `a01772b95`; `verdict.py stats 0.5.0-rc22` |
+| 1 | audit findings | 56 of 56 dispositioned; the audit closed | `audit.py check`, `audits_histo.jsonl` |
+| 2 | divergent duplicates | text 0 (baseline 32), code 0 (baseline 17) | the re-audit on the new E (FR15) |
+| 3 | bolt-ons and symptom patches in HEAD | 0 (baseline 43) | the re-audit |
+| 4 | fix-induced bugs in the final round | 0 | the re-audit, origin column |
+| 5 | REBUILD share (PILLAR-BUGS metric 9) for records registered after the ADR | 100% (baseline 57%) | the re-audit |
+| 6 | full suite | green on Linux, macOS and Windows at E | the CI run on E (gap G3) |
+| 7 | agentic scorecard | every cell >= 9 from both judges at the frozen tip | `.dadaia/reports/dadaia-workspace/agentic-scorecard/<UTC>/` |
+| 8 | evals on E, fixed graders | T1 3/3, T2 >= 2/3, T3 >= 2/3, `compare.py` prints `non-blocking`; Codex T1–T3 at k=3 as readout | `eval.yml` job summary; the local harbor run |
+| 9 | the operator's validation round | the operator's words, logged | a `_RELEASE.json` note |
+| 10 | E is the evaluated tree | `git diff --name-only E..<PR head>` lists only `specs/releases/0.5.0/_RELEASE.json` | git |
 
 ## 3. Non-goals (0.6.0)
 
-- The CI Codex lane (`eval-codex-lane-in-library-ci`, ruled 0.6.0). The Codex lane here is a local readout, and the 0.5.0 gate stays Claude.
-- Graded rewards inside the graders. The gate stays binary (Q2), and checkpoint scores are computed outside the repo, as readout only.
-- Any new gate, step or review round. The one import-linter contract runs inside the `lint-imports` that `ci.py` already runs (Q10).
-- A pre-gate identity key for Copilot, Codex, Kimi, Cursor or Devin. Each row names none until its key is verified (ADR 0279). The shell-level forge on those harnesses is the accepted residual (Q5).
-- The 0.6.0 intake items. Bug proposals still waiting for confirmation are not requirements; the bug law governs them.
+- The CI Codex lane; graded rewards inside the graders (R5 keeps k=3 binary).
+- Any change to a `verify:` line or a merge check, and any new gate. R3's checks are review criteria (root map §1 gate law).
+- Re-registering the auditors' new defects as bugs: each stays one finding (grill handoff, finding 1).
+- The T3 instruction's text-asserting test (ruled to 0.6.0 intake; a test leaves only on the operator's order).
 
 ## 4. Requirements
 
-Each bug FR lands by its own `0.5.0/wt-hotfix-<bug-id>` lane (`specs/bugs/AGENTS.md` §2), not by an rc job. Its AC is the record resolved with its named RED test. FR2, FR3 and FR5 have already merged on `feature/0.5.0`.
+**Wave ranking** (grill summary). Each wave opens when the previous one has merged:
 
-Wave ranking, by the pick:
+1. I: law. FR1 and FR2.
+2. II: text. FR3.
+3. III: code duplicates. FR4.
+4. IV: REBUILD per unit. FR5–FR11.
+5. V: tests. FR12.
+6. VI: eval graders. FR13.
+7. Then FR14 (scorecard), the closure, and FR15 (exit and promote).
 
-1. Law, skills and dev loop: FR10 (ADR 0279, in the define). FR1, FR2, FR3 and FR5 go first, in the lane order of the r2 handoff.
-2. Shared foundation: FR4 and FR7.
-3. Features and bugs: FR6 runs last among the lanes, because it touches `workspace_layout.py`, `init.py` and `reconcile.py` after FR1, FR3 and FR5.
-4. Promote-facing: FR8 (the scorecard, the rc's one implementation job, after every lane that writes `dadaia_workspace/public/**`), then the closure, E and FR9.
+The PLAN carries the waves' rows:
 
-### FR1 — worktree merge accepts a verdict written by the merger, and a caller-written produced_at outranks an earlier REJECTED
+- PLAN §1 holds one row per audit unit (42) and per still-in-HEAD item (43), plus one row per row of the two deletion plans (29 text, 18 code). Those plans and worklists live outside the repo (gap G1).
+- The PLAN caps parallel agents at 4 (summary).
+- The held lanes `wt-hotfix-init-no-terminal-…` and `wt-hotfix-verdict-act-gate-lexer-…` do not merge. Their RED tests are reused by FR7 and FR8 (summary).
 
-- Bug `merge-accepts-a-verdict-written-by-the-merger` (CRITICAL; ADR 0279; operator Q4, Q5, Q7, Q8).
-- Repro: Reproduced at feature/0.5.0 114b632b3. Command 1: python -m pytest tests/public/skills/dd_gitflow_default/scripts/test__worktree_end__verdict_binding.py::test_a_bound_approval_of_head_lands -q -p no:cacheprovider (workspace venv, worktree root): exit 0, '1 passed' - approve() in tests/helpers/worktree_ws.py:218-230 writes the verdict by hand (a plain JSON file under .dadaia/handoff/c/) and worktree merge lands the tree: cases (a) and (b). Command 2: a scratch pytest (outside the repo, same helpers) that calls approve(verdict='REJECTED', at='T10:00:00Z') then approve(at='T11:00:00Z') for the same sha and runs worktree merge: exit 0, '1 passed', the merge lands: case (c). Ruled out: not an unmerged-worktree failure (the gate is merged code), not wrong usage (no flag is misused), not a missing feature (the fixed bug's contract already claimed the verdict binds the reviewer's evidence), not a designed validation with a runnable fix (the merge succeeds, nothing refuses).
-- AC1.1 `verdict.py` writes a verdict only under `.dadaia/states/verdicts/<ctx>/`, and `verdicts` joins the states canon. Any agent's file-tool write there, the reviewer's included, is refused by the existing PROTECTED/STATE class with its one fix line. Test: unit (`tests/hooks/test_sdd_gate.py`, a `Write` payload).
-- AC1.2 The merge reads verdicts only from that place. A hand-placed verdict under `.dadaia/handoff/` or the reaper hold, with the right diff hash, is not honoured. That covers case (b), and case (c), a later hand-written `produced_at` after a `verdict.py` REJECTED. The handoff-zone read, the reaper-hold read, the `agent`-field filter and the verdict TTL class are deleted. Test: integration (`test__worktree_end__verdict_binding.py`).
-- AC1.3 The pre-gate judges one Bash act: a command that runs `verdict.py` with `--verdict`. It refuses the act when the harness's registry row names a subagent key and the payload's value is not `dd-code-reviewer`; an absent value is the main thread. `verdict.py stats` and `--help` pass, and so does any runtime whose row names no key. The Claude Code row names `agent_type`, and its PreToolUse matcher gains `Bash`. Every other row names none. The refusal prints one `fix: Agent action:` line that dispatches `dd-code-reviewer`. The pre-gate has one reader of the identity field. Test: unit (`tests/features/spec_context/test_gate_policy.py`, `tests/hooks/test_sdd_gate.py`, the hook-wrapper matcher pin).
-- AC1.4 The worktrees law §2 states once that only the dispatched `dd-code-reviewer` writes a verdict, with `verdict.py`. The map §3 gate bullet names the one judged Bash act. The handoff law, the emitter skill and the reviewer persona point to that line, and none of them places a verdict under `.dadaia/handoff/`. Test: unit (the existing law-text pins, `tests/infrastructure/test_projection.py`); the scorecard judges the text.
-- AC1.5 `tests/helpers/worktree_ws.py` `approve()` writes the place and body shape that `verdict.py` writes. The rows of `test__worktree_end__verdict_ttl.py` that test the deleted reaper-hold read are deleted in a `test(...)` commit naming the operator's Q7 words "Mover para .dadaia/states (Recommended)" (root map §1). Test: unit.
-- AC1.6 The record resolves with `--caused-by merge-gate-accepts-verdict-written-by-the-merger` and names its RED test, after the instance is reprojected and `doctor` is clean. Test: none; `bugs.py check`.
+**Delivered, no task.** These lanes merged and resolved before the re-scope, and they stay delivered:
 
-### FR2 — T3 eval grader requires an active backlog entry while the law also admits an operator demand recorded in the SPEC Origin
+- The seven original lanes: `merge-accepts-…`, `t3-grader-…`, `init-over-a-folder-…`, `merge-of-a-gone-tree-…`, `reconcile-rollback-…`, `code-breaks-the-constitution-…`, `stats-counts-…`.
+- Their five children: `verdict-act-gate-regex-…`, `stats-reads-closure-…`, `reconcile-service-…`, `init-fix-line-text-…`, `merge-of-a-path-…`.
+- ADR 0279 (accepted).
 
-- Bug `t3-grader-requires-an-active-backlog-entry` (HIGH; operator Q6). Merged and resolved (`332f2a5eb`, fix `5fe06d62f`).
-- Repro: Reproduced at feature/0.5.0 114b632b3 in a scratch dir (specs/backlog/BACKLOG.json = {schema: backlog-v1, active: []}; specs/releases/0.1.0/rc-1/SPEC.md with '**Status:** Approved' and '**Origin:** operator-demand'): python -I -c 'import test_grade as g; g.BACKLOG=<library backlog.py>; g.WORKSPACE=<scratch>; print(g.filled(Path("specs")))' printed 'backlog check clean, SPEC Origin operator-demand -> filled = False', exit 0; the grader then appends 'no valid backlog entry' and scores 0. Ruled out: not a failure inside an unmerged worktree (the grader is merged), not wrong usage (the operator's own law admits the SPEC Origin path), not a missing feature (the law already defines both entry paths), not a designed validation whose fix line runs (the grader prints no fix).
-- AC2.1 The grader passes a tree that entered work by either path the law admits, each judged by its checker's exit status: `backlog.py check` clean with an active entry, or a release SPEC with `release.py check` clean. It still scores 0 when neither holds. The verifier stays binary. Test: E2E (`tests/e2e/test_evals_t3.py` rows for operator-demand, delivered-backlog and none).
+The fixes the window review rates REBUILD are re-worked by the FRs named in its table.
 
-### FR3 — init over a folder holding only a .venv refuses and its fix line names the sibling folder, not the act that onboards the named one
+### FR1 — the process ADR in law (R3; F001–F007, F009, F010, F027, F028, F051)
 
-- Bug `init-over-a-folder-with-a-venv-fix-line-names-another-folder` (MEDIUM; operator Q6, Q9, Q11). Merged and resolved (`62ae52e04`). The Q11 fix lines `813ab93ba` and `c3bd83228` followed.
-- Repro: Reproduced at feature/0.5.0 114b632b3 in a scratch dir (mkdir -p r3/workspace/.venv; never the live instance), worktree code on PYTHONPATH: python -c 'from dadaia_workspace.cli.main import app; ...' with argv init <scratch>/workspace --harness claude: exit 1; stderr "Error: '<scratch>/workspace' already holds a foreign tree (not a dadaia workspace)." then 'fix: uvx dadaia-workspace init <scratch>/workspace-workspace --harness claude'; the folder still holds only .venv. Ruled out: not an unmerged-worktree failure, not wrong usage (init on the folder the operator named is the documented act), not an environment limit, not a designed validation whose fix line runs (the line runs but onboards another folder than the named one), not a missing feature.
-- AC3.1 The refusal stays. It names the foreign entries, and its one fix line is `Operator action: empty <folder> or name another empty folder for the workspace, then run init on it`, the same for every folder. The move of the pinned assert in `test_init__init_requires_dir_and_harness.py` names Q9. Test: unit (that file and `tests/cli/test_main__refusals_carry_a_fix.py`).
+- AC1.1 ADR 0280 (proposed with this SPEC) is accepted by the operator before any wave II task opens. Test: none; `doctor` `LEDGER-ADR-SCHEMA`.
+- AC1.2 Each of its five clauses lands in one law home, and every other copy of that rule becomes a pointer. The homes: the bugs law §2, `dd-code-review` §4–§4a, `dd-bug-resolution/LINEAGE.md`, `dd-release-definition` §1–§2, and `RELEASE-EVENTS.md`. The deferral line `specs/bugs/AGENTS.md:27` goes. Test: none (law text; the scorecard judges it); FR5 and FR10 own the code halves.
+- AC1.3 F027 and F028 are dispositioned with ADR 0279 and AC1.2 as the reason. F051 is the history of the shapes AC1.2 now enforces at review. Test: none; `audit.py disposition`.
 
-### FR4 — worktree merge of a task whose tree is gone, with its parent tree also gone, ends in a generic fix line
+### FR2 — slop has one home (R2; F052)
 
-- Bug `merge-of-a-gone-tree-with-its-parent-gone-prints-a-generic-fix-line` (MEDIUM; operator Q6).
-- Repro: Reproduced at feature/0.5.0 114b632b3 in a scratch workspace (repos/r with branch wt/0.5.0/rc-1/job-1/wt-task-001, no worktrees/ folders), worktree code: python -m dadaia_workspace worktree merge <scratch>/worktrees/r/0.5.0/rc-1/job-1/wt-task-001 (via the CLI entry on a scratch root): exit 1; '[error] git branch --show-current: fatal: cannot change to <scratch>/worktrees/r/0.5.0/rc-1/job-1/wt-main: No such file or directory' then 'fix: Agent action: clear the git failure above, then rerun <runner> worktree.py merge <path>'. Calling _worktree_end.merge directly raises GitError with the same text. With neither the tree nor the branch present the same call returns 'merged into' without any check. Ruled out: not an unmerged-worktree failure, not wrong usage, not a designed validation whose fix line runs (the line cannot clear the failure, it restates it), not a missing feature.
-- AC4.1 One parent-tree check runs first on both paths of `merge`, tree present and tree gone. A merge whose parent tree is gone refuses with the fix line that restores the parent tree, as the present-tree merge does, whether or not the branch exists. `_kind_checks` loses its inline copy, and net source lines on `_worktree_end.py` are <= 0. Test: unit (`test__worktree_end__removal.py`).
+- AC2.1 `SLOP.md` states the definition R2 words: the deletion test plus the evidence test, and the four new signals. Test: none (law text).
+- AC2.2 No other law, skill or persona file defines slop. Each one points to `SLOP.md`; `git grep -n` of a second definition prints nothing. Test: none; the grep, at review.
 
-### FR5 — reconcile prints its rollback advice as prose with no fix: line
+### FR3 — one owner per fact, text (F041–F050)
 
-- Bug `reconcile-rollback-advice-is-prose-not-a-fix-line` (MEDIUM; operator Q6). Merged and resolved (`2dcc10f5d`, fix `2ea8f2c4f`).
-- Repro: Reproduced at feature/0.5.0 114b632b3 in a scratch dir, worktree code: typer CliRunner over reconcile.reconcile with container.reconcile_workspace replaced by a ReconcileResult(ok=False, error='projection failed', rollback_required=True): exit 1; output '[error] reconciliation failed: projection failed' then '[rollback-required] reinstall the previous exact provider version, then run its matching <venv>/bin/dadaia public install.'; no line starts with 'fix:'. Ruled out: not an unmerged-worktree failure, not wrong usage, not a designed validation whose fix line runs (there is no fix line), not a missing feature (the law demands the line on every block).
-- AC5.1 A failed reconcile prints its error and then exactly one `fix:` line through the CLI's one refusal renderer. The JSON key `rollback_required` is unchanged. Test: unit (`tests/features/reconcile/test_service.py`, `tests/cli/test_main__refusals_carry_a_fix.py`).
+- AC3.1 Every text deletion-plan row in PLAN §1 keeps its owner. Each other copy is deleted or becomes a pointer (`<owner> §n`, `<script> --help`). Test: none (text); the existing projection guards stay green.
+- AC3.2 Every divergence F042–F049 names now reads as its owner does. Test: none; the re-audit's text pass.
+- AC3.3 `specs/constitution.md:25,29` (F047) is the operator's text; the main thread puts the pointer to the operator. Test: none.
+- AC3.4 F050 is resolved by AC3.1, because a pointer leaves nothing to hold equal. No guard is added. Test: none.
 
-### FR6 — Nine functions above radon grade C and one import cycle break constitution section 5 item 3
+### FR4 — one owner per question, code (F030–F040)
 
-- Bug `code-breaks-the-constitution-complexity-and-import-cycle-law` (HIGH; operator Q6 "Proposta c (radon D)", Q10).
-- Repro: Reproduced at feature/0.5.0 114b632b3: radon cc -s -n D dadaia_workspace (workspace venv, radon 6.0.1), exit 0, prints the nine functions with grades D (28, 22, 23, 23, 26, 26, 25, 23, 21) and nothing else; sed -n 39p dadaia_workspace/cli/help_digest.py prints the lazy 'from dadaia_workspace.cli.main import app  # lazy: avoid an import cycle'. Ruled out: not an unmerged-worktree failure, not wrong usage, not a law ambiguity (item 3 states grade C or better and zero import cycle), not a missing feature, not an environment limit; the nine scores were re-measured on this tree, not copied.
-- AC6.1 `help_digest.command_paths` takes the root command from its caller, which reads it from Typer's context. The lazy `cli.main` import and its `lru_cache` go. The RED test is a forbidden import-linter contract, `dadaia_workspace.cli.help_digest` → `dadaia_workspace.cli.main`, in `setup.cfg`. It is broken before the fix and kept after it, inside the `lint-imports` that `ci.py` already runs. Test: the lint contract.
-- AC6.2 Each of the nine functions is split to grade C or better with no behaviour change: every verb's output and every refusal's message and fix line stay byte-identical. No RED is possible for a grade (Q10). The existing characterization and contract tests are the guard and stay unloosened. Afterwards `radon cc -s -n D dadaia_workspace` prints nothing. Test: unit (the existing tests); the scorecard is the measure.
+- AC4.1 Every code deletion-plan item in PLAN §1 ends with one owner. A missing kernel function is added beside its kernel peers, the losing unit is deleted, and its callers call the owner (ADR 0246). Test: unit, the owner's contract test file.
+- AC4.2 Each divergence repro (F031–F040 and the rest of F030's 17) becomes a row at the owner's contract test, RED before the merge and green after. Test: unit.
+- AC4.3 No guard, gate or allow-list is added; each item's net source lines are <= 0, or the reviewer accepts the stated reason. Test: none; review.
 
-### FR7 — verdict.py stats metric 6 counts the chore(audits) commits the work branch takes directly
+### FR5 — REBUILD: the bug ledger kernel (F005, F006, F007, F018, F019, F020, F029, F045)
 
-- Bug `stats-counts-audit-commits-as-non-block-work-after-closure` (LOW; operator Q6).
-- Repro: Reproduced at feature/0.5.0 114b632b3 in a scratch git repo with two empty commits, 'docs(memory): closure' then 'chore(audits): F1 resolved': PYTHONDONTWRITEBYTECODE=1 python3 -c 'import _stats; print(_stats._after_closure(Path("."), <closure sha>, "HEAD"))' (skill scripts on sys.path): prints 1, exit 0; expected 0. Ruled out: not an unmerged-worktree failure, not wrong usage, not a missing feature (the commit shape exists in the law), not an environment limit. Law note: the metric's exempt list is code only; the exemption is read from dd-gitflow-default section 4.
-- AC7.1 Metric 6 counts no `chore(audits)` commit. The repro reads 0. Test: unit (a `_stats` row on a scratch repo).
+- AC5.1 A unit's history is the id-line git query. Nothing reads `fix_files` for history. One REBUILD-due decider in `bugs.py` (`append` and `stats` agree) says due on a child after the unit's last REBUILD. Test: unit (`test_bugs.py`).
+- AC5.2 The archive holds one record shape, migrated once. A record clears only by a citing commit, never by archiving. `main_checkout` has no sentinel value. `bugs.py append` takes `--caused-by`. Test: unit.
 
-### FR8 — the agentic scorecard final round (constitution §5)
+### FR6 — REBUILD: worktree merge and its refusals (F013, F017; batch A units 1, 2, 5, 6, 11)
 
-- AC8.1 The round runs at the frozen tip, after every lane that writes `dadaia_workspace/public/**` (FR1, FR4, FR6, FR7) has merged. Two independent `dd-code-reviewer` judges score every cell (R1-R8, P1-P3, S1-S12, C1-C6) against `agentic-scorecard/20261017T0519Z/rubric.md`. Every cell below 9 carries its `path:line` and is fixed, then the round is re-scored. Test: none; the record is the evidence.
-- AC8.2 A fix deletes or corrects text before it adds any. No fix adds a mechanism. Test: none; the review.
-- AC8.3 Both judges put every cell at >= 9, and the record lives under `.dadaia/reports/dadaia-workspace/agentic-scorecard/<UTC>/`. Test: none; the record.
+- AC6.1 `merge` reads from git whether a branch is already merged. A missing tree or branch is never success, and a never-opened path refuses with one fix line. Test: unit (`test__worktree_end__removal.py`).
+- AC6.2 An rc merge runs no tree-tracked ledger script. Test: unit.
+- AC6.3 Every `dd-gitflow-default` refusal prints a fix line that clears it, the catch-all `worktree.py` GitError line included. FR12's census proves it. Test: unit.
 
-### FR9 — E, the gating eval, the readouts and the promote (ADRs 0269, 0277; operator Q1, Q2, summary)
+### FR7 — REBUILD: the verdict-writer gate (F016; open bugs `verdict-act-gate-lexer-lets-…`, `verdict-act-gate-lexer-misses-…`)
 
-- AC9.1 After the rc-22 closure reconcile (§Closure), E is the last commit that is not `_RELEASE.json`. The push follows, and every CI job goes green. Test: none; git and CI.
-- AC9.2 `eval.yml` runs on E with T1 3/3, T2 >= 2/3 and T3 >= 2/3, and `compare.py` prints `non-blocking`. A `chore(release):` note names the run URL, the verdict and E. Test: E2E (the run).
-- AC9.3 The local Codex readout runs on E: harbor `-a codex`, on E's wheel, T1-T3 at k=3, with the operator's Codex login. The tasks are adapted to the Codex harness in scratch only. The result is recorded as a note and gates nothing (Q1). Test: none; the note.
-- AC9.4 A checkpoint score of 0-100 per trial, with the process flags (self-approve, reviewer dispatches), comes from a script outside the repo for every lane of AC9.2 and AC9.3. It is recorded as a note and gates nothing (Q2). Test: none; the note.
-- AC9.5 The promote continues on the new E through rc-21 SPEC FR6-FR9 (AC6.3, FR7 AC7.2, FR8, AC9.1 steps 4-8, AC9.2). The operator's "Let's move forward with the promotion" is the AC9.1 step 4 order. So the PR feature/0.5.0 → develop opens without a new question once the gate on E is `non-blocking` (summary ruling). The operator's own acts remain: the portfolio PR #33 merge and the PyPI approval. Test: none; the PRs and the log.
+- AC7.1 On a harness whose registry row names a subagent key, a non-reviewer cannot write a verdict by any shell form in F016's probe set or in the two open records' repros. Test: unit (`test_gate_policy.py`, the held lane's REDs).
+- AC7.2 ADR 0279's residual on harnesses with no key is unchanged. Both open records resolve with a `refactor(bugs)` line. Test: none; `bugs.py check`.
 
-### FR10 — the define's law record (operator Q8: "Aceito a ADR (Recommended)")
+### FR8 — REBUILD: fix-line production (F015, F042 code half; open bug `init-no-terminal-fix-line-nests-one-act-label-inside-another`)
 
-- AC10.1 ADR 0279 is proposed (`1b513b006`), accepted with the operator's Q7 and Q8 words (`3a7547e0b`), has its `measured_by` repaired (`079285f98`) and is rendered in the ARCHITECTURE adr-list (`a01772b95`). It amends 0096 and 0133 for the one verdict act only. Test: unit (its `measured_by`, FR1's AC1.2-AC1.3 tests); `doctor` `LEDGER-ADR-SCHEMA`.
+- AC8.1 No act sentence holds a second label: all six F015 sites, swept by the AST walk of every `act()` call. Test: unit (`test_cli_line__fix_line_contract.py`).
+- AC8.2 `InitPlan.command`'s `render=` switch is deleted. Init's foreign-tree fix line keeps the operator's Q11 text. Test: unit (init refusal tests).
+
+### FR9 — REBUILD: chokepoints and the gate (batch C units: ref gate, `gate_policy` scope, `workspace_layout`)
+
+- AC9.1 Each unit's PLAN §1 row is rebuilt to one decider per question, with no special case kept for a test value. Test: unit, each unit's contract file.
+
+### FR10 — REBUILD: release state, stats and the fold (F008; R3 clause 5)
+
+- AC10.1 No milestone, memory-window bound or stats input is a stored sha that a rewrite can orphan. A missing closure commit is a refusal, never a metric of 0. Test: unit (`test_release__release_script.py`, `test_verdict.py`).
+- AC10.2 The fold's rewriting remedy, `ci push-gate-check --rewrite-from`, is deleted with its fix line. Test: unit (the push-gate refusal's fix-line row).
+
+### FR11 — REBUILD: the remaining units (F021, F025; batch C reconcile, template history; batch D export, guards, version label, Windows timing)
+
+- AC11.1 Each remaining unit with `addressed` no or partly, and each still-in-HEAD item no other FR names, gets its PLAN §1 REBUILD or DELETE row, and the row lands. Test: unit, per row.
+
+### FR12 — tests (F009, F011, F012, F014, F022, F023, F024)
+
+- AC12.1 The fix-line census covers every `dd-gitflow-default` worktree script (F014). Test: unit (the census test).
+- AC12.2 `fake_venv` is stdlib `venv.create` (F022). Tests write scratch only under a tmp path and never under `tests/`, through one enumerator (F023). Test: unit.
+- AC12.3 Each contract's literal is pinned in one test home (F024). The vacuous RED goes red on revert (F011). The asserts F012 names are restored. Test: unit; the reviewer's revert check.
+- AC12.4 F009 is answered by ADR 0280 clause 3, not by a `verify:` change. Test: none.
+
+### FR13 — eval graders (R5; F026)
+
+- AC13.1 The T3 grader gives 0 to a stub SPEC (the bare `release.py new` output). Test: E2E (`tests/e2e/test_evals_t3.py`, a stub row).
+- AC13.2 Every grader gives 0 to a trial whose verdict was written outside the dispatched reviewer. k=3 and the local Codex readout stay. Test: E2E (one row per task).
+
+### FR14 — the agentic scorecard (constitution §5)
+
+- AC14.1 Two independent `dd-code-reviewer` judges score every cell at the tip after FR13. A fix deletes or corrects before it adds. The loop stops when both put every cell at >= 9. Test: none; the record.
+
+### FR15 — the exit and the promote (R4; ADRs 0269, 0277)
+
+- AC15.1 After the closure reconcile, E is the last commit that is not `_RELEASE.json`. Test: none; git.
+- AC15.2 The same audit, re-run on E, reports goals 2–5 at target. Each finding it raises enters by Arm B or the intake, and E is re-cut. Test: none; the new audit record.
+- AC15.3 Goals 6, 8 and 9 hold on E. Each is recorded as a `chore(release):` note with its run URL or the operator's words. Test: E2E (the eval run); none for the rest.
+- AC15.4 Only then does the PR `feature/0.5.0` → `develop` open, continuing rc-21 SPEC FR6–FR9. The portfolio PR #33 merge and the PyPI approval stay the operator's acts. Test: none; the PRs.
 
 ### Replaces
 
-- FR1 (as-is R2, R3): the verdict place under `.dadaia/handoff/<ctx>/`, the merge's reaper-hold read, the `agent`-field identity test and the verdict TTL class. Also ADR 0096's and 0133's "Bash is never judged", for the verdict act only (R1).
-- FR2 (R9): T3's backlog-only entry rule, the grader's private copy of the law's entry rule.
-- FR3 (R4): init's sibling `<dir>-workspace` fix for a foreign tree.
-- FR4: `_kind_checks`'s inline parent-tree check, which only the present-tree path reached.
-- FR5 (R5): reconcile's `[rollback-required]` prose and `[error] reconciliation failed` line.
-- FR6 (R6): `help_digest`'s lazy `cli.main` import, its `lru_cache` and the zero-argument `command_paths()`.
-- FR7 (R8): metric 6's subject list, which counted `chore(audits)` commits.
+- FR1: the one-id hotfix lane at the ticket's site for a fix with a culprit (`specs/bugs/AGENTS.md:22`), and the deferral of its REBUILD to the next rc's window and Job 1 (`:27`). Also review's sibling sweep only on a re-review (`dd-code-review` §4a); the `fix_files` slice and the ">= 2 bugs" trigger (F005, F006).
+- FR2: `SLOP.md:4`'s one-line definition.
+- FR3: every restated copy of a fact in the text deletion plan.
+- FR4: every losing duplicate of the code deletion plan (F031–F040).
+- FR5: the two REBUILD-due thresholds, the two-shape archive and its events flag, archive-as-clearance, and the `Path(".")` sentinel.
+- FR6: `merge`'s absence-based success path, its ledger-script execution, and the catch-all GitError fix line.
+- FR7: the verdict gate's text match on one command spelling.
+- FR8: `InitPlan.command`'s `render=` switch and the nested-label act sentences.
+- FR9, FR11: each PLAN §1 REBUILD or DELETE row's current behaviour.
+- FR10: stored milestone and memory-window shas, and `--rewrite-from`.
+- FR12: `fake_venv`, the scratch writers under `tests/`, and the duplicate literal pins.
+- FR13: T3's pass on a stub.
 
 ### Closure
 
-- The bug archive takes the seven Origin records. The mcp record stays open and carried (rc-21 AC9.2).
-- The memory pass (`MEMORY-UPDATE.md`) covers at least the atoms the lanes made stale:
-  - `workspace-init.md:27` (the sibling fix line);
-  - `agent-evals.md:16` (the backlog-only grader);
-  - `harness-claude-code.md:25` (the matcher gains `Bash`);
-  - the `ARCHITECTURE.md` ADR 0133 summary ("Bash is not covered");
-  - the verdict place wherever an atom states it (`agent-comms`, `agent-orchestration`, `worktrees`, `bug-ledger`);
-  - `docs/getting-started.md:32` against init's new fix line;
-  - the catalog.
-- `llms-full.txt` is regenerated. All of it, and every scorecard fix, lands before E: after E only `_RELEASE.json` changes (ADR 0269 (a)).
+- The bug archive takes every resolved Origin record. `mcp-on-main-is-vulnerable-to-session-exhaustion` resolves at the promote (rc-21 AC9.2).
+- Each finding is dispositioned through `audit.py disposition … --release 0.5.0`, then `audit.py close`.
+- The memory pass (`MEMORY-UPDATE.md`) covers F053–F056 and every atom with changed sources, followed by `memory.py catalog generate`.
+- `llms-full.txt` is regenerated. All of this lands before E.
 
 ## 5. Constraints and risks
 
-- Each bug lands by its hotfix lane before any other merge, then `worktree sync` (`specs/bugs/AGENTS.md` §2). Lane order follows the r2 handoff. FR6 goes last.
-- A library change is finished only once the instance is reprojected and `doctor` is clean. After FR1 lands, a verdict written before the upgrade is not honoured, so reviews in flight on open lanes are redone (ADR 0279).
-- Hook cost: on Claude Code, every Bash call pays the pre-gate, 0.06 s measured over 8 runs (ADR 0279). It is a per-call cost; no `verify:` line changes.
-- Public boundary: no AC requires a remote, CI, `gh` or a toolchain of a user's repo. `eval.yml`, harbor and the checkpoint scorer are this repo's developer acts.
-- Risk: R1 and R2 change a judged set, a path and a fix line. A read-only `dd-researcher` pre-mortem names their consumers before the SPEC is approved, and the PLAN answers each hit.
-- Risk: a T3 below 2/3 on E, or a red gating run, costs a re-cut E. Its cause enters by Arm B.
+- A library change is finished only once the instance is reprojected and `doctor` is clean.
+- A bug found during the remediation follows ADR 0280 once it is accepted: the REBUILD of its unit, in its lane.
+- Risk: waves II–IV touch the same files (`_worktree_end.py`, `gate_policy.py`, the laws). The PLAN serializes overlapping `W:` sets across waves.
+- Risk: the re-audit finds what this release left. Its findings re-cut E (AC15.2). The release has no date.
 
 ## 6. Open questions
 
-none. The PLAN closes the seams that remain open: the scorecard job's DAG, and the Copilot key, which stays none (ADR 0279).
+- G1. The audit's unit list, still-in-HEAD worklist and two deletion plans exist only in the audit session's scratch. The main thread copies them to a durable place before the PLAN cites them.
+- G2. ADR 0280's `amends` holds one id (0273). It also amends 0235, 0264 and 0267, which its decision names.
+- G3. Goal 6: the Windows and macOS legs run only on a pull request, and they run the small and medium tiers. R4 says "no promote PR until …". The main thread rules how the three-OS run is obtained (for example a draft PR whose merge waits for every other goal) without changing a gate.
