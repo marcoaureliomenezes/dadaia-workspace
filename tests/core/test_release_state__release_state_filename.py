@@ -4,6 +4,7 @@ RELEASE.json dir is live for neither the doctor nor release.py live_ids. Size: S
 
 from __future__ import annotations
 
+import ast
 import sys
 from pathlib import Path
 
@@ -15,13 +16,28 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]
                        / "dadaia_workspace/public/skills/dd-bug-resolution/scripts"))  # fmt: skip
 import _grammar
 
-from tests.helpers.oslib import write_text
+from tests.helpers.oslib import read_text, write_text
 
 _DOC = '{"schema": "release-state-v1", "release": "1.0.0", "phase": "IMPLEMENTATION"}'
 
 
 def test_canonical_filename_is_underscore_release_json() -> None:
-    assert release_state.RELEASE_STATE_FILENAME == "_RELEASE.json"
+    assert release_state.RELEASE_STATE_FILENAME == _grammar.STATE == "_RELEASE.json"
+
+
+def test_the_package_spells_the_state_filename_nowhere() -> None:
+    """The kernel's `STATE` is the one spelling; the package reads it, never retypes it."""
+    package = Path(__file__).resolve().parents[2] / "dadaia_workspace"
+    spelled = [
+        p.relative_to(package).as_posix()
+        for p in package.rglob("*.py")
+        if "public" not in p.relative_to(package).parts[:1]
+        and any(
+            isinstance(n, ast.Constant) and n.value == "_RELEASE.json"
+            for n in ast.walk(ast.parse(read_text(p)))
+        )
+    ]
+    assert spelled == []
 
 
 def test_a_legacy_state_file_makes_no_release_live(tmp_path: Path) -> None:

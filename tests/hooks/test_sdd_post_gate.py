@@ -14,10 +14,11 @@ from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.core.spec_status import STATUS_LINE
+from dadaia_workspace.core.skill_owner import load_owner
 from tests.fixtures.harness_env import claude_hook_env, run_hook_subprocess
 from tests.helpers.oslib import read_text, write_text
 
+STATUS_LINE = load_owner("dd-bug-resolution", "_grammar").STATUS_RE
 _MARKER_RE = re.compile(r"^- \[([ xX-])\]", re.MULTILINE)
 
 _FIXTURE_TASKS_MD = """\

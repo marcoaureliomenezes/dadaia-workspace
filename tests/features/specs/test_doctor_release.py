@@ -147,3 +147,34 @@ def test_doctor_names_the_candidate_release_py_names(tmp_path: Path) -> None:
     release_py = load_owner("dd-release-implementation", "_release_store").live_release(specs)
     assert release_py.candidate == specs / "releases/0.5.0/rc-1"
     assert SpecsTree(specs).active_release.candidate == release_py.candidate
+
+
+_GRAMMAR = load_owner("dd-bug-resolution", "_grammar")
+_STATUS_ROWS = [
+    ("# SPEC\n\n**Status:**   Approved\n", "Approved"),
+    ("# SPEC\n\n**Status:** Approved (pending)\n", "Approved (pending)"),
+    ("# TASKS\n\n**Status:** approved\n" + "- t\n" * 170, "approved"),
+    ("# PLAN\n" + "text\n" * 36 + "**Status:** Approved\n", "Approved"),
+    ("# SPEC\n\n**Status:** Draft\n\n**Status:** Approved\n", "Draft"),
+    ("# SPEC\n\n- **Status:** Approved\n", None),
+    ("# SPEC\n\n> **Status:** Approved\n", None),
+    ("# SPEC\n\nthe line reads **Status:** Approved here\n", None),
+    ("# SPEC\n\nno status here\n", None),
+]
+
+
+def test_the_status_vocabulary_is_the_canonical_triple_in_the_kernel() -> None:
+    assert {"Draft", "In review", "Approved"} == _GRAMMAR.CANONICAL_STATUS
+    assert (_GRAMMAR.DRAFT, _GRAMMAR.IN_REVIEW, _GRAMMAR.APPROVED) == (
+        "Draft",
+        "In review",
+        "Approved",
+    )
+
+
+@pytest.mark.parametrize(("text", "expected"), _STATUS_ROWS)
+def test_both_status_readers_return_the_same_token(text: str, expected: str | None) -> None:
+    """The first anchored line counts anywhere; a bullet, a blockquote and a mid-line quote
+    never count; absent is None; the kernel and the release script agree."""
+    script = load_owner("dd-release-implementation", "_release_schema").extract_status
+    assert _GRAMMAR.extract_status(text) == script(text) == expected

@@ -291,6 +291,8 @@ def test_the_fix_line_clears_the_finding_it_was_stamped_on(
     assert not re.search(r"<[^<>]+>", printed.fix), f"{code}: placeholder in {printed.fix}"
     command = _resolve(printed.fix, plant)
     done = run_bash(command, cwd=root, check=False)
+    _git(root, "add", "-A")  # the gates and GITFLOW-1 read what is committed
+    _git(root, "commit", "-qm", "fix", "--allow-empty")
     # `doctor --fix` exits 1 while the fixture's unrelated findings remain; the judge is:
     # re-run the WHOLE doctor — this
     # finding (its message) is gone and the fix created no new error elsewhere.
@@ -300,6 +302,32 @@ def test_the_fix_line_clears_the_finding_it_was_stamped_on(
     )
     new_errors = {f for f in after - whole_before if f[2]}
     assert not new_errors, f"{code}: the fix created {new_errors}"
+
+
+_FLOW = "gitflow: {principal: trunk, integration: next, work: work/}\n"
+
+
+def _commit_constitution(root: Path, *, committed: bool, worktree: bool) -> None:
+    """HEAD's constitution holds a gitflow block iff *committed*; the working copy iff *worktree*."""
+    constitution = root / "specs" / "constitution.md"
+    for has_block, commit in ((committed, True), (worktree, False)):
+        head = f"---\nspecs_pattern_version: {CANONICAL_SPECS_VERSION}\n{_FLOW if has_block else ''}---\n"
+        write_text(constitution, head + "# C\n")
+        if commit:
+            _git(root, "add", "-A")
+            _git(root, "commit", "-qm", "constitution")
+
+
+def test_gitflow_1_judges_the_committed_constitution_not_the_working_tree(repo: Path) -> None:
+    """A gitflow block dropped in the working tree only is no finding; a block added only in
+    the working tree is still one, worded as the gates word it."""
+    _commit_constitution(repo, committed=True, worktree=False)
+    assert _doctor(repo)._coherence.check_gitflow() == []
+
+    _commit_constitution(repo, committed=False, worktree=True)
+    [finding] = _doctor(repo)._coherence.check_gitflow()
+    warning = GitSubprocessClient().gitflow(repo)[1]
+    assert warning is not None and warning in finding.message
 
 
 def test_spec_doc_046_never_clobbers_a_canonical_state_file(repo: Path) -> None:
