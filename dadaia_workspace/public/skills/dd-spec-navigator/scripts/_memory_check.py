@@ -34,8 +34,11 @@ def check(specs: Path) -> list[Finding]:
         if (specs / PRODUCT).is_dir():
             fix = act("agent", f"correct the source atom — {exc} (specs/memory/AGENTS.md: "
                       f"fix findings at the source atom, never in {CATALOG})")  # fmt: skip
-        return [{"code": CODE, "verdict": "error", "path": CATALOG, "line": 0,
-                 "message": str(exc), "fix": fix}]  # fmt: skip
+        return [_findings.finding(CODE, CATALOG, 0, str(exc), fix)]
+    # the pair is regenerated, never hand-fixed: the fix line clears it
+    fix = script(Path(__file__).with_name("memory.py"))(
+        "catalog", "generate", specs=specs.resolve()
+    )
     out: list[Finding] = []
     for name, rendered in (
         (CATALOG, cat.catalog_text(catalog)),
@@ -43,15 +46,11 @@ def check(specs: Path) -> list[Finding]:
     ):
         path = specs / name
         if not path.is_file():
-            out.append({"path": name, "line": 0, "message": f"{path.name} does not exist"})
+            out.append(_findings.finding(CODE, name, 0, f"{path.name} does not exist", fix))
         elif read_text(path) != rendered:
-            out.append({
-                "path": name, "line": 0,
-                "message": f"{path.name} does not match the atoms it is generated from",
-            })  # fmt: skip
-    fix = script(Path(__file__).with_name("memory.py"))(
-        "catalog", "generate", specs=specs.resolve()
-    )
-    for finding in out:  # the pair is regenerated, never hand-fixed: the fix line clears it
-        finding |= {"code": CODE, "verdict": "error", "fix": fix}
+            out.append(
+                _findings.finding(
+                    CODE, name, 0, f"{path.name} does not match the atoms it is generated from", fix
+                )
+            )
     return out

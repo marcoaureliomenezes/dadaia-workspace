@@ -12,7 +12,6 @@ replaces the file — so this script's writer and its validator cannot disagree.
 from __future__ import annotations
 
 import argparse
-import json
 import sys
 from pathlib import Path
 
@@ -65,12 +64,7 @@ def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     specs = find_specs(args.specs)
     if args.verb == "check":
-        findings = check(specs)
-        if args.json:
-            print(json.dumps(findings, indent=2))
-        else:
-            _findings.print_text(findings)
-        return 1 if findings else 0
+        return _findings.run_check(check(specs), as_json=args.json)
     try:
         if args.verb == "disposition":
             values = {name: getattr(args, name) for name in ("disposition", "release", "reason")}

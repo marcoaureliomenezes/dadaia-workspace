@@ -12,7 +12,6 @@ doctor's alone.
 from __future__ import annotations
 
 import argparse
-import json
 import sys
 from pathlib import Path
 
@@ -88,9 +87,7 @@ def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     specs = find_specs(args.specs, ledger=None if args.verb == "check" else f"specs/{LEDGER}")
     if args.verb == "check":
-        findings = check(specs)
-        print(json.dumps(findings, indent=2)) if args.json else _findings.print_text(findings)
-        return 1 if findings else 0
+        return _findings.run_check(check(specs), as_json=args.json)
     try:
         return _new(args, specs) if args.verb == "new" else _exit(args, specs)
     except Refusal as refusal:

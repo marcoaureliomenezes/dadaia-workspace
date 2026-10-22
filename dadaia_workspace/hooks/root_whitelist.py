@@ -5,10 +5,15 @@ is blocked; the doctor asks the same function and reports existing slop. Fails o
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
 from pathlib import Path
 
-from dadaia_workspace.core import context_registry, invocation, workspace_layout, workspace_resolver
+from dadaia_workspace.core import (
+    clock,
+    context_registry,
+    invocation,
+    workspace_layout,
+    workspace_resolver,
+)
 from dadaia_workspace.core.cli_line import mkdir_line, spell_fix
 from dadaia_workspace.hooks import _common
 
@@ -46,5 +51,5 @@ def _root_violation(anchor: Path | None, raw_path: str, agent: str) -> str | Non
         f"does not admit. The workspace root may only contain: {workspace_layout.root_entries_display()}; "
         ".dadaia/ only its zones; a closed-canon zone only its canon. Temp files belong in "
         f"{ws / '.dadaia' / 'tmp'}/<agent>/<YYYYMMDD>/.\n"
-        + spell_fix(mkdir_line(ws / ".dadaia" / "tmp" / agent / f"{datetime.now(UTC):%Y%m%d}"))
+        + spell_fix(mkdir_line(ws / ".dadaia" / "tmp" / agent / clock.compact_day()))
     )

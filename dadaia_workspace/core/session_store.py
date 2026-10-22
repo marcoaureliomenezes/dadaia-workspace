@@ -15,6 +15,7 @@ from pathlib import Path
 
 from dadaia_workspace.core import platform
 from dadaia_workspace.core.atomic_write import atomic_write
+from dadaia_workspace.core.clock import instant
 from dadaia_workspace.core.models.spec_context import CONTEXT_NAME_RE as _NAME_RE
 
 __all__ = [
@@ -107,7 +108,7 @@ def is_live(record: dict[str, object], *, clock: Callable[[], datetime] | None =
     seen = parse_instant(record.get(SESSION_HEARTBEAT_FIELD))
     if seen is None:
         return False
-    now = clock() if clock is not None else datetime.now(tz=UTC)
+    now = clock() if clock is not None else instant()
     age = now - seen
     return age.total_seconds() < SESSION_GC_TTL_SECONDS
 

@@ -72,12 +72,7 @@ def main(argv: list[str] | None = None) -> int:
     reads = args.verb in ("check", "drift")
     specs = find_specs(args.specs, ledger=None if reads else "specs/memory/product/catalog.json")
     if args.verb == "check":
-        findings = check(specs)
-        if args.json:
-            print(json.dumps(findings, indent=2))
-        else:
-            _findings.print_text(findings)
-        return 1 if findings else 0
+        return _findings.run_check(check(specs), as_json=args.json)
     try:
         if args.verb == "drift":
             return _drift(args, specs)
