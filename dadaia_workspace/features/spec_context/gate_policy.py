@@ -22,6 +22,7 @@ from pathlib import Path, PurePath
 
 from dadaia_workspace.core import workspace_layout
 from dadaia_workspace.core.cli_line import fix_line, mkdir_line, reinstall_fix, spell_fix
+from dadaia_workspace.core.linked_tree import linked_tree_depths
 from dadaia_workspace.core.platform import act
 from dadaia_workspace.core.skill_owner import load_owner
 
@@ -137,7 +138,7 @@ def evaluate(
         return Decision.BLOCK, message + spell_fix(fix)
     if cls == PathClass.ADDITIVE or repo is None:
         return Decision.ALLOW, ""
-    in_linked_tree = zone == "worktree" and workspace_layout.linked_tree_depths(
+    in_linked_tree = zone == "worktree" and linked_tree_depths(
         Path(root), rel_path.replace("\\", "/").strip("/").split("/")
     )
     if (
