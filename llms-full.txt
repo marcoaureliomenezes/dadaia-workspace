@@ -527,7 +527,7 @@ runs every worktree verb: `new`, `merge`, `sync`, `clean`, `hash`, `list`, `paus
    one job file per job, `tasks/job<n>.md`, in that `rc-<N>/`, as the first commits of
    the `wt-rc`, cut from the work branch (`<work>M.m.p`; the names are the
    `gitflow:` block of `specs/constitution.md`).
-4. **Open implementation.** `release.py phase IMPLEMENTATION --sha <sha>` requires
+4. **Open implementation.** `release.py phase IMPLEMENTATION` requires
    `SPEC.md` and `PLAN.md` `**Status:** Approved`, PLAN's `## DAG` with wave and exact
    `W:` sets, and lean job files containing task id, AC and exact `W:`, then stamps `defined`.
 5. **Run the jobs.** Each job opens its `wt-main` by `.dadaia/.venv/bin/dadaia worktree new`
@@ -539,7 +539,7 @@ runs every worktree verb: `new`, `merge`, `sync`, `clean`, `hash`, `list`, `paus
    `.dadaia/.venv/bin/dadaia worktree sync <wt-rc path>` rebases the rc and its trees,
    parents first.
 6. **Close the candidate.** The Reconciliation, as the last commits of the `wt-rc`:
-   `release.py phase CLOSURE --sha <sha>` (no `wt/*` tree or branch open but the `wt-rc`), the
+   `release.py phase CLOSURE` (no `wt/*` tree or branch open but the `wt-rc`), the
    closure `log` entries, the disposition sweep (`backlog.py exit`, `audit.py
    disposition`/`close`, `bugs.py archive`), artifact GC, and last the memory
    reconciliation with its derived docs; after CLOSURE a hotfix lane still reaches it by
@@ -549,7 +549,7 @@ runs every worktree verb: `new`, `merge`, `sync`, `clean`, `hash`, `list`, `paus
    candidate, reopening `DEFINITION`. Promote: merge the integration branch into the
    principal by PR — that merge is the deploy. The old work tip is tagged
    `archive/<work-branch>` and the work branch is renamed to the next release id
-   (`git branch -m`, then `git push -u`), never cut anew; `release.py ship --sha <sha>`,
+   (`git branch -m`, then `git push -u`), never cut anew; `release.py ship`,
    in a backlog lane on that branch, then records the promote and moves the release
    folder to `_archive/`.
 
@@ -785,7 +785,7 @@ lane.
 release or a non-SemVer id with a `fix:` line; the stub opens with `## Bug window review`. From there, author
 `SPEC.md`, `PLAN.md` and one job file per job, `tasks/job<n>.md`, in that `rc-<N>/`, `PLAN.md`
 opening with the As-is review table (`unit | today | bugs | verdict | why`) and carrying the
-`## DAG` of jobs with waves and exact write sets; `release.py phase IMPLEMENTATION --sha <sha>` opens
+`## DAG` of jobs with waves and exact write sets; `release.py phase IMPLEMENTATION` opens
 implementation once SPEC and PLAN carry `**Status:** Approved` and every job file is well formed.
 
 Next: [positioning](positioning.md) for why this shape, [the bug loop](bug-loop.md)
