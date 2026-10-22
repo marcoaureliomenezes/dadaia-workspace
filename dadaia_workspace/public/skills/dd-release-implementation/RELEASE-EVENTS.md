@@ -35,6 +35,8 @@ stays open.
 
 ## Milestones
 
+A milestone or memory-window bound is found from its commit subject line, as a fix is (`dd-bug-resolution/LINEAGE.md` §Read persisted facts); a stored sha is a hint a history rewrite can orphan.
+
 | Milestone | Command | Written shape |
 |---|---|---|
 | candidate birth | `release.py new <id>` | `phase: DEFINITION` plus a `note` |

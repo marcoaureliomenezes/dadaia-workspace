@@ -18,16 +18,16 @@ description: >
 3. Read `specs/backlog/BACKLOG.json`'s `active[]`; audit each entry before scheduling it (gain, cost, trade-offs, product fit, no new gate, no layer on an existing feature) and take open doubts to the grill.
 4. Each undispositioned `specs/audits/**` finding enters the SPEC's Origin as `findings:<id>`.
 5. Name the SPEC's `**Origin:**` per `specs/releases/AGENTS.md` §2.
-6. Write the SPEC's `## Bug window review`: list the resolved bugs' ids in `<specs-dir>/bugs/BUGS.jsonl`, find and inspect each fix as `dd-bug-resolution/LINEAGE.md` §Read persisted facts says, and compare that fix against the overfitting patterns — an assert or test the fix changed; a special case on a test value; a new branch, flag or second path; a reach into another feature; deleted functionality; ≥ 2 fixes on the unit.
+6. Write the SPEC's `## Bug window review`: list the resolved bugs' ids in `<specs-dir>/bugs/BUGS.jsonl`, find and inspect each fix as `dd-bug-resolution/LINEAGE.md` §Read persisted facts says, and compare that fix against the overfitting patterns — an assert or test the fix changed; a special case on a test value; a new branch, flag or second path; a reach into another feature; deleted functionality.
 7. Give each fix KEEP or REBUILD; a REBUILD reworks the fix's code and what surrounds it, and keeps the contract tests its fixes hardened.
 
 ## 2. As-is review
 
 - `dd-sw-engineer-sr` runs it read-only, dispatched after the pick and before the grill.
 - The pick ranks its set into waves: law, skills and dev loop; shared foundation; features and bugs; promote-facing.
-- Read every unit the picked set touches and its ledger slice (the records in `BUGS.jsonl` and `_archive/bugs_histo.jsonl` whose `fix_files` name the unit's files, `git log` on the unit); the table rides the handoff into the grill and lands as PLAN §1.
+- Read every unit the picked set touches and its ledger slice (its history per `dd-bug-resolution/LINEAGE.md` §The filter); the table rides the handoff into the grill and lands as PLAN §1.
 - One row per touched unit, columns `unit | today | bugs | verdict | why`; DELETE vs KEEP is the deletion test (`dd-code-review` SLOP.md); a duplicated decider lists every copy with `path:line`, and a repro where the copies diverge; verdicts follow the root map §1 work order, ADD only for what no unit can carry (`today` `—`, `why` says why).
-- REBUILD is mandatory when the unit carries ≥ 2 bugs, the demand changes its fundamental behaviour, the change would need a flag, branch, special case or second path, or its contract contradicts the demand; the engineer and the reviewer judge these triggers.
+- REBUILD is mandatory when `bugs.py` reports it due (`dd-bug-resolution/LINEAGE.md` §The filter), the demand changes its fundamental behaviour, the change would need a flag, branch, special case or second path, or its contract contradicts the demand; the engineer and the reviewer judge these triggers.
 - §1.1 Authorities: one row per touched question, one authority each; `consults` call it, `deleted` leave with the row's bug.
 - A row that REBUILDs or DELETEs a grammar, format, public name or fix line names its consumers; a read-only `dd-researcher` pre-mortem precedes the SPEC approval and the PLAN answers each hit.
 - The PLAN §1 skeleton:

@@ -17,10 +17,9 @@ of repeating it.
 
 ## The filter
 
-- Group by recorded fix files: a record matches when its `fix_files` share a file with the bug's files (its `component` paths).
+- A unit's bug history is the id-line query `git log -E --grep '^(fix|refactor)\(bugs\): ' -- <file>`, never `fix_files`; the ids it prints are looked up in the ledger.
 - Match `component` by engineering judgement; it is precise free text, not an enum.
-- Read at most the 20 most recent matching records in the window, ordered by
-  `closed_at`, newest first.
+- A REBUILD of a unit is due on a child bug (`caused_by` naming the unit's fix) registered after the unit's last REBUILD; `bugs.py` is the one decider.
 
 ## Read persisted facts, inspect the named fix
 
@@ -48,4 +47,3 @@ of repeating it.
 
 - Read at most 20 records and inspect at most 20 named fix commits per fix. A wider read
   belongs to `dd-audit-project`.
-- This is a reading discipline. The audit measures its outcomes across the fleet.
