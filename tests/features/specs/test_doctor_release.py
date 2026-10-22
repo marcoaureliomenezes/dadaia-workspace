@@ -14,9 +14,11 @@ from typing import Any
 import pytest
 
 from dadaia_workspace.core.cli_line import shell_line
+from dadaia_workspace.core.skill_owner import load_owner
 from dadaia_workspace.features.specs.doctor import SpecsDoctor
 from dadaia_workspace.features.specs.doctor_common import resolve_active_release
 from dadaia_workspace.features.specs.doctor_release import ReleaseValidator
+from dadaia_workspace.features.specs.specs_tree import SpecsTree
 from tests.helpers.oslib import run as os_run
 from tests.helpers.oslib import write_text
 from tests.helpers.release_state import PLAN
@@ -134,3 +136,14 @@ def test_a_legacy_next_dir_is_not_live_and_new_refuses(tmp_path: Path) -> None:
     assert fix == f"Agent action: move {move}, or out of specs/"
     assert resolve_active_release(specs) == (None, None)
     assert any("/next/" in i.message for i in SpecsDoctor(specs).check() if i.code == "TREE-8")
+
+
+def test_doctor_names_the_candidate_release_py_names(tmp_path: Path) -> None:
+    """A milestone makes rc-1 the live candidate; the empty rc-2 folder is not, for doctor or script."""
+    milestone = {"ts": "2026-09-21T10:00:00Z", "agent": "release.py", "kind": "milestone",
+                 "candidate": "rc-1", "milestone": "implemented", "sha": "0000002", "text": "rc-1 implemented."}  # fmt: skip
+    specs = _specs(tmp_path, "IMPLEMENTATION", [milestone])
+    (specs / "releases/0.5.0/rc-2").mkdir()
+    release_py = load_owner("dd-release-implementation", "_release_store").live_release(specs)
+    assert release_py.candidate == specs / "releases/0.5.0/rc-1"
+    assert SpecsTree(specs).active_release.candidate == release_py.candidate

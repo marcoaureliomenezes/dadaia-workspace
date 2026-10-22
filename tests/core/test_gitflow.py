@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 from pathlib import Path
 
@@ -15,6 +16,7 @@ from dadaia_workspace.core.gitflow import (
     SeveralWorkBranches,
     from_mapping,
     live_release_id,
+    resolve_live_candidate,
     work_branch,
 )
 from dadaia_workspace.core.skill_owner import load_owner
@@ -60,6 +62,29 @@ def test_the_sole_live_release_is_the_kernels_and_several_refuse_there(tmp_path:
         " ship or move out the others"
     )
     assert live_release_id(tmp_path) is None
+
+
+def test_resolve_live_candidate_names_the_candidate_release_py_names(tmp_path: Path) -> None:
+    """A milestone makes rc-1 the live candidate; the empty rc-2 folder is not."""
+    release = tmp_path / "releases" / "0.5.0"
+    (release / "rc-1").mkdir(parents=True)
+    (release / "rc-2").mkdir()
+    milestone = {"ts": "2026-09-21T10:00:00Z", "agent": "release.py", "kind": "milestone",
+                 "candidate": "rc-1", "milestone": "implemented", "sha": "0000002", "text": "rc-1 implemented."}  # fmt: skip
+    state = {"schema": "release-state-v1", "release": "0.5.0", "phase": "IMPLEMENTATION",
+             "defined": None, "implemented": None, "shipped": None, "log": [milestone]}  # fmt: skip
+    write_text(release / "_RELEASE.json", json.dumps(state))
+    release_py = load_owner("dd-release-implementation", "_release_store").live_release(tmp_path)
+    assert release_py.candidate == release / "rc-1"
+    assert resolve_live_candidate(tmp_path) == release_py.candidate
+
+
+def test_an_unreadable_state_names_no_live_candidate(tmp_path: Path) -> None:
+    """The doctor's rule: a state it cannot read names no candidate; `release.py check` reports it."""
+    release = tmp_path / "releases" / "0.5.0"
+    (release / "rc-1").mkdir(parents=True)
+    write_text(release / "_RELEASE.json", "{not json")
+    assert resolve_live_candidate(tmp_path) is None
 
 
 @pytest.mark.parametrize(
