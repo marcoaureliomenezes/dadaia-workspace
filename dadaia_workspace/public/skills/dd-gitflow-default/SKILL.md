@@ -81,7 +81,7 @@ The branch contract by role; the names are `specs/constitution.md`'s `gitflow:` 
 ## 4. Done when
 
 - Current branches match §2a, and every commit since the work branch's cut, `specs/audits/**` commits aside, matches one §3a row.
-- After a work → integration PR: §3b holds and the PR merged.
+- After a work → integration PR: The PR gate holds and the PR merged.
 - After promotion: the `archive/<work-name>` tag resolves to the former work tip, once the next release is named the work branch carries its name and its first merge records the principal merge as `shipped` in the archived state.
 
 ## 5. References

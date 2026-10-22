@@ -11,7 +11,7 @@ record whose `ts` or `closed_at` falls inside that window.
 - Derive diff direction from the named commit's production numstat. Direction is an
   audit result.
 - The prior `SPEC.md` `## Bug window review` judges each fix KEEP or REBUILD and schedules
-  no work (`dd-release-definition` §1 step 7); a REBUILD is proposed as a bug, rebuilt in its own lane once confirmed.
+  no work (`dd-release-definition`, Pick the set, step 7); a REBUILD is proposed as a bug, rebuilt in its own lane once confirmed.
 
 ## Recurrence and fix-induced bugs
 

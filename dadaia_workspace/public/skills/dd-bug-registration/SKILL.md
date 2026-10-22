@@ -7,7 +7,7 @@ description: >
 
 # dd-bug-registration
 
-> Who writes `bugs/**`: `specs/AGENTS.md` §4; the propose/confirm rule: `specs/bugs/AGENTS.md` §1. Fixing a registered bug is dd-bug-resolution's.
+> Who writes `bugs/**`: `specs/AGENTS.md`, Artifact authority; the propose/confirm rule: `specs/bugs/AGENTS.md`, What a bug is. Fixing a registered bug is dd-bug-resolution's.
 
 ## 1. When
 
