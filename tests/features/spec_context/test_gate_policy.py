@@ -11,7 +11,8 @@ from pathlib import Path, PurePosixPath
 
 import pytest
 
-from dadaia_workspace.core.cli_line import mkdir_line
+from dadaia_workspace.core.cli_line import fix_line, mkdir_line
+from dadaia_workspace.core.skill_owner import load_owner
 from dadaia_workspace.features.spec_context import gate_policy
 from dadaia_workspace.features.spec_context.gate_policy import (
     Decision,
@@ -19,7 +20,7 @@ from dadaia_workspace.features.spec_context.gate_policy import (
     classify_path,
     evaluate,
 )
-from tests.helpers.oslib import cli_path
+from tests.helpers.oslib import cli_path, write_text
 
 _ROOT = Path("/ws")
 A, M, P = PathClass.ADDITIVE, PathClass.MUTATING, PathClass.PROTECTED
@@ -68,6 +69,8 @@ def test_a_protected_glob_holds_at_every_tree_depth(path: str, tmp_path: Path) -
 
 _A: dict[str, object] = {"context": "ctx-a", "repos": frozenset({"ctx-a", "ctx-a-infra"})}
 _DADAIA = str(cli_path(PurePosixPath("/ws")))
+# /ws holds no workspace on disk, so the owner's projected act falls back to the init act.
+_INIT = "Agent action: run `uvx dadaia-workspace init` with the workspace's directory as its first argument"
 
 
 def _wt(repo: str) -> str:
@@ -93,12 +96,12 @@ def _at(zone: str, repo: str, owner: str | None = None, **session: object) -> di
     pytest.param("repos/ctx-b/src/x.py", _at("repo", "ctx-b", has_id=False), _wt("ctx-b"), id="ADR0105-repos-refused-for-every-session"),
     pytest.param("repos/stranger/src/x.py", {**_at("repo", "stranger", **_A), "owner": None}, _wt("stranger"), id="unregistered-slug-still-merge-only"),
     pytest.param("repos/beta/x.py", _at("repo", "beta", context="alpha", repos=frozenset({"alpha"}), has_id=False), "fix: Operator action: relaunch this session with DADAIA_CONTEXT=beta", id="sa-bind-has-two-stores#S5-env-bound-is-told-an-operator-step"),
-    pytest.param("AGENTS.md", {}, f"fix: {_DADAIA} public install", id="S6-floor-law-one-restore-command"),
+    pytest.param("AGENTS.md", {}, f"fix: {_INIT}", id="S6-floor-law-one-restore-command"),
     pytest.param(".dadaia/states/spec_contexts.json", {}, "fix: Agent action: use the verb or skill script that owns that state file instead of editing it", id="states-floor-names-the-owning-verb-not-public-install"),
     pytest.param(".dadaia/states/privacy_denylist.json", {}, f"fix: {mkdir_line(_ROOT / '.dadaia' / 'tmp')}", id="the-denylist-is-the-operators-own-file-not-a-verbs-state"),
     pytest.param(".dadaia/sessions/x.json", _A, f"fix: {_DADAIA} context bind ctx-a", id="AC4.4-session-floor-names-the-bound-context"),
     pytest.param(".dadaia/sessions/x.json", {}, f"fix: {_DADAIA} context list", id="AC4.4-session-floor-unbound-lists-contexts"),
-    pytest.param(".dadaia/states/install_ledger.json", {"projected": frozenset({".dadaia/states/install_ledger.json"})}, f"fix: {_DADAIA} public install", id="H1-ledgered-floor-path-is-projected-law-first"),
+    pytest.param(".dadaia/states/install_ledger.json", {"projected": frozenset({".dadaia/states/install_ledger.json"})}, f"fix: {_INIT}", id="H1-ledgered-floor-path-is-projected-law-first"),
     pytest.param("repos/x/secrets/k", {"protected": ("secrets",)}, f"fix: {mkdir_line(_ROOT / '.dadaia' / 'tmp')}", id="AC2.5-protected-glob-operator-drafts-in-tmp"),
 ])
 # fmt: on
@@ -229,3 +232,11 @@ def test_a_command_that_runs_the_writer_with_the_flag_is_refused_in_any_shell_po
     command: str,
 ) -> None:
     assert gate_policy.verdict_act(command, key="agent_type", subagent=None) is not None
+
+
+def test_the_law_floor_fix_is_the_owners_projected_act_of_its_workspace(tmp_path: Path) -> None:
+    write_text(tmp_path / ".dadaia" / "states" / "spec_contexts.json", "{}")
+    want = load_owner("dd-bug-resolution", "_jsonl").reinstall_fix(tmp_path, projected=True)
+    _, message = evaluate("AGENTS.md", root=tmp_path)
+    assert message.splitlines()[-1] == f"fix: {want}"
+    assert want == fix_line(tmp_path.resolve(), "public", "install")

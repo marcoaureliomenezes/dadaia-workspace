@@ -143,3 +143,18 @@ def test_a_failed_worktree_read_names_the_public_runner_as_its_fix(
 
     assert found == [] and failed.startswith("list failed: ")
     assert fix == cli_line.fix_line(tmp_path, "worktree", "list")
+
+
+def test_an_uninstalled_worktree_script_is_re_projected_from_its_workspace(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The owner's projected act for the workspace given, not the running CLI's venv."""
+    from dadaia_workspace.infrastructure import ledger_scripts
+
+    write_text(tmp_path / ".dadaia" / "states" / "spec_contexts.json", "{}")
+    monkeypatch.setattr(ledger_scripts, "_PACKAGE_SKILLS", tmp_path / "package")
+
+    found, failed, fix = worktree_rows(tmp_path, {"mine"})
+
+    assert found == [] and failed.startswith("list failed: ")
+    assert fix == cli_line.fix_line(tmp_path.resolve(), "public", "install")

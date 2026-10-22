@@ -10,7 +10,8 @@ import subprocess
 import sys
 from pathlib import Path
 
-from dadaia_workspace.core.cli_line import shell_line
+from dadaia_workspace.core.cli_line import fix_line, shell_line
+from dadaia_workspace.core.skill_owner import load_owner
 from tests.helpers.oslib import run, write_text
 
 _KERNEL = (
@@ -70,3 +71,28 @@ def test_a_denylist_that_is_not_utf8_is_the_operators_to_rewrite(tmp_path: Path)
         f"fix: Operator action: rewrite {denylist} as one JSON object mapping each term to "
         "its reason\n"
     )
+
+
+_INIT_ACT = "Agent action: run `uvx dadaia-workspace init` with the workspace's directory as its first argument"
+
+
+def test_a_projected_file_is_re_projected_by_public_install(tmp_path: Path) -> None:
+    """The owner holds one act per file class: a shipped file is reinstalled by `init`, a
+    projected one re-projected by the workspace CLI's `public install`."""
+    write_text(tmp_path / ".dadaia" / "states" / "spec_contexts.json", "{}")
+    owner = load_owner("dd-bug-resolution", "_jsonl")
+    inside = tmp_path / "specs"
+
+    assert owner.reinstall_fix(inside, projected=True) == fix_line(
+        tmp_path.resolve(), "public", "install"
+    )
+    assert owner.reinstall_fix(inside) == shell_line(
+        "uvx", "dadaia-workspace", "init", str(tmp_path.resolve())
+    )
+
+
+def test_outside_every_workspace_both_classes_are_the_one_init_act(tmp_path: Path) -> None:
+    owner = load_owner("dd-bug-resolution", "_jsonl")
+
+    assert owner.reinstall_fix(tmp_path, projected=True) == _INIT_ACT
+    assert owner.reinstall_fix(tmp_path) == _INIT_ACT
