@@ -10,7 +10,7 @@ if TYPE_CHECKING:
     from dadaia_workspace.features.certification import CertificationResult
 
 from dadaia_workspace.core.models.git_scan import ScannedObject
-from dadaia_workspace.core.workspace_resolver import not_initialized
+from dadaia_workspace.core.workspace_resolver import is_workspace, not_initialized
 from dadaia_workspace.features.capabilities import distribution_version
 from dadaia_workspace.features.chokepoints.denylist_scan import BaselinePatternLike
 from dadaia_workspace.features.chokepoints.push_gate import read_failure_fix
@@ -47,8 +47,7 @@ def build_context_store(workspace_root: Path) -> JsonContextStore:
 
 
 def _guard_initialized(workspace_root: Path) -> None:
-    marker = states_dir(workspace_root) / "spec_contexts.json"
-    if not marker.exists():
+    if not is_workspace(workspace_root):
         raise not_initialized(workspace_root)
 
 

@@ -67,13 +67,14 @@ class HookFileSpec:
     events: tuple[tuple[str, str, str | None], ...]
 
 
+_SENTINEL = load_owner("dd-bug-resolution", "_root").SENTINEL
 #: Resolve the workspace from the wrapper's OWN location — never a ``PATH`` lookup.
 _SELF_ROOT = 'ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)\n'
 #: A user-level shim serves every workspace: walk up from the hook cwd to the nearest
 #: sentinel; none -> not a workspace, exit 0.
 _CWD_ROOT = (
     "ROOT=$PWD\n"
-    'while [ ! -f "$ROOT/.dadaia/states/spec_contexts.json" ]; do\n'
+    f'while [ ! -f "$ROOT/{_SENTINEL.as_posix()}" ]; do\n'
     '  [ "$ROOT" = / ] && exit 0\n'
     '  ROOT=$(dirname "$ROOT")\n'
     "done\n"
@@ -342,7 +343,7 @@ def _cmd_script(lane: HookLane, dialect: HookDialect) -> str:
         "setlocal EnableExtensions DisableDelayedExpansion",
         'set "ROOT=%CD%"',
         ":up",
-        'if exist "%ROOT%\\.dadaia\\states\\spec_contexts.json" goto found',
+        f'if exist "%ROOT%\\{PureWindowsPath(_SENTINEL)}" goto found',
         'for %%I in ("%ROOT%\\..") do set "UP=%%~fI"',
         'if "%UP%"=="%ROOT%" exit /b 0',
         'set "ROOT=%UP%"',

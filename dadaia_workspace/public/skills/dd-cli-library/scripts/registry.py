@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Any
 
 sys.dont_write_bytecode = True  # the shared _ledger imports without a __pycache__
-sys.path.append(str(Path(__file__).resolve().parents[2] / "dd-bug-resolution" / "scripts"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "dd-bug-resolution" / "scripts"))
 import _clock
 import _platform
 from _ledger import replace, workspace_of
