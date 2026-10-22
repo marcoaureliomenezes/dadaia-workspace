@@ -16,7 +16,6 @@ from dadaia_workspace.core import platform
 from dadaia_workspace.core.fixed_sections import authored_text
 from dadaia_workspace.core.skill_owner import load_owner
 from dadaia_workspace.features.specs import memory_canon
-from dadaia_workspace.features.specs.schemas import load_schema
 
 __all__ = [
     "AtomResult",
@@ -29,7 +28,7 @@ __all__ = [
 
 
 def load_frontmatter_schema() -> dict[str, Any]:
-    return load_schema("memory/memory-frontmatter-v1")
+    return dict(load_owner("dd-bug-resolution", "_ledger").load_schema("memory-frontmatter-v1"))
 
 
 _H2_RE = re.compile(r"^##\s+(.+)$", re.MULTILINE)

@@ -45,14 +45,15 @@ and a git tree listing (``git ls-tree``'s own native output) already produce.
 from __future__ import annotations
 
 from collections.abc import Callable, Iterable
-from dataclasses import astuple, dataclass
+from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
 from typing import Literal
 
 from dadaia_workspace.core import clock, platform
 from dadaia_workspace.core.atomic_write import SymlinkRefusedError, atomic_write
-from dadaia_workspace.core.gitflow import DEFAULT
+from dadaia_workspace.core.gitflow import DEFAULT, gitflow_value
+from dadaia_workspace.core.skill_owner import load_owner
 from dadaia_workspace.core.specs_version import CANONICAL_SPECS_VERSION
 from dadaia_workspace.core.workspace_layout import (
     CANON_ROOT_MEMBERS,
@@ -112,8 +113,6 @@ One statement of what this project is for.
 - (State what this project is not.)
 """
 
-_BACKLOG_STUB = '{"schema": "backlog-v1", "active": []}\n'
-
 
 # ---------------------------------------------------------------------------------
 # THE RENDERER MAP — how a canon row's content is produced. Keyed by
@@ -137,7 +136,10 @@ TEMPLATES: dict[str, tuple[Kind, str]] = {
     "releases/AGENTS.md": ("copy", "scaffold/releases/AGENTS.md"),
     "releases/_archive/releases_histo.jsonl": ("static", ""),
     "backlog/AGENTS.md": ("copy", "scaffold/backlog/AGENTS.md"),
-    "backlog/BACKLOG.json": ("static", _BACKLOG_STUB),
+    "backlog/BACKLOG.json": (
+        "static",
+        load_owner("dd-backlog-definition", "_backlog_store").render([]),
+    ),
     "backlog/_archive/backlog_histo.jsonl": ("static", ""),
     "bugs/AGENTS.md": ("copy", "scaffold/bugs/AGENTS.md"),
     "bugs/_archive/bugs_histo.jsonl": ("static", ""),
@@ -237,7 +239,7 @@ def scaffold(
         "today": clock.today(),
         "project_name": project_name,
         "specs_pattern_version": str(CANONICAL_SPECS_VERSION),
-        "gitflow": "{{principal: {}, integration: {}, work: {}}}".format(*astuple(DEFAULT)),
+        "gitflow": gitflow_value(DEFAULT),
     }
     writes: list[tuple[Path, Callable[[], str], bool]] = [
         # Only "no destination" disqualifies an entry: a required_at_birth row always

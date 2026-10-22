@@ -44,6 +44,11 @@ def read_active(path: Path) -> Items:
     return active
 
 
+def render(active: Items) -> str:
+    """The bytes of a ``BACKLOG.json`` holding *active*."""
+    return json.dumps({"schema": "backlog-v1", "active": active}, indent=2) + "\n"
+
+
 def commit(
     specs: Path, apply: Callable[[Items], Items], record: dict[str, Any] | None = None
 ) -> Items:
@@ -60,9 +65,8 @@ def commit(
         why = private_refusal(new, path)
         if why is not None:
             raise Refusal(*why)
-        text = json.dumps({"schema": "backlog-v1", "active": written}, indent=2) + "\n"
         return _commit.validated(
-            text,
+            render(written),
             f"{LEDGER} + {HISTO}",
             lambda t: pair_findings(t, old + appended),
             SCRIPT("check"),

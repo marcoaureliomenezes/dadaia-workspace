@@ -27,6 +27,7 @@ __all__ = [
     "constitution_path",
     "constitution_text",
     "from_mapping",
+    "gitflow_value",
     "merge_frontmatter",
     "live_release_id",
     "origin_work_branch",
@@ -211,6 +212,12 @@ def read_gitflow(specs_dir: Path, text: str | None = None) -> tuple[Gitflow, str
     )
 
 
+def gitflow_value(flow: Gitflow) -> str:
+    """The ``gitflow:`` block's value as written into the constitution (JSON is YAML)."""
+    names = (flow.principal, flow.integration, flow.work_prefix)
+    return json.dumps(dict(zip(("principal", "integration", "work"), names, strict=True)))
+
+
 def merge_frontmatter(
     specs_dir: Path,
     *,
@@ -219,12 +226,11 @@ def merge_frontmatter(
 ) -> None:
     """Write the given keys into the constitution frontmatter (replaced in place, else
     appended; no block ⇒ one prepended); every other line stays identical."""
-    names = gitflow and (gitflow.principal, gitflow.integration, gitflow.work_prefix)
     values = {
-        "specs_pattern_version": specs_pattern_version,
-        "gitflow": names and dict(zip(("principal", "integration", "work"), names, strict=True)),
+        "specs_pattern_version": specs_pattern_version and json.dumps(specs_pattern_version),
+        "gitflow": gitflow and gitflow_value(gitflow),
     }
-    updates = {k: json.dumps(v) for k, v in values.items() if v is not None}  # JSON is YAML
+    updates = {k: v for k, v in values.items() if v is not None}
     constitution = constitution_path(specs_dir)
     text = platform.read_text(constitution) if constitution.exists() else ""
     parts = split(text)
