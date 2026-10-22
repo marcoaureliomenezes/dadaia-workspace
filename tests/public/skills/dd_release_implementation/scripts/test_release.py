@@ -188,7 +188,7 @@ def test_a_verb_refuses_several_live_releases_with_the_one_fix_line(
     specs = _specs(tmp_path)
     _release(specs, "0.5.0")
     _release(specs, "0.6.0")
-    result = _run(script, "phase", "IMPLEMENTATION", "--sha", "abc1234", "--specs", str(specs))
+    result = _run(script, "phase", "IMPLEMENTATION", "--specs", str(specs))
     assert result.returncode == 1
     assert f"[error] {_SEVERAL}" in result.stderr
     assert [ln for ln in result.stderr.splitlines() if ln.startswith("fix: ")] == [
@@ -234,7 +234,7 @@ def test_a_verb_with_no_live_release_hands_new_to_the_agent(
 ) -> None:
     """With no live release the one fix is the agent's `new`, version unchosen."""
     specs = _specs(tmp_path)
-    result = _run(script, "phase", "IMPLEMENTATION", "--sha", "abc1234", "--specs", str(specs))
+    result = _run(script, "phase", "IMPLEMENTATION", "--specs", str(specs))
     assert result.returncode == 1
     assert result.stderr.splitlines()[-1] == (
         f"fix: Agent action: run `{shell_line(sys.executable, str(script), 'new', '--specs', str(specs))}` "
@@ -268,7 +268,7 @@ def test_new_births_the_stacked_candidate_on_a_closed_live_release(
     assert state["defined"] == {"sha": "aaaaaaa", "ts": "2026-01-01T00:00:00Z"}
     assert state["implemented"] == {"sha": "beef123", "ts": "2026-01-02T00:00:00Z"}
     notes = [entry["text"] for entry in state["log"] if entry["kind"] == "note"]
-    assert notes == ["Candidate born on 0.5.0 (prior candidate closed at beef123)"]
+    assert notes == ["Candidate born on 0.5.0 (stacked on the closed prior candidate)"]
 
 
 def test_new_refuses_the_same_id_while_its_candidate_is_open(script: Path, tmp_path: Path) -> None:
@@ -296,43 +296,43 @@ def test_new_refuses_a_non_semver_id(script: Path, tmp_path: Path) -> None:
 def test_phase_implementation_stamps_defined(script: Path, tmp_path: Path) -> None:
     specs = _specs(tmp_path)
     _release(specs, "0.5.0")
-    result = _run(script, "phase", "IMPLEMENTATION", "--sha", "abc1234", "--specs", str(specs))
+    result = _run(script, "phase", "IMPLEMENTATION", "--specs", str(specs))
     assert result.returncode == 0, result.stderr
     state = _read(specs / "releases" / "0.5.0" / "_RELEASE.json")
     assert state["phase"] == "IMPLEMENTATION"
     assert isinstance(state["defined"], dict)
-    assert state["defined"]["sha"] == "abc1234"
+    assert set(state["defined"]) == {"ts"}
 
 
 def test_phase_closure_stamps_the_implemented_milestone(script: Path, tmp_path: Path) -> None:
     specs = _specs(tmp_path)
     _release(specs, "0.5.0", phase="IMPLEMENTATION")
-    result = _run(script, "phase", "CLOSURE", "--sha", "beef123", "--specs", str(specs))
+    result = _run(script, "phase", "CLOSURE", "--specs", str(specs))
     assert result.returncode == 0, result.stderr
     state = _read(specs / "releases" / "0.5.0" / "_RELEASE.json")
     assert state["phase"] == "CLOSURE"
-    assert state["implemented"] == {"sha": "beef123", "ts": state["implemented"]["ts"]}
+    assert state["implemented"] == {"ts": state["implemented"]["ts"]}
     # the slot holds the live candidate's stamp; the log keeps every one.
     assert state["log"][-1] == {"ts": ANY, "agent": "release.py", "kind": "milestone",
                                 "candidate": "rc-1", "milestone": "implemented",
-                                "sha": "beef123", "text": ANY}  # fmt: skip
+                                "text": ANY}  # fmt: skip
 
 
 def test_phase_implementation_refuses_an_unapproved_trio(script: Path, tmp_path: Path) -> None:
     specs = _specs(tmp_path)
     release_dir = _release(specs, "0.5.0")
     write_text(release_dir / "rc-1/PLAN.md", "# PLAN\n\n**Status:** Draft\n")
-    result = _run(script, "phase", "IMPLEMENTATION", "--sha", "abc1234", "--specs", str(specs))
+    result = _run(script, "phase", "IMPLEMENTATION", "--specs", str(specs))
     assert result.returncode == 1
     assert "PLAN.md" in result.stderr
 
 
-def test_phase_refuses_a_malformed_sha(script: Path, tmp_path: Path) -> None:
+def test_phase_refuses_a_sha_flag(script: Path, tmp_path: Path) -> None:
     specs = _specs(tmp_path)
     _release(specs, "0.5.0")
     assert (
         _run(script, "phase", "IMPLEMENTATION", "--sha", "zz", "--specs", str(specs)).returncode
-        == 1
+        == 2
     )
 
 
@@ -489,10 +489,8 @@ def test_check_judges_a_definition_release(
 def test_a_definition_finding_stamps_the_commit_that_touched_the_trio(
     script: Path, tmp_path: Path
 ) -> None:
-    """`defined` is the trio's last commit, never HEAD — implementation
-    commits after it stay inside the memory window `defined.sha` opens."""
+    """The phase fix is the plain verb: no commit is named, since none is stored."""
     root, specs, _ = _memory_repo(tmp_path, script)
-    trio = _git(root, "log", "-1", "--format=%h", "--", "specs/releases/0.5.0/rc-1/SPEC.md")
     entries = [  # a closure entry logged after the birth note; the trio's bytes unchanged
         {"ts": _TS, "agent": f"release.py {a}", "kind": k, "text": k}
         for a, k in (("new", "note"), ("x", "dispositions"))
@@ -503,7 +501,7 @@ def test_a_definition_finding_stamps_the_commit_that_touched_the_trio(
     fixes = [
         f["fix"] for f in json.loads(_run(script, "check", "--json", "--specs", str(specs)).stdout)
     ]
-    assert fixes and all(f" --sha {trio} " in f for f in fixes), (trio, fixes)
+    assert fixes and all(f.endswith(f"phase IMPLEMENTATION --specs {specs}") for f in fixes), fixes
 
 
 def test_check_reports_a_schema_violation_and_emits_json(script: Path, tmp_path: Path) -> None:
@@ -556,14 +554,13 @@ def _in_phase(root: Path, script: Path, phase: str) -> Path:
 @pytest.mark.parametrize(
     ("phase", "argv"),
     [
-        ("DEFINITION", ("phase", "IMPLEMENTATION", "--sha", "nope")),
-        ("DEFINITION", ("phase", "CLOSURE", "--sha", "abc1234")),
-        ("IMPLEMENTATION", ("phase", "IMPLEMENTATION", "--sha", "abc1234")),
-        ("CLOSURE", ("phase", "DEFINITION", "--sha", "abc1234")),
-        ("CLOSURE", ("phase", "ARCHIVED", "--sha", "abc1234")),
-        ("DEFINITION", ("ship", "--sha", "abc1234", "--pr", "7")),
-        ("IMPLEMENTATION", ("ship", "--sha", "abc1234", "--pr", "7")),
-        ("CLOSURE", ("ship", "--sha", "abc1234", "--pr", "zero")),
+        ("DEFINITION", ("phase", "CLOSURE")),
+        ("IMPLEMENTATION", ("phase", "IMPLEMENTATION")),
+        ("CLOSURE", ("phase", "DEFINITION")),
+        ("CLOSURE", ("phase", "ARCHIVED")),
+        ("DEFINITION", ("ship", "--pr", "7")),
+        ("IMPLEMENTATION", ("ship", "--pr", "7")),
+        ("CLOSURE", ("ship", "--pr", "zero")),
     ],
 )
 def test_every_refusal_carries_one_fix_that_is_not_itself_refused(
@@ -908,7 +905,7 @@ def test_ship_refuses_what_check_refuses_and_touches_nothing(script: Path, tmp_p
     _release(specs, "0.5.0", phase="CLOSURE")
     before = _tree_hash(specs)
     checked = json.loads(_run(script, "check", "--json", "--specs", str(specs)).stdout)[0]
-    result = _run(script, "ship", "--sha", "beef123", "--pr", "261", "--specs", str(specs))
+    result = _run(script, "ship", "--pr", "261", "--specs", str(specs))
     assert result.returncode == 1
     assert checked["message"] in result.stderr
     assert [x for x in result.stderr.splitlines() if x.startswith("fix: ")] == [
@@ -916,21 +913,21 @@ def test_ship_refuses_what_check_refuses_and_touches_nothing(script: Path, tmp_p
     ]
     assert _tree_hash(specs) == before
     _release(specs, "0.5.0", phase="BOGUS")  # an invalid phase refuses, no KeyError
-    bogus = _run(script, "ship", "--sha", "beef123", "--pr", "261", "--specs", str(specs))
+    bogus = _run(script, "ship", "--pr", "261", "--specs", str(specs))
     assert bogus.returncode == 1 and "Traceback" not in bogus.stderr, bogus.stderr
 
 
 def test_ship_records_the_promote_and_new_births_the_next(script: Path, tmp_path: Path) -> None:
     """A reconciled CLOSURE ships by verb; the folder moves to `_archive/<v>/`;
-    `shipped` is the one sha/PR field,
-    an archived state without a hex `shipped.sha` and int `shipped.pr` is a finding, a
+    `shipped` is the one PR field,
+    an archived state without an int-or-null `shipped.pr` is a finding, a
     truncated one a finding with a fix and no traceback; the histo `summary` null."""
     specs = _reconciled_closure(tmp_path, script)
-    result = _run(script, "ship", "--sha", "beef123", "--pr", "261", "--specs", str(specs))
+    result = _run(script, "ship", "--pr", "261", "--specs", str(specs))
     assert result.returncode == 0, result.stderr
     archived = specs / "releases/_archive/0.5.0"
     assert not (specs / "releases/0.5.0").exists() and (archived / "rc-1/TASKS.md").is_file()
-    assert _read(archived / "_RELEASE.json")["shipped"] == {"sha": "beef123", "pr": 261, "ts": ANY}
+    assert _read(archived / "_RELEASE.json")["shipped"] == {"pr": 261, "ts": ANY}
     records = load_owner("dd-bug-resolution", "_ledger").records(
         specs / "releases/_archive/releases_histo.jsonl"
     )
@@ -985,13 +982,13 @@ def test_ship_refuses_every_open_bug_without_derived_candidate_fields(
     ledger.parent.mkdir(exist_ok=True)
     write_text(ledger, json.dumps(_found("a-bug", "open")) + "\n")
     before = _tree_hash(specs)
-    refused = _run(script, "ship", "--sha", "beef123", "--pr", "261", "--specs", str(specs))
+    refused = _run(script, "ship", "--pr", "261", "--specs", str(specs))
     assert refused.returncode == 1 and "a-bug" in refused.stderr
     fixes = [x for x in refused.stderr.splitlines() if x.startswith("fix: ")]
     assert len(fixes) == 1 and "resolve a-bug" in fixes[0]
     assert _tree_hash(specs) == before
     write_text(ledger, json.dumps(_found("done", "resolved")) + "\n")
-    shipped = _run(script, "ship", "--sha", "beef123", "--pr", "261", "--specs", str(specs))
+    shipped = _run(script, "ship", "--pr", "261", "--specs", str(specs))
     assert shipped.returncode == 0, shipped.stderr
 
 
@@ -999,10 +996,10 @@ def test_ship_records_a_null_pr_when_none_is_given(script: Path, tmp_path: Path)
     """No host is assumed: `--pr` is the promote PR's number when there is one; its absence is
     `pr: null` in the archived state, and `check` accepts it."""
     specs = _reconciled_closure(tmp_path, script)
-    shipped = _run(script, "ship", "--sha", "beef123", "--specs", str(specs))
+    shipped = _run(script, "ship", "--specs", str(specs))
     assert shipped.returncode == 0, shipped.stderr
     archived = specs / "releases/_archive/0.5.0/_RELEASE.json"
-    assert _read(archived)["shipped"] == {"sha": "beef123", "pr": None, "ts": ANY}
+    assert _read(archived)["shipped"] == {"pr": None, "ts": ANY}
     assert _run(script, "check", "--specs", str(specs)).returncode == 0
 
 
@@ -1041,7 +1038,7 @@ def test_check_prints_the_dag_mismatch_phase_refuses_with(script: Path, tmp_path
     """The mismatch kind is a DAG job (Job 2) with no tasks/job2.md: `phase` reports it
     today as 'PLAN.md DAG jobs do not equal ...'; `check` must report the same line."""
     specs = _dag_tree(tmp_path, extra_dag_job=True)
-    phase = _run(script, "phase", "IMPLEMENTATION", "--sha", "abc1234", "--specs", str(specs))
+    phase = _run(script, "phase", "IMPLEMENTATION", "--specs", str(specs))
     check = _run(script, "check", "--specs", str(specs))
     assert phase.returncode == 1
     message = phase.stderr.splitlines()[0].removeprefix("[error] ")
@@ -1054,7 +1051,7 @@ def test_a_matching_dag_passes_check_and_phase(script: Path, tmp_path: Path) -> 
     """Passes today: the DAG and the job files agree, so neither verb refuses."""
     specs = _dag_tree(tmp_path, extra_dag_job=False)
     assert _run(script, "check", "--specs", str(specs)).returncode == 0
-    phase = _run(script, "phase", "IMPLEMENTATION", "--sha", "abc1234", "--specs", str(specs))
+    phase = _run(script, "phase", "IMPLEMENTATION", "--specs", str(specs))
     assert phase.returncode == 0, phase.stderr
 
 

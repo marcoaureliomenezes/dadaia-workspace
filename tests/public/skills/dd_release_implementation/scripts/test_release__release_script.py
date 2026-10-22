@@ -55,7 +55,12 @@ def _specs(tmp_path: Path, plan: str, *, plan_status: str = "Approved") -> Path:
 
 
 def _phase(script: Path, specs: Path) -> subprocess.CompletedProcess[str]:
-    argv = [sys.executable, str(script), "phase", "IMPLEMENTATION", "--sha", "abc1234"]
+    argv = [
+        sys.executable,
+        str(script),
+        "phase",
+        "IMPLEMENTATION",
+    ]
     return run([*argv, "--specs", str(specs)])
 
 
@@ -64,7 +69,7 @@ def _admits(script: Path, tmp_path: Path, plan: str) -> None:
     result = _phase(script, specs)
     assert result.returncode == 0, result.stderr
     state = json.loads(read_text(specs / "releases/0.5.0/_RELEASE.json"))
-    assert (state["phase"], state["defined"]["sha"]) == ("IMPLEMENTATION", "abc1234")
+    assert (state["phase"], set(state["defined"])) == ("IMPLEMENTATION", {"ts"})
     assert len(state["log"]) == 1
 
 

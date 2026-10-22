@@ -22,7 +22,6 @@ pytestmark = [
 
 _NOW = "2026-10-09T12:00:00Z"
 _MILESTONE = "2026-10-09T10:00:00Z"
-_SHIP_SHA = "beef123"
 
 
 def _bytes(document: dict[str, object]) -> bytes:
@@ -167,14 +166,12 @@ def test_drift_memory_and_ship_pin_outputs_and_release_bytes(tmp_path: Path) -> 
 
     shipped = {
         **remembered,
-        "shipped": {"sha": _SHIP_SHA, "pr": 42, "ts": _NOW},
+        "shipped": {"pr": 42, "ts": _NOW},
     }
     ship = _run(
         script,
         repo,
         "ship",
-        "--sha",
-        _SHIP_SHA,
         "--pr",
         "42",
         "--specs",
@@ -183,7 +180,7 @@ def test_drift_memory_and_ship_pin_outputs_and_release_bytes(tmp_path: Path) -> 
     )
     assert (ship.returncode, ship.stdout, ship.stderr) == (
         0,
-        f"[ok] release 0.5.0 shipped at {_SHIP_SHA} (PR #42)\n",
+        "[ok] release 0.5.0 shipped (PR #42)\n",
         "",
     )
     archived = archive / "0.5.0"
