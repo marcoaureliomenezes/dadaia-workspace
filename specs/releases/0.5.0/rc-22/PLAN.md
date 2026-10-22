@@ -124,7 +124,7 @@ One row per touched question, one authority each; `consults` calls the authority
 | **X03** milestone and memory-window bounds | commit subject (as ADR 0273), `_release_store` | `_stats._after_closure`, `_memory_drift.window`, `doctor_release` | stored `defined.sha`/`implemented.sha`/`until` (neither read nor written: ADR 0280 clause 5, Q6); `fold.py` |
 | **X04** how an act line is composed (label vs command) | `K/_platform` producer with a type boundary (R46) | the 172 `act(` call sites (41 importers of `_platform`) | `InitPlan.command(render=)`, 6 nested sites |
 | **X05** did this tree land (merge idempotence) | `_worktree_end` reading git (`drop_argv` ancestor test) | `clean`, `_remove` | absence-as-success paths; `worktree.py:97-102` catch-all |
-| **X06** is path P a test path (RED separation) | the declared `tests:` globs; the fallback per Q2 | `_refuse_implementation_tests` | the dot-folder special case |
+| **X06** is path P a test path (RED separation) | the declared `tests:` globs; the fallback per Q2 | `_refuse_implementation_tests` | the root-only `tests/` prefix (job4.md ruling 1) |
 | **X07** which ledger scripts run at an rc merge | the instance's projected kernel copy (ADR 0246) | `_ledgers` | `_tracked`, `git ls-files */<ledger>.py` (CWE-427) |
 | **X08** the archive record shape | `K/_bugs_store.history`, the shape read from the line (Q5: no migration) | `_bugs_check`, `append` | the `events` flag (the 124 legacy event lines stay untouched) |
 | **X09** what `caused_by` may name | `K/_grammar` (prior bug id, candidate-qualified task id, `none`); `resolve` refuses an ambiguous bare id (Q11) | `LINEAGE.md`, `resolve` | the ambiguous bare task id at `resolve` (old records are not regrammared) |
