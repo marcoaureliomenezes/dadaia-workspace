@@ -182,7 +182,7 @@ def test_a_gone_task_with_its_job_tree_gone_refuses_with_the_fix_that_restores_t
     )
 
 
-def test_a_finished_task_merge_reruns_clean_after_its_job_landed(root: Path) -> None:
+def test_a_finished_task_merge_rerun_refuses_with_the_new_that_opens_it(root: Path) -> None:
     task = open_tree(root, NEW_TASK)
     commit(task, "src/a.py")
     assert run(root, "merge", str(task)).returncode == 0
@@ -191,14 +191,16 @@ def test_a_finished_task_merge_reruns_clean_after_its_job_landed(root: Path) -> 
         root / "repos/r", "branch", "-D", f"wt/{NEW_JOB}"
     )  # the job landed: parent tree and branch gone
     rerun = run(root, "merge", str(task))
-    assert rerun.returncode == 0, rerun.stderr
+    assert rerun.returncode == 1 and "merged" not in rerun.stdout
+    assert _line(rerun) == command(sys.executable, str(SCRIPT), "new", "r", NEW_TASK)
 
 
-def test_merge_of_a_path_with_no_tree_and_no_branch_claims_no_merge_and_exits_0(root: Path) -> None:
+def test_merge_of_a_path_with_no_tree_and_no_branch_refuses_with_the_new_that_opens_it(
+    root: Path,
+) -> None:
     result = run(root, "merge", str(root / f"worktrees/r/{NEW_TASK}"))
-    assert result.returncode == 0, result.stderr
-    assert "merged" not in result.stdout
-    assert "nothing left to merge at" in result.stdout
+    assert result.returncode == 1 and "merged" not in result.stdout
+    assert _line(result) == command(sys.executable, str(SCRIPT), "new", "r", NEW_TASK)
 
 
 def test_clean_of_a_task_with_its_job_tree_gone_refuses_with_the_fix_that_restores_it(
