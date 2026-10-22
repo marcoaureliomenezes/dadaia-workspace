@@ -14,7 +14,7 @@ Disclosed reference reached at `SKILL.md` step 7 — `dd-product-engineer` runs 
 5. History lines are `LINT-1` errors (`specs/memory/AGENTS.md` §Tree, format, validation) — say what the product does, never when it started.
 6. `python3 .agents/skills/dd-spec-navigator/scripts/memory.py catalog generate`, then `memory.py check`.
 7. In the same `wt-rc`, before its merge: reconcile the repo's derived docs from every changed atom.
-8. Commit the atoms, then `python3 .agents/skills/dd-release-implementation/scripts/release.py memory --reviewed <slugs> --changed <slugs>` — it derives the window and records `since`/`until` itself; `reviewed` names the entries read and left as they were, `changed` those rewritten or created; its refusals are `release.py memory --help`'s.
+8. Commit the atoms, then `python3 .agents/skills/dd-release-implementation/scripts/release.py memory --reviewed <slugs> --changed <slugs>` — it derives the window and records `since`/`until` itself; `reviewed` names the entries read and left as they were, `changed` those rewritten or created.
 9. `.dadaia/.venv/bin/dadaia doctor`: `LEDGER-RELEASE-SCHEMA` (the memory record), `MEM-DRIFT-2` and `LINT-1` (history lines included) clean; the `wt-rc` merge waits until they are.
 
 ## Canonical memory

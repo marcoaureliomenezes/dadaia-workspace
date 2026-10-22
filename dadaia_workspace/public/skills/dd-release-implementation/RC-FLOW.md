@@ -16,7 +16,7 @@ An rc is a DAG of jobs the PLAN draws, Job 1 first. Its `wt-rc` carries the defi
 
 **Step 1 — Open a job.**
 - `WT new` opens the job's `wt-main` once its PLAN edges are merged (leaf grammar: `worktrees/AGENTS.md` §The tree); its tasks live in its job file (`dd-release-definition` §The job file — tasks).
-- Each task opens its `wt-task-<kkk>` tree from its `wt-main`; a sub-agent works it.
+- Each task opens its `wt-task-<kkk>` tree (`kkk`: `worktrees/AGENTS.md` §The tree) from its `wt-main`; a sub-agent works it.
 - Done when: the tree exists.
 
 **Step 2 — Tasks.**
