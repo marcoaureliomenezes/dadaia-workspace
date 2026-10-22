@@ -69,6 +69,10 @@ def _fill_memory(root: Path) -> None:
         catalog = specs / "memory" / "product" / "catalog.json"
         catalog.parent.mkdir(parents=True, exist_ok=True)
         write_text(catalog, json.dumps({"features": [{"slug": "core"}]}))
+        write_text(
+            specs / "memory" / "product" / "core.md",
+            "---\nslug: core\ntitle: core\ntldr: core\nsummary: core\n---\n\n# core\n",
+        )
 
 
 def _run_fix(step: Step, root: Path, bare: Path) -> None:
