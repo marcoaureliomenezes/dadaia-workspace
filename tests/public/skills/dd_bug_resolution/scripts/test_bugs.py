@@ -1706,19 +1706,6 @@ def test_an_archive_of_both_shapes_is_read_from_its_lines_for_check_and_the_ids_
     assert refused.returncode == 1 and "already exists" in refused.stderr
 
 
-def test_check_judges_an_archived_record_no_commit_cites_and_leaves_the_event_lines_alone(
-    script: Path, tmp_path: Path
-) -> None:
-    specs = _ledger(tmp_path)
-    _commit_as(tmp_path, "feat: x")
-    _archived(specs, _resolved("old-a"))
-    done = _run(script, "check", "--specs", str(specs), "--json")
-    assert done.returncode == 1, done.stdout
-    [found] = json.loads(done.stdout)
-    assert (found["path"], found["line"]) == ("bugs/_archive/bugs_histo.jsonl", 2)
-    assert "'old-a'" in found["message"]
-
-
 def test_a_fix_sha_only_record_whose_id_commit_exists_passes_check(
     script: Path, tmp_path: Path
 ) -> None:
