@@ -517,7 +517,7 @@ def test_release_closure_waits_for_every_other_wt(tmp_path: Path) -> None:
     ):
         stage_skill_scripts(skill, tmp_path / "skills" / skill / "scripts")
     script = tmp_path / "skills/dd-release-implementation/scripts/release.py"
-    closure = [str(script), "phase", "CLOSURE", "--sha", "beef123", "--specs", str(specs)]
+    closure = [str(script), "phase", "CLOSURE", "--specs", str(specs)]
 
     refused = run_python(*closure, cwd=root)
     fix = refused.stderr.rsplit("fix: ", 1)[1].strip()
