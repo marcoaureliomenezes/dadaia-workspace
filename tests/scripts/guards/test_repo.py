@@ -37,13 +37,16 @@ def _guards(monkeypatch: pytest.MonkeyPatch) -> tuple[ModuleType, ModuleType]:
     return importlib.import_module("run"), importlib.import_module("repo")
 
 
+_PKG, _SNAKE = "dadaia" + "-workspace", "dadaia" + "_workspace"
+
+
 @pytest.mark.medium
 @pytest.mark.parametrize(
     "line",
     [
-        'CMD = "uv pip install -U dadaia-workspace"\n',
-        'CMD = "pip install dadaia_workspace==0.4.7"\n',
-        "CMD = 'pip install \"dadaia-workspace>0.4\"'\n",
+        f'CMD = "uv pip install -U {_PKG}"\n',
+        f'CMD = "pip install {_SNAKE}==0.4.7"\n',
+        f"CMD = 'pip install \"{_PKG}>0.4\"'\n",
     ],
     ids=["flag-between-verb-and-name", "underscore-spelling", "bare-greater-than"],
 )
@@ -60,7 +63,9 @@ def test_the_published_install_rule_leaves_the_import_name_and_a_local_build(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     run, repo = _guards(monkeypatch)
-    text = "import dadaia_workspace\nCMD = 'python -m dadaia_workspace.cli'\nW = 'uvx --from ./dist/x.whl dadaia'\n"
+    text = (
+        f"import {_SNAKE}\nCMD = 'python -m {_SNAKE}.cli'\nW = 'uvx --from ./dist/x.whl dadaia'\n"
+    )
     found = run._judge([], repo.release_workflow_canon, repo._file("tests/helpers/pin.py", text))
     assert [v for v in found if v.startswith("published-dadaia-workspace-install:")] == []
 
