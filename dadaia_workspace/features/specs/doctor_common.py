@@ -16,7 +16,6 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from dadaia_workspace.core import platform
 from dadaia_workspace.core.gitflow import live_release_id
 from dadaia_workspace.core.release_state import CANDIDATE_RE, RELEASE_STATE_FILENAME
 from dadaia_workspace.core.skill_owner import load_owner
@@ -35,12 +34,12 @@ def resolve_active_release(specs_dir: Path) -> tuple[str | None, str | None]:
     release_id = live_release_id(specs_dir)
     if release_id is None:
         return None, None
-    jsonl = load_owner("dd-bug-resolution", "_jsonl")
+    store = load_owner("dd-release-implementation", "_release_store")
     try:
-        text = platform.read_text(specs_dir / "releases" / release_id / RELEASE_STATE_FILENAME)
-        phase = jsonl.parse_object(text, "").get("phase")
-    except (OSError, jsonl.Unreadable):
+        state = store.read_state(specs_dir / "releases" / release_id / RELEASE_STATE_FILENAME)
+    except load_owner("dd-bug-resolution", "_refusal").Refusal:
         return None, None
+    phase = state.get("phase")
     return (release_id, phase) if isinstance(phase, str) and phase else (None, None)
 
 

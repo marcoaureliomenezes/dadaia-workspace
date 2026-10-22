@@ -88,10 +88,22 @@ def live_release_id(specs_dir: Path) -> str | None:
 
 
 def resolve_live_candidate(specs_dir: Path) -> Path | None:
-    """The live release's highest-numbered ``rc-<N>/`` — `_release_store`'s
-    `candidate_dir` rule; ``None`` with no live release or no candidate folder."""
+    """The live release's candidate folder: `_release_schema.current_candidate` over the state
+    `_release_store.read_state` reads; ``None`` with no live release or an unreadable state."""
     release_id = live_release_id(specs_dir)
-    return candidate_dir(specs_dir / "releases" / release_id) if release_id else None
+    if release_id is None:
+        return None
+    release_dir = specs_dir / "releases" / release_id
+    try:
+        state = load_owner("dd-release-implementation", "_release_store").read_state(
+            release_dir / _grammar.STATE
+        )
+    except load_owner("dd-bug-resolution", "_refusal").Refusal:
+        return None
+    candidate: Path | None = load_owner(
+        "dd-release-implementation", "_release_schema"
+    ).current_candidate(release_dir, state)
+    return candidate
 
 
 _git = load_owner("dd-gitflow-default", "_worktree_git")

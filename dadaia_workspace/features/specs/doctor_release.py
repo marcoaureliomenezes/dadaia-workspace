@@ -34,6 +34,9 @@ CANONICAL_STATUS = _CANONICAL_STATUS
 _PHASES = load_owner("dd-bug-resolution", "_ledger").load_schema("release-state-v1")["properties"][
     "phase"
 ]["enum"]
+CANDIDATE_DOCS: tuple[str, ...] = load_owner(
+    "dd-release-implementation", "_release_schema"
+).CANDIDATE_DOCS
 
 
 def _extract_status(md_path: Path) -> str | None:
@@ -57,7 +60,7 @@ class ReleaseValidator:
         active = self.tree.active_release
         if not active.candidate:
             return issues
-        for fname in ("SPEC.md", "PLAN.md"):
+        for fname in CANDIDATE_DOCS:
             fpath = active.candidate / fname
             if not fpath.exists():
                 # Presence is `release.py check`'s rule, in ONE home. This rule judges the `**Status:**`
