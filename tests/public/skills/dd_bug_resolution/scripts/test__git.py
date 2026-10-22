@@ -196,11 +196,12 @@ def test_main_checkout_of_a_linked_worktree_and_of_its_main_checkout_answer_alik
     assert main_checkout(linked) == main.resolve()
 
 
-def test_main_checkout_of_a_path_that_is_no_repository_is_the_current_directory(
+def test_main_checkout_of_a_path_that_is_no_repository_raises_and_returns_no_stand_in(
     tmp_path: Path,
 ) -> None:
-    main_checkout = load_owner("dd-bug-resolution", "_git").main_checkout
-    assert main_checkout(tmp_path) == Path(".")
+    git = load_owner("dd-bug-resolution", "_git")
+    with pytest.raises(git.GitError):
+        git.main_checkout(tmp_path)
 
 
 def test_fix_commit_returns_the_older_of_two_same_subject_fixes_when_the_newer_is_reverted(

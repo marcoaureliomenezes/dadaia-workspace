@@ -1648,3 +1648,116 @@ def test_check_refuses_a_registry_the_workspace_cli_rejects_with_its_fix_line(
     assert "Traceback" not in out and "AttributeError" not in out, out
     assert done.returncode == 1, out
     assert "fix: Agent action: repair the registry row" in out, out
+
+
+def _unit_history(
+    tmp_path: Path, steps: list[tuple[str, str, str]]
+) -> Path:
+    """Resolved bugs, oldest first, each fixed by a commit on cli/x.py: `(id, line kind, caused_by)`."""
+    _ledger(tmp_path)
+    records = []
+    for bug, kind, caused_by in steps:
+        line = "refactor(bugs): {} — REBUILD u: c" if kind == "refactor" else "fix(bugs): {} — c"
+        sha = _commit_as(tmp_path, line.format(bug))
+        records.append({**_resolved(bug, sha), "caused_by": caused_by})
+    return _ledger(tmp_path, *records)
+
+
+@pytest.mark.parametrize(("steps", "due"), [
+    ([("b1", "fix", "none"), ("b2", "fix", "b1")], True),  # a child of b1, and no REBUILD since
+    ([("b1", "fix", "none"), ("b2", "refactor", "b1")], False),  # the REBUILD answered the child
+    ([("b1", "fix", "none"), ("b2", "refactor", "b1"), ("b3", "fix", "b2")], True),  # a child after the last REBUILD
+    ([("b1", "fix", "none"), ("b2", "fix", "none")], False),  # two bugs, none caused by the other
+])  # fmt: skip
+def test_append_and_stats_say_rebuild_due_alike_on_a_child_after_the_units_last_rebuild(
+    script: Path, tmp_path: Path, steps: list[tuple[str, str, str]], due: bool
+) -> None:
+    specs = _unit_history(tmp_path, steps)
+    stats = _run(script, "stats", "--specs", str(specs))
+    flagged = [ln.split("\t")[0] for ln in stats.stdout.splitlines() if ln.startswith("rebuild-due:")]
+    correlates = ",".join(bug for bug, _, _ in steps)
+    done = _run(script, *_append_argv(specs), "--correlates", correlates)
+    assert done.returncode == 0, done.stderr
+    said = [ln for ln in done.stdout.splitlines() if ln.startswith("REBUILD due")]
+    assert (flagged == ["rebuild-due:cli/x.py"], bool(said)) == (due, due), (stats.stdout, done.stdout)
+
+
+def _both_shapes(specs: Path) -> None:
+    """An archive as the real one is: legacy event lines, then plain records; `shared` is both."""
+    shared = {"ts": "2026-08-28T12:45:33Z", "event": "archived", "agent": "a",
+              "data": {"id": "shared", "status": "Closed"}}  # fmt: skip
+    (specs / "bugs" / "_archive").mkdir(parents=True, exist_ok=True)
+    lines = [_LEGACY_EVENT, shared, _closed("shared"), _closed("plain-one")]
+    write_text(specs / "bugs" / "_archive" / "bugs_histo.jsonl",
+               "".join(json.dumps(r) + "\n" for r in lines))  # fmt: skip
+
+
+def test_an_archive_of_both_shapes_is_read_from_its_lines_for_check_and_the_ids_append_takes(
+    script: Path, tmp_path: Path
+) -> None:
+    specs = _ledger(tmp_path, _OPEN_RECORD)
+    _both_shapes(specs)
+    assert _run(script, "check", "--specs", str(specs)).returncode == 0
+    for bug in ("legacy-one", "plain-one", "shared"):
+        argv = _append_argv(specs, bug_id=f"n-{bug}")
+        done = _run(script, *argv, "--correlates", bug)
+        assert done.returncode == 0, (bug, done.stderr)
+    refused = _run(script, *_append_argv(specs, bug_id="shared"), "--correlates", "none")
+    assert refused.returncode == 1 and "already exists" in refused.stderr
+
+
+def test_check_judges_an_archived_record_no_commit_cites_and_leaves_the_event_lines_alone(
+    script: Path, tmp_path: Path
+) -> None:
+    specs = _ledger(tmp_path)
+    _commit_as(tmp_path, "feat: x")
+    _archived(specs, _resolved("old-a"))
+    done = _run(script, "check", "--specs", str(specs), "--json")
+    assert done.returncode == 1, done.stdout
+    [found] = json.loads(done.stdout)
+    assert (found["path"], found["line"]) == ("bugs/_archive/bugs_histo.jsonl", 2)
+    assert "'old-a'" in found["message"]
+
+
+def test_a_fix_sha_only_record_whose_id_commit_exists_passes_check(
+    script: Path, tmp_path: Path
+) -> None:
+    _ledger(tmp_path)
+    sha = _commit_as(tmp_path, _FIXED)
+    specs = _ledger(tmp_path, _resolved("a-bug", sha))
+    assert "fix_files" not in _records(specs)[0]
+    done = _run(script, "check", "--specs", str(specs))
+    assert done.returncode == 0, done.stdout + done.stderr
+
+
+def _two_candidates(specs: Path) -> None:
+    """`J1.T3` heads a task row in rc-9 and in rc-10; `J2.T1` only in rc-10."""
+    for number, ids in ((9, ["J1.T3"]), (10, ["J1.T3", "J2.T1"])):
+        job = specs / "releases" / "0.5.0" / f"rc-{number}" / "tasks" / "job1.md"
+        job.parent.mkdir(parents=True)
+        write_text(job, "".join(f"| {i} | AC1.1 | `ci.py` |\n" for i in ids))
+
+
+def test_resolve_refuses_a_bare_task_id_two_candidates_carry_and_names_the_qualified_form(
+    script: Path, tmp_path: Path
+) -> None:
+    specs = _ledger(tmp_path, _OPEN_RECORD)
+    _two_candidates(specs)
+    _fix_commit(tmp_path, "cli/x.py", _FIXED)
+    before = (specs / "bugs/BUGS.jsonl").read_bytes()
+    done = _run(script, *_resolve_argv(caused_by="J1.T3"), "--specs", str(specs))
+    assert done.returncode == 1 and "Traceback" not in done.stderr, done.stderr
+    [fix] = [ln for ln in done.stderr.splitlines() if ln.startswith("fix: ")]
+    assert "J1.T3" in fix and "0.5.0-rc9" in fix and "0.5.0-rc10" in fix, fix
+    assert (specs / "bugs/BUGS.jsonl").read_bytes() == before
+
+
+def test_resolve_takes_a_bare_task_id_only_one_candidate_carries(
+    script: Path, tmp_path: Path
+) -> None:
+    specs = _ledger(tmp_path, _OPEN_RECORD)
+    _two_candidates(specs)
+    _fix_commit(tmp_path, "cli/x.py", _FIXED)
+    done = _run(script, *_resolve_argv(caused_by="J2.T1"), "--specs", str(specs))
+    assert done.returncode == 0, done.stderr
+    assert _records(specs)[0]["caused_by"] == "J2.T1"
