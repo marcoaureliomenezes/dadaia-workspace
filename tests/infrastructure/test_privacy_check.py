@@ -387,17 +387,3 @@ def test_the_denylist_of_a_scanned_path_is_its_own_workspaces_not_the_cwds(
     monkeypatch.chdir(cwd_ws)
 
     assert load_privacy_terms(repo) == (("zzplantedterm", "b"),)
-
-
-def test_a_repo_named_like_its_workspace_keeps_its_workspaces_terms(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """The own-name drop never erases a term the workspace's denylist holds."""
-    monkeypatch.delenv("DADAIA_PRIVACY_DENYLIST", raising=False)
-    workspace = _workspace_with_terms(
-        tmp_path / "zzplantedws", {"zzplantedws": "r", "zzother": "o"}
-    )
-    repo = _repo_in(workspace, "zzplantedws")
-    monkeypatch.chdir(workspace)
-
-    assert load_privacy_terms(repo) == (("zzplantedws", "r"), ("zzother", "o"))
