@@ -1786,7 +1786,7 @@ def test_a_bare_ambiguous_task_id_already_in_a_ledger_still_passes_check(
 def test_open_ids_and_standing_read_the_live_ledger_and_the_archive(tmp_path: Path) -> None:
     store = load_owner("dd-bug-resolution", "_bugs_store")
     rejected = {**_OPEN_RECORD, "id": "r-bug", "status": "rejected", "closed_at": "2026-09-21"}
-    legacy = {**_closed("old"), "resolved_release": "0.4.0"}
+    legacy = {**_resolved("old"), "resolved_release": "0.4.0"}
     specs = _ledger(tmp_path, _OPEN_RECORD, rejected, {**_OPEN_RECORD, "id": "s", "superseded_by": "old"})
     _archived(specs, legacy)
     assert store.open_ids(specs) == ["a-bug", "s"]
