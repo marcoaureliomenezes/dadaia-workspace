@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any, cast
 
+from dadaia_workspace.core import context_registry
 from dadaia_workspace.core.workspace_resolver import not_initialized
 from dadaia_workspace.infrastructure.json_context_store import (
     LEGACY_STATES,
@@ -32,8 +34,9 @@ def plan_migration(store: JsonContextStore) -> MigrationPlan:
     if not store.exists():
         raise ValueError(str(not_initialized(states_dir.parent.parent)))
 
-    raw = store.read_raw()
-    if (version := parse_schema_version(raw, states_dir / "spec_contexts.json")) >= 2:
+    registry = states_dir / "spec_contexts.json"
+    raw = context_registry.read(registry)
+    if (version := parse_schema_version(raw, registry)) >= 2:
         return MigrationPlan(
             contexts_to_migrate=[],
             primary_context_exists=primary_file.exists(),
@@ -48,7 +51,7 @@ def plan_migration(store: JsonContextStore) -> MigrationPlan:
             "had_is_primary": "is_primary" in ctx,
             "had_activated_at": "activated_at" in ctx,
         }
-        for ctx in raw.get("contexts", [])
+        for ctx in cast("list[dict[str, Any]]", raw["contexts"])
         if (state := ctx.get("state", "")) in LEGACY_STATES
     ]
 
@@ -65,8 +68,9 @@ def execute_migration(store: JsonContextStore, workspace_root: Path) -> None:
     """Migrate the registry and its retired primary marker to the current schema."""
     states_dir = store.states_dir
     primary_file = states_dir / "primary_context.json"
-    raw = store.read_raw() if store.exists() else None
-    if raw is not None and parse_schema_version(raw, states_dir / "spec_contexts.json") < 2:
+    registry = states_dir / "spec_contexts.json"
+    raw = context_registry.read(registry) if store.exists() else None
+    if raw is not None and parse_schema_version(raw, registry) < 2:
         store.replace_raw(
             {
                 "contexts": [
@@ -81,7 +85,7 @@ def execute_migration(store: JsonContextStore, workspace_root: Path) -> None:
                         "alive_since": ctx.get("activated_at"),
                         "dead_since": None,
                     }
-                    for ctx in raw.get("contexts", [])
+                    for ctx in cast("list[dict[str, Any]]", raw["contexts"])
                 ],
             },
         )

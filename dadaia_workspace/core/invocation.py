@@ -17,6 +17,7 @@ from typing import Literal
 from dadaia_workspace.core import context_registry, platform, workspace_resolver
 from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.exceptions import SpecsDirUnresolvedError
+from dadaia_workspace.core.harness_registry import HARNESS_RECORDS
 from dadaia_workspace.core.models.spec_context import CONTEXT_NAME_RE
 from dadaia_workspace.core.platform import act
 from dadaia_workspace.core.session_store import live_session
@@ -44,10 +45,8 @@ __all__ = [
 
 #: Harness-native session-id env vars, in resolution order (a modern Codex subprocess
 #: exposes ``CODEX_THREAD_ID`` instead of ``CODEX_SESSION_ID``).
-HARNESS_SESSION_ID_ENV_VARS: tuple[str, ...] = (
-    "CLAUDE_CODE_SESSION_ID",
-    "CODEX_SESSION_ID",
-    "CODEX_THREAD_ID",
+HARNESS_SESSION_ID_ENV_VARS: tuple[str, ...] = tuple(
+    var for record in HARNESS_RECORDS.values() for var in record.session_env
 )
 
 _SESSION_ID_STRIP = re.compile(r"[^A-Za-z0-9_-]")
@@ -93,7 +92,7 @@ def resolve_session_id(env: Mapping[str, str]) -> str:
 
 
 def _alive(entry: dict[str, object]) -> bool:
-    return str(entry.get("state")).lower() == "alive" and bool(entry.get("name"))
+    return context_registry.is_alive(entry) and bool(entry.get("name"))
 
 
 def _main_slug(entry: dict[str, object]) -> str | None:

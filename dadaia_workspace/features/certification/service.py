@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any
 
 from dadaia_workspace.core import platform
-from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES
+from dadaia_workspace.core.harness_registry import HARNESS_RECORDS, L1_ENTRY_HARNESSES
 from dadaia_workspace.core.redaction import Redactor
 from dadaia_workspace.core.skill_owner import load_owner
 from dadaia_workspace.core.workspace_resolver import fenced_env
@@ -38,16 +38,6 @@ class CertificationResult:
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
-
-
-def _git(process: SubprocessCertificationProcess, cwd: Path, *args: str) -> None:
-    proc = process.run(
-        ["git", "-c", "user.email=certify@dadaia.invalid", "-c", "user.name=dadaia-certify", *args],
-        cwd=cwd,
-        timeout=60,
-    )
-    if proc.returncode != 0:
-        raise RuntimeError(proc.stderr.strip() or proc.stdout.strip() or f"git {args} failed")
 
 
 class _CertificationSkip(Exception):
@@ -124,19 +114,6 @@ def _codex_probe_outcome(output: str, cwd: Path) -> tuple[bool, str]:
         f"non-JSON codex exec output ({len(output)} bytes captured)", cwd
     )
 
-
-#: The CLI binary each registered harness installs. It is NOT a field on
-#: ``HarnessRecord``: the record describes what the workspace PROJECTS for a harness, and
-#: nothing in the projection depends on the binary's name — only this probe does, so the
-#: fact lives with its one consumer instead of widening a core dataclass.
-_HARNESS_PROBE_BINARIES: dict[str, str] = {
-    "claude": "claude",
-    "codex": "codex",
-    "kimi-code": "kimi",
-    "cursor": "cursor-agent",
-    "devin": "devin",
-    "copilot": "copilot",
-}
 
 #: A record with a probe deeper than "the binary answers" names it here; every other
 #: record falls back to :func:`_version_probe_detail`. There is NO version floor: the
@@ -266,9 +243,7 @@ def certify(
     for key in (
         "DADAIA_CONTEXT",
         "DADAIA_SESSION_ID",
-        "CLAUDE_CODE_SESSION_ID",
-        "CODEX_SESSION_ID",
-        "CODEX_THREAD_ID",
+        *(v for r in HARNESS_RECORDS.values() for v in r.session_env),
     ):
         env.pop(key, None)
 
@@ -343,15 +318,16 @@ def certify(
     bare = run_root / "certified-consumer.git"  # slug == context name
 
     def empty_remote() -> str:
-        _git(process, run_root, "init", "--bare", str(bare))
-        _git(process, bare, "config", "core.longpaths", "true")
+        git = load_owner("dd-bug-resolution", "_git").git
+        git(run_root, "init", "--bare", str(bare))
+        git(bare, "config", "core.longpaths", "true")
         cli("context", "create", "certified-consumer", "--main-repo", str(bare))
         repo = target / "repos" / "certified-consumer"
-        _git(process, repo, "config", "user.email", "certify@dadaia.invalid")
-        _git(process, repo, "config", "user.name", "dadaia-certify")
+        git(repo, "config", "user.email", "certify@dadaia.invalid")
+        git(repo, "config", "user.name", "dadaia-certify")
         cli("specs", "init", "--context", "certified-consumer")
         cli("context", "baseline", "certified-consumer")
-        _git(process, repo, "rev-parse", "--verify", "HEAD")
+        git(repo, "rev-parse", "--verify", "HEAD")
         return "empty remote cloned, specs initialized, baseline committed and pushed"
 
     check("context-empty-remote-baseline", empty_remote)
@@ -422,7 +398,7 @@ def certify(
     # tests attest file shape only; these attest that the runtime answers. An absent
     # binary leaves the claim UNVERIFIED (honest SKIP), never a FAIL.
     for harness in L1_ENTRY_HARNESSES:
-        binary = _HARNESS_PROBE_BINARIES[harness]
+        binary = HARNESS_RECORDS[harness].binary
         probe = _DEEP_LIVE_PROBES.get(harness, _version_probe_detail)
         check(f"{harness}-live-probe", partial(probe, process, target, harness, binary))
 

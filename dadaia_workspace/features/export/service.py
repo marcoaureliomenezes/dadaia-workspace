@@ -11,7 +11,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
-from dadaia_workspace.core import clock, harness_registry, platform
+from dadaia_workspace.core import clock, context_registry, harness_registry, platform
 from dadaia_workspace.core.atomic_write import atomic_write
 from dadaia_workspace.core.cli_line import cli_words, fix_line
 from dadaia_workspace.core.exceptions import DadaiaError, SchemaVersionError
@@ -182,7 +182,7 @@ class ExportService:
             )
             for r in payload["contexts"]
         )
-        alive = tuple(r["name"] for r in payload["contexts"] if r["state"] == "alive")
+        alive = tuple(r["name"] for r in payload["contexts"] if context_registry.is_alive(r))
         artifact = Artifact(harnesses, contexts, alive)
         if tarfile.is_tarfile(path):
             with tarfile.open(path) as tar:

@@ -54,6 +54,8 @@ class HarnessRecord:
         hooks: the format its hook registration serializes into.
         subagent_key: the key of its pre-tool payload that names the running subagent, or
             ``None`` when it gives no identity.
+        session_env: the env vars carrying its session id, in resolution order.
+        binary: the CLI binary it installs (the live probe runs it).
     """
 
     name: str
@@ -61,6 +63,8 @@ class HarnessRecord:
     agent_transcode: AgentTranscode
     hooks: HookFormat
     subagent_key: str | None
+    session_env: tuple[str, ...]
+    binary: str
 
 
 #: The registry. Insertion order IS the canonical order (``init --harness`` and the
@@ -74,6 +78,8 @@ HARNESS_RECORDS: dict[str, HarnessRecord] = {
             agent_transcode=AgentTranscode.CLAUDE_MD_SYMLINK,
             hooks=HookFormat.CLAUDE_SETTINGS,
             subagent_key="agent_type",
+            session_env=("CLAUDE_CODE_SESSION_ID",),
+            binary="claude",
         ),
         HarnessRecord(
             name="codex",
@@ -81,6 +87,8 @@ HARNESS_RECORDS: dict[str, HarnessRecord] = {
             agent_transcode=AgentTranscode.CODEX_TOML,
             hooks=HookFormat.CODEX_HOOKS,
             subagent_key=None,
+            session_env=("CODEX_SESSION_ID", "CODEX_THREAD_ID"),
+            binary="codex",
         ),
         HarnessRecord(
             name="kimi-code",
@@ -88,6 +96,8 @@ HARNESS_RECORDS: dict[str, HarnessRecord] = {
             agent_transcode=AgentTranscode.NONE,
             hooks=HookFormat.KIMI_HOOKS,
             subagent_key=None,
+            session_env=(),
+            binary="kimi",
         ),
         HarnessRecord(
             name="cursor",
@@ -95,6 +105,8 @@ HARNESS_RECORDS: dict[str, HarnessRecord] = {
             agent_transcode=AgentTranscode.CURSOR_MD,
             hooks=HookFormat.CURSOR_HOOKS,
             subagent_key=None,
+            session_env=(),
+            binary="cursor-agent",
         ),
         HarnessRecord(
             name="devin",
@@ -102,6 +114,8 @@ HARNESS_RECORDS: dict[str, HarnessRecord] = {
             agent_transcode=AgentTranscode.DEVIN_MD,
             hooks=HookFormat.DEVIN_HOOKS,
             subagent_key=None,
+            session_env=(),
+            binary="devin",
         ),
         HarnessRecord(
             name="copilot",
@@ -109,6 +123,8 @@ HARNESS_RECORDS: dict[str, HarnessRecord] = {
             agent_transcode=AgentTranscode.COPILOT_AGENT_MD,
             hooks=HookFormat.COPILOT_HOOKS,
             subagent_key=None,
+            session_env=(),
+            binary="copilot",
         ),
     )
 }
