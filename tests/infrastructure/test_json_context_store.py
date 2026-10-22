@@ -230,7 +230,9 @@ def test_a_row_state_has_one_meaning_for_every_reader(tmp_path: Path, spelling: 
     row = {
         "name": "a", "state": spelling, "repo_slug": "a", "repo_url": "u", "created_at": "t",
     }  # fmt: skip
-    write_text(tmp_path / "spec_contexts.json", json.dumps({"schema_version": "3", "contexts": [row]}))
+    write_text(
+        tmp_path / "spec_contexts.json", json.dumps({"schema_version": "3", "contexts": [row]})
+    )
 
     assert [c.state for c in JsonContextStore(tmp_path).list_all()] == [ContextState.ALIVE]
     assert context_registry.is_alive(row)

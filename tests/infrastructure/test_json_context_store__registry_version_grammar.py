@@ -206,7 +206,7 @@ def test_a_registry_row_missing_a_key_is_reg_schema(ws: Path) -> None:
 
 
 def _stored(path: Path) -> dict:  # type: ignore[type-arg]
-    return json.loads(path.read_text())
+    return json.loads(read_text(path))
 
 
 def _ctx(name: str) -> SpecContextProject:
