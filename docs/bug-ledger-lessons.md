@@ -25,7 +25,7 @@ reopen is a new record.
 Candidate maturity is not stored on the bug. The next candidate's `SPEC.md`
 `## Bug window review` judges each fix and never schedules work; the window rule is in
 `dd-bug-resolution/LINEAGE.md`, and the review step is in `dd-release-definition/SKILL.md`,
-section 1, step 7. The release summary's scope is in
+Pick the set, step 7. The release summary's scope is in
 `dd-release-implementation/RELEASE-EVENTS.md`.
 
 ## Lesson 1 — a per-caller fix breeds the next caller's bug
