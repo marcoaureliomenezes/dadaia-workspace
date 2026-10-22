@@ -8,7 +8,7 @@ Where dadaia-workspace is published and what each channel carries.
 |---|---|---|
 | PyPI | the wheel; `README.md` is the long description and `pyproject.toml` the metadata | `.github/workflows/release.yml`: merging the release PR creates the tag, and the publish jobs, gated on `release_created` and on the operator's `release-gate` approval, upload under OIDC trusted publishing |
 | GitHub repository | the repository description, topics and homepage | set from the same tagline and keywords as `pyproject.toml` |
-| Repository root | `llms.txt` — an index whose every line links to a derived document, the law, the CLI reference or the memory catalog; `llms-full.txt` — the full text of every repository page `llms.txt` links, in its order, the changelog excepted | `llms.txt` committed and reconciled from product memory; `llms-full.txt` written only by `python scripts/llms_full.py > llms-full.txt` |
+| Repository root | `llms.txt` — an index whose every line links to a derived document, the law, the CLI reference or the memory catalog; `llms-full.txt` — the full text of every repository page `llms.txt` links, in its order, the changelog excepted | `llms.txt` committed and reconciled from product memory; `llms-full.txt` generated, never hand-edited, from the pages `llms.txt` links |
 | Docs | the repository's `docs/` folder on `main`, with no build toolchain or site | every page reconciled from product memory |
 
 ## The PyPI metadata contract
@@ -37,8 +37,8 @@ Every field PyPI renders has exactly one home:
 
 The wheel ships `dadaia_workspace/` with the full `public/` tree (`.dadaia/.venv/bin/dadaia init` still
 resolves the workspace venv's dependencies from PyPI). It does not ship the
-consumer-validation recipe: that lives in `scripts/CONSUMER_VALIDATION_RECIPE.md`, the
-developer's matrix run against every candidate wheel before a deploy. It installs one CLI under two console-script
+developer's consumer-validation matrix, which runs against every candidate wheel before a
+deploy. It installs one CLI under two console-script
 names, `dadaia` and `dadaia-workspace`. Consumer-validation candidate wheels are
 throwaway and never mint a published version; a venv bootstrap installs the running
 distribution itself, and `DADAIA_BOOTSTRAP_PACKAGE=<wheel>` makes it install a named

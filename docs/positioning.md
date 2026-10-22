@@ -5,62 +5,32 @@ projects.
 
 ## The paradigm
 
-A workspace is one folder, and the agent session launches at its root, always.
-Projects live in repos inside it — `repos/<slug>/` — which take agent work only as
-merges from their worktree hierarchy under `worktrees/<repo>/<M.m.p>/`. Governance lives outside every
-repo: the root `AGENTS.md` map, the scoped `AGENTS.md` files, `.agents/skills`,
-`.agents/agents` and `.dadaia/` sit above them all.
+Governance lives outside every repository: the root map, the scoped `AGENTS.md` files,
+the skills, the personas and `.dadaia/`. The root map, `dadaia_workspace/public/data/AGENTS.md`,
+states the folder layout and the one-folder, never-a-monorepo rule.
 
 That inversion is the whole position. A repository is a repository: production source,
-its own history, its own CI. What steers an agent — law, skills, personas, hooks,
-memory, releases, backlog, bugs — is workspace state, not repository content.
-
-A workspace holds many contexts and a context many repos. It is never a monorepo, and a
-single-repo context is the minimal case of the multi-repo one.
+its own history, its own CI. What steers an agent (law, skills, personas, hooks, memory,
+releases, backlog, bugs) is workspace state, not repository content.
 
 ## The unit is the context
 
-A context — a Spec Context Project — is one canonical `specs/` tree owned by one main
-repository: the unit for memory, backlog, bugs, releases, reports and handoffs. A
-product spanning several repositories is still one project: the context carries
-associated repositories, added by `.dadaia/.venv/bin/dadaia context repo add` and removed by
-`.dadaia/.venv/bin/dadaia context repo remove`, which live and die with it.
-
-The asymmetry is deliberate:
-
-- the main repository owns production source **and** `specs/`;
-- an associated repository owns production source only;
-- specs, bind, memory, releases and backlog resolve from the main repo alone — an
-  associated repo's own `specs/` is never read.
-
-`.dadaia/.venv/bin/dadaia context bind <ctx>` selects a context and nothing else, changing only the
-record of the caller's environment session id; a session without a harness-native id
-exports `DADAIA_SESSION_ID` before it binds, or carries the binding in `DADAIA_CONTEXT`.
-The bind carries a scope — the main repo plus its associated repos — and a MUTATING
-file-tool write into a repo outside it is refused, naming the bind that would allow it;
-an unbound session with an id owns no repo; a write inside a worktree git linked from a repo
-of this workspace is in scope whatever the bind. A repo checkout receives only merges: agents
-write a repo inside its worktrees and land each on its parent by
-`.dadaia/.venv/bin/dadaia worktree merge`, audits aside.
+A context is one canonical `specs/` tree owned by one main repository, and it can carry
+associated repositories that own production source only. Scope, bind and the resolution
+order are stated once, in `dadaia_workspace/public/data/dadaia-AGENTS.md`, heading
+*Context, scope and races*. A repo checkout receives only merges from its worktrees.
 
 ## Ten repositories, one law
 
 A team with ten repositories does not maintain ten copies of anything:
 
-- **Zero agent config in a product repo.** Governance lives outside every repository,
-  and every project in the workspace is governed by that one set.
-- **One authored set, every harness.** Claude Code, Codex, Kimi Code, Cursor, Devin and
-  GitHub Copilot are entry harnesses over the same canonical rules: public assets
-  originate once, installation refreshes their staging, and each harness reads them
-  natively or through its projection.
+- **Zero agent config in a product repo.** Every project in the workspace is governed by
+  one set, outside every repository.
+- **One authored set, every harness.** Public assets originate once; `harness list`
+  names the registered runtimes that read them.
 - **One project, however many repos.** Ten repositories can be one context or ten
-  contexts. The specs tree follows the product, and the repositories it spans are
-  declared as its associated repos.
-- **Boundaries are mechanical.** Path class, bind scope, root hygiene and
-  the push gate refuse mechanically, each refusal carrying one fix line. No
-  phase and no mode is enforced.
-- **Concurrency stays visible.** Concurrent sessions never block each other; overlap
-  surfaces through git, and nothing waits on a lock.
+  contexts. The specs tree follows the product, and the repositories it spans are its
+  associated repos.
 
 The consequence for a reviewer: everything that steers the agents is in one tree, so
 changing how ten projects are governed is one diff, and reading how they are governed
