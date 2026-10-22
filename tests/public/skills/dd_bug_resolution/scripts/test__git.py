@@ -6,6 +6,9 @@
   so a caller's ``GIT_DIR`` or ``GIT_WORK_TREE`` never redirects it; stdout on success;
   ``RuntimeError("git <args>: <stderr>")`` on a non-zero exit when ``check`` (``check=False``
   returns stdout unchecked).
+* ``git_bytes(repo, *args, input=None, timeout=None, env=None) -> CompletedProcess[bytes]`` is
+  the byte-level twin on the same scrubbed env (*env* overrides on top): unchecked, stderr as
+  bytes, ``subprocess.TimeoutExpired`` and ``OSError`` raised as they are.
 * ``parse_worktrees(text)`` takes ``git worktree list --porcelain`` text and returns the LINKED
   worktrees, main checkout excluded, one dict per block in git's order: each ``key value`` line
   is ``key -> value``, a bare flag line (``locked``, ``detached``) is ``key -> ""``, and
@@ -88,22 +91,42 @@ def test_the_scrubbed_env_marks_the_child_as_a_worktree_tool_and_still_drops_rep
     assert {"GIT_DIR", "GIT_WORK_TREE"}.isdisjoint(kept)
 
 
-def test_the_git_subprocess_env_marks_the_child_and_still_drops_repo_selectors(
-    monkeypatch: pytest.MonkeyPatch,
+def test_git_bytes_returns_the_raw_bytes_and_the_exit_status_unchecked(tmp_path: Path) -> None:
+    git_bytes = load_owner("dd-bug-resolution", "_git").git_bytes
+    repo = _repo(tmp_path / "r")
+    done = git_bytes(repo, "hash-object", "--stdin", input=b"hello\n")
+    assert (done.returncode, done.stdout) == (0, b"ce013625030ba8dba906f756967f9e9ca394464a\n")
+    failed = git_bytes(repo, "cat-file", "-e", "f" * 40)
+    assert failed.returncode != 0
+    assert isinstance(failed.stderr, bytes)
+
+
+def test_git_bytes_answers_for_its_repo_not_the_callers_git_env(leaked: tuple[Path, Path]) -> None:
+    a, _ = leaked
+    done = load_owner("dd-bug-resolution", "_git").git_bytes(a, "rev-parse", "--show-toplevel")
+    assert Path(done.stdout.decode().strip()) == a.resolve()
+
+
+def test_the_git_bytes_child_env_is_the_scrubbed_one_plus_the_callers_overrides(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from dadaia_workspace.infrastructure import git_subprocess
+    monkeypatch.setenv("GIT_INDEX_FILE", "x")
+    monkeypatch.setenv("GIT_COMMON_DIR", "y")
+    repo = _repo(tmp_path / "r")
+    done = load_owner("dd-bug-resolution", "_git").git_bytes(
+        repo, "-c", "alias.dump=!env", "dump", env={"DUMP_PROBE": "on"}
+    )
+    child = set(done.stdout.decode().splitlines())
+    assert {"DADAIA_WT=1", "DUMP_PROBE=on"} <= child
+    assert not [k for k in child if k.startswith(("GIT_INDEX_FILE=", "GIT_COMMON_DIR="))]
 
-    seen: dict[str, dict[str, str]] = {}
 
-    def fake_run(args: list[str], **kw: dict[str, str]) -> subprocess.CompletedProcess[str]:
-        seen["env"] = kw["env"]
-        return subprocess.CompletedProcess(args, 0, "", "")
-
-    monkeypatch.setenv("GIT_DIR", "x")
-    monkeypatch.setattr(git_subprocess.subprocess, "run", fake_run)
-    git_subprocess._run(["git", "status"])
-    assert {k: seen["env"][k] for k in ("DADAIA_WT",) if k in seen["env"]} == {"DADAIA_WT": "1"}
-    assert "GIT_DIR" not in seen["env"]
+def test_git_bytes_raises_the_timeout_it_was_given(tmp_path: Path) -> None:
+    repo = _repo(tmp_path / "r")
+    with pytest.raises(subprocess.TimeoutExpired):
+        load_owner("dd-bug-resolution", "_git").git_bytes(
+            repo, "-c", "alias.nap=!sleep 5", "nap", timeout=0.2
+        )
 
 
 def test_the_scrubbed_env_forbids_bytecode_even_when_the_parent_allows_it(

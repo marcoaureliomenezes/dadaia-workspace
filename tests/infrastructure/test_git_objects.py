@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.core.models.git_scan import ZERO_SHA, GitObjectReadError, ScannedObject
+from dadaia_workspace.core.skill_owner import load_owner
 from dadaia_workspace.infrastructure import git_objects
 from dadaia_workspace.infrastructure.git_objects import GitSubprocessObjectReader, unpublished
 from tests.helpers.oslib import run, run_bytes, write_text
@@ -95,17 +96,16 @@ def test_rev_list_argv_carries_trailing_end_of_options_marker(
 ) -> None:
     """Both range forms end the rev-list argv with ``--``."""
     repo, (base, tip) = _repo(tmp_path, {"a.txt": "one\n"}, {"b.txt": "two\n"})
-    real_run = git_objects._run
-    argvs: list[list[str]] = []
+    kernel = load_owner("dd-bug-resolution", "_git")
+    real_run = kernel.git_bytes
+    argvs: list[tuple[str, ...]] = []
 
-    def spy(
-        args: list[str], cwd: Path, *, input_bytes: bytes | None = None
-    ) -> subprocess.CompletedProcess[bytes]:
-        if args[:3] == ["git", "rev-list", "--objects"]:
+    def spy(repo: Path, *args: str, **kw: object) -> subprocess.CompletedProcess[bytes]:
+        if args[:2] == ("rev-list", "--objects"):
             argvs.append(args)
-        return real_run(args, cwd, input_bytes=input_bytes)
+        return real_run(repo, *args, **kw)
 
-    monkeypatch.setattr(git_objects, "_run", spy)
+    monkeypatch.setattr(kernel, "git_bytes", spy)
     _scan(repo, tip, base if remote == "base" else remote)
     assert argvs and argvs[0][-1] == "--"
 
@@ -248,30 +248,46 @@ def test_a_corrupt_or_failing_git_answer_raises_the_typed_error(
     repo, (base, tip) = _repo(tmp_path, {"a.txt": "hello\n"}, {"a.txt": "edited\n"})
     blob = _git(["rev-parse", "HEAD:a.txt"], repo)
 
-    def is_target(args: list[str], stdin: bytes) -> bool:
-        check = args[:2] == ["git", "cat-file"] and args[2].startswith("--batch-check")
+    def is_target(args: tuple[str, ...], stdin: bytes) -> bool:
+        check = args[:1] == ("cat-file",) and args[1].startswith("--batch-check")
         prior = f"{base}:".encode() in stdin
         return {
             _CURRENT_CHECK: check and not prior,
             _PRIOR_CHECK: check and prior,
-            _CONTENT: args == ["git", "cat-file", "--batch"] and blob.encode() in stdin,
-            _BODIES: args == ["git", "cat-file", "--batch"] and stdin.strip() == tip.encode(),
+            _CONTENT: args == ("cat-file", "--batch") and blob.encode() in stdin,
+            _BODIES: args == ("cat-file", "--batch") and stdin.strip() == tip.encode(),
         }[call]
 
-    def fake(args: list[str], **kwargs: object) -> subprocess.CompletedProcess[bytes]:
+    kernel = load_owner("dd-bug-resolution", "_git")
+    real_run = kernel.git_bytes
+
+    def fake(repo: Path, *args: str, **kwargs: object) -> subprocess.CompletedProcess[bytes]:
         stdin = kwargs.get("input") or b""
         assert isinstance(stdin, bytes)
         if not is_target(args, stdin):
-            return run_bytes(args, **kwargs)  # type: ignore[arg-type]
+            return real_run(repo, *args, **kwargs)
+        argv = ["git", *args]
         if isinstance(reply, str):
-            return _out(reply.format(blob=blob))(args)
-        return reply(args)
+            return _out(reply.format(blob=blob))(argv)
+        return reply(argv)
 
-    monkeypatch.setattr(git_objects.platform, "run_bytes", fake)
+    monkeypatch.setattr(kernel, "git_bytes", fake)
     yielded: list[ScannedObject] = []
     with pytest.raises(GitObjectReadError, match=match):
         yielded.extend(GitSubprocessObjectReader().new_objects(repo, tip, base))
     assert [o for o in yielded if not o.decodable] == []
+
+
+def test_a_callers_git_env_never_redirects_the_scan_to_another_repo(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """With GIT_DIR/GIT_WORK_TREE naming repo B, the scan reads repo A's range."""
+    repo, (base, tip) = _repo(tmp_path, {"a.txt": "one\n"}, {"b.txt": "two\n"})
+    (tmp_path / "other").mkdir()
+    other, _ = _repo(tmp_path / "other", {"z.txt": "z\n"})
+    monkeypatch.setenv("GIT_DIR", str(other / ".git"))
+    monkeypatch.setenv("GIT_WORK_TREE", str(other))
+    assert _blobs(_scan(repo, tip, base)) == {"b.txt"}
 
 
 def test_a_directory_that_is_not_a_repo_raises_the_typed_error(tmp_path: Path) -> None:
