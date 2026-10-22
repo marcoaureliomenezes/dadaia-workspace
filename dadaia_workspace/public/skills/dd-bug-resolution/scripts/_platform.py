@@ -177,12 +177,13 @@ def run_bytes(
     argv: Sequence[str],
     *,
     cwd: Path | None = None,
+    env: Mapping[str, str] | None = None,
     input: bytes | None = None,
     timeout: float | None = None,
 ) -> subprocess.CompletedProcess[bytes]:
     """Run *argv* (no shell) and capture its output as raw bytes."""
     return subprocess.run(  # noqa: S603 — an argv list, no shell
-        list(argv), cwd=cwd, input=input, timeout=timeout, capture_output=True
+        list(argv), cwd=cwd, env=env, input=input, timeout=timeout, capture_output=True
     )
 
 

@@ -25,7 +25,7 @@ SHA_SHAPE_RE = load_owner("dd-bug-resolution", "_grammar").OBJECT_ID_RE
 
 def is_zero_sha(sha: str) -> bool:
     """True when *sha* is git's absent-object sentinel: an object id of only zeros, SHA-1 or SHA-256."""
-    return bool(SHA_SHAPE_RE.match(sha)) and not sha.strip("0")
+    return bool(load_owner("dd-bug-resolution", "_grammar").is_zero_object_id(sha))
 
 
 @dataclass(frozen=True)

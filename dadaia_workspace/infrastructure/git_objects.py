@@ -2,7 +2,7 @@
 ``GitObjectReader`` port: one adapter, no swap seam).
 
 Reads over ``git rev-list --objects`` + ``git cat-file``. Every subprocess invocation
-here — including the batch calls that need ``input=`` — is routed through :func:`_run`,
+here — including the batch calls that need ``input=`` — is routed through :func:`_git`,
 so a timeout or a missing ``git`` executable always surfaces as
 :class:`GitObjectReadError`, never a raw exception at the push boundary.
 
@@ -28,6 +28,7 @@ from dadaia_workspace.core.models.git_scan import (
     is_zero_sha,
 )
 from dadaia_workspace.core.redaction import PUBLISHED, publication_boundaries
+from dadaia_workspace.core.skill_owner import load_owner
 
 _TIMEOUT_S = 30
 
@@ -51,22 +52,15 @@ _COMMIT_BODY_PATH = "(commit message)"
 _TAG_BODY_PATH = "(tag message)"
 
 
-def _run(
-    args: list[str], cwd: Path, *, input_bytes: bytes | None = None
-) -> subprocess.CompletedProcess[bytes]:
-    """Run a git subcommand, capturing raw bytes (never ``text=True`` — decoding is the
-    caller's job, and content bytes may not be valid UTF-8 at all).
-
-    ``input_bytes``, when given, is piped to stdin — the shape the batch commands need
-    (``git cat-file --batch[-check]`` reads one object id per line from stdin). Every
-    call site in this module goes through here so a timeout or missing-``git`` failure
-    is always converted to the typed :class:`GitObjectReadError`, never left to escape
-    as a raw ``subprocess`` exception.
-    """
+def _git(repo: Path, *args: str, input: bytes | None = None) -> subprocess.CompletedProcess[bytes]:
+    """The kernel's `git_bytes` in *repo*; git missing or past the timeout is a `GitRunError`, never a raw exception (content bytes may not be UTF-8, so nothing is decoded)."""
     try:
-        return platform.run_bytes(args, cwd=cwd, input=input_bytes, timeout=_TIMEOUT_S)
+        done: subprocess.CompletedProcess[bytes] = load_owner(
+            "dd-bug-resolution", "_git"
+        ).git_bytes(repo, *args, input=input, timeout=_TIMEOUT_S)
+        return done
     except OSError as exc:  # no git on PATH, or a cwd that is not a directory (WinError 267)
-        raise GitRunError(f"git could not run in {cwd}: {exc}") from exc
+        raise GitRunError(f"git could not run in {repo}: {exc}") from exc
     except subprocess.TimeoutExpired as exc:
         raise GitRunError(f"git command timed out: {' '.join(args)}") from exc
 
@@ -90,7 +84,7 @@ def _is_resolvable_commit(repo: Path, sha: str) -> bool:
     """
     if is_zero_sha(sha) or not SHA_SHAPE_RE.match(sha):
         return False
-    result = _run(["git", "cat-file", "-e", f"{sha}^{{commit}}"], repo)
+    result = _git(repo, "cat-file", "-e", f"{sha}^{{commit}}")
     return result.returncode == 0
 
 
@@ -118,8 +112,7 @@ def _rev_list_candidates(
     The argv ends with a ``--`` end-of-options marker after the revision arguments
     (CWE-88/CWE-20).
     """
-    args = ["git", "rev-list", "--objects", local_sha, "--not", *exclusions, "--"]
-    result = _run(args, repo)
+    result = _git(repo, "rev-list", "--objects", local_sha, "--not", *exclusions, "--")
     if result.returncode != 0:
         raise GitObjectReadError(f"git rev-list --objects failed: {_decode(result.stderr).strip()}")
     entries: list[tuple[str, str]] = []
@@ -135,8 +128,7 @@ def _range_commit_shas(repo: Path, local_sha: str, exclusions: list[str]) -> lis
     SAME range shape :func:`_rev_list_candidates` walks (the SAME *exclusions*,
     :func:`_base_exclusions`), reused here so the two callers agree on what "the
     range" means without either re-deriving it."""
-    args = ["git", "rev-list", local_sha, "--not", *exclusions, "--"]
-    result = _run(args, repo)
+    result = _git(repo, "rev-list", local_sha, "--not", *exclusions, "--")
     if result.returncode != 0:
         raise GitObjectReadError(f"git rev-list failed: {_decode(result.stderr).strip()}")
     return _lines(result.stdout)
@@ -148,7 +140,7 @@ def _publication_boundaries(repo: Path, local_sha: str, exclusions: list[str]) -
     *exclusions* (:func:`_base_exclusions`) the range walk uses."""
 
     def git(args: list[str]) -> list[str]:
-        result = _run(["git", *args], repo)
+        result = _git(repo, *args)
         if result.returncode != 0:
             raise GitObjectReadError(
                 f"git rev-list --boundary failed: {_decode(result.stderr).strip()}"
@@ -168,7 +160,7 @@ def _is_annotated_tag(repo: Path, sha: str) -> bool:
     """
     if is_zero_sha(sha) or not SHA_SHAPE_RE.match(sha):
         return False
-    result = _run(["git", "cat-file", "-t", sha], repo)
+    result = _git(repo, "cat-file", "-t", sha)
     return result.returncode == 0 and _decode(result.stdout).strip() == "tag"
 
 
@@ -246,7 +238,7 @@ def _read_object_bodies(
     BODY of each commit/tag object.
 
     A batched ``git cat-file --batch`` conversation, chunked to :data:`_BATCH_CHUNK_SIZE`,
-    routed through :func:`_run` so a timeout or missing ``git`` raises
+    routed through :func:`_git` so a timeout or missing ``git`` raises
     :class:`GitObjectReadError`, never a silent skip. ``prior_text`` is never set (stays
     ``None``): a commit/tag object carries no real path to key a prior-text lookup on, so
     every hit here is fail-closed, and the matcher treats ``prior_text=None`` as "never
@@ -255,7 +247,7 @@ def _read_object_bodies(
     for start in range(0, len(shas), _BATCH_CHUNK_SIZE):
         chunk = shas[start : start + _BATCH_CHUNK_SIZE]
         stdin_payload = ("\n".join(chunk) + "\n").encode("utf-8")
-        result = _run(["git", "cat-file", "--batch"], repo, input_bytes=stdin_payload)
+        result = _git(repo, "cat-file", "--batch", input=stdin_payload)
         if result.returncode != 0:
             raise GitObjectReadError(
                 f"git cat-file --batch failed reading {kind} bodies: "
@@ -323,7 +315,7 @@ def _multi_path_shas(
     commit_shas = {local_sha, *_range_commit_shas(repo, local_sha, exclusions)}
     paths_by_sha: dict[str, set[str]] = {}
     for commit_sha in commit_shas:
-        result = _run(["git", "ls-tree", "-r", "--full-tree", commit_sha, "--"], repo)
+        result = _git(repo, "ls-tree", "-r", "--full-tree", commit_sha, "--")
         if result.returncode != 0:
             raise GitObjectReadError(f"git ls-tree -r failed: {_decode(result.stderr).strip()}")
         for line in _lines(result.stdout):
@@ -356,10 +348,11 @@ def _blob_info(repo: Path, candidates: list[tuple[str, str]]) -> dict[str, tuple
     if not candidates:
         return {}
     stdin_payload = ("\n".join(sha for sha, _ in candidates) + "\n").encode("utf-8")
-    result = _run(
-        ["git", "cat-file", "--batch-check=%(objectname) %(objecttype) %(objectsize)"],
+    result = _git(
         repo,
-        input_bytes=stdin_payload,
+        "cat-file",
+        "--batch-check=%(objectname) %(objecttype) %(objectsize)",
+        input=stdin_payload,
     )
     if result.returncode != 0:
         raise GitObjectReadError(
@@ -416,10 +409,11 @@ def _resolve_prior_texts_at_base(repo: Path, base: str, paths: list[str]) -> dic
         return {}
     unique_paths = list(dict.fromkeys(paths))
     check_stdin = ("\n".join(f"{base}:{path}" for path in unique_paths) + "\n").encode("utf-8")
-    check_result = _run(
-        ["git", "cat-file", "--batch-check=%(objectname) %(objecttype) %(objectsize)"],
+    check_result = _git(
         repo,
-        input_bytes=check_stdin,
+        "cat-file",
+        "--batch-check=%(objectname) %(objecttype) %(objectsize)",
+        input=check_stdin,
     )
     if check_result.returncode != 0:
         raise GitObjectReadError(
@@ -466,7 +460,7 @@ def _resolve_prior_texts_at_base(repo: Path, base: str, paths: list[str]) -> dic
 
     fetch_paths = list(under_cap)
     fetch_stdin = ("\n".join(f"{base}:{path}" for path in fetch_paths) + "\n").encode("utf-8")
-    batch_result = _run(["git", "cat-file", "--batch"], repo, input_bytes=fetch_stdin)
+    batch_result = _git(repo, "cat-file", "--batch", input=fetch_stdin)
     if batch_result.returncode != 0:
         raise GitObjectReadError(
             "git cat-file --batch failed resolving prior content: "
@@ -550,7 +544,7 @@ def _read_blob_chunk(
     arbitrary first-seen path. This is the only place the multi-path decision is made.
     """
     stdin_payload = ("\n".join(chunk_shas) + "\n").encode("utf-8")
-    result = _run(["git", "cat-file", "--batch"], repo, input_bytes=stdin_payload)
+    result = _git(repo, "cat-file", "--batch", input=stdin_payload)
     if result.returncode != 0:
         raise GitObjectReadError(f"git cat-file --batch failed: {_decode(result.stderr).strip()}")
 
@@ -592,7 +586,7 @@ def _read_oversized_blob_prefix(repo: Path, sha: str) -> bytes:
     git (unknown oid, a tree) raises :class:`GitObjectReadError`."""
     try:
         proc = platform.popen_bytes(["git", "cat-file", "blob", sha], cwd=repo)
-    except OSError as exc:  # same conversion as ``_run``
+    except OSError as exc:  # same conversion as ``_git``
         raise GitObjectReadError(f"git could not run in {repo}: {exc}") from exc
     with proc:
         prefix = proc.stdout.read(_MAX_BLOB_BYTES) if proc.stdout else b""
@@ -694,7 +688,7 @@ class GitSubprocessObjectReader:
     def remote_branch(self, repo: Path, branch: str) -> bool:
         """``refs/remotes/origin/<branch>`` exists locally (offline)."""
         ref = f"refs/remotes/origin/{branch}"
-        return _run(["git", "rev-parse", "-q", "--verify", ref], repo).returncode == 0
+        return _git(repo, "rev-parse", "-q", "--verify", ref).returncode == 0
 
     def netted_specs(self, repo: Path, local_sha: str, remote_sha: str) -> list[str]:
         """The ``specs/`` paths the push nets in. Netted in = present at the tip and
@@ -710,7 +704,7 @@ class GitSubprocessObjectReader:
         runs = [["diff", "--name-only", "--no-renames", "--diff-filter=AM", b] for b in bases]
         netted: set[str] | None = None
         for run in runs or [["ls-tree", "-r", "--name-only"]]:
-            result = _run(["git", *run, local_sha, "--", "specs/"], repo)
+            result = _git(repo, *run, local_sha, "--", "specs/")
             if result.returncode != 0:
                 raise GitObjectReadError(f"git {run[0]} failed: {_decode(result.stderr).strip()}")
             paths = set(_lines(result.stdout))

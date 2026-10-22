@@ -5,12 +5,13 @@ from __future__ import annotations
 
 import os
 import re
+import subprocess
 from collections import Counter
 from collections.abc import Iterable, Mapping
 from pathlib import Path
 
 from _grammar import SHA_RE
-from _platform import run
+from _platform import run, run_bytes
 
 #: `git rev-parse --local-env-vars` less the config injectors: what makes git answer for another repo. Identity, config and ssh are the caller's.
 _LOCAL = frozenset({
@@ -40,6 +41,22 @@ def git(repo: Path, *args: str, check: bool = True, input: str | None = None) ->
     if check and done.returncode:
         raise GitError(args, done.stderr.strip())
     return done.stdout
+
+
+def git_bytes(
+    repo: Path,
+    *args: str,
+    input: bytes | None = None,
+    timeout: float | None = None,
+    env: Mapping[str, str] | None = None,
+) -> subprocess.CompletedProcess[bytes]:
+    """`git -C repo args` on the scrubbed env plus *env*: raw bytes, the exit status unchecked; a missing git raises `OSError`, a run past *timeout* `subprocess.TimeoutExpired`."""
+    return run_bytes(
+        ["git", "-C", str(repo), *args],
+        env=scrubbed_env() | dict(env or {}),
+        input=input,
+        timeout=timeout,
+    )
 
 
 def shallow(repo: Path) -> bool:

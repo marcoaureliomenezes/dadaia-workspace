@@ -29,6 +29,12 @@ SHA_RE = re.compile(r"^(?:[0-9a-f]{7,40}|[0-9a-f]{64})$")
 OBJECT_ID_RE = re.compile(r"^[0-9a-fA-F]{40}$|^[0-9a-fA-F]{64}$")
 
 
+def is_zero_object_id(sha: str | bytes) -> bool:
+    """Whether *sha* is git's absent-object id: exactly 40 or 64 zeros, nothing else."""
+    text = sha.decode("ascii", "replace") if isinstance(sha, bytes) else sha
+    return bool(OBJECT_ID_RE.fullmatch(text)) and not text.strip("0")
+
+
 def candidate_number(names: Iterable[str]) -> int:
     """The highest ``rc-<N>`` among *names*, 0 when none — the live candidate's number."""
     return max((int(m.group(1)) for n in names if (m := CANDIDATE_RE.match(n))), default=0)
