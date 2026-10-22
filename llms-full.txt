@@ -148,10 +148,10 @@ The documentation is the repository's [docs folder](https://github.com/marcoaure
 
 ## 3. What is enforced
 
-- One PreToolUse gate blocks: a file-tool write (`WRITE_TOOLS`) creating a new entry at the root, `.dadaia/`, a closed-canon zone or the first level of `repos/`, `worktrees/` (root_whitelist); a file-tool write (`WRITE_TOOLS`) to a `CORE_FLOOR` path (PROTECTED); a file-tool write (`WRITE_TOOLS`) out of the bound scope (out-of-scope); a file-tool write under `repos/<slug>/` outside `specs/audits/`, since `repos/` is merge-only: `specs/audits/` is written directly, the rest by worktree merge, and only `context create` and a repo's first `specs init` write `specs/` directly (_MERGE_ONLY_MESSAGE); and a Bash call that runs `verdict.py … --verdict` outside the dispatched `dd-code-reviewer`, on a harness whose registry row names a subagent key, the only Bash act it judges (verdict_act).
+- One PreToolUse gate blocks: a file-tool write (`WRITE_TOOLS`) creating a new entry at the root, `.dadaia/`, a closed-canon zone or the first level of `repos/`, `worktrees/`, `NotebookEdit` excepted (root_whitelist); a file-tool write (`WRITE_TOOLS`) to a path of the PROTECTED class below (PROTECTED); a file-tool write (`WRITE_TOOLS`) out of the bound scope (out-of-scope); a file-tool write under `repos/<slug>/` outside `specs/audits/`, since `repos/` is merge-only: `specs/audits/` is written directly, the rest by worktree merge, and only `context create` and a repo's first `specs init` write `specs/` directly (_MERGE_ONLY_MESSAGE); and a Bash call that runs `verdict.py … --verdict` outside the dispatched `dd-code-reviewer`, on a harness whose registry row names a subagent key, the only Bash act it judges (verdict_act).
 - The gate fails open on: a pre-gate past 10 s (TOOL_TIMEOUT_S); an id-less unbound session under `worktrees/<r>/` (gate_policy); a policy that raises (`pre_gate`); an unreadable payload (`read_stdin_json`); an unreadable registry, judging nothing below `repos/`, `worktrees/`, so only the merge-only block holds there (registered_slugs).
 - The Bash hook wrapper accepts the workspace venv's POSIX or Windows Python; when neither is executable, it warns and exits 0, and each context-injection lane prints the reinstall `fix: Agent action:` line.
-- Path classes: ADDITIVE (`.dadaia/AGENTS.md`'s output and ephemeral zones) writable; PROTECTED (`CORE_FLOOR` and the protected globs) blocked; the rest MUTATING.
+- Path classes: ADDITIVE (`.dadaia/AGENTS.md`'s output and ephemeral zones) writable; PROTECTED (the projected law files and hook wiring, `CORE_FLOOR`, and the `.dadaiaignore` `[protected]` globs, as `gate_policy._protection` decides) blocked; the rest MUTATING.
 - Every BLOCK carries exactly one fix line: `fix: <command>`, `fix: Agent action: <one act>` for an act an agent performs (one act may chain up to three steps with `, then`), or `fix: Operator action: <one act>` only for an ADR acceptance, a secret, a `.dadaiaignore` or PROTECTED edit, a ruling the law names, or an act outside the agents' reach (relaunching the session); a BLOCK whose fix is itself blocked is a Stall, CRITICAL.
 - Git chokepoints (branch contract and scope: `dd-gitflow-default`, The branch contract): pre-push: `.dadaia/AGENTS.md`, Git chokepoints; `.dadaia/.venv/bin/dadaia worktree merge` refuses a `wt-main`, `wt-rc`, hotfix or backlog tree without a valid APPROVED verdict bound to its diff, and a `wt-main`, `wt-rc` or hotfix tree whose `verify:` does not exit 0 (`worktrees/AGENTS.md`, Merges, gates, review); the PR gate is discipline (`dd-gitflow-default`, The PR gate).
 - The binding: `.dadaia/.venv/bin/dadaia context show --json`. The gate reads no SDD artifact.
@@ -282,8 +282,9 @@ heading *Context, scope and races*.
 
 A *release* is one SemVer line under `specs/releases/<M.m.p>/`, and its *candidates*
 (`rc-<N>/`) are closed-scope steps through it; the highest candidate is live. The release
-state, the SPEC `Origin` line and the release ids are owned by
-`dadaia_workspace/public/skills/dd-release-implementation/RELEASE-EVENTS.md`.
+state is owned by
+`dadaia_workspace/public/skills/dd-release-implementation/RELEASE-EVENTS.md`; the SPEC `Origin` line
+and the release ids by `dadaia_workspace/public/scaffold/releases/AGENTS.md` (Authoring rules).
 
 ## The flow
 
@@ -707,7 +708,7 @@ python3 .agents/skills/dd-release-implementation/scripts/release.py new "$V" --s
   `.dadaia/.venv/bin/dadaia`, which `init` prints by its absolute path.
 - **Level 2 — project.** `--repo` clones the repo into `repos/<slug>/`, installs the
   pre-push and reference-transaction hooks and makes the context (named after the slug) ALIVE; only `context bind`
-  binds a session (*The bind*, above).
+  binds a session (*The bind*, below).
 - **Level 3 — specs.** 3a `specs init` brings the repo's `specs/` to the canon and, on a
   repo with no work branch, cuts the local one and commits only the scaffold on it; a foreign
   `specs/` is refused until `--replace-foreign` moves it to `specs-bkp/` (to
@@ -932,7 +933,7 @@ reopen is a new record.
 Candidate maturity is not stored on the bug. The next candidate's `SPEC.md`
 `## Bug window review` judges each fix and never schedules work; the window rule is in
 `dd-bug-resolution/LINEAGE.md`, and the review step is in `dd-release-definition/SKILL.md`,
-section 1, step 7. The release summary's scope is in
+Pick the set, step 7. The release summary's scope is in
 `dd-release-implementation/RELEASE-EVENTS.md`.
 
 ## Lesson 1 — a per-caller fix breeds the next caller's bug
