@@ -69,17 +69,14 @@ def test_onto_judges_the_content_of_a_range_on_a_branch_no_push_could_carry(
     monkeypatch, tmp_path: Path
 ) -> None:
     """`--onto` refuses the denylisted blob of `<onto>..HEAD` on a task branch (never pushable),
-    and its rewrite fix starts at the range's own oldest commit, never below `<onto>`."""
+    and its one fix is an Agent action naming the listed path, never a history rewrite."""
     repo = tmp_path / "repo"
     base = _init_repo(repo)
     os_run(["git", "switch", "-q", "-c", "wt/0.5.0/rc-1/job-1/wt-task-001"], cwd=repo, check=True)
-    shas = []
     for rel, text in (("leak.md", "zz-synthetic-term\n"), ("more.md", "m\n")):
         write_text(repo / rel, text)
         os_run(["git", "add", "-A"], cwd=repo, check=True)
         os_run(["git", "commit", "-q", "-m", f"add {rel}"], cwd=repo, check=True)
-        shas.append(_git(repo, "rev-parse", "HEAD"))
-    first = shas[0]
     monkeypatch.setattr(ci, "_repo_root", lambda: repo)
     monkeypatch.setattr(
         container, "load_denylist_terms", lambda _repo=None: (("zz-synthetic-term", "t"),)
@@ -89,7 +86,9 @@ def test_onto_judges_the_content_of_a_range_on_a_branch_no_push_could_carry(
 
     assert done.exit_code == 1, done.output
     assert "leak.md:1" in done.output and "zz-synthetic-term" not in done.output
-    assert f"--rewrite-from {first}" in done.output and base not in done.output.split("fix:")[-1]
+    fixes = [ln for ln in done.output.splitlines() if ln.startswith("fix: ")]
+    assert len(fixes) == 1 and fixes[0].startswith("fix: Agent action: ") and "leak.md" in fixes[0]
+    assert "--rewrite-from" not in done.output and base not in fixes[0]
 
 
 @pytest.mark.parametrize(("name", "code"), [("acme-site", 0), ("other", 1)])
@@ -306,18 +305,11 @@ def test_a_malformed_privacy_baseline_fails_the_gate_closed_with_one_fix_line(
     ]
 
 
-def test_push_gate_check_help_names_the_rewrite_remedy_and_its_contract() -> None:
+def test_push_gate_check_help_offers_no_history_rewrite() -> None:
     result = _runner.invoke(app, ["ci", "push-gate-check", "--help"], env={"COLUMNS": "400"})
     assert result.exit_code == 0, result.output
-    assert (
-        "Remedy: the subject of the commit holding a listed message, else of the last; "
-        "the other folded messages stay in the body."
-    ) in " ".join(result.output.split())
-    assert (
-        "Remedy for a refused push: --rewrite-from re-commits the whole unpublished range "
-        "as one commit, or two when RED `test(` commits and others mix, "
-        "over edits and deletions of the paths the gate lists."
-    ) in " ".join(result.output.split())
+    text = " ".join(result.output.split())
+    assert "--rewrite-from" not in text and "re-commit" not in text
 
 
 def test_a_decision_carries_its_listed_paths_even_when_it_lists_none() -> None:

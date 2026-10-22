@@ -1172,18 +1172,15 @@ def test_every_fix_line_prints_on_one_line_without_a_tty(tmp_path: Path) -> None
 
 
 @_SLOW
-def test_the_gate_is_read_only_and_its_rewrite_fix_uncommits_only_unpublished_work(
+def test_the_gate_is_read_only_and_its_fix_is_one_agent_action_naming_the_listed_path(
     world: World,
 ) -> None:
-    """The denylist refusal's fix uncommits the refused ref's own
-    unpublished range, down to its oldest unpublished commit — never a squash of
-    published history, never a publish verb that rewrites."""
+    """The denylist refusal's one fix is an Agent action naming the listed path; the gate
+    offers no history rewrite and no publish verb that rewrites."""
     command = _denylisted(world)
-    oldest = world.git(world.repo, "rev-parse", "HEAD~1")
     fix = _fix(_hit(world, command), world.ws)
-    assert fix == fix_line(
-        world.ws, "ci", "push-gate-check", "--repo", str(world.repo), "--rewrite-from", oldest
-    )
+    assert fix.startswith("Agent action: ") and "notes.md" in fix, fix
+    assert "--rewrite-from" not in fix
     assert "--republish" not in world.cli("context", "baseline", "--help").stdout
 
 
@@ -1230,11 +1227,11 @@ def test_a_refused_baseline_push_names_the_anchor_and_the_publish_as_the_next_st
     world: World,
 ) -> None:
     """The gate refuses baseline's push — the refusal keeps the gate's
-    one fix (reset to the oldest unpublished commit) and names the anchor and the publish
-    as the step after the rewrite (a hand push would drop origin's merge parent)."""
+    one fix (an Agent action naming the listed path) and names the anchor and the publish
+    as the step after that fix (a hand push would drop origin's merge parent)."""
     done = _hit(world, _baseline_denylisted(world))
     output = done.stdout + done.stderr
-    assert done.returncode != 0 and "--rewrite-from" in _fix(done, world.ws)
+    assert done.returncode != 0 and _fix(done, world.ws).startswith("Agent action: ")
     assert f"onboarding commit {world.git(world.repo, 'rev-parse', 'HEAD')}" in output
     assert fix_line(world.ws, "context", "baseline", "proj") in output.replace("\n", "")
 

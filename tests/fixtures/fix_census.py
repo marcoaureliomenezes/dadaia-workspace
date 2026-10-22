@@ -18,7 +18,6 @@ _CHOKEPOINTS = {
 #: (``self.<method>()`` and module-level calls, transitively) is a site.
 _VERBS = {
     "ci": (_PKG / "cli" / "commands" / "ci.py", ("push_gate_check",)),
-    "fold": (_PKG / "features" / "chokepoints" / "fold.py", ("rewrite_unpublished",)),
     "service": (_PKG / "features" / "spec_context" / "service.py", ("alive", "baseline", "dead")),
 }
 
