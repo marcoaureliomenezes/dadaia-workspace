@@ -100,3 +100,63 @@ def test_a_full_line_comment_is_refused() -> None:
     fm = load_owner("dd-bug-resolution", "_frontmatter")
     with pytest.raises(ValueError, match="line 2"):
         fm.parse("a: 1\n# note\nb: 2")
+
+
+_SPANS_BLOCK = (
+    "name: a\n"
+    "tools:\n"
+    "  - Read\n"
+    "  - Edit\n"
+    "list:\n"
+    "- x\n"
+    "- y\n"
+    "gitflow:\n"
+    "  principal: main\n"
+    "\n"
+    "flow: [a, b]\n"
+    "note: >\n"
+    "  folded\n"
+    "  text\n"
+    "last: 1"
+)
+
+
+def _spans(doc: str) -> list[tuple[str | None, list[str]]]:
+    fm = load_owner("dd-bug-resolution", "_frontmatter")
+    split = fm.split(doc)
+    assert split is not None
+    spans: list[tuple[str | None, list[str]]] = fm.key_spans(split[0])
+    return spans
+
+
+def test_a_key_span_is_the_key_line_and_every_line_of_its_block_value() -> None:
+    assert _spans(f"---\n{_SPANS_BLOCK}\n---\n") == [
+        ("name", ["name: a"]),
+        ("tools", ["tools:", "  - Read", "  - Edit"]),
+        ("list", ["list:", "- x", "- y"]),
+        ("gitflow", ["gitflow:", "  principal: main", ""]),
+        ("flow", ["flow: [a, b]"]),
+        ("note", ["note: >", "  folded", "  text"]),
+        ("last", ["last: 1"]),
+    ]
+
+
+def test_the_key_spans_rejoin_to_the_block_they_came_from() -> None:
+    spans = _spans(f"---\n{_SPANS_BLOCK}\n---\n")
+
+    assert "\n".join(line for _key, lines in spans for line in lines) == _SPANS_BLOCK
+
+
+@pytest.mark.parametrize("prefix", ["", "﻿"])
+@pytest.mark.parametrize("eol", ["\n", "\r\n"])
+def test_the_key_spans_are_the_same_for_lf_crlf_and_bom_documents(prefix: str, eol: str) -> None:
+    doc = f"---\n{_SPANS_BLOCK}\n---\n"
+    twin = prefix + doc.replace("\n", eol)
+
+    assert _spans(twin) == _spans(doc)
+
+
+def test_lines_before_the_first_key_belong_to_no_key() -> None:
+    fm = load_owner("dd-bug-resolution", "_frontmatter")
+
+    assert fm.key_spans("  - orphan\na: 1") == [(None, ["  - orphan"]), ("a", ["a: 1"])]

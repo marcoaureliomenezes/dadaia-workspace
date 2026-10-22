@@ -265,3 +265,46 @@ def test_work_branch_with_several_raises_the_one_class_and_never_the_skills(
     assert type(refused.value) is SeveralWorkBranches
     assert not isinstance(refused.value, skill_class)
     assert refused.value.keep == "0.6.0"
+
+
+def _constitution(tmp_path: Path, text: str) -> Path:
+    specs = tmp_path / "specs"
+    specs.mkdir()
+    write_text(specs / "constitution.md", text)
+    return specs
+
+
+@pytest.mark.parametrize("eol", ["\n", "\r\n"])
+@pytest.mark.parametrize("prefix", ["", "﻿"])
+def test_merge_frontmatter_replaces_a_block_value_whole_and_keeps_the_rest(
+    tmp_path: Path, prefix: str, eol: str
+) -> None:
+    from dadaia_workspace.core.gitflow import merge_frontmatter
+
+    text = (
+        "---\nconstitution_version: 7.0.0\nspecs_pattern_version:\n- 1\n- 2\n"
+        "gitflow:\n  principal: x\n  work: y\nkeep:\n  - a\n---\n\n# body\n"
+    )
+    specs = _constitution(tmp_path, prefix + text.replace("\n", eol))
+
+    merge_frontmatter(specs, specs_pattern_version=7, gitflow=Gitflow("main", "dev", "feature/"))
+
+    assert read_text(specs / "constitution.md") == (
+        "---\nconstitution_version: 7.0.0\nspecs_pattern_version: 7\n"
+        'gitflow: {"principal": "main", "integration": "dev", "work": "feature/"}\n'
+        "keep:\n  - a\n---\n\n# body\n"
+    )
+
+
+def test_merge_frontmatter_appends_an_absent_key_after_a_trailing_block_list(
+    tmp_path: Path,
+) -> None:
+    from dadaia_workspace.core.gitflow import merge_frontmatter
+
+    specs = _constitution(tmp_path, "---\nkeep:\n  - a\n---\nbody\n")
+
+    merge_frontmatter(specs, specs_pattern_version=7)
+
+    assert read_text(specs / "constitution.md") == (
+        "---\nkeep:\n  - a\nspecs_pattern_version: 7\n---\nbody\n"
+    )
