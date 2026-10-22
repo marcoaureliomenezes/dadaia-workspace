@@ -235,12 +235,16 @@ def test_a_runner_planted_in_the_repo_is_never_run_ahead_of_the_workspace_venv(r
     assert not marker.exists()
 
 
-@pytest.mark.parametrize("code", [1, 2])
-def test_a_faulting_runner_does_not_open_the_work_branch(tmp_path: Path, code: int) -> None:
-    """With the module importable, a runner that cannot answer is no reason to let a raw commit
-    move the work branch: the shipped script refuses it and never warns-and-passes."""
+def test_a_raw_commit_on_the_work_branch_is_refused_by_the_shipped_script(tmp_path: Path) -> None:
+    """The shipped script, module importable and runner working, refuses a raw work-branch commit."""
     ws = tmp_path / "ws"
-    fake_venv(ws, cli=f"#!python\nimport sys\nsys.exit({code})\n", pth=True)
+    source = Path(dadaia_workspace.__file__).parent.parent
+    runner = (
+        "#!python\nimport runpy, sys\nsys.dont_write_bytecode = True\n"
+        f"sys.path.insert(0, {str(source)!r})\n"
+        'runpy.run_module("dadaia_workspace", run_name="__main__", alter_sys=True)\n'
+    )
+    fake_venv(ws, cli=runner, pth=True)
     origin, root = tmp_path / "origin.git", ws / "repo"
     root.mkdir()
     env = {k: v for k, v in os.environ.items() if k != "DADAIA_WT"}
