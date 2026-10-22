@@ -18,7 +18,6 @@ from dadaia_workspace.cli._specs_resolution import (
 )
 from dadaia_workspace.core import platform
 from dadaia_workspace.core.cli_line import fix_line
-from dadaia_workspace.core.exceptions import DadaiaError
 from dadaia_workspace.core.gitflow import Gitflow, SeveralWorkBranches, work_branch
 from dadaia_workspace.core.platform import act
 from dadaia_workspace.core.skill_owner import load_owner
@@ -170,33 +169,10 @@ def _content_decision(repo: Path, held: str, tag: str) -> Decision:
     )
 
 
-def _rewrite_unpublished(repo: Path, oldest: str, message: str | None) -> None:
-    from dadaia_workspace.container import build_git_client, build_git_object_reader
-    from dadaia_workspace.features.chokepoints.fold import rewrite_unpublished
-
-    try:
-        rewrite_unpublished(
-            repo,
-            oldest,
-            message,
-            git=build_git_client(),
-            reader=build_git_object_reader(),
-            decide=lambda r, held: _content_decision(r, held, "[pre-push]"),
-        )
-    except DadaiaError as refusal:
-        fail(refusal)
-
-
 @app.command("push-gate-check")
 def push_gate_check(
-    rewrite_from: str | None = typer.Option(
-        None, "--rewrite-from", help="Remedy: re-commit the unpublished range from this commit."
-    ),
-    repo: Path | None = typer.Option(None, "--repo", help="Remedy target. Default: cwd's repo."),
-    message: str | None = typer.Option(
-        None,
-        "--message",
-        help="Remedy: the subject of the commit holding a listed message, else of the last; the other folded messages stay in the body.",
+    repo: Path | None = typer.Option(
+        None, "--repo", help="Repo --onto judges. Default: cwd's repo."
     ),
     onto: str | None = typer.Option(
         None,
@@ -218,14 +194,8 @@ def push_gate_check(
     injected; a call site that fails to wire the object reader is a defect, never a
     bypass. No repo or context name is a term source.
 
-    Remedy for a refused push: --rewrite-from re-commits the whole unpublished range as one
-    commit, or two when RED `test(` commits and others mix, over edits and deletions of the
-    paths the gate lists.
-
     The merge gate of a worktree judges the same content with --onto, on a branch of any name.
     """
-    if rewrite_from is not None:
-        return _rewrite_unpublished(repo or _repo_root(), rewrite_from, message)
     if onto is not None:
         from dadaia_workspace.container import build_git_client
 
