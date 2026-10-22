@@ -9,7 +9,7 @@
 - One workspace folder; the agent session launches at its root, always.
 - Projects live in `repos/<slug>/`; governance (`AGENTS.md`, `.agents/`, `.dadaia/`) lives outside every repo.
 - A project is a **context**: one **main repo** (where `specs/` lives) plus **associated repos**; never a monorepo.
-- Two rule-file kinds exist: this map and the scoped `AGENTS.md` per governed area (§5); nothing else is law.
+- Two rule-file kinds exist: this map and the scoped `AGENTS.md` per governed area (Scoped law); nothing else is law.
 - A scoped file is the system of record for its area and takes precedence there — open it before acting in that area.
 
 ## 1. The flow
@@ -18,7 +18,7 @@
 - Arm A: `demand -> backlog -> as-is review -> release candidate (SPEC/PLAN/job files) -> implementation + review -> memory -> closure -> promote by merging the release PR`.
 - Arm B: `propose -> operator confirms -> register -> lowest-level RED test -> root-cause fix -> GREEN -> resolved`.
 - Test: does the tool break its own contract? Yes -> Arm B. No -> Arm A.
-- A feature enters only through the backlog or an operator demand recorded in the SPEC `Origin`; a confirmed bug is fixed per `specs/bugs/AGENTS.md` §2.
+- A feature enters only through the backlog or an operator demand recorded in the SPEC `Origin`; a confirmed bug is fixed per `specs/bugs/AGENTS.md` (Resolution).
 - A test, or an existing assert, is removed or skipped only on the operator's order.
 - Every change minimizes code: DELETE → REBUILD → UPDATE → KEEP → ADD last; verbosity is a defect; documented behavior still works; tests assert behavior not text, mock only boundaries, expect literals; a docstring states only its unit's contract (inputs, output, raises, side effects); no bug id, ADR, FR, AC, task id, candidate, review round or audit id appears in a docstring or comment.
 - A fix hardens the contract test in that contract's one home: it tightens an assert or adds the missing partition and never loosens one, a new case is written only when no contract test covers the partition, and the reviewer reverts the fix and confirms the hardened test goes red.
@@ -40,17 +40,17 @@
 | Read-only findings, each a `path:line` or URL | `dd-researcher` |
 | Three-axis review + six lenses (architecture, security, QA, product, audit, AI surface) | `dd-code-reviewer` |
 
-- Only the operator accepts an ADR (`specs/ADRs/AGENTS.md` §2).
+- Only the operator accepts an ADR (`specs/ADRs/AGENTS.md`, Acceptance law).
 - Every agent but `dd-researcher` invokes `dd-ai-eng-knowhow` for harness literacy; an AI-entity change follows its AUTHORING contract.
 
 ## 3. What is enforced
 
-- One PreToolUse gate blocks: a file-tool write (`Write`, `Edit`, `MultiEdit`, `apply_patch`) creating a new entry at the root, `.dadaia/`, a closed-canon zone or the first level of `repos/`, `worktrees/` per §4 (root_whitelist); a file-tool write (those or `NotebookEdit`) to a PROTECTED path (PROTECTED); a file-tool write (those or `NotebookEdit`) out of the bound scope (out-of-scope); a file-tool write under `repos/<slug>/` outside `specs/audits/`, since `repos/` is merge-only: `specs/audits/` is written directly, the rest by worktree merge, and only `context create` and a repo's first `specs init` write `specs/` directly (_MERGE_ONLY_MESSAGE); and a Bash call that runs `verdict.py … --verdict` outside the dispatched `dd-code-reviewer`, on a harness whose registry row names a subagent key, the only Bash act it judges (verdict_act).
+- One PreToolUse gate blocks: a file-tool write (`WRITE_TOOLS`) creating a new entry at the root, `.dadaia/`, a closed-canon zone or the first level of `repos/`, `worktrees/` (root_whitelist); a file-tool write (`WRITE_TOOLS`) to a `CORE_FLOOR` path (PROTECTED); a file-tool write (`WRITE_TOOLS`) out of the bound scope (out-of-scope); a file-tool write under `repos/<slug>/` outside `specs/audits/`, since `repos/` is merge-only: `specs/audits/` is written directly, the rest by worktree merge, and only `context create` and a repo's first `specs init` write `specs/` directly (_MERGE_ONLY_MESSAGE); and a Bash call that runs `verdict.py … --verdict` outside the dispatched `dd-code-reviewer`, on a harness whose registry row names a subagent key, the only Bash act it judges (verdict_act).
 - The gate fails open on: a pre-gate past 10 s (TOOL_TIMEOUT_S); an id-less unbound session under `worktrees/<r>/` (gate_policy); a policy that raises (`pre_gate`); an unreadable payload (`read_stdin_json`); an unreadable registry, judging nothing below `repos/`, `worktrees/`, so only the merge-only block holds there (registered_slugs).
 - The Bash hook wrapper accepts the workspace venv's POSIX or Windows Python; when neither is executable, it warns and exits 0, and each context-injection lane prints the reinstall `fix: Agent action:` line.
-- Path classes: ADDITIVE (`.dadaia/AGENTS.md`'s output and ephemeral zones) writable; PROTECTED (projected law files and hook wiring, `.dadaia/states`, `hooks`, `agentic`, `sessions`, `.dadaiaignore` and its `[protected]` globs) blocked; the rest MUTATING.
+- Path classes: ADDITIVE (`.dadaia/AGENTS.md`'s output and ephemeral zones) writable; PROTECTED (`CORE_FLOOR` and the protected globs) blocked; the rest MUTATING.
 - Every BLOCK carries exactly one fix line: `fix: <command>`, `fix: Agent action: <one act>` for an act an agent performs (one act may chain up to three steps with `, then`), or `fix: Operator action: <one act>` only for an ADR acceptance, a secret, a `.dadaiaignore` or PROTECTED edit, a ruling the law names, or an act outside the agents' reach (relaunching the session); a BLOCK whose fix is itself blocked is a Stall, CRITICAL.
-- Git chokepoints (branch contract and scope: `dd-gitflow-default` §2a): pre-push: `.dadaia/AGENTS.md` §3; `.dadaia/.venv/bin/dadaia worktree merge` refuses a `wt-main`, `wt-rc`, hotfix or backlog tree without a valid APPROVED verdict bound to its diff, and a `wt-main`, `wt-rc` or hotfix tree whose `verify:` does not exit 0 (`worktrees/AGENTS.md` §2); the PR gate is discipline (`dd-gitflow-default` §3b).
+- Git chokepoints (branch contract and scope: `dd-gitflow-default`, The branch contract): pre-push: `.dadaia/AGENTS.md`, Git chokepoints; `.dadaia/.venv/bin/dadaia worktree merge` refuses a `wt-main`, `wt-rc`, hotfix or backlog tree without a valid APPROVED verdict bound to its diff, and a `wt-main`, `wt-rc` or hotfix tree whose `verify:` does not exit 0 (`worktrees/AGENTS.md`, Merges, gates, review); the PR gate is discipline (`dd-gitflow-default`, The PR gate).
 - The binding: `.dadaia/.venv/bin/dadaia context show --json`. The gate reads no SDD artifact.
 - Common behaviour lives in skills and `AGENTS.md`; a persona or hook carries only the surface its harness cannot do without; a harness fact lives in one registry row.
 
