@@ -27,10 +27,9 @@ from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES
+from dadaia_workspace.core.harness_registry import HARNESS_RECORDS, L1_ENTRY_HARNESSES
 from dadaia_workspace.features.certification import service
 from dadaia_workspace.features.certification.service import (
-    _HARNESS_PROBE_BINARIES,
     CertificationCheck,
     _all_checks_ok,
     _CertificationSkip,
@@ -222,10 +221,10 @@ def _result(returncode: int = 0, stdout: str = "", stderr: str = "") -> Certific
 
 def test_every_registered_record_has_a_probe_binary() -> None:
     """A record with no binary would silently never be probed."""
-    assert set(_HARNESS_PROBE_BINARIES) == set(L1_ENTRY_HARNESSES)
+    assert all(HARNESS_RECORDS[name].binary for name in L1_ENTRY_HARNESSES)
 
 
-@pytest.mark.parametrize("harness", sorted(_HARNESS_PROBE_BINARIES))
+@pytest.mark.parametrize("harness", sorted(HARNESS_RECORDS))
 def test_the_probe_leaves_the_claim_unverified_when_the_binary_is_absent(
     harness: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -235,11 +234,11 @@ def test_the_probe_leaves_the_claim_unverified_when_the_binary_is_absent(
     fake = _FakeProcess(_result())
 
     with pytest.raises(_CertificationSkip) as excinfo:
-        _version_probe_detail(fake, tmp_path, harness, _HARNESS_PROBE_BINARIES[harness])
+        _version_probe_detail(fake, tmp_path, harness, HARNESS_RECORDS[harness].binary)
 
     message = str(excinfo.value)
     assert message.startswith("UNVERIFIED:"), message
-    assert _HARNESS_PROBE_BINARIES[harness] in message
+    assert HARNESS_RECORDS[harness].binary in message
     assert harness in message
     assert fake.calls == [], "an absent binary must not be executed"
 

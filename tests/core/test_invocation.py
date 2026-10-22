@@ -208,3 +208,21 @@ def test_a_row_without_a_main_slug_has_no_specs_tree(tmp_path: Path) -> None:
     assert invocation.alive_context_trees(ws) == {"proj": ws / "repos" / "proj" / "specs"}
     assert invocation.repo_slug_for_context(ws, "blank") is None
     assert invocation.alive_context_names(ws) == ["proj", "blank", "bare"]
+
+
+@pytest.mark.parametrize("spelling", ["ALIVE", "Alive", "alive"])
+def test_a_registry_state_spelling_is_alive_for_bind_and_for_the_layout_gate(
+    tmp_path: Path, spelling: str
+) -> None:
+    """One row parser: ``alive_context_names``, ``alive_context_trees`` and the ALIVE slug
+    set agree on every spelling the store itself accepts."""
+    from dadaia_workspace.core import context_registry
+
+    ws = _mk_ws(tmp_path)
+    path = ws / ".dadaia" / "states" / "spec_contexts.json"
+    row = {"name": "proj", "state": spelling, "repo_slug": "proj"}
+    write_text(path, json.dumps({"schema_version": "3", "contexts": [row]}))
+
+    assert invocation.alive_context_names(ws) == ["proj"]
+    assert list(invocation.alive_context_trees(ws)) == ["proj"]
+    assert context_registry.registered_slugs(ws)[1] == frozenset({"proj"})

@@ -132,7 +132,7 @@ def test_execute_migration_transforms_contexts(tmp_path: Path) -> None:
     execute_migration(store, ws)
 
     rows = {context.name: context for context in store.list_all()}
-    assert store.read_raw()["schema_version"] == "3"
+    assert json.loads((states / "spec_contexts.json").read_text())["schema_version"] == "3"
 
     ctx_a = rows["ctx-a"]
     assert ctx_a.state.value == "alive"
@@ -173,3 +173,24 @@ def test_execute_migration_side_effects_and_v2_noop(tmp_path: Path) -> None:
     before = store.list_all()
     execute_migration(store, ws2)
     assert store.list_all() == before
+
+
+def test_a_v1_registry_that_is_not_a_contexts_object_is_refused_by_the_one_parser(
+    tmp_path: Path,
+) -> None:
+    """The migration reads the registry through the same parser as every reader: an
+    unreadable shape is a SchemaVersionError, never an AttributeError from a half-read."""
+    from dadaia_workspace.core.exceptions import SchemaVersionError
+
+    ws, states = _workspace(tmp_path)
+    write_text(states / "spec_contexts.json", json.dumps({"schema_version": "1", "contexts": "x"}))
+    store = JsonContextStore(states)
+
+    with pytest.raises(SchemaVersionError):
+        plan_migration(store)
+    with pytest.raises(SchemaVersionError):
+        execute_migration(store, ws)
+
+
+def test_the_store_has_no_second_raw_reader() -> None:
+    assert not hasattr(JsonContextStore, "read_raw")

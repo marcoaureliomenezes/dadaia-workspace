@@ -11,6 +11,7 @@ from pathlib import Path
 
 import pytest
 
+from dadaia_workspace.core import context_registry
 from dadaia_workspace.core.exceptions import SchemaVersionError
 from dadaia_workspace.core.models.spec_context import (
     AssociatedRepo,
@@ -19,7 +20,7 @@ from dadaia_workspace.core.models.spec_context import (
 )
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
 from tests.fixtures.stores import context_store
-from tests.helpers.oslib import Undecodable, read_text, write_text
+from tests.helpers.oslib import read_text, write_text
 
 
 def _make_ctx(
@@ -214,10 +215,22 @@ def test_a_refused_row_is_named_by_its_name(tmp_path: Path) -> None:
     assert refused.value.message == f"{path}: context row 'beta' has no created_at."
 
 
-def test_a_registry_that_is_not_utf8_is_undecodable_not_a_codec_error(tmp_path: Path) -> None:
+def test_a_registry_that_is_not_utf8_is_unreadable_not_a_codec_error(tmp_path: Path) -> None:
     (tmp_path / "spec_contexts.json").write_bytes(b'{"contexts": "caf\xe9"}')
 
-    with pytest.raises(Undecodable) as refused:
-        JsonContextStore(tmp_path).read_raw()
+    with pytest.raises(SchemaVersionError) as refused:
+        JsonContextStore(tmp_path).list_all()
 
-    assert refused.value.path == tmp_path / "spec_contexts.json"
+    assert str(tmp_path / "spec_contexts.json") in refused.value.message
+
+
+@pytest.mark.parametrize("spelling", ["ALIVE", "Alive", "alive"])
+def test_a_row_state_has_one_meaning_for_every_reader(tmp_path: Path, spelling: str) -> None:
+    """The store, the invocation authority and the layout gate all read the row ALIVE."""
+    row = {
+        "name": "a", "state": spelling, "repo_slug": "a", "repo_url": "u", "created_at": "t",
+    }  # fmt: skip
+    write_text(tmp_path / "spec_contexts.json", json.dumps({"schema_version": "3", "contexts": [row]}))
+
+    assert [c.state for c in JsonContextStore(tmp_path).list_all()] == [ContextState.ALIVE]
+    assert context_registry.is_alive(row)

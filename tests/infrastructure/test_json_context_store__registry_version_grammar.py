@@ -205,6 +205,10 @@ def test_a_registry_row_missing_a_key_is_reg_schema(ws: Path) -> None:
     assert fix.startswith("Operator action: ")
 
 
+def _stored(path: Path) -> dict:  # type: ignore[type-arg]
+    return json.loads(path.read_text())
+
+
 def _ctx(name: str) -> SpecContextProject:
     return SpecContextProject(
         name=name, state=ContextState.DEAD, repo_slug=name, repo_url="u", created_at="t"
@@ -217,22 +221,22 @@ def test_every_write_stamps_the_one_schema_version_and_restore_puts_back_the_byt
     """``replace_raw``, ``save`` and ``update`` write ``"3"`` over any older stamp; an empty
     registry spells it the same; ``restore`` returns a snapshot byte for byte."""
     store = JsonContextStore(tmp_path)
-    store.seed_if_absent()
-    assert store.read_raw() == {"schema_version": "3", "contexts": []}
-
     path = tmp_path / "spec_contexts.json"
+    store.seed_if_absent()
+    assert _stored(path) == {"schema_version": "3", "contexts": []}
+
     stale = json.dumps({"schema_version": "2", "contexts": []})
     write_text(path, stale)
     snapshot = store.snapshot()
 
     store.save(_ctx("a"))
-    assert store.read_raw()["schema_version"] == "3"
+    assert _stored(path)["schema_version"] == "3"
     row = {"name": "a", "state": "dead", "repo_slug": "a", "repo_url": "u", "created_at": "t"}
     write_text(path, json.dumps({"schema_version": "2", "contexts": [row]}))
     store.update(_ctx("a"))
-    assert store.read_raw()["schema_version"] == "3"
+    assert _stored(path)["schema_version"] == "3"
     store.replace_raw({"contexts": []})
-    assert store.read_raw() == {"schema_version": "3", "contexts": []}
+    assert _stored(path) == {"schema_version": "3", "contexts": []}
 
     store.restore(snapshot)
     assert path.read_text() == stale
