@@ -67,6 +67,13 @@ def cli_argv(venv: PurePath, caps: Caps | None = None) -> list[str]:
     return [str(venv_tool(venv, "dadaia", caps))]
 
 
+def cli_words(root: PurePath | None, *argv: str, caps: Caps | None = None) -> tuple[str, ...]:
+    """The words that run the workspace CLI of *root* (the venv running now when ``None``) with
+    *argv*: rendered once, by :func:`command` for a fix or :func:`inline` inside a sentence."""
+    venv = venv_dir(root) if root is not None else Path(sys.prefix)
+    return (*cli_argv(venv, caps), *argv)
+
+
 def norm_sep(path: str) -> str:
     """*path* spelled with forward slashes, whatever host wrote it."""
     return path.replace("\\", "/")
@@ -157,6 +164,13 @@ def run(
         list(argv), cwd=cwd, env=env, input=input, stdin=stdin, timeout=timeout, check=check,
         capture_output=True, text=True, encoding="utf-8", errors="replace",
     )  # fmt: skip
+
+
+def passthrough(
+    argv: Sequence[str], *, cwd: Path | None = None, env: Mapping[str, str] | None = None
+) -> int:
+    """Run *argv* (no shell) with this process's own stdin, stdout and stderr; its exit code."""
+    return subprocess.run(argv, cwd=cwd, env=env, check=False).returncode  # noqa: S603
 
 
 def run_bytes(
@@ -440,6 +454,13 @@ def command(*argv: str, caps: Caps | None = None) -> str:
     spelling on the host, ``Agent action: run `` and :func:`inline`'s text instead."""
     text, safe = _inline(argv, caps or detect())
     return text if safe else act("agent", f"run {text}")
+
+
+def mkdir_line(directory: PurePath, caps: Caps | None = None) -> str:
+    """Create *directory* and its parents, idempotent: one interpreter line that runs unchanged
+    under sh, bash, cmd and PowerShell, the path its own argv word."""
+    code = "import pathlib, sys; pathlib.Path(sys.argv[1]).mkdir(parents=True, exist_ok=True)"
+    return command(sys.executable, "-c", code, str(directory), caps=caps)
 
 
 _LABELS = {"agent": "Agent action", "operator": "Operator action"}

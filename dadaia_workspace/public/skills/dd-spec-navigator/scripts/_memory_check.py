@@ -14,7 +14,7 @@ from typing import Any
 
 import _findings
 import _memory_catalog as cat
-from _memory_schema import CODE, INDEX
+from _memory_schema import CODE, INDEX, PRODUCT
 from _platform import Undecodable, act, read_text
 from _refusal import Refusal
 from _specs import CATALOG, script
@@ -31,7 +31,7 @@ def check(specs: Path) -> list[Finding]:
         raise  # `decodable` names the file; it is no atom or catalog fault
     except (Refusal, json.JSONDecodeError) as exc:  # the missing tree's fix makes it
         fix = getattr(exc, "fix", "")
-        if not fix.startswith("mkdir"):
+        if (specs / PRODUCT).is_dir():
             fix = act("agent", f"correct the source atom — {exc} (specs/memory/AGENTS.md: "
                       f"fix findings at the source atom, never in {CATALOG})")  # fmt: skip
         return [{"code": CODE, "verdict": "error", "path": CATALOG, "line": 0,

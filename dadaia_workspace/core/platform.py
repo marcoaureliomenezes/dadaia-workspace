@@ -94,6 +94,16 @@ def is_fully_qualified(candidate: str) -> bool:
     return _owner.is_fully_qualified(candidate, _caps())
 
 
+def cli_words(root: PurePath | None, *argv: str) -> tuple[str, ...]:
+    """The words that run the workspace CLI of *root* with *argv*, on the current ``PLATFORM``."""
+    return _owner.cli_words(root, *argv, caps=_caps())
+
+
+def mkdir_line(directory: PurePath) -> str:
+    """The cross-shell mkdir line for *directory*, on the current ``PLATFORM``."""
+    return _owner.mkdir_line(directory, _caps())
+
+
 def canonical_cli(text: str) -> str:
     """*text* with the current ``PLATFORM``'s venv CLI spelling replaced by the source form."""
     return _owner.canonical_cli(text, _caps())

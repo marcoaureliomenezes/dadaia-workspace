@@ -21,7 +21,7 @@ from typing import Any
 
 import _clock
 from _memory_schema import INDEX, PRODUCT, WIKILINK_RE, parse
-from _platform import read_text
+from _platform import mkdir_line, read_text
 from _refusal import Refusal
 from _specs import CATALOG, script
 
@@ -34,7 +34,7 @@ def atoms(specs: Path) -> list[Path]:
     if not product.is_dir():
         raise Refusal(
             f"no {PRODUCT}/ under {specs} — there is no catalog to generate",
-            f"mkdir -p {specs / PRODUCT}",
+            mkdir_line(product),
         )
     return sorted(path for path in product.rglob("*.md") if path.name != "index.md")
 
