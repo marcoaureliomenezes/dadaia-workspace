@@ -29,6 +29,10 @@ Wave IV. Each task that fixes a recorded bug, or lands on a unit already fixed i
 6. R46. The J4.T21 sweep names nine sites, not six. The three extra are the same defect (`init.py:232`, `service.py:354`, `service.py:734`), all inside J4.T23's `W:`. The RED stands as written, and J4.T23 fixes all eight non-`invocation.py` sites; a leftover hit is refused.
 7. R44 `--sha` removal (ADR 0280 clause 5, accepted by the operator). The operator's order removes the flag, so its tests leave with it. J4.T12's c189c7daf deletes `test__release_phase__fix_line.py`'s two bad-sha fix-line tests and the `test_release.py` `--sha nope` row: they pin a flag that no longer exists. Every other changed pin asserts the flag-less behaviour.
 8. Test isolation. A J4.T11 drafting run let `release.py phase` commit into the enclosing worktree (f7dea7b06, fixture identity `t@t`), which overwrote `_RELEASE.json`. It was reverted on job-4 wt-main (600137b51) before any merge into the wt-rc. Re-measure at the re-audit: a test git call must not reach the enclosing repo.
+9. R42 archived records.
+   - ADR 0278 (operator-accepted) makes `bugs.py archive` the exit for an uncited resolved record, and SPEC AC10.3 clears the historic ones through that act. An archived record is therefore never cite-judged.
+   - The J4.T5 row `test_check_judges_an_archived_record_no_commit_cites_and_leaves_the_event_lines_alone` contradicts that ADR. It leaves in a J4.T6 `test(...)` commit that names this ruling; its event-line half stays pinned by the both-shapes row.
+   - The ambiguous-bare-id refusal at `resolve` is wired by J4.T7, the owner of `_bugs_transition.py`.
 
 | task | who | AC | `W:` | waits on | outcome |
 |---|---|---|---|---|---|
