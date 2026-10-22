@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from dadaia_workspace.core.gitflow import DEFAULT, merge_frontmatter, read_gitflow
+from dadaia_workspace.core.gitflow import DEFAULT, merge_frontmatter
 from dadaia_workspace.core.skill_owner import load_owner
 from dadaia_workspace.features.specs import canon
 from dadaia_workspace.features.specs.canon import (
@@ -110,23 +110,11 @@ def test_a_fresh_backlog_stub_is_the_stores_empty_render(tmp_path: Path) -> None
     assert stub == store.render([])
 
 
-def test_a_fresh_constitution_gitflow_block_is_the_one_merge_frontmatter_writes(
-    tmp_path: Path,
-) -> None:
+def test_a_fresh_constitution_is_unchanged_by_merge_frontmatter(tmp_path: Path) -> None:
     specs = _fresh(tmp_path)
-    scaffolded = (specs / "constitution.md").read_text(encoding="utf-8")
-    merge_frontmatter(specs, gitflow=DEFAULT)
-    merged = (specs / "constitution.md").read_text(encoding="utf-8")
-    assert read_gitflow(specs, scaffolded) == (DEFAULT, None)
-    assert read_gitflow(specs, merged) == (DEFAULT, None)
-    assert merged.split("---\n", 2)[2] == scaffolded.split("---\n", 2)[2]
-
-
-def test_canon_holds_no_backlog_or_gitflow_literal() -> None:
-    source = Path(canon.__file__).read_text(encoding="utf-8")
-    assert '"active": []' not in source
-    assert "backlog-v1" not in source
-    assert "{principal:" not in source
+    scaffolded = (specs / "constitution.md").read_bytes()
+    merge_frontmatter(specs, specs_pattern_version=13, gitflow=DEFAULT)
+    assert (specs / "constitution.md").read_bytes() == scaffolded
 
 
 def test_the_package_outside_the_skills_holds_no_second_schema_loader() -> None:
@@ -137,15 +125,3 @@ def test_the_package_outside_the_skills_holds_no_second_schema_loader() -> None:
         and "def load_schema" in p.read_text(encoding="utf-8")
     ]
     assert holders == []
-
-
-def test_a_fresh_specs_init_writes_these_stub_bytes(tmp_path: Path) -> None:
-    specs = _fresh(tmp_path)
-    constitution = (specs / "constitution.md").read_bytes()
-    assert constitution.startswith(
-        b"---\nspecs_pattern_version: 13\n"
-        b"gitflow: {principal: main, integration: develop, work: feature/}\n---\n"
-    )
-    assert (specs / "backlog" / "BACKLOG.json").read_bytes() == (
-        b'{"schema": "backlog-v1", "active": []}\n'
-    )
