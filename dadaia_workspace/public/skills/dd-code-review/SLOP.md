@@ -1,4 +1,4 @@
-# SLOP.md — detection signals
+# SLOP.md — the slop definition and its detection signals
 
 Disclosed sibling of [`SKILL.md`](SKILL.md), read inside Axis 1 (Standards).
 
@@ -41,7 +41,7 @@ Each signal is a labelled judgement call with the command that makes it verifiab
 ## Lifecycle
 
 - Slop dies in the change that finds it — never commented out, marked, archived or deferred.
-- The writer proves the artifact fails the test, the reviewer applies it, the auditor measures the balance.
+- The writer proves the artifact fails either test, the reviewer applies it, the auditor measures the balance.
 
 ## Verdict rule
 
