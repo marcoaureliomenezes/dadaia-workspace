@@ -14,7 +14,7 @@ The gate reads no SDD artifact; memory authorship is never gated.
 
 from __future__ import annotations
 
-import shlex
+import re
 from collections.abc import Callable
 from enum import Enum
 from itertools import chain
@@ -166,37 +166,20 @@ def evaluate(
     return Decision.ALLOW, ""
 
 
-_CONTROL = ";&|()\n"
-
-
-def _runs_writer(words: list[str]) -> bool:
-    return any(
-        (w.lower().endswith("verdict.py") or (w.lower() == "verdict" and words[i - 1] == "-m"))
-        and any(x == "--verdict" or x.startswith("--verdict=") for x in words[i + 1 :])
-        for i, w in enumerate(words)
-    )
-
-
-def _runs_verdict_writer(command: str) -> bool:
-    """Whether a shell command in *command* names the writer script (or ``-m verdict``) and
-    then ``--verdict``; text the shell lexer cannot parse is judged by both names appearing."""
-    lexer = shlex.shlex(command.replace("\\\n", ""), posix=True, punctuation_chars=_CONTROL)
-    lexer.whitespace, lexer.whitespace_split = " \t\r", True
-    try:
-        words = [*lexer, ";"]
-    except ValueError:
-        lowered = command.lower()
-        return "verdict.py" in lowered and "--verdict" in lowered
-    ends = [i for i, w in enumerate(words) if set(w) <= set(_CONTROL)]
-    return any(_runs_writer(words[a + 1 : b]) for a, b in zip([-1, *ends], ends, strict=False))
+_WRITER = re.compile(r"verdict\.py|-m\s*verdict")
 
 
 def verdict_act(command: str, *, key: str | None, subagent: str | None) -> str | None:
-    """The block message when *command* runs ``verdict.py … --verdict`` and the harness, which
+    """The block message when the text of *command* holds the writer (``verdict.py`` or
+    ``-m verdict``) and ``--verdict``, in any shell form, and the harness, which
     names a running subagent under payload *key* (``None``: it gives no identity), reports
     *subagent* (``None``: the main thread) other than the reviewer; else ``None``."""
     reviewer = load_owner("dd-bug-resolution", "_handoffs").REVIEWER
-    if key is None or subagent == reviewer or not _runs_verdict_writer(command):
+    if (
+        key is None
+        or subagent == reviewer
+        or not (_WRITER.search(text := command.lower()) and "--verdict" in text)
+    ):
         return None
     dispatch = f"dispatch {reviewer} on the tree to judge; its verdict.py run writes the verdict"
     return f"[GATE] Only the dispatched {reviewer} writes a verdict.\n" + spell_fix(
