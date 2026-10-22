@@ -40,8 +40,6 @@ def transition(
     if verb == "resolve":
         for key in (*REQUIRED_BY_VERB["resolve"], "fix_sha"):
             _set(updated, key, values[key])
-        if values.get("fix_files"):
-            _set(updated, "fix_files", values["fix_files"])
     elif verb == "supersede":
         _set(updated, "superseded_by", values["by"])
     else:
