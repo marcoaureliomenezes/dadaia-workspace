@@ -49,7 +49,7 @@ python3 .agents/skills/dd-release-implementation/scripts/release.py new "$V" --s
   `.dadaia/.venv/bin/dadaia`, which `init` prints by its absolute path.
 - **Level 2 — project.** `--repo` clones the repo into `repos/<slug>/`, installs the
   pre-push and reference-transaction hooks and makes the context (named after the slug) ALIVE; only `context bind`
-  binds a session (§3).
+  binds a session (*The bind*, above).
 - **Level 3 — specs.** 3a `specs init` brings the repo's `specs/` to the canon and, on a
   repo with no work branch, cuts the local one and commits only the scaffold on it; a foreign
   `specs/` is refused until `--replace-foreign` moves it to `specs-bkp/` (to
@@ -105,9 +105,8 @@ id, else `DADAIA_CONTEXT`, never the cwd: sitting inside a repository is not a b
 
 `doctor` is the one instance validator; three sections run in fixed order —
 `workspace`, `specs`, `ledgers`. Every finding prints as one `<CODE> <verdict>
-<message>` line, every error-class finding carries one fix line (a command, an
-`Agent action: <one act>`, or an `Operator action: <one act>` for what only the human may do), and any
-error-class finding exits 1. There is no score: the findings and the exit code are the
+<message>` line, every error-class finding carries one fix line (its forms are the root `AGENTS.md` map's
+*What is enforced* section), and any error-class finding exits 1. There is no score: the findings and the exit code are the
 run. `--fix` moves slop to `.dadaia/reaped/`; a TTL expiry acts by zone class, an OUTPUT
 entry held, an EPHEMERAL one deleted.
 
