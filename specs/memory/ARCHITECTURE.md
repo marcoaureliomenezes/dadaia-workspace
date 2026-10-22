@@ -283,6 +283,7 @@ flowchart TB
 - 0277 — The 0.5.0 eval gate is candidate-only, the release tag may differ from E by _RELEASE.json, and T3 is the 0.5.0 adoption readout in place of D1-D10
 - 0278 — Amend ADR 0273: an uncited resolved record's fix line is the one bugs.py archive act naming every missed id
 - 0279 — Only the dispatched dd-code-reviewer writes a verdict: verdicts live in the PROTECTED states zone, and the pre-gate judges the one Bash act that writes one where the harness names the subagent
+- 0280 — A fix with a culprit is the REBUILD of its unit in its own lane; review sweeps the fixed pattern on the first pass and refuses a verdict without the reached-test run; history is the id-line query; no stored sha a rewrite can orphan
 <!-- /dadaia:fixed adr-list -->
 
 <!-- dadaia:fixed slop-code -->
