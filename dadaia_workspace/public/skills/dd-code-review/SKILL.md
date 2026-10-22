@@ -48,19 +48,18 @@ axes are reported side by side with equal weight, so no axis hides another's fin
 
 ## 4. Axis 3 — Bug-surface
 
-- Read the touched unit's bug history by the id-line query `git log -E --grep '^(fix|refactor)\(bugs\): ' -- <file>`, one touched file per run, never by `fix_files`.
+- Read each touched file's bug history per `dd-bug-resolution/LINEAGE.md` §The filter.
 - Answer WITH EVIDENCE: did this diff reduce, keep, or increase the feature's bug surface?
 - The operator's rule applied as a review axis: a diff that GROWS the feature is a stop —
   a branch, flag, special case, second code path or cross-feature reach-in added by a fix
   is a layer; name it and recommend the replace-don't-layer shape instead.
-- A fix whose `caused_by` names a culprit, or that lands on a unit already fixed in the window, is the REBUILD of that unit under `refactor(bugs)`; a `fix(bugs)` label there is REJECTED.
+- A fix whose `caused_by` names a commit: inspect it (LINEAGE §Read persisted facts); a `fix(bugs)` label where `specs/bugs/AGENTS.md` §2 requires a REBUILD is REJECTED.
 
 ## 4a. The root-cause and approval bars
 
 - A fix qualifies only when it reproduces the failure on the executed path, tests for the real reason, fixes the cause and proves it green — a workaround or symptom patch is a finding.
 - The verdict is the enum `APPROVED`/`REJECTED`: on a worktree, written by `verdict.py` (`worktrees/AGENTS.md` §2); on a PR, returned as text the main thread quotes (`dd-gitflow-default` §3b).
-- The first review of a fix sweeps the fixed pattern across the context's repos and states the grep with its hit count; a net-positive fix states its reason, else it is a finding.
-- A verdict whose evidence lacks the implementer's run of the tests the change reaches (the dirs `python scripts/impact.py <W:>` prints) is refused.
+- The first review of a fix sweeps the fixed pattern across the context's repos and states the grep with its hit count; a net-positive fix states its reason, else it is a finding; a verdict whose evidence lacks the implementer's run of the tests the change reaches (`dd-release-implementation` §3) is REJECTED.
 - A green internal gate that diverges from real consumer behavior is itself a bug.
 - A reviewer probe runs in scratch only: a copy of the context, with the live workspace root listed in `DADAIA_FENCED_ROOTS`; an explicit `--specs` path bypasses that fence, so every explicit path must point into the copy; never `doctor --fix`. A probe that reaches the live workspace is a finding.
 
