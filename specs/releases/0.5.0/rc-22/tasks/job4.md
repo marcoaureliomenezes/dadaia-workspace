@@ -12,10 +12,11 @@ Wave IV. Each task that fixes a recorded bug, or lands on a unit already fixed i
 
 **Main-thread rulings (2026-10-22).**
 1. R40 test-path fallback (X06, AC6.4). The one rule is `_is_test_path`'s single predicate: a path is a test path when it lies in a `tests` folder at any depth or has a test-named file name, and never when it is inside a tooling dot-folder. The root-only `tests/` prefix is the loser. The dot-folder clause stays inside the rule, because deleting it re-opens the resolved `tests-fallback-classes-test-named-ci-files-as-tests` (4e853dfd3), which `test__worktree_end.py` `test_a_workflow_file_named_test_is_not_a_test_when_no_tests_line_is_declared` pins.
-2. R40 never-opened path (AC6.1).
-   - SPEC AC6.1 governs `test_merge_of_a_path_with_no_tree_and_no_branch_claims_no_merge_and_exits_0`. Its exit-0 assert flips to the refusal in a J4.T2 `test(...)` commit that names this ruling.
-   - `test_a_finished_task_merge_reruns_clean_after_its_job_landed` keeps its contract. `merge` therefore tells a landed task from a never-opened path by reading git (the task's commits reachable from a live ancestor branch), never from absence.
-   - If no git-readable fact separates the two without a new stored mechanism, the implementer stops and reports.
+2. R40 never-opened path (AC6.1, amended after J4.T2 showed that git cannot tell a landed task from a never-opened one once its parent is gone).
+   - AC6.1's first sentence governs both pins: a path with no tree and no branch, landed or never opened, is never success. `merge` refuses with one fix line, specific to the path (the `worktree new` that opens it), so the generic-fix-line bug fixed in cac2ec646 stays fixed.
+   - `test_merge_of_a_path_with_no_tree_and_no_branch_claims_no_merge_and_exits_0` and `test_a_finished_task_merge_reruns_clean_after_its_job_landed` flip to that refusal in one J4.T2 `test(...)` commit that names this ruling.
+   - No stored mechanism and no reflog read.
+   - A caller that relies on a rerun exiting 0 is named by the implementer before the source lands.
 3. R40 tracked ledger scripts (Q2 i). The tracked-script pins in `test__worktree_end__tree_ledgers.py` go with `_tracked` in J4.T3.
 4. R42.
    - SPEC AC5.2 replaces the `main_checkout` sentinel pin (J4.T5 RED).
