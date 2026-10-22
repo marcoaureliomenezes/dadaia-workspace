@@ -50,9 +50,8 @@ def _embeds_line_or_label(call: ast.Call, spelled: set[str]) -> bool:
         for node in ast.walk(arg):
             if _spells(node) or (isinstance(node, ast.Name) and node.id in spelled):
                 return True
-            if isinstance(node, ast.Constant) and isinstance(node.value, str):
-                if "action:" in node.value.lower():
-                    return True
+            if isinstance(node, ast.Constant) and "action:" in str(node.value).lower():
+                return True
     return False
 
 
