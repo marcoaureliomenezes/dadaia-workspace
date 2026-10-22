@@ -1,8 +1,13 @@
 # SLOP.md — detection signals
 
-Disclosed sibling of [`SKILL.md`](SKILL.md), read inside Axis 1 (Standards). The definition
-is one line: slop is what passes the deletion test without loss. Each signal is a
-labelled judgement call with the command that makes it verifiable in the diff.
+Disclosed sibling of [`SKILL.md`](SKILL.md), read inside Axis 1 (Standards).
+
+Slop is any artifact — code, test, text, record, claim or classification — that has the shape of finished work without the evidence of it: made to look right, not shown to be right. Two tests:
+
+- The deletion test: delete the unit; does complexity vanish or reappear across callers? It applies to a file, line, comment, spec sentence, acronym, branch, release, rule or handoff alike.
+- The evidence test: is the claimed result shown by a run, a `path:line` or a sha?
+
+Each signal is a labelled judgement call with the command that makes it verifiable in the diff.
 
 ## Signals
 
@@ -18,6 +23,10 @@ labelled judgement call with the command that makes it verifiable in the diff.
 | S8 | File outside the canon | `git diff --name-status \| grep '^A'` against the root whitelist, the specs canon, the `.dadaia/` canon; `*.bak`, `SUMMARY.md`, `NOTES.md`; `find .dadaia/handoff -mtime +1` | HIGH | Delete, or move to its home |
 | S9 | Commit outside the §3a shapes; surviving branch | `git log --stat` against `dd-gitflow-default` §3a; `git branch -r --merged` | MEDIUM | Rewrite the series before the push; tag and delete |
 | S10 | Second authority: a question answered in two places | a symbol, command or rule answering a PLAN §1.1 question beside its authority; a ratchet allowance key added; an identical paragraph in two files | HIGH | Consult the authority; delete the second |
+| S11 | Unverified claim: "fixed", "unused", "pre-existing", "done" or a count with no run, `path:line`, grep or sha beside it | read each claim in the diff, commit body and report; the evidence named is re-run or opened | HIGH | Run it and cite the output, or delete the claim |
+| S12 | Symptom fit: the fix covers the reported case and leaves the siblings of its pattern unswept | grep the fixed pattern across the repo; each leftover hit; a special case on the reported value | HIGH (bug-surface) | Fix the shared cause once; sweep every hit |
+| S13 | Dishonest label: a REBUILD that is an iteration on the old unit, a "structural" fix that is a patch, a KEEP that grew | compare the commit label and the PLAN verdict with `--stat` and the old unit's surviving lines | HIGH | Relabel to what the diff does, or do the rebuild |
+| S14 | Eval tuned until it passes: the prompt, threshold, fixture or expected value edited after a red run | `git log -p` on the eval and its expected values; a loosened threshold; a case dropped or reworded | HIGH | Restore the eval; fix the artifact it judges |
 
 ## Tests (S3)
 
@@ -31,10 +40,9 @@ labelled judgement call with the command that makes it verifiable in the diff.
 
 ## Lifecycle
 
-- The deletion test: delete the unit; does complexity vanish or reappear across callers? It applies to a file, line, comment, spec sentence, acronym, branch, release, rule or handoff alike.
 - Slop dies in the change that finds it — never commented out, marked, archived or deferred.
 - The writer proves the artifact fails the test, the reviewer applies it, the auditor measures the balance.
 
 ## Verdict rule
 
-- A diff that adds an S4, S5, S8 or S10 finding, or a ratchet allowance key, grows the bug surface: Axis 3 answers "increased" until it is gone.
+- A diff that adds an S4, S5, S8, S10 or S12 finding, or a ratchet allowance key, grows the bug surface: Axis 3 answers "increased" until it is gone.
