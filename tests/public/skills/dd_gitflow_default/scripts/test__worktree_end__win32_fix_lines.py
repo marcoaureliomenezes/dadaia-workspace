@@ -28,7 +28,7 @@ def test_an_open_child_is_named_by_a_command_line(
     child = {"name": "0.5.0/rc-1/job-1/wt-main", "path": "/w/a%b"}
     monkeypatch.setattr(end, "ours", lambda repo: [child])
     with pytest.raises(end.Refusal) as refused:
-        end._open_children(Path("r"), "0.5.0/rc-1/wt-rc")
+        end.open_children(Path("r"), "0.5.0/rc-1/wt-rc")
     assert refused.value.fix == command(*end.LAUNCH, "merge", "/w/a%b", caps=_WIN)
 
 
@@ -37,7 +37,7 @@ def test_an_unmerged_tree_is_named_by_a_command_line(
 ) -> None:
     tree = tmp_path.resolve() / "a%b"
     name = "0.5.0/rc-1/wt-rc"
-    monkeypatch.setattr(end, "_target", lambda root, path: (tmp_path, tree, name, "feature/0.5.0"))
+    monkeypatch.setattr(end, "target", lambda root, path: (tmp_path, tree, name, "feature/0.5.0"))
     monkeypatch.setattr(end, "ours", lambda repo: [{"path": str(tree), "name": name}])
     monkeypatch.setattr(end, "git", lambda *a, **k: "2")
     with pytest.raises(end.Refusal) as refused:
