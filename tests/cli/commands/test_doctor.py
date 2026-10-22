@@ -190,7 +190,6 @@ PLANTS: dict[str, Plant] = {
     "SPEC-DOC-034": Plant(_plant_nothing),
     "FIXED-1": Plant(_plant_fixed_block_gone),
     "FIXED-2": Plant(_plant_fixed_block_drifted),
-    "GITFLOW-1": Plant(_plant_gitflow_gone, {"<specs>": "specs"}),
     "TREE-3": Plant(_plant_missing_memory_document),
     "SPEC-DOC-046": Plant(_plant_legacy_state_name),
 }
@@ -291,8 +290,6 @@ def test_the_fix_line_clears_the_finding_it_was_stamped_on(
     assert not re.search(r"<[^<>]+>", printed.fix), f"{code}: placeholder in {printed.fix}"
     command = _resolve(printed.fix, plant)
     done = run_bash(command, cwd=root, check=False)
-    _git(root, "add", "-A")  # the gates and GITFLOW-1 read what is committed
-    _git(root, "commit", "-qm", "fix", "--allow-empty")
     # `doctor --fix` exits 1 while the fixture's unrelated findings remain; the judge is:
     # re-run the WHOLE doctor — this
     # finding (its message) is gone and the fix created no new error elsewhere.
@@ -328,6 +325,34 @@ def test_gitflow_1_judges_the_committed_constitution_not_the_working_tree(repo: 
     [finding] = _doctor(repo)._coherence.check_gitflow()
     warning = GitSubprocessClient().gitflow(repo)[1]
     assert warning is not None and warning in finding.message
+
+
+def test_gitflow_1_fix_is_one_agent_action_that_commits_and_performing_it_clears_it(
+    repo: Path,
+) -> None:
+    _commit_constitution(repo, committed=False, worktree=False)
+    rule = next(r for r in SPECS_RULES if "GITFLOW-1" in r.codes)
+    (printed, *_) = run_section("specs", [rule], _doctor(repo), None, repo / "specs").findings
+    fix = printed.fix
+    assert fix.startswith("Agent action: ") and fix.count("Agent action:") == 1, fix
+    assert "specs init" in fix and "commit" in fix and "constitution.md" in fix, fix
+    assert not re.search(r"<[^<>]+>", fix), fix
+
+    with pytest.MonkeyPatch.context() as mp:
+        mp.chdir(repo)
+        CliRunner().invoke(app, ["specs", "init", "--specs-dir", str(repo / "specs")])
+    _git(repo, "add", "specs/constitution.md")
+    _git(repo, "commit", "-qm", "gitflow")
+    assert _doctor(repo)._coherence.check_gitflow() == []
+
+
+def test_the_no_gitflow_warning_names_the_committed_constitution_and_hints_nothing(
+    tmp_path: Path,
+) -> None:
+    _git(tmp_path, "init", "-q")
+    warning = GitSubprocessClient().gitflow(tmp_path)[1]
+    assert warning is not None and "no committed specs/constitution.md" in warning
+    assert "hint:" not in warning
 
 
 def test_spec_doc_046_never_clobbers_a_canonical_state_file(repo: Path) -> None:

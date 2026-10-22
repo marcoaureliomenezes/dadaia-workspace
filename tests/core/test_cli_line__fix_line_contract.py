@@ -524,7 +524,6 @@ PLANTS: dict[str, Callable[[Path], None]] = {
     "SPEC-DOC-034": _plant_nothing,
     "FIXED-1": _plant_fixed_block_gone,
     "FIXED-2": _plant_fixed_block_drifted,
-    "GITFLOW-1": _plant_gitflow_gone,
     "TREE-3": _plant_missing_memory_document,
     "SPEC-DOC-046": _plant_legacy_state_name,
 }
@@ -630,8 +629,6 @@ def _clears(
     )
     assert not dead, f"{code}: the finding cites a verb that does not exist: {dead}"
     done = run_bash(first["fix"], cwd=root, check=False)
-    _tree_git(root, "add", "-A")  # the gates and GITFLOW-1 read what is committed
-    _tree_git(root, "commit", "-qm", "fix", "--allow-empty")
     after = _keys(_findings(root))
     assert (first["code"], first["message"], first["verdict"] == "error") not in after, (
         f"{code}: survives\n{first['fix']}\n{done.stderr}"
@@ -649,6 +646,27 @@ def _agent_action(ws: Path, code: str) -> str:
     for finding in found:
         assert finding["fix"].startswith("Agent action: ") and str(root) in finding["fix"]
     return f"fix: {found[0]['fix']}"
+
+
+def _gitflow_1(ws: Path) -> str:
+    """The fix is one Agent action naming `specs init` and the commit; performing both clears
+    the finding with no new error."""
+    root = _specs_tree(ws, _plant_gitflow_gone, commit=True)
+    before = _findings(root)
+    first = next((f for f in before if f["code"] == "GITFLOW-1"), None)
+    assert first, "GITFLOW-1: the fixture did not make the rule fire"
+    fix = first["fix"]
+    assert fix.startswith("Agent action: ") and fix.count("Agent action:") == 1, fix
+    assert "specs init" in fix and str(root / "specs") in fix, fix
+    assert "commit" in fix and "constitution.md" in fix, fix
+    with contextlib.chdir(root):
+        CliRunner().invoke(app, ["specs", "init", "--specs-dir", str(root / "specs")])
+    _tree_git(root, "add", "specs/constitution.md")
+    _tree_git(root, "commit", "-qm", "gitflow")
+    after = _keys(_findings(root))
+    assert ("GITFLOW-1", first["message"], False) not in after, f"GITFLOW-1 survives\n{fix}"
+    assert not {f for f in after - _keys(before) if f[2]}, "GITFLOW-1: the fix created an error"
+    return f"fix: {fix}"
 
 
 def _law_is_rendered(root: Path) -> None:
@@ -692,6 +710,7 @@ SITES |= {
         for code in AGENT_ACTION
     },
     "doctor-specs-WORKTREE": _worktree,
+    "doctor-specs-GITFLOW-1": _gitflow_1,
     # a raw ``specs/AGENTS.md`` (the template an older ``specs init`` copied) is flagged
     # refreshable; its fix renders the law.
     "doctor-specs-TREE-5-raw-law": lambda ws: _clears(
