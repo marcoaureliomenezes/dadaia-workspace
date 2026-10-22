@@ -178,3 +178,13 @@ def test_both_status_readers_return_the_same_token(text: str, expected: str | No
     never count; absent is None; the kernel and the release script agree."""
     script = load_owner("dd-release-implementation", "_release_schema").extract_status
     assert _GRAMMAR.extract_status(text) == script(text) == expected
+
+
+def test_a_log_the_schema_refuses_names_no_active_release(tmp_path: Path) -> None:
+    specs = _specs(tmp_path, "IMPLEMENTATION", [1])
+    assert resolve_active_release(specs) == (None, None)
+
+
+def test_the_doctor_reports_a_log_the_schema_refuses_and_never_crashes(tmp_path: Path) -> None:
+    specs = _specs(tmp_path, "IMPLEMENTATION", [1])
+    assert SpecsDoctor(specs).check()

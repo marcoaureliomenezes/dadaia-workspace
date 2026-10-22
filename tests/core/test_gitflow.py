@@ -87,6 +87,13 @@ def test_an_unreadable_state_names_no_live_candidate(tmp_path: Path) -> None:
     assert resolve_live_candidate(tmp_path) is None
 
 
+def test_a_log_the_schema_refuses_names_no_live_candidate(tmp_path: Path) -> None:
+    release = tmp_path / "releases" / "0.5.0"
+    (release / "rc-1").mkdir(parents=True)
+    write_text(release / "_RELEASE.json", json.dumps({"phase": "IMPLEMENTATION", "log": [1]}))
+    assert resolve_live_candidate(tmp_path) is None
+
+
 @pytest.mark.parametrize(
     ("branch", "role"),
     [
