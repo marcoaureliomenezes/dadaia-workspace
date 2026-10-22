@@ -17,8 +17,7 @@ completed agent task; the HTML report is the exception, not the rule.
 1. Open `.dadaia/handoff/AGENTS.md` (the area's scoped law) and follow it.
 2. Resolve the workspace root: walk up from cwd to the nearest ancestor holding
    `.dadaia/states/spec_contexts.json` — write under that root only, since a second `.dadaia/` splits workspace state.
-3. Report mode only per `.dadaia/handoff/AGENTS.md`.
-4. Report mode first writes the HTML to
+3. Report mode first writes the HTML to
    `.dadaia/reports/<context>/<UTC>-<agent>-<slug>.html`, then captures
    `sha256sum <report>` as `artifact.content_hash`.
 5. Assemble the handoff field-by-field against
@@ -27,10 +26,7 @@ completed agent task; the HTML report is the exception, not the rule.
 6. The file name stamp and `produced_at` come from one clock read: `python3 -c "import datetime as d; print(d.datetime.now(d.UTC).strftime('%Y-%m-%dT%H%M%SZ'))"`; `produced_at` is that instant with colons (`YYYY-MM-DDTHH:MM:SSZ`, the schema's pattern). Any other date names its source: `git` or the clock.
    Write `.dadaia/handoff/<context>/<YYYY-MM-DDTHHMMSSZ>-<agent>-<slug>.handoff.json` (2-space indent) and run `.dadaia/.venv/bin/dadaia reports validate <path>`;
    fix any non-zero exit before moving on.
-7. A reviewer verdict is written only by `python3 .agents/skills/dd-handoff-emitter/scripts/verdict.py <worktree> --sha <sha> --context <ctx>
-   --slug <slug> --verdict APPROVED|REJECTED --reason "<line>"`, the rest of the body as one JSON
-   object on stdin; it binds the verdict to the diff it judged, writes it to `.dadaia/states/verdicts/<context>/` and validates the file against the
-   reviewed tree before accepting it. A validation refusal leaves no file and prints one `fix:` line; the path it prints is the verdict.
+7. A reviewer verdict is written only by `python3 .agents/skills/dd-handoff-emitter/scripts/verdict.py` (flags: its `--help`). A refusal leaves no file and prints one `fix:` line; the path it prints is the verdict.
 
 **Done when** the handoff file exists at that exact path shape, `.dadaia/.venv/bin/dadaia reports
 validate` exits 0 on a non-verdict handoff, and (report mode) `artifact.content_hash` matches the file on disk; a verdict is done when `verdict.py` prints its path, having validated it against the reviewed tree.
@@ -52,4 +48,4 @@ validates.
 - `.dadaia/agentic/schemas/handoff-v1.schema.json` — field list, types, enums,
   patterns, `schema_version` posture.
 - `python3 .agents/skills/dd-handoff-emitter/scripts/verdict.py --help` — the verdict writer's flags.
-- `python3 .agents/skills/dd-handoff-emitter/scripts/verdict.py stats <M.m.p>-rc<N>` — the candidate's readout table: local metrics 1, 2, 4, 6, 7 and 9, each beside its target, and the oldest record read; it refuses any release state `release.py check` refuses, so run it after the memory pass, since check refuses CLOSURE until that pass is recorded.
+- `python3 .agents/skills/dd-handoff-emitter/scripts/verdict.py stats <M.m.p>-rc<N>` — the candidate's readout table, each metric beside its target (metric names: its `--help`); it refuses any release state `release.py check` refuses, so run it after the memory pass.

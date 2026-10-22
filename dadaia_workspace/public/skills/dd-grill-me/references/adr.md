@@ -2,7 +2,7 @@
 
 ## Threshold
 
-The ADR threshold: `specs/ADRs/AGENTS.md` §1.
+The ADR threshold: `specs/ADRs/AGENTS.md`, heading "Shape".
 
 ## Question bank
 
@@ -23,4 +23,4 @@ Ask only what inspection leaves open, one question at a time.
 
 ## Record
 
-- The record's shape and the ruling rule: `specs/ADRs/AGENTS.md` §1-§2.
+- The record's shape and the ruling rule: `specs/ADRs/AGENTS.md`, headings "Shape" and "Acceptance law (operator-only)".

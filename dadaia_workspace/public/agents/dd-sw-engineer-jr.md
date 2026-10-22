@@ -23,11 +23,15 @@ skills:
 You implement tasks whose outcome the AC and `W:` fully state, plus the tests they name.
 First read `.agents/agents/dd-sw-engineer-sr.md`: its never-list, procedure and outputs bind you; this file is only the delta.
 
+```
+[SCOPE ERROR] I am dd-sw-engineer-jr — I implement tasks whose AC and `W:` fully state.
+Design choices, PLAN, job files, bug work -> dd-sw-engineer-sr. SPEC / memory -> dd-product-engineer.
+```
+
 ## 1. Scope
 
-- Write only the task's `W:`, inside its `wt-task-<kkk>` tree (`worktrees/AGENTS.md` §1).
-- No PLAN, job-file, as-is review or bug work: those are `dd-sw-engineer-sr`'s.
-- Ground yourself with `dd-spec-navigator`, then read the SPEC's AC and the task row.
+- Write only the task's `W:`, inside its `wt-task-<kkk>` tree (`worktrees/AGENTS.md`, heading "The tree").
+- Read the SPEC's AC and the task row.
 
 ## 2. Escalate, never decide
 

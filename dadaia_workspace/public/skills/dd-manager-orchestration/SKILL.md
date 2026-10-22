@@ -8,7 +8,7 @@ description: >
 
 ## 1. Dispatch protocol
 
-1. The main thread dispatches the five roles; resolve the target agent from the root `AGENTS.md` map §2. Research and extraction go to `dd-researcher`, never `Explore` or `general-purpose`.
+1. Resolve the target agent from the root `AGENTS.md`, heading "Who does what". Research and extraction go to `dd-researcher`, never `Explore` or `general-purpose`.
 2. Only the main thread calls other agents; route a leaf's returned handoff to its `next_handoff.agent`.
 3. Open every dispatch prompt with this block:
 
@@ -19,10 +19,10 @@ description: >
    task_id: <J<n>.T<k> or the review target>
    worktree: <path>
    ```
-4. Reports land where the root `AGENTS.md` map §4 says; a report feeding another agent gets a handoff under `.dadaia/handoff/<context>/`.
-5. Open, merge, clean and sync worktrees with `.dadaia/.venv/bin/dadaia worktree new|merge|clean|sync` (`worktrees/AGENTS.md`).
-6. The task is the unit of dispatch, never a job: sub-agents work disjoint tasks in parallel, one `wt-task-<kkk>` tree each (`worktrees/AGENTS.md` §1).
-7. Dispatch by the job file's `who:` (shape rule: `dd-release-definition` §5): `sr` → dd-sw-engineer-sr, `jr` → dd-sw-engineer-jr, `pe`/`cr` → the owning persona. Pass no model; the installed template decides.
+4. Reports land where the root `AGENTS.md`, heading "Where things are written", says; a report feeding another agent gets a handoff under `.dadaia/handoff/<context>/`.
+5. Open, merge and clean worktrees with `.dadaia/.venv/bin/dadaia worktree` (verbs: its `--help`; rules: `worktrees/AGENTS.md`).
+6. The task is the unit of dispatch, never a job: sub-agents work disjoint tasks in parallel, one `wt-task-<kkk>` tree each (`worktrees/AGENTS.md`, heading "The tree").
+7. Dispatch by the job file's `who:` (shape rule: `dd-release-definition`, heading "The job file — tasks"): `sr` → dd-sw-engineer-sr, `jr` → dd-sw-engineer-jr, `pe`/`cr` → the owning persona. Pass no model; the installed template decides.
 8. A REJECTED verdict whose finding names a `jr` task re-dispatches that task to dd-sw-engineer-sr.
 9. A ruling carries its reproduction and a consumer sweep across every repo of the context.
 10. A rework brief names the finding's contract class, requires its RED test first and a sweep of every other site of the class, and carries the bug history to read, the seams with evidence and the merge hazards with sibling jobs.
@@ -33,11 +33,11 @@ description: >
 
 ## 2. Conflict resolution
 
-1. Resolve a decision by domain with the Decision Authority table (§3); evidence
+1. Resolve a decision by domain with the "Decision authority" table below; evidence
    means `file:line`, spec citation, command output, or handoff field.
 2. On a two-agent deadlock: each agent states its position with evidence in the `findings` of its handoff or verdict; the main thread writes a synthesis naming the exact decision point.
-3. Still unresolved: before launch, call `dd-grill-me` and reflect the operator's answer in SPEC, PLAN, job files, ADR, or memory per the phase; after launch, decide by law, ADRs and rulings (a failing old test: the root map §1 test line) and log it with the label `dd-grill-me` gives an unruled default.
-4. Between launch and the closure report to the operator the main thread asks nothing: every question belongs to `dd-grill-me` before launch. An act the law reserves to the operator, and a bug proposal, wait for the closure report as one batch while independent tasks continue; the exception is a block-list bug (`specs/bugs/AGENTS.md` §2, a security finding included), put to the operator at once since it stops every merge.
+3. Still unresolved: before launch, call `dd-grill-me` and reflect the operator's answer in SPEC, PLAN, job files, ADR, or memory per the phase; after launch, decide by law, ADRs and rulings (a failing old test: the root `AGENTS.md`, heading "The flow", test line) and log it with the label `dd-grill-me` gives an unruled default.
+4. Between launch and the closure report to the operator the main thread asks nothing: every question belongs to `dd-grill-me` before launch. An act the law reserves to the operator, and a bug proposal, wait for the closure report as one batch while independent tasks continue; the exception is a block-list bug (`specs/bugs/AGENTS.md`, heading "Resolution", a security finding included), put to the operator at once since it stops every merge.
 
 ## 3. Reference tables
 
@@ -52,7 +52,7 @@ description: >
 ### Escalation triggers — a report line, not a wait
 
 1. Required SPEC/PLAN/job files or a resolvable `_RELEASE.json` `phase` missing or not
-   approved (the `specs/AGENTS.md` §3 precondition fails: `phase` is not `IMPLEMENTATION`, or `python3 .agents/skills/dd-release-implementation/scripts/release.py check --specs <specs-dir>` exits non-zero on the job files; a `wt-hotfix` lane, or a block-list fix on a closed `wt-rc`, under `specs/bugs/AGENTS.md` §2 needs only its open bug).
+   approved (the `specs/AGENTS.md` precondition, heading "Before implementing", fails; a `wt-hotfix` lane, or a block-list fix on a closed `wt-rc`, under `specs/bugs/AGENTS.md`, heading "Resolution", needs only its open bug).
 2. A CRITICAL security issue.
 3. A dispatched agent returns `[SCOPE ERROR]`.
 4. Three or more unresolved conflicts open.
@@ -64,12 +64,11 @@ description: >
 |---|---|
 | Chain agents only through the main thread | Every hand-off stays traceable |
 | Merge a task only with its validation evidence | Acceptance is checked |
-| Merge a `wt-main`, `wt-rc` or lane tree (`wt-backlog-*`, `wt-hotfix-*`), deploy or close only after the reviewer's `APPROVED` | `worktrees/AGENTS.md` §2 |
-| Edit production files only inside the tree its task names; a bug fix, where `specs/bugs/AGENTS.md` §2 says | The edit then passes its tree's merge checks and review. |
+| Merge only as `worktrees/AGENTS.md`, heading "Merges, gates, review", says | One gate, one home |
+| Edit production files only inside the tree its task names; a bug fix, where `specs/bugs/AGENTS.md`, heading "Resolution", says | The edit then passes its tree's merge checks and review. |
 | Land an edit inside an open job as one of its tasks | Micro-dispatch: the ritual wait it adds outweighs the edit |
-| Keep private/project-specific details out of public assets | Security and portability |
 
 ## 4. Done when
 
-- Every `wt-main`, `wt-rc` or lane merge names an APPROVED verdict file; every dispatch prompt carries that block.
+- Every merge meets its gate (the first row of the table above); every dispatch prompt carries the block of step 3.
 - Every conflict either resolved via evidence-based authority or reported.
