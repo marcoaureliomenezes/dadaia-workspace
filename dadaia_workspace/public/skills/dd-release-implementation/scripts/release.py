@@ -25,7 +25,7 @@ sys.path[:0] = [
 import _findings
 import _ledger
 from _clock import now_iso as utc_now
-from _grammar import SHA_RE, STATE
+from _grammar import STATE
 from _platform import Undecodable, act, read_text, use_utf8_stdio
 from _platform import replace as move
 from _refusal import Refusal, report
@@ -42,7 +42,6 @@ from _release_schema import (
 from _release_store import (
     SCRIPT,
     Live,
-    at_head,
     commit,
     live_release,
     open_bug_ids,
@@ -81,8 +80,6 @@ def _parser() -> argparse.ArgumentParser:
             command.add_argument("--origin", default="operator-demand", help=_ORIGIN_GRAMMAR)
         if verb == "phase":
             command.add_argument("phase", help="IMPLEMENTATION or CLOSURE")
-        if verb in ("phase", "ship"):
-            command.add_argument("--sha", required=True, help="the commit the milestone names")
         if verb == "ship":
             command.add_argument("--pr", help="the merged promote PR number, when the host has one")
             command.add_argument(
@@ -129,7 +126,7 @@ def _origin(spec: Path) -> int:
 
 
 def _phase(args: argparse.Namespace, specs: Path) -> int:
-    release_id, ts = set_phase(specs, args.phase.upper(), args.sha)
+    release_id, ts = set_phase(specs, args.phase.upper())
     print(f"[ok] release {release_id} -> phase {args.phase.upper()} ({ts})")
     return 0
 
@@ -229,26 +226,22 @@ def _record_ship(args: argparse.Namespace, specs: Path, live: Live, ts: str) -> 
         raise Refusal(f"the ship ledger would not pass check: {errors[-1]['message']}",
                       SCRIPT("check"))  # fmt: skip
     commit(live.release_dir / STATE, f"releases/{live.release_id}/{STATE}",
-           lambda s: {**s, "shipped": {"sha": args.sha, "pr": int(args.pr) if args.pr else None, "ts": ts}})  # fmt: skip
+           lambda s: {**s, "shipped": {"pr": int(args.pr) if args.pr else None, "ts": ts}})  # fmt: skip
     _ledger.replace(histo, kept + line)
     move(live.release_dir, specs / "releases" / "_archive" / live.release_id)
 
 
 def _ship(args: argparse.Namespace, specs: Path) -> int:
-    """CLOSURE -> shipped {sha, pr, ts}, one `delivered` histo line, the whole directory
+    """CLOSURE -> shipped {pr, ts}, one `delivered` histo line, the whole directory
     moved to `_archive/<v>/`, never deleted; refused on any `ship_findings`."""
     live, ts = live_release(specs), utc_now()
-    if not (SHA_RE.match(args.sha) and (args.pr is None or args.pr.isdigit() and int(args.pr) > 0)):
-        raise choice(Refusal(f"--sha {args.sha!r} / --pr {args.pr!r}: a hex sha and, if given, a PR number",
-                             SCRIPT("ship", "--sha", args.sha) if SHA_RE.match(args.sha) else at_head(specs, "ship")), SHIP_PR)  # fmt: skip
+    if not (args.pr is None or args.pr.isdigit() and int(args.pr) > 0):
+        raise choice(Refusal(f"--pr {args.pr!r}: a PR number, when the host has one", SCRIPT("ship")), SHIP_PR)  # fmt: skip
     if found := ship_findings(specs):
         raise Refusal(found[0]["message"], found[0]["fix"])
     _refuse_unauthorized(_allowed_open_bugs(args, specs), live.state)
     _record_ship(args, specs, live, ts)
-    print(
-        f"[ok] release {live.release_id} shipped at {args.sha}"
-        + (f" (PR #{args.pr})" if args.pr else "")
-    )
+    print(f"[ok] release {live.release_id} shipped" + (f" (PR #{args.pr})" if args.pr else ""))
     return 0
 
 
@@ -264,19 +257,22 @@ def main(argv: list[str] | None = None) -> int:
     specs = find_specs(args.specs, ledger=None if reads else f"specs/releases/{STATE}")
     if args.verb == "check":
         findings = check(specs)
-        errors = [f for f in findings if f["verdict"] == "error"]
         origin_rows = [f for f in findings if f["message"].startswith("Origin ")]
         publish_origin = bool(origin_rows) and all(
             f["verdict"] == "info" and f["message"].endswith(" traced") for f in origin_rows
         )
-        json_findings = [
-            f
-            for f in findings
-            if f["verdict"] == "error" or (publish_origin and f["message"].startswith("Origin "))
-        ]
         # JSON adds Origin trace information; only errors control the exit status.
-        print(json.dumps(json_findings, indent=2)) if args.json else _findings.print_text(findings)
-        return 1 if errors else 0
+        _findings.run_check(
+            [
+                f
+                for f in findings
+                if f["verdict"] == "error" or (publish_origin and f in origin_rows)
+            ]
+            if args.json
+            else findings,
+            as_json=args.json,
+        )
+        return int(any(f["verdict"] == "error" for f in findings))
     try:
         return _VERBS[args.verb](args, specs)
     except (Refusal, drift.Refusal) as refusal:

@@ -14,12 +14,12 @@ from typing import Any
 
 import _clock
 import _git
-from _grammar import APPROVED, SHA_RE, STATE, extract_status
+from _grammar import APPROVED, STATE, extract_status
 from _platform import act, command, read_text, run
 from _refusal import Refusal, fix_of
 from _release_check import candidate_errors
 from _release_schema import CANDIDATE_DOCS, CLOSURE, DEFINITION, IMPLEMENTATION, PHASES
-from _release_store import SCRIPT, Live, State, at_head, commit, live_release
+from _release_store import SCRIPT, Live, State, commit, live_release
 from _specs import choice
 
 #: DEFINITION is `new`'s; each later phase has one predecessor (out-of-order = re-run).
@@ -109,20 +109,15 @@ SHIP_PR = "with --pr set to the promote PR's number, when the host has one"
 SUPPLY = {CLOSURE: SHIP_PR}
 
 
-def set_phase(specs: Path, phase: str, sha: str) -> tuple[str, str]:
+def set_phase(specs: Path, phase: str) -> tuple[str, str]:
     """Move the live release to *phase* and stamp its milestone."""
-    if not SHA_RE.match(sha):
-        raise Refusal(
-            f"--sha {sha!r} is not a commit sha",
-            at_head(specs, "phase", phase),
-        )
     live = live_release(specs)
     current = str(live.state.get("phase"))
     if PREDECESSOR.get(phase) != current:
         refusal = Refusal(
             f"release {live.release_id} is in phase {current!r} — `phase` writes "
             f"{IMPLEMENTATION} after {DEFINITION} and {CLOSURE} after {IMPLEMENTATION}, once each",
-            SCRIPT(*NEXT.get(current, "check").split(), "--sha", sha),
+            SCRIPT(*NEXT.get(current, "check").split()),
         )
         raise choice(refusal, SUPPLY.get(current, ""))
     ts, candidate = _clock.now_iso(), live.candidate
@@ -138,11 +133,10 @@ def set_phase(specs: Path, phase: str, sha: str) -> tuple[str, str]:
 
     def apply(state: State) -> State:
         # The slot is the live candidate's stamp; the `milestone` entry is its history .
-        state[milestone] = {"sha": sha, "ts": ts}
+        state[milestone] = {"ts": ts}
         state.setdefault("log", []).append({
             "ts": ts, "agent": "release.py", "kind": "milestone", **rc,
-            "milestone": milestone, "sha": sha,
-            "text": f"Candidate {milestone} at {sha}; phase {phase}."})  # fmt: skip
+            "milestone": milestone, "text": f"Candidate {milestone}; phase {phase}."})  # fmt: skip
         state["phase"] = phase
         return state
 

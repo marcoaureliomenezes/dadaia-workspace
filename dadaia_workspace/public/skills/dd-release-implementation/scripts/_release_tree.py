@@ -15,7 +15,7 @@ from typing import Any
 
 import _findings
 import _memory_drift as drift
-from _grammar import SEMVER_RE, SHA_RE, STATE, sole_live
+from _grammar import SEMVER_RE, STATE, sole_live
 from _ledger import records
 from _platform import act, read_text
 from _refusal import Refusal
@@ -33,7 +33,7 @@ from _release_schema import (
     origin,
     origin_line,
 )
-from _release_store import SCRIPT, Live, at_head, live_release
+from _release_store import SCRIPT, Live, live_release
 from _specs import script
 
 __all__ = ["check", "drift", "memory_errors", "ship_findings", "tree_findings"]
@@ -176,9 +176,7 @@ def _origin_findings(specs: Path) -> list[dict[str, Any]]:
     return out + [_origin_row(specs, spec, line, live, swept, row) for row in rows]
 
 
-def _definition_findings(
-    state: dict[str, Any], rel: str, candidate: Path, specs: Path
-) -> list[dict[str, Any]]:
+def _definition_findings(state: dict[str, Any], rel: str, specs: Path) -> list[dict[str, Any]]:
     """DEFINITION implements nothing: a closure entry logged after the live candidate's
     birth note means the phase verb was never run."""
     log = state["log"]
@@ -187,12 +185,7 @@ def _definition_findings(
              for e in log[born + 1:] if e["kind"] not in ("note", "milestone", "merge")]  # fmt: skip
     if not found:
         return []
-    try:  # `defined` is the commit that approved the SPEC and PLAN, never HEAD: impl commits follow it
-        docs = [str(candidate / n) for n in ("SPEC.md", "PLAN.md")]
-        sha = drift.git(specs.parent, "log", "-1", "--format=%h", "--", *docs)[0]
-        fix: str = SCRIPT(*NEXT["DEFINITION"].split(), "--sha", sha, specs=specs)
-    except (drift.Refusal, OSError, IndexError):  # no history, no git binary
-        fix = act("agent", f"run `{NEXT['DEFINITION']}` at the commit approving {candidate}")
+    fix = SCRIPT(*NEXT["DEFINITION"].split(), specs=specs)
     return [_findings.finding(CODE, rel, 1, "; ".join(found), fix)]
 
 
@@ -211,7 +204,7 @@ def _directory_findings(release_dir: Path, specs: Path) -> list[dict[str, Any]]:
             for path, message, fix in (candidate_errors(candidate) if candidate else [])
             if not (phase == CLOSURE and MEMORY_WRITE in message)]  # fmt: skip
     if phase not in TRIO_PHASES:
-        return (_definition_findings(state, f"{dir_rel}/{STATE}", candidate, specs)
+        return (_definition_findings(state, f"{dir_rel}/{STATE}", specs)
                 if candidate else []) + jobs  # fmt: skip
     missing = [n for n in CANDIDATE_DOCS if not (candidate and (candidate / n).is_file())]
     if candidate is None or missing:
@@ -292,11 +285,10 @@ def tree_findings(specs: Path) -> list[dict[str, Any]]:
                                     act("agent", f"{rewrite}object, from git history")))  # fmt: skip
             continue
         shipped = state.get("shipped") if isinstance(state, dict) else None
-        if not (isinstance(shipped, dict) and SHA_RE.match(str(shipped.get("sha")))
-                and "pr" in shipped and isinstance(shipped["pr"], int | None)):  # fmt: skip
-            findings.append(_findings.finding(CODE, rel, 1, "archived release carries no shipped {sha, pr}",
+        if not (isinstance(shipped, dict) and "pr" in shipped and isinstance(shipped["pr"], int | None)):  # fmt: skip
+            findings.append(_findings.finding(CODE, rel, 1, "archived release carries no shipped {pr}",
                                     act("agent", f"{rewrite}object whose shipped names the "
-                                    "merged promote PR's sha")))  # fmt: skip
+                                    "merged promote PR")))  # fmt: skip
     return findings
 
 
@@ -316,7 +308,7 @@ def ship_findings(specs: Path) -> list[dict[str, Any]]:
     if phase != "CLOSURE":
         found.append(_findings.finding(CODE, rel, 1, f"release {live.release_id} is in phase {phase!r} — "
                      "only a CLOSURE release ships",
-                     at_head(specs, *NEXT.get(phase, "check").split())))  # fmt: skip
+                     SCRIPT(*NEXT.get(phase, "check").split())))  # fmt: skip
     if (archive := specs / "releases" / "_archive" / live.release_id).exists():
         found.append(_findings.finding(CODE, rel, 1, f"release {live.release_id} is live and already "
                      f"archived at {archive}", act("agent", f"decide which of "
