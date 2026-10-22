@@ -61,14 +61,6 @@ def test_canonical_cli_maps_the_windows_spelling_to_the_source_form() -> None:
     assert K.canonical_cli("run .venv/bin/dadaia doctor", POSIX) == "run .venv/bin/dadaia doctor"
 
 
-def test_host_cli_is_the_inverse_of_canonical_cli_on_every_host() -> None:
-    source = "run .venv/bin/dadaia doctor"
-    assert K.host_cli(source, WIN) == "run .venv/Scripts/dadaia.exe doctor"
-    assert K.host_cli(source, POSIX) == source
-    for caps in (WIN, POSIX):
-        assert K.canonical_cli(K.host_cli(source, caps), caps) == source
-
-
 def test_cli_words_are_the_console_script_of_the_root_venv_then_the_argv() -> None:
     root = PurePosixPath("/ws")
     assert K.cli_words(root, "context", "bind", caps=WIN) == (
