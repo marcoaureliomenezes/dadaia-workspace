@@ -232,6 +232,12 @@ def test_a_command_that_writes_no_verdict_is_never_judged(command: str) -> None:
         _VERDICT_RUN.replace("--verdict", ">&2 --verdict"),
         _VERDICT_RUN.replace("--verdict", "--reason see-x/y#L10 --verdict"),
         "python3 -mverdict /t --sha a --context c --slug s --verdict APPROVED --reason r",
+        f"bash -c '{_VERDICT_RUN}'",
+        f'sh -c "{_VERDICT_RUN}"',
+        "F='python3 .agents/skills/dd-handoff-emitter/scripts/verdict.py'; $F /t --sha a --context c --slug s --verdict APPROVED --reason r",
+        f"echo $({_VERDICT_RUN})",
+        f"x=`{_VERDICT_RUN}`",
+        "python3 -c \"import runpy,sys; sys.argv=['v','/t','--verdict','APPROVED']; runpy.run_path('.agents/skills/dd-handoff-emitter/scripts/verdict.py', run_name='__main__')\"",
     ],
 )
 def test_a_command_that_runs_the_writer_with_the_flag_is_refused_in_any_shell_position(
