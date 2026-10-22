@@ -37,6 +37,13 @@ The operator's words:
   - R4: "Medido + re-auditoria (Recommended)".
   - R5: "Corrigir os graders (Recommended)".
   - Summary: "Confirmo, segue (Recommended)".
+- As-is rulings 2026-10-22 (handoff `2026-10-22T072837Z-main-thread-asis-rulings`; the ten questions ruled by law are its `findings`):
+  - ADR 0280: "Aceito a ADR 0280 (Recommended)".
+  - F047: "Pode trocar pelo ponteiro (Recommended)".
+  - Q1: "Teste de token (Recommended)".
+  - Q3: "Ordeno (a)–(d) (Recommended)".
+  - Q5: "Ler, sem reescrever (Recommended)".
+  - Q13: "Emendar (Recommended)".
 
 The gap is the audit: 56 findings, its five structural causes (`AUDIT.md` §1.7) and its two single-source passes (§1.5, §2.2). This SPEC cites them by id and never restates them.
 
@@ -49,7 +56,7 @@ The gap is the audit: 56 findings, its five structural causes (`AUDIT.md` §1.7)
 | 3 | bolt-ons and symptom patches in HEAD | 0 (baseline 43) | the re-audit |
 | 4 | fix-induced bugs in the final round | 0 | the re-audit, origin column |
 | 5 | REBUILD share (PILLAR-BUGS metric 9) for records registered after the ADR | 100% (baseline 57%) | the re-audit |
-| 6 | full suite | green on Linux, macOS and Windows at E | the CI run on E (gap G3) |
+| 6 | full suite | every job of the existing CI green at E | the draft promote PR's CI run (AC15.4) |
 | 7 | agentic scorecard | every cell >= 9 from both judges at the frozen tip | `.dadaia/reports/dadaia-workspace/agentic-scorecard/<UTC>/` |
 | 8 | evals on E, fixed graders | T1 3/3, T2 >= 2/3, T3 >= 2/3, `compare.py` prints `non-blocking`; Codex T1–T3 at k=3 as readout | `eval.yml` job summary; the local harbor run |
 | 9 | the operator's validation round | the operator's words, logged | a `_RELEASE.json` note |
@@ -76,7 +83,7 @@ The gap is the audit: 56 findings, its five structural causes (`AUDIT.md` §1.7)
 
 The PLAN carries the waves' rows:
 
-- PLAN §1 holds one row per audit unit (42) and per still-in-HEAD item (43), plus one row per row of the two deletion plans (29 text, 18 code). Those plans and worklists live outside the repo (gap G1).
+- PLAN §1 holds one row per audit unit (42) and per still-in-HEAD item (43), plus one row per row of the two deletion plans (29 text, 18 code). PLAN §1 is their durable home (G1).
 - The PLAN caps parallel agents at 4 (summary).
 - The held lanes `wt-hotfix-init-no-terminal-…` and `wt-hotfix-verdict-act-gate-lexer-…` do not merge. Their RED tests are reused by FR7 and FR8 (summary).
 
@@ -90,7 +97,7 @@ The fixes the window review rates REBUILD are re-worked by the FRs named in its 
 
 ### FR1 — the process ADR in law (R3; F001–F007, F009, F010, F027, F028, F051)
 
-- AC1.1 ADR 0280 (proposed with this SPEC) is accepted by the operator before any wave II task opens. Test: none; `doctor` `LEDGER-ADR-SCHEMA`.
+- AC1.1 ADR 0280 is accepted (`e2097af15`), before any wave II task opens. Test: none; `doctor` `LEDGER-ADR-SCHEMA`.
 - AC1.2 Each of its five clauses lands in one law home, and every other copy of that rule becomes a pointer. The homes: the bugs law §2, `dd-code-review` §4–§4a, `dd-bug-resolution/LINEAGE.md`, `dd-release-definition` §1–§2, and `RELEASE-EVENTS.md`. The deferral line `specs/bugs/AGENTS.md:27` goes. Test: none (law text; the scorecard judges it); FR5 and FR10 own the code halves.
 - AC1.3 F027 and F028 are dispositioned with ADR 0279 and AC1.2 as the reason. F051 is the history of the shapes AC1.2 now enforces at review. Test: none; `audit.py disposition`.
 
@@ -103,7 +110,7 @@ The fixes the window review rates REBUILD are re-worked by the FRs named in its 
 
 - AC3.1 Every text deletion-plan row in PLAN §1 keeps its owner. Each other copy is deleted or becomes a pointer (`<owner> §n`, `<script> --help`). Test: none (text); the existing projection guards stay green.
 - AC3.2 Every divergence F042–F049 names now reads as its owner does. Test: none; the re-audit's text pass.
-- AC3.3 `specs/constitution.md:25,29` (F047) is the operator's text; the main thread puts the pointer to the operator. Test: none.
+- AC3.3 `specs/constitution.md:25,29` (F047) points the harness roster at `dadaia_workspace/core/harness_registry.py`, a wave II task by the operator's F047 answer. Test: none.
 - AC3.4 F050 is resolved by AC3.1, because a pointer leaves nothing to hold equal. No guard is added. Test: none.
 
 ### FR4 — one owner per question, code (F030–F040)
@@ -115,17 +122,18 @@ The fixes the window review rates REBUILD are re-worked by the FRs named in its 
 ### FR5 — REBUILD: the bug ledger kernel (F005, F006, F007, F018, F019, F020, F029, F045)
 
 - AC5.1 A unit's history is the id-line git query. Nothing reads `fix_files` for history. One REBUILD-due decider in `bugs.py` (`append` and `stats` agree) says due on a child after the unit's last REBUILD. Test: unit (`test_bugs.py`).
-- AC5.2 The archive holds one record shape, migrated once. A record clears only by a citing commit, never by archiving. `main_checkout` has no sentinel value. `bugs.py append` takes `--caused-by`. Test: unit.
+- AC5.2 The 124 legacy event lines of `_archive/bugs_histo.jsonl` stay untouched (Q5). One reader recognises the legacy shape from the line itself, and the shape-picking flag is deleted. `resolve` refuses an ambiguous bare task id in `caused_by` and its fix line names the candidate-qualified form; one grammar (Q11). `main_checkout` has no sentinel value. Test: unit.
 
 ### FR6 — REBUILD: worktree merge and its refusals (F013, F017; batch A units 1, 2, 5, 6, 11)
 
 - AC6.1 `merge` reads from git whether a branch is already merged. A missing tree or branch is never success, and a never-opened path refuses with one fix line. Test: unit (`test__worktree_end__removal.py`).
-- AC6.2 An rc merge runs no tree-tracked ledger script. Test: unit.
+- AC6.2 An rc merge runs its ledger checks from the instance's copy only, never a tree-tracked script (Q2). Test: unit.
+- AC6.4 The built-in test-path fallback of the RED separation stays, under one rule; a user repo is never required to declare `tests:` (Q2). Test: unit.
 - AC6.3 Every `dd-gitflow-default` refusal prints a fix line that clears it, the catch-all `worktree.py` GitError line included. FR12's census proves it. Test: unit.
 
 ### FR7 — REBUILD: the verdict-writer gate (F016; open bugs `verdict-act-gate-lexer-lets-…`, `verdict-act-gate-lexer-misses-…`)
 
-- AC7.1 On a harness whose registry row names a subagent key, a non-reviewer cannot write a verdict by any shell form in F016's probe set or in the two open records' repros. Test: unit (`test_gate_policy.py`, the held lane's REDs).
+- AC7.1 On a harness whose registry row names a subagent key, a Bash command from a non-reviewer whose text holds `verdict.py` (or `-m verdict`) and `--verdict`, in any shell form, is refused (Q1). The lexer is deleted. The root map §3 states the residual: a read-only mention is refused too. Test: unit (`test_gate_policy.py`, F016's probe set, the held lane's REDs).
 - AC7.2 ADR 0279's residual on harnesses with no key is unchanged. Both open records resolve with a `refactor(bugs)` line. Test: none; `bugs.py check`.
 
 ### FR8 — REBUILD: fix-line production (F015, F042 code half; open bug `init-no-terminal-fix-line-nests-one-act-label-inside-another`)
@@ -139,24 +147,31 @@ The fixes the window review rates REBUILD are re-worked by the FRs named in its 
 
 ### FR10 — REBUILD: release state, stats and the fold (F008; R3 clause 5)
 
-- AC10.1 No milestone, memory-window bound or stats input is a stored sha that a rewrite can orphan. A missing closure commit is a refusal, never a metric of 0. Test: unit (`test_release__release_script.py`, `test_verdict.py`).
+- AC10.1 No milestone, memory-window bound or stats input is a stored sha that a rewrite can orphan: `release.py` stops writing the milestone shas, and the schema no longer requires `sha` (Q6). A missing closure commit is a refusal, never a metric of 0. Test: unit (`test_release__release_script.py`, `test_verdict.py`).
+- AC10.3 The 5 uncited and 28 id-line-less historic bug records clear through ADR 0278's one `bugs.py archive` act; no baseline list (Q6). Test: none; `bugs.py check`.
 - AC10.2 The fold's rewriting remedy, `ci push-gate-check --rewrite-from`, is deleted with its fix line. Test: unit (the push-gate refusal's fix-line row).
 
 ### FR11 — REBUILD: the remaining units (F021, F025; batch C reconcile, template history; batch D export, guards, version label, Windows timing)
 
 - AC11.1 Each remaining unit with `addressed` no or partly, and each still-in-HEAD item no other FR names, gets its PLAN §1 REBUILD or DELETE row, and the row lands. Test: unit, per row.
+- AC11.2 The template-history row is REBUILT to one normalised digest, gated by a script that recomputes every published digest from git. If any published digest fails to recompute, the row is KEEP and its finding is dispositioned with that measured reason (Q9). Test: unit; the recompute script's output.
 
 ### FR12 — tests (F009, F011, F012, F014, F022, F023, F024)
 
 - AC12.1 The fix-line census covers every `dd-gitflow-default` worktree script (F014). Test: unit (the census test).
-- AC12.2 `fake_venv` is stdlib `venv.create` (F022). Tests write scratch only under a tmp path and never under `tests/`, through one enumerator (F023). Test: unit.
+- AC12.2 `fake_venv` is `venv.create(with_pip=False)` (F022). The repo `AGENTS.md` line "Tests never build a real venv (exhausts disk)" becomes "Tests never pip-install into a venv (exhausts disk)" (Q13). Tests write scratch only under a tmp path and never under `tests/`, through one enumerator (F023). Test: unit.
 - AC12.3 Each contract's literal is pinned in one test home (F024). The vacuous RED goes red on revert (F011). The asserts F012 names are restored. Test: unit; the reviewer's revert check.
 - AC12.4 F009 is answered by ADR 0280 clause 3, not by a `verify:` change. Test: none.
+- AC12.5 The removals the operator ordered (Q3), in order; each contract keeps one test in its one home, and each commit names the ruling. Test: none; the reviewer's check of each kept home.
+  - (a) `tests/core/test_spec_status.py`, the pinned pair with `core/spec_status.py`.
+  - (b) `tests/features/chokepoints/test_fold.py` and the fold rows of `tests/fixtures/fix_world.py` and `fix_census.py`, with `--rewrite-from`.
+  - (c) the 8 `repack_installed_wheel`/`build_digest` tests in `test_python_env.py`/`test_one_line_bootstrap.py`; `repack_installed_wheel` is deleted when no consumer remains at the verified label.
+  - (d) duplicate pins: `SKILL-MD-LENGTH` x3 to 1 and `SeveralWork` x5 to 1 in `test_cli_line__fix_line_contract.py`, the asset-count literals, the `45` change-detector at `tests/scripts/test_ci.py:183`, and the T3 prompt-wording test at `tests/e2e/test_evals_t3.py:87`.
 
 ### FR13 — eval graders (R5; F026)
 
 - AC13.1 The T3 grader gives 0 to a stub SPEC (the bare `release.py new` output). Test: E2E (`tests/e2e/test_evals_t3.py`, a stub row).
-- AC13.2 Every grader gives 0 to a trial whose verdict was written outside the dispatched reviewer. k=3 and the local Codex readout stay. Test: E2E (one row per task).
+- AC13.2 Every grader gives 0 to a trial whose verdict was written outside the dispatched reviewer. k=3 and the local Codex readout stay. That check lives once, in `compare.py`, reading the trial transcript (Q8). Test: E2E (one row per task).
 
 ### FR14 — the agentic scorecard (constitution §5)
 
@@ -167,7 +182,7 @@ The fixes the window review rates REBUILD are re-worked by the FRs named in its 
 - AC15.1 After the closure reconcile, E is the last commit that is not `_RELEASE.json`. Test: none; git.
 - AC15.2 The same audit, re-run on E, reports goals 2–5 at target. Each finding it raises enters by Arm B or the intake, and E is re-cut. Test: none; the new audit record.
 - AC15.3 Goals 6, 8 and 9 hold on E. Each is recorded as a `chore(release):` note with its run URL or the operator's words. Test: E2E (the eval run); none for the rest.
-- AC15.4 Only then does the PR `feature/0.5.0` → `develop` open, continuing rc-21 SPEC FR6–FR9. The portfolio PR #33 merge and the PyPI approval stay the operator's acts. Test: none; the PRs.
+- AC15.4 The PR `feature/0.5.0` → `develop` opens as a draft at E; every job of the existing CI on it is goal 6 (G3). It is marked ready and merged only after every other goal holds, continuing rc-21 SPEC FR6–FR9. The portfolio PR #33 merge and the PyPI approval stay the operator's acts. Test: none; the PRs.
 
 ### Replaces
 
@@ -175,13 +190,13 @@ The fixes the window review rates REBUILD are re-worked by the FRs named in its 
 - FR2: `SLOP.md:4`'s one-line definition.
 - FR3: every restated copy of a fact in the text deletion plan.
 - FR4: every losing duplicate of the code deletion plan (F031–F040).
-- FR5: the two REBUILD-due thresholds, the two-shape archive and its events flag, archive-as-clearance, and the `Path(".")` sentinel.
-- FR6: `merge`'s absence-based success path, its ledger-script execution, and the catch-all GitError fix line.
-- FR7: the verdict gate's text match on one command spelling.
+- FR5: the two REBUILD-due thresholds, the archive's shape-picking flag, the ambiguous bare task id in `caused_by`, and the `Path(".")` sentinel.
+- FR6: `merge`'s absence-based success path, its tree-tracked ledger-script execution, and the catch-all GitError fix line.
+- FR7: the verdict gate's lexer.
 - FR8: `InitPlan.command`'s `render=` switch and the nested-label act sentences.
 - FR9, FR11: each PLAN §1 REBUILD or DELETE row's current behaviour.
-- FR10: stored milestone and memory-window shas, and `--rewrite-from`.
-- FR12: `fake_venv`, the scratch writers under `tests/`, and the duplicate literal pins.
+- FR10: stored milestone and memory-window shas, the schema's required `sha`, and `--rewrite-from`.
+- FR12: `fake_venv`, the scratch writers under `tests/`, the duplicate literal pins, and the tests AC12.5 removes.
 - FR13: T3's pass on a stub.
 
 ### Closure
@@ -194,12 +209,14 @@ The fixes the window review rates REBUILD are re-worked by the FRs named in its 
 ## 5. Constraints and risks
 
 - A library change is finished only once the instance is reprojected and `doctor` is clean.
-- A bug found during the remediation follows ADR 0280 once it is accepted: the REBUILD of its unit, in its lane.
+- A bug found during the remediation follows ADR 0280: the REBUILD of its unit, in its lane.
 - Risk: waves II–IV touch the same files (`_worktree_end.py`, `gate_policy.py`, the laws). The PLAN serializes overlapping `W:` sets across waves.
 - Risk: the re-audit finds what this release left. Its findings re-cut E (AC15.2). The release has no date.
 
 ## 6. Open questions
 
-- G1. The audit's unit list, still-in-HEAD worklist and two deletion plans exist only in the audit session's scratch. The main thread copies them to a durable place before the PLAN cites them.
-- G2. ADR 0280's `amends` holds one id (0273). It also amends 0235, 0264 and 0267, which its decision names.
-- G3. Goal 6: the Windows and macOS legs run only on a pull request, and they run the small and medium tiers. R4 says "no promote PR until …". The main thread rules how the three-OS run is obtained (for example a draft PR whose merge waits for every other goal) without changing a gate.
+None open.
+
+- G1 closed: PLAN §1 is the repo's durable home of the unit rows, the worklist and the deletion plans; the evidence copy is outside the repo, at `.dadaia/reports/dadaia-workspace/audit-20261022-bug-history-and-single-source/`.
+- G2 closed: ADR 0280's ruling words name 0267, 0235 and 0264 clause 3.
+- G3 ruled: goal 6 is every job of the existing CI on the promote PR `feature/0.5.0` → `develop` at E, a draft until every other goal holds (AC15.4). No leg, tier or gate changes.
