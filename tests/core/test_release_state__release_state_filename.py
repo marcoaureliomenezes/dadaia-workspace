@@ -5,6 +5,7 @@ RELEASE.json dir is live for neither the doctor nor release.py live_ids. Size: S
 from __future__ import annotations
 
 import ast
+import json
 import sys
 from pathlib import Path
 
@@ -18,7 +19,8 @@ import _grammar
 
 from tests.helpers.oslib import read_text, write_text
 
-_DOC = '{"schema": "release-state-v1", "release": "1.0.0", "phase": "IMPLEMENTATION"}'
+_DOC = json.dumps({"schema": "release-state-v1", "release": "1.0.0", "phase": "IMPLEMENTATION",
+                   "defined": None, "implemented": None, "shipped": None, "log": []})  # fmt: skip
 
 
 def test_canonical_filename_is_underscore_release_json() -> None:
