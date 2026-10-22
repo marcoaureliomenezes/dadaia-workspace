@@ -90,21 +90,13 @@ def live_release_id(specs_dir: Path) -> str | None:
 
 
 def resolve_live_candidate(specs_dir: Path) -> Path | None:
-    """The live release's candidate folder: `_release_schema.current_candidate` over the state
-    `_release_store.read_state` reads; ``None`` with no live release or an unreadable state."""
-    release_id = live_release_id(specs_dir)
-    if release_id is None:
-        return None
-    release_dir = specs_dir / "releases" / release_id
+    """The live release's candidate folder, ``None`` with no live release or a state the
+    release owner refuses."""
     try:
-        state = load_owner("dd-release-implementation", "_release_store").read_state(
-            release_dir / _grammar.STATE
-        )
+        live = load_owner("dd-release-implementation", "_release_store").live_release(specs_dir)
     except load_owner("dd-bug-resolution", "_refusal").Refusal:
         return None
-    candidate: Path | None = load_owner(
-        "dd-release-implementation", "_release_schema"
-    ).current_candidate(release_dir, state)
+    candidate: Path | None = live.candidate
     return candidate
 
 

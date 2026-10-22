@@ -16,8 +16,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from dadaia_workspace.core.gitflow import live_release_id
-from dadaia_workspace.core.release_state import CANDIDATE_RE, RELEASE_STATE_FILENAME
+from dadaia_workspace.core.release_state import CANDIDATE_RE
 from dadaia_workspace.core.skill_owner import load_owner
 
 # A dir counts as a "release dir" iff it carries at least one SDD release artifact.
@@ -28,19 +27,15 @@ _SEGMENT_NAME_RE = re.compile(rf"{CANDIDATE_RE.pattern}|^alpha-\d+$|^integration
 
 
 def resolve_active_release(specs_dir: Path) -> tuple[str | None, str | None]:
-    """``(release_id, phase)`` of the ONE live release (`live_release_id`), or
+    """``(release_id, phase)`` of the ONE live release (`_release_store.live_release`), or
     ``(None, None)`` when there is none, several, or no readable phase: `release.py check`
     reports those defects, so no rule here judges them twice."""
-    release_id = live_release_id(specs_dir)
-    if release_id is None:
-        return None, None
-    store = load_owner("dd-release-implementation", "_release_store")
     try:
-        state = store.read_state(specs_dir / "releases" / release_id / RELEASE_STATE_FILENAME)
+        live = load_owner("dd-release-implementation", "_release_store").live_release(specs_dir)
     except load_owner("dd-bug-resolution", "_refusal").Refusal:
         return None, None
-    phase = state.get("phase")
-    return (release_id, phase) if isinstance(phase, str) and phase else (None, None)
+    phase = live.state.get("phase")
+    return (live.release_id, phase) if isinstance(phase, str) and phase else (None, None)
 
 
 def is_release_dir(d: Path) -> bool:
