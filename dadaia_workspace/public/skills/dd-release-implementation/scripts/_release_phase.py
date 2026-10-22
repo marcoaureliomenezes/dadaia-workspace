@@ -18,8 +18,16 @@ from _grammar import APPROVED, STATE, extract_status
 from _platform import act, command, read_text, run
 from _refusal import Refusal, fix_of
 from _release_check import candidate_errors
-from _release_schema import CANDIDATE_DOCS, CLOSURE, DEFINITION, IMPLEMENTATION, PHASES
-from _release_store import SCRIPT, Live, State, commit, live_release
+from _release_schema import (
+    CANDIDATE_DOCS,
+    CLOSURE,
+    DEFINITION,
+    IMPLEMENTATION,
+    PHASES,
+    SCRIPT,
+    State,
+)
+from _release_store import Live, commit, live_release
 from _specs import choice
 
 #: DEFINITION is `new`'s; each later phase has one predecessor (out-of-order = re-run).

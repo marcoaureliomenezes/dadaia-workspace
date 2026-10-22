@@ -27,13 +27,14 @@ from _release_schema import (
     CODE,
     HISTO,
     MEMORY_WRITE,
+    SCRIPT,
     TRIO_PHASES,
     closure_summary,
     current_candidate,
     origin,
     origin_line,
 )
-from _release_store import SCRIPT, Live, live_release
+from _release_store import Live, live_release
 from _specs import script
 
 __all__ = ["check", "drift", "memory_errors", "ship_findings", "tree_findings"]

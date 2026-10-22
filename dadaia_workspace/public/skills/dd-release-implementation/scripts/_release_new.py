@@ -13,8 +13,8 @@ from _grammar import SEMVER_RE, STATE, live_ids
 from _ledger import records, replace
 from _platform import act, is_link, quote, write_text
 from _refusal import Refusal
-from _release_schema import next_candidate
-from _release_store import SCRIPT, State, read_state, validated
+from _release_schema import SCRIPT, State, next_candidate, read_state
+from _release_store import validated
 from _release_tree import BUG_WINDOW, tree_findings
 
 SPEC_STUB = """\

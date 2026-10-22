@@ -36,11 +36,11 @@ from _release_schema import (
     _ORIGIN_GRAMMAR,
     HISTO,
     ORIGIN_KINDS,
+    SCRIPT,
     closure_summary,
     origin,
 )
 from _release_store import (
-    SCRIPT,
     Live,
     commit,
     live_release,
