@@ -86,5 +86,6 @@ def test_a_git_failure_reruns_through_inline(
     assert cli.main(["merge", "a%b"]) == 1
     rerun = inline(*cli.LAUNCH, "merge", str(Path("a%b").resolve()), caps=_WIN)
     assert (
-        f"Agent action: clear the git failure above, then rerun {rerun}" in capsys.readouterr().err
+        f"Agent action: clear what `git merge` reports above, then rerun {rerun}"
+        in capsys.readouterr().err
     )
