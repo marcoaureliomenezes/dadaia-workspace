@@ -10,7 +10,11 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
+from dadaia_workspace import container
 from dadaia_workspace.cli.main import app
+from dadaia_workspace.core import workspace_resolver
+from dadaia_workspace.core.exceptions import WorkspaceNotInitializedError
+from dadaia_workspace.core.skill_owner import load_owner
 from dadaia_workspace.features.specs.memory_lint import main as memory_lint
 from tests.fixtures.harness_env import claude_hook_env, run_hook_subprocess
 from tests.helpers.oslib import read_text, write_text
@@ -91,3 +95,44 @@ def test_memory_lint_has_no_cwd_default() -> None:
     with pytest.raises(SystemExit) as refused:
         memory_lint([])
     assert refused.value.code == 2
+
+
+def _sentinel_cases(tmp_path: Path) -> dict[str, tuple[Path, bool]]:
+    """Each directory shape that can stand for a workspace, with the one right answer."""
+    full = _workspace(tmp_path / "full")
+    as_dir = tmp_path / "as_dir"
+    (as_dir / ".dadaia" / "states" / "spec_contexts.json").mkdir(parents=True)
+    bare = tmp_path / "bare"
+    (bare / ".dadaia").mkdir(parents=True)
+    no_states = tmp_path / "no_states"
+    (no_states / ".dadaia" / "states").mkdir(parents=True)
+    return {
+        "full": (full, True),
+        "sentinel-is-a-directory": (as_dir, False),
+        "bare-dadaia": (bare, False),
+        "empty-states": (no_states, False),
+    }
+
+
+def test_is_workspace_is_the_one_sentinel_every_caller_agrees_with(tmp_path: Path) -> None:
+    """A file named `spec_contexts.json` marks a workspace; a directory of that name, a bare
+    `.dadaia/` or an empty `states/` does not — for the kernel and for every caller."""
+    root = load_owner("dd-bug-resolution", "_root")
+    for name, (ws, expected) in _sentinel_cases(tmp_path).items():
+        probe = ws / "repos" / "x" / "f.txt"
+        got = {
+            "is_workspace": root.is_workspace(ws),
+            "acting_root": workspace_resolver.acting_root(probe) == ws.resolve(),
+            "owning_root": workspace_resolver.owning_root(probe) == ws.resolve(),
+        }
+        try:
+            container.build_doctor_service(ws)
+            got["container"] = True
+        except WorkspaceNotInitializedError:
+            got["container"] = False
+        try:
+            workspace_resolver.resolve_cli_workspace_root(ws)
+            got["explicit"] = True
+        except WorkspaceNotInitializedError:
+            got["explicit"] = False
+        assert got == dict.fromkeys(got, expected), name

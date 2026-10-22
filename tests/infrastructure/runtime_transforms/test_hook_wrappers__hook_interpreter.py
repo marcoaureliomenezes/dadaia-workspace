@@ -12,12 +12,13 @@ import os
 import shutil
 import subprocess
 import tomllib
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 
 import pytest
 
 from dadaia_workspace.core.harness_registry import HARNESS_RECORDS
 from dadaia_workspace.core.platform import Capabilities
+from dadaia_workspace.core.skill_owner import load_owner
 from dadaia_workspace.infrastructure.runtime_config import claude_hooks, kimi_hooks_block
 from dadaia_workspace.infrastructure.runtime_transforms.hook_wrappers import (
     envelope,
@@ -257,3 +258,18 @@ def test_kimi_windows_command_is_what_cmd_runs_whole(
     monkeypatch.setattr("dadaia_workspace.core.platform.PLATFORM", _WIN)
     hooks = tomllib.loads(kimi_hooks_block(Path(home)))["hooks"]
     assert hooks[0]["command"] == command
+
+
+def test_every_shim_walks_to_the_kernels_sentinel() -> None:
+    """The sh and cmd shims render the sentinel the kernel's `_root` owns, never their own spelling."""
+    sentinel = load_owner("dd-bug-resolution", "_root").SENTINEL
+    spellings = {"linux": sentinel.as_posix(), "win32": str(PureWindowsPath(sentinel))}
+    walked = 0
+    for platform_name, spelling in spellings.items():
+        caps = Capabilities.detect(platform_name)
+        for record in HARNESS_RECORDS.values():
+            for name, body in hook_wrapper_contents(record, caps).items():
+                if "spec_contexts.json" in body:
+                    walked += 1
+                    assert spelling in body, name
+    assert walked > 0

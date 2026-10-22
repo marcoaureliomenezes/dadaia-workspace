@@ -275,3 +275,16 @@ def test_every_registry_refusal_prints_one_error_line_and_one_fix_line(tmp_path:
         f"{reg} is not valid UTF-8",
         f"Operator action: delete {quote(str(reg))} — the next registry.py run starts an empty registry",
     )
+
+
+def test_a_planted_kernel_module_on_the_path_never_loads(tmp_path: Path) -> None:
+    """The kernel's `_clock` wins over any same-named module an earlier path entry holds."""
+    planted = tmp_path / "planted"
+    planted.mkdir()
+    marker = tmp_path / "loaded"
+    write_text(planted / "_clock.py", f"open({str(marker)!r}, 'w').close()\nraise SystemExit(97)\n")
+    reg = tmp_path / ".dadaia" / "states" / "server_registry.json"
+    env = {**os.environ, "PYTHONPATH": str(planted)}
+    done = run([sys.executable, str(_SCRIPT), "--registry", str(reg), "list"], check=False, env=env)
+
+    assert (done.returncode, marker.exists()) == (0, False), done.stderr
