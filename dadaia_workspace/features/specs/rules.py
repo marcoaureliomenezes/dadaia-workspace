@@ -102,8 +102,6 @@ RULES: tuple[SpecsRule, ...] = (
     _rule(
         ("GITFLOW-1",),
         lambda d: d._coherence.check_gitflow(),
-        # No flag: `specs init` keeps a valid block, else writes the detected gitflow.
-        fix_help=("specs", "init", "--specs-dir", "<specs>"),
     ),
     _rule(
         ("SPEC-DOC-026",),

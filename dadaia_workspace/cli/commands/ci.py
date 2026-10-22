@@ -17,7 +17,7 @@ from dadaia_workspace.cli._specs_resolution import (
     scope,
 )
 from dadaia_workspace.core import platform
-from dadaia_workspace.core.cli_line import fix_line
+from dadaia_workspace.core.cli_line import fix_line, spell_fix
 from dadaia_workspace.core.gitflow import Gitflow, SeveralWorkBranches, work_branch
 from dadaia_workspace.core.platform import act
 from dadaia_workspace.core.skill_owner import load_owner
@@ -31,6 +31,7 @@ from dadaia_workspace.features.chokepoints.branch_policy import (
 )
 from dadaia_workspace.features.chokepoints.denylist_scan import BaselinePatternLike
 from dadaia_workspace.features.spec_context.service import install_git_hooks
+from dadaia_workspace.infrastructure.git_subprocess import gitflow_fix
 
 app = typer.Typer(help="Git-hook chokepoints: the pre-push and ref gates and their installer.")
 
@@ -71,6 +72,8 @@ def _gate_inputs(repo_root: Path, head: str) -> tuple[Gitflow, GateFixes]:
     gitflow, warning, slug = _gitflow(repo_root)
     if warning:
         typer.echo(f"[pre-push] WARNING: {warning}", err=True)
+        if git.committed_text(repo_root, "specs/constitution.md") is None:
+            typer.echo(spell_fix(gitflow_fix(repo_root / "specs")), err=True)
     try:
         work = work_branch(repo_root, gitflow, slug)
     except SeveralWorkBranches as several:

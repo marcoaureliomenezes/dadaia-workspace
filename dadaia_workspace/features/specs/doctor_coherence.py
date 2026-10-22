@@ -6,7 +6,7 @@ from pathlib import Path
 
 from dadaia_workspace.core.doctor_rules import SectionFinding
 from dadaia_workspace.features.specs.doctor_types import Severity, specs_finding
-from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
+from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient, gitflow_fix
 
 
 class CoherenceValidator:
@@ -49,5 +49,6 @@ class CoherenceValidator:
                 severity=Severity.WARNING,
                 description=warning,
                 path=str(constitution),
+                fix=gitflow_fix(self.specs_dir),
             )
         ]

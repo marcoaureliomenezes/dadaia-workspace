@@ -6,11 +6,11 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from dadaia_workspace.core import platform
-from dadaia_workspace.core.cli_line import fix_line, fix_of, git_line, without_fix
+from dadaia_workspace.core.cli_line import cli_words, fix_of, git_line, without_fix
 from dadaia_workspace.core.exceptions import GitCloneError, GitSyncError
 from dadaia_workspace.core.gitflow import DEFAULT, Gitflow, read_gitflow, work_branch
 from dadaia_workspace.core.models.git_scan import GitObjectReadError
-from dadaia_workspace.core.platform import act
+from dadaia_workspace.core.platform import act, inline
 from dadaia_workspace.core.skill_owner import load_owner
 from dadaia_workspace.infrastructure.git_objects import unpublished
 
@@ -74,6 +74,13 @@ def _commit(path: Path, msg: str, pathspec: Sequence[str] | None = None) -> None
         if not stdout and not stderr:
             return  # silent no-op (submodule edge case)
         raise GitSyncError(f"git commit failed in {path}. stdout: {stdout!r} stderr: {stderr!r}")
+
+
+def gitflow_fix(specs_dir: Path) -> str:
+    """The one remedy of a committed constitution without a usable gitflow: run ``specs init``
+    on *specs_dir*, then commit the constitution it writes."""
+    init = inline(*cli_words(None, "specs", "init", "--specs-dir", str(specs_dir)))
+    return act("agent", f"run {init}, then commit {specs_dir / 'constitution.md'}.")
 
 
 class GitSubprocessClient:
@@ -243,9 +250,9 @@ class GitSubprocessClient:
         if text is None and main_repo is not None and main_repo.resolve() != repo.resolve():
             return self.gitflow(main_repo)
         if text is None:
-            return DEFAULT, (
-                f"{repo}: no specs/constitution.md — using the default gitflow\n"
-                f"hint: {fix_line(None, 'specs', 'init', '--specs-dir', str(repo / 'specs'))}"
+            return (
+                DEFAULT,
+                f"{repo}: no committed specs/constitution.md — using the default gitflow",
             )
         return read_gitflow(repo / "specs", text)
 
