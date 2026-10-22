@@ -25,9 +25,7 @@ def spell_fix(fix: str) -> str:
     return str(load_owner("dd-bug-resolution", "_refusal").spell_fix(fix))
 
 
-def reinstall_fix(start: Path, *, projected: bool = False) -> str:
-    """The command that repairs a missing file under *start*: the kernel's one decider."""
-    return str(load_owner("dd-bug-resolution", "_jsonl").reinstall_fix(start, projected=projected))
+reinstall_fix = platform.reinstall_fix
 
 
 def cli_words(root: PurePath | None, *argv: str) -> tuple[str, ...]:

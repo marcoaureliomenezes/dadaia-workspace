@@ -99,6 +99,13 @@ def cli_words(root: PurePath | None, *argv: str) -> tuple[str, ...]:
     return _owner.cli_words(root, *argv, caps=_caps())
 
 
+def reinstall_fix(start: Path, *, projected: bool = False) -> str:
+    """The command that repairs a missing file under *start*, on the current ``PLATFORM``."""
+    return str(
+        load_owner("dd-bug-resolution", "_jsonl").reinstall_fix(start, _caps(), projected=projected)
+    )
+
+
 def mkdir_line(directory: PurePath) -> str:
     """The cross-shell mkdir line for *directory*, on the current ``PLATFORM``."""
     return _owner.mkdir_line(directory, _caps())

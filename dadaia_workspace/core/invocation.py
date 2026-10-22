@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Literal
 
 from dadaia_workspace.core import context_registry, platform, workspace_resolver
-from dadaia_workspace.core.cli_line import fix_line
+from dadaia_workspace.core.cli_line import cli_words
 from dadaia_workspace.core.exceptions import SpecsDirUnresolvedError
 from dadaia_workspace.core.harness_registry import HARNESS_RECORDS
 from dadaia_workspace.core.models.spec_context import CONTEXT_NAME_RE
@@ -258,7 +258,7 @@ def resolve_specs_dir(specs_dir: str | None) -> Path:
         fix=act(
             "agent",
             "pass --specs-dir with the specs/ directory, or run "
-            f"`{fix_line(None, 'context', 'bind')}` with a context name",
+            f"`{platform.inline(*cli_words(None, 'context', 'bind'))}` with a context name",
         ),
     )
 

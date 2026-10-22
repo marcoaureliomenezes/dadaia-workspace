@@ -468,9 +468,12 @@ _LABELS = {"agent": "Agent action", "operator": "Operator action"}
 
 
 def act(kind: Literal["agent", "operator"], text: str) -> str:
-    """*text* behind the label of *kind* (``agent`` or ``operator``); any other *kind* raises ``ValueError``."""
+    """*text* behind the label of *kind* (``agent`` or ``operator``); any other *kind*, or a
+    *text* already holding a label, raises ``ValueError``."""
     if kind not in _LABELS:
         raise ValueError(f"unknown action kind {kind!r}")
+    if any(f"{label}:" in text for label in _LABELS.values()):
+        raise ValueError(f"an act sentence never embeds a second label: {text!r}")
     return f"{_LABELS[kind]}: {text}"
 
 
