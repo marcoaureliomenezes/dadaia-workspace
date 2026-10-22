@@ -476,7 +476,10 @@ def merge(root: Path, path: str, keep: list[str], drop: bool) -> str:
         git(into, "merge", "-q", "--ff-only", ref)
     except RuntimeError as error:
         check_ancestor(root, tree, onto)  # moved while merge ran; else a stray the operator owns
-        fix = act("agent", f"commit or remove the paths above in {into}")
+        fix = act(
+            "agent",
+            f"commit or remove the paths `{git_inline(into, 'status', '--short')}` lists in {into}",
+        )
         raise Refusal(f"fast-forward failed: {error}", fix) from error
     _remove(repo, tree, onto, name, kept)
     return f"{ref} merged into {onto}"

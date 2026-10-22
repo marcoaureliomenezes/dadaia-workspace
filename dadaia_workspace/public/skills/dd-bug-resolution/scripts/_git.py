@@ -29,17 +29,18 @@ def scrubbed_env(parent: Mapping[str, str] | None = None) -> dict[str, str]:
 
 
 class GitError(RuntimeError):
-    """A git command that exited non-zero; *stderr* is git's own text."""
+    """A git command that exited non-zero; *stderr* is git's own text, *argv* the command that failed."""
 
-    def __init__(self, args: tuple[str, ...], stderr: str) -> None:
+    def __init__(self, args: tuple[str, ...], stderr: str, repo: Path | None = None) -> None:
         super().__init__(f"git {' '.join(args)}: {stderr}")
         self.stderr = stderr
+        self.argv = ("git", *(("-C", str(repo)) if repo else ()), *args)
 
 
 def git(repo: Path, *args: str, check: bool = True, input: str | None = None) -> str:
     done = run(["git", "-C", str(repo), *args], env=scrubbed_env(), input=input)
     if check and done.returncode:
-        raise GitError(args, done.stderr.strip())
+        raise GitError(args, done.stderr.strip(), repo)
     return done.stdout
 
 

@@ -99,7 +99,10 @@ def main(argv: list[str] | None = None) -> int:
         words = sys.argv[1:] if argv is None else argv
         path = getattr(args, "path", None)
         again = inline(*LAUNCH, *(str(Path(w).resolve()) if w == path else w for w in words))
-        report(failure, act("agent", f"clear the git failure above, then rerun {again}"))
+        report(
+            failure,
+            act("agent", f"clear what `{inline(*failure.argv)}` reports above, then rerun {again}"),
+        )
         return 1
     if args.json:
         print(json.dumps(found, indent=2))
