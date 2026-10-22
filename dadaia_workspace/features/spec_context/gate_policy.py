@@ -21,7 +21,7 @@ from itertools import chain
 from pathlib import Path, PurePath
 
 from dadaia_workspace.core import workspace_layout
-from dadaia_workspace.core.cli_line import fix_line, mkdir_line, spell_fix
+from dadaia_workspace.core.cli_line import fix_line, mkdir_line, reinstall_fix, spell_fix
 from dadaia_workspace.core.platform import act
 from dadaia_workspace.core.skill_owner import load_owner
 
@@ -34,7 +34,7 @@ _Fix = Callable[[PurePath, str | None], str]
 _DRAFT: _Fix = lambda root, _: mkdir_line(root / ".dadaia" / "tmp")  # noqa: E731
 #: One fix per refusal, total: a new ``FloorRefusal`` member fails here, as ``REFUSALS`` does.
 _FIXES: dict[workspace_layout.FloorRefusal, _Fix] = {
-    _R.LAW: lambda root, _: fix_line(root, "public", "install"),
+    _R.LAW: lambda root, _: reinstall_fix(Path(root), projected=True),
     _R.STATE: lambda root, _: act(
         "agent", "use the verb or skill script that owns that state file instead of editing it"
     ),

@@ -18,6 +18,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from dadaia_workspace.core.exceptions import WorkspaceNotInitializedError
+from dadaia_workspace.core.platform import act
 from dadaia_workspace.core.skill_owner import load_owner
 
 _root = load_owner("dd-bug-resolution", "_root")
@@ -90,9 +91,14 @@ def not_initialized(
         if skipped
         else ""
     )
+    holder = _workspace_of(searched)
+    fix = (
+        act("agent", f"run the verb again with `--workspace {holder}`")
+        if holder
+        else load_owner("dd-bug-resolution", "_jsonl").reinstall_fix(searched)
+    )
     return WorkspaceNotInitializedError(
-        f"No initialized workspace found from '{searched}'.{partial}",
-        fix=load_owner("dd-bug-resolution", "_jsonl").reinstall_fix(searched),
+        f"No initialized workspace found from '{searched}'.{partial}", fix=fix
     )
 
 

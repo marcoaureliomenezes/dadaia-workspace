@@ -20,7 +20,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol
 
-from dadaia_workspace.core.cli_line import fix_line, fix_of, without_fix
+from dadaia_workspace.core.cli_line import fix_line, fix_of, reinstall_fix, without_fix
 from dadaia_workspace.core.doctor_rules import SectionFinding
 from dadaia_workspace.core.skill_owner import load_owner
 from dadaia_workspace.core.workspace_resolver import own_workspace_root
@@ -113,7 +113,9 @@ def resolve_script(script: LedgerScript, specs_dir: Path) -> Path | None:
     return None
 
 
-def _unrunnable(script: LedgerScript, reason: str, fix: str = "") -> SectionFinding:
+def _unrunnable(
+    script: LedgerScript, specs_dir: Path, reason: str, fix: str = ""
+) -> SectionFinding:
     return SectionFinding(
         code=script.code,
         verdict="error",
@@ -121,11 +123,11 @@ def _unrunnable(script: LedgerScript, reason: str, fix: str = "") -> SectionFind
         canonical=False,
         error=True,
         # The script's own refusal fix, else the one for a script that cannot run: re-project.
-        fix=fix or fix_line(None, "public", "install"),
+        fix=fix or reinstall_fix(specs_dir, projected=True),
     )
 
 
-def _finding(script: LedgerScript, record: dict[str, Any]) -> SectionFinding:
+def _finding(script: LedgerScript, specs_dir: Path, record: dict[str, Any]) -> SectionFinding:
     unit = f"{record.get('path', '')}:{record.get('line', 0)}".strip(":")
     return SectionFinding(
         code=str(record.get("code") or script.code),
@@ -134,7 +136,7 @@ def _finding(script: LedgerScript, record: dict[str, Any]) -> SectionFinding:
         canonical=False,
         error=str(record.get("verdict") or "error") == "error",
         # Every check record carries its fix; one without is an install older than this one.
-        fix=str(record.get("fix") or fix_line(None, "public", "install")),
+        fix=str(record.get("fix") or reinstall_fix(specs_dir, projected=True)),
     )
 
 
@@ -145,21 +147,23 @@ def script_findings(specs_dir: Path, runner: _Runner | None = None) -> list[Sect
     for script in LEDGER_SCRIPTS:
         path = resolve_script(script, specs_dir)
         if path is None:
-            findings.append(_unrunnable(script, "is not installed"))
+            findings.append(_unrunnable(script, specs_dir, "is not installed"))
             continue
         argv = [sys.executable, str(path), "check", "--specs", str(specs_dir), "--json"]
         try:
             result = process.run(argv, cwd=specs_dir.parent, timeout=_TIMEOUT_SECONDS)
         except (OSError, TimeoutError) as exc:
-            findings.append(_unrunnable(script, f"could not run: {type(exc).__name__}"))
+            findings.append(_unrunnable(script, specs_dir, f"could not run: {type(exc).__name__}"))
             continue
         records = _parse(result)
         if records is None:
             reason = f"check exited {result.returncode} with no JSON"
-            findings.append(_unrunnable(script, reason, fix_of(result.stderr)))
+            findings.append(_unrunnable(script, specs_dir, reason, fix_of(result.stderr)))
             continue
         findings.extend(
-            _finding(script, record) for record in records if record.get("verdict") != "info"
+            _finding(script, specs_dir, record)
+            for record in records
+            if record.get("verdict") != "info"
         )
     return findings
 
@@ -209,7 +213,7 @@ def worktree_rows(
         return (
             [],
             "list failed: the dd-gitflow-default worktree scripts are not installed",
-            fix_line(root, "public", "install"),
+            reinstall_fix(root, projected=True),
         )
     process = runner if runner is not None else SubprocessProcessRunner()
     try:
