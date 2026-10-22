@@ -9,7 +9,7 @@ import typer
 from rich.console import Console
 
 from dadaia_workspace.cli._fail import fail
-from dadaia_workspace.core.cli_line import fix_line
+from dadaia_workspace.core.cli_line import fix_line, reinstall_fix
 from dadaia_workspace.core.exceptions import HandoffSchemaError, WorkspaceNotInitializedError
 from dadaia_workspace.core.handoff_index import Handoff, HandoffIndex, ValidationResult
 from dadaia_workspace.core.workspace_resolver import (
@@ -159,7 +159,7 @@ def validate(
             index.validate_file(p, reviewed_root=reviewed_root) for p in target_paths
         ]
     except HandoffSchemaError as exc:
-        fail(f"Could not load handoff schema: {exc}", fix_line(workspace_root, "public", "install"))
+        fail(f"Could not load handoff schema: {exc}", reinstall_fix(workspace_root, projected=True))
 
     # Apply release filter if requested
     if release:
