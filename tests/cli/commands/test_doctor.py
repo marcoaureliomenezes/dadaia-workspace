@@ -337,6 +337,9 @@ def test_gitflow_1_fix_is_one_agent_action_that_commits_and_performing_it_clears
     assert fix.startswith("Agent action: ") and fix.count("Agent action:") == 1, fix
     assert "specs init" in fix and "commit" in fix and "constitution.md" in fix, fix
     assert not re.search(r"<[^<>]+>", fix), fix
+    from dadaia_workspace.infrastructure.git_subprocess import gitflow_fix
+
+    assert fix == gitflow_fix(repo / "specs")
 
     with pytest.MonkeyPatch.context() as mp:
         mp.chdir(repo)

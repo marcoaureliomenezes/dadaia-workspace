@@ -12,7 +12,6 @@ import pytest
 import typer
 
 from dadaia_workspace.cli.commands import ci
-from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.gitflow import Gitflow
 from tests.helpers.oslib import run, write_text
 
@@ -101,9 +100,12 @@ def test_an_absent_specs_tree_is_reported_as_absent_with_the_specs_init_fix(
     _git(app, "commit", "-q", "--allow-empty", "-m", "birth")
     ci._gate_inputs(app, "")
     err = capsys.readouterr().err
-    assert "no specs/constitution.md" in err
-    fixes = [line for line in err.splitlines() if line.startswith("hint: ")]
-    assert fixes == [f"hint: {fix_line(None, 'specs', 'init', '--specs-dir', str(app / 'specs'))}"]
+    from dadaia_workspace.infrastructure.git_subprocess import gitflow_fix
+
+    assert "no committed specs/constitution.md" in err
+    fixes = [line for line in err.splitlines() if line.startswith(("fix: ", "hint: "))]
+    assert fixes == [f"fix: {gitflow_fix(app / 'specs')}"]
+    assert fixes[0].startswith("fix: Agent action: ")
 
 
 def test_a_committed_constitution_without_a_block_keeps_the_no_block_warning(
