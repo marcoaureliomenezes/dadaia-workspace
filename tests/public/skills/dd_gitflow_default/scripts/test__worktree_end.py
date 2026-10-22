@@ -15,6 +15,7 @@ import os
 import shutil
 import subprocess
 import sys
+from collections.abc import Callable
 from pathlib import Path
 from subprocess import run as real_run
 from typing import Any
@@ -1033,8 +1034,8 @@ def test_a_task_carrying_a_denylisted_literal_is_refused_then_lands_by_its_print
     shown = refused.stdout + refused.stderr  # the scan's findings, then the refusal
     assert "tests/test_a.py" in shown and address not in shown
     assert git(root / TREE, "rev-parse", "HEAD").strip() == onto
-    write_text(task / "tests/test_a.py", "HOST = None\n")  # the term removed, as the refusal says
-    _fix(root, refused)
+    reworded = _hand_rewrite(task, onto, [_edit_tree("tests/test_a.py", "HOST = None\n"), None])
+    assert reworded.returncode == 0, reworded.stderr
     landed = run(root, "merge", str(task))
     assert landed.returncode == 0, landed.stderr
     assert address not in git(root / TREE, "log", "-p", f"{onto}..HEAD")
@@ -1074,8 +1075,8 @@ def test_a_red_then_green_task_lands_after_its_printed_fix_with_both_kinds_apart
     refused = run(root, "merge", str(task))
 
     assert refused.returncode == 1
-    write_text(task / "tests/test_a.py", "HOST = None\n")
-    _fix(root, refused)
+    reworded = _hand_rewrite(task, onto, [_edit_tree("tests/test_a.py", "HOST = None\n"), None])
+    assert reworded.returncode == 0, reworded.stderr
     landed = run(root, "merge", str(task))
     assert landed.returncode == 0, landed.stderr
     subjects = git(root / TREE, "log", "--reverse", "--format=%s", f"{onto}..HEAD").splitlines()
@@ -1083,11 +1084,51 @@ def test_a_red_then_green_task_lands_after_its_printed_fix_with_both_kinds_apart
     assert git(root / TREE, "show", "--format=", "--name-only", "HEAD").split() == ["src.py"]
 
 
-def _follow(root: Path, refused: subprocess.CompletedProcess[str], extra: str = "") -> Any:
-    """The refusal's one printed `fix:` line plus *extra* words, run as an agent would."""
-    (fix,) = fixes(refused)
-    env = suite_env(os.environ, Path.home(), overrides={"HOME": str(root), "GIT_CONFIG_NOSYSTEM": "1"})  # fmt: skip
-    return run_bash(f"{fix.removeprefix('fix: ')} {extra}", cwd=root, env=env, check=False)
+def _git_proc(repo: Path, *args: str) -> subprocess.CompletedProcess[str]:
+    """`git` as the helper runs it, with the exit code left to the caller."""
+    env = suite_env(
+        os.environ,
+        Path.home(),
+        overrides={"HOME": str(repo), "PATH": os.environ["PATH"], "GIT_CONFIG_NOSYSTEM": "1"},
+    )
+    ident = ["-c", "user.name=t", "-c", "user.email=t@t"]
+    return real_run(["git", *ident, "-C", str(repo), *args], env=env, capture_output=True, text=True, check=False)  # fmt: skip
+
+
+def _edit_tree(rel: str, text: str) -> Callable[[Path], None]:
+    """A hand edit of the commit a rebase stopped at: the file rewritten, amended into it."""
+
+    def step(task: Path) -> None:
+        write_text(task / rel, text)
+        git(task, "add", rel)
+        git(task, "commit", "-q", "--amend", "--no-edit")
+
+    return step
+
+
+def _reword_subject(subject: str) -> Callable[[Path], None]:
+    """A hand reword of the commit a rebase stopped at: its message replaced by *subject*."""
+
+    def step(task: Path) -> None:
+        git(task, "commit", "-q", "--amend", "-m", subject)
+
+    return step
+
+
+def _hand_rewrite(
+    task: Path, base: str, steps: list[Callable[[Path], None] | None]
+) -> subprocess.CompletedProcess[str]:
+    """The act a refusal's Agent action names, done by hand: an interactive rebase of
+    `<base>..HEAD` stops at every commit, one step per commit edits it, and the rebase continues.
+    Order and subjects stay unless a step names a new one."""
+    stopped = _git_proc(task, "-c", "sequence.editor=sed -i s/^pick/edit/", "rebase", "-i", base)
+    assert stopped.returncode == 0, stopped.stderr
+    done = stopped
+    for step in steps:
+        if step is not None:
+            step(task)
+        done = _git_proc(task, "rebase", "--continue")
+    return done
 
 
 def _red_then(root: Path, address: str, green: str, *flags: str) -> Path:
@@ -1113,10 +1154,12 @@ def test_a_message_hit_on_the_implementation_lands_after_its_printed_fix_and_mes
 
     refused = run(root, "merge", str(task))
     assert refused.returncode == 1
-    write_text(task / "tests/test_a.py", "HOST = None\n")
-    folded = _follow(root, refused, "--message 'feat(J1.T1): host'")
-
-    assert folded.returncode == 0, folded.stderr
+    reworded = _hand_rewrite(
+        task,
+        onto,
+        [_edit_tree("tests/test_a.py", "HOST = None\n"), _reword_subject("feat(J1.T1): host")],
+    )
+    assert reworded.returncode == 0, reworded.stderr
     landed = run(root, "merge", str(task))
     assert landed.returncode == 0, landed.stderr
     log = git(root / TREE, "log", "--reverse", "--format=%s", f"{onto}..HEAD").splitlines()
@@ -1124,16 +1167,16 @@ def test_a_message_hit_on_the_implementation_lands_after_its_printed_fix_and_mes
     assert address not in git(root / TREE, "log", "-p", f"{onto}..HEAD")
 
 
-def test_a_fold_that_cannot_finish_changes_nothing_and_prints_one_fix(root: Path) -> None:
+def test_an_uncommitted_edit_clears_nothing_and_the_refusal_prints_one_fix(root: Path) -> None:
     address = ".".join(["8"] * 4)
     _real_denylist_gate(root)
-    task = _red_then(root, address, "", "--allow-empty-message")  # a group left with no message
+    task = _red_then(root, address, "feat(J1.T1): host")
     head = git(task, "rev-parse", "HEAD")
 
     refused = run(root, "merge", str(task))
     assert refused.returncode == 1
-    write_text(task / "tests/test_a.py", "HOST = None\n")
-    stuck = _follow(root, refused)
+    write_text(task / "tests/test_a.py", "HOST = None\n")  # edited, never committed
+    stuck = run(root, "merge", str(task))
 
     assert stuck.returncode != 0
     assert len([ln for ln in stuck.stderr.splitlines() if ln.startswith("fix: ")]) == 1
