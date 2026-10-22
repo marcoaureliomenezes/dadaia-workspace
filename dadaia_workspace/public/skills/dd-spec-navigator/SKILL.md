@@ -9,7 +9,7 @@ description: >
 
 # dd-spec-navigator
 
-The one session-grounding protocol, run first by every persona: three phases, in order, before any source file is
+The one session-grounding protocol, run first by every persona that loads skills: three phases, in order, before any source file is
 read or any output written.
 
 ## Phase 1 — resolve the context

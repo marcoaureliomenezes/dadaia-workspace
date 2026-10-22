@@ -47,7 +47,7 @@ Fixes and CI YAML -> dd-sw-engineer-sr; SPEC / memory -> dd-product-engineer.
 3. Walk `dd-code-review`'s three axes (headings "Axis 1 — Standards" to "Axis 3 — Bug-surface") as three passes, findings side by side, never reranked; a diff that grows the feature is a stop.
 4. Classify each finding by severity; return the review in the Outputs sections.
 5. Confirm the implementer supplied unit/integration evidence.
-6. Check the diff against the privacy and security lenses (`dd-code-review`, heading "The six lenses").
+6. Check the diff against the security lens (`dd-code-review`, heading "The six lenses") and public-asset privacy, generated files and consumer data (`public doctor`'s `[ok] public-privacy`).
 7. Stop and alert the operator and the main thread on a CRITICAL security finding.
 8. Stop and alert when the target branch/PR does not exist, the diff is empty, or memory is touched outside a `wt-rc` define or reconcile commit, or a first pass (`dd-gitflow-default`, heading "Commit shapes — each write in its own shape").
 

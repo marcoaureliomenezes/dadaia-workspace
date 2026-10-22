@@ -70,5 +70,5 @@ description: >
 
 ## 4. Done when
 
-- Every merge meets its gate (the first row of the table above); every dispatch prompt carries the block of step 3.
+- Every merge meets its gate (the "Merge only as" row above); every dispatch prompt carries the block of step 3.
 - Every conflict either resolved via evidence-based authority or reported.

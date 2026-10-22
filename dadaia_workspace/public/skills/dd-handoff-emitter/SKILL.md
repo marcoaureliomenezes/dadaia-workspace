@@ -20,13 +20,13 @@ completed agent task; the HTML report is the exception, not the rule.
 3. Report mode first writes the HTML to
    `.dadaia/reports/<context>/<UTC>-<agent>-<slug>.html`, then captures
    `sha256sum <report>` as `artifact.content_hash`.
-5. Assemble the handoff field-by-field against
+4. Assemble the handoff field-by-field against
    `.dadaia/agentic/schemas/handoff-v1.schema.json`; set `artifact.path` only for a
    file already on disk.
-6. The file name stamp and `produced_at` come from one clock read: `python3 -c "import datetime as d; print(d.datetime.now(d.UTC).strftime('%Y-%m-%dT%H%M%SZ'))"`; `produced_at` is that instant with colons (`YYYY-MM-DDTHH:MM:SSZ`, the schema's pattern). Any other date names its source: `git` or the clock.
+5. The file name stamp and `produced_at` come from one clock read: `python3 -c "import datetime as d; print(d.datetime.now(d.UTC).strftime('%Y-%m-%dT%H%M%SZ'))"`; `produced_at` is that instant with colons (`YYYY-MM-DDTHH:MM:SSZ`, the schema's pattern). Any other date names its source: `git` or the clock.
    Write `.dadaia/handoff/<context>/<YYYY-MM-DDTHHMMSSZ>-<agent>-<slug>.handoff.json` (2-space indent) and run `.dadaia/.venv/bin/dadaia reports validate <path>`;
    fix any non-zero exit before moving on.
-7. A reviewer verdict is written only by `python3 .agents/skills/dd-handoff-emitter/scripts/verdict.py` (flags: its `--help`). A refusal leaves no file and prints one `fix:` line; the path it prints is the verdict.
+6. A reviewer verdict is written only by `python3 .agents/skills/dd-handoff-emitter/scripts/verdict.py` (flags: its `--help`). A refusal leaves no file and prints one `fix:` line; the path it prints is the verdict.
 
 **Done when** the handoff file exists at that exact path shape, `.dadaia/.venv/bin/dadaia reports
 validate` exits 0 on a non-verdict handoff, and (report mode) `artifact.content_hash` matches the file on disk; a verdict is done when `verdict.py` prints its path, having validated it against the reviewed tree.
@@ -48,4 +48,4 @@ validates.
 - `.dadaia/agentic/schemas/handoff-v1.schema.json` — field list, types, enums,
   patterns, `schema_version` posture.
 - `python3 .agents/skills/dd-handoff-emitter/scripts/verdict.py --help` — the verdict writer's flags.
-- `python3 .agents/skills/dd-handoff-emitter/scripts/verdict.py stats <M.m.p>-rc<N>` — the candidate's readout table, each metric beside its target (metric names: its `--help`); it refuses any release state `release.py check` refuses, so run it after the memory pass.
+- `python3 .agents/skills/dd-handoff-emitter/scripts/verdict.py stats <M.m.p>-rc<N>` — the candidate's readout table, each metric beside its target (metrics: `scripts/_stats.py`); it refuses any release state `release.py check` refuses, so run it after the memory pass.
