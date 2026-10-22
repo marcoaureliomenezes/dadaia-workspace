@@ -20,4 +20,3 @@ def today() -> str:
 
 def compact_day() -> str:
     return instant().strftime("%Y%m%d")
-
