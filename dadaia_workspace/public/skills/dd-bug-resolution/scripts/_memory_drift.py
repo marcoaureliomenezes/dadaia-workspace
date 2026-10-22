@@ -2,7 +2,7 @@
 """The closure worklist: which atoms the window's code changes touched, and which code no
 atom describes at all.
 
-A pure function of the catalog's `sources`, `git diff --name-only <since>..HEAD` and `git
+A pure function of the atom files' `sources`, `git diff --name-only <since>..HEAD` and `git
 ls-files`; `release.py memory` imports :func:`report`, so no caller hands it a worklist.
 
 `sources` globs are matched with `fnmatch` over repo-relative POSIX paths, where `*` and
@@ -13,14 +13,94 @@ lint requires, and a wider match here can only ADD an atom to the worklist, neve
 from __future__ import annotations
 
 import fnmatch
-import json
+import re
 from pathlib import Path
 from typing import Any
 
 import _git
-from _platform import git_line, read_text
+from _frontmatter import parse as parse_block
+from _frontmatter import split
+from _platform import git_line, mkdir_line, read_text
 from _refusal import Refusal as Refusal
-from _specs import CATALOG, script
+from _specs import script
+
+CODE = "LEDGER-MEMORY-SCHEMA"
+PRODUCT = "memory/product"
+INDEX = "memory/product/index.md"
+WIKILINK_RE = re.compile(r"\[\[([^\]]+)\]\]")
+
+
+def parse(text: str) -> tuple[dict[str, Any] | None, str, str | None]:
+    """``(frontmatter, body, error)`` for one atom's text.
+
+    The block is read by the kernel grammar; the atom rules are flat keys, each a
+    single-line scalar or a list of them (an empty key is ``[]``).
+    """
+    parts = split(text)
+    if parts is None:
+        return None, "", "no YAML frontmatter found"
+    try:
+        data = parse_block(parts[0])
+    except ValueError as exc:
+        return None, "", f"frontmatter {exc}"
+    for key, value in data.items():
+        items = [] if value is None else value if isinstance(value, list) else [value]
+        if not all(not isinstance(item, dict | list) and "\n" not in str(item) for item in items):
+            return (
+                None,
+                "",
+                f"frontmatter key {key!r} is not a flat single-line value or a list of them",
+            )
+        data[key] = [] if value is None else value
+    return data, parts[1], None
+
+
+def atoms(specs: Path) -> list[Path]:
+    """Every feature atom under `product/`, in the alphabetical order `rank` follows."""
+    product = specs / PRODUCT
+    if not product.is_dir():
+        raise Refusal(
+            f"no {PRODUCT}/ under {specs} — there is no catalog to generate",
+            mkdir_line(product),
+        )
+    return sorted(path for path in product.rglob("*.md") if path.name != "index.md")
+
+
+def _depends_on(body: str) -> list[str]:
+    """The body's `[[wikilink]]` slugs, first-occurrence order, deduplicated."""
+    return list(dict.fromkeys(WIKILINK_RE.findall(body)))
+
+
+def feature(path: Path, specs: Path, rank: int) -> dict[str, Any]:
+    """One catalog entry built from *path*'s frontmatter and body."""
+    data, body, error = parse(read_text(path))
+    if error is not None or data is None:
+        fix = script(Path(__file__).parents[2] / "dd-spec-navigator" / "scripts" / "memory.py")(
+            "check"
+        )
+        raise Refusal(f"{path}: {error}", fix)
+    sources = [str(item) for item in data.get("sources") or []]
+    return {
+        "rank": rank,
+        "slug": str(data.get("slug", path.stem)),
+        "title": str(data.get("title", data.get("slug", path.stem))),
+        "area": "product" if path.parent == specs / PRODUCT else path.parent.name,
+        "tldr": str(data.get("tldr", "")),
+        "summary": str(data.get("summary", "")),
+        "path": path.relative_to(specs.parent).as_posix(),
+        "tags": list(data.get("tags") or []),
+        "token_estimate": round(len(body.split()) * 1.35),
+        "depends_on": _depends_on(body),
+        **({"sources": sources} if sources else {}),
+    }
+
+
+def entries(specs: Path) -> list[dict[str, Any]]:
+    """The feature entries the atom files declare, in `atoms` order; none without a product tree."""
+    if not (specs / PRODUCT).is_dir():
+        return []
+    return [feature(path, specs, rank) for rank, path in enumerate(atoms(specs), start=1)]
+
 
 NOT_CODE = frozenset({"specs", "tests", "test", "docs"})
 
@@ -73,7 +153,7 @@ def report(specs: Path, since: str, until: str = "HEAD") -> dict[str, Any]:
         raise Refusal(f"{bound} is not an ancestor of HEAD — a clone of this branch lacks it (a rebase rewrote it)",
                       script(Path(__file__).parents[2] / "dd-spec-navigator" / "scripts" / "memory.py")(
                           "drift", "--since", _root(repo), specs=specs))  # fmt: skip
-    catalog = json.loads(read_text(specs / CATALOG))
+    catalog = {"features": entries(specs)}
     changed = git(repo, "diff", "--name-only", f"{since}..{until}")
     return {"since": since, **worklist(catalog, changed, git(repo, "ls-files"))}
 

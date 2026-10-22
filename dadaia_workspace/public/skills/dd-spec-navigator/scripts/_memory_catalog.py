@@ -20,50 +20,12 @@ from pathlib import Path
 from typing import Any
 
 import _clock
-from _memory_schema import INDEX, PRODUCT, WIKILINK_RE, parse
-from _platform import mkdir_line, read_text
-from _refusal import Refusal
-from _specs import CATALOG, script
+from _memory_drift import atoms, feature
+from _memory_schema import INDEX
+from _platform import read_text
+from _specs import CATALOG
 
 Catalog = dict[str, Any]
-
-
-def atoms(specs: Path) -> list[Path]:
-    """Every feature atom under `product/`, in the alphabetical order `rank` follows."""
-    product = specs / PRODUCT
-    if not product.is_dir():
-        raise Refusal(
-            f"no {PRODUCT}/ under {specs} — there is no catalog to generate",
-            mkdir_line(product),
-        )
-    return sorted(path for path in product.rglob("*.md") if path.name != "index.md")
-
-
-def _depends_on(body: str) -> list[str]:
-    """The body's `[[wikilink]]` slugs, first-occurrence order, deduplicated."""
-    return list(dict.fromkeys(WIKILINK_RE.findall(body)))
-
-
-def feature(path: Path, specs: Path, rank: int) -> dict[str, Any]:
-    """One catalog entry built from *path*'s frontmatter and body."""
-    data, body, error = parse(read_text(path))
-    if error is not None or data is None:
-        fix = script(Path(__file__).with_name("memory.py"))("check")
-        raise Refusal(f"{path}: {error}", fix)
-    sources = [str(item) for item in data.get("sources") or []]
-    return {
-        "rank": rank,
-        "slug": str(data.get("slug", path.stem)),
-        "title": str(data.get("title", data.get("slug", path.stem))),
-        "area": "product" if path.parent == specs / PRODUCT else path.parent.name,
-        "tldr": str(data.get("tldr", "")),
-        "summary": str(data.get("summary", "")),
-        "path": path.relative_to(specs.parent).as_posix(),
-        "tags": list(data.get("tags") or []),
-        "token_estimate": round(len(body.split()) * 1.35),
-        "depends_on": _depends_on(body),
-        **({"sources": sources} if sources else {}),
-    }
 
 
 def generate(specs: Path) -> Catalog:

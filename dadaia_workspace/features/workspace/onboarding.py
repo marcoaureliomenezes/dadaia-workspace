@@ -10,7 +10,6 @@ else the only one in *trees* (every ALIVE name -> its ``specs/`` dir; the caller
 
 from __future__ import annotations
 
-import json
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
@@ -24,6 +23,7 @@ from dadaia_workspace.core.platform import act
 from dadaia_workspace.core.specs_version import state
 from dadaia_workspace.core.template_history import was_shipped
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
+from dadaia_workspace.infrastructure.ledger_scripts import load_owner
 
 CODE = "ONBOARDING"
 Kind = Literal["command", "agent"]
@@ -74,10 +74,10 @@ def _first_pass(c: _Ctx) -> list[str]:
             strip_fixed_sections(text), f"scaffold/memory/{name}", templates
         ):
             pending.append(str(path))
+    drift = load_owner("dd-bug-resolution", "_memory_drift")
     try:
-        catalog = json.loads(platform.read_text(c.specs / "memory" / "product" / "catalog.json"))
-        atoms = bool(catalog.get("features"))
-    except (OSError, ValueError, AttributeError, platform.Undecodable):
+        atoms = bool(drift.atoms(c.specs))
+    except drift.Refusal:
         atoms = False
     return pending if atoms else [*pending, f"{c.specs / 'memory' / 'product'} (no atom)"]
 

@@ -9,6 +9,7 @@ import json
 import os
 import sys
 from pathlib import Path
+from typing import Any
 
 from dadaia_workspace.core import clock, invocation, platform, session_store, workspace_layout
 from dadaia_workspace.core.cli_line import spell_fix
@@ -17,6 +18,7 @@ from dadaia_workspace.core.exceptions import SchemaVersionError
 from dadaia_workspace.features.spec_context import injection_policy
 from dadaia_workspace.features.workspace import onboarding
 from dadaia_workspace.hooks import _common
+from dadaia_workspace.infrastructure.ledger_scripts import load_owner
 from dadaia_workspace.infrastructure.runtime_transforms.hook_wrappers import envelope
 
 _DIGEST_FIELDS: tuple[str, ...] = ("slug", "title", "tldr", "path")
@@ -42,18 +44,29 @@ def _emit(payload: str) -> None:
     sys.stdout.write(envelope(os.environ, payload))
 
 
-def _digest_catalog(raw: str) -> str:
-    """The catalog reduced to :data:`_DIGEST_FIELDS`; the raw text when it does not parse."""
-    try:
-        features = json.loads(raw).get("features")
-    except (ValueError, AttributeError):
-        return raw
-    if not isinstance(features, list):
-        return raw
-    digested = [
-        {k: f[k] for k in _DIGEST_FIELDS if k in f} for f in features if isinstance(f, dict)
-    ]
+def _digest(features: list[dict[str, Any]]) -> str:
+    """The atom entries reduced to :data:`_DIGEST_FIELDS`."""
+    digested = [{k: f[k] for k in _DIGEST_FIELDS} for f in features]
     return json.dumps({"features": digested}, ensure_ascii=False, indent=2)
+
+
+def _product_memory(specs_dir: Path) -> str:
+    """The atom digest; the product index when no atom exists; a refused atom read is its finding."""
+    drift = load_owner("dd-bug-resolution", "_memory_drift")
+    try:
+        features = drift.entries(specs_dir)
+    except drift.Refusal as refusal:
+        return render_finding(
+            SectionFinding(drift.CODE, "error", str(refusal), False, True, refusal.fix)
+        )
+    if features:
+        return _digest(features)
+    index = specs_dir / "memory" / "product" / "index.md"
+    if not index.is_file():
+        return ""
+    with contextlib.suppress(OSError):
+        return platform.read_text(index)
+    return ""
 
 
 def _tech_stack_section(raw: str) -> str:
@@ -81,14 +94,8 @@ def _build_memory(specs_dir: Path) -> str:
             section = _tech_stack_section(platform.read_text(architecture))
             if section:
                 parts.append(section)
-    catalog = memory_dir / "product" / "catalog.json"
-    index = memory_dir / "product" / "index.md"
-    if catalog.is_file():
-        with contextlib.suppress(OSError):
-            parts.append(_digest_catalog(platform.read_text(catalog)))
-    elif index.is_file():
-        with contextlib.suppress(OSError):
-            parts.append(platform.read_text(index))
+    if block := _product_memory(specs_dir):
+        parts.append(block)
     parts.append("=== end memory bootstrap ===")
     return "\n".join(parts)
 
