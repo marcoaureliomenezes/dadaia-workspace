@@ -148,9 +148,27 @@ def test_a_window_with_nothing_drifted_exits_zero(script: Path, repo: Path) -> N
     assert json.loads(result.stdout) == {"since": base, "atoms": [], "uncovered": []}
 
 
-def test_an_atom_without_sources_covers_nothing(script: Path, repo: Path) -> None:
-    """`sources` arrives atom by atom: a catalog entry without the field is tolerated and
-    simply covers no code — never a traceback, never a silent full-tree pass."""
+def test_the_atom_file_decides_its_sources_not_a_stale_catalog(script: Path, repo: Path) -> None:
+    """The catalog still names alpha's package, but the atom file no longer declares it: the
+    file answers, so alpha covers nothing and its package is uncovered again."""
+    atom = repo / "specs" / "memory" / "product" / "platform" / "alpha.md"
+    write_text(atom, _ATOM.format(slug="alpha", sources=""))
+    _git(repo, "commit", "-aqm", "alpha drops its source")
+    base = _git(repo, "rev-parse", "HEAD")
+    write_text(repo / "dadaia_workspace" / "features" / "alpha" / "core.py", "x = 2\n")
+    _git(repo, "commit", "-aqm", "touch alpha")
+
+    report = json.loads(_run(script, repo, "--since", base, "--json").stdout)
+
+    assert report["atoms"] == []
+    assert "dadaia_workspace/features/alpha" in report["uncovered"]
+
+
+def test_a_catalog_without_sources_does_not_hide_the_sources_the_atom_file_declares(
+    script: Path, repo: Path
+) -> None:
+    """The catalog entry lost its `sources` field, the atom file kept them: the file answers,
+    so alpha's package is covered and never listed as uncovered."""
     catalog = repo / "specs" / "memory" / "product" / "catalog.json"
     document = json.loads(read_text(catalog))
     for entry in document["features"]:
@@ -161,8 +179,30 @@ def test_an_atom_without_sources_covers_nothing(script: Path, repo: Path) -> Non
 
     report = json.loads(_run(script, repo, "--since", base, "--json").stdout)
 
-    assert report["atoms"] == []
-    assert "dadaia_workspace/features/alpha" in report["uncovered"]
+    assert "dadaia_workspace/features/alpha" not in report["uncovered"]
+    assert report["uncovered"] == [
+        "dadaia_workspace/features/beta",
+        "dadaia_workspace/hooks",
+    ]
+
+
+def test_an_unreadable_atom_is_a_refusal_with_the_check_that_names_it(
+    script: Path, repo: Path
+) -> None:
+    """An atom whose frontmatter does not parse stops the worklist: the refusal names the file
+    and the `memory.py check` that finds it, never a silent window over the other atoms."""
+    atom = repo / "specs" / "memory" / "product" / "platform" / "alpha.md"
+    write_text(atom, "---\nslug: [unclosed\n---\n\n# alpha\n")
+    _git(repo, "commit", "-aqm", "break alpha frontmatter")
+    base = _git(repo, "rev-parse", "HEAD")
+
+    shown = _refusal(
+        script, f"d.report(__import__('pathlib').Path({str(repo / 'specs')!r}), {base!r})"
+    )
+
+    assert len(shown) == 2, shown
+    assert "alpha.md" in shown[0]
+    assert shown[1].endswith("memory.py check")
 
 
 def test_drift_requires_since_and_resolves_no_window_itself(script: Path, repo: Path) -> None:

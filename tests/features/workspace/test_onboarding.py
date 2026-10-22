@@ -47,6 +47,7 @@ def _specs(tmp_path: Path, name: str = "app", *, audited: bool = False) -> Path:
         os_write_text(
             specs / "memory" / "product" / "catalog.json", json.dumps({"features": [{"slug": "x"}]})
         )
+        os_write_text(specs / "memory" / "product" / "x.md", _ATOM)
     return specs
 
 
@@ -74,6 +75,7 @@ def _v047(tmp: Path) -> dict[str, Path]:
 
 
 _CMD = "command"
+_ATOM = "---\nslug: x\ntitle: x\ntldr: x\nsummary: x\n---\n\n# x\n"
 
 
 # fmt: off
@@ -111,6 +113,33 @@ def test_next_step_is_derived_from_the_workspace_state(
         assert step.command == fix_line(tmp_path, *command)
     create = fix_line(tmp_path, "context", "create")  # the binary every OS prints, {} in a row
     assert all(part.format(create) in step.command.replace("\\", "/") for part in in_command)
+
+
+@pytest.mark.parametrize("catalog", ['{"features": []}', "{not json"], ids=["empty", "unreadable"])
+def test_the_first_pass_counts_the_atom_files_not_the_catalog(tmp_path: Path, catalog: str) -> None:
+    """A catalog that holds no feature, or does not parse, never hides an atom file: the files
+    are the owner's answer, so no atom is pending."""
+    specs = _specs(tmp_path, audited=True)
+    write_text(specs / "memory" / "product" / "catalog.json", catalog)
+
+    step = next_step(tmp_path, {"app": specs})
+
+    assert step is None or step.id != "first-pass", step and step.command
+
+
+def test_the_first_pass_names_no_atom_when_only_the_catalog_claims_one(tmp_path: Path) -> None:
+    """The catalog names feature x, but no atom file exists: the files answer, and the first
+    pass is pending with the no-atom finding."""
+    specs = _specs(tmp_path, audited=True)
+    (specs / "memory" / "product" / "x.md").unlink()
+    write_text(
+        specs / "memory" / "product" / "catalog.json", json.dumps({"features": [{"slug": "x"}]})
+    )
+
+    step = next_step(tmp_path, {"app": specs})
+
+    assert step is not None and (step.id, step.kind) == ("first-pass", "agent")
+    assert "(no atom)" in step.command
 
 
 def test_the_first_pass_fix_opens_the_backlog_first_pass_lane(tmp_path: Path) -> None:

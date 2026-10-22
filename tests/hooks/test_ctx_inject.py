@@ -24,7 +24,8 @@ from tests.helpers.oslib import write_text as os_write_text
 
 def _ws(root: Path, *contexts: dict[str, Any]) -> Path:
     """Register *contexts* (``name`` plus optional ``slug``/``state``/``stack``/``catalog``/
-    ``index``/``assoc``) and write each main repo's memory."""
+    ``index``/``atoms``/``assoc``) and write each main repo's memory; ``atoms`` maps a path under
+    ``product/`` to an atom file's text."""
     states = root / ".dadaia" / "states"
     states.mkdir(parents=True)
     entries = []
@@ -42,6 +43,9 @@ def _ws(root: Path, *contexts: dict[str, Any]) -> Path:
             write_text(product / "index.md", c["index"])
         else:
             write_text(product / "catalog.json", c.get("catalog", '{"features": []}'))
+        for rel, text in c.get("atoms", {}).items():  # the atom files: the owner's answer
+            (product / rel).parent.mkdir(parents=True, exist_ok=True)
+            write_text(product / rel, text)
         if "assoc" in c:  # an associated repo carrying its OWN memory tree
             entry["associated_repos"] = [{"slug": "assoc", "url": "https://example.invalid/a.git"}]
             assoc = root / "repos" / "assoc" / "specs" / "memory"
@@ -347,6 +351,13 @@ def test_emissions_attach_the_derived_help_digest(tmp_path: Path) -> None:
     assert "# dadaia CLI digest (vX)" in _run(tmp_path, "s")
 
 
+def _atom(slug: str, summary: str = "short") -> str:
+    return (
+        f"---\nslug: {slug}\ntitle: {slug}\ntldr: handoffs\nsummary: {summary}\n"
+        f"tags: [handoff]\n---\n\n# {slug}\n"
+    )
+
+
 def test_injected_catalog_is_tldr_digest_and_measurably_smaller(tmp_path: Path) -> None:
     """The injected catalog keeps slug/title/tldr/path only (never the heavy
     ``summary`` nor ``rank``), is under half the raw bytes, and the file on disk is untouched."""
@@ -360,7 +371,18 @@ def test_injected_catalog_is_tldr_digest_and_measurably_smaller(tmp_path: Path) 
         "path": "specs/memory/product/agents/agent-comms.md",
     }
     raw = json.dumps({"context": "ctx", "features": [feature, {**feature, "slug": "b"}]})
-    _ws(tmp_path, {"name": "ctx", "catalog": raw})
+    heavy = "heavy self-pull text " * 60
+    _ws(
+        tmp_path,
+        {
+            "name": "ctx",
+            "catalog": raw,
+            "atoms": {
+                "agents/agent-comms.md": _atom("agent-comms", heavy),
+                "agents/b.md": _atom("b", heavy),
+            },
+        },
+    )
     _bind(tmp_path, "s", "ctx")
     out = _run(tmp_path, "s")
     block = out[out.index("{") : out.rindex("}") + 1]
@@ -372,6 +394,53 @@ def test_injected_catalog_is_tldr_digest_and_measurably_smaller(tmp_path: Path) 
     }
     assert len(block) < len(raw) * 0.5
     assert read_text(tmp_path / "repos/ctx/specs/memory/product/catalog.json") == raw
+
+
+def test_the_digest_is_the_atom_files_when_the_catalog_names_a_ghost(tmp_path: Path) -> None:
+    """Catalog and files disagree: the catalog names a feature with no atom file, and the atom
+    file has no catalog entry. The files are the owner's answer."""
+    ghost = json.dumps(
+        {"features": [{"slug": "ghost", "title": "ghost", "tldr": "x", "path": "p"}]}
+    )
+    _ws(tmp_path, {"name": "ctx", "catalog": ghost, "atoms": {"agents/real.md": _atom("real")}})
+    _bind(tmp_path, "s", "ctx")
+
+    out = _run(tmp_path, "s")
+
+    assert '"slug": "real"' in out
+    assert '"slug": "ghost"' not in out
+
+
+def test_the_digest_is_built_from_files_when_the_catalog_is_unreadable(tmp_path: Path) -> None:
+    """A catalog that does not parse is not injected raw: the atom files still answer."""
+    _ws(
+        tmp_path,
+        {"name": "ctx", "catalog": "{not json", "atoms": {"agents/real.md": _atom("real")}},
+    )
+    _bind(tmp_path, "s", "ctx")
+
+    out = _run(tmp_path, "s")
+
+    assert '"slug": "real"' in out
+    assert "{not json" not in out
+
+
+def test_an_unreadable_atom_is_a_finding_with_the_check_that_names_it(tmp_path: Path) -> None:
+    """An atom whose frontmatter does not parse is printed as a finding that names the file and
+    the `memory.py check` fix line, never silently dropped from the emission."""
+    _ws(
+        tmp_path,
+        {
+            "name": "ctx",
+            "atoms": {"agents/broken.md": "---\nslug: [unclosed\n---\n\n# broken\n"},
+        },
+    )
+    _bind(tmp_path, "s", "ctx")
+
+    out = _run(tmp_path, "s")
+
+    assert "broken.md" in out
+    assert "memory.py check" in out
 
 
 # The hook under ``runpy``, with an audit hook counting filesystem and subprocess operations
