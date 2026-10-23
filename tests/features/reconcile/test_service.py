@@ -94,6 +94,37 @@ def test_version_mismatch_is_read_only(tmp_path: Path) -> None:
     assert (workspace / ".dadaia" / "states" / "spec_contexts.json").read_bytes() == before
 
 
+def test_the_structured_result_carries_the_fix_line(tmp_path: Path) -> None:
+    result = _reconcile(
+        _v1_workspace(tmp_path),
+        expected_version="9.9.9",
+        actual_version="1.0.0",
+        public_service=_Public(),
+        doctor_service=_Doctor(),
+    )
+    assert result.to_dict()["fix"] == result.fix
+    assert result.fix.startswith(
+        "Agent action: install the exact provider version 9.9.9, then run "
+    )
+
+
+def test_missing_dependencies_are_fixed_by_rerunning_the_cli_not_by_an_install(
+    tmp_path: Path,
+) -> None:
+    result = reconcile_workspace(
+        _v1_workspace(tmp_path),
+        expected_version="1.2.3",
+        actual_version="1.2.3",
+        public_service=_Public(),
+        doctor_service=_Doctor(),
+    )
+    assert result.error == "dependencies not composed"
+    assert result.fix == (
+        "Agent action: run "
+        + platform.inline(*cli_words(None, "reconcile", "--expect-version", "1.2.3"))
+    )
+
+
 def test_failure_restores_migrated_state_and_requires_projection_rollback(tmp_path: Path) -> None:
     workspace = _v1_workspace(tmp_path)
     state_path = workspace / ".dadaia" / "states" / "spec_contexts.json"
