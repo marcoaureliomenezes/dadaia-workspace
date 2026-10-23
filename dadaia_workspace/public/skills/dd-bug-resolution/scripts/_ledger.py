@@ -196,6 +196,12 @@ def terms(root: Path | None, repo: Path | None = None) -> list[tuple[str, str]]:
     return [(str(t), str(r)) for t, r in json.loads(read_text(path)).items() if not (t and t.lower() in own)]  # fmt: skip
 
 
+def scanned_patterns(patterns: Iterable[Any], path: str) -> list[Any]:
+    """The baseline patterns that scan *path*: a pattern whose ``skip_paths`` names the path never
+    scans it, every other pattern scans it with its own ``exclude`` carve-out intact."""
+    return [p for p in patterns if not (p.skip_paths and p.skip_paths.search(path))]
+
+
 def _published_text(path: Path) -> str | None:
     """*path*'s text at the first publication boundary carrying it (the push's prior text,
     ``_privacy.publication_boundaries``); ``None`` outside git, when none carries it, or when

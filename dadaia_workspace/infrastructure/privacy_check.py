@@ -26,7 +26,6 @@ from dadaia_workspace.core.redaction import (
     mask,
     privacy_matches,
 )
-from dadaia_workspace.core.workspace_resolver import own_workspace_root
 from dadaia_workspace.infrastructure.ledger_scripts import load_owner
 
 #: Directory names never walked when scanning public assets: Python's own bytecode cache
@@ -39,6 +38,7 @@ _PUBLIC_PRIVACY_TEXT_SUFFIXES = {
     ".j2",
     ".js",
     ".json",
+    ".lock",
     ".md",
     ".py",
     ".sh",
@@ -83,12 +83,11 @@ def _load_privacy_baseline() -> tuple[BaselinePattern, ...]:
 
 
 def load_privacy_terms(repo: Path | None = None) -> tuple[tuple[str, str], ...]:
-    """The operator denylist, loaded through the ledger reader: ``_ledger.terms`` rooted at
-    ``_ledger.workspace_of`` the cwd (the ledger seam passes its ``--specs``), else the
-    workspace owning this venv, minus the terms the name of the scanned *repo* carries. ``$DADAIA_PRIVACY_DENYLIST`` loads
-    even outside any workspace."""
+    """The operator denylist of the workspace holding *repo* (``_ledger.terms`` over its
+    ``workspace_of``), minus the terms the name of *repo* carries. Without *repo* only
+    ``$DADAIA_PRIVACY_DENYLIST`` applies."""
     ledger = load_owner("dd-bug-resolution", "_ledger")
-    return tuple(ledger.terms(ledger.workspace_of(Path.cwd()) or own_workspace_root(), repo))
+    return tuple(ledger.terms(ledger.workspace_of(repo) if repo else None, repo))
 
 
 def load_baseline_patterns() -> tuple[_BaselinePattern, ...]:
@@ -150,7 +149,8 @@ def check_public_privacy(
     """
     lib_root = public_dir.parent.parent
     roots: list[Path] = [public_dir]
-    denylist = load_privacy_terms()
+    ledger = load_owner("dd-bug-resolution", "_ledger")
+    denylist = ledger.terms(ledger.workspace_of(public_dir))
     try:
         baseline = _load_privacy_baseline()
     except load_owner("dd-bug-resolution", "_refusal").Refusal as refusal:
@@ -182,9 +182,7 @@ def check_public_privacy(
                                 f"public-privacy:{rel.as_posix()}: contains '{term}' ({reason})",
                             )
                         )
-            scanned = [
-                p for p in baseline if not (p.skip_paths and p.skip_paths.search(rel.as_posix()))
-            ]
+            scanned = ledger.scanned_patterns(baseline, rel.as_posix())
             for value, source, reason in privacy_matches(text, denylist, scanned):
                 kind = "contains" if source == "operator denylist" else "baseline match"
                 findings.append(
