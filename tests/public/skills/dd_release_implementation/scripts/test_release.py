@@ -602,6 +602,9 @@ def _git(root: Path, *argv: str) -> str:
     return run(["git", *argv], cwd=root, check=True).stdout.strip()
 
 
+_PASS = "chore(release): rc-1 memory pass recorded — 1 reviewed, 0 changed"
+
+
 def _memory_repo(tmp_path: Path, script: Path) -> tuple[Path, Path, str]:
     """A git repo whose one atom `alpha` covers `features/alpha`, committed at *base*;
     the live release is in CLOSURE, its IMPLEMENTATION phase commit is base, and the code moved since."""
@@ -740,13 +743,13 @@ def test_memory_opens_the_next_window_at_the_previous_until(script: Path, tmp_pa
     its worklist is empty and the empty entry is accepted."""
     root, specs, _ = _memory_repo(tmp_path, script)
     assert _memory(script, root, specs, reviewed="alpha", changed="").returncode == 0
-    _git(root, "commit", "-qam", "memory entry")  # the state file is tracked
-    until = _log(specs)[-1]["until"]
+    _git(root, "commit", "-qam", _PASS)  # the state file is tracked
+    recorded = _git(root, "rev-parse", "HEAD")
 
     result = _memory(script, root, specs, reviewed="", changed="")
 
     assert result.returncode == 0, result.stderr
-    assert _log(specs)[-1]["since"] == until
+    assert _log(specs)[-1]["since"] == recorded
 
 
 @pytest.mark.parametrize("rewrite", ["rebase", "fold"])
@@ -855,7 +858,7 @@ def test_a_rerun_after_the_second_reconciliation_appends_nothing(
     """The no-op reads the LAST memory record's until, not the first one's."""
     root, specs, _ = _memory_repo(tmp_path, script)
     assert _memory(script, root, specs, reviewed="alpha", changed="").returncode == 0
-    _git(root, "commit", "-qam", "memory entry")
+    _git(root, "commit", "-qam", _PASS)
     assert _memory(script, root, specs, reviewed="", changed="").returncode == 0
 
     result = _memory(script, root, specs, reviewed="", changed="")
@@ -884,7 +887,7 @@ def test_check_is_clean_when_a_source_moves_after_the_memory_entry(
     clean."""
     specs = _reconciled_closure(tmp_path, script)
     root = specs.parent
-    _git(root, "commit", "-qam", "memory entry")
+    _git(root, "commit", "-qam", _PASS)
     write_text(root / "dadaia_workspace" / "features" / "alpha" / "core.py", "x = 3\n")
     _git(root, "commit", "-qam", "code moved after the entry")
 
