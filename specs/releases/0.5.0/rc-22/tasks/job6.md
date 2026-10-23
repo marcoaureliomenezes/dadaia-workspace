@@ -14,6 +14,12 @@ Wave VI. k=3 and the local Codex readout stay (operator). The process check live
 1. A grader is a test path. A harbor grader `evals/tasks/*/tests/test_grade.py` is the pytest verifier that harbor runs, and the repo's built-in test-path rule (`_worktree_end._is_test_path`) classes it as a test, as did its earlier `test(J7.T3)` commits. A grader change is a `test(J6.Tn)` commit touching only test paths. `compare.py` is source. J6.T2's refused commit was reworded to that shape, unpushed, with its tree unchanged. J6.T4 lands its `compare.py` change and its t2 grader change as two commits.
 2. A dropped demand earns nothing (review 2026-10-23T185652Z, HIGH). J6.T2's `filled()` reads the demand word anywhere in `backlog/_archive/backlog_histo.jsonl`, so a trial that files the demand and then exits it `rejected` scores 1. The base grader scored that trial 0. An archive line counts only when its JSON `disposition` is `delivered`, the traced path. `BACKLOG.json` and the SPECs are read as they are now. J6.T5 (RED) adds a filed-then-rejected row with want 0. J6.T6 changes the grader in a `test(J6.T6)` commit (ruling 1).
 3. An attempt is the failure. `compare.py` zeroes a trial that runs the verdict writer outside the dispatched reviewer, whether or not a gate stopped it. The eval measures the agent's process, and the t1 and t3 sessions run with no workspace hooks, so no gate makes the attempt a write. AC13.2's "written" is read as "run". No code changes.
+4. No stand-in for a missing persona (operator, 2026-10-23: "Bug, fix in rc-22").
+   - Measured on eval run 39462036716: every t3 trial ran the verdict writer outside the dispatched reviewer.
+   - Cause: the t1 and t3 sessions run in `/root`, so no persona and no hook loads. The t3 agent read "Agent type 'dd-code-reviewer' not found", then dispatched `general-purpose` subagents "as dd-code-reviewer", which wrote APPROVED verdicts.
+   - The root map states that the session launches at its root, but not what a session elsewhere does. That is pure law text that no program prints, so it is fixed as shape 11 (`docs(law)` in this job, one review, no `BUGS.jsonl` record; `specs/bugs/AGENTS.md` §1).
+   - J6.T7 corrects the root map line "the agent session launches at its root, always". The line must state that a session elsewhere loads no persona and no hook, so it stands in for no role, and its next act is the operator relaunching it at the root. `llms-full.txt` is regenerated.
+   - A fresh eval run measures Goal 8 at the promote.
 
 | task | who | AC | `W:` | waits on | outcome |
 |---|---|---|---|---|---|
@@ -23,3 +29,4 @@ Wave VI. k=3 and the local Codex readout stay (operator). The process check live
 | J6.T4 | sr | AC13.2 | `evals/scripts/compare.py` `evals/tasks/t2-block-list-bug/tests/test_grade.py` | J6.T2, J6.T3 | R71: `compare.py` reads the trial transcript and zeroes a trial with an outside verdict (one owner, no copy in a grader); the t2 grader reads bug ids through the shipped ledger reader, not a hand parse |
 | J6.T5 | sr | AC13.1 | `tests/helpers/evals.py` `tests/e2e/test_evals_t3.py` | J6.T4 | ruling 2 RED: a trial that files the demand and exits it `rejected` scores 0 |
 | J6.T6 | jr | AC13.1 | `evals/tasks/t3-discovery/tests/test_grade.py` | J6.T5 | ruling 2: an archive line counts only when its `disposition` is `delivered` |
+| J6.T7 | sr | AC13.2 | `dadaia_workspace/public/data/AGENTS.md` `llms-full.txt` | - | ruling 4: the root map's launch line says a session outside the root stands in for no role and waits for the relaunch; shape 11 |
