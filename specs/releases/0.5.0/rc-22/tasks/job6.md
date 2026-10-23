@@ -10,6 +10,9 @@ Wave VI. k=3 and the local Codex readout stay (operator). The process check live
 
 **Sweep greps.** `git grep -n "def filled" -- evals` prints one definition; `git grep -n "verdict" -- evals/scripts/compare.py evals/tasks` prints the one process check, in `compare.py`, and none in a grader.
 
+**Main-thread rulings (2026-10-23).**
+1. A grader is a test path. A harbor grader `evals/tasks/*/tests/test_grade.py` is the pytest verifier that harbor runs, and the repo's built-in test-path rule (`_worktree_end._is_test_path`) classes it as a test, as did its earlier `test(J7.T3)` commits. A grader change is a `test(J6.Tn)` commit touching only test paths. `compare.py` is source. J6.T2's refused commit was reworded to that shape, unpushed, with its tree unchanged. J6.T4 lands its `compare.py` change and its t2 grader change as two commits.
+
 | task | who | AC | `W:` | waits on | outcome |
 |---|---|---|---|---|---|
 | J6.T1 | sr | AC13.1 | `tests/helpers/evals.py` `tests/e2e/test_evals_t3.py` | - | R70 RED: the bare `release.py new` stub is a negative fixture and the grader gives it 0; a SPEC whose Origin or entry carries the demand text of the container's brief passes |
