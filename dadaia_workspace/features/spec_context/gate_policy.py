@@ -178,7 +178,9 @@ def verdict_act(command: str, *, key: str | None, subagent: str | None) -> str |
     if (
         key is None
         or subagent == reviewer
-        or not (_WRITER.search(text := command.lower()) and "--verdict" in text)
+        or not (
+            _WRITER.search(text := re.sub(r"['\"\\]", "", command.lower())) and "--verdict" in text
+        )
     ):
         return None
     dispatch = f"dispatch {reviewer} on the tree to judge; its verdict.py run writes the verdict"
