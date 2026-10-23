@@ -1,16 +1,21 @@
 """The object scan of an export bundle, matched by an injected matcher; each refusal has its fix."""
 
+import subprocess
 import tempfile
 from collections.abc import Callable, Iterable
 from pathlib import Path
 from typing import NoReturn
 
 from dadaia_workspace.core.cli_line import git_line
-from dadaia_workspace.core.exceptions import DadaiaError, GitSyncError
+from dadaia_workspace.core.exceptions import DadaiaError
 from dadaia_workspace.core.models.git_scan import GitObjectReadError, GitRunError, ScannedObject
 from dadaia_workspace.core.platform import act, write_text
+from dadaia_workspace.core.skill_owner import load_owner
 from dadaia_workspace.infrastructure.git_objects import GitSubprocessObjectReader
-from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
+
+_GIT_TIMEOUT_S = 300
+# git's own words for a full or unwritable disk: the environment's fault, never the bundle's.
+_ENVIRONMENT = ("No space left", "Disk quota", "Permission denied", "Read-only file system")
 
 
 def scratch_fix(tmp: Path) -> str:
@@ -54,11 +59,17 @@ def scan_bundle(
 
     def git(cwd: Path, *args: str, why: str, fix: str) -> str:
         try:
-            return GitSubprocessClient().git(cwd, *args)
-        except GitSyncError as exc:
-            refuse(f"{why}: {exc.message.partition(':\n')[2].strip()}", fix)
-        except (OSError, TimeoutError):
+            done = load_owner("dd-bug-resolution", "_git").git_bytes(
+                cwd, *args, timeout=_GIT_TIMEOUT_S
+            )
+        except (OSError, subprocess.TimeoutExpired):
             refuse("git could not run", read_fix(GitRunError("git"), repo))
+        if done.returncode:
+            reason = (done.stdout + done.stderr).decode("utf-8", "replace").strip()
+            if any(marker in reason for marker in _ENVIRONMENT):
+                fix = scratch_fix(workspace_root / ".dadaia" / "tmp")
+            refuse(f"{why}: {reason}", fix)
+        return done.stdout.decode("utf-8", "replace").strip()
 
     try:
         bundle.open("rb").close()

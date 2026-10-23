@@ -253,7 +253,7 @@ class ExportService:
         hits = []
         for arc, file in sorted(bundles.items()):
             repo = self._workspace_root / "repos" / arc.split("/")[0]
-            if file.is_symlink():
+            if load_owner("dd-bug-resolution", "_platform").is_link(file):
                 raise DadaiaError(
                     f"{arc} is a symlink; an archive carries bundle files only",
                     fix=act("agent", f"replace {file} with the bundle file itself, then export"),
