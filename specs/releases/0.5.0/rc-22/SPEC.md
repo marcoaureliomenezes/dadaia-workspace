@@ -147,7 +147,7 @@ The fixes the window review rates REBUILD are re-worked by the FRs named in its 
 
 ### FR10 — REBUILD: release state, stats and the fold (F008; R3 clause 5)
 
-- AC10.1 No milestone, memory-window bound or stats input is a stored sha that a rewrite can orphan: `release.py` stops writing the milestone shas, and the schema no longer requires `sha` (Q6). A missing closure commit is a refusal, never a metric of 0. Test: unit (`test_release__release_script.py`, `test_verdict.py`).
+- AC10.1 No milestone, memory-window bound or stats input is a stored sha that a rewrite can orphan: `release.py` stops writing the milestone shas, and the schema no longer requires `sha` (Q6). A missing closure commit prints metric 6 as `n/a (no closure commit)` and never refuses. Test: unit (`test_release__release_script.py`, `test_verdict.py`).
 - AC10.3 The 5 uncited and 28 id-line-less historic bug records clear through ADR 0278's one `bugs.py archive` act; no baseline list (Q6). Test: none; `bugs.py check`.
 - AC10.2 The fold's rewriting remedy, `ci push-gate-check --rewrite-from`, is deleted with its fix line. Test: unit (the push-gate refusal's fix-line row).
 
