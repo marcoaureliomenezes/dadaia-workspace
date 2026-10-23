@@ -27,7 +27,7 @@ class ReconcileResult:
     fix: str = ""
 
     def to_dict(self) -> dict[str, Any]:
-        return {k: v for k, v in asdict(self).items() if k != "fix"}
+        return asdict(self)
 
 
 def reconcile_workspace(
@@ -62,7 +62,7 @@ def reconcile_workspace(
             install_first,
         )
     if context_store is None or migration_plan is None or migrate is None:
-        return failed("dependencies not composed", install_first)
+        return failed("dependencies not composed", act("agent", f"run {rerun}"))
 
     steps: list[str] = ["provider-version"]
     registry_snapshot = context_store.snapshot()
