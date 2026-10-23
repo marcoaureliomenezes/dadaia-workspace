@@ -82,12 +82,14 @@ def _load_privacy_baseline() -> tuple[BaselinePattern, ...]:
     return load_baseline()
 
 
-def load_privacy_terms(repo: Path | None = None) -> tuple[tuple[str, str], ...]:
+def load_privacy_terms(
+    repo: Path | None = None, *, own: bool = True
+) -> tuple[tuple[str, str], ...]:
     """The operator denylist of the workspace holding *repo* (``_ledger.terms`` over its
-    ``workspace_of``), minus the terms the name of *repo* carries. Without *repo* only
-    ``$DADAIA_PRIVACY_DENYLIST`` applies."""
+    ``workspace_of``), minus the terms the name of *repo* carries when *own*. Without *repo*
+    only ``$DADAIA_PRIVACY_DENYLIST`` applies."""
     ledger = load_owner("dd-bug-resolution", "_ledger")
-    return tuple(ledger.terms(ledger.workspace_of(repo) if repo else None, repo))
+    return tuple(ledger.terms(ledger.workspace_of(repo) if repo else None, repo if own else None))
 
 
 def load_baseline_patterns() -> tuple[_BaselinePattern, ...]:
