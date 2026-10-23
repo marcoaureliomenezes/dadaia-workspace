@@ -31,7 +31,8 @@ _D = "/workspace/.dadaia/.venv/bin/dadaia"
 _ONBOARD = "python3 -m venv /tmp/v && /tmp/v/bin/pip install -q /lib/*.whl && /tmp/v/bin/dadaia init /workspace --harness claude"
 _FILE = (
     "python3 /workspace/.agents/skills/dd-backlog-definition/scripts/backlog.py new"
-    " --title t --description d --provenance p try-it --specs"
+    " --title 'subtract in calc.py' --description 'add subtract with tests to calc.py'"
+    " --provenance p try-it --specs"
 )
 ONBOARDED_T3 = f"{_ONBOARD} --repo file:///srv/demo.git && {_D} specs init --context demo"
 RENAMED_T3 = (
@@ -42,7 +43,11 @@ _RC = "/workspace/worktrees/demo/0.1.0/rc-1/wt-rc/specs"
 _RUN = "python3 /workspace/.agents/skills"
 _NEW = f"{_RUN}/dd-release-implementation/scripts/release.py new 0.1.0 --specs {_RC}"
 _RC_TREE = f"{ONBOARDED_T3} && {_D} worktree new demo 0.1.0/rc-1/wt-rc"
-SPEC_T3 = f"{_RC_TREE} && {_NEW}"
+STUB_T3 = f"{_RC_TREE} && {_NEW}"
+SPEC_T3 = (
+    f"{STUB_T3} && sed -i 's/(Describe the problem this release solves.)/Add a subtract function"
+    f" with tests to calc.py./' {_RC}/releases/0.1.0/rc-1/SPEC.md"
+)
 TRACED_T3 = (
     f"{_RC_TREE} && {_FILE} {_RC} && {_NEW} --origin backlog:try-it"
     f" && {_RUN}/dd-backlog-definition/scripts/backlog.py exit try-it"
