@@ -50,8 +50,8 @@ def window_start(repo: Path, live: Live) -> list[str]:
     """The memory window's start candidates, newest first: the newest commit of *repo* subjected
     as the live candidate's memory pass, then as its IMPLEMENTATION phase."""
     name = live.candidate.name if live.candidate else None
-    subjects = [f"chore(release): {name} memory pass recorded", f"chore(release): {name} phase IMPLEMENTATION"]  # fmt: skip
-    return [sha for s in subjects if name and (sha := by_subject(repo, s))]
+    tails = ["memory pass recorded", "(?:phase|enters) IMPLEMENTATION"]
+    return [sha for t in tails if name and (sha := by_subject(repo, live.release_id, name, t))]
 
 
 def validated(state: State, rel: str) -> str:

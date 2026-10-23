@@ -74,10 +74,10 @@ def _merge(repo: Path, branch: str, sha: str) -> list[str]:
 
 def _closure(repo: Path, rc: str) -> str:
     """The sha of the commit subjected as *rc*'s CLOSURE phase; a history without it is refused."""
-    n = rc.rpartition("-rc")[2]
-    if sha := by_subject(repo, f"chore(release): rc-{n} phase CLOSURE"):
+    version, _, n = rc.partition("-rc")
+    if sha := by_subject(repo, version, f"rc-{n}", "(?:phase|enters) CLOSURE"):
         return sha
-    raise Refusal(f"{rc} is closed, but no commit of this history is subjected 'chore(release): rc-{n} phase CLOSURE'", act("agent", "restore the closure commit's history (fetch it), then rerun the stats"))  # fmt: skip
+    raise Refusal(f"{rc} is closed, but no commit touching specs/releases/{version}/ is subjected 'chore(release): rc-{n} phase CLOSURE'", act("agent", f"commit the closure with the subject 'chore(release): rc-{n} phase CLOSURE' touching specs/releases/{version}/, then rerun the stats"))  # fmt: skip
 
 
 def _after_closure(repo: Path, sha: str | None, tip: str) -> str:

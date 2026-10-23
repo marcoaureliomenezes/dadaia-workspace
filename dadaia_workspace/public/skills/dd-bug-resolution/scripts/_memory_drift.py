@@ -127,10 +127,11 @@ def git(repo: Path, *argv: str) -> list[str]:
     return [line for line in out.split("\n") if line]
 
 
-def by_subject(repo: Path, prefix: str) -> str:
-    """The newest commit of *repo* whose subject starts with *prefix*, else `""`: the one reader of a window bound."""
-    out = _git.git(repo, "log", "--format=%H %s", "--fixed-strings", "--grep", prefix, check=False)
-    return next((ln.split()[0] for ln in out.splitlines() if ln.partition(" ")[2].startswith(prefix)), "")  # fmt: skip
+def by_subject(repo: Path, version: str, rc: str, tail: str) -> str:
+    """The newest commit touching `specs/releases/<version>/` subjected `chore(release): <rc> <tail>` (*tail* a regex), else `""`: the one reader of a window bound."""
+    out = _git.git(repo, "log", "--format=%H %s", "--", f"specs/releases/{version}/", check=False)
+    pat = re.compile(rf"chore\(release\): {re.escape(rc)} {tail}\b")
+    return next((ln.split()[0] for ln in out.splitlines() if pat.match(ln.partition(" ")[2])), "")
 
 
 def _root(repo: Path) -> str:
