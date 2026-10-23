@@ -150,6 +150,4 @@ def set_phase(specs: Path, phase: str) -> tuple[str, str]:
         return state
 
     commit(live.release_dir / STATE, f"releases/{live.release_id}/{STATE}", apply)
-    if candidate:
-        print(f"commit subject: chore(release): {candidate.name} phase {phase}")
     return live.release_id, ts

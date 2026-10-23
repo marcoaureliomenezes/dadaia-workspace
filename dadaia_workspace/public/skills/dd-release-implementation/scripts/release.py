@@ -125,9 +125,16 @@ def _origin(spec: Path) -> int:
     return 0
 
 
+def _subject(live: Live, tail: str) -> None:
+    """Print the subject the milestone commit carries (the one reader of it is `_memory_drift.by_subject`)."""
+    if live.candidate:
+        print(f"commit subject: chore(release): {live.candidate.name} {tail}")
+
+
 def _phase(args: argparse.Namespace, specs: Path) -> int:
     release_id, ts = set_phase(specs, args.phase.upper())
     print(f"[ok] release {release_id} -> phase {args.phase.upper()} ({ts})")
+    _subject(live_release(specs), f"phase {args.phase.upper()}")
     return 0
 
 
@@ -163,6 +170,7 @@ def _memory(args: argparse.Namespace, specs: Path) -> int:
     commit(live.release_dir / STATE, f"releases/{live.release_id}/{STATE}",
            lambda state: {**state, "log": [*(state.get("log") or []), entry]})  # fmt: skip
     print(f"[ok] release {live.release_id} log <- kind memory {since}..{until[:12]} ({ts})")
+    _subject(live, "memory pass recorded")
     return 0
 
 

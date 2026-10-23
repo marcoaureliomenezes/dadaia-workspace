@@ -15,7 +15,6 @@ from _handoffs import reviewer_records
 from _jsonl import parse_object
 from _memory_drift import by_subject
 from _platform import act, read_text, run
-from _refusal import Refusal
 from _specs import check_release, context_row
 
 _FREE = ("docs(memory)", "chore(release)", "chore(backlog)", "chore(bugs)", "docs(adr)", "chore(adrs)")  # fmt: skip
@@ -72,14 +71,6 @@ def _merge(repo: Path, branch: str, sha: str) -> list[str]:
     return next((m.split() for m in merges if m.split()[0] in holds), [])
 
 
-def _closure(repo: Path, rc: str) -> str:
-    """The sha of the commit subjected as *rc*'s CLOSURE phase; a history without it is refused."""
-    version, _, n = rc.partition("-rc")
-    if sha := by_subject(repo, version, f"rc-{n}", "(?:phase|enters) CLOSURE"):
-        return sha
-    raise Refusal(f"{rc} is closed, but no commit touching specs/releases/{version}/ is subjected 'chore(release): rc-{n} phase CLOSURE'", act("agent", f"commit the closure with the subject 'chore(release): rc-{n} phase CLOSURE' touching specs/releases/{version}/, then rerun the stats"))  # fmt: skip
-
-
 def _after_closure(repo: Path, sha: str | None, tip: str) -> str:
     if not sha:  # the candidate is not closed yet
         return NA
@@ -100,7 +91,8 @@ def table(root: Path, specs: Path, rc: str) -> str:
     vals = [NA] * 6
     if window:
         birth, prior, end, closed, newest = window
-        sha = _closure(repo, rc) if closed else None
+        version, _, n = rc.partition("-rc")
+        sha = by_subject(repo, version, f"rc-{n}", "(?:phase|enters) CLOSURE") if closed else None
         row = context_row(root, repo) or {}
         name, integration = row.get("name"), (row.get("gitflow") or {}).get("integration")
         trees: dict[str, list[tuple[str, str]]] = {}
@@ -124,7 +116,9 @@ def table(root: Path, specs: Path, rc: str) -> str:
             _ratio(int(got["fix-induced"]), int(got["closed"])) if "closed" in got else NA,
             _ratio(first.count("APPROVED"), len(first)),
             f"{(_parse(merge[1]) - _parse(end)).total_seconds() / 3600:.1f} h" if merge else NA,
-            _after_closure(repo, sha, f"{merge[0]}^2" if merge else "HEAD"),
+            _after_closure(repo, sha, f"{merge[0]}^2" if merge else "HEAD")
+            if sha or not closed
+            else f"{NA} (no closure commit)",  # fmt: skip
             atoms,
             got.get("rebuild-due", NA),
         ]
