@@ -1,7 +1,7 @@
 """The census of refusal sites: one entry per site, keyed by its enclosing function. Two scopes, no
 more: every ``raise`` reachable from the pre-push gate and the ``context`` verbs (plus the
-chokepoints' refusals), and every function of the ``dd-gitflow-default`` worktree scripts that ends
-a statement in a ``fix:`` line. One consumer, ``tests/core/test_cli_line__refusal_fix_lines_clear_their_refusal.py``,
+chokepoints' refusals), and every function of the ``dd-gitflow-default`` worktree scripts that raises
+or spells a ``fix:`` line. One consumer, ``tests/core/test_cli_line__refusal_fix_lines_clear_their_refusal.py``,
 gives every site a case or a named ``Skip``."""
 
 from __future__ import annotations
@@ -82,14 +82,19 @@ def _functions(node: ast.AST, prefix: tuple[str, ...] = ()) -> dict[str, ast.AST
     return found
 
 
+def _ends(node: ast.AST) -> bool:
+    """A statement that refuses: a ``raise`` of an exception, or any simple statement that spells
+    a fix line."""
+    if isinstance(node, ast.Raise):
+        return node.exc is not None
+    simple = (ast.Return, ast.Expr, ast.Assign, ast.AnnAssign, ast.AugAssign)
+    return isinstance(node, simple) and any(map(_is_site, ast.walk(node)))
+
+
 def _refusals(fn: ast.AST) -> int:
-    """How many statements of *fn* end in a fix line (a raise, a return or a bare call that spells
-    one); a function that only assigns one counts once."""
-    ends = sum(
-        isinstance(s, (ast.Raise, ast.Return, ast.Expr)) and any(map(_is_site, ast.walk(s)))
-        for s in ast.walk(fn)
-    )
-    return ends or 1
+    """How many statements of *fn* refuse (see :func:`_ends`); a function that only spells a fix
+    line inside a compound header counts once."""
+    return sum(map(_ends, ast.walk(fn))) or 1
 
 
 def fix_sites() -> list[str]:
@@ -122,6 +127,6 @@ def fix_sites() -> list[str]:
             sites += [f"{stem}.{name}"] * len(raises)
     for path in sorted(_SCRIPTS.glob("*.py")):
         for qual, fn in _functions(ast.parse(read_text(path))).items():
-            if qual.rsplit(".", 1)[-1] not in _SPELLERS and any(map(_is_site, ast.walk(fn))):
+            if qual.rsplit(".", 1)[-1] not in _SPELLERS and any(map(_ends, ast.walk(fn))):
                 sites += [f"{path.stem}.{qual}"] * _refusals(fn)
     return sites

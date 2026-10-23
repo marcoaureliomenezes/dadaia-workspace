@@ -54,8 +54,8 @@ from tests.fixtures.fix_world import (
     _on_work,
     _push_gate,
     _rmtree,
-    _single_fix,
     _unborn_dirty,
+    the_fix,
 )
 from tests.helpers import worktree_ws as wt
 from tests.helpers.oslib import write_text
@@ -85,7 +85,7 @@ def _drive(world: World, case: Case) -> None:
     assert done.returncode != 0, f"the case planted no refusal:\n{done.stdout}{done.stderr}"
     seen: list[str] = []
     for step in range(4):
-        fix = _single_fix(done)
+        fix = the_fix(done, world.ws)
         assert fix not in seen, f"no progress — the same fix line again:\n{fix}"
         seen.append(fix)
         act = fix.startswith(("Agent action: ", "Operator action: "))
@@ -135,10 +135,10 @@ def test_the_worktree_fix_line_clears_the_refusal(case: WtCase, tmp_path: Path) 
     assert done.returncode != 0, f"the case planted no refusal:\n{done.stdout}{done.stderr}"
     seen: list[str] = []
     for _ in range(4):
-        (fix,) = wt.fixes(done)
+        fix = the_fix(done, root)
         assert fix not in seen, f"no progress — the same fix line again:\n{fix}"
         seen.append(fix)
-        if fix.startswith(("fix: Agent action: ", "fix: Operator action: ")):
+        if fix.startswith(("Agent action: ", "Operator action: ")):
             if case.play is not None:
                 case.play(root)
         else:
@@ -197,7 +197,7 @@ def test_every_fix_line_prints_on_one_line_without_a_tty(tmp_path: Path) -> None
     through the one ``cli/_fail.fail`` a real child process exercises here."""
     world = World(tmp_path / ("d" * 90))
     _unborn_dirty(world)
-    fix = _single_fix(world.cli("context", "dead", "proj"))
+    fix = the_fix(world.cli("context", "dead", "proj"), world.ws)
     assert fix.startswith("Agent action: move ") and fix.endswith("notes.txt into a worktree"), fix
     assert re.search(re.escape(str(world.ws)), fix)
 
@@ -208,7 +208,7 @@ def test_the_gate_is_read_only_and_its_fix_is_one_agent_action_naming_the_listed
     """The denylist refusal's one fix is an Agent action naming the listed path; the gate
     offers no history rewrite and no publish verb that rewrites."""
     command = _denylisted(world)
-    fix = _single_fix(_hit(world, command))
+    fix = the_fix(_hit(world, command), world.ws)
     assert fix.startswith("Agent action: ") and "notes.md" in fix, fix
     assert "--rewrite-from" not in fix
     assert "--republish" not in world.cli("context", "baseline", "--help").stdout
@@ -258,7 +258,7 @@ def test_a_refused_baseline_push_names_the_anchor_and_the_publish_as_the_next_st
     as the step after that fix (a hand push would drop origin's merge parent)."""
     done = _hit(world, _baseline_denylisted(world))
     output = done.stdout + done.stderr
-    assert done.returncode != 0 and _single_fix(done).startswith("Agent action: ")
+    assert done.returncode != 0 and the_fix(done, world.ws).startswith("Agent action: ")
     assert f"onboarding commit {world.git(world.repo, 'rev-parse', 'HEAD')}" in output
     assert fix_line(world.ws, "context", "baseline", "proj") in output.replace("\n", "")
 
@@ -280,7 +280,7 @@ def test_dead_after_the_operator_pulls_into_a_conflict_publishes_no_markers(
     published = world.remote_heads()["feature/1.0.0"]
     done = world.cli("context", "dead", "proj")
     output = done.stdout + done.stderr
-    fix = _single_fix(done)
+    fix = the_fix(done, world.ws)
     assert done.returncode != 0 and "README.md" in fix and "x.md" in fix, output
     assert fix.startswith("Agent action: move ") and fix.endswith("into a worktree"), output
     assert world.repo.is_dir() and world.remote_heads()["feature/1.0.0"] == published

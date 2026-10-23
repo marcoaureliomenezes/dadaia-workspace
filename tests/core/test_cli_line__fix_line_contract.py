@@ -1,9 +1,7 @@
 """The fix-line contract: every refusal carries exactly one ``fix:`` line that clears it.
 
 ``SITES`` maps a site name to a producer: given a fresh workspace root it returns the refusal
-text that site prints. The ``refusal`` sites are real git and CLI child processes; their producer
-also follows the fix lines until the refused command succeeds or refuses with a different fix,
-in at most four steps. A further adapter adds its sites with ``SITES |= {...}``.
+text that site prints.
 
 size: MEDIUM — real git and real CLI child processes, no network.
 """
@@ -42,14 +40,13 @@ from dadaia_workspace.core.skill_owner import load_owner
 from dadaia_workspace.core.specs_version import CANONICAL_SPECS_VERSION
 from dadaia_workspace.features.chokepoints import push_gate_decision
 from dadaia_workspace.features.chokepoints.branch_policy import parse_push_stdin
-from dadaia_workspace.features.spec_context.gate_policy import PathClass, classify_path
 from dadaia_workspace.features.spec_context.service import install_git_hooks
 from dadaia_workspace.features.specs import canon
 from dadaia_workspace.features.specs.canon import canon_violations
 from dadaia_workspace.features.specs.citations import dead_verb_citations
 from dadaia_workspace.features.specs.rules import RULES as SPECS_RULES
 from dadaia_workspace.features.workspace.service import WorkspaceService
-from dadaia_workspace.hooks import pre_gate, sdd_gate
+from dadaia_workspace.hooks import pre_gate
 from dadaia_workspace.infrastructure.git_objects import GitSubprocessObjectReader
 from dadaia_workspace.infrastructure.json_install_ledger_store import JsonInstallLedgerStore
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
@@ -61,7 +58,6 @@ from tests.features.specs.test_doctor import _make_clean_specs_tree
 from tests.fixtures.fix_world import (
     _TERM,
     _UNSET,
-    Case,
     World,
     _advance_origin_work,
     _associated_dead,
@@ -75,9 +71,10 @@ from tests.fixtures.fix_world import (
     _dirty_on_integration,
     _hit,
     _on_work,
-    _push_gate,
     _rmtree,
     _unborn_dirty,
+    fix_defect,
+    the_fix,
 )
 from tests.fixtures.harness_env import git_bash, run_bash, suite_env
 from tests.fixtures.real_git import PushRepo
@@ -87,74 +84,7 @@ from tests.helpers.cli_root import live_root
 from tests.helpers.oslib import link, read_text, stub_cli, venv_tool, write_text
 from tests.helpers.oslib import run as os_run
 
-_FIX_LINE_RE = re.compile(r"^fix: (\S.*)$", re.MULTILINE)
-#: Not one act: a `<…>` (bar the `<specs>` a rule fix fills), an `&&` chain, an `a|b` menu;
-#: a command also no ` or ` / ` then `.
-_NOT_ONE_ACT_RE = re.compile(r"<(?!specs>)[^<>\n]+>|&&|\w\|\w")
-_NOT_ONE_COMMAND_RE = re.compile(rf"{_NOT_ONE_ACT_RE.pattern}| or | then ")
-#: The installer a workspace is born from, absent from CI runners.
-_PREREQUISITES = {"uvx"}
-#: The executables a fix line opens with (a list, not `which`: a host may ship a prose-named binary).
-_HEADS = {"chmod", "gh", "git", "grep", "ls", "mkdir", "rm", "sed", *_PREREQUISITES}
 _SHA_B, _ZERO = "b" * 40, "0" * 40
-
-
-#: The two act labels: an act the agent performs, and one the law reserves to the human.
-_ACT_LABELS = ("Agent action: ", "Operator action: ")
-_LABEL_RE = re.compile(r"[A-Z]\w* action: ")
-
-
-def fix_defect(fix: str) -> bool:
-    """True when *fix* is neither `Agent action: <one act>` nor `Operator action: <one act>`
-    nor one command whose head is no prose word, or carries any other `<Word> action:` label;
-    `·` stands for a value a source walk cannot know."""
-    known = fix.split("·", 1)[0]
-    if fix.startswith(_ACT_LABELS) or " " not in known and "·" in fix:
-        return bool(_NOT_ONE_ACT_RE.search(fix))
-    if _LABEL_RE.match(fix):
-        return True
-    head = known.split(" ", 1)[0]
-    prose = re.fullmatch(r"[a-z][a-z0-9-]*", head) and head not in _HEADS
-    return bool(prose or _NOT_ONE_ACT_RE.search(fix) or _NOT_ONE_COMMAND_RE.search(known))
-
-
-def _protected_paths(fix: str, root: Path) -> list[str]:
-    """Each absolute path word of *fix* under *root* that the gate classes PROTECTED, by the
-    gate's own law set (its install ledger and the operator's globs): a path an agent's act
-    cannot write."""
-    projected, protected = sdd_gate.law_set(root)
-    found: list[str] = []
-    for word in re.findall(r"(?:[A-Za-z]:)?[\\/][^\s`'\"]+", fix):
-        try:
-            rel = Path(word).resolve().relative_to(root.resolve()).as_posix()
-        except ValueError:
-            continue
-        if classify_path(rel, projected, protected, root=root)[0] is PathClass.PROTECTED:
-            found.append(rel)
-    return found
-
-
-def the_fix(message: str | None, root: Path) -> str:
-    """The one ``fix:`` line of *message*; raises AssertionError unless it is one act the
-    gate lets run; an ``Agent action:`` under *root* names no path the gate protects."""
-    assert message, "a refusal with an empty message is a stall"
-    fixes = _FIX_LINE_RE.findall(message)
-    assert len(fixes) == 1, f"expected exactly one 'fix:' line, got {fixes} in:\n{message}"
-    fix = fixes[0]
-    assert not fix_defect(fix) and "<specs>" not in fix, f"not one act: {fix}"
-    if fix.startswith(_ACT_LABELS):
-        assert not (fix.startswith("Agent action: ") and _protected_paths(fix, root)), fix
-        return fix
-    cli = command(str(workspace_cli_path(root)))
-    if fix == cli or fix.startswith(f"{cli} "):  # the CLI line, whole: its head must exist
-        assert workspace_cli_path(root).is_file(), fix
-    else:
-        argv0 = fix.split()[0]  # an absolute file, or a bare name on PATH, never cwd-relative
-        on_path = "/" not in argv0 and (shutil.which(argv0) or argv0 in _PREREQUISITES)
-        assert on_path or (Path(argv0).is_absolute() and Path(argv0).is_file()), fix
-    block = pre_gate.evaluate_payload({"tool_name": "Bash", "tool_input": {"command": fix}})
-    assert block is None, f"the fix command is itself blocked:\n{fix}\n{block}"
-    return fix
 
 
 def _workspace(root: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
@@ -360,42 +290,6 @@ def test_fix_defect_judges_both_action_labels_by_one_act(fix: str, defect: bool)
 @pytest.fixture
 def world(tmp_path: Path) -> World:
     return World.of(tmp_path)
-
-
-def _fix(done: subprocess.CompletedProcess[str], root: Path) -> str:
-    """The one runnable fix line of a refusal's output in the workspace *root*."""
-    return the_fix(done.stdout + done.stderr, root)
-
-
-def _chain(ws: Path, case: Case) -> str:
-    """Plants *case*'s refusal in a world under *ws* and follows its fix lines: the command
-    then succeeds, or refuses with a different fix, in at most four steps. Returns the first
-    refusal text."""
-    world = World.of(ws)
-    command = case.build(world)
-    if isinstance(command, str) and " push " in command:
-        done = _push_gate(world, command)
-    else:
-        done = _hit(world, command)
-    assert done.returncode != 0, f"the case planted no refusal:\n{done.stdout}{done.stderr}"
-    first, seen = done.stdout + done.stderr, []
-    for step in range(4):
-        fix = _fix(done, world.ws)
-        assert fix not in seen, f"no progress — the same fix line again:\n{fix}"
-        seen.append(fix)
-        act = fix.startswith(_ACT_LABELS)
-        if act or step == 0:
-            case.play(world, fix)
-        ran = None if act else world.run(fix, world.elsewhere)  # a fix line runs from any cwd
-        assert ran is None or ran.returncode == 0, f"the fix does not run:\n{fix}\n{ran}"
-        if case.replaces and step == 0:
-            case.done(world)
-            return first
-        done = _hit(world, case.then if case.then is not None else command)
-        if done.returncode == 0:
-            case.done(world)
-            return first
-    pytest.fail("the refusal chain did not clear within four fix lines:\n" + "\n".join(seen))
 
 
 # ── doctor-specs: the specs rules' fix lines ─────────────────────────────────────────
@@ -1046,9 +940,7 @@ _SLOW = pytest.mark.slow(reason="real git remotes and CLI child processes")
 @pytest.mark.parametrize(
     "site",
     [
-        pytest.param(s, marks=_SLOW)
-        if s.startswith(("refusal-", "doctor-specs-", "doctor-workspace-"))
-        else s
+        pytest.param(s, marks=_SLOW) if s.startswith(("doctor-specs-", "doctor-workspace-")) else s
         for s in SITES
     ],
 )
@@ -1179,7 +1071,7 @@ def test_every_fix_line_prints_on_one_line_without_a_tty(tmp_path: Path) -> None
     through the one ``cli/_fail.fail`` a real child process exercises here."""
     world = World(tmp_path / ("d" * 90))
     _unborn_dirty(world)
-    fix = _fix(world.cli("context", "dead", "proj"), world.ws)
+    fix = the_fix(world.cli("context", "dead", "proj"), world.ws)
     assert fix.startswith("Agent action: move ") and fix.endswith("notes.txt into a worktree"), fix
     assert re.search(re.escape(str(world.ws)), fix)
 
@@ -1191,7 +1083,7 @@ def test_the_gate_is_read_only_and_its_fix_is_one_agent_action_naming_the_listed
     """The denylist refusal's one fix is an Agent action naming the listed path; the gate
     offers no history rewrite and no publish verb that rewrites."""
     command = _denylisted(world)
-    fix = _fix(_hit(world, command), world.ws)
+    fix = the_fix(_hit(world, command), world.ws)
     assert fix.startswith("Agent action: ") and "notes.md" in fix, fix
     assert "--rewrite-from" not in fix
     assert "--republish" not in world.cli("context", "baseline", "--help").stdout
@@ -1244,7 +1136,7 @@ def test_a_refused_baseline_push_names_the_anchor_and_the_publish_as_the_next_st
     as the step after that fix (a hand push would drop origin's merge parent)."""
     done = _hit(world, _baseline_denylisted(world))
     output = done.stdout + done.stderr
-    assert done.returncode != 0 and _fix(done, world.ws).startswith("Agent action: ")
+    assert done.returncode != 0 and the_fix(done, world.ws).startswith("Agent action: ")
     assert f"onboarding commit {world.git(world.repo, 'rev-parse', 'HEAD')}" in output
     assert fix_line(world.ws, "context", "baseline", "proj") in output.replace("\n", "")
 
@@ -1267,7 +1159,7 @@ def test_dead_after_the_operator_pulls_into_a_conflict_publishes_no_markers(
     published = world.remote_heads()["feature/1.0.0"]
     done = world.cli("context", "dead", "proj")
     output = done.stdout + done.stderr
-    fix = _fix(done, world.ws)
+    fix = the_fix(done, world.ws)
     assert done.returncode != 0 and "README.md" in fix and "x.md" in fix, output
     assert fix.startswith("Agent action: move ") and fix.endswith("into a worktree"), output
     assert world.repo.is_dir() and world.remote_heads()["feature/1.0.0"] == published

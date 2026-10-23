@@ -31,9 +31,12 @@ from dadaia_workspace.core.models.spec_context import (
     ContextState,
     SpecContextProject,
 )
+from dadaia_workspace.core.platform import command as cli_command
 from dadaia_workspace.core.platform import workspace_cli_path
 from dadaia_workspace.core.specs_version import CANONICAL_SPECS_VERSION
+from dadaia_workspace.features.spec_context.gate_policy import PathClass, classify_path
 from dadaia_workspace.features.spec_context.service import git_hooks_dir, install_git_hooks
+from dadaia_workspace.hooks import pre_gate, sdd_gate
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
 from tests.conftest import GIT_QUIET_INCLUDE
 from tests.helpers import worktree_ws as wt
@@ -74,12 +77,74 @@ def _rmtree(path: Path) -> None:
     shutil.rmtree(path, onexc=lambda fn, name, _: (make_writable(Path(name)), fn(name)))
 
 
-def _single_fix(done: subprocess.CompletedProcess[str]) -> str:
-    output = done.stdout + done.stderr
-    lines = [line[len("fix: ") :] for line in output.splitlines() if line.startswith("fix: ")]
-    assert len(lines) == 1, f"exactly one fix line expected, got {len(lines)}:\n{output}"
-    assert "&&" not in lines[0], f"one command per fix line (PowerShell 5.1): {lines[0]}"
-    return lines[0]
+_FIX_LINE_RE = re.compile(r"^fix: (\S.*)$", re.MULTILINE)
+#: Not one act: a `<…>` (bar the `<specs>` a rule fix fills), an `&&` chain, an `a|b` menu;
+#: a command also no ` or ` / ` then `.
+_NOT_ONE_ACT_RE = re.compile(r"<(?!specs>)[^<>\n]+>|&&|\w\|\w")
+_NOT_ONE_COMMAND_RE = re.compile(rf"{_NOT_ONE_ACT_RE.pattern}| or | then ")
+#: The installer a workspace is born from, absent from CI runners.
+_PREREQUISITES = {"uvx"}
+#: The executables a fix line opens with (a list, not `which`: a host may ship a prose-named binary).
+_HEADS = {"chmod", "gh", "git", "grep", "ls", "mkdir", "rm", "sed", *_PREREQUISITES}
+
+#: The two act labels: an act the agent performs, and one the law reserves to the human.
+_ACT_LABELS = ("Agent action: ", "Operator action: ")
+_LABEL_RE = re.compile(r"[A-Z]\w* action: ")
+
+
+def fix_defect(fix: str) -> bool:
+    """True when *fix* is neither `Agent action: <one act>` nor `Operator action: <one act>`
+    nor one command whose head is no prose word, or carries any other `<Word> action:` label;
+    `·` stands for a value a source walk cannot know."""
+    known = fix.split("·", 1)[0]
+    if fix.startswith(_ACT_LABELS) or " " not in known and "·" in fix:
+        return bool(_NOT_ONE_ACT_RE.search(fix))
+    if _LABEL_RE.match(fix):
+        return True
+    head = known.split(" ", 1)[0]
+    prose = re.fullmatch(r"[a-z][a-z0-9-]*", head) and head not in _HEADS
+    return bool(prose or _NOT_ONE_ACT_RE.search(fix) or _NOT_ONE_COMMAND_RE.search(known))
+
+
+def _protected_paths(fix: str, root: Path) -> list[str]:
+    """Each absolute path word of *fix* under *root* that the gate classes PROTECTED, by the
+    gate's own law set (its install ledger and the operator's globs): a path an agent's act
+    cannot write."""
+    projected, protected = sdd_gate.law_set(root)
+    found: list[str] = []
+    for word in re.findall(r"(?:[A-Za-z]:)?[\\/][^\s`'\"]+", fix):
+        try:
+            rel = Path(word).resolve().relative_to(root.resolve()).as_posix()
+        except ValueError:
+            continue
+        if classify_path(rel, projected, protected, root=root)[0] is PathClass.PROTECTED:
+            found.append(rel)
+    return found
+
+
+def the_fix(message: str | subprocess.CompletedProcess[str] | None, root: Path) -> str:
+    """The one ``fix:`` line of *message* (or of a finished process's output); raises AssertionError unless it is one act the
+    gate lets run; an ``Agent action:`` under *root* names no path the gate protects."""
+    if isinstance(message, subprocess.CompletedProcess):
+        message = message.stdout + message.stderr
+    assert message, "a refusal with an empty message is a stall"
+    fixes = _FIX_LINE_RE.findall(message)
+    assert len(fixes) == 1, f"expected exactly one 'fix:' line, got {fixes} in:\n{message}"
+    fix = fixes[0]
+    assert not fix_defect(fix) and "<specs>" not in fix, f"not one act: {fix}"
+    if fix.startswith(_ACT_LABELS):
+        assert not (fix.startswith("Agent action: ") and _protected_paths(fix, root)), fix
+        return fix
+    cli = cli_command(str(workspace_cli_path(root)))
+    if fix == cli or fix.startswith(f"{cli} "):  # the CLI line, whole: its head must exist
+        assert workspace_cli_path(root).is_file(), fix
+    else:
+        argv0 = fix.split()[0]  # an absolute file, or a bare name on PATH, never cwd-relative
+        on_path = "/" not in argv0 and (shutil.which(argv0) or argv0 in _PREREQUISITES)
+        assert on_path or (Path(argv0).is_absolute() and Path(argv0).is_file()), fix
+    block = pre_gate.evaluate_payload({"tool_name": "Bash", "tool_input": {"command": fix}})
+    assert block is None, f"the fix command is itself blocked:\n{fix}\n{block}"
+    return fix
 
 
 def _constitution(
@@ -731,7 +796,7 @@ def _two_untracked(world: World) -> list[str]:
 
 def _discard_what_the_fix_names(world: World) -> None:
     """The operator discards exactly the paths the printed fix names — no more."""
-    fix = _single_fix(_hit(world, ["context", "dead", "proj"]))
+    fix = the_fix(_hit(world, ["context", "dead", "proj"]), world.ws)
     for name in ("notes.md", "b.md"):
         if name in fix:
             (world.repo / name).unlink()
@@ -1081,6 +1146,25 @@ def _wt_bad_name(root: Path) -> list[str]:
     return ["new", "r", "bad-name"]
 
 
+def _wt_other_version(root: Path) -> list[str]:
+    return ["new", "r", "9.9.9/rc-1/wt-rc"]
+
+
+def _wt_unnamed_tree(root: Path) -> list[str]:
+    wt.open_tree(root, _RC)
+    return ["clean", "worktrees/r/bad-name"]
+
+
+def _wt_state_not_an_object(root: Path) -> list[str]:
+    write_text(wt.open_tree(root, _RC) / "specs/releases/0.5.0/_RELEASE.json", "[]")
+    return ["new", "r", wt.NEW_JOB]
+
+
+def _wt_state_repaired(root: Path) -> None:
+    state = root / "worktrees/r" / _RC / "specs/releases/0.5.0/_RELEASE.json"
+    wt.git(state.parent, "checkout", "--", state.name)
+
+
 def _wt_outside_path(root: Path) -> list[str]:
     wt.open_tree(root, _RC)
     return ["clean", str(root / "elsewhere")]
@@ -1135,11 +1219,18 @@ def _skips(count: int, reason: str) -> tuple[Skip, ...]:
 
 
 _WORKTREE: dict[str, tuple[WtCase | Skip, ...]] = {
-    "_worktree_new.new": (WtCase(_wt_no_start), WtCase(_wt_branch_exists)),
+    "_worktree_new.new": (
+        _wt_agent_reruns(_wt_bad_name, lambda root: ["new", "r", _RC]),
+        _wt_agent_reruns(_wt_other_version, lambda root: ["new", "r", _RC]),
+        WtCase(_wt_no_start),
+        WtCase(_wt_branch_exists),
+    ),
     "_worktree_new._refuse_symlink": (WtCase(_wt_symlink),),
     "_worktree_new._refuse_unopened_bug": (WtCase(_wt_unopened_bug, _wt_bug_confirmed),),
     "_worktree_new._refuse_unready": (
         WtCase(_wt_rc_gone),
+        WtCase(_wt_state_not_an_object, _wt_state_repaired),
+        Skip("the fix assigned for the refusal below it; the next case runs it"),
         WtCase(_wt_not_implementation, _wt_implementation),
     ),
     "_worktree_pause.pause": (
@@ -1152,13 +1243,20 @@ _WORKTREE: dict[str, tuple[WtCase | Skip, ...]] = {
         WtCase(_wt_resume_ref_exists),
         _wt_agent_reruns(_wt_resume_no_bundle, _wt_on_rc("resume")),
     ),
-    "_worktree_sync.sync": (Skip("needs a rebase conflict; " + _SUITE),),
+    "_worktree_sync.sync": (
+        Skip("the conflict fix assigned for the refusal below it; the next entry names it"),
+        Skip("needs a rebase conflict; " + _SUITE),
+    ),
     "_worktree_sync._cascade": (_wt_agent_reruns(_wt_not_ours("sync"), _wt_on_rc("sync")),),
-    "_worktree_end.target": (_wt_agent_reruns(_wt_outside_path, _wt_on_rc("clean")),),
+    "_worktree_end.target": (
+        _wt_agent_reruns(_wt_outside_path, _wt_on_rc("clean")),
+        _wt_agent_reruns(_wt_unnamed_tree, _wt_on_rc("clean")),
+    ),
     "_worktree_end.refuse_dirty": (WtCase(_wt_dirty, _wt_commit_staged),),
     "_worktree_end._kept": (WtCase(_wt_ignored, then=lambda _: ["merge", _TASK, "--drop"]),),
     "_worktree_end.merge": (
         WtCase(_wt_task_unopened),
+        Skip("the fast-forward fix assigned for the refusal below it; the next entry names it"),
         Skip("a fast-forward race; " + _SUITE),
     ),
     "_worktree_end.clean": (
@@ -1169,7 +1267,8 @@ _WORKTREE: dict[str, tuple[WtCase | Skip, ...]] = {
     "_worktree_end.digest": (WtCase(_wt_bad_sha, then=_wt_real_sha),),
     "_worktree_end._check_approved": (
         WtCase(_wt_unreviewed_rc, _wt_review_rc),
-        *_skips(3, "a verdict that is missing, invalid or stale; " + _SUITE),
+        *_skips(3, "a verdict that is invalid, rejected or stale; " + _SUITE),
+        Skip("the dispatch act assigned for the missing and stale refusals; the case runs it"),
     ),
     "_worktree_end._remove": _skips(2, "a branch unmerged or a tree to reattach; " + _SUITE),
     "_worktree_end._undo": _skips(1, "a backlog lane holding code; " + _SUITE),
@@ -1188,9 +1287,12 @@ _WORKTREE: dict[str, tuple[WtCase | Skip, ...]] = {
     "_worktree_git.gitflows": _skips(1, "a failing `context list`; " + _SUITE),
     "_worktree_git.flow_for": _skips(1, "a repo no context owns; " + _SUITE),
     "_worktree_git.SeveralWork.__init__": _skips(1, "several work branches; " + _SUITE),
-    "_worktree_git.work_version": _skips(1, "no work branch; " + _SUITE),
+    "_worktree_git.work_version": (
+        Skip("several work branches; " + _SUITE),
+        Skip("no work branch; " + _SUITE),
+    ),
     "_worktree_git._row": _skips(1, "a `list` finding row, not a refusal; " + _SUITE),
-    "_worktree_git._absent": _skips(1, "a `list` finding row, not a refusal; " + _SUITE),
+    "_worktree_git._absent": _skips(3, "a `list` finding row, not a refusal; " + _SUITE),
     "_worktree_git._repo_rows": _skips(1, "a `list` finding row, not a refusal; " + _SUITE),
     "_worktree_git._unregistered": _skips(1, "a `list` finding row, not a refusal; " + _SUITE),
     "worktree.main": _skips(3, "no workspace root or a failing child; " + _SUITE),
