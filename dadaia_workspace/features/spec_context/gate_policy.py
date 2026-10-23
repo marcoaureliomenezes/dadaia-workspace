@@ -171,7 +171,7 @@ _WRITER = re.compile(r"verdict\.py|-m\s*verdict")
 
 def verdict_act(command: str, *, key: str | None, subagent: str | None) -> str | None:
     """The block message when the text of *command* holds the writer (``verdict.py`` or
-    ``-m verdict``) and ``--verdict``, in any shell form, and the harness, which
+    ``-m verdict``) and ``--verdict`` once quotes and backslashes are removed (a glob spelling of the name is not caught), and the harness, which
     names a running subagent under payload *key* (``None``: it gives no identity), reports
     *subagent* (``None``: the main thread) other than the reviewer; else ``None``."""
     reviewer = load_owner("dd-bug-resolution", "_handoffs").REVIEWER
