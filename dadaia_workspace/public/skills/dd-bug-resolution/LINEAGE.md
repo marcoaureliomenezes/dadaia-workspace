@@ -8,8 +8,7 @@ of repeating it.
 
 - The window runs from the newest archived audit to `HEAD`.
 - Read `specs/audits/_archive/audits_histo.jsonl`; an audit is not a release milestone.
-- A shipped release survives under `releases/_archive/<v>/`; its `_RELEASE.json`
-  `shipped` field holds the sha and PR.
+- A shipped release survives under `releases/_archive/<v>/`.
 - The window is `[newest archived audit sha, HEAD]`, or the whole history when the audit
   history is empty.
 - Recover a historical audit record missing its sha with

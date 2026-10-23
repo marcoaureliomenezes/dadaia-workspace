@@ -1,4 +1,5 @@
 # CONTEXT-ENGINEERING.md — Authoring and Auditing the AI-Entity Surface
+Sections: 1. Token Economy · 2. Instruction Hierarchy and Attention Ordering · 3. Persona-Consistency Invariants · 4. Model-Tier Selection Decision Protocol · 5. Recursive Scope-Drift Detection · Applying this file
 
 Sibling of [`SKILL.md`](SKILL.md) (`dd-ai-eng-knowhow`, authoring depth).
 Persona files, skills, and rules are themselves prompts — every shipped line is paid for in tokens by every downstream invocation.

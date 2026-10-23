@@ -1,4 +1,5 @@
 # CLAUDE-CODE.md — Claude Code Harness Mastery
+Sections: 1. Agentic loop model and the compaction boundary · 2. Context hierarchy decision protocol (ADR-style) · 3. Rules enforcement model — always-on vs path-scoped · 4. Skills mechanics — and the listing-budget tax · 5. Hooks lifecycle — the determinism primitive · 6. Subagents and dispatch authority · 7. Tools and permission model · 8. MCP and tool-search · Composition decision tree · 9. Official reference index (on-demand links — no content copied)
 
 Sibling of [`SKILL.md`](SKILL.md) (`dd-ai-eng-knowhow`, authoring depth).
 A decision surface, not a doc mirror — official docs are an on-demand index at "Official reference index"; consult, never transcribe.

@@ -1,4 +1,5 @@
 # CODEX.md — Compiled Decision Protocols for the Codex Harness
+Sections: 1. AGENTS.md as scoped constitution — discovery + stacking · 2. Naming-collision disambiguation (EXPLICIT — read code/logs correctly) · 3. Codex Rules (Starlark `.rules`) — what they enforce, when to use · 4. Skills in Codex — discovery, frontmatter deltas, cross-harness authoring · 5. Subagents and fan-out — concurrency, deltas, guard conditions · 6. Config layers and trust model (EXPLICIT — what must NOT be project-local) · 7. Hooks in Codex — types and lifecycle deltas · Customization decision table — goal -> layer + file type · 8. Official reference index (links only — no content copied)
 
 Sibling of [`SKILL.md`](SKILL.md) (`dd-ai-eng-knowhow`, authoring depth).
 A protocol reference, not a doc mirror — the links in "Official reference index" carry the primitive-level detail.

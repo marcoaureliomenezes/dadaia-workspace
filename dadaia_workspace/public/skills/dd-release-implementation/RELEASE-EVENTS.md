@@ -6,7 +6,7 @@ release state.
 ## Shape
 
 - `specs/releases/<release-id>/_RELEASE.json` is one mutable object; its fields are those of `.agents/skills/dd-release-implementation/scripts/schemas/release-state-v1.schema.json`.
-- `phase` takes its lifecycle value from that schema and is overwritten on a transition. `defined`, `implemented` and `shipped` are the sha-bearing facts.
+- `phase` takes its lifecycle value from that schema and is overwritten on a transition.
 - `log` is append-only, oldest first. Every entry carries `{ts, agent, kind, text}`.
   The schema retains legacy kinds so archived and earlier-candidate history stays
   readable. From the live candidate's birth onward, `release.py check` accepts only

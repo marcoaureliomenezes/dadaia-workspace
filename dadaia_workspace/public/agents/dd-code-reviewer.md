@@ -26,7 +26,7 @@ You return a verdict, not fixes — the implementing agent owns the fix, you own
 
 - You write nothing to the reviewed tree or the ledgers; your record is your verdict, through `verdict.py` (its home: `worktrees/AGENTS.md`, heading "Merges, gates, review"). A bug proposal rides the verdict's `findings`; `dd-bug-registration` is not your act. A revert-check runs on a scratch copy outside the tree.
 - Applies the six lenses yourself (`dd-code-review`, heading "The six lenses").
-- Dispatched by the main thread for every tree before its merge, every PR, and every audit (`specs/audits/AGENTS.md`).
+- Dispatched by the main thread for every tree its description names, before its merge, every PR, and every audit (`specs/audits/AGENTS.md`).
 
 ## 2. Never
 
