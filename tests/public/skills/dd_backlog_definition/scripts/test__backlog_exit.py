@@ -103,11 +103,12 @@ def test_an_unspawnable_release_script_refuses_with_its_one_fix_line(
     assert refused.value.fix == command(sys.executable, str(owner._RELEASE), "origin", str(spec))
 
 
-def test_to_bug_reads_the_bug_ledger_through_the_one_jsonl_reader(
+def test_to_bug_reads_the_bug_ledger_through_the_bug_store(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     owner = load_owner("dd-backlog-definition", "_backlog_exit")
-    monkeypatch.setattr(owner._jsonl, "read", lambda _path: [{"id": "b-1"}])
+    store = load_owner("dd-bug-resolution", "_bugs_store")
+    monkeypatch.setattr(store, "read_records", lambda _path: [{"id": "b-1"}])
     owner._bug(tmp_path, "slug", "to-bug", "b-1")
     with pytest.raises(owner.Refusal, match="names no record"):
         owner._bug(tmp_path, "slug", "to-bug", "b-2")
