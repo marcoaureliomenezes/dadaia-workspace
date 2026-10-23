@@ -195,23 +195,12 @@ def _plant_disarmed_gate(ws: Path) -> str:
     return "PROJECTION"
 
 
-def _plant_long_skill(ws: Path) -> str:
-    skill = ws / ".agents" / "skills" / "long" / "SKILL.md"
-    skill.parent.mkdir(parents=True)
-    soft = json.loads(
-        (_REPO / "dadaia_workspace/features/spec_context/behavior-map.json").read_bytes()
-    )
-    write_text(skill, "l\n" * (soft["skill_md_line_soft"] + 1))
-    return "SKILL-MD-LENGTH"
-
-
 #: Every code this module proves: cleared by its printed fix, or an agent action .
 WORKSPACE_PLANTS = {
     **dict.fromkeys(code for code, *_ in _LEDGER_ROWS),
     "WS-ENTRY": _plant_root_slop,  # the fixable sub-rule
     "HOOKS-DRIFT-1": _plant_drifted_hook,
     "PROJECTION": _plant_disarmed_gate,
-    "SKILL-MD-LENGTH": _plant_long_skill,
 }
 
 
@@ -223,30 +212,6 @@ def test_a_workspace_finding_is_cleared_by_its_printed_fix(tmp_path: Path, plant
     code = plant(ws)  # type: ignore[operator]
     fix = next(f["fix"] for f in _findings_before(ws) if f["code"] == code)
     _run_from_elsewhere(ws, fix)
-    assert code not in {f["code"] for f in _findings(ws)}
-
-
-def test_a_long_skill_md_is_a_warning_whose_fix_names_who_splits_it(tmp_path: Path) -> None:
-    """The real doctor run prints one non-error SKILL-MD-LENGTH: with a repo of the
-    workspace holding the source the fix is the agent action of adding the split to a task of
-    the open rc; with none the source is outside the workspace and the split is the
-    operator's. Once the skill is short, the finding is gone."""
-    ws = _workspace(tmp_path)
-    code = _plant_long_skill(ws)
-    source = ws / "repos" / "lib" / "dadaia_workspace/public/skills/long/SKILL.md"
-    source.parent.mkdir(parents=True)
-    write_text(source, "l\n")
-    fixes = [
-        "Agent action: add the split of long/SKILL.md to a task of the open rc, then run public install",
-        "Operator action: split long/SKILL.md at its library source; this workspace holds none and never edits the projection",
-    ]
-    for i, expected in enumerate(fixes):
-        if i:
-            source.unlink()
-        [found] = [f for f in _findings_before(ws) if f["code"] == code]
-        assert found["verdict"] == "warning"
-        assert found["fix"] == expected
-    write_text(ws / ".agents" / "skills" / "long" / "SKILL.md", "l\n")
     assert code not in {f["code"] for f in _findings(ws)}
 
 

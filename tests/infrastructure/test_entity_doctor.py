@@ -444,14 +444,12 @@ def test_skill_md_over_the_soft_limit_warns(tmp_path: Path, line: bytes) -> None
 
     [found] = service.check_skill_md_length()
 
-    assert (found.code, found.verdict, found.canonical, found.error, found.message, found.fix) == (
+    assert (found.code, found.verdict, found.canonical, found.error, found.message) == (
         "SKILL-MD-LENGTH",
         "warning",
         False,
         False,
         f"fixture-longer/SKILL.md has {soft + 1} lines > soft limit {soft}",
-        "Operator action: split fixture-longer/SKILL.md at its library source; "
-        "this workspace holds none and never edits the projection",
     )
 
 
@@ -477,12 +475,7 @@ def test_a_long_skill_md_with_its_source_in_a_repo_is_split_there_in_a_tree(tmp_
         context_store(tmp_path / ".dadaia" / "states"), GitSubprocessClient(), tmp_path
     )
 
-    [found] = service.check_skill_md_length()
-
-    assert found.fix == (
-        "Agent action: add the split of fixture-long/SKILL.md to a task of the open rc, "
-        "then run public install"
-    )
+    assert [f.code for f in service.check_skill_md_length()] == ["SKILL-MD-LENGTH"]
     edited = (
         tmp_path / "worktrees" / "lib" / "task" / source.relative_to(tmp_path / "repos" / "lib")
     )

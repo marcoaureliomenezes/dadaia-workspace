@@ -918,18 +918,29 @@ def _workspace_clears(ws: Path, plant: Callable[[Path], str]) -> str:
 
 
 def _long_skill(ws: Path) -> str:
-    """A long SKILL.md is one non-error finding whose `Operator action:` names its library source."""
+    """A long SKILL.md is one non-error finding whose fix names who splits it: an agent action
+    when its library source sits in a repo of the workspace, else the operator's. Once the skill
+    is short, the finding is gone."""
     root = _initialized(ws)
     skill = root / ".agents" / "skills" / "long" / "SKILL.md"
     skill.parent.mkdir(parents=True)
     soft = json.loads((_PKG / "features/spec_context/behavior-map.json").read_bytes())
     write_text(skill, "l\n" * (soft["skill_md_line_soft"] + 1))
+    source = root / "repos" / "lib" / "dadaia_workspace" / "public" / "skills" / "long" / "SKILL.md"
+    source.parent.mkdir(parents=True)
+    write_text(source, "l\n")
     [found] = [f for f in _doctor(root) if f["code"] == "SKILL-MD-LENGTH"]
     assert found["verdict"] == "warning"
-    assert (
-        found["fix"]
-        == "Operator action: split long/SKILL.md at its library source; this workspace holds none and never edits the projection"
+    assert found["fix"] == (
+        "Agent action: add the split of long/SKILL.md to a task of the open rc, then run public install"
     )
+    source.unlink()
+    [found] = [f for f in _doctor(root) if f["code"] == "SKILL-MD-LENGTH"]
+    assert found["fix"] == (
+        "Operator action: split long/SKILL.md at its library source; this workspace holds none and never edits the projection"
+    )
+    write_text(skill, "l\n")
+    assert "SKILL-MD-LENGTH" not in {f["code"] for f in _doctor(root, real=True)}
     return f"fix: {found['fix']}"
 
 
