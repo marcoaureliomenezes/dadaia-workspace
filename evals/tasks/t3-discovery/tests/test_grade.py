@@ -1,7 +1,6 @@
 """T3 grader: /workspace onboards file:///srv/demo.git (one ALIVE context, its specs initialized,
-`dadaia doctor` with no error) and the repo's own specs, or a lane tree's, show work entered: a
-backlog that passes the library's check with an active entry, or a release candidate whose SPEC
-passes the library's release check. Reads only the verbs and fields the candidate offers."""
+`dadaia doctor` with no error) and the repo's own specs, or a lane tree's, show the operator's
+demand entered as work, in a backlog and release that pass the library's checks. Reads only the verbs and fields the candidate offers."""
 
 import json
 import subprocess
@@ -12,6 +11,7 @@ URL = "file:///srv/demo.git"
 WORKSPACE = Path("/workspace")
 DADAIA = WORKSPACE / ".dadaia/.venv/bin/dadaia"
 BACKLOG = WORKSPACE / ".agents/skills/dd-backlog-definition/scripts/backlog.py"
+DEMAND = "subtract"
 RELEASE = WORKSPACE / ".agents/skills/dd-release-implementation/scripts/release.py"
 
 
@@ -30,11 +30,15 @@ def clean(script, specs):
 
 
 def filled(specs):
-    """The specs tree enters work by an active backlog entry or by a SPEC, each judged by its checker's exit."""
-    backlog = Path(specs, "backlog/BACKLOG.json")
-    if clean(BACKLOG, specs) and json.loads(backlog.read_text(encoding="utf-8"))["active"]:
-        return True
-    return any(Path(specs, "releases").glob("*/rc-*/SPEC.md")) and clean(RELEASE, specs)
+    """The checked specs tree holds the operator's demand, in the backlog, its archive or a SPEC."""
+    root = Path(specs)
+    files = [
+        root / "backlog/BACKLOG.json",
+        root / "backlog/_archive/backlog_histo.jsonl",
+        *root.glob("releases/*/rc-*/SPEC.md"),
+    ]
+    text = "".join(f.read_text(encoding="utf-8") for f in files if f.is_file()).lower()
+    return clean(BACKLOG, specs) and clean(RELEASE, specs) and DEMAND in text
 
 
 def problems():
