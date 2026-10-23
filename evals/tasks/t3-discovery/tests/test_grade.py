@@ -32,12 +32,17 @@ def clean(script, specs):
 def filled(specs):
     """The checked specs tree holds the operator's demand, in the backlog, its archive or a SPEC."""
     root = Path(specs)
-    files = [
-        root / "backlog/BACKLOG.json",
-        root / "backlog/_archive/backlog_histo.jsonl",
-        *root.glob("releases/*/rc-*/SPEC.md"),
+    archive = root / "backlog/_archive/backlog_histo.jsonl"
+    lines = (
+        archive.read_text(encoding="utf-8").splitlines(keepends=True) if archive.is_file() else []
+    )
+    delivered = [
+        row for row in lines if row.strip() and json.loads(row)["disposition"] == "delivered"
     ]
-    text = "".join(f.read_text(encoding="utf-8") for f in files if f.is_file()).lower()
+    files = [root / "backlog/BACKLOG.json", *root.glob("releases/*/rc-*/SPEC.md")]
+    text = "".join(
+        delivered + [f.read_text(encoding="utf-8") for f in files if f.is_file()]
+    ).lower()
     return clean(BACKLOG, specs) and clean(RELEASE, specs) and DEMAND in text
 
 
