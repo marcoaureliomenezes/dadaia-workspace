@@ -12,7 +12,10 @@ from typing import Any
 
 from _git import fix_files, git, scrubbed_env
 from _handoffs import reviewer_records
-from _platform import run
+from _jsonl import parse_object
+from _memory_drift import by_subject
+from _platform import act, read_text, run
+from _refusal import Refusal
 from _specs import check_release, context_row
 
 _FREE = ("docs(memory)", "chore(release)", "chore(backlog)", "chore(bugs)", "docs(adr)", "chore(adrs)")  # fmt: skip
@@ -38,8 +41,8 @@ def _script(skill: str, script: str, *args: str, ok: tuple[int, ...] = (0,)) -> 
     return str(done.stdout) if done.returncode in ok else None
 
 
-def _window(state: dict[str, Any], rc: str) -> tuple[str, str, str, str | None, bool] | None:
-    """(birth, previous CLOSURE or "", end, `implemented` sha, newest) of a candidate the log names,
+def _window(state: dict[str, Any], rc: str) -> tuple[str, str, str, bool, bool] | None:
+    """(birth, previous CLOSURE or "", end, closed, newest) of a candidate the log names,
     where end is its CLOSURE stamp or now; None when the log never names it."""
     n = int(m) if (m := rc.rpartition("-rc")[2]).isdigit() else 0
     log = [(int(e["candidate"][3:]), e) for e in state.get("log") or [] if e.get("candidate")]
@@ -49,10 +52,16 @@ def _window(state: dict[str, Any], rc: str) -> tuple[str, str, str, str | None, 
     first = min(e["ts"] for e in mine)
     born = [e["ts"] for e in state["log"] if e.get("agent") == "release.py new" and e["ts"] <= first]  # fmt: skip
     now = datetime.now(tz=UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
-    done = next((e for e in mine if e.get("milestone") == "implemented"), {"ts": now})
+    done = next((e for e in mine if e.get("milestone") == "implemented"), None)
     before = [e["ts"] for k, e in log if k < n and e.get("milestone") == "implemented"]
     newest = n >= max(k for k, _ in log)
-    return max(born, default=first), max(before, default=""), done["ts"], done.get("sha"), newest
+    return (
+        max(born, default=first),
+        max(before, default=""),
+        (done or {"ts": now})["ts"],
+        done is not None,
+        newest,
+    )
 
 
 def _merge(repo: Path, branch: str, sha: str) -> list[str]:
@@ -63,8 +72,16 @@ def _merge(repo: Path, branch: str, sha: str) -> list[str]:
     return next((m.split() for m in merges if m.split()[0] in holds), [])
 
 
+def _closure(repo: Path, rc: str) -> str:
+    """The sha of the commit subjected as *rc*'s CLOSURE phase; a history without it is refused."""
+    n = rc.rpartition("-rc")[2]
+    if sha := by_subject(repo, f"chore(release): rc-{n} phase CLOSURE"):
+        return sha
+    raise Refusal(f"{rc} is closed, but no commit of this history is subjected 'chore(release): rc-{n} phase CLOSURE'", act("agent", "restore the closure commit's history (fetch it), then rerun the stats"))  # fmt: skip
+
+
 def _after_closure(repo: Path, sha: str | None, tip: str) -> str:
-    if not sha:
+    if not sha:  # the candidate is not closed yet
         return NA
     raw = git(repo, "log", "--no-merges", "--format=%H%x00%B%x01", f"{sha}..{tip}", check=False)
     entries = [c.strip().partition("\0") for c in raw.split("\x01") if c.strip()]
@@ -76,12 +93,14 @@ def table(root: Path, specs: Path, rc: str) -> str:
     """The tab-separated metric table of candidate *rc* (`<M.m.p>-rc<N>`); absent data reads `n/a`; a release state `release.py check` refuses raises its Refusal."""
     repo = specs.parent
     check_release(specs)
-    state = json.loads(p.read_text("utf-8")) if (p := specs / "releases" / rc.partition("-rc")[0] / "_RELEASE.json").is_file() else {}  # fmt: skip
+    p = specs / "releases" / rc.partition("-rc")[0] / "_RELEASE.json"
+    state = parse_object(read_text(p), act("agent", f"repair {p} until release.py check passes")) if p.is_file() else {}  # fmt: skip
     window = _window(state, rc)
     seen: list[str] = []
     vals = [NA] * 6
     if window:
-        birth, prior, end, sha, newest = window
+        birth, prior, end, closed, newest = window
+        sha = _closure(repo, rc) if closed else None
         row = context_row(root, repo) or {}
         name, integration = row.get("name"), (row.get("gitflow") or {}).get("integration")
         trees: dict[str, list[tuple[str, str]]] = {}
