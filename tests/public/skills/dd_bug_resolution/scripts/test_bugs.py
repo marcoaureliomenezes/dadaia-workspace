@@ -212,8 +212,10 @@ def test_the_uncited_fix_fix_line_is_the_archive_act_naming_the_id(
                 "cause": "c", "solution": "s", "caused_by": "none", "fix_sha": "a" * 40}  # fmt: skip
     _ledger(tmp_path, resolved)
     run([*git, "commit", "-q", "--allow-empty", "-m", "base"], check=True)
-    fix = _run(script, "check", "--specs", str(specs)).stdout.splitlines()[-1]
+    out = _run(script, "check", "--specs", str(specs)).stdout
+    fix = out.splitlines()[-1]
     assert fix == f"fix: {_archive_act(script, specs, 'a-bug')}", fix
+    assert "fix(bugs): a-bug \u2014 " in out and "refactor(bugs): a-bug \u2014 " in out, out
 
 
 @pytest.mark.parametrize(("ids", "depth", "code"), [
@@ -1630,9 +1632,12 @@ def test_the_archive_act_check_prints_clears_a_record_a_task_commit_fixed(
     assert _run(script, "check", "--specs", str(specs)).returncode == 0
 
 
-def test_resolve_records_the_sha_of_the_id_commit(script: Path, tmp_path: Path) -> None:
+@pytest.mark.parametrize("message", [_FIXED, "refactor(bugs): a-bug \u2014 REBUILD u: c"])
+def test_resolve_records_the_sha_of_the_id_commit(
+    script: Path, tmp_path: Path, message: str
+) -> None:
     specs = _ledger(tmp_path, _OPEN_RECORD)
-    sha = _fix_commit(tmp_path, "cli/x.py", _FIXED)
+    sha = _fix_commit(tmp_path, "cli/x.py", message)
     done = _run(script, "resolve", "a-bug", "--cause", "c", "--caused-by", "none",
                 "--solution", "s", "--specs", str(specs))  # fmt: skip
     assert done.returncode == 0, done.stdout + done.stderr
@@ -1651,26 +1656,15 @@ def test_resolve_with_no_id_commit_is_one_refusal_with_one_fix_line(
                 "--solution", "s", "--specs", str(specs))  # fmt: skip
     assert done.returncode == 1 and "Traceback" not in done.stderr, done.stderr
     [fix] = [ln for ln in done.stderr.splitlines() if ln.startswith("fix: ")]
-    assert "fix(bugs): a-bug \u2014 " in fix, fix
+    assert "fix(bugs): a-bug \u2014 " in fix and "refactor(bugs): a-bug \u2014 " in fix, fix
+    assert "caused_by" not in fix and " when " not in fix, fix
     assert (specs / "bugs/BUGS.jsonl").read_bytes() == before
-
-
-def test_resolve_refusal_names_the_rebuild_id_line_beside_the_fix_line(
-    script: Path, tmp_path: Path
-) -> None:
-    specs = _ledger(tmp_path, _OPEN_RECORD)
-    _commit_as(tmp_path, "feat: x")
-    done = _run(script, *_resolve_argv(), "--specs", str(specs))
-    assert done.returncode == 1, done.stderr
-    [fix] = [ln for ln in done.stderr.splitlines() if ln.startswith("fix: ")]
-    assert "refactor(bugs): a-bug \u2014 REBUILD" in fix, fix
-    _commit_as(tmp_path, "refactor(bugs): a-bug \u2014 REBUILD cli/x.py: c")
-    assert _run(script, *_resolve_argv(), "--specs", str(specs)).returncode == 0
 
 
 def test_help_describes_resolves_fix_as_either_id_line(script: Path) -> None:
     done = _run(script, "--help")
-    assert done.returncode == 0 and "refactor(bugs)" in done.stdout, done.stdout
+    entry = " ".join(done.stdout.split()).split(" resolve ", 1)[1].split(" archive ")[0]
+    assert done.returncode == 0 and "fix(bugs)" in entry and "refactor(bugs)" in entry, entry
 
 
 def test_resolve_takes_no_fix_sha_flag(script: Path, tmp_path: Path) -> None:
