@@ -8,9 +8,10 @@ here and nowhere else, which is why `update` refuses them (`_bugs_write.apply_up
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
-from _bugs_check import STATUS_BY_VERB
+from _bugs_check import STATUS_BY_VERB, ambiguous
 from _bugs_store import Records, Refusal, by_id
 from _bugs_write import _set, now_iso
 from _specs import choice
@@ -26,6 +27,7 @@ def transition(
     bug_id: str,
     verb: str,
     values: dict[str, Any],
+    specs: Path,
 ) -> Records:
     """The ONE way a record reaches a terminal status. Every field the verb requires is
     checked first and every problem named at once; the record is untouched on refusal.
@@ -35,6 +37,11 @@ def transition(
     if missing:
         raise choice(Refusal(f"transition {verb!r} refused — {', '.join(repr(m) for m in missing)} required"),
                      f"with {', '.join('--' + m.replace('_', '-') for m in missing)} set")  # fmt: skip
+    if verb == "resolve" and (forms := ambiguous(specs, values["caused_by"].strip())):
+        raise choice(
+            Refusal(f"caused_by {values['caused_by']!r} is carried by several candidates"),
+            f"with --caused-by one of {', '.join(forms)}",
+        )
     record = by_id(records, bug_id)
     updated = dict(record)
     if verb == "resolve":

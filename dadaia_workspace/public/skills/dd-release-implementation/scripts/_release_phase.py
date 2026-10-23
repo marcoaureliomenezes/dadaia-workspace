@@ -92,9 +92,10 @@ def _refuse_open_worktrees(specs: Path) -> None:
     root = workspace_of(specs)
     if root is None:  # no workspace holds this tree: there is no worktree to wait for
         return
-    main = _git.main_checkout(specs)
-    if main == Path("."):  # main_checkout's answer for a tree outside every repository
-        raise Refusal(f"{specs} is in no git checkout", act("agent", "close from the specs of a repo's git checkout"))  # fmt: skip
+    try:
+        main = _git.main_checkout(specs)
+    except _git.GitError:
+        raise Refusal(f"{specs} is in no git checkout", act("agent", "close from the specs of a repo's git checkout")) from None  # fmt: skip
     own = specs.parent.resolve()
     held = [
         r for r in _worktree_rows(root)

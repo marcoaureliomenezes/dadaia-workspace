@@ -20,7 +20,7 @@ import _jsonl
 from _atomic import SymlinkRefusedError
 from _bugs_check import LEDGER, OPEN, STATUS_BY_VERB, check
 from _bugs_store import Refusal, archived_plain_ids, commit, history, read_records
-from _git import GitError, fix_commit, fix_files, git
+from _git import GitError, fix_commit, git
 from _platform import act, use_utf8_stdio
 from _refusal import report
 from _specs import context_repos, find_specs, refuse
@@ -186,9 +186,9 @@ def _write(args: argparse.Namespace, specs: Path) -> int:
                 f"no commit of HEAD holds the line `fix(bugs): {args.bug_id} — …`",
                 act("agent", f"commit the fix with the line `fix(bugs): {args.bug_id} — …` in its message, then resolve again"),
             )  # fmt: skip
-        repo, sha = found[args.bug_id]
-        values |= {"fix_sha": sha, "fix_files": fix_files(repo, [sha]).get(sha)}
-    commit(ledger, lambda records: tr.transition(records, args.bug_id, args.verb, values))
+        _, sha = found[args.bug_id]
+        values["fix_sha"] = sha
+    commit(ledger, lambda records: tr.transition(records, args.bug_id, args.verb, values, specs))
     print(f"[ok] {STATUS_BY_VERB[args.verb]} {args.bug_id}")
     return 0
 

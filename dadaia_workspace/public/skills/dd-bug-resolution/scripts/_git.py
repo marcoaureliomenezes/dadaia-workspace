@@ -66,12 +66,8 @@ def shallow(repo: Path) -> bool:
 
 
 def main_checkout(repo: Path) -> Path:
-    """The parent of the git common dir of *repo* (a linked worktree resolves to its main checkout); `Path(".")` when *repo* is no repository."""
-    try:
-        common = git(repo, "rev-parse", "--git-common-dir")
-    except GitError:
-        return Path(".")
-    return (repo / common.strip()).resolve().parent
+    """The parent of the git common dir of *repo* (a linked worktree resolves to its main checkout). Raises `GitError` when *repo* is no repository."""
+    return (repo / git(repo, "rev-parse", "--git-common-dir").strip()).resolve().parent
 
 
 def reaches(repo: Path, sha: str) -> bool:

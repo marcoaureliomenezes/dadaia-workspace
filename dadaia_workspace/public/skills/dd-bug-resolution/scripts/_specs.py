@@ -12,7 +12,7 @@ from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
-from _git import main_checkout, scrubbed_env
+from _git import GitError, main_checkout, scrubbed_env
 from _jsonl import reinstall_fix
 from _ledger import parse as parse
 from _platform import act, cli_argv, cli_path, command, inline, run, venv_dir
@@ -75,7 +75,9 @@ def context_row(root: Path, repo: Path) -> dict[str, Any] | None:
 def context_repos(repo: Path) -> Iterator[Path]:
     """*repo*, then the existing checkouts of the repos its context associates; the workspace beside its checkout is read only when the second is pulled, and *repo* stays alone when it is no repository or that workspace holds no registry or no CLI."""
     yield repo
-    if (main := main_checkout(repo)) == Path("."):
+    try:
+        main = main_checkout(repo)
+    except GitError:
         return
     root = main.parent.parent
     row = context_row(root, repo) if (root / STATES / "spec_contexts.json").is_file() and cli_path(root).exists() else None  # fmt: skip

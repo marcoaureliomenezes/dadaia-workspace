@@ -189,7 +189,10 @@ def terms(root: Path | None, repo: Path | None = None) -> list[tuple[str, str]]:
     name itself. Absent is empty."""
     if not (path := denylist_file(root)):
         return []
-    own = _git.main_checkout(repo).name.lower() if repo else ""
+    try:
+        own = _git.main_checkout(repo).name.lower() if repo else ""
+    except _git.GitError:
+        own = ""
     return [(str(t), str(r)) for t, r in json.loads(read_text(path)).items() if not (t and t.lower() in own)]  # fmt: skip
 
 
