@@ -650,6 +650,13 @@ def _log(specs: Path) -> list[dict[str, object]]:
     return _read(specs / "releases" / "0.5.0" / "_RELEASE.json")["log"]  # type: ignore[return-value]
 
 
+def test_memory_prints_the_subject_its_commit_carries(script: Path, tmp_path: Path) -> None:
+    root, specs, _ = _memory_repo(tmp_path, script)
+    result = _memory(script, root, specs, reviewed="alpha", changed="")
+    assert result.returncode == 0, result.stderr
+    assert "commit subject: chore(release): rc-1 memory pass recorded" in result.stdout.splitlines()
+
+
 def test_memory_derives_its_window_and_records_since_and_until(
     script: Path, tmp_path: Path
 ) -> None:

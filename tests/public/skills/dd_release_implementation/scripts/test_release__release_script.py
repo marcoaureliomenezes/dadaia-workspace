@@ -624,6 +624,7 @@ def test_a_reader_prints_the_schema_finding_for_a_non_object_log_entry(
 _ATOM = "---\nslug: {0}\ntitle: {0}\ntldr: {0}\nsummary: {0}\ntags: [{0}]\nsources:\n  - src/{0}.py\n---\n\n# {0}\n"
 _SUBJECTS = {
     "milestone": "chore(release): rc-1 phase IMPLEMENTATION",
+    "enters": "chore(release): rc-1 enters IMPLEMENTATION at abc1234",
     "memory-pass": "chore(release): rc-1 memory pass recorded — 1 reviewed, 1 changed",
 }
 
@@ -639,19 +640,27 @@ def _drift_after_rewrite(script: Path, tmp_path: Path, bound: str) -> list[str]:
         write_text(tmp_path / f"src/{slug}.py", "x = 0\n")
         (specs / "memory/product").mkdir(parents=True, exist_ok=True)
         write_text(specs / f"memory/product/{slug}.md", _ATOM.format(slug))
+    real = _SUBJECTS["milestone" if bound == "decoy" else bound]
+    decoy = _SUBJECTS["enters"]
     steps = [
         ("init", None),
         ("feat(J1.T1): a", "a"),
-        (_SUBJECTS[bound], None),
+        (real, None),
         ("feat(J1.T2): b", "b"),
+        *([(decoy, None)] if bound == "decoy" else []),
     ]
+    if bound == "decoy":  # the same-numbered rc of another release, ending its folder
+        (specs / "releases/0.4.9").mkdir()
+        write_text(specs / "releases/0.4.9/old.md", "old\n")
     old: dict[str, str] = {}
     for subject, edited in steps:
         if edited:
             write_text(tmp_path / f"src/{edited}.py", f"x = '{subject}'\n")
-        if subject == _SUBJECTS[bound]:  # a milestone commit touches its release folder
+        if subject == real:  # a milestone commit touches its release folder
             write_text(specs / "releases/0.5.0/bound.md", subject)
-        git(tmp_path, "add", "specs", "src")
+        if subject == decoy and bound == "decoy":
+            (specs / "releases/0.4.9/old.md").unlink()
+        git(tmp_path, "add", "-A", "specs", "src")
         git(tmp_path, "commit", "-q", "--allow-empty", "-m", subject)
         old[subject] = git(tmp_path, "rev-parse", "HEAD").strip()
     git(tmp_path, "rebase", "-q", "--root", "--exec", "git commit -q --amend --allow-empty --no-edit --date=2030-01-01T00:00:00Z")  # fmt: skip
@@ -659,18 +668,18 @@ def _drift_after_rewrite(script: Path, tmp_path: Path, bound: str) -> list[str]:
     state_path = specs / "releases/0.5.0/_RELEASE.json"
     state = json.loads(read_text(state_path))
     state["defined"] = {
-        "sha": old[_SUBJECTS[bound]] if bound == "milestone" else old["init"],
+        "sha": old["init"] if bound == "memory-pass" else old[real],
         "ts": ts,
     }
-    state["log"] = [] if bound == "milestone" else [
+    state["log"] = [] if bound != "memory-pass" else [
         {"ts": ts, "agent": "release.py memory", "kind": "memory", "text": "m", "since": old["init"],
-         "until": old[_SUBJECTS[bound]], "reviewed": [], "changed": []}]  # fmt: skip
+         "until": old[real], "reviewed": [], "changed": []}]  # fmt: skip
     write_text(state_path, json.dumps(state))
     done = run([sys.executable, str(script), "drift", "--json", "--specs", str(specs)])
     return [a["slug"] for a in json.loads(done.stdout)["atoms"]]
 
 
-@pytest.mark.parametrize("bound", ["milestone", "memory-pass"])
+@pytest.mark.parametrize("bound", ["milestone", "enters", "decoy", "memory-pass"])
 def test_a_window_opens_at_its_commit_subject_after_a_history_rewrite(
     script: Path, tmp_path: Path, bound: str
 ) -> None:
@@ -721,3 +730,10 @@ def test_a_state_written_with_sha_keys_stays_valid(script: Path, tmp_path: Path)
     write_text(archived, json.dumps({**state, "release": "0.4.0", "phase": "CLOSURE", "shipped": {**stamp, "pr": 7}}))  # fmt: skip
     done = run([sys.executable, str(script), "check", "--json", "--specs", str(specs)])
     assert [f["message"] for f in json.loads(done.stdout) if f["verdict"] == "error" and "Origin" not in f["message"]] == []  # fmt: skip
+
+
+def test_phase_prints_the_subject_its_commit_carries(script: Path, tmp_path: Path) -> None:
+    specs = _specs(tmp_path, _dag(*_CHAIN[:2]))
+    done = run([sys.executable, str(script), "phase", "IMPLEMENTATION", "--specs", str(specs)])
+    assert done.returncode == 0, done.stderr
+    assert "commit subject: chore(release): rc-1 phase IMPLEMENTATION" in done.stdout.splitlines()

@@ -6,8 +6,6 @@ import json
 import sys
 from pathlib import Path
 
-import pytest
-
 from tests.helpers.oslib import read_text, write_text
 from tests.helpers.worktree_ws import git, make_workspace
 
@@ -117,9 +115,9 @@ def test_a_same_numbered_rc_of_another_release_is_never_the_bound(tmp_path: Path
     assert _metric_6(tmp_path) == "2"
 
 
-def test_a_vanished_closure_commit_refusal_names_the_subject_grammar(tmp_path: Path) -> None:
+def test_a_vanished_closure_commit_prints_the_table_with_metric_6_n_a(tmp_path: Path) -> None:
+    """No act can restore a closure commit a rewrite removed, so the metric is absent, never a number."""
     _closed_candidate(tmp_path, closure_commit=False)
-    with pytest.raises(Refusal) as err:
-        _stats.table(tmp_path, tmp_path / "repos/r/specs", "0.5.0-rc1")
-    assert "chore(release): rc-1 phase CLOSURE" in err.value.fix
-    assert "fetch" not in err.value.fix
+    rows = _stats.table(tmp_path, tmp_path / "repos/r/specs", "0.5.0-rc1").splitlines()
+    value = next(ln.split("\t")[1] for ln in rows if ln.startswith("6 "))
+    assert value == "n/a (no closure commit)"
