@@ -47,7 +47,7 @@ _HELP = {
     "status": "list records, open only by default",
     "stats": "aggregate counts by status and severity",
     "update": "write a governance field other than status/closed_at",
-    "resolve": "close a record as resolved, with its cause and solution; its fix is the commit holding its fix(bugs) line",
+    "resolve": "close a record as resolved, with its cause and solution; its fix is the commit holding its fix(bugs) or refactor(bugs) id line",
     "supersede": "close a record as superseded by another slug",
     "reject": "close a record as rejected, with a reason",
     "archive": "move named terminal records into bugs_histo.jsonl",
@@ -202,8 +202,8 @@ def _write(args: argparse.Namespace, specs: Path) -> int:
         found = fix_commit(context_repos(specs.parent), [args.bug_id])
         if args.bug_id not in found:
             raise Refusal(
-                f"no commit of HEAD holds the line `fix(bugs): {args.bug_id} — …`",
-                act("agent", f"commit the fix with the line `fix(bugs): {args.bug_id} — …` in its message, then resolve again"),
+                f"no commit of HEAD holds the line `fix(bugs): {args.bug_id} — …` or `refactor(bugs): {args.bug_id} — …`",
+                act("agent", f"commit the fix with the line `fix(bugs): {args.bug_id} — …`, or `refactor(bugs): {args.bug_id} — REBUILD <unit>: …` when its caused_by names a culprit, in its message, then resolve again"),
             )  # fmt: skip
         _, sha = found[args.bug_id]
         values["fix_sha"] = sha
