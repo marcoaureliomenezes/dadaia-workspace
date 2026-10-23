@@ -604,7 +604,7 @@ def _git(root: Path, *argv: str) -> str:
 
 def _memory_repo(tmp_path: Path, script: Path) -> tuple[Path, Path, str]:
     """A git repo whose one atom `alpha` covers `features/alpha`, committed at *base*;
-    the live release is in CLOSURE with `defined.sha` = base, and the code moved since."""
+    the live release is in CLOSURE, its IMPLEMENTATION phase commit is base, and the code moved since."""
     root = tmp_path / "repo"
     specs = _specs(root)
     code = root / "dadaia_workspace" / "features" / "alpha" / "core.py"
@@ -619,10 +619,9 @@ def _memory_repo(tmp_path: Path, script: Path) -> tuple[Path, Path, str]:
     _git(root, "config", "user.email", "fixture@example.invalid")
     _git(root, "config", "user.name", "fixture")
     _git(root, "add", "-A")
-    _git(root, "commit", "-qm", "base")
+    _git(root, "commit", "-qm", "chore(release): rc-1 phase IMPLEMENTATION")
     base = _git(root, "rev-parse", "HEAD")
-    _release(specs, "0.5.0", phase="CLOSURE", defined={"sha": base, "ts": _TS},
-             implemented={"sha": base, "ts": _TS})  # fmt: skip
+    _release(specs, "0.5.0", phase="CLOSURE", defined={"ts": _TS}, implemented={"ts": _TS})
     write_text(code, "x = 2\n")
     _git(root, "add", "-A")
     _git(root, "commit", "-qm", "code moved")
@@ -678,15 +677,14 @@ def test_a_memory_rerun_over_the_same_window_appends_nothing(script: Path, tmp_p
     assert after == before
 
 
-def test_the_first_memory_run_at_the_definition_sha_records_its_entry(
+def test_the_first_memory_run_at_the_implementation_phase_commit_records_its_entry(
     script: Path, tmp_path: Path
 ) -> None:
-    """With HEAD at defined.sha and no memory entry yet, the run is
+    """With HEAD at the IMPLEMENTATION phase commit and no memory entry yet, the run is
     the first reconciliation, never "already reconciled": it records since == until."""
     root, specs, _ = _memory_repo(tmp_path, script)
+    _git(root, "commit", "-q", "--allow-empty", "-m", "chore(release): rc-1 phase IMPLEMENTATION")
     head = _git(root, "rev-parse", "HEAD")
-    _release(specs, "0.5.0", phase="CLOSURE", defined={"sha": head, "ts": _TS},
-             implemented={"sha": head, "ts": _TS})  # fmt: skip
 
     result = _memory(script, root, specs, reviewed="", changed="")
 
