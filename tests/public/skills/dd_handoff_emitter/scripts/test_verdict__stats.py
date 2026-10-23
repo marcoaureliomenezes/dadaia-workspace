@@ -6,6 +6,8 @@ import json
 import sys
 from pathlib import Path
 
+import pytest
+
 from tests.helpers.oslib import read_text, write_text
 from tests.helpers.worktree_ws import git, make_workspace
 
@@ -55,7 +57,9 @@ def test_audit_paths_with_a_space_or_a_non_ascii_byte_are_not_work(tmp_path: Pat
 _CLOSURE = "chore(release): rc-1 phase CLOSURE"
 
 
-def _closed_candidate(root: Path, *, closure_commit: bool) -> Path:
+def _closed_candidate(
+    root: Path, *, closure_commit: bool, closure: str = _CLOSURE, other: bool = False
+) -> Path:
     """A workspace whose release state stores an `implemented` sha no history holds, with two
     non-block commits after the closure commit when *closure_commit*."""
     make_workspace(root)
@@ -66,10 +70,15 @@ def _closed_candidate(root: Path, *, closure_commit: bool) -> Path:
             "milestone": "implemented", "sha": "9" * 40, "text": "x"}]  # fmt: skip
     write_text(state, json.dumps({**json.loads(read_text(state)), "log": log}))
     git(repo, "add", "specs")
-    _commit(repo, "feat(J1.T1): before")
+    _commit(repo, "feat(J1.T1): before", *(["specs/releases/0.4.9/old.md"] if other else []))
     if closure_commit:
-        _commit(repo, _CLOSURE)
+        _commit(repo, closure, "specs/releases/0.5.0/closure.md")
     _commit(repo, "feat(J1.T2): after one")
+    if other:
+        git(
+            repo, "rm", "-q", "specs/releases/0.4.9/old.md"
+        )  # a commit touching another release's folder
+        git(repo, "commit", "-q", "-m", _CLOSURE)
     _commit(repo, "feat(J1.T3): after two")
     return repo
 
@@ -94,3 +103,23 @@ def test_the_closure_commit_is_found_by_its_subject_when_the_stored_sha_is_orpha
 def test_a_vanished_closure_commit_is_never_zero(tmp_path: Path) -> None:
     _closed_candidate(tmp_path, closure_commit=False)
     assert _metric_6(tmp_path) in (None, "n/a")
+
+
+def test_a_closure_commit_that_says_enters_closure_is_the_bound(tmp_path: Path) -> None:
+    _closed_candidate(
+        tmp_path, closure_commit=True, closure="chore(release): rc-1 enters CLOSURE at abc123"
+    )
+    assert _metric_6(tmp_path) == "2"
+
+
+def test_a_same_numbered_rc_of_another_release_is_never_the_bound(tmp_path: Path) -> None:
+    _closed_candidate(tmp_path, closure_commit=True, other=True)
+    assert _metric_6(tmp_path) == "3"
+
+
+def test_a_vanished_closure_commit_refusal_names_the_subject_grammar(tmp_path: Path) -> None:
+    _closed_candidate(tmp_path, closure_commit=False)
+    with pytest.raises(Refusal) as err:
+        _stats.table(tmp_path, tmp_path / "repos/r/specs", "0.5.0-rc1")
+    assert "chore(release): rc-1 phase CLOSURE" in err.value.fix
+    assert "fetch" not in err.value.fix
