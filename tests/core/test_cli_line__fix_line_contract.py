@@ -896,14 +896,6 @@ def _plant_disarmed_gate(root: Path) -> str:
     return "PROJECTION"
 
 
-def _plant_long_skill(root: Path) -> str:
-    skill = root / ".agents" / "skills" / "long" / "SKILL.md"
-    skill.parent.mkdir(parents=True)
-    soft = json.loads((_PKG / "features/spec_context/behavior-map.json").read_bytes())
-    write_text(skill, "l\n" * (soft["skill_md_line_soft"] + 1))
-    return "SKILL-MD-LENGTH"
-
-
 #: Every workspace-doctor code the home proves: cleared by its printed fix (a plant), or an
 #: agent action (``None``: a ledger row, or the long SKILL.md).
 WORKSPACE_PLANTS = {
@@ -928,8 +920,11 @@ def _workspace_clears(ws: Path, plant: Callable[[Path], str]) -> str:
 def _long_skill(ws: Path) -> str:
     """A long SKILL.md is one non-error finding whose `Operator action:` names its library source."""
     root = _initialized(ws)
-    code = _plant_long_skill(root)
-    [found] = [f for f in _doctor(root) if f["code"] == code]
+    skill = root / ".agents" / "skills" / "long" / "SKILL.md"
+    skill.parent.mkdir(parents=True)
+    soft = json.loads((_PKG / "features/spec_context/behavior-map.json").read_bytes())
+    write_text(skill, "l\n" * (soft["skill_md_line_soft"] + 1))
+    [found] = [f for f in _doctor(root) if f["code"] == "SKILL-MD-LENGTH"]
     assert found["verdict"] == "warning"
     assert (
         found["fix"]
