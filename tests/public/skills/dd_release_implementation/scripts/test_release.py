@@ -686,7 +686,9 @@ def test_the_first_memory_run_at_the_implementation_phase_commit_records_its_ent
     """With HEAD at the IMPLEMENTATION phase commit and no memory entry yet, the run is
     the first reconciliation, never "already reconciled": it records since == until."""
     root, specs, _ = _memory_repo(tmp_path, script)
-    _git(root, "commit", "-q", "--allow-empty", "-m", "chore(release): rc-1 phase IMPLEMENTATION")
+    write_text(specs / "releases/0.5.0/milestone.md", "x\n")  # a milestone commit touches its release folder
+    _git(root, "add", "-A")
+    _git(root, "commit", "-q", "-m", "chore(release): rc-1 phase IMPLEMENTATION")
     head = _git(root, "rev-parse", "HEAD")
 
     result = _memory(script, root, specs, reviewed="", changed="")

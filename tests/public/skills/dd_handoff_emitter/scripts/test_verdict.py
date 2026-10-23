@@ -322,7 +322,11 @@ def _stats_workspace(tmp_path: Path) -> Path:
 
 def _close(repo: Path, n: int) -> str:
     """Commits candidate *n*'s CLOSURE phase under its subject and returns its sha."""
-    git(repo, "commit", "-q", "--allow-empty", "-m", f"chore(release): rc-{n} phase CLOSURE")
+    write_text(
+        repo / f"specs/releases/0.5.0/closure-{n}.md", "closed\n"
+    )  # a milestone commit touches its release folder
+    git(repo, "add", "specs")
+    git(repo, "commit", "-q", "-m", f"chore(release): rc-{n} phase CLOSURE")
     return git(repo, "rev-parse", "HEAD").strip()
 
 

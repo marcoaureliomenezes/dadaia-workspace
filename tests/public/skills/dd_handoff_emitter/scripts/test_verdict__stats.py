@@ -114,7 +114,7 @@ def test_a_closure_commit_that_says_enters_closure_is_the_bound(tmp_path: Path) 
 
 def test_a_same_numbered_rc_of_another_release_is_never_the_bound(tmp_path: Path) -> None:
     _closed_candidate(tmp_path, closure_commit=True, other=True)
-    assert _metric_6(tmp_path) == "3"
+    assert _metric_6(tmp_path) == "2"
 
 
 def test_a_vanished_closure_commit_refusal_names_the_subject_grammar(tmp_path: Path) -> None:

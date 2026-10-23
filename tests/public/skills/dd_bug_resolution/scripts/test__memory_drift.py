@@ -396,8 +396,9 @@ def test_the_closure_window_opens_at_the_live_release_defined_sha(script: Path, 
 def test_the_closure_window_opens_at_the_last_memory_entry_until(script: Path, repo: Path) -> None:
     """The window start is the newest commit subjected as the candidate's memory pass."""
     base = _git(repo, "rev-parse", "HEAD")
-    write_text(repo / "README.md", "later\n")
-    _git(repo, "add", "README.md")
+    (repo / "specs/releases/9.9.9").mkdir(parents=True)
+    write_text(repo / "specs/releases/9.9.9/memory.md", "later\n")
+    _git(repo, "add", "specs")
     _git(repo, "commit", "-qm", "chore(release): rc-1 memory pass recorded — 0 reviewed, 0 changed")
     until = _git(repo, "rev-parse", "HEAD")
     state = {"defined": {"sha": base, "ts": "2026-01-01T00:00:00Z"}}

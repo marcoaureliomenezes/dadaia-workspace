@@ -649,6 +649,8 @@ def _drift_after_rewrite(script: Path, tmp_path: Path, bound: str) -> list[str]:
     for subject, edited in steps:
         if edited:
             write_text(tmp_path / f"src/{edited}.py", f"x = '{subject}'\n")
+        if subject == _SUBJECTS[bound]:  # a milestone commit touches its release folder
+            write_text(specs / "releases/0.5.0/bound.md", subject)
         git(tmp_path, "add", "specs", "src")
         git(tmp_path, "commit", "-q", "--allow-empty", "-m", subject)
         old[subject] = git(tmp_path, "rev-parse", "HEAD").strip()
