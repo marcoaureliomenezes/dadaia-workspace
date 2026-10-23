@@ -240,7 +240,7 @@ def _uncited(specs: Path, text: str) -> list[dict[str, Any]]:
         return [_findings.finding(CODE, LEDGER, held[missed[0]][0], "the clone is shallow: its misses cannot be judged", git_line(cut, "fetch", "--unshallow"))]  # fmt: skip
     return [
         _findings.finding(
-            CODE, LEDGER, held[i][0], f"{i!r} fix_sha {held[i][1]} has no commit in HEAD of {', '.join(p.name for p in repos)} holding the line `fix(bugs): {i} — …`",
+            CODE, LEDGER, held[i][0], f"{i!r} fix_sha {held[i][1]} has no commit in HEAD of {', '.join(p.name for p in repos)} holding the line `fix(bugs): {i} — …` or `refactor(bugs): {i} — …`",
             script(Path(__file__).with_name("bugs.py"))("archive", *missed, specs=specs),
         )
         for i in missed
