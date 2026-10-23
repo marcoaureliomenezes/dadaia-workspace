@@ -24,8 +24,13 @@ _HEADS, _WT = b"refs/heads/", b"refs/heads/wt/"
 _BLOCKED = 3
 
 
-def _zero(sha: bytes) -> bool:
-    return not sha.strip(b"0")
+def _nil(sha: bytes) -> bool:
+    """Whether *sha* is git's zero id (the kernel decides); a sha not opening with ``0`` loads nothing."""
+    if sha[:1] != b"0":
+        return False
+    from dadaia_workspace.core.skill_owner import load_owner
+
+    return bool(load_owner("dd-bug-resolution", "_grammar").is_zero_object_id(sha))
 
 
 def _kernel() -> ModuleType:
@@ -65,12 +70,12 @@ def main(stdin: bytes) -> int:
         if len(parts) != 3:
             continue
         old, new, ref = parts
-        if ref.startswith(_HEADS) and _zero(old) and not _zero(new):
+        if ref.startswith(_HEADS) and _nil(old) and not _nil(new):
             platform = _kernel()
             existing = platform.run(["git", "rev-parse", "-q", "--verify", platform.decode(ref)])
             old = existing.stdout.strip().encode() or old
         if ref.startswith(_WT):
-            if _zero(old) and not _zero(new):
+            if _nil(old) and not _nil(new):
                 return _creation_refusal(ref)
         elif ref.startswith(_HEADS):
             platform = _kernel()

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import subprocess
 import sys
 from collections.abc import Callable, Iterable, Sequence
 from dataclasses import replace
@@ -16,7 +15,6 @@ from dadaia_workspace.cli._specs_resolution import (
     resolve_workspace_root_for_cli,
     scope,
 )
-from dadaia_workspace.core import platform
 from dadaia_workspace.core.cli_line import fix_line, spell_fix
 from dadaia_workspace.core.gitflow import Gitflow, SeveralWorkBranches, work_branch
 from dadaia_workspace.core.platform import act
@@ -38,11 +36,11 @@ app = typer.Typer(help="Git-hook chokepoints: the pre-push and ref gates and the
 
 def _repo_root() -> Path:
     """Resolve the enclosing git repo root, or fail with a clear message."""
+    git = load_owner("dd-bug-resolution", "_git")
     try:
-        out = platform.run(["git", "rev-parse", "--show-toplevel"], check=True)
-    except (subprocess.CalledProcessError, FileNotFoundError):
+        return Path(git.git(Path.cwd(), "rev-parse", "--show-toplevel").strip())
+    except (git.GitError, OSError):
         fail("not inside a git repository", act("agent", "run it inside a git repository"))
-    return Path(out.stdout.strip())
 
 
 def _no_canon_violations(paths: Iterable[str]) -> list[str]:
@@ -51,16 +49,16 @@ def _no_canon_violations(paths: Iterable[str]) -> list[str]:
     return []
 
 
-def _gitflow(repo_root: Path) -> tuple[Gitflow, str | None, str]:
+def _gitflow(repo_root: Path) -> tuple[Gitflow, str | None, Path]:
     """The gitflow through the one reader (committed first; an associated repo reads its
-    owner's main repo), its warning on the default, and the slug of the repo's main repo."""
+    owner's main repo), its warning on the default, and the repo whose constitution answers for it."""
     from dadaia_workspace.container import build_git_client
 
     workspace = resolve_workspace_root_for_cli(repo_root)
     owner = repo_owner(workspace, repo_root)
-    main = workspace / "repos" / owner[2] if owner else None
+    main = workspace / "repos" / owner[2] if owner and owner[1] != owner[2] else None
     gitflow, warning = build_git_client().gitflow(repo_root, main)
-    return gitflow, warning, owner[2] if owner else repo_root.name
+    return gitflow, warning, main or repo_root
 
 
 def _gate_inputs(repo_root: Path, head: str) -> tuple[Gitflow, GateFixes]:
@@ -69,13 +67,12 @@ def _gate_inputs(repo_root: Path, head: str) -> tuple[Gitflow, GateFixes]:
     from dadaia_workspace.container import build_git_client
 
     git = build_git_client()
-    gitflow, warning, slug = _gitflow(repo_root)
+    gitflow, warning, source = _gitflow(repo_root)
     if warning:
         typer.echo(f"[pre-push] WARNING: {warning}", err=True)
-        if git.committed_text(repo_root, "specs/constitution.md") is None:
-            typer.echo(spell_fix(gitflow_fix(repo_root / "specs")), err=True)
+        typer.echo(spell_fix(gitflow_fix(source / "specs")), err=True)
     try:
-        work = work_branch(repo_root, gitflow, slug)
+        work = work_branch(repo_root, gitflow, source.name)
     except SeveralWorkBranches as several:
         typer.echo(f"[pre-push] WARNING: {several.message}\nhint: {several.fix}", err=True)
         work = gitflow.work_prefix + several.keep
