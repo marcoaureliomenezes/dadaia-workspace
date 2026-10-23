@@ -151,7 +151,6 @@ A decision surface, not a doc mirror — official docs are an on-demand index at
 - A blanket-allow layer is acceptable only when real enforcement lives in correctly-scoped hooks.
 - Gotcha: nothing enforces the per-persona write-allowlist.
 - Native frontmatter (`name`, `description`, `model`, `tools`, `skills`, `maxTurns`) is honored.
-- dadaia's PreToolUse gate is persona-blind: path-class x scope only.
 
 ---
 

@@ -64,7 +64,7 @@ gap was returned first).*
 **Phase 6 — Cleanup + resolve.** Grep the probe prefix to zero:
 
 - Commit the GREEN source fix with shape 3 of `dd-gitflow-default` §3a, then resolve; it derives
-  `fix_sha` from that commit's `fix(bugs): <id>` line:
+  `fix_sha` from that commit's id line (`specs/bugs/AGENTS.md` §2):
 
 ```bash
 python3 .agents/skills/dd-bug-resolution/scripts/bugs.py resolve <bug-id> --specs <specs-dir> \
