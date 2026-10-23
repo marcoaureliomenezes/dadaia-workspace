@@ -102,15 +102,18 @@ def build_git_object_reader() -> GitSubprocessObjectReader:
     return GitSubprocessObjectReader()
 
 
-def load_denylist_terms(repo: Path | None = None) -> tuple[tuple[str, str], ...]:
-    """Composition-root seam over the operator privacy denylist.
+def load_denylist_terms(
+    repo: Path | None = None, *, own: bool = True
+) -> tuple[tuple[str, str], ...]:
+    """Composition-root seam over the operator privacy denylist of the workspace holding *repo*.
 
     ``push-gate-check`` reads operator terms through here rather than importing
-    ``infrastructure.privacy_check`` directly (``cli-no-infrastructure``).
+    ``infrastructure.privacy_check`` directly (``cli-no-infrastructure``). *own* off keeps
+    the repo's own-name drop off.
     """
     from dadaia_workspace.infrastructure.privacy_check import load_privacy_terms
 
-    return load_privacy_terms(repo)
+    return load_privacy_terms(repo, own=own)
 
 
 def load_denylist_baseline_patterns() -> tuple[BaselinePatternLike, ...]:
@@ -134,15 +137,16 @@ def scan_publish_candidates(repo: Path, rels: list[str], *, own: bool = False) -
                 objects.append(ScannedObject(rel, "", data.decode("utf-8"), decodable=True))
             except UnicodeDecodeError:
                 objects.append(ScannedObject(rel, "", "", decodable=False))
-    return _findings(repo if own else None, objects)
+    return _findings(repo, objects, own)
 
 
-def _findings(terms_of: Path | None, objects: Iterable[ScannedObject]) -> dict[str, str]:
-    """One masked finding per offending path of *objects*; *terms_of*'s repo may name itself."""
+def _findings(repo: Path, objects: Iterable[ScannedObject], own: bool = True) -> dict[str, str]:
+    """One masked finding per offending path of *objects*; the terms are *repo*'s workspace's, and
+    *repo* may name itself when *own*."""
     from dadaia_workspace.features.chokepoints.denylist_scan import scan_objects
 
     outcome = scan_objects(
-        objects, load_denylist_terms(terms_of), load_denylist_baseline_patterns()
+        objects, load_denylist_terms(repo, own=own), load_denylist_baseline_patterns()
     )
     return {h.path: f"{h.source_layer} '{h.masked_term}' (line {h.line})" for h in outcome.hits}
 
