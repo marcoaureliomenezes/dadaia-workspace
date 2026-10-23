@@ -241,7 +241,7 @@ def test_load_denylist_env_precedence_and_workspace_fallback(
     monkeypatch.chdir(tmp_path / "ws")
     assert load_privacy_terms() == (("from-env", "env"),)
     monkeypatch.delenv("DADAIA_PRIVACY_DENYLIST")
-    assert load_privacy_terms() == (("from-file", "file"),)
+    assert load_privacy_terms(tmp_path / "ws") == (("from-file", "file"),)
 
 
 @pytest.mark.parametrize(

@@ -281,7 +281,7 @@ def test_a_ledger_verb_outside_the_workspace_loads_the_pre_push_terms(
     specs.mkdir(parents=True)
     monkeypatch.delenv("DADAIA_PRIVACY_DENYLIST", raising=False)
     monkeypatch.chdir(specs)
-    assert load_denylist_terms() == _TERMS
+    assert load_denylist_terms(specs) == _TERMS
     monkeypatch.chdir(tmp_path)
     ledger = load_owner("dd-bug-resolution", "_ledger")
     assert ledger.private_refusal([{"title": f"a {_TERM} leak"}], specs) is not None
