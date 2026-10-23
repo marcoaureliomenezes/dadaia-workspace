@@ -22,6 +22,7 @@ sys.path[:0] = [
     str(Path(__file__).resolve().parents[2] / "dd-bug-resolution" / "scripts"),
 ]
 
+import _bugs_store as store
 import _findings
 import _ledger
 from _clock import now_iso as utc_now
@@ -44,7 +45,6 @@ from _release_store import (
     Live,
     commit,
     live_release,
-    open_bug_ids,
     window_start,
 )
 from _release_tree import check, drift, memory_errors, ship_findings
@@ -133,7 +133,9 @@ def _phase(args: argparse.Namespace, specs: Path) -> int:
 
 def _drift(args: argparse.Namespace, specs: Path) -> int:
     """The worklist over the window `memory` records: from the newest recorded bound HEAD reaches, else the root commit."""
-    report = drift.report(specs, drift.reach(specs.parent, window_start(live_release(specs).state)))
+    report = drift.report(
+        specs, drift.reach(specs.parent, window_start(specs.parent, live_release(specs)))
+    )
     print(json.dumps(report, indent=2) if args.json else drift.render(report))
     return 1 if report["atoms"] or report["uncovered"] else 0
 
@@ -141,7 +143,7 @@ def _drift(args: argparse.Namespace, specs: Path) -> int:
 def _memory(args: argparse.Namespace, specs: Path) -> int:
     """Append the record over the ledger-derived window, refused unless its worklist was worked."""
     live, ts = live_release(specs), utc_now()
-    since = drift.reach(specs.parent, window_start(live.state))
+    since = drift.reach(specs.parent, window_start(specs.parent, live))
     lists = [[s for s in getattr(args, n).split(",") if s] for n in ("reviewed", "changed")]
     try:
         until = drift.git(specs.parent, "rev-parse", "HEAD")[0]
@@ -166,7 +168,7 @@ def _memory(args: argparse.Namespace, specs: Path) -> int:
 
 def _allowed_open_bugs(args: argparse.Namespace, specs: Path) -> list[str]:
     """The `--allow-open` ids, once each, matching the open bugs exactly; refuses otherwise."""
-    open_ids = open_bug_ids(specs)
+    open_ids = store.open_ids(specs)
     allowed = sorted(set(args.allow_open))
     if len(allowed) != len(args.allow_open):
         raise Refusal(

@@ -14,9 +14,9 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import _commit
-from _bugs_check import OPEN
+import _git
 from _grammar import STATE
-from _ledger import records, replace
+from _ledger import replace
 from _refusal import Refusal
 from _release_check import state_findings
 from _release_schema import SCRIPT, State, UnreadableRelease, current_candidate, live_id, read_state
@@ -46,21 +46,15 @@ def live_release(specs: Path) -> Live:
     return Live(live, release_dir, state, current_candidate(release_dir, state))
 
 
-def window_start(state: State) -> list[str]:
-    """The memory window's start candidates, newest first: each memory entry's `until`,
-    newest entry first, then `defined.sha`."""
-    bounds = [str(e["until"]) for e in reversed(state.get("log") or [])
+def window_start(repo: Path, live: Live) -> list[str]:
+    """The memory window's start candidates, newest first: each memory entry's `until`, newest
+    entry first, then the newest commit of *repo* subjected as the live candidate's IMPLEMENTATION phase."""
+    bounds = [str(e["until"]) for e in reversed(live.state.get("log") or [])
               if e.get("kind") == "memory" and e.get("until")]  # fmt: skip
-    return bounds + [str(d) for d in [(state.get("defined") or {}).get("sha")] if d]
-
-
-def open_bug_ids(specs: Path) -> list[str]:
-    """Every persisted open bug id, sorted for deterministic refusals."""
-    return sorted(
-        str(record["id"])
-        for record in records(specs / "bugs" / "BUGS.jsonl")
-        if record.get("status") == OPEN and record.get("id")
+    subject = (
+        f"^chore(release): {live.candidate.name} phase IMPLEMENTATION$" if live.candidate else ""
     )
+    return bounds + ([sha] if subject and (sha := _git.git(repo, "log", "-1", "--format=%H", "--grep", subject, check=False).strip()) else [])  # fmt: skip
 
 
 def validated(state: State, rel: str) -> str:
