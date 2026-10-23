@@ -13,6 +13,7 @@ import re
 from pathlib import Path
 from typing import Any
 
+import _bugs_store as store
 import _findings
 import _memory_drift as drift
 from _grammar import SEMVER_RE, STATE, sole_live
@@ -68,8 +69,7 @@ def _trace(
     document = specs / "backlog" / "BACKLOG.json"
     active = json.loads(read_text(document)) if document.is_file() else {}
     exits = records(specs / "backlog/_archive/backlog_histo.jsonl")
-    bugs = {r.get("id"): r for p in ("BUGS.jsonl", "_archive/bugs_histo.jsonl")
-            for r in records(specs / "bugs" / p)}  # fmt: skip
+    bugs = {r.get("id"): r for r in store.history(specs)}
     closed = {r.get("id"): {"release": r.get("release"), "status": r.get("disposition")}
               for r in records(specs / "audits/_archive/audits_histo.jsonl")}  # fmt: skip
     found = {r.get("id"): r for p in sorted(specs.glob("audits/*/FINDINGS.jsonl"))
@@ -77,13 +77,14 @@ def _trace(
     ledgers = {
         "backlog": {**{e.get("id"): {} for e in active.get("active") or []},
                     **{r.get("id"): r for r in exits}},
-        "bugs": bugs,
         "findings": found,
     }  # fmt: skip
 
     def standing(kind: str, i: str, seen: frozenset[str] = frozenset()) -> str:
         if summary and re.search(rf"(?<![\w-]){re.escape(i)}(?![\w-])", summary):
             return "traced"
+        if kind == "bugs":
+            return store.standing(specs, i, release)
         record = ledgers[kind].get(
             i, closed.get(i.rpartition("-F")[0]) if kind == "findings" else None
         )
@@ -95,7 +96,7 @@ def _trace(
             return "traced"
         if (by := record.get("superseded_by")) and by not in seen:
             return standing(kind, by, seen | {i})
-        back = record.get("resolved_release" if kind == "bugs" else "release")
+        back = record.get("release")
         declined = "rejected" in (record.get("status"), record.get("disposition"))
         return "traced" if back == release or declined else "untraced"
 

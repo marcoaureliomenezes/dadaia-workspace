@@ -9,8 +9,9 @@ import shutil
 from pathlib import Path
 
 import _clock
+from _bugs_store import history
 from _grammar import SEMVER_RE, STATE, live_ids
-from _ledger import records, replace
+from _ledger import replace
 from _platform import act, is_link, quote, write_text
 from _refusal import Refusal
 from _release_schema import SCRIPT, State, next_candidate, read_state
@@ -63,7 +64,7 @@ def seeded_scope(specs: Path, origin: str) -> str:
     """One scope clause per bug named by a `bugs:` origin, else the placeholder."""
     if not origin.startswith("bugs:"):
         return "(List the scope clusters / acceptance criteria.)"
-    known = {str(r.get("id")): r for r in records(specs / "bugs" / "BUGS.jsonl")}
+    known = {str(r.get("id")): r for r in history(specs)}
     bugs = [b.strip() for b in origin[5:].split(",") if b.strip()]
     return "\n".join(
         f"### FR{n} — {known.get(bug, {}).get('title', bug)}\n\n- Bug `{bug}`.\n"
