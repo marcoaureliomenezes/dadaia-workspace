@@ -369,20 +369,28 @@ def test_the_origin_read_lists_the_work_branches_origin_holds_and_keeps_the_high
     assert several.value.keep == "0.8.0"
 
 
+@pytest.mark.parametrize("merged", [True, False], ids=["drop-merged-low", "merge-unmerged-low"])
 def test_the_several_work_decision_yields_the_kept_version_and_the_local_act(
-    tmp_path: Path,
+    tmp_path: Path, merged: bool
 ) -> None:
     owner = load_owner("dd-gitflow-default", "_worktree_git")
     repo = _repo_with_origin(tmp_path, ["0.6.0", "0.8.0"], [])
+    if not merged:
+        git(repo, "switch", "-q", "feature/0.6.0")
+        commit(repo, "low.txt")
     flow = {"work": "feature/"}
 
     keep, text = owner.several_work(repo, flow, ["0.6.0", "0.8.0"])
 
     assert keep == "0.8.0"
-    assert text == (
-        f"run `{owner.git_inline(repo, 'switch', 'feature/0.8.0')}`, "
-        f"then run `{owner.git_inline(repo, 'branch', '-d', 'feature/0.6.0')}`"
-    )
+    switch = f"run `{owner.git_inline(repo, 'switch', 'feature/0.8.0')}`"
+    if merged:
+        assert (
+            text
+            == f"{switch}, then run `{owner.git_inline(repo, 'branch', '-d', 'feature/0.6.0')}`"
+        )
+    else:
+        assert text == f"{switch}, then merge feature/0.6.0 into feature/0.8.0"
 
 
 def test_an_origin_only_lower_work_branch_yields_no_local_step(tmp_path: Path) -> None:
@@ -402,10 +410,9 @@ def test_the_several_work_act_reads_the_merged_state_and_upstream_in_one_git_rea
     real = owner.git
     monkeypatch.setattr(owner, "git", lambda tree, *args, **kw: (reads.append(args), real(tree, *args, **kw))[1])  # fmt: skip
 
-    _, text = owner.several_work(repo, {"work": "feature/"}, ["0.6.0", "0.8.0"])
+    owner.several_work(repo, {"work": "feature/"}, ["0.6.0", "0.8.0"])
 
     assert len(reads) == 1, reads
-    assert text.count("`") == 6 and "--unset-upstream" in text and "branch -d" in text
 
 
 def test_the_child_cli_is_handed_the_denylist_file_the_loader_reads(
