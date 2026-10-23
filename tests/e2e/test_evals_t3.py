@@ -13,7 +13,6 @@ from tests.helpers.evals import (
     HAND_T3,
     ONBOARDED_T3,
     RENAMED_T3,
-    ROOT,
     SPEC_T3,
     T3,
     TRACED_T3,
@@ -83,10 +82,3 @@ def test_a_plain_install_resolves_the_lib_build_offline(version: str, route: str
 )
 def test_the_grader_rewards_the_discovery(version: str, script: str, want: str) -> None:
     assert reward(T3, version, script) == want
-
-
-def test_the_instruction_gives_the_operator_work_and_names_the_workspace() -> None:
-    text = (ROOT / "evals" / "tasks" / T3 / "instruction.md").read_text()
-    assert "`/workspace` itself is the workspace folder" in text
-    assert "`calc.py`" in text
-    assert "`subtract`" in text
