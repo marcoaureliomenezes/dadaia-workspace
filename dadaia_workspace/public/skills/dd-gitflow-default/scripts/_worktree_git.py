@@ -16,7 +16,8 @@ from pathlib import Path
 from _git import git as git, parse_worktrees, scrubbed_env as scrubbed_env  # isort: skip
 from _grammar import SEMVER_RE, TAG_RE, sole_live
 from _ledger import denylist_file
-from _platform import act, cli_argv, command, git_inline, git_line, inline, is_link, venv_dir
+from _platform import act, command, git_inline, git_line, inline, is_link
+from _platform import cli_words as cli_words
 from _specs import run_cli
 from _specs import workspace_of as workspace_of
 from _worktree_names import (
@@ -51,11 +52,6 @@ def diff_sha256(tree: Path, work: str, tip: str) -> str:
 def dirty(tree: Path) -> bool:
     """Whether *tree* holds an uncommitted change or an untracked file."""
     return bool(git(tree, "status", "--porcelain").strip())
-
-
-def cli_words(root: Path, *args: str) -> tuple[str, ...]:
-    """The words that run the workspace CLI with *args*, its head from the kernel's `cli_argv`."""
-    return (*cli_argv(venv_dir(root)), *args)
 
 
 def cli(root: Path, *args: str, tree: Path | None = None) -> subprocess.CompletedProcess[str]:
