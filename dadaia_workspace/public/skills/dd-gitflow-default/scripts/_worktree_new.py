@@ -98,7 +98,7 @@ def new(root: Path, repo_name: str, name: str) -> Path:
         _refuse_unopened_bug(root / "repos" / flow["main"], start, match["bug"])
     tree = tree_path(root, repo_name, name)
     if git(repo, "branch", "--list", branch(name)).strip():
-        raise Refusal(f"{branch(name)} exists", command(*LAUNCH, "list"))
+        raise Refusal(f"{branch(name)} exists", command(*LAUNCH, "clean", str(tree)))  # fmt: skip
     made = absent_levels(root, repo_name, name)
     git(repo, *locked_add(name, "-q", "-b", branch(name)), str(tree), start)
     write_level_files(made)

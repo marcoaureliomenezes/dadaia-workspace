@@ -54,7 +54,7 @@ def target(root: Path, path: str) -> tuple[Path, Path, str, str]:
     rel = tree.relative_to(root).as_posix() if tree.is_relative_to(root) else ""
     repo_name, name, tail = locate(rel) or ("", None, ())
     if tail or not repo_name:
-        raise Refusal(f"{path} is not a worktrees/<repo>/<name> path", command(*LAUNCH, "list"))
+        raise Refusal(f"{path} is not a worktrees/<repo>/<name> path", act("agent", f"rerun with a tree path `{inline(*LAUNCH, 'list')}` prints"))  # fmt: skip
     if name is None or not NAME_RE.match(name):
         raise not_a_name(name or rel.split("/", 2)[-1])
     repo = root / "repos" / repo_name
@@ -488,7 +488,7 @@ def merge(root: Path, path: str, keep: list[str], drop: bool) -> str:
 def clean(root: Path, path: str, keep: list[str], drop: bool) -> str:
     repo, tree, name, onto = target(root, path)
     if not any(Path(row["path"]).resolve() == tree for row in ours(repo)):
-        raise Refusal(f"{tree} is not a worktree of ours", command(*LAUNCH, "list"))
+        raise Refusal(f"{tree} is not a worktree of ours", act("agent", f"rerun with a tree path `{inline(*LAUNCH, 'list')}` prints"))  # fmt: skip
     ahead = int(git(repo, "rev-list", "--count", f"{onto}..{branch(name)}"))
     if ahead:
         merge = inline(*LAUNCH, "merge", str(tree))

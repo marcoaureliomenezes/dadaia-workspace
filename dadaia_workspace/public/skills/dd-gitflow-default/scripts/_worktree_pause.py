@@ -8,7 +8,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from _git import GitError
-from _platform import act, command
+from _platform import act, command, inline
 from _worktree_end import open_children, precious, refuse_dirty, rmdir, target
 from _worktree_git import _row, git, locked_add, ours
 from _worktree_names import LAUNCH, Refusal, branch, kind_of, tree_path
@@ -62,7 +62,7 @@ def pause(root: Path, path: str) -> str:
     if kind_of(name) not in CARRIED:
         raise Refusal(f"{tree} is a {kind_of(name)} tree: only a lane or a wt-rc pauses", land)
     if not any(Path(row["path"]).resolve() == tree for row in ours(repo)):
-        raise Refusal(f"{tree} is not a worktree of ours", command(*LAUNCH, "list"))
+        raise Refusal(f"{tree} is not a worktree of ours", act("agent", f"rerun with a tree path `{inline(*LAUNCH, 'list')}` prints"))  # fmt: skip
     if held := precious(tree):
         raise Refusal(
             f"{tree} holds ignored files: {', '.join(held)}",
@@ -88,9 +88,9 @@ def resume(root: Path, path: str) -> str:
     ref, dist = branch(name), root / ".dadaia" / "dist" / repo.name
     bundle = dist / f"{name}.bundle"
     if git(repo, "branch", "--list", ref).strip():
-        raise Refusal(f"{ref} exists", command(*LAUNCH, "list"))
+        raise Refusal(f"{ref} exists", command(*LAUNCH, "clean", str(tree)))  # fmt: skip
     if not bundle.is_file():
-        raise Refusal(f"no bundle at {bundle}", command(*LAUNCH, "list"))
+        raise Refusal(f"no bundle at {bundle}", act("agent", f"rerun with the tree of a bundle under {dist}"))  # fmt: skip
     made = absent_levels(root, repo.name, name)
     git(repo, "fetch", "-q", str(bundle), f"{ref}:{ref}")
     try:

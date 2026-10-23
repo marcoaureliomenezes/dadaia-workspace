@@ -7,7 +7,7 @@ from __future__ import annotations
 from collections import deque
 from pathlib import Path
 
-from _platform import act, command, git_inline, inline
+from _platform import act, git_inline, inline
 from _worktree_end import check_ancestor, refuse_dirty, target
 from _worktree_git import cli_words, flow_for, git, ours
 from _worktree_names import LAUNCH, Refusal, base_of, branch
@@ -17,7 +17,7 @@ def _cascade(root: Path, path: str) -> list[tuple[Path, str]]:
     """(tree, base) of the tree at *path* then of each open tree whose base chain leads to it."""
     repo, tree, name, onto = target(root, path)
     if not tree.exists():
-        raise Refusal(f"{tree} does not exist", command(*LAUNCH, "list"))
+        raise Refusal(f"{tree} does not exist", act("agent", f"rerun with a tree path `{inline(*LAUNCH, 'list')}` prints"))  # fmt: skip
     work = flow_for(root, repo)["work"]
     below = [(row["name"], Path(row["path"])) for row in ours(repo)]
     order: list[tuple[Path, str]] = []

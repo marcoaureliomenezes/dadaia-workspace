@@ -162,11 +162,11 @@ def work_version(repo: Path, flow: dict[str, str], ref: str = "refs/heads") -> s
 
 
 def not_a_name(name: str, live: str = "") -> Refusal:
-    """The one refusal of a name the grammar does not take; its one fix lists the trees."""
+    """The refusal of a name the grammar does not take; its fix reruns with the shape it lists."""
     shape = live or "<M.m.p>"
     return Refusal(
         f"not a worktree name: {name!r} (expected {shape}/rc-<N>/wt-rc, {shape}/rc-<N>/job-<n>/wt-main, {shape}/rc-<N>/job-<n>/wt-task-<kkk>, {shape}/wt-backlog-<slug> or {shape}/wt-hotfix-<bug>)",  # fmt: skip
-        command(*LAUNCH, "list"),
+        act("agent", "rerun with a name shaped as the message lists"),
     )
 
 
