@@ -323,7 +323,7 @@ def test_several_work_branches_warn_and_keep_the_gate_on_the_kept_branch(
     repo = tmp_path / "repo"
     _init_repo(repo)
     flow = Gitflow("main", "dev", "feature/")
-    monkeypatch.setattr(ci, "_gitflow", lambda _r: (flow, None, "repo"))
+    monkeypatch.setattr(ci, "_gitflow", lambda _r: (flow, None, repo))
 
     def several(*_a: object) -> str:
         raise SeveralWorkBranches("2 work branches", "run `x`, then run `y`", "0.2.0")

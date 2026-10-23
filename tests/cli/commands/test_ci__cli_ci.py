@@ -176,6 +176,7 @@ def test_ref_gate_refuses_an_audit_update_that_touches_any_other_path(
 def test_ref_gate_refuses_when_the_move_check_faults(monkeypatch, tmp_path: Path) -> None:
     """A fault while reading the move's facts is a refusal the hook can read, never a fail-open."""
     from dadaia_workspace import container
+    from dadaia_workspace.core.exceptions import GitSyncError
 
     repo, base = _work_repo(tmp_path)
     tip = _commit(repo, **{"specs__audits__2026-10-14.md": "finding\n"})
@@ -187,7 +188,7 @@ def test_ref_gate_refuses_when_the_move_check_faults(monkeypatch, tmp_path: Path
 
         def git(self, root: Path, *args: str) -> str:
             if args[0] == "rev-list":
-                raise OSError("git vanished")
+                raise GitSyncError("git rev-list failed")
             return real.git(root, *args)
 
     monkeypatch.setattr(container, "build_git_client", Faulting)

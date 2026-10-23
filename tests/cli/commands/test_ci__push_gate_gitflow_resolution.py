@@ -121,4 +121,4 @@ def test_a_committed_constitution_without_a_block_keeps_the_no_block_warning(
     ci._gate_inputs(app, "")
     err = capsys.readouterr().err
     assert f"{app / 'specs' / 'constitution.md'}: no gitflow block" in err
-    assert "specs init" not in err
+    assert f"specs init --specs-dir {app / 'specs'}" in err
