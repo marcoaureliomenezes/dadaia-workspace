@@ -8,10 +8,11 @@ Wave V. Only the test REBUILDs that cross units; every pin a producer owns chang
 
 **Definition of done (each task).** `python scripts/ci.py job` passes; the test directories `python scripts/impact.py <the task's W:>` prints pass; for a fix, the first-pass sweep grep with its hit count (ADR 0280 clause 2); the own-diff self-check of `dd-release-implementation` section 3. The gate is the repo `verify:` line, unchanged: no preflight, no new gate, never the full CI line. A task that finds a pin its `W:` does not name stops and amends this file in a shape-5 commit, then continues; it never edits outside its `W:`. Net production lines are at most 0 per task, or the outcome states the reason.
 
-**Sweep greps.** `git grep -nE "write_text\(.*tests/" -- tests` prints 0 after J5.T5; for each literal pin removed, the grep that finds the one remaining home, with its count, is in the commit body.
+**Sweep greps.** the checkout-rooted write grep of ruling 2 prints 0 after J5.T5; for each literal pin removed, the grep that finds the one remaining home, with its count, is in the commit body.
 
 **Main-thread rulings (2026-10-23).**
 1. R61 worktree sites are driven, not exempted. The census exists for the `dd-gitflow-default` worktree refusals that printed an act that could not clear them (F014); an exemption of those sites leaves F014 open. J5.T2 drives the worktree scripts' refusal sites through cases built on `tests/helpers/worktree_ws.py` in `tests/fixtures/fix_world.py`, which joins its `W:`. A site no case can reach keeps its own named exemption with its reason. The sweep keeps the old strength: it counts refusal call sites per function and the test compares that count with the cases, so a second refusal in a covered function is caught; no assert is narrowed.
+2. R63 sweep grep. `write_text\(.*tests/` also matches writes into per-test scratch trees (`task / "tests/…"`, `root / "tests/…"`), 7 hits outside J5.T5's `W:` (`test__worktree_end.py`, `test__worktree_end__landing.py`, `test_release__release_script.py`, `test_impact.py`), none under the checkout. The sweep measures writes rooted at the checkout: `git grep -nE '(_REPO_ROOT|REPO_ROOT|\bROOT|Path\(__file__\)[^)]*\))[^\n]*/ *"tests' -- tests | grep -E 'write_text|mkdir|open\('` prints 0 after J5.T5.
 
 | task | who | AC | `W:` | waits on | outcome |
 |---|---|---|---|---|---|
