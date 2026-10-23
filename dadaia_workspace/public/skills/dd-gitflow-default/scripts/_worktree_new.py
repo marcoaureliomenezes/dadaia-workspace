@@ -3,14 +3,14 @@
 
 from __future__ import annotations
 
-import json
 import shutil
 from pathlib import Path
 
 from _bugs_check import OPEN
 from _git import git
 from _grammar import STATE, candidate_number
-from _platform import act, command, is_link
+from _jsonl import parse_object
+from _platform import act, command, is_link, read_text
 from _specs import check_release, parse
 from _worktree_git import flow_for, locked_add, not_a_name, reattach, work_version, work_versions
 from _worktree_names import (
@@ -57,7 +57,7 @@ def _refuse_unready(root: Path, main: Path, version: str, rc: str) -> None:
     phase = None
     if state.is_file():
         check_release(rc_tree / "specs")
-        phase = json.loads(state.read_text("utf-8")).get("phase")
+        phase = parse_object(read_text(state), act("agent", f"repair {state} into a JSON object")).get("phase")  # fmt: skip
     if phase != "IMPLEMENTATION":
         nxt = f"{version}/rc-{candidate_number([rc]) + 1}/wt-rc"  # a phase never goes back: past IMPLEMENTATION the way on is the next candidate's own tree
         fix = (command(*LAUNCH, "new", main.name, nxt) if phase == "CLOSURE"
