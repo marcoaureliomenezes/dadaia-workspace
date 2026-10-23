@@ -238,6 +238,10 @@ def test_a_command_that_writes_no_verdict_is_never_judged(command: str) -> None:
         f"echo $({_VERDICT_RUN})",
         f"x=`{_VERDICT_RUN}`",
         "python3 -c \"import runpy,sys; sys.argv=['v','/t','--verdict','APPROVED']; runpy.run_path('.agents/skills/dd-handoff-emitter/scripts/verdict.py', run_name='__main__')\"",
+        "python3 verdict.p'y' --verdict APPROVED",
+        "python3 verdict''.py --verdict APPROVED",
+        "python3 verdict.py --ver''dict APPROVED",
+        "python3 verdict.p\\y --verdict APPROVED",
     ],
 )
 def test_a_command_that_runs_the_writer_with_the_flag_is_refused_in_any_shell_position(
