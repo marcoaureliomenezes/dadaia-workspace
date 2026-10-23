@@ -3,6 +3,7 @@ matcher; every refusal carries its one fix. Size: SMALL — real git in a tmp re
 the read-failure fix are fakes, since the export feature may not import the chokepoints.
 """
 
+import subprocess
 from collections.abc import Callable, Iterable
 from pathlib import Path
 
@@ -109,3 +110,62 @@ def test_an_object_read_failure_carries_the_injected_fix(
 
     assert refused.value.fix == _READ_FIX
     assert "listing the range failed" in str(refused.value)
+
+
+_PAUSE = ".dadaia/dist/r/lane.bundle"
+
+
+@pytest.mark.parametrize("where", ["out/lane.bundle", _PAUSE], ids=["open-lane", "pause-bundle"])
+def test_an_unbundle_out_of_space_refuses_with_gits_reason_and_the_space_act(
+    ws: Path, monkeypatch: pytest.MonkeyPatch, where: str
+) -> None:
+    bundle = _bundle(ws, where)
+    real = subprocess.run
+
+    def run(argv: list[str], **kwargs: object) -> subprocess.CompletedProcess[bytes]:
+        if "unbundle" in argv:
+            return subprocess.CompletedProcess(
+                argv, 128, b"", b"fatal: write error: No space left on device\n"
+            )
+        return real(argv, **kwargs)  # type: ignore[call-overload,no-any-return]
+
+    monkeypatch.setattr(subprocess, "run", run)
+
+    with pytest.raises(DadaiaError) as refused:
+        _scan(ws, bundle)
+
+    assert "No space left on device" in str(refused.value)
+    assert refused.value.fix == act(
+        "agent",
+        f"free space and write permission under {ws / '.dadaia/tmp'}, then rerun the export",
+    )
+
+
+def test_a_pause_bundle_whose_pack_is_damaged_still_asks_the_operators_ruling(ws: Path) -> None:
+    bundle = _bundle(ws, _PAUSE)
+    data = bundle.read_bytes()
+    bundle.write_bytes(data[: len(data) - 20])
+
+    with pytest.raises(DadaiaError) as refused:
+        _scan(ws, bundle)
+
+    assert refused.value.fix == act(
+        "operator", f"rule whether {bundle} is restored from a copy or discarded"
+    )
+
+
+def test_a_git_call_that_hangs_refuses_instead_of_raising_the_timeout(
+    ws: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    bundle = _bundle(ws, "out/lane.bundle")
+
+    def run(argv: list[str], **kwargs: object) -> subprocess.CompletedProcess[bytes]:
+        assert kwargs.get("timeout"), "git ran with no timeout and would hang"
+        raise subprocess.TimeoutExpired(argv, float(str(kwargs["timeout"])))
+
+    monkeypatch.setattr(subprocess, "run", run)
+
+    with pytest.raises(DadaiaError) as refused:
+        _scan(ws, bundle)
+
+    assert refused.value.fix == _READ_FIX
