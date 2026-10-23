@@ -57,6 +57,10 @@ HAND_T3 = (
     f"{ONBOARDED_T3} && {_D} worktree new demo 0.1.0/wt-backlog-x"
     f" && {_FILE} /workspace/worktrees/demo/0.1.0/wt-backlog-x/specs"
 )
+REJECTED_T3 = (
+    f"{HAND_T3} && {_RUN}/dd-backlog-definition/scripts/backlog.py exit try-it"
+    " --disposition rejected --reason no --specs /workspace/worktrees/demo/0.1.0/wt-backlog-x/specs"
+)
 
 
 def sh(*cmd: str) -> str:

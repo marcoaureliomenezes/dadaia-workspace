@@ -12,6 +12,7 @@ import pytest
 from tests.helpers.evals import (
     HAND_T3,
     ONBOARDED_T3,
+    REJECTED_T3,
     RENAMED_T3,
     SPEC_T3,
     STUB_T3,
@@ -70,6 +71,7 @@ def test_a_plain_install_resolves_the_lib_build_offline(version: str, route: str
         (SPEC_T3, "1"),
         (STUB_T3, "0"),
         (TRACED_T3, "1"),
+        (REJECTED_T3, "0"),
         (ONBOARDED_T3, "0"),
         ("true", "0"),
     ],
@@ -79,6 +81,7 @@ def test_a_plain_install_resolves_the_lib_build_offline(version: str, route: str
         "operator-demand-spec",
         "bare-stub-spec",
         "backlog-origin-traced",
+        "filed-then-rejected",
         "no-entry",
         "empty",
     ],
