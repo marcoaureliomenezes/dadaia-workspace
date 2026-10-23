@@ -2499,6 +2499,47 @@
       "milestone": "implemented",
       "sha": "e02c302ff",
       "text": "Candidate implemented at e02c302ff; phase CLOSURE."
+    },
+    {
+      "ts": "2026-10-23T23:36:34Z",
+      "agent": "release.py memory",
+      "kind": "memory",
+      "text": "Memory reconciled over 6d10dd9dd3d038267544d88d30990fc5d7f3e708..390591423edf: 3 reviewed, 26 changed.",
+      "since": "6d10dd9dd3d038267544d88d30990fc5d7f3e708",
+      "until": "390591423edf611b760a5464d1766acafe3c7ede",
+      "reviewed": [
+        "capabilities",
+        "consumer-agent-support",
+        "spec-context-project"
+      ],
+      "changed": [
+        "agent-comms",
+        "agent-orchestration",
+        "agentic-entities",
+        "agent-evals",
+        "public-asset-distribution",
+        "pypi-distribution",
+        "harness-claude-code",
+        "harness-codex",
+        "harness-copilot",
+        "harness-cursor",
+        "harness-devin",
+        "harness-kimi-code",
+        "product-vision",
+        "context-management",
+        "context-portability",
+        "cross-platform-portability",
+        "server-registry",
+        "specs-migration",
+        "workspace-doctor",
+        "workspace-init",
+        "audits-canon",
+        "backlog-ledger",
+        "bug-ledger",
+        "release-lifecycle",
+        "sdd-gate-v3",
+        "worktrees"
+      ]
     }
   ]
 }
