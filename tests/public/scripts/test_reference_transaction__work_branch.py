@@ -19,7 +19,7 @@ import pytest
 import dadaia_workspace
 from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.platform import PLATFORM
-from tests.fixtures.fix_world import World, _single_fix
+from tests.fixtures.fix_world import World, the_fix
 from tests.fixtures.stores import fake_venv, own_venv_python
 from tests.helpers.oslib import make_executable, run, write_text
 
@@ -365,7 +365,7 @@ def test_the_creation_refusals_fix_runs_in_the_refused_state(tmp_path: Path) -> 
     world = _fix_world(tmp_path)
     refused = world.run(["git", "branch", "wt/0.1.0/wt-backlog-foo"], world.repo)
     assert refused.returncode != 0
-    fix = world.run(_single_fix(refused), world.repo)
+    fix = world.run(the_fix(refused, world.ws), world.repo)
     assert fix.returncode == 0, fix.stderr
     assert "wt/0.1.0/wt-backlog-foo" in world.git(world.repo, "branch", "--list", "wt/*")
 
@@ -381,5 +381,5 @@ def test_recreating_the_work_branch_at_another_commit_is_refused_with_a_runnable
     refused = world.run(["git", "branch", "feature/0.1.0", "other"], world.repo)
     assert refused.returncode != 0
     assert "[ref-gate] BLOCKED" in refused.stderr
-    fix = world.run(_single_fix(refused), world.repo)
+    fix = world.run(the_fix(refused, world.ws), world.repo)
     assert fix.returncode == 0, fix.stderr
