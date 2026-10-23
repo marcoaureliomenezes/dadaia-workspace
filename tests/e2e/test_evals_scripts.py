@@ -103,3 +103,53 @@ def test_compare_gate(tmp_path: Path, cand: dict[str, list[float]], expected: in
     for task, rewards in cand.items():
         _job(tmp_path, task, rewards)
     assert _run("compare.py", tmp_path) == expected
+
+
+_VERDICT = (
+    "python3 .agents/skills/dd-handoff-emitter/scripts/verdict.py wt --sha abc"
+    " --context c --slug s --verdict APPROVED --reason ok"
+)
+
+
+def _bash_line(command: str, *, sidechain: bool) -> str:
+    block = {"type": "tool_use", "id": "toolu_1", "name": "Bash", "input": {"command": command}}
+    line = {
+        "type": "assistant",
+        "isSidechain": sidechain,
+        "message": {"role": "assistant", "content": [block]},
+    }
+    return json.dumps(line) + "\n"
+
+
+def _transcript(trial: Path, *, agent_type: str | None) -> None:
+    """A Claude Code session under the trial's agent dir: the verdict in the main thread, or in a subagent file."""
+    session = trial / "agent" / "sessions" / "projects" / "-app" / "s1"
+    session.parent.mkdir(parents=True)
+    main = _bash_line("ls", sidechain=False)
+    if agent_type is None:
+        main += _bash_line(_VERDICT, sidechain=False)
+    write_text(session.parent / "s1.jsonl", main)
+    if agent_type is not None:
+        (session / "subagents").mkdir(parents=True)
+        write_text(session / "subagents" / "agent-a1.jsonl", _bash_line(_VERDICT, sidechain=True))
+        write_text(
+            session / "subagents" / "agent-a1.meta.json", json.dumps({"agentType": agent_type})
+        )
+
+
+@pytest.mark.parametrize(
+    ("agent_type", "expected"),
+    [(None, "2/3"), ("general-purpose", "2/3"), ("dd-code-reviewer", "3/3")],
+    ids=["main-thread", "other-subagent", "dispatched-reviewer"],
+)
+@pytest.mark.parametrize("task", [_T1, _T2, _T3], ids=["t1", "t2", "t3"])
+def test_compare_zeroes_a_verdict_written_outside_the_reviewer(
+    tmp_path: Path, task: str, agent_type: str | None, expected: str
+) -> None:
+    for t in (_T1, _T2, _T3):
+        _job(tmp_path, t, [1, 1, 1])
+    _transcript(tmp_path / f"{task}__0", agent_type=agent_type)
+    out = run(
+        [sys.executable, str(_ROOT / "evals" / "scripts" / "compare.py"), str(tmp_path)], timeout=60
+    ).stdout
+    assert f"| {task} | {expected} (3 found) |" in out
