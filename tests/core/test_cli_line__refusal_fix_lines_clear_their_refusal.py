@@ -14,9 +14,10 @@ followed the same way — at most four steps, never a repeated line. A fix that 
 the publish (``git push …``, ``context baseline``) replaces the refused command: its
 success is the clearance.
 
-The census (an AST sweep of the package and the skill scripts) lists every function that spells a
-``fix:`` line: a new site with neither a case, a ``Skip`` reason nor an entry of ``_EXEMPT`` fails
-:func:`test_every_fix_site_has_a_case`.
+The census (``tests/fixtures/fix_census.py``) sweeps two scopes: every ``raise`` reachable from the
+gate and the ``context`` verbs, and every function of the ``dd-gitflow-default`` worktree scripts.
+A site with neither a case nor a named ``Skip`` in ``_REFUSALS`` fails the census test below, and
+so does an entry for a site that is gone.
 
 size: MEDIUM — real git and real CLI child processes, no network.
 """
@@ -103,46 +104,8 @@ def _drive(world: World, case: Case) -> None:
     pytest.fail("the refusal chain did not clear within four fix lines:\n" + "\n".join(seen))
 
 
-_SERVICE = "features/spec_context/service."
-#: A path prefix (a module or folder) or one ``<path>.<function>`` of the sweep, with why this
-#: harness cannot drive it. The driven modules are exempt function by function.
-_EXEMPT = {
-    "cli/": "a verb whose refusal the CLI's own command tests run",
-    "core/": "a kernel reader whose fix the verbs above it print; their cases cover the chain",
-    "hooks/": "a hook entry whose fix its own tests run",
-    "infrastructure/": "an adapter whose fix the verbs above it print; their cases cover the chain",
-    "features/export/": "the export verb: its own tests run the fix",
-    "features/migrate/": "the migrate verb: its own tests run the fix",
-    "features/reconcile/": "the reconcile verb: its own tests run the fix",
-    "features/specs/": "a doctor finding, not a refusal: the doctor tests run its fix",
-    "features/workspace/": "an onboarding step: its property test runs every step's fix",
-    "features/spec_context/doctor": "a doctor finding: the doctor tests run its fix",
-    "features/spec_context/gate_policy": "the tool gate's block: the hook tests run its fix",
-    "features/spec_context/sweep": "the sweep's own tests run the fix",
-    "public/skills/": "a skill script: its own tests run the printed fix",
-    "features/chokepoints/push_gate.read_failure_fix": "needs a corrupted object store",
-    **dict.fromkeys(
-        (
-            f"{_SERVICE}SpecContextService.{name}"
-            for name in ("_refuse_slug", "_validate", "add_repo", "delete", "remove_repo")
-        ),
-        "a registry edit, no publish-chain step: the service tests run it",
-    ),
-    f"{_SERVICE}_require_allowlisted": "a registry edit: the service tests run it",
-    f"{_SERVICE}install_git_hooks": "the hook installer: its own tests run it",
-}
-
-
-def _covered(site: str) -> bool:
-    return site.rsplit("/", 1)[-1] in _REFUSALS or any(site.startswith(p) for p in _EXEMPT)
-
-
 def test_every_fix_site_has_a_case() -> None:
-    sites = fix_sites()
-    assert [site for site in sites if not _covered(site)] == []
-    found = Counter(site.rsplit("/", 1)[-1] for site in sites)
-    assert {k: found[k] for k in _REFUSALS} == {k: len(v) for k, v in _REFUSALS.items()}
-    assert [p for p in _EXEMPT if not any(s.startswith(p) for s in sites)] == []
+    assert Counter(fix_sites()) == {site: len(refusals) for site, refusals in _REFUSALS.items()}
 
 
 _CASES = [

@@ -21,7 +21,6 @@ import site
 import subprocess
 import sys
 import tempfile
-from collections import Counter
 from collections.abc import Callable
 from dataclasses import replace
 from pathlib import Path
@@ -59,13 +58,10 @@ from dadaia_workspace.infrastructure.runtime_transforms.hook_wrappers import VEN
 from tests.fakes import gate_fixes
 from tests.features.backlog.test_doctor import _SOURCE, _active_entry
 from tests.features.specs.test_doctor import _make_clean_specs_tree
-from tests.fixtures.fix_census import fix_sites
 from tests.fixtures.fix_world import (
-    _REFUSALS,
     _TERM,
     _UNSET,
     Case,
-    Skip,
     World,
     _advance_origin_work,
     _associated_dead,
@@ -402,13 +398,6 @@ def _chain(ws: Path, case: Case) -> str:
     pytest.fail("the refusal chain did not clear within four fix lines:\n" + "\n".join(seen))
 
 
-SITES |= {
-    f"refusal-{case.build.__name__.strip('_')}": lambda ws, case=case: _chain(ws, case)
-    for refusals in _REFUSALS.values()
-    for entry in refusals
-    if not isinstance(entry, Skip)
-    for case in (entry if isinstance(entry, tuple) else (entry,))
-}
 # ── doctor-specs: the specs rules' fix lines ─────────────────────────────────────────
 # A producer plants one finding in a clean specs tree and reads it from ``doctor --json``. Its
 # progress rule: the printed fix runs and the finding is gone with no new error; an operator
@@ -1082,10 +1071,6 @@ _BLOCKS = {
 @pytest.mark.parametrize("block", list(_BLOCKS))
 def test_every_block_carries_a_runnable_fix(workspace: Path, block: str) -> None:
     the_fix(_BLOCKS[block](workspace), workspace)
-
-
-def test_every_fix_site_has_a_case() -> None:
-    assert Counter(fix_sites()) == {site: len(refusals) for site, refusals in _REFUSALS.items()}
 
 
 def _shell_argv(shell: str) -> list[str]:

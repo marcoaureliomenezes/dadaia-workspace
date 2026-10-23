@@ -1030,6 +1030,24 @@ def _wt_review_rc(root: Path) -> None:
     wt.approve(root, wt.git(tree, "rev-parse", "HEAD").strip(), name=_RC)
 
 
+_LANE = "0.5.0/wt-backlog-d"
+
+
+def _wt_red_doctor(root: Path) -> list[str]:
+    """A backlog lane whose `specs/` the doctor refuses, approved: its merge relays the doctor."""
+    wt.git(root / "repos/r", "checkout", "-q", "feature/0.5.0")
+    tree = wt.open_tree(root, _LANE)
+    wt.approve(root, wt.commit(tree, "specs/RED-doctor", ""))
+    return ["merge", str(tree)]
+
+
+def _wt_fix_doctor(root: Path) -> None:
+    tree = root / "worktrees/r" / _LANE
+    wt.git(tree, "rm", "-q", "specs/RED-doctor")
+    wt.git(tree, "commit", "-qm", "doctor-clean")
+    wt.approve(root, wt.git(tree, "rev-parse", "HEAD").strip(), at="T11:00:00Z")
+
+
 def _wt_rc_path(root: Path) -> str:
     return f"worktrees/r/{_RC}"
 
@@ -1134,8 +1152,8 @@ _WORKTREE: dict[str, tuple[WtCase | Skip, ...]] = {
         WtCase(_wt_resume_ref_exists),
         _wt_agent_reruns(_wt_resume_no_bundle, _wt_on_rc("resume")),
     ),
-    "_worktree_sync.sync": (_wt_agent_reruns(_wt_not_ours("sync"), _wt_on_rc("sync")),),
-    "_worktree_sync._cascade": (Skip("needs a rebase conflict; " + _SUITE),),
+    "_worktree_sync.sync": (Skip("needs a rebase conflict; " + _SUITE),),
+    "_worktree_sync._cascade": (_wt_agent_reruns(_wt_not_ours("sync"), _wt_on_rc("sync")),),
     "_worktree_end.target": (_wt_agent_reruns(_wt_outside_path, _wt_on_rc("clean")),),
     "_worktree_end.refuse_dirty": (WtCase(_wt_dirty, _wt_commit_staged),),
     "_worktree_end._kept": (WtCase(_wt_ignored, then=lambda _: ["merge", _TASK, "--drop"]),),
@@ -1147,6 +1165,7 @@ _WORKTREE: dict[str, tuple[WtCase | Skip, ...]] = {
         _wt_agent_reruns(_wt_not_ours("clean"), _wt_on_rc("clean")),
         WtCase(_wt_unmerged, then=["merge", _TASK]),
     ),
+    "_worktree_end._relay": (WtCase(_wt_red_doctor, _wt_fix_doctor),),
     "_worktree_end.digest": (WtCase(_wt_bad_sha, then=_wt_real_sha),),
     "_worktree_end._check_approved": (
         WtCase(_wt_unreviewed_rc, _wt_review_rc),
@@ -1170,6 +1189,7 @@ _WORKTREE: dict[str, tuple[WtCase | Skip, ...]] = {
     "_worktree_git.flow_for": _skips(1, "a repo no context owns; " + _SUITE),
     "_worktree_git.SeveralWork.__init__": _skips(1, "several work branches; " + _SUITE),
     "_worktree_git.work_version": _skips(1, "no work branch; " + _SUITE),
+    "_worktree_git._row": _skips(1, "a `list` finding row, not a refusal; " + _SUITE),
     "_worktree_git._absent": _skips(1, "a `list` finding row, not a refusal; " + _SUITE),
     "_worktree_git._repo_rows": _skips(1, "a `list` finding row, not a refusal; " + _SUITE),
     "_worktree_git._unregistered": _skips(1, "a `list` finding row, not a refusal; " + _SUITE),
@@ -1226,7 +1246,6 @@ _REFUSALS: dict[str, tuple[Case | WtCase | tuple[Case, ...] | Skip, ...]] = {
         Skip(
             "it prints the work-branch rule's own fix; test_ci__push_gate_gitflow_resolution pins it"
         ),
-        Skip("a warning's fix line on a repaired default, the push going on: not a refusal"),
     ),
     "ci._repo_root": (Skip("the pre-push hook always runs inside the repo it pushes"),),
     "ci.push_gate_check": (Skip("the gate's refusal: its fix is a branch_policy/push_gate site"),),
@@ -1261,7 +1280,6 @@ _REFUSALS: dict[str, tuple[Case | WtCase | tuple[Case, ...] | Skip, ...]] = {
             Case(_commits_no_remote, _dead_done, before=_origin),
             Case(_stashed, _dead_done, before=_play_stash_act),
         ),
-        Skip("a linked worktree of the repo: tests/features/spec_context/test_sweep.py"),
     ),
     "service.SpecContextService._refuse_off_work": (
         (
