@@ -8,6 +8,7 @@ from __future__ import annotations
 from pathlib import Path, PurePath
 
 from dadaia_workspace.core import platform
+from dadaia_workspace.core.platform import read_text
 
 
 def gitdir(entry: Path) -> PurePath | None:
@@ -15,7 +16,7 @@ def gitdir(entry: Path) -> PurePath | None:
     if not entry.is_file() or platform.is_link(entry):
         return None
     try:
-        return PurePath(platform.read_text(entry).removeprefix("gitdir:").strip())
+        return PurePath(read_text(entry).removeprefix("gitdir:").strip())
     except (OSError, platform.Undecodable):
         return None
 
@@ -39,7 +40,7 @@ def _anchors(root: Path, entry: Path) -> bool:
     ):
         return False
     try:
-        back = platform.read_text(Path(named) / "gitdir").strip()
+        back = read_text(Path(named) / "gitdir").strip()
     except (OSError, platform.Undecodable):
         return False
     return Path(back).resolve() == entry.resolve()
