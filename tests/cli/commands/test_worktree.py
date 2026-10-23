@@ -15,6 +15,7 @@ import dadaia_workspace
 from dadaia_workspace.cli.main import app
 from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.infrastructure import ledger_scripts
+from tests.fixtures.stores import fake_venv
 from tests.helpers.oslib import make_executable, run, write_text
 
 _STUB = "import json, sys\nprint(json.dumps(sys.argv[1:]))\nsys.exit(3)\n"
@@ -96,6 +97,7 @@ def test_a_runner_that_lags_the_hook_still_creates_a_wt_branch(
 ) -> None:
     """The BLOCK's fix line is `worktree new`: the forwarder marks the run, whatever the projected runner does."""
     monkeypatch.delenv("DADAIA_WT", raising=False)
+    fake_venv(workspace, pth=True)
     repo = workspace / "repo"
     git = lambda *a: run(["git", "-C", str(repo), *a], check=True)  # noqa: E731
     repo.mkdir()
