@@ -1,6 +1,5 @@
 """The object scan of an export bundle, matched by an injected matcher; each refusal has its fix."""
 
-import subprocess
 import tempfile
 from collections.abc import Callable, Iterable
 from pathlib import Path
@@ -10,10 +9,8 @@ from dadaia_workspace.core.cli_line import git_line
 from dadaia_workspace.core.exceptions import DadaiaError
 from dadaia_workspace.core.models.git_scan import GitObjectReadError, GitRunError, ScannedObject
 from dadaia_workspace.core.platform import act, write_text
-from dadaia_workspace.core.skill_owner import load_owner
-from dadaia_workspace.infrastructure.git_objects import GitSubprocessObjectReader
+from dadaia_workspace.infrastructure.git_objects import GitSubprocessObjectReader, git_run
 
-_GIT_TIMEOUT_S = 300
 # git's own words for a full or unwritable disk: the environment's fault, never the bundle's.
 _ENVIRONMENT = ("No space left", "Disk quota", "Permission denied", "Read-only file system")
 
@@ -59,10 +56,8 @@ def scan_bundle(
 
     def git(cwd: Path, *args: str, why: str, fix: str) -> str:
         try:
-            done = load_owner("dd-bug-resolution", "_git").git_bytes(
-                cwd, *args, timeout=_GIT_TIMEOUT_S
-            )
-        except (OSError, subprocess.TimeoutExpired):
+            done = git_run(cwd, *args)
+        except GitRunError:
             refuse("git could not run", read_fix(GitRunError("git"), repo))
         if done.returncode:
             reason = (done.stdout + done.stderr).decode("utf-8", "replace").strip()
