@@ -1655,6 +1655,24 @@ def test_resolve_with_no_id_commit_is_one_refusal_with_one_fix_line(
     assert (specs / "bugs/BUGS.jsonl").read_bytes() == before
 
 
+def test_resolve_refusal_names_the_rebuild_id_line_beside_the_fix_line(
+    script: Path, tmp_path: Path
+) -> None:
+    specs = _ledger(tmp_path, _OPEN_RECORD)
+    _commit_as(tmp_path, "feat: x")
+    done = _run(script, *_resolve_argv(), "--specs", str(specs))
+    assert done.returncode == 1, done.stderr
+    [fix] = [ln for ln in done.stderr.splitlines() if ln.startswith("fix: ")]
+    assert "refactor(bugs): a-bug \u2014 REBUILD" in fix, fix
+    _commit_as(tmp_path, "refactor(bugs): a-bug \u2014 REBUILD cli/x.py: c")
+    assert _run(script, *_resolve_argv(), "--specs", str(specs)).returncode == 0
+
+
+def test_help_describes_resolves_fix_as_either_id_line(script: Path) -> None:
+    done = _run(script, "--help")
+    assert done.returncode == 0 and "refactor(bugs)" in done.stdout, done.stdout
+
+
 def test_resolve_takes_no_fix_sha_flag(script: Path, tmp_path: Path) -> None:
     specs = _ledger(tmp_path, _OPEN_RECORD)
     _commit_as(tmp_path, _FIXED)
