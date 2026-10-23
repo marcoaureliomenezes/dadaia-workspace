@@ -18,7 +18,7 @@ import pytest
 
 from dadaia_workspace.infrastructure.ledger_scripts import load_owner
 from tests.fixtures.harness_env import git_bash
-from tests.helpers.oslib import is_executable, read_text, run, write_text
+from tests.helpers.oslib import command, is_executable, read_text, run, write_text
 from tests.helpers.skill_scripts import stage_skill_scripts
 
 _PUBLIC = Path(__file__).resolve().parents[5] / "dadaia_workspace" / "public"
@@ -251,7 +251,8 @@ def test_a_second_exit_exits_one_with_a_fix_naming_the_script(script: Path, tmp_
     assert again.returncode == 1
     fixes = _fix_lines(again)
     assert len(fixes) == 1
-    assert fixes == ["fix: grep an-idea specs/backlog/_archive/backlog_histo.jsonl"]
+    histo = str(specs / "backlog" / "_archive" / "backlog_histo.jsonl")
+    assert fixes == [f"fix: {command('grep', 'an-idea', histo)}"]
     assert len(_histo(specs)) == 1
 
 
