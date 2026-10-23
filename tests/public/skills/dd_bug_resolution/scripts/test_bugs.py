@@ -272,9 +272,20 @@ def test_an_id_commit_any_repo_of_the_context_reaches_is_clean(
     assert done.returncode == 1 and "'a-bug'" in done.stdout, done.stdout
 
 
-def test_a_fix_line_survives_a_percent_in_the_script_path(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    "record",
+    [
+        {"caused_by": "ghost"},
+        {"status": "resolved", "closed_at": "2026-09-21T10:00:00Z", "cause": "c",
+         "solution": "s", "caused_by": "none", "fix_sha": "a" * 40},  # fmt: skip
+    ],
+    ids=["caused-by-ghost", "fix-sha-unreached"],
+)  # fmt: skip
+def test_a_fix_line_survives_a_percent_in_the_script_path(
+    tmp_path: Path, record: dict[str, object]
+) -> None:
     script = stage_skill_scripts("dd-bug-resolution", tmp_path / "a%sb" / "scripts") / "bugs.py"
-    specs = _ledger(tmp_path, {**_OPEN_RECORD, "caused_by": "ghost"})
+    specs = _ledger(tmp_path, {**_OPEN_RECORD, **record})
     done = _run(script, "check", "--specs", str(specs))
     assert "Traceback" not in done.stderr, done.stderr
     assert done.returncode == 1, done.stdout + done.stderr
