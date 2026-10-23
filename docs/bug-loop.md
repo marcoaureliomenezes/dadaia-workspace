@@ -20,8 +20,8 @@ python3 .agents/skills/dd-bug-resolution/scripts/bugs.py append \
 ```
 
 The ledger holds one record per bug, keyed by id. `append` prints each earlier bug whose
-recorded fix files lie under a path the `component` names, with the REBUILD due on that
-path, opens the record, refuses a duplicate id or a `component` naming no tracked path, and
+id-line fix commit touched a path the `component` names, with the REBUILD due on that
+path when a child bug (its `caused_by` names an earlier fix of the path) landed after the path's last REBUILD, opens the record, refuses a duplicate id or a `component` naming no tracked path, and
 requires `--correlates` as ledger or archive ids (repeated or comma-separated), or `none`;
 `update --set correlates=<a>,<b>` records a correlate found later. `component` is precise free text; its tracked paths
 are the bug's files. Every supplied value passes the same privacy check used by the push gate.

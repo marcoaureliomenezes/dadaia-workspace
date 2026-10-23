@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import argparse
-import json
 import sys
 from collections import Counter
 from pathlib import Path
@@ -89,6 +88,26 @@ def _ordinal(n: int) -> str:
     return f"{n}{'th' if 10 <= n % 100 <= 20 else {1: 'st', 2: 'nd', 3: 'rd'}.get(n % 10, 'th')}"
 
 
+def _due(
+    past: list[dict[str, Any]], fixed: dict[str, dict[str, str]], repo: Path
+) -> dict[str, list[str]]:
+    """The ONE REBUILD-due decider over *fixed* (`by_file`'s paths): each path with a child, a fix whose bug's `caused_by` names an earlier fix of the path and that lands after the path's last REBUILD (a `refactor(bugs):` commit), -> the ids of those children and their causes. Fixes are ordered by *repo*'s log; a fix of another repo of the context sorts as the oldest."""
+    log = git(repo, "log", "--format=%H%x00%s", check=False).splitlines()
+    age = {ln.split("\0")[0]: len(log) - n for n, ln in enumerate(log)}
+    rebuilt = {ln.split("\0")[0] for ln in log if ln.split("\0")[1].startswith("refactor(bugs):")}
+    causes = {str(r["id"]): str(r.get("caused_by")) for r in past}
+    due: dict[str, list[str]] = {}
+    for path, fixes in fixed.items():
+        last = max((age.get(s, 0) for s in fixes.values() if s in rebuilt), default=-1)
+        kids = {
+            b for b, s in fixes.items()
+            if age.get(s, 0) > last and causes[b] in fixes and age.get(fixes[causes[b]], 0) < age.get(s, 0)
+        }  # fmt: skip
+        if kids:
+            due[path] = sorted(kids | {causes[b] for b in kids})
+    return due
+
+
 def _read(args: argparse.Namespace, specs: Path) -> int:
     records = read_records(specs / LEDGER)
     if args.verb == "stats":
@@ -110,7 +129,7 @@ def _stats(args: argparse.Namespace, records: list[dict[str, Any]], specs: Path)
         for value, count in sorted(Counter(values).items()):
             print(f"{label}:{value}\t{count}")
     past = history(specs)
-    due = {path: list(m) for path, m in wr.by_file(past, specs.parent).items() if len(set(m.values())) > 1}  # fmt: skip
+    due = _due(past, wr.by_file(past, specs.parent), specs.parent)
     for path, ids in due.items():
         print(f"rebuild-due:{path}\t{','.join(ids)}")
     if args.closed_after or args.closed_until:
@@ -154,12 +173,12 @@ def _write(args: argparse.Namespace, specs: Path) -> int:
             ) from None
         past = history(specs)
         fixed = wr.by_file(past, specs.parent)
+        due = _due(past, fixed, specs.parent)
         for path in wr.named_paths(values["component"], tracked):
             under = [m for p, m in fixed.items() if wr.under(p, path)]
-            earlier = sorted({i for m in under for i in m})
-            for bug in earlier:
+            for bug in sorted({i for m in under for i in m}):
                 print(f"earlier bug on {path}: {bug}")
-            if earlier:
+            if any(wr.under(p, path) for p in due):
                 print(f"REBUILD due: {_ordinal(len({s for m in under for s in m.values()}) + 1)} bug on {path}")  # fmt: skip
         known = {str(r["id"]) for r in past}
         commit(
@@ -200,12 +219,7 @@ def main(argv: list[str] | None = None) -> int:
     specs = find_specs(args.specs, ledger=None if reads else f"specs/{LEDGER}")
     try:
         if args.verb == "check":
-            findings = check(specs)
-            if args.json:
-                print(json.dumps(findings, indent=2))
-            else:
-                _findings.print_text(findings)
-            return 1 if findings else 0
+            return _findings.run_check(check(specs), as_json=args.json)
         if args.verb in ("status", "stats"):
             return _read(args, specs)
         return _archive(args, specs) if args.verb == "archive" else _write(args, specs)

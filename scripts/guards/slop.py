@@ -32,6 +32,7 @@ if TYPE_CHECKING:
 
 SELF, PKG, SWEEP = "scripts/guards/slop.py", "dadaia_workspace", "features/spec_context/sweep.py"
 _LEDGER = load_owner("dd-bug-resolution", "_ledger")
+_STORE = load_owner("dd-bug-resolution", "_bugs_store")
 _BACKLOG = load_owner("dd-backlog-definition", "_backlog_store")
 
 IGNORE_EDGES = 0
@@ -113,8 +114,7 @@ def _allowance(tree: Tree, hits: dict[str, str], check: str, also: str = "") -> 
     """*hits* (key -> its sub-rule) against the tree's allowance rows of *check*."""
     rows = [r for r in _table(tree.read(SELF)) if r[0].rstrip("*") == check]
     allow = {key: value for _, key, value in rows if value != "-"}
-    ledger = _LEDGER.records(tree.root / "specs/bugs/BUGS.jsonl")
-    valid = {r["id"] for r in ledger if r.get("status") == "open"} | {also}
+    valid = {*_STORE.open_ids(tree.root / "specs"), also}
     out = [f"{r}: {k} has no allowance key" for k, r in sorted(hits.items()) if k not in allow]
     out += [f"stale-key: {k} matches nothing" for k in sorted(allow.keys() - hits.keys())]
     for key, value in sorted(allow.items()):
