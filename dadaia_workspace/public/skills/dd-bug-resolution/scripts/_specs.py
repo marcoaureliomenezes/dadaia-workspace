@@ -15,7 +15,7 @@ from typing import Any
 from _git import GitError, main_checkout, scrubbed_env
 from _jsonl import reinstall_fix
 from _ledger import parse as parse
-from _platform import act, cli_argv, cli_path, command, inline, run, venv_dir
+from _platform import act, cli_path, cli_words, command, inline, run
 from _refusal import Refusal, relay, report, said
 from _root import STATES, fenced_roots
 from _root import workspace_of as workspace_of
@@ -61,14 +61,14 @@ def run_cli(
 
 
 def context_row(root: Path, repo: Path) -> dict[str, Any] | None:
-    """The `context list --json` row owning *repo* (main or associated; a checkout or a worktree of it), or None when no context owns it.
+    """The `context list --json` row owning *repo* (main or associated; a checkout or a worktree of it), or None when no context owns it or *repo* is no repository.
     Raises `Refusal` with the CLI's own fix when the CLI fails; rows it cannot read name no owner. A registry read: the fence is lifted for *root* only."""
-    fence = os.pathsep.join(map(str, fenced_roots() - {root.resolve()}))
-    done = run_cli(root, "context", "list", "--json", env=scrubbed_env() | {"DADAIA_FENCED_ROOTS": fence})  # fmt: skip
+    done = run_cli(root, "context", "list", "--json", env=scrubbed_env() | {"DADAIA_FENCED_ROOTS": os.pathsep.join(map(str, fenced_roots() - {root.resolve()}))})  # fmt: skip
     relay(done, "context list failed", reinstall_fix(root))
     try:
-        return next((r for r in json.loads(done.stdout) if main_checkout(repo).name in (r["main_repo"], *(a["slug"] for a in r["associated_repos"]))), None)  # fmt: skip
-    except (ValueError, TypeError, KeyError):
+        checkout = main_checkout(repo)
+        return next((r for r in json.loads(done.stdout) if any((root / "repos" / s).resolve() == checkout for s in (r["main_repo"], *(a["slug"] for a in r["associated_repos"])))), None)  # fmt: skip
+    except (GitError, ValueError, TypeError, KeyError):
         return None
 
 
@@ -100,10 +100,10 @@ def _bound_fix(here: Path, rerun: Script, ledger: str | None) -> tuple[str, str]
     except Refusal as refusal:
         return refusal.fix, ""
     except (ValueError, LookupError, TypeError):
-        return command(*cli_argv(venv_dir(root)), "context", "list"), ""
+        return command(*cli_words(root, "context", "list")), ""
     if ledger is None or ledger.startswith("specs/audits/"):
         return rerun(specs=root / "repos" / repo / "specs"), ""
-    return command(*cli_argv(venv_dir(root)), "worktree", "list"), ""
+    return command(*cli_words(root, "worktree", "list")), ""
 
 
 class Fix(str):
