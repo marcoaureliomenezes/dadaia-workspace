@@ -225,7 +225,9 @@ def test_a_git_failure_no_check_named_ends_as_one_refusal(root: Path, verb: str)
     assert refused.returncode == 1 and "Traceback" not in refused.stderr
     assert "[error]" in refused.stderr
     [fix] = fixes(refused)
-    assert fix.startswith(f"fix: Agent action: clear what `git -C {quote(str(root / TREE))} ")
+    assert fix.startswith(
+        f"fix: Agent action: clear what `{inline('git', '-C', str(root / TREE))} "
+    )
     assert " reports above, then rerun " in fix
     assert fix.endswith(f"worktree.py {verb} {quote(str(root / TREE))}")  # absolute, never `list`
 
@@ -385,7 +387,7 @@ def test_failed_fast_forward_tells_a_stray_from_a_moved_work_branch(root: Path) 
     )  # untracked in the release tree: the fast-forward would clobber it
     stray = run(root, "merge", TREE)
     assert "src/a.py" in stray.stderr and fixes(stray) == [
-        f"fix: Agent action: commit or remove the paths `git -C {quote(str(rc))} status --short` lists in {rc}"
+        f"fix: Agent action: commit or remove the paths `{inline('git', '-C', str(rc), 'status', '--short')}` lists in {rc}"
     ]
     (rc / "src/a.py").unlink()
     # a sibling lands while the verdict is read
