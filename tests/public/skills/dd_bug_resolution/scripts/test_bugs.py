@@ -595,6 +595,10 @@ def _land(root: Path, records: tuple[dict[str, object], ...]) -> list[dict[str, 
     return [{k: v for k, v in r.items() if k != "_files"} for r in records]
 
 
+def _child(bug_id: str, cause: str, *files: str) -> dict[str, object]:
+    return {**_sibling(bug_id, *files), "caused_by": cause}
+
+
 _LEGACY_EVENT = {"ts": "2026-08-28T12:45:33Z", "event": "archived", "agent": "claude-code",
                  "data": {"id": "legacy-one", "status": "Closed", "severity": "HIGH",
                           "reported": "2026-06-11", "resolved_in": "v0.1.13",
@@ -622,7 +626,7 @@ def test_append_prints_the_earlier_bugs_whose_id_commits_touch_the_path_and_the_
     specs = _ledger(
         tmp_path, _sibling("b1", "cli/x.py"), _sibling("b4", "hooks/y.py"), _OPEN_RECORD
     )
-    _archived(specs, _sibling("b3", "cli/x.py", "z"))
+    _archived(specs, _child("b3", "b1", "cli/x.py", "z"))
     argv = _append_argv(specs)
     bare, named = _run(script, *argv), _run(script, *argv, "--correlates", "b1,b3")
     assert bare.returncode == 1
@@ -637,13 +641,15 @@ def test_append_prints_the_earlier_bugs_whose_id_commits_touch_the_path_and_the_
     ]
 
 
-def test_a_fix_commit_shared_by_three_bugs_counts_once_toward_a_files_rebuild_due(
+def test_bugs_sharing_one_fix_commit_are_no_child_of_one_another(
     script: Path, tmp_path: Path
 ) -> None:
     _ledger(tmp_path)
     _land(tmp_path, ({"id": "b1, b2, b3", "_files": ["cli/x.py"]},))
-    shared = [{**_sibling(i), "fix_sha": "c" * 40} for i in ("b1", "b2", "b3")]
-    twice = [_sibling("b4", "tests/t.py"), _sibling("b5", "tests/t.py")]
+    shared = [{**_sibling("b1"), "fix_sha": "c" * 40}] + [
+        {**_child(i, "b1"), "fix_sha": "c" * 40} for i in ("b2", "b3")
+    ]
+    twice = [_sibling("b4", "tests/t.py"), _child("b5", "b4", "tests/t.py")]
     specs = _ledger(tmp_path, *shared, *twice)
     stats = _run(script, "stats", "--specs", str(specs))
     assert [ln for ln in stats.stdout.splitlines() if ln.startswith("rebuild-due:")] == [
@@ -653,15 +659,21 @@ def test_a_fix_commit_shared_by_three_bugs_counts_once_toward_a_files_rebuild_du
     assert done.returncode == 0, done.stderr
     assert done.stdout.splitlines()[:4] == [
         "earlier bug on cli/x.py: b1", "earlier bug on cli/x.py: b2",
-        "earlier bug on cli/x.py: b3", "REBUILD due: 2nd bug on cli/x.py",
+        "earlier bug on cli/x.py: b3", f"[ok] registered new-bug -> {specs}",
     ]  # fmt: skip
 
 
 def test_append_lists_a_bug_once_when_two_of_its_files_match(script: Path, tmp_path: Path) -> None:
-    specs = _ledger(tmp_path, _sibling("b1", "cli/x.py", "cli/y.py"))
-    done = _run(script, *_append_argv(specs, "cli"), "--correlates", "b1")
+    specs = _ledger(
+        tmp_path, _sibling("b1", "cli/x.py", "cli/y.py"), _child("b2", "b1", "cli/x.py")
+    )
+    done = _run(script, *_append_argv(specs, "cli"), "--correlates", "b1,b2")
     assert done.returncode == 0, done.stderr
-    assert done.stdout.splitlines()[:2] == ["earlier bug on cli: b1", "REBUILD due: 2nd bug on cli"]
+    assert done.stdout.splitlines()[:3] == [
+        "earlier bug on cli: b1",
+        "earlier bug on cli: b2",
+        "REBUILD due: 3rd bug on cli",
+    ]
 
 
 def test_append_prints_no_rebuild_due_for_a_first_bug_on_a_file(
@@ -705,11 +717,13 @@ def test_append_refuses_a_correlate_no_ledger_or_archive_holds(
 def test_append_takes_a_component_that_names_a_tracked_path_in_free_text(
     script: Path, tmp_path: Path, component: str
 ) -> None:
-    specs = _ledger(tmp_path, _sibling("b1", "cli/x.py"), _sibling("b4", "hooks/y.py"))
+    specs = _ledger(tmp_path, _sibling("b1", "cli/x.py"), _child("b2", "b1", "cli/x.py"),
+                    _sibling("b4", "hooks/y.py"))  # fmt: skip
     done = _run(script, *_append_argv(specs, component), "--correlates", "b1")
     assert done.returncode == 0, done.stderr
-    assert done.stdout.splitlines()[:2] == [
-        "earlier bug on cli/x.py: b1", "REBUILD due: 2nd bug on cli/x.py",
+    assert done.stdout.splitlines()[:3] == [
+        "earlier bug on cli/x.py: b1", "earlier bug on cli/x.py: b2",
+        "REBUILD due: 3rd bug on cli/x.py",
     ]  # fmt: skip
     assert _records(specs)[-1]["component"] == component
 
@@ -824,9 +838,9 @@ def test_resolve_stores_no_fix_files(script: Path, tmp_path: Path) -> None:
 
 
 def test_stats_reports_the_files_two_or_more_bugs_fixed(script: Path, tmp_path: Path) -> None:
-    specs = _ledger(tmp_path, _sibling("b1", "cli/x.py"), _sibling("b2", "cli/x.py", "hooks/y.py"),
-                    _sibling("b4", "hooks/y.py"), _sibling("b5", "solo.py"), _OPEN_RECORD)  # fmt: skip
-    _archived(specs, _sibling("b3", "cli/x.py"))
+    specs = _ledger(tmp_path, _sibling("b1", "cli/x.py"), _child("b2", "b1", "cli/x.py", "hooks/y.py"),
+                    _child("b4", "b2", "hooks/y.py"), _sibling("b5", "solo.py"), _OPEN_RECORD)  # fmt: skip
+    _archived(specs, _child("b3", "b1", "cli/x.py"))
     done = _run(script, "stats", "--specs", str(specs))
     assert done.returncode == 0, done.stderr
     assert [ln for ln in done.stdout.splitlines() if ln.startswith("rebuild-due:")] == [
@@ -1324,7 +1338,7 @@ def _closed_on(bug_id: str, closed_at: str, caused_by: str, *files: str) -> dict
 
 
 def test_stats_window_counts_what_closed_between_two_stamps(script: Path, tmp_path: Path) -> None:
-    """b2 and b5 share a fixed file with an out-of-window bug, b3 fixed a file alone, b4 closed
+    """b2 is a child of an out-of-window bug on a file, b5 the cause of an out-of-window child, b3 fixed a file alone, b4 closed
     after the window; the archive counts like the live ledger."""
     specs = _ledger(
         tmp_path,
@@ -1337,7 +1351,7 @@ def test_stats_window_counts_what_closed_between_two_stamps(script: Path, tmp_pa
     _archived(
         specs,
         _closed_on("b5", "2026-09-22T00:00:00Z", "none", "hooks/y.py"),
-        _closed_on("b6", "2026-08-01T00:00:00Z", "none", "hooks/y.py"),
+        _closed_on("b6", "2026-08-01T00:00:00Z", "b5", "hooks/y.py"),
     )
     window = ["--closed-after", "2026-09-15T00:00:00Z", "--closed-until", "2026-10-01T00:00:00Z"]
     done = _run(script, "stats", "--specs", str(specs), *window)
@@ -1459,7 +1473,7 @@ def test_append_finds_the_earlier_bugs_of_records_without_fix_files_in_one_diff_
     _ledger(tmp_path)
     first = _fix_commit(tmp_path, "cli/x.py", "fix(bugs): b1 \u2014 c")
     second = _fix_commit(tmp_path, "cli/x.py", "fix(bugs): b2 \u2014 c")
-    old = [{**_sibling(i), "fix_sha": sha} for i, sha in (("b1", first), ("b2", second))]
+    old = [{**_child(i, c), "fix_sha": sha} for i, c, sha in (("b1", "none", first), ("b2", "b1", second))]
     specs = _ledger(tmp_path, *old)
     trace, env = _traced(tmp_path)
     done = _run(script, *_append_argv(specs), "--correlates", "b1,b2", env=env)
@@ -1644,7 +1658,7 @@ def test_stats_reads_the_files_of_the_id_commit_for_a_record_without_fix_files(
     _ledger(tmp_path)
     for bug in ("b1", "b2"):
         _commit_as(tmp_path, f"fix(bugs): {bug} \u2014 c")
-    specs = _ledger(tmp_path, _resolved("b1", "1" * 40), _resolved("b2", "2" * 40))
+    specs = _ledger(tmp_path, _resolved("b1", "1" * 40), {**_resolved("b2", "2" * 40), "caused_by": "b1"})
     done = _run(script, "stats", "--specs", str(specs))
     assert [ln for ln in done.stdout.splitlines() if ln.startswith("rebuild-due:")] == [
         "rebuild-due:cli/x.py\tb1,b2"
