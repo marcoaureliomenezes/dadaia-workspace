@@ -81,7 +81,7 @@ is the context's main repo plus its associated repos; a MUTATING file-tool write
 repo outside it is refused with the bind that would allow it, unless the write lands in a
 worktree git linked from a repo of this workspace, and agents write a repo only inside its
 worktrees. After a bind, the ctx-inject hook injects the context header,
-`constitution.md`, `ARCHITECTURE.md`'s `## Tech Stack` section, the memory catalog digest
+`constitution.md`, `ARCHITECTURE.md`'s `## Tech Stack` section, the memory atom digest
 and the open worktrees once.
 
 ## Level 3 — the specs
@@ -178,6 +178,6 @@ runs every worktree verb: `new`, `merge`, `sync`, `clean`, `hash`, `list`, `paus
    folder to `_archive/`.
 
 A bug is registered once the operator confirms it; a bug in code the work branch holds is fixed in
-a `wt-hotfix-<bug-id>` lane — lineage, a RED new case, root-cause fix, GREEN, then `resolve` with the
-implementation sha. Any other bug becomes explicit candidate scope; ship refuses it while
+a `wt-hotfix-<bug-id>` lane — lineage, a RED new case, root-cause fix, GREEN, then `resolve`, which reads the
+fix from its id line. Any other bug becomes explicit candidate scope; ship refuses it while
 open unless the operator authorizes that exact id and the authorization is recorded.

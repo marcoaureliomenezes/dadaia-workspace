@@ -40,7 +40,7 @@ Rationale: every context bug came from a second resolution path answering differ
 Measured by: `poetry run python scripts/guards/run.py` prints `PASS ignore-cap` — `scripts/guards/slop.py`'s `IGNORE_EDGES` is the cap's one numeric home.
 Rationale: a pinned exception list turns every new suppression into a reviewable diff.
 
-### P-11 · We keep `core` file-I/O pure outside an authorized set of seven modules; new file I/O enters `core` only by joining that set on purpose.
+### P-11 · We keep `core` file-I/O pure outside an authorized set of modules (`_CORE_IO_STEMS` of the purity test); new file I/O enters `core` only by joining that set on purpose.
 Measured by: `pytest 'tests/core/test_atomic_write__core_file_io_purity.py::test_each_question_has_one_owner[core-file-io-purity]'` (AST walk; every authorized stem must exist).
 Rationale: joining the set is legal; arriving there unnoticed is not.
 
@@ -109,9 +109,9 @@ flowchart TB
 
 - `container.py` is composition wiring only: every definition keeps a production consumer, and a single-consumer adapter is imported directly by its feature.
 - No `core/protocols/` package exists: no seam carries two production adapters, so every adapter is imported by its one consumer; a `typing.Protocol` lives only as a structural type inside the module that consumes it.
-- `setup.cfg` carries seven import-linter contracts; `features-no-subprocess` and `features-no-cross-feature` have no suppressed edge (P-10).
+- The import-linter contracts are the `[importlinter:contract:*]` sections of `setup.cfg`; `features-no-subprocess` and `features-no-cross-feature` have no suppressed edge (P-10).
 - Hooks import `core.invocation` directly and build the `Invocation` once per process (P-12); `sdd_post_gate` touches `last_seen_at` and writes nothing else.
-- The package/skill seam (ADR 0246): every shared fact has one owner, a skill script; the cross-cutting ones (refusal, git runner, JSONL, atomic writer, frontmatter parser, clock, the OS boundary `_platform.py`, workspace-root walk, privacy matcher) live in `public/skills/dd-bug-resolution/scripts/`, the kernel, and each ledger schema in its writer skill's `scripts/schemas/`. `core/skill_owner.load_owner` loads an owner by absolute path as one module object, and no copy is staged or projected.
+- The package/skill seam (ADR 0246): every shared fact has one owner, a skill script; the cross-cutting ones (refusal, git runner, zero-object-id predicate, JSONL and the reinstall act per shipped-file class, atomic writer, frontmatter parser and key span, clock, finding constructor and check-verb body, the OS boundary `_platform.py` with the CLI words, workspace test and root walk, privacy matcher) live in `public/skills/dd-bug-resolution/scripts/`, the kernel, and each ledger schema in its writer skill's `scripts/schemas/`. `core/skill_owner.load_owner` loads an owner by absolute path as one module object, and no copy is staged or projected.
 - `core/atomic_write.py`, `core/clock.py`, `core/frontmatter.py`, `core/platform.py` and `core/redaction.py` are typed doors over their kernel owners and import only `core.skill_owner` among the package's modules (ADR 0246).
 - `features/migrate` stamps `specs_pattern_version: 13` (`core/specs_version.CANONICAL_SPECS_VERSION`) or refuses; a tree below v6 is foreign, and `specs init --replace-foreign` moves it to `specs-bkp/` before the canon is scaffolded.
 

@@ -12,7 +12,7 @@ sources:
 
 ## Paradigm
 
-- An agent session starts at the workspace root. Product repositories live under `repos/<slug>/`; governance, projections, skills and runtime state live outside them.
+- An agent session starts at the workspace root; a session launched elsewhere loads no persona and no hook, so it stands in for no role and writes no verdict. Product repositories live under `repos/<slug>/`; governance, projections, skills and runtime state live outside them.
 - A context is one main repository, where `specs/` lives, plus associated repositories. A workspace holds many contexts and a context may span many repositories; this is not a monorepo ([[context-management]]).
 - Repository changes land from canonical worktrees. Audits are the sole direct specs exception ([[worktrees]]).
 - The same authored law reaches every registered harness through native files or projections ([[agentic-entities]]).
@@ -22,7 +22,7 @@ sources:
 - Simplicity and lightness are the first law: the lightest solution that works wins, and a heavier one is chosen only when a lighter one was tried and failed. A requirement applied to every task, job or deletion is a gate, states its measured cost per run, and that cost never exceeds one run of the job's `verify:` gate as it stood before the change without the operator's ruling. The `verify:` line and the merge checks are gates: a change to one states its measured cost against the line it replaces, never against itself, and needs the operator's ruling; no step after the implementer's hand-back reruns a check the merge runs; a heavier gate is never the recommended option. A new gate names the heavier one it deletes.
 - Context is explicit: a bind scopes the session to one context's repository set and injects its constitution and memory.
 - Documents are the lifecycle: backlog, approved definition, job files, release state and record stores carry progress; no workflow engine advances them.
-- Mechanical boundaries cover path class, bind scope, root hygiene and push publication. Each refusal carries one fix line: a runnable command, an `Agent action:` an agent performs (one act may chain up to three steps), or an `Operator action:` only for an act the law reserves to the operator ([[sdd-gate-v3]]).
+- Mechanical boundaries cover path class, bind scope, root hygiene, the verdict writer and push publication. Each refusal carries one fix line: a runnable command, an `Agent action:` an agent performs (one act may chain up to three steps), or an `Operator action:` only for an act the law reserves to the operator ([[sdd-gate-v3]]).
 - Concurrency remains visible through git; no lock hides overlap.
 - The version's agentic scorecard, every cell at 9 or more by two independent judges, is the final candidate's last implementation job, before the promote and never after the closure summary.
 - Evidence is produced by the mechanism that judged the artifact and binds to the judged sha.

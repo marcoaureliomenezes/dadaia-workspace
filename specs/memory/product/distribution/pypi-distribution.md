@@ -33,7 +33,7 @@ sources:
 ## One version axis, two positions
 
 - The manifest holds the published floor, `pyproject.toml` the label of the build under development and the release PR the number proposed next; nothing else states a version.
-- Tests, evals and the release validate only the current build, never a published `dadaia-workspace`: `workflow_never_rules`' `published-dadaia-workspace-install` rule refuses, under `.github`, `tests`, `evals` and `scripts`, a pin, tag, range or bare name of it after `install`, `download`, `add`, `--from` or `--with`; `uvx dadaia-workspace init` and `--from <path>` stay legal, and third-party dependencies still resolve from PyPI.
+- Tests, evals and the release validate only the current build, never a published `dadaia-workspace`: `workflow_never_rules`' `published-dadaia-workspace-install` rule refuses, under `.github`, `tests`, `evals` and `scripts`, a pin, tag, range or bare name of it, spelled in any form PEP 503 normalises to that name, after `install`, `download`, `add`, `--from` or `--with`; `uvx dadaia-workspace init` and `--from <path>` stay legal, and third-party dependencies still resolve from PyPI.
 - A `v<version>` tag exists only for numbers release-please released; withholding the `release-gate` approval leaves the tag and CHANGELOG section without an upload, and the number is never reused.
 - Consumer-validation candidate wheels are throwaway and never mint a published version.
 - `CHANGELOG.md` is written by release-please; a hand-written legacy section is never renamed, renumbered or deleted.

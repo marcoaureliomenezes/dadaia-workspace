@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-20T18:48:19Z",
+  "generated_at": "2026-10-23T23:34:33Z",
   "features": [
     {
       "rank": 1,
@@ -14,7 +14,7 @@
         "handoff",
         "schema"
       ],
-      "token_estimate": 1094,
+      "token_estimate": 1125,
       "depends_on": [
         "worktrees",
         "bug-ledger",
@@ -43,7 +43,7 @@
         "dispatch",
         "sdd"
       ],
-      "token_estimate": 1029,
+      "token_estimate": 1139,
       "depends_on": [
         "bug-ledger",
         "worktrees",
@@ -74,7 +74,7 @@
         "derivation",
         "governance"
       ],
-      "token_estimate": 568,
+      "token_estimate": 639,
       "depends_on": [
         "sdd-gate-v3",
         "cross-platform-portability",
@@ -106,7 +106,7 @@
         "release-gate",
         "distribution"
       ],
-      "token_estimate": 688,
+      "token_estimate": 772,
       "depends_on": [
         "pypi-distribution",
         "QUALITY",
@@ -132,7 +132,7 @@
         "projection",
         "privacy"
       ],
-      "token_estimate": 1505,
+      "token_estimate": 1566,
       "depends_on": [
         "agentic-entities",
         "bug-ledger",
@@ -178,7 +178,7 @@
         "release",
         "packaging"
       ],
-      "token_estimate": 1621,
+      "token_estimate": 1635,
       "depends_on": [
         "release-lifecycle",
         "QUALITY",
@@ -211,7 +211,7 @@
         "projection",
         "hooks"
       ],
-      "token_estimate": 444,
+      "token_estimate": 500,
       "depends_on": [
         "agent-orchestration",
         "agentic-entities",
@@ -240,7 +240,7 @@
         "projection",
         "hooks"
       ],
-      "token_estimate": 417,
+      "token_estimate": 439,
       "depends_on": [
         "agentic-entities",
         "sdd-gate-v3",
@@ -270,7 +270,7 @@
         "projection",
         "hooks"
       ],
-      "token_estimate": 284,
+      "token_estimate": 282,
       "depends_on": [
         "agentic-entities",
         "context-management",
@@ -298,7 +298,7 @@
         "projection",
         "hooks"
       ],
-      "token_estimate": 244,
+      "token_estimate": 243,
       "depends_on": [
         "agentic-entities",
         "context-management",
@@ -326,7 +326,7 @@
         "projection",
         "hooks"
       ],
-      "token_estimate": 173,
+      "token_estimate": 171,
       "depends_on": [
         "agentic-entities",
         "sdd-gate-v3",
@@ -353,7 +353,7 @@
         "hooks",
         "binding"
       ],
-      "token_estimate": 471,
+      "token_estimate": 470,
       "depends_on": [
         "agentic-entities",
         "sdd-gate-v3",
@@ -380,7 +380,7 @@
         "paradigm",
         "pillars"
       ],
-      "token_estimate": 784,
+      "token_estimate": 817,
       "depends_on": [
         "context-management",
         "worktrees",
@@ -497,7 +497,7 @@
         "session",
         "privacy"
       ],
-      "token_estimate": 3287,
+      "token_estimate": 3357,
       "depends_on": [
         "specs-migration",
         "workspace-doctor",
@@ -537,7 +537,7 @@
         "portability",
         "worktrees"
       ],
-      "token_estimate": 1214,
+      "token_estimate": 1273,
       "depends_on": [
         "worktrees",
         "sdd-gate-v3",
@@ -568,7 +568,7 @@
         "macos",
         "linux"
       ],
-      "token_estimate": 933,
+      "token_estimate": 1002,
       "depends_on": [
         "bug-ledger",
         "workspace-doctor",
@@ -597,7 +597,7 @@
         "ports",
         "ttl"
       ],
-      "token_estimate": 437,
+      "token_estimate": 450,
       "depends_on": [
         "workspace-init",
         "agentic-entities"
@@ -621,7 +621,7 @@
         "registry",
         "onboarding"
       ],
-      "token_estimate": 1376,
+      "token_estimate": 1411,
       "depends_on": [
         "public-asset-distribution",
         "sdd-gate-v3",
@@ -656,7 +656,7 @@
         "compliance",
         "privacy"
       ],
-      "token_estimate": 3729,
+      "token_estimate": 3881,
       "depends_on": [
         "public-asset-distribution",
         "sdd-gate-v3",
@@ -699,7 +699,7 @@
         "upgrade",
         "onboarding"
       ],
-      "token_estimate": 2368,
+      "token_estimate": 2453,
       "depends_on": [
         "context-management",
         "specs-migration",
@@ -738,7 +738,7 @@
         "specs",
         "memory"
       ],
-      "token_estimate": 474,
+      "token_estimate": 505,
       "depends_on": [
         "bug-ledger",
         "release-lifecycle",
@@ -766,7 +766,7 @@
         "ledger",
         "governance"
       ],
-      "token_estimate": 1065,
+      "token_estimate": 1079,
       "depends_on": [
         "agent-orchestration",
         "worktrees",
@@ -786,7 +786,7 @@
       "title": "bug-ledger",
       "area": "sdd",
       "tldr": "BUGS.jsonl stores one lean record per confirmed defect; a resolved bug's fix is the commit carrying its fix(bugs) or refactor(bugs) id line.",
-      "summary": "The bug record grammar, confirmation and privacy boundary, terminal transitions, persisted fix lineage and fix files, the earlier-bug and REBUILD-due readout, archival and candidate integration.",
+      "summary": "The bug record grammar, confirmation and privacy boundary, terminal transitions, persisted fix lineage, the earlier-bug and REBUILD-due readout, archival and candidate integration.",
       "path": "specs/memory/product/sdd/bug-ledger.md",
       "tags": [
         "bugs",
@@ -794,7 +794,7 @@
         "lineage",
         "resolution"
       ],
-      "token_estimate": 2002,
+      "token_estimate": 2192,
       "depends_on": [
         "cross-platform-portability",
         "public-asset-distribution",
@@ -824,7 +824,7 @@
         "state",
         "closure"
       ],
-      "token_estimate": 1665,
+      "token_estimate": 1794,
       "depends_on": [
         "agent-orchestration",
         "worktrees",
@@ -846,7 +846,7 @@
       "title": "sdd-gate-v3",
       "area": "sdd",
       "tldr": "No-lock enforcement — root-entry hygiene and SDD write policy before tools; branch, canon and privacy checks at push; a ref gate on raw ref moves.",
-      "summary": "The two-policy pre-tool gate, path classes and bind scope, fail-open boundaries, one-fix refusal shape, range-scoped git publication chokepoint with its remedy verb, and the reference-transaction ref gate.",
+      "summary": "The two-policy pre-tool gate, path classes and bind scope, fail-open boundaries, one-fix refusal shape, range-scoped git publication chokepoint, the verdict-writer act, and the reference-transaction ref gate.",
       "path": "specs/memory/product/sdd/sdd-gate-v3.md",
       "tags": [
         "gate",
@@ -855,7 +855,7 @@
         "privacy",
         "git"
       ],
-      "token_estimate": 1725,
+      "token_estimate": 1550,
       "depends_on": [
         "cross-platform-portability",
         "worktrees",
@@ -893,7 +893,7 @@
         "merge",
         "review"
       ],
-      "token_estimate": 2990,
+      "token_estimate": 3015,
       "depends_on": [
         "context-management",
         "sdd-gate-v3",

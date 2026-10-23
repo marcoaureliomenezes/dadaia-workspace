@@ -50,10 +50,11 @@ commit.
 
 ## Standing order
 
-- Read the matching ledger history before proposing a fix, within the cap that
-  `dd-bug-resolution/LINEAGE.md` sets.
+- Read each touched file's history, the id-line query of `dd-bug-resolution/LINEAGE.md`,
+  before proposing a fix, within the cap it sets.
 - Use `caused_by: <bug-id> | <task-id> | none`; choose `none` only when blame offers no
-  candidate. A REBUILD is due as `bugs.py append` prints it.
+  candidate. A fix whose `caused_by` names a culprit, or that lands on a unit already fixed
+  in the window, is the REBUILD of that unit in the same lane (`specs/bugs/AGENTS.md`, Resolution).
 - Prefer a deletion-shaped fix. If the production diff grows, route it through the
   architecture lens.
 - Derive the bug-surface delta from `git show` of the fix commit, found by its `fix(bugs)` or `refactor(bugs)` id line, and report it in review evidence.

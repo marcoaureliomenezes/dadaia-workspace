@@ -20,8 +20,8 @@ associated repos; a single-repo context is the minimal case. Eight pillars:
   memory, release and task state.
 - **Documents are the lifecycle** — backlog, SPEC, PLAN, the job files, `_RELEASE.json` and
   `BUGS.jsonl` carry ordered work; no runtime drives agents through steps.
-- **Deterministic boundaries** — path class, bind scope, root hygiene and
-  the push gate are mechanical, each refusal carrying one fix line; what cannot
+- **Deterministic boundaries** — path class, bind scope, root hygiene, the verdict
+  writer and the push gate are mechanical, each refusal carrying one fix line; what cannot
   be mechanical is written as law.
 - **Visible concurrency** — sessions may race, git exposes the overlap, and nothing
   waits on a lock.

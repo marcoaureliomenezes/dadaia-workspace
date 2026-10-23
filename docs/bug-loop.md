@@ -31,19 +31,19 @@ ambiguity or a missing feature.
 
 ## 2. Lineage, then RED
 
-Read the ledger slice `dd-bug-resolution/LINEAGE.md` names for the bug's fix files or
-component. Inspect each prior fix, the commit whose `fix(bugs): <id>` or
+Read the history of each file the `component` names, by the id-line query
+`dd-bug-resolution/LINEAGE.md` names. Inspect each prior fix, the commit whose `fix(bugs): <id>` or
 `refactor(bugs): <id>` line names its bug (the recorded `fix_sha` is only a hint), and blame the production
 lines the new fix replaces. End with `caused_by: <bug-id> | <task-id> | none`; use `none`
 only when blame offers no candidate.
 
-A REBUILD is due as `bugs.py append` prints it; it keeps the regression tests. Then add the lowest-level case that fails for the real cause before production code
+A fix whose `caused_by` names a culprit, or that lands on a unit already fixed in the window, is the REBUILD of that unit in the same lane, under `refactor(bugs): <id> — REBUILD <unit>` (`specs/bugs/AGENTS.md`, Resolution); `bugs.py append` prints a REBUILD due on a path, and a REBUILD keeps the regression tests. Then add the lowest-level case that fails for the real cause before production code
 moves. Existing assertions remain contract evidence.
 
 ## 3. Fix at the owning seam
 
 Replace the faulty path and let the RED case turn GREEN. Prefer deletion and locality over
-a wrapper around the old behavior. The fix commit's id line is its cite; the rule is `specs/bugs/AGENTS.md`'s, and `resolve` derives `fix_sha` and `fix_files` from it; its production numstat is the source for any later diff-direction analysis.
+a wrapper around the old behavior. The fix commit's id line is its cite; the rule is `specs/bugs/AGENTS.md`'s, and `resolve` derives `fix_sha` from it; its production numstat is the source for any later diff-direction analysis.
 
 ## 4. Resolve with persisted facts
 
@@ -54,8 +54,9 @@ python3 .agents/skills/dd-bug-resolution/scripts/bugs.py resolve <bug-id> \
 
 - `resolve` requires `cause`, `caused_by` and `solution`, derives `fix_sha`, then stamps
   `status: resolved` and `closed_at`.
-- `caused_by` names a live or archived bug, a known release task, or `none`; `check`
-  refuses a dangling link or loop.
+- `caused_by` names a live or archived bug, a known release task, or `none`; `resolve`
+  refuses a bare task id several candidates carry, naming its `<M.m.p>-rc<N>/<id>` forms, and
+  `check` refuses a dangling link or loop.
 - `supersede --by` and `reject --reason` are the other terminal transitions.
 - `update <id> --set field=value` uses the schema's mutability classes and cannot replace
   transition-owned state.

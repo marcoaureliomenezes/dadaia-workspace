@@ -25,7 +25,8 @@ sources:
 
 - The root map, scoped `AGENTS.md` sources, `.agents/skills/dd-*` and `.agents/agents/dd-*.md` are authored once and consumed natively or through harness projections.
 - Every skill that operates in a governed area opens that area's scoped law as its first procedural step.
-- `CONTEXT-MAP.md` records each surface, purpose and load trigger. Size is a review signal; only the behavior map's skill ceiling is mechanical.
+- `CONTEXT-MAP.md` records each surface, purpose and load trigger: one harness row per registered harness record, its own directory the record's, and each persona row pointing to its persona file. Size is a review signal; only the behavior map's skill ceiling is mechanical.
+- Each fact of the law has one owner file; every other surface points to it by file and heading, never by section number, and slop is defined once, in `dd-code-review/SLOP.md`.
 
 ## Structural behavior map
 

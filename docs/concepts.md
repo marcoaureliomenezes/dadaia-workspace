@@ -34,7 +34,7 @@ enforced* lists. Every refusal carries one executable `fix:` line or one operato
 ## Memory
 
 *Memory* is current product truth: the product atoms, `ARCHITECTURE.md` and `QUALITY.md`.
-A bound session receives the constitution, technical bootstrap and catalog digest. Its
+A bound session receives the constitution, technical bootstrap and atom digest. Its
 writing rules are the memory law, `dadaia_workspace/public/scaffold/memory/AGENTS.md`.
 
 ## Bugs and backlog
