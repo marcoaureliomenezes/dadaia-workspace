@@ -24,6 +24,7 @@ size: MEDIUM — real git and real CLI child processes, no network.
 from __future__ import annotations
 
 import re
+from collections import Counter
 from pathlib import Path
 
 import pytest
@@ -37,6 +38,7 @@ from tests.fixtures.fix_world import (
     Skip,
     Templates,
     World,
+    WtCase,
     _advance_origin_work,
     _associated_dead,
     _associated_on_integration,
@@ -54,6 +56,7 @@ from tests.fixtures.fix_world import (
     _single_fix,
     _unborn_dirty,
 )
+from tests.helpers import worktree_ws as wt
 from tests.helpers.oslib import write_text
 
 pytestmark = [
@@ -116,8 +119,6 @@ _EXEMPT = {
     "features/spec_context/doctor": "a doctor finding: the doctor tests run its fix",
     "features/spec_context/gate_policy": "the tool gate's block: the hook tests run its fix",
     "features/spec_context/sweep": "the sweep's own tests run the fix",
-    "public/skills/dd-gitflow-default/": "a worktree script: its tests under "
-    "tests/public/skills/dd_gitflow_default/scripts run the fix; this world has no worktree workspace",
     "public/skills/": "a skill script: its own tests run the printed fix",
     "features/chokepoints/push_gate.read_failure_fix": "needs a corrupted object store",
     **dict.fromkeys(
@@ -139,7 +140,8 @@ def _covered(site: str) -> bool:
 def test_every_fix_site_has_a_case() -> None:
     sites = fix_sites()
     assert [site for site in sites if not _covered(site)] == []
-    assert [k for k in _REFUSALS if not any(s.endswith("/" + k) for s in sites)] == []
+    found = Counter(site.rsplit("/", 1)[-1] for site in sites)
+    assert {k: found[k] for k in _REFUSALS} == {k: len(v) for k, v in _REFUSALS.items()}
     assert [p for p in _EXEMPT if not any(s.startswith(p) for s in sites)] == []
 
 
@@ -147,9 +149,42 @@ _CASES = [
     pytest.param(case, id=case.build.__name__.strip("_"))
     for refusals in _REFUSALS.values()
     for entry in refusals
-    if not isinstance(entry, Skip)
+    if not isinstance(entry, (Skip, WtCase))
     for case in (entry if isinstance(entry, tuple) else (entry,))
 ]
+
+
+_WT_CASES = [
+    pytest.param(case, id=key.strip("_") + f"-{n}")
+    for key, refusals in _REFUSALS.items()
+    for n, case in enumerate(refusals)
+    if isinstance(case, WtCase)
+]
+
+
+@pytest.mark.parametrize("case", _WT_CASES)
+def test_the_worktree_fix_line_clears_the_refusal(case: WtCase, tmp_path: Path) -> None:
+    root = tmp_path / "ws"
+    root.mkdir()
+    wt.make_workspace(root)
+    argv = case.build(root)
+    done = wt.run(root, *argv)
+    assert done.returncode != 0, f"the case planted no refusal:\n{done.stdout}{done.stderr}"
+    seen: list[str] = []
+    for _ in range(4):
+        (fix,) = wt.fixes(done)
+        assert fix not in seen, f"no progress — the same fix line again:\n{fix}"
+        seen.append(fix)
+        if fix.startswith(("fix: Agent action: ", "fix: Operator action: ")):
+            if case.play is not None:
+                case.play(root)
+        else:
+            wt.run_fix(root, done)
+        argv = case.then(root) if callable(case.then) else case.then or argv
+        done = wt.run(root, *argv)
+        if done.returncode == 0:
+            return
+    pytest.fail("the refusal chain did not clear within four fix lines:\n" + "\n".join(seen))
 
 
 def test_dead_leaves_a_clean_published_detached_head(world: World) -> None:
