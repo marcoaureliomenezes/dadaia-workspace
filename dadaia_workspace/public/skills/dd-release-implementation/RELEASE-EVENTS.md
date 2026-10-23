@@ -31,7 +31,7 @@ stays open.
 
 ## Milestones
 
-A milestone or memory-window bound is found from its commit subject line, as a fix is (`specs/bugs/AGENTS.md` §Resolution); a stored sha is a hint a history rewrite can orphan.
+A milestone or memory-window bound is found from its commit subject line, as a fix is (`specs/bugs/AGENTS.md` §Resolution); a stored sha is a hint a history rewrite can orphan. The subject is `chore(release): rc-<N> (phase|enters) <PHASE>`, optionally followed by more words, on a commit touching `specs/releases/<version>/`: `release.py phase` prints the `phase` form to commit, and both forms are read. The memory pass is `chore(release): rc-<N> memory pass recorded`.
 
 | Milestone | Command | Written shape |
 |---|---|---|
