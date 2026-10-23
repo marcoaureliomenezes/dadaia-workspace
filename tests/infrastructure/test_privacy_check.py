@@ -16,7 +16,6 @@ import re
 import shutil
 import sys
 import tomllib
-import uuid
 from collections.abc import Collection
 from pathlib import Path
 
@@ -30,6 +29,7 @@ from tests.fixtures.real_git import git
 from tests.helpers.oslib import Undecodable, read_text, run, write_text
 from tests.helpers.privacy_fixtures import internal_host, private_ip
 from tests.helpers.scan_population import assert_populated
+from tests.helpers.suite_files import tracked
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _PUBLIC_ROOT = _REPO_ROOT / "dadaia_workspace" / "public"
@@ -39,8 +39,10 @@ _SCRIPTS_DIR = _PUBLIC_ROOT / "scripts"
 def tracked_bytecode(repo_root: Path) -> list[str]:
     """The bytecode artifacts *git tracks* under ``dadaia_workspace/public/`` in the repo at
     *repo_root* (sorted paths relative to it). An ignored or untracked cache is not shipped."""
-    tracked = git(repo_root, "ls-files", "dadaia_workspace/public").splitlines()
-    return sorted(p for p in tracked if p.endswith(".pyc") or "__pycache__/" in p)
+    tracked_paths = (
+        p.relative_to(repo_root).as_posix() for p in tracked(repo_root, "dadaia_workspace/public")
+    )
+    return sorted(p for p in tracked_paths if p.endswith(".pyc") or "__pycache__/" in p)
 
 
 def test_bytecode_contract_judges_tracked_files_not_the_working_tree(tmp_path: Path) -> None:
@@ -265,40 +267,44 @@ def test_every_flag_cited_beside_a_venv_call_exists_in_that_verbs_help() -> None
 _RETIRED_PERSONA = "dd-" + "software-engineer"
 
 
-def test_the_retired_persona_name_stays_out_of_library_and_tests() -> None:
-    """No text file under dadaia_workspace/ or tests/ names the retired persona."""
-    tracked = git(_REPO_ROOT, "ls-files", "dadaia_workspace", "tests").splitlines()
-    paths = sorted(_REPO_ROOT / p for p in tracked if "__pycache__" not in p.split("/"))
-    assert_populated(paths, sentinel=Path(__file__))
+def _persona_hits(root: Path) -> list[str]:
+    paths = tracked(root, "dadaia_workspace", "tests")
+    assert_populated(
+        paths, sentinel=root / "tests/test_a.py" if root != _REPO_ROOT else Path(__file__)
+    )
     hits = []
     for path in paths:
         try:
             lines = read_text(path).splitlines()
         except Undecodable:
             continue
-        rel = path.relative_to(_REPO_ROOT).as_posix()
+        rel = path.relative_to(root).as_posix()
         hits += [f"{rel}:{n}" for n, line in enumerate(lines, 1) if _RETIRED_PERSONA in line]
-    assert hits == [], "\n".join(hits)
+    return hits
+
+
+def test_the_retired_persona_name_stays_out_of_library_and_tests() -> None:
+    """No text file under dadaia_workspace/ or tests/ names the retired persona."""
+    assert _persona_hits(_REPO_ROOT) == []
 
 
 def test_the_persona_scan_survives_an_untracked_scratch_file_deleted_mid_scan(
-    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    scratch = _REPO_ROOT / "tests" / "tmp" / f"persona-race-{uuid.uuid4().hex[:8]}"
-    scratch.mkdir(parents=True)
-    try:
-        write_text(scratch / "test_gone.py", "X = 1\n")
+    git(tmp_path, "init", "-q")
+    (tmp_path / "tests/tmp/persona-race").mkdir(parents=True)
+    write_text(tmp_path / "tests" / "test_a.py", f"X = '{_RETIRED_PERSONA}'\n")
+    git(tmp_path, "add", "tests/test_a.py")
+    scratch = tmp_path / "tests" / "tmp" / "persona-race"
+    write_text(scratch / "test_gone.py", f"X = '{_RETIRED_PERSONA}'\n")
+    listed = assert_populated
 
-        listed = assert_populated
+    def populated_then_deleted(population: Collection[Path], sentinel: Path) -> None:
+        listed(population, sentinel)
+        shutil.rmtree(scratch)
 
-        def populated_then_deleted(population: Collection[Path], sentinel: Path) -> None:
-            listed(population, sentinel)
-            shutil.rmtree(scratch)
-
-        monkeypatch.setattr(sys.modules[__name__], "assert_populated", populated_then_deleted)
-        test_the_retired_persona_name_stays_out_of_library_and_tests()
-    finally:
-        shutil.rmtree(scratch, ignore_errors=True)
+    monkeypatch.setattr(sys.modules[__name__], "assert_populated", populated_then_deleted)
+    assert _persona_hits(tmp_path) == ["tests/test_a.py:1"]
 
 
 def test_a_public_file_that_is_not_utf8_is_skipped_by_the_scan(tmp_path: Path) -> None:

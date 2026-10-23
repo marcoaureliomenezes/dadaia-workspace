@@ -1,17 +1,14 @@
 """The size marker comes from what a test reaches, never from its folder. Each case
-is judged by a real inner collection (pytester) over a throwaway module placed under the
-checkout's ``tests/tmp/``, where the root conftest applies."""
+is a real collected item (pytester, under ``tmp_path``) that the root conftest's
+collection hook marks."""
 
 from __future__ import annotations
 
-import shutil
-import uuid
-from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
 
-from tests.helpers.oslib import write_text
+from tests import conftest
 
 _CHECKOUT = Path(__file__).resolve().parents[2]
 
@@ -54,12 +51,12 @@ def test_inner():
 """
 
 
-@pytest.fixture()
-def inner() -> Iterator[Path]:
-    where = _CHECKOUT / "tests" / "tmp" / f"size-{uuid.uuid4().hex[:8]}"
-    where.mkdir(parents=True)
-    yield where
-    shutil.rmtree(where, ignore_errors=True)
+def _marked(pytester: pytest.Pytester, source: str, under: str) -> pytest.Item:
+    """The first item of *source*, run through the conftest hook as a test at ``<checkout>/<under>``."""
+    item = pytester.getitems(source)[0]
+    item.path = _CHECKOUT / under / "test_inner_case.py"
+    conftest.pytest_collection_modifyitems(item.config, [item])
+    return item
 
 
 @pytest.mark.parametrize(
@@ -95,35 +92,14 @@ def inner() -> Iterator[Path]:
     ],
 )
 def test_size_follows_what_the_test_reaches(
-    pytester: pytest.Pytester, inner: Path, source: str, size: str, other: str
+    pytester: pytest.Pytester, source: str, size: str, other: str
 ) -> None:
-    write_text(inner / "test_inner_case.py", source)
-    nodeid = f"tests/tmp/{inner.name}/test_inner_case.py::test_inner"
-
-    def collected(marker: str) -> list[str]:
-        run = pytester.runpytest_subprocess(
-            "--collect-only", "-q", "-p", "no:randomly", "-m", marker, str(inner)
-        )
-        return [line for line in run.outlines if "::" in line]
-
-    assert collected(size) == [nodeid]
-    assert collected(other) == []
+    item = _marked(pytester, source, "tests/tmp")
+    assert item.get_closest_marker(size) is not None
+    assert item.get_closest_marker(other) is None
 
 
 def test_a_journey_under_e2e_is_e2e_whatever_it_reaches(pytester: pytest.Pytester) -> None:
-    where = _CHECKOUT / "tests" / "e2e" / f"size-{uuid.uuid4().hex[:8]}"
-    where.mkdir(parents=True)
-    try:
-        write_text(where / "test_inner_case.py", _SUBPROCESS)
-        nodeid = f"tests/e2e/{where.name}/test_inner_case.py::test_inner"
-
-        def collected(marker: str) -> list[str]:
-            run = pytester.runpytest_subprocess(
-                "--collect-only", "-q", "-p", "no:randomly", "-m", marker, str(where)
-            )
-            return [line for line in run.outlines if "::" in line]
-
-        assert collected("e2e") == [nodeid]
-        assert collected("medium") == []
-    finally:
-        shutil.rmtree(where, ignore_errors=True)
+    item = _marked(pytester, _SUBPROCESS, "tests/e2e")
+    assert item.get_closest_marker("e2e") is not None
+    assert item.get_closest_marker("medium") is None
