@@ -320,6 +320,12 @@ def _stats_workspace(tmp_path: Path) -> Path:
     return root
 
 
+def _close(repo: Path, n: int) -> str:
+    """Commits candidate *n*'s CLOSURE phase under its subject and returns its sha."""
+    git(repo, "commit", "-q", "--allow-empty", "-m", f"chore(release): rc-{n} phase CLOSURE")
+    return git(repo, "rev-parse", "HEAD").strip()
+
+
 def _log(root: Path, log: list[dict[str, str]]) -> None:
     state = root / "repos/r/specs/releases/0.5.0/_RELEASE.json"
     write_text(state, json.dumps({**json.loads(read_text(state)), "log": log}))
@@ -369,7 +375,7 @@ def test_stats_prints_the_local_metric_table_over_the_candidate_window(tmp_path:
     held by the reaper is read, and the oldest record read is printed whatever its window."""
     root = _stats_workspace(tmp_path)
     repo = root / "repos/r"
-    closure = git(repo, "rev-parse", "HEAD").strip()
+    closure = _close(repo, 99)
     _log(
         root,
         [
@@ -460,7 +466,7 @@ def test_stats_of_a_worktree_reads_the_same_table_as_the_repo_checkout(tmp_path:
     root = _stats_workspace(tmp_path)
     repo = root / "repos/r"
     _log(root, [_born("2026-10-12T09:00:00Z"),
-                _milestone("2026-10-12T11:00:00Z", "rc-99", "implemented", git(repo, "rev-parse", "HEAD").strip())])  # fmt: skip
+                _milestone("2026-10-12T11:00:00Z", "rc-99", "implemented", _close(repo, 99))])  # fmt: skip
     git(repo, "add", "-A")
     git(repo, "commit", "-qm", "state")
     tree = root / "worktrees/r/wt-rc"
@@ -475,7 +481,7 @@ def test_stats_of_a_worktree_reads_the_same_table_as_the_repo_checkout(tmp_path:
 def test_stats_reads_closure_duration_as_n_a_before_the_integration_merge(tmp_path: Path) -> None:
     root = _stats_workspace(tmp_path)
     repo = root / "repos/r"
-    closure = git(repo, "rev-parse", "HEAD").strip()
+    closure = _close(repo, 99)
     git(repo, "branch", "dev")
     _log(
         root,
@@ -510,6 +516,7 @@ def test_stats_reads_memory_drift_only_for_the_newest_candidate(tmp_path: Path) 
 
 def test_stats_window_of_a_first_candidate_opens_at_its_release_born_note(tmp_path: Path) -> None:
     root = _stats_workspace(tmp_path)
+    _close(root / "repos/r", 1)
     _log(
         root,
         [
@@ -596,6 +603,8 @@ def test_stats_counts_a_bug_closed_between_two_candidates_in_exactly_one_window(
     tmp_path: Path,
 ) -> None:
     root = _stats_workspace(tmp_path)
+    _close(root / "repos/r", 98)
+    _close(root / "repos/r", 99)
     _log(
         root,
         [
@@ -618,6 +627,7 @@ def test_stats_counts_a_bug_closed_between_two_candidates_in_exactly_one_window(
 
 def test_stats_window_of_the_first_candidate_has_no_lower_bound(tmp_path: Path) -> None:
     root = _stats_workspace(tmp_path)
+    _close(root / "repos/r", 1)
     _log(
         root,
         [
@@ -633,8 +643,9 @@ def test_stats_reads_the_closed_counts_by_running_the_bug_script_without_its_int
     tmp_path: Path,
 ) -> None:
     root = _stats_workspace(tmp_path)
+    _close(root / "repos/r", 99)
     scripts = root / ".agents/skills/dd-bug-resolution/scripts"
-    (scripts / "_bugs_store.py").unlink()
+    (scripts / "_bugs_write.py").unlink()
     _log(
         root,
         [
@@ -698,7 +709,7 @@ def test_stats_counts_the_integration_line_merge_not_a_back_merge_into_the_work_
     work = git(repo, "rev-parse", "--abbrev-ref", "HEAD").strip()
     _dev_side_merge(repo, "2026-10-12T08:00:00Z")
     git(repo, "commit", "-q", "--allow-empty", "-m", "feat(J1.T0): the closure")
-    closure = git(repo, "rev-parse", "HEAD").strip()
+    closure = _close(repo, 99)
     _log(
         root,
         [
@@ -724,7 +735,7 @@ def test_stats_names_the_context_that_owns_the_repo_among_several(tmp_path: Path
     repo = root / "repos/r"
     work = _dev_side_merge(repo, "2026-10-12T08:00:00Z")
     git(repo, "commit", "-q", "--allow-empty", "-m", "feat(J1.T0): the closure")
-    closure = git(repo, "rev-parse", "HEAD").strip()
+    closure = _close(repo, 99)
     _log(root, [_born("2026-10-12T09:00:00Z"), _milestone("2026-10-12T11:00:00Z", "rc-99", "implemented", closure)])  # fmt: skip
     _merge_at(repo, "dev", work, "2026-10-12T14:30:00Z")
     done = _stats(root)
@@ -739,7 +750,7 @@ def test_stats_reads_closure_duration_as_n_a_when_no_integration_merge_holds_the
     repo = root / "repos/r"
     _dev_side_merge(repo, "2026-10-12T08:00:00Z")
     git(repo, "commit", "-q", "--allow-empty", "-m", "feat(J1.T0): the closure")
-    closure = git(repo, "rev-parse", "HEAD").strip()
+    closure = _close(repo, 99)
     _log(
         root,
         [
@@ -777,6 +788,7 @@ def test_stats_with_the_root_found_and_the_cli_missing_refuses_with_the_install_
     tmp_path: Path,
 ) -> None:
     root = _stats_workspace(tmp_path)
+    _close(root / "repos/r", 99)
     _log(root, [_born("2026-10-12T09:00:00Z"), _milestone("2026-10-12T11:00:00Z", "rc-99", "implemented", "2" * 40)])  # fmt: skip
     shutil.rmtree(root / ".dadaia/.venv")
     refused = _stats(root)
