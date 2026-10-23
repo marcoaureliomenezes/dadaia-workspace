@@ -93,7 +93,10 @@ def _ledger(root: Path, *records: dict[str, object]) -> Path:
         )
     )
     required = set(schema["required"])
-    shaped = [{**{key: None for key in required - record.keys()}, **record} for record in records]
+    shaped = [
+        {**{key: None for key in required - record.keys()}, **record}
+        for record in _land(root, records)
+    ]
     write_text(
         specs / "bugs" / "BUGS.jsonl", "".join(json.dumps(record) + "\n" for record in shaped)
     )
@@ -570,9 +573,26 @@ def test_append_registers_one_open_record(script: Path, tmp_path: Path) -> None:
 def _sibling(bug_id: str, *files: str) -> dict[str, object]:
     record = {**_OPEN_RECORD, "id": bug_id, "status": "resolved", "closed_at": "2026-09-21T10:00:00Z",
               "cause": "c", "solution": "s", "caused_by": "none",
-              "fix_sha": (bug_id.encode().hex() * 40)[:40], "fix_files": list(files)}  # fmt: skip
+              "fix_sha": (bug_id.encode().hex() * 40)[:40], "_files": list(files)}  # fmt: skip
     del record["surface"]
     return record
+
+
+def _land(root: Path, records: tuple[dict[str, object], ...]) -> list[dict[str, object]]:
+    """Commit, for each record carrying `_files`, the id-line fix touching those files; the records without that key."""
+    git = ["git", "-C", str(root), "-c", "user.name=t", "-c", "user.email=t@t.test"]
+    if any(r.get("_files") for r in records):
+        run([*git, "add", "-A"], check=True)
+        run([*git, "commit", "-q", "--allow-empty", "-m", "base"], check=True)
+    for record in records:
+        for path in record.get("_files") or ():
+            (root / str(path)).parent.mkdir(parents=True, exist_ok=True)
+            with (root / str(path)).open("a") as out:
+                out.write("# fix\n")
+        if record.get("_files"):
+            run([*git, "add", "-A"], check=True)
+            run([*git, "commit", "-q", "-m", f"fix(bugs): {record['id']} \u2014 c"], check=True)
+    return [{k: v for k, v in r.items() if k != "_files"} for r in records]
 
 
 _LEGACY_EVENT = {"ts": "2026-08-28T12:45:33Z", "event": "archived", "agent": "claude-code",
@@ -585,7 +605,7 @@ def _archived(specs: Path, *records: dict[str, object]) -> None:
     """The archive as the real one is: legacy event lines first, then the plain records."""
     (specs / "bugs" / "_archive").mkdir(parents=True, exist_ok=True)
     write_text(specs / "bugs" / "_archive" / "bugs_histo.jsonl",
-               "".join(json.dumps(r) + "\n" for r in (_LEGACY_EVENT, *records)))  # fmt: skip
+               "".join(json.dumps(r) + "\n" for r in (_LEGACY_EVENT, *_land(specs.parent, records))))  # fmt: skip
 
 
 def _append_argv(specs: Path, component: str = "cli/x.py", bug_id: str = "new-bug") -> list[str]:
@@ -594,11 +614,11 @@ def _append_argv(specs: Path, component: str = "cli/x.py", bug_id: str = "new-bu
             "--symptom", "s", "--repro", "r", "--expected", "e"]  # fmt: skip
 
 
-def test_append_prints_the_earlier_bugs_whose_fix_files_match_and_the_rebuild_due(
+def test_append_prints_the_earlier_bugs_whose_id_commits_touch_the_path_and_the_rebuild_due(
     script: Path, tmp_path: Path
 ) -> None:
-    """Live and archived records whose `fix_files` hold the component's path are listed by id;
-    a legacy record without `fix_files` never matches. Without `--correlates` it refuses."""
+    """Live and archived records whose id commit touches the component's path are listed by id;
+    a record whose id commit holds no such path never matches. Without `--correlates` it refuses."""
     specs = _ledger(
         tmp_path, _sibling("b1", "cli/x.py"), _sibling("b4", "hooks/y.py"), _OPEN_RECORD
     )
@@ -620,7 +640,9 @@ def test_append_prints_the_earlier_bugs_whose_fix_files_match_and_the_rebuild_du
 def test_a_fix_commit_shared_by_three_bugs_counts_once_toward_a_files_rebuild_due(
     script: Path, tmp_path: Path
 ) -> None:
-    shared = [{**_sibling(i, "cli/x.py"), "fix_sha": "c" * 40} for i in ("b1", "b2", "b3")]
+    _ledger(tmp_path)
+    _land(tmp_path, ({"id": "b1, b2, b3", "_files": ["cli/x.py"]},))
+    shared = [{**_sibling(i), "fix_sha": "c" * 40} for i in ("b1", "b2", "b3")]
     twice = [_sibling("b4", "tests/t.py"), _sibling("b5", "tests/t.py")]
     specs = _ledger(tmp_path, *shared, *twice)
     stats = _run(script, "stats", "--specs", str(specs))
@@ -793,15 +815,12 @@ def test_a_legacy_record_with_a_surface_passes_check(script: Path, tmp_path: Pat
     assert done.returncode == 0, done.stdout + done.stderr
 
 
-def test_resolve_records_the_fix_files_once(script: Path, tmp_path: Path) -> None:
+def test_resolve_stores_no_fix_files(script: Path, tmp_path: Path) -> None:
     specs = _ledger(tmp_path, _OPEN_RECORD)
     _fix_commit(tmp_path, "cli/x.py", _FIXED)
     done = _run(script, *_resolve_argv(), "--specs", str(specs))
     assert done.returncode == 0, done.stderr
-    assert _records(specs)[0]["fix_files"] == ["cli/x.py"]
-    again = _run(script, "update", "a-bug", "--set", "fix_files=other.py", "--specs", str(specs))
-    assert again.returncode == 1 and "write-once" in again.stderr
-    assert _records(specs)[0]["fix_files"] == ["cli/x.py"]
+    assert "fix_files" not in _records(specs)[0]
 
 
 def test_stats_reports_the_files_two_or_more_bugs_fixed(script: Path, tmp_path: Path) -> None:
@@ -1440,9 +1459,7 @@ def test_append_finds_the_earlier_bugs_of_records_without_fix_files_in_one_diff_
     _ledger(tmp_path)
     first = _fix_commit(tmp_path, "cli/x.py", "fix(bugs): b1 \u2014 c")
     second = _fix_commit(tmp_path, "cli/x.py", "fix(bugs): b2 \u2014 c")
-    old = [{**_sibling(i, "cli/x.py"), "fix_sha": sha} for i, sha in (("b1", first), ("b2", second))]
-    for record in old:
-        del record["fix_files"]
+    old = [{**_sibling(i), "fix_sha": sha} for i, sha in (("b1", first), ("b2", second))]
     specs = _ledger(tmp_path, *old)
     trace, env = _traced(tmp_path)
     done = _run(script, *_append_argv(specs), "--correlates", "b1,b2", env=env)
@@ -1588,14 +1605,14 @@ def test_the_archive_act_check_prints_clears_a_record_a_task_commit_fixed(
     assert _run(script, "check", "--specs", str(specs)).returncode == 0
 
 
-def test_resolve_records_the_sha_and_files_of_the_id_commit(script: Path, tmp_path: Path) -> None:
+def test_resolve_records_the_sha_of_the_id_commit(script: Path, tmp_path: Path) -> None:
     specs = _ledger(tmp_path, _OPEN_RECORD)
     sha = _fix_commit(tmp_path, "cli/x.py", _FIXED)
     done = _run(script, "resolve", "a-bug", "--cause", "c", "--caused-by", "none",
                 "--solution", "s", "--specs", str(specs))  # fmt: skip
     assert done.returncode == 0, done.stdout + done.stderr
     [record] = _records(specs)
-    assert (record["fix_sha"], record["fix_files"]) == (sha, ["cli/x.py"])
+    assert (record["fix_sha"], "fix_files" in record) == (sha, False)
     assert _run(script, "check", "--specs", str(specs)).returncode == 0
 
 

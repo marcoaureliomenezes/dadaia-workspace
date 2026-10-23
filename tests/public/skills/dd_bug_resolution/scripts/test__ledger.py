@@ -64,7 +64,7 @@ _CASES: dict[str, tuple[str, dict[str, str], list[str]]] = {
         "dd-release-implementation/scripts/release.py",
         {"releases/9.9.9/_RELEASE.json": json.dumps(_STATE) + "\n",
          "releases/_archive/releases_histo.jsonl": ""},
-        ["phase", "CLOSURE", "--sha", "abc1234"],
+        ["phase", "CLOSURE"],
     ),
 }  # fmt: skip
 
@@ -195,7 +195,7 @@ _WRITES = {
     "audit": ({"audits/a1/FINDINGS.jsonl": json.dumps(_FINDING) + "\n"},
               ["disposition", "a1", "a1-F001", "--disposition", "rejected", "--reason", "r"]),
     "release": ({"releases/9.9.9/_RELEASE.json": json.dumps({**_STATE, "phase": "IMPLEMENTATION", "defined": None, "shipped": None}) + "\n"},
-                ["phase", "CLOSURE", "--sha", "abc1234"]),
+                ["phase", "CLOSURE"]),
 }  # fmt: skip
 
 
