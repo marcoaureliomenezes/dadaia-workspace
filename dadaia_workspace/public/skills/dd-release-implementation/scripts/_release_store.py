@@ -14,9 +14,9 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import _commit
-import _git
 from _grammar import STATE
 from _ledger import replace
+from _memory_drift import by_subject
 from _refusal import Refusal
 from _release_check import state_findings
 from _release_schema import SCRIPT, State, UnreadableRelease, current_candidate, live_id, read_state
@@ -47,14 +47,11 @@ def live_release(specs: Path) -> Live:
 
 
 def window_start(repo: Path, live: Live) -> list[str]:
-    """The memory window's start candidates, newest first: each memory entry's `until`, newest
-    entry first, then the newest commit of *repo* subjected as the live candidate's IMPLEMENTATION phase."""
-    bounds = [str(e["until"]) for e in reversed(live.state.get("log") or [])
-              if e.get("kind") == "memory" and e.get("until")]  # fmt: skip
-    subject = (
-        f"^chore(release): {live.candidate.name} phase IMPLEMENTATION$" if live.candidate else ""
-    )
-    return bounds + ([sha] if subject and (sha := _git.git(repo, "log", "-1", "--format=%H", "--grep", subject, check=False).strip()) else [])  # fmt: skip
+    """The memory window's start candidates, newest first: the newest commit of *repo* subjected
+    as the live candidate's memory pass, then as its IMPLEMENTATION phase."""
+    name = live.candidate.name if live.candidate else None
+    subjects = [f"chore(release): {name} memory pass recorded", f"chore(release): {name} phase IMPLEMENTATION"]  # fmt: skip
+    return [sha for s in subjects if name and (sha := by_subject(repo, s))]
 
 
 def validated(state: State, rel: str) -> str:
