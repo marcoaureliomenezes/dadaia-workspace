@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import contextlib
 import inspect
+import json
 import os
 import re
 import shutil
@@ -1029,9 +1030,85 @@ def _wt_review_rc(root: Path) -> None:
     wt.approve(root, wt.git(tree, "rev-parse", "HEAD").strip(), name=_RC)
 
 
+def _wt_rc_path(root: Path) -> str:
+    return f"worktrees/r/{_RC}"
+
+
+def _wt_planted(build: Callable[[Path], list[str]]) -> Callable[[Path], list[str]]:
+    def planted(root: Path) -> list[str]:
+        argv = build(root)
+        write_text(root / "refused.json", json.dumps(argv))
+        return argv
+
+    return planted
+
+
+def _wt_agent_reruns(
+    build: Callable[[Path], list[str]], corrected: Callable[[Path], list[str]]
+) -> WtCase:
+    """An input error whose fix is an Agent action: only playing it chooses the valid argument, so
+    a fix line that is a command (which `play` never sees) reruns the argv that refused."""
+
+    def play(root: Path) -> None:
+        write_text(root / "corrected.json", json.dumps(corrected(root)))
+
+    def then(root: Path) -> list[str]:
+        chosen = root / "corrected.json"
+        return json.loads(read_text(chosen if chosen.exists() else root / "refused.json"))
+
+    return WtCase(_wt_planted(build), play, then)
+
+
+def _wt_bad_name(root: Path) -> list[str]:
+    return ["new", "r", "bad-name"]
+
+
+def _wt_outside_path(root: Path) -> list[str]:
+    wt.open_tree(root, _RC)
+    return ["clean", str(root / "elsewhere")]
+
+
+def _wt_not_ours(verb: str) -> Callable[[Path], list[str]]:
+    """*verb* on a lane never opened, while the rc is the one tree `list` prints."""
+
+    def build(root: Path) -> list[str]:
+        wt.open_tree(root, _RC)
+        return [verb, "worktrees/r/0.5.0/wt-backlog-foo"]
+
+    return build
+
+
+def _wt_on_rc(verb: str) -> Callable[[Path], list[str]]:
+    return lambda root: [verb, _wt_rc_path(root)]
+
+
+def _wt_paused(root: Path) -> None:
+    """The rc paused: its bundle sits under `.dadaia/dist/r/`."""
+    wt.open_tree(root, _RC)
+    done = wt.run(root, "pause", _wt_rc_path(root))
+    assert done.returncode == 0, done.stderr
+
+
+def _wt_resume_no_bundle(root: Path) -> list[str]:
+    _wt_paused(root)
+    return ["resume", "worktrees/r/0.5.0/wt-backlog-foo"]
+
+
+def _wt_resume_ref_exists(root: Path) -> list[str]:
+    """The rc paused, then opened afresh: its branch exists beside the bundle."""
+    _wt_paused(root)
+    wt.open_tree(root, _RC)
+    return ["resume", _wt_rc_path(root)]
+
+
+def _wt_branch_exists(root: Path) -> list[str]:
+    """A task tree already open: `new` of its name finds the branch. Its clean frees the name."""
+    _wt_task(root)
+    return ["new", "r", wt.NEW_TASK]
+
+
 # ── the census ───────────────────────────────────────────────────────────────────────
 
-_LIST = "FINDING: its one fix is `worktree.py list`, which inspects and clears nothing"
 _SUITE = "tests/public/skills/dd_gitflow_default/scripts runs it"
 
 
@@ -1040,7 +1117,7 @@ def _skips(count: int, reason: str) -> tuple[Skip, ...]:
 
 
 _WORKTREE: dict[str, tuple[WtCase | Skip, ...]] = {
-    "_worktree_new.new": (WtCase(_wt_no_start), Skip(_LIST)),
+    "_worktree_new.new": (WtCase(_wt_no_start), WtCase(_wt_branch_exists)),
     "_worktree_new._refuse_symlink": (WtCase(_wt_symlink),),
     "_worktree_new._refuse_unopened_bug": (WtCase(_wt_unopened_bug, _wt_bug_confirmed),),
     "_worktree_new._refuse_unready": (
@@ -1049,21 +1126,27 @@ _WORKTREE: dict[str, tuple[WtCase | Skip, ...]] = {
     ),
     "_worktree_pause.pause": (
         Skip("its fix lands the tree through the merge chain, whose verdict step is an act"),
-        Skip(_LIST),
+        _wt_agent_reruns(_wt_not_ours("pause"), _wt_on_rc("pause")),
         WtCase(_wt_pause_ignored, _wt_drop_ignored),
         Skip("a bundle that carries nothing; " + _SUITE),
     ),
-    "_worktree_pause.resume": _skips(2, _LIST),
-    "_worktree_sync.sync": (Skip(_LIST),),
+    "_worktree_pause.resume": (
+        WtCase(_wt_resume_ref_exists),
+        _wt_agent_reruns(_wt_resume_no_bundle, _wt_on_rc("resume")),
+    ),
+    "_worktree_sync.sync": (_wt_agent_reruns(_wt_not_ours("sync"), _wt_on_rc("sync")),),
     "_worktree_sync._cascade": (Skip("needs a rebase conflict; " + _SUITE),),
-    "_worktree_end.target": (Skip(_LIST),),
+    "_worktree_end.target": (_wt_agent_reruns(_wt_outside_path, _wt_on_rc("clean")),),
     "_worktree_end.refuse_dirty": (WtCase(_wt_dirty, _wt_commit_staged),),
     "_worktree_end._kept": (WtCase(_wt_ignored, then=lambda _: ["merge", _TASK, "--drop"]),),
     "_worktree_end.merge": (
         WtCase(_wt_task_unopened),
         Skip("a fast-forward race; " + _SUITE),
     ),
-    "_worktree_end.clean": (Skip(_LIST), WtCase(_wt_unmerged, then=["merge", _TASK])),
+    "_worktree_end.clean": (
+        _wt_agent_reruns(_wt_not_ours("clean"), _wt_on_rc("clean")),
+        WtCase(_wt_unmerged, then=["merge", _TASK]),
+    ),
     "_worktree_end.digest": (WtCase(_wt_bad_sha, then=_wt_real_sha),),
     "_worktree_end._check_approved": (
         WtCase(_wt_unreviewed_rc, _wt_review_rc),
@@ -1082,7 +1165,7 @@ _WORKTREE: dict[str, tuple[WtCase | Skip, ...]] = {
     "_worktree_end._scaffold": _skips(1, "a level folder holding other files; " + _SUITE),
     "_worktree_end._parent": _skips(1, "a parent tree removed by hand; " + _SUITE),
     "_worktree_end._on_target": _skips(1, "a parent tree on another branch; " + _SUITE),
-    "_worktree_git.not_a_name": (Skip(_LIST),),
+    "_worktree_git.not_a_name": (_wt_agent_reruns(_wt_bad_name, lambda root: ["new", "r", _RC]),),
     "_worktree_git.gitflows": _skips(1, "a failing `context list`; " + _SUITE),
     "_worktree_git.flow_for": _skips(1, "a repo no context owns; " + _SUITE),
     "_worktree_git.SeveralWork.__init__": _skips(1, "several work branches; " + _SUITE),

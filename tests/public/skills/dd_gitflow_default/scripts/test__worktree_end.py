@@ -1287,7 +1287,7 @@ def _plain_tree(root: Path, name: str) -> Path:
 
 
 @pytest.mark.parametrize("name", ["maintenance", "0.5.0-rc1/j1", "0.5.0-rc1/define"])
-def test_a_plain_tree_is_refused_by_merge_with_the_list_fix(tmp_path: Path, name: str) -> None:
+def test_a_plain_tree_is_refused_by_merge(tmp_path: Path, name: str) -> None:
     root = make_workspace(tmp_path)
     repo = root / "repos/r"
     git(repo, "checkout", "-q", "feature/0.5.0")
@@ -1300,9 +1300,6 @@ def test_a_plain_tree_is_refused_by_merge_with_the_list_fix(tmp_path: Path, name
 
     assert refused.returncode == 1
     assert "not a worktree name" in refused.stderr
-    assert [f.removeprefix("fix: ") for f in fixes(refused)] == [
-        shell_line(sys.executable, str(SCRIPT), "list")
-    ]
     assert git(repo, "rev-parse", "feature/0.5.0").strip() != head
 
 

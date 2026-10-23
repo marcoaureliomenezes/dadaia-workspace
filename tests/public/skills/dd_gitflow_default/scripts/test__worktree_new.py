@@ -174,7 +174,6 @@ def test_a_reconcile_name_refuses_even_in_closure(definition_root: Path, name: s
     refused = _run(definition_root, "new", "r", name)
 
     assert (refused.returncode, refused.stdout) == (1, "")
-    assert [f.removeprefix("fix: ") for f in _fixes(refused)] == [f"{_script()} list"]
     assert not (definition_root / "worktrees/r").exists()
 
 
@@ -256,32 +255,27 @@ def test_a_plain_name_refuses_whatever_branch_the_repo_is_on(
     ],
     ids=["remote-only", "detached-no-work-branch"],
 )
-def test_a_plain_name_refuses_without_a_local_work_branch_with_the_list_fix(
+def test_a_plain_name_refuses_without_a_local_work_branch(
     root: Path, steps: tuple[tuple[str, ...], ...]
 ) -> None:
     repo = root / "repos/r"
     for step in steps:
         _git(repo, *step)
 
-    refused = _run(root, "new", "r", "maintenance")
-
-    _assert_plain_refused(root, refused)
-    run_fix(root, refused)
     _assert_plain_refused(root, _run(root, "new", "r", "maintenance"))
 
 
 def _assert_plain_refused(root: Path, refused: subprocess.CompletedProcess[str]) -> None:
-    """A one-segment name is no worktree name: refused with the `list` fix, nothing created, no base recorded."""
+    """A one-segment name is no worktree name: refused, nothing created, no base recorded."""
     repo = root / "repos/r"
     assert refused.returncode == 1
     assert "not a worktree name" in refused.stderr
-    assert [f.removeprefix("fix: ") for f in _fixes(refused)] == [f"{_script()} list"]
     assert not (root / "worktrees/r").exists()
     assert _git(repo, "branch", "--list", "wt/maintenance").strip() == ""
     assert "dadaia-base" not in _git(repo, "config", "--list")
 
 
-def test_two_work_branches_still_refuse_a_plain_name_with_the_list_fix(root: Path) -> None:
+def test_two_work_branches_still_refuse_a_plain_name(root: Path) -> None:
     repo = root / "repos/r"
     _git(repo, "checkout", "-q", "feature/0.5.0")
     _git(repo, "commit", "-q", "--allow-empty", "-m", "lower work")
@@ -311,7 +305,6 @@ def test_two_work_branches_still_refuse_a_plain_name_with_the_list_fix(root: Pat
 def test_an_old_grammar_or_foreign_name_refuses(root: Path, name: str) -> None:
     result = _run(root, "new", "r", name)
     assert result.returncode == 1 and not (root / "worktrees/r").exists()
-    assert [f.removeprefix("fix: ") for f in _fixes(result)] == [f"{_script()} list"]
     assert "0.5.0/rc-<N>/job-<n>/wt-main" in result.stderr  # the refusal teaches the hierarchy
 
 

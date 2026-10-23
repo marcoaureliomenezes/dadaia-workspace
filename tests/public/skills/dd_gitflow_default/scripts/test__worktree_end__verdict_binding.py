@@ -10,16 +10,13 @@ from __future__ import annotations
 
 import json
 import subprocess
-import sys
 from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.core.cli_line import shell_line
 from tests.helpers.oslib import write_text
 from tests.helpers.worktree_ws import (
     NEW_JOB,
-    SCRIPT,
     approve,
     commit,
     diff_hash,
@@ -199,6 +196,5 @@ def test_a_plain_name_is_refused_as_not_a_worktree_name(root: Path) -> None:
 
     assert refused.returncode == 1
     assert "[error] not a worktree name" in refused.stderr
-    assert fixes(refused) == [f"fix: {shell_line(sys.executable, str(SCRIPT))} list"]
     assert not (root / "worktrees/r/maintenance").exists()
     assert git(repo, "rev-parse", "feature/0.5.0").strip() == base
