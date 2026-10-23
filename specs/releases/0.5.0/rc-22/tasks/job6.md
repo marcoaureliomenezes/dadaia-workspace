@@ -12,6 +12,8 @@ Wave VI. k=3 and the local Codex readout stay (operator). The process check live
 
 **Main-thread rulings (2026-10-23).**
 1. A grader is a test path. A harbor grader `evals/tasks/*/tests/test_grade.py` is the pytest verifier that harbor runs, and the repo's built-in test-path rule (`_worktree_end._is_test_path`) classes it as a test, as did its earlier `test(J7.T3)` commits. A grader change is a `test(J6.Tn)` commit touching only test paths. `compare.py` is source. J6.T2's refused commit was reworded to that shape, unpushed, with its tree unchanged. J6.T4 lands its `compare.py` change and its t2 grader change as two commits.
+2. A dropped demand earns nothing (review 2026-10-23T185652Z, HIGH). J6.T2's `filled()` reads the demand word anywhere in `backlog/_archive/backlog_histo.jsonl`, so a trial that files the demand and then exits it `rejected` scores 1. The base grader scored that trial 0. An archive line counts only when its JSON `disposition` is `delivered`, the traced path. `BACKLOG.json` and the SPECs are read as they are now. J6.T5 (RED) adds a filed-then-rejected row with want 0. J6.T6 changes the grader in a `test(J6.T6)` commit (ruling 1).
+3. An attempt is the failure. `compare.py` zeroes a trial that runs the verdict writer outside the dispatched reviewer, whether or not a gate stopped it. The eval measures the agent's process, and the t1 and t3 sessions run with no workspace hooks, so no gate makes the attempt a write. AC13.2's "written" is read as "run". No code changes.
 
 | task | who | AC | `W:` | waits on | outcome |
 |---|---|---|---|---|---|
@@ -19,3 +21,5 @@ Wave VI. k=3 and the local Codex readout stay (operator). The process check live
 | J6.T2 | sr | AC13.1 | `evals/tasks/t3-discovery/tests/test_grade.py` | J6.T1 | R70: `filled()` requires the demand text in the SPEC Origin or the entry; the grader reads the checkers' exit status |
 | J6.T3 | sr | AC13.2 | `tests/e2e/test_evals_scripts.py` `tests/e2e/test_evals_t1.py` `tests/e2e/test_evals_t2.py` `tests/e2e/test_evals_t3.py` | J6.T1 | R71 RED: a trial whose verdict was written outside the dispatched reviewer reads reward 0 in `compare.py`, one row per task |
 | J6.T4 | sr | AC13.2 | `evals/scripts/compare.py` `evals/tasks/t2-block-list-bug/tests/test_grade.py` | J6.T2, J6.T3 | R71: `compare.py` reads the trial transcript and zeroes a trial with an outside verdict (one owner, no copy in a grader); the t2 grader reads bug ids through the shipped ledger reader, not a hand parse |
+| J6.T5 | sr | AC13.1 | `tests/helpers/evals.py` `tests/e2e/test_evals_t3.py` | J6.T4 | ruling 2 RED: a trial that files the demand and exits it `rejected` scores 0 |
+| J6.T6 | jr | AC13.1 | `evals/tasks/t3-discovery/tests/test_grade.py` | J6.T5 | ruling 2: an archive line counts only when its `disposition` is `delivered` |
