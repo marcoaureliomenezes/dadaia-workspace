@@ -6,7 +6,7 @@
 # dadaia-workspace — the map
 
 - Simplicity and lightness are the first law, never above an operator order, the test rule, or security and privacy. The lightest solution that works wins: every gate, step, file and line must earn its place, and a heavier option is chosen only when a lighter one was tried and failed.
-- One workspace folder; the agent session launches at its root, always.
+- One workspace folder; the agent session launches at its root, always. A session launched elsewhere loads no persona and no hook, so it stands in for no role (no subagent "as" a dd persona, no verdict); its next act is `Operator action: relaunch the session at the workspace root`, and the tree stays open until then.
 - Projects live in `repos/<slug>/`; governance (`AGENTS.md`, `.agents/`, `.dadaia/`) lives outside every repo.
 - A project is a **context**: one **main repo** (where `specs/` lives) plus **associated repos**; never a monorepo.
 - Two rule-file kinds exist: this map and the scoped `AGENTS.md` per governed area (Scoped law); nothing else is law.
