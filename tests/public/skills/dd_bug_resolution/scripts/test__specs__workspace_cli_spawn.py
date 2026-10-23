@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import io
 import json
+import shutil
 import subprocess
 import sys
 from collections.abc import Callable
@@ -178,3 +179,33 @@ def test_a_path_that_is_no_repository_starts_no_cli_of_the_workspace_it_is_run_f
     monkeypatch.setenv("DADAIA_FENCED_ROOTS", str(root))
     assert list(specs.context_repos(loose)) == [loose]
     assert not log.exists()
+
+
+def test_context_row_finds_a_checkout_by_the_path_the_workspace_keeps_it_at(
+    tmp_path: Path,
+) -> None:
+    """The repo registered as `r` lives at `repos/r`, whatever its real folder is called."""
+    specs = load_owner("dd-bug-resolution", "_specs")
+    root = _answering(tmp_path / "ws")
+    (real := tmp_path / "elsewhere/odd-name").parent.mkdir()
+    shutil.rmtree(root / "repos/r")
+    _init(real)
+    try:
+        (root / "repos/r").symlink_to(real, target_is_directory=True)
+    except OSError:
+        pytest.skip("symlinks unavailable")
+    assert (specs.context_row(root, real) or {}).get("name") == "c"
+
+
+def test_context_row_does_not_take_a_foreign_repo_named_like_a_slug(tmp_path: Path) -> None:
+    specs = load_owner("dd-bug-resolution", "_specs")
+    root = _answering(tmp_path / "ws")
+    _init(foreign := tmp_path / "foreign/r")
+    assert specs.context_row(root, foreign) is None
+
+
+def test_context_row_of_a_path_that_is_no_repository_names_no_owner(tmp_path: Path) -> None:
+    specs = load_owner("dd-bug-resolution", "_specs")
+    root = _answering(tmp_path / "ws")
+    (loose := tmp_path / "loose").mkdir()
+    assert specs.context_row(root, loose) is None
