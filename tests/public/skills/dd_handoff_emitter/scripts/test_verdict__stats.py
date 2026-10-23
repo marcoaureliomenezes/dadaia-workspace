@@ -100,7 +100,7 @@ def test_the_closure_commit_is_found_by_its_subject_when_the_stored_sha_is_orpha
 
 def test_a_vanished_closure_commit_is_never_zero(tmp_path: Path) -> None:
     _closed_candidate(tmp_path, closure_commit=False)
-    assert _metric_6(tmp_path) in (None, "n/a")
+    assert _metric_6(tmp_path) == "n/a (no closure commit)"
 
 
 def test_a_closure_commit_that_says_enters_closure_is_the_bound(tmp_path: Path) -> None:

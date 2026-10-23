@@ -159,7 +159,8 @@ def test_drift_memory_and_ship_pin_outputs_and_release_bytes(tmp_path: Path) -> 
     )
     assert (memory.returncode, memory.stdout, memory.stderr) == (
         0,
-        f"[ok] release 0.5.0 log <- kind memory {base}..{base[:12]} ({_NOW})\n",
+        f"[ok] release 0.5.0 log <- kind memory {base}..{base[:12]} ({_NOW})\n"
+        "commit subject: chore(release): rc-1 memory pass recorded\n",
         "",
     )
     assert state.read_bytes() == _bytes(remembered)
