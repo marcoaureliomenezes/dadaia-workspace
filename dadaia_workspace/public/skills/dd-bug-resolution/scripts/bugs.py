@@ -203,7 +203,7 @@ def _write(args: argparse.Namespace, specs: Path) -> int:
         if args.bug_id not in found:
             raise Refusal(
                 f"no commit of HEAD holds the line `fix(bugs): {args.bug_id} — …` or `refactor(bugs): {args.bug_id} — …`",
-                act("agent", f"commit the fix with the line `fix(bugs): {args.bug_id} — …` or `refactor(bugs): {args.bug_id} — REBUILD <unit>: …` (`specs/bugs/AGENTS.md` §2 says which) in its message, then resolve again"),
+                act("agent", f"commit the fix with the line `fix(bugs): {args.bug_id} — …` or `refactor(bugs): {args.bug_id} — REBUILD …` (`specs/bugs/AGENTS.md` §2 says which) in its message, then resolve again"),
             )  # fmt: skip
         _, sha = found[args.bug_id]
         values["fix_sha"] = sha
