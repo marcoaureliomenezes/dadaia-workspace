@@ -361,7 +361,7 @@ def test_session_check_passes_a_governed_session_and_refuses_the_rest(
         pytest.param({"CLAUDE_CODE_SESSION_ID": "sess_nohook"}, "sess_nohook", False, 1, id="claude-no-record-refused"),
         pytest.param({"CLAUDE_CODE_SESSION_ID": "sess_hooked"}, "sess_hooked", True, 0, id="claude-after-heartbeat-binds"),
         pytest.param({"DADAIA_SESSION_ID": "sess_operator"}, "sess_operator", False, 0, id="operator-terminal-binds"),
-        pytest.param({"CODEX_THREAD_ID": "codex-thread"}, "codex-thread", False, 0, id="codex-binds"),
+        pytest.param({"CODEX_THREAD_ID": "codex-thread"}, "codex-thread", True, 0, id="codex-binds"),
         pytest.param({"CODEX_SESSION_ID": "codex-nohook"}, "codex-nohook", False, 1, id="codex-no-record-refused"),
         pytest.param({"CODEX_SESSION_ID": "codex-hooked"}, "codex-hooked", True, 0, id="codex-after-heartbeat-binds"),
     ],
