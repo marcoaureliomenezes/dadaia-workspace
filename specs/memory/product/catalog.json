@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-24T18:35:00Z",
+  "generated_at": "2026-10-24T18:38:02Z",
   "features": [
     {
       "rank": 1,
@@ -97,7 +97,7 @@
       "slug": "agent-evals",
       "title": "agent-evals",
       "area": "distribution",
-      "tldr": "The library's own agent evals — three graded tasks run on the candidate wheel by Claude Code and Codex, and the Eval gate that makes a green run the deploy gate.",
+      "tldr": "The library's own agent evals — three graded tasks run on the candidate wheel by Claude Code and Codex; a green run is the deploy gate.",
       "summary": "evals/ holds a cold-onboarding task, a block-list-bug task and a discovery task, each graded by a script on the state the agent leaves; .github/workflows/eval.yml builds the candidate wheel once, runs each task three times per harness in its own leg, scans every upload for secrets and account ids, and blocks when any (harness, task) falls below its floor; the Eval gate check on a PR into main passes only with a green run on a commit whose diff to the head is release bookkeeping.",
       "path": "specs/memory/product/distribution/agent-evals.md",
       "tags": [
@@ -106,7 +106,7 @@
         "release-gate",
         "distribution"
       ],
-      "token_estimate": 1256,
+      "token_estimate": 1260,
       "depends_on": [
         "pypi-distribution",
         "QUALITY",

@@ -583,7 +583,7 @@ open unless the operator authorizes that exact id and the authorization is recor
 
 | slug | title | tldr |
 |------|-------|------|
-| `agent-evals` | agent-evals | The library's own agent evals — three graded tasks run on the candidate wheel by Claude Code and Codex, and the Eval gate that makes a green run the deploy gate. |
+| `agent-evals` | agent-evals | The library's own agent evals — three graded tasks run on the candidate wheel by Claude Code and Codex; a green run is the deploy gate. |
 | `public-asset-distribution` | public-asset-distribution | Public install stages packaged assets and projects shared law, agents, skills and every registered harness; public doctor reports projection drift. |
 | `pypi-distribution` | pypi-distribution | The PyPI package on one version axis, two console-script names, the OIDC pipeline, the wheel contract and the derived docs. |
 
