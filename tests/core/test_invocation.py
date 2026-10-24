@@ -117,21 +117,48 @@ def test_resolve_session_id_precedence(env: dict[str, str], expected: str) -> No
     assert invocation.resolve_session_id(env) == expected
 
 
+_CODEX = {"DADAIA_RUNTIME": "codex"}
+
+
 @pytest.mark.parametrize(
     ("env", "payload_id", "expected"),
     [
-        pytest.param({}, "pay-1", "pay-1", id="payload_when_env_has_none"),
-        pytest.param({_CLAUDE: "env-1"}, "pay-1", "env-1", id="env_wins_over_payload"),
-        pytest.param({"CODEX_THREAD_ID": "t-1"}, "pay-1", "t-1", id="codex_env_wins_over_payload"),
-        pytest.param({"DADAIA_SESSION_ID": "own-1"}, "pay-1", "own-1", id="override_wins_over_payload"),
-        pytest.param({}, "../pay/1", "pay1", id="payload_is_sanitized"),
-        pytest.param({}, "", "", id="empty_payload_resolves_nothing"),
+        pytest.param(_CODEX, "pay-1", "pay-1", id="payload_counts_where_the_harness_shell_carries_it"),
+        pytest.param({"DADAIA_RUNTIME": "kimi-code"}, "pay-1", "", id="payload_dropped_when_the_row_has_no_session_env"),
+        pytest.param({}, "pay-1", "", id="payload_dropped_without_a_runtime"),
+        pytest.param({"DADAIA_RUNTIME": "no-such-harness"}, "pay-1", "", id="payload_dropped_for_an_unknown_runtime"),
+        pytest.param({**_CODEX, _CLAUDE: "env-1"}, "pay-1", "env-1", id="env_wins_over_payload"),
+        pytest.param({**_CODEX, "CODEX_THREAD_ID": "t-1"}, "pay-1", "t-1", id="codex_env_wins_over_payload"),
+        pytest.param({**_CODEX, "DADAIA_SESSION_ID": "own-1"}, "pay-1", "own-1", id="override_wins_over_payload"),
+        pytest.param(_CODEX, "../pay/1", "pay1", id="payload_is_sanitized"),
+        pytest.param(_CODEX, "", "", id="empty_payload_resolves_nothing"),
+        pytest.param(_CODEX, 42, "", id="non_string_payload_resolves_nothing"),
+        pytest.param({}, 42, "", id="non_string_payload_without_runtime_resolves_nothing"),
     ],
 )  # fmt: skip
 def test_resolve_session_id_takes_the_payload_id_last(
-    env: dict[str, str], payload_id: str, expected: str
+    env: dict[str, str], payload_id: object, expected: str
 ) -> None:
-    assert invocation.resolve_session_id(env, payload_id) == expected
+    assert invocation.resolve_session_id(env, payload_id) == expected  # type: ignore[arg-type]
+
+
+def test_resolve_carries_the_payload_id_to_the_session_and_its_bind(tmp_path: Path) -> None:
+    """One call, one id: the payload id of a Codex hook names the session and finds its record."""
+    ws = _mk_ws(tmp_path, _ctx("proj"))
+    record = session_store.new_binding_record(
+        session_id="pay-1",
+        context="proj",
+        runtime="codex",
+        pid=1,
+        now=datetime.now(UTC).isoformat(),
+    )
+    session_store.write_session(ws, "pay-1", record)
+
+    inv = invocation.resolve(env=_CODEX, cwd=ws, payload_id="pay-1")
+
+    assert inv.session_id == "pay-1"
+    assert inv.bind.context_name == "proj"
+    assert invocation.resolve(env={}, cwd=ws, payload_id="pay-1").session_id is None
 
 
 def test_context_name_for_repo_slug_maps_main_associated_and_legacy_repo_field(

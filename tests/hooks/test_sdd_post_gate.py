@@ -16,7 +16,12 @@ import pytest
 
 from dadaia_workspace.core import session_store
 from dadaia_workspace.core.skill_owner import load_owner
-from tests.fixtures.harness_env import claude_hook_env, kimi_hook_env, run_hook_subprocess
+from tests.fixtures.harness_env import (
+    claude_hook_env,
+    codex_hook_env,
+    kimi_hook_env,
+    run_hook_subprocess,
+)
 from tests.helpers.oslib import read_text, write_text
 
 STATUS_LINE = load_owner("dd-bug-resolution", "_grammar").STATUS_RE
@@ -168,29 +173,51 @@ def test_the_first_post_tool_use_of_an_unrecorded_session_leaves_a_live_record(
     assert "context" not in record and "bind_id" not in record
 
 
+def _post_tool_use(ws: Path, env: dict[str, str], session_id: object) -> int:
+    result = run_hook_subprocess(
+        "sdd_post_gate",
+        {"session_id": session_id, "tool_name": "Bash", "tool_input": {"command": "ls"}},
+        env,
+    )
+    return result.returncode
+
+
 @pytest.mark.medium
 @pytest.mark.parametrize(
     ("payload_id", "recorded"),
     [("codex-payload-sess", "codex-payload-sess"), ("../pay/1", "pay1")],
     ids=["plain", "traversal-sanitized"],
 )
-def test_a_post_tool_use_with_no_env_session_id_records_the_payload_session(
+def test_a_codex_post_tool_use_records_the_payload_session(
     tmp_path: Path, payload_id: str, recorded: str
 ) -> None:
     ws = _mk_hook_workspace(tmp_path)
 
-    result = run_hook_subprocess(
-        "sdd_post_gate",
-        {"session_id": payload_id, "tool_name": "Bash", "tool_input": {"command": "ls"}},
-        kimi_hook_env(ws),
-    )
+    assert _post_tool_use(ws, codex_hook_env(ws), payload_id) == 0
 
-    assert result.returncode == 0, result.stderr
     record = session_store.live_session(ws, recorded)
     assert record is not None and record["session_id"] == recorded
     assert sorted(p.name for p in (ws / ".dadaia" / "sessions").glob("*.json")) == [
         f"{recorded}.json"
     ]
+
+
+@pytest.mark.medium
+@pytest.mark.parametrize(
+    ("env_extra", "session_id"),
+    [
+        pytest.param({"DADAIA_RUNTIME": "kimi-code"}, "kimi-sess", id="kimi-payload-id-only"),
+        pytest.param({"DADAIA_RUNTIME": "codex"}, 42, id="non-string-payload-id"),
+    ],
+)
+def test_a_post_tool_use_whose_payload_id_counts_for_nothing_exits_0_and_leaves_no_record(
+    tmp_path: Path, env_extra: dict[str, str], session_id: object
+) -> None:
+    ws = _mk_hook_workspace(tmp_path)
+
+    assert _post_tool_use(ws, kimi_hook_env(ws, extra=env_extra), session_id) == 0
+
+    assert not list((ws / ".dadaia" / "sessions").glob("*.json"))
 
 
 @pytest.mark.medium

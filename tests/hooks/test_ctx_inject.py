@@ -16,7 +16,12 @@ from typing import Any
 import pytest
 
 from dadaia_workspace.core import clock, session_store
-from tests.fixtures.harness_env import claude_hook_env, kimi_hook_env, run_hook_subprocess
+from tests.fixtures.harness_env import (
+    claude_hook_env,
+    codex_hook_env,
+    kimi_hook_env,
+    run_hook_subprocess,
+)
 from tests.helpers.oslib import read_text, run, write_text
 from tests.helpers.oslib import run as os_run
 from tests.helpers.oslib import write_text as os_write_text
@@ -319,12 +324,12 @@ def test_the_first_event_of_an_unrecorded_session_leaves_a_live_record(
     [("codex-payload-sess", "codex-payload-sess"), ("../pay/1", "pay1")],
     ids=["plain", "traversal-sanitized"],
 )
-def test_a_prompt_with_no_env_session_id_records_the_payload_session(
+def test_a_codex_prompt_records_the_payload_session(
     tmp_path: Path, payload_id: str, recorded: str
 ) -> None:
     _ws(tmp_path, {"name": "alpha"})
 
-    result = run_hook_subprocess("ctx_inject", {"session_id": payload_id}, kimi_hook_env(tmp_path))
+    result = run_hook_subprocess("ctx_inject", {"session_id": payload_id}, codex_hook_env(tmp_path))
 
     assert result.returncode == 0, result.stderr
     record = session_store.live_session(tmp_path, recorded)
@@ -332,6 +337,37 @@ def test_a_prompt_with_no_env_session_id_records_the_payload_session(
     assert sorted(p.name for p in (tmp_path / ".dadaia" / "sessions").glob("*.json")) == [
         f"{recorded}.json"
     ]
+
+
+@pytest.mark.parametrize("event", [None, "SessionStart"], ids=["prompt", "session-start"])
+def test_a_codex_session_bound_under_its_payload_id_is_injected_and_never_told_to_bind(
+    tmp_path: Path, event: str | None
+) -> None:
+    """The env carries no Codex id: heartbeat, Bind and next step all read the payload's."""
+    _ws(tmp_path, {"name": "alpha"})
+    _bind(tmp_path, "cx-sess", "alpha")
+    env = codex_hook_env(tmp_path, extra={"DADAIA_HOOK_EVENT": event} if event else None)
+
+    result = run_hook_subprocess("ctx_inject", {"session_id": "cx-sess"}, env)
+
+    assert result.returncode == 0, result.stderr
+    assert _A in result.stdout and "Python 3.12" in result.stdout, result.stdout
+    assert "context bind" not in result.stdout
+
+
+def test_a_kimi_prompt_with_only_a_payload_id_leaves_no_record_and_no_bind_step(
+    tmp_path: Path,
+) -> None:
+    """Kimi's shell carries no id, so its payload id binds nothing and `context bind` is no step."""
+    _ws(tmp_path, {"name": "alpha"})
+    env = kimi_hook_env(tmp_path, extra={"DADAIA_RUNTIME": "kimi-code"})
+
+    result = run_hook_subprocess("ctx_inject", {"session_id": "kimi-sess"}, env)
+
+    assert result.returncode == 0, result.stderr
+    assert _UNBOUND in result.stdout
+    assert "context bind" not in result.stdout
+    assert not list((tmp_path / ".dadaia" / "sessions").glob("*.json"))
 
 
 def test_env_override_injects_context_memory(tmp_path: Path) -> None:

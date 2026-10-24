@@ -13,8 +13,9 @@ hook can rely on is whatever the *operator's shell* exported (``DADAIA_CONTEXT``
 documented operator-shell convenience var). In particular the harness never sets:
 
 - ``DADAIA_SESSION_ID`` — the dadaia hooks resolve session identity from the harness's
-  *native* id var (``CLAUDE_CODE_SESSION_ID`` / ``CODEX_SESSION_ID``)
-  (``dadaia_workspace/core/invocation.py:resolve_session_id``, env only). ``DADAIA_SESSION_ID`` is an
+  *native* id var (``CLAUDE_CODE_SESSION_ID``) or, for a harness whose shell carries the same
+  id (Codex), the hook payload's ``session_id``
+  (``dadaia_workspace/core/invocation.py:resolve_session_id``). ``DADAIA_SESSION_ID`` is an
   *operator override only*, never a harness-supplied value.
 - ``DADAIA_PERSONA`` / ``*_AGENT_PERSONA`` — no harness exposes the dispatched persona to
   a hook subprocess. Tests must never plant it.
@@ -26,8 +27,8 @@ Verification source: ``dadaia_workspace/hooks/{sdd_gate,sdd_post_gate,ctx_inject
 existing real-harness subprocess test ``tests/integration/gate/test_path_scope.py`` (which
 already strips ``DADAIA_SESSION_ID`` / ``*_AGENT_PERSONA`` before invoking the gate). The
 env returned here is **pinned-minimal**: a clean base (operator shell *without* any leaked
-``DADAIA_*``/persona/mode vars) plus ``PWD`` (the session cwd) and the one native session-id var
-the named harness provides.
+``DADAIA_*``/persona/mode vars) plus ``PWD`` (the session cwd) and, for Claude Code, its one native
+session-id var; Codex and Kimi deliver the id in the payload only.
 
 Usage
 -----
@@ -66,7 +67,6 @@ from tests.helpers import oslib
 __all__ = [
     "ALLOWLISTED_DADAIA_ENV",
     "CLAUDE_SESSION_ENV_VAR",
-    "CODEX_SESSION_ENV_VAR",
     "HARNESS_CONTROL_DADAIA_ENV",
     "HOOK_MODULES",
     "HookResult",
@@ -84,9 +84,6 @@ __all__ = [
 
 #: The native session-id env var Claude Code provides to a hook subprocess.
 CLAUDE_SESSION_ENV_VAR: Final[str] = "CLAUDE_CODE_SESSION_ID"
-
-#: The native session-id env var Codex provides to a hook subprocess.
-CODEX_SESSION_ENV_VAR: Final[str] = "CODEX_SESSION_ID"
 
 #: The suite's own ``DADAIA_*`` knobs, kept by :func:`suite_env`: the fence (tests/conftest.py)
 #: and CI's E2E switch (read at import by test_onboarding_journey).
@@ -265,21 +262,16 @@ def claude_hook_env(
 def codex_hook_env(
     workspace: Path,
     *,
-    session_id: str = "codex-sess-1",
     extra: dict[str, str] | None = None,
 ) -> dict[str, str]:
     """Pinned-minimal env a real Codex hook subprocess receives.
 
-    Contains the operator shell (scrubbed of harness-never-set vars), ``PWD``,
-    and ``CODEX_SESSION_ID``. ``extra`` may add operator-shell vars (e.g.
-    ``DADAIA_CONTEXT``); a non-allowlisted ``DADAIA_*`` in ``extra`` raises ``ValueError``.
+    A Codex hook env carries no session id (neither ``CODEX_SESSION_ID`` nor
+    ``CODEX_THREAD_ID``): the id travels in the stdin payload, and the hook wrapper exports
+    ``DADAIA_RUNTIME=codex``. ``extra`` may add operator-shell vars (e.g. ``DADAIA_CONTEXT``);
+    a non-allowlisted ``DADAIA_*`` in ``extra`` raises ``ValueError``.
     """
-    return _harness_env(
-        workspace,
-        session_env_var=CODEX_SESSION_ENV_VAR,
-        session_id=session_id,
-        extra=extra,
-    )
+    return kimi_hook_env(workspace, extra={"DADAIA_RUNTIME": "codex", **(extra or {})})
 
 
 def kimi_hook_env(
@@ -291,7 +283,8 @@ def kimi_hook_env(
 
     Kimi Code delivers **no native session-id env var** to a hook process — the session
     id travels exclusively in the stdin JSON payload (``session_id`` field), which
-    ``core/invocation.resolve_session_id`` never reads (env only). The env is therefore the scrubbed
+    ``core/invocation.resolve_session_id`` counts only for a harness whose shell carries the same
+    id, which Kimi's does not. The env is therefore the scrubbed
     operator shell plus ``PWD`` only; ``extra`` may add the shim-exported
     wiring vars (``DADAIA_RUNTIME``/``DADAIA_HOOK_EVENT``) or operator-shell vars — a
     non-allowlisted ``DADAIA_*`` raises ``ValueError``.

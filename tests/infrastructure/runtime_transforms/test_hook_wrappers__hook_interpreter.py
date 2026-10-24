@@ -231,11 +231,17 @@ def test_kimi_on_windows_gets_a_cmd_wrapper_whose_literal_is_pinned() -> None:
     assert "echo dadaia: no workspace venv at %ROOT%\\.dadaia\\.venv - the gate is off.\r\n" in told
 
 
-@pytest.mark.parametrize("harness", sorted(HARNESS_RECORDS))
-def test_every_pre_gate_wrapper_names_its_harness_to_the_gate(harness: str) -> None:
-    """The gate finds its harness record by the label its own wrapper exports."""
-    record = HARNESS_RECORDS[harness]
-    body = hook_wrapper_contents(record, Capabilities.detect("linux"))[wrapper_name(record, "pre-gate")]  # fmt: skip
+_LANE_WRAPPERS = [
+    pytest.param(harness, name, id=name)
+    for harness, record in sorted(HARNESS_RECORDS.items())
+    for name in sorted(hook_wrapper_contents(record, Capabilities.detect("linux")))
+]
+
+
+@pytest.mark.parametrize(("harness", "name"), _LANE_WRAPPERS)
+def test_every_lane_wrapper_names_its_harness_to_the_hook(harness: str, name: str) -> None:
+    """A hook finds its harness record by the label its own wrapper exports, on every lane."""
+    body = hook_wrapper_contents(HARNESS_RECORDS[harness], Capabilities.detect("linux"))[name]
     assert f'DADAIA_RUNTIME="{harness}"\nexport DADAIA_RUNTIME\n' in body
 
 
