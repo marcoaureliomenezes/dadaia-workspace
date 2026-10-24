@@ -136,9 +136,8 @@ jobs:
         id: compare
         run: python3 evals/scripts/compare.py "evals/jobs/$HARNESS/$TASK" "$TASK" > evals/summary.md
         continue-on-error: true
-      # The raw rollouts hold account ids; compare.py has already read them for the forged check.
-      - if: matrix.harness == 'codex'
-        run: find "evals/jobs/$HARNESS/$TASK" -type d -path '*/agent/sessions' -prune -exec rm -rf {} +
+      # The raw rollouts hold account ids and the signed config of either harness; compare.py has already read them.
+      - run: find "evals/jobs/$HARNESS/$TASK" -type d -path '*/agent/sessions' -prune -exec rm -rf {} +
       - run: python3 evals/scripts/scan.py evals/jobs evals/summary.md
       - run: cat evals/summary.md >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1

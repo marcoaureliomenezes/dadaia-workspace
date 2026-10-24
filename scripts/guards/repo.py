@@ -52,6 +52,7 @@ _EVAL_TRIGGERS = {"workflow_dispatch", "schedule"}
 _HOSTED = {"ubuntu-latest", "ubuntu-24.04", "ubuntu-22.04", "windows-latest", "windows-2025",
            "windows-2022", "macos-latest", "macos-15", "macos-14"}  # fmt: skip
 _SCAN = "python3 evals/scripts/scan.py evals/jobs evals/summary.md"
+_PRUNE_TAIL = "-type d -path '*/agent/sessions' -prune -exec rm -rf {} +"  # the harness config dir
 _SUMMARY = 'cat evals/summary.md >> "$GITHUB_STEP_SUMMARY"'
 _UPLOADED = {"evals/jobs/", "evals/summary.md"}  # what the scan covers
 _ACTIONS = ("actions/checkout@", "actions/upload-artifact@", "actions/download-artifact@")
@@ -285,6 +286,10 @@ def _eval_publish(job: dict[str, Any]) -> list[str]:
     shapes = {
         "summary-unscanned": any(_publishes(s, free) for s in steps) and not scans,
         "upload-before-scan": bool(pub and scans) and pub[0] < scan,
+        "sessions-unpruned": any("harbor run" in str(s.get("run")) for s in steps)
+        and not any(
+            len(s) == 1 and str(s["run"]).endswith(_PRUNE_TAIL) for s in steps[:scan] if "run" in s
+        ),
         **_scan_rules(steps),
     }
     return _hits(shapes, _EVAL) + [f"{r}: {_EVAL}" for r in rules if r]
