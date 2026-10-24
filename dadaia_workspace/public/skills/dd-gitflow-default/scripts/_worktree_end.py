@@ -337,15 +337,14 @@ def _refuse_denylisted(root: Path, tree: Path, onto: str) -> None:
     _relay("the denylist scan", cli(root, "ci", "push-gate-check", "--onto", onto, tree=tree), tree)  # fmt: skip
 
 
-def _series(tree: Path, work: str, tip: str) -> list[tuple[str, str]]:
-    """(patch-id, full message) per commit of *work*..*tip*, oldest first, keyed by commit id:
+def _series(tree: Path, *rng: str) -> list[tuple[str, str]]:
+    """(patch-id, full message) per commit of the log range *rng*, oldest first, keyed by commit id:
     an empty commit has no patch-id (""); a changed one without a patch-id never matches."""
-    rng = f"{work}..{tip}"
-    patch = git(tree, "log", "-p", "--no-color", "--no-ext-diff", "--format=commit %H", rng)
+    patch = git(tree, "log", "-p", "--no-color", "--no-ext-diff", "--format=commit %H", *rng)
     pids = git(tree, "patch-id", "--stable", input=patch).split()
     ids = dict(zip(pids[1::2], pids[::2], strict=True))
-    changed = set(git(tree, "log", "--format=%H", rng, "--", ".").split())
-    logs = git(tree, "log", "--reverse", "--no-show-signature", "--format=%H%n%B%x00", rng)
+    changed = set(git(tree, "log", "--format=%H", *rng, "--", ".").split())
+    logs = git(tree, "log", "--reverse", "--no-show-signature", "--format=%H%n%B%x00", *rng)
     return [
         (ids.get(c, f"unmatched {c}" if c in changed else ""), msg)
         for c, _, msg in (x.lstrip("\n").partition("\n") for x in logs.split("\0")[:-1])
@@ -379,12 +378,15 @@ def _dispatch(tree: Path, at: str) -> str:
 def _check_approved(root: Path, tree: Path, work: str, name: str) -> None:
     """The newest reviewer handoffs naming a candidate sha decide: each must be a valid APPROVED
     whose `diff_sha256` is HEAD's. A candidate is HEAD or a sha of this branch's reflog whose
-    (patch-id, message) series over *work* equals HEAD's; newest is `produced_at`, a missing or
+    last len(HEAD's series) commits equal HEAD's (patch-id, message) series, so a parent rewritten
+    by sync does not widen it; newest is `produced_at`, a missing or
     naive one ranks newest, and ties all decide."""
     head = git(tree, "rev-parse", "HEAD").strip()
-    mine = _series(tree, work, head)
+    mine = _series(tree, f"{work}..{head}")
     reflog = {head, *git(tree, "reflog", "--format=%H", branch(name), check=False).split()}
-    named = _reviews(root, {x for x in reflog if x == head or _series(tree, work, x) == mine})
+    named = _reviews(
+        root, {x for x in reflog if x == head or _series(tree, "-n", str(len(mine)), x) == mine}
+    )
     top = max((row[:2] for row in named), default=None)
     decided = sorted(row for row in named if row[:2] == top)
     invalid = next(
