@@ -350,6 +350,7 @@ def bind(name: str = typer.Argument(..., help="Context name to bind to")) -> Non
                 "before opening the session",
             ),
         )
+    _require_governed(workspace_root)
     _sessions_dir(workspace_root).mkdir(parents=True, exist_ok=True)
     session_store.write_session(
         workspace_root,
@@ -365,14 +366,18 @@ def bind(name: str = typer.Argument(..., help="Context name to bind to")) -> Non
     console.print(f"[green]✓[/green] Bound to '[bold]{name}[/bold]' (session id: {session_id})")
 
 
-@app.command(name="session-check")
-def session_check() -> None:
-    """Exit 0 when no workspace hook is bypassed: an operator terminal or a session with a live record."""
-    if not governed(resolve_workspace_root(), os.environ):
+def _require_governed(workspace_root: Path) -> None:
+    if not governed(workspace_root, os.environ):
         fail(
             "No workspace hook governs this session.",
             act("operator", "relaunch the session at the workspace root"),
         )
+
+
+@app.command(name="session-check")
+def session_check() -> None:
+    """Exit 0 when no workspace hook is bypassed: an operator terminal or a session with a live record."""
+    _require_governed(resolve_workspace_root())
 
 
 # ------------------------------------------------------------------ context repo
