@@ -24,6 +24,7 @@ from _handoffs import REVIEWER, reviewer_records
 from _jsonl import reinstall_fix
 from _platform import act, command, git_inline, git_line, inline, run, venv_dir, venv_tool
 from _refusal import relay, without_fix
+from _specs import require_governed
 from _worktree_git import (
     cli,
     cli_words,
@@ -459,6 +460,7 @@ def _on_target(into: Path, onto: str) -> None:
 
 
 def merge(root: Path, path: str, keep: list[str], drop: bool) -> str:
+    require_governed(root)
     repo, tree, name, onto = target(root, path)
     ref = branch(name)
     if not tree.exists() and not git(repo, "branch", "--list", ref).strip():

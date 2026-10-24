@@ -14,6 +14,7 @@ from dadaia_workspace import container
 from dadaia_workspace.cli._fail import fail
 from dadaia_workspace.cli._specs_resolution import (
     alive_context_trees,
+    governed,
     own_bind_for_cli,
     resolve_session_id,
 )
@@ -362,6 +363,16 @@ def bind(name: str = typer.Argument(..., help="Context name to bind to")) -> Non
         ),
     )
     console.print(f"[green]✓[/green] Bound to '[bold]{name}[/bold]' (session id: {session_id})")
+
+
+@app.command(name="session-check")
+def session_check() -> None:
+    """Exit 0 when no workspace hook is bypassed: an operator terminal or a session with a live record."""
+    if not governed(resolve_workspace_root(), os.environ):
+        fail(
+            "No workspace hook governs this session.",
+            act("operator", "relaunch the session at the workspace root"),
+        )
 
 
 # ------------------------------------------------------------------ context repo

@@ -60,6 +60,12 @@ def run_cli(
         raise Refusal(f"the workspace CLI cannot start: {error}", reinstall_fix(root)) from error
 
 
+def require_governed(root: Path) -> None:
+    """Raises `Refusal` with the CLI's own fix when a workspace hook does not govern this call's session."""
+    done = run_cli(root, "context", "session-check", env=scrubbed_env(), stdin=subprocess.DEVNULL)
+    relay(done, "no workspace hook governs this session", reinstall_fix(root))
+
+
 def context_row(root: Path, repo: Path) -> dict[str, Any] | None:
     """The `context list --json` row owning *repo* (main or associated; a checkout or a worktree of it), or None when no context owns it or *repo* is no repository.
     Raises `Refusal` with the CLI's own fix when the CLI fails; rows it cannot read name no owner. A registry read: the fence is lifted for *root* only."""

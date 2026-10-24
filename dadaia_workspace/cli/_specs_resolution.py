@@ -22,6 +22,7 @@ from dadaia_workspace.core.invocation import (
     HARNESS_SESSION_ID_ENV_VARS as _HARNESS_SESSION_ID_ENV_VARS,
 )
 from dadaia_workspace.core.invocation import alive_context_trees as _alive_context_trees
+from dadaia_workspace.core.invocation import governed as _governed
 from dadaia_workspace.core.invocation import repo_owner as _repo_owner
 from dadaia_workspace.core.invocation import resolve as _resolve_invocation
 from dadaia_workspace.core.invocation import (
@@ -38,6 +39,7 @@ HARNESS_SESSION_ID_ENV_VARS = _HARNESS_SESSION_ID_ENV_VARS
 resolve_session_id = _resolve_session_id
 alive_context_trees = _alive_context_trees
 repo_owner = _repo_owner
+governed = _governed
 scope = _scope
 
 

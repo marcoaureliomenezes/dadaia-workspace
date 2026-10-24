@@ -25,7 +25,7 @@ from _grammar import CONTEXT_NAME_RE
 from _handoffs import REVIEWER
 from _platform import act, run, use_utf8_stdio, write_text
 from _refusal import Refusal, fix_of, report
-from _specs import find_specs, run_cli
+from _specs import find_specs, require_governed, run_cli
 from _stats import table as _stats_table
 
 _WORKTREE = Path(__file__).resolve().parents[2] / "dd-gitflow-default" / "scripts" / "worktree.py"
@@ -113,6 +113,8 @@ def _run(argv: list[str]) -> int:
                 act("agent", f"pass a {name} matching that pattern, then rerun verdict.py"),
             )
     tree = Path(args.path).resolve()
+    if (home := _root.workspace_of(tree, Path.cwd())) is not None:
+        require_governed(home)
     body = _body(sys.stdin.read())
     done = run([sys.executable, str(_WORKTREE), "hash", str(tree), "--sha", args.sha])
     if done.returncode:

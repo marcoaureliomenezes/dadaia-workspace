@@ -30,6 +30,7 @@ __all__ = [
     "Zone",
     "all_repos",
     "alive_context_trees",
+    "governed",
     "context_name_for_repo_slug",
     "repo_owner",
     "repo_slug_for_context",
@@ -89,6 +90,13 @@ def resolve_session_id(env: Mapping[str, str]) -> str:
         filter(None, map(env.get, HARNESS_SESSION_ID_ENV_VARS)), ""
     )
     return sanitize_session_id(candidate)
+
+
+def governed(root: Path, env: Mapping[str, str]) -> bool:
+    """True when the caller is an operator terminal (no session id) or a session whose hooks
+    left a live record under *root*: the one test of "a workspace hook governs this call"."""
+    session_id = resolve_session_id(env)
+    return not session_id or live_session(root, session_id) is not None
 
 
 def _alive(entry: dict[str, object]) -> bool:
