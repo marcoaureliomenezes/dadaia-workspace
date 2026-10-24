@@ -152,7 +152,7 @@ def test_push_event_run_fails(tmp_path: Path) -> None:
 
 def test_older_good_run_passes_behind_a_newer_failed_run(tmp_path: Path) -> None:
     repo, e = _fixture(tmp_path)
-    later = _commit(repo, {"src/mod.py": "A = 2\n"})
+    later = _commit(repo, {"CHANGELOG.md": "# log\n\nfirst\n"})
     head = _allowed_head(repo)
     runs = [_run(later, conclusion="failure"), _run(e)]
     code, out = _gate(tmp_path, repo, runs, head)
