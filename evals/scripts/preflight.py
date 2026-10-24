@@ -1,6 +1,5 @@
-"""Exit 0 when the named env secret is non-empty (and parses as JSON for codex); otherwise
-print one ::error:: line naming the harness, the secret's name and the reseed doc. Never
-prints a value."""
+"""Exit 0 when $SCAN_SECRET is non-empty (and parses as JSON for codex); otherwise print one
+::error:: line naming the harness, the secret's name and the reseed doc. Never prints a value."""
 
 import json
 import os
@@ -20,7 +19,7 @@ def _valid(harness, value):
 
 
 def main(harness, name):
-    if _valid(harness, os.environ.get(name, "")):
+    if _valid(harness, os.environ.get("SCAN_SECRET", "")):
         return 0
     print(f"::error::{harness} secret {name} is empty or invalid; see evals/RESEED.md")
     return 1

@@ -10,9 +10,9 @@ from pathlib import Path
 
 # ponytail: plain-text match only; misses base64, UTF-16, archives and symlinked dirs.
 SHAPES = [
-    r"sk-[\w-]{20,}",  # Anthropic token and OpenAI key shapes
-    r"eyJ[\w-]+\.eyJ[\w-]+\.[\w-]+",  # JWT
-    r"creator_(?:user|account)_id\"\s*:\s*\"[^\"]+\"",
+    r"\bsk-[\w-]{20,}",  # Anthropic token and OpenAI key shapes
+    r"\beyJ[\w-]+\.eyJ[\w-]+\.[\w-]+",  # JWT
+    r"\bcreator_(?:user|account)_id\\?\"\s*:\s*\\?\"[^\"\\]+",  # plain or inside a JSON string
 ]
 
 
