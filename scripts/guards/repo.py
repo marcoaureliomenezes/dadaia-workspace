@@ -225,16 +225,12 @@ def _paths(step: dict[str, Any]) -> set[str]:
     return set(str((step.get("with") or {}).get("path", "")).split())
 
 
-def _publishes(step: dict[str, Any]) -> bool:
+def _publishes(step: dict[str, Any], secret_free: bool) -> bool:
+    """A step that writes the step summary or uploads anything; the wheel handed to the eval
+    job is no publish only in a secret-free job."""
     return "GITHUB_STEP_SUMMARY" in str(step.get("run")) or (
-        str(step.get("uses")).startswith(_ACTIONS[1]) and _paths(step) != {_WHEEL}
-    )
-
-
-def _publishing(step: dict[str, Any]) -> bool:
-    """A step that writes the step summary, or uploads what the scan covers."""
-    return "GITHUB_STEP_SUMMARY" in str(step.get("run")) or (
-        str(step.get("uses")).startswith(_ACTIONS[1]) and bool(_paths(step) & _UPLOADED)
+        str(step.get("uses")).startswith(_ACTIONS[1])
+        and not (secret_free and _paths(step) == {_WHEEL})
     )
 
 
@@ -255,8 +251,7 @@ def _publish_step(step: dict[str, Any]) -> str | None:
         return _publish_if(step)
     if "run" in step and step != {"run": _SUMMARY}:
         return "summary-step-extra-key" if step["run"] == _SUMMARY else "summary-other-source"
-    paths = str((step.get("with") or {}).get("path", "")).split()
-    return None if "run" in step or set(paths) <= _UPLOADED else "upload-other-path"
+    return None if "run" in step or _paths(step) <= _UPLOADED else "upload-other-path"
 
 
 def _write_rule(before_first_publish: bool) -> str:
@@ -278,16 +273,17 @@ def _eval_publish(job: dict[str, Any]) -> list[str]:
     """Clause (c): after the canonical scan, only publishing steps up to the last one, each
     unconditional and uploading only what the scan covers."""
     steps = job.get("steps") or []
-    pub = [i for i, s in enumerate(steps) if _publishes(s)]
+    free = not _secret_use(job) and "environment" not in job
+    pub = [i for i, s in enumerate(steps) if _publishes(s, free)]
     scans = [i for i, s in enumerate(steps) if s.get("run") == _SCAN and len(s) == 1]
     scan = scans[0] if scans else len(steps)
     after = steps[scan + 1 : pub[-1] + 1] if pub else []
     rules = [
-        _publish_step(s) if _publishes(s) else _write_rule(i < pub[0])
+        _publish_step(s) if _publishes(s, free) else _write_rule(i < pub[0])
         for i, s in enumerate(after, scan + 1)
     ]
     shapes = {
-        "summary-unscanned": any(_publishing(s) for s in steps) and not scans,
+        "summary-unscanned": any(_publishes(s, free) for s in steps) and not scans,
         "upload-before-scan": bool(pub and scans) and pub[0] < scan,
         **_scan_rules(steps),
     }
