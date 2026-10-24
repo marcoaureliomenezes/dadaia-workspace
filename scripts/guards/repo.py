@@ -54,7 +54,8 @@ _HOSTED = {"ubuntu-latest", "ubuntu-24.04", "ubuntu-22.04", "windows-latest", "w
 _SCAN = "python3 evals/scripts/scan.py evals/jobs evals/summary.md"
 _SUMMARY = 'cat evals/summary.md >> "$GITHUB_STEP_SUMMARY"'
 _UPLOADED = {"evals/jobs/", "evals/summary.md"}  # what the scan covers
-_ACTIONS = ("actions/checkout@", "actions/upload-artifact@")
+_ACTIONS = ("actions/checkout@", "actions/upload-artifact@", "actions/download-artifact@")
+_WHEEL = "dist/*.whl"  # the candidate build, handed to the eval job; not a publish
 _EXPR = re.compile(r"\$\{\{(.*?)\}\}", re.S)
 _SECRETS = re.compile(r"\bsecrets\b(?!\.GITHUB_TOKEN\b)", re.I)
 _WORD = re.compile(r"\bsecrets\b", re.I)
@@ -220,10 +221,18 @@ def _eval_job(job: dict[str, Any]) -> list[str]:
     return _hits(shapes, _EVAL)
 
 
+def _paths(step: dict[str, Any]) -> set[str]:
+    return set(str((step.get("with") or {}).get("path", "")).split())
+
+
 def _publishes(step: dict[str, Any]) -> bool:
-    return "GITHUB_STEP_SUMMARY" in str(step.get("run")) or str(step.get("uses")).startswith(
-        _ACTIONS[1]
+    return "GITHUB_STEP_SUMMARY" in str(step.get("run")) or (
+        str(step.get("uses")).startswith(_ACTIONS[1]) and _paths(step) != {_WHEEL}
     )
+
+
+def _uploads_scan(step: dict[str, Any]) -> bool:
+    return str(step.get("uses")).startswith(_ACTIONS[1]) and bool(_paths(step) & _UPLOADED)
 
 
 def _publish_if(step: dict[str, Any]) -> str:
@@ -275,7 +284,7 @@ def _eval_publish(job: dict[str, Any]) -> list[str]:
         for i, s in enumerate(after, scan + 1)
     ]
     shapes = {
-        "summary-unscanned": not scans,
+        "summary-unscanned": any(_uploads_scan(s) for s in steps) and not scans,
         "upload-before-scan": bool(pub and scans) and pub[0] < scan,
         **_scan_rules(steps),
     }
@@ -293,6 +302,22 @@ def _cli_pin(tree: Tree, doc: dict[Any, Any]) -> list[str]:
     ]
 
 
+def _row_pins(doc: dict[Any, Any]) -> list[str]:
+    """``eval-cli-pin`` on the matrix: every row names a model and a version; a claude-code row's
+    version is the ``CLAUDE_CODE_VERSION`` pin."""
+    pin = str((doc.get("env") or {}).get("CLAUDE_CODE_VERSION"))
+    strategies = [j.get("strategy") for j in _jobs(doc).values()]
+    matrices = [s.get("matrix") for s in strategies if isinstance(s, dict)]
+    rows = [r for m in matrices if isinstance(m, dict) for r in m.get("include") or []]
+    out: list[str] = []
+    for row in rows:
+        if not isinstance(row, dict) or "model" not in row or "version" not in row:
+            out.append(f"eval-cli-pin: {_EVAL} matrix row without a model or a version")
+        elif row.get("harness") == "claude-code" and str(row["version"]) != pin:
+            out.append(f"eval-cli-pin: {_EVAL} claude-code matrix row off the pin")
+    return out
+
+
 def no_model_calls_in_ci(tree: Tree) -> list[str]:
     """A model is called only from ``eval.yml``, which is dispatch or schedule
     only, on an exact hosted runner, reads its secret at job level alone, and publishes
@@ -303,7 +328,7 @@ def no_model_calls_in_ci(tree: Tree) -> list[str]:
             out += _model_markers(tree, p, doc) + _outside_eval(p, doc)
             continue
         jobs = _jobs(doc).values()
-        out += _eval_header(doc) + _cli_pin(tree, doc)
+        out += _eval_header(doc) + _cli_pin(tree, doc) + _row_pins(doc)
         out += [v for job in jobs for v in _eval_job(job) + _eval_publish(job)]
     return out
 
@@ -907,6 +932,7 @@ _NON_EVAL = _CLEAN + "    runs-on: ubuntu-latest\n"
 _ON = r"(?ms)^on:.*?(?=^permissions:)"
 _STEPS = "    steps:\n      - run: echo\n"
 _GATED_JOB = f"  rogue:\n    needs: [release-please, ghost]\n    if: {_GATE}\n    runs-on: x\n"
+_ROW = "    strategy:\n      matrix:\n        include:\n          - harness: claude-code\n"
 _SUPERSEDED = json.dumps({"id": "9999", "status": "superseded", "supersedes": None}) + "\n"
 
 CHECKS: dict[str, Check] = {
@@ -1073,6 +1099,19 @@ CHECKS: dict[str, Check] = {
             ),
             "eval-cli-pin": _file(
                 "evals/tasks/x/environment/Dockerfile", "ARG CLAUDE_CODE_VERSION=0.0.1\n"
+            ),
+            "eval-cli-pin#row-without-model": _edit(
+                _EVAL, "    environment: evals\n", _ROW + "            version: 2.1.284\n"
+            ),
+            "eval-cli-pin#row-without-version": _edit(
+                _EVAL,
+                "    environment: evals\n",
+                _ROW + "            model: anthropic/claude-sonnet-5\n",
+            ),
+            "eval-cli-pin#row-version-off-pin": _edit(
+                _EVAL,
+                "    environment: evals\n",
+                _ROW + "            model: anthropic/claude-sonnet-5\n            version: 9.9.9\n",
             ),
         },
     ),
