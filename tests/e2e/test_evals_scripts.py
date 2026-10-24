@@ -239,31 +239,19 @@ def test_compare_never_passes_an_errored_trial(tmp_path: Path) -> None:
 _HARNESSES = ("claude-code", "codex")
 
 
-def _leg(path: Path, harness: str, passes: dict[str, int], errored: dict[str, int] | None = None):
-    """Write a leg.json holding one row per task in `passes`; a task absent from it has no row."""
-    rows = [
-        {
-            "harness": harness,
-            "task": t,
-            "passes": p,
-            "errored": (errored or {}).get(t, 0),
-            "found": 3,
-        }
-        for t, p in passes.items()
-    ]
-    path.parent.mkdir(parents=True, exist_ok=True)
-    write_text(path, json.dumps(rows))
-    return path
+def _leg(
+    root: Path, harness: str, passes: dict[str, int], errored: dict[str, int] | None = None
+) -> None:
+    """Write `<root>/<harness>/<task>/leg.json` for each task in `passes`; an absent task has no file."""
+    for t, p in passes.items():
+        row = {"harness": harness, "task": t, "passes": p, "errored": (errored or {}).get(t, 0)}
+        (root / harness / t).mkdir(parents=True)
+        write_text(root / harness / t / "leg.json", json.dumps([row | {"found": 3}]))
 
 
-def _table(*legs: Path) -> tuple[int, list[list[str]]]:
-    """Run `compare.py --table`; return the exit code and each row's cells."""
-    cmd = [
-        sys.executable,
-        str(_ROOT / "evals" / "scripts" / "compare.py"),
-        "--table",
-        *map(str, legs),
-    ]
+def _table(root: Path) -> tuple[int, list[list[str]]]:
+    """Run `compare.py --table ROOT`; return the exit code and each row's cells."""
+    cmd = [sys.executable, str(_ROOT / "evals" / "scripts" / "compare.py"), "--table", str(root)]
     done = run(cmd, timeout=60)
     rows = [
         [c.strip() for c in line.strip("| \n").split("|")]
@@ -273,6 +261,9 @@ def _table(*legs: Path) -> tuple[int, list[list[str]]]:
     return done.returncode, rows
 
 
+_FULL = {_T1: 3, _T2: 3, _T3: 3}
+
+
 # Columns: harness, task, passes, floor, errored, pass^3, interval, verdict.
 @pytest.mark.parametrize(
     ("passes", "pass3", "interval"),
@@ -280,17 +271,16 @@ def _table(*legs: Path) -> tuple[int, list[list[str]]]:
     ids=["three-of-three", "two-of-three", "zero-of-three"],
 )
 def test_table_statistics(tmp_path: Path, passes: int, pass3: str, interval: str) -> None:
-    leg = _leg(tmp_path / "leg.json", "codex", {_T1: 3, _T2: 3, _T3: passes})
-    _, rows = _table(leg)
+    _leg(tmp_path, "codex", _FULL | {_T3: passes})
+    _, rows = _table(tmp_path)
     row = next(r for r in rows if r[:2] == ["codex", _T3])
     assert (row[2], row[5], row[6]) == (f"{passes}/3 (3 found)", pass3, interval)
 
 
 def test_table_merges_two_harnesses_into_six_rows(tmp_path: Path) -> None:
-    full = {_T1: 3, _T2: 3, _T3: 3}
-    a = _leg(tmp_path / "a" / "leg.json", "claude-code", full)
-    b = _leg(tmp_path / "b" / "leg.json", "codex", full)
-    code, rows = _table(a, b)
+    for h in _HARNESSES:
+        _leg(tmp_path, h, _FULL)
+    code, rows = _table(tmp_path)
     assert code == 0
     assert [(r[0], r[1]) for r in rows] == [(h, t) for h in _HARNESSES for t in (_T1, _T2, _T3)]
 
@@ -303,30 +293,35 @@ def test_table_merges_two_harnesses_into_six_rows(tmp_path: Path) -> None:
 def test_table_floor_is_per_harness_and_task(
     tmp_path: Path, task: str, passes: int, code: int
 ) -> None:
-    ok = _leg(tmp_path / "a" / "leg.json", "claude-code", {_T1: 3, _T2: 3, _T3: 3})
-    bad = _leg(tmp_path / "b" / "leg.json", "codex", {_T1: 3, _T2: 3, _T3: 3} | {task: passes})
-    got, rows = _table(ok, bad)
+    _leg(tmp_path, "claude-code", _FULL)
+    _leg(tmp_path, "codex", _FULL | {task: passes})
+    got, rows = _table(tmp_path)
     row = next((r for r in rows if r[0] == "codex" and r[1] == task), [])
     assert (got, row[2:3]) == (code, [f"{passes}/3 (3 found)"])
 
 
-def test_table_missing_leg_file_blocks(tmp_path: Path) -> None:
-    only = _leg(tmp_path / "a" / "leg.json", "claude-code", {_T1: 3, _T2: 3, _T3: 3})
-    code, rows = _table(only, tmp_path / "b" / "leg.json")
+def test_table_missing_harness_blocks(tmp_path: Path) -> None:
+    _leg(tmp_path, "claude-code", _FULL)
+    code, rows = _table(tmp_path)
     missing = [r[2] for r in rows if r[0] == "codex"]
     assert (code, len(rows), missing) == (1, 6, ["0/3 (0 found)"] * 3)
 
 
-def test_table_missing_task_row_blocks(tmp_path: Path) -> None:
-    leg = _leg(tmp_path / "leg.json", "codex", {_T1: 3, _T2: 3})
-    code, rows = _table(leg)
+def test_table_empty_directory_reads_six_missing_rows(tmp_path: Path) -> None:
+    code, rows = _table(tmp_path)
+    assert (code, len(rows), {r[2] for r in rows}) == (1, 6, {"0/3 (0 found)"})
+
+
+def test_table_missing_task_leg_blocks(tmp_path: Path) -> None:
+    _leg(tmp_path, "codex", {_T1: 3, _T2: 3})
+    code, rows = _table(tmp_path)
     row = next(r for r in rows if r[:2] == ["codex", _T3])
     assert (code, row[2]) == (1, "0/3 (0 found)")
 
 
 def test_table_errored_column_counts_an_errored_trial(tmp_path: Path) -> None:
-    leg = _leg(tmp_path / "leg.json", "codex", {_T1: 2, _T2: 3, _T3: 3}, {_T1: 1})
-    code, rows = _table(leg)
+    _leg(tmp_path, "codex", {_T1: 2, _T2: 3, _T3: 3}, {_T1: 1})
+    code, rows = _table(tmp_path)
     row = next(r for r in rows if r[:2] == ["codex", _T1])
     assert (code, row[2], row[4]) == (1, "2/3 (3 found)", "1")
 
