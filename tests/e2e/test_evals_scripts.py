@@ -234,3 +234,99 @@ def test_compare_never_passes_an_errored_trial(tmp_path: Path) -> None:
     leg = json.loads((tmp_path / "leg.json").read_text(encoding="utf-8"))
     row = next(r for r in leg if r["task"] == _T1)
     assert (code, row["passes"], row["errored"]) == (1, 2, 1)
+
+
+_HARNESSES = ("claude-code", "codex")
+
+
+def _leg(path: Path, harness: str, passes: dict[str, int], errored: dict[str, int] | None = None):
+    """Write a leg.json holding one row per task in `passes`; a task absent from it has no row."""
+    rows = [
+        {
+            "harness": harness,
+            "task": t,
+            "passes": p,
+            "errored": (errored or {}).get(t, 0),
+            "found": 3,
+        }
+        for t, p in passes.items()
+    ]
+    path.parent.mkdir(parents=True, exist_ok=True)
+    write_text(path, json.dumps(rows))
+    return path
+
+
+def _table(*legs: Path) -> tuple[int, list[list[str]]]:
+    """Run `compare.py --table`; return the exit code and each row's cells."""
+    cmd = [
+        sys.executable,
+        str(_ROOT / "evals" / "scripts" / "compare.py"),
+        "--table",
+        *map(str, legs),
+    ]
+    done = run(cmd, timeout=60)
+    rows = [
+        [c.strip() for c in line.strip("| \n").split("|")]
+        for line in done.stdout.splitlines()
+        if line.startswith("| ") and not line.startswith("| harness")
+    ]
+    return done.returncode, rows
+
+
+# Columns: harness, task, passes, floor, errored, pass^3, interval, verdict.
+@pytest.mark.parametrize(
+    ("passes", "pass3", "interval"),
+    [(3, "1", "[0.44, 1.00]"), (2, "0", "[0.21, 0.94]"), (0, "0", "[0.00, 0.56]")],
+    ids=["three-of-three", "two-of-three", "zero-of-three"],
+)
+def test_table_statistics(tmp_path: Path, passes: int, pass3: str, interval: str) -> None:
+    leg = _leg(tmp_path / "leg.json", "codex", {_T1: 3, _T2: 3, _T3: passes})
+    _, rows = _table(leg)
+    row = next(r for r in rows if r[1] == _T3)
+    assert (row[0], row[2], row[5], row[6]) == ("codex", f"{passes}/3", pass3, interval)
+
+
+def test_table_merges_two_harnesses_into_six_rows(tmp_path: Path) -> None:
+    full = {_T1: 3, _T2: 3, _T3: 3}
+    a = _leg(tmp_path / "a" / "leg.json", "claude-code", full)
+    b = _leg(tmp_path / "b" / "leg.json", "codex", full)
+    code, rows = _table(a, b)
+    assert code == 0
+    assert sorted((r[0], r[1]) for r in rows) == sorted(
+        (h, t) for h in _HARNESSES for t in (_T1, _T2, _T3)
+    )
+
+
+@pytest.mark.parametrize(
+    ("task", "passes", "code"),
+    [(_T1, 2, 1), (_T2, 2, 0), (_T2, 1, 1), (_T3, 1, 1)],
+    ids=["t1-two", "t2-two", "t2-one", "t3-one"],
+)
+def test_table_floor_is_per_harness_and_task(
+    tmp_path: Path, task: str, passes: int, code: int
+) -> None:
+    ok = _leg(tmp_path / "a" / "leg.json", "claude-code", {_T1: 3, _T2: 3, _T3: 3})
+    bad = _leg(tmp_path / "b" / "leg.json", "codex", {_T1: 3, _T2: 3, _T3: 3} | {task: passes})
+    got, rows = _table(ok, bad)
+    row = next((r for r in rows if r[0] == "codex" and r[1] == task), [])
+    assert (got, row[2:3]) == (code, [f"{passes}/3"])
+
+
+def test_table_missing_leg_file_blocks(tmp_path: Path) -> None:
+    only = _leg(tmp_path / "a" / "leg.json", "claude-code", {_T1: 3, _T2: 3, _T3: 3})
+    code, rows = _table(only, tmp_path / "b" / "leg.json")
+    assert (code, len(rows)) == (1, 3)
+
+
+def test_table_missing_task_row_blocks(tmp_path: Path) -> None:
+    leg = _leg(tmp_path / "leg.json", "codex", {_T1: 3, _T2: 3})
+    code, rows = _table(leg)
+    row = next(r for r in rows if r[1] == _T3)
+    assert (code, row[2]) == (1, "0/3")
+
+
+def test_table_errored_column_counts_an_errored_trial(tmp_path: Path) -> None:
+    leg = _leg(tmp_path / "leg.json", "codex", {_T1: 2, _T2: 3, _T3: 3}, {_T1: 1})
+    code, rows = _table(leg)
+    row = next(r for r in rows if r[1] == _T1)
+    assert (code, row[2], row[4]) == (1, "2/3", "1")
