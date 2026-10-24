@@ -283,6 +283,7 @@ flowchart TB
 - 0279 — Only the dispatched dd-code-reviewer writes a verdict: verdicts live in the PROTECTED states zone, and the pre-gate judges the one Bash act that writes one where the harness names the subagent
 - 0280 — A fix with a culprit is the REBUILD of its unit in its own lane; review sweeps the fixed pattern on the first pass and refuses a verdict without the reached-test run; history is the id-line query; no stored sha a rewrite can orphan
 - 0281 — The deploy gate is the multi-harness eval pipeline: Claude Code and Codex legs at k=3 on sha E, read by a required Eval gate check on the promote PR
+- 0282 — Codex is judged by its session record: its hooks leave the record under the id its commands resolve, and its registry row names a subagent key
 <!-- /dadaia:fixed adr-list -->
 
 <!-- dadaia:fixed slop-code -->
