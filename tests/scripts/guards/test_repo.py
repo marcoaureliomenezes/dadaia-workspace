@@ -209,13 +209,25 @@ def test_the_multi_job_eval_workflow_yields_no_hit(monkeypatch: pytest.MonkeyPat
         ),
         ("summary-unscanned", f"      - run: {_SCAN_RUN}\n", "      - run: echo skipped\n"),
         (
+            "summary-unscanned",
+            f"> evals/summary.md\n        continue-on-error: true\n      - run: {_SCAN_RUN}\n",
+            "> evals/summary.md\n        continue-on-error: true\n",
+        ),
+        (
             "step-env-secret",
             "      - name: Run the leg\n",
             "      - name: Run the leg\n        env: {K: '${{ secrets.OTHER }}'}\n",
         ),
         ("eval-cli-pin", f"            version: {_PIN}\n", ""),
     ],
-    ids=["action", "upload-path", "no-scan", "step-secret", "row-without-version"],
+    ids=[
+        "action",
+        "upload-path",
+        "no-scan",
+        "summary-no-scan",
+        "step-secret",
+        "row-without-version",
+    ],
 )
 def test_each_mutation_of_the_multi_job_eval_workflow_trips_its_own_rule(
     monkeypatch: pytest.MonkeyPatch, rule: str, old: str, new: str
