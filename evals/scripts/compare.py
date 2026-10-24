@@ -6,11 +6,16 @@ agent_info.name; a trial with no identity rule, or no agent_info, exits 1. A tri
 reward is 1, it did not error, and no transcript outside the dispatched dd-code-reviewer runs the
 verdict writer. Blocks (exit 1) when the candidate is below its floor on a gated task (t1 3/3, t2
 2/3, t3 2/3). A missing trial is a fail. Prints a Markdown table with the trials found.
+
+Usage: compare.py --table LEG.json [LEG.json ...]. Merges the given legs into one row per
+(harness, task) in HARNESS and FLOOR order, with pass^3 and the Wilson 95% interval. A missing
+pair reads 0 found; a leg path that does not exist adds no rows. Exits 1 below any floor.
 """
 
 import json
+import math
 import sys
-from collections import Counter
+from collections import Counter, defaultdict
 from pathlib import Path
 
 TRIALS = 3
@@ -110,5 +115,40 @@ def main(jobs_dir):
     return 1 if block else 0
 
 
+def wilson(c):
+    z2 = 1.96**2
+    p = c / TRIALS
+    centre = (p + z2 / (2 * TRIALS)) / (1 + z2 / TRIALS)
+    half = 1.96 * math.sqrt(p * (1 - p) / TRIALS + z2 / (4 * TRIALS**2)) / (1 + z2 / TRIALS)
+    return centre - half, centre + half
+
+
+def table(legs):
+    got = defaultdict(Counter)
+    for p in map(Path, legs):
+        if p.is_file():
+            for r in json.loads(p.read_text(encoding="utf-8")):
+                got[r["harness"], r["task"]].update(
+                    passes=r["passes"], errored=r["errored"], found=r["found"]
+                )
+    block = False
+    print("| harness | task | passes | floor | errored | pass^3 | interval | verdict |")
+    print("|---|---|---|---|---|---|---|---|")
+    for harness in HARNESS:
+        for task, floor in FLOOR.items():
+            r = got[harness, task]
+            c = r["passes"]
+            below = c < floor
+            block |= below
+            lo, hi = wilson(c)
+            print(
+                f"| {harness} | {task} | {c}/{TRIALS} ({r['found']} found) | {floor}/{TRIALS} "
+                f"| {r['errored']} | {math.comb(c, 3) / math.comb(TRIALS, 3):g} "
+                f"| [{lo:.2f}, {hi:.2f}] | {'BLOCK: below floor' if below else 'readout'} |"
+            )
+    print(f"\n**{'BLOCKING' if block else 'non-blocking'}**")
+    return 1 if block else 0
+
+
 if __name__ == "__main__":
-    sys.exit(main(sys.argv[1]))
+    sys.exit(table(sys.argv[2:]) if sys.argv[1] == "--table" else main(sys.argv[1]))
