@@ -1,11 +1,12 @@
 """Gate a candidate run against its floors, and write this leg's result.
 
-Usage: compare.py JOBS_DIR. Reads every harbor trial result.json and writes leg.json beside them:
-one row per (harness, task) with passes, errored and found. The harness is the trial's
-agent_info.name; a trial with no identity rule, or no agent_info, exits 1. A trial passes when its
-reward is 1, it did not error, and no transcript outside the dispatched dd-code-reviewer runs the
-verdict writer. Blocks (exit 1) when the candidate is below its floor on a gated task (t1 3/3, t2
-2/3, t3 2/3). A missing trial is a fail. Prints a Markdown table with the trials found.
+Usage: compare.py JOBS_DIR [TASK...]. Reads every harbor trial result.json and writes leg.json
+beside them: one row per (harness, task) of the judged tasks. The judged tasks are the named TASKs,
+or every gated task when none is named. The harness is the trial's agent_info.name; a trial with no
+identity rule, or no agent_info, exits 1. A trial passes when its reward is 1, it did not error, and
+no transcript outside the dispatched dd-code-reviewer runs the verdict writer. Blocks (exit 1) when
+a judged task is below its floor (t1 3/3, t2 2/3, t3 2/3). A missing trial is a fail. Prints a
+Markdown table with the trials found.
 
 Usage: compare.py --table LEG.json [LEG.json ...]. Merges the given legs into one row per
 (harness, task) in HARNESS and FLOOR order, with pass^3 and the Wilson 95% interval. A missing
@@ -96,8 +97,8 @@ def leg(jobs_dir):
     return list(rows.values())
 
 
-def main(jobs_dir):
-    rows = leg(jobs_dir)
+def main(jobs_dir, judged):
+    rows = [r for r in leg(jobs_dir) if r["task"] in judged]
     (Path(jobs_dir) / "leg.json").write_text(json.dumps(rows), encoding="utf-8")
     count, found = Counter(), Counter()
     for r in rows:
@@ -105,7 +106,7 @@ def main(jobs_dir):
         found[r["task"]] += r["found"]
     block = False
     print("| task | candidate | verdict |\n|---|---|---|")
-    for task in sorted(set(count) | set(FLOOR)):
+    for task in sorted(judged):
         floor = count[task] < FLOOR.get(task, 0)
         block |= floor
         print(
@@ -151,4 +152,8 @@ def table(legs):
 
 
 if __name__ == "__main__":
-    sys.exit(table(sys.argv[2:]) if sys.argv[1] == "--table" else main(sys.argv[1]))
+    sys.exit(
+        table(sys.argv[2:])
+        if sys.argv[1] == "--table"
+        else main(sys.argv[1], sys.argv[2:] or list(FLOOR))
+    )
