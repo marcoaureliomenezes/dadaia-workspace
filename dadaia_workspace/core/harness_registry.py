@@ -86,7 +86,7 @@ HARNESS_RECORDS: dict[str, HarnessRecord] = {
             directory=".codex",
             agent_transcode=AgentTranscode.CODEX_TOML,
             hooks=HookFormat.CODEX_HOOKS,
-            subagent_key="agent_type",
+            subagent_key=None,
             session_env=("CODEX_SESSION_ID", "CODEX_THREAD_ID"),
             binary="codex",
         ),
