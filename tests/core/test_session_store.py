@@ -56,6 +56,15 @@ def test_touch_creates_the_minimal_record_of_a_session_with_none(tmp_path: Path)
     assert si.read_session(tmp_path, "ghost") == created
 
 
+def test_touch_leaves_an_unreadable_record_for_doctor(tmp_path: Path) -> None:
+    path = si.session_record_path(tmp_path, SID, create=True)
+    os_write_text(path, "{bad")
+    before = path.read_bytes()
+
+    assert si.touch_last_seen_at(tmp_path, SID, now="2030-06-10T12:00:00+00:00") is None
+    assert path.read_bytes() == before
+
+
 def test_touch_renews_a_bound_record_without_changing_its_bind(tmp_path: Path) -> None:
     bound = si.new_binding_record(
         session_id=SID,
