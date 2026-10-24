@@ -35,11 +35,6 @@ def _session_bound_at(workspace: Path, session_id: str) -> float | None:
     return bound.timestamp() if bound else None
 
 
-def _resolve_context() -> str:
-    """The session's bind — never the cwd's repo: an unbound session injects no memory."""
-    return invocation.resolve(env=os.environ, cwd=Path.cwd()).bind.context_name or ""
-
-
 def _emit(payload: str) -> None:
     sys.stdout.write(envelope(os.environ, payload))
 
@@ -182,13 +177,24 @@ def _emit_bootstrap(workspace: Path, context: str) -> None:
 
 
 def main() -> int:
+    try:
+        return _run()
+    except SchemaVersionError as refused:  # unreadable, never "no context": the doctor's finding
+        finding = SectionFinding("REG-SCHEMA", "error", refused.message, False, True, refused.fix)
+        _emit(render_finding(finding) + "\n")
+        return 0
+
+
+def _run() -> int:
     platform.use_utf8_stdio()
     payload = _common.read_stdin_json()
     workspace = invocation.resolve_root(cwd=Path.cwd(), target_path=None)
     if workspace is None:
         _emit("")
         return 0
-    own = invocation.resolve_session_id(os.environ, payload.get("session_id")) or None
+    # the session's bind, never the cwd's repo: an unbound session injects no memory
+    inv = invocation.resolve(env=os.environ, cwd=Path.cwd(), payload_id=payload.get("session_id"))
+    own = inv.session_id
     if own:  # the operator's prompt is activity too: renew the liveness clock
         session_store.touch_last_seen_at(workspace, own, now=clock.now_iso())
     session_id = own or "workspace"
@@ -213,25 +219,20 @@ def main() -> int:
     record = session_store.read_session(workspace, session_id)
     bind_id = str(record.get("bind_id") or "").strip() if isinstance(record, dict) else ""
     compact_mtime = _read_sentinel(compact_marker)[0]
-    try:
-        decision = injection_policy.decide_injection(
-            event=event,
-            context=_resolve_context(),
-            recorded_slug=recorded_slug,
-            sentinel_exists=sentinel_mtime is not None,
-            compacted=sentinel_mtime is not None
-            and compact_mtime is not None
-            and compact_mtime > sentinel_mtime,
-            rebound=bool(bind_id) and bind_id != recorded_bind,
-        )
-        if decision.emit == "bootstrap":
-            _emit_bootstrap(workspace, decision.context)
-        elif decision.emit == "preflight":
-            _emit(_generic_preflight(workspace, own, decision.context))
-    except SchemaVersionError as refused:  # unreadable, never "no context": the doctor's finding
-        finding = SectionFinding("REG-SCHEMA", "error", refused.message, False, True, refused.fix)
-        _emit(render_finding(finding) + "\n")
-        return 0
+    decision = injection_policy.decide_injection(
+        event=event,
+        context=inv.bind.context_name or "",
+        recorded_slug=recorded_slug,
+        sentinel_exists=sentinel_mtime is not None,
+        compacted=sentinel_mtime is not None
+        and compact_mtime is not None
+        and compact_mtime > sentinel_mtime,
+        rebound=bool(bind_id) and bind_id != recorded_bind,
+    )
+    if decision.emit == "bootstrap":
+        _emit_bootstrap(workspace, decision.context)
+    elif decision.emit == "preflight":
+        _emit(_generic_preflight(workspace, own, decision.context))
     if decision.stamp_slug is not None:
         _stamp_sentinel(tmp_dir, sentinel, decision.stamp_slug, bind_id)
     return 0

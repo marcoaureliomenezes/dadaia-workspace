@@ -84,9 +84,12 @@ def sanitize_session_id(raw: str | None) -> str:
 
 def resolve_session_id(env: Mapping[str, str], payload_id: str | None = None) -> str:
     """The one session-id rule, sanitized: ``DADAIA_SESSION_ID``, then
-    :data:`HARNESS_SESSION_ID_ENV_VARS`, then the hook payload's id, else ``""``."""
+    :data:`HARNESS_SESSION_ID_ENV_VARS`, then the hook payload's id only when the harness named
+    by ``DADAIA_RUNTIME`` carries a session id in its shell, else ``""``."""
+    row = HARNESS_RECORDS.get(env.get("DADAIA_RUNTIME", ""))
+    payload = payload_id if isinstance(payload_id, str) and row and row.session_env else ""
     candidate = env.get("DADAIA_SESSION_ID") or next(
-        filter(None, map(env.get, HARNESS_SESSION_ID_ENV_VARS)), payload_id or ""
+        filter(None, map(env.get, HARNESS_SESSION_ID_ENV_VARS)), payload
     )
     return sanitize_session_id(candidate)
 
@@ -227,11 +230,12 @@ def resolve(
     target_path: Path | None = None,
     env: Mapping[str, str],
     cwd: Path,
+    payload_id: str | None = None,
 ) -> Invocation:
     """Resolve session, context, root and bind once. *explicit*/*target_path* are rung 0 (a
     write under ``repos/x/`` resolves ``x`` even while bound to ``y``)."""
     root = resolve_root(cwd=cwd, target_path=target_path)
-    session_id = resolve_session_id(env) or None
+    session_id = resolve_session_id(env, payload_id) or None
     bind = resolve_bind(root, session_id, env)
 
     def owner(path: Path | None) -> str | None:
