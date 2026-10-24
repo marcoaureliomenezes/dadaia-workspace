@@ -87,6 +87,7 @@ def test_the_readers_agree_on_the_bind(
     if sid_var:
         monkeypatch.setenv(sid_var, sid)
     if record:
+        session_store.touch_last_seen_at(ws, sid, now=_NOW)  # the hook heartbeat
         assert CliRunner().invoke(app, ["context", "bind", record]).exit_code == 0
         assert (ws / ".dadaia" / "sessions" / f"{sid}.json").is_file()
     monkeypatch.setenv("DADAIA_CONTEXT", env_ctx)

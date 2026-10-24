@@ -174,11 +174,12 @@ def test_bind_resolves_one_session_identity(
 ) -> None:
     """Two binds both exit 0 (peer presence is advisory) and persist the record under the one
     resolved identity — no global pointer, no second record, no minted stray."""
-    from dadaia_workspace.core import session_store
+    from dadaia_workspace.core import clock, session_store
 
     for name, value in env.items():
         monkeypatch.setenv(name, value)
     _register_alive_ctx(workspace)
+    session_store.touch_last_seen_at(workspace, session_id, now=clock.now_iso())  # the hook heartbeat
     outputs = [_runner.invoke(app, ["context", "bind", "myctx"]) for _ in range(2)]
     assert [r.exit_code for r in outputs] == [0, 0], outputs[0].output
     sessions = workspace / ".dadaia" / "sessions"
