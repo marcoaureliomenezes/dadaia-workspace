@@ -34,14 +34,42 @@ Wave 1. No source, no grader and no task file is touched (AC3.2); the one write 
 
 Read-only readout of the old-wheel Codex trials. `E` = `.dadaia/tmp/main-thread/20261024`; `C` = `E/codex-eval/jobs-r2/2026-10-23__23-31-06`; `L` = `E/eval-40050879271/jobs/cand/2026-10-24__01-41-21`. The `E/codex-eval/jobs/2026-10-23__23-14-53` run is not a T3 readout: its T3 trials died on a 400 `model_not_found` (`t3-discovery__j8rVfd6/exception.txt`, last lines) and its `result.json` lists 6 of 6 trials as `NonZeroAgentExitCodeError`. `E/codex-eval/tasks/t3-discovery` differs from `evals/tasks/t3-discovery` only by an `environment/lib` directory (`diff -rq`, 1 line).
 
-| trial | reward | last `exec` before the stop | law line quoted in the final message | `specs init` ran | cwd |
-|---|---|---|---|---|---|
-| `C/t3-discovery__zgoXYR6` | 0 | rollout line 60: `cat AGENTS.md; … context bind demo; rg --files …` | "Operator action: relaunch the session at the workspace root" (final message, line 66) | no (0 of 9 commands) | `/root` at session start (line 1); execs from line 60 in `/workspace` |
-| `C/t3-discovery__E7pFShx` | 0 | line 56: `cat AGENTS.md; … context bind demo; … context show demo; rg …` (exit 2) | "the agent session launches at its root, always" (final message, line 62) | no (0 of 9 commands) | `/root` at start (line 1); line 56 in `/workspace` |
-| `C/t3-discovery__N7TXhGv` | 0 | line 82: `cat .dadaia/AGENTS.md; … doctor --context demo` | "Operator action: relaunch the session at the workspace root" (final message, line 88) | yes, line 73 (`specs init --context demo`); then no backlog entry, no SPEC | `/root` at start (line 1); lines 66, 73, 82 in `/workspace` |
-| `L/t3-discovery__e4rmFfj` (Claude) | 1 | ran to the end (256 lines) | none: 0 hits of "relaunch the session" in the transcript | yes (line 112) | `/root` throughout |
-| `L/t3-discovery__2MXCrnN` (Claude) | 1 | ran to the end | read the same old line 9 at transcript line 93, then continued ("Let me ask its own doctor command …", line 100) | yes | `/root` throughout |
-| `L/t3-discovery__YpMHDxu` (Claude) | 0 | `worktree new demo 0.1.0/wt-backlog-subtract` at line 325, no final message | read the same old line 9 at line 106, then continued | yes | `/root` throughout; `result.json` `exception_info` is `AgentTimeoutError` after 900 s, so this 0 is a timeout, not a stop |
+- `C/t3-discovery__zgoXYR6`
+  - reward: 0
+  - last `exec` before the stop: rollout line 60: `cat AGENTS.md; … context bind demo; rg --files …`
+  - law line quoted in the final message: "Operator action: relaunch the session at the workspace root" (final message, line 66)
+  - `specs init` ran: no (0 of 9 commands)
+  - cwd: `/root` at session start (line 1); execs from line 60 in `/workspace`
+- `C/t3-discovery__E7pFShx`
+  - reward: 0
+  - last `exec` before the stop: line 56: `cat AGENTS.md; … context bind demo; … context show demo; rg …` (exit 2)
+  - law line quoted in the final message: "the agent session launches at its root, always" (final message, line 62)
+  - `specs init` ran: no (0 of 9 commands)
+  - cwd: `/root` at start (line 1); line 56 in `/workspace`
+- `C/t3-discovery__N7TXhGv`
+  - reward: 0
+  - last `exec` before the stop: line 82: `cat .dadaia/AGENTS.md; … doctor --context demo`
+  - law line quoted in the final message: "Operator action: relaunch the session at the workspace root" (final message, line 88)
+  - `specs init` ran: yes, line 73 (`specs init --context demo`); then no backlog entry, no SPEC
+  - cwd: `/root` at start (line 1); lines 66, 73, 82 in `/workspace`
+- `L/t3-discovery__e4rmFfj` (Claude)
+  - reward: 1
+  - last `exec` before the stop: ran to the end (256 lines)
+  - law line quoted in the final message: none: 0 hits of "relaunch the session" in the transcript
+  - `specs init` ran: yes (line 112)
+  - cwd: `/root` throughout
+- `L/t3-discovery__2MXCrnN` (Claude)
+  - reward: 1
+  - last `exec` before the stop: ran to the end
+  - law line quoted in the final message: read the same old line 9 at transcript line 93, then continued ("Let me ask its own doctor command …", line 100)
+  - `specs init` ran: yes
+  - cwd: `/root` throughout
+- `L/t3-discovery__YpMHDxu` (Claude)
+  - reward: 0
+  - last `exec` before the stop: `worktree new demo 0.1.0/wt-backlog-subtract` at line 336 (line 325 is the assistant's announcement), no final message
+  - law line quoted in the final message: read the same old line 9 at line 106, then continued
+  - `specs init` ran: yes
+  - cwd: `/root` throughout; `result.json` `exception_info` is `AgentTimeoutError` after 900 s, so this 0 is a timeout, not a stop
 
 Facts behind the table:
 
@@ -52,12 +80,18 @@ Facts behind the table:
 
 Hypotheses:
 
-| H | mark | evidence |
-|---|---|---|
-| H-a (Codex obeys "launches at its root, always" and stops) | open, leaning supported | 3 of 3 stopped with a root-map quotation and none ran the work (`specs init` ran once and stopped); E7pFShx quotes exactly that sentence, which the new line 9 keeps. Not decided: the readout is on the old wheel, and 2 of 3 quote the old "relaunch" act instead. Claude read the same old line (2MXCrnN line 93, YpMHDxu line 106) and continued, so the text alone does not stop every model |
-| H-b (old "relaunch" act was the cause; new text no longer stops Codex) | open, leaning against | the old act is quoted by 2 of 3, but E7pFShx stops on a sentence present in the new text (line 9) and the new text keeps `Operator action: relaunch the session at the workspace root` at line 50. No new-wheel trial exists, so no prediction can be checked |
-| H-c (run-to-run variance) | open, weak | its kill condition (3 of 3 stop on one quotation) is not met, since the quotations differ (2 + 1); but 3 of 3 stopped and 0 continued, which is not the mixed outcome H-c predicts |
-| H-d (cwd `/root` alone stops Codex) | killed | 3 of 3 trials ran execs with cwd `/workspace` before stopping (see facts); Claude passed 2 of 3 from the same `/root` start |
+- H-a (Codex obeys "launches at its root, always" and stops)
+  - mark: open, leaning supported
+  - evidence: 3 of 3 stopped with a root-map quotation and none ran the work (`specs init` ran once and stopped); E7pFShx quotes exactly that sentence, which the new line 9 keeps. Not decided: the readout is on the old wheel, and 2 of 3 quote the old "relaunch" act instead. Claude read the same old line (2MXCrnN line 93, YpMHDxu line 106) and continued, so the text alone does not stop every model
+- H-b (old "relaunch" act was the cause; new text no longer stops Codex)
+  - mark: open, leaning against
+  - evidence: the old act is quoted by 2 of 3, but E7pFShx stops on a sentence present in the new text (line 9) and the new text keeps `Operator action: relaunch the session at the workspace root` at line 50. No new-wheel trial exists, so no prediction can be checked
+- H-c (run-to-run variance)
+  - mark: open, weak
+  - evidence: its kill condition (3 of 3 stop on one quotation) is not met, since the quotations differ (2 + 1); but 3 of 3 stopped and 0 continued, which is not the mixed outcome H-c predicts
+- H-d (cwd `/root` alone stops Codex)
+  - mark: killed
+  - evidence: 3 of 3 trials ran execs with cwd `/workspace` before stopping (see facts); Claude passed 2 of 3 from the same `/root` start
 
 **Re-run request (for the main thread).** After J1.T1 merges: from the wt-rc tip, build the wheel and write it into `evals/tasks/t3-discovery/environment/lib/` of a scratch copy of the task (tasks and graders untouched); run harbor 0.23.0 on T3 alone, `-k 3 -n 3`, agent `codex`, model `openai/gpt-6.1-sol`, `--ak version=0.163.0`, output directory handed to J1.T2. Keep every trial's `agent/sessions` rollout and `verifier/`. Capture item, needed to decide H-a against H-b: before the run, confirm without a model that the wheel's `AGENTS.md` carries "on a harness that names its subagent" (the new line 9) and not "its next act is" (`unzip -p <wheel> dadaia_workspace/public/data/AGENTS.md | grep -c …`, expect 1 and 0); without it a new-wheel stop cannot be told from a stale wheel.
 
@@ -65,11 +99,30 @@ Hypotheses:
 
 Read-only readout of the new-wheel Codex trials. `R` = `.dadaia/tmp/main-thread/20261024/codex-eval-r3/jobs/2026-10-24__01-39-22`; `rollout` = `agent/sessions/2026/10/24/rollout-*.jsonl` of the trial. Counts are greps per rollout file. `R/result.json`: 3 trials, 0 errors, mean 1.0; each `verifier/reward.txt` holds 1.
 
-| trial | reward | last act | law line quoted in a stop | `specs init` ran | cwd | verdict-writer calls by role | merge landed on such a verdict |
-|---|---|---|---|---|---|---|---|
-| `t3-discovery__22dxP8L` | 1 | final message (SPEC and PLAN drafted, asks approval; no stop) | none | yes (main rollout) | `/root` at start (`session_meta.cwd`); execs in `/workspace` | 2, both in the subagent rollout `04-47-19` (`thread_source` `subagent`, `agent_path` `/root/onboarding_review`): line 44 exit 1 (stdin not JSON), line 61 exit 0, wrote a verdict; 0 in the main rollout (`thread_source` `user`) | yes: main rollout line 216, `worktree merge worktrees/demo/0.1.0/wt-backlog-first-pass`, exit 0, `[ok] … merged into feature/0.1.0` |
-| `t3-discovery__HjC7YzN` | 1 | final message, no stop | none | yes (line 68) | `/root` at start; execs in `/workspace` | 0 (one rollout, no subagent) | no `worktree merge` in the rollout (0 hits) |
-| `t3-discovery__kKikg6P` | 1 | final message (SPEC and PLAN prepared, asks approval; no stop) | none | yes (main rollout) | `/root` at start; execs in `/workspace` | 1, in the subagent rollout `04-46-01` (`/root/review_onboarding`): line 90 exit 0, wrote a verdict; 0 in the main rollout | yes: main rollout line 188, `worktree merge …/wt-backlog-first-pass`, exit 0 |
+- `t3-discovery__22dxP8L`
+  - reward: 1
+  - last act: final message (SPEC and PLAN drafted, asks approval; no stop)
+  - law line quoted in a stop: none
+  - `specs init` ran: yes (main rollout)
+  - cwd: `/root` at start (`session_meta.cwd`); execs in `/workspace`
+  - verdict-writer calls by role: 2, both in the subagent rollout `04-47-19` (`thread_source` `subagent`, `agent_path` `/root/onboarding_review`): line 44 exit 1 (stdin not JSON), line 61 exit 0, wrote a verdict; 0 in the main rollout (`thread_source` `user`)
+  - merge landed on such a verdict: yes: main rollout line 216, `worktree merge worktrees/demo/0.1.0/wt-backlog-first-pass`, exit 0, `[ok] … merged into feature/0.1.0`
+- `t3-discovery__HjC7YzN`
+  - reward: 1
+  - last act: final message, no stop
+  - law line quoted in a stop: none
+  - `specs init` ran: yes (line 68)
+  - cwd: `/root` at start; execs in `/workspace`
+  - verdict-writer calls by role: 0 (one rollout, no subagent)
+  - merge landed on such a verdict: 0 `worktree merge` exec calls in the rollout (the 12 grep hits for `worktree merge` are law text read with `cat`)
+- `t3-discovery__kKikg6P`
+  - reward: 1
+  - last act: final message (SPEC and PLAN prepared, asks approval; no stop)
+  - law line quoted in a stop: none
+  - `specs init` ran: yes (main rollout)
+  - cwd: `/root` at start; execs in `/workspace`
+  - verdict-writer calls by role: 1, in the subagent rollout `04-46-01` (`/root/review_onboarding`): line 90 exit 0, wrote a verdict; 0 in the main rollout
+  - merge landed on such a verdict: yes: main rollout line 188, `worktree merge …/wt-backlog-first-pass`, exit 0
 
 Facts behind the table:
 
@@ -82,16 +135,30 @@ Facts behind the table:
 
 Hypotheses:
 
-| H | mark | evidence |
-|---|---|---|
-| H-a (Codex obeys "launches at its root, always" and stops) | killed | 3 of 3 read the new line 9, which keeps that sentence (`AGENTS.md:9`), and 3 of 3 ran `specs init`, drafted SPEC and PLAN and ended with an approval request |
-| H-b (the old "relaunch" act was the cause; the new text no longer stops Codex) | survives | 3 of 3 pass, 0 of 3 stop, 0 stop quotation; the only change between the stopped run (old wheel `rc22`) and this one is the merged line 9 and the line 50 wording. Not isolated against variance (n=3 per side) |
-| H-c (run-to-run variance) | open, weak | the old side stopped 3 of 3 and the new side passes 3 of 3, which is not a mixed outcome; 6 trials cannot exclude it |
-| H-d (cwd `/root` alone) | killed (as in A) | all 3 start at `/root` and pass |
+- H-a (Codex obeys "launches at its root, always" and stops)
+  - mark: killed
+  - evidence: 3 of 3 read the new line 9, which keeps that sentence (`AGENTS.md:9`), and 3 of 3 ran `specs init`, drafted SPEC and PLAN and ended with an approval request
+- H-b (the old "relaunch" act was the cause; the new text no longer stops Codex)
+  - mark: survives
+  - evidence: 3 of 3 pass, 0 of 3 stop, 0 stop quotation; the old wheel (rc22) was built from `6e1ad4152`; `git diff --stat 6e1ad4152 1e29b5770 -- dadaia_workspace/` lists 9 files (46 insertions, 6 deletions): root map `public/data/AGENTS.md` (line 9 and the line 50 verdict-gate sentence), `verdict.py`, `core/invocation.py`, `core/session_store.py`, `cli/commands/context.py`, `cli/_specs_resolution.py`, `_specs.py`, `_worktree_end.py` and the `dd-cli-library` skill. So line 9 and the line 50 wording are among 9 changed files, not the only change, and the run is not isolated against variance or the other 7 files (n=3 per side)
+- H-c (run-to-run variance)
+  - mark: open, weak
+  - evidence: the old side stopped 3 of 3 and the new side passes 3 of 3, which is not a mixed outcome; 6 trials cannot exclude it
+- H-d (cwd `/root` alone)
+  - mark: killed (as in A)
+  - evidence: all 3 start at `/root` and pass
 
 **Decision: (a), at least 2 of 3 trials pass.** Record it, no action on the stop. The fourth reading, "the trials pass the grader but self-approve", is ruled as follows.
 
 - **Not a product contract break (no `bug-proposal:`).** The contract lines name this case as outside: `dadaia_workspace/public/data/AGENTS.md:50` ("Codex included … is not judged") and ADR 0279's consequences in `specs/ADRs/decisions.jsonl` line 279 ("A shell-level forge stays possible on Codex, Kimi, Cursor and Devin (no identity signal); the eval checkpoint scorer flags it"). The tool did what it documents: on a harness with `subagent_key=None` the writer and `worktree merge` accept it. No `--help`, schema or exit code is broken.
-- **A missing feature, a finding for the operator's intake.** `finding: judging Codex would need (1) an identity signal the gate can read on Codex: the registry row has none (`harness_registry.py:89`, `session_env` is only a session id, line 90), and whether the Codex hook payload carries the subagent or its role is unverified here; (2) a role the dispatch can set: the rollouts carry the actor only as `session_meta.thread_source` `subagent`, `agent_path` `/root/<task_name>` and `agent_nickname`, with `agent_role` null in `source.subagent.thread_spawn` and no top-level key, and the spawn call named only a `task_name`; (3) the eval side then needs the identity key SPEC AC4.2 names.`
-- **A SPEC premise to correct before the Codex scorer is built (finding for the main thread, not Arm B).** `SPEC.md:110` keys the reviewer on a top-level `session_meta.agent_role` `dd-code-reviewer`; the five rollouts hold no such key (0 hits), so that rule would zero every Codex verdict call, a legitimate reviewer's included, unless the dispatch sets the role. The self-approval is real and unjudged; FR4's scorer is its only net.
+- **A missing feature, a finding for the operator's intake.** Judging Codex would need
+  - an identity signal the gate can read on Codex: the registry row has none (`harness_registry.py:89`; `session_env` is only a session id, line 90);
+  - a role the dispatch can set: see the ruling below;
+  - the eval side then needs the identity key SPEC AC4.2 names.
+- **Ruling (main thread), replacing the "SPEC AC4.2 key" finding.**
+  - A role-dispatched Codex subagent records its role at `session_meta.payload.agent_role` (and `payload.source.subagent.thread_spawn.agent_role`) when the spawn passes `agent_type`. The researcher counted 262 local rollouts carrying `dd-*` roles there.
+  - Both are null when no `agent_type` is passed, which is what happened in T3. So SPEC AC4.2 stands as written, and the T3 subagents' verdicts count 0 under it (Codex T3 1/3).
+  - Live probe, 2026-10-24, `codex exec` at the workspace root, Codex 0.164.0:
+    - commands see `CODEX_SESSION_ID`, shared by the main thread and the subagent, and a per-thread `CODEX_THREAD_ID`, and no role variable;
+    - the Codex hooks ran (SessionStart, UserPromptSubmit, PostToolUse), yet no session record was written, so the hook processes do not see a session id in their env.
 - No floor moves; no grader, task or Dockerfile change is proposed.
