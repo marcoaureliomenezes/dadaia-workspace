@@ -458,3 +458,25 @@ def test_scan_escaped_creator_id_inside_a_json_string_names_the_file(tmp_path: P
     assert code == 1
     assert "log.txt" in out
     assert value not in out
+
+
+def _compare_named(root: Path, *tasks: str) -> int:
+    cmd = [sys.executable, str(_ROOT / "evals" / "scripts" / "compare.py"), str(root), *tasks]
+    return run(cmd, timeout=60).returncode
+
+
+@pytest.mark.parametrize(
+    ("rewards", "expected"), [([1, 1, 1], 0), ([1, 0, 0], 1)], ids=["at-floor", "below-floor"]
+)
+def test_compare_judges_only_the_tasks_it_names(
+    tmp_path: Path, rewards: list[float], expected: int
+) -> None:
+    _job(tmp_path, _T3, rewards, harness="codex")
+    assert _compare_named(tmp_path, _T3) == expected
+    leg = json.loads((tmp_path / "leg.json").read_text(encoding="utf-8"))
+    assert [r["task"] for r in leg] == [_T3]
+
+
+def test_compare_without_a_task_judges_every_gated_task(tmp_path: Path) -> None:
+    _job(tmp_path, _T3, [1, 1, 1], harness="codex")
+    assert _compare_named(tmp_path) == 1
