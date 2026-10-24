@@ -228,26 +228,47 @@ def test_a_registry_state_spelling_is_alive_for_bind_and_for_the_layout_gate(
     assert context_registry.registered_slugs(ws)[1] == frozenset({"proj"})
 
 
+_CLAUDE = "CLAUDE_CODE_SESSION_ID"
+_LIVE, _STALE = timedelta(minutes=5), timedelta(days=2)
+
+
 @pytest.mark.parametrize(
-    ("env_var", "record_age", "governed"),
+    ("env", "record_id", "record_age", "governed"),
     [
-        pytest.param(None, None, True, id="no-session-is-an-operator-terminal"),
-        pytest.param("CLAUDE_CODE_SESSION_ID", timedelta(minutes=5), True, id="live-record"),
-        pytest.param("CLAUDE_CODE_SESSION_ID", None, False, id="no-record"),
-        pytest.param("CLAUDE_CODE_SESSION_ID", timedelta(days=2), False, id="stale-record"),
-        pytest.param("CODEX_THREAD_ID", timedelta(minutes=5), True, id="codex-thread-live"),
-        pytest.param("CODEX_THREAD_ID", None, False, id="codex-thread-no-record"),
-        pytest.param("DADAIA_SESSION_ID", timedelta(minutes=5), True, id="override-live"),
-        pytest.param("DADAIA_SESSION_ID", None, False, id="override-no-record"),
+        pytest.param({}, None, None, True, id="no-session-is-an-operator-terminal"),
+        pytest.param({_CLAUDE: "sess-1"}, "sess-1", _LIVE, True, id="live-record"),
+        pytest.param({_CLAUDE: "sess-1"}, None, None, False, id="no-record"),
+        pytest.param({_CLAUDE: "sess-1"}, "sess-1", _STALE, False, id="stale-record"),
+        pytest.param({"CODEX_THREAD_ID": "sess-1"}, "sess-1", _LIVE, True, id="codex-thread-live"),
+        pytest.param({"CODEX_THREAD_ID": "sess-1"}, None, None, True, id="codex-thread-no-record"),
+        pytest.param({"DADAIA_SESSION_ID": "sess-1"}, "sess-1", _LIVE, True, id="override-live"),
+        pytest.param({"DADAIA_SESSION_ID": "sess-1"}, None, None, True, id="override-no-record"),
+        pytest.param(
+            {_CLAUDE: "claude-1", "DADAIA_SESSION_ID": "over-1"},
+            "over-1",
+            _LIVE,
+            True,
+            id="claude-with-override-live-under-the-override",
+        ),
+        pytest.param(
+            {_CLAUDE: "claude-1", "DADAIA_SESSION_ID": "over-1"},
+            None,
+            None,
+            False,
+            id="claude-with-override-no-record",
+        ),
     ],
 )
-def test_governed_is_true_for_no_session_or_a_session_with_a_live_record(
-    tmp_path: Path, env_var: str | None, record_age: timedelta | None, governed: bool
+def test_governed_judges_only_a_harness_that_names_a_subagent(
+    tmp_path: Path,
+    env: dict[str, str],
+    record_id: str | None,
+    record_age: timedelta | None,
+    governed: bool,
 ) -> None:
     ws = _mk_ws(tmp_path)
-    if record_age is not None:
+    if record_id and record_age is not None:
         seen = (datetime.now(UTC) - record_age).isoformat()
-        session_store.write_session(ws, "sess-1", {"session_id": "sess-1", "last_seen_at": seen})
-    env = {env_var: "sess-1"} if env_var else {}
+        session_store.write_session(ws, record_id, {"session_id": record_id, "last_seen_at": seen})
 
     assert invocation.governed(ws, env) is governed
