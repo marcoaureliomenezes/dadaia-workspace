@@ -188,7 +188,7 @@ def main() -> int:
     if workspace is None:
         _emit("")
         return 0
-    own = invocation.resolve_session_id(os.environ) or None
+    own = invocation.resolve_session_id(os.environ, payload.get("session_id")) or None
     if own:  # the operator's prompt is activity too: renew the liveness clock
         session_store.touch_last_seen_at(workspace, own, now=clock.now_iso())
     session_id = own or "workspace"

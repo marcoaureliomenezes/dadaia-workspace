@@ -82,12 +82,11 @@ def sanitize_session_id(raw: str | None) -> str:
     return _SESSION_ID_STRIP.sub("", raw or "")
 
 
-def resolve_session_id(env: Mapping[str, str]) -> str:
+def resolve_session_id(env: Mapping[str, str], payload_id: str | None = None) -> str:
     """The one session-id rule, sanitized: ``DADAIA_SESSION_ID``, then
-    :data:`HARNESS_SESSION_ID_ENV_VARS`, else ``""``. Env only: ``context bind`` sees no
-    hook payload, so a payload id would be an id no bind can ever record."""
+    :data:`HARNESS_SESSION_ID_ENV_VARS`, then the hook payload's id, else ``""``."""
     candidate = env.get("DADAIA_SESSION_ID") or next(
-        filter(None, map(env.get, HARNESS_SESSION_ID_ENV_VARS)), ""
+        filter(None, map(env.get, HARNESS_SESSION_ID_ENV_VARS)), payload_id or ""
     )
     return sanitize_session_id(candidate)
 
