@@ -128,6 +128,18 @@
       "relates": [
         "rc18-review-loose-ends"
       ]
+    },
+    {
+      "id": "opencode-harness-support",
+      "title": "OpenCode harness support in the product, and an OpenCode lane in the eval pipeline",
+      "opened": "2026-10-24",
+      "status": "idea",
+      "description": "Target 0.5.0, after rc-23. Exit condition: the operator validates the rc-23 eval pipeline (R1: 'Open Code vamos configurar depois que eu sentir que vc sabe construir ... um pipeline de eval'); only then is this entry picked. Scope: (1) product support: a registry row in dadaia_workspace/core/harness_registry.py, a persona transcode to .opencode/agents/<name>.md, and a hook projection as .opencode/plugins/*.js that spawns the projected hook wrappers; (2) an OpenCode leg in eval.yml's matrix at the same floors, with a forged-verdict identity rule in compare.py. Facts, measured locally on opencode 1.14.33: it reads AGENTS.md, .agents/skills and .claude/skills; it lists .opencode/agents/*.md (frontmatter mode: subagent) as subagents in 'opencode agent list'; a plugin in .opencode/plugins/ can block a tool call by throwing in tool.execute.before. Unverified: the plugin behaviour in headless mode (opencode run) and the subagent identity in its transcript, so subagent_key stays unset and the eval's forged check would be that harness's only verdict guard until verified; the first task is a read-only check against the live binary. Estimate: about 200-250 source lines and 300-400 test lines, 8-10 tasks, two jobs (registry row and personas; hook plugin). History: OpenCode support was removed once (v0.1.24, opencode_runtime deleted; histo shared-headless-adapter-base), and ADR 0020 governs roster growth, naming cursor, devin and copilot only, so adding OpenCode is a roster decision the operator rules. Open for the grill: the lane's auth and model (agent default, unruled: a provider API key with openai/gpt-6.1-sol; cost unmeasured).",
+      "provenance": "Operator demand 2026-10-24 (grill handoff 2026-10-24T035818Z-main-thread-grill-eval-pipeline): R0 'eval em diferentes harnesses, pelo menos openCode Claude code e codex'; R3 'Suportar OpenCode no 0.5.0 (Recomendado)', sequenced by R1 after the operator validates the pipeline.",
+      "relates": [
+        "eval-codex-lane-in-library-ci",
+        "evals-benchmark-lanes"
+      ]
     }
   ]
 }
