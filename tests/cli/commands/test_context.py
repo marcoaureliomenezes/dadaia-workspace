@@ -352,6 +352,59 @@ def test_session_check_passes_a_governed_session_and_refuses_the_rest(
         assert _RELAUNCH in " ".join(result.output.split())
 
 
+@pytest.mark.parametrize(
+    ("env", "session_id", "heartbeat", "exit_code"),
+    [
+        pytest.param({"CLAUDE_CODE_SESSION_ID": "sess_nohook"}, "sess_nohook", False, 1, id="claude-no-record-refused"),
+        pytest.param({"CLAUDE_CODE_SESSION_ID": "sess_hooked"}, "sess_hooked", True, 0, id="claude-after-heartbeat-binds"),
+        pytest.param({"DADAIA_SESSION_ID": "sess_operator"}, "sess_operator", False, 0, id="operator-terminal-binds"),
+        pytest.param({"CODEX_THREAD_ID": "codex-thread"}, "codex-thread", False, 0, id="codex-binds"),
+    ],
+)  # fmt: skip
+def test_bind_needs_a_hook_heartbeat_for_a_judged_harness_session(
+    workspace: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    env: dict[str, str],
+    session_id: str,
+    heartbeat: bool,
+    exit_code: int,
+) -> None:
+    """A Claude Code session id binds only after its hook heartbeat created the record; a
+    refused bind writes nothing and prints the one relaunch fix line."""
+    from dadaia_workspace.core import clock, session_store
+
+    for name, value in env.items():
+        monkeypatch.setenv(name, value)
+    _register_alive_ctx(workspace)
+    if heartbeat:
+        session_store.touch_last_seen_at(workspace, session_id, now=clock.now_iso())
+
+    result = _runner.invoke(app, ["context", "bind", "myctx"])
+
+    assert result.exit_code == exit_code, result.output
+    record = session_store.read_session(workspace, session_id)
+    if exit_code:
+        assert " ".join(result.output.split()).count("fix: ") == 1
+        assert _RELAUNCH in " ".join(result.output.split())
+        assert record is None
+        assert not (workspace / ".dadaia" / "sessions" / f"{session_id}.json").exists()
+    else:
+        assert record is not None and record["context"] == "myctx"
+
+
+def test_a_refused_bind_does_not_make_session_check_pass(
+    workspace: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("CLAUDE_CODE_SESSION_ID", "sess_nohook")
+    _register_alive_ctx(workspace)
+
+    _runner.invoke(app, ["context", "bind", "myctx"])
+    result = _runner.invoke(app, ["context", "session-check"])
+
+    assert result.exit_code == 1, result.output
+    assert _RELAUNCH in " ".join(result.output.split())
+
+
 def test_show_unbound_is_calm_in_both_modes(workspace: Path) -> None:
     """With no bind, `show --json` answers
     {"context": null} and human `show` prints a calm line — both exit 0, no traceback."""
