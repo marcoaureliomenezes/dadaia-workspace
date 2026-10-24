@@ -60,7 +60,7 @@ def test_scan_missing_path_is_red(tmp_path: Path) -> None:
     assert _run("scan.py", tmp_path / "no-such-dir") == 1
 
 
-def _job(root: Path, task: str, rewards: list[float]) -> None:
+def _job(root: Path, task: str, rewards: list[float], harness: str | None = "claude-code") -> None:
     root.mkdir(parents=True, exist_ok=True)
     write_text(root / "result.json", json.dumps({"stats": {}}))
     for i, r in enumerate(rewards):
@@ -70,6 +70,8 @@ def _job(root: Path, task: str, rewards: list[float]) -> None:
             "task_name": f"dadaia-workspace-evals/{task}",
             "verifier_result": {"rewards": {"reward": r}},
         }
+        if harness is not None:
+            body["agent_info"] = {"name": harness}
         write_text(d / "result.json", json.dumps(body))
 
 
@@ -153,3 +155,82 @@ def test_compare_zeroes_a_verdict_written_outside_the_reviewer(
         [sys.executable, str(_ROOT / "evals" / "scripts" / "compare.py"), str(tmp_path)], timeout=60
     ).stdout
     assert f"| {task} | {expected} (3 found) |" in out
+
+
+def _rollout(
+    trial: Path, name: str, *, thread_source: str, agent_role: str | None, act: bool
+) -> None:
+    """A Codex rollout under the trial's agent dir: the session_meta record, then one shell act."""
+    spawn = {"thread_spawn": {"agent_role": agent_role}}
+    meta = {
+        "creator_user_id": "user-synthetic-1",
+        "creator_account_id": "acct-synthetic-1",
+        "thread_source": thread_source,
+        "agent_role": agent_role,
+        "source": {"subagent": spawn} if thread_source == "subagent" else "cli",
+    }
+    command = _VERDICT if act else "ls"
+    call = {"type": "custom_tool_call", "name": "exec", "input": f'text(await sh("{command}"))'}
+    lines = [{"type": "session_meta", "payload": meta}, {"type": "response_item", "payload": call}]
+    folder = trial / "agent" / "sessions" / "2026" / "10" / "24"
+    folder.mkdir(parents=True, exist_ok=True)
+    write_text(folder / f"rollout-{name}.jsonl", "".join(json.dumps(x) + "\n" for x in lines))
+
+
+def _compare(root: Path) -> tuple[int, str]:
+    done = run(
+        [sys.executable, str(_ROOT / "evals" / "scripts" / "compare.py"), str(root)], timeout=60
+    )
+    return done.returncode, done.stdout
+
+
+@pytest.mark.parametrize(
+    ("thread_source", "agent_role", "expected", "passes"),
+    [
+        ("subagent", "dd-code-reviewer", "3/3", 3),
+        ("user", None, "2/3", 2),
+        ("subagent", "dd-sw-engineer-sr", "2/3", 2),
+        ("subagent", None, "2/3", 2),
+    ],
+    ids=["dispatched-reviewer", "user-thread", "other-role", "null-role-subagent"],
+)
+@pytest.mark.parametrize("task", [_T1, _T2, _T3], ids=["t1", "t2", "t3"])
+def test_compare_zeroes_a_codex_verdict_written_outside_the_reviewer(
+    tmp_path: Path,
+    task: str,
+    thread_source: str,
+    agent_role: str | None,
+    expected: str,
+    passes: int,
+) -> None:
+    for t in (_T1, _T2, _T3):
+        _job(tmp_path, t, [1, 1, 1], harness="codex")
+    trial = tmp_path / f"{task}__0"
+    _rollout(trial, "main", thread_source="user", agent_role=None, act=False)
+    _rollout(trial, "act", thread_source=thread_source, agent_role=agent_role, act=True)
+    _, out = _compare(tmp_path)
+    assert f"| {task} | {expected} (3 found) |" in out
+    leg = json.loads((tmp_path / "leg.json").read_text(encoding="utf-8"))
+    row = next(r for r in leg if r["task"] == task)
+    assert row == {"harness": "codex", "task": task, "passes": passes, "errored": 0, "found": 3}
+
+
+@pytest.mark.parametrize("harness", ["opencode", None], ids=["unknown-name", "no-agent-info"])
+def test_compare_refuses_a_harness_with_no_identity_rule(
+    tmp_path: Path, harness: str | None
+) -> None:
+    for t in (_T1, _T2, _T3):
+        _job(tmp_path, t, [1, 1, 1], harness=harness)
+    assert _compare(tmp_path)[0] == 1
+
+
+def test_compare_never_passes_an_errored_trial(tmp_path: Path) -> None:
+    for t in (_T1, _T2, _T3):
+        _job(tmp_path, t, [1, 1, 1])
+    trial = tmp_path / f"{_T1}__0" / "result.json"
+    body = json.loads(trial.read_text(encoding="utf-8")) | {"exception_info": {"type": "Timeout"}}
+    write_text(trial, json.dumps(body))
+    code, _ = _compare(tmp_path)
+    leg = json.loads((tmp_path / "leg.json").read_text(encoding="utf-8"))
+    row = next(r for r in leg if r["task"] == _T1)
+    assert (code, row["passes"], row["errored"]) == (1, 2, 1)
