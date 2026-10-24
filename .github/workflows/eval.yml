@@ -149,3 +149,35 @@ jobs:
             evals/summary.md
       - if: steps.compare.outcome == 'failure'
         run: echo "compare.py blocks" && exit 1
+  aggregate:
+    needs: eval
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      # Each artifact is rooted at evals/ (the common ancestor of its two paths): jobs/… and summary.md.
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
+        with:
+          pattern: jobs-*
+          merge-multiple: true
+          path: evals
+      - name: Compare
+        id: compare
+        run: python3 evals/scripts/compare.py --table evals/jobs > evals/summary.md
+        continue-on-error: true
+      - run: python3 evals/scripts/scan.py evals/jobs evals/summary.md
+      - run: cat evals/summary.md >> "$GITHUB_STEP_SUMMARY"
+      - if: steps.compare.outcome == 'failure'
+        run: echo "compare.py blocks" && exit 1
+  result:
+    needs: [prepare, eval, aggregate]
+    if: ${{ always() }}
+    runs-on: ubuntu-24.04
+    env:
+      PREPARE: ${{ needs.prepare.result }}
+      EVAL: ${{ needs.eval.result }}
+      AGGREGATE: ${{ needs.aggregate.result }}
+    steps:
+      - run: test "$PREPARE $EVAL $AGGREGATE" = "success success success"
