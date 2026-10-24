@@ -286,9 +286,9 @@ _LIVE, _STALE = timedelta(minutes=5), timedelta(days=2)
         pytest.param({_CLAUDE: "sess-1"}, None, None, False, id="no-record"),
         pytest.param({_CLAUDE: "sess-1"}, "sess-1", _STALE, False, id="stale-record"),
         pytest.param({"CODEX_THREAD_ID": "sess-1"}, "sess-1", _LIVE, True, id="codex-thread-live"),
-        pytest.param({"CODEX_THREAD_ID": "sess-1"}, None, None, False, id="codex-thread-no-record"),
+        pytest.param({"CODEX_THREAD_ID": "sess-1"}, None, None, True, id="codex-thread-no-record"),
         pytest.param(
-            {"CODEX_SESSION_ID": "sess-1"}, None, None, False, id="codex-session-no-record"
+            {"CODEX_SESSION_ID": "sess-1"}, None, None, True, id="codex-session-no-record"
         ),
         pytest.param(
             {"CODEX_SESSION_ID": "sess-1"}, "sess-1", _LIVE, True, id="codex-session-live"
@@ -318,7 +318,7 @@ _LIVE, _STALE = timedelta(minutes=5), timedelta(days=2)
         ),
     ],
 )
-def test_governed_judges_a_harness_that_names_a_subagent(
+def test_governed_judges_only_a_harness_that_names_a_subagent(
     tmp_path: Path,
     env: dict[str, str],
     record_id: str | None,
