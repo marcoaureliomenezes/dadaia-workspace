@@ -179,7 +179,9 @@ def test_bind_resolves_one_session_identity(
     for name, value in env.items():
         monkeypatch.setenv(name, value)
     _register_alive_ctx(workspace)
-    session_store.touch_last_seen_at(workspace, session_id, now=clock.now_iso())  # the hook heartbeat
+    session_store.touch_last_seen_at(
+        workspace, session_id, now=clock.now_iso()
+    )  # the hook heartbeat
     outputs = [_runner.invoke(app, ["context", "bind", "myctx"]) for _ in range(2)]
     assert [r.exit_code for r in outputs] == [0, 0], outputs[0].output
     sessions = workspace / ".dadaia" / "sessions"
