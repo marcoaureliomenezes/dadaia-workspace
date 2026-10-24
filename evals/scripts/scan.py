@@ -16,9 +16,13 @@ SHAPES = [
 ]
 
 
+MIN_LEAF = 16  # shorter JSON leaves are enum-like words, not secrets
+
+
 def _leaves(node):
     if isinstance(node, str):
-        yield node
+        if len(node) >= MIN_LEAF:
+            yield node
     elif isinstance(node, dict):
         yield from (leaf for v in node.values() for leaf in _leaves(v))
     elif isinstance(node, list):
@@ -29,7 +33,7 @@ def _needles(secret):
     if not secret:
         return []
     try:
-        leaves = [s for s in _leaves(json.loads(secret)) if s]
+        leaves = list(_leaves(json.loads(secret)))
     except ValueError:
         return [secret]
     return leaves or [secret]
