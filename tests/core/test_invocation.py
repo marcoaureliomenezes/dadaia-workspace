@@ -260,8 +260,12 @@ _LIVE, _STALE = timedelta(minutes=5), timedelta(days=2)
         pytest.param({_CLAUDE: "sess-1"}, "sess-1", _STALE, False, id="stale-record"),
         pytest.param({"CODEX_THREAD_ID": "sess-1"}, "sess-1", _LIVE, True, id="codex-thread-live"),
         pytest.param({"CODEX_THREAD_ID": "sess-1"}, None, None, False, id="codex-thread-no-record"),
-        pytest.param({"CODEX_SESSION_ID": "sess-1"}, None, None, False, id="codex-session-no-record"),
-        pytest.param({"CODEX_SESSION_ID": "sess-1"}, "sess-1", _LIVE, True, id="codex-session-live"),
+        pytest.param(
+            {"CODEX_SESSION_ID": "sess-1"}, None, None, False, id="codex-session-no-record"
+        ),
+        pytest.param(
+            {"CODEX_SESSION_ID": "sess-1"}, "sess-1", _LIVE, True, id="codex-session-live"
+        ),
         pytest.param(
             {"CODEX_SESSION_ID": "root-1", "CODEX_THREAD_ID": "sub-1"},
             "root-1",
