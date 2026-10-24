@@ -66,6 +66,21 @@ jobs:
             model: anthropic/claude-sonnet-5
             version: 2.1.284
             secret_name: CLAUDE_CODE_OAUTH_TOKEN
+          - harness: codex
+            task: t1-cold-onboarding
+            model: openai/gpt-6.1-sol
+            version: 0.163.0
+            secret_name: CODEX_AUTH_JSON
+          - harness: codex
+            task: t2-block-list-bug
+            model: openai/gpt-6.1-sol
+            version: 0.163.0
+            secret_name: CODEX_AUTH_JSON
+          - harness: codex
+            task: t3-discovery
+            model: openai/gpt-6.1-sol
+            version: 0.163.0
+            secret_name: CODEX_AUTH_JSON
     env:
       SCAN_SECRET: ${{ secrets[matrix.secret_name] }}
       HARNESS: ${{ matrix.harness }}
@@ -90,14 +105,24 @@ jobs:
         run: |
           echo "CLAUDE_CODE_OAUTH_TOKEN=$SCAN_SECRET" >> "$GITHUB_ENV"
           echo "CLAUDE_FORCE_OAUTH=1" >> "$GITHUB_ENV"
+          echo "TASKS=evals/tasks" >> "$GITHUB_ENV"
+      # The login is a 0600 file in RUNNER_TEMP; only its path reaches the environment. Harbor's
+      # Codex agent reads CODEX_AUTH_JSON_PATH first, so CODEX_FORCE_AUTH_JSON is not set.
+      - if: matrix.harness == 'codex'
+        run: |
+          umask 077
+          printf '%s' "$SCAN_SECRET" > "$RUNNER_TEMP/codex-auth.json"
+          echo "CODEX_AUTH_JSON_PATH=$RUNNER_TEMP/codex-auth.json" >> "$GITHUB_ENV"
+          python3 evals/scripts/render.py evals/tasks "$RUNNER_TEMP/tasks" codex Codex
+          echo "TASKS=$RUNNER_TEMP/tasks" >> "$GITHUB_ENV"
       # environment/lib/ is each image's last layer: the wheel and the requirements.txt naming it.
       # Written per run, never committed.
       - name: Run the task
         run: |
           w=$(ls dist/*.whl)
-          lib="evals/tasks/$TASK/environment/lib"
+          lib="$TASKS/$TASK/environment/lib"
           rm -rf "$lib"; mkdir -p "$lib"; cp "$w" "$lib/"; echo "/lib/$(basename "$w")" > "$lib/requirements.txt"
-          harbor run -p evals/tasks -i "$TASK" -a "$HARNESS" -m "$MODEL" --ak version="$VERSION" -k 3 -n 3 -o "evals/jobs/$HARNESS/$TASK" \
+          harbor run -p "$TASKS" -i "$TASK" -a "$HARNESS" -m "$MODEL" --ak version="$VERSION" -k 3 -n 3 -o "evals/jobs/$HARNESS/$TASK" \
             --max-retries 2 \
             --retry-include EnvironmentStartTimeoutError \
             --retry-include SandboxBuildFailedError \
@@ -111,6 +136,9 @@ jobs:
         id: compare
         run: python3 evals/scripts/compare.py "evals/jobs/$HARNESS/$TASK" "$TASK" > evals/summary.md
         continue-on-error: true
+      # The raw rollouts hold account ids; compare.py has already read them for the forged check.
+      - if: matrix.harness == 'codex'
+        run: find "evals/jobs/$HARNESS/$TASK" -type d -path '*/agent/sessions' -prune -exec rm -rf {} +
       - run: python3 evals/scripts/scan.py evals/jobs evals/summary.md
       - run: cat evals/summary.md >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
