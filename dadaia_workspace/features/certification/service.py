@@ -343,10 +343,10 @@ def certify(
 
     check("context-list-show-json", context_json)
 
-    harness_env = {"CODEX_THREAD_ID": "certification-session"}
+    bind_env = {"DADAIA_SESSION_ID": "certification-session"}
 
     def bind() -> str:
-        output = cli("context", "bind", "certified-consumer", extra_env=harness_env)
+        output = cli("context", "bind", "certified-consumer", extra_env=bind_env)
         if "certified-consumer" not in output:
             raise RuntimeError(output)
         return "caller-owned bind"
