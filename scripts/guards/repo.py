@@ -935,7 +935,7 @@ _NON_EVAL = _CLEAN + "    runs-on: ubuntu-latest\n"
 _ON = r"(?ms)^on:.*?(?=^permissions:)"
 _STEPS = "    steps:\n      - run: echo\n"
 _GATED_JOB = f"  rogue:\n    needs: [release-please, ghost]\n    if: {_GATE}\n    runs-on: x\n"
-_ROW = "    strategy:\n      matrix:\n        include:\n          - harness: claude-code\n"
+_ROW = "        include:\n          - harness: claude-code\n"
 _SUPERSEDED = json.dumps({"id": "9999", "status": "superseded", "supersedes": None}) + "\n"
 
 CHECKS: dict[str, Check] = {
@@ -1104,16 +1104,16 @@ CHECKS: dict[str, Check] = {
                 "evals/tasks/x/environment/Dockerfile", "ARG CLAUDE_CODE_VERSION=0.0.1\n"
             ),
             "eval-cli-pin#row-without-model": _edit(
-                _EVAL, "    environment: evals\n", _ROW + "            version: 2.1.284\n"
+                _EVAL, "        include:\n", _ROW + "            version: 2.1.284\n"
             ),
             "eval-cli-pin#row-without-version": _edit(
                 _EVAL,
-                "    environment: evals\n",
+                "        include:\n",
                 _ROW + "            model: anthropic/claude-sonnet-5\n",
             ),
             "eval-cli-pin#row-version-off-pin": _edit(
                 _EVAL,
-                "    environment: evals\n",
+                "        include:\n",
                 _ROW + "            model: anthropic/claude-sonnet-5\n            version: 9.9.9\n",
             ),
         },

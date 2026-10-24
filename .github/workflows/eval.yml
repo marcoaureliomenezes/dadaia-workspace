@@ -1,6 +1,6 @@
 name: eval
 # The one workflow that calls a model (ADR 0217): dispatch or weekly schedule, GitHub-hosted,
-# the secret at job level in the one job that needs it, the scan before anything is published.
+# the secret at job level in the one leg that needs it, the scan before anything is published.
 # The guard no-model-api-in-ci (scripts/guards/repo.py) judges every line of it.
 on:
   workflow_dispatch:
@@ -12,38 +12,110 @@ env:
   # The one owner of the Claude CLI pin; each task Dockerfile's ARG equals it (guard eval-cli-pin).
   CLAUDE_CODE_VERSION: 2.1.284
 jobs:
-  eval:
+  prepare:
     runs-on: ubuntu-24.04
-    environment: evals
-    env:
-      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-      CLAUDE_FORCE_OAUTH: "1"
-      SCAN_SECRET: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+    permissions:
+      contents: read
+      checks: read
+    outputs:
+      wheel_sha256: ${{ steps.build.outputs.sha }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           persist-credentials: false
+      # The wheel is only worth building from a commit whose graders already passed their own tests.
+      - name: Require the E2E check run on this commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ok=$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/check-runs?per_page=100" --jq '[.check_runs[] | select(.name == "E2E Python (pytest)")] | length > 0 and all(.conclusion == "success")')
+          test "$ok" = true
       - run: pipx install poetry==2.5.1
-      - run: pipx install harbor==0.23.0
       # The candidate is this checkout: the dispatched ref, or main on the schedule.
       - name: Build the candidate wheel
-        run: poetry build -f wheel
+        id: build
+        run: |
+          poetry build -f wheel
+          echo "sha=$(sha256sum dist/*.whl | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+      - name: Upload the wheel
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: wheel
+          path: dist/*.whl
+  eval:
+    needs: prepare
+    runs-on: ubuntu-24.04
+    environment: evals
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - harness: claude-code
+            task: t1-cold-onboarding
+            model: anthropic/claude-sonnet-5
+            version: 2.1.284
+            secret_name: CLAUDE_CODE_OAUTH_TOKEN
+          - harness: claude-code
+            task: t2-block-list-bug
+            model: anthropic/claude-sonnet-5
+            version: 2.1.284
+            secret_name: CLAUDE_CODE_OAUTH_TOKEN
+          - harness: claude-code
+            task: t3-discovery
+            model: anthropic/claude-sonnet-5
+            version: 2.1.284
+            secret_name: CLAUDE_CODE_OAUTH_TOKEN
+    env:
+      SCAN_SECRET: ${{ secrets[matrix.secret_name] }}
+      HARNESS: ${{ matrix.harness }}
+      TASK: ${{ matrix.task }}
+      MODEL: ${{ matrix.model }}
+      VERSION: ${{ matrix.version }}
+      SECRET_NAME: ${{ matrix.secret_name }}
+      WHEEL_SHA256: ${{ needs.prepare.outputs.wheel_sha256 }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
+        with:
+          name: wheel
+          path: dist
+      - name: Check the wheel is the one prepare built
+        run: echo "$WHEEL_SHA256  $(ls dist/*.whl)" | sha256sum --check
+      - run: pipx install harbor==0.23.0
+      - run: python3 evals/scripts/preflight.py "$HARNESS" "$SECRET_NAME"
+      - if: matrix.harness == 'claude-code'
+        run: |
+          echo "CLAUDE_CODE_OAUTH_TOKEN=$SCAN_SECRET" >> "$GITHUB_ENV"
+          echo "CLAUDE_FORCE_OAUTH=1" >> "$GITHUB_ENV"
       # environment/lib/ is each image's last layer: the wheel and the requirements.txt naming it.
       # Written per run, never committed.
-      - name: Run on the candidate wheel
+      - name: Run the task
         run: |
           w=$(ls dist/*.whl)
-          for t in evals/tasks/*/; do rm -rf "$t/environment/lib"; mkdir -p "$t/environment/lib"; cp "$w" "$t/environment/lib/"; echo "/lib/$(basename "$w")" > "$t/environment/lib/requirements.txt"; done
-          harbor run -p evals/tasks -a claude-code -m anthropic/claude-sonnet-5 --ak version=$CLAUDE_CODE_VERSION -k 3 -n 2 -o evals/jobs/cand
+          lib="evals/tasks/$TASK/environment/lib"
+          rm -rf "$lib"; mkdir -p "$lib"; cp "$w" "$lib/"; echo "/lib/$(basename "$w")" > "$lib/requirements.txt"
+          harbor run -p evals/tasks -i "$TASK" -a "$HARNESS" -m "$MODEL" --ak version="$VERSION" -k 3 -n 3 -o "evals/jobs/$HARNESS/$TASK" \
+            --max-retries 2 \
+            --retry-include EnvironmentStartTimeoutError \
+            --retry-include SandboxBuildFailedError \
+            --retry-include SandboxLikelyOutOfMemoryError \
+            --retry-include VerifierTimeoutError \
+            --retry-include ApiRateLimitError \
+            --retry-include ApiOverloadedError \
+            --retry-include ApiInternalServerError \
+            --retry-include ApiConnectionError
       - name: Compare
         id: compare
-        run: python3 evals/scripts/compare.py evals/jobs/cand > evals/summary.md
+        run: python3 evals/scripts/compare.py "evals/jobs/$HARNESS/$TASK" "$TASK" > evals/summary.md
         continue-on-error: true
       - run: python3 evals/scripts/scan.py evals/jobs evals/summary.md
       - run: cat evals/summary.md >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
-          name: jobs
+          name: jobs-${{ matrix.harness }}-${{ matrix.task }}
           path: |
             evals/jobs/
             evals/summary.md
