@@ -329,3 +329,89 @@ def test_table_errored_column_counts_an_errored_trial(tmp_path: Path) -> None:
     code, rows = _table(leg)
     row = next(r for r in rows if r[:2] == ["codex", _T1])
     assert (code, row[2], row[4]) == (1, "2/3 (3 found)", "1")
+
+
+# Composed at runtime: no key, JWT or account value is tracked whole.
+_OPENAI_KEY = "sk-" + "proj-" + "PLANTED" * 5
+_JWT = ".".join(["eyJ" + "hbGciOiJIUzI1NiJ9", "eyJ" + "zdWIiOiJwbGFudGVkIn0", "PLANTEDsig" * 3])
+_ACCOUNT = "acct-" + "planted-" + "0042"
+_REFRESH = "rt-" + "planted-" + "refresh-" + "77"
+_CODEX_SECRET = json.dumps(
+    {"tokens": {"id_token": "idt-planted-1", "refresh_token": _REFRESH}, "n": 1}
+)
+
+
+def _scan_out(tmp_path: Path, content: str, env: dict[str, str] | None) -> tuple[int, str]:
+    trial = tmp_path / "jobs" / "trial"
+    trial.mkdir(parents=True)
+    (trial / "log.txt").write_text(content, encoding="utf-8")
+    full = {k: v for k, v in os.environ.items() if k != "SCAN_SECRET"} | (env or {})
+    cmd = [sys.executable, str(_ROOT / "evals" / "scripts" / "scan.py"), str(tmp_path / "jobs")]
+    done = run(cmd, env=full, timeout=60)
+    return done.returncode, done.stdout + done.stderr
+
+
+@pytest.mark.parametrize(
+    ("content", "env", "needle"),
+    [
+        (json.dumps({"k": _REFRESH}), {"SCAN_SECRET": _CODEX_SECRET}, _REFRESH),
+        ("key " + _OPENAI_KEY, None, _OPENAI_KEY),
+        ("jwt " + _JWT, None, _JWT),
+        (json.dumps({"creator_account_id": _ACCOUNT}), None, _ACCOUNT),
+        ("token " + _TOKEN, None, _TOKEN),
+    ],
+    ids=["codex-json-leaf", "openai-key-shape", "jwt-shape", "creator-account-id", "anthropic-shape"],
+)
+def test_scan_needle_kinds_name_the_file_and_never_the_needle(
+    tmp_path: Path, content: str, env: dict[str, str] | None, needle: str
+) -> None:
+    code, out = _scan_out(tmp_path, content, env)
+    assert code == 1
+    assert "log.txt" in out
+    assert needle not in out
+
+
+def test_scan_clean_tree_with_a_codex_secret_exits_zero(tmp_path: Path) -> None:
+    code, out = _scan_out(tmp_path, "nothing here", {"SCAN_SECRET": _CODEX_SECRET})
+    assert (code, _REFRESH in out) == (0, False)
+
+
+def _preflight(harness: str, secret: str | None) -> tuple[int, str]:
+    env = {k: v for k, v in os.environ.items() if k != "MODEL_SECRET"}
+    if secret is not None:
+        env["MODEL_SECRET"] = secret
+    cmd = [sys.executable, str(_ROOT / "evals" / "scripts" / "preflight.py"), harness, "MODEL_SECRET"]
+    done = run(cmd, env=env, timeout=60)
+    return done.returncode, done.stdout + done.stderr
+
+
+@pytest.mark.parametrize(
+    ("harness", "secret", "code"),
+    [
+        ("claude-code", "", 1),
+        ("codex", "", 1),
+        ("claude-code", None, 1),
+        ("codex", "not-json-" + "PLANTED", 1),
+        ("claude-code", "not-json-" + "PLANTED", 0),
+        ("codex", _CODEX_SECRET, 0),
+    ],
+    ids=["claude-empty", "codex-empty", "claude-unset", "codex-non-json", "claude-plain", "codex-json"],
+)
+def test_preflight_exit_and_output(harness: str, secret: str | None, code: int) -> None:
+    got, out = _preflight(harness, secret)
+    assert got == code
+    if secret:
+        assert secret not in out
+        assert _REFRESH not in out
+
+
+@pytest.mark.parametrize("harness", ["claude-code", "codex"])
+def test_preflight_error_is_one_line_naming_harness_secret_and_reseed_doc(harness: str) -> None:
+    code, out = _preflight(harness, "")
+    lines = out.strip().splitlines()
+    assert code == 1
+    assert len(lines) == 1
+    assert lines[0].startswith("::error::")
+    assert harness in lines[0]
+    assert "MODEL_SECRET" in lines[0]
+    assert "evals/RESEED.md" in lines[0]
