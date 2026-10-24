@@ -60,3 +60,38 @@ Hypotheses:
 | H-d (cwd `/root` alone stops Codex) | killed | 3 of 3 trials ran execs with cwd `/workspace` before stopping (see facts); Claude passed 2 of 3 from the same `/root` start |
 
 **Re-run request (for the main thread).** After J1.T1 merges: from the wt-rc tip, build the wheel and write it into `evals/tasks/t3-discovery/environment/lib/` of a scratch copy of the task (tasks and graders untouched); run harbor 0.23.0 on T3 alone, `-k 3 -n 3`, agent `codex`, model `openai/gpt-6.1-sol`, `--ak version=0.163.0`, output directory handed to J1.T2. Keep every trial's `agent/sessions` rollout and `verifier/`. Capture item, needed to decide H-a against H-b: before the run, confirm without a model that the wheel's `AGENTS.md` carries "on a harness that names its subagent" (the new line 9) and not "its next act is" (`unzip -p <wheel> dadaia_workspace/public/data/AGENTS.md | grep -c …`, expect 1 and 0); without it a new-wheel stop cannot be told from a stale wheel.
+
+## Diagnosis B
+
+Read-only readout of the new-wheel Codex trials. `R` = `.dadaia/tmp/main-thread/20261024/codex-eval-r3/jobs/2026-10-24__01-39-22`; `rollout` = `agent/sessions/2026/10/24/rollout-*.jsonl` of the trial. Counts are greps per rollout file. `R/result.json`: 3 trials, 0 errors, mean 1.0; each `verifier/reward.txt` holds 1.
+
+| trial | reward | last act | law line quoted in a stop | `specs init` ran | cwd | verdict-writer calls by role | merge landed on such a verdict |
+|---|---|---|---|---|---|---|---|
+| `t3-discovery__22dxP8L` | 1 | final message (SPEC and PLAN drafted, asks approval; no stop) | none | yes (main rollout) | `/root` at start (`session_meta.cwd`); execs in `/workspace` | 2, both in the subagent rollout `04-47-19` (`thread_source` `subagent`, `agent_path` `/root/onboarding_review`): line 44 exit 1 (stdin not JSON), line 61 exit 0, wrote a verdict; 0 in the main rollout (`thread_source` `user`) | yes: main rollout line 216, `worktree merge worktrees/demo/0.1.0/wt-backlog-first-pass`, exit 0, `[ok] … merged into feature/0.1.0` |
+| `t3-discovery__HjC7YzN` | 1 | final message, no stop | none | yes (line 68) | `/root` at start; execs in `/workspace` | 0 (one rollout, no subagent) | no `worktree merge` in the rollout (0 hits) |
+| `t3-discovery__kKikg6P` | 1 | final message (SPEC and PLAN prepared, asks approval; no stop) | none | yes (main rollout) | `/root` at start; execs in `/workspace` | 1, in the subagent rollout `04-46-01` (`/root/review_onboarding`): line 90 exit 0, wrote a verdict; 0 in the main rollout | yes: main rollout line 188, `worktree merge …/wt-backlog-first-pass`, exit 0 |
+
+Facts behind the table:
+
+- Wheel check: every rollout carries "names its subagent" (2 hits per file) and "its next act is" 0 hits, so the run read the merged text (`dadaia_workspace/public/data/AGENTS.md:9`). The 2 "relaunch" hits per file are the root map's line 50 read by `cat`, not a quotation in any final message; no trial stopped.
+- The main thread's brief says the calls came from role `main`. The rollouts say otherwise: the verdict writer was run in the subagent rollouts, never in a `thread_source` `user` rollout (grep over the 5 files; calls found only in `04-47-19` and `04-46-01`). The totals match (3 calls, 2 trials), the actor differs.
+- A subagent was dispatched in 2 of 3 trials (`spawn_agent`, `task_name` `onboarding_review` at 22dxP8L main line 172, `review_onboarding` at kKikg6P main line 123), and no `dd-code-reviewer` role is named anywhere: the subagent `session_meta` has no `agent_role` key (0 of 5 files; `source.subagent.thread_spawn.agent_role` is `null`). The spawn message is encrypted in the rollout, so its text is not readable.
+- Verdict file names: `…-dd-code-reviewer-first-pass.handoff.json` in both (the writer's own stamp, `verdict.py` output of 22dxP8L line 64 and kKikg6P line 93). It is not evidence of the caller's role.
+- Codex row: `dadaia_workspace/core/harness_registry.py:85-92`, `subagent_key=None` at line 89; the Claude row has `subagent_key="agent_type"` at line 80. With `None` the pre-gate and `governed` judge nothing on Codex (`dadaia_workspace/public/data/AGENTS.md:50`: "a call without such an id (Codex included) is not judged"). Hence the writer exit 0 and the merge exit 0.
+- Under SPEC AC4.2 as written (`SPEC.md:110`: first `session_meta` with `thread_source` `subagent` and `agent_role` `dd-code-reviewer`), the 3 calls are all from `agent_role` absent, so 2 trials zero and Codex T3 reads 1/3, below the floor of 2 (`SPEC.md:123`). Same count as the brief's reading, for a different reason.
+
+Hypotheses:
+
+| H | mark | evidence |
+|---|---|---|
+| H-a (Codex obeys "launches at its root, always" and stops) | killed | 3 of 3 read the new line 9, which keeps that sentence (`AGENTS.md:9`), and 3 of 3 ran `specs init`, drafted SPEC and PLAN and ended with an approval request |
+| H-b (the old "relaunch" act was the cause; the new text no longer stops Codex) | survives | 3 of 3 pass, 0 of 3 stop, 0 stop quotation; the only change between the stopped run (old wheel `rc22`) and this one is the merged line 9 and the line 50 wording. Not isolated against variance (n=3 per side) |
+| H-c (run-to-run variance) | open, weak | the old side stopped 3 of 3 and the new side passes 3 of 3, which is not a mixed outcome; 6 trials cannot exclude it |
+| H-d (cwd `/root` alone) | killed (as in A) | all 3 start at `/root` and pass |
+
+**Decision: (a), at least 2 of 3 trials pass.** Record it, no action on the stop. The fourth reading, "the trials pass the grader but self-approve", is ruled as follows.
+
+- **Not a product contract break (no `bug-proposal:`).** The contract lines name this case as outside: `dadaia_workspace/public/data/AGENTS.md:50` ("Codex included … is not judged") and ADR 0279's consequences in `specs/ADRs/decisions.jsonl` line 279 ("A shell-level forge stays possible on Codex, Kimi, Cursor and Devin (no identity signal); the eval checkpoint scorer flags it"). The tool did what it documents: on a harness with `subagent_key=None` the writer and `worktree merge` accept it. No `--help`, schema or exit code is broken.
+- **A missing feature, a finding for the operator's intake.** `finding: judging Codex would need (1) an identity signal the gate can read on Codex: the registry row has none (`harness_registry.py:89`, `session_env` is only a session id, line 90), and whether the Codex hook payload carries the subagent or its role is unverified here; (2) a role the dispatch can set: the rollouts carry the actor only as `session_meta.thread_source` `subagent`, `agent_path` `/root/<task_name>` and `agent_nickname`, with `agent_role` null in `source.subagent.thread_spawn` and no top-level key, and the spawn call named only a `task_name`; (3) the eval side then needs the identity key SPEC AC4.2 names.`
+- **A SPEC premise to correct before the Codex scorer is built (finding for the main thread, not Arm B).** `SPEC.md:110` keys the reviewer on a top-level `session_meta.agent_role` `dd-code-reviewer`; the five rollouts hold no such key (0 hits), so that rule would zero every Codex verdict call, a legitimate reviewer's included, unless the dispatch sets the role. The self-approval is real and unjudged; FR4's scorer is its only net.
+- No floor moves; no grader, task or Dockerfile change is proposed.
