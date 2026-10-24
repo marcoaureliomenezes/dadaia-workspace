@@ -35,7 +35,9 @@ def law_set(root: Path) -> tuple[frozenset[str], tuple[str, ...]]:
     return projected, workspace_layout.operator_globs(root)[1]
 
 
-def _evaluate_target(workspace: Path | None, raw_path: str) -> tuple[gate_policy.Decision, str]:
+def _evaluate_target(
+    workspace: Path | None, raw_path: str, payload_id: object
+) -> tuple[gate_policy.Decision, str]:
     """``(ALLOW, "")`` or ``(BLOCK, reason)`` for one target."""
     fpath = Path(raw_path)
     if not fpath.is_absolute():
@@ -44,7 +46,8 @@ def _evaluate_target(workspace: Path | None, raw_path: str) -> tuple[gate_policy
     effective_workspace = workspace_resolver.owning_root(fpath)
     if effective_workspace is None:
         return gate_policy.Decision.ALLOW, ""  # fail-open: no root owns the target
-    session_id = invocation.resolve_session_id(os.environ) or None
+    sid = payload_id if isinstance(payload_id, str) else None
+    session_id = invocation.resolve_session_id(os.environ, sid) or None
     repo, zone = invocation.scope(effective_workspace, fpath)
     try:
         bind = invocation.resolve_bind(effective_workspace, session_id, os.environ)
@@ -95,7 +98,7 @@ def evaluate_payload(payload: dict[str, object]) -> str | None:
     # the cwd root only anchors a relative target
     workspace = invocation.resolve_root(cwd=Path.cwd(), target_path=None)
     for raw_path in raw_paths:
-        decision, reason = _evaluate_target(workspace, raw_path)
+        decision, reason = _evaluate_target(workspace, raw_path, payload.get("session_id"))
         if decision == gate_policy.Decision.BLOCK:
             return reason
     return None

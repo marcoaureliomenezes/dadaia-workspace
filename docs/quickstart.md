@@ -95,8 +95,8 @@ clones every repo, installs the hook and makes the context ALIVE; `context bind`
 ```
 
 `bind` writes one record, `.dadaia/sessions/<session-id>.json` (context, runtime, pid,
-`bound_at`, `bind_id`, `last_seen_at`), and acquires nothing; the gate and the bind read the session id from the
-environment only. The bind names the session's scope — the
+`bound_at`, `bind_id`, `last_seen_at`), and acquires nothing; the CLI verbs read the session id from the environment, and the hooks also take the
+hook payload's id where the harness's registry row names a session variable. The bind names the session's scope — the
 context's main repo plus its associated repos — and the bound context's memory is
 injected once into the session. The bind is read from the session's own record when it has an
 id, else `DADAIA_CONTEXT`, never the cwd: sitting inside a repository is not a binding.

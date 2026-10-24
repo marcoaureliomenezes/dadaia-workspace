@@ -75,7 +75,7 @@ die with it. Specs, bind, memory, releases and backlog resolve only from the mai
 the context ALIVE — it never binds; on failure nothing is left behind. The name
 defaults to the main repo's slug. `bind` writes exactly one record,
 `.dadaia/sessions/<session-id>.json` (context, runtime, pid, `bound_at`, `bind_id`, `last_seen_at`), and acquires
-nothing; the session id comes from the environment only, and a session without a
+nothing; the CLI verbs read the session id from the environment, and the hooks also take the hook payload's id where the harness's registry row names a session variable, and a session without a
 harness-native id exports `DADAIA_SESSION_ID` before it binds. The bind's scope
 is the context's main repo plus its associated repos; a MUTATING file-tool write into a
 repo outside it is refused with the bind that would allow it, unless the write lands in a
