@@ -26,6 +26,14 @@ Also not a code consumer but stale after the job, for the closure memory pass (R
 
 **Definition of done (each task).** `python scripts/ci.py job` passes (about 73 s); the reached test directories pass: `python -m pytest -q tests/core tests/hooks tests/cli/commands/test_context.py` (an estimate of well under a minute; unmeasured); for J8.T3 and J8.T4, reverting the source change makes the J8.T1 and J8.T2 rows red again; the own-diff self-check of `dd-release-implementation` section 3; the sweep `git grep -n -E "Codex included|Claude Code today"` over `dadaia_workspace/` returns 0 hits after J8.T5. A test file carries its `Owner:` line and no task or AC id in a docstring or comment.
 
+## Probe
+
+H12, recorded by the main thread. Decision: the plan holds, and J8.T2 proceeded.
+
+- **Command env, live** (`codex exec`, Codex 0.164.0, at the workspace root, 2026-10-24). The main thread and one `dd-code-reviewer` subagent each ran `env | grep -E '^CODEX_(SESSION|THREAD)_ID='`. Both carry the same `CODEX_SESSION_ID`; each carries its own `CODEX_THREAD_ID`; in the main thread the two are equal. Ids compared by script, never recorded (`.dadaia/tmp/main-thread/20261024/codex-probe/out2.txt`).
+- **Hook payload, source read** (Codex `rust-v0.163.0`, unchanged in 0.164): the payload `session_id` equals the command env's `CODEX_SESSION_ID` in the main thread and in a subagent (`codex-rs/core/src/hook_runtime.rs:156`, `:308`, `:685`; `exec_env.rs:41-42`). A hook process's env carries no session id.
+- **Not run:** the live payload capture this file describes. It needs the Codex hook-trust bypass flag, which the session's permission classifier refused, and that refusal was not worked around. The run on E is its live measure: a Codex T3 reviewer writes its verdict only if a hook left the record under the id its command resolves.
+
 | task | who | AC | `W:` | waits on | tests | outcome |
 |---|---|---|---|---|---|---|
 | J8.T1 | sr | AC10.2 AC10.3 | `tests/core/test_harness_registry__harness_registry_records.py` `tests/core/test_invocation.py` `tests/hooks/test_sdd_gate__protected_projections.py` | - | owners as named. RED (the decider): the registry map names `agent_type` for Codex (the one assert moved, on the operator's R7 ruling named in the `test(` commit); `governed` is false for an env holding only `CODEX_SESSION_ID` or only `CODEX_THREAD_ID` with no record, true with a live record, and true for the shared id a subagent resolves; an env with only `DADAIA_SESSION_ID` is unchanged; `resolve_session_id` with a payload id returns it when env has none, and env wins when both are present | RED acceptance test for the judged Codex row and the payload source; the probe request above rides this task |
