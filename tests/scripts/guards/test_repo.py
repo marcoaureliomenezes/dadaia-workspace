@@ -88,7 +88,7 @@ _PIN = "2.1.284"
 _TASKS = ("t1-cold-onboarding", "t2-block-list-bug", "t3-discovery")
 _ROWS = "".join(
     f"          - harness: {h}\n            task: {t}\n            model: {m}\n"
-    f"            version: {v}\n            secret: {s}\n"
+    f"            version: {v}\n            secret_name: {s}\n"
     for h, m, v, s in (
         ("claude-code", "anthropic/claude-sonnet-5", _PIN, "CLAUDE_CODE_OAUTH_TOKEN"),
         ("codex", "openai/gpt-6.1-sol", "0.163.0", "CODEX_AUTH_JSON"),
@@ -130,7 +130,7 @@ jobs:
       matrix:
         include:
 {_ROWS}    env:
-      SCAN_SECRET: ${{{{ secrets[matrix.secret] }}}}
+      SCAN_SECRET: ${{{{ secrets[matrix.secret_name] }}}}
     steps:
       - uses: actions/checkout@aaa
       - uses: actions/download-artifact@ccc
@@ -161,7 +161,7 @@ jobs:
       - uses: actions/download-artifact@ccc
         with:
           pattern: jobs-*
-          path: evals/jobs
+          path: evals
           merge-multiple: true
       - name: Table
         id: compare
@@ -175,10 +175,12 @@ jobs:
     needs: [prepare, eval, aggregate]
     if: ${{{{ always() }}}}
     runs-on: ubuntu-24.04
+    env:
+      PREPARE: ${{{{ needs.prepare.result }}}}
+      EVAL: ${{{{ needs.eval.result }}}}
+      AGGREGATE: ${{{{ needs.aggregate.result }}}}
     steps:
-      - run: test "$R" = success && exit 0 || exit 1
-        env:
-          R: ${{{{ needs.eval.result }}}}
+      - run: test "$PREPARE $EVAL $AGGREGATE" = "success success success"
 """
 
 
@@ -191,6 +193,21 @@ def _eval_rules(monkeypatch: pytest.MonkeyPatch, text: str) -> set[str]:
 @pytest.mark.medium
 def test_the_multi_job_eval_workflow_yields_no_hit(monkeypatch: pytest.MonkeyPatch) -> None:
     assert _eval_rules(monkeypatch, _EVAL_YML) == set()
+
+
+_LEG_PUBLISH = f"""      - run: {_SCAN_RUN}
+      - run: cat evals/summary.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@bbb
+        with:
+          name: jobs-h-t
+          path: |
+            evals/jobs/
+            evals/summary.md
+"""
+_LEG_UPLOAD = (
+    "      - uses: actions/upload-artifact@bbb\n        with:\n          name: jobs-h-t\n"
+    "          path: {}\n"
+)
 
 
 @pytest.mark.medium
@@ -219,6 +236,14 @@ def test_the_multi_job_eval_workflow_yields_no_hit(monkeypatch: pytest.MonkeyPat
             "      - name: Run the leg\n        env: {K: '${{ secrets.OTHER }}'}\n",
         ),
         ("eval-cli-pin", f"            version: {_PIN}\n", ""),
+        ("summary-unscanned", _LEG_PUBLISH, _LEG_UPLOAD.format("evals/jobs")),
+        ("summary-unscanned", _LEG_PUBLISH, _LEG_UPLOAD.format("evals/")),
+        (
+            "upload-before-scan",
+            "      - name: Run the leg\n",
+            "      - uses: actions/upload-artifact@bbb\n        with:\n          name: wheel2\n"
+            "          path: dist/*.whl\n      - name: Run the leg\n",
+        ),
     ],
     ids=[
         "action",
@@ -227,6 +252,9 @@ def test_the_multi_job_eval_workflow_yields_no_hit(monkeypatch: pytest.MonkeyPat
         "summary-no-scan",
         "step-secret",
         "row-without-version",
+        "leg-uploads-jobs-without-slash",
+        "leg-uploads-evals-dir",
+        "wheel-upload-in-the-secret-leg",
     ],
 )
 def test_each_mutation_of_the_multi_job_eval_workflow_trips_its_own_rule(
