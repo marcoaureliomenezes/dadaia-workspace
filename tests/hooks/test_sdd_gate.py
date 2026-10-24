@@ -17,7 +17,12 @@ import pytest
 from dadaia_workspace.core import session_store
 from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.workspace_resolver import FENCE_ENV
-from tests.fixtures.harness_env import claude_hook_env, run_hook_subprocess
+from tests.fixtures.harness_env import (
+    claude_hook_env,
+    codex_hook_env,
+    kimi_hook_env,
+    run_hook_subprocess,
+)
 from tests.helpers.oslib import write_text
 
 
@@ -73,6 +78,15 @@ def _row(id: str, target: Any, want: str | None = None, **opts: Any) -> Any:
              records=_BOUND_A),
         _row("no-repo-write-resolves-via-rung3-cwd-repo", "specs/releases/r/TASKS.md",
              cwd="repos/a"),
+        _row("a-bound-claude-session-writing-another-contexts-tree-is-out-of-scope",
+             "worktrees/b/0.5.0-rc1/j1/src/x.py", "context bind b", records=_BOUND_A),
+        _row("a-bound-codex-session-id-in-the-payload-writing-another-contexts-tree-is-out-of-scope",
+             "worktrees/b/0.5.0-rc1/j1/src/x.py", "context bind b", records=_BOUND_A,
+             harness="codex"),
+        _row("a-bound-codex-session-writing-inside-its-own-tree-is-allowed",
+             _WT_A + "src/x.py", records=_BOUND_A, harness="codex"),
+        _row("a-kimi-payload-id-does-not-count-so-the-session-stays-id-less",
+             "worktrees/b/0.5.0-rc1/j1/src/x.py", records=_BOUND_A, harness="kimi"),
         _row("two-live-sessions-both-write-no-lock", _WT_A + "specs/releases/rel-1/TASKS.md",
              records={**_BOUND_A, "peer": {"context": "a"}}),
         _row("a-foreign-read-bind-never-imposes-read-on-my-write", _WT_A + "src/x.py",
@@ -118,7 +132,8 @@ def test_gate_verdict(tmp_path: Path, target: Any, want: str | None, opts: dict[
         tool_input = {}
     else:
         tool_input = {"file_path": str(ws / target)}
-    env = claude_hook_env(ws, session_id="s")
+    harness_env = {"codex": codex_hook_env, "kimi": kimi_hook_env}.get(opts.get("harness", ""))
+    env = harness_env(ws) if harness_env else claude_hook_env(ws, session_id="s")
     env.pop("DADAIA_CONTEXT", None)  # never inherit the operator's shell
     env.update(opts.get("env", {}))
     if opts.get("fence"):  # the fence says "never act on", never "nothing protects"
