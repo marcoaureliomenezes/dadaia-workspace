@@ -6,7 +6,7 @@ Where dadaia-workspace is published and what each channel carries.
 
 | channel | artifact | how it is published |
 |---|---|---|
-| PyPI | the wheel; `README.md` is the long description and `pyproject.toml` the metadata | `.github/workflows/release.yml`: merging the release PR creates the tag, and the publish jobs, gated on `release_created` and on the operator's `release-gate` approval, upload under OIDC trusted publishing |
+| PyPI | the wheel; `README.md` is the long description and `pyproject.toml` the metadata | `.github/workflows/release.yml`: merging the release PR creates the tag, and the publish jobs, gated on `release_created` and on the operator's `release-gate` approval, upload under OIDC trusted publishing; a PR into `main` needs the `Eval gate` check, which passes only on a green run of the library's own agent evals over the PR's content |
 | GitHub repository | the repository description, topics and homepage | set from the same tagline and keywords as `pyproject.toml` |
 | Repository root | `llms.txt` — an index whose every line links to a derived document, the law, the CLI reference or the memory catalog; `llms-full.txt` — the full text of every repository page `llms.txt` links, in its order, the changelog excepted | `llms.txt` committed and reconciled from product memory; `llms-full.txt` generated, never hand-edited, from the pages `llms.txt` links |
 | Docs | the repository's `docs/` folder on `main`, with no build toolchain or site | every page reconciled from product memory |

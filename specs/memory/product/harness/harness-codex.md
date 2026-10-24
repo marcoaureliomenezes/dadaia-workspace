@@ -22,7 +22,9 @@ sources:
 ## Hooks
 
 - The hook behaviours ([[agentic-entities]]) are registered in `.codex/hooks.json` through wrappers under `.dadaia/hooks/codex-*`: `PreToolUse` the pre-gate (matcher `^(apply_patch|Edit|Write)$`), a matcher-less `PostToolUse` post-gate, `SessionStart` (`startup|resume`) ctx-inject plus the reaper, and `UserPromptSubmit` ctx-inject.
-- Codex reads the gate's `decision: block`/`reason` envelope directly; the wrappers translate nothing. Its payload names no running subagent (no `subagent_key`), so the verdict-writer act is judged nowhere on Codex ([[sdd-gate-v3]]).
+- Codex reads the gate's `decision: block`/`reason` envelope directly; the wrappers translate nothing.
+- Its hooks run with no session id in their env: each takes the payload's `session_id`, which equals the `CODEX_SESSION_ID` a command of the session and of its subagents sees, so the heartbeat leaves the live record under that id ([[context-management]]).
+- Its registry row names the payload's `agent_type` as its subagent key, so Codex is judged by its session record: `verdict.py`, `worktree merge` and `context bind` refuse a call whose env carries a Codex session id with no live record under the workspace root, a session launched outside it included. The pre-gate's matcher holds no shell tool, so the verdict-writer act itself is not judged: inside a governed session an ad-hoc subagent can still write a verdict, which the eval's forged-verdict check measures ([[sdd-gate-v3]], [[agent-evals]]).
 - Whether hooks fire is `dadaia certify`'s `codex-live-probe` (a real `codex exec`), never the doctor's.
 
 ## Models and doctor

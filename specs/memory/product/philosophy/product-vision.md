@@ -12,7 +12,7 @@ sources:
 
 ## Paradigm
 
-- An agent session starts at the workspace root; a session launched elsewhere loads no persona and no hook, so it stands in for no role and writes no verdict. Product repositories live under `repos/<slug>/`; governance, projections, skills and runtime state live outside them.
+- An agent session starts at the workspace root; a session launched elsewhere loads no persona and no hook, so it stands in for no role; on a harness whose registry row names its subagent, Claude Code and Codex, `context bind`, the verdict writer and `worktree merge` refuse it ([[context-management]]). Product repositories live under `repos/<slug>/`; governance, projections, skills and runtime state live outside them.
 - A context is one main repository, where `specs/` lives, plus associated repositories. A workspace holds many contexts and a context may span many repositories; this is not a monorepo ([[context-management]]).
 - Repository changes land from canonical worktrees. Audits are the sole direct specs exception ([[worktrees]]).
 - The same authored law reaches every registered harness through native files or projections ([[agentic-entities]]).

@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-23T23:34:33Z",
+  "generated_at": "2026-10-24T18:35:00Z",
   "features": [
     {
       "rank": 1,
@@ -97,8 +97,8 @@
       "slug": "agent-evals",
       "title": "agent-evals",
       "area": "distribution",
-      "tldr": "The library's own agent evals — three graded tasks run on the candidate wheel alone by one dispatch-or-schedule workflow.",
-      "summary": "evals/ holds a cold-onboarding task, a block-list-bug task and a discovery task, each graded by a script on the state the agent leaves; .github/workflows/eval.yml runs each three times on the candidate wheel built from its own checkout, never on a published release, scans every upload for the model secret, and blocks when a gated task falls below its floor.",
+      "tldr": "The library's own agent evals — three graded tasks run on the candidate wheel by Claude Code and Codex, and the Eval gate that makes a green run the deploy gate.",
+      "summary": "evals/ holds a cold-onboarding task, a block-list-bug task and a discovery task, each graded by a script on the state the agent leaves; .github/workflows/eval.yml builds the candidate wheel once, runs each task three times per harness in its own leg, scans every upload for secrets and account ids, and blocks when any (harness, task) falls below its floor; the Eval gate check on a PR into main passes only with a green run on a commit whose diff to the head is release bookkeeping.",
       "path": "specs/memory/product/distribution/agent-evals.md",
       "tags": [
         "evals",
@@ -106,7 +106,7 @@
         "release-gate",
         "distribution"
       ],
-      "token_estimate": 772,
+      "token_estimate": 1256,
       "depends_on": [
         "pypi-distribution",
         "QUALITY",
@@ -132,16 +132,16 @@
         "projection",
         "privacy"
       ],
-      "token_estimate": 1566,
+      "token_estimate": 1581,
       "depends_on": [
         "agentic-entities",
+        "context-management",
         "bug-ledger",
         "agent-orchestration",
         "sdd-gate-v3",
         "workspace-init",
         "workspace-doctor",
         "specs-migration",
-        "context-management",
         "pypi-distribution",
         "consumer-agent-support",
         "harness-kimi-code"
@@ -178,7 +178,7 @@
         "release",
         "packaging"
       ],
-      "token_estimate": 1635,
+      "token_estimate": 1733,
       "depends_on": [
         "release-lifecycle",
         "QUALITY",
@@ -240,10 +240,12 @@
         "projection",
         "hooks"
       ],
-      "token_estimate": 439,
+      "token_estimate": 585,
       "depends_on": [
         "agentic-entities",
+        "context-management",
         "sdd-gate-v3",
+        "agent-evals",
         "agent-orchestration",
         "public-asset-distribution"
       ],
@@ -380,7 +382,7 @@
         "paradigm",
         "pillars"
       ],
-      "token_estimate": 817,
+      "token_estimate": 844,
       "depends_on": [
         "context-management",
         "worktrees",
@@ -466,7 +468,7 @@
         "release-gate",
         "sdd"
       ],
-      "token_estimate": 405,
+      "token_estimate": 427,
       "depends_on": [
         "pypi-distribution",
         "workspace-init",
@@ -497,7 +499,7 @@
         "session",
         "privacy"
       ],
-      "token_estimate": 3357,
+      "token_estimate": 3575,
       "depends_on": [
         "specs-migration",
         "workspace-doctor",
@@ -855,12 +857,12 @@
         "privacy",
         "git"
       ],
-      "token_estimate": 1550,
+      "token_estimate": 1598,
       "depends_on": [
+        "context-management",
         "cross-platform-portability",
         "worktrees",
         "bug-ledger",
-        "context-management",
         "workspace-doctor",
         "agentic-entities",
         "public-asset-distribution",
