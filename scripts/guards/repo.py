@@ -231,8 +231,11 @@ def _publishes(step: dict[str, Any]) -> bool:
     )
 
 
-def _uploads_scan(step: dict[str, Any]) -> bool:
-    return str(step.get("uses")).startswith(_ACTIONS[1]) and bool(_paths(step) & _UPLOADED)
+def _publishing(step: dict[str, Any]) -> bool:
+    """A step that writes the step summary, or uploads what the scan covers."""
+    return "GITHUB_STEP_SUMMARY" in str(step.get("run")) or (
+        str(step.get("uses")).startswith(_ACTIONS[1]) and bool(_paths(step) & _UPLOADED)
+    )
 
 
 def _publish_if(step: dict[str, Any]) -> str:
@@ -284,7 +287,7 @@ def _eval_publish(job: dict[str, Any]) -> list[str]:
         for i, s in enumerate(after, scan + 1)
     ]
     shapes = {
-        "summary-unscanned": any(_uploads_scan(s) for s in steps) and not scans,
+        "summary-unscanned": any(_publishing(s) for s in steps) and not scans,
         "upload-before-scan": bool(pub and scans) and pub[0] < scan,
         **_scan_rules(steps),
     }
