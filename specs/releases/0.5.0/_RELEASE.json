@@ -2592,6 +2592,18 @@
         "product-vision",
         "consumer-agent-support"
       ]
+    },
+    {
+      "ts": "2026-10-24T18:36:41Z",
+      "agent": "dd-product-engineer",
+      "kind": "note",
+      "text": "Operator authorization verbatim: Authorize the carry — mcp-on-main-is-vulnerable-to-session-exhaustion"
+    },
+    {
+      "ts": "2026-10-24T18:36:41Z",
+      "agent": "dd-product-engineer",
+      "kind": "summary",
+      "text": "delivered: rc-23 'the multi-harness eval pipeline and its deploy gate' (SPEC FR1-FR10, Origin operator-demand) in 8 jobs merged into its wt-rc; net source +497 (+599 -102) over 149571afb..562c37889 by git diff --numstat, specs/, tests/, docs/, README.md and llms-full.txt excluded (tests +946 -39): (1) Job 1, the Codex T3 diagnosis, whose T3 adoption readout is: on the rc22 wheel Codex T3 scored 0/3, every trial stopping on the root map's relaunch text; on the rc-23 tip before Job 8 the grader passed 3/3 with no stop (hypothesis H-b survives), but 2 of the 3 trials merged on a verdict a role-less subagent wrote, so under AC4.2 Codex T3 reads 1/3, below its floor of 2; (2) Job 2, ADR 0281 accepted, ADR 0225 rejected, ADRs 0269 and 0277 superseded; (3) Jobs 3-5, evals/scripts compare.py (the per-harness forged check, leg.json, --table with pass^3 and the Wilson 95% interval), scan.py (JSON-leaf, key, JWT and creator-id needles), preflight.py, render.py and evals/RESEED.md; (4) Job 6, eval.yml rebuilt as prepare, a 6-leg Claude Code x Codex matrix, aggregate and result, with no-model-api-in-ci holding one publish decider and eval-cli-pin judging every matrix row; (5) Job 7, the Eval gate (evals/scripts/gate.py, the ci.yml job, .github/required-checks.json; release.yml grants actions: read); (6) Job 8 (FR10, ADR 0282 accepted), Codex judged by its session record: its registry row names agent_type, the hooks take the payload session id under the one session-id rule, one id per hook call, every lane wrapper exports DADAIA_RUNTIME, certify binds as an operator terminal, root map line 50 restated; (7) at closure the REBUILD a46615b31 resolved codex-pre-gate-judges-a-bound-session-as-id-less, and the -s ours merge of origin/main (7438f591f) changed no file; earlier on the work branch in this window, the session-check hotfix (a-session-outside-the-workspace-root-merges-on-its-own-verdict) and the bind hotfix (context-bind-fakes-a-governed-session), both resolved; goals: 1-3 and 5 on the run on E, which follows this reconcile; goal 4's Eval gate is listed in .github/required-checks.json and its branch protection is the operator's act after that run; memory: 8 atoms changed, 6 reviewed, QUALITY P-33 and its gates line; carried: mcp-on-main-is-vulnerable-to-session-exhaustion (open CRITICAL on main only, where the work line has no mcp, clearing at the promote; authorized in the note above); backlog exits: eval-codex-lane-in-library-ci rejected (absorbed by rc-23's Codex legs and Eval gate; delivered and superseded are refused for an operator-demand Origin), release-approve-requires-evals-gate rejected (absorbed by rc-23's Eval gate, ADR 0281 (3)); evals-benchmark-lanes and opencode-harness-support stay active"
     }
   ]
 }
