@@ -301,6 +301,19 @@ def test_first_emission(
     assert not any(a in out for a in absent), out
 
 
+@pytest.mark.parametrize("event", [None, "SessionStart"], ids=["prompt", "session-start"])
+def test_the_first_event_of_an_unrecorded_session_leaves_a_live_record(
+    tmp_path: Path, event: str | None
+) -> None:
+    _ws(tmp_path, {"name": "alpha"})
+
+    _run(tmp_path, "fresh", event=event)
+
+    record = session_store.live_session(tmp_path, "fresh")
+    assert record is not None and record["session_id"] == "fresh"
+    assert "context" not in record and "bind_id" not in record
+
+
 def test_env_override_injects_context_memory(tmp_path: Path) -> None:
     """A session with no id (a Kimi shell, no payload id) is bound by DADAIA_CONTEXT."""
     _ws(tmp_path, {"name": "ctx"})

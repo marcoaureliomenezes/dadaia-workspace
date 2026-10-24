@@ -322,6 +322,36 @@ def test_context_dead_surfaces_the_refused_push_with_its_fix_line(
     assert repo.is_dir()
 
 
+_RELAUNCH = "fix: Operator action: relaunch the session at the workspace root"
+
+
+@pytest.mark.parametrize(
+    ("session", "recorded", "exit_code"),
+    [
+        pytest.param(None, False, 0, id="no-session"),
+        pytest.param("sess_live", True, 0, id="live-record"),
+        pytest.param("sess_ghost", False, 1, id="no-record"),
+    ],
+)
+def test_session_check_passes_a_governed_session_and_refuses_the_rest(
+    workspace: Path, session: str | None, recorded: bool, exit_code: int
+) -> None:
+    from dadaia_workspace.core import clock, session_store
+
+    if recorded and session:
+        session_store.write_session(
+            workspace, session, {"session_id": session, "last_seen_at": clock.now_iso()}
+        )
+    env = {"CLAUDE_CODE_SESSION_ID": session} if session else {}
+
+    result = _runner.invoke(app, ["context", "session-check"], env=env)
+
+    assert result.exit_code == exit_code, result.output
+    if exit_code:
+        assert " ".join(result.output.split()).count("fix: ") == 1
+        assert _RELAUNCH in " ".join(result.output.split())
+
+
 def test_show_unbound_is_calm_in_both_modes(workspace: Path) -> None:
     """With no bind, `show --json` answers
     {"context": null} and human `show` prints a calm line — both exit 0, no traceback."""

@@ -17,6 +17,7 @@ import pytest
 from tests.helpers.oslib import write_text
 from tests.helpers.worktree_ws import (
     NEW_JOB,
+    RELAUNCH,
     approve,
     commit,
     diff_hash,
@@ -25,6 +26,7 @@ from tests.helpers.worktree_ws import (
     land,
     make_workspace,
     open_tree,
+    record_session,
     run,
 )
 
@@ -167,12 +169,36 @@ def test_a_matching_verdict_tied_with_a_forged_one_refuses(root: Path) -> None:
     _refusal(root, run(root, "merge", TREE), head)
 
 
-def test_a_bound_approval_of_head_lands(root: Path) -> None:
+@pytest.mark.parametrize("session", [None, "recorded-sess"], ids=["no-session", "recorded-session"])
+def test_a_bound_approval_of_head_lands(root: Path, session: str | None) -> None:
     head = land(root, "src/a.py")
     approve(root, head, name=NEW_JOB)
-    landed = run(root, "merge", TREE)
+    if session:
+        record_session(root, session)
+    landed = run(root, "merge", TREE, session=session)
     assert landed.returncode == 0, landed.stderr
     assert git(root / "repos/r", "rev-parse", f"wt/{RC}").strip() == head
+
+
+def test_a_session_no_workspace_hook_governs_cannot_merge_on_a_valid_verdict(root: Path) -> None:
+    head = land(root, "src/a.py")
+    approve(root, head, name=NEW_JOB)
+
+    refused = run(root, "merge", TREE, session="unrecorded-sess")
+
+    assert refused.returncode == 1 and fixes(refused) == [RELAUNCH], refused.stderr
+    assert git(root / "repos/r", "rev-parse", f"wt/{RC}").strip() != head
+
+
+def test_a_session_no_workspace_hook_governs_is_refused_before_the_verdict_check(
+    root: Path,
+) -> None:
+    head = land(root, "src/a.py")  # no verdict exists: the dispatch line must not be the answer
+
+    refused = run(root, "merge", TREE, session="unrecorded-sess")
+
+    assert refused.returncode == 1 and fixes(refused) == [RELAUNCH], refused.stderr
+    assert git(root / "repos/r", "rev-parse", f"wt/{RC}").strip() != head
 
 
 def test_a_bound_approval_does_not_land_a_tree_with_uncommitted_changes(root: Path) -> None:

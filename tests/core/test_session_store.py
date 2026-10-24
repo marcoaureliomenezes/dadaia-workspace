@@ -42,12 +42,34 @@ def test_record_roundtrip_atomicity_and_fail_soft(tmp_path: Path) -> None:
 
 
 def test_touch_last_seen_at(tmp_path: Path) -> None:
-    """The heartbeat stamps and persists ``last_seen_at``; a missing record is a no-op None."""
+    """The heartbeat stamps and persists ``last_seen_at`` on an existing record."""
     si.write_session(tmp_path, SID, {"id": SID, "last_seen_at": "2020-01-01T00:00:00+00:00"})
     updated = si.touch_last_seen_at(tmp_path, SID, now="2030-06-10T12:00:00+00:00")
     assert updated is not None and updated["last_seen_at"] == "2030-06-10T12:00:00+00:00"
     assert si.read_session(tmp_path, SID) == updated
-    assert si.touch_last_seen_at(tmp_path, "ghost", now="2030-06-10T12:00:00+00:00") is None
+
+
+def test_touch_creates_the_minimal_record_of_a_session_with_none(tmp_path: Path) -> None:
+    """A session the hooks see for the first time gets a record that binds nothing."""
+    created = si.touch_last_seen_at(tmp_path, "ghost", now="2030-06-10T12:00:00+00:00")
+    assert created == {"session_id": "ghost", "last_seen_at": "2030-06-10T12:00:00+00:00"}
+    assert si.read_session(tmp_path, "ghost") == created
+
+
+def test_touch_renews_a_bound_record_without_changing_its_bind(tmp_path: Path) -> None:
+    bound = si.new_binding_record(
+        session_id=SID,
+        context="alpha",
+        runtime="claude-code",
+        pid=7,
+        now="2020-01-01T00:00:00+00:00",
+    )
+    si.write_session(tmp_path, SID, bound)
+
+    renewed = si.touch_last_seen_at(tmp_path, SID, now="2030-06-10T12:00:00+00:00")
+
+    assert renewed == {**bound, "last_seen_at": "2030-06-10T12:00:00+00:00"}
+    assert si.read_session(tmp_path, SID) == renewed
 
 
 def test_new_binding_record_authors_the_schema_and_retired_keys_still_parse() -> None:

@@ -14,6 +14,7 @@ from pathlib import Path
 
 import pytest
 
+from dadaia_workspace.core import session_store
 from dadaia_workspace.core.skill_owner import load_owner
 from tests.fixtures.harness_env import claude_hook_env, run_hook_subprocess
 from tests.helpers.oslib import read_text, write_text
@@ -147,6 +148,24 @@ def test_sdd_post_gate_hook_never_mutates_tasks_md_content(tmp_path: Path) -> No
 
     after = read_text(target)
     _assert_sdd_invariants_preserved(before, after)
+
+
+@pytest.mark.medium
+def test_the_first_post_tool_use_of_an_unrecorded_session_leaves_a_live_record(
+    tmp_path: Path,
+) -> None:
+    ws = _mk_hook_workspace(tmp_path)
+
+    result = run_hook_subprocess(
+        "sdd_post_gate",
+        {"session_id": "fresh-sess", "tool_name": "Bash", "tool_input": {"command": "ls"}},
+        claude_hook_env(ws, session_id="fresh-sess"),
+    )
+
+    assert result.returncode == 0, result.stderr
+    record = session_store.live_session(ws, "fresh-sess")
+    assert record is not None and record["session_id"] == "fresh-sess"
+    assert "context" not in record and "bind_id" not in record
 
 
 @pytest.mark.medium

@@ -17,11 +17,21 @@ import pytest
 
 from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.skill_owner import load_owner
-from tests.fixtures.harness_env import suite_env
+from tests.fixtures.harness_env import CLAUDE_SESSION_ENV_VAR, suite_env
 from tests.helpers.oslib import command, read_text, write_text
 from tests.helpers.oslib import run as os_run
 from tests.helpers.skill_scripts import stage_skill_scripts
-from tests.helpers.worktree_ws import approve, commit, fixes, git, make_workspace, patch_cli, run
+from tests.helpers.worktree_ws import (
+    RELAUNCH,
+    approve,
+    commit,
+    fixes,
+    git,
+    make_workspace,
+    patch_cli,
+    record_session,
+    run,
+)
 
 PKG = Path(__file__).resolve().parents[5] / "dadaia_workspace"
 SKILL = "dd-handoff-emitter"
@@ -66,6 +76,7 @@ def _verdict(
     stdin: str | None = None,
     slug: str = "s",
     cwd: Path | None = None,
+    session: str | None = None,
     **over: str,
 ) -> subprocess.CompletedProcess[str]:
     script = root / ".agents/skills" / SKILL / "scripts/verdict.py"
@@ -81,7 +92,12 @@ def _verdict(
     env = suite_env(
         os.environ,
         Path.home(),
-        overrides={"PATH": os.environ["PATH"], "HOME": str(root), "GIT_CONFIG_NOSYSTEM": "1"},
+        overrides={
+            "PATH": os.environ["PATH"],
+            "HOME": str(root),
+            "GIT_CONFIG_NOSYSTEM": "1",
+            **({CLAUDE_SESSION_ENV_VAR: session} if session else {}),
+        },
     )
     return os_run(cmd, cwd=cwd or root, env=env, input=json.dumps(BODY) if stdin is None else stdin)
 
@@ -109,6 +125,29 @@ def test_a_verdict_binds_the_head_it_judged_and_the_merge_lands_on_it(tmp_path: 
     jsonschema.validate(body, schema)
     landed = run(root, "merge", str(tree))
     assert landed.returncode == 0, landed.stderr
+
+
+@pytest.mark.parametrize(
+    ("session", "recorded", "written"),
+    [
+        pytest.param(None, False, True, id="operator-terminal-no-session"),
+        pytest.param("recorded-sess", True, True, id="session-a-hook-governs"),
+        pytest.param("unrecorded-sess", False, False, id="session-no-hook-governs"),
+    ],
+)
+def test_a_verdict_is_written_only_by_a_session_the_workspace_governs(
+    tmp_path: Path, session: str | None, recorded: bool, written: bool
+) -> None:
+    """A reviewer subagent carries its parent's id, so it writes exactly when the parent does."""
+    root, tree, head = _workspace(tmp_path)
+    if recorded and session:
+        record_session(root, session)
+
+    done = _verdict(root, tree, sha=head, session=session)
+
+    assert (done.returncode == 0, len(_written(root))) == (written, int(written)), done.stderr
+    if not written:
+        assert fixes(done) == [RELAUNCH] and done.stdout == ""
 
 
 def test_a_verdict_for_a_sha_a_later_commit_left_behind_is_refused_by_the_merge(

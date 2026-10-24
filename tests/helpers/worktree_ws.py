@@ -14,13 +14,14 @@ import subprocess
 import sys
 from pathlib import Path
 
+from dadaia_workspace.core import clock, session_store
 from dadaia_workspace.core.cli_line import shell_line
 from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
 from dadaia_workspace.core.platform import PLATFORM
 from dadaia_workspace.core.skill_owner import load_owner
 from dadaia_workspace.features.spec_context.doctor import DoctorService
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
-from tests.fixtures.harness_env import run_bash, suite_env
+from tests.fixtures.harness_env import CLAUDE_SESSION_ENV_VAR, run_bash, suite_env
 from tests.fixtures.stores import context_store, fake_venv
 from tests.helpers.oslib import run as run_text
 from tests.helpers.oslib import write_text
@@ -29,6 +30,8 @@ SCRIPT = (
     Path(__file__).resolve().parents[2]
     / "dadaia_workspace/public/skills/dd-gitflow-default/scripts/worktree.py"
 )
+#: The refusal line of a session no workspace hook governs.
+RELAUNCH = "fix: Operator action: relaunch the session at the workspace root"
 FLOW = {"principal": "trunk", "integration": "dev", "work": "feature/"}
 #: The repo's gate: prints its argv; level L fails iff the tree holds `RED-<L>`.
 CI = 'import pathlib, sys\nprint("ci", *sys.argv[1:])\nsys.exit(pathlib.Path("RED-" + sys.argv[1]).exists())\n'
@@ -45,6 +48,13 @@ if args[:2] == ["context", "list"]:
         print("[error] the workspace root is fenced", file=sys.stderr)
         sys.exit(1)
     print({rows!r})
+elif args[:2] == ["context", "session-check"]:
+    import os
+    sid = os.environ.get("DADAIA_SESSION_ID") or os.environ.get("CLAUDE_CODE_SESSION_ID") or ""
+    if sid and not os.path.exists(os.path.join(os.getcwd(), ".dadaia", "sessions", sid + ".json")):
+        print("[error] no workspace hook governs this session", file=sys.stderr)
+        print({relaunch!r}, file=sys.stderr)
+        sys.exit(1)
 elif args[:2] == ["reports", "validate"]:
     sys.exit(0 if "schema_version" in json.load(open(args[2])) else 1)
 elif args[:1] == ["doctor"]:
@@ -73,7 +83,7 @@ _STUBS: dict[Path, str] = {}  # each workspace's stub source: on Windows the stu
 
 def _stub_cli(root: Path, *listed: dict[str, object]) -> None:
     """The `dadaia` stub over *listed*, placed at `cli_path` by `fake_venv` (startable per platform)."""
-    _STUBS[root] = _CLI.format(rows=json.dumps(list(listed)))
+    _STUBS[root] = _CLI.format(rows=json.dumps(list(listed)), relaunch=RELAUNCH)
     fake_venv(root, cli=_STUBS[root])
 
 
@@ -159,7 +169,18 @@ def associate(root: Path, spec: str, slugs: tuple[str, ...] = ("a",)) -> None:
     git(root / "repos/r", "branch", "-f", "feature/0.5.0")
 
 
-def run(root: Path, *args: str, input: str | None = None) -> subprocess.CompletedProcess[str]:
+def record_session(root: Path, session_id: str) -> None:
+    """The live record a workspace hook leaves for *session_id*: its id and a fresh heartbeat."""
+    session_store.write_session(
+        root, session_id, {"session_id": session_id, "last_seen_at": clock.now_iso()}
+    )
+
+
+def run(
+    root: Path, *args: str, input: str | None = None, session: str | None = None
+) -> subprocess.CompletedProcess[str]:
+    """`worktree.py *args*` from *root*; *session* is the harness session id the run carries (none
+    by default: an operator terminal)."""
     env = suite_env(
         os.environ,
         Path.home(),
@@ -169,6 +190,7 @@ def run(root: Path, *args: str, input: str | None = None) -> subprocess.Complete
             "GIT_DIR": "/nonexistent",
             "GIT_CONFIG_NOSYSTEM": "1",
             "TZ": "Asia/Tokyo",  # a naive produced_at never orders by the local zone
+            **({CLAUDE_SESSION_ENV_VAR: session} if session else {}),
         },
     )
     return run_text([sys.executable, str(SCRIPT), *args], cwd=root, env=env, input=input)
