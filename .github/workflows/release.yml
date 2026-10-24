@@ -57,6 +57,8 @@ jobs:
     if: needs.release-please.outputs.release_created == 'true'
     permissions:
       contents: read
+      # The called Eval gate job reads workflow runs; a called job can only narrow this token.
+      actions: read
     uses: ./.github/workflows/ci.yml
 
   build:
