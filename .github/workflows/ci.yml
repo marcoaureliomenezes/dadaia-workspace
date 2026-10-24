@@ -408,3 +408,24 @@ jobs:
               sys.exit(1)
           print(f"PR head {head} - gitflow source rule satisfied ({base}).")
           PY
+
+  # Deploy gate of a PR to main: passes only on an eval run of its content (evals/scripts/gate.py).
+  # Model-free: git and gh only, no secret.
+  eval-gate:
+    name: Eval gate
+    if: github.event_name == 'pull_request' && github.base_ref == 'main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: eval-gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: python3 evals/scripts/gate.py "$HEAD_SHA"
