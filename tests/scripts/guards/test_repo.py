@@ -82,3 +82,143 @@ def test_the_memory_shape_rule_flags_the_headings_the_doctor_flags(
     plant = repo._edit(repo._A, "\n## Tech Stack", "\n### Version notes\n\n## Tech Stack")
     found = run._judge([], repo.memory_canonical_shape, plant)
     assert [v for v in found if v.startswith("history-heading:")]
+
+
+_PIN = "2.1.284"
+_TASKS = ("t1-cold-onboarding", "t2-block-list-bug", "t3-discovery")
+_ROWS = "".join(
+    f"          - harness: {h}\n            task: {t}\n            model: {m}\n"
+    f"            version: {v}\n            secret: {s}\n"
+    for h, m, v, s in (
+        ("claude-code", "anthropic/claude-sonnet-5", _PIN, "CLAUDE_CODE_OAUTH_TOKEN"),
+        ("codex", "openai/gpt-6.1-sol", "0.163.0", "CODEX_AUTH_JSON"),
+    )
+    for t in _TASKS
+)
+_SCAN_RUN = "python3 evals/scripts/scan.py evals/jobs evals/summary.md"
+_EVAL_YML = f"""name: eval
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+env:
+  CLAUDE_CODE_VERSION: {_PIN}
+jobs:
+  prepare:
+    runs-on: ubuntu-24.04
+    permissions:
+      checks: read
+    outputs:
+      wheel_sha256: ${{{{ steps.build.outputs.sha }}}}
+    steps:
+      - uses: actions/checkout@aaa
+      - name: Build the wheel
+        id: build
+        run: poetry build -f wheel
+      - name: Upload the wheel
+        uses: actions/upload-artifact@bbb
+        with:
+          name: wheel
+          path: dist/*.whl
+  eval:
+    needs: prepare
+    runs-on: ubuntu-24.04
+    environment: evals
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+{_ROWS}    env:
+      SCAN_SECRET: ${{{{ secrets[matrix.secret] }}}}
+    steps:
+      - uses: actions/checkout@aaa
+      - uses: actions/download-artifact@ccc
+        with:
+          name: wheel
+      - name: Run the leg
+        run: harbor run -i ${{{{ matrix.task }}}} -o evals/jobs/${{{{ matrix.harness }}}}/${{{{ matrix.task }}}}
+      - name: Compare
+        id: compare
+        run: python3 evals/scripts/compare.py evals/jobs/h/t t
+        continue-on-error: true
+      - run: {_SCAN_RUN}
+      - run: cat evals/summary.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@bbb
+        with:
+          name: jobs-h-t
+          path: |
+            evals/jobs/
+            evals/summary.md
+      - if: steps.compare.outcome == 'failure'
+        run: exit 1
+  aggregate:
+    needs: eval
+    if: ${{{{ !cancelled() }}}}
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@aaa
+      - uses: actions/download-artifact@ccc
+        with:
+          pattern: jobs-*
+          path: evals/jobs
+          merge-multiple: true
+      - name: Table
+        id: compare
+        run: python3 evals/scripts/compare.py --table evals/jobs > evals/summary.md
+        continue-on-error: true
+      - run: {_SCAN_RUN}
+      - run: cat evals/summary.md >> "$GITHUB_STEP_SUMMARY"
+      - if: steps.compare.outcome == 'failure'
+        run: exit 1
+  result:
+    needs: [prepare, eval, aggregate]
+    if: ${{{{ always() }}}}
+    runs-on: ubuntu-24.04
+    steps:
+      - run: test "$R" = success && exit 0 || exit 1
+        env:
+          R: ${{{{ needs.eval.result }}}}
+"""
+
+
+def _eval_rules(monkeypatch: pytest.MonkeyPatch, text: str) -> set[str]:
+    run, repo = _guards(monkeypatch)
+    found = run._judge([], repo.no_model_calls_in_ci, repo._file(repo._EVAL, text))
+    return {v.split(":")[0] for v in found}
+
+
+@pytest.mark.medium
+def test_the_multi_job_eval_workflow_yields_no_hit(monkeypatch: pytest.MonkeyPatch) -> None:
+    assert _eval_rules(monkeypatch, _EVAL_YML) == set()
+
+
+@pytest.mark.medium
+@pytest.mark.parametrize(
+    ("rule", "old", "new"),
+    [
+        (
+            "action-not-allowlisted",
+            "      - uses: actions/download-artifact@ccc\n        with:\n          name: wheel\n",
+            "      - uses: someone/else@v1\n",
+        ),
+        (
+            "upload-other-path",
+            "            evals/summary.md\n      - if",
+            "            evals/other.md\n      - if",
+        ),
+        ("summary-unscanned", f"      - run: {_SCAN_RUN}\n", "      - run: echo skipped\n"),
+        (
+            "step-env-secret",
+            "      - name: Run the leg\n",
+            "      - name: Run the leg\n        env: {K: '${{ secrets.OTHER }}'}\n",
+        ),
+        ("eval-cli-pin", f"            version: {_PIN}\n", ""),
+    ],
+    ids=["action", "upload-path", "no-scan", "step-secret", "row-without-version"],
+)
+def test_each_mutation_of_the_multi_job_eval_workflow_trips_its_own_rule(
+    monkeypatch: pytest.MonkeyPatch, rule: str, old: str, new: str
+) -> None:
+    assert old in _EVAL_YML
+    assert _eval_rules(monkeypatch, _EVAL_YML.replace(old, new, 1)) == {rule}
