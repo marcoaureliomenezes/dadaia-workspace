@@ -96,6 +96,7 @@ _ROWS = "".join(
     for t in _TASKS
 )
 _SCAN_RUN = "python3 evals/scripts/scan.py evals/jobs evals/summary.md"
+_PRUNE = "find evals/jobs/h/t -type d -path '*/agent/sessions' -prune -exec rm -rf {} +"
 _EVAL_YML = f"""name: eval
 on:
   workflow_dispatch:
@@ -142,6 +143,7 @@ jobs:
         id: compare
         run: python3 evals/scripts/compare.py evals/jobs/h/t t
         continue-on-error: true
+      - run: {_PRUNE}
       - run: {_SCAN_RUN}
       - run: cat evals/summary.md >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@bbb
@@ -236,6 +238,12 @@ _LEG_UPLOAD = (
             "      - name: Run the leg\n        env: {K: '${{ secrets.OTHER }}'}\n",
         ),
         ("eval-cli-pin", f"            version: {_PIN}\n", ""),
+        ("sessions-unpruned", f"      - run: {_PRUNE}\n", ""),
+        (
+            "sessions-unpruned",
+            f"      - run: {_PRUNE}\n",
+            f"      - if: matrix.harness == 'codex'\n        run: {_PRUNE}\n",
+        ),
         ("summary-unscanned", _LEG_PUBLISH, _LEG_UPLOAD.format("evals/jobs")),
         ("summary-unscanned", _LEG_PUBLISH, _LEG_UPLOAD.format("evals/")),
         (
@@ -252,6 +260,8 @@ _LEG_UPLOAD = (
         "summary-no-scan",
         "step-secret",
         "row-without-version",
+        "sessions-not-pruned",
+        "sessions-pruned-conditionally",
         "leg-uploads-jobs-without-slash",
         "leg-uploads-evals-dir",
         "wheel-upload-in-the-secret-leg",
