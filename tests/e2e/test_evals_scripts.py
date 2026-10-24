@@ -360,7 +360,13 @@ def _scan_out(tmp_path: Path, content: str, env: dict[str, str] | None) -> tuple
         (json.dumps({"creator_account_id": _ACCOUNT}), None, _ACCOUNT),
         ("token " + _TOKEN, None, _TOKEN),
     ],
-    ids=["codex-json-leaf", "openai-key-shape", "jwt-shape", "creator-account-id", "anthropic-shape"],
+    ids=[
+        "codex-json-leaf",
+        "openai-key-shape",
+        "jwt-shape",
+        "creator-account-id",
+        "anthropic-shape",
+    ],
 )
 def test_scan_needle_kinds_name_the_file_and_never_the_needle(
     tmp_path: Path, content: str, env: dict[str, str] | None, needle: str
@@ -380,7 +386,12 @@ def _preflight(harness: str, secret: str | None) -> tuple[int, str]:
     env = {k: v for k, v in os.environ.items() if k != "MODEL_SECRET"}
     if secret is not None:
         env["MODEL_SECRET"] = secret
-    cmd = [sys.executable, str(_ROOT / "evals" / "scripts" / "preflight.py"), harness, "MODEL_SECRET"]
+    cmd = [
+        sys.executable,
+        str(_ROOT / "evals" / "scripts" / "preflight.py"),
+        harness,
+        "MODEL_SECRET",
+    ]
     done = run(cmd, env=env, timeout=60)
     return done.returncode, done.stdout + done.stderr
 
@@ -395,7 +406,14 @@ def _preflight(harness: str, secret: str | None) -> tuple[int, str]:
         ("claude-code", "not-json-" + "PLANTED", 0),
         ("codex", _CODEX_SECRET, 0),
     ],
-    ids=["claude-empty", "codex-empty", "claude-unset", "codex-non-json", "claude-plain", "codex-json"],
+    ids=[
+        "claude-empty",
+        "codex-empty",
+        "claude-unset",
+        "codex-non-json",
+        "claude-plain",
+        "codex-json",
+    ],
 )
 def test_preflight_exit_and_output(harness: str, secret: str | None, code: int) -> None:
     got, out = _preflight(harness, secret)
@@ -415,3 +433,14 @@ def test_preflight_error_is_one_line_naming_harness_secret_and_reseed_doc(harnes
     assert harness in lines[0]
     assert "MODEL_SECRET" in lines[0]
     assert "evals/RESEED.md" in lines[0]
+
+
+def test_scan_short_json_leaf_is_not_a_needle(tmp_path: Path) -> None:
+    long_leaf = "tok-" + "planted-" + "long-leaf-" + "0123456789"
+    secret = {"SCAN_SECRET": json.dumps({"auth_mode": "chatgpt", "tokens": {"access": long_leaf}})}
+    short_code, short_out = _scan_out(tmp_path / "a", "mode chatgpt", secret)
+    long_code, long_out = _scan_out(tmp_path / "b", "got " + long_leaf, secret)
+    assert (short_code, short_out) == (0, "")
+    assert long_code == 1
+    assert "log.txt" in long_out
+    assert long_leaf not in long_out
