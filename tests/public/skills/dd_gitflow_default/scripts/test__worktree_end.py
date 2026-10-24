@@ -585,7 +585,7 @@ def test_a_verdict_carries_over_only_an_identical_patch_and_message_series(root:
     assert git(repo, "rev-parse", WORK) == work
 
 
-@pytest.mark.parametrize("change", ["same-patch", "new-patch"])
+@pytest.mark.parametrize("change", ["same-patch", "rewritten-parent", "new-patch"])
 def test_a_moved_work_branch_refuses_and_its_fix_rebase_keeps_only_an_identical_patch(
     root: Path, change: str
 ) -> None:
@@ -593,8 +593,15 @@ def test_a_moved_work_branch_refuses_and_its_fix_rebase_keeps_only_an_identical_
     unchanged; after it, a patch-identical rebase lands under the old verdict,
     a changed patch refuses for review."""
     repo, tree = root / "repos/r", root / TREE
-    approve(root, mine := land(root, "src/a.py"))
-    work = commit(root / RC_TREE, "src/z.py")
+    if change == "rewritten-parent":  # the job is cut on a parent commit that sync rewrites
+        commit(root / RC_TREE, "src/y.py")
+        git(tree, "rebase", "-q", WORK)
+    approve(root, mine := land(root, "src/a.py"), name=NEW_JOB)
+    if change == "rewritten-parent":
+        git(root / RC_TREE, "commit", "-q", "--amend", "-m", "y reworded")
+        work = git(root / RC_TREE, "rev-parse", "HEAD").strip()
+    else:
+        work = commit(root / RC_TREE, "src/z.py")
     moved = run(root, "merge", TREE)
     assert _line(moved) == _sync_line(root, tree)
     assert [
@@ -607,7 +614,7 @@ def test_a_moved_work_branch_refuses_and_its_fix_rebase_keeps_only_an_identical_
         git(tree, "commit", "-q", "--amend", "-C", "HEAD", "-a")
     result = run(root, "merge", TREE)
     landed = git(repo, "rev-parse", WORK).strip()
-    if change == "same-patch":
+    if change != "new-patch":
         assert result.returncode == 0, result.stderr
         assert git(repo, "rev-parse", f"{WORK}~").strip() == work != landed
     else:
