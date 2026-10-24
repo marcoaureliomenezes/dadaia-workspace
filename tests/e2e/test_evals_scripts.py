@@ -282,8 +282,8 @@ def _table(*legs: Path) -> tuple[int, list[list[str]]]:
 def test_table_statistics(tmp_path: Path, passes: int, pass3: str, interval: str) -> None:
     leg = _leg(tmp_path / "leg.json", "codex", {_T1: 3, _T2: 3, _T3: passes})
     _, rows = _table(leg)
-    row = next(r for r in rows if r[1] == _T3)
-    assert (row[0], row[2], row[5], row[6]) == ("codex", f"{passes}/3", pass3, interval)
+    row = next(r for r in rows if r[:2] == ["codex", _T3])
+    assert (row[2], row[5], row[6]) == (f"{passes}/3 (3 found)", pass3, interval)
 
 
 def test_table_merges_two_harnesses_into_six_rows(tmp_path: Path) -> None:
@@ -292,9 +292,7 @@ def test_table_merges_two_harnesses_into_six_rows(tmp_path: Path) -> None:
     b = _leg(tmp_path / "b" / "leg.json", "codex", full)
     code, rows = _table(a, b)
     assert code == 0
-    assert sorted((r[0], r[1]) for r in rows) == sorted(
-        (h, t) for h in _HARNESSES for t in (_T1, _T2, _T3)
-    )
+    assert [(r[0], r[1]) for r in rows] == [(h, t) for h in _HARNESSES for t in (_T1, _T2, _T3)]
 
 
 @pytest.mark.parametrize(
@@ -309,24 +307,25 @@ def test_table_floor_is_per_harness_and_task(
     bad = _leg(tmp_path / "b" / "leg.json", "codex", {_T1: 3, _T2: 3, _T3: 3} | {task: passes})
     got, rows = _table(ok, bad)
     row = next((r for r in rows if r[0] == "codex" and r[1] == task), [])
-    assert (got, row[2:3]) == (code, [f"{passes}/3"])
+    assert (got, row[2:3]) == (code, [f"{passes}/3 (3 found)"])
 
 
 def test_table_missing_leg_file_blocks(tmp_path: Path) -> None:
     only = _leg(tmp_path / "a" / "leg.json", "claude-code", {_T1: 3, _T2: 3, _T3: 3})
     code, rows = _table(only, tmp_path / "b" / "leg.json")
-    assert (code, len(rows)) == (1, 3)
+    missing = [r[2] for r in rows if r[0] == "codex"]
+    assert (code, len(rows), missing) == (1, 6, ["0/3 (0 found)"] * 3)
 
 
 def test_table_missing_task_row_blocks(tmp_path: Path) -> None:
     leg = _leg(tmp_path / "leg.json", "codex", {_T1: 3, _T2: 3})
     code, rows = _table(leg)
-    row = next(r for r in rows if r[1] == _T3)
-    assert (code, row[2]) == (1, "0/3")
+    row = next(r for r in rows if r[:2] == ["codex", _T3])
+    assert (code, row[2]) == (1, "0/3 (0 found)")
 
 
 def test_table_errored_column_counts_an_errored_trial(tmp_path: Path) -> None:
     leg = _leg(tmp_path / "leg.json", "codex", {_T1: 2, _T2: 3, _T3: 3}, {_T1: 1})
     code, rows = _table(leg)
-    row = next(r for r in rows if r[1] == _T1)
-    assert (code, row[2], row[4]) == (1, "2/3", "1")
+    row = next(r for r in rows if r[:2] == ["codex", _T1])
+    assert (code, row[2], row[4]) == (1, "2/3 (3 found)", "1")
