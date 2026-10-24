@@ -24,7 +24,7 @@ pytestmark = [
 ]
 
 _GATE = Path(__file__).resolve().parents[2] / "evals" / "scripts" / "gate.py"
-_URL = "https://github.com/o/r/actions/runs/1"
+_URL = "https://github.com/o/r/actions/runs"
 _FIX = "fix: Agent action: "
 _DISPATCH = "gh workflow run eval.yml --ref feature/0.5.0"
 _PYPROJECT = 'name = "x"\nversion = "0.5.0"\n'
@@ -64,21 +64,16 @@ def _fixture(tmp_path: Path) -> tuple[Path, str]:
     return repo, e
 
 
-def _gate(tmp_path: Path, repo: Path, good_sha: str, head: str) -> tuple[int, str]:
-    """Run the gate with a fake `gh` that lists one successful dispatch run on *good_sha*."""
-    runs = {
-        "workflow_runs": [
-            {
-                "head_sha": good_sha,
-                "event": "workflow_dispatch",
-                "conclusion": "success",
-                "html_url": _URL,
-            }
-        ]
-    }
+def _run(sha: str, *, event: str = "workflow_dispatch", conclusion: str = "success") -> dict:
+    return {"head_sha": sha, "event": event, "conclusion": conclusion, "html_url": f"{_URL}/{sha}"}
+
+
+def _gate(tmp_path: Path, repo: Path, runs: list[dict], head: str) -> tuple[int, str]:
+    """Run the gate with a fake `gh` that lists *runs*, newest first."""
+    body = {"workflow_runs": runs}
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
-    write_text(tmp_path / "runs.json", json.dumps(runs))
+    write_text(tmp_path / "runs.json", json.dumps(body))
     gh = bin_dir / "gh"
     write_text(gh, f"#!/bin/sh\ncat '{(tmp_path / 'runs.json').as_posix()}'\n")
     gh.chmod(0o755)
@@ -109,25 +104,58 @@ def test_bookkeeping_only_diff_passes_and_prints_the_sha_and_url(tmp_path: Path)
             "pyproject.toml": 'name = "x"\nversion = "0.5.1"\n',
         },
     )
-    code, out = _gate(tmp_path, repo, e, head)
+    code, out = _gate(tmp_path, repo, [_run(e)], head)
     assert code == 0, out
     assert e in out
-    assert _URL in out
+    assert f"{_URL}/{e}" in out
 
 
 def test_source_file_changed_after_e_fails(tmp_path: Path) -> None:
     repo, e = _fixture(tmp_path)
     head = _commit(repo, {"src/mod.py": "A = 2\n"})
-    _assert_failed_with_fix_line(*_gate(tmp_path, repo, e, head))
+    _assert_failed_with_fix_line(*_gate(tmp_path, repo, [_run(e)], head))
 
 
 def test_pyproject_line_other_than_version_changed_fails(tmp_path: Path) -> None:
     repo, e = _fixture(tmp_path)
     head = _commit(repo, {"pyproject.toml": 'name = "y"\nversion = "0.5.0"\n'})
-    _assert_failed_with_fix_line(*_gate(tmp_path, repo, e, head))
+    _assert_failed_with_fix_line(*_gate(tmp_path, repo, [_run(e)], head))
 
 
 def test_good_run_sha_absent_from_the_repo_fails_without_traceback(tmp_path: Path) -> None:
     repo, _ = _fixture(tmp_path)
     head = _commit(repo, {"CHANGELOG.md": "# log\n\nmore\n"})
-    _assert_failed_with_fix_line(*_gate(tmp_path, repo, "0" * 39 + "1", head))
+    _assert_failed_with_fix_line(*_gate(tmp_path, repo, [_run("0" * 39 + "1")], head))
+
+
+def _allowed_head(repo: Path) -> str:
+    return _commit(repo, {"CHANGELOG.md": "# log\n\nmore\n"})
+
+
+def test_failed_run_fails(tmp_path: Path) -> None:
+    repo, e = _fixture(tmp_path)
+    head = _allowed_head(repo)
+    _assert_failed_with_fix_line(*_gate(tmp_path, repo, [_run(e, conclusion="failure")], head))
+
+
+def test_no_run_fails(tmp_path: Path) -> None:
+    repo, _ = _fixture(tmp_path)
+    head = _allowed_head(repo)
+    _assert_failed_with_fix_line(*_gate(tmp_path, repo, [], head))
+
+
+def test_push_event_run_fails(tmp_path: Path) -> None:
+    repo, e = _fixture(tmp_path)
+    head = _allowed_head(repo)
+    _assert_failed_with_fix_line(*_gate(tmp_path, repo, [_run(e, event="push")], head))
+
+
+def test_older_good_run_passes_behind_a_newer_failed_run(tmp_path: Path) -> None:
+    repo, e = _fixture(tmp_path)
+    later = _commit(repo, {"src/mod.py": "A = 2\n"})
+    head = _allowed_head(repo)
+    runs = [_run(later, conclusion="failure"), _run(e)]
+    code, out = _gate(tmp_path, repo, runs, head)
+    assert code == 0, out
+    assert e in out
+    assert f"{_URL}/{e}" in out
