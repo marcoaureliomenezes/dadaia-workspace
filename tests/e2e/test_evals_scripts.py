@@ -383,9 +383,9 @@ def test_scan_clean_tree_with_a_codex_secret_exits_zero(tmp_path: Path) -> None:
 
 
 def _preflight(harness: str, secret: str | None) -> tuple[int, str]:
-    env = {k: v for k, v in os.environ.items() if k != "MODEL_SECRET"}
+    env = {k: v for k, v in os.environ.items() if k not in ("MODEL_SECRET", "SCAN_SECRET")}
     if secret is not None:
-        env["MODEL_SECRET"] = secret
+        env["SCAN_SECRET"] = secret
     cmd = [
         sys.executable,
         str(_ROOT / "evals" / "scripts" / "preflight.py"),
@@ -444,3 +444,17 @@ def test_scan_short_json_leaf_is_not_a_needle(tmp_path: Path) -> None:
     assert long_code == 1
     assert "log.txt" in long_out
     assert long_leaf not in long_out
+
+
+def test_scan_words_that_end_in_sk_are_not_a_key_shape(tmp_path: Path) -> None:
+    words = "task-line-grammar-" + "0123456789abcdef and dd-ask-me-owned-" + "0123456789abcdef"
+    assert _scan_out(tmp_path, words, None) == (0, "")
+
+
+def test_scan_escaped_creator_id_inside_a_json_string_names_the_file(tmp_path: Path) -> None:
+    value = "user-" + "planted-" + "0042"
+    escaped = '{"line": "{\\"creator_user_id\\":\\"' + value + '\\"}"}'
+    code, out = _scan_out(tmp_path, escaped, None)
+    assert code == 1
+    assert "log.txt" in out
+    assert value not in out
