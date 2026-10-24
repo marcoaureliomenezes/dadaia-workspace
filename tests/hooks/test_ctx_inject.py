@@ -314,6 +314,26 @@ def test_the_first_event_of_an_unrecorded_session_leaves_a_live_record(
     assert "context" not in record and "bind_id" not in record
 
 
+@pytest.mark.parametrize(
+    ("payload_id", "recorded"),
+    [("codex-payload-sess", "codex-payload-sess"), ("../pay/1", "pay1")],
+    ids=["plain", "traversal-sanitized"],
+)
+def test_a_prompt_with_no_env_session_id_records_the_payload_session(
+    tmp_path: Path, payload_id: str, recorded: str
+) -> None:
+    _ws(tmp_path, {"name": "alpha"})
+
+    result = run_hook_subprocess("ctx_inject", {"session_id": payload_id}, kimi_hook_env(tmp_path))
+
+    assert result.returncode == 0, result.stderr
+    record = session_store.live_session(tmp_path, recorded)
+    assert record is not None and record["session_id"] == recorded
+    assert sorted(p.name for p in (tmp_path / ".dadaia" / "sessions").glob("*.json")) == [
+        f"{recorded}.json"
+    ]
+
+
 def test_env_override_injects_context_memory(tmp_path: Path) -> None:
     """A session with no id (a Kimi shell, no payload id) is bound by DADAIA_CONTEXT."""
     _ws(tmp_path, {"name": "ctx"})

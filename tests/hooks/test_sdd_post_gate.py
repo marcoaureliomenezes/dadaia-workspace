@@ -16,7 +16,7 @@ import pytest
 
 from dadaia_workspace.core import session_store
 from dadaia_workspace.core.skill_owner import load_owner
-from tests.fixtures.harness_env import claude_hook_env, run_hook_subprocess
+from tests.fixtures.harness_env import claude_hook_env, kimi_hook_env, run_hook_subprocess
 from tests.helpers.oslib import read_text, write_text
 
 STATUS_LINE = load_owner("dd-bug-resolution", "_grammar").STATUS_RE
@@ -166,6 +166,31 @@ def test_the_first_post_tool_use_of_an_unrecorded_session_leaves_a_live_record(
     record = session_store.live_session(ws, "fresh-sess")
     assert record is not None and record["session_id"] == "fresh-sess"
     assert "context" not in record and "bind_id" not in record
+
+
+@pytest.mark.medium
+@pytest.mark.parametrize(
+    ("payload_id", "recorded"),
+    [("codex-payload-sess", "codex-payload-sess"), ("../pay/1", "pay1")],
+    ids=["plain", "traversal-sanitized"],
+)
+def test_a_post_tool_use_with_no_env_session_id_records_the_payload_session(
+    tmp_path: Path, payload_id: str, recorded: str
+) -> None:
+    ws = _mk_hook_workspace(tmp_path)
+
+    result = run_hook_subprocess(
+        "sdd_post_gate",
+        {"session_id": payload_id, "tool_name": "Bash", "tool_input": {"command": "ls"}},
+        kimi_hook_env(ws),
+    )
+
+    assert result.returncode == 0, result.stderr
+    record = session_store.live_session(ws, recorded)
+    assert record is not None and record["session_id"] == recorded
+    assert sorted(p.name for p in (ws / ".dadaia" / "sessions").glob("*.json")) == [
+        f"{recorded}.json"
+    ]
 
 
 @pytest.mark.medium
