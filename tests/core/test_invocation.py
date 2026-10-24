@@ -40,6 +40,9 @@ def _mk_ws(tmp_path: Path, *contexts: tuple[str, str, tuple[str, ...]]) -> Path:
     return ws
 
 
+_CLAUDE = "CLAUDE_CODE_SESSION_ID"
+
+
 def _ctx(slug: str, name: str | None = None, *associated: str) -> tuple[str, str, tuple[str, ...]]:
     return (slug, name or slug, associated)
 
@@ -112,6 +115,23 @@ def test_resolve_scenarios(tmp_path: Path, given: dict[str, Any], then: dict[str
 def test_resolve_session_id_precedence(env: dict[str, str], expected: str) -> None:
     """DADAIA_SESSION_ID > harness env > ""; env only — bind sees no payload."""
     assert invocation.resolve_session_id(env) == expected
+
+
+@pytest.mark.parametrize(
+    ("env", "payload_id", "expected"),
+    [
+        pytest.param({}, "pay-1", "pay-1", id="payload_when_env_has_none"),
+        pytest.param({_CLAUDE: "env-1"}, "pay-1", "env-1", id="env_wins_over_payload"),
+        pytest.param({"CODEX_THREAD_ID": "t-1"}, "pay-1", "t-1", id="codex_env_wins_over_payload"),
+        pytest.param({"DADAIA_SESSION_ID": "own-1"}, "pay-1", "own-1", id="override_wins_over_payload"),
+        pytest.param({}, "../pay/1", "pay1", id="payload_is_sanitized"),
+        pytest.param({}, "", "", id="empty_payload_resolves_nothing"),
+    ],
+)  # fmt: skip
+def test_resolve_session_id_takes_the_payload_id_last(
+    env: dict[str, str], payload_id: str, expected: str
+) -> None:
+    assert invocation.resolve_session_id(env, payload_id) == expected
 
 
 def test_context_name_for_repo_slug_maps_main_associated_and_legacy_repo_field(
@@ -228,7 +248,6 @@ def test_a_registry_state_spelling_is_alive_for_bind_and_for_the_layout_gate(
     assert context_registry.registered_slugs(ws)[1] == frozenset({"proj"})
 
 
-_CLAUDE = "CLAUDE_CODE_SESSION_ID"
 _LIVE, _STALE = timedelta(minutes=5), timedelta(days=2)
 
 
@@ -240,7 +259,16 @@ _LIVE, _STALE = timedelta(minutes=5), timedelta(days=2)
         pytest.param({_CLAUDE: "sess-1"}, None, None, False, id="no-record"),
         pytest.param({_CLAUDE: "sess-1"}, "sess-1", _STALE, False, id="stale-record"),
         pytest.param({"CODEX_THREAD_ID": "sess-1"}, "sess-1", _LIVE, True, id="codex-thread-live"),
-        pytest.param({"CODEX_THREAD_ID": "sess-1"}, None, None, True, id="codex-thread-no-record"),
+        pytest.param({"CODEX_THREAD_ID": "sess-1"}, None, None, False, id="codex-thread-no-record"),
+        pytest.param({"CODEX_SESSION_ID": "sess-1"}, None, None, False, id="codex-session-no-record"),
+        pytest.param({"CODEX_SESSION_ID": "sess-1"}, "sess-1", _LIVE, True, id="codex-session-live"),
+        pytest.param(
+            {"CODEX_SESSION_ID": "root-1", "CODEX_THREAD_ID": "sub-1"},
+            "root-1",
+            _LIVE,
+            True,
+            id="codex-subagent-under-the-live-root-session",
+        ),
         pytest.param({"DADAIA_SESSION_ID": "sess-1"}, "sess-1", _LIVE, True, id="override-live"),
         pytest.param({"DADAIA_SESSION_ID": "sess-1"}, None, None, True, id="override-no-record"),
         pytest.param(
@@ -259,7 +287,7 @@ _LIVE, _STALE = timedelta(minutes=5), timedelta(days=2)
         ),
     ],
 )
-def test_governed_judges_only_a_harness_that_names_a_subagent(
+def test_governed_judges_a_harness_that_names_a_subagent(
     tmp_path: Path,
     env: dict[str, str],
     record_id: str | None,
