@@ -272,7 +272,6 @@ flowchart TB
 - 0266 — A fix line's label is spelled by one producer, act(kind, text), beside command() in the skill kernel's _platform.py; call sites pass only the act text
 - 0267 — A bug record's surface is derived from the files its fix commit touched, never typed; append lists the earlier bugs whose fixes touched the same files
 - 0268 — The OS boundary admits one lint rule: ruff PLW1514 (a text open names its encoding), in the existing ruff step; still no guard and no gate
-- 0269 — The 0.5.0 eval gate runs in this repo's eval.yml on sha E; the promote PR head differs from E only by the _RELEASE.json record; T1 3/3, T2 and T3 at least 2/3 on the candidate
 - 0270 — Amend ADR 0171: context alive takes the highest work branch on its clone's origin through the one work-branch reader, every other caller staying local; no registry migration ships
 - 0271 — dadaia worktree pause bundles one clean lane or wt-rc tree and removes it; job and task trees are never paused; context dead is unchanged and keeps refusing every wt/*
 - 0272 — Amend ADR 0175: export always bundles and never probes visibility; hard carries the open lane and wt-rc trees with no snapshots zone; the artifact carries the export-v1 format; a context with no remote is listed unreplicable; init --from excludes --repo and installs every harness
@@ -280,10 +279,10 @@ flowchart TB
 - 0274 — The code under development carries <release>rc<N>; tests, evals and release validate only the current build, never a published dadaia-workspace
 - 0275 — Amend ADR 0103: scope follows the linked tree a write lands in; a write inside a back-pointer-verified linked worktree of a registered repo is in scope for any session
 - 0276 — Amend ADR 0088: a skill's registry read of the repo's own workspace, found by position, lifts the fence for that one root
-- 0277 — The 0.5.0 eval gate is candidate-only, the release tag may differ from E by _RELEASE.json, and T3 is the 0.5.0 adoption readout in place of D1-D10
 - 0278 — Amend ADR 0273: an uncited resolved record's fix line is the one bugs.py archive act naming every missed id
 - 0279 — Only the dispatched dd-code-reviewer writes a verdict: verdicts live in the PROTECTED states zone, and the pre-gate judges the one Bash act that writes one where the harness names the subagent
 - 0280 — A fix with a culprit is the REBUILD of its unit in its own lane; review sweeps the fixed pattern on the first pass and refuses a verdict without the reached-test run; history is the id-line query; no stored sha a rewrite can orphan
+- 0281 — The deploy gate is the multi-harness eval pipeline: Claude Code and Codex legs at k=3 on sha E, read by a required Eval gate check on the promote PR
 <!-- /dadaia:fixed adr-list -->
 
 <!-- dadaia:fixed slop-code -->
