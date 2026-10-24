@@ -8,9 +8,9 @@ no transcript outside the dispatched dd-code-reviewer runs the verdict writer. B
 a judged task is below its floor (t1 3/3, t2 2/3, t3 2/3). A missing trial is a fail. Prints a
 Markdown table with the trials found.
 
-Usage: compare.py --table LEG.json [LEG.json ...]. Merges the given legs into one row per
-(harness, task) in HARNESS and FLOOR order, with pass^3 and the Wilson 95% interval. A missing
-pair reads 0 found; a leg path that does not exist adds no rows. Exits 1 below any floor.
+Usage: compare.py --table DIR. Merges every leg.json under DIR into one row per (harness, task)
+in HARNESS and FLOOR order, with pass^3 and the Wilson 95% interval. A missing pair reads 0 found.
+Exits 1 below any floor.
 """
 
 import json
@@ -124,14 +124,13 @@ def wilson(c):
     return centre - half, centre + half
 
 
-def table(legs):
+def table(root):
     got = defaultdict(Counter)
-    for p in map(Path, legs):
-        if p.is_file():
-            for r in json.loads(p.read_text(encoding="utf-8")):
-                got[r["harness"], r["task"]].update(
-                    passes=r["passes"], errored=r["errored"], found=r["found"]
-                )
+    for p in Path(root).rglob("leg.json"):
+        for r in json.loads(p.read_text(encoding="utf-8")):
+            got[r["harness"], r["task"]].update(
+                passes=r["passes"], errored=r["errored"], found=r["found"]
+            )
     block = False
     print("| harness | task | passes | floor | errored | pass^3 | interval | verdict |")
     print("|---|---|---|---|---|---|---|---|")
@@ -153,7 +152,7 @@ def table(legs):
 
 if __name__ == "__main__":
     sys.exit(
-        table(sys.argv[2:])
+        table(sys.argv[2])
         if sys.argv[1] == "--table"
         else main(sys.argv[1], sys.argv[2:] or list(FLOOR))
     )
