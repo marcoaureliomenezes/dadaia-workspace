@@ -67,8 +67,13 @@ def write_session(workspace: Path, session_id: str, record: dict[str, object]) -
 
 def touch_last_seen_at(workspace: Path, session_id: str, *, now: str) -> dict[str, object] | None:
     """The heartbeat: renew ``last_seen_at``, creating the minimal ``{session_id, last_seen_at}``
-    record of a session no one bound yet; the record, or ``None`` when unwritable."""
-    data = read_session(workspace, session_id) or {"session_id": session_id}
+    record only when the file is absent; the record, or ``None`` when unwritable or unreadable
+    (left untouched for doctor)."""
+    data = read_session(workspace, session_id)
+    if data is None:
+        if session_record_path(workspace, session_id).exists():
+            return None
+        data = {"session_id": session_id}
     data[SESSION_HEARTBEAT_FIELD] = now
     try:
         write_session(workspace, session_id, data)

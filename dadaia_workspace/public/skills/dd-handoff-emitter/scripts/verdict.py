@@ -113,14 +113,13 @@ def _run(argv: list[str]) -> int:
                 act("agent", f"pass a {name} matching that pattern, then rerun verdict.py"),
             )
     tree = Path(args.path).resolve()
-    if (home := _root.workspace_of(tree, Path.cwd())) is not None:
-        require_governed(home)
     body = _body(sys.stdin.read())
     done = run([sys.executable, str(_WORKTREE), "hash", str(tree), "--sha", args.sha])
     if done.returncode:
         sys.stderr.write(done.stderr)
         return done.returncode
     bound = json.loads(done.stdout)
+    require_governed(Path(bound["root"]))
     now = _clock.now_iso()
     handoff = {
         "schema_version": "handoff-v1.2",

@@ -93,10 +93,16 @@ def resolve_session_id(env: Mapping[str, str]) -> str:
 
 
 def governed(root: Path, env: Mapping[str, str]) -> bool:
-    """True when the caller is an operator terminal (no session id) or a session whose hooks
-    left a live record under *root*: the one test of "a workspace hook governs this call"."""
-    session_id = resolve_session_id(env)
-    return not session_id or live_session(root, session_id) is not None
+    """True unless *env* carries the session id of a harness whose registry row names a subagent
+    and no live record of that session (under :func:`resolve_session_id`) sits under *root*: the
+    one test of "a workspace hook governs this call". Other callers control their own env."""
+    judged = any(
+        env.get(var)
+        for rec in HARNESS_RECORDS.values()
+        if rec.subagent_key
+        for var in rec.session_env
+    )
+    return not judged or live_session(root, resolve_session_id(env)) is not None
 
 
 def _alive(entry: dict[str, object]) -> bool:
