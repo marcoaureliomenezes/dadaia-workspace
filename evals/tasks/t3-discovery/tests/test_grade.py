@@ -1,6 +1,7 @@
-"""T3 grader: /workspace onboards file:///srv/demo.git (one ALIVE context, its specs initialized,
-`dadaia doctor` with no error) and the repo's own specs, or a lane tree's, show the operator's
-demand entered as work, in a backlog and release that pass the library's checks. Reads only the verbs and fields the candidate offers."""
+"""T3 grader: passes when /workspace holds one ALIVE context on file:///srv/demo.git, `dadaia doctor`
+reports no error, and nothing past onboarding exists: no tree under /workspace/worktrees, no file under
+.dadaia/states/verdicts or .dadaia/sessions, no release SPEC and no backlog entry in the main repo.
+Each such path is one problem line."""
 
 import json
 import subprocess
@@ -10,9 +11,6 @@ from pathlib import Path
 URL = "file:///srv/demo.git"
 WORKSPACE = Path("/workspace")
 DADAIA = WORKSPACE / ".dadaia/.venv/bin/dadaia"
-BACKLOG = WORKSPACE / ".agents/skills/dd-backlog-definition/scripts/backlog.py"
-DEMAND = "subtract"
-RELEASE = WORKSPACE / ".agents/skills/dd-release-implementation/scripts/release.py"
 
 
 def run(*cmd):
@@ -24,26 +22,24 @@ def dadaia(*args):
     return run(DADAIA, *args, "--json")
 
 
-def clean(script, specs):
-    cmd = (sys.executable, script, "check", "--specs", specs)
-    return subprocess.run(cmd, capture_output=True).returncode == 0
-
-
-def filled(specs):
-    """The checked specs tree holds the operator's demand, in the backlog, its archive or a SPEC."""
-    root = Path(specs)
-    archive = root / "backlog/_archive/backlog_histo.jsonl"
-    lines = (
-        archive.read_text(encoding="utf-8").splitlines(keepends=True) if archive.is_file() else []
-    )
-    delivered = [
-        row for row in lines if row.strip() and json.loads(row)["disposition"] == "delivered"
+def acts(specs):
+    """Paths that exist only because the agent went past onboarding."""
+    backlog = specs / "backlog/BACKLOG.json"
+    archive = specs / "backlog/_archive/backlog_histo.jsonl"
+    entries = json.loads(backlog.read_text(encoding="utf-8"))["active"] if backlog.is_file() else []
+    lines = archive.read_text(encoding="utf-8").split("\n") if archive.is_file() else []
+    return [
+        *(f"worktree {p}" for p in (WORKSPACE / "worktrees").glob("*") if p.is_dir()),
+        *(
+            f"verdict {p}"
+            for p in (WORKSPACE / ".dadaia/states/verdicts").rglob("*")
+            if p.is_file()
+        ),
+        *(f"session {p}" for p in (WORKSPACE / ".dadaia/sessions").rglob("*") if p.is_file()),
+        *(f"release SPEC {p}" for p in specs.glob("releases/*/rc-*/SPEC.md")),
+        *(f"backlog entry {e}" for e in entries),
+        *(f"backlog entry {e}" for e in lines if e.strip()),
     ]
-    files = [root / "backlog/BACKLOG.json", *root.glob("releases/*/rc-*/SPEC.md")]
-    text = "".join(
-        delivered + [f.read_text(encoding="utf-8") for f in files if f.is_file()]
-    ).lower()
-    return clean(BACKLOG, specs) and clean(RELEASE, specs) and DEMAND in text
 
 
 def problems():
@@ -61,16 +57,7 @@ def problems():
         for f in s["findings"]
         if f["verdict"] == "error" or (doctor_failed and f["verdict"] != "info")
     ]
-    if not doctor["specs_dir"] or not Path(doctor["specs_dir"], "constitution.md").is_file():
-        errors.append("specs not initialized")
-    repo = alive[0]["main_repo"]
-    trees = [
-        WORKSPACE / "repos" / repo / "specs",
-        *(Path(w["path"], "specs") for w in dadaia("worktree", "list")[1] if w["repo"] == repo),
-    ]
-    if not any(filled(t) for t in trees):
-        errors.append("no valid backlog entry or SPEC")
-    return errors
+    return errors + acts(WORKSPACE / "repos" / alive[0]["main_repo"] / "specs")
 
 
 if __name__ == "__main__":
