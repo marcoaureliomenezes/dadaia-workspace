@@ -91,3 +91,18 @@ def test_doctor_names_the_onboarding_step_of_the_context_it_judges(
     assert "SPEC-DOC" not in result.output
     assert code != 1 or result.output.count("fix: ") == 1, result.output  # a refusal: one fix line
     assert f"{fix_line(workspace)} " in result.output
+
+
+@pytest.mark.slow(reason="git init subprocess")
+def test_doctor_names_the_relaunch_for_a_session_bind_refuses(
+    workspace: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A subagent-harness session with no live record cannot bind: the step's fix is the
+    relaunch, and no line of the report names ``context bind``."""
+    _register_specless_context(workspace, "app")
+    monkeypatch.setenv("CLAUDE_CODE_SESSION_ID", "sess-1")
+
+    result = _runner.invoke(app, ["doctor", "--context", "app"])
+
+    assert "fix: Operator action: relaunch the session at the workspace root" in result.output, result.output
+    assert "context bind" not in result.output, result.output
