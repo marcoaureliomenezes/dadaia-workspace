@@ -119,11 +119,22 @@ class Undecodable(Refusal):
         self.path, self.line = path, line
 
 
+def _retrying[T](act: Callable[[], T]) -> T:
+    """Run *act*, retrying a held-open file (``PermissionError``, Windows) 49 times 0.01 s apart
+    before the final raising call; POSIX never raises it for this cause."""
+    for _ in range(49):
+        with contextlib.suppress(PermissionError):
+            return act()
+        time.sleep(0.01)
+    return act()
+
+
 def read_text(path: Path, fix: str = "") -> str:
-    """The text of *path*, newlines as ``\\n``; bytes that are not UTF-8 raise :class:`Undecodable`
-    naming it, with *fix* in place of the default act."""
+    """The text of *path*, newlines as ``\\n``; a read the swap holds is retried as :func:`replace`
+    is, and a real denial still raises ``PermissionError`` after it; bytes that are not UTF-8 raise
+    :class:`Undecodable` naming it, with *fix* in place of the default act."""
     try:
-        return path.read_text(encoding="utf-8")
+        return _retrying(lambda: path.read_text(encoding="utf-8"))
     except UnicodeDecodeError as exc:
         raise Undecodable(path, fix, exc.object.count(b"\n", 0, exc.start) + 1) from exc
 
@@ -239,13 +250,8 @@ def can_write(path: Path) -> bool:
 
 
 def replace(src: Path, dst: Path) -> None:
-    """Move *src* onto *dst* atomically. A held-open destination (``PermissionError``, Windows) is
-    retried 49 times 0.01 s apart before the final raising swap; POSIX never raises it there."""
-    for _ in range(49):
-        with contextlib.suppress(PermissionError):
-            return os.replace(src, dst)
-        time.sleep(0.01)
-    os.replace(src, dst)
+    """Move *src* onto *dst* atomically, retrying a held-open destination as :func:`_retrying` does."""
+    _retrying(lambda: os.replace(src, dst))
 
 
 def is_link(path: Path) -> bool:
