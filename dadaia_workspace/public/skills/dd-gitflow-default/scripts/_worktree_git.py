@@ -43,10 +43,25 @@ def reattach(repo: Path, tree: Path, name: str) -> str:
     return git_line(repo, *locked_add(name, "-f", "-f"), str(tree), branch(name))
 
 
+def _series(tree: Path, *rng: str) -> list[tuple[str, str]]:
+    """(patch-id, full message) per commit of the log range *rng*, oldest first, keyed by commit id:
+    an empty commit has no patch-id (""); a changed one without a patch-id never matches."""
+    patch = git(tree, "log", "-p", "--no-color", "--no-ext-diff", "--format=commit %H", *rng)
+    pids = git(tree, "patch-id", "--stable", input=patch).split()
+    ids = dict(zip(pids[1::2], pids[::2], strict=True))
+    changed = set(git(tree, "log", "--format=%H", *rng, "--", ".").split())
+    logs = git(tree, "log", "--reverse", "--no-show-signature", "--format=%H%n%B%x00", *rng)
+    return [
+        (ids.get(c, f"unmatched {c}" if c in changed else ""), msg)
+        for c, _, msg in (x.lstrip("\n").partition("\n") for x in logs.split("\0")[:-1])
+    ]
+
+
 def diff_sha256(tree: Path, work: str, tip: str) -> str:
-    """The sha256 of *tip*'s plumbing diff over its merge-base with *work*: it names blob ids, so it binds the exact bytes a fast-forward lands."""
+    """The sha256 of *tip*'s plumbing diff over its merge-base with *work* and of the (patch-id, message) series of the commits between: it names blob ids, so it binds the exact bytes and commits a fast-forward lands."""
     base = git(tree, "merge-base", work, tip).strip()
-    return hashlib.sha256(git(tree, "diff-tree", "-r", "-z", "--full-index", base, tip).encode()).hexdigest()  # fmt: skip
+    diff = git(tree, "diff-tree", "-r", "-z", "--full-index", base, tip)
+    return hashlib.sha256(json.dumps([diff, _series(tree, f"{base}..{tip}")]).encode()).hexdigest()
 
 
 def dirty(tree: Path) -> bool:

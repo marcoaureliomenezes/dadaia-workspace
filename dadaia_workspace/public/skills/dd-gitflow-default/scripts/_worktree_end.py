@@ -337,20 +337,6 @@ def _refuse_denylisted(root: Path, tree: Path, onto: str) -> None:
     _relay("the denylist scan", cli(root, "ci", "push-gate-check", "--onto", onto, tree=tree), tree)  # fmt: skip
 
 
-def _series(tree: Path, *rng: str) -> list[tuple[str, str]]:
-    """(patch-id, full message) per commit of the log range *rng*, oldest first, keyed by commit id:
-    an empty commit has no patch-id (""); a changed one without a patch-id never matches."""
-    patch = git(tree, "log", "-p", "--no-color", "--no-ext-diff", "--format=commit %H", *rng)
-    pids = git(tree, "patch-id", "--stable", input=patch).split()
-    ids = dict(zip(pids[1::2], pids[::2], strict=True))
-    changed = set(git(tree, "log", "--format=%H", *rng, "--", ".").split())
-    logs = git(tree, "log", "--reverse", "--no-show-signature", "--format=%H%n%B%x00", *rng)
-    return [
-        (ids.get(c, f"unmatched {c}" if c in changed else ""), msg)
-        for c, _, msg in (x.lstrip("\n").partition("\n") for x in logs.split("\0")[:-1])
-    ]
-
-
 def _moment(data: dict[str, object]) -> float | None:
     """The instant of a handoff's `produced_at`, `None` when missing, unparseable or offset-less."""
     try:
@@ -376,17 +362,19 @@ def _dispatch(tree: Path, at: str) -> str:
 
 
 def _check_approved(root: Path, tree: Path, work: str, name: str) -> None:
-    """The newest reviewer handoffs naming a candidate sha decide: each must be a valid APPROVED
-    whose `diff_sha256` is HEAD's. A candidate is HEAD or a sha of this branch's reflog whose
-    last len(HEAD's series) commits equal HEAD's (patch-id, message) series, so a parent rewritten
-    by sync does not widen it; newest is `produced_at`, a missing or
-    naive one ranks newest, and ties all decide."""
+    """The newest reviewer handoffs decide, each a valid APPROVED bound to HEAD's `diff_sha256` (diff
+    and commit series). A verdict names HEAD, or a sha of the branch's reflog outside *work* and
+    then counts only when its recorded `diff_sha256` is HEAD's; newest is `produced_at`, a
+    missing or naive one ranks newest, and ties all decide."""
     head = git(tree, "rev-parse", "HEAD").strip()
-    mine = _series(tree, f"{work}..{head}")
-    reflog = {head, *git(tree, "reflog", "--format=%H", branch(name), check=False).split()}
-    named = _reviews(
-        root, {x for x in reflog if x == head or _series(tree, "-n", str(len(mine)), x) == mine}
-    )
+    want = diff_sha256(tree, work, head)
+    held = git(tree, "reflog", "--format=%H", branch(name), check=False).split()
+    own = {head, *git(tree, "rev-list", head, *held, f"^{work}", check=False).split()}
+    named = [
+        row
+        for row in _reviews(root, own)
+        if row[3].get("reviewed_sha") == head or row[3].get("diff_sha256") == want
+    ]
     top = max((row[:2] for row in named), default=None)
     decided = sorted(row for row in named if row[:2] == top)
     invalid = next(
@@ -400,7 +388,7 @@ def _check_approved(root: Path, tree: Path, work: str, name: str) -> None:
         ),
         None,
     )
-    said = f"the newest {REVIEWER} handoff naming HEAD {head} or a sha of its patch and message series is not a valid APPROVED (the file comes from the reviewer's verdict)"  # fmt: skip
+    said = f"the newest {REVIEWER} handoff naming HEAD {head} or a sha of its reflog bound to its diff is not a valid APPROVED (the file comes from the reviewer's verdict)"  # fmt: skip
     if invalid:
         raise Refusal(said, command(*cli_words(root, "reports", "validate", invalid, "--reviewed-root", str(tree))))  # fmt: skip
     if rejected := next((row[2] for row in decided if row[3].get("verdict") != "APPROVED"), None):
@@ -409,7 +397,6 @@ def _check_approved(root: Path, tree: Path, work: str, name: str) -> None:
     dispatch = act("agent", _dispatch(tree, f"HEAD {head}"))
     if not decided:
         raise Refusal(said, dispatch)
-    want = diff_sha256(tree, work, head)
     if any(row[3].get("diff_sha256") != want for row in decided):
         raise Refusal(f"no {REVIEWER} verdict binds the diff {head} lands", dispatch)
 
@@ -472,12 +459,15 @@ def merge(root: Path, path: str, keep: list[str], drop: bool) -> str:
         _on_target(into, onto)
         _remove(repo, tree, onto, name, [])
         return f"{ref} merged into {onto}"
+    head = git(tree, "rev-parse", "HEAD").strip()
+    if git(tree, "rev-parse", ref, check=False).strip() != head:
+        raise Refusal(f"{ref} is not at HEAD {head}", git_line(tree, "switch", ref))
     for check in _kind_checks(root, repo, tree, name, onto, into):
         check()
     kept = _kept(tree, "merge", keep, drop)
     _on_target(into, onto)
     try:
-        git(into, "merge", "-q", "--ff-only", ref)
+        git(into, "merge", "-q", "--ff-only", head)
     except RuntimeError as error:
         check_ancestor(root, tree, onto)  # moved while merge ran; else a stray the operator owns
         fix = act(
