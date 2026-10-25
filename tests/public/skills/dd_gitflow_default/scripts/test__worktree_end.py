@@ -530,7 +530,7 @@ def test_release_closure_waits_for_every_other_wt(tmp_path: Path) -> None:
 
 
 def test_a_verdict_carries_over_only_an_identical_patch_and_message_series(root: Path) -> None:
-    """Once the work branch moved, a reword, a dropped or added empty
+    """Once the work branch moved, a reword, a dropped top or an added empty
     commit, a reorder, code amended under the same message (a colored config included), a gitlink
     amended under the same message (diff.ignoreSubmodules=all), or a hand-resolved conflict each change the approved series and refuse for review."""
     repo, tree = root / "repos/r", root / TREE
@@ -583,6 +583,49 @@ def test_a_verdict_carries_over_only_an_identical_patch_and_message_series(root:
     git(tree, "-c", "core.editor=true", "rebase", "--continue")
     assert _line(run(root, "merge", TREE)) == _dispatch(tree)
     assert git(repo, "rev-parse", WORK) == work
+
+
+@pytest.mark.parametrize("bottom", ["empty", "add-then-revert"])
+def test_a_verdict_does_not_carry_over_a_hand_dropped_bottom_commit(
+    root: Path, bottom: str
+) -> None:
+    """Dropping the reviewed series' bottom commits by hand leaves a top that still matches
+    the approved one, yet the series it was reviewed as is gone: the merge refuses for review."""
+    repo, tree = root / "repos/r", root / TREE
+    if bottom == "empty":
+        git(tree, "commit", "-q", "--allow-empty", "-m", "empty0")
+    else:
+        commit(tree, "src/q.py")
+        git(tree, "revert", "--no-edit", "HEAD")
+    land(root, "src/a.py")
+    approve(root, git(tree, "rev-parse", "HEAD").strip())
+    work = commit(root / RC_TREE, "src/z.py")
+    git(tree, "rebase", "-q", "--onto", WORK, "HEAD~")  # rewrites the branch itself
+    assert git(tree, "branch", "--show-current").strip() == f"wt/{NEW_JOB}"
+    assert _line(run(root, "merge", TREE)) == _dispatch(tree)
+    assert git(repo, "rev-parse", WORK).strip() == work
+
+
+@pytest.mark.parametrize("kind", ["job", "backlog", "task"])
+def test_a_merge_refuses_a_tree_whose_head_is_not_its_branch_tip(root: Path, kind: str) -> None:
+    """Every check judges HEAD, so a detached HEAD at the reviewed sha must not land the branch's
+    unreviewed tip: the merge refuses, the fix reattaches HEAD to the branch."""
+    repo = root / "repos/r"
+    name, first, onto = {
+        "job": (NEW_JOB, "src/a.py", WORK),
+        "backlog": (BACKLOG, "specs/x.md", "feature/0.5.0"),
+        "task": (NEW_TASK, "src/a.py", f"wt/{NEW_JOB}"),
+    }[kind]
+    tree = root / TREE if kind == "job" else open_tree(root, name)
+    reviewed = commit(tree, first)
+    if kind != "task":
+        approve(root, reviewed, name=name)
+    commit(tree, "src/evil.py")
+    git(tree, "checkout", "-q", "--detach", reviewed)
+    landed = git(repo, "rev-parse", onto).strip()
+    refused = run(root, "merge", str(tree))
+    assert refused.returncode == 1 and _line(refused) == git_line(tree, "switch", f"wt/{name}")
+    assert git(repo, "rev-parse", onto).strip() == landed
 
 
 @pytest.mark.parametrize("change", ["same-patch", "rewritten-parent", "new-patch"])

@@ -31,6 +31,7 @@ from tests.helpers.worktree_ws import (
 )
 
 RC = "0.5.0/rc-1/wt-rc"
+RC_TREE = f"worktrees/r/{RC}"
 TREE = f"worktrees/r/{NEW_JOB}"
 
 
@@ -150,6 +151,18 @@ def test_a_sync_that_changes_the_patch_context_refuses_with_a_dispatch_the_appro
     head = git(tree, "rev-parse", "HEAD").strip()  # read before the merge removes the tree
     _refusal(root, run(root, "merge", TREE), head)
     approve(root, head, name=NEW_JOB, at="T11:00:00Z")
+    landed = run(root, "merge", TREE)
+    assert landed.returncode == 0, landed.stderr
+    assert git(root / "repos/r", "rev-parse", f"wt/{RC}").strip() == head
+
+
+def test_a_head_that_holds_a_merge_commit_lands_on_its_own_verdict(root: Path) -> None:
+    land(root, "src/a.py")
+    commit(root / RC_TREE, "src/z.py")
+    git(root / TREE, "merge", "-q", "--no-edit", f"wt/{RC}")
+    head = git(root / TREE, "rev-parse", "HEAD").strip()
+    bound = json.loads(run(root, "hash", TREE, "--sha", head).stdout)["diff_sha256"]
+    _hand(root, head, reviewed_sha=head, diff_sha256=bound)
     landed = run(root, "merge", TREE)
     assert landed.returncode == 0, landed.stderr
     assert git(root / "repos/r", "rev-parse", f"wt/{RC}").strip() == head
