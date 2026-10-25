@@ -41,9 +41,21 @@ def locked_add(name: str, *opts: str) -> tuple[str, ...]:
     return ("worktree", "add", *opts, "--lock", "--reason", f"{LOCK}{name}")
 
 
+def move_aside(tree: Path, then: str = "") -> str:
+    """The act that clears a folder at *tree* git does not list: it may hold work, so it moves, never
+    deletes, and what holds files open in it (the usual reason a delete failed) stops first."""
+    tail = f", then {then}" if then else ""
+    return act("agent", f"stop what holds files open in {tree}, then move the folder {tree} out of the lane path (it may hold work){tail}")  # fmt: skip
+
+
+def _git_after_clear(repo: Path, tree: Path, *argv: str) -> str:
+    """The fix line running git *argv* into *tree*, a folder there moved aside first."""
+    return move_aside(tree, f"run `{git_inline(repo, *argv)}`") if tree.exists() else git_line(repo, *argv)  # fmt: skip
+
+
 def reattach(repo: Path, tree: Path, name: str) -> str:
     """The fix line that re-adds the removed tree *name* at *tree* on its branch, locked as `new` locks it."""
-    return git_line(repo, *locked_add(name, "-f", "-f"), str(tree), branch(name))
+    return _git_after_clear(repo, tree, *locked_add(name, "-f", "-f"), str(tree), branch(name))
 
 
 def _series(tree: Path, *rng: str) -> list[tuple[str, str]]:
@@ -203,6 +215,26 @@ def ours(repo: Path) -> list[dict[str, str]]:
     ]
 
 
+def holder(repo: Path, ref: str) -> Path | None:
+    """The path of the tree git lists on branch *ref*; none when no tree holds it."""
+    return next((Path(t["worktree"]).resolve() for t in _trees(repo) if t.get("branch") == f"refs/heads/{ref}"), None)  # fmt: skip
+
+
+def tree_at(repo: Path, tree: Path, name: str) -> bool:
+    """Whether tree *name* is at *tree*: the tree git lists on its branch is there and its folder exists.
+    False is the no-tree ending, taken only when no tree git lists holds the branch (it is left, or
+    the folder is gone). Refuses a tree git lists on that branch at another path, a tree git lists
+    at *tree* on another branch, and a name with neither tree nor branch, each touching nothing."""
+    held, ref = holder(repo, branch(name)), branch(name)
+    if held not in (None, tree):
+        raise Refusal(f"{ref} is held by the tree at {held}, not {tree}", _git_after_clear(repo, tree, "worktree", "move", "-f", "-f", str(held), str(tree)))  # fmt: skip
+    if held is None and any(Path(t["worktree"]).resolve() == tree for t in _trees(repo)):
+        raise Refusal(f"{tree} is not a worktree of ours", act("agent", f"rerun with a tree path `{inline(*LAUNCH, 'list')}` prints"))  # fmt: skip
+    if held is None and not git(repo, "branch", "--list", ref).strip():
+        raise Refusal(f"{tree} has no tree and no branch {ref}", command(*LAUNCH, "new", repo.name, name))  # fmt: skip
+    return held is not None and tree.exists()
+
+
 def _row(repo: Path, path: str, state: str, age: float = 0.0, **facts: object) -> dict[str, object]:
     """One worktree: WARN past a day or off-canon; `fix` shown only when ready or orphan;
     `exit`, the line a hold names — `clean` for an empty tree, `resume` for a paused one, else `merge`."""
@@ -210,9 +242,7 @@ def _row(repo: Path, path: str, state: str, age: float = 0.0, **facts: object) -
     line = command(*LAUNCH, verb, path)
     # merge cannot clear a directory git does not know
     if state == "orphan" and Path(path).exists():
-        line = act(
-            "agent", f"remove the directory {path}, then run `{inline(*LAUNCH, verb, path)}`"
-        )
+        line = move_aside(Path(path), f"run `{inline(*LAUNCH, verb, path)}`")
     return {"repo": repo.name, "path": path, "state": state, "age_hours": age, "registered": True,
             "kind": None, **facts, "warn": state not in ("ready", "open", "empty", "paused") or age > 24,
             "fix": line if state in ("ready", "orphan") else "",
@@ -273,8 +303,7 @@ def _absent(root: Path, repo: Path, flow: dict[str, str], held: set[str], found:
     listed = {Path(str(r["path"])).resolve() for r in (*found, *out)}
     ancestors = {p for path in listed for p in path.parents}
     return out + [
-        _row(repo, str(stray), "unregistered")
-        | {"fix": act("agent", f"remove the directory {stray}")}
+        _row(repo, str(stray), "unregistered") | {"fix": move_aside(stray)}
         for stray in _strays(home, home, listed, ancestors)
     ]
 

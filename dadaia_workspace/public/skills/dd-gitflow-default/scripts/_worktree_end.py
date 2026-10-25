@@ -20,6 +20,7 @@ from functools import partial
 from pathlib import Path
 
 import _worktree_names as names
+from _git import GitError
 from _handoffs import REVIEWER, reviewer_records
 from _jsonl import reinstall_fix
 from _platform import act, command, git_inline, git_line, inline, run, venv_dir, venv_tool
@@ -33,10 +34,13 @@ from _worktree_git import (
     drop_argv,
     flow_for,
     git,
+    holder,
+    move_aside,
     not_a_name,
     ours,
     reattach,
     scrubbed_env,
+    tree_at,
     workspace_of,
 )
 from _worktree_names import LAUNCH, NAME_RE, Refusal, base_of, branch, kind_of, locate, tree_path
@@ -100,6 +104,20 @@ def _kept(tree: Path, verb: str, keep: list[str], drop: bool) -> list[str]:
     return [p for p in ignored if p in keep]
 
 
+def drop_tree(repo: Path, tree: Path, name: str) -> None:
+    """Remove the worktree *name* at *tree* (an absent folder is pruned); a Refusal to move the folder
+    aside when git, failing on it, no longer lists a tree on the branch."""
+    try:
+        git(repo, "worktree", *(("remove", str(tree)) if tree.exists() else ("prune",)))
+    except GitError as error:
+        if not tree.exists() or holder(repo, branch(name)):
+            raise
+        raise Refusal(
+            f"git no longer lists {tree}, which still holds files: {error}",
+            move_aside(tree, "rerun the same command"),
+        ) from error
+
+
 def _remove(repo: Path, tree: Path, onto: str, name: str, kept: list[str]) -> None:
     """Copy *kept* into the checkout of *onto* (of *repo*) and drop the tree (an absent one is pruned), its branch (on
     the remote too, when it was pushed) and the folder it leaves empty."""
@@ -125,7 +143,7 @@ def _remove(repo: Path, tree: Path, onto: str, name: str, kept: list[str]) -> No
                 git_line(into, "push", fields[0], "--delete", branch(name)),
             ) from error
     git(into, "worktree", "unlock", str(tree), check=False)
-    git(into, "worktree", *(("remove", str(tree)) if tree.exists() else ("prune",)))
+    drop_tree(into, tree, name)
     for argv in drops:
         git(into, *argv)
     rmdir(tree, name)
@@ -452,10 +470,9 @@ def merge(root: Path, path: str, keep: list[str], drop: bool) -> str:
     require_governed(root)
     repo, tree, name, onto = target(root, path)
     ref = branch(name)
-    if not tree.exists() and not git(repo, "branch", "--list", ref).strip():
-        raise Refusal(f"{tree} has no tree and no branch {ref}", command(*LAUNCH, "new", repo.name, name))  # fmt: skip
+    here = tree_at(repo, tree, name)
     into = _parent(repo, onto)
-    if not tree.exists():  # only the branch is left
+    if not here:  # no tree git lists holds the branch: only it is left
         _on_target(into, onto)
         _remove(repo, tree, onto, name, [])
         return f"{ref} merged into {onto}"
@@ -481,13 +498,14 @@ def merge(root: Path, path: str, keep: list[str], drop: bool) -> str:
 
 def clean(root: Path, path: str, keep: list[str], drop: bool) -> str:
     repo, tree, name, onto = target(root, path)
-    if not any(Path(row["path"]).resolve() == tree for row in ours(repo)):
-        raise Refusal(f"{tree} is not a worktree of ours", act("agent", f"rerun with a tree path `{inline(*LAUNCH, 'list')}` prints"))  # fmt: skip
+    if not tree_at(repo, tree, name):
+        merge(root, path, keep, drop)  # no tree git lists holds the branch: its no-tree ending
+        return f"cleaned {tree}"
     ahead = int(git(repo, "rev-list", "--count", f"{onto}..{branch(name)}"))
     if ahead:
-        merge = inline(*LAUNCH, "merge", str(tree))
+        land = inline(*LAUNCH, "merge", str(tree))
         raise Refusal(f"{branch(name)} holds {ahead} unmerged commit(s)",
-                      act("agent", f"{_dispatch(tree, 'its HEAD')}, then run `{merge}`"))  # fmt: skip
+                      act("agent", f"{_dispatch(tree, 'its HEAD')}, then run `{land}`"))  # fmt: skip
     refuse_dirty(tree)
     _remove(repo, tree, onto, name, _kept(tree, "clean", keep, drop))
     return f"cleaned {tree}"
