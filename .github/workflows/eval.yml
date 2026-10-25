@@ -99,7 +99,7 @@ jobs:
           path: dist
       - name: Check the wheel is the one prepare built
         run: echo "$WHEEL_SHA256  $(ls dist/*.whl)" | sha256sum --check
-      - run: pipx install harbor==0.23.0
+      - run: pipx install harbor==0.24.0
       - run: python3 evals/scripts/preflight.py "$HARNESS" "$SECRET_NAME"
       - if: matrix.harness == 'claude-code'
         run: |
@@ -122,7 +122,8 @@ jobs:
           w=$(ls dist/*.whl)
           lib="$TASKS/$TASK/environment/lib"
           rm -rf "$lib"; mkdir -p "$lib"; cp "$w" "$lib/"; echo "/lib/$(basename "$w")" > "$lib/requirements.txt"
-          harbor run -p "$TASKS" -i "$TASK" -a "$HARNESS" -m "$MODEL" --ak version="$VERSION" -k 3 -n 3 -o "evals/jobs/$HARNESS/$TASK" \
+          extra=(); if [ "$HARNESS" = codex ]; then extra=(--ak dangerously_bypass_hook_trust=true --ak 'config={"projects":{"/workspace":{"trust_level":"trusted"}}}'); fi
+          harbor run -p "$TASKS" -i "$TASK" -a "$HARNESS" -m "$MODEL" --ak version="$VERSION" "${extra[@]}" -k 3 -n 3 -o "evals/jobs/$HARNESS/$TASK" \
             --max-retries 2 \
             --retry-include EnvironmentStartTimeoutError \
             --retry-include SandboxBuildFailedError \
