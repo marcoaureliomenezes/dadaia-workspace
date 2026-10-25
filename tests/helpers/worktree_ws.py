@@ -229,12 +229,19 @@ def open_tree(root: Path, name: str) -> Path:
 
 
 def diff_hash(root: Path, sha: str, name: str | None = None, repo: str = "r") -> str:
-    """The oracle: sha256 (UTF-8) of `git diff-tree -r -z --full-index <merge-base> <sha>` in repo *repo*,
-    the merge-base taken against the branch tree *name* is cut from; the work branch with no *name*."""
+    """The oracle: sha256 (UTF-8) of the JSON `[diff, series]` over the merge-base of *sha* and the
+    branch tree *name* is cut from (the work branch with no *name*): `diff` is
+    `git diff-tree -r -z --full-index <base> <sha>`, `series` is each linear commit's
+    [`patch-id --stable` or "" when empty, full message], oldest first."""
     checkout = root / "repos" / repo
     base = git(checkout, "merge-base", _parent(name) if name else "feature/0.5.0", sha).strip()
     diff = git(checkout, "diff-tree", "-r", "-z", "--full-index", base, sha)
-    return hashlib.sha256(diff.encode("utf-8")).hexdigest()
+    series = []
+    for one in git(checkout, "rev-list", "--reverse", f"{base}..{sha}").split():
+        patch = git(checkout, "diff-tree", "-p", "--no-color", one)
+        pid = run_text(["git", "patch-id", "--stable"], input=patch, check=True).stdout.split()
+        series.append([pid[0] if pid else "", git(checkout, "log", "-1", "--format=%B%x00", one).split("\0")[0]])  # fmt: skip
+    return hashlib.sha256(json.dumps([diff, series]).encode("utf-8")).hexdigest()
 
 
 def approve(
