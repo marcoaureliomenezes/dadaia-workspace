@@ -17,7 +17,16 @@ import pytest
 
 import dadaia_workspace
 from tests.fixtures.stores import fake_venv
-from tests.helpers.oslib import command, make_executable, read_text, stub_cli, write_text
+from tests.helpers.oslib import (
+    PERMISSIONS_ENFORCED,
+    command,
+    make_executable,
+    make_readonly,
+    make_writable,
+    read_text,
+    stub_cli,
+    write_text,
+)
 from tests.helpers.oslib import run as os_run
 from tests.helpers.worktree_ws import (
     NEW_JOB,
@@ -308,3 +317,41 @@ def test_the_dist_writer_sentence_names_worktree_pause_and_resume() -> None:
 
     assert "`worktree pause`" in sentence
     assert "`worktree resume`" in sentence
+
+
+@pytest.mark.skipif(not PERMISSIONS_ENFORCED, reason="needs a folder this process cannot empty")
+def test_a_folder_git_cannot_delete_is_named_and_the_rerun_ends_the_pause(root: Path) -> None:
+    make_readonly((tree := _lane(root)) / "specs")
+    aside = root.parent / "aside"
+    # the bundle is written, git forgot the tree, the folder stays
+    for _ in range(2):
+        refused = run(root, "pause", str(tree))
+        assert refused.returncode == 1
+        (fix,) = fixes(refused)
+        assert f"move the folder {tree} out of the lane path" in fix and "rerun" in fix
+    tree.rename(aside)
+    make_writable(aside / "specs")
+    done = run(root, "pause", str(tree))
+    assert done.returncode == 0, done.stderr
+    assert _bundle(root, BACKLOG).is_file()
+    assert git(root / "repos/r", "branch", "--list", _branch(BACKLOG)) == ""
+
+
+def test_a_pause_of_a_tree_git_forgot_bundles_the_branch_tip_not_an_earlier_bundle(
+    root: Path,
+) -> None:
+    repo = root / "repos/r"
+    tree = _lane(root)
+    assert run(root, "pause", str(tree)).returncode == 0
+    later = commit(open_tree(root, BACKLOG), "specs/later.md")
+    git(repo, "worktree", "unlock", str(tree))
+    shutil.rmtree(tree)
+    git(repo, "worktree", "prune")
+
+    paused = run(root, "pause", str(tree))
+
+    assert paused.returncode == 0, paused.stderr
+    assert f"{later} refs/heads/{_branch(BACKLOG)}" in git(
+        repo, "bundle", "list-heads", str(_bundle(root, BACKLOG))
+    )
+    assert git(repo, "branch", "--list", _branch(BACKLOG)) == ""

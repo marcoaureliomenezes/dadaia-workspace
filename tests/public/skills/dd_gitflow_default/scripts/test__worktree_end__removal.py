@@ -15,11 +15,18 @@ import pytest
 
 from dadaia_workspace.core.platform import quote
 from dadaia_workspace.core.skill_owner import load_owner
-from tests.helpers.oslib import command, write_text
+from tests.helpers.oslib import (
+    PERMISSIONS_ENFORCED,
+    command,
+    make_readonly,
+    make_writable,
+    write_text,
+)
 from tests.helpers.worktree_ws import (
     NEW_JOB,
     approve,
     commit,
+    fixes,
     git,
     land,
     make_workspace,
@@ -337,3 +344,90 @@ def test_a_branch_with_no_upstream_is_deleted_alone(
     root: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     assert _branch_argv_of_a_clean(root, monkeypatch) == [["branch", "-d", BRANCH]]
+
+
+def _stuck(root: Path, verb: str) -> Path:
+    """The job tree to *verb* with a root folder git cannot empty: git forgets the tree, the folder stays."""
+    if verb == "merge":
+        approve(root, land(root, "fe/a.py"), name=NEW_JOB)
+    make_readonly(tree := root / "worktrees/r" / NEW_JOB)
+    return tree
+
+
+@pytest.mark.skipif(not PERMISSIONS_ENFORCED, reason="needs a folder this process cannot empty")
+@pytest.mark.parametrize("verb", ["merge", "clean"])
+def test_a_folder_git_cannot_delete_is_named_and_the_rerun_ends_the_tree(
+    root: Path, verb: str
+) -> None:
+    tree = _stuck(root, verb)
+    aside = root.parent / "aside"
+    # the folder is still there, no longer a worktree: the same act, not a dead end
+    for _ in range(2):
+        refused = run(root, verb, str(tree))
+        assert refused.returncode == 1
+        (fix,) = fixes(refused)
+        assert f"move the folder {tree} out of the lane path" in fix and "rerun" in fix
+    make_writable(tree)
+    tree.rename(aside)
+    done = run(root, verb, str(tree))
+    assert done.returncode == 0, done.stderr
+    assert git(root / "repos/r", "branch", "--list", BRANCH).strip() == ""
+
+
+@pytest.mark.parametrize("verb", ["merge", "clean"])
+def test_a_tree_git_lists_off_its_branch_keeps_its_files(root: Path, verb: str) -> None:
+    tree = root / "worktrees/r" / NEW_JOB
+    git(tree, "switch", "-q", "--detach")
+    commit(tree, ".gitignore", "secret.env\n")
+    write_text(tree / "secret.env", "key\n")
+    refused = run(root, verb, str(tree))
+    assert refused.returncode == 1
+    assert (tree / "secret.env").read_text() == "key\n"
+    assert str(tree) in git(root / "repos/r", "worktree", "list")
+
+
+def test_a_remove_git_refuses_on_a_listed_tree_keeps_gits_message(root: Path) -> None:
+    end: Any = load_owner("dd-gitflow-default", "_worktree_end")
+    repo, tree, name, onto = end.target(root, str(root / "worktrees/r" / NEW_JOB))
+    write_text(tree / "work.txt", "x")
+    with pytest.raises(RuntimeError) as raised:
+        end._remove(repo, tree, onto, name, [])
+    assert "untracked" in str(raised.value) and "move the folder" not in str(raised.value)
+    assert str(tree) in git(repo, "worktree", "list")
+
+
+@pytest.mark.parametrize("verb", ["merge", "clean"])
+def test_a_folder_in_the_way_of_an_unmerged_branch_is_moved_before_the_tree_comes_back(
+    root: Path, verb: str
+) -> None:
+    land(root, "src/a.py")
+    tree = _gone(root)
+    tree.mkdir()
+    write_text(tree / "notes.txt", "mine\n")
+
+    refused = run(root, verb, str(tree))
+
+    assert refused.returncode == 1
+    (fix,) = fixes(refused)
+    assert f"move the folder {tree} out of the lane path" in fix
+    assert " worktree add -f -f --lock " in fix
+    assert (tree / "notes.txt").read_text() == "mine\n"
+
+
+@pytest.mark.parametrize("verb", ["merge", "clean", "pause"])
+def test_a_tree_git_lists_at_another_path_is_named_and_never_ended(root: Path, verb: str) -> None:
+    repo, tree, moved = root / "repos/r", root / "worktrees/r" / RC, root.parent / "elsewhere"
+    git(repo, "worktree", "move", "-f", "-f", str(tree), str(moved))
+    write_text(moved / "notes.txt", "mine\n")
+
+    refused = run(root, verb, str(tree))
+
+    assert refused.returncode == 1
+    assert str(moved) in refused.stderr
+    assert (moved / "notes.txt").read_text() == "mine\n"
+    assert git(repo, "branch", "--list", f"wt/{RC}").strip() != ""
+    assert f"{moved} " in git(repo, "worktree", "list")
+    assert not (root / ".dadaia/dist").exists()
+    run_fix(root, refused)
+    assert f"{tree} " in git(repo, "worktree", "list")
+    assert str(moved) not in run(root, verb, str(tree)).stderr
