@@ -100,7 +100,7 @@ def test_doctor_names_the_onboarding_step_of_the_context_it_judges(
     ("live", "fix"),
     [
         pytest.param(False, "fix: Operator action: relaunch the session at the workspace root", id="ungoverned-names-the-relaunch"),
-        pytest.param(True, "dadaia context bind app", id="governed-unbound-binds"),
+        pytest.param(True, "", id="governed-unbound-binds"),
     ],
 )  # fmt: skip
 def test_doctor_names_the_bind_only_to_a_session_bind_accepts(
@@ -108,6 +108,7 @@ def test_doctor_names_the_bind_only_to_a_session_bind_accepts(
 ) -> None:
     """A subagent-harness session with no live record cannot bind: the step's fix is the
     relaunch; with a live record, that session binds."""
+    fix = fix or f"fix: {fix_line(workspace, 'context', 'bind', 'app')}"
     _register_specless_context(workspace, "app")
     monkeypatch.setenv("CLAUDE_CODE_SESSION_ID", "sess-1")
     if live:
