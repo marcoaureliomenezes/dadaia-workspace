@@ -37,7 +37,7 @@ def test_a_row_names_its_exit_through_command_or_inline(win32: None, tmp_path: P
     bad.mkdir()
     held = git._row(Path("r"), str(bad), "orphan")
     assert held["fix"] == (
-        f"Agent action: remove the directory {bad}, then run "
+        f"Agent action: stop what holds files open in {bad}, then move the folder {bad} out of the lane path (it may hold work), then run "
         f"`{inline(*git.LAUNCH, 'merge', str(bad), caps=_WIN)}`"
     )
 

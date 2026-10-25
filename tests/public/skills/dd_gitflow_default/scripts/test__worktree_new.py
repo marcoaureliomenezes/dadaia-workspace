@@ -648,7 +648,7 @@ def test_new_onto_an_unlisted_folder_makes_no_branch_and_names_its_move(root: Pa
     assert (refused.returncode, refused.stdout) == (1, "")
     assert _git(root / "repos/r", "branch", "--list", f"wt/{RC}").strip() == ""
     assert _fixes(refused) == [
-        f"fix: Agent action: move the folder {folder} out of the lane path (it may hold work), then rerun `{_script()} new r {RC}`"
+        f"fix: Agent action: stop what holds files open in {folder}, then move the folder {folder} out of the lane path (it may hold work), then rerun `{_script()} new r {RC}`"
     ]
     folder.rename(root / "aside")
     assert _run(root, "new", "r", RC).returncode == 0
@@ -681,7 +681,7 @@ def test_merge_onto_a_leftover_folder_without_a_branch_ends_through_new(root: Pa
     assert (merged.returncode, _fixes(merged)) == (1, [f"fix: {_script()} new r {RC}"])
     new_fix = _run(root, "new", "r", RC)  # the line merge prints, run as printed
     assert _fixes(new_fix) == [
-        f"fix: Agent action: move the folder {folder} out of the lane path (it may hold work), then rerun `{_script()} new r {RC}`"
+        f"fix: Agent action: stop what holds files open in {folder}, then move the folder {folder} out of the lane path (it may hold work), then rerun `{_script()} new r {RC}`"
     ]
     folder.rename(root / "aside")
 
