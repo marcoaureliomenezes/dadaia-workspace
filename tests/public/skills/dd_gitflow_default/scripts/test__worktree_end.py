@@ -628,6 +628,21 @@ def test_a_merge_refuses_a_tree_whose_head_is_not_its_branch_tip(root: Path, kin
     assert git(repo, "rev-parse", onto).strip() == landed
 
 
+def test_a_deleted_branch_beside_a_detached_tree_refuses_with_a_fix_that_clears_it(
+    root: Path,
+) -> None:
+    tree, repo = root / TREE, root / "repos/r"
+    reviewed = commit(tree, "src/a.py")
+    approve(root, reviewed, name=NEW_JOB)
+    git(tree, "checkout", "-q", "--detach", reviewed)
+    git(repo, "branch", "-D", f"wt/{NEW_JOB}")
+    refused = run(root, "merge", str(tree))
+    assert refused.returncode == 1
+    _fix(root, refused)
+    after = run(root, "merge", str(tree))
+    assert after.returncode == 0 or "is not at HEAD" not in after.stderr, after.stderr
+
+
 @pytest.mark.parametrize("change", ["same-patch", "rewritten-parent", "new-patch"])
 def test_a_moved_work_branch_refuses_and_its_fix_rebase_keeps_only_an_identical_patch(
     root: Path, change: str

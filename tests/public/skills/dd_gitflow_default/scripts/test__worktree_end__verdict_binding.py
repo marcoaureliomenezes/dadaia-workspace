@@ -256,7 +256,14 @@ def test_a_rename_commit_binds_as_the_oracle_binds_it(root: Path) -> None:
 
 
 @pytest.mark.parametrize(
-    "key, value", [("diff.noprefix", "true"), ("diff.renames", "false"), ("diff.context", "1")]
+    "key, value",
+    [
+        ("diff.noprefix", "true"),
+        ("diff.renames", "false"),
+        ("diff.context", "1"),
+        ("core.quotePath", "false"),
+        ("i18n.logOutputEncoding", "ISO-8859-1"),
+    ],
 )
 def test_the_binding_does_not_read_the_diff_config(root: Path, key: str, value: str) -> None:
     tree = root / TREE
@@ -264,6 +271,9 @@ def test_the_binding_does_not_read_the_diff_config(root: Path, key: str, value: 
     git(tree, "mv", "src/a.py", "src/b.py")
     write_text(tree / "src/b.py", "".join(f"l{i}\n" for i in range(30)).replace("l15", "m15"))
     git(tree, "commit", "-qam", "rename and edit")
+    write_text(tree / "src/é.py", "x = 1\n")
+    git(tree, "add", "src/é.py")
+    git(tree, "commit", "-qm", "é: non-ASCII path and message")
     head = git(tree, "rev-parse", "HEAD").strip()
     before = _printed(root, head)
 
