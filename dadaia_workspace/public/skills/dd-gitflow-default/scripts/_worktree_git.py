@@ -33,6 +33,7 @@ from _worktree_names import (
 )
 
 PLUMBING = ("--no-renames", "--no-ext-diff", "--no-color", "--full-index")
+PINS = ("-c", "core.quotePath=true", "-c", "i18n.logOutputEncoding=UTF-8")
 
 
 def locked_add(name: str, *opts: str) -> tuple[str, ...]:
@@ -47,11 +48,11 @@ def reattach(repo: Path, tree: Path, name: str) -> str:
 
 def _series(tree: Path, *rng: str) -> list[tuple[str, str]]:
     """(patch-id, full message) per commit of the log range *rng*, oldest first: the patch-id
-    (whitespace-blind) is of the commit's plumbing diff, which reads no diff config; an empty one,
+    (whitespace-blind) is of the commit's plumbing diff, which reads no config; an empty one,
     or a merge, has "" (the tree diff still binds a binary change)."""
-    logs = git(tree, "log", "--reverse", "--no-show-signature", "--format=%H%n%B%x00", *rng)
+    logs = git(tree, *PINS, "log", "--reverse", "--no-show-signature", "--format=%H%n%B%x00", *rng)
     rows = [x.lstrip("\n").partition("\n") for x in logs.split("\0")[:-1]]
-    patch = git(tree, "diff-tree", "--stdin", "-p", "--root", *PLUMBING, input="".join(f"{c}\n" for c, _, _ in rows))  # fmt: skip
+    patch = git(tree, *PINS, "diff-tree", "--stdin", "-p", "--root", *PLUMBING, input="".join(f"{c}\n" for c, _, _ in rows))  # fmt: skip
     pids = git(tree, "patch-id", "--stable", input=patch).split()
     ids = dict(zip(pids[1::2], pids[::2], strict=True))
     return [(ids.get(c, ""), msg) for c, _, msg in rows]

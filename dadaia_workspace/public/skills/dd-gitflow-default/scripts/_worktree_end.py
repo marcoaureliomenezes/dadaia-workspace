@@ -460,7 +460,7 @@ def merge(root: Path, path: str, keep: list[str], drop: bool) -> str:
         _remove(repo, tree, onto, name, [])
         return f"{ref} merged into {onto}"
     head = git(tree, "rev-parse", "HEAD").strip()
-    if (tip := git(tree, "rev-parse", f"refs/heads/{ref}", check=False).strip()) != head:
+    if (tip := git(tree, "rev-parse", "-q", "--verify", f"refs/heads/{ref}", check=False).strip()) != head:  # fmt: skip
         raise Refusal(f"{ref} is not at HEAD {head}", git_line(tree, "switch", *(() if tip else ("-c",)), ref))  # fmt: skip
     for check in _kind_checks(root, repo, tree, name, onto, into):
         check()

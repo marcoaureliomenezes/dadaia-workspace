@@ -229,6 +229,7 @@ def open_tree(root: Path, name: str) -> Path:
 
 
 PLUMBING = ("--no-renames", "--no-ext-diff", "--no-color", "--full-index")
+PINS = ("-c", "core.quotePath=true", "-c", "i18n.logOutputEncoding=UTF-8")
 
 
 def diff_hash(root: Path, sha: str, name: str | None = None, repo: str = "r") -> str:
@@ -241,9 +242,9 @@ def diff_hash(root: Path, sha: str, name: str | None = None, repo: str = "r") ->
     diff = git(checkout, "diff-tree", "-r", "-z", "--full-index", base, sha)
     series = []
     for one in git(checkout, "rev-list", "--reverse", f"{base}..{sha}").split():
-        patch = git(checkout, "diff-tree", "-p", "--root", *PLUMBING, one)
+        patch = git(checkout, *PINS, "diff-tree", "-p", "--root", *PLUMBING, one)
         pid = run_text(["git", "patch-id", "--stable"], input=patch, check=True).stdout.split()
-        series.append([pid[0] if pid else "", git(checkout, "log", "-1", "--format=%B%x00", one).split("\0")[0]])  # fmt: skip
+        series.append([pid[0] if pid else "", git(checkout, *PINS, "log", "-1", "--format=%B%x00", one).split("\0")[0]])  # fmt: skip
     return hashlib.sha256(json.dumps([diff, series]).encode("utf-8")).hexdigest()
 
 
