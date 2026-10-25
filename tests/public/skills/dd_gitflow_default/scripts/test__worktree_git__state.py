@@ -210,7 +210,7 @@ def test_a_branch_without_its_tree_is_ended_by_merge_and_clean_and_named_by_new(
     assert _branch(root) == ""
 
 
-@pytest.mark.parametrize("verb", [*VERBS, "resume"])
+@pytest.mark.parametrize("verb", VERBS)
 def test_an_absent_name_is_named_alike_and_new_ends_it(root: Path, verb: str) -> None:
     tree = _tree(root)
 
@@ -219,6 +219,12 @@ def test_an_absent_name_is_named_alike_and_new_ends_it(root: Path, verb: str) ->
     assert fix == _line("new", "r", LANE)
     run_fix(root, run(root, verb, str(tree)))
     assert (tree / "specs").is_dir()
+
+
+def test_resume_of_a_name_no_bundle_holds_is_an_agent_rerun_never_new(root: Path) -> None:
+    fix = _refused(root, "resume", str(_tree(root)))
+
+    assert fix == f"fix: Agent action: rerun with the tree of a bundle under {root / '.dadaia/dist/r'}"
 
 
 @pytest.mark.parametrize("verb", ["new", "resume"])
