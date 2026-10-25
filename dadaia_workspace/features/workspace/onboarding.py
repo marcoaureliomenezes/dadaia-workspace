@@ -49,6 +49,7 @@ class _Ctx:
     name: str
     specs: Path
     bound: bool | None
+    bind_fix: str | None = None
 
 
 def specs_ready(specs_dir: Path) -> bool:
@@ -102,7 +103,12 @@ _Pending = Callable[[_Ctx], str | None]
 #: (id, kind, pending -> reason | None, fix). The ``context`` step is derived in
 #: :func:`next_step` — it is the one step with no context to judge.
 STEPS: tuple[tuple[str, Kind, _Pending, Callable[[_Ctx], str]], ...] = (
-    ("bind", "command", _unbound, lambda c: fix_line(c.root, "context", "bind", c.name)),
+    (
+        "bind",
+        "command",
+        _unbound,
+        lambda c: c.bind_fix or fix_line(c.root, "context", "bind", c.name),
+    ),
     (
         "constitution",
         "agent",
@@ -136,10 +142,15 @@ STEP_IDS = ("context", *(step[0] for step in STEPS))
 
 
 def next_step(
-    root: Path, trees: Mapping[str, Path], focus: str | None = None, bound: bool | None = None
+    root: Path,
+    trees: Mapping[str, Path],
+    focus: str | None = None,
+    bound: bool | None = None,
+    bind_fix: str | None = None,
 ) -> Step | None:
     """The judged context's first pending step, or ``None``; *bound* is
-    whether the caller's session is bound (``None``: no identity, so no ``bind`` step)."""
+    whether the caller's session is bound (``None``: no identity, so no ``bind`` step) and
+    *bind_fix* the fix a pending ``bind`` names instead of ``context bind`` (a refused bind)."""
     if not trees:
         create = act(
             "agent",
@@ -151,7 +162,7 @@ def next_step(
         focus = next(iter(trees))
     if focus is None or focus not in trees:
         return None
-    c = _Ctx(root, focus, trees[focus], bound)
+    c = _Ctx(root, focus, trees[focus], bound, bind_fix)
     for step_id, kind, pending, fix in STEPS:
         if (reason := pending(c)) is not None:
             return Step(step_id, kind, reason, fix(c))

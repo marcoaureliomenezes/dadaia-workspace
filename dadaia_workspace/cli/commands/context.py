@@ -13,9 +13,10 @@ from rich.table import Table
 from dadaia_workspace import container
 from dadaia_workspace.cli._fail import fail
 from dadaia_workspace.cli._specs_resolution import (
-    alive_context_trees,
+    RELAUNCH,
     governed,
     own_bind_for_cli,
+    own_next_step,
     resolve_session_id,
 )
 from dadaia_workspace.cli.redact import build_context_redactor
@@ -43,7 +44,6 @@ from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.spec_context.service import (
     SpecContextService,
 )
-from dadaia_workspace.features.workspace import onboarding
 
 app = typer.Typer(help="Manage Spec Context Projects.")
 # Associated-repo registry verbs, nested under `context repo`
@@ -112,11 +112,7 @@ def _live_session(workspace_root: Path, session_id: str) -> dict[str, Any] | Non
 
 def print_next_step(workspace_root: Path, focus: str | None = None) -> None:
     """Print the derived onboarding next step, the text ``doctor`` also reports."""
-    trees = alive_context_trees(workspace_root)
-    bind, session = own_bind_for_cli()
-    step = onboarding.next_step(
-        workspace_root, trees, focus, None if session is None else bool(bind)
-    )
+    step = own_next_step(workspace_root, focus)
     if step is not None:
         console.print(step.text(), markup=False, highlight=False, soft_wrap=True)
 
@@ -370,7 +366,7 @@ def _require_governed(workspace_root: Path) -> None:
     if not governed(workspace_root, os.environ):
         fail(
             "No workspace hook governs this session.",
-            act("operator", "relaunch the session at the workspace root"),
+            RELAUNCH,
         )
 
 

@@ -3,7 +3,8 @@
 Every resolver-driven ``dadaia`` command resolves through this module — its specs
 directory via :func:`resolve_specs_dir_for_cli`, or the bound context name itself via
 :func:`resolve_context_for_cli`. A thin call onto :mod:`dadaia_workspace.core.invocation`,
-which owns resolution; this module adds only the CLI-specific allowlist validation.
+which owns resolution; this module adds the CLI-specific allowlist validation, the onboarding
+next step of the caller (:func:`own_next_step`) and the relaunch fix (:data:`RELAUNCH`).
 
 An *explicit* context name is gated by :data:`~dadaia_workspace.core.invocation.CONTEXT_NAME_RE`
 before any ``repos/<name>/specs`` join; an ambient ``DADAIA_CONTEXT`` is judged by the
@@ -31,6 +32,8 @@ from dadaia_workspace.core.invocation import (
 from dadaia_workspace.core.invocation import resolve_session_id as _resolve_session_id
 from dadaia_workspace.core.invocation import resolve_specs_dir as _core_resolve_specs_dir
 from dadaia_workspace.core.invocation import scope as _scope
+from dadaia_workspace.core.platform import act
+from dadaia_workspace.features.workspace.onboarding import Step, next_step
 
 #: Re-exports so a verb never reaches ``core.invocation`` directly: every consumer of the
 #: harness-session-id env-var list, the session-id rule, or the name->repo-slug mapping
@@ -72,6 +75,23 @@ def own_bind_for_cli() -> tuple[str | None, str | None]:
     """THIS caller's ``(bound context, session id)`` — the one Bind every reader shares."""
     inv = _resolve_invocation(env=os.environ, cwd=Path.cwd())
     return inv.bind.context_name, inv.session_id
+
+
+#: The fix of a refusal for a session no workspace hook governs.
+RELAUNCH = act("operator", "relaunch the session at the workspace root")
+
+
+def own_next_step(workspace_root: Path, focus: str | None = None) -> Step | None:
+    """The onboarding next step for THIS caller: its bound state, and the relaunch for a
+    bind that :func:`governed` refuses."""
+    bind, session = own_bind_for_cli()
+    return next_step(
+        workspace_root,
+        _alive_context_trees(workspace_root),
+        focus,
+        None if session is None else bool(bind),
+        None if _governed(workspace_root, os.environ) else RELAUNCH,
+    )
 
 
 def resolve_context_specs_dir_for_cli(workspace_root: Path, context: str) -> Path | None:

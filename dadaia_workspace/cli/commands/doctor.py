@@ -21,8 +21,7 @@ import typer
 
 from dadaia_workspace import container
 from dadaia_workspace.cli._specs_resolution import (
-    alive_context_trees,
-    own_bind_for_cli,
+    own_next_step,
     resolve_context_for_cli,
     resolve_context_specs_dir_for_cli,
     resolve_specs_dir_for_cli,
@@ -222,13 +221,9 @@ def _onboarding_section(
     if workspace_root is None or expired_only:
         return _empty_section("workspace")
     try:
-        trees = alive_context_trees(workspace_root)
-        bind, session = own_bind_for_cli()
+        step = own_next_step(workspace_root, scope)
     except SchemaVersionError:  # `check` reports REG-SCHEMA; no next step is guessed
         return _empty_section("workspace")
-    step = onboarding.next_step(
-        workspace_root, trees, scope, None if session is None else bool(bind)
-    )
     if step is None:
         return _empty_section("workspace")
     finding = SectionFinding(
