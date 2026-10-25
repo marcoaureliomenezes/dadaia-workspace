@@ -8,9 +8,9 @@ from __future__ import annotations
 from pathlib import Path
 
 from _git import GitError
-from _platform import act, command, inline
-from _worktree_end import open_children, precious, refuse_dirty, rmdir, target
-from _worktree_git import _row, git, locked_add, ours
+from _platform import act, command
+from _worktree_end import drop_tree, open_children, precious, refuse_dirty, rmdir, target
+from _worktree_git import _row, bundle_path, git, holder, locked_add, require
 from _worktree_names import LAUNCH, Refusal, branch, kind_of, tree_path
 from _worktree_new import absent_levels, write_level_files
 
@@ -18,6 +18,12 @@ from _worktree_new import absent_levels, write_level_files
 def write_bundle(repo: Path, ref: str, dest: Path) -> None:
     """Runs `git bundle create` for the commits of branch *ref* that no `origin` ref holds, into
     *dest*, and verifies it. Raises `GitError` on any failure, leaving nothing at *dest*."""
+    for head in git(repo, "bundle", "list-heads", str(dest)).split()[::2] if dest.is_file() else []:
+        try:  # a bundle holding a commit the branch lacks is the only copy of it
+            git(repo, "merge-base", "--is-ancestor", head, ref)
+        except GitError as error:
+            raise Refusal(f"{dest} holds {head}, which {ref} lacks",
+                          act("agent", f"move the bundle {dest} aside (it holds commits), then rerun the pause")) from error  # fmt: skip
     dest.parent.mkdir(parents=True, exist_ok=True)
     git(
         repo, "bundle", "create", str(dest), ref, "--not", "--remotes=origin"
@@ -39,14 +45,15 @@ def member(repo: str, name: str) -> str:
 
 
 def carry(repo: Path, tree: Path, name: str, into: Path) -> str | None:
-    """Writes the commits of the lane or `wt-rc` tree *name* at *tree* that no `origin` ref holds
-    to `<into>/<repo>/<name>.bundle` and returns that member; `None`, writing nothing, when origin
-    holds them all or *name* is no lane or `wt-rc`. Refuses a dirty tree first, whatever it is
-    ahead."""
+    """Writes the commits of the lane or `wt-rc` tree *name* that no `origin` ref holds to
+    `<into>/<repo>/<name>.bundle` and returns that member; `None`, writing nothing, when origin
+    holds them all or *name* is no lane or `wt-rc`. Refuses first, whatever it is ahead, a dirty
+    tree git lists on the branch at *tree*; a branch no tree holds is bundled as the repo has it."""
     if kind_of(name) not in CARRIED:
         return None
-    refuse_dirty(tree)
     ref = branch(name)
+    if tree.exists() and holder(repo, ref) == tree:
+        refuse_dirty(tree)
     if git(repo, "rev-list", "--count", ref, "--not", "--remotes=origin").strip() == "0":
         return None
     write_bundle(repo, ref, into / (found := member(repo.name, name)))
@@ -54,27 +61,25 @@ def carry(repo: Path, tree: Path, name: str, into: Path) -> str | None:
 
 
 def pause(root: Path, path: str) -> str:
-    """Bundles the tree at *path*, removes it and its local `wt/` branch; refuses first, touching
-    nothing, a job or task tree, a dirty one, one holding ignored files, a `wt-rc` with a tree
-    open below it, and a branch origin already holds."""
+    """Bundles the tree at *path* (a branch no tree git lists holds, as the repo has it), removes it
+    and its local `wt/` branch; refuses first, touching nothing, a job or task tree, the branch's
+    tree at another path, a dirty tree or one holding ignored files, a `wt-rc` with a tree open
+    below it, and a branch origin already holds."""
     repo, tree, name, _ = target(root, path)
     land = command(*LAUNCH, "merge", str(tree))
     if kind_of(name) not in CARRIED:
         raise Refusal(f"{tree} is a {kind_of(name)} tree: only a lane or a wt-rc pauses", land)
-    if not any(Path(row["path"]).resolve() == tree for row in ours(repo)):
-        raise Refusal(f"{tree} is not a worktree of ours", act("agent", f"rerun with a tree path `{inline(*LAUNCH, 'list')}` prints"))  # fmt: skip
-    if held := precious(tree):
+    ref, dist = branch(name), root / ".dadaia" / "dist"
+    if require(repo, tree, name, "normal", "branch") == "normal" and (held := precious(tree)):
         raise Refusal(
             f"{tree} holds ignored files: {', '.join(held)}",
             act("agent", f"delete or commit {', '.join(held)}, then rerun the pause"),
         )
     if kind_of(name) == "rc":
         open_children(repo, name)
-    ref, dist = branch(name), root / ".dadaia" / "dist"
     if (found := carry(repo, tree, name, dist)) is None:
         raise Refusal(f"{ref} holds no commit origin lacks", land)
-    git(repo, "worktree", "unlock", str(tree), check=False)
-    git(repo, "worktree", "remove", str(tree))
+    drop_tree(repo, tree, name)
     rmdir(tree, name)
     git(repo, "update-ref", "-d", f"refs/heads/{ref}")
     return f"paused {ref} at {dist / found}"
@@ -85,12 +90,8 @@ def resume(root: Path, path: str) -> str:
     the bundle and the `dist/<repo>/` folders it leaves empty; refuses, touching nothing, a branch
     that exists or a missing bundle."""
     repo, tree, name, _ = target(root, path)
-    ref, dist = branch(name), root / ".dadaia" / "dist" / repo.name
-    bundle = dist / f"{name}.bundle"
-    if git(repo, "branch", "--list", ref).strip():
-        raise Refusal(f"{ref} exists", command(*LAUNCH, "clean", str(tree)))  # fmt: skip
-    if not bundle.is_file():
-        raise Refusal(f"no bundle at {bundle}", act("agent", f"rerun with the tree of a bundle under {dist}"))  # fmt: skip
+    require(repo, tree, name, "paused")
+    ref, bundle = branch(name), bundle_path(root, repo.name, name)
     made = absent_levels(root, repo.name, name)
     git(repo, "fetch", "-q", str(bundle), f"{ref}:{ref}")
     try:
@@ -101,7 +102,7 @@ def resume(root: Path, path: str) -> str:
     write_level_files(made)
     bundle.unlink()
     for folder in bundle.parents:
-        if folder == dist.parent or any(folder.iterdir()):
+        if folder == root / ".dadaia" / "dist" or any(folder.iterdir()):
             break
         folder.rmdir()
     return f"resumed {ref} at {tree}"

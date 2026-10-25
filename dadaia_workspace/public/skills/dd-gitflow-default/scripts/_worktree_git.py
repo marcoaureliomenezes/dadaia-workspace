@@ -16,13 +16,14 @@ from pathlib import Path
 from _git import git as git, parse_worktrees, scrubbed_env as scrubbed_env  # isort: skip
 from _grammar import SEMVER_RE, TAG_RE, sole_live
 from _ledger import denylist_file
-from _platform import act, command, git_inline, git_line, inline, is_link
+from _platform import act, command, git_inline, git_line, is_link
 from _platform import cli_words as cli_words
 from _specs import run_cli
 from _specs import workspace_of as workspace_of
 from _worktree_names import (
     LAUNCH,
     LOCK,
+    NAME_RE,
     Refusal,
     base_of,
     branch,
@@ -41,9 +42,21 @@ def locked_add(name: str, *opts: str) -> tuple[str, ...]:
     return ("worktree", "add", *opts, "--lock", "--reason", f"{LOCK}{name}")
 
 
+def move_aside(tree: Path, then: str = "") -> str:
+    """The act that clears a folder at *tree* git does not list: it may hold work, so it moves, never
+    deletes, and what holds files open in it (the usual reason a delete failed) stops first."""
+    tail = f", then {then}" if then else ""
+    return act("agent", f"stop what holds files open in {tree}, then move the folder {tree} out of the lane path (it may hold work){tail}")  # fmt: skip
+
+
+def _git_after_clear(repo: Path, tree: Path, *argv: str) -> str:
+    """The fix line running git *argv* into *tree*, a folder there moved aside first."""
+    return move_aside(tree, f"run `{git_inline(repo, *argv)}`") if tree.exists() else git_line(repo, *argv)  # fmt: skip
+
+
 def reattach(repo: Path, tree: Path, name: str) -> str:
     """The fix line that re-adds the removed tree *name* at *tree* on its branch, locked as `new` locks it."""
-    return git_line(repo, *locked_add(name, "-f", "-f"), str(tree), branch(name))
+    return _git_after_clear(repo, tree, *locked_add(name, "-f", "-f"), str(tree), branch(name))
 
 
 def _series(tree: Path, *rng: str) -> list[tuple[str, str]]:
@@ -203,16 +216,72 @@ def ours(repo: Path) -> list[dict[str, str]]:
     ]
 
 
+def holder(repo: Path, ref: str) -> Path | None:
+    """The path of the tree git lists on branch *ref*; none when no tree holds it."""
+    return next((Path(t["worktree"]).resolve() for t in _trees(repo) if t.get("branch") == f"refs/heads/{ref}"), None)  # fmt: skip
+
+
+def bundle_path(root: Path, repo: str, name: str) -> Path:
+    """Where the pause bundle of tree *name* of *repo* sits: `.dadaia/dist/<repo>/<name>.bundle`."""
+    return root / ".dadaia" / "dist" / repo / f"{name}.bundle"
+
+
+def _foreign(repo: Path, tree: Path | str, ref: str = "", then: str = "") -> str:
+    """The act that ends a linked worktree no lane owns: its work lands first, then it switches onto
+    *ref* (a lane's own branch) or, with none, goes; *then* follows."""
+    end = git_inline(tree, "switch", ref) if ref else git_inline(repo, "worktree", "remove", "--force", "--force", str(tree))  # fmt: skip
+    return act("agent", f"land the work of {tree}, then run `{end}`" + (f", then {then}" if then else ""))  # fmt: skip
+
+
+def state(repo: Path, tree: Path, name: str, ok: tuple[str, ...] = ()) -> tuple[str, Refusal]:
+    """The one state of lane path *tree* for tree *name* and the Refusal naming the one act that ends it
+    (a normal tree's names `clean`). `normal`: git lists the branch there; `held`: a tree git lists
+    holds the branch at another path, move it back (after the next two clear their path first); `foreign`: git lists another worktree at *tree*,
+    land its work and switch it onto the branch (or remove it, with no branch); a tree there detached at or behind
+    its own branch (or whose branch is gone) just switches onto it (`-c` when gone); `folder`: files git
+    does not list sit at *tree*, move them aside; else no tree holds the branch and the folder is
+    clear: `branch` (merge's no-tree ending), `paused` (a bundle holds it, resume) or `absent` (new; for
+    a verb that takes `paused`, an Agent rerun with a bundle's tree)."""
+    tree, ref = tree.resolve(), branch(name)
+    held, has = holder(repo, ref), bool(git(repo, "branch", "--list", ref).strip())
+    if held == tree and tree.exists():
+        return "normal", Refusal(f"{ref} exists", command(*LAUNCH, "clean", str(tree)))
+    away = held if held and held != tree and held.exists() else None
+    back = (git_inline(repo, "worktree", "move", "-f", "-f", str(away), str(tree)) if away else "")  # fmt: skip
+    there = next((t for t in _trees(repo) if Path(t["worktree"]).resolve() == tree), None)
+    if held != tree and there:
+        if not away and "branch" not in there and (not has or not git(repo, "rev-list", "-1", f"{ref}..{there['HEAD']}", check=False).strip()):  # fmt: skip
+            return "foreign", Refusal(f"{tree} is detached, not on {ref}", git_line(tree, "switch", *(() if has else ("-c",)), ref))  # fmt: skip
+        return "foreign", Refusal(f"{tree} is not a worktree of ours", _foreign(repo, tree, "" if away or not has else ref, f"run `{back}`" if away else ""))  # fmt: skip
+    if tree.exists() and (not tree.is_dir() or any(tree.iterdir())):
+        return "folder", Refusal(f"{tree} holds files git does not list", move_aside(tree, f"run `{back}`" if away else ""))  # fmt: skip
+    if away:
+        return "held", Refusal(f"{ref} is held by the tree at {away}, not {tree}", _git_after_clear(repo, tree, "worktree", "move", "-f", "-f", str(away), str(tree)))  # fmt: skip
+    bundle = bundle_path(repo.parents[1], repo.name, name)
+    paused = not has and bundle.is_file()
+    kind, words, why = (
+        ("branch", ("merge", str(tree)), f"{ref} exists with no tree at {tree}") if has
+        else ("paused", ("resume", str(tree)), f"{ref} is paused: a bundle holds its commits") if paused
+        else ("absent", ("new", repo.name, name), f"{tree} has no tree and no branch {ref}")
+    )  # fmt: skip
+    if kind == "absent" and "paused" in ok:
+        return kind, Refusal(f"no bundle at {bundle}", act("agent", f"rerun with the tree of a bundle under {bundle.parents[name.count('/')]}"))  # fmt: skip
+    return kind, Refusal(why, command(*LAUNCH, *words))
+
+
+def require(repo: Path, tree: Path, name: str, *ok: str) -> str:
+    """The state of *tree* when it is one of *ok*; else its Refusal, touching nothing."""
+    kind, why = state(repo, tree, name, ok)
+    if kind not in ok:
+        raise why
+    return kind
+
+
 def _row(repo: Path, path: str, state: str, age: float = 0.0, **facts: object) -> dict[str, object]:
     """One worktree: WARN past a day or off-canon; `fix` shown only when ready or orphan;
     `exit`, the line a hold names — `clean` for an empty tree, `resume` for a paused one, else `merge`."""
     verb = {"empty": "clean", "paused": "resume"}.get(state, "merge")
     line = command(*LAUNCH, verb, path)
-    # merge cannot clear a directory git does not know
-    if state == "orphan" and Path(path).exists():
-        line = act(
-            "agent", f"remove the directory {path}, then run `{inline(*LAUNCH, verb, path)}`"
-        )
     return {"repo": repo.name, "path": path, "state": state, "age_hours": age, "registered": True,
             "kind": None, **facts, "warn": state not in ("ready", "open", "empty", "paused") or age > 24,
             "fix": line if state in ("ready", "orphan") else "",
@@ -257,39 +326,48 @@ def _absent(root: Path, repo: Path, flow: dict[str, str], held: set[str], found:
     live = work_versions(repo, flow)  # the one live work branch judges a merged orphan
     work = f"{flow['work']}{live[0]}" if len(live) == 1 else ""
     for ref in git(repo, "for-each-ref", "--format=%(refname:short)", "refs/heads/wt/").split():
-        if f"refs/heads/{ref}" not in held:
-            name = ref.removeprefix("wt/")
-            row = _row(repo, str(home / name), "orphan", kind=kind_of(name))
-            # `merge` refuses a name off the grammar: git drops a branch HEAD holds; one with
-            # commits of its own has no exit (the unpublished-branch rule of `context dead` owns
-            # it) and a fix that waits on an agent
-            if not name_of(ref):
-                if work and (steps := drop_steps(repo, ref, work)):
-                    line = act("agent", ", then ".join(steps))
-                    row |= {"fix": line, "exit": line}
-                else:
-                    row |= {"fix": act("agent", f"land or archive the wt/* branch {ref}, then close again"), "exit": ""}  # fmt: skip
-            out.append(row)
+        if f"refs/heads/{ref}" in held:
+            continue
+        name = ref.removeprefix("wt/")
+        row = _row(repo, str(home / name), "orphan", kind=kind_of(name))
+        if name_of(ref):  # the table's name; a worktree on another branch has its own row
+            kind, why = state(repo, home / name, name)
+            if kind in ("branch", "folder"):
+                out.append(row | {"fix": why.fix, "exit": why.fix})
+            continue
+        # `merge` refuses a name off the grammar: git drops a branch HEAD holds; one with
+        # commits of its own has no exit (the unpublished-branch rule of `context dead` owns
+        # it) and a fix that waits on an agent
+        if work and (steps := drop_steps(repo, ref, work)):
+            line = act("agent", ", then ".join(steps))
+            out.append(row | {"fix": line, "exit": line})
+        else:
+            out.append(row | {"fix": act("agent", f"land or archive the wt/* branch {ref}, then close again"), "exit": ""})  # fmt: skip
     listed = {Path(str(r["path"])).resolve() for r in (*found, *out)}
     ancestors = {p for path in listed for p in path.parents}
     return out + [
-        _row(repo, str(stray), "unregistered")
-        | {"fix": act("agent", f"remove the directory {stray}")}
+        _row(repo, str(stray), "unregistered") | {"fix": move_aside(stray)}
         for stray in _strays(home, home, listed, ancestors)
     ]
 
 
 def _repo_rows(root: Path, repo: Path, flow: dict[str, str]) -> list[dict[str, object]]:
-    trees, mine = _trees(repo), {Path(r["path"]).resolve(): r["name"] for r in ours(repo)}
+    home, trees = tree_path(root, repo.name), _trees(repo)
     out: list[dict[str, object]] = []
-    for tree in trees:
-        path, name = tree["worktree"], mine.get(Path(tree["worktree"]).resolve())
+    for t in trees:
+        path, here = t["worktree"], Path(t["worktree"]).resolve()
+        rel = here.relative_to(home.resolve()).as_posix() if here.is_relative_to(home.resolve()) else ""  # fmt: skip
+        name = name_of(t.get("branch", "").removeprefix("refs/heads/")) or (rel if NAME_RE.match(rel) else None)  # fmt: skip
         if name is None:
-            out.append(_row(repo, path, "foreign") | {"fix": act("agent", f"land the work of the linked worktree {path}, then remove it: no tree of this workspace")})  # fmt: skip
-        elif not Path(path).is_dir():
-            out.append(_row(repo, path, "orphan", name=name, kind=kind_of(name)))
-        else:
+            out.append(_row(repo, path, "foreign") | {"fix": _foreign(repo, path)})
+            continue
+        kind, why = state(repo, home / name, name)
+        if kind == "normal":
             out.append(_ours(repo, flow, name, path))
+        elif kind in ("branch", "folder"):  # git lists the tree, its folder is gone
+            out.append(_row(repo, path, "orphan", name=name, kind=kind_of(name)) | {"fix": why.fix, "exit": why.fix})  # fmt: skip
+        else:
+            out.append(_row(repo, path, "foreign") | {"fix": why.fix})
     return out + _absent(root, repo, flow, {t.get("branch", "") for t in trees}, out)
 
 
@@ -297,13 +375,7 @@ def _unregistered(repo: Path, trees: list[dict[str, str]]) -> list[dict[str, obj
     """The linked trees of a repo no context owns: a finding whose one fix is the operator's act."""
     return [
         _row(repo, t["worktree"], "unregistered", registered=False)
-        | {
-            "fix": act(
-                "agent",
-                f"land the work of {t['worktree']}, then run "
-                f"`{git_inline(repo, 'worktree', 'remove', '--force', '--force', t['worktree'])}`",
-            )
-        }  # fmt: skip
+        | {"fix": _foreign(repo, t["worktree"])}
         for t in trees
     ]
 
