@@ -7,17 +7,15 @@ two git reads (``published``, ``work_version``) are patched at the adapter; the 
 from __future__ import annotations
 
 import json
-import os
 import shutil
 from collections.abc import Callable
 from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.core import clock, workspace_layout
+from dadaia_workspace.core import workspace_layout
 from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.gitflow import SeveralWorkBranches
-from dadaia_workspace.core.session_store import new_binding_record, write_session
 from dadaia_workspace.core.specs_version import CANONICAL_SPECS_VERSION, state
 from dadaia_workspace.features.specs.rules import RULES
 from dadaia_workspace.features.workspace.onboarding import next_step
@@ -117,34 +115,14 @@ def test_next_step_is_derived_from_the_workspace_state(
     assert all(part.format(create) in step.command.replace("\\", "/") for part in in_command)
 
 
-@pytest.mark.parametrize(
-    ("live", "fix"),
-    [
-        pytest.param(False, "fix: Operator action: relaunch the session at the workspace root", id="ungoverned-names-the-relaunch"),
-        pytest.param(True, None, id="governed-unbound-binds"),
-    ],
-)  # fmt: skip
-def test_the_bind_step_names_the_relaunch_for_a_session_bind_refuses(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, live: bool, fix: str | None
-) -> None:
-    """A subagent-harness session with no live record cannot bind: its bind step is the
-    relaunch, never ``context bind``; with a live record it still binds."""
-    monkeypatch.delenv("DADAIA_SESSION_ID", raising=False)
-    monkeypatch.setenv("CLAUDE_CODE_SESSION_ID", "sess-1")
-    if live:
-        write_session(
-            tmp_path,
-            "sess-1",
-            new_binding_record(session_id="sess-1", context="app", runtime="claude", pid=os.getpid(), now=clock.now_iso()),
-        )
+def test_a_pending_bind_names_the_fix_the_caller_gives_instead_of_the_bind(tmp_path: Path) -> None:
+    """The bind step prints the caller's *bind_fix* when its session cannot bind."""
+    relaunch = "Operator action: relaunch the session at the workspace root"
 
-    step = next_step(tmp_path, _bare(tmp_path), bound=False)
+    step = next_step(tmp_path, _bare(tmp_path), bound=False, bind_fix=relaunch)
 
     assert step is not None and step.id == "bind"
-    if fix:
-        assert fix in step.text() and "context bind" not in step.text()
-    else:
-        assert step.command == fix_line(tmp_path, "context", "bind", "app")
+    assert step.text().endswith(f"fix: {relaunch}")
 
 
 @pytest.mark.parametrize("catalog", ['{"features": []}', "{not json"], ids=["empty", "unreadable"])

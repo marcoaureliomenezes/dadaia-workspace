@@ -6,16 +6,18 @@ Size: MEDIUM (integration: a real initialized workspace, a real git checkout as 
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 import pytest
 from typer.testing import CliRunner
 
 from dadaia_workspace.cli.main import app
-from dadaia_workspace.core import workspace_layout
+from dadaia_workspace.core import clock, workspace_layout
 from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES
 from dadaia_workspace.core.platform import PLATFORM
+from dadaia_workspace.core.session_store import new_binding_record, write_session
 from dadaia_workspace.features.workspace.service import WorkspaceService
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
@@ -94,15 +96,35 @@ def test_doctor_names_the_onboarding_step_of_the_context_it_judges(
 
 
 @pytest.mark.slow(reason="git init subprocess")
-def test_doctor_names_the_relaunch_for_a_session_bind_refuses(
-    workspace: Path, monkeypatch: pytest.MonkeyPatch
+@pytest.mark.parametrize(
+    ("live", "fix"),
+    [
+        pytest.param(False, "fix: Operator action: relaunch the session at the workspace root", id="ungoverned-names-the-relaunch"),
+        pytest.param(True, "dadaia context bind app", id="governed-unbound-binds"),
+    ],
+)  # fmt: skip
+def test_doctor_names_the_bind_only_to_a_session_bind_accepts(
+    workspace: Path, monkeypatch: pytest.MonkeyPatch, live: bool, fix: str
 ) -> None:
     """A subagent-harness session with no live record cannot bind: the step's fix is the
-    relaunch, and no line of the report names ``context bind``."""
+    relaunch; with a live record, that session binds."""
     _register_specless_context(workspace, "app")
     monkeypatch.setenv("CLAUDE_CODE_SESSION_ID", "sess-1")
+    if live:
+        write_session(
+            workspace,
+            "sess-1",
+            new_binding_record(
+                session_id="sess-1",
+                context=None,
+                runtime="claude",
+                pid=os.getpid(),
+                now=clock.now_iso(),
+            ),
+        )
 
     result = _runner.invoke(app, ["doctor", "--context", "app"])
 
-    assert "fix: Operator action: relaunch the session at the workspace root" in result.output, result.output
-    assert "context bind" not in result.output, result.output
+    assert "step bind" in result.output, result.output
+    assert fix in result.output, result.output
+    assert ("context bind app" in result.output) == live, result.output
