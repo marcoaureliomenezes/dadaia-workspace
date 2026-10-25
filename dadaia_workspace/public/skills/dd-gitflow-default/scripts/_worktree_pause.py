@@ -10,7 +10,7 @@ from pathlib import Path
 from _git import GitError
 from _platform import act, command
 from _worktree_end import drop_tree, open_children, precious, refuse_dirty, rmdir, target
-from _worktree_git import _row, git, holder, locked_add, tree_at
+from _worktree_git import _row, bundle_path, git, holder, locked_add, require
 from _worktree_names import LAUNCH, Refusal, branch, kind_of, tree_path
 from _worktree_new import absent_levels, write_level_files
 
@@ -18,6 +18,12 @@ from _worktree_new import absent_levels, write_level_files
 def write_bundle(repo: Path, ref: str, dest: Path) -> None:
     """Runs `git bundle create` for the commits of branch *ref* that no `origin` ref holds, into
     *dest*, and verifies it. Raises `GitError` on any failure, leaving nothing at *dest*."""
+    for head in git(repo, "bundle", "list-heads", str(dest)).split()[::2] if dest.is_file() else []:
+        try:  # a bundle holding a commit the branch lacks is the only copy of it
+            git(repo, "merge-base", "--is-ancestor", head, ref)
+        except GitError as error:
+            raise Refusal(f"{dest} holds {head}, which {ref} lacks",
+                          act("agent", f"move the bundle {dest} aside (it holds commits), then rerun the pause")) from error  # fmt: skip
     dest.parent.mkdir(parents=True, exist_ok=True)
     git(
         repo, "bundle", "create", str(dest), ref, "--not", "--remotes=origin"
@@ -64,7 +70,7 @@ def pause(root: Path, path: str) -> str:
     if kind_of(name) not in CARRIED:
         raise Refusal(f"{tree} is a {kind_of(name)} tree: only a lane or a wt-rc pauses", land)
     ref, dist = branch(name), root / ".dadaia" / "dist"
-    if tree_at(repo, tree, name) and (held := precious(tree)):
+    if require(repo, tree, name, "normal", "branch") == "normal" and (held := precious(tree)):
         raise Refusal(
             f"{tree} holds ignored files: {', '.join(held)}",
             act("agent", f"delete or commit {', '.join(held)}, then rerun the pause"),
@@ -73,7 +79,6 @@ def pause(root: Path, path: str) -> str:
         open_children(repo, name)
     if (found := carry(repo, tree, name, dist)) is None:
         raise Refusal(f"{ref} holds no commit origin lacks", land)
-    git(repo, "worktree", "unlock", str(tree), check=False)
     drop_tree(repo, tree, name)
     rmdir(tree, name)
     git(repo, "update-ref", "-d", f"refs/heads/{ref}")
@@ -85,12 +90,8 @@ def resume(root: Path, path: str) -> str:
     the bundle and the `dist/<repo>/` folders it leaves empty; refuses, touching nothing, a branch
     that exists or a missing bundle."""
     repo, tree, name, _ = target(root, path)
-    ref, dist = branch(name), root / ".dadaia" / "dist" / repo.name
-    bundle = dist / f"{name}.bundle"
-    if git(repo, "branch", "--list", ref).strip():
-        raise Refusal(f"{ref} exists", command(*LAUNCH, "clean", str(tree)))  # fmt: skip
-    if not bundle.is_file():
-        raise Refusal(f"no bundle at {bundle}", act("agent", f"rerun with the tree of a bundle under {dist}"))  # fmt: skip
+    require(repo, tree, name, "paused")
+    ref, bundle = branch(name), bundle_path(root, repo.name, name)
     made = absent_levels(root, repo.name, name)
     git(repo, "fetch", "-q", str(bundle), f"{ref}:{ref}")
     try:
@@ -101,7 +102,7 @@ def resume(root: Path, path: str) -> str:
     write_level_files(made)
     bundle.unlink()
     for folder in bundle.parents:
-        if folder == dist.parent or any(folder.iterdir()):
+        if folder == root / ".dadaia" / "dist" or any(folder.iterdir()):
             break
         folder.rmdir()
     return f"resumed {ref} at {tree}"

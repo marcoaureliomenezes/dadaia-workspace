@@ -35,12 +35,12 @@ from _worktree_git import (
     flow_for,
     git,
     holder,
-    move_aside,
     not_a_name,
     ours,
     reattach,
+    require,
     scrubbed_env,
-    tree_at,
+    state,
     workspace_of,
 )
 from _worktree_names import LAUNCH, NAME_RE, Refusal, base_of, branch, kind_of, locate, tree_path
@@ -105,17 +105,18 @@ def _kept(tree: Path, verb: str, keep: list[str], drop: bool) -> list[str]:
 
 
 def drop_tree(repo: Path, tree: Path, name: str) -> None:
-    """Remove the worktree *name* at *tree* (an absent folder is pruned); a Refusal to move the folder
-    aside when git, failing on it, no longer lists a tree on the branch."""
+    """Unlock and remove the worktree *name* at *tree*; a tree whose folder is gone, at *tree* or at the
+    path git lists it, is pruned. A Refusal with the state's act when git, failing on it, no longer
+    lists a tree on the branch."""
+    held = holder(repo, branch(name))
+    git(repo, "worktree", "unlock", str(held or tree), check=False)
     try:
-        git(repo, "worktree", *(("remove", str(tree)) if tree.exists() else ("prune",)))
+        git(repo, "worktree", *(("remove", str(tree)) if held == tree and tree.exists() else ("prune",)))  # fmt: skip
     except GitError as error:
-        if not tree.exists() or holder(repo, branch(name)):
+        kind, why = state(repo, tree, name)
+        if kind != "folder":
             raise
-        raise Refusal(
-            f"git no longer lists {tree}, which still holds files: {error}",
-            move_aside(tree, "rerun the same command"),
-        ) from error
+        raise Refusal(f"git no longer lists {tree}, which still holds files: {error}", why.fix) from error  # fmt: skip
 
 
 def _remove(repo: Path, tree: Path, onto: str, name: str, kept: list[str]) -> None:
@@ -142,7 +143,6 @@ def _remove(repo: Path, tree: Path, onto: str, name: str, kept: list[str]) -> No
                 f"{branch(name)} is still on {fields[0]}: {error}",
                 git_line(into, "push", fields[0], "--delete", branch(name)),
             ) from error
-    git(into, "worktree", "unlock", str(tree), check=False)
     drop_tree(into, tree, name)
     for argv in drops:
         git(into, *argv)
@@ -470,9 +470,9 @@ def merge(root: Path, path: str, keep: list[str], drop: bool) -> str:
     require_governed(root)
     repo, tree, name, onto = target(root, path)
     ref = branch(name)
-    here = tree_at(repo, tree, name)
+    kind = require(repo, tree, name, "normal", "branch")
     into = _parent(repo, onto)
-    if not here:  # no tree git lists holds the branch: only it is left
+    if kind == "branch":  # no tree git lists holds the branch: only it is left
         _on_target(into, onto)
         _remove(repo, tree, onto, name, [])
         return f"{ref} merged into {onto}"
@@ -498,7 +498,7 @@ def merge(root: Path, path: str, keep: list[str], drop: bool) -> str:
 
 def clean(root: Path, path: str, keep: list[str], drop: bool) -> str:
     repo, tree, name, onto = target(root, path)
-    if not tree_at(repo, tree, name):
+    if require(repo, tree, name, "normal", "branch") == "branch":
         merge(root, path, keep, drop)  # no tree git lists holds the branch: its no-tree ending
         return f"cleaned {tree}"
     ahead = int(git(repo, "rev-list", "--count", f"{onto}..{branch(name)}"))
