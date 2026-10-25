@@ -363,8 +363,8 @@ def _dispatch(tree: Path, at: str) -> str:
 
 def _check_approved(root: Path, tree: Path, work: str, name: str) -> None:
     """The newest reviewer handoffs decide, each a valid APPROVED bound to HEAD's `diff_sha256` (diff
-    and commit series). A verdict names HEAD, or a sha of the branch's reflog outside *work* and
-    then counts only when its recorded `diff_sha256` is HEAD's; newest is `produced_at`, a
+    and commit series). A verdict names HEAD, or a sha reachable from HEAD or from the branch
+    reflog's shas, outside *work*, and then counts only when its recorded `diff_sha256` is HEAD's; newest is `produced_at`, a
     missing or naive one ranks newest, and ties all decide."""
     head = git(tree, "rev-parse", "HEAD").strip()
     want = diff_sha256(tree, work, head)
@@ -460,8 +460,8 @@ def merge(root: Path, path: str, keep: list[str], drop: bool) -> str:
         _remove(repo, tree, onto, name, [])
         return f"{ref} merged into {onto}"
     head = git(tree, "rev-parse", "HEAD").strip()
-    if git(tree, "rev-parse", ref, check=False).strip() != head:
-        raise Refusal(f"{ref} is not at HEAD {head}", git_line(tree, "switch", ref))
+    if (tip := git(tree, "rev-parse", f"refs/heads/{ref}", check=False).strip()) != head:
+        raise Refusal(f"{ref} is not at HEAD {head}", git_line(tree, "switch", *(() if tip else ("-c",)), ref))  # fmt: skip
     for check in _kind_checks(root, repo, tree, name, onto, into):
         check()
     kept = _kept(tree, "merge", keep, drop)
