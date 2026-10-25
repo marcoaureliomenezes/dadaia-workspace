@@ -10,7 +10,7 @@ Disclosed reference reached at `SKILL.md` step 7 — `dd-product-engineer` runs 
    - DELETE every claim the code no longer supports — a verb, a file, a behavior, a number.
    - UPDATE every claim whose behavior changed; the tldr and summary are claims too.
    - ADD what is new, only after the two passes above.
-4. For each uncovered package, write one atom (`product/<area>/<slug>.md`, frontmatter with `sources`); for a feature that died, delete its atom and its wikilinks.
+4. For each uncovered unit, write one atom (`product/<area>/<slug>.md`, frontmatter with `sources` globbing the unit) and name it in `--changed`; for a feature that died, delete its atom and its wikilinks.
 5. History lines are `LINT-1` errors (`specs/memory/AGENTS.md` §Tree, format, validation) — say what the product does, never when it started.
 6. `python3 .agents/skills/dd-spec-navigator/scripts/memory.py catalog generate`, then `memory.py check`.
 7. In the same `wt-rc`, before its merge: reconcile the repo's derived docs from every changed atom.

@@ -91,7 +91,7 @@ def _parser() -> argparse.ArgumentParser:
             )
         if verb == "memory":
             for name in ("--reviewed", "--changed"):
-                command.add_argument(name, default="", help="comma-separated worklist entries")
+                command.add_argument(name, default="", help="comma-separated atom slugs")
         if verb in ("check", "drift"):
             command.add_argument("--json", action="store_true", help="emit findings as JSON")
     return parser
@@ -166,7 +166,7 @@ def _memory(args: argparse.Namespace, specs: Path) -> int:
     except drift.Refusal as refusal:
         raise Refusal(str(refusal), refusal.fix) from refusal
     if errors:
-        raise Refusal(errors[0], SCRIPT("memory", "--help"))
+        raise errors[0]
     commit(live.release_dir / STATE, f"releases/{live.release_id}/{STATE}",
            lambda state: {**state, "log": [*(state.get("log") or []), entry]})  # fmt: skip
     print(f"[ok] release {live.release_id} log <- kind memory {since}..{until[:12]} ({ts})")

@@ -217,25 +217,36 @@ def _directory_findings(release_dir: Path, specs: Path) -> list[dict[str, Any]]:
     return jobs
 
 
-def memory_errors(specs: Path, phase: str, entry: dict[str, Any]) -> list[str]:
-    """Why *entry* reconciles nothing over its own [since, until]: what the `memory`
-    verb refuses on."""
+def memory_errors(specs: Path, phase: str, entry: dict[str, Any]) -> list[Refusal]:
+    """Why *entry* reconciles nothing over its own [since, until], each with the act that
+    clears it: what the `memory` verb refuses on. A name is valid when its atom matched the
+    window's worklist or its own file moved in the window."""
     since, until = str(entry.get("since")), str(entry.get("until"))
     worklist = drift.report(specs, since, until)
-    lists = [[str(s) for s in entry.get(name) or []] for name in ("reviewed", "changed")]
-    paths = {str(atom["slug"]): str(atom["path"]) for atom in worklist["atoms"]}
-    # git decides "moved": it normalises line endings a byte compare would not.
-    unmoved = [f"--changed names {slug!r}, whose atom did not move since {since}"
-               for slug in lists[1] if slug in paths and not drift.git(
-                   specs.parent, "diff", "--name-only", since, until, "--", paths[slug])]  # fmt: skip
     if phase != "CLOSURE":
-        return [f"release is in phase {phase!r} — the memory reconciliation is CLOSURE work"]
-    listed = [str(atom["slug"]) for atom in worklist["atoms"]] + worklist["uncovered"]
-    named = set(lists[0]) | set(lists[1])
-    errors = [f"worklist entry {e!r} is in neither --reviewed nor --changed"
-              for e in listed if e not in named]  # fmt: skip
-    errors += [f"{e!r} is not in the window's worklist" for e in sorted(named - set(listed))]
-    return errors or unmoved
+        return [Refusal(f"release is in phase {phase!r} — the memory reconciliation is CLOSURE work",
+                        SCRIPT(*NEXT.get(phase, "check").split(), specs=specs))]  # fmt: skip
+    reviewed, changed = (
+        [str(s) for s in entry.get(name) or []] for name in ("reviewed", "changed")
+    )
+    paths = {str(f["slug"]): str(f["path"]) for f in drift.entries(specs)}
+    moved = set(drift.git(specs.parent, "diff", "--name-only", since, until))
+    listed = [str(atom["slug"]) for atom in worklist["atoms"]]
+    valid = set(listed) | {slug for slug, path in paths.items() if path in moved}
+    run = f"run `{SCRIPT.inline('memory', specs=specs)}`"
+    errors = [Refusal(f"worklist entry {e!r} is in neither --reviewed nor --changed",
+                      act("agent", f"{run} with {e!r} in --reviewed, or in --changed once its atom is rewritten"))
+              for e in listed if e not in {*reviewed, *changed}]  # fmt: skip
+    errors += [Refusal(f"unit {u!r} is covered by no atom",
+                       act("agent", f"write an atom whose `sources` glob covers the unit, commit it, then {run} "
+                           "with that atom in --changed"))
+               for u in worklist["uncovered"]]  # fmt: skip
+    errors += [Refusal(f"{e!r} is not in the window's worklist",
+                       act("agent", f"{run} naming only atoms `drift` lists or atoms created or rewritten in the window"))
+               for e in sorted({*reviewed, *changed} - valid)]  # fmt: skip
+    return errors or [Refusal(f"--changed names {slug!r}, whose atom did not move since {since}",
+                              act("agent", f"{run} with {slug!r} in --reviewed"))
+                      for slug in changed if slug in paths and paths[slug] not in moved]  # fmt: skip
 
 
 def _memory_findings(specs: Path) -> list[dict[str, Any]]:
