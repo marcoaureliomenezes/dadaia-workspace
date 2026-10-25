@@ -167,3 +167,30 @@ def test_a_truncated_registry_is_no_context_at_the_gate(tmp_path: Path) -> None:
 
     assert gate.returncode == 0, gate.stderr
     assert gate.block_envelope() is None
+
+
+@pytest.mark.medium
+@pytest.mark.parametrize(
+    ("record", "fix"),
+    [
+        pytest.param("{not json", ("doctor", "--fix"), id="unreadable-names-doctors-fix"),
+        pytest.param(
+            '{"session_id": "s", "last_seen_at": "2999-01-01T00:00:00+00:00"}',
+            ("context", "bind", "b"),
+            id="readable-live-unbound-names-the-bind",
+        ),
+    ],
+)
+def test_a_block_names_a_fix_the_session_can_run(tmp_path: Path, record: str, fix: tuple[str, ...]) -> None:
+    """The out-of-scope BLOCK of a session whose record does not read names the act that clears
+    the record, not the `context bind` that bind refuses."""
+    ws = _mk_workspace(tmp_path, "a", "b")
+    write_text(session_store.session_record_path(ws, "s", create=True), record)
+    env = claude_hook_env(ws, session_id="s")
+    env.pop("DADAIA_CONTEXT", None)
+    target = ws / "worktrees/b/0.5.0-rc1/j1/src/x.py"
+    payload = {"tool_name": "Write", "tool_input": {"file_path": str(target)}, "session_id": "s"}
+
+    block = run_hook_subprocess("sdd_gate", payload, env, cwd=ws).block_envelope()
+
+    assert block is not None and block["reason"].splitlines()[-1] == f"fix: {fix_line(ws, *fix)}", block

@@ -16,6 +16,7 @@ from typing import Any
 import pytest
 
 from dadaia_workspace.core import clock, session_store
+from dadaia_workspace.core.cli_line import fix_line
 from tests.fixtures.harness_env import (
     claude_hook_env,
     codex_hook_env,
@@ -616,3 +617,28 @@ def test_naive_bound_at_reads_as_utc_in_any_zone(
     finally:
         monkeypatch.undo()
         time.tzset()
+
+
+@pytest.mark.parametrize(
+    ("record", "fix"),
+    [
+        pytest.param("{not json", ("doctor", "--fix"), id="unreadable-names-doctors-fix"),
+        pytest.param(
+            '{"session_id": "s", "last_seen_at": "2999-01-01T00:00:00+00:00"}',
+            ("context", "bind", "alpha"),
+            id="readable-live-unbound-names-the-bind",
+        ),
+    ],
+)
+def test_the_next_step_names_a_fix_the_session_can_run(
+    tmp_path: Path, record: str, fix: tuple[str, ...]
+) -> None:
+    """A record that does not read leaves the session ungoverned, so `context bind` is refused:
+    SessionStart names the act that clears the record instead."""
+    _ws(tmp_path, {"name": "alpha"})
+    write_text(session_store.session_record_path(tmp_path, "s", create=True), record)
+
+    out = _run(tmp_path, "s", event="SessionStart")
+
+    assert f"fix: {fix_line(tmp_path, *fix)}" in out, out
+    assert ("context bind" in out) is (fix[0] == "context"), out
