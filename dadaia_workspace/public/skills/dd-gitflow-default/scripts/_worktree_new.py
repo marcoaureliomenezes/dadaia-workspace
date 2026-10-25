@@ -10,9 +10,17 @@ from _bugs_check import OPEN
 from _git import git
 from _grammar import STATE, candidate_number
 from _jsonl import parse_object
-from _platform import act, command, is_link, read_text
+from _platform import act, command, inline, is_link, read_text
 from _specs import check_release, parse
-from _worktree_git import flow_for, locked_add, not_a_name, reattach, work_version, work_versions
+from _worktree_git import (
+    flow_for,
+    locked_add,
+    move_aside,
+    not_a_name,
+    reattach,
+    work_version,
+    work_versions,
+)
 from _worktree_names import (
     LAUNCH,
     LEVEL_FILE,
@@ -99,6 +107,8 @@ def new(root: Path, repo_name: str, name: str) -> Path:
     tree = tree_path(root, repo_name, name)
     if git(repo, "branch", "--list", branch(name)).strip():
         raise Refusal(f"{branch(name)} exists", command(*LAUNCH, "clean", str(tree)))  # fmt: skip
+    if tree.is_dir() and any(tree.iterdir()):  # git would make the branch, then fail on the folder
+        raise Refusal(f"{tree} holds files", move_aside(tree, f"rerun `{inline(*LAUNCH, 'new', repo.name, name)}`"))  # fmt: skip
     made = absent_levels(root, repo_name, name)
     git(repo, *locked_add(name, "-q", "-b", branch(name)), str(tree), start)
     write_level_files(made)
