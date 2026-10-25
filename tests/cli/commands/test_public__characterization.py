@@ -61,7 +61,7 @@ def test_public_projection_lifecycle(tmp_path: Path, monkeypatch: pytest.MonkeyP
     doctor = CliRunner().invoke(app, ["public", "doctor"])
 
     assert (install.exit_code, doctor.exit_code) == (0, 0), doctor.output
-    assert len(staged) == (31 if PLATFORM.windows else 8)
+    assert len(staged) == (32 if PLATFORM.windows else 8)
     assert install.output.splitlines()[0].endswith(" asset(s) processed:")
     assert "fix:" not in install.output
     assert "fix:" not in doctor.output

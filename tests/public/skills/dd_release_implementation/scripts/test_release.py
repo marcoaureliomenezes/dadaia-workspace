@@ -21,7 +21,7 @@ import pytest
 from dadaia_workspace.core.cli_line import git_line, shell_line
 from dadaia_workspace.infrastructure.ledger_scripts import load_owner
 from tests.fixtures.harness_env import git_bash
-from tests.helpers.oslib import read_text, run, write_text
+from tests.helpers.oslib import read_text, run, spell, write_text
 from tests.helpers.release_state import PLAN
 from tests.helpers.skill_scripts import stage_skill_scripts
 
@@ -501,7 +501,7 @@ def test_a_definition_finding_stamps_the_commit_that_touched_the_trio(
     fixes = [
         f["fix"] for f in json.loads(_run(script, "check", "--json", "--specs", str(specs)).stdout)
     ]
-    assert fixes and all(f.endswith(f"phase IMPLEMENTATION --specs {specs}") for f in fixes), fixes
+    assert fixes and all(f.endswith(f"phase IMPLEMENTATION --specs {spell(str(specs))}") for f in fixes), fixes
 
 
 def test_check_reports_a_schema_violation_and_emits_json(script: Path, tmp_path: Path) -> None:

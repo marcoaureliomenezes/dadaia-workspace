@@ -13,7 +13,7 @@ import typer
 
 from dadaia_workspace.cli.commands import ci
 from dadaia_workspace.core.gitflow import Gitflow
-from tests.helpers.oslib import run, write_text
+from tests.helpers.oslib import run, spell, write_text
 
 _CUSTOM = "---\nspecs_pattern_version: 7\ngitflow: {principal: trunk, integration: next, work: work/}\n---\n"
 
@@ -121,4 +121,4 @@ def test_a_committed_constitution_without_a_block_keeps_the_no_block_warning(
     ci._gate_inputs(app, "")
     err = capsys.readouterr().err
     assert f"{app / 'specs' / 'constitution.md'}: no gitflow block" in err
-    assert f"specs init --specs-dir {app / 'specs'}" in err
+    assert f"specs init --specs-dir {spell(str(app / 'specs'))}" in err

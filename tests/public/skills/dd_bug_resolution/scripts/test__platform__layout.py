@@ -71,7 +71,10 @@ def test_cli_words_are_the_console_script_of_the_root_venv_then_the_argv() -> No
 
 def test_cli_words_of_no_root_name_the_venv_running_now(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("sys.prefix", "/cache/venvs/proj")
-    assert K.cli_words(None, "doctor", caps=POSIX) == ("/cache/venvs/proj/bin/dadaia", "doctor")
+    assert K.cli_words(None, "doctor", caps=POSIX) == (
+        str(Path("/cache/venvs/proj") / "bin" / "dadaia"),
+        "doctor",
+    )
 
 
 def test_home_env_sets_the_variable_the_host_reads(tmp_path: Path) -> None:

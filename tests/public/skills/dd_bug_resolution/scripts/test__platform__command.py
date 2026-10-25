@@ -6,7 +6,7 @@ import os
 import shutil
 import subprocess
 import sys
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 import pytest
 
@@ -239,9 +239,9 @@ def test_mkdir_line_is_the_interpreter_act_with_the_path_as_its_own_word(
 ) -> None:
     code = "import pathlib, sys; pathlib.Path(sys.argv[1]).mkdir(parents=True, exist_ok=True)"
     monkeypatch.setattr(sys, "executable", "/usr/bin/python3")
-    assert K.mkdir_line(Path("/w/a b"), POSIX) == f"/usr/bin/python3 -c '{code}' '/w/a b'"
+    assert K.mkdir_line(PurePosixPath("/w/a b"), POSIX) == f"/usr/bin/python3 -c '{code}' '/w/a b'"
     monkeypatch.setattr(sys, "executable", "C:/py/python.exe")
-    assert K.mkdir_line(Path("/w/a b"), WIN) == f'C:/py/python.exe -c "{code}" "/w/a b"'
+    assert K.mkdir_line(PurePosixPath("/w/a b"), WIN) == f'C:/py/python.exe -c "{code}" "/w/a b"'
 
 
 @pytest.mark.medium

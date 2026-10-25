@@ -16,7 +16,7 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.infrastructure.ledger_scripts import load_owner
-from tests.helpers.oslib import read_text, run, write_text
+from tests.helpers.oslib import read_text, run, spell, write_text
 from tests.helpers.skill_scripts import stage_skill_scripts
 
 _PUBLIC = Path(__file__).resolve().parents[5] / "dadaia_workspace" / "public"
@@ -210,4 +210,4 @@ def test_an_unknown_finding_refusal_greps_the_findings_file_by_its_absolute_path
     )  # fmt: skip
     assert result.returncode == 1
     assert result.stderr.count("fix: ") == 1
-    assert f"fix: grep {_AUDIT}-F099 {findings}\n" in result.stderr
+    assert f"fix: grep {_AUDIT}-F099 {spell(str(findings))}\n" in result.stderr

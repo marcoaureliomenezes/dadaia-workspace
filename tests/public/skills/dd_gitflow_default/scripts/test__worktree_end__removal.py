@@ -381,7 +381,7 @@ def test_a_tree_git_lists_off_its_branch_keeps_its_files(root: Path, verb: str) 
     refused = run(root, verb, str(tree))
     assert refused.returncode == 1
     assert (tree / "secret.env").read_text() == "key\n"
-    assert str(tree) in git(root / "repos/r", "worktree", "list")
+    assert tree.as_posix() in git(root / "repos/r", "worktree", "list")
 
 
 def test_a_remove_git_refuses_on_a_listed_tree_keeps_gits_message(root: Path) -> None:
@@ -391,7 +391,7 @@ def test_a_remove_git_refuses_on_a_listed_tree_keeps_gits_message(root: Path) ->
     with pytest.raises(RuntimeError) as raised:
         end._remove(repo, tree, onto, name, [])
     assert "untracked" in str(raised.value) and "move the folder" not in str(raised.value)
-    assert str(tree) in git(repo, "worktree", "list")
+    assert tree.as_posix() in git(repo, "worktree", "list")
 
 
 @pytest.mark.parametrize("verb", ["merge", "clean"])
@@ -426,8 +426,8 @@ def test_a_tree_git_lists_at_another_path_is_named_and_never_ended(root: Path, v
     assert str(moved) in refused.stderr
     assert (moved / "notes.txt").read_text() == "mine\n"
     assert git(repo, "branch", "--list", f"wt/{RC}").strip() != ""
-    assert f"{moved} " in git(repo, "worktree", "list")
+    assert f"{moved.as_posix()} " in git(repo, "worktree", "list")
     assert not (root / ".dadaia/dist").exists()
     run_fix(root, refused)
-    assert f"{tree} " in git(repo, "worktree", "list")
+    assert f"{tree.as_posix()} " in git(repo, "worktree", "list")
     assert str(moved) not in run(root, verb, str(tree)).stderr

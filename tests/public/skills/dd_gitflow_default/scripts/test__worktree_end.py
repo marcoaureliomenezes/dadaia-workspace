@@ -1168,7 +1168,9 @@ def _hand_rewrite(
     """The act a refusal's Agent action names, done by hand: an interactive rebase of
     `<base>..HEAD` stops at every commit, one step per commit edits it, and the rebase continues.
     Order and subjects stay unless a step names a new one."""
-    stopped = _git_proc(task, "-c", "sequence.editor=sed -i s/^pick/edit/", "rebase", "-i", base)
+    stopped = _git_proc(
+        task, "-c", "sequence.editor=sed -i.bak s/^pick/edit/", "rebase", "-i", base
+    )
     assert stopped.returncode == 0, stopped.stderr
     done = stopped
     for step in steps:

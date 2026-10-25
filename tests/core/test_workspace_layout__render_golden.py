@@ -81,7 +81,8 @@ def test_all_placeholders_in_one_template_render_together() -> None:
     assert render_registry_tables(template) == "|".join([ZONES, CANON, ROOT, SPECS_CANON])
 
 
-def test_workspace_cli_is_the_source_spelling_on_posix() -> None:
+def test_workspace_cli_is_the_source_spelling_on_posix(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("dadaia_workspace.core.platform.PLATFORM", Capabilities.detect("linux"))
     text = "run .dadaia/.venv/bin/dadaia doctor"
     assert render_workspace_cli(text) == text
     assert render_registry_tables(text) == text

@@ -20,7 +20,7 @@ from dadaia_workspace.features.spec_context.gate_policy import (
     classify_path,
     evaluate,
 )
-from tests.helpers.oslib import cli_path, write_text
+from tests.helpers.oslib import cli_path, command, write_text
 
 _ROOT = Path("/ws")
 A, M, P = PathClass.ADDITIVE, PathClass.MUTATING, PathClass.PROTECTED
@@ -153,7 +153,7 @@ def test_a_tree_that_git_did_not_link_grants_no_scope(planted: str, tmp_path: Pa
         )
     decision, message = evaluate(path, root=tmp_path, **_at("worktree", "ctx-b", **_A))  # type: ignore[arg-type]
     assert decision == Decision.BLOCK
-    assert message.splitlines()[-1] == f"fix: {cli_path(tmp_path)} context bind ctx-b"
+    assert message.splitlines()[-1] == f"fix: {command(str(cli_path(tmp_path)), 'context', 'bind', 'ctx-b')}"
 
 
 _VERDICT_RUN = "python3 .agents/skills/dd-handoff-emitter/scripts/verdict.py /t --sha a --context c --slug s --verdict APPROVED --reason r"

@@ -21,7 +21,7 @@ import pytest
 
 from dadaia_workspace.features.specs.memory_lint import lint_atom, load_frontmatter_schema
 from tests.fixtures.harness_env import git_bash
-from tests.helpers.oslib import read_text, run, write_text
+from tests.helpers.oslib import read_text, run, spell, write_text
 from tests.helpers.skill_scripts import stage_skill_scripts
 
 _REPO = Path(__file__).resolve().parents[5]
@@ -185,7 +185,7 @@ def test_a_specs_tree_without_product_names_the_cross_shell_mkdir_by_absolute_pa
 
     assert refusal.returncode == 1
     for fix in (finding["fix"], refusal.stderr.split("fix: ", 1)[1].strip()):
-        assert fix.endswith(f" {product}")
+        assert fix.endswith(f" {spell(str(product))}")
         assert not fix.startswith(("mkdir", "Agent action"))
         assert run([git_bash(), "-c", fix], cwd=tmp_path).returncode == 0
         assert product.is_dir()
