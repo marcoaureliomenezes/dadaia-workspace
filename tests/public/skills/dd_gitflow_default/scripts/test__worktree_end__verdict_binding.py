@@ -237,3 +237,36 @@ def test_a_plain_name_is_refused_as_not_a_worktree_name(root: Path) -> None:
     assert "[error] not a worktree name" in refused.stderr
     assert not (root / "worktrees/r/maintenance").exists()
     assert git(repo, "rev-parse", "feature/0.5.0").strip() == base
+
+
+def _printed(root: Path, head: str) -> str:
+    printed = run(root, "hash", TREE, "--sha", head)
+    assert printed.returncode == 0, printed.stderr
+    return json.loads(printed.stdout)["diff_sha256"]
+
+
+def test_a_rename_commit_binds_as_the_oracle_binds_it(root: Path) -> None:
+    tree = root / TREE
+    commit(tree, "src/a.py", "".join(f"l{i}\n" for i in range(30)))
+    git(tree, "mv", "src/a.py", "src/b.py")
+    git(tree, "commit", "-q", "-m", "rename")
+    head = git(tree, "rev-parse", "HEAD").strip()
+
+    assert _printed(root, head) == diff_hash(root, head, NEW_JOB)
+
+
+@pytest.mark.parametrize(
+    "key, value", [("diff.noprefix", "true"), ("diff.renames", "false"), ("diff.context", "1")]
+)
+def test_the_binding_does_not_read_the_diff_config(root: Path, key: str, value: str) -> None:
+    tree = root / TREE
+    commit(tree, "src/a.py", "".join(f"l{i}\n" for i in range(30)))
+    git(tree, "mv", "src/a.py", "src/b.py")
+    write_text(tree / "src/b.py", "".join(f"l{i}\n" for i in range(30)).replace("l15", "m15"))
+    git(tree, "commit", "-qam", "rename and edit")
+    head = git(tree, "rev-parse", "HEAD").strip()
+    before = _printed(root, head)
+
+    git(tree, "config", key, value)
+
+    assert _printed(root, head) == before == diff_hash(root, head, NEW_JOB)
