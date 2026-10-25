@@ -24,7 +24,7 @@ Scope: this file governs only `worktrees/**`.
 4. Each merge fast-forwards its base, removes the tree and deletes its branch; the work branch receives only closed rcs and lanes, audits aside. Release closure refuses while `WT list` shows any row of the repo (a paused, foreign or stray one included) but a `wt-rc` and the tree it runs from.
 
 - A task, `wt-hotfix` or `wt-backlog` merge also refuses a tree whose `<base>..HEAD` carries a denylisted term (`.dadaia/.venv/bin/dadaia ci push-gate-check --onto <base>`, the pre-push content matcher); its fix is an Agent action naming the listed paths: remove the term from them in the unpublished commits, reworded or split by hand, so a verdict on the old HEAD no longer binds.
-- A lane that lands during an open rc moves `<work><v>`: `WT sync <wt-rc path>` rebases `wt-rc`, each `wt-main` and each task, parents first, never pushing; it stops at the first conflict with one fix line and a re-run finishes. A ledger conflict is redone by the ledger's own writer, never hand-merged. `WT merge` re-runs after any stop short of landing; a path with no tree and no branch refuses with the `WT new` that opens it.
+- A lane that lands during an open rc moves `<work><v>`: `WT sync <wt-rc path>` rebases `wt-rc`, each `wt-main` and each task, parents first, never pushing; it stops at the first conflict with one fix line and a re-run finishes. A ledger conflict is redone by the ledger's own writer, never hand-merged. `WT merge` re-runs after any stop short of landing; a path a verb cannot act on is refused, never reported done, with the one fix line its state names.
 - Jobs of one PLAN wave and tasks of one job run in parallel only with disjoint exact `W:` sets.
 
 ## 3. Environment and hygiene

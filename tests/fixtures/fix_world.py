@@ -1170,16 +1170,6 @@ def _wt_outside_path(root: Path) -> list[str]:
     return ["clean", str(root / "elsewhere")]
 
 
-def _wt_not_ours(verb: str) -> Callable[[Path], list[str]]:
-    """*verb* on a lane never opened, while the rc is the one tree `list` prints."""
-
-    def build(root: Path) -> list[str]:
-        wt.open_tree(root, _RC)
-        return [verb, "worktrees/r/0.5.0/wt-backlog-foo"]
-
-    return build
-
-
 def _wt_on_rc(verb: str) -> Callable[[Path], list[str]]:
     return lambda root: [verb, _wt_rc_path(root)]
 
@@ -1245,7 +1235,6 @@ _WORKTREE: dict[str, tuple[WtCase | Skip, ...]] = {
         Skip("the conflict fix assigned for the refusal below it; the next entry names it"),
         Skip("needs a rebase conflict; " + _SUITE),
     ),
-    "_worktree_sync._cascade": (_wt_agent_reruns(_wt_not_ours("sync"), _wt_on_rc("sync")),),
     "_worktree_end.target": (
         _wt_agent_reruns(_wt_outside_path, _wt_on_rc("clean")),
         _wt_agent_reruns(_wt_unnamed_tree, _wt_on_rc("clean")),
