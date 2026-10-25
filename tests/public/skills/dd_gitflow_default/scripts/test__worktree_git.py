@@ -250,9 +250,7 @@ def test_an_orphans_surviving_directory_is_the_orphans_row_alone(root: Path) -> 
     [row] = _rows(root)
 
     assert (row["state"], row["path"]) == ("orphan", str(folder))
-    assert row["fix"].startswith(
-        f"Agent action: stop what holds files open in {folder}, then move the folder {folder} out of the lane path (it may hold work), then run `"
-    )
+    assert row["fix"] == f"Agent action: stop what holds files open in {folder}, then move the folder {folder} out of the lane path (it may hold work)"  # fmt: skip
 
 
 def test_a_git_failure_in_a_row_read_ends_as_one_refusal_with_an_agent_action_fix(

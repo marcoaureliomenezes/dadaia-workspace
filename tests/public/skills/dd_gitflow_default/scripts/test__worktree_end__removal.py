@@ -156,10 +156,7 @@ def test_an_orphan_whose_directory_survives_names_the_move_and_following_it_empt
     tree.mkdir()
     write_text(tree / "f.txt", "x")
     [row] = [r for r in json.loads(run(root, "list", "--json").stdout) if r["state"] != "empty"]
-    assert row["fix"].startswith(
-        f"Agent action: stop what holds files open in {tree}, then move the folder {tree} out of the lane path (it may hold work), then run `"
-    )
-    assert row["fix"].endswith(f"worktree.py merge {quote(str(tree))}`")
+    assert row["fix"] == f"Agent action: stop what holds files open in {tree}, then move the folder {tree} out of the lane path (it may hold work)"  # fmt: skip
     assert row["exit"] == row["fix"]  # the closure refusal and `context dead` print `exit`
     tree.rename(root.parent / "aside")  # the act the fix names
     assert run(root, "merge", str(tree)).returncode == 0
@@ -367,7 +364,7 @@ def test_a_folder_git_cannot_delete_is_named_and_the_rerun_ends_the_tree(
         refused = run(root, verb, str(tree))
         assert refused.returncode == 1
         (fix,) = fixes(refused)
-        assert f"move the folder {tree} out of the lane path" in fix and "rerun" in fix
+        assert fix == f"fix: Agent action: stop what holds files open in {tree}, then move the folder {tree} out of the lane path (it may hold work)"  # fmt: skip
     make_writable(tree)
     tree.rename(aside)
     done = run(root, verb, str(tree))
@@ -411,8 +408,10 @@ def test_a_folder_in_the_way_of_an_unmerged_branch_is_moved_before_the_tree_come
     assert refused.returncode == 1
     (fix,) = fixes(refused)
     assert f"move the folder {tree} out of the lane path" in fix
-    assert " worktree add -f -f --lock " in fix
     assert (tree / "notes.txt").read_text() == "mine\n"
+    tree.rename(root.parent / "aside")
+    (again,) = fixes(run(root, verb, str(tree)))
+    assert " worktree add -f -f --lock " in again
 
 
 @pytest.mark.parametrize("verb", ["merge", "clean", "pause"])
