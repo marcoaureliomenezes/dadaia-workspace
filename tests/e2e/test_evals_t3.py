@@ -1,5 +1,5 @@
 """T3 discovery: the image builds on this checkout's wheel, holds no dadaia
-on PATH, installs only the run's build, and the grader passes a hand-done workspace and fails an empty one.
+on PATH, installs only the run's build, and the grader rewards onboarding and nothing past it.
 
 Docker is required: a missing tool fails the row, never skips it. 600 s: T1's four image builds
 took 95 s on ubuntu-24.04 (run 37554712931). Candidate only: no published build is installed.
@@ -10,14 +10,21 @@ Owner: dd-sw-engineer-sr
 import pytest
 
 from tests.helpers.evals import (
+    DOCTOR_ERROR_T3,
     HAND_T3,
+    MAIN_BACKLOG_T3,
+    MAIN_SPEC_T3,
+    ONBOARDED_NO_SPECS_T3,
     ONBOARDED_T3,
     REJECTED_T3,
     RENAMED_T3,
+    SESSION_T3,
     SPEC_T3,
     STUB_T3,
     T3,
     TRACED_T3,
+    VERDICT_T3,
+    WORKTREE_ONLY_T3,
     image,
     reward,
     wheel,
@@ -66,25 +73,42 @@ def test_a_plain_install_resolves_the_lib_build_offline(version: str, route: str
 @pytest.mark.parametrize(
     ("script", "want"),
     [
-        (HAND_T3, "1"),
-        (RENAMED_T3, "1"),
-        (SPEC_T3, "1"),
+        (HAND_T3, "0"),
+        (RENAMED_T3, "0"),
+        (SPEC_T3, "0"),
         (STUB_T3, "0"),
-        (TRACED_T3, "1"),
+        (TRACED_T3, "0"),
         (REJECTED_T3, "0"),
-        (ONBOARDED_T3, "0"),
+        (ONBOARDED_T3, "1"),
+        (ONBOARDED_NO_SPECS_T3, "1"),
+        (WORKTREE_ONLY_T3, "0"),
+        (MAIN_BACKLOG_T3, "0"),
+        (MAIN_SPEC_T3, "0"),
+        (VERDICT_T3, "0"),
+        (SESSION_T3, "0"),
+        (DOCTOR_ERROR_T3, "0"),
         ("true", "0"),
     ],
     ids=[
-        "hand-done",
+        "hand-done-lane-entry",
         "context-named-otherwise",
         "operator-demand-spec",
         "bare-stub-spec",
         "backlog-origin-traced",
         "filed-then-rejected",
-        "no-entry",
+        "onboarded",
+        "onboarded-without-specs-init",
+        "worktree-new-only",
+        "main-repo-backlog-entry",
+        "main-repo-release-spec",
+        "hand-written-verdict",
+        "hand-written-session",
+        "doctor-error",
         "empty",
     ],
 )
-def test_the_grader_rewards_the_discovery(version: str, script: str, want: str) -> None:
+def test_the_grader_rewards_onboarding_and_nothing_past_it(
+    version: str, script: str, want: str
+) -> None:
+    """The grader rewards onboarding and nothing past it."""
     assert reward(T3, version, script) == want

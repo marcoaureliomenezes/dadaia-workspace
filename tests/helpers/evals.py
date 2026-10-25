@@ -34,7 +34,8 @@ _FILE = (
     " --title 'subtract in calc.py' --description 'add subtract with tests to calc.py'"
     " --provenance p try-it --specs"
 )
-ONBOARDED_T3 = f"{_ONBOARD} --repo file:///srv/demo.git && {_D} specs init --context demo"
+ONBOARDED_NO_SPECS_T3 = f"{_ONBOARD} --repo file:///srv/demo.git"
+ONBOARDED_T3 = f"{ONBOARDED_NO_SPECS_T3} && {_D} specs init --context demo"
 RENAMED_T3 = (
     f"{_ONBOARD} && {_D} context create myproj --main-repo file:///srv/demo.git"
     f" && {_D} specs init --context myproj && {_FILE} /workspace/repos/demo/specs"
@@ -61,6 +62,17 @@ REJECTED_T3 = (
     f"{HAND_T3} && {_RUN}/dd-backlog-definition/scripts/backlog.py exit try-it"
     " --disposition rejected --reason no --specs /workspace/worktrees/demo/0.1.0/wt-backlog-x/specs"
 )
+# One act each, beside an onboarded workspace: the grader rewards onboarding and nothing past it.
+_MAIN = "/workspace/repos/demo/specs"
+_HAND = "mkdir -p {d} && echo x > {d}/hand.json"
+WORKTREE_ONLY_T3 = f"{ONBOARDED_T3} && {_D} worktree new demo 0.1.0/wt-backlog-x"
+MAIN_BACKLOG_T3 = f"{ONBOARDED_T3} && {_FILE} {_MAIN}"
+MAIN_SPEC_T3 = f"{ONBOARDED_T3} && " + _HAND.format(d=f"{_MAIN}/releases/0.1.0/rc-1").replace(
+    "hand.json", "SPEC.md"
+)
+VERDICT_T3 = f"{ONBOARDED_T3} && " + _HAND.format(d="/workspace/.dadaia/states/verdicts/demo")
+SESSION_T3 = f"{ONBOARDED_T3} && " + _HAND.format(d="/workspace/.dadaia/sessions")
+DOCTOR_ERROR_T3 = f"{ONBOARDED_T3} && rm -rf /workspace/.agents/skills/dd-backlog-definition"
 
 
 def sh(*cmd: str) -> str:
