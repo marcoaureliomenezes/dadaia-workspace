@@ -736,6 +736,79 @@ def test_memory_refuses_a_slug_outside_the_worklist(script: Path, tmp_path: Path
     assert _log(specs) == []
 
 
+def _unit(root: Path, name: str) -> str:
+    """Commit a tracked unit no atom covers; returns its path."""
+    (root / f"dadaia_workspace/features/{name}").mkdir(parents=True)
+    write_text(root / f"dadaia_workspace/features/{name}/core.py", "y = 1\n")
+    _git(root, "add", "-A")
+    _git(root, "commit", "-qm", f"{name} unit")
+    return f"dadaia_workspace/features/{name}"
+
+
+def _cover(root: Path, specs: Path, name: str) -> None:
+    write_text(specs / f"memory/product/platform/{name}.md", _ATOM.format(name))
+    _git(root, "add", "-A")
+    _git(root, "commit", "-qm", f"{name} atom")
+
+
+def _fix(result) -> str:
+    return next(ln for ln in result.stderr.splitlines() if ln.startswith("fix:"))
+
+
+def test_memory_names_the_atom_act_for_an_uncovered_unit_without_its_path(
+    script: Path, tmp_path: Path
+) -> None:
+    root, specs, _ = _memory_repo(tmp_path, script)
+    unit = _unit(root, "beta")
+
+    result = _memory(script, root, specs, reviewed="alpha", changed="")
+
+    assert result.returncode == 1 and f"unit '{unit}' is covered by no atom" in result.stderr
+    fix = _fix(result)
+    assert "write an atom whose `sources` glob covers the unit" in fix and unit not in fix, fix
+    assert _log(specs) == []
+
+
+def test_memory_accepts_the_atom_written_in_the_window_for_a_unit_that_predates_it(
+    script: Path, tmp_path: Path
+) -> None:
+    """The unit lies before the window's start; the atom created in the window is `changed`."""
+    root, specs, _ = _memory_repo(tmp_path, script)
+    _unit(root, "beta")
+    write_text(specs / "releases/0.5.0/milestone.md", "x\n")
+    _git(root, "add", "-A")
+    _git(root, "commit", "-qm", "chore(release): rc-1 phase IMPLEMENTATION")
+    refused = _memory(script, root, specs, reviewed="", changed="")
+    _cover(root, specs, "beta")
+
+    result = _memory(script, root, specs, reviewed="", changed="beta")
+
+    assert refused.returncode == 1 and "beta" in refused.stderr
+    assert result.returncode == 0, result.stderr
+    assert [e["changed"] for e in _log(specs) if e["kind"] == "memory"] == [["beta"]]
+
+
+def test_memory_refuses_a_stranger_atom_whose_file_did_not_move_in_the_window(
+    script: Path, tmp_path: Path
+) -> None:
+    root, specs, _ = _memory_repo(tmp_path, script)
+
+    result = _memory(script, root, specs, reviewed="alpha", changed="ghost")
+
+    assert result.returncode == 1 and "'ghost' is not in the window's worklist" in result.stderr
+    assert "memory" in _fix(result) and "atoms" in _fix(result)
+
+
+def test_memory_in_the_wrong_phase_prints_the_phase_verb(script: Path, tmp_path: Path) -> None:
+    root, specs, _ = _memory_repo(tmp_path, script)
+    _release(specs, "0.5.0", phase="IMPLEMENTATION", defined={"ts": _TS})
+
+    result = _memory(script, root, specs, reviewed="alpha", changed="")
+
+    assert result.returncode == 1 and "CLOSURE work" in result.stderr
+    assert "phase CLOSURE" in _fix(result) and "atom" not in _fix(result), _fix(result)
+
+
 def test_memory_refuses_a_changed_slug_whose_atom_never_moved(script: Path, tmp_path: Path) -> None:
     """A `changed` atom git says did not move over since..HEAD changed nothing."""
     root, specs, _ = _memory_repo(tmp_path, script)
