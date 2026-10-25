@@ -102,7 +102,7 @@ def entries(specs: Path) -> list[dict[str, Any]]:
     return [feature(path, specs, rank) for rank, path in enumerate(atoms(specs), start=1)]
 
 
-NOT_CODE = frozenset({"specs", "tests", "test", "docs"})
+NOT_CODE = frozenset({"specs", "specs-bkp", "tests", "test", "docs"})
 
 
 def _cut(repo: Path, what: str) -> Refusal | None:
@@ -169,7 +169,7 @@ def _units(tracked: list[str]) -> dict[str, list[str]]:
     """Every directory directly holding a tracked file, any language, mapped to every file
     beneath it; a root-level file belongs to no unit.
 
-    Derived from the audited repo alone: `specs/`, `tests/`, `docs/` and dot-dirs hold no
+    Derived from the audited repo alone: `specs/`, `specs-bkp/`, `tests/`, `docs/` and dot-dirs hold no
     unit, so a parent directory is covered as soon as any child is.
     """
     units = {
