@@ -6,7 +6,6 @@ nothing behind — its parent folder once empty, and its branch on the remote wh
 from __future__ import annotations
 
 import json
-import shutil
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -149,7 +148,7 @@ def test_list_gives_one_row_per_path_the_orphan_winning(root: Path) -> None:
     ]
 
 
-def test_an_orphan_whose_directory_survives_names_the_removal_and_following_it_empties_list(
+def test_an_orphan_whose_directory_survives_names_the_move_and_following_it_empties_list(
     root: Path,
 ) -> None:
     assert (tree := open_tree(root, JOB2)).is_dir()
@@ -157,10 +156,12 @@ def test_an_orphan_whose_directory_survives_names_the_removal_and_following_it_e
     tree.mkdir()
     write_text(tree / "f.txt", "x")
     [row] = [r for r in json.loads(run(root, "list", "--json").stdout) if r["state"] != "empty"]
-    assert row["fix"].startswith(f"Agent action: remove the directory {tree}, then run `")
+    assert row["fix"].startswith(
+        f"Agent action: stop what holds files open in {tree}, then move the folder {tree} out of the lane path (it may hold work), then run `"
+    )
     assert row["fix"].endswith(f"worktree.py merge {quote(str(tree))}`")
     assert row["exit"] == row["fix"]  # the closure refusal and `context dead` print `exit`
-    shutil.rmtree(tree)  # the operator act the fix names
+    tree.rename(root.parent / "aside")  # the act the fix names
     assert run(root, "merge", str(tree)).returncode == 0
     assert [
         r for r in json.loads(run(root, "list", "--json").stdout) if r["state"] != "empty"
