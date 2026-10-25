@@ -1711,7 +1711,11 @@ def _unit_history(
     _ledger(tmp_path)
     records = []
     for bug, kind, caused_by in steps:
-        line = "refactor(bugs): {} — REBUILD u: c" if kind == "refactor" else "fix(bugs): {} — c"
+        line = {
+            "refactor": "refactor(bugs): {} — REBUILD u: c",
+            "body": "test({0}): t\n\nrefactor(bugs): {0} — REBUILD u: c",
+            "plain": "test({0}): t\n\nrefactor(bugs): {0} — a token test, no lexer",
+        }.get(kind, "fix(bugs): {} — c")
         sha = _commit_as(tmp_path, line.format(bug))
         records.append({**_resolved(bug, sha), "caused_by": caused_by})
     return _ledger(tmp_path, *records)
@@ -1720,6 +1724,8 @@ def _unit_history(
 @pytest.mark.parametrize(("steps", "due"), [
     ([("b1", "fix", "none"), ("b2", "fix", "b1")], True),  # a child of b1, and no REBUILD since
     ([("b1", "fix", "none"), ("b2", "refactor", "b1")], False),  # the REBUILD answered the child
+    ([("b1", "fix", "none"), ("b2", "body", "b1")], False),  # the REBUILD line sits in a test commit's body
+    ([("b1", "fix", "none"), ("b2", "plain", "b1")], False),  # a refactor(bugs) line without the REBUILD token
     ([("b1", "fix", "none"), ("b2", "refactor", "b1"), ("b3", "fix", "b2")], True),  # a child after the last REBUILD
     ([("b1", "fix", "none"), ("b2", "fix", "none")], False),  # two bugs, none caused by the other
 ])  # fmt: skip
