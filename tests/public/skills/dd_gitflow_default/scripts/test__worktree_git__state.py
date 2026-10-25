@@ -81,6 +81,11 @@ def _refused(root: Path, verb: str, *more: str) -> str:
     return fix
 
 
+def _args(verb: str, tree: Path) -> tuple[str, ...]:
+    """The words after the verb that aim it at *tree*."""
+    return {"new": ("r", LANE), "hash": (str(tree), "--sha", "0" * 40)}.get(verb, (str(tree),))
+
+
 def _do(root: Path, fix: str) -> None:
     """Run the command an `Agent action:` line names, as printed."""
     cmd = (re.findall(r"`([^`]+)`", fix) or [fix.removeprefix("fix: ")])[-1]
@@ -95,8 +100,8 @@ def test_a_paused_name_is_taken_and_every_verb_names_resume(root: Path) -> None:
     kept = bundle.read_bytes()
     resume = _line("resume", str(tree))
 
-    for verb in ("pause", "merge", "clean", "sync"):
-        assert _refused(root, verb, str(tree)) == resume
+    for verb in ("pause", "merge", "clean", "sync", "hash"):
+        assert _refused(root, verb, *_args(verb, tree)) == resume
     assert _refused(root, "new", "r", LANE) == resume
     assert bundle.read_bytes() == kept and _branch(root) == ""
     assert _row(root, tree)["exit"] == resume.removeprefix("fix: ")
@@ -127,13 +132,13 @@ def test_a_pause_never_replaces_a_bundle_holding_a_commit_the_branch_lacks(root:
     assert other in git(root / "repos/r", "bundle", "list-heads", str(bundle))
 
 
-@pytest.mark.parametrize("verb", [*VERBS, "new", "resume"])
+@pytest.mark.parametrize("verb", [*VERBS, "new", "resume", "hash"])
 def test_a_moved_tree_is_named_by_every_verb_and_list_and_the_move_back_ends_it(
     root: Path, verb: str
 ) -> None:
     tree, moved = _lane(root, commits=False), root.parent / "elsewhere"
     git(root / "repos/r", "worktree", "move", "-f", "-f", str(tree), str(moved))
-    args = ("r", LANE) if verb == "new" else (str(tree),)
+    args = _args(verb, tree)
 
     fix = _refused(root, verb, *args)
 
@@ -159,13 +164,13 @@ def test_a_moved_tree_whose_folder_is_gone_is_no_holder_and_the_verb_ends(
     assert _branch(root) == "" and "elsewhere" not in git(root / "repos/r", "worktree", "list")
 
 
-@pytest.mark.parametrize("verb", [*VERBS, "new", "resume"])
+@pytest.mark.parametrize("verb", [*VERBS, "new", "resume", "hash"])
 def test_a_worktree_off_its_branch_at_the_path_is_named_alike_and_the_switch_ends_it(
     root: Path, verb: str
 ) -> None:
     tree = _lane(root, commits=False)
     git(tree, "switch", "-q", "--detach")
-    args = ("r", LANE) if verb == "new" else (str(tree),)
+    args = _args(verb, tree)
 
     fix = _refused(root, verb, *args)
 
@@ -176,7 +181,7 @@ def test_a_worktree_off_its_branch_at_the_path_is_named_alike_and_the_switch_end
 
 
 @pytest.mark.parametrize("has_branch", [False, True])
-@pytest.mark.parametrize("verb", [*VERBS, "new", "sync"])
+@pytest.mark.parametrize("verb", [*VERBS, "new", "sync", "hash"])
 def test_a_folder_git_does_not_list_is_named_alike_and_the_move_ends_it(
     root: Path, verb: str, has_branch: bool
 ) -> None:
@@ -185,7 +190,7 @@ def test_a_folder_git_does_not_list_is_named_alike_and_the_move_ends_it(
         git(root / "repos/r", "branch", f"wt/{LANE}", "feature/0.5.0")
     tree.mkdir(parents=True)
     write_text(tree / "stray.txt", "x\n")
-    args = ("r", LANE) if verb == "new" else (str(tree),)
+    args = _args(verb, tree)
 
     fix = _refused(root, verb, *args)
 
@@ -210,14 +215,14 @@ def test_a_branch_without_its_tree_is_ended_by_merge_and_clean_and_named_by_new(
     assert _branch(root) == ""
 
 
-@pytest.mark.parametrize("verb", [*VERBS, "sync"])
+@pytest.mark.parametrize("verb", [*VERBS, "sync", "hash"])
 def test_an_absent_name_is_named_alike_and_new_ends_it(root: Path, verb: str) -> None:
     tree = _tree(root)
 
-    fix = _refused(root, verb, str(tree))
+    fix = _refused(root, verb, *_args(verb, tree))
 
     assert fix == _line("new", "r", LANE)
-    run_fix(root, run(root, verb, str(tree)))
+    run_fix(root, run(root, verb, *_args(verb, tree)))
     assert (tree / "specs").is_dir()
 
 
@@ -232,7 +237,7 @@ def test_resume_of_a_name_no_bundle_holds_is_an_agent_rerun_never_new(root: Path
 @pytest.mark.parametrize("verb", ["new", "resume"])
 def test_an_open_tree_is_named_by_new_and_resume_with_clean(root: Path, verb: str) -> None:
     tree = _lane(root, commits=False)
-    args = ("r", LANE) if verb == "new" else (str(tree),)
+    args = _args(verb, tree)
 
     assert _refused(root, verb, *args) == _line("clean", str(tree))
     run_fix(root, run(root, verb, *args))
@@ -240,7 +245,7 @@ def test_an_open_tree_is_named_by_new_and_resume_with_clean(root: Path, verb: st
 
 
 @pytest.mark.parametrize("occupant", ["folder", "worktree"])
-@pytest.mark.parametrize("verb", [*VERBS, "new"])
+@pytest.mark.parametrize("verb", [*VERBS, "new", "hash"])
 def test_a_branch_held_elsewhere_names_the_act_for_an_occupied_path_before_the_move_back(
     root: Path, verb: str, occupant: str
 ) -> None:
@@ -252,7 +257,7 @@ def test_a_branch_held_elsewhere_names_the_act_for_an_occupied_path_before_the_m
         write_text(tree / "stray.txt", "x\n")
     else:
         git(repo, "worktree", "add", "-q", "--detach", str(tree), "feature/0.5.0")
-    args = ("r", LANE) if verb == "new" else (str(tree),)
+    args = _args(verb, tree)
 
     fix = _refused(root, verb, *args)
 
