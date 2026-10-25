@@ -1197,9 +1197,10 @@ def _wt_resume_no_bundle(root: Path) -> list[str]:
 
 
 def _wt_resume_ref_exists(root: Path) -> list[str]:
-    """The rc paused, then opened afresh: its branch exists beside the bundle."""
+    """The rc paused, then its branch recreated by git beside the bundle: no tree, a branch, a bundle."""
     _wt_paused(root)
-    wt.open_tree(root, _RC)
+    wt.git(root / "repos/r", "checkout", "-q", "feature/0.5.0")
+    wt.git(root / "repos/r", "branch", f"wt/{_RC}", "feature/0.5.0")
     return ["resume", _wt_rc_path(root)]
 
 
@@ -1223,7 +1224,6 @@ _WORKTREE: dict[str, tuple[WtCase | Skip, ...]] = {
         _wt_agent_reruns(_wt_bad_name, lambda root: ["new", "r", _RC]),
         _wt_agent_reruns(_wt_other_version, lambda root: ["new", "r", _RC]),
         WtCase(_wt_no_start),
-        WtCase(_wt_branch_exists),
     ),
     "_worktree_new._refuse_symlink": (WtCase(_wt_symlink),),
     "_worktree_new._refuse_unopened_bug": (WtCase(_wt_unopened_bug, _wt_bug_confirmed),),
@@ -1235,14 +1235,10 @@ _WORKTREE: dict[str, tuple[WtCase | Skip, ...]] = {
     ),
     "_worktree_pause.pause": (
         Skip("its fix lands the tree through the merge chain, whose verdict step is an act"),
-        _wt_agent_reruns(_wt_not_ours("pause"), _wt_on_rc("pause")),
         WtCase(_wt_pause_ignored, _wt_drop_ignored),
         Skip("a bundle that carries nothing; " + _SUITE),
     ),
-    "_worktree_pause.resume": (
-        WtCase(_wt_resume_ref_exists),
-        _wt_agent_reruns(_wt_resume_no_bundle, _wt_on_rc("resume")),
-    ),
+    "_worktree_pause.write_bundle": _skips(1, "a bundle holding a commit the branch lacks; " + _SUITE),
     "_worktree_sync.sync": (
         Skip("the conflict fix assigned for the refusal below it; the next entry names it"),
         Skip("needs a rebase conflict; " + _SUITE),
@@ -1255,12 +1251,10 @@ _WORKTREE: dict[str, tuple[WtCase | Skip, ...]] = {
     "_worktree_end.refuse_dirty": (WtCase(_wt_dirty, _wt_commit_staged),),
     "_worktree_end._kept": (WtCase(_wt_ignored, then=lambda _: ["merge", _TASK, "--drop"]),),
     "_worktree_end.merge": (
-        WtCase(_wt_task_unopened),
         Skip("the fast-forward fix assigned for the refusal below it; the next entry names it"),
         Skip("a fast-forward race; " + _SUITE),
     ),
     "_worktree_end.clean": (
-        _wt_agent_reruns(_wt_not_ours("clean"), _wt_on_rc("clean")),
         WtCase(_wt_unmerged, then=["merge", _TASK]),
     ),
     "_worktree_end._relay": (WtCase(_wt_red_doctor, _wt_fix_doctor),),
@@ -1270,6 +1264,7 @@ _WORKTREE: dict[str, tuple[WtCase | Skip, ...]] = {
         *_skips(3, "a verdict that is invalid, rejected or stale; " + _SUITE),
         Skip("the dispatch act assigned for the missing and stale refusals; the case runs it"),
     ),
+    "_worktree_end.drop_tree": _skips(1, "git failing to remove a tree; " + _SUITE),
     "_worktree_end._remove": _skips(2, "a branch unmerged or a tree to reattach; " + _SUITE),
     "_worktree_end._undo": _skips(1, "a backlog lane holding code; " + _SUITE),
     "_worktree_end._check_specs_only": _skips(1, "a backlog lane holding code; " + _SUITE),
@@ -1291,10 +1286,19 @@ _WORKTREE: dict[str, tuple[WtCase | Skip, ...]] = {
         Skip("several work branches; " + _SUITE),
         Skip("no work branch; " + _SUITE),
     ),
-    "_worktree_git._row": _skips(1, "a `list` finding row, not a refusal; " + _SUITE),
-    "_worktree_git._absent": _skips(3, "a `list` finding row, not a refusal; " + _SUITE),
-    "_worktree_git._repo_rows": _skips(1, "a `list` finding row, not a refusal; " + _SUITE),
-    "_worktree_git._unregistered": _skips(1, "a `list` finding row, not a refusal; " + _SUITE),
+    "_worktree_git._absent": _skips(2, "a `list` finding row, not a refusal; " + _SUITE),
+    "_worktree_git.move_aside": _skips(1, "a folder git does not list; " + _SUITE),
+    "_worktree_git._foreign": _skips(1, "a linked worktree no lane owns; " + _SUITE),
+    "_worktree_git.state": (
+        WtCase(_wt_branch_exists),
+        Skip("a tree detached at its branch; " + _SUITE),
+        Skip("a linked worktree no lane owns; " + _SUITE),
+        Skip("a folder git does not list; " + _SUITE),
+        Skip("a branch held by a tree at another path; " + _SUITE),
+        _wt_agent_reruns(_wt_resume_no_bundle, _wt_on_rc("resume")),
+        WtCase(_wt_resume_ref_exists),
+    ),
+    "_worktree_git.require": (WtCase(_wt_task_unopened),),
     "worktree.main": _skips(3, "no workspace root or a failing child; " + _SUITE),
 }
 
