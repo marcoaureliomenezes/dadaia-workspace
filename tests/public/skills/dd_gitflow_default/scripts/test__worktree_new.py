@@ -630,3 +630,59 @@ def test_list_shows_no_stray_for_a_level_folder_holding_only_its_file(root: Path
     assert (tree.parent / "AGENTS.md").is_file() and not tree.exists()
     rows = json.loads(_run(root, "list", "--json").stdout)
     assert [r["path"] for r in rows if r["state"] == "unregistered"] == []
+
+
+def _leftover(root: Path) -> Path:
+    """A non-empty folder at the rc's tree path that git does not list."""
+    folder = root / "worktrees/r" / RC
+    folder.mkdir(parents=True)
+    write_text(folder / "stray.txt", "x\n")
+    return folder
+
+
+def test_new_onto_an_unlisted_folder_makes_no_branch_and_names_its_move(root: Path) -> None:
+    folder = _leftover(root)
+
+    refused = _run(root, "new", "r", RC)
+
+    assert (refused.returncode, refused.stdout) == (1, "")
+    assert _git(root / "repos/r", "branch", "--list", f"wt/{RC}").strip() == ""
+    assert _fixes(refused) == [
+        f"fix: Agent action: move the folder {folder} out of the lane path (it may hold work), then rerun `{_script()} new r {RC}`"
+    ]
+    folder.rename(root / "aside")
+    assert _run(root, "new", "r", RC).returncode == 0
+    assert (folder / "specs").is_dir()
+
+
+@pytest.mark.parametrize("leftover", [False, True])
+def test_a_branch_left_without_its_tree_is_cleared_by_the_printed_acts(
+    root: Path, leftover: bool
+) -> None:
+    folder = root / "worktrees/r" / RC
+    _git(root / "repos/r", "branch", f"wt/{RC}", "feature/0.5.0")
+    _git(root / "repos/r", "checkout", "-q", "feature/0.5.0")
+    refused = _run(root, "new", "r", RC)
+    assert refused.returncode == 1 and "exists" in refused.stderr
+    if leftover:
+        _leftover(root)
+        assert "move the folder" in _fixes(_run(root, "clean", str(folder)))[0]
+        folder.rename(root / "aside")
+    run_fix(root, refused)
+
+    assert _run(root, "new", "r", RC).returncode == 0
+    assert (folder / "specs").is_dir()
+
+
+def test_merge_onto_a_leftover_folder_without_a_branch_ends_through_new(root: Path) -> None:
+    folder = _leftover(root)
+
+    merged = _run(root, "merge", str(folder))
+    assert (merged.returncode, _fixes(merged)) == (1, [f"fix: {_script()} new r {RC}"])
+    new_fix = _run(root, "new", "r", RC)  # the line merge prints, run as printed
+    assert _fixes(new_fix) == [
+        f"fix: Agent action: move the folder {folder} out of the lane path (it may hold work), then rerun `{_script()} new r {RC}`"
+    ]
+    folder.rename(root / "aside")
+
+    assert _run(root, "new", "r", RC).returncode == 0
