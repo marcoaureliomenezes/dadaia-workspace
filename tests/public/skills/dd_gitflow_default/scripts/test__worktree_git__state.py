@@ -83,7 +83,7 @@ def _refused(root: Path, verb: str, *more: str) -> str:
 
 def _do(root: Path, fix: str) -> None:
     """Run the command an `Agent action:` line names, as printed."""
-    cmd = re.findall(r"`([^`]+)`", fix)[-1]
+    cmd = (re.findall(r"`([^`]+)`", fix) or [fix.removeprefix("fix: ")])[-1]
     run_fix(root, subprocess.CompletedProcess([], 1, "", f"fix: {cmd}"))
 
 
