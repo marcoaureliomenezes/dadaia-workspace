@@ -1238,7 +1238,9 @@ _WORKTREE: dict[str, tuple[WtCase | Skip, ...]] = {
         WtCase(_wt_pause_ignored, _wt_drop_ignored),
         Skip("a bundle that carries nothing; " + _SUITE),
     ),
-    "_worktree_pause.write_bundle": _skips(1, "a bundle holding a commit the branch lacks; " + _SUITE),
+    "_worktree_pause.write_bundle": _skips(
+        1, "a bundle holding a commit the branch lacks; " + _SUITE
+    ),
     "_worktree_sync.sync": (
         Skip("the conflict fix assigned for the refusal below it; the next entry names it"),
         Skip("needs a rebase conflict; " + _SUITE),
@@ -1254,9 +1256,7 @@ _WORKTREE: dict[str, tuple[WtCase | Skip, ...]] = {
         Skip("the fast-forward fix assigned for the refusal below it; the next entry names it"),
         Skip("a fast-forward race; " + _SUITE),
     ),
-    "_worktree_end.clean": (
-        WtCase(_wt_unmerged, then=["merge", _TASK]),
-    ),
+    "_worktree_end.clean": (WtCase(_wt_unmerged, then=["merge", _TASK]),),
     "_worktree_end._relay": (WtCase(_wt_red_doctor, _wt_fix_doctor),),
     "_worktree_end.digest": (WtCase(_wt_bad_sha, then=_wt_real_sha),),
     "_worktree_end._check_approved": (

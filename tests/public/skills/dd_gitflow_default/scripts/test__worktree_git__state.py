@@ -224,7 +224,9 @@ def test_an_absent_name_is_named_alike_and_new_ends_it(root: Path, verb: str) ->
 def test_resume_of_a_name_no_bundle_holds_is_an_agent_rerun_never_new(root: Path) -> None:
     fix = _refused(root, "resume", str(_tree(root)))
 
-    assert fix == f"fix: Agent action: rerun with the tree of a bundle under {root / '.dadaia/dist/r'}"
+    assert (
+        fix == f"fix: Agent action: rerun with the tree of a bundle under {root / '.dadaia/dist/r'}"
+    )
 
 
 @pytest.mark.parametrize("verb", ["new", "resume"])
