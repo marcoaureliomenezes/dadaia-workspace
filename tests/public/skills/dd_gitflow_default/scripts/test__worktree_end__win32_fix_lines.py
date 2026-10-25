@@ -38,7 +38,7 @@ def test_an_unmerged_tree_is_named_by_a_command_line(
     tree = tmp_path.resolve() / "a%b"
     name = "0.5.0/rc-1/wt-rc"
     monkeypatch.setattr(end, "target", lambda root, path: (tmp_path, tree, name, "feature/0.5.0"))
-    monkeypatch.setattr(end, "require", lambda *a: "normal")
+    monkeypatch.setattr(end, "ours", lambda repo: [{"path": str(tree), "name": name}])
     monkeypatch.setattr(end, "git", lambda *a, **k: "2")
     with pytest.raises(end.Refusal) as refused:
         end.clean(tmp_path, "p", [], False)

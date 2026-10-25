@@ -222,7 +222,7 @@ def test_an_off_grammar_orphan_branch_with_a_diverged_upstream_is_deleted_by_its
 @pytest.mark.parametrize(
     "stray", ["0.5.0/junk", "0.5.0/rc-1/junk", "0.5.0/rc-1/job-1/junk"], ids=["lane", "rc", "job"]
 )
-def test_a_stray_folder_at_any_depth_is_one_row_whose_fix_moves_it(
+def test_a_stray_folder_at_any_depth_is_one_row_whose_fix_removes_it(
     root: Path, stray: str, filled: bool
 ) -> None:
     _open(root, RC)
@@ -233,12 +233,7 @@ def test_a_stray_folder_at_any_depth_is_one_row_whose_fix_moves_it(
 
     unregistered = [(r["path"], r["fix"]) for r in _rows(root) if r["state"] == "unregistered"]
 
-    assert unregistered == [
-        (
-            str(folder),
-            f"Agent action: stop what holds files open in {folder}, then move the folder {folder} out of the lane path (it may hold work)",
-        )
-    ]
+    assert unregistered == [(str(folder), f"Agent action: remove the directory {folder}")]
 
 
 def test_an_orphans_surviving_directory_is_the_orphans_row_alone(root: Path) -> None:
@@ -250,7 +245,7 @@ def test_an_orphans_surviving_directory_is_the_orphans_row_alone(root: Path) -> 
     [row] = _rows(root)
 
     assert (row["state"], row["path"]) == ("orphan", str(folder))
-    assert row["fix"] == f"Agent action: stop what holds files open in {folder}, then move the folder {folder} out of the lane path (it may hold work)"  # fmt: skip
+    assert row["fix"].startswith(f"Agent action: remove the directory {folder}, then run `")
 
 
 def test_a_git_failure_in_a_row_read_ends_as_one_refusal_with_an_agent_action_fix(

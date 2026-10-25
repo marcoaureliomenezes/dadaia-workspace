@@ -34,7 +34,12 @@ def test_a_row_names_its_exit_through_command_or_inline(win32: None, tmp_path: P
     assert ready["fix"] == command(*git.LAUNCH, "merge", str(bad), caps=_WIN)
     gone = git._row(Path("r"), str(bad), "orphan")
     assert gone["fix"] == command(*git.LAUNCH, "merge", str(bad), caps=_WIN)
-    assert git.move_aside(bad) == f"Agent action: stop what holds files open in {bad}, then move the folder {bad} out of the lane path (it may hold work)"  # fmt: skip
+    bad.mkdir()
+    held = git._row(Path("r"), str(bad), "orphan")
+    assert held["fix"] == (
+        f"Agent action: remove the directory {bad}, then run "
+        f"`{inline(*git.LAUNCH, 'merge', str(bad), caps=_WIN)}`"
+    )
 
 
 def test_ignored_files_are_kept_by_a_command_line(

@@ -12,15 +12,7 @@ from _grammar import STATE, candidate_number
 from _jsonl import parse_object
 from _platform import act, command, is_link, read_text
 from _specs import check_release, parse
-from _worktree_git import (
-    flow_for,
-    locked_add,
-    not_a_name,
-    reattach,
-    require,
-    work_version,
-    work_versions,
-)
+from _worktree_git import flow_for, locked_add, not_a_name, reattach, work_version, work_versions
 from _worktree_names import (
     LAUNCH,
     LEVEL_FILE,
@@ -105,7 +97,8 @@ def new(root: Path, repo_name: str, name: str) -> Path:
     if match["bug"]:
         _refuse_unopened_bug(root / "repos" / flow["main"], start, match["bug"])
     tree = tree_path(root, repo_name, name)
-    require(repo, tree, name, "absent")  # a branch, a folder or a paused bundle holds the name
+    if git(repo, "branch", "--list", branch(name)).strip():
+        raise Refusal(f"{branch(name)} exists", command(*LAUNCH, "clean", str(tree)))  # fmt: skip
     made = absent_levels(root, repo_name, name)
     git(repo, *locked_add(name, "-q", "-b", branch(name)), str(tree), start)
     write_level_files(made)

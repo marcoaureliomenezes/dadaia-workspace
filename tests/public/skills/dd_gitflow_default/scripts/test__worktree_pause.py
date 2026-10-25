@@ -17,16 +17,7 @@ import pytest
 
 import dadaia_workspace
 from tests.fixtures.stores import fake_venv
-from tests.helpers.oslib import (
-    PERMISSIONS_ENFORCED,
-    command,
-    make_executable,
-    make_readonly,
-    make_writable,
-    read_text,
-    stub_cli,
-    write_text,
-)
+from tests.helpers.oslib import command, make_executable, read_text, stub_cli, write_text
 from tests.helpers.oslib import run as os_run
 from tests.helpers.worktree_ws import (
     NEW_JOB,
@@ -317,21 +308,3 @@ def test_the_dist_writer_sentence_names_worktree_pause_and_resume() -> None:
 
     assert "`worktree pause`" in sentence
     assert "`worktree resume`" in sentence
-
-
-@pytest.mark.skipif(not PERMISSIONS_ENFORCED, reason="needs a folder this process cannot empty")
-def test_a_folder_git_cannot_delete_is_named_and_the_rerun_ends_the_pause(root: Path) -> None:
-    make_readonly((tree := _lane(root)) / "specs")
-    aside = root.parent / "aside"
-    # the bundle is written, git forgot the tree, the folder stays
-    for _ in range(2):
-        refused = run(root, "pause", str(tree))
-        assert refused.returncode == 1
-        (fix,) = fixes(refused)
-        assert fix == f"fix: Agent action: stop what holds files open in {tree}, then move the folder {tree} out of the lane path (it may hold work)"  # fmt: skip
-    tree.rename(aside)
-    make_writable(aside / "specs")
-    done = run(root, "pause", str(tree))
-    assert done.returncode == 0, done.stderr
-    assert _bundle(root, BACKLOG).is_file()
-    assert git(root / "repos/r", "branch", "--list", _branch(BACKLOG)) == ""
