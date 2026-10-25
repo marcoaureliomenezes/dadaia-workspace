@@ -1,9 +1,9 @@
 {
   "schema": "release-state-v1",
   "release": "0.5.0",
-  "phase": "DEFINITION",
+  "phase": "IMPLEMENTATION",
   "defined": {
-    "ts": "2026-10-24T04:30:34Z"
+    "ts": "2026-10-25T21:59:18Z"
   },
   "implemented": {
     "ts": "2026-10-24T17:44:03Z"
@@ -2610,6 +2610,14 @@
       "agent": "release.py new",
       "kind": "note",
       "text": "Candidate born on 0.5.0 (stacked on the closed prior candidate)"
+    },
+    {
+      "ts": "2026-10-25T21:59:18Z",
+      "agent": "release.py",
+      "kind": "milestone",
+      "candidate": "rc-24",
+      "milestone": "defined",
+      "text": "Candidate defined; phase IMPLEMENTATION."
     }
   ]
 }
