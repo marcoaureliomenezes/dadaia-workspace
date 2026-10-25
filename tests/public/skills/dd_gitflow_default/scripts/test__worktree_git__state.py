@@ -95,7 +95,7 @@ def test_a_paused_name_is_taken_and_every_verb_names_resume(root: Path) -> None:
     kept = bundle.read_bytes()
     resume = _line("resume", str(tree))
 
-    for verb in ("pause", "merge", "clean"):
+    for verb in ("pause", "merge", "clean", "sync"):
         assert _refused(root, verb, str(tree)) == resume
     assert _refused(root, "new", "r", LANE) == resume
     assert bundle.read_bytes() == kept and _branch(root) == ""
@@ -176,7 +176,7 @@ def test_a_worktree_off_its_branch_at_the_path_is_named_alike_and_the_switch_end
 
 
 @pytest.mark.parametrize("has_branch", [False, True])
-@pytest.mark.parametrize("verb", [*VERBS, "new"])
+@pytest.mark.parametrize("verb", [*VERBS, "new", "sync"])
 def test_a_folder_git_does_not_list_is_named_alike_and_the_move_ends_it(
     root: Path, verb: str, has_branch: bool
 ) -> None:
@@ -210,7 +210,7 @@ def test_a_branch_without_its_tree_is_ended_by_merge_and_clean_and_named_by_new(
     assert _branch(root) == ""
 
 
-@pytest.mark.parametrize("verb", VERBS)
+@pytest.mark.parametrize("verb", [*VERBS, "sync"])
 def test_an_absent_name_is_named_alike_and_new_ends_it(root: Path, verb: str) -> None:
     tree = _tree(root)
 
