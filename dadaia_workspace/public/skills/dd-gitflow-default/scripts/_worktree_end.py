@@ -421,7 +421,8 @@ def _check_approved(root: Path, tree: Path, work: str, name: str) -> None:
 
 def digest(root: Path, path: str, sha: str) -> str:
     """The binding a verdict carries for *sha* of a worktree, as one JSON object."""
-    _, tree, name, onto = target(root, path)
+    repo, tree, name, onto = target(root, path)
+    require(repo, tree, name, "normal")
     if git(tree, "rev-parse", "--verify", "--quiet", f"{sha}^{{commit}}", check=False).strip() != sha:  # fmt: skip
         raise Refusal(f"{sha} is not a commit sha of {tree}", act("agent", f"pass a 40-hex commit of {tree}, as `{git_inline(tree, 'rev-parse', 'HEAD')}` prints"))  # fmt: skip
     scope = f"{branch(name)}@{git(tree, 'rev-parse', 'HEAD').strip()}"
