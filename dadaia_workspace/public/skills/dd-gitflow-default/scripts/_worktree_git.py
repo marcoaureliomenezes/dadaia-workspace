@@ -237,7 +237,8 @@ def state(repo: Path, tree: Path, name: str) -> tuple[str, Refusal]:
     """The one state of lane path *tree* for tree *name* and the Refusal naming the one act that ends it
     (a normal tree's names `clean`). `normal`: git lists the branch there; `held`: a tree git lists
     holds the branch at another path, move it back (after the next two clear their path first); `foreign`: git lists another worktree at *tree*,
-    land its work and switch it onto the branch (or remove it, with no branch); `folder`: files git
+    land its work and switch it onto the branch (or remove it, with no branch); a tree there detached at or behind
+    its own branch (or whose branch is gone) just switches onto it (`-c` when gone); `folder`: files git
     does not list sit at *tree*, move them aside; else no tree holds the branch and the folder is
     clear: `branch` (merge's no-tree ending), `paused` (a bundle holds it, resume) or `absent` (new)."""
     tree, ref = tree.resolve(), branch(name)
@@ -246,7 +247,10 @@ def state(repo: Path, tree: Path, name: str) -> tuple[str, Refusal]:
         return "normal", Refusal(f"{ref} exists", command(*LAUNCH, "clean", str(tree)))
     away = held if held and held != tree and held.exists() else None
     back = (git_inline(repo, "worktree", "move", "-f", "-f", str(away), str(tree)) if away else "")  # fmt: skip
-    if held != tree and any(Path(t["worktree"]).resolve() == tree for t in _trees(repo)):
+    there = next((t for t in _trees(repo) if Path(t["worktree"]).resolve() == tree), None)
+    if held != tree and there:
+        if not away and "branch" not in there and (not has or not git(repo, "rev-list", "-1", f"{ref}..{there['HEAD']}", check=False).strip()):  # fmt: skip
+            return "foreign", Refusal(f"{tree} is detached, not on {ref}", git_line(tree, "switch", *(() if has else ("-c",)), ref))  # fmt: skip
         return "foreign", Refusal(f"{tree} is not a worktree of ours", _foreign(repo, tree, "" if away or not has else ref, f"run `{back}`" if away else ""))  # fmt: skip
     if tree.exists() and (not tree.is_dir() or any(tree.iterdir())):
         return "folder", Refusal(f"{tree} holds files git does not list", move_aside(tree, f"run `{back}`" if away else ""))  # fmt: skip
@@ -322,9 +326,7 @@ def _absent(root: Path, repo: Path, flow: dict[str, str], held: set[str], found:
             continue
         name = ref.removeprefix("wt/")
         row = _row(repo, str(home / name), "orphan", kind=kind_of(name))
-        if name_of(
-            ref
-        ):  # a grammar name is the table's; a worktree listed on another branch has its own row
+        if name_of(ref):  # the table's name; a worktree on another branch has its own row
             kind, why = state(repo, home / name, name)
             if kind in ("branch", "folder"):
                 out.append(row | {"fix": why.fix, "exit": why.fix})
