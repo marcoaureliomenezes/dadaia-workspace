@@ -81,8 +81,13 @@ def reaches(repo: Path, sha: str) -> bool:
     return True
 
 
-#: A bug-fix line of a commit message: `fix(bugs): <id>[, <id>…] — …` or the REBUILD `refactor(bugs): …`.
-_FIX_LINE = re.compile(r"^(?:fix|refactor)\(bugs\): (.*?) — ", re.M)
+#: A bug-fix line of a commit message: `fix(bugs): <id>[, <id>…] — …` or `refactor(bugs): <id> — …`, the REBUILD.
+_FIX_LINE = re.compile(r"^(fix|refactor)\(bugs\): (.*?) — ", re.M)
+
+
+def is_rebuild(message: str) -> bool:
+    """Whether a line of the commit *message* is a `refactor(bugs):` fix line."""
+    return any(label == "refactor" for label, _ in _FIX_LINE.findall(message))
 
 
 def _canon(subject: str) -> str:
@@ -103,7 +108,7 @@ def fix_commit(repos: Iterable[Path], ids: Iterable[str]) -> dict[str, tuple[Pat
                 continue
             if subject.startswith('Revert "'):
                 retired[_canon(subject[8:-1])] += 1
-            for head in _FIX_LINE.findall(message):
+            for _, head in _FIX_LINE.findall(message):
                 for bug in re.split(r"[,\s]+", head):
                     if bug in wanted:
                         found.setdefault(bug, (each, sha))

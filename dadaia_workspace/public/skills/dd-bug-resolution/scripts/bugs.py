@@ -19,7 +19,7 @@ import _jsonl
 from _atomic import SymlinkRefusedError
 from _bugs_check import LEDGER, OPEN, STATUS_BY_VERB, check
 from _bugs_store import Refusal, archived_plain_ids, commit, history, read_records
-from _git import GitError, fix_commit, git
+from _git import GitError, fix_commit, git, is_rebuild
 from _platform import act, use_utf8_stdio
 from _refusal import report
 from _specs import context_repos, find_specs, refuse
@@ -91,10 +91,13 @@ def _ordinal(n: int) -> str:
 def _due(
     past: list[dict[str, Any]], fixed: dict[str, dict[str, str]], repo: Path
 ) -> dict[str, list[str]]:
-    """The ONE REBUILD-due decider over *fixed* (`by_file`'s paths): each path with a child, a fix whose bug's `caused_by` names an earlier fix of the path and that lands after the path's last REBUILD (a `refactor(bugs):` commit), -> the ids of those children and their causes. Fixes are ordered by *repo*'s log; a fix of another repo of the context sorts as the oldest."""
-    log = git(repo, "log", "--format=%H%x00%s", check=False).splitlines()
-    age = {ln.split("\0")[0]: len(log) - n for n, ln in enumerate(log)}
-    rebuilt = {ln.split("\0")[0] for ln in log if ln.split("\0")[1].startswith("refactor(bugs):")}
+    """The ONE REBUILD-due decider over *fixed* (`by_file`'s paths): each path with a child, a fix whose bug's `caused_by` names an earlier fix of the path and that lands after the path's last REBUILD (a commit holding a REBUILD fix line), -> the ids of those children and their causes. Fixes are ordered by *repo*'s log; a fix of another repo of the context sorts as the oldest."""
+    log = [
+        e.partition("\0")
+        for e in git(repo, "log", "--format=%x1e%H%x00%B", check=False).split("\x1e")[1:]
+    ]
+    age = {sha: len(log) - n for n, (sha, _, _) in enumerate(log)}
+    rebuilt = {sha for sha, _, message in log if is_rebuild(message)}
     causes = {str(r["id"]): str(r.get("caused_by")) for r in past}
     due: dict[str, list[str]] = {}
     for path, fixes in fixed.items():
