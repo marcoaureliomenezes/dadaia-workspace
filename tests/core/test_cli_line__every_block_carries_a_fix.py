@@ -574,7 +574,7 @@ def _text_sites(texts: dict[str, str]) -> list[str]:
             whole = fenced and rel.startswith("dadaia_workspace/public/") and _bad_command(line)
             if whole or any(row(line) for row in rows):
                 sites.append(f"{rel}:{number}")
-        if rel.startswith("dadaia_workspace/public/") and rel.endswith(".md"):
+        if rel.startswith(("dadaia_workspace/public/", "docs/")) and rel.endswith(".md"):
             sites += [f"{rel}:{n}" for n in _ledger_lines(authored_text(text))]
     return sites
 
@@ -658,6 +658,7 @@ def test_the_scans_bite() -> None:
     assert _text_sites({"dadaia_workspace/public/l.md": ledger}) == [
         f"dadaia_workspace/public/l.md:{n}" for n in (1, 5, 7, 8, 14)
     ]
+    assert _text_sites({"docs/d.md": ledger.splitlines()[0] + "\n"}) == ["docs/d.md:1"]
     script = 'fix = git_line(repo, "switch", work)\nfix = f"git -C ' + '{repo} switch {work}"\n'
     assert _text_sites({"dadaia_workspace/public/s.py": script}) == [
         "dadaia_workspace/public/s.py:2"
