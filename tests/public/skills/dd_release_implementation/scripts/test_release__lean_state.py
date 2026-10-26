@@ -264,6 +264,14 @@ def test_ship_requires_each_open_bug_flag_and_its_verbatim_authorization_note(
             "Agent action: add a-bug to the carried field of the kind: summary entry",
             id="no-carry-is-the-agents",
         ),
+        pytest.param(
+            [
+                _entry("note", 'He said: Operator authorization verbatim: "carry a-bug open"'),
+                _entry("summary", "delivered: x; carried: a-bug; backlog exits: none"),
+            ],
+            "Operator action: authorize carrying a-bug",
+            id="a-phrase-mid-note-is-no-authorization",
+        ),
     ],
 )
 def test_ship_names_who_clears_a_missing_authorization_or_carry(
