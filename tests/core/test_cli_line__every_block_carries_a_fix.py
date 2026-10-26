@@ -4,14 +4,19 @@ shipped text."""
 
 from __future__ import annotations
 
+import argparse
 import ast
+import contextlib
 import functools
 import importlib.util
+import io
 import re
+import shlex
 import sys
 from collections.abc import Callable
 from pathlib import Path, PurePosixPath
 from typing import Any
+from unittest import mock
 
 import pytest
 
@@ -417,27 +422,96 @@ _DEAD_RELEASE_VOCABULARY = re.compile(r"rc-archive|release\.py (fold|archive)|rc
 _NON_AUTHORITY_DONE = re.compile(r"memory\.py check`? exit 0")
 
 
-#: A stated ledger-script command: the script by path or scaffold variable and its verb, or its
-#: short name with a verb and arguments (a bare `release.py phase` only names a verb). These
-#: scripts resolve their tree through `find_specs`, so from the workspace root one with no
-#: `--specs` finds no specs tree; `--help` needs none.
-_LEDGER_COMMAND = re.compile(
-    r"(?:scripts/(?:backlog|audit|bugs|release|memory)\.py|\b(?:RELEASE|BACKLOG|MEMORY)_PY"
-    r"|scripts/verdict\.py(?= stats\b)) (?![-\s])\S"
-    r"|(?<![/\w])(?:backlog|audit|bugs|release|memory)\.py \S+ (?:(?!-)\S|[^<]*<)"
+#: The skill owning each ledger script a law states.
+_LEDGER_SKILL = {
+    "backlog": "dd-backlog-definition", "audit": "dd-audit-project", "bugs": "dd-bug-resolution",
+    "release": "dd-release-implementation", "memory": "dd-spec-navigator", "verdict": "dd-handoff-emitter",
+}  # fmt: skip
+#: A ledger script named by path, by short name or by scaffold variable, with what follows it.
+_LEDGER_NAME = re.compile(
+    r"scripts/(?P<path>backlog|audit|bugs|release|memory|verdict)\.py"
+    r"|(?<![/\w])(?P<short>backlog|audit|bugs|release|memory)\.py"
+    r"|\b(?P<var>RELEASE|BACKLOG|MEMORY)_PY"
 )
 
 
+class _Parsed(Exception):
+    """Raised by the spy once a script's parser has accepted its argv."""
+
+
+def _stated_ledger_command(span: str) -> tuple[str, str] | None:
+    """`(script, words after it)` when *span* states a ledger command: a verb after a path or a
+    scaffold variable, or after a short name with arguments (a bare `release.py phase` names a
+    verb); `--help` states none."""
+    name = _LEDGER_NAME.search(span)
+    if name is None:
+        return None
+    script = name["path"] or name["short"] or name["var"].lower()
+    rest = span[name.end() :]
+    words = rest.split()
+    if not words or "--help" in words or not (words[0].isalpha() or words[0].startswith("-")):
+        return None
+    if script == "verdict" and words[0] != "stats":
+        return None
+    if name["short"] and not words[0].isalpha():
+        return None
+    if name["short"] and not (len(words) > 1 and (not words[1].startswith("-") or "<" in span)):
+        return None
+    return script, rest
+
+
+def _shape_only(parser: argparse.ArgumentParser) -> None:
+    """Strip every value check (choices, types) below *parser*: the stated words are judged on
+    their shape — verbs, flags, positionals — with placeholders standing for values."""
+    for action in parser._actions:
+        if isinstance(action, argparse._SubParsersAction):
+            for sub in action.choices.values():
+                _shape_only(sub)
+        else:
+            action.choices = action.type = None
+
+
+def _parsed_specs(script: str, rest: str) -> bool:
+    """Whether the script's own parser takes the stated words and the command names its specs
+    tree. A placeholder stands for a value; `…` after a flag is its value, elsewhere it is dropped."""
+    words = shlex.split(re.sub(r"<[^>]*>", "x", rest).replace("[", "").replace("]", ""))
+    argv = [
+        "x" if w in ("…", "...") and before.startswith("-") else w
+        for before, w in zip(["", *words], words, strict=False)
+        if w not in ("…", "...") or before.startswith("-")
+    ]
+    parse = argparse.ArgumentParser.parse_args
+
+    def spy(self: argparse.ArgumentParser, *a: object, **k: object) -> None:
+        _shape_only(self)
+        raise _Parsed(parse(self, *a, **k))
+
+    owner = load_owner(_LEDGER_SKILL[script], script)
+    with (
+        mock.patch.object(argparse.ArgumentParser, "parse_args", spy),
+        contextlib.redirect_stderr(io.StringIO()),
+    ):
+        try:
+            owner.main(argv)
+        except _Parsed as parsed:
+            return getattr(parsed.args[0], "specs", True) is not None
+        except SystemExit:
+            return False
+    return False
+
+
 def _ledger_lines(text: str) -> list[int]:
-    """Lines of the stated ledger commands lacking `--specs`: a fenced line (indented or
-    not), or a code span of a paragraph (a span may wrap)."""
+    """Lines of the stated ledger commands their own parser refuses or that name no specs tree: a
+    fenced line (indented or not), or a code span of a paragraph (a span may wrap)."""
     hits: list[int] = []
     para: list[tuple[int, str]] = []
+    cont: list[str] = []
+    first = 0
     fenced = False
 
     def bare(span: str) -> bool:
-        span = " ".join(span.split())
-        return bool(_LEDGER_COMMAND.search(span)) and "--specs" not in span and "--help" not in span
+        stated = _stated_ledger_command(" ".join(span.split()))
+        return stated is not None and not _parsed_specs(*stated)
 
     def flush() -> None:
         body = "\n".join(line for _, line in para)
@@ -453,7 +527,13 @@ def _ledger_lines(text: str) -> list[int]:
             flush()
             fenced = not fenced
         elif fenced:
-            hits += [number] * bare(line)
+            if cont:
+                cont.append(line)
+            else:
+                cont, first = [line], number
+            if not line.rstrip().endswith("\\"):
+                hits += [first] * bare(" ".join(c.rstrip(" \\") for c in cont))
+                cont = []
         elif line.strip():
             para.append((number, line))
         else:
@@ -563,11 +643,20 @@ def test_the_scans_bite() -> None:
         "`python3 .agents/skills/dd-bug-resolution/scripts/bugs.py append --help`\n"
         "`python3 .agents/skills/dd-cli-library/scripts/registry.py list`\n"
         "a wrapped `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py\nexit <slug>`\n"
-        "short `audit.py close <dir>` and `RELEASE_PY new` and `RELEASE_PY new --specs s` and `release.py phase`\n"
-        "   ```bash\n   python3 .agents/skills/dd-audit-project/scripts/audit.py close \\\n   ```\n"
+        "short `audit.py close <dir>`, variable `RELEASE_PY new --specs <specs-dir>`, clean"
+        " `RELEASE_PY new <id> --specs <specs-dir>` and a mention of `release.py phase`\n"
+        "flag before the verb `RELEASE_PY --specs <specs-dir> check`\n"
+        "   ```bash\n"
+        "   python3 .agents/skills/dd-audit-project/scripts/audit.py close <dir> \\\n"
+        "     --sha <window-end> --specs <specs-dir>\n"
+        "   ```\n"
+        "   ```bash\n"
+        "   python3 .agents/skills/dd-audit-project/scripts/audit.py close <dir> \\\n"
+        "     --sha <window-end>\n"
+        "   ```\n"
     )
     assert _text_sites({"dadaia_workspace/public/l.md": ledger}) == [
-        f"dadaia_workspace/public/l.md:{n}" for n in (1, 5, 7, 9)
+        f"dadaia_workspace/public/l.md:{n}" for n in (1, 5, 7, 8, 14)
     ]
     script = 'fix = git_line(repo, "switch", work)\nfix = f"git -C ' + '{repo} switch {work}"\n'
     assert _text_sites({"dadaia_workspace/public/s.py": script}) == [
