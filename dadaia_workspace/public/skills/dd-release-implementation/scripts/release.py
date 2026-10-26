@@ -139,7 +139,7 @@ def _phase(args: argparse.Namespace, specs: Path) -> int:
 
 
 def _drift(args: argparse.Namespace, specs: Path) -> int:
-    """The worklist over the window `memory` records: from the newest recorded bound HEAD reaches, else the root commit."""
+    """The worklist over the window `memory` records: from the newest earlier candidate's memory pass HEAD reaches, else the live IMPLEMENTATION commit, else the root commit."""
     report = drift.report(
         specs, drift.reach(specs.parent, window_start(specs.parent, live_release(specs)))
     )
@@ -148,7 +148,7 @@ def _drift(args: argparse.Namespace, specs: Path) -> int:
 
 
 def _memory(args: argparse.Namespace, specs: Path) -> int:
-    """Append the record over the ledger-derived window, refused unless its worklist was worked."""
+    """Append the record over the window `drift` reports, refused unless its worklist was worked."""
     live, ts = live_release(specs), utc_now()
     since = drift.reach(specs.parent, window_start(specs.parent, live))
     lists = [[s for s in getattr(args, n).split(",") if s] for n in ("reviewed", "changed")]

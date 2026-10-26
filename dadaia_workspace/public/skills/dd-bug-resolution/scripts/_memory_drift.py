@@ -127,11 +127,11 @@ def git(repo: Path, *argv: str) -> list[str]:
     return [line for line in out.split("\n") if line]
 
 
-def by_subject(repo: Path, version: str, rc: str, tail: str) -> str:
-    """The newest commit touching `specs/releases/<version>/` subjected `chore(release): <rc> <tail>` (*tail* a regex), else `""`: the one reader of a window bound."""
-    out = _git.git(repo, "log", "--format=%H %s", "--", f"specs/releases/{version}/", check=False)
-    pat = re.compile(rf"chore\(release\): {re.escape(rc)} {tail}\b")
-    return next((ln.split()[0] for ln in out.splitlines() if pat.match(ln.partition(" ")[2])), "")
+def by_subject(repo: Path, version: str, rc: str, tail: str) -> list[str]:
+    """Every commit touching `specs/releases/<version>` (every release when *version* is empty) subjected `chore(release): <rc> <tail>` (*rc* and *tail* regexes), newest first: the one reader of a window bound."""
+    out = _git.git(repo, "log", "--format=%H %s", "--", f"specs/releases/{version}", check=False)
+    pat = re.compile(rf"chore\(release\): {rc} {tail}\b")
+    return [ln.split()[0] for ln in out.splitlines() if pat.match(ln.partition(" ")[2])]
 
 
 def _root(repo: Path) -> str:

@@ -92,7 +92,8 @@ def table(root: Path, specs: Path, rc: str) -> str:
     if window:
         birth, prior, end, closed, newest = window
         version, _, n = rc.partition("-rc")
-        sha = by_subject(repo, version, f"rc-{n}", "(?:phase|enters) CLOSURE") if closed else None
+        closing = by_subject(repo, version, f"rc-{n}", "(?:phase|enters) CLOSURE")
+        sha = closing[0] if closed and closing else None
         row = context_row(root, repo) or {}
         name, integration = row.get("name"), (row.get("gitflow") or {}).get("integration")
         trees: dict[str, list[tuple[str, str]]] = {}

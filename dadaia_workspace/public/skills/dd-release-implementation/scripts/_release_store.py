@@ -21,6 +21,9 @@ from _refusal import Refusal
 from _release_check import state_findings
 from _release_schema import SCRIPT, State, UnreadableRelease, current_candidate, live_id, read_state
 
+PASS = "memory pass recorded"
+IMPLEMENTATION = "(?:phase|enters) IMPLEMENTATION"
+
 
 @dataclass(frozen=True)
 class Live:
@@ -47,11 +50,15 @@ def live_release(specs: Path) -> Live:
 
 
 def window_start(repo: Path, live: Live) -> list[str]:
-    """The memory window's start candidates, newest first: the newest commit of *repo* subjected
-    as the live candidate's memory pass, then as its IMPLEMENTATION phase."""
-    name = live.candidate.name if live.candidate else None
-    tails = ["memory pass recorded", "(?:phase|enters) IMPLEMENTATION"]
-    return [sha for t in tails if name and (sha := by_subject(repo, live.release_id, name, t))]
+    """The memory window's start candidates, newest first: the newest memory pass of any
+    candidate in any release except the live candidate's own passes in the live release
+    (product memory is one per repo; sync rebases what landed after an own pass under it),
+    then the live candidate's IMPLEMENTATION commit."""
+    if not live.candidate:
+        return []
+    name, own = live.candidate.name, by_subject(repo, live.release_id, live.candidate.name, PASS)
+    other = [sha for sha in by_subject(repo, "", r"rc-\d+", PASS) if sha not in own]
+    return [*other[:1], *by_subject(repo, live.release_id, name, IMPLEMENTATION)[:1]]
 
 
 def validated(state: State, rel: str) -> str:
