@@ -35,7 +35,7 @@ __all__ = ["main"]
 
 def main(argv: list[str] | None = None) -> int:
     use_utf8_stdio()
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     verbs = parser.add_subparsers(dest="verb", required=True)
     make = verbs.add_parser("new", help="open an rc, main, task, backlog or hotfix worktree")
     make.add_argument("repo")

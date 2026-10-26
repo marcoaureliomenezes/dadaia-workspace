@@ -67,7 +67,7 @@ def _mentions(text: str, bug_id: str) -> bool:
 
 
 def _parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     sub = parser.add_subparsers(dest="verb", required=True)
     for verb, help_text in _HELP.items():
         command = sub.add_parser(verb, help=help_text)

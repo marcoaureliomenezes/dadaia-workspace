@@ -43,7 +43,12 @@ from dadaia_workspace.core.exceptions import (
 from dadaia_workspace.core.specs_version import NO_TREE, state
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.backlog import doctor as backlog_doctor
-from dadaia_workspace.features.spec_context.doctor import DoctorService, workspace_rules
+from dadaia_workspace.features.spec_context.doctor import (
+    EXPIRE_STEPS,
+    REAP_STEPS,
+    DoctorService,
+    workspace_rules,
+)
 from dadaia_workspace.features.specs import SpecsDoctor, doctor_adr
 from dadaia_workspace.features.specs.doctor_types import finding_path
 from dadaia_workspace.features.specs.rules import RULES as SPECS_RULES
@@ -273,13 +278,18 @@ def doctor(
             "checks. Default: auto-detected from specs_dir/../dadaia_workspace/public/."
         ),
     ),
-    fix: bool = typer.Option(False, "--fix", help=render_fix_help()),
+    fix: bool = typer.Option(
+        False,
+        "--fix",
+        help=f"{render_fix_help()} Workspace repairs: {EXPIRE_STEPS}, then {REAP_STEPS}. "
+        "Afterwards it re-checks and reports residual issues.",
+    ),
     expired_only: bool = typer.Option(
         False,
         "--expired-only",
         help=(
             "Scope the run to the workspace TTL lane: the workspace section reports "
-            "only expired entries and --fix deletes only those and stale session records "
+            f"only expired entries and --fix only {EXPIRE_STEPS} "
             "— no slop move, no repo walk, no specs repairs (the SessionStart lane)."
         ),
     ),

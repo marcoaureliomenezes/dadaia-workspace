@@ -36,7 +36,7 @@ from _specs import CATALOG, find_specs, refuse
 
 
 def _parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     sub = parser.add_subparsers(dest="verb", required=True)
     catalog = sub.add_parser("catalog", help="the generated catalog").add_subparsers(
         dest="noun", required=True

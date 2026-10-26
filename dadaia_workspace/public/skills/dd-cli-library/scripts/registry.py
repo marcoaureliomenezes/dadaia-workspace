@@ -234,7 +234,9 @@ def cmd_scan(doc: dict[str, Any], args: argparse.Namespace, path: Path) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(prog="dd-cli-library/scripts/registry.py", description=__doc__)
+    p = argparse.ArgumentParser(
+        prog="dd-cli-library/scripts/registry.py", description=__doc__.split("\n\n")[0]
+    )
     p.add_argument(
         "--registry",
         type=Path,

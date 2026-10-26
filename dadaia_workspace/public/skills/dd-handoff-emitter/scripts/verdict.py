@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Write the reviewer's verdict handoff, bound to the sha and diff it judged."""
+"""Write the reviewer's verdict handoff, bound to the sha and diff it judged; `verdict.py stats <rc>` prints the readout."""
 
 from __future__ import annotations
 
@@ -97,7 +97,7 @@ def main(argv: list[str] | None = None) -> int:
 def _run(argv: list[str]) -> int:
     if argv[:1] == ["stats"]:
         return _stats(argv[1:])
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0], allow_abbrev=False)
+    parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0], allow_abbrev=False)
     parser.add_argument("path")
     parser.add_argument("--sha", required=True)
     parser.add_argument("--context", required=True)

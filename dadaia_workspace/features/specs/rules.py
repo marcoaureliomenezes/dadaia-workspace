@@ -140,8 +140,4 @@ def render_fix_help() -> str:
     The CODES only: ``fix_help`` is the one executable remediation command, not a
     description; every auto-fixable rule's command is this very flag."""
     parts = ", ".join("/".join(r.codes) for r in RULES if r.fix is not None)
-    return (
-        f"Apply auto-fixes for fixable issues ({parts}). "
-        "Every other invariant is warn/report-only and never auto-fixed. "
-        "After fixing, re-checks and reports residual issues."
-    )
+    return f"Apply auto-fixes for fixable issues ({parts})."

@@ -56,7 +56,7 @@ _HELP = {
 
 
 def _parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     sub = parser.add_subparsers(dest="verb", required=True)
     for verb, help_text in _HELP.items():
         command = sub.add_parser(verb, help=help_text)
