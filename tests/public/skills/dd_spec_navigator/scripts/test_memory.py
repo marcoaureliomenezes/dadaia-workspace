@@ -101,6 +101,46 @@ def test_catalog_generate_preserves_non_catalog_sections_verbatim(
     assert read_text(index).endswith("## Operator notes\n\nkept verbatim.\n")
 
 
+@pytest.mark.parametrize(
+    ("authored", "kept_before", "kept_after"),
+    [
+        ("# Mine\n\n## Authored\n\nkeep me.\n", "# Mine\n\n## Authored\n\nkeep me.\n\n", ""),
+        (
+            "# Mine\n\n## Feature catalog (generated)\n\nhand text.\n",
+            "# Mine\n\n## Feature catalog (generated)\n\nhand text.\n\n",
+            "",
+        ),
+        ("# Mine\n\n### Feature catalog\n\nsub.\n", "# Mine\n\n### Feature catalog\n\nsub.\n\n", ""),
+        (
+            "# Mine\n\n## Feature catalog\n\nSTALE row\n\n## Notes\n\nafter.\n",
+            "# Mine\n\n## Feature catalog\n\n",
+            "\n\n## Notes\n\nafter.\n",
+        ),
+    ],
+    ids=["no-heading", "longer-heading-line", "deeper-heading", "exact-heading"],
+)
+def test_catalog_generate_keeps_every_authored_line_and_owns_one_exact_section(
+    script: Path, specs: Path, authored: str, kept_before: str, kept_after: str
+) -> None:
+    index = specs / "memory" / "product" / "index.md"
+    write_text(index, authored)
+
+    assert _run(script, "catalog", "generate", "--specs", str(specs)).returncode == 0
+    text = read_text(index)
+    assert text.startswith(kept_before) and text.endswith(kept_after or "|\n")
+    assert text.count("\n## Feature catalog\n\n### ") == 1
+    assert "STALE" not in text
+    assert _run(script, "check", "--specs", str(specs)).returncode == 0
+
+
+def test_catalog_generate_writes_the_template_for_a_missing_index(script: Path, specs: Path) -> None:
+    index = specs / "memory" / "product" / "index.md"
+    index.unlink()
+
+    assert _run(script, "catalog", "generate", "--specs", str(specs)).returncode == 0
+    assert read_text(index).startswith("# Memory Catalog\n\n> Generated automatically")
+
+
 def test_check_passes_in_a_checkout_folder_not_named_after_the_repo(
     script: Path, specs: Path
 ) -> None:
