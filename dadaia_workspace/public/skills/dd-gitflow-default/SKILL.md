@@ -65,9 +65,10 @@ The branch contract by role; the names are `specs/constitution.md`'s `gitflow:` 
 | 5 | `wt-rc` (define) | Release definition, and a candidate's birth (`release.py new` writes `_RELEASE.json` and the SPEC stub in one transaction): `specs/releases/<v>/rc-<N>/*`, `specs/releases/<v>/_RELEASE.json` | `feat(specs): define candidate …` |
 | 6 | a task tree, or a `wt-backlog-<slug>` lane (the repo's `AGENTS.md` alone) | Task: its `W:` | `conventional-commit(<id>): description`, a REBUILD `refactor(<id>): REBUILD <unit> — …` |
 | 7 | `wt-hotfix-<bug-id>` | Specs revert, no code: the `specs/` paths of the culprit commit, put back | `Revert "<subject>"`; body `This reverts commit <sha>.` |
-| 8 | `wt-rc` (define) | SPEC and PLAN approval: `specs/releases/<v>/rc-<N>/{SPEC,PLAN}.md` | `docs(specs): …` |
+| 8 | `wt-rc` (define), a `wt-backlog-<slug>` lane on the operator's order | SPEC and PLAN approval: `specs/releases/<v>/rc-<N>/{SPEC,PLAN}.md`; the lane: `specs/constitution.md`, a `specs/AGENTS.md` re-render | `docs(specs): …` |
 | 9 | `wt-rc` (reconcile) | Memory pass and derived docs: `specs/memory/*`, `README.md`, `docs/*.md` | `docs(memory): …` |
 | 9 | the `wt-backlog-first-pass` lane | Memory pass: `specs/memory/*` | `docs(memory): …` |
+| 9 | a `wt-backlog-<slug>` lane on the operator's order | Canonical-memory rewrite: `specs/memory/ARCHITECTURE.md`, `specs/memory/QUALITY.md` | `docs(memory): …` |
 | 10 | `wt-rc` (define, reconcile), a `wt-backlog-<slug>` lane on the next work branch (§2 step 11, `ship`) | Release state: `specs/releases/<v>/_RELEASE.json` and `specs/releases/_archive/**`, only when [`RELEASE-EVENTS.md`](../dd-release-implementation/RELEASE-EVENTS.md) requires a current entry | `chore(release): …` |
 | 11 | the job tree that found the defect (`wt-main`) | Pure law or doc text that no program prints (a fix line, `--help` or a schema stays Arm B, shape 3): the file it corrects; no `BUGS.jsonl` record | `docs(law): <what>`; the body cites the finding; one review |
 | 12 | a `wt-task-<kkk>` or `wt-hotfix` tree | Code revert: the culprit commit's paths, put back | `Revert "<subject>"`; body `This reverts commit <sha>.` |
