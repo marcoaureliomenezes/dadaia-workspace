@@ -641,4 +641,4 @@ def test_the_next_step_names_a_fix_the_session_can_run(
     out = _run(tmp_path, "s", event="SessionStart")
 
     assert f"fix: {fix_line(tmp_path, *fix)}" in out, out
-    assert ("context bind" in out) is (fix[0] == "context"), out
+    assert (fix_line(tmp_path, "context", "bind", "alpha") in out) is (fix[0] == "context"), out
