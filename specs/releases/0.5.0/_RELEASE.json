@@ -2647,6 +2647,37 @@
         "agent-evals",
         "harness-codex"
       ]
+    },
+    {
+      "ts": "2026-10-26T08:37:52Z",
+      "agent": "release.py memory",
+      "kind": "memory",
+      "text": "Memory reconciled over 562c37889ff6e42f6ee794f774fbfca17550af84..7931bb2abb8b: 6 reviewed, 13 changed.",
+      "since": "562c37889ff6e42f6ee794f774fbfca17550af84",
+      "until": "7931bb2abb8b5443f738bf18dd729bbbc5b01c75",
+      "reviewed": [
+        "agent-orchestration",
+        "agentic-entities",
+        "public-asset-distribution",
+        "pypi-distribution",
+        "product-vision",
+        "audits-canon"
+      ],
+      "changed": [
+        "agent-comms",
+        "agent-evals",
+        "harness-codex",
+        "context-management",
+        "specs-migration",
+        "workspace-doctor",
+        "workspace-init",
+        "sdd-gate-v3",
+        "release-lifecycle",
+        "worktrees",
+        "cross-platform-portability",
+        "bug-ledger",
+        "spec-context-project"
+      ]
     }
   ]
 }
