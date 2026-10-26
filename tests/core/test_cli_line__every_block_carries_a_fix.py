@@ -417,6 +417,51 @@ _DEAD_RELEASE_VOCABULARY = re.compile(r"rc-archive|release\.py (fold|archive)|rc
 _NON_AUTHORITY_DONE = re.compile(r"memory\.py check`? exit 0")
 
 
+#: A stated ledger-script command: the script by path or scaffold variable and its verb, or its
+#: short name with a verb and arguments (a bare `release.py phase` only names a verb). These
+#: scripts resolve their tree through `find_specs`, so from the workspace root one with no
+#: `--specs` finds no specs tree; `--help` needs none.
+_LEDGER_COMMAND = re.compile(
+    r"(?:scripts/(?:backlog|audit|bugs|release|memory)\.py|\b(?:RELEASE|BACKLOG|MEMORY)_PY"
+    r"|scripts/verdict\.py(?= stats\b)) (?![-\s])\S"
+    r"|(?<![/\w])(?:backlog|audit|bugs|release|memory)\.py \S+ (?:(?!-)\S|[^<]*<)"
+)
+
+
+def _ledger_lines(text: str) -> list[int]:
+    """Lines of the stated ledger commands lacking `--specs`: a fenced line (indented or
+    not), or a code span of a paragraph (a span may wrap)."""
+    hits: list[int] = []
+    para: list[tuple[int, str]] = []
+    fenced = False
+
+    def bare(span: str) -> bool:
+        span = " ".join(span.split())
+        return bool(_LEDGER_COMMAND.search(span)) and "--specs" not in span and "--help" not in span
+
+    def flush() -> None:
+        body = "\n".join(line for _, line in para)
+        hits.extend(
+            para[0][0] + body.count("\n", 0, m.start())
+            for m in re.finditer(r"`([^`]+)`", body)
+            if bare(m.group(1))
+        )
+        para.clear()
+
+    for number, line in enumerate(text.splitlines(), start=1):
+        if line.lstrip().startswith("```"):
+            flush()
+            fenced = not fenced
+        elif fenced:
+            hits += [number] * bare(line)
+        elif line.strip():
+            para.append((number, line))
+        else:
+            flush()
+    flush()
+    return sorted(set(hits))
+
+
 def _text_rows(rel: str) -> list[Callable[[str], object]]:
     """The scans a tracked text file's lines take, by where it ships: the law (the shipped
     surface, product memory, the glossary) names no retired verb; what ships names no
@@ -449,6 +494,8 @@ def _text_sites(texts: dict[str, str]) -> list[str]:
             whole = fenced and rel.startswith("dadaia_workspace/public/") and _bad_command(line)
             if whole or any(row(line) for row in rows):
                 sites.append(f"{rel}:{number}")
+        if rel.startswith("dadaia_workspace/public/") and rel.endswith(".md"):
+            sites += [f"{rel}:{n}" for n in _ledger_lines(authored_text(text))]
     return sites
 
 
@@ -510,6 +557,18 @@ def test_the_scans_bite() -> None:
         "`.dadaia/.venv/bin/dadaia doctor --context x` and a bare `dadaia`\n"
         "the `rc-archive` verb\n"
     )
+    ledger = (
+        "`python3 .agents/skills/dd-backlog-definition/scripts/backlog.py check`\n"
+        "`python3 .agents/skills/dd-backlog-definition/scripts/backlog.py check --specs <specs-dir>`\n"
+        "`python3 .agents/skills/dd-bug-resolution/scripts/bugs.py append --help`\n"
+        "`python3 .agents/skills/dd-cli-library/scripts/registry.py list`\n"
+        "a wrapped `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py\nexit <slug>`\n"
+        "short `audit.py close <dir>` and `RELEASE_PY new` and `RELEASE_PY new --specs s` and `release.py phase`\n"
+        "   ```bash\n   python3 .agents/skills/dd-audit-project/scripts/audit.py close \\\n   ```\n"
+    )
+    assert _text_sites({"dadaia_workspace/public/l.md": ledger}) == [
+        f"dadaia_workspace/public/l.md:{n}" for n in (1, 5, 7, 9)
+    ]
     script = 'fix = git_line(repo, "switch", work)\nfix = f"git -C ' + '{repo} switch {work}"\n'
     assert _text_sites({"dadaia_workspace/public/s.py": script}) == [
         "dadaia_workspace/public/s.py:2"
