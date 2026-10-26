@@ -48,7 +48,7 @@ python3 .agents/skills/dd-release-implementation/scripts/release.py new "$V" --s
   virtualenv; every later command runs through the workspace's CLI,
   `.dadaia/.venv/bin/dadaia`, which `init` prints by its absolute path.
 - **Level 2 — project.** `--repo` clones the repo into `repos/<slug>/`, installs the
-  pre-push and reference-transaction hooks and makes the context (named after the slug) ALIVE; only `context bind`
+  pre-push and reference-transaction hooks and makes the context (named after the slug) ALIVE; `context bind`
   binds a session (*The bind*, below).
 - **Level 3 — specs.** 3a `specs init` brings the repo's `specs/` to the canon and, on a
   repo with no work branch, cuts the local one and commits only the scaffold on it; a foreign

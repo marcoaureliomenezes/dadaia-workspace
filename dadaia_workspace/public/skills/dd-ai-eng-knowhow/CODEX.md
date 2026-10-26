@@ -100,7 +100,7 @@ A protocol reference, not a doc mirror — the links in "Official reference inde
 
 | Guard | Rule |
 |---|---|
-| Read vs write | Parallel read is the safe default; parallel write needs disjoint allowlists + coordination |
+| Read vs write | Parallel read is the safe default; parallel write needs disjoint exact `W:` sets + coordination |
 | Same path family | Do not fan out parallel writes to the same path family; one implementer, one task owner |
 | SPEC ambiguity | Never fan out to resolve SPEC ambiguity — that is operator refinement |
 | Recursion depth | A subagent should not spawn another subagent except in exceptional cases |

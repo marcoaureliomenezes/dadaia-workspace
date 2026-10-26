@@ -104,6 +104,6 @@
 ## 7. Onboarding — three levels
 
 - Level 1 workspace: `uvx dadaia-workspace init [DIR]`; re-running it on an existing workspace is the upgrade.
-- Level 2 context: `.dadaia/.venv/bin/dadaia context create <name> --main-repo <url> [--associated-repo <url>]...` clones, hooks and marks ALIVE; only `.dadaia/.venv/bin/dadaia context bind <ctx>` binds a session.
+- Level 2 context: `.dadaia/.venv/bin/dadaia context create <name> --main-repo <url> [--associated-repo <url>]...` clones, hooks and marks ALIVE; `.dadaia/.venv/bin/dadaia context bind <ctx>` binds a session.
 - Level 3 specs: 3a `.dadaia/.venv/bin/dadaia specs init --context <ctx>`; 3b the `dd-audit-project` first pass, done when memory holds real content (never a stamp); 3c `.dadaia/.venv/bin/dadaia context baseline <ctx>` publishes.
 - Read the next step from `.dadaia/.venv/bin/dadaia doctor` (`ONBOARDING`) and SessionStart print it with its `fix:` line.

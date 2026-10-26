@@ -149,7 +149,6 @@ A decision surface, not a doc mirror — official docs are an on-demand index at
 - Narrow a subagent's surface with `tools:`/`disallowedTools:` rather than broad global allows.
 - Background subagents auto-deny anything that would prompt.
 - A blanket-allow layer is acceptable only when real enforcement lives in correctly-scoped hooks.
-- Gotcha: nothing enforces the per-persona write-allowlist.
 - Native frontmatter (`name`, `description`, `model`, `tools`, `skills`, `maxTurns`) is honored.
 
 ---

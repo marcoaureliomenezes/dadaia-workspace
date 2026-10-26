@@ -1,7 +1,7 @@
 ---
 name: dd-ai-eng-knowhow
 description: >
-  Use before reading or changing any persona, skill, rule, hook, AGENTS.md or MCP config: harness literacy, Claude Code/Codex deltas, the AUTHORING contract.
+  Use before changing or auditing any persona, skill, rule, hook, AGENTS.md or MCP config: harness literacy, Claude Code/Codex deltas, the AUTHORING contract. Not for reading law to do a task.
 compatibility: Standalone Agent Skill; the full lifecycle lives in a dadaia-workspace.
 ---
 

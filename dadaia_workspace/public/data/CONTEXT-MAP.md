@@ -71,7 +71,7 @@ One procedure each; a skill that touches a governed area opens its scoped law as
 
 ## 4. Personas — `.agents/agents/*.md`
 
-One file per persona. Each file's frontmatter declares its role, tools and model policy; the
+One file per persona. Each file's frontmatter declares its role and tools; the
 root map's Who does what table (`AGENTS.md`, Who does what) indexes them.
 
 | Surface | Mandate |
