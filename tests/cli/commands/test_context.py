@@ -410,6 +410,30 @@ def test_a_refused_bind_does_not_make_session_check_pass(
     assert _RELAUNCH in " ".join(result.output.split())
 
 
+@pytest.mark.parametrize("argv", [["bind", "myctx"], ["session-check"]])
+def test_a_refused_session_with_an_unreadable_record_names_doctors_fix(
+    workspace: Path, monkeypatch: pytest.MonkeyPatch, argv: list[str]
+) -> None:
+    """The record that does not read is what refuses the session: both verbs name doctor's
+    fix, the one act that clears it, never the relaunch."""
+    from dadaia_workspace.core import session_store
+    from dadaia_workspace.core.cli_line import fix_line
+
+    monkeypatch.setenv("CLAUDE_CODE_SESSION_ID", "sess_corrupt")
+    _register_alive_ctx(workspace)
+    write_text(
+        session_store.session_record_path(workspace, "sess_corrupt", create=True), "{not json"
+    )
+
+    result = _runner.invoke(app, ["context", *argv])
+
+    out = " ".join(result.output.split())
+    assert result.exit_code == 1, result.output
+    assert out.count("fix: ") == 1
+    assert f"fix: {fix_line(workspace, 'doctor', '--fix')}" in out
+    assert _RELAUNCH not in out
+
+
 def test_show_unbound_is_calm_in_both_modes(workspace: Path) -> None:
     """With no bind, `show --json` answers
     {"context": null} and human `show` prints a calm line — both exit 0, no traceback."""

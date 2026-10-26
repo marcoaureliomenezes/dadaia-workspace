@@ -17,7 +17,11 @@ from dadaia_workspace.core import clock, workspace_layout
 from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES
 from dadaia_workspace.core.platform import PLATFORM
-from dadaia_workspace.core.session_store import new_binding_record, write_session
+from dadaia_workspace.core.session_store import (
+    new_binding_record,
+    session_record_path,
+    write_session,
+)
 from dadaia_workspace.features.workspace.service import WorkspaceService
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
 from dadaia_workspace.infrastructure.python_env import VenvPythonEnvironmentManager
@@ -101,16 +105,21 @@ def test_doctor_names_the_onboarding_step_of_the_context_it_judges(
     [
         pytest.param(False, "fix: Operator action: relaunch the session at the workspace root", id="ungoverned-names-the-relaunch"),
         pytest.param(True, "", id="governed-unbound-binds"),
+        pytest.param(None, "doctor --fix", id="unreadable-record-names-doctors-fix"),
     ],
 )  # fmt: skip
 def test_doctor_names_the_bind_only_to_a_session_bind_accepts(
-    workspace: Path, monkeypatch: pytest.MonkeyPatch, live: bool, fix: str
+    workspace: Path, monkeypatch: pytest.MonkeyPatch, live: bool | None, fix: str
 ) -> None:
     """A subagent-harness session with no live record cannot bind: the step's fix is the
     relaunch; with a live record, that session binds."""
+    if live is None:
+        fix = f"fix: {fix_line(workspace, 'doctor', '--fix')}"
     fix = fix or f"fix: {fix_line(workspace, 'context', 'bind', 'app')}"
     _register_specless_context(workspace, "app")
     monkeypatch.setenv("CLAUDE_CODE_SESSION_ID", "sess-1")
+    if live is None:
+        write_text(session_record_path(workspace, "sess-1", create=True), "{not json")
     if live:
         write_session(
             workspace,
@@ -128,4 +137,5 @@ def test_doctor_names_the_bind_only_to_a_session_bind_accepts(
 
     assert "step bind" in result.output, result.output
     assert fix in result.output, result.output
-    assert ("context bind app" in result.output) == live, result.output
+    assert ("context bind app" in result.output) == bool(live), result.output
+    assert ("relaunch the session" in result.output) == (live is False), result.output
