@@ -96,6 +96,7 @@ def render(specs: Path, catalog: Catalog) -> str:
         (i for i in range(start + 1, len(lines)) if lines[i].lstrip().startswith("## ")),
         len(lines),
     )
-    head = ("".join(lines[:start]).rstrip("\n") + "\n\n").lstrip("\n")
+    head = "".join(lines[:start])
+    head = head.rstrip("\n") + "\n\n" if head and start == len(lines) else head
     text = "".join([head, f"{HEADING}\n\n{rendered}\n\n", *lines[end:]])
     return text.rstrip("\n") + "\n"
