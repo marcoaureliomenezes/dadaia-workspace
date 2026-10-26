@@ -133,8 +133,7 @@ def _refuse_branch(
         )
     head = gitflow.integration if role == "principal" else fixes.work
     return _blocked(
-        f"the {role} branch '{branch}' is never pushed directly — it advances only via a PR "
-        f"from '{head}'",
+        f"the {role} branch '{branch}' is never pushed directly — it advances only via a PR",
         act("agent", f"open a PR/MR from '{head}' into '{branch}' on your git host"),
     )
 

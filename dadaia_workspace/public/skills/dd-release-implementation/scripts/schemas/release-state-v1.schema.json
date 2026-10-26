@@ -112,7 +112,7 @@
           "description": "When this milestone was recorded."
         }
       },
-      "description": "Set once, at the integration->principal ship merge. null before that point."
+      "description": "Set once, at the promote merge. null before that point."
     },
     "log": {
       "type": "array",

@@ -25,7 +25,7 @@ The branch contract by role; the names are `specs/constitution.md`'s `gitflow:` 
 7. Implementation stage: one commit per task, shaped per §3a.
 8. Candidate closure, on the operator's explicit order (publication): open one work → integration PR and merge it green; before that order, "finish" means merged into the work branch.
 9. After the merge, the main thread asks the operator one question: **promote or continue?** — and, for promote, the next release `<id>` or none. Continue = the next candidate's `python3 .agents/skills/dd-release-implementation/scripts/release.py new <id>`; promote = step 10.
-10. Promote: open the PR integration → principal (the reviewer's `APPROVED` on the integration tip, §3b); its merge is the deploy.
+10. Promote: open the integration → principal PR and merge it (the reviewer's `APPROVED` on its head, §3b); the merge of the release PR the project's own release pipeline then opens into the principal is the deploy, else this one.
 11. After the promote PR merges, tag the work tip as `archive/<work-name>`; once the next release `<id>` is named (step 9), rename the work branch, never cut a new one: `git -C <repo> branch -m <work><old> <work><id>` (and its remote ref, when one exists: `git -C <repo> push -u origin <work><id> :<work><old>`). On it a `wt-backlog-<slug>` lane ships the release, its carry owned by `dd-release-implementation/RELEASE-EVENTS.md`, then the new candidate starts in its `wt-rc` (step 9). Until then work continues on the old-named branch; the rename carries every commit, the ship included, to the next work → integration PR.
 12. A `.dadaia/.venv/bin/dadaia worktree` tree and its branch complete under `worktrees/AGENTS.md` §2, which owns their merge and cleanup lifecycle.
 
@@ -37,7 +37,7 @@ The branch contract by role; the names are `specs/constitution.md`'s `gitflow:` 
 |---|---|---|---|
 | work `<work>M.m.p` | Yes — valid name (each `wt-rc` and hotfix merge into it ran `verify:`; no rerun before a push) | integration | its `wt-rc` and lane merges, and direct `specs/audits/**` commits |
 | integration | No — advances only by PR | principal (bootstrap only) | PR from the row above, one per candidate |
-| principal | No — advances only by PR | — | PR from the integration branch, at the final `rc` |
+| principal | No — advances only by PR | — | PR from the integration branch, or the release PR the project's own release pipeline opens |
 | rc `wt/<M.m.p>/rc-<N>/wt-rc` | Yes | work | its merge into the work branch (`worktrees/AGENTS.md` §2) |
 | job `wt/<M.m.p>/rc-<N>/job-<n>/wt-main` | Yes | its `wt-rc` | its merge into `wt-rc` (`worktrees/AGENTS.md` §2) |
 | task `wt/<M.m.p>/rc-<N>/job-<n>/wt-task-<kkk>` | No | its `wt-main` | its merge into `wt-main` (its task gate) |
