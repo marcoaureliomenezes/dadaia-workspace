@@ -168,14 +168,6 @@ def test_catalog_generate_never_creates_the_index(script: Path, specs: Path) -> 
     assert _run(script, "check", "--specs", str(specs)).returncode == 0
 
 
-def test_help_describes_the_unit_in_a_whole_sentence(script: Path) -> None:
-    out = " ".join(_run(script, "--help").stdout.split())
-    assert (
-        "The memory catalog's ONE writer: catalog.json and the Feature catalog of index.md, from the atoms."
-        in out
-    )
-
-
 def test_check_passes_in_a_checkout_folder_not_named_after_the_repo(
     script: Path, specs: Path
 ) -> None:

@@ -56,6 +56,7 @@ def test_fix_dispatch_and_help_derive_from_the_registry() -> None:
     for code in fixable:
         assert code in help_text, code
     assert "TREE-8" not in help_text, "TREE-8 is never auto-fixed (decision D8)"
+    assert "never auto-fixed" not in help_text
 
 
 def test_cli_fix_help_is_the_derived_text() -> None:
