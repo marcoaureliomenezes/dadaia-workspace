@@ -81,22 +81,21 @@ def _tables(catalog: Catalog) -> str:
 
 
 def render(specs: Path, catalog: Catalog) -> str:
-    """`index.md` as it should be: ONLY the catalog section's body is replaced (to the next
-    `## ` heading or EOF), so every other heading — and every derivable doc anchor — survives
-    verbatim; a missing file is written from the template. Exactly one trailing newline in
-    either branch: they once differed by a blank line at EOF, and `generate` over a file it
-    had just written disagreed with `check` forever."""
+    """`index.md` as it should be: ONLY the exact `## Feature catalog` section's body is
+    replaced (to the next `## ` heading or EOF); every other line survives verbatim, and an
+    index without the section gains it at the end. A missing file is written from the
+    template. Exactly one trailing newline: `generate` over a file it had just written must
+    agree with `check`."""
     path = specs / INDEX
-    existing = read_text(path) if path.is_file() else None
     rendered = _tables(catalog)
-    if existing and HEADING in existing:
-        lines = existing.splitlines(keepends=True)
-        start = next(i for i, line in enumerate(lines) if line.strip() == HEADING)
-        end = next(
-            (i for i in range(start + 1, len(lines)) if lines[i].lstrip().startswith("## ")),
-            len(lines),
-        )
-        text = "".join([*lines[:start], f"{HEADING}\n\n{rendered}\n\n", *lines[end:]])
-    else:
-        text = _TEMPLATE.format(heading=HEADING, tables=rendered)
+    if not path.is_file():
+        return _TEMPLATE.format(heading=HEADING, tables=rendered).rstrip("\n") + "\n"
+    lines = read_text(path).splitlines(keepends=True)
+    start = next((i for i, line in enumerate(lines) if line.strip() == HEADING), len(lines))
+    end = next(
+        (i for i in range(start + 1, len(lines)) if lines[i].lstrip().startswith("## ")),
+        len(lines),
+    )
+    head = ("".join(lines[:start]).rstrip("\n") + "\n\n").lstrip("\n")
+    text = "".join([head, f"{HEADING}\n\n{rendered}\n\n", *lines[end:]])
     return text.rstrip("\n") + "\n"
