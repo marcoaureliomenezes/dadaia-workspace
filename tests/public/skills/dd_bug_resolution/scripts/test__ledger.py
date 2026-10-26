@@ -278,6 +278,8 @@ def test_a_shared_disposition_requires_the_same_evidence_in_both_ledgers(
     assert set(rows) == set(dispositions)
     backlog = {word: flag for word, (flag, _verifier) in rows.items()}
     audit = script_table("dd-audit-project/scripts/_audit_check.py")
+    terminal = script_table("dd-backlog-definition/scripts/_backlog_schema.py", "TERMINAL")
+    assert set(TERMINAL_DISPOSITIONS) == set(terminal) | set(audit)
     shared = {w: (backlog[w], audit[w]) for w in backlog.keys() & audit.keys()}
     assert shared == {"superseded": ("release",) * 2, "rejected": ("reason",) * 2}
 
