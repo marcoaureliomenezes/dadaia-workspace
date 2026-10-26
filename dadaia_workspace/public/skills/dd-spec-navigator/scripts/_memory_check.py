@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""What a valid memory tree is HERE: the two generated files say what the atoms say.
+"""What a valid memory tree is HERE: the catalog says what the atoms say.
 
 The atoms' schema is the library lint's (the doctor's LINT-1, over this skill's one
-grammar) — this module is the generated-pair decider, and `catalog generate` validates
+grammar) — this module is the catalog decider, and `catalog generate` validates
 its own result against it, so the renderer and the checker cannot disagree.
 """
 
@@ -35,7 +35,7 @@ def check(specs: Path) -> list[Finding]:
             fix = act("agent", f"correct the source atom — {exc} (specs/memory/AGENTS.md: "
                       f"fix findings at the source atom, never in {CATALOG})")  # fmt: skip
         return [_findings.finding(CODE, CATALOG, 0, str(exc), fix)]
-    # the pair is regenerated, never hand-fixed: the fix line clears it
+    # the catalog is regenerated, never hand-fixed: the fix line clears it
     fix = script(Path(__file__).with_name("memory.py"))(
         "catalog", "generate", specs=specs.resolve()
     )
@@ -50,7 +50,7 @@ def check(specs: Path) -> list[Finding]:
         elif read_text(path) != rendered:
             out.append(
                 _findings.finding(
-                    CODE, name, 0, f"{path.name} does not match the atoms it is generated from", fix
+                    CODE, name, 0, f"the catalog in {path.name} does not match the atoms", fix
                 )
             )
     return out

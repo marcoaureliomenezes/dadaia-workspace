@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""The generated pair's ONE writer: `memory/product/<area>/*.md` frontmatter ->
-`catalog.json` and `index.md`.
+"""The catalog's ONE writer: `memory/product/<area>/*.md` frontmatter -> `catalog.json`
+and `index.md`'s `## Feature catalog`, the rest kept (`specs/memory/AGENTS.md` §Tree, format,
+validation).
 
-Both files are written in one act, so one module renders both: two renderers in two
-files were two writers of one fact, and the pair drifted apart between them.
+One module renders both, so the two cannot drift apart between two writers.
 
 `rank` is the position in sorted-path order — an enumeration aid, NOT a priority.
 `token_estimate` is COMPUTED (`word_count * 1.35`): a value both stored and derivable

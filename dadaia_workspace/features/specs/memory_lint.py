@@ -193,7 +193,7 @@ def lint_atom(md_path: Path, memory_dir: Path, schema: dict[str, Any]) -> AtomRe
 
 def lint_directory(memory_dir: Path, schema: dict[str, Any]) -> list[AtomResult]:
     """Lint the atoms of *memory_dir* and ``product/**`` — never AGENTS.md (a directory
-    contract) nor ``product/index.md`` (a generated TOC)."""
+    contract) nor ``product/index.md`` (its catalog is generated)."""
     product_dir = memory_dir / "product"
     atom_files = sorted(p for p in memory_dir.glob("*.md") if p.name != "AGENTS.md")
     if product_dir.is_dir():

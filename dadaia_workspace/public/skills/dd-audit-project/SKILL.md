@@ -29,8 +29,8 @@ The main thread refuses to write `AUDIT.md` until all three pillar sections are 
 
 - Applies while `.dadaia/.venv/bin/dadaia doctor`'s ONBOARDING next step is `first-pass`; its fix line lists the pending memory files.
 - Worklist: `python3 .agents/skills/dd-spec-navigator/scripts/memory.py drift --since <root commit> --specs repos/<slug>/specs` (root commit: `git -C repos/<slug> rev-list --max-parents=0 HEAD`) — every uncovered unit.
-- `dd-product-engineer` fills `ARCHITECTURE.md`, `QUALITY.md` and the product atoms from the code, and from `specs-bkp/` when present.
-- Done = every worklist line covered and `.dadaia/.venv/bin/dadaia doctor --context <ctx>` exit 0 (LINT-1 owns the atoms, `memory.py check` only the generated pair) — the next step moves to `publish`; the first pass opens no audit window.
+- `dd-product-engineer` fills `ARCHITECTURE.md`, `QUALITY.md`, the product atoms and `index.md`'s non-catalog sections (`specs/memory/AGENTS.md` §Tree, format, validation) from the code, and from `specs-bkp/` when present.
+- Done = every worklist line covered and `.dadaia/.venv/bin/dadaia doctor --context <ctx>` exit 0 (LINT-1 owns the atoms, `memory.py check` only the catalog) — the next step moves to `publish`; the first pass opens no audit window.
 
 ## 4. Done when
 

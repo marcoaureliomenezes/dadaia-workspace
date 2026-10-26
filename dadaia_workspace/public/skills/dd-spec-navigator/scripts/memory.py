@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""The memory catalog's ONE writer — `specs/memory/product/{catalog.json,index.md}` and
-the atoms they are generated from, stdlib only.
+"""The memory catalog's ONE writer — `specs/memory/product/catalog.json` and the
+`## Feature catalog` of `index.md`, from the atoms, stdlib only.
 
-``memory.py <verb> --specs <path>``. `catalog generate` rewrites both generated files
+``memory.py <verb> --specs <path>``. `catalog generate` rewrites that catalog
 from the atoms' frontmatter in one act; `drift` reports what a commit window left stale
-and what code no atom covers; `check` reports where the pair drifted from the atoms.
+and what code no atom covers; `check` reports where the catalog drifted from the atoms.
 """
 
 from __future__ import annotations
@@ -36,13 +36,13 @@ from _specs import CATALOG, find_specs, refuse
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     sub = parser.add_subparsers(dest="verb", required=True)
-    catalog = sub.add_parser("catalog", help="the generated catalog pair").add_subparsers(
+    catalog = sub.add_parser("catalog", help="the generated catalog").add_subparsers(
         dest="noun", required=True
     )
-    generate = catalog.add_parser("generate", help="rewrite catalog.json and index.md")
+    generate = catalog.add_parser("generate", help="rewrite catalog.json and the index catalog")
     drift = sub.add_parser("drift", help="what a commit window left stale, and what no atom covers")
     drift.add_argument("--since", required=True, help="the window start: a commit sha")
-    validate = sub.add_parser("check", help="validate the generated pair against the atoms")
+    validate = sub.add_parser("check", help="validate the catalog against the atoms")
     for command in (drift, validate):
         command.add_argument("--json", action="store_true", help="emit the result as JSON")
     for command in (generate, drift, validate):
