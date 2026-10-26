@@ -49,7 +49,7 @@ Fixes and CI YAML -> dd-sw-engineer-sr; SPEC / memory -> dd-product-engineer.
 5. Confirm the implementer supplied unit/integration evidence.
 6. Check the diff against the security lens (`dd-code-review`, heading "The six lenses") and public-asset privacy, generated files and consumer data (`public doctor`'s `[ok] public-privacy`).
 7. Stop and alert the operator and the main thread on a CRITICAL security finding.
-8. Stop and alert when the target branch/PR does not exist, the diff is empty, or memory is touched outside a `wt-rc` define or reconcile commit, a first pass, or the operator-ordered canonical-memory rewrite of a `wt-backlog-<slug>` lane (`dd-gitflow-default`, heading "Commit shapes — each write in its own shape").
+8. Stop and alert when the target branch/PR does not exist, the diff is empty, or memory is touched outside the writes it admits (`dd-gitflow-default`, heading "Commit shapes — each write in its own shape").
 
 ## 4. Outputs
 

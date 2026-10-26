@@ -118,7 +118,7 @@ The documentation is the repository's [docs folder](https://github.com/marcoaure
 ## 1. The flow
 
 - Classify every demand: Arm A (feature) or Arm B (bug); state the arm before acting.
-- Arm A: `demand -> backlog -> as-is review -> release candidate (SPEC/PLAN/job files) -> implementation + review -> memory -> closure -> promote by merging the release PR`.
+- Arm A: `demand -> backlog -> as-is review -> release candidate (SPEC/PLAN/job files) -> implementation + review -> memory -> closure -> promote` (`dd-gitflow-default`, step 10).
 - Arm B: `propose -> operator confirms -> register -> lowest-level RED test -> root-cause fix -> GREEN -> resolved`.
 - Test: does the tool break its own contract? Yes -> Arm B. No -> Arm A.
 - A feature enters only through the backlog or an operator demand recorded in the SPEC `Origin`; a confirmed bug is fixed per `specs/bugs/AGENTS.md` (Resolution).
