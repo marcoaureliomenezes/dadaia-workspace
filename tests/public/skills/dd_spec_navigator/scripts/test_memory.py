@@ -1,6 +1,6 @@
 """dd-spec-navigator/scripts/memory.py owns specs/memory/product/
 {index.md,catalog.json} and NOTHING else: its grammar is the atoms' one grammar, the
-schema is the library lint's (LINT-1), so `check` compares the generated pair against
+schema is the library lint's (LINT-1), so `check` compares the catalog against
 the atoms and there is no atom generator. Size: SMALL.
 
 The byte-reproduction case is the anti-drift one: the script regenerates THIS repo's
@@ -179,7 +179,7 @@ def test_check_passes_in_a_checkout_folder_not_named_after_the_repo(
 
 def test_check_ignores_frontmatter_the_library_lint_owns(script: Path, specs: Path) -> None:
     """A tldr over the schema ceiling is LINT-1's
-    finding over the one grammar's dict; `check` reports only the generated pair."""
+    finding over the one grammar's dict; `check` reports only the catalog."""
     assert _run(script, "check", "--specs", str(specs)).returncode == 0
 
     atom = next((specs / "memory" / "product").glob("*/*.md"))
@@ -206,19 +206,18 @@ def test_check_flags_a_catalog_that_drifted_from_the_atoms(script: Path, specs: 
     result = _run(script, "check", "--specs", str(specs))
 
     assert result.returncode == 1
-    assert "catalog.json" in result.stdout
+    assert "the catalog in catalog.json does not match the atoms" in result.stdout
 
 
 def test_check_flags_an_index_that_drifted_from_the_atoms(script: Path, specs: Path) -> None:
-    """Both halves of the generated pair are checked — index.md is not the catalog's
-    shadow, it is the second file `catalog generate` writes in the same act."""
+    """The index's `## Feature catalog` is checked beside catalog.json."""
     index = specs / "memory" / "product" / "index.md"
     write_text(index, read_text(index).replace("| `agent-comms` |", "| `agent-coms` |", 1))
 
     result = _run(script, "check", "--specs", str(specs))
 
     assert result.returncode == 1
-    assert "index.md" in result.stdout
+    assert "the catalog in index.md does not match the atoms" in result.stdout
 
 
 def test_a_drifted_pair_names_the_generator_as_its_fix(

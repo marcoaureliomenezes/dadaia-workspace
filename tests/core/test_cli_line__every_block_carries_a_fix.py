@@ -413,7 +413,7 @@ def _bad_command(text: str) -> bool:
 
 #: Dead law words: retired release verbs and retired release-candidate shapes.
 _DEAD_RELEASE_VOCABULARY = re.compile(r"rc-archive|release\.py (fold|archive)|rc-N|resolve` carrying")  # fmt: skip
-#: `memory.py check` decides only the generated catalog pair; LINT-1 owns the atoms.
+#: `memory.py check` decides only the catalog; LINT-1 owns the atoms.
 _NON_AUTHORITY_DONE = re.compile(r"memory\.py check`? exit 0")
 
 
