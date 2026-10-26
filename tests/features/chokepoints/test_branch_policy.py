@@ -128,11 +128,11 @@ def _birth_fix(tip: str, role: str) -> list[str]:
 
 # fmt: off
 @pytest.mark.parametrize(("flow", "scenario", "named", "fix"), [
-    pytest.param(_D, lambda r, f: _line(f.integration, remote_sha=_B), "'{integration}'", _PR_TO_INTEGRATION, id="default-integration-is-PR-only"),
-    pytest.param(_C, lambda r, f: _line(f.integration, remote_sha=_B), "'{integration}'", _PR_TO_INTEGRATION, id="custom-integration-is-PR-only"),
-    pytest.param(_D, lambda r, f: _line(f.principal, remote_sha=_B), "'{principal}'", _PR_TO_PRINCIPAL, id="default-principal-is-PR-only"),
-    pytest.param(_C, lambda r, f: _line(f.principal, remote_sha=_B), "'{principal}'", _PR_TO_PRINCIPAL, id="custom-principal-is-PR-only"),
-    pytest.param(_D, lambda r, f: f"refs/tags/v1 {_A} refs/heads/{f.principal} {_B}", "'{principal}'", _PR_TO_PRINCIPAL, id="a-local-tag-onto-the-principal-is-PR-only"),
+    pytest.param(_D, lambda r, f: _line(f.integration, remote_sha=_B), "'{integration}' is never pushed directly — it advances only via a PR (", _PR_TO_INTEGRATION, id="default-integration-is-PR-only"),
+    pytest.param(_C, lambda r, f: _line(f.integration, remote_sha=_B), "'{integration}' is never pushed directly — it advances only via a PR (", _PR_TO_INTEGRATION, id="custom-integration-is-PR-only"),
+    pytest.param(_D, lambda r, f: _line(f.principal, remote_sha=_B), "'{principal}' is never pushed directly — it advances only via a PR (", _PR_TO_PRINCIPAL, id="default-principal-is-PR-only"),
+    pytest.param(_C, lambda r, f: _line(f.principal, remote_sha=_B), "'{principal}' is never pushed directly — it advances only via a PR (", _PR_TO_PRINCIPAL, id="custom-principal-is-PR-only"),
+    pytest.param(_D, lambda r, f: f"refs/tags/v1 {_A} refs/heads/{f.principal} {_B}", "'{principal}' is never pushed directly — it advances only via a PR (", _PR_TO_PRINCIPAL, id="a-local-tag-onto-the-principal-is-PR-only"),
     pytest.param(_D, _birth_with_commit("principal", "integration"), "", _birth_fix("integration", "principal"), id="default-M2-principal-birth-carrying-a-commit"),
     pytest.param(_C, _birth_with_commit("principal", "integration"), "", _birth_fix("integration", "principal"), id="custom-M2-principal-birth-carrying-a-commit"),
     pytest.param(_D, _birth_with_commit("integration", "principal"), "", _birth_fix("principal", "integration"), id="default-M2-integration-birth-carrying-a-commit"),
