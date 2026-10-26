@@ -23,7 +23,7 @@ An append authors the immutable core. Every later change uses the disposition ve
 2. Move a finding with:
 
    ```bash
-   python3 .agents/skills/dd-audit-project/scripts/audit.py disposition \
+   python3 .agents/skills/dd-audit-project/scripts/audit.py disposition --specs <specs-dir> \
      <audit> <finding-id> --disposition <terminal-disposition> \
      [--release <id>] [--reason <reason>]
    ```
@@ -31,5 +31,5 @@ An append authors the immutable core. Every later change uses the disposition ve
 3. The finding schema defines dispositions and their required evidence. A later
    disposition replaces only the finding's governance triple; its immutable fields
    remain unchanged.
-4. `audit.py close <audit> --sha <window-end>` refuses while any finding is `open`, then
+4. `audit.py close <audit> --sha <window-end> --specs <specs-dir>` refuses while any finding is `open`, then
    appends one audit-history record and deletes the live directory.

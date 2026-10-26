@@ -51,5 +51,5 @@ line here and `--help` disagree, `--help` wins.
 
 ## References
 
-- `dd-bug-registration` — the ask-first proposal a genuine bug takes before `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py append`.
+- `dd-bug-registration` — the ask-first proposal a genuine bug takes before `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py append --specs <specs-dir>`.
 - `dd-handoff-emitter` — emit/validate the final handoff.

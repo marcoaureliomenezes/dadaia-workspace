@@ -12,7 +12,7 @@ description: >
 
 1. Open `specs/backlog/AGENTS.md` (the area's scoped law) and follow it.
 2. Before `backlog.py new`, read the main thread's `dd-grill-me` backlog-stage handoff (`dd-grill-me`'s `references/backlog.md`).
-3. Write inside the `wt-backlog-<slug>` lane the main thread opened (`worktrees/AGENTS.md` §1). Append via `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py new <slug> --title "…" --description "…" --provenance "<operator words or intake item + date>" --relates <slugs>|none`; validate via `.dadaia/.venv/bin/dadaia doctor` (`ledgers`
+3. Write inside the `wt-backlog-<slug>` lane the main thread opened (`worktrees/AGENTS.md` §1). Append via `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py new <slug> --title "…" --description "…" --provenance "<operator words or intake item + date>" --relates <slugs>|none --specs <specs-dir>`; validate via `.dadaia/.venv/bin/dadaia doctor` (`ledgers`
    section).
 
 ## Continuous curation
@@ -37,7 +37,7 @@ description: >
 ## Pick and dispositions
 
 - Pick and exit: `specs/backlog/AGENTS.md` §5. The exit command: `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py exit <slug> --disposition
-  <disposition> [--release <id>] [--reason <text>]` — one histo
+  <disposition> [--release <id>] [--reason <text>] --specs <specs-dir>` — one histo
   record, refused on a second exit (`dd-release-implementation` RC-FLOW step 4).
 
 ## Done when

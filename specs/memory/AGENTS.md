@@ -31,9 +31,9 @@ Memory is current product truth: what the product is now, never how it got there
 ## 4. Tree, format, validation
 
 - `MEMORY_PY` = `python3 .agents/skills/dd-spec-navigator/scripts/memory.py`.
-- `MEMORY_PY catalog generate` writes `catalog.json` and `index.md`'s `## Feature catalog` only; the first pass and each closure memory pass write its other sections from the code; `MEMORY_PY check` (`LEDGER-MEMORY-SCHEMA`) fails when that catalog differs from the atoms.
+- `MEMORY_PY catalog generate --specs <specs-dir>` writes `catalog.json` and `index.md`'s `## Feature catalog` only; the first pass and each closure memory pass write its other sections from the code; `MEMORY_PY check --specs <specs-dir>` (`LEDGER-MEMORY-SCHEMA`) fails when that catalog differs from the atoms.
 - Frontmatter `memory-frontmatter-v1`, applied by `LINT-1`: `slug`, `title`, `tldr`, `summary`, `tags` on every atom, `sources` on every product atom; a stray field is a hard error.
 - Body: curated headings only; `[[slug]]` wikilinks resolve by slug, never a path; no history heading, and no history line — a date or a release, candidate, task or FR id anywhere, or a history phrase in a product atom, is a `LINT-1` history-line error.
-- Fix findings at the source atom; regenerate `catalog.json` with `MEMORY_PY catalog generate`.
+- Fix findings at the source atom; regenerate `catalog.json` with `MEMORY_PY catalog generate --specs <specs-dir>`.
 
 Generated from this release's scaffold image. Project teams may customize this file; `.dadaia/.venv/bin/dadaia doctor` reports drift instead of overwriting it.

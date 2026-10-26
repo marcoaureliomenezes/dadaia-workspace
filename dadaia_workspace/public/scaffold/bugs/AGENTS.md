@@ -20,7 +20,7 @@ Scope: this file governs only `specs/bugs/`.
 - The block list, closed: (1) the work branch's `verify:` line is red, or merging the change would turn the work branch's CI red; (2) a Stall; (3) the running task cannot deliver its AC;
   (4) a security finding; (5) data loss or corruption.
 - Any confirmed bug in code the work branch holds takes a `<v>/wt-hotfix-<bug-id>` lane (`worktrees/AGENTS.md` §1–2), in any phase, landing before any other merge, then `worktree sync`.
-- After `release.py phase CLOSURE`, a fix to code that exists only on the `wt-rc` lands in that rc only for a block-list bug; any other confirmed bug there, REBUILD or operator demand is a job of the next rc, which opens at once. A block-list bug in that code takes the `wt-rc`: its registration, `test(` commit, fix, `bugs.py update` and `resolve` are commits there, under its merge's `verify:` and `APPROVED` verdict; its `test(` and fix commits name `block: <item>`, the only path that requires it; no SPEC amendment.
+- After `release.py phase CLOSURE --specs <specs-dir>`, a fix to code that exists only on the `wt-rc` lands in that rc only for a block-list bug; any other confirmed bug there, REBUILD or operator demand is a job of the next rc, which opens at once. A block-list bug in that code takes the `wt-rc`: its registration, `test(` commit, fix, `bugs.py update` and `resolve` are commits there, under its merge's `verify:` and `APPROVED` verdict; its `test(` and fix commits name `block: <item>`, the only path that requires it; no SPEC amendment.
 - Every other confirmed bug becomes explicit candidate scope. Ship refuses an open bug unless
   the operator authorizes that exact id; the authorization is recorded verbatim and the bug remains open for the next candidate.
 - A fix whose `caused_by` names a culprit, a bug's fix or a feature task, or that lands on a unit already fixed in the window, is the REBUILD of that unit in the same lane, keeping its tests, under `refactor(bugs): <id> — REBUILD <unit>`; review refuses a `fix(bugs)` label there.
@@ -37,7 +37,7 @@ Scope: this file governs only `specs/bugs/`.
 
 ## 4. Authoring rules
 
-- Register a new bug with `bugs.py append --bug-id <slug> --title ... --severity ...` and the remaining required flags.
+- Register a new bug with `bugs.py append --specs <specs-dir> --bug-id <slug> --title ... --severity ...` and the remaining required flags.
 - Every record change is one governance verb; `bugs.py --help` lists them.
 - `status` and `closed_at` change only through the three terminal transitions (`resolve`, `supersede`, `reject`), never through `--set`.
 

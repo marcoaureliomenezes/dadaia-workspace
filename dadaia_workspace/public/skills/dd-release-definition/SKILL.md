@@ -14,7 +14,7 @@ description: >
 ## 1. Pick the set
 
 1. Open `specs/releases/AGENTS.md` (the area's scoped law) and follow it.
-2. Inspect `specs/bugs/BUGS.jsonl` via `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py status`/`stats`, each with `--specs <specs-dir>`; read the prior candidate's `## Bug window review` and the ledger slice of `.agents/skills/dd-bug-resolution/LINEAGE.md` §The window and §The filter.
+2. Inspect `specs/bugs/BUGS.jsonl` via `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py status --specs <specs-dir>`/`stats --specs <specs-dir>`; read the prior candidate's `## Bug window review` and the ledger slice of `.agents/skills/dd-bug-resolution/LINEAGE.md` §The window and §The filter.
 3. Read `specs/backlog/BACKLOG.json`'s `active[]`; audit each entry before scheduling it (gain, cost, trade-offs, product fit, no new gate, no layer on an existing feature) and take open doubts to the grill.
 4. Each undispositioned `specs/audits/**` finding enters the SPEC's Origin as `findings:<id>`.
 5. Name the SPEC's `**Origin:**` per `specs/releases/AGENTS.md` §Authoring rules.
@@ -60,7 +60,7 @@ Before the SPEC or any ADR, the main thread runs `dd-grill-me` on the picked set
 
 1. Author the SPEC (Draft) after the grill: the picked set, its acceptance, every `superseded_by` link.
 2. Definition runs in the rc's `wt-rc` tree, its first commits (`worktrees/AGENTS.md` §The tree); the files' place is the releases law's.
-3. Commit shape 5 (`dd-gitflow-default` §Commit shapes — each write in its own shape); after the operator approves SPEC and PLAN, `release.py phase IMPLEMENTATION` sets `defined` (`dd-release-implementation`'s `RELEASE-EVENTS.md`).
+3. Commit shape 5 (`dd-gitflow-default` §Commit shapes — each write in its own shape); after the operator approves SPEC and PLAN, `release.py phase IMPLEMENTATION --specs <specs-dir>` sets `defined` (`dd-release-implementation`'s `RELEASE-EVENTS.md`).
 4. SPEC states the pick's wave ranking unprompted; SPEC says what; PLAN opens with the As-is review (this skill's As-is review) and draws the rc's DAG of jobs — Job 1 first (the reconcile is the `wt-rc`'s last commits, `dd-release-implementation`'s `RC-FLOW.md` step 4), an edge where one job needs another's merge; SPEC carries `Replaces` — one bullet per current behaviour a DELETE/REBUILD row removes, or `none` with its reason.
 5. SPEC in the repo's existing domain names; only FR, AC and `J<n>.T<k>` numbered; each AC names its test level (unit, integration, E2E, or no test with its reason); sizes per the releases law.
 6. After the PLAN, only for a technical decision past the threshold, run `dd-grill-me` with its `references/plan.md`.

@@ -35,7 +35,7 @@ A milestone or memory-window bound is found from its commit subject line, as a f
 
 | Milestone | Command | Written shape |
 |---|---|---|
-| candidate birth | `release.py new <id>` | `phase: DEFINITION` plus a `note` |
-| definition | `release.py phase IMPLEMENTATION` | `defined: {ts}` plus a `milestone` |
-| implementation | `release.py phase CLOSURE` | `implemented: {ts}` plus a `milestone` |
-| ship | `release.py ship [--pr <n>]` | `shipped: {pr, ts}`, then archive |
+| candidate birth | `release.py new <id> --specs <specs-dir>` | `phase: DEFINITION` plus a `note` |
+| definition | `release.py phase IMPLEMENTATION --specs <specs-dir>` | `defined: {ts}` plus a `milestone` |
+| implementation | `release.py phase CLOSURE --specs <specs-dir>` | `implemented: {ts}` plus a `milestone` |
+| ship | `release.py ship [--pr <n>] --specs <specs-dir>` | `shipped: {pr, ts}`, then archive |

@@ -46,7 +46,7 @@ description: >
 - Current step (`RC-FLOW.md`) identified before attempting its unlock action.
 - Self-check before every hand-back: run the repo's `verify:` line and the test directories the change reaches, then read your own `git diff <base>...HEAD` for removed assertions, newly skipped tests, hand-typed fix-line labels, platform literals in assertions and the sweep greps the job file names; a hit is fixed or reported, never handed back silently.
 - The hand-back carries evidence per item, extending the engineer's evidence line: the consumer sweep for a changed grammar, format, public name or fix line (other repos as a count, never by name) and evidence for each QA-lens item of `dd-code-review` §The six lenses; old asserts follow the root map §The flow test line; a bare PASS goes back unreviewed.
-- At candidate closure: the `wt-rc` carrying the reconcile merged (`RC-FLOW.md` step 4) -> candidate PR -> the promote-or-continue gate; the main thread's closure report to the operator carries the batch of `dd-manager-orchestration` (Conflict resolution, step 4) and the readout table of `python3 .agents/skills/dd-handoff-emitter/scripts/verdict.py stats <M.m.p>-rc<N>`.
+- At candidate closure: the `wt-rc` carrying the reconcile merged (`RC-FLOW.md` step 4) -> the candidate PR (`dd-gitflow-default` step 8) -> the promote-or-continue gate; the main thread's closure report to the operator carries the batch of `dd-manager-orchestration` (Conflict resolution, step 4) and the readout table of `python3 .agents/skills/dd-handoff-emitter/scripts/verdict.py stats <M.m.p>-rc<N> --specs <specs-dir>`.
 
 ## 4. References
 

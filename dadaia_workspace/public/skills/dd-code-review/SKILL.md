@@ -79,7 +79,7 @@ One reviewer, six checklists applied on every verdict; the engineer anticipates 
 - **QA, platform and claims** — the diff holds on Windows, platform facts read from one module; each negative claim in a verdict carries its grep and hit count; a new assert holds no platform literal and a child process copies the parent's env; the verdict names its platform proof.
 - **QA, visual and format** — a visual change is judged by the implementer's screenshot, framed on the reported symptom and taken after a server restart and a cache clear, which the reviewer checks against each layer that renders there; a changed grammar, format, stamp, fix line or public name is grepped across every repo of the context, and each consumer it breaks is HIGH.
 - **Product** — the diff matches SPEC scope; memory atoms still tell the truth (`.agents/skills/dd-release-implementation/MEMORY-UPDATE.md`).
-- **Audit** — `dd-audit-project` pillars over the window, `SLOP.md` S1-S14 in pillar 2; findings, never fixes.
+- **Audit** — `dd-audit-project` pillars over the window, its Slop readout (`PILLAR-SPECS.md`); findings, never fixes.
 - **AI surface** — every agent, skill, rule or hook change satisfies the fifteen rules of `.agents/skills/dd-ai-eng-knowhow/AUTHORING.md`.
 
 ## 7. References
