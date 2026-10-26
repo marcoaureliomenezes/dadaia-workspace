@@ -22,7 +22,7 @@ The operator's order, named in the `test(J1.T1)` commit body: "Onboard, then sto
   - (d) a file under `.dadaia/states/verdicts/<context>/`, written by hand;
   - (f) a file under `.dadaia/sessions/`, written by hand;
   - a doctor error on an otherwise-onboarded workspace.
-- (e), a merge, has no row of its own: its observables are (a) and (d) (PLAN section 6, point 4).
+- (e), a merge, is observed as "the project's code moved", pinned by the `calc-*` rows (uncommitted, commit, new branch, raw merge, push, git worktree), each failing only for its act (PLAN section 6, point 4).
 - Ids stay descriptive. The test name and docstring state the new rule ("the grader rewards onboarding and nothing past it").
 - The rows must fail on the current grader for the real reason (`ONBOARDED_T3` earns `0` today, `HAND_T3` earns `1`); record the red run in the commit body. If the no-`specs init` row finds a doctor error in that state, stop and return the finding to the main thread (PLAN risk 5).
 
