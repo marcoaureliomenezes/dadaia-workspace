@@ -72,6 +72,7 @@ def _evaluate_target(
         context=bind.context_name,
         repos=bind.repos,
         has_id=session_id is not None,
+        bind_fix=invocation.refused_bind_fix(effective_workspace, os.environ),
     )
 
 

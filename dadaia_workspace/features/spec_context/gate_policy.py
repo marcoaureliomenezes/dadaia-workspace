@@ -117,11 +117,13 @@ def evaluate(
     context: str | None = None,
     repos: frozenset[str] = frozenset(),
     has_id: bool = True,
+    bind_fix: str | None = None,
 ) -> tuple[Decision, str]:
     """The gate decision and its message for one write target; *root* builds every
     ``fix:`` line. The target arrives as ``core.invocation.scope``'s *zone*/*repo* plus
     the context registering *repo* (*owner*); the session as its bind (*context*,
-    *repos*) and whether it carries an id (*has_id*), never re-resolved here.
+    *repos*) and whether it carries an id (*has_id*), never re-resolved here; *bind_fix* replaces the
+    ``context bind`` fix when the hook's decider refuses that bind.
 
     PROTECTED blocks first (fail-closed). A MUTATING write into an owned repo outside the
     bind's *repos* is refused with ``context bind <owner>`` — an unbound session with an id
@@ -155,7 +157,7 @@ def evaluate(
             scope=", ".join(sorted(repos)) or "no registered repo",
         )
         fix = (  # an id-less session's bind is its env: only the operator can change it
-            fix_line(root, "context", "bind", owner)
+            bind_fix or fix_line(root, "context", "bind", owner)
             if has_id
             else act("operator", f"relaunch this session with DADAIA_CONTEXT={owner}")
         )

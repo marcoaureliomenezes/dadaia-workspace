@@ -15,12 +15,12 @@ from pathlib import Path
 from typing import Literal
 
 from dadaia_workspace.core import context_registry, platform, workspace_resolver
-from dadaia_workspace.core.cli_line import cli_words
+from dadaia_workspace.core.cli_line import cli_words, fix_line
 from dadaia_workspace.core.exceptions import SpecsDirUnresolvedError
 from dadaia_workspace.core.harness_registry import HARNESS_RECORDS
 from dadaia_workspace.core.models.spec_context import CONTEXT_NAME_RE
 from dadaia_workspace.core.platform import act
-from dadaia_workspace.core.session_store import live_session
+from dadaia_workspace.core.session_store import is_unreadable, live_session
 
 __all__ = [
     "CONTEXT_NAME_RE",
@@ -30,7 +30,9 @@ __all__ = [
     "Zone",
     "all_repos",
     "alive_context_trees",
+    "RELAUNCH",
     "governed",
+    "refused_bind_fix",
     "context_name_for_repo_slug",
     "repo_owner",
     "repo_slug_for_context",
@@ -94,6 +96,10 @@ def resolve_session_id(env: Mapping[str, str], payload_id: str | None = None) ->
     return sanitize_session_id(candidate)
 
 
+#: The fix of a refusal for a session no workspace hook governs.
+RELAUNCH = act("operator", "relaunch the session at the workspace root")
+
+
 def governed(root: Path, env: Mapping[str, str]) -> bool:
     """True unless *env* carries the session id of a harness whose registry row names a subagent
     and no live record of that session (under :func:`resolve_session_id`) sits under *root*: the
@@ -105,6 +111,18 @@ def governed(root: Path, env: Mapping[str, str]) -> bool:
         for var in rec.session_env
     )
     return not judged or live_session(root, resolve_session_id(env)) is not None
+
+
+def refused_bind_fix(root: Path, env: Mapping[str, str]) -> str | None:
+    """The fix of a ``context bind`` that :func:`governed` refuses for *env*'s session: ``None``
+    when governed; doctor's ``--fix`` when its record file exists and does not read; else the
+    relaunch."""
+    if governed(root, env):
+        return None
+    session = resolve_session_id(env)
+    return (
+        fix_line(root, "doctor", "--fix") if session and is_unreadable(root, session) else RELAUNCH
+    )
 
 
 def _alive(entry: dict[str, object]) -> bool:

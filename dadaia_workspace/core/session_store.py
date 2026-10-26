@@ -65,6 +65,14 @@ def write_session(workspace: Path, session_id: str, record: dict[str, object]) -
     atomic_write(path, json.dumps(record, indent=2), ensure_parent=True)
 
 
+def is_unreadable(workspace: Path, session_id: str) -> bool:
+    """True when the session's record file exists and does not read."""
+    return (
+        read_session(workspace, session_id) is None
+        and session_record_path(workspace, session_id).exists()
+    )
+
+
 def touch_last_seen_at(workspace: Path, session_id: str, *, now: str) -> dict[str, object] | None:
     """The heartbeat: renew ``last_seen_at``, creating the minimal ``{session_id, last_seen_at}``
     record only when the file is absent; the record, or ``None`` when unwritable or unreadable

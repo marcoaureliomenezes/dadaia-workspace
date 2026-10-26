@@ -13,10 +13,9 @@ from rich.table import Table
 from dadaia_workspace import container
 from dadaia_workspace.cli._fail import fail
 from dadaia_workspace.cli._specs_resolution import (
-    RELAUNCH,
-    governed,
     own_bind_for_cli,
     own_next_step,
+    refused_bind_fix,
     resolve_session_id,
 )
 from dadaia_workspace.cli.redact import build_context_redactor
@@ -363,11 +362,8 @@ def bind(name: str = typer.Argument(..., help="Context name to bind to")) -> Non
 
 
 def _require_governed(workspace_root: Path) -> None:
-    if not governed(workspace_root, os.environ):
-        fail(
-            "No workspace hook governs this session.",
-            RELAUNCH,
-        )
+    if fix := refused_bind_fix(workspace_root, os.environ):
+        fail("No workspace hook governs this session.", fix)
 
 
 @app.command(name="session-check")

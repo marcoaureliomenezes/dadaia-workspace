@@ -4,7 +4,7 @@ Every resolver-driven ``dadaia`` command resolves through this module — its sp
 directory via :func:`resolve_specs_dir_for_cli`, or the bound context name itself via
 :func:`resolve_context_for_cli`. A thin call onto :mod:`dadaia_workspace.core.invocation`,
 which owns resolution; this module adds the CLI-specific allowlist validation, the onboarding
-next step of the caller (:func:`own_next_step`) and the relaunch fix (:data:`RELAUNCH`).
+next step of the caller (:func:`own_next_step`).
 
 An *explicit* context name is gated by :data:`~dadaia_workspace.core.invocation.CONTEXT_NAME_RE`
 before any ``repos/<name>/specs`` join; an ambient ``DADAIA_CONTEXT`` is judged by the
@@ -23,7 +23,7 @@ from dadaia_workspace.core.invocation import (
     HARNESS_SESSION_ID_ENV_VARS as _HARNESS_SESSION_ID_ENV_VARS,
 )
 from dadaia_workspace.core.invocation import alive_context_trees as _alive_context_trees
-from dadaia_workspace.core.invocation import governed as _governed
+from dadaia_workspace.core.invocation import refused_bind_fix as _refused_bind_fix
 from dadaia_workspace.core.invocation import repo_owner as _repo_owner
 from dadaia_workspace.core.invocation import resolve as _resolve_invocation
 from dadaia_workspace.core.invocation import (
@@ -32,7 +32,6 @@ from dadaia_workspace.core.invocation import (
 from dadaia_workspace.core.invocation import resolve_session_id as _resolve_session_id
 from dadaia_workspace.core.invocation import resolve_specs_dir as _core_resolve_specs_dir
 from dadaia_workspace.core.invocation import scope as _scope
-from dadaia_workspace.core.platform import act
 from dadaia_workspace.features.workspace.onboarding import Step, next_step
 
 #: Re-exports so a verb never reaches ``core.invocation`` directly: every consumer of the
@@ -42,7 +41,7 @@ HARNESS_SESSION_ID_ENV_VARS = _HARNESS_SESSION_ID_ENV_VARS
 resolve_session_id = _resolve_session_id
 alive_context_trees = _alive_context_trees
 repo_owner = _repo_owner
-governed = _governed
+refused_bind_fix = _refused_bind_fix
 scope = _scope
 
 
@@ -77,20 +76,16 @@ def own_bind_for_cli() -> tuple[str | None, str | None]:
     return inv.bind.context_name, inv.session_id
 
 
-#: The fix of a refusal for a session no workspace hook governs.
-RELAUNCH = act("operator", "relaunch the session at the workspace root")
-
-
 def own_next_step(workspace_root: Path, focus: str | None = None) -> Step | None:
-    """The onboarding next step for THIS caller: its bound state, and the relaunch for a
-    bind that :func:`governed` refuses."""
+    """The onboarding next step for THIS caller: its bound state, and the fix of a bind that
+    :func:`governed` refuses."""
     bind, session = own_bind_for_cli()
     return next_step(
         workspace_root,
         _alive_context_trees(workspace_root),
         focus,
         None if session is None else bool(bind),
-        None if _governed(workspace_root, os.environ) else RELAUNCH,
+        _refused_bind_fix(workspace_root, os.environ),
     )
 
 

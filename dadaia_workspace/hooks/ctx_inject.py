@@ -125,7 +125,8 @@ def _read_help_digest(workspace: Path) -> str:
 def _head(workspace: Path, header: str, focus: str | None, bound: bool | None) -> list[str]:
     """The header and the onboarding next step ``doctor`` reports."""
     trees = invocation.alive_context_trees(workspace)
-    step = onboarding.next_step(workspace, trees, focus, bound)
+    fix = invocation.refused_bind_fix(workspace, os.environ)
+    step = onboarding.next_step(workspace, trees, focus, bound, fix)
     return [header] if step is None else [header, step.text()]
 
 
