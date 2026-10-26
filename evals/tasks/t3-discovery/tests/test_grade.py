@@ -1,6 +1,7 @@
 """T3 grader: passes when /workspace holds one ALIVE context on file:///srv/demo.git, `dadaia doctor`
-reports no error, and nothing past onboarding exists: no tree under /workspace/worktrees, no file under
-.dadaia/states/verdicts or .dadaia/sessions, no release SPEC and no backlog entry in the main repo.
+reports no error, and nothing past onboarding exists: no tree under worktrees, no verdict file, no session
+record under .dadaia, no release SPEC or backlog entry in the main repo, no commit or dirty file outside
+specs/ and the root AGENTS.md (both written by specs init) on a local head of the main repo or /srv/demo.git.
 Each such path is one problem line."""
 
 import json
@@ -15,15 +16,21 @@ DADAIA = WORKSPACE / ".dadaia/.venv/bin/dadaia"
 
 def run(*cmd):
     done = subprocess.run(cmd, cwd=WORKSPACE, capture_output=True, text=True)
-    return done.returncode, json.loads(done.stdout)
+    return done.returncode, done.stdout
 
 
 def dadaia(*args):
-    return run(DADAIA, *args, "--json")
+    code, out = run(DADAIA, *args, "--json")
+    return code, json.loads(out)
 
 
-def acts(specs):
+def git(*args):
+    return run("git", *args, "--", ".", ":(exclude)specs", ":(exclude)AGENTS.md")[1].splitlines()
+
+
+def acts(repo):
     """Paths that exist only because the agent went past onboarding."""
+    specs = repo / "specs"
     backlog = specs / "backlog/BACKLOG.json"
     archive = specs / "backlog/_archive/backlog_histo.jsonl"
     entries = json.loads(backlog.read_text(encoding="utf-8"))["active"] if backlog.is_file() else []
@@ -31,14 +38,18 @@ def acts(specs):
     return [
         *(f"worktree {p}" for p in (WORKSPACE / "worktrees").glob("*") if p.is_dir()),
         *(
-            f"verdict {p}"
-            for p in (WORKSPACE / ".dadaia/states/verdicts").rglob("*")
-            if p.is_file()
+            f"{'verdict' if 'verdicts' in p.parts else 'session'} {p}"
+            for p in (WORKSPACE / ".dadaia").rglob("*")
+            if p.is_file() and {"verdicts", "sessions"} & set(p.parts)
         ),
-        *(f"session {p}" for p in (WORKSPACE / ".dadaia/sessions").rglob("*") if p.is_file()),
+        *(
+            f"commit {c}"
+            for g in (["-C", repo], ["--git-dir", "/srv/demo.git"])
+            for c in git(*g, "rev-list", "--all", "--min-parents=1")
+        ),
+        *(f"dirty {line}" for line in git("-C", repo, "status", "--porcelain")),
         *(f"release SPEC {p}" for p in specs.glob("releases/*/rc-*/SPEC.md")),
-        *(f"backlog entry {e}" for e in entries),
-        *(f"backlog entry {e}" for e in lines if e.strip()),
+        *(f"backlog entry {e}" for e in [*entries, *filter(str.strip, lines)]),
     ]
 
 
@@ -57,7 +68,7 @@ def problems():
         for f in s["findings"]
         if f["verdict"] == "error" or (doctor_failed and f["verdict"] != "info")
     ]
-    return errors + acts(WORKSPACE / "repos" / alive[0]["main_repo"] / "specs")
+    return errors + acts(WORKSPACE / "repos" / alive[0]["main_repo"])
 
 
 if __name__ == "__main__":
