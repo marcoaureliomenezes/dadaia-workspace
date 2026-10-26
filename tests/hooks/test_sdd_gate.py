@@ -181,7 +181,9 @@ def test_a_truncated_registry_is_no_context_at_the_gate(tmp_path: Path) -> None:
         ),
     ],
 )
-def test_a_block_names_a_fix_the_session_can_run(tmp_path: Path, record: str, fix: tuple[str, ...]) -> None:
+def test_a_block_names_a_fix_the_session_can_run(
+    tmp_path: Path, record: str, fix: tuple[str, ...]
+) -> None:
     """The out-of-scope BLOCK of a session whose record does not read names the act that clears
     the record, not the `context bind` that bind refuses."""
     ws = _mk_workspace(tmp_path, "a", "b")
@@ -193,4 +195,6 @@ def test_a_block_names_a_fix_the_session_can_run(tmp_path: Path, record: str, fi
 
     block = run_hook_subprocess("sdd_gate", payload, env, cwd=ws).block_envelope()
 
-    assert block is not None and block["reason"].splitlines()[-1] == f"fix: {fix_line(ws, *fix)}", block
+    assert block is not None and block["reason"].splitlines()[-1] == f"fix: {fix_line(ws, *fix)}", (
+        block
+    )
