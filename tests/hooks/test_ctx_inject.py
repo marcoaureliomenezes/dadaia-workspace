@@ -513,14 +513,26 @@ def test_an_unreadable_atom_is_a_finding_with_the_check_that_names_it(tmp_path: 
     assert "memory.py check" in out
 
 
-# The hook under ``runpy``, with an audit hook counting filesystem and subprocess operations
-# (CPython's own audit events: the seam itself, never a production counter).
+# The hook under ``runpy``, with an audit hook counting subprocess spawns and the filesystem
+# operations under the workspace (cwd): CPython's own audit events, the seam itself. Import
+# opens and the import system's re-listing of a ``sys.path`` dir another process changed lie
+# outside the workspace, so they are never counted; an open by file descriptor names no path.
 _COUNTING_DRIVER = """
-import runpy, sys
+import os, runpy, sys
 _SEAM = ("open", "os.listdir", "os.scandir", "os.mkdir", "os.remove", "os.rename",
          "subprocess.Popen")
 ops = [0]
-sys.addaudithook(lambda event, _: ops.__setitem__(0, ops[0] + (event in _SEAM)))
+ROOT = os.getcwd()
+def _counts(event, args):
+    if event == "subprocess.Popen":
+        return True
+    if event not in _SEAM or isinstance(args[0], int):
+        return False
+    try:
+        return os.path.commonpath([ROOT, os.path.abspath(os.fsdecode("." if args[0] is None else args[0]))]) == ROOT
+    except ValueError:
+        return False
+sys.addaudithook(lambda event, args: ops.__setitem__(0, ops[0] + _counts(event, args)))
 try:
     runpy.run_module("{hook}", run_name="__main__")
 except SystemExit:
@@ -536,8 +548,6 @@ def _ops(root: Path, hook: str, bound: bool, path: Path | None = None) -> int:
     pythonpath = str(path) if path else os.environ.get("PYTHONPATH", "")
     env = {**claude_hook_env(root, session_id="s"), "PYTHONPATH": pythonpath}
     env.pop("DADAIA_CONTEXT", None)
-    # A cold, never-written cache: import opens are then the same on every run and machine.
-    env |= {"PYTHONPYCACHEPREFIX": str(root / "cold-pyc"), "PYTHONDONTWRITEBYTECODE": "1"}
     done = run([sys.executable, "-c", _COUNTING_DRIVER.format(hook=hook)], input=json.dumps({"session_id": "s"}), env=env, cwd=root, check=True, timeout=30)  # fmt: skip
     return int(done.stderr.rsplit("OPS=", 1)[1])
 
