@@ -625,7 +625,7 @@ _ATOM = "---\nslug: {0}\ntitle: {0}\ntldr: {0}\nsummary: {0}\ntags: [{0}]\nsourc
 _SUBJECTS = {
     "milestone": "chore(release): rc-1 phase IMPLEMENTATION",
     "enters": "chore(release): rc-1 enters IMPLEMENTATION at abc1234",
-    "memory-pass": "chore(release): rc-1 memory pass recorded — 1 reviewed, 1 changed",
+    "memory-pass": "chore(release): rc-0 memory pass recorded — 1 reviewed, 1 changed",
 }
 
 

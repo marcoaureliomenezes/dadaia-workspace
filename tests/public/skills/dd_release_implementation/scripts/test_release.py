@@ -605,9 +605,10 @@ def _git(root: Path, *argv: str) -> str:
 _PASS = "chore(release): rc-1 memory pass recorded — 1 reviewed, 0 changed"
 
 
-def _memory_repo(tmp_path: Path, script: Path) -> tuple[Path, Path, str]:
+def _memory_repo(tmp_path: Path, script: Path, prior: tuple[str, str] | None = None) -> tuple[Path, Path, str]:
     """A git repo whose one atom `alpha` covers `features/alpha`, committed at *base*;
-    the live release is in CLOSURE, its IMPLEMENTATION phase commit is base, and the code moved since."""
+    the live release is in CLOSURE, its IMPLEMENTATION phase commit is base, and the code moved since;
+    *prior* (release, candidate) puts that candidate's memory pass before base."""
     root = tmp_path / "repo"
     specs = _specs(root)
     code = root / "dadaia_workspace" / "features" / "alpha" / "core.py"
@@ -621,8 +622,18 @@ def _memory_repo(tmp_path: Path, script: Path) -> tuple[Path, Path, str]:
     _git(root.parent, "init", "-q", root.name)
     _git(root, "config", "user.email", "fixture@example.invalid")
     _git(root, "config", "user.name", "fixture")
+    if prior:
+        write_text(root / "older.txt", "x\n")
+        _git(root, "add", "-A")
+        _git(root, "commit", "-qm", "older")
+        (specs / "releases" / prior[0]).mkdir(parents=True)
+        write_text(specs / "releases" / prior[0] / "milestone.md", "x\n")
+        _git(root, "add", "-A")
+        _git(root, "commit", "-qm", _PASS.replace("rc-1", prior[1]))
+        write_text(code, "x = 0\n")
+        _git(root, "commit", "-qam", "lane landed between the candidates")
     _git(root, "add", "-A")
-    _git(root, "commit", "-qm", "chore(release): rc-1 phase IMPLEMENTATION")
+    _git(root, "commit", "-q", "--allow-empty", "-m", "chore(release): rc-1 phase IMPLEMENTATION")
     base = _git(root, "rev-parse", "HEAD")
     _release(specs, "0.5.0", phase="CLOSURE", defined={"ts": _TS}, implemented={"ts": _TS})
     write_text(code, "x = 2\n")
@@ -825,13 +836,89 @@ def test_memory_opens_the_next_window_at_the_previous_until(script: Path, tmp_pa
     its worklist is empty and the empty entry is accepted."""
     root, specs, _ = _memory_repo(tmp_path, script)
     assert _memory(script, root, specs, reviewed="alpha", changed="").returncode == 0
-    _git(root, "commit", "-qam", _PASS)  # the state file is tracked
+    _git(root, "commit", "-qam", _PASS.replace("rc-1", "rc-0"))  # a previous candidate's pass
     recorded = _git(root, "rev-parse", "HEAD")
 
     result = _memory(script, root, specs, reviewed="", changed="")
 
     assert result.returncode == 0, result.stderr
     assert _log(specs)[-1]["since"] == recorded
+
+
+def test_the_window_opens_at_the_previous_candidates_pass_not_the_live_implementation_commit(
+    script: Path, tmp_path: Path
+) -> None:
+    """A commit landed between two candidates (a lane or hotfix) sits after the previous
+    pass and before the live IMPLEMENTATION commit: the window must include it."""
+    root, specs, _ = _memory_repo(tmp_path, script, prior=("0.5.0", "rc-0"))
+    prior = _git(root, "log", "-1", "--format=%H", "--grep", "rc-0 memory pass")
+
+    drift = _run(script, "drift", "--specs", str(specs), cwd=root)
+
+    assert drift.stdout.splitlines()[0] == f"[drift] since {prior}"
+
+
+def test_a_same_named_candidate_of_an_earlier_release_is_a_previous_pass(
+    script: Path, tmp_path: Path
+) -> None:
+    """Only the live candidate's passes in the live release are its own: an earlier release's
+    pass by a same-named candidate is a previous pass."""
+    root, specs, _ = _memory_repo(tmp_path, script, prior=("0.4.9", "rc-1"))
+    prior = _git(root, "log", "-1", "--format=%H", "--grep", "rc-1 memory pass")
+
+    drift = _run(script, "drift", "--specs", str(specs), cwd=root)
+
+    assert drift.stdout.splitlines()[0] == f"[drift] since {prior}"
+
+
+def test_a_commit_rebased_under_the_live_candidates_own_pass_stays_on_the_worklist(
+    script: Path, tmp_path: Path
+) -> None:
+    """The live candidate's own pass is not a window bound: `worktree sync` rebases commits
+    that landed after it under it, and a window opening there would skip them."""
+    root, specs, base = _memory_repo(tmp_path, script)
+    assert _memory(script, root, specs, reviewed="alpha", changed="").returncode == 0
+    _git(root, "commit", "-qam", _PASS)
+    work = _git(root, "branch", "--show-current")
+    _git(root, "checkout", "-q", "-b", "moved", "HEAD~1")
+    (root / "dadaia_workspace" / "features" / "beta").mkdir()
+    write_text(root / "dadaia_workspace" / "features" / "beta" / "core.py", "y = 1\n")
+    _git(root, "add", "-A")
+    _git(root, "commit", "-qm", "lane landed after the pass")
+    _git(root, "checkout", "-q", work)
+    _git(root, "rebase", "-q", "moved")
+
+    drift = _run(script, "drift", "--specs", str(specs), cwd=root)
+
+    assert drift.returncode == 1, drift.stderr
+    assert drift.stdout.splitlines()[0] == f"[drift] since {base}"
+    assert "uncovered dadaia_workspace/features/beta" in drift.stdout
+
+
+def test_a_commit_rebased_under_two_own_passes_stays_on_the_worklist(
+    script: Path, tmp_path: Path
+) -> None:
+    """A rerun records a second pass: the window still opens at the previous candidate's."""
+    root, specs, _ = _memory_repo(tmp_path, script, prior=("0.5.0", "rc-0"))
+    prior = _git(root, "log", "-1", "--format=%H", "--grep", "rc-0 memory pass")
+    assert _memory(script, root, specs, reviewed="alpha", changed="").returncode == 0
+    _git(root, "commit", "-qam", _PASS)
+    assert _memory(script, root, specs, reviewed="alpha", changed="").returncode == 0
+    _git(root, "commit", "-qam", _PASS)
+    work = _git(root, "branch", "--show-current")
+    _git(root, "checkout", "-q", "-b", "moved", "HEAD~2")
+    (root / "dadaia_workspace" / "features" / "beta").mkdir()
+    write_text(root / "dadaia_workspace" / "features" / "beta" / "core.py", "y = 1\n")
+    _git(root, "add", "-A")
+    _git(root, "commit", "-qm", "hotfix synced under both passes")
+    _git(root, "checkout", "-q", work)
+    _git(root, "rebase", "-q", "moved")
+
+    drift = _run(script, "drift", "--specs", str(specs), cwd=root)
+
+    assert drift.returncode == 1, drift.stderr
+    assert drift.stdout.splitlines()[0] == f"[drift] since {prior}"
+    assert "uncovered dadaia_workspace/features/beta" in drift.stdout
 
 
 @pytest.mark.parametrize("rewrite", ["rebase", "fold"])
@@ -941,7 +1028,7 @@ def test_a_rerun_after_the_second_reconciliation_appends_nothing(
     root, specs, _ = _memory_repo(tmp_path, script)
     assert _memory(script, root, specs, reviewed="alpha", changed="").returncode == 0
     _git(root, "commit", "-qam", _PASS)
-    assert _memory(script, root, specs, reviewed="", changed="").returncode == 0
+    assert _memory(script, root, specs, reviewed="alpha", changed="").returncode == 0
 
     result = _memory(script, root, specs, reviewed="", changed="")
 
