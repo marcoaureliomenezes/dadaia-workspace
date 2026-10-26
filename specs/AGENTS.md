@@ -16,8 +16,8 @@ Scope: this file governs only the `specs/` tree of one Spec Context Project.
 | `memory/product/` | `index.md catalog.json <area>/<slug>.md` |
 | `releases/` | `AGENTS.md _archive/ <M.m.p>/` |
 | `releases/_archive/` | `releases_histo.jsonl <M.m.p>/**` |
-| `releases/<M.m.p>/` | `_RELEASE.json RELEASE.json rc-<N>/` |
-| `releases/<M.m.p>/rc-<N>/` | `SPEC.md PLAN.md TASKS.md tasks/<slug>.md` |
+| `releases/<M.m.p>/` | `_RELEASE.json rc-<N>/` |
+| `releases/<M.m.p>/rc-<N>/` | `SPEC.md PLAN.md tasks/job<n>.md` |
 | `backlog/` | `AGENTS.md BACKLOG.json _archive/backlog_histo.jsonl` |
 | `bugs/` | `AGENTS.md BUGS.jsonl _archive/bugs_histo.jsonl` |
 | `audits/` | `AGENTS.md _archive/audits_histo.jsonl <YYYYMMDD-slug>/` |
@@ -43,7 +43,7 @@ Scope: this file governs only the `specs/` tree of one Spec Context Project.
 | `releases/<id>/_RELEASE.json` | `python3 .agents/skills/dd-release-implementation/scripts/release.py`; `log` entries per `dd-release-implementation`'s `RELEASE-EVENTS.md` table |
 | `releases/<id>/rc-<N>/{SPEC,PLAN}.md`, `rc-<N>/tasks/job<n>.md` (read-only after its closure; archived whole at promote) | `dd-product-engineer` (SPEC), `dd-sw-engineer-sr` (PLAN, job files) |
 | `memory/**` | `dd-product-engineer`; phases and tiers: `memory/AGENTS.md` §1 |
-| `backlog/**` | `dd-product-engineer`; entries exit by `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py exit --specs <specs-dir>` |
+| `backlog/**` | `dd-product-engineer`; entries exit by `backlog.py exit` (`dd-backlog-definition`) |
 | `bugs/**` | `dd-product-engineer`, `dd-sw-engineer-sr`, by verbs only, after the operator confirms; propose and confirm: `bugs/AGENTS.md` |
 | `audits/**` | the main thread, from the reviewer's audit-lens report; how a finding moves: `audits/AGENTS.md` |
 

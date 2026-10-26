@@ -5,7 +5,7 @@ Scope: `specs/memory/**`; broader SDD rules are in the sibling `specs/AGENTS.md`
 Memory is current product truth: what the product is now, never how it got there.
 
 - Product memory is `dd-product-engineer`'s.
-- Stale memory found mid-implementation becomes a bug or a closure note.
+- Stale memory found mid-implementation becomes a bug.
 
 ## 1. The two tiers
 

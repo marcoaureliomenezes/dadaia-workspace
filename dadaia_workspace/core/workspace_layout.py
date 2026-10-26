@@ -447,12 +447,14 @@ def _shape_regex(shape: str) -> str:
 
 @dataclass(frozen=True)
 class CanonEntry:
-    """One ``specs/`` canon row: a path shape in the law's notation, its root member, and
-    whether a fresh tree must carry it at birth."""
+    """One ``specs/`` canon row: a path shape in the law's notation, its root member, whether a
+    fresh tree must carry it at birth, and how the rendered canon table names it (``None``: by
+    its shape; ``""``: not at all, a legacy name the doctor still admits)."""
 
     shape: str
     area: SpecsArea
     required_at_birth: bool = False
+    display: str | None = None
 
     @property
     def dest(self) -> str | None:
@@ -478,11 +480,15 @@ SPECS_CANON: tuple[CanonEntry, ...] = (
     CanonEntry("releases/_archive/<M.m.p>/**", "releases"),
     CanonEntry("releases/<M.m.p>/_RELEASE.json", "releases"),
     # Legacy state-file name, admitted only as the input of the doctor's rename to _RELEASE.json.
-    CanonEntry("releases/<M.m.p>/RELEASE.json", "releases"),
+    CanonEntry("releases/<M.m.p>/RELEASE.json", "releases", display=""),
     CanonEntry("releases/<M.m.p>/rc-<N>/SPEC.md", "releases"),
     CanonEntry("releases/<M.m.p>/rc-<N>/PLAN.md", "releases"),
-    CanonEntry("releases/<M.m.p>/rc-<N>/TASKS.md", "releases"),  # a closed rc's
-    CanonEntry("releases/<M.m.p>/rc-<N>/tasks/<slug>.md", "releases"),  # one per job
+    CanonEntry("releases/<M.m.p>/rc-<N>/TASKS.md", "releases", display=""),  # a closed rc's
+    CanonEntry(
+        "releases/<M.m.p>/rc-<N>/tasks/<slug>.md",
+        "releases",
+        display="releases/<M.m.p>/rc-<N>/tasks/job<n>.md",
+    ),  # one per job
     CanonEntry("backlog/AGENTS.md", "backlog", True),
     CanonEntry("backlog/BACKLOG.json", "backlog", True),
     CanonEntry("backlog/_archive/backlog_histo.jsonl", "backlog", True),
@@ -540,7 +546,8 @@ def specs_canon_table_rows() -> tuple[tuple[str, str], ...]:
     root); a single-member directory is path-compressed into its parent's cell."""
     children: dict[str, list[str]] = {}
     for entry in SPECS_CANON:
-        segments = entry.shape.split("/")
+        shown = entry.shape if entry.display is None else entry.display
+        segments = shown.split("/") if shown else []
         for depth, segment in enumerate(segments):
             bucket = children.setdefault("/".join(segments[:depth]), [])
             if segment not in bucket:

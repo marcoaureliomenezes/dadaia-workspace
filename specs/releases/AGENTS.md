@@ -7,7 +7,7 @@ Scope: this file governs only `specs/releases/`.
 
 - Exactly ONE live release directory, ever: a bare SemVer id, created only by `RELEASE_PY new <id> --specs <specs-dir>`,
   which writes the next `rc-<N>/SPEC.md` + `_RELEASE.json` (DEFINITION) in one transaction and refuses a second one.
-- The release has OPEN scope: it grows by CANDIDATES, each born by `RELEASE_PY new --specs <specs-dir>` in its own `rc-<N>/`.
+- The release has OPEN scope: it grows by CANDIDATES, each born by `RELEASE_PY new <id> --specs <specs-dir>` in its own `rc-<N>/`.
 - Canonical release state: `_RELEASE.json` — one mutable document (`phase`/milestones) plus an append-only `log`.
 
 ## 1. Structure
@@ -24,7 +24,7 @@ Scope: this file governs only `specs/releases/`.
 - SDD lifecycle order PER CANDIDATE: as-is review -> grill -> SPEC (Draft) -> PLAN -> job files -> operator approval of SPEC and PLAN -> implementation -> closure -> integration-branch merge -> promote-or-continue gate.
 - Full arc, gate cadence, the step-by-step ladder: `dd-release-implementation`'s `RC-FLOW.md`.
 - A candidate is closed: created, implemented, or cancelled into the next; never amended (shape 8 records approval only); a new AC goes to the next rc.
-- A candidate is defined in its own `rc-<N>/`, authored in its `wt-rc` tree (`worktrees/AGENTS.md` §1): rc N+1 is drafted there while rc N implements and enters by `RELEASE_PY new --specs <specs-dir>` at rc N's CLOSURE;
+- A candidate is defined in its own `rc-<N>/`, authored in its `wt-rc` tree (`worktrees/AGENTS.md` §1): rc N+1 is drafted there while rc N implements and enters by `RELEASE_PY new <id> --specs <specs-dir>` at rc N's CLOSURE;
   its `## Bug window review` judges rc N's bug fixes; one rc implements at a time.
 - Recommended size, never a gate: SPEC.md within 24 KiB, each job file within 12 KiB.
 - Release ids are bare SemVer (`^\d+\.\d+\.\d+$`).

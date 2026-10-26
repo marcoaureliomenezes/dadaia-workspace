@@ -16,7 +16,7 @@ Scope: this file governs only `specs/backlog/`.
 ## 2. Authoring rules
 
 - `<slug>` matches `$defs.slug` of backlog-v1.
-- `BACKLOG_PY new --specs <specs-dir>` writes `status: idea`; a later lowercase live token (`candidate`, …) is a hand edit, which `BACKLOG_PY check --specs <specs-dir>` validates (§4).
+- A new entry has `status: idea`; a later lowercase live token (`candidate`, …) is a hand edit, which `BACKLOG_PY check --specs <specs-dir>` validates (§4).
 - `relates` is required while `active[]` holds an entry (`--relates <slugs>|none`); `intents` is optional (§4).
 - An entry leaves only by `BACKLOG_PY exit <slug> --disposition … --specs <specs-dir>`, which removes the `active[]` object and appends its one histo record.
 
