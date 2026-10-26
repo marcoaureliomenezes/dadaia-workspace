@@ -16,6 +16,8 @@ skills:
   - dd-ai-eng-knowhow
   - dd-gitflow-default
   - dd-release-implementation
+  - dd-code-review
+  - dd-bug-registration
 ---
 
 # Software Engineer (junior)
