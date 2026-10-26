@@ -1,9 +1,5 @@
 # Memory Catalog — dadaia-workspace
 
-> Generated automatically from `specs/memory/product/<area>/*.md` frontmatter.
-> The catalog section below is refreshed by `.agents/skills/dd-spec-navigator/scripts/memory.py catalog generate`; other
-> sections of this file are preserved verbatim.
-
 ## Feature catalog
 
 ### agents

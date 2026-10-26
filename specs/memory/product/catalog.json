@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-26T07:04:08Z",
+  "generated_at": "2026-10-26T08:36:49Z",
   "features": [
     {
       "rank": 1,
@@ -106,7 +106,7 @@
         "release-gate",
         "distribution"
       ],
-      "token_estimate": 1438,
+      "token_estimate": 1488,
       "depends_on": [
         "harness-codex",
         "pypi-distribution",
@@ -415,7 +415,7 @@
         "lifecycle",
         "concurrency"
       ],
-      "token_estimate": 652,
+      "token_estimate": 670,
       "depends_on": [
         "context-management",
         "specs-migration",
@@ -571,7 +571,7 @@
         "macos",
         "linux"
       ],
-      "token_estimate": 1002,
+      "token_estimate": 1023,
       "depends_on": [
         "bug-ledger",
         "workspace-doctor",
@@ -659,7 +659,7 @@
         "compliance",
         "privacy"
       ],
-      "token_estimate": 3891,
+      "token_estimate": 3918,
       "depends_on": [
         "public-asset-distribution",
         "sdd-gate-v3",
@@ -797,7 +797,7 @@
         "lineage",
         "resolution"
       ],
-      "token_estimate": 2192,
+      "token_estimate": 2202,
       "depends_on": [
         "cross-platform-portability",
         "public-asset-distribution",
@@ -827,7 +827,7 @@
         "state",
         "closure"
       ],
-      "token_estimate": 1794,
+      "token_estimate": 1960,
       "depends_on": [
         "agent-orchestration",
         "worktrees",
@@ -896,7 +896,7 @@
         "merge",
         "review"
       ],
-      "token_estimate": 3015,
+      "token_estimate": 3433,
       "depends_on": [
         "context-management",
         "sdd-gate-v3",

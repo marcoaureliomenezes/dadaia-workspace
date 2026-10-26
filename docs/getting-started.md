@@ -171,7 +171,8 @@ runs every worktree verb: `new`, `merge`, `sync`, `clean`, `hash`, `list`, `paus
    the ledger checks, and the work -> integration PR merges green.
 7. **Continue or promote.** Continue: `release.py new` with the same id stacks the next
    candidate, reopening `DEFINITION`. Promote: merge the integration branch into the
-   principal by PR — that merge is the deploy. The old work tip is tagged
+   principal by PR; when the project's own release pipeline then opens a PR into the
+   principal, that PR's merge is the deploy, else this one's. The old work tip is tagged
    `archive/<work-branch>` and the work branch is renamed to the next release id
    (`git branch -m`, then `git push -u`), never cut anew; `release.py ship`,
    in a backlog lane on that branch, then records the promote and moves the release
