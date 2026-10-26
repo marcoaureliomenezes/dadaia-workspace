@@ -110,7 +110,11 @@ def test_catalog_generate_preserves_non_catalog_sections_verbatim(
             "# Mine\n\n## Feature catalog (generated)\n\nhand text.\n\n",
             "",
         ),
-        ("# Mine\n\n### Feature catalog\n\nsub.\n", "# Mine\n\n### Feature catalog\n\nsub.\n\n", ""),
+        (
+            "# Mine\n\n### Feature catalog\n\nsub.\n",
+            "# Mine\n\n### Feature catalog\n\nsub.\n\n",
+            "",
+        ),
         (
             "# Mine\n\n## Feature catalog\n\nSTALE row\n\n## Notes\n\nafter.\n",
             "# Mine\n\n## Feature catalog\n\n",
@@ -133,7 +137,9 @@ def test_catalog_generate_keeps_every_authored_line_and_owns_one_exact_section(
     assert _run(script, "check", "--specs", str(specs)).returncode == 0
 
 
-def test_catalog_generate_writes_the_template_for_a_missing_index(script: Path, specs: Path) -> None:
+def test_catalog_generate_writes_the_template_for_a_missing_index(
+    script: Path, specs: Path
+) -> None:
     index = specs / "memory" / "product" / "index.md"
     index.unlink()
 
