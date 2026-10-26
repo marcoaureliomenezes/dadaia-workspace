@@ -26,7 +26,7 @@ sources:
 - `--workspace` pins the workspace root; `--reviewed-root` resolves `self_pull.refs` against another tree (a worktree at the reviewed commit) before `repos/<context>/<ref>` and `<workspace>/<ref>`.
 - `dadaia_workspace/core/handoff_index.py` is the one handoff reader: `HandoffIndex.validate_file()` validates, and `Handoff.validate()` checks schema shape (through `jsonschema`), version, the `self_pull` rule and the artifact hash; every other consumer calls it.
 - The `self_pull` rule lives in the reader, not the schema: a `handoff-v1.2` record needs non-empty `refs`, each an existing file inside its boundary root.
-- With `artifact.path` present the artifact is resolved inside the workspace (no `..` or symlink escape) and its SHA-256 recomputed.
+- With `artifact.path` present the artifact is resolved inside the workspace (no `..` or symlink escape) and its SHA-256 recomputed; its hash status, in `--json` as `hash_status`, is `match`, `mismatch`, `missing_artifact` or `missing_hash` (an absent or empty `content_hash`), and any status but `match` fails `artifact.content_hash`.
 
 ## Lifecycle
 

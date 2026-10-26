@@ -30,7 +30,7 @@ sources:
 
 - Every BLOCK contains exactly one fix line, in one of three forms: `fix: <command>`, `fix: Agent action: <one act>` for an act an agent performs that no single command does, or `fix: Operator action: <one act>` only for an act the law reserves to the operator (an ADR acceptance, a secret, a `.dadaiaignore` or PROTECTED edit, a named ruling, an act outside agent reach).
 - CLI fixes are rendered by the shared command-line builder through the kernel's one spelling, with real values and no placeholder or command chain; a word the host shell cannot spell turns the line into an `Agent action:` naming that word ([[cross-platform-portability]]).
-- Root slop points to the agent's dated scratch directory; law and projection paths point to `public install`; the operator's files (`.dadaiaignore`, the privacy denylist) and `[protected]` globs to the command creating the draft directory `.dadaia/tmp`; other state files to the `Agent action:` to use their owning verb or script; an out-of-scope repository points to the owning context bind; merge-only repository writes point to the canonical worktree list.
+- Root slop points to the agent's dated scratch directory; law and projection paths point to `public install`; the operator's files (`.dadaiaignore`, the privacy denylist) and `[protected]` globs to the command creating the draft directory `.dadaia/tmp`; other state files to the `Agent action:` to use their owning verb or script; an out-of-scope repository points to the owning context bind, or to the refused bind's fix when that bind would be refused ([[context-management]]); merge-only repository writes point to the canonical worktree list.
 
 ## Push chokepoint
 

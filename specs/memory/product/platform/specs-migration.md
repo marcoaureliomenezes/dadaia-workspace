@@ -32,7 +32,7 @@ sources:
 - `dadaia specs upgrade [--specs-dir <path>] [--dry-run]` reads the tree's `specs_pattern_version` and stamps only canonical version 13; `CANON_AT` pins the scaffold fingerprint for that stamp, and `--specs-dir` defaults to the bound context.
 - A tree below 6 is refused with no filesystem write, naming the prerequisite: upgrade with an earlier dadaia-workspace line first.
 - A supported older tree folds `memory/TECHSTACK.md` into ARCHITECTURE and moves a flat candidate trio into its next `rc-<N>/` before receiving the current stamp. A failed guarded delete restores the source document, and a closed candidate is never rewritten.
-- Every run also applies the specs doctor's repair set and regenerates the product-memory catalog pair when its owner check is red. Record ledgers are validated by their own scripts and are never reconstructed by upgrade.
+- Every run also applies the specs doctor's repair set and regenerates `catalog.json` and `index.md`'s `## Feature catalog` section, every other `index.md` line kept, when its owner check is red. Record ledgers are validated by their own scripts and are never reconstructed by upgrade.
 - Each change prints its action; `--dry-run` plans the same set without writing, and a canonical tree with nothing to repair reports a no-op.
 - `dadaia_workspace/core/specs_version.py`'s `state` is the one reader of a tree's state — `absent` (nothing there, a dangling symlink included), `file` (any non-directory), `malformed`, `foreign`, `upgradable` or `canonical`, the path's kind decided once by `core/gitflow.specs_path_kind` — with its one fix, naming the context when the caller knows it, else the tree as `--specs-dir`; onboarding's `specs` step reports it ([[workspace-init]]).
 
