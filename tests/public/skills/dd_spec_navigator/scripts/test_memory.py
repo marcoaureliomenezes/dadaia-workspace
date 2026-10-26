@@ -74,13 +74,13 @@ def test_catalog_generate_byte_reproduces_the_committed_catalog_and_index(
 def test_catalog_generate_rebuilds_the_committed_content_from_the_atoms_alone(
     script: Path, specs: Path
 ) -> None:
-    """The stamp is the only field carried over: with both generated files deleted, the
+    """The stamp is the only field carried over: with the catalog deleted and the section stale, the
     atoms alone reproduce every committed entry and every rendered row."""
     product = specs / "memory" / "product"
     committed = json.loads(read_text(_REPO / "specs" / "memory" / "product" / "catalog.json"))
     committed_index = read_text(_REPO / "specs" / "memory" / "product" / "index.md")
     (product / "catalog.json").unlink()
-    (product / "index.md").unlink()
+    write_text(product / "index.md", "## Feature catalog\n\nstale\n")
 
     assert _run(script, "catalog", "generate", "--specs", str(specs)).returncode == 0
 
@@ -156,14 +156,24 @@ def test_catalog_generate_keeps_every_authored_line_and_owns_one_exact_section(
     assert _run(script, "check", "--specs", str(specs)).returncode == 0
 
 
-def test_catalog_generate_writes_the_template_for_a_missing_index(
-    script: Path, specs: Path
-) -> None:
-    index = specs / "memory" / "product" / "index.md"
-    index.unlink()
+def test_catalog_generate_never_creates_the_index(script: Path, specs: Path) -> None:
+    """The index has one creator, the scaffold copy (`specs upgrade`); generate refreshes
+    the catalog beside a missing one and leaves the doctor's TREE-3 to create it."""
+    product = specs / "memory" / "product"
+    (product / "index.md").unlink()
 
     assert _run(script, "catalog", "generate", "--specs", str(specs)).returncode == 0
-    assert read_text(index).startswith("# Memory Catalog\n\n> Generated automatically")
+    assert (product / "catalog.json").is_file()
+    assert not (product / "index.md").exists()
+    assert _run(script, "check", "--specs", str(specs)).returncode == 0
+
+
+def test_help_describes_the_unit_in_a_whole_sentence(script: Path) -> None:
+    out = " ".join(_run(script, "--help").stdout.split())
+    assert (
+        "The memory catalog's ONE writer: catalog.json and the Feature catalog of index.md, from the atoms."
+        in out
+    )
 
 
 def test_check_passes_in_a_checkout_folder_not_named_after_the_repo(
