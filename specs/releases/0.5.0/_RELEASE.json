@@ -2626,6 +2626,27 @@
       "candidate": "rc-24",
       "milestone": "implemented",
       "text": "Candidate implemented; phase CLOSURE."
+    },
+    {
+      "ts": "2026-10-26T07:04:15Z",
+      "agent": "release.py memory",
+      "kind": "memory",
+      "text": "Memory reconciled over 1ca66fbf61ce26cfd13d5b35e145168cf2addf5c..b53f83d99867: 7 reviewed, 2 changed.",
+      "since": "1ca66fbf61ce26cfd13d5b35e145168cf2addf5c",
+      "until": "b53f83d99867eb3b3252601f0e765cff45a8eef7",
+      "reviewed": [
+        "public-asset-distribution",
+        "pypi-distribution",
+        "harness-claude-code",
+        "harness-copilot",
+        "harness-cursor",
+        "harness-devin",
+        "harness-kimi-code"
+      ],
+      "changed": [
+        "agent-evals",
+        "harness-codex"
+      ]
     }
   ]
 }
