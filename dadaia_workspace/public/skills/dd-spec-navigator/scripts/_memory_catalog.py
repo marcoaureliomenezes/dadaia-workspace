@@ -3,7 +3,7 @@
 and `index.md`'s `## Feature catalog`, the rest kept (`specs/memory/AGENTS.md` §Tree, format,
 validation).
 
-One module renders both, so the two cannot drift apart between two writers.
+One module renders both pieces, so the two cannot drift apart between two writers.
 
 `rank` is the position in sorted-path order — an enumeration aid, NOT a priority.
 `token_estimate` is COMPUTED (`word_count * 1.35`): a value both stored and derivable
@@ -52,17 +52,6 @@ def catalog_text(catalog: Catalog) -> str:
 #: The canonical, ANCHOR-STABLE catalog section heading. Backlog intents bind doc anchors
 #: like `memory/product/index.md#feature-catalog` — regeneration never renames it.
 HEADING = "## Feature catalog"
-_TEMPLATE = """\
-# Memory Catalog
-
-> Generated automatically from `specs/memory/product/<area>/*.md` frontmatter.
-> The catalog section below is refreshed by `memory.py catalog generate`; other
-> sections of this file are preserved verbatim.
-
-{heading}
-
-{tables}
-"""
 # No trailing newline: sections are "\n".join-ed, so a trailing "\n" here would insert a
 # blank line between the separator row and the first data row, breaking the GFM table.
 _HEADER = "| slug | title | tldr |\n|------|-------|------|"
@@ -83,14 +72,11 @@ def _tables(catalog: Catalog) -> str:
 def render(specs: Path, catalog: Catalog) -> str:
     """`index.md` as it should be: ONLY the exact `## Feature catalog` section's body is
     replaced (to the next `## ` heading or EOF); every other line survives verbatim, and an
-    index without the section gains it at the end. A missing file is written from the
-    template. Exactly one trailing newline: `generate` over a file it had just written must
-    agree with `check`."""
-    path = specs / INDEX
+    index without the section gains it at the end. The index must exist (its one creator is
+    the scaffold copy). Exactly one trailing newline: `generate` over a file it had just
+    written must agree with `check`."""
     rendered = _tables(catalog)
-    if not path.is_file():
-        return _TEMPLATE.format(heading=HEADING, tables=rendered).rstrip("\n") + "\n"
-    lines = read_text(path).splitlines(keepends=True)
+    lines = read_text(specs / INDEX).splitlines(keepends=True)
     start = next((i for i, line in enumerate(lines) if line.strip() == HEADING), len(lines))
     end = next(
         (i for i in range(start + 1, len(lines)) if lines[i].lstrip().startswith("## ")),

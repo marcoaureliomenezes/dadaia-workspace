@@ -40,10 +40,10 @@ def check(specs: Path) -> list[Finding]:
         "catalog", "generate", specs=specs.resolve()
     )
     out: list[Finding] = []
-    for name, rendered in (
-        (CATALOG, cat.catalog_text(catalog)),
-        (INDEX, cat.render(specs, catalog)),
-    ):
+    # a missing index is the scaffold copy's to create (the doctor's tree check), not this fix's
+    pairs = [(CATALOG, cat.catalog_text(catalog))]
+    pairs += [(INDEX, cat.render(specs, catalog))] if (specs / INDEX).is_file() else []
+    for name, rendered in pairs:
         path = specs / name
         if not path.is_file():
             out.append(_findings.finding(CODE, name, 0, f"{path.name} does not exist", fix))

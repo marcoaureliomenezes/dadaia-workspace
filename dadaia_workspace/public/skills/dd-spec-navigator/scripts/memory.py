@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
-"""The memory catalog's ONE writer — `specs/memory/product/catalog.json` and the
-`## Feature catalog` of `index.md`, from the atoms, stdlib only.
+"""The memory catalog's ONE writer: catalog.json and the Feature catalog of index.md, from the atoms.
+
+Stdlib only; it writes `specs/memory/product/catalog.json` and the `## Feature catalog`
+section of an existing `index.md`, never another line, and never creates the index.
 
 ``memory.py <verb> --specs <path>``. `catalog generate` rewrites that catalog
 from the atoms' frontmatter in one act; `drift` reports what a commit window left stale
@@ -51,12 +53,16 @@ def _parser() -> argparse.ArgumentParser:
 
 
 def _generate(specs: Path) -> str:
-    """Rewrite BOTH generated files from the atoms — one act, no half-refresh."""
+    """Rewrite catalog.json and index.md's Feature catalog section from the atoms — one act;
+    a missing index stays missing."""
     catalog = cat.generate(specs)
     write_text(specs / CATALOG, cat.catalog_text(catalog))
-    write_text(specs / INDEX, cat.render(specs, catalog))
+    names = [CATALOG]
+    if (specs / INDEX).is_file():
+        write_text(specs / INDEX, cat.render(specs, catalog))
+        names.append(INDEX)
     count = len(catalog["features"])
-    return f"[ok] {CATALOG} and {INDEX} written ({count} feature{'s' if count != 1 else ''})"
+    return f"[ok] {' and '.join(names)} written ({count} feature{'s' if count != 1 else ''})"
 
 
 def _drift(args: argparse.Namespace, specs: Path) -> int:
