@@ -522,7 +522,7 @@ _SEAM = ("open", "os.listdir", "os.scandir", "os.mkdir", "os.remove", "os.rename
 ops = [0]
 sys.addaudithook(lambda event, _: ops.__setitem__(0, ops[0] + (event in _SEAM)))
 try:
-    runpy.run_module("dadaia_workspace.hooks.{hook}", run_name="__main__")
+    runpy.run_module("{hook}", run_name="__main__")
 except SystemExit:
     pass
 finally:
@@ -530,10 +530,11 @@ finally:
 """
 
 
-def _ops(root: Path, hook: str, bound: bool) -> int:
+def _ops(root: Path, hook: str, bound: bool, path: Path | None = None) -> int:
     if bound:
         _bind(root, "s", "c0")
-    env = {**claude_hook_env(root, session_id="s"), "PYTHONPATH": os.environ.get("PYTHONPATH", "")}
+    pythonpath = str(path) if path else os.environ.get("PYTHONPATH", "")
+    env = {**claude_hook_env(root, session_id="s"), "PYTHONPATH": pythonpath}
     env.pop("DADAIA_CONTEXT", None)
     # A cold, never-written cache: import opens are then the same on every run and machine.
     env |= {"PYTHONPYCACHEPREFIX": str(root / "cold-pyc"), "PYTHONDONTWRITEBYTECODE": "1"}
@@ -562,10 +563,32 @@ def test_hook_lane_cost_does_not_grow_with_the_registry(
 ) -> None:
     """A hook lane's filesystem and subprocess operations are the same at 2 and at 20 contexts."""
     two, twenty = (
-        _ops(_ws(tmp_path / str(n), *({"name": f"c{i}"} for i in range(n))), hook, bound)
+        _ops(
+            _ws(tmp_path / str(n), *({"name": f"c{i}"} for i in range(n))),
+            f"dadaia_workspace.hooks.{hook}",
+            bound,
+        )
         for n in (2, 20)
     )
-    assert twenty == two
+    assert twenty == two > 0
+
+
+def test_hook_lane_cost_ignores_a_sys_path_dir_another_process_changes_mid_run(
+    tmp_path: Path,
+) -> None:
+    """The import system re-lists a ``sys.path`` dir whose mtime moved (another test worker
+    writing into the checkout does that); the count is of the workspace's own operations."""
+    path = tmp_path / "path"
+    path.mkdir()
+    (tmp_path / "off").mkdir()
+    # Both write one file; only churn's lands in a ``sys.path`` dir, so the delta is the re-list.
+    (path / "quiet.py").write_text(f"open({str(tmp_path / 'off' / 'x')!r}, 'w').close()\nimport colorsys\n")  # fmt: skip
+    (path / "churn.py").write_text("open(__file__ + 'x', 'w').close()\nimport colorsys\n")  # fmt: skip
+    os.utime(path, (0, 0))  # the write below always moves the mtime, whatever the clock tick
+    quiet, churn = (
+        _ops(_ws(tmp_path / hook, {"name": "c0"}), hook, False, path) for hook in ("quiet", "churn")
+    )
+    assert churn == quiet
 
 
 def test_hook_lane_cost_is_the_same_whatever_bytecode_cache_the_parent_holds(
@@ -578,7 +601,9 @@ def test_hook_lane_cost_is_the_same_whatever_bytecode_cache_the_parent_holds(
     counts = []
     for n, prefix in enumerate((tmp_path / "cold", warm)):
         monkeypatch.setenv("PYTHONPYCACHEPREFIX", str(prefix))
-        counts.append(_ops(_ws(tmp_path / str(n), {"name": "c0"}), "ctx_inject", True))
+        counts.append(
+            _ops(_ws(tmp_path / str(n), {"name": "c0"}), "dadaia_workspace.hooks.ctx_inject", True)
+        )
     assert counts[0] == counts[1]
 
 
