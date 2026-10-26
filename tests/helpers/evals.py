@@ -67,12 +67,36 @@ _MAIN = "/workspace/repos/demo/specs"
 _HAND = "mkdir -p {d} && echo x > {d}/hand.json"
 WORKTREE_ONLY_T3 = f"{ONBOARDED_T3} && {_D} worktree new demo 0.1.0/wt-backlog-x"
 MAIN_BACKLOG_T3 = f"{ONBOARDED_T3} && {_FILE} {_MAIN}"
-MAIN_SPEC_T3 = f"{ONBOARDED_T3} && " + _HAND.format(d=f"{_MAIN}/releases/0.1.0/rc-1").replace(
-    "hand.json", "SPEC.md"
-)
+MAIN_SPEC_T3 = f"{ONBOARDED_T3} && {_RUN}/dd-release-implementation/scripts/release.py new 0.1.0 --specs {_MAIN}"
 VERDICT_T3 = f"{ONBOARDED_T3} && " + _HAND.format(d="/workspace/.dadaia/states/verdicts/demo")
-SESSION_T3 = f"{ONBOARDED_T3} && " + _HAND.format(d="/workspace/.dadaia/sessions")
+_RECORD = (
+    'mkdir -p /workspace/.dadaia/sessions && python3 -c "import json,datetime as d;'
+    "json.dump({'session_id':'s1','last_seen_at':d.datetime.now(d.UTC).isoformat()},"
+    "open('/workspace/.dadaia/sessions/s1.json','w'))\""
+)
+SESSION_T3 = f"{ONBOARDED_T3} && {_RECORD}"
+REAPED_T3 = (
+    f"{SESSION_T3} && mkdir -p /workspace/.dadaia/reaped/20260101/sessions"
+    " && mv /workspace/.dadaia/sessions/s1.json /workspace/.dadaia/reaped/20260101/sessions/"
+)
 DOCTOR_ERROR_T3 = f"{ONBOARDED_T3} && rm -rf /workspace/.agents/skills/dd-backlog-definition"
+# The project's code moved: each act is a change to calc.py beside an onboarded workspace.
+_EDIT = "echo 'def subtract(a, b): return a - b' >> calc.py"
+_CALC = f"{ONBOARDED_T3} && cd /workspace/repos/demo && "
+CALC_UNCOMMITTED_T3 = f"{_CALC}{_EDIT}"
+CALC_COMMIT_T3 = f"{_CALC}{_EDIT} && git commit -qam sub"
+CALC_BRANCH_T3 = f"{_CALC}git checkout -q -b subtract && {_EDIT} && git commit -qam sub"
+CALC_MERGE_T3 = (
+    f"{CALC_BRANCH_T3} && git checkout -q feature/0.1.0 && git merge -q --no-edit subtract"
+)
+CALC_PUSH_T3 = (
+    f"{ONBOARDED_T3} && git clone -q /srv/demo.git /root/demo && cd /root/demo"
+    f" && {_EDIT} && git commit -qam sub && git push -q origin main"
+)
+CALC_WORKTREE_T3 = (
+    f"{_CALC}git worktree add -q -b feat /root/wt && cd /root/wt && {_EDIT} && git commit -qam sub"
+)
+BASELINED_T3 = f"{ONBOARDED_T3} && {_D} context baseline demo"
 
 
 def sh(*cmd: str) -> str:
