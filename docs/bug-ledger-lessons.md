@@ -14,8 +14,8 @@ the fix commit, found by its `fix(bugs)` or `refactor(bugs)` id line, to see wha
 The ledger verbs report current counts without copying them into prose:
 
 ```bash
-python3 .agents/skills/dd-bug-resolution/scripts/bugs.py stats
-python3 .agents/skills/dd-bug-resolution/scripts/bugs.py status --all
+python3 .agents/skills/dd-bug-resolution/scripts/bugs.py stats --specs <specs-dir>
+python3 .agents/skills/dd-bug-resolution/scripts/bugs.py status --all --specs <specs-dir>
 ```
 
 Current bug status is `open | resolved | superseded | rejected`. A terminal status is

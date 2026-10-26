@@ -16,7 +16,7 @@ python3 .agents/skills/dd-bug-resolution/scripts/bugs.py append \
   --bug-id doctor-exits-zero-with-errors --reported-by dd-sw-engineer-sr \
   --title "doctor exits 0 while reporting error findings" \
   --severity HIGH --component "cli/commands/doctor.py#run" \
-  --context demo --symptom "…" --repro "…" --expected "…" --correlates none
+  --context demo --symptom "…" --repro "…" --expected "…" --correlates none --specs <specs-dir>
 ```
 
 The ledger holds one record per bug, keyed by id. `append` prints each earlier bug whose
@@ -48,7 +48,7 @@ a wrapper around the old behavior. The fix commit's id line is its cite; the rul
 ## 4. Resolve with persisted facts
 
 ```bash
-python3 .agents/skills/dd-bug-resolution/scripts/bugs.py resolve <bug-id> \
+python3 .agents/skills/dd-bug-resolution/scripts/bugs.py resolve <bug-id> --specs <specs-dir> \
   --cause "…" --caused-by none --solution "…"
 ```
 
@@ -63,6 +63,6 @@ python3 .agents/skills/dd-bug-resolution/scripts/bugs.py resolve <bug-id> \
 - Every write validates the candidate bytes before atomic replacement, so refusal leaves
   both ledger files unchanged.
 
-`bugs.py archive <ids…>` moves exactly the named terminal records into
+`bugs.py archive <ids…> --specs <specs-dir>` moves exactly the named terminal records into
 `specs/bugs/_archive/bugs_histo.jsonl`. The archive retains historical record shapes as
 readable history; new writes use the lean schema.

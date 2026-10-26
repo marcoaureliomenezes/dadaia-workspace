@@ -137,10 +137,10 @@ the candidate's `rc-<N>/wt-rc`, its integration branch, for steps 2, 3, 4 and 6;
 runs every worktree verb: `new`, `merge`, `sync`, `clean`, `hash`, `list`, `pause`, `resume`.
 
 1. **Demand enters the backlog.** Only the operator creates demand;
-   `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py new <slug> --relates <slugs>|none`
+   `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py new <slug> --relates <slugs>|none --specs <specs-dir>`
    appends one `active[]` entry born `idea`, and every later status binds `intents[]` that resolve to a code, catalog, doc or invariant anchor.
 2. **Birth the release.**
-   `python3 .agents/skills/dd-release-implementation/scripts/release.py new <M.m.p>`
+   `python3 .agents/skills/dd-release-implementation/scripts/release.py new <M.m.p> --specs <specs-dir>`
    writes a `SPEC.md` stub in `specs/releases/<M.m.p>/rc-<N>/` and `_RELEASE.json` in
    `DEFINITION` at the release root, all or nothing, refusing a second live release.
 3. **Define the candidate.** The picked set; the as-is review — one row per unit the
@@ -151,7 +151,7 @@ runs every worktree verb: `new`, `merge`, `sync`, `clean`, `hash`, `list`, `paus
    one job file per job, `tasks/job<n>.md`, in that `rc-<N>/`, as the first commits of
    the `wt-rc`, cut from the work branch (`<work>M.m.p`; the names are the
    `gitflow:` block of `specs/constitution.md`).
-4. **Open implementation.** `release.py phase IMPLEMENTATION` requires
+4. **Open implementation.** `release.py phase IMPLEMENTATION --specs <specs-dir>` requires
    `SPEC.md` and `PLAN.md` `**Status:** Approved`, PLAN's `## DAG` with wave and exact
    `W:` sets, and lean job files containing task id, AC and exact `W:`, then stamps `defined`.
 5. **Run the jobs.** Each job opens its `wt-main` by `.dadaia/.venv/bin/dadaia worktree new`
@@ -163,7 +163,7 @@ runs every worktree verb: `new`, `merge`, `sync`, `clean`, `hash`, `list`, `paus
    `.dadaia/.venv/bin/dadaia worktree sync <wt-rc path>` rebases the rc and its trees,
    parents first.
 6. **Close the candidate.** The Reconciliation, as the last commits of the `wt-rc`:
-   `release.py phase CLOSURE` (no `wt/*` tree or branch open but the `wt-rc`), the
+   `release.py phase CLOSURE --specs <specs-dir>` (no `wt/*` tree or branch open but the `wt-rc`), the
    closure `log` entries, the disposition sweep (`backlog.py exit`, `audit.py
    disposition`/`close`, `bugs.py archive`), artifact GC, and last the memory
    reconciliation with its derived docs; after CLOSURE a hotfix lane still reaches it by
