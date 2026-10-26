@@ -208,7 +208,7 @@ def _refuse_unauthorized(allowed: list[str], state: dict[str, Any]) -> None:
     for bug_id in allowed:
         authorized = any(
             entry.get("kind") == "note"
-            and "Operator authorization verbatim:" in str(entry.get("text", ""))
+            and str(entry.get("text", "")).startswith("Operator authorization verbatim:")
             and _mentions(str(entry.get("text", "")), bug_id)
             for entry in log
         )

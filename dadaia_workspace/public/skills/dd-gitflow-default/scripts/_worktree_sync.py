@@ -74,7 +74,7 @@ def sync(root: Path, path: str) -> str:
             git(tree, "rebase", "--abort", check=False)
             fix = act(
                 "agent",
-                f"resolve the conflict by hand (`{git_inline(tree, 'rebase', '--onto', base, forks[tree])}`), "
+                f"resolve the conflict (`{git_inline(tree, 'rebase', '--onto', base, forks[tree])}`; a ledger conflict is redone by the ledger's own writer, never hand-merged), "
                 f"then rerun `{inline(*cli_words(root, 'worktree', 'sync', path))}`",
             )
             raise Refusal(f"{tree} conflicts rebasing onto {base}", fix) from error
