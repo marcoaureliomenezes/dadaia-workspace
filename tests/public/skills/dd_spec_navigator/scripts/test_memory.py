@@ -120,8 +120,27 @@ def test_catalog_generate_preserves_non_catalog_sections_verbatim(
             "# Mine\n\n## Feature catalog\n\n",
             "\n\n## Notes\n\nafter.\n",
         ),
+        (
+            "# Mine\n\n\n## Feature catalog\n\nSTALE row\n\n## Notes\n\nafter.\n",
+            "# Mine\n\n\n## Feature catalog\n\n",
+            "\n\n## Notes\n\nafter.\n",
+        ),
+        ("\n# Mine\n\n## Feature catalog\n\nSTALE row\n", "\n# Mine\n\n## Feature catalog\n\n", ""),
+        (
+            "# Mine\n\n## Authored\n\nkeep.\n\n\n",
+            "# Mine\n\n## Authored\n\nkeep.\n\n## Feature catalog\n\n### ",
+            "",
+        ),
     ],
-    ids=["no-heading", "longer-heading-line", "deeper-heading", "exact-heading"],
+    ids=[
+        "no-heading",
+        "longer-heading-line",
+        "deeper-heading",
+        "exact-heading",
+        "two-blank-lines-before-exact",
+        "leading-blank-line",
+        "append-after-trailing-blanks",
+    ],
 )
 def test_catalog_generate_keeps_every_authored_line_and_owns_one_exact_section(
     script: Path, specs: Path, authored: str, kept_before: str, kept_after: str
