@@ -118,7 +118,7 @@ def test_catalog_generate_and_drift_pin_exit_output_and_artifacts(tmp_path: Path
     atom.parent.mkdir(parents=True)
     write_text(atom, _ATOM)
     stale_catalog = b'{"generated_at":"2000-01-01T00:00:00Z","features":[]}\n'
-    stale_index = b"# stale catalog fixture\n"
+    stale_index = _INDEX.split(b"### platform")[0] + b"stale rows\n"
     (product / "catalog.json").write_bytes(stale_catalog)
     (product / "index.md").write_bytes(stale_index)
     expected_catalog = _CATALOG
