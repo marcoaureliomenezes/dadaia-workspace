@@ -64,7 +64,7 @@ def _remote(parent: Path, branches: tuple[str, ...], tag: bool) -> Path:
 def _fill_memory(root: Path) -> None:
     """The scripted stand-in for the ``agent`` step: an audit that writes real memory."""
     for specs in alive_context_trees(root).values():
-        for stub in ("ARCHITECTURE.md", "QUALITY.md"):
+        for stub in ("ARCHITECTURE.md", "QUALITY.md", "product/index.md"):
             write_text(specs / "memory" / stub, f"# {stub}\n\naudited\n")
         catalog = specs / "memory" / "product" / "catalog.json"
         catalog.parent.mkdir(parents=True, exist_ok=True)

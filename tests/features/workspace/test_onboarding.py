@@ -39,7 +39,7 @@ def _specs(tmp_path: Path, name: str = "app", *, audited: bool = False) -> Path:
     (specs / "memory" / "product").mkdir(parents=True)
     stamp = f"---\nspecs_pattern_version: {CANONICAL_SPECS_VERSION}\n---\n# c\n"
     os_write_text(specs / "constitution.md", stamp)
-    for stub in ("ARCHITECTURE.md", "QUALITY.md"):
+    for stub in ("ARCHITECTURE.md", "QUALITY.md", "product/index.md"):
         shutil.copyfile(_SCAFFOLD / "memory" / stub, specs / "memory" / stub)
     if audited:
         for stub in ("ARCHITECTURE.md", "QUALITY.md"):
@@ -48,6 +48,7 @@ def _specs(tmp_path: Path, name: str = "app", *, audited: bool = False) -> Path:
             specs / "memory" / "product" / "catalog.json", json.dumps({"features": [{"slug": "x"}]})
         )
         os_write_text(specs / "memory" / "product" / "x.md", _ATOM)
+        os_write_text(specs / "memory" / "product" / "index.md", "# Product\n\nReal vision.\n")
     return specs
 
 
@@ -152,11 +153,38 @@ def test_the_first_pass_names_no_atom_when_only_the_catalog_claims_one(tmp_path:
     assert "(no atom)" in step.command
 
 
+_SCAFFOLD_INDEX = (_SCAFFOLD / "memory" / "product" / "index.md").read_text(encoding="utf-8")
+
+
+@pytest.mark.parametrize(
+    ("index", "pending"),
+    [
+        (_SCAFFOLD_INDEX, True),
+        (_SCAFFOLD_INDEX.replace("_No features found._", "### product\n\n| `x` | X | x |"), True),
+        (_SCAFFOLD_INDEX.replace("The product vision is not documented yet.", "Real vision."), False),
+    ],
+    ids=["scaffold", "scaffold-with-generated-catalog", "hand-written"],
+)
+def test_the_first_pass_judges_the_product_index_apart_from_its_generated_catalog(
+    tmp_path: Path, index: str, pending: bool
+) -> None:
+    """With an atom and filled stubs, the index is pending exactly while what the catalog
+    section leaves is still the shipped scaffold text."""
+    specs = _specs(tmp_path, audited=True)
+    write_text(specs / "memory" / "product" / "index.md", index)
+
+    step = next_step(tmp_path, {"app": specs})
+
+    assert step is not None
+    assert (step.id == "first-pass") == pending
+    assert (str(specs / "memory" / "product" / "index.md") in step.command) == pending
+
+
 def test_the_first_pass_fix_opens_the_backlog_first_pass_lane(tmp_path: Path) -> None:
     specs = _specs(tmp_path, "proj")  # the repo slug differs from the context name
     step = next_step(tmp_path, {"app": specs})
     memory = specs / "memory"
-    pending = f"{memory / 'ARCHITECTURE.md'}, {memory / 'QUALITY.md'}, {memory / 'product'} (no atom)"
+    pending = f"{memory / 'ARCHITECTURE.md'}, {memory / 'QUALITY.md'}, {memory / 'product' / 'index.md'}, {memory / 'product'} (no atom)"
     lane = fix_line(tmp_path, "worktree", "new", "proj", "0.1.0/wt-backlog-first-pass")
     assert step is not None
     assert step.command == (
