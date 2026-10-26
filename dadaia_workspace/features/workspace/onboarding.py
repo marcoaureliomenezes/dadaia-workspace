@@ -27,7 +27,8 @@ from dadaia_workspace.infrastructure.ledger_scripts import load_owner
 
 CODE = "ONBOARDING"
 Kind = Literal["command", "agent"]
-_STUBS = ("ARCHITECTURE.md", "QUALITY.md")
+_INDEX = "product/index.md"
+_STUBS = ("ARCHITECTURE.md", "QUALITY.md", _INDEX)
 
 
 @dataclass(frozen=True)
@@ -67,10 +68,13 @@ def _unbound(c: _Ctx) -> str | None:
 
 def _first_pass(c: _Ctx) -> list[str]:
     templates = workspace_layout.public_scripts_dir().parent / "templates"
+    catalog = load_owner("dd-spec-navigator", "_memory_catalog")
     pending = []
     for name in _STUBS:
         path = c.specs / "memory" / name
         text = platform.read_text(path) if path.is_file() else ""
+        if text and name == _INDEX:
+            text = catalog.render(c.specs, {})  # the generated section set aside
         if not text or was_shipped(
             strip_fixed_sections(text), f"scaffold/memory/{name}", templates
         ):
