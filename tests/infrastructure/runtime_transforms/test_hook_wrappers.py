@@ -185,9 +185,9 @@ def test_only_a_harness_naming_its_subagent_and_matching_the_shell_tool_judges_t
     does not: a Codex shell matcher would refuse the reviewer, its payload carrying no agent_type."""
     seen = {
         name: any(
-            re.search(matcher, "Bash")
+            not matcher or re.search(matcher, "Bash")
             for _, lane, matcher in HOOK_DIALECTS[rec.hooks].files[0].events
-            if lane == "pre-gate" and matcher
+            if lane == "pre-gate"
         )
         for name, rec in HARNESS_RECORDS.items()
         if rec.subagent_key
