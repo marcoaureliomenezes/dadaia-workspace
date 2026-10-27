@@ -141,7 +141,12 @@ def test_capabilities_json_matches_service_and_public_schema() -> None:
     Draft202012Validator(schema).validate(payload)
     assert "workflows" not in payload
     assert payload["contexts"]["selection_contract"] == "explicit-or-caller-owned-bind"
-    assert payload["consumer_requirements"]["exact_provider_version"] is True
+    assert payload["consumer_requirements"] == {
+        "exact_provider_version": True,
+        "reconcile_public_projections_after_upgrade": True,
+        "load_scoped_context_after_bind": True,
+        "preserve_complete_diagnostics": True,
+    }
     assert payload["certification"] == {"schema_version": "dadaia-certification-v1"}
     assert "dadaia " not in json.dumps(payload)
 
