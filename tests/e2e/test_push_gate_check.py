@@ -17,9 +17,11 @@ from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.core.cli_line import shell_line
+from dadaia_workspace.core.cli_line import cli_words
+from dadaia_workspace.core.platform import inline
 from dadaia_workspace.core.specs_version import CANONICAL_SPECS_VERSION
 from dadaia_workspace.features.spec_context import sweep
+from tests.fakes import land_fix
 from tests.fixtures.harness_env import suite_env
 from tests.helpers.oslib import make_readonly, run, write_text
 
@@ -102,7 +104,7 @@ def test_a_custom_gitflow_governs_the_push(tmp_path: Path) -> None:
     assert _run_push_gate(repo, tmp_path, _push("work/0.0.1", sha)).returncode == 0
     refused = _run_push_gate(repo, tmp_path, _push("feature/0.0.1", sha))
     assert refused.returncode != 0
-    fix = shell_line("git", "-C", str(repo), "switch", "-c", "work/0.1.0", sha)
+    fix = land_fix(lambda root, *words: inline(*cli_words(root, *words)))
     assert f"fix: {fix}" in refused.stderr, refused.stderr
 
 

@@ -23,6 +23,7 @@ from dadaia_workspace.features.chokepoints.branch_policy import (
 from dadaia_workspace.features.specs.canon import canon_violations
 from dadaia_workspace.infrastructure.git_objects import GitSubprocessObjectReader
 from tests.fakes import gate_fixes
+from tests.fakes import land_fix as _land_fix
 from tests.fixtures.real_git import PushRepo
 from tests.helpers.oslib import command
 
@@ -141,20 +142,22 @@ def _birth_fix(tip: str, role: str) -> list[str]:
     pytest.param(_C, lambda r, f: _line("work/0.0.1", "work/0.0.2"), "refs/heads/work/0.0.2",
                  ["git", "-C", "/repo", "branch", "-m", "work/0.0.1", "work/0.0.2"], id="finding-2-work-branch-to-a-foreign-remote-ref"),
     pytest.param(_C, _feature_to_published_integration, "", None, id="finding-2-work-branch-to-the-integration-ref"),
-    pytest.param(_C, lambda r, f: f"HEAD {_A} refs/heads/work/0.0.1 {_ZERO}", "",
-                 ["git", "-C", "/repo", "switch", "-c", "work/0.6.0", _A], id="finding-6-detached-head-cuts-the-work-branch"),
+    pytest.param(_C, lambda r, f: f"HEAD {_A} refs/heads/work/0.0.1 {_ZERO}", "", _land_fix, id="finding-6-detached-head-is-landed-through-a-tree"),
     pytest.param(_D, lambda r, f: "this line has three fields", "", None, id="finding-1-malformed-stdin-fails-closed"),
 ])
 # fmt: on
 def test_the_gate_refuses_with_the_configured_fix(
-    repo: PushRepo, flow: Gitflow, scenario: Scenario, named: str, fix: list[str] | str | None
+    repo: PushRepo, flow: Gitflow, scenario: Scenario, named: str, fix: list[str] | str | Callable[..., str] | None,
+    sentence: Callable[..., str],
 ) -> None:
-    """Each refusal names the configured branches; its fix is one command, no `&&` (PowerShell 5.1 has none)."""
+    """Each refusal names the configured branches; its fix is one command (no `&&`: PowerShell 5.1 has none) or one Agent action."""
     names = {"principal": flow.principal, "integration": flow.integration, "prefix": flow.work_prefix}
     decision = _decide(scenario(repo, flow), repo, flow)
     assert not decision.allowed
     assert named.format(**names) in decision.message
-    if isinstance(fix, str):
+    if callable(fix):
+        assert _fix(decision) == fix(sentence)
+    elif isinstance(fix, str):
         assert _fix(decision) == fix.format(**names)
     else:
         assert fix is None or _fix(decision) == command(*[part.format(**names) for part in fix])
@@ -170,27 +173,40 @@ def test_the_gate_refuses_with_the_configured_fix(
 ])
 # fmt: on
 def test_a_branch_outside_the_gitflow_is_refused_naming_the_work_branch(
-    repo: PushRepo, flow: Gitflow, branch: str
+    repo: PushRepo, flow: Gitflow, branch: str, sentence: Callable[..., str]
 ) -> None:
     """A name that is not exactly the principal, the integration or prefix + M.m.p has no role.
 
-    The fix is one command from any cwd carrying the refused commit.
+    The fix is the Agent action that lands the work through a tree.
     """
     decision = _decide(_line(branch), repo, flow)
     assert not decision.allowed
     assert "outside the gitflow" in decision.message
     assert all(word in decision.message for word in (branch, flow.principal, flow.integration, flow.work_prefix))
-    assert _fix(decision) == command("git", "-C", "/repo", "switch", "-c", f"{flow.work_prefix}0.6.0", _A)
+    assert "dd-gitflow-default" in decision.message and "only a work branch" not in decision.message
+    assert "worktree merge" in decision.message and f"merge {_A}" not in decision.message
+    assert _fix(decision) == _land_fix(sentence)
 
 
-def test_an_outside_ref_is_carried_onto_the_live_work_branch() -> None:
-    """The live work branch may have diverged — switch to it and merge (append-only, never a
-    rebase)."""
+def test_an_outside_ref_is_routed_through_a_tree_whatever_the_live_work_branch(sentence: Callable[..., str]) -> None:
+    """With a live work branch the route stays `worktree merge`: the pushable set is the §2a
+    contract, never a raw merge of the refused commit into the work branch."""
     refs = parse_push_stdin(_line("topic"))[0]
-    decision = check_branch_policy(refs, _CUSTOM, replace(gate_fixes(), work="work/1.2.3", cut=True))
+    decision = check_branch_policy(refs, _CUSTOM, replace(gate_fixes(), work="work/1.2.3"))
     assert decision is not None and "'work/1.2.3'" in decision.message
-    assert f"merge {_A}" in decision.message
-    assert _fix(decision) == command("git", "-C", "/repo", "switch", "work/1.2.3")
+    assert "dd-gitflow-default" in decision.message and "worktree merge" in decision.message
+    assert f"merge {_A}" not in decision.message
+    assert _fix(decision) == _land_fix(sentence)
+
+
+def test_a_task_branch_is_routed_to_its_parent_by_worktree_merge(sentence: Callable[..., str]) -> None:
+    """A `wt/` task branch is not pushable: its route is `worktree merge` into its parent, never a raw merge."""
+    ref = "wt/0.5.0/rc-1/job-1/wt-task-001"
+    decision = check_branch_policy(parse_push_stdin(_line(ref))[0], _CUSTOM, replace(gate_fixes(), work="work/1.2.3"))
+    assert decision is not None and not decision.allowed
+    assert "worktree merge" in decision.message and "dd-gitflow-default" in decision.message
+    assert "only a work branch" not in decision.message and f"merge {_A}" not in decision.message
+    assert _fix(decision) == _land_fix(sentence)
 
 
 @pytest.mark.parametrize(

@@ -413,40 +413,6 @@ def _seeded(world: World) -> None:
     world.seed(_constitution())
 
 
-def _outside(world: World, published: bool = True) -> str:
-    """The refused ref is not the checked-out one."""
-    if published:
-        _published(world)
-    world.commit("notes.md", "n\n", branch="topic")
-    world.git(world.repo, "checkout", "-q", "main")
-    return "git push -q origin topic"
-
-
-def _outside_with_work(world: World) -> str:
-    """The live work branch has diverged from the refused ref: only switch + merge carries it."""
-    _published(world)
-    world.commit("w.md", "w\n", branch="feature/0.1.0")
-    world.git(world.repo, "checkout", "-q", "main")
-    return _outside(world, published=False)
-
-
-def _outside_detached(world: World) -> str:
-    _published(world)
-    world.commit("notes.md", "n\n", branch="topic")
-    world.git(world.repo, "checkout", "-q", "--detach")
-    world.git(world.repo, "branch", "-q", "-D", "topic")
-    return "git push -q origin HEAD:refs/heads/topic"
-
-
-#: The refusal's documented steps after its switch: merge the refused commit, push the work.
-_MERGE_TOPIC = "git merge -q --no-edit topic && git push -q origin feature/0.1.0"
-
-
-def _work_carries_topic(world: World) -> None:
-    tip = world.remote_heads()["feature/0.1.0"]
-    assert "notes.md" in world.git(world.repo, "ls-tree", "--name-only", tip).splitlines()
-
-
 def _mismatch(world: World) -> str:
     _published(world)
     world.commit("notes.md", "n\n", branch="topic")
@@ -1295,10 +1261,9 @@ _WORKTREE: dict[str, tuple[WtCase | Skip, ...]] = {
 _REFUSALS: dict[str, tuple[Case | WtCase | tuple[Case, ...] | Skip, ...]] = {
     "branch_policy._refuse_branch": (
         Case(_birth_published, _develop_at_main, replaces=True),
-        (
-            Case(_outside, _work_carries_topic, then=_MERGE_TOPIC),
-            Case(_outside_with_work, _work_carries_topic, then=_MERGE_TOPIC),
-            Case(_outside_detached, _work_carries_topic, then="git push -q origin feature/0.1.0"),
+        Skip(
+            "an Agent action over worktree verbs: the worktree_ws harness drives it, "
+            "tests/core/test_cli_line__refusal_fix_lines_clear_their_refusal.py::test_an_outside_ref_lands_through_a_tree"
         ),
         Skip("an Agent action on the git host: the PR is no command to run"),
     ),

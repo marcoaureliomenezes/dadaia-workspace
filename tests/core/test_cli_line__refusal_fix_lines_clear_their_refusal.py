@@ -26,13 +26,24 @@ from __future__ import annotations
 
 import re
 from collections import Counter
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.core.cli_line import fix_line
+from dadaia_workspace.core.cli_line import cli_words, fix_line
+from dadaia_workspace.core.gitflow import Gitflow
+from dadaia_workspace.core.platform import inline
+from dadaia_workspace.core.skill_owner import load_owner
+from dadaia_workspace.features.chokepoints.branch_policy import (
+    GateFixes,
+    PushRef,
+    check_branch_policy,
+)
+from tests.fakes import land_fix
 from tests.fixtures.fix_census import fix_sites
 from tests.fixtures.fix_world import (
+    _RC,
     _REFUSALS,
     _TERM,
     Case,
@@ -148,6 +159,103 @@ def test_the_worktree_fix_line_clears_the_refusal(case: WtCase, tmp_path: Path) 
         if done.returncode == 0:
             return
     pytest.fail("the refusal chain did not clear within four fix lines:\n" + "\n".join(seen))
+
+
+def test_a_refused_task_branch_lands_on_its_wt_main_by_worktree_merge(tmp_path: Path) -> None:
+    """Push of a task branch is refused; the route the Agent action names, `worktree merge` of the
+    tree (path from the branch name), leaves the commit on wt-main, which pre-push admits and
+    origin then holds."""
+    root = tmp_path / "ws"
+    root.mkdir()
+    wt.make_workspace(root)
+    names = load_owner("dd-gitflow-default", "_worktree_names")
+    wt_task = names.branch(wt.NEW_TASK)
+    wt_main = names.branch(wt.NEW_JOB)
+    repo = root / "repos" / "r"
+    flow = Gitflow(principal="trunk", integration="dev", work_prefix="feature/")
+    ref = PushRef(f"refs/heads/{wt_task}", "a" * 40, f"refs/heads/{wt_task}", "0" * 40)
+
+    refused = check_branch_policy([ref], flow, GateFixes(repo=str(repo), work="feature/0.5.0"))
+    assert refused is not None and not refused.allowed
+    assert the_fix(refused.message, root) == land_fix(
+        lambda r, *words: inline(*cli_words(r, *words))
+    )
+
+    for name in (_RC, wt.NEW_JOB):
+        wt.open_tree(root, name)
+    task = wt.open_tree(root, wt.NEW_TASK)
+    sha = wt.commit(task, "src/a.py")
+    merged = wt.run(root, "merge", str(names.tree_path(root, "r", names.name_of(wt_task))))
+    assert merged.returncode == 0, merged.stderr
+
+    main_ref = PushRef(f"refs/heads/{wt_main}", "a" * 40, f"refs/heads/{wt_main}", "0" * 40)
+    assert check_branch_policy([main_ref], flow, GateFixes(repo=str(repo))) is None
+    origin = tmp_path / "origin.git"
+    wt.git(tmp_path, "init", "-q", "--bare", str(origin))
+    wt.git(repo, "push", "-q", str(origin), f"{wt_main}:refs/heads/{wt_main}")
+    assert sha in wt.git(origin, "rev-list", wt_main).split()
+
+
+def _topic(repo: Path) -> tuple[str, str]:
+    """A commit on a branch of its own, still named."""
+    wt.git(repo, "checkout", "-q", "-b", "topic")
+    sha = wt.commit(repo, "src/a.py", "topic = 1\n")
+    wt.git(repo, "checkout", "-q", "main")
+    return "refs/heads/topic", sha
+
+
+def _diverged(repo: Path) -> tuple[str, str]:
+    """The same, with the live work branch holding a commit the topic lacks."""
+    wt.git(repo, "checkout", "-q", "feature/0.5.0")
+    wt.commit(repo, "w.md", "w\n")
+    wt.git(repo, "checkout", "-q", "main")
+    return _topic(repo)
+
+
+def _detached(repo: Path) -> tuple[str, str]:
+    """The commit on a detached HEAD, no branch naming it."""
+    _, sha = _topic(repo)
+    wt.git(repo, "checkout", "-q", "--detach", sha)
+    wt.git(repo, "branch", "-q", "-D", "topic")
+    return "HEAD", sha
+
+
+@pytest.mark.parametrize(
+    "plant", [_topic, _diverged, _detached], ids=lambda f: f.__name__.strip("_")
+)
+def test_an_outside_ref_lands_through_a_tree(
+    plant: Callable[[Path], tuple[str, str]], tmp_path: Path
+) -> None:
+    """The refusal's Agent action, played with the real verbs: the refused commit is carried into a tree
+    opened by `worktree new`, `worktree merge` lands it on wt-main, wt-main is pushed and origin holds it."""
+    root = tmp_path / "ws"
+    root.mkdir()
+    wt.make_workspace(root)
+    repo = root / "repos" / "r"
+    local, sha = plant(repo)
+    flow = Gitflow(principal="trunk", integration="dev", work_prefix="feature/")
+    fixes = GateFixes(repo=str(repo), work="feature/0.5.0")
+    refused = check_branch_policy([PushRef(local, sha, "refs/heads/topic", "0" * 40)], flow, fixes)
+    assert refused is not None and not refused.allowed
+    assert the_fix(refused.message, root) == land_fix(
+        lambda r, *words: inline(*cli_words(r, *words))
+    )
+
+    names = load_owner("dd-gitflow-default", "_worktree_names")
+    for name in (_RC, wt.NEW_JOB):
+        wt.open_tree(root, name)
+    task = wt.open_tree(root, wt.NEW_TASK)
+    wt.git(task, "cherry-pick", sha)
+    merged = wt.run(root, "merge", str(names.tree_path(root, "r", wt.NEW_TASK)))
+    assert merged.returncode == 0, merged.stderr
+
+    main = names.branch(wt.NEW_JOB)
+    landed = PushRef(f"refs/heads/{main}", "a" * 40, f"refs/heads/{main}", "0" * 40)
+    assert check_branch_policy([landed], flow, fixes) is None
+    origin = tmp_path / "origin.git"
+    wt.git(tmp_path, "init", "-q", "--bare", str(origin))
+    wt.git(repo, "push", "-q", str(origin), f"{main}:refs/heads/{main}")
+    assert "topic = 1" in wt.git(origin, "show", f"{main}:src/a.py")
 
 
 def test_dead_leaves_a_clean_published_detached_head(world: World) -> None:
