@@ -29,7 +29,7 @@ read or any output written.
 ## Phase 3 — resolve the live release and its candidate
 
 1. Read `<specs-dir>/releases/<release-id>/_RELEASE.json` — read its `phase`; the live candidate is the highest `rc-<N>/` beside it (`ls -d <specs-dir>/releases/[0-9]*/rc-* | sort -V | tail -1`).
-2. No `_RELEASE.json` under `<specs-dir>/releases/`: stop before implementation and inform the operator.
+2. No `_RELEASE.json` under `<specs-dir>/releases/`: stop before implementation and report it.
 3. Read the SPEC; add the PLAN when planning or implementing and every job file when implementing; read `_RELEASE.json`'s `log` when `phase` is `CLOSURE`.
 4. Before any implementation, the precondition is `specs/AGENTS.md`, heading "Before implementing"; stop and name the missing item otherwise.
 

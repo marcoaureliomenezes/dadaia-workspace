@@ -17,7 +17,7 @@
 - `.dadaia/.venv/bin/dadaia context bind <ctx>` binds; the ctx-inject hook then injects memory (`dd-spec-navigator` Phase 2); the CLI verbs read the session id from the environment, and the hooks also take the hook payload's id where the harness's registry row names a session variable; a subagent inherits its parent's session id and binding and never binds.
 - Scope = the bound context's main and associated repos, judged under `repos/<slug>/` and `worktrees/<slug>/`; a write inside a tree git linked from a registered repo is in scope whatever the bind; binding is optional, an ADDITIVE write needs none.
 - An id-bearing session with no bind owns no repo; an unregistered slug and a root path are not scope-judged.
-- Races are surfaced, not prevented; zero ALIVE -> alert the operator.
+- Races are surfaced, not prevented; zero ALIVE -> the main thread runs `context create` (a subagent stops and reports).
 - One harness session per checked-out tree; parallel work: `worktrees/AGENTS.md`.
 
 ## 3. Git chokepoints

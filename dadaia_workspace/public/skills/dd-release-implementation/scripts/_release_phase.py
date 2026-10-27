@@ -46,7 +46,7 @@ def _refuse_unapproved_docs(live: Live) -> Path:
                 f"release {live.release_id} has no {document.relative_to(live.release_dir).as_posix()}",
                 act(
                     "agent",
-                    f"write {document.resolve()} (its writer per specs/AGENTS.md §4) and put it to the operator for approval",
+                    f"write {document.resolve()} (its writer per specs/AGENTS.md §4)",
                 ),
             )
         status = extract_status(read_text(document))

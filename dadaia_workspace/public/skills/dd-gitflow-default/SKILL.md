@@ -19,7 +19,7 @@ The branch contract by role; the names are `specs/constitution.md`'s `gitflow:` 
 1. `git fetch --all --prune`.
 2. Read the gitflow block; branch B lacks a change branch A holds when `git merge-tree --write-tree origin/B origin/A` prints a tree other than `git rev-parse origin/B^{tree}` (git ≥ 2.38); the integration branch carries undeployed changes when the principal lacks a change it holds.
 3. Identify the one live work branch `<work>M.m.p`.
-4. Surface a work branch that lacks a change the integration branch holds (step 2's test, B the work branch, A the integration branch) to the operator first — it is stale.
+4. Report a work branch that lacks a change the integration branch holds (step 2's test, B the work branch, A the integration branch) first — it is stale.
 5. Branch count, cut point and name follow §2a.
 6. Definition stage: where a candidate is defined is `specs/releases/AGENTS.md`'s.
 7. Implementation stage: one commit per task, shaped per §3a.

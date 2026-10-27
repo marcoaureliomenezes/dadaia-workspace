@@ -126,7 +126,7 @@ decision-rich part.
 - Steps are actions in execution order, one idea per step, each ending on its criterion (Completion criteria).
 - When a skill branches, the branch decision is the FIRST step — picking the wrong branch wastes the whole run.
 - Templates and formats are given as fenced blocks where they are used.
-- Human gates are explicit: finding facts is the agent's job (inspect before asking); decisions are the operator's — put each one to them and wait.
+- Human gates are explicit: finding facts is the agent's job (inspect before asking); decisions are the operator's — the main thread puts each one to them and waits; a subagent returns it to the main thread.
 
 ---
 

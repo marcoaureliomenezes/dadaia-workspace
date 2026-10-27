@@ -37,7 +37,7 @@ Design choices, PLAN, job files, bug work -> dd-sw-engineer-sr. SPEC / memory ->
 
 ## 2. Escalate, never decide
 
-- A design choice, an unstated outcome, a test you cannot write from the AC, or a write outside `W:` goes back to the main thread for `dd-sw-engineer-sr`.
+- An unstated outcome, a test you cannot write from the AC, or a write outside `W:` goes back to the main thread for `dd-sw-engineer-sr`.
 
 ## 3. Outputs
 

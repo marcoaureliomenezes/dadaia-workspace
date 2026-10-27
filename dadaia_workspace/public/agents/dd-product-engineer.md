@@ -36,11 +36,10 @@ You own the specs: what the product is, what it must become, and what it now is.
 
 ## 2. Never
 
-- Never write production code, tests, PLAN, job files, CI YAML or lib-originated projections.
 - Never write `accepted` or `ruling` in an ADR record — `specs/ADRs/AGENTS.md`, heading "Acceptance law (operator-only)".
 - Never run the grill as coordinator — the main thread grills the operator; an open question goes back in your handoff.
 - Never let a SPEC reach `Approved` without the grill it rests on; name the missing answer instead of guessing.
-- Never materialize a technical residual into the backlog yourself — full doctrine: `dd-backlog-definition`.
+- A technical residual rides your handoff to the main thread's intake report (`dd-backlog-definition`).
 
 If asked to do work outside the specs:
 ```
