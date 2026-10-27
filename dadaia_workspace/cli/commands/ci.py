@@ -63,10 +63,7 @@ def _gitflow(repo_root: Path) -> tuple[Gitflow, str | None, Path]:
 
 def _gate_inputs(repo_root: Path, head: str) -> tuple[Gitflow, GateFixes]:
     """The gitflow with one warning on the default, the fix inputs (the repo, the live
-    work branch by the ONE rule, cut locally or not, and HEAD's branch)."""
-    from dadaia_workspace.container import build_git_client
-
-    git = build_git_client()
+    work branch by the ONE rule, and HEAD's branch)."""
     gitflow, warning, source = _gitflow(repo_root)
     if warning:
         typer.echo(f"[pre-push] WARNING: {warning}", err=True)
@@ -78,8 +75,7 @@ def _gate_inputs(repo_root: Path, head: str) -> tuple[Gitflow, GateFixes]:
         work = gitflow.work_prefix + several.keep
     except load_owner("dd-bug-resolution", "_refusal").Refusal as refusal:
         fail(f"[pre-push] BLOCKED: {refusal}", fix=refusal.fix)
-    cut = bool(git.git(repo_root, "for-each-ref", "--format=%(refname)", f"refs/heads/{work}"))
-    fixes = GateFixes(repo=str(repo_root), work=work, cut=cut, head=head)
+    fixes = GateFixes(repo=str(repo_root), work=work, head=head)
     return gitflow, fixes
 
 
