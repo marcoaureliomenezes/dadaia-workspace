@@ -38,9 +38,7 @@ def test_a_missing_spec_is_written_by_its_agent_and_a_draft_is_approved_by_the_o
     with pytest.raises(_PHASE.Refusal) as missing:
         _PHASE._refuse_unapproved_docs(live)
     spec = (tmp_path / "rc-1" / "SPEC.md").resolve()
-    assert missing.value.fix == (
-        f"Agent action: write {spec} (its writer per specs/AGENTS.md §4) and put it to the operator for approval"
-    )
+    assert missing.value.fix == (f"Agent action: write {spec} (its writer per specs/AGENTS.md §4)")
     spec.write_text("**Status:** Draft\n", encoding="utf-8")
     with pytest.raises(_PHASE.Refusal) as draft:
         _PHASE._refuse_unapproved_docs(live)
