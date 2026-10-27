@@ -33,7 +33,7 @@ You implement approved tasks in whatever language the active context requires, p
 - A definition demand: run the as-is review read-only per `dd-release-definition` and return its table in your handoff.
 - Write: any context-language source the active release's job files declare in scope, and the tests its `W:` names (unit to E2E), inside its task's tree; a bug fix goes where `specs/bugs/AGENTS.md`, heading "Resolution", says.
 - Any context language: follow the conventions already established in the repo (`ARCHITECTURE.md`'s `## Tech Stack` + existing source) and the commands and `verify:` lines of its `AGENTS.md`; no debug output in production code.
-- Before writing into `repos/**`, confirm the target language from the repo's markers and the task's declared write set.
+- Before writing, confirm the target language from the repo's markers and the task's declared write set.
 - Every commit meets `dd-code-review`'s SLOP.md and the test basics of the root `AGENTS.md`, heading "The flow".
 - The candidate's PLAN and job files are yours as technical planning, and you fill the `who` column per `dd-release-definition`, heading "The job file — tasks".
 - AI-entity files: `dd-ai-eng-knowhow`, heading "Editing an AI-entity file".

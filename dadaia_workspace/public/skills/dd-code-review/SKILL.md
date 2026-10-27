@@ -19,7 +19,7 @@ axes are reported side by side with equal weight, so no axis hides another's fin
 
 1. Inside a dadaia workspace, open `specs/memory/AGENTS.md` (the area's scoped law) and follow it — the diff is
    judged against current product truth.
-2. Reviewing a PR, branch or commit range before the candidate's PR.
+2. Reviewing a PR, branch or commit range before its merge.
 3. An architecture or audit verdict needs Axis 3 — Bug-surface.
 
 ## 2. Axis 1 — Standards

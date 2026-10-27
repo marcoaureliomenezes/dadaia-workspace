@@ -36,7 +36,7 @@ An rc is a DAG of jobs the PLAN draws, Job 1 first. Its `wt-rc` carries the defi
 - Artifact GC: `.dadaia/.venv/bin/dadaia doctor` dry, then `--fix`; resolve or hold every reported artifact through the doctor's own procedure.
 - Done when: the reconcile commits are on `wt-rc`; `.dadaia/.venv/bin/dadaia doctor` is clean.
 
-**Step 5 — Candidate PR.**
+**Step 5 — Merge the `wt-rc`.**
 - `WT merge` of the `wt-rc` into the work branch; the candidate PR is `dd-gitflow-default` step 8's, on the operator's order.
 - Done when: the `wt-rc` is merged.
 

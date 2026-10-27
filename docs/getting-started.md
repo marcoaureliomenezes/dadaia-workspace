@@ -168,7 +168,7 @@ runs every worktree verb: `new`, `merge`, `sync`, `clean`, `hash`, `list`, `paus
    disposition`/`close`, `bugs.py archive`), artifact GC, and last the memory
    reconciliation with its derived docs; after CLOSURE a hotfix lane still reaches it by
    `worktree sync`, in code only the `wt-rc` holds only a block-list bug lands, on the `wt-rc` itself, and any other work opens the next candidate. Then the `wt-rc` merges into the work branch through the job gate plus
-   the ledger checks, and the work -> integration PR merges green.
+   the ledger checks; the PR to the integration branch is `dd-gitflow-default` step 8's, on the operator's order.
 7. **Continue or promote.** Continue: `release.py new` with the same id stacks the next
    candidate, reopening `DEFINITION`. Promote: merge the integration branch into the
    principal by PR; when the project's own release pipeline then opens a PR into the

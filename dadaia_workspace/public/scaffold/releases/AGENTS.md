@@ -21,7 +21,7 @@ Scope: this file governs only `specs/releases/`.
 ## 2. Authoring rules
 
 - One `**Origin:**` line per SPEC, the first counting: `operator-demand`, or `backlog:<ids>; bugs:<ids>; findings:<ids>`, each kind at most once, a finding id in full (`<audit-id>-F<nnn>`); `RELEASE_PY check --specs <specs-dir>` judges it and traces each id back.
-- SDD lifecycle order PER CANDIDATE: as-is review -> grill -> SPEC (Draft) -> PLAN -> job files -> operator approval of SPEC and PLAN -> implementation -> closure -> integration-branch merge -> promote-or-continue gate.
+- SDD lifecycle order PER CANDIDATE: as-is review -> grill -> SPEC (Draft) -> PLAN -> job files -> operator approval of SPEC and PLAN -> implementation -> closure -> promote-or-continue gate (`dd-gitflow-default` steps 8-9).
 - Full arc, gate cadence, the step-by-step ladder: `dd-release-implementation`'s `RC-FLOW.md`.
 - A candidate is closed: created, implemented, or cancelled into the next; never amended (shape 8 records approval only); a new AC goes to the next rc.
 - A candidate is defined in its own `rc-<N>/`, authored in its `wt-rc` tree (`worktrees/AGENTS.md` §1): rc N+1 is drafted there while rc N implements and enters by `RELEASE_PY new <id> --specs <specs-dir>` at rc N's CLOSURE;

@@ -55,7 +55,6 @@ def build_capabilities(command_paths: Collection[tuple[str, ...]]) -> dict[str, 
             "reconcile_public_projections_after_upgrade": True,
             "load_scoped_context_after_bind": True,
             "preserve_complete_diagnostics": True,
-            "credentials_location": "workspace-root-.env-only",
         },
         "certification": {"schema_version": "dadaia-certification-v1"},
     }
