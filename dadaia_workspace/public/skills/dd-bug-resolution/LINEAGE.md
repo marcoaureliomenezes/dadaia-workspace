@@ -18,7 +18,7 @@ of repeating it.
 
 - A unit's bug history is the id-line query `git log -E --grep '^(fix|refactor)\(bugs\): ' -- <file>`, never `fix_files`; the ids it prints are looked up in the ledger.
 - Match `component` by engineering judgement; it is precise free text, not an enum.
-- A REBUILD of a unit is due on a child bug (`caused_by` naming the unit's fix) registered after the unit's last REBUILD; `bugs.py` is the one decider.
+- A REBUILD is due where `bugs.py stats` and `append` say so; the label is `specs/bugs/AGENTS.md` §2's.
 
 ## Read persisted facts, inspect the named fix
 
