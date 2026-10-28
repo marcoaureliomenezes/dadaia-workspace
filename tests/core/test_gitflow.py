@@ -150,7 +150,7 @@ def test_the_history_rewrite_rule_covers_only_the_branches_that_advance_by_merge
     rule = next(ln for ln in skill.splitlines() if "pushed history" in ln)
     verbs, scope = rule.split("force-pushing,", 1)
     assert "pushed history of," in verbs
-    assert "work, integration or principal branch" in scope
+    assert "a branch the gitflow block names" in scope
     assert "advances only by PR" not in scope
     pushable = {r[0].split()[0]: r[1].strip() for r in rows if "wt/" not in r[0]}
     assert pushable["integration"].startswith("Yes")
@@ -158,8 +158,8 @@ def test_the_history_rewrite_rule_covers_only_the_branches_that_advance_by_merge
     assert not {"job", "backlog", "task", "plain"} & set(re.findall(r"\w+", scope))
 
 
-def test_the_history_rewrite_rule_names_the_branches_that_never_rebase() -> None:
-    """A wt/* branch is rebased by its owner."""
+def test_the_history_rewrite_rule_refers_to_the_gitflow_block_not_its_rows() -> None:
+    """A wt/* branch is rebased by its owner; the rule names no row, so none is reachable."""
     skill = read_text(
         Path(__file__).resolve().parents[2]
         / "dadaia_workspace/public/skills/dd-gitflow-default/SKILL.md"
@@ -170,7 +170,8 @@ def test_the_history_rewrite_rule_names_the_branches_that_never_rebase() -> None
         for ln in skill.splitlines()
         if re.match(r"\| (work|integration|principal|job|backlog|task|plain) ", ln)
     ]
-    assert [r for r in rows if re.search(rf"\b{r}\b", rule)] == ["work", "integration", "principal"]
+    assert "the gitflow block" in rule
+    assert [r for r in rows if re.search(rf"\b{r}\b", rule)] == []
     assert "advances only by PR" not in rule
 
 
