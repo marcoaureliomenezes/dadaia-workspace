@@ -3,8 +3,8 @@
 Races between sessions are never prevented; there is no session mode. Protected CLI session records remain fail-closed against
 file-tool writes.
 
-**The gate blocks four things.** A PROTECTED write (CLI-owned session
-records and projected law files); a MUTATING write out of the bind's scope or under
+**The gate blocks four things.** A PROTECTED write (the class
+``_protection`` decides); a MUTATING write out of the bind's scope or under
 ``repos/<r>/`` outside ``specs/audits/``; in ``hooks/root_whitelist`` a new workspace-root
 entry; and a verdict write by anyone but the reviewer (:func:`verdict_act`, the one Bash act
 judged). There is no path class beyond ``ADDITIVE``/``MUTATING``/``PROTECTED``.
