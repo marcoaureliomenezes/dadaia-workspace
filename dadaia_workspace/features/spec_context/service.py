@@ -568,10 +568,11 @@ class SpecContextService:
         work outside the paths is never committed and git refuses a switch or merge that
         would overwrite it (residual: it rides along onto ``<work>``). Never a forced
         checkout, a reset, a rebase, a force-push or a deletion; the one forced act is
-        pointing a role branch origin lacks at its tip, which the push is about to publish."""
+        pointing a role branch origin lacks at its tip, which the push is about to publish
+        (residual: it moves such a branch even when another worktree has it checked out)."""
         repo = self._publishable_repo(name)
         git = partial(self._git.git, repo)
-        git("fetch", "--prune", "--tags", "origin")
+        git("fetch", "--prune", "--tags", "origin", "+refs/heads/*:refs/remotes/origin/*")
         refs = git("for-each-ref", "--format=%(refname:lstrip=3)", "refs/remotes/origin")
         heads = [h for h in refs.split() if h != "HEAD"]
         born = self._git.has_commits(repo)
