@@ -151,7 +151,7 @@ def test_shipped_baseline_header_and_single_line_documented_carve_outs() -> None
     )
     assert raw["_header"]["version"] == 17
     excludes = " ".join(raw["_header"]["excludes"])
-    assert all(word in excludes for word in ("/root", "Users", "FR12/A12.3", "FR12/A12.4"))
+    assert all(word in excludes for word in ("/root", "Users", "Public", ".home"))
     for pattern in raw["patterns"]:
         assert "\n" not in pattern["regex"] + (pattern.get("exclude_regex") or "")
         if pattern.get("exclude_regex"):
