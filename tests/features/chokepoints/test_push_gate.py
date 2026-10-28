@@ -111,9 +111,9 @@ def test_shared_blob_across_two_refs_is_deduped(repo: PushRepo) -> None:
 def test_branch_policy_refusal_precedes_the_scan(repo: PushRepo) -> None:
     """A branch-policy refusal is decided before the denylist scan."""
     sha = repo.commit({"leak.md": f"{_TERM}\n"})
-    decision = _decide(repo, f"refs/heads/main {sha} refs/heads/main {'b' * 40}", denylist_terms=_TERMS)
+    decision = _decide(repo, f"refs/heads/topic {sha} refs/heads/topic {'b' * 40}", denylist_terms=_TERMS)
     assert not decision.allowed
-    assert "main" in decision.message
+    assert "topic" in decision.message
     assert "denylisted term" not in decision.message
 
 

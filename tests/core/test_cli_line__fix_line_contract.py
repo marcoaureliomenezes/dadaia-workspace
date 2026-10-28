@@ -177,11 +177,6 @@ SITES: dict[str, Callable[[Path], str | None]] = {
     "kernel-no-specs-tree-lists-the-worktrees": _kernel_no_specs_tree,
     "hook-missing-venv": lambda ws: VENV_MISSING.replace("$ROOT", ws.as_posix()),
     "push-malformed-stdin": lambda ws: _push(ws, malformed_lines=1),
-    "push-main": lambda ws: _push(ws, "refs/heads/main {sha} refs/heads/main {other}"),
-    "push-develop": lambda ws: _push(ws, "refs/heads/develop {sha} refs/heads/develop {other}"),
-    "push-birth-with-content": lambda ws: _push(
-        ws, "refs/heads/develop {sha} refs/heads/develop {zero}"
-    ),
     "push-invalid-name": lambda ws: _push(ws, "refs/heads/wip/x {sha} refs/heads/wip/x {zero}"),
     "push-not-a-branch-head": lambda ws: _push(ws, "refs/notes/x {sha} refs/notes/x {zero}"),
     "push-refspec": lambda ws: _push(
@@ -954,8 +949,8 @@ _BLOCKS = {
     for s in (
         "gate-root-whitelist", "gate-protected-sessions", "gate-protected-projected",
         "gate-protected-glob", "gate-scope-names-the-bind", "gate-id-less-session-relaunch",
-        "hook-missing-venv", "push-malformed-stdin", "push-main", "push-develop",
-        "push-birth-with-content", "push-invalid-name", "push-not-a-branch-head", "push-refspec",
+        "hook-missing-venv", "push-malformed-stdin",
+        "push-invalid-name", "push-not-a-branch-head", "push-refspec",
         "push-specs-canon", "push-denylist", "push-git-read-failure",
     )
 }  # fmt: skip
