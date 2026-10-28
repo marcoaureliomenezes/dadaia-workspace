@@ -76,7 +76,7 @@ The branch contract by role; the names are `specs/constitution.md`'s `gitflow:` 
 
 ## 3b. The merge gate
 
-- A merge that advances integration or principal requires the repo's `verify:` line green and a `dd-code-reviewer` APPROVED verdict, security lens included, on the merged head; through a PR when the host has one.
+- The merges of steps 8 and 10 require the repo's `verify:` line green and a `dd-code-reviewer` APPROVED verdict, security lens included, on the merged head; through a PR when the host has one. The project's own pipeline PR into the principal stays outside this gate.
 - A PR merge: the main thread quotes the verdict in it verbatim, its only record; no script checks it.
 
 ## 4. Done when
