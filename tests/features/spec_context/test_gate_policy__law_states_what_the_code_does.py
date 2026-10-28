@@ -176,3 +176,21 @@ def test_the_orchestration_skill_dispatches_a_task_never_a_job() -> None:
     job as a unit of dispatch."""
     skill = read_text(_SKILLS / "dd-manager-orchestration/SKILL.md")
     assert "unit of dispatch is a job" not in skill
+
+
+def test_the_map_cites_the_write_tools_and_a_bash_write_passes_where_a_file_tool_write_blocks(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The path-classes line cites `WRITE_TOOLS`, which omits Bash: a Write to a PROTECTED path
+    blocks, the same path written by Bash passes `pre_gate`; no sentence pinned."""
+    (tmp_path / ".dadaia/states").mkdir(parents=True)
+    write_text(tmp_path / ".dadaia/states/spec_contexts.json", '{"contexts": []}')
+    monkeypatch.chdir(tmp_path)
+    write = {"tool_name": "Write", "tool_input": {"file_path": "AGENTS.md"}, "session_id": "s"}
+    bash = {"tool_name": "Bash", "tool_input": {"command": "echo x > AGENTS.md"}, "session_id": "s"}
+    section = read_text(_MAP).split("## 3.")[1].split("\n## ")[0].splitlines()
+    cited = [ln for ln in section if ln.startswith("- Path classes:") and "`WRITE_TOOLS`" in ln]
+    assert "Bash" not in sdd_gate._common.WRITE_TOOLS
+    assert pre_gate.evaluate_payload(write) is not None
+    assert pre_gate.evaluate_payload(bash) is None
+    assert len(cited) == 1
