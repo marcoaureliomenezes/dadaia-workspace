@@ -8,7 +8,6 @@ Scope: this file governs only `.dadaia/handoff/**`.
 - Path shape, emission and ack-on-consume: `dd-handoff-emitter`; a reviewer verdict is not one of these handoffs: `worktrees/AGENTS.md` (Merges, gates, review).
 - Validate with `.dadaia/.venv/bin/dadaia reports validate <path>.handoff.json`; an HTML report's integrity rides on its `content_hash`.
 - Expiry: the zone table in `.dadaia/AGENTS.md`.
-- The main thread deletes a coordination handoff once the agent it names has acted on it.
 - Schema: `.dadaia/agentic/schemas/handoff-v1.schema.json` — its `schema_version` enum is the one source.
 
 ## 1. Write rules
