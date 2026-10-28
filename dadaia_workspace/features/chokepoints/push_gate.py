@@ -12,11 +12,9 @@ from typing import Protocol
 from dadaia_workspace.core.cli_line import git_line, spell_fix
 from dadaia_workspace.core.gitflow import Gitflow
 from dadaia_workspace.core.models.git_scan import (
-    ZERO_SHA,
     GitObjectReadError,
     GitRunError,
     ScannedObject,
-    is_zero_sha,
 )
 from dadaia_workspace.core.platform import act
 from dadaia_workspace.features.chokepoints.branch_policy import (
@@ -47,10 +45,6 @@ class ObjectSource(Protocol):
     def new_objects(
         self, repo: Path, local_sha: str, remote_sha: str
     ) -> Iterable[ScannedObject]: ...
-
-    def unpublished(self, repo: Path, sha: str, held: str = ZERO_SHA) -> list[str]: ...
-
-    def remote_branch(self, repo: Path, branch: str) -> bool: ...
 
     def netted_specs(self, repo: Path, local_sha: str, remote_sha: str) -> list[str]: ...
 
@@ -178,9 +172,7 @@ def push_gate_decision(
     baseline_patterns: Iterable[BaselinePatternLike] = (),
 ) -> Decision:
     """Decide a push, first refusal wins: a malformed stdin line (fail closed); branch
-    policy over every non-deletion, non-tag ref (a principal/integration birth allowed
-    when origin holds no gitflow branch or it publishes nothing); then
-    :func:`content_decision`. Every capability is a required parameter: an unwired call site is a CLI defect, never a
+    policy over every non-deletion, non-tag ref; then :func:`content_decision`. Every capability is a required parameter: an unwired call site is a CLI defect, never a
     bypass."""
     if malformed_lines > 0:
         return Decision(
@@ -190,17 +182,7 @@ def push_gate_decision(
             + spell_fix(git_line(fixes.repo, "push", "origin", fixes.work)),
         )
     branch_refs = [r for r in refs if not r.is_deletion and not r.is_tag]
-    roles = (gitflow.principal, gitflow.integration)
-    unborn = [
-        r
-        for r in branch_refs
-        if is_zero_sha(r.remote_sha) and r.remote_ref.removeprefix(HEADS_PREFIX) in roles
-    ]
-    bootstrap = bool(unborn) and not any(object_source.remote_branch(repo, b) for b in roles)
-    births = frozenset(
-        r.local_sha for r in unborn if bootstrap or not object_source.unpublished(repo, r.local_sha)
-    )
-    if refusal := check_branch_policy(branch_refs, gitflow, fixes, births):
+    if refusal := check_branch_policy(branch_refs, gitflow, fixes):
         return refusal
     return content_decision(
         refs,

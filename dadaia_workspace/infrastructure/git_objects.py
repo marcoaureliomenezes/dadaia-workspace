@@ -671,7 +671,7 @@ def _read_blobs(
 
 def unpublished(repo: Path, rev: str, held: str = ZERO_SHA) -> list[str]:
     """The commits of *rev* origin and the commit *held* do not hold, newest first — the ONE "already
-    published" rule (:func:`_base_exclusions`) the push gate and ``unpushed`` share."""
+    published" rule (:func:`_base_exclusions`) that ``unpushed`` reads."""
     return _range_commit_shas(repo, rev, _base_exclusions(repo, held))
 
 
@@ -679,23 +679,10 @@ class GitSubprocessObjectReader:
     """Subprocess-backed push-range object reader: the sole adapter, with no
     ``GitObjectReader`` port."""
 
-    def unpublished(self, repo: Path, sha: str, held: str = ZERO_SHA) -> list[str]:
-        """:func:`unpublished` for the gate, failing closed: an unreadable *sha* is
-        itself unpublished — never a birth, never an empty range."""
-        try:
-            return unpublished(repo, sha, held) if SHA_SHAPE_RE.match(sha) else [sha]
-        except GitObjectReadError:
-            return [sha]
-
-    def remote_branch(self, repo: Path, branch: str) -> bool:
-        """``refs/remotes/origin/<branch>`` exists locally (offline)."""
-        ref = f"refs/remotes/origin/{branch}"
-        return git_run(repo, "rev-parse", "-q", "--verify", ref).returncode == 0
-
     def netted_specs(self, repo: Path, local_sha: str, remote_sha: str) -> list[str]:
         """The ``specs/`` paths the push nets in. Netted in = present at the tip and
         different from every publication boundary; an empty range nets nothing; a range
-        with no boundary (bootstrap) nets the tip's whole ``specs/``. A force-push
+        with no boundary (a first push) nets the tip's whole ``specs/``. A force-push
         re-judges paths carried from the overwritten tip (it is no boundary)."""
         if not SHA_SHAPE_RE.match(local_sha) or is_zero_sha(local_sha):
             return []

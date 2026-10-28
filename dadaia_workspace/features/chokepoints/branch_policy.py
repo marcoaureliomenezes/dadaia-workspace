@@ -108,58 +108,34 @@ def _blocked(text: str, fix: str) -> Decision:
     )
 
 
-def _refuse_branch(
-    ref: PushRef, branch: str | None, gitflow: Gitflow, fixes: GateFixes
-) -> Decision:
-    """Actionable refusal for a non-pushable ref (*branch* ``None``: not a branch head)."""
-    role = gitflow.role_of(branch) if branch is not None else None
-    if role is not None and is_zero_sha(ref.remote_sha):
-        other = gitflow.integration if role == "principal" else gitflow.principal
-        return _blocked(
-            f"creating the {role} branch '{branch}' on an origin that already holds "
-            f"'{other}' would publish new objects — birth it at the published '{other}' tip",
-            git_line(fixes.repo, "push", "origin", f"refs/remotes/origin/{other}:{ref.remote_ref}"),
-        )
-    if role is None:
-        return _blocked(
-            f"ref '{ref.local_ref}' is outside the gitflow — principal '{gitflow.principal}', "
-            f"integration '{gitflow.integration}', work '{fixes.work}'; the pushable branches are "
-            "dd-gitflow-default's branch contract (§2a), and work reaches them through a tree: a wt/ "
-            "tree lands by `worktree merge` into its parent, never a raw merge",
-            act(
-                "agent",
-                f"land the work with {platform.inline(*cli_words(None, 'worktree', 'merge'))} on its "
-                f"tree (see {platform.inline(*cli_words(None, 'worktree', 'list'))}), or open one "
-                f"with {platform.inline(*cli_words(None, 'worktree', 'new'))}",
-            ),
-        )
-    head = gitflow.integration if role == "principal" else fixes.work
+def _refuse_branch(ref: PushRef, gitflow: Gitflow, fixes: GateFixes) -> Decision:
+    """Actionable refusal for a ref outside the gitflow (not a branch head, or unpushable)."""
     return _blocked(
-        f"the {role} branch '{branch}' is never pushed directly — it advances only via a PR",
-        act("agent", f"open a PR/MR from '{head}' into '{branch}' on your git host"),
+        f"ref '{ref.local_ref}' is outside the gitflow — principal '{gitflow.principal}', "
+        f"integration '{gitflow.integration}', work '{fixes.work}'; the pushable branches are "
+        "dd-gitflow-default's branch contract (§2a), and work reaches them through a tree: a wt/ "
+        "tree lands by `worktree merge` into its parent, never a raw merge",
+        act(
+            "agent",
+            f"land the work with {platform.inline(*cli_words(None, 'worktree', 'merge'))} on its "
+            f"tree (see {platform.inline(*cli_words(None, 'worktree', 'list'))}), or open one "
+            f"with {platform.inline(*cli_words(None, 'worktree', 'new'))}",
+        ),
     )
 
 
-def check_branch_policy(
-    refs: list[PushRef],
-    gitflow: Gitflow,
-    fixes: GateFixes,
-    births: frozenset[str] = frozenset(),
-) -> Decision | None:
-    """The first refusal, or ``None``: each ref lands on a work or job branch from the
-    same-named local head, or births the principal/integration at a sha in *births*;
-    those two are otherwise PR-only."""
+def check_branch_policy(refs: list[PushRef], gitflow: Gitflow, fixes: GateFixes) -> Decision | None:
+    """The first refusal, or ``None``: each ref is a gitflow role branch, or a pushable work or
+    job branch, pushed from the same-named local head."""
     for ref in refs:
         if not ref.remote_ref.startswith(HEADS_PREFIX):
-            return _refuse_branch(ref, None, gitflow, fixes)
+            return _refuse_branch(ref, gitflow, fixes)
         branch = ref.remote_ref[len(HEADS_PREFIX) :]
         role = gitflow.role_of(branch)
-        if role in ("principal", "integration") and ref.local_sha in births:
-            continue
-        if role != "work" and not _pushable(branch):
-            return _refuse_branch(ref, branch, gitflow, fixes)
+        if role is None and not _pushable(branch):
+            return _refuse_branch(ref, gitflow, fixes)
         if not ref.local_ref.startswith(HEADS_PREFIX):
-            return _refuse_branch(ref, None, gitflow, fixes)
+            return _refuse_branch(ref, gitflow, fixes)
         if ref.local_ref != ref.remote_ref:
             return _blocked(
                 f"refspec aims '{ref.local_ref}' at remote '{ref.remote_ref}' — only "
