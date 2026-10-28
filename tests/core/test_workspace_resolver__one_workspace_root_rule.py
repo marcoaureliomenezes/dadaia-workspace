@@ -51,7 +51,7 @@ def test_workspace_root_in_the_hook_env_never_opens_a_protected_write(tmp_path: 
     payload = {"tool_name": "Write", "tool_input": {"file_path": str(target)}, "session_id": "s"}
     result = run_hook_subprocess("sdd_gate", payload, env, cwd=elsewhere)
     block = result.block_envelope()
-    assert block is not None and "SEC-01" in block["reason"], result.stdout + result.stderr
+    assert block is not None and "CWE-284" in block["reason"], result.stdout + result.stderr
 
 
 def test_migrate_runs_in_the_cli_own_workspace_from_any_cwd(
