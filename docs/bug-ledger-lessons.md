@@ -52,8 +52,8 @@ commit.
 
 - Read each touched file's history, the id-line query of `dd-bug-resolution/LINEAGE.md`,
   before proposing a fix, within the cap it sets.
-- Use `caused_by: <bug-id> | <task-id> | none`; choose `none` only when blame offers no
-  candidate. A fix whose `caused_by` names a culprit, or that lands on a unit already fixed
+- Declare `caused_by: <bug-id> | <task-id> | none` per `dd-bug-resolution` LINEAGE.md,
+  Declare `caused_by`. A fix whose `caused_by` names a culprit, or that lands on a unit already fixed
   in the window, is the REBUILD of that unit in the same lane (`specs/bugs/AGENTS.md`, Resolution).
 - Prefer a deletion-shaped fix. If the production diff grows, route it through the
   architecture lens.

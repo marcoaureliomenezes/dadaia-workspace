@@ -34,8 +34,8 @@ ambiguity or a missing feature.
 Read the history of each file the `component` names, by the id-line query
 `dd-bug-resolution/LINEAGE.md` names. Inspect each prior fix, the commit whose `fix(bugs): <id>` or
 `refactor(bugs): <id>` line names its bug (the recorded `fix_sha` is only a hint), and blame the production
-lines the new fix replaces. End with `caused_by: <bug-id> | <task-id> | none`; use `none`
-only when blame offers no candidate.
+lines the new fix replaces. End with `caused_by: <bug-id> | <task-id> | none`, declared per
+`dd-bug-resolution` LINEAGE.md, Declare `caused_by`.
 
 A fix whose `caused_by` names a culprit, or that lands on a unit already fixed in the window, is the REBUILD of that unit in the same lane, under `refactor(bugs): <id> — REBUILD <unit>` (`specs/bugs/AGENTS.md`, Resolution); `bugs.py append` prints a REBUILD due on a path, and a REBUILD keeps the regression tests. Then add the lowest-level case that fails for the real cause before production code
 moves. Existing assertions remain contract evidence.
