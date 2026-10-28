@@ -2,9 +2,10 @@
 name: dd-handoff-emitter
 description: >
   Emit the machine-readable handoff JSON at the end of any agent task (handoff-only by
-  default; HTML report added only when the operator asks or the next hop is human), and
-  delete a consumed coordination handoff (ack-on-consume). Use at task completion, when
-  writing a reviewer verdict (verdict.py), and after acting on a handoff addressed to you.
+  default; HTML report added only when the operator asks or the next hop is human); the main
+  thread deletes a consumed coordination handoff (ack-on-consume). Use at task completion,
+  when writing a reviewer verdict (verdict.py), and, for the main thread, once a returned
+  handoff's next agent has acted on it.
 ---
 
 # dd-handoff-emitter
@@ -33,7 +34,7 @@ validate` exits 0 on a non-verdict handoff, and (report mode) `artifact.content_
 
 ## Consuming (ack-on-consume)
 
-After reading and acting on a coordination handoff addressed to you:
+The main thread, once the agent a coordination handoff names has acted on it:
 
 1. Resolve its real target path; act only when the resolved path stays inside `.dadaia/`, since a
    symlinked directory can point the delete elsewhere.
