@@ -643,7 +643,10 @@ class SpecContextService:
             )
             git("merge", "--no-edit", *["--allow-unrelated-histories"] * ours, start)
         at = f"refs/remotes/origin/{flow.principal}" if heads else anchor
-        births = [f"{at}:refs/heads/{b}" for b in roles[1:] if b not in heads]
+        births = [b for b in roles[1:] if b not in heads]
+        for b in births:
+            if not git("for-each-ref", "--format=%(objectname)", f"refs/heads/{b}"):
+                git("branch", b, at)
         if not births and not self._git.unpushed(repo):
             return False
         git("push", "--atomic", "-u", "origin", *births, work)
