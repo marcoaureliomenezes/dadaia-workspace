@@ -58,7 +58,7 @@ axes are reported side by side with equal weight, so no axis hides another's fin
 ## 4a. The root-cause and approval bars
 
 - A fix qualifies only when it reproduces the failure on the executed path, tests for the real reason, fixes the cause and proves it green — a workaround or symptom patch is a finding.
-- The verdict is the enum `APPROVED`/`REJECTED`: on a worktree per `worktrees/AGENTS.md` §Merges, gates, review; on a PR per `dd-gitflow-default` §The PR gate.
+- The verdict is the enum `APPROVED`/`REJECTED`: on a worktree per `worktrees/AGENTS.md` §Merges, gates, review; on a PR per `dd-gitflow-default` §3b.
 - The first review of a fix sweeps the fixed pattern across the context's repos and states the grep with its hit count; a net-positive fix states its reason, else it is a finding; a verdict whose evidence lacks the implementer's run of the tests the change reaches (`dd-release-implementation` §Done when) is REJECTED.
 - A green internal gate that diverges from real consumer behavior is itself a bug.
 - A reviewer probe runs in scratch only: a copy of the context, with the live workspace root listed in `DADAIA_FENCED_ROOTS`; an explicit `--specs` path bypasses that fence, so every explicit path must point into the copy; never `doctor --fix`. A probe that reaches the live workspace is a finding.

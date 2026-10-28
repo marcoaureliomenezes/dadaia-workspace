@@ -52,9 +52,9 @@ Fixes and CI YAML -> dd-sw-engineer-sr; SPEC / memory -> dd-product-engineer.
 
 ## 4. Outputs
 
-- Return these sections for a worktree in `verdict.py`'s stdin body (each finding one `findings[]` item, axis, category and `file:line` in `message`; the other sections in one INFO finding's `detail_md`), as your returned text for a PR (`dd-gitflow-default`, heading "The PR gate").
+- Return these sections for a worktree in `verdict.py`'s stdin body (each finding one `findings[]` item, axis, category and `file:line` in `message`; the other sections in one INFO finding's `detail_md`), as your returned text for a PR (`dd-gitflow-default` §3b).
 - `## Target` — PR/branch/SHA, base ref, files changed.
-- `## Verify` — the tests you ran yourself (the revert-RED check), and for a PR the `verify:` result `dd-gitflow-default`, heading "The PR gate", requires of its head; you never run `verify:`, the merge does.
+- `## Verify` — the tests you ran yourself (the revert-RED check), and for a PR the `verify:` result `dd-gitflow-default` §3b requires of its head; you never run `verify:`, the merge does.
 - `## Findings` — the `dd-code-review` fields (heading "Done when — the report carries"), plus category; a `slop` category carries the signal id of `dd-code-review`'s SLOP.md.
 - `## Bug-surface delta` — reduced/increased/unchanged, evidenced per `dd-code-review`'s "Axis 3 — Bug-surface".
 - `## Summary` — counts by severity.

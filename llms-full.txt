@@ -155,7 +155,7 @@ The documentation is the repository's [docs folder](https://github.com/marcoaure
 - The Bash hook wrapper accepts the workspace venv's POSIX or Windows Python; when neither is executable, it warns and exits 0, and each context-injection lane prints the reinstall `fix: Agent action:` line.
 - Path classes: ADDITIVE (`.dadaia/AGENTS.md`'s output and ephemeral zones) writable; PROTECTED (every projected path the install ledger records, the hook wiring, `CORE_FLOOR`, and the `.dadaiaignore` `[protected]` globs, as `gate_policy._protection` decides) blocked; the rest MUTATING.
 - Every BLOCK carries exactly one fix line: `fix: <command>`, `fix: Agent action: <one act>` for an act an agent performs (one act may chain up to three steps with `, then`), or `fix: Operator action: <one act>` only for an ADR acceptance, a secret, a `.dadaiaignore` or PROTECTED edit, a ruling the law names, or an act outside the agents' reach (relaunching the session); a BLOCK whose fix is itself blocked is a Stall, CRITICAL.
-- Git chokepoints (branch contract and scope: `dd-gitflow-default`, The branch contract): pre-push: `.dadaia/AGENTS.md`, Git chokepoints; `.dadaia/.venv/bin/dadaia worktree merge` refuses a `wt-main`, `wt-rc`, hotfix or backlog tree without a valid APPROVED verdict bound to its diff, and a `wt-main`, `wt-rc` or hotfix tree whose `verify:` does not exit 0 (`worktrees/AGENTS.md`, Merges, gates, review); the PR gate is discipline (`dd-gitflow-default`, The PR gate).
+- Git chokepoints (branch contract and scope: `dd-gitflow-default`, The branch contract): pre-push: `.dadaia/AGENTS.md`, Git chokepoints; `.dadaia/.venv/bin/dadaia worktree merge` refuses a `wt-main`, `wt-rc`, hotfix or backlog tree without a valid APPROVED verdict bound to its diff, and a `wt-main`, `wt-rc` or hotfix tree whose `verify:` does not exit 0 (`worktrees/AGENTS.md`, Merges, gates, review); the merge gate is discipline (`dd-gitflow-default` §3b).
 - The binding: `.dadaia/.venv/bin/dadaia context show --json`. The gate reads no SDD artifact.
 - Common behaviour lives in skills and `AGENTS.md`; a persona or hook carries only the surface its harness cannot do without; a harness fact lives in one registry row.
 
@@ -194,7 +194,7 @@ The documentation is the repository's [docs folder](https://github.com/marcoaure
 | `dd-release-implementation` | tasks, push green, closure order |
 | `dd-code-review` | three axes, six lenses, slop detection |
 | `dd-bug-registration`, `dd-bug-resolution` | Arm B end to end |
-| `dd-gitflow-default` | branches, PRs, commit shapes |
+| `dd-gitflow-default` | branches, merges, commit shapes |
 | `dd-handoff-emitter` | machine-readable completion records |
 | `dd-audit-project` | the periodic three-pillar audit |
 | `dd-spec-navigator` | finding truth in `specs/` |

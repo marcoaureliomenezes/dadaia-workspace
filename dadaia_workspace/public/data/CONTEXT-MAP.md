@@ -61,7 +61,7 @@ One procedure each; a skill that touches a governed area opens its scoped law as
 | `dd-bug-resolution` | the seven-phase diagnosing method and the resolve record | `specs/bugs/AGENTS.md` |
 | `dd-cli-library` | CLI idioms, CLI-owned state, the dev-server registry | `.dadaia/AGENTS.md` |
 | `dd-code-review` | the three review axes and the six lenses | `specs/memory/AGENTS.md` |
-| `dd-gitflow-default` | the branch contract, commit shapes, the PR gate | — |
+| `dd-gitflow-default` | the branch contract, commit shapes, the merge gate | — |
 | `dd-grill-me` | the operator grill that precedes a candidate | — |
 | `dd-handoff-emitter` | handoff-first emission and ack-on-consume | `.dadaia/handoff/AGENTS.md` |
 | `dd-manager-orchestration` | intake, dispatch and the closure pass | — |

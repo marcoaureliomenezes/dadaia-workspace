@@ -14,7 +14,7 @@ Scope: this file governs only `worktrees/**`.
 - Leaves: the rc, job, task and lane shapes of `dd-gitflow-default` (The branch contract), where `kkk` is the `T<k>` of `J<n>.T<k>` in 3 digits (the rc's `wt-rc` is its integration branch: its define is the first commits, its reconcile the last). Any other name is refused; there is no free-named tree.
 - Cut points: `dd-gitflow-default` (The branch contract). A `wt-main` opens only while `_RELEASE.json` on its `wt-rc` reads `IMPLEMENTATION`; a `wt-hotfix` only while the main repo's `specs/bugs/BUGS.jsonl` on the work branch holds that bug `open`; it needs no rc `SPEC.md`.
 - `WT new` writes a short `AGENTS.md` into each `<v>/`, `rc-<N>/` and `job-<n>/` folder it creates; the last merge or clean removes a folder holding only it.
-- One change lands in one job; a bug lands as `specs/bugs/AGENTS.md` (Resolution) says, a promote is its PR plus `release.py ship`.
+- One change lands in one job; a bug lands as `specs/bugs/AGENTS.md` (Resolution) says, a promote is its merge plus `release.py ship`.
 
 ## 2. Merges, gates, review
 

@@ -6,7 +6,7 @@ candidates. `WT` is `.dadaia/.venv/bin/dadaia worktree` (`worktrees/AGENTS.md`).
 
 ## Gate cadence
 
-Each gate is owned elsewhere: task, job and candidate close at `WT merge` (`worktrees/AGENTS.md` §Merges, gates, review; one review per job, never per task); promote at `dd-gitflow-default` §The PR gate.
+Each gate is owned elsewhere: task, job and candidate close at `WT merge` (`worktrees/AGENTS.md` §Merges, gates, review; one review per job, never per task); promote at the merge gate, `dd-gitflow-default` §3b.
 
 - Any `REJECTED`, CRITICAL/HIGH finding, failed E2E, or missing evidence sends the job back to its tree.
 
@@ -37,7 +37,7 @@ An rc is a DAG of jobs the PLAN draws, Job 1 first. Its `wt-rc` carries the defi
 - Done when: the reconcile commits are on `wt-rc`; `.dadaia/.venv/bin/dadaia doctor` is clean.
 
 **Step 5 — Merge the `wt-rc`.**
-- `WT merge` of the `wt-rc` into the work branch; the candidate PR is `dd-gitflow-default` step 8's, on the operator's order.
+- `WT merge` of the `wt-rc` into the work branch; the candidate merge is `dd-gitflow-default` step 8's, on the operator's order.
 - Done when: the `wt-rc` is merged.
 
 The arc ends here. Promote and what follows it: `dd-gitflow-default` Steps, steps 9-12.

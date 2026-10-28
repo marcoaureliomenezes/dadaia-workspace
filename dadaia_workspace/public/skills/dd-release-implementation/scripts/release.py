@@ -2,7 +2,7 @@
 """Validate and write a release's `_RELEASE.json` and SPEC stub, stdlib only.
 
 Also validates the candidate's SPEC/PLAN/job files and the ship ledger. Every write is validated by `check`
-before an atomic replace; `ship` records the merged promote PR and moves the release to `_archive/<v>/`.
+before an atomic replace; `ship` records the promote merge and moves the release to `_archive/<v>/`.
 """
 
 from __future__ import annotations
@@ -55,7 +55,7 @@ _HELP = {
     "phase": "move the live release to IMPLEMENTATION or CLOSURE, stamping its milestone",
     "drift": "the closure worklist over the live release's memory window (memory.py drift)",
     "memory": "append a structured `kind: memory` entry to the live log",
-    "ship": "record the merged promote PR: shipped, a delivered histo line, the dir archived",
+    "ship": "record the promote merge: shipped, a delivered histo line, the dir archived",
     "origin": "print the ids a SPEC's **Origin:** line carries, one `<kind> <id>` per line",
     "check": "validate every _RELEASE.json under releases/ and the ship ledger",
 }
