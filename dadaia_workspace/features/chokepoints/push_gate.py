@@ -102,7 +102,7 @@ def _refusal_fix(ref: PushRef, fixes: GateFixes, names: Sequence[str]) -> str:
         fix = act(
             "agent",
             f"remove the listed term or path from {', '.join(names)} in the unpublished commits, "
-            "reword or split those commits by hand, then push again",
+            "reword or split those commits by hand",
         )
     return spell_fix(fix)
 
