@@ -557,7 +557,8 @@ def test_a_second_foreign_backup_is_published_inside_specs_bkp(env, tmp_path: Pa
 
 def test_the_publish_code_never_rewrites_forces_or_deletes() -> None:
     """No forced checkout, reset, rebase, force-push, remote delete or squash
-    in the publish, the gate or the sync-failure fixes."""
+    in the publish, the gate or the sync-failure fixes; the one forced act is
+    pointing a role branch origin lacks at its tip."""
     pkg = Path(__file__).resolve().parents[3] / "dadaia_workspace"
     for rel in (
         "features/spec_context/service.py",
@@ -566,3 +567,8 @@ def test_the_publish_code_never_rewrites_forces_or_deletes() -> None:
         text = read_text(pkg / rel)
         for verb in ('"-f"', '"reset"', '"rebase"', '"--force"', '"--delete"', "--republish"):
             assert verb not in text, f"{rel} carries {verb}"
+    service = read_text(pkg / "features/spec_context/service.py")
+    pin = 'git("update-ref", f"refs/heads/{b}", at)'
+    assert service.count('"update-ref"') == 1
+    assert service.count(pin) == 1
+    assert '"update-ref"' not in read_text(pkg / "features/chokepoints/branch_policy.py")
