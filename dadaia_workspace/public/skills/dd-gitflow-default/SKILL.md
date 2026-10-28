@@ -48,7 +48,7 @@ The branch contract by role; the names are `specs/constitution.md`'s `gitflow:` 
 
 ## 3a. Commit shapes — each write in its own shape
 
-`<code>` is any path outside `specs/`; `<id>` is the bug id in shapes 1, 3 and 4, and in shape 6 the current task id `J<n>.T<k>` (in a lane, its `<slug>`).
+`<code>` is any path outside `specs/`; `<id>` is the bug id in shapes 1, 3 and 4, and in shape 6 the current task id `J<n>.T<k>` (in a lane, its `<slug>`). A `wt-backlog-<slug>` lane writes these only on the operator's order: shape 2's ADR acceptance or rejection (`specs/ADRs/decisions.jsonl`, `specs/memory/ARCHITECTURE.md`, `specs/memory/QUALITY.md`, never product memory), shape 8, shape 9's canonical-memory rewrite.
 
 | # | Tree | Write | Message |
 |---|---|---|---|
@@ -56,7 +56,7 @@ The branch contract by role; the names are `specs/constitution.md`'s `gitflow:` 
 | 2 | `wt-backlog-<slug>`, `wt-rc` (reconcile) | Backlog entry or exit: `specs/backlog/BACKLOG.json`, `specs/backlog/_archive/backlog_histo.jsonl` | `chore(backlog): …` |
 | 2 | `wt-backlog-<slug>`, `wt-rc` (define) | ADR proposal: `specs/ADRs/decisions.jsonl` | `docs(adr): propose <slug>` |
 | 2 | `wt-backlog-<slug>`, `wt-rc` (define, reconcile) | In-place `measured_by` repair: `specs/ADRs/decisions.jsonl` | `chore(adrs): repair …` |
-| 2 | `wt-rc` (define, reconcile) | ADR acceptance or rejection: `specs/ADRs/decisions.jsonl`, `specs/memory/*` | `docs(adr): accept <slug>` or `docs(adr): reject <slug>` |
+| 2 | `wt-rc` (define, reconcile), a `wt-backlog-<slug>` lane | ADR acceptance or rejection: `specs/ADRs/decisions.jsonl`, `specs/memory/*` | `docs(adr): accept <slug>` or `docs(adr): reject <slug>` |
 | 3 | a `wt-task-<kkk>` or `wt-hotfix` tree, `wt-rc (closure)` | Bug fix or REBUILD: `<code>` and the tracked `specs/**/AGENTS.md` mirrors its own scaffold or template change re-renders, by the doctor's render; red loop in the body, `block: <item>` where `specs/bugs/AGENTS.md` §2 requires it; the regression test lands first as a `test(` commit (a task's shape 6, or the lane's) | `fix(bugs): <id> — <cause>`; a REBUILD `refactor(bugs): <id> — REBUILD <unit>: …`; a group names its N ids |
 | 3 | a `wt-task-<kkk>` or `wt-hotfix` tree, `wt-rc (closure)` | A fix that is itself a test change: the test files | `test(<id>): …`; body: the record's fix line, as `specs/bugs/AGENTS.md` §2 decides |
 | 4 | a `wt-main`, `wt-hotfix`, `wt-backlog-<slug>` tree or `wt-rc (closure)` | Terminal transition without code (`resolve` after its named shape-3 fix commit, `supersede`, `reject`): `specs/bugs/BUGS.jsonl` | `chore(bugs): <verb> <id> — <reason, by task-id, or fix sha>`; per class `chore(bugs): <verb> class <class> — <reason>`, one id per body line |
@@ -65,10 +65,10 @@ The branch contract by role; the names are `specs/constitution.md`'s `gitflow:` 
 | 5 | `wt-rc` (define) | Release definition, and a candidate's birth (`release.py new` writes `_RELEASE.json` and the SPEC stub in one transaction): `specs/releases/<v>/rc-<N>/*`, `specs/releases/<v>/_RELEASE.json` | `feat(specs): define candidate …` |
 | 6 | a task tree, or a `wt-backlog-<slug>` lane (the repo's `AGENTS.md` alone) | Task: its `W:` | `conventional-commit(<id>): description`, a REBUILD `refactor(<id>): REBUILD <unit> — …` |
 | 7 | `wt-hotfix-<bug-id>` | Specs revert, no code: the `specs/` paths of the culprit commit, put back | `Revert "<subject>"`; body `This reverts commit <sha>.` |
-| 8 | `wt-rc` (define), a `wt-backlog-<slug>` lane on the operator's order | SPEC and PLAN approval: `specs/releases/<v>/rc-<N>/{SPEC,PLAN}.md`; the lane: `specs/constitution.md`, a `specs/AGENTS.md` re-render | `docs(specs): …` |
+| 8 | `wt-rc` (define), a `wt-backlog-<slug>` lane | SPEC and PLAN approval: `specs/releases/<v>/rc-<N>/{SPEC,PLAN}.md`; the lane: `specs/constitution.md`, a `specs/AGENTS.md` re-render | `docs(specs): …` |
 | 9 | `wt-rc` (reconcile) | Memory pass and derived docs: `specs/memory/*`, `README.md`, `docs/*.md` | `docs(memory): …` |
 | 9 | the `wt-backlog-first-pass` lane | Memory pass: `specs/memory/*` | `docs(memory): …` |
-| 9 | a `wt-backlog-<slug>` lane on the operator's order | Canonical-memory rewrite: `specs/memory/ARCHITECTURE.md`, `specs/memory/QUALITY.md` | `docs(memory): …` |
+| 9 | a `wt-backlog-<slug>` lane | Canonical-memory rewrite: `specs/memory/ARCHITECTURE.md`, `specs/memory/QUALITY.md` | `docs(memory): …` |
 | 10 | `wt-rc` (define, reconcile), a `wt-backlog-<slug>` lane on the next work branch (§2 step 11, `ship`) | Release state: `specs/releases/<v>/_RELEASE.json` and `specs/releases/_archive/**`, only when [`RELEASE-EVENTS.md`](../dd-release-implementation/RELEASE-EVENTS.md) requires a current entry | `chore(release): …` |
 | 11 | the job tree that found the defect (`wt-main`) | Pure law or doc text that no program prints (a fix line, `--help` or a schema stays Arm B, shape 3): the file it corrects; no `BUGS.jsonl` record | `docs(law): <what>`; the body cites the finding; one review |
 | 12 | a `wt-task-<kkk>` or `wt-hotfix` tree | Code revert: the culprit commit's paths, put back | `Revert "<subject>"`; body `This reverts commit <sha>.` |
