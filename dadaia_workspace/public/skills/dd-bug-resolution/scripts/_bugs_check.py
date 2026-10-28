@@ -186,8 +186,8 @@ def findings_for(
 ) -> list[dict[str, Any]]:
     """Every finding the ledger *text* carries — the ONE validation path, run both by
     ``check`` over the committed file and by every write over its own candidate bytes.
-    Lineage: a `caused_by` names a record of *text* or of the archive text *archived*, or a task
-    a `TASKS.md` under *root*`/releases/` carries, and never loops. An id holds at most one plain
+    Lineage: a `caused_by` names a record of *text* or of the archive text *archived*, or a release
+    task `tasks` finds under *root*, and never loops. An id holds at most one plain
     record across *text* and *archived*; a pre-v6 event line is not a record."""
     lines: dict[int, list[str]] = {}
     fixes: dict[int, str] = {}  # a line a governance verb clears
