@@ -275,6 +275,21 @@ def test_every_publish_passes_the_shipped_pre_push_gate(env, tmp_path: Path, see
     assert {"main", "develop", "feature/0.1.0"} <= set(_heads(bare))
 
 
+@pytest.mark.parametrize("seeded", [(), ("main",)], ids=["empty", "principal-only"])
+def test_baseline_leaves_the_role_heads_local_at_their_origin_tips(
+    env, tmp_path: Path, seeded
+) -> None:
+    """After baseline the integration and principal exist as local heads, each at
+    the tip origin holds."""
+    svc, repo, bare = env
+    if seeded:
+        _seed(bare, tmp_path / "seed", *seeded)
+    _clone_onboarded(bare, repo)
+    svc.baseline("proj")
+    for role in ("main", "develop"):
+        assert _git(repo, "rev-parse", f"refs/heads/{role}") == _heads(bare)[role]
+
+
 @pytest.mark.parametrize("seeded", [(), ("main", "develop")], ids=["empty", "adopted"])
 def test_second_run_is_a_no_op(env, tmp_path: Path, seeded) -> None:
     svc, repo, bare = env
