@@ -265,7 +265,6 @@ flowchart TB
 - 0259 — ADR 0152 (2) as amended by ADR 0193: SPEC and job-file size stay a recommendation, the TASKS size reads per job file
 - 0260 — ADR 0193 is superseded: no fixed job cap per rc; the DAG, Job 1 and the Reconciliation live in dd-release-definition
 - 0261 — ADR 0142 stays: no hard line-count limit gates any change; line counts are a readout; its measured_by is repaired
-- 0262 — The per-job CI wall-clock budget of ADR 0119 is re-frozen at measured durations, judged by dd-code-reviewer from the CI job durations
 - 0263 — A fix line has three forms: a runnable command, 'Agent action: <one act>' for an act an agent performs, and 'Operator action: <one act>' only for an act the law reserves to the human
 - 0264 — Worktrees are a hierarchy under worktrees/<repo>/<v>/: an rc integration branch wt-rc, a base derived from the path, the plain kind deleted, and the CLI enforced by a git hook
 - 0265 — The OS boundary is one module of the skill kernel, _platform.py; no other file decides a host fact
@@ -285,6 +284,7 @@ flowchart TB
 - 0281 — The deploy gate is the multi-harness eval pipeline: Claude Code and Codex legs at k=3 on sha E, read by a required Eval gate check on the promote PR
 - 0282 — Codex is judged by its session record: its hooks leave the record under the id its commands resolve, and its registry row names a subagent key
 - 0283 — The principal and integration branches are ordinary pushable refs: the pre-push gate stops refusing their direct push, and the bootstrap birth is deleted
+- 0284 — The per-job CI wall-clock budget of ADR 0262 is re-frozen at the per-job maximum of the green feature/0.5.0 runs read on 2026-10-28; the Integration and Contract coverage timeouts are about 1.5x their budget
 <!-- /dadaia:fixed adr-list -->
 
 <!-- dadaia:fixed slop-code -->
