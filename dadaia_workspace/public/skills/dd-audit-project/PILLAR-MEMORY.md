@@ -26,8 +26,8 @@ Supports §2 — a module claimed live in memory but unreachable is drift. Every
 
 ## 4 — `constitution.md` violations
 
-- Check every absolute law in `constitution.md` against the window's commits and current tree state.
-- A violated absolute law is CRITICAL by definition.
+- Check every invariant in `constitution.md` against the window's commits and current tree state.
+- A violated invariant is CRITICAL by definition.
 
 ## Findings
 
