@@ -91,7 +91,7 @@
 | `dd-release-implementation` | tasks, push green, closure order |
 | `dd-code-review` | three axes, six lenses, slop detection |
 | `dd-bug-registration`, `dd-bug-resolution` | Arm B end to end |
-| `dd-gitflow-default` | branches, merges, commit shapes |
+| `dd-gitflow-default` | branches, merges and PRs, commit shapes |
 | `dd-handoff-emitter` | machine-readable completion records |
 | `dd-audit-project` | the periodic three-pillar audit |
 | `dd-spec-navigator` | finding truth in `specs/` |

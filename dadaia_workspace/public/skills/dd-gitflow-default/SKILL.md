@@ -1,7 +1,7 @@
 ---
 name: dd-gitflow-default
 description: >
-  The branch and commit contract (§2a, §3a): which branch to cut and push, the commit shape of each write, and the merge gate. Use when branching, writing a commit message, merging, or promoting; task and job order is dd-release-implementation's.
+  The branch and commit contract (§2a, §3a): which branch to cut and push, the commit shape of each write, and the merge gate. Use when branching, writing a commit message, merging (through a PR where the host has one), or promoting; task and job order is dd-release-implementation's.
 ---
 
 # dd-gitflow-default — The Branch Contract
@@ -36,7 +36,7 @@ The branch contract by role; the names are `specs/constitution.md`'s `gitflow:` 
 | Branch | Pushable | Cut from | Advances by |
 |---|---|---|---|
 | work `<work>M.m.p` | Yes — valid name (each `wt-rc` and hotfix merge into it ran `verify:`; no rerun before a push) | integration | its `wt-rc` and lane merges, and direct `specs/audits/**` commits |
-| integration | Yes | — | the work → integration merge (step 8) |
+| integration | Yes | principal | the merge from the row above (step 8) |
 | principal | Yes | — | the integration → principal merge (step 10), or the pipeline PR the project's own release pipeline opens |
 | rc `wt/<M.m.p>/rc-<N>/wt-rc` | Yes | work | its merge into the work branch (`worktrees/AGENTS.md` §2) |
 | job `wt/<M.m.p>/rc-<N>/job-<n>/wt-main` | Yes | its `wt-rc` | its merge into `wt-rc` (`worktrees/AGENTS.md` §2) |
