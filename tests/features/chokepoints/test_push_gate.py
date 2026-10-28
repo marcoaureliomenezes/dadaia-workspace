@@ -204,9 +204,6 @@ class _Raising:
     def __init__(self, exc: GitObjectReadError) -> None:
         self._exc = exc
 
-    def remote_branch(self, repo: Path, branch: str) -> bool:
-        return True
-
     def new_objects(self, repo: Path, local_sha: str, remote_sha: str) -> Iterable[ScannedObject]:
         raise self._exc
 

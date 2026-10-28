@@ -218,7 +218,7 @@ def test_a_sibling_repo_name_that_is_an_english_word_does_not_block_the_push(
     assert result.exit_code == 0, result.output
 
 
-# ── the bootstrap birth through the REAL reader ──────────
+# ── a role-branch push through the REAL reader ──────────
 
 
 def _git(repo: Path, *args: str) -> str:
@@ -237,9 +237,7 @@ def _gate(monkeypatch, tmp_path: Path, repo: Path, line: str) -> int:
     return _runner.invoke(app, ["ci", "push-gate-check"], input=line).exit_code
 
 
-def test_births_publish_nothing_and_a_birth_with_content_is_refused(
-    monkeypatch, tmp_path: Path
-) -> None:
+def test_any_push_of_a_role_branch_passes_the_gate(monkeypatch, tmp_path: Path) -> None:
     remote = tmp_path / "origin.git"
     remote.mkdir()
     _git(remote, "init", "-q", "--bare")
@@ -264,7 +262,7 @@ def test_births_publish_nothing_and_a_birth_with_content_is_refused(
     _git(repo, "push", "-q", "--no-verify", "origin", "develop")
     assert _remote_objects(remote) == before
 
-    # A birth carrying a new commit is refused.
+    # A birth carrying a new commit passes too: a role branch is an ordinary ref.
     _git(repo, "checkout", "-q", "-b", "next", "main")
     write_text(repo / "x.txt", "x\n")
     _git(repo, "add", "x.txt")
@@ -273,7 +271,7 @@ def test_births_publish_nothing_and_a_birth_with_content_is_refused(
     _git(repo, "update-ref", "-d", "refs/heads/develop")
     _git(repo, "branch", "develop", tip)
     line = f"refs/heads/develop {tip} refs/heads/develop {_ZERO}\n"
-    assert _gate(monkeypatch, tmp_path, repo, line) != 0
+    assert _gate(monkeypatch, tmp_path, repo, line) == 0
 
 
 def test_a_malformed_privacy_baseline_fails_the_gate_closed_with_one_fix_line(

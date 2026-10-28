@@ -419,18 +419,6 @@ def _mismatch(world: World) -> str:
     return "git push -q origin topic:feature/1.0.0"
 
 
-def _birth_published(world: World) -> str:
-    world.seed(_constitution(), "main")
-    world.clone()
-    world.commit("notes.md", "n\n", branch="develop")
-    return "git push -q origin develop"
-
-
-def _develop_at_main(world: World) -> None:
-    heads = world.remote_heads()
-    assert heads["develop"] == heads["main"]
-
-
 def _baseline_done(
     world: World, work: str = "feature/0.1.0", gitflow: tuple[str, ...] = ("main", "develop")
 ) -> None:
@@ -1260,12 +1248,10 @@ _WORKTREE: dict[str, tuple[WtCase | Skip, ...]] = {
 
 _REFUSALS: dict[str, tuple[Case | WtCase | tuple[Case, ...] | Skip, ...]] = {
     "branch_policy._refuse_branch": (
-        Case(_birth_published, _develop_at_main, replaces=True),
         Skip(
             "an Agent action over worktree verbs: the worktree_ws harness drives it, "
             "tests/core/test_cli_line__refusal_fix_lines_clear_their_refusal.py::test_an_outside_ref_lands_through_a_tree"
         ),
-        Skip("an Agent action on the git host: the PR is no command to run"),
     ),
     "branch_policy.check_branch_policy": (
         Case(_mismatch, _work_pushed, then="git push -q origin feature/1.0.0"),

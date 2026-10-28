@@ -1,8 +1,8 @@
 """`ci push-gate-check` driven as the pre-push hook drives it (git's ref lines on stdin,
-harness-free env, no handoff on disk). A work-branch push, a branch deletion and a tag push pass;
-the branch names come from the committed constitution's gitflow (custom, absent -> default + one
-warning, inherited by an associated repo; its main repo absent -> default + one warning). The
-integration-branch refusal and its fix are the refusal harness Case `birth_published`.
+harness-free env, no handoff on disk). A push of a work, principal or integration branch, a branch
+deletion and a tag push pass; the branch names come from the committed constitution's gitflow
+(custom, absent -> default + one warning, inherited by an associated repo; its main repo absent ->
+default + one warning).
 
 Owner: dd-sw-engineer-sr
 """
@@ -71,11 +71,13 @@ def _run_push_gate(
     [
         pytest.param("refs/heads/feature/0.0.1 {sha} refs/heads/feature/0.0.1 " + _ZERO, id="work-branch-push"),
         pytest.param("refs/heads/old " + _ZERO + " refs/heads/old {sha}", id="branch-deletion"),
+        pytest.param("refs/heads/main {sha} refs/heads/main {sha}", id="principal-update"),
+        pytest.param("refs/heads/develop {sha} refs/heads/develop {sha}", id="integration-update"),
         pytest.param("refs/tags/v1 {sha} refs/tags/v1 " + _ZERO, id="tag-push"),
     ],
 )  # fmt: skip
 def test_pass_matrix(tmp_path: Path, line: str) -> None:
-    """Never review-gated: the verdict is a PR gate, not on this path."""
+    """Never review-gated: the verdict is the PR gate's, not this path's; no role branch is refused."""
     repo, sha = _init_repo(tmp_path, _SLUG)
     result = _run_push_gate(repo, tmp_path, line.format(sha=sha) + "\n")
     assert result.returncode == 0, result.stdout + result.stderr

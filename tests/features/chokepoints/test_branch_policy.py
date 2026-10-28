@@ -1,5 +1,5 @@
 """The branch contract, read from the project gitflow: work branches ``<prefix><M.m.p>`` are
-pushable; the principal and integration branches are PR-only; every refusal and its fix line
+pushable, and so are the principal and integration branches (ordinary refs); every refusal and its fix line
 name the CONFIGURED branches.
 Every row runs under the default gitflow or a custom one (``trunk``/``next``/``work/``).
 """
@@ -55,35 +55,26 @@ def _fix(decision: Decision) -> str:
     return decision.message.rsplit("fix: ", 1)[1]
 
 
-def _birth(role: str) -> Scenario:
+def _update_of(branch: str) -> Scenario:
+    """A fast-forward of *branch* over a tip origin already holds: the refspec matches."""
+
     def run(repo: PushRepo, flow: Gitflow) -> str:
         repo.commit({"a.md": "a\n"})
-        sha = repo.publish(flow.integration if role == "principal" else flow.principal)
-        return _line(getattr(flow, role), sha=sha)
+        old = repo.publish(getattr(flow, branch))
+        return _line(getattr(flow, branch), remote_sha=old, sha=repo.commit({"b.md": "b\n"}))
 
     return run
 
 
-def _birth_with_commit(role: str, other: str) -> Scenario:
+def _create_of(branch: str) -> Scenario:
+    """A role branch created at a new commit, the other role already on origin."""
+
     def run(repo: PushRepo, flow: Gitflow) -> str:
         repo.commit({"a.md": "a\n"})
-        repo.publish(getattr(flow, other))
-        return _line(getattr(flow, role), sha=repo.commit({"b.md": "b\n"}))
+        repo.publish(flow.integration if branch == "principal" else flow.principal)
+        return _line(getattr(flow, branch), sha=repo.commit({"b.md": "b\n"}))
 
     return run
-
-
-def _existing_principal(repo: PushRepo, flow: Gitflow) -> str:
-    repo.commit({"a.md": "a\n"})
-    sha = repo.publish(flow.principal)
-    return _line(flow.principal, remote_sha=sha, sha=sha)
-
-
-def _birth_from_any_source(repo: PushRepo, flow: Gitflow) -> str:
-    """Judged by the remote branch it creates and what it publishes, never the local name."""
-    repo.commit({"a.md": "a\n"})
-    sha = repo.publish()
-    return f"{_line('main', 'develop', sha=sha)}\n{sha} {sha} refs/heads/develop {_ZERO}"
 
 
 def _feature_to_published_integration(repo: PushRepo, flow: Gitflow) -> str:
@@ -105,11 +96,14 @@ _D, _C = DEFAULT, _CUSTOM
     pytest.param(_C, _commit_then(lambda s, f: _line(f"{f.work_prefix}0.0.0", sha=s)), id="custom-work-branch"),
     pytest.param(_D, _commit_then(lambda s, f: _line(f.principal, sha=s)), id="default-R13-empty-origin-admits-principal"),
     pytest.param(_C, _commit_then(lambda s, f: _line(f.principal, sha=s)), id="custom-R13-empty-origin-admits-principal"),
-    pytest.param(_D, _birth("principal"), id="default-ADR0036-contentless-principal-birth"),
-    pytest.param(_C, _birth("principal"), id="custom-ADR0036-contentless-principal-birth"),
-    pytest.param(_D, _birth("integration"), id="default-ADR0036-contentless-integration-birth"),
-    pytest.param(_C, _birth("integration"), id="custom-ADR0036-contentless-integration-birth"),
-    pytest.param(_D, _birth_from_any_source, id="H4-contentless-birth-from-any-source"),
+    pytest.param(_D, _update_of("integration"), id="default-integration-update-matching-refspec"),
+    pytest.param(_D, _create_of("integration"), id="default-integration-create-carrying-a-commit"),
+    pytest.param(_D, _update_of("principal"), id="default-principal-update-matching-refspec"),
+    pytest.param(_D, _create_of("principal"), id="default-principal-create-carrying-a-commit"),
+    pytest.param(_C, _update_of("integration"), id="custom-integration-update-matching-refspec"),
+    pytest.param(_C, _create_of("integration"), id="custom-integration-create-carrying-a-commit"),
+    pytest.param(_C, _update_of("principal"), id="custom-principal-update-matching-refspec"),
+    pytest.param(_C, _create_of("principal"), id="custom-principal-create-carrying-a-commit"),
     pytest.param(_D, _commit_then(lambda s, f: f"refs/heads/wt/x {s} refs/tags/archive/wt/x {_ZERO}"), id="tag-carve-out-keys-on-the-remote-ref"),
     pytest.param(_D, lambda repo, flow: "", id="finding-1-empty-stdin-has-nothing-to-gate"),
 ])
@@ -119,26 +113,12 @@ def test_the_gate_allows(repo: PushRepo, flow: Gitflow, scenario: Scenario) -> N
     assert decision.allowed, decision.message
 
 
-_PR_TO_INTEGRATION = "Agent action: open a PR/MR from '{prefix}0.6.0' into '{integration}' on your git host"
-_PR_TO_PRINCIPAL = "Agent action: open a PR/MR from '{integration}' into '{principal}' on your git host"
-
-
-def _birth_fix(tip: str, role: str) -> list[str]:
-    return ["git", "-C", "/repo", "push", "origin", f"refs/remotes/origin/{{{tip}}}:refs/heads/{{{role}}}"]
-
 
 # fmt: off
 @pytest.mark.parametrize(("flow", "scenario", "named", "fix"), [
-    pytest.param(_D, lambda r, f: _line(f.integration, remote_sha=_B), "'{integration}' is never pushed directly — it advances only via a PR (", _PR_TO_INTEGRATION, id="default-integration-is-PR-only"),
-    pytest.param(_C, lambda r, f: _line(f.integration, remote_sha=_B), "'{integration}' is never pushed directly — it advances only via a PR (", _PR_TO_INTEGRATION, id="custom-integration-is-PR-only"),
-    pytest.param(_D, lambda r, f: _line(f.principal, remote_sha=_B), "'{principal}' is never pushed directly — it advances only via a PR (", _PR_TO_PRINCIPAL, id="default-principal-is-PR-only"),
-    pytest.param(_C, lambda r, f: _line(f.principal, remote_sha=_B), "'{principal}' is never pushed directly — it advances only via a PR (", _PR_TO_PRINCIPAL, id="custom-principal-is-PR-only"),
-    pytest.param(_D, lambda r, f: f"refs/tags/v1 {_A} refs/heads/{f.principal} {_B}", "'{principal}' is never pushed directly — it advances only via a PR (", _PR_TO_PRINCIPAL, id="a-local-tag-onto-the-principal-is-PR-only"),
-    pytest.param(_D, _birth_with_commit("principal", "integration"), "", _birth_fix("integration", "principal"), id="default-M2-principal-birth-carrying-a-commit"),
-    pytest.param(_C, _birth_with_commit("principal", "integration"), "", _birth_fix("integration", "principal"), id="custom-M2-principal-birth-carrying-a-commit"),
-    pytest.param(_D, _birth_with_commit("integration", "principal"), "", _birth_fix("principal", "integration"), id="default-M2-integration-birth-carrying-a-commit"),
-    pytest.param(_C, _birth_with_commit("integration", "principal"), "", _birth_fix("principal", "integration"), id="custom-M2-integration-birth-carrying-a-commit"),
-    pytest.param(_D, _existing_principal, "", None, id="an-existing-principal-is-never-a-birth"),
+    pytest.param(_D, lambda r, f: f"refs/tags/v1 {_A} refs/heads/{f.principal} {_B}", "is outside the gitflow", _land_fix, id="a-local-tag-aimed-at-the-principal-is-outside-the-gitflow"),
+    pytest.param(_D, _commit_then(lambda s, f: _line("topic", f.principal, remote_sha=_B, sha=s)), "refspec aims 'refs/heads/topic' at remote 'refs/heads/{principal}'", ["git", "-C", "/repo", "branch", "-m", "topic", "{principal}"], id="default-mismatched-refspec-at-the-principal"),
+    pytest.param(_C, _commit_then(lambda s, f: _line("topic", f.integration, remote_sha=_B, sha=s)), "refspec aims 'refs/heads/topic' at remote 'refs/heads/{integration}'", ["git", "-C", "/repo", "branch", "-m", "topic", "{integration}"], id="custom-mismatched-refspec-at-the-integration"),
     pytest.param(_C, lambda r, f: _line("work/0.0.1", "work/0.0.2"), "refs/heads/work/0.0.2",
                  ["git", "-C", "/repo", "branch", "-m", "work/0.0.1", "work/0.0.2"], id="finding-2-work-branch-to-a-foreign-remote-ref"),
     pytest.param(_C, _feature_to_published_integration, "", None, id="finding-2-work-branch-to-the-integration-ref"),

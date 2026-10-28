@@ -369,43 +369,6 @@ def test_a_new_branch_keeps_amnesty_for_what_origin_already_published(tmp_path: 
     assert shape(_scan(repo, tip, base)) == shape(_scan(repo, tip, ZERO_SHA))
 
 
-def _published_repo(tmp_path: Path) -> tuple[Path, str]:
-    """A repo whose one commit is already on a bare ``origin``."""
-    remote = tmp_path / "origin.git"
-    run(["git", "init", "-q", "--bare", str(remote)], check=True)
-    repo, (sha,) = _repo(tmp_path, {"a.txt": "first\n"})
-    _git(["remote", "add", "origin", str(remote)], repo)
-    _git(["push", "-q", "origin", "HEAD:refs/heads/main"], repo)
-    return repo, sha
-
-
-def test_a_commit_already_on_origin_publishes_nothing(tmp_path: Path) -> None:
-    repo, sha = _published_repo(tmp_path)
-    assert GitSubprocessObjectReader().unpublished(repo, sha) == []
-
-
-def test_the_unpublished_range_is_newest_first_and_ignores_an_advanced_origin(
-    tmp_path: Path,
-) -> None:
-    """The oldest entry is where the rewrite fix resets — never origin's tip."""
-    repo, _ = _published_repo(tmp_path)
-    _git(["checkout", "-q", "-b", "topic"], repo)
-    _git(["commit", "-q", "--allow-empty", "-m", "mine"], repo)
-    oldest = _git(["rev-parse", "HEAD"], repo)
-    _git(["commit", "-q", "--allow-empty", "-m", "more"], repo)
-    tip = _git(["rev-parse", "HEAD"], repo)
-    _git(["checkout", "-q", "main"], repo)
-    _git(["commit", "-q", "--allow-empty", "-m", "dep"], repo)
-    _git(["push", "-q", "origin", "main"], repo)
-    assert GitSubprocessObjectReader().unpublished(repo, tip) == [tip, oldest]
-
-
-def test_a_range_reaching_a_root_commit_ends_at_the_root(tmp_path: Path) -> None:
-    """An empty origin is the same formula — the oldest commit is the root."""
-    repo, (root, sha) = _repo(tmp_path, {}, {})
-    assert GitSubprocessObjectReader().unpublished(repo, sha) == [sha, root]
-
-
 def test_a_commit_only_another_remote_holds_is_still_unpublished(tmp_path: Path) -> None:
     """A commit is published when it is on origin — one rule for the gate and ``unpushed``."""
     repo, (sha,) = _repo(tmp_path, {})
@@ -413,13 +376,6 @@ def test_a_commit_only_another_remote_holds_is_still_unpublished(tmp_path: Path)
     assert unpublished(repo, sha) == [sha]
     _git(["update-ref", "refs/remotes/origin/main", sha], repo)
     assert unpublished(repo, sha) == []
-
-
-@pytest.mark.parametrize("sha", ["a" * 40, "--upload-pack=evil"])
-def test_an_unresolvable_or_option_shaped_sha_fails_closed(tmp_path: Path, sha: str) -> None:
-    """Unreadable counts as unpublished: never a birth, never an empty range."""
-    repo, _ = _published_repo(tmp_path)
-    assert GitSubprocessObjectReader().unpublished(repo, sha) == [sha]
 
 
 def test_an_oversized_blob_read_that_cannot_start_git_raises_the_typed_error(
