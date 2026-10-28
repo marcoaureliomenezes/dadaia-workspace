@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-26T08:36:49Z",
+  "generated_at": "2026-10-28T06:59:09Z",
   "features": [
     {
       "rank": 1,
@@ -74,7 +74,7 @@
         "derivation",
         "governance"
       ],
-      "token_estimate": 639,
+      "token_estimate": 636,
       "depends_on": [
         "sdd-gate-v3",
         "cross-platform-portability",
@@ -133,7 +133,7 @@
         "projection",
         "privacy"
       ],
-      "token_estimate": 1581,
+      "token_estimate": 1592,
       "depends_on": [
         "agentic-entities",
         "context-management",
@@ -241,7 +241,7 @@
         "projection",
         "hooks"
       ],
-      "token_estimate": 643,
+      "token_estimate": 662,
       "depends_on": [
         "agentic-entities",
         "context-management",
@@ -443,7 +443,7 @@
         "provider",
         "onboarding"
       ],
-      "token_estimate": 325,
+      "token_estimate": 317,
       "depends_on": [
         "consumer-agent-support",
         "workspace-doctor",
@@ -500,7 +500,7 @@
         "session",
         "privacy"
       ],
-      "token_estimate": 3623,
+      "token_estimate": 3665,
       "depends_on": [
         "specs-migration",
         "workspace-doctor",
@@ -659,7 +659,7 @@
         "compliance",
         "privacy"
       ],
-      "token_estimate": 3918,
+      "token_estimate": 3947,
       "depends_on": [
         "public-asset-distribution",
         "sdd-gate-v3",
@@ -769,7 +769,7 @@
         "ledger",
         "governance"
       ],
-      "token_estimate": 1079,
+      "token_estimate": 1077,
       "depends_on": [
         "agent-orchestration",
         "worktrees",
@@ -827,7 +827,7 @@
         "state",
         "closure"
       ],
-      "token_estimate": 1960,
+      "token_estimate": 2051,
       "depends_on": [
         "agent-orchestration",
         "worktrees",
@@ -858,12 +858,13 @@
         "privacy",
         "git"
       ],
-      "token_estimate": 1616,
+      "token_estimate": 1728,
       "depends_on": [
         "context-management",
         "cross-platform-portability",
         "worktrees",
         "bug-ledger",
+        "release-lifecycle",
         "workspace-doctor",
         "agentic-entities",
         "public-asset-distribution",
@@ -896,7 +897,7 @@
         "merge",
         "review"
       ],
-      "token_estimate": 3433,
+      "token_estimate": 3448,
       "depends_on": [
         "context-management",
         "sdd-gate-v3",

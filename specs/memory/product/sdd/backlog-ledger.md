@@ -31,7 +31,7 @@ sources:
 ## Validation
 
 - `dadaia doctor`'s `ledgers` section runs `backlog.py check` (`LEDGER-BACKLOG-SCHEMA`), the one entry validator, and two anchor rules over the repo's git-tracked paths: `BL-SCHEMA` (a bound subject that resolves to no live anchor) and `BL-CONFLICT` (two entries binding one anchor with incompatible changes); each carries its `fix:` line, and a `BACKLOG.json` the backlog store refuses binds nothing there, so the ledger finding is its one voice ([[workspace-doctor]]).
-- One histo vocabulary serves every ledger: `delivered resolved superseded deferred rejected to-bug`; a backlog entry exits `delivered`, `superseded`, `rejected` or `to-bug` (its `reason` the bug's id), and `deferred` is not terminal for it.
+- One histo vocabulary serves every ledger: `delivered resolved superseded rejected to-bug`, each ledger's validator holding its own subset; a backlog entry exits `delivered`, `superseded`, `rejected` or `to-bug` (its `reason` the bug's id).
 - `release.py check` lists each picked slug with whether its exit points back to the release, and a `to-bug` exit whose bug was later rejected ([[release-lifecycle]]).
 
 ## Runtime state
