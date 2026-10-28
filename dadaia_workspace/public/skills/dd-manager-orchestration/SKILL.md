@@ -52,7 +52,7 @@ description: >
 ### Escalation triggers — a report line, not a wait
 
 1. Required SPEC/PLAN/job files or a resolvable `_RELEASE.json` `phase` missing or not
-   approved (the `specs/AGENTS.md` precondition, heading "Before implementing", fails; a `wt-hotfix` lane, or a block-list fix on a closed `wt-rc`, under `specs/bugs/AGENTS.md`, heading "Resolution", needs only its open bug).
+   approved (the `specs/AGENTS.md` precondition, heading "Before implementing", fails).
 2. A CRITICAL security issue.
 3. A dispatched agent returns `[SCOPE ERROR]`.
 4. Three or more unresolved conflicts open.
