@@ -41,5 +41,5 @@ Scope: this file governs only `specs/releases/`.
 
 ## 5. Promote
 
-- Promote is merging the promote PR (`dd-gitflow-default`, step 10); `RELEASE_PY ship --specs <specs-dir>` records it: `shipped`, one `delivered` histo line, the whole release directory moved to `_archive/<id>/`, never deleted.
+- Promote is the integration → principal merge (`dd-gitflow-default`, step 10); `RELEASE_PY ship --specs <specs-dir>` records it: `shipped`, one `delivered` histo line, the whole release directory moved to `_archive/<id>/`, never deleted.
 - Version, CHANGELOG and tag belong to the project's own release pipeline; no verb and no agent mints a version.
