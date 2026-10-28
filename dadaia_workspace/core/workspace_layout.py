@@ -118,7 +118,7 @@ REFUSALS: dict[FloorRefusal, str] = {
     FloorRefusal.SESSION: (
         "[GATE] .dadaia/sessions/ is protected CLI-owned bind state. Agents must not write "
         "here via file tools. Blocked to preserve caller session identity integrity "
-        "(SEC-01 / CWE-284).\n"
+        "(CWE-284).\n"
     ),
 }
 

@@ -126,8 +126,7 @@ def _check_baseline_exclude_rationale(
                 DoctorLine(
                     DoctorStatus.ERROR,
                     f"public-privacy: baseline pattern '{pattern.id}' has an "
-                    "exclude_regex carve-out with no documented exclude_rationale "
-                    "(v0.4.3 FR12/A12.1)",
+                    "exclude_regex carve-out with no documented exclude_rationale",
                 )
             )
     return findings

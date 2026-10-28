@@ -136,7 +136,7 @@ def _installed_binary(
     if resolved is None:
         raise _CertificationSkip(
             f"UNVERIFIED: no {binary!r} binary on PATH, so the {harness} runtime claim is "
-            "unproven in this environment (A22.4 honest degrade; the projection tests "
+            "unproven in this environment (honest degrade; the projection tests "
             "validate file shape only, never runtime behavior)"
         )
     proc = process.run([resolved, "--version"], cwd=cwd, timeout=_CODEX_VERSION_PROBE_TIMEOUT)
@@ -189,7 +189,7 @@ def _codex_live_probe_detail(
         if unavailable:
             raise _CertificationSkip(
                 "codex CLI installed but unusable in this environment — "
-                f"{detail} (A22.4 honest degrade; upstream auth/entitlement "
+                f"{detail} (honest degrade; upstream auth/entitlement "
                 "rejection, not a probe defect)"
             )
         raise RuntimeError(f"codex exec exited {exec_proc.returncode}: {detail}")

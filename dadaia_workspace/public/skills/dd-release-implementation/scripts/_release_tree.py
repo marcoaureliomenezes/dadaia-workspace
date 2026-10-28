@@ -123,7 +123,7 @@ def _window_findings(
     head = next((n for n, h in enumerate(lines, 1) if h.startswith("## ")), 1)
     if lines[head - 1 : head] == [BUG_WINDOW]:
         return []
-    message = f"the live SPEC's first `## ` heading is not `{BUG_WINDOW}` (AC5.6)"
+    message = f"the live SPEC's first `## ` heading is not `{BUG_WINDOW}`"
     if state.get("phase") != "DEFINITION":
         return [_findings.info(CODE, rel, head, message)]
     return [_findings.finding(CODE, rel, head, message,

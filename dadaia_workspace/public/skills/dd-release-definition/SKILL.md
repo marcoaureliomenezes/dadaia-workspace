@@ -79,8 +79,8 @@ Before the SPEC or any ADR, the main thread runs `dd-grill-me` on the picked set
 
 | task | who | AC | `W:` | outcome |
 |---|---|---|---|---|
-| J2.T1 | sr | AC2.1 | `tests/unit/test_x.py` | RED acceptance test |
-| J2.T2 | jr | AC2.1 | `src/x.py` | implementation; owner `tests/unit/test_x.py` |
+| J2.T1 | sr | AC<n>.<m> | `tests/unit/test_x.py` | RED acceptance test |
+| J2.T2 | jr | AC<n>.<m> | `src/x.py` | implementation; owner `tests/unit/test_x.py` |
 ```
 
 ## 6. Declaring consumption
