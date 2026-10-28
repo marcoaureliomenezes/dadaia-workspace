@@ -2700,6 +2700,37 @@
       "candidate": "rc-25",
       "milestone": "implemented",
       "text": "Candidate implemented; phase CLOSURE."
+    },
+    {
+      "ts": "2026-10-28T06:59:25Z",
+      "agent": "release.py memory",
+      "kind": "memory",
+      "text": "Memory reconciled over 516320ff348480d6a27ce2a690d53631a062b31b..5312dcea1f42: 8 reviewed, 11 changed.",
+      "since": "516320ff348480d6a27ce2a690d53631a062b31b",
+      "until": "5312dcea1f4225b7e0dbe589ace02c1af610fe19",
+      "reviewed": [
+        "agent-comms",
+        "pypi-distribution",
+        "product-vision",
+        "spec-context-project",
+        "server-registry",
+        "specs-migration",
+        "audits-canon",
+        "bug-ledger"
+      ],
+      "changed": [
+        "sdd-gate-v3",
+        "context-management",
+        "release-lifecycle",
+        "agent-orchestration",
+        "capabilities",
+        "harness-codex",
+        "backlog-ledger",
+        "worktrees",
+        "workspace-doctor",
+        "agentic-entities",
+        "public-asset-distribution"
+      ]
     }
   ]
 }
