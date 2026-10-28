@@ -1,7 +1,7 @@
 ---
 name: dd-gitflow-default
 description: >
-  The branch and commit contract (§2a, §3a): which branch to cut and push, the commit shape of each write, and the PR gate. Use when branching, writing a commit message, opening or merging a PR, or promoting; task and job order is dd-release-implementation's.
+  The branch and commit contract (§2a, §3a): which branch to cut and push, the commit shape of each write, and the merge gate. Use when branching, writing a commit message, merging, or promoting; task and job order is dd-release-implementation's.
 ---
 
 # dd-gitflow-default — The Branch Contract
@@ -11,33 +11,33 @@ The branch contract by role; the names are `specs/constitution.md`'s `gitflow:` 
 ## 1. When
 
 - Start of any session touching git.
-- Branching, committing, opening a PR.
+- Branching, committing, merging.
 - Any bug fix (`dd-bug-resolution`).
 
 ## 2. Steps
 
 1. `git fetch --all --prune`.
-2. Read the gitflow block; branch B lacks a change branch A holds when `git merge-tree --write-tree origin/B origin/A` prints a tree other than `git rev-parse origin/B^{tree}` (git ≥ 2.38); the integration branch carries undeployed changes when the principal lacks a change it holds.
+2. Ref R is `origin/R` when the repo has a remote, else the local `R`. Read the gitflow block; branch B lacks a change branch A holds when `git merge-tree --write-tree B A` prints a tree other than `git rev-parse B^{tree}` (git ≥ 2.38); the integration branch carries undeployed changes when the principal lacks a change it holds.
 3. Identify the one live work branch `<work>M.m.p`.
 4. Report a work branch that lacks a change the integration branch holds (step 2's test, B the work branch, A the integration branch) first — it is stale.
 5. Branch count, cut point and name follow §2a.
 6. Definition stage: where a candidate is defined is `specs/releases/AGENTS.md`'s.
 7. Implementation stage: one commit per task, shaped per §3a.
-8. Candidate closure, on the operator's explicit order (publication): open one work → integration PR and merge it green; before that order, "finish" means merged into the work branch.
-9. When a candidate closes — its work → integration PR merged, or, before the operator's order, its `wt-rc` merged into the work branch — the main thread asks the operator one question: **promote or continue?** — and, for promote, the next release `<id>` or none. Continue = the next candidate's `python3 .agents/skills/dd-release-implementation/scripts/release.py new <id> --specs <specs-dir>`; promote = step 10.
-10. Promote: open the integration → principal PR and merge it (the reviewer's `APPROVED` on its head, §3b); the pipeline PR the project's own release pipeline then opens into the principal, if any, is the promote PR whose merge deploys, else the integration → principal PR is.
-11. After the promote PR merges, tag the work tip as `archive/<work-name>`; once the next release `<id>` is named (step 9), rename the work branch, never cut a new one: `git -C <repo> branch -m <work><old> <work><id>` (and its remote ref, when one exists: `git -C <repo> push -u origin <work><id> :<work><old>`). On it a `wt-backlog-<slug>` lane ships the release, its carry owned by `dd-release-implementation/RELEASE-EVENTS.md`, then the new candidate starts in its `wt-rc` (step 9). Until then work continues on the old-named branch; the rename carries every commit, the ship included, to the next work → integration PR.
+8. Candidate closure, on the operator's explicit order (publication): merge the work → integration branch, green (§3b); before that order, "finish" means merged into the work branch.
+9. When a candidate closes — its work → integration merge, or, before the operator's order, its `wt-rc` merged into the work branch — the main thread asks the operator one question: **promote or continue?** — and, for promote, the next release `<id>` or none. Continue = the next candidate's `python3 .agents/skills/dd-release-implementation/scripts/release.py new <id> --specs <specs-dir>`; promote = step 10.
+10. Promote: merge integration → principal (the reviewer's `APPROVED` on its head, §3b); the pipeline PR the project's own release pipeline then opens into the principal, if any, is the promote PR whose merge deploys, else the integration → principal merge is.
+11. After the promote merges, tag the work tip as `archive/<work-name>`; once the next release `<id>` is named (step 9), rename the work branch, never cut a new one: `git -C <repo> branch -m <work><old> <work><id>` (and its remote ref `origin/<work><old>`, when one exists: `git -C <repo> push -u origin <work><id> :<work><old>`). On it a `wt-backlog-<slug>` lane ships the release, its carry owned by `dd-release-implementation/RELEASE-EVENTS.md`, then the new candidate starts in its `wt-rc` (step 9). Until then work continues on the old-named branch; the rename carries every commit, the ship included, to the next work → integration merge.
 12. A `.dadaia/.venv/bin/dadaia worktree` tree and its branch complete under `worktrees/AGENTS.md` §2, which owns their merge and cleanup lifecycle.
 
-- Rewriting the pushed history of, or force-pushing, the work branch or a branch that advances only by PR is refused unless the operator authorizes that act in its own turn.
+- Rewriting the pushed history of, or force-pushing, a branch the gitflow block names is refused unless the operator authorizes that act in its own turn.
 
 ## 2a. The branch contract
 
 | Branch | Pushable | Cut from | Advances by |
 |---|---|---|---|
 | work `<work>M.m.p` | Yes — valid name (each `wt-rc` and hotfix merge into it ran `verify:`; no rerun before a push) | integration | its `wt-rc` and lane merges, and direct `specs/audits/**` commits |
-| integration | No — advances only by PR | principal (bootstrap only) | PR from the row above (step 8) |
-| principal | No — advances only by PR | — | the integration → principal PR, or the pipeline PR the project's own release pipeline opens |
+| integration | Yes | — | the work → integration merge (step 8) |
+| principal | Yes | — | the integration → principal merge (step 10), or the pipeline PR the project's own release pipeline opens |
 | rc `wt/<M.m.p>/rc-<N>/wt-rc` | Yes | work | its merge into the work branch (`worktrees/AGENTS.md` §2) |
 | job `wt/<M.m.p>/rc-<N>/job-<n>/wt-main` | Yes | its `wt-rc` | its merge into `wt-rc` (`worktrees/AGENTS.md` §2) |
 | task `wt/<M.m.p>/rc-<N>/job-<n>/wt-task-<kkk>` | No | its `wt-main` | its merge into `wt-main` (its task gate) |
@@ -74,15 +74,15 @@ The branch contract by role; the names are `specs/constitution.md`'s `gitflow:` 
 | 12 | a `wt-task-<kkk>` or `wt-hotfix` tree | Code revert: the culprit commit's paths, put back | `Revert "<subject>"`; body `This reverts commit <sha>.` |
 | 13 | a `wt-task-<kkk>` or `wt-hotfix` tree | Format-only commit: shape 6's `style(<id>): …`, never a `fix(bugs)` or `refactor(bugs)` line, since a record's fix is the newest id-line commit (`dd-bug-resolution/LINEAGE.md` §The filter) | `style(<id>): …` |
 
-## 3b. The PR gate
+## 3b. The merge gate
 
-- Both PR edges require the repo's `verify:` line green and a `dd-code-reviewer` APPROVED verdict, security lens included, on the PR head.
-- The reviewer's verdict is pasted verbatim into the PR as a quote by the main thread; that quote is the verdict's only record, since no script checks a PR.
+- A merge that advances integration or principal requires the repo's `verify:` line green and a `dd-code-reviewer` APPROVED verdict, security lens included, on the merged head; through a PR when the host has one.
+- A PR merge: the main thread quotes the verdict in it verbatim, its only record; no script checks it.
 
 ## 4. Done when
 
 - Current branches match §2a, and every commit since the work branch's cut, `specs/audits/**` commits aside, matches one §3a row.
-- After a work → integration PR: The PR gate holds and the PR merged.
+- After a work → integration merge: the merge gate (§3b) holds.
 - After promotion: the `archive/<work-name>` tag resolves to the former work tip, once the next release is named the work branch carries its name and its first merge records the principal merge as `shipped` in the archived state.
 
 ## 5. References
