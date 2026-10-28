@@ -567,7 +567,8 @@ class SpecContextService:
         refusal leaves HEAD on ``<work>`` holding the anchor, and names it. Uncommitted
         work outside the paths is never committed and git refuses a switch or merge that
         would overwrite it (residual: it rides along onto ``<work>``). Never a forced
-        checkout, a reset, a rebase, a force-push or a deletion."""
+        checkout, a reset, a rebase, a force-push or a deletion; the one forced act is
+        pointing a role branch origin lacks at its tip, which the push is about to publish."""
         repo = self._publishable_repo(name)
         git = partial(self._git.git, repo)
         git("fetch", "--prune", "--tags", "origin")
@@ -645,11 +646,10 @@ class SpecContextService:
         at = f"refs/remotes/origin/{flow.principal}" if heads else anchor
         births = [b for b in roles[1:] if b not in heads]
         for b in births:
-            if not git("for-each-ref", "--format=%(objectname)", f"refs/heads/{b}"):
-                git("branch", b, at)
+            git("update-ref", f"refs/heads/{b}", at)
         if not births and not self._git.unpushed(repo):
             return False
-        git("push", "--atomic", "-u", "origin", *births, work)
+        git("push", "--atomic", "-u", "origin", work, *births)
         return True
 
     def _refuse_principal_absent(
