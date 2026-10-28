@@ -160,6 +160,20 @@ def test_public_law_names_no_adr_number_or_library_path() -> None:
     assert _denied_lines(globs, r"ADR \d{4}|dadaia_workspace/", _BANNER_SPAN[0]) == []
 
 
+_PROVENANCE_ID = (
+    r"v?0\.\d+\.\d+ (?:FR|specs-canon)|retired in 0\.|T-0\d{2}-\d+|AC\d+\.\d+|\bA\d+\.\d+ |FR\d+"
+    r"|ADR 0\d{3}:|\bD1[45]\b|SEC-\d+"
+)
+
+
+def test_shipped_package_names_no_release_or_requirement_id() -> None:
+    """A shipped schema, message or law line states its rule, never the release, requirement, task or finding id."""
+    globs = ("**/*.json", "**/*.py", "public/**/*.md")
+    baseline = "public/skills/dd-bug-resolution/scripts/privacy_baseline.json"
+    hits = _denied_lines(globs, _PROVENANCE_ID, None)
+    assert [h for h in hits if not h.startswith(baseline)] == []
+
+
 _BARE_CLI_RE = re.compile(r"(?<![\w./-])dadaia(?:-workspace)?(?= [a-z-])")
 _UVX_INIT_RE = re.compile(r"uvx dadaia-workspace(?:@\S+)? init\b")
 _VENV_CALL_RE = re.compile(r"\.dadaia/\.venv/bin/dadaia((?: [a-z][\w-]*)+)([^`]*)")
