@@ -956,6 +956,19 @@ _BLOCKS = {
 }  # fmt: skip
 
 
+@pytest.mark.parametrize(
+    ("site", "path"),
+    [("push-denylist", "b.md"), ("push-specs-canon", "specs/not-a-canon-entry.md")],
+)
+def test_a_push_refusal_fix_names_only_the_act_that_clears_the_block(
+    workspace: Path, site: str, path: str
+) -> None:
+    assert the_fix(SITES[site](workspace), workspace) == (
+        f"Agent action: remove the listed term or path from {path} in the unpublished commits, "
+        "reword or split those commits by hand"
+    )
+
+
 @pytest.mark.parametrize("block", list(_BLOCKS))
 def test_every_block_carries_a_runnable_fix(workspace: Path, block: str) -> None:
     the_fix(_BLOCKS[block](workspace), workspace)
