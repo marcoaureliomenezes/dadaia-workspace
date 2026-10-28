@@ -120,6 +120,15 @@
         "eval-codex-lane-in-library-ci",
         "evals-benchmark-lanes"
       ]
+    },
+    {
+      "id": "gate-and-worktree-git-calls-per-operation",
+      "title": "The gate and worktree features read each git fact once per operation, so the per-operation subprocess count and the CI wall come back down",
+      "opened": "2026-10-28",
+      "status": "idea",
+      "description": "One git read per fact in the gate and worktree features. Measured 2026-10-28 with strace between a6cddda33 and f8d56a124: test_the_fix_line_clears_the_refusal[dead_denylisted] went from 1574 to 2150 execve and from 4.63 to 6.10 s; git rev-list 93 -> 245, cat-file 17 -> 169, ls-tree 8 -> 65, diff 2 -> 40. The Integration job wall grew to 415-589 s and E2E to 173-333 s; ADR 0284 is the third CI budget re-freeze in a month (ADR 0119, 0262, 0284). Goal: the per-operation git subprocess count falls, and with it the CI wall.",
+      "provenance": "Operator ruling on ADR 0284, AskUserQuestion 2026-10-28: 'Re-congelar no m\u00e1x (Recommended)' ('A redu\u00e7\u00e3o de chamadas git vai ao backlog. O 0.5.0 segue.'); ADR 0284 decision: 'Reducing the git subprocesses per gate and worktree operation is backlog work, not part of this record.'",
+      "relates": []
     }
   ]
 }
