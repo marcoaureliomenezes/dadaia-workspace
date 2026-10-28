@@ -72,7 +72,7 @@ The branch contract by role; the names are `specs/constitution.md`'s `gitflow:` 
 | 10 | `wt-rc` (define, reconcile), a `wt-backlog-<slug>` lane on the next work branch (§2 step 11, `ship`) | Release state: `specs/releases/<v>/_RELEASE.json` and `specs/releases/_archive/**`, only when [`RELEASE-EVENTS.md`](../dd-release-implementation/RELEASE-EVENTS.md) requires a current entry | `chore(release): …` |
 | 11 | the job tree that found the defect (`wt-main`) | Pure law or doc text that no program prints (a fix line, `--help` or a schema stays Arm B, shape 3): the file it corrects; no `BUGS.jsonl` record | `docs(law): <what>`; the body cites the finding; one review |
 | 12 | a `wt-task-<kkk>` or `wt-hotfix` tree | Code revert: the culprit commit's paths, put back | `Revert "<subject>"`; body `This reverts commit <sha>.` |
-| 13 | a `wt-task-<kkk>` or `wt-hotfix` tree | Format-only commit: shape 6's `style(<id>): …`, never a `fix(bugs)` or `refactor(bugs)` line, since a record's fix is the newest id-line commit (`dd-bug-resolution/LINEAGE.md` §The filter) | `style(<id>): …` |
+| 13 | a `wt-task-<kkk>` or `wt-hotfix` tree | Format-only commit: shape 6's `style(<id>): …`, never a `fix(bugs)` or `refactor(bugs)` line (`specs/bugs/AGENTS.md` §2) | `style(<id>): …` |
 
 ## 3b. The merge gate
 
