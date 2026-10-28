@@ -77,7 +77,7 @@ def _run_push_gate(
     ],
 )  # fmt: skip
 def test_pass_matrix(tmp_path: Path, line: str) -> None:
-    """Never review-gated: the verdict is the PR gate's, not this path's; no role branch is refused."""
+    """Never review-gated: the verdict is the merge gate's, not this path's; no role branch is refused."""
     repo, sha = _init_repo(tmp_path, _SLUG)
     result = _run_push_gate(repo, tmp_path, line.format(sha=sha) + "\n")
     assert result.returncode == 0, result.stdout + result.stderr
