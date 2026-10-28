@@ -290,6 +290,26 @@ def test_baseline_leaves_the_role_heads_local_at_their_origin_tips(
         assert _git(repo, "rev-parse", f"refs/heads/{role}") == _heads(bare)[role]
 
 
+def test_a_single_branch_clone_keeps_the_unpushed_commits_of_a_role_head_origin_holds(
+    env, tmp_path: Path
+) -> None:
+    """A local integration branch origin holds is never moved, though the clone tracks
+    only the principal."""
+    svc, repo, bare = env
+    _seed(bare, tmp_path / "seed", "main", "develop")
+    _git(repo.parent, "clone", "-q", "--single-branch", "-b", "main", bare.as_uri(), str(repo))
+    _identity(repo)
+    _git(repo, "switch", "-q", "-c", "develop", "origin/main")
+    _commit_file(repo, "mine.py")
+    mine = _git(repo, "rev-parse", "develop")
+    _git(repo, "switch", "-q", "main")
+    (repo / "specs").mkdir()
+    write_text(repo / "specs" / "constitution.md", _CONSTITUTION)
+    write_text(repo / "AGENTS.md", "# law\n")
+    svc.baseline("proj")
+    assert _git(repo, "rev-parse", "refs/heads/develop") == mine
+
+
 @pytest.mark.parametrize("seeded", [(), ("main", "develop")], ids=["empty", "adopted"])
 def test_second_run_is_a_no_op(env, tmp_path: Path, seeded) -> None:
     svc, repo, bare = env
