@@ -50,7 +50,7 @@ if args[:2] == ["context", "list"]:
     print({rows!r})
 elif args[:2] == ["context", "session-check"]:
     import os
-    sid = os.environ.get("DADAIA_SESSION_ID") or os.environ.get("CLAUDE_CODE_SESSION_ID") or ""
+    sid = next((os.environ[v] for v in ("DADAIA_SESSION_ID", "CLAUDE_CODE_SESSION_ID", "CODEX_THREAD_ID") if os.environ.get(v)), "")
     if sid and not os.path.exists(os.path.join(os.getcwd(), ".dadaia", "sessions", sid + ".json")):
         print("[error] no workspace hook governs this session", file=sys.stderr)
         print({relaunch!r}, file=sys.stderr)
