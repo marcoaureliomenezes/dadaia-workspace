@@ -18,6 +18,7 @@ import pytest
 
 from dadaia_workspace.infrastructure.ledger_scripts import load_owner
 from tests.fixtures.harness_env import git_bash
+from tests.fixtures.stores import fake_venv
 from tests.helpers.oslib import command, is_executable, read_text, run, write_text
 from tests.helpers.skill_scripts import stage_skill_scripts
 
@@ -665,6 +666,7 @@ def test_new_refuses_a_state_file_term_with_no_environment_variable(
     monkeypatch.delenv("DADAIA_PRIVACY_DENYLIST", raising=False)
     (tmp_path / ".dadaia/states").mkdir(parents=True)
     write_text(tmp_path / ".dadaia/states/spec_contexts.json", "{}")
+    fake_venv(tmp_path, cli="#!python\n")  # the CLI boundary: the session check passes
     write_text(tmp_path / ".dadaia/states/privacy_denylist.json", json.dumps({"zorblax": "client"}))
     specs = _specs(tmp_path)
     before = (specs / "backlog" / "BACKLOG.json").read_bytes()

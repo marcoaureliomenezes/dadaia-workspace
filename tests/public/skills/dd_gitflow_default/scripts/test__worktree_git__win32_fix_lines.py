@@ -73,6 +73,7 @@ def test_a_git_failure_reruns_through_inline(
 ) -> None:
     cli = _mod("worktree")
     monkeypatch.setattr(cli, "workspace_of", lambda *a: tmp_path)
+    monkeypatch.setattr(cli, "require_governed", lambda root: None)  # the CLI is the boundary
 
     def failing(*a: object) -> str:
         raise cli.GitError(("merge",), "boom")

@@ -33,7 +33,7 @@ from _backlog_schema import DISPOSITIONS, HISTO, LEDGER
 from _backlog_store import commit, read_active
 from _platform import use_utf8_stdio
 from _refusal import Refusal
-from _specs import find_specs, refuse
+from _specs import find_specs, refuse, require_governed, workspace_of
 
 _HELP = {
     "new": "append one brand-new active[] entry, born at status 'idea'",
@@ -89,6 +89,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.verb == "check":
         return _findings.run_check(check(specs), as_json=args.json)
     try:
+        if root := workspace_of(specs):
+            require_governed(root)
         return _new(args, specs) if args.verb == "new" else _exit(args, specs)
     except Refusal as refusal:
         return refuse(refusal, specs)

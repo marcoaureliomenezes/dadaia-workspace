@@ -23,6 +23,7 @@ from _git import GitError
 from _jsonl import reinstall_fix
 from _platform import act, inline, use_utf8_stdio
 from _refusal import report, spell_fix
+from _specs import require_governed
 from _worktree_end import clean, digest, merge
 from _worktree_git import rows, workspace_of
 from _worktree_names import LAUNCH, Refusal
@@ -31,6 +32,8 @@ from _worktree_pause import pause, paused_rows, resume
 from _worktree_sync import sync
 
 __all__ = ["main"]
+
+_WRITES = {"new", "merge", "clean", "sync", "pause", "resume"}
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -72,6 +75,8 @@ def main(argv: list[str] | None = None) -> int:
             raise Refusal(
                 "no workspace root above the cwd or this script", reinstall_fix(Path.cwd())
             )
+        if args.verb in _WRITES:
+            require_governed(root)
         if args.verb == "new":
             print(f"[ok] {new(root, args.repo, args.name)}")
             return 0

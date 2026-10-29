@@ -48,7 +48,7 @@ from _release_store import (
     window_start,
 )
 from _release_tree import check, drift, memory_errors, ship_findings
-from _specs import choice, find_specs, refuse
+from _specs import choice, find_specs, refuse, require_governed, workspace_of
 
 _HELP = {
     "new": "open the next candidate: its rc-<N+1>/SPEC.md stub and _RELEASE.json, in one act",
@@ -284,6 +284,8 @@ def main(argv: list[str] | None = None) -> int:
         )
         return int(any(f["verdict"] == "error" for f in findings))
     try:
+        if not reads and (root := workspace_of(specs)):
+            require_governed(root)
         return _VERBS[args.verb](args, specs)
     except (Refusal, drift.Refusal) as refusal:
         return refuse(refusal, specs)
