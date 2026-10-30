@@ -31,8 +31,8 @@ def fix_of(text: str, default: str = "") -> str:
 
 
 def said(text: str, default: str) -> str:
-    """The message of the first `[error] …` or `<CODE> error …` line of a child's *text*, else *default*."""
-    return next((m[1] for ln in text.splitlines() if (m := re.match(r"(?:\S+ error |\[error\] )(.*)", ln))), default)  # fmt: skip
+    """The message of the first `[error] …`, `Error: …` or `<CODE> error …` line of a child's *text*, else *default*."""
+    return next((m[1] for ln in text.splitlines() if (m := re.match(r"(?:\S+ error |\[error\] |Error: )(.*)", ln))), default)  # fmt: skip
 
 
 def relay(done: subprocess.CompletedProcess[str], message: str, fix: str) -> None:
