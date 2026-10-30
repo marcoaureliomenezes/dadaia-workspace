@@ -24,7 +24,7 @@ from _git import scrubbed_env
 from _grammar import CONTEXT_NAME_RE
 from _handoffs import REVIEWER
 from _platform import act, run, use_utf8_stdio, write_text
-from _refusal import Refusal, fix_of, report
+from _refusal import Refusal, fix_of, report, said, without_fix
 from _specs import find_specs, require_governed, run_cli
 from _stats import table as _stats_table
 
@@ -56,11 +56,10 @@ def _reason(stdout: str, stderr: str) -> Refusal:
     try:
         err = json.loads(stdout)[0]["errors"][0]
     except (ValueError, LookupError, TypeError):  # no JSON: the CLI refused before validating
-        said = stderr.splitlines()
+        why = said(stderr, without_fix(stderr).strip() or "no output")
         fix = fix_of(
             stderr, act("agent", "resolve the workspace CLI error above, then rerun verdict.py")
         )
-        why = next((x[7:] for x in said if x.startswith("Error: ")), stderr.strip() or "no output")
         return Refusal(why, fix)
     where, why = err["field_path"], err["message"]
     return Refusal(

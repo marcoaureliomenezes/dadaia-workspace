@@ -18,6 +18,7 @@ from _grammar import SEMVER_RE, TAG_RE, sole_live
 from _ledger import denylist_file
 from _platform import act, command, git_inline, git_line, is_link
 from _platform import cli_words as cli_words
+from _refusal import relay
 from _specs import run_cli
 from _specs import workspace_of as workspace_of
 from _worktree_names import (
@@ -102,15 +103,14 @@ def gitflows(root: Path) -> dict[str, dict[str, str]]:
     context's main repo), read by the one
     reader through `context list --json`; a repo whose record has none is absent."""
     done = cli(root, "context", "list", "--json")
+    fix = command(*cli_words(root, "doctor"))
+    relay(done, "context list failed", fix)
     try:
-        listed = json.loads(done.stdout) if not done.returncode else None
+        listed = json.loads(done.stdout)
     except ValueError:
         listed = None
     if not isinstance(listed, list):
-        raise Refusal(
-            f"context list failed: {done.stderr.strip() or done.stdout.strip()}",
-            command(*cli_words(root, "doctor")),
-        )
+        raise Refusal("context list failed", fix)
     return {
         repo: {**row["gitflow"], "main": row["main_repo"]}
         for row in listed
