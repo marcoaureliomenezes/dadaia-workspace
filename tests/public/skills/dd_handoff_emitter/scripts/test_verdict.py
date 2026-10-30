@@ -1102,6 +1102,22 @@ def test_a_cli_crash_with_its_own_fix_line_is_refused_with_that_one_fix_line(
     assert _written(root) == []
 
 
+def test_a_cli_refusal_printed_as_error_colon_is_relayed_as_one_error_line(
+    tmp_path: Path,
+) -> None:
+    root, tree, head = _workspace(tmp_path)
+    patch_cli(
+        root,
+        _STUB_VALIDATE,
+        '    sys.stderr.write("Error: registry unreadable\\nfix: run the registry repair\\n")\n'
+        "    sys.exit(1)",
+    )
+    refused = _verdict(root, tree, sha=head)
+    assert refused.returncode == 1
+    assert refused.stderr == "[error] registry unreadable\nfix: run the registry repair\n"
+    assert _written(root) == []
+
+
 def test_stats_outside_a_workspace_is_refused_with_one_fix_line(tmp_path: Path) -> None:
     root, _tree, _head = _workspace(tmp_path)
     (away := tmp_path / "away").mkdir()
