@@ -15,11 +15,12 @@ from typing import Any
 
 import pytest
 
+from dadaia_workspace.core.cli_line import shell_line
 from dadaia_workspace.core.platform import git_inline, quote
 from dadaia_workspace.core.skill_owner import load_owner
 from tests.fixtures.harness_env import run_bash
 from tests.helpers.oslib import link, write_text
-from tests.helpers.worktree_ws import commit, fixes, git, make_workspace, run
+from tests.helpers.worktree_ws import cli_path, commit, fixes, git, make_workspace, patch_cli, run
 
 RC = "0.5.0/rc-1/wt-rc"
 MAIN = "0.5.0/rc-1/job-1/wt-main"
@@ -439,3 +440,34 @@ def test_the_child_cli_is_handed_the_denylist_file_the_loader_reads(
     owner.cli(root, "doctor", tree=root / "worktrees/r/tree")
 
     assert [e["DADAIA_PRIVACY_DENYLIST"] for e in seen] == [str(workspace)]
+
+
+def test_a_failing_context_list_refuses_with_the_clis_one_fix_line(root: Path) -> None:
+    patch_cli(
+        root,
+        'if args[:2] == ["context", "list"]:\n',
+        'if args[:2] == ["context", "list"]:\n'
+        '    print("[error] registry unreadable\\nfix: run the registry repair", file=sys.stderr)\n'
+        "    sys.exit(1)\n",
+    )
+    done = run(root, "new", "r", RC)
+    assert done.returncode != 0
+    assert done.stderr.strip().splitlines() == [
+        "[error] context list failed",
+        "fix: run the registry repair",
+    ]
+
+
+def test_a_context_list_that_prints_no_json_list_refuses_with_the_doctor_fix(root: Path) -> None:
+    patch_cli(
+        root,
+        'if args[:2] == ["context", "list"]:\n',
+        'if args[:2] == ["context", "list"]:\n    print("not a list")\n    sys.exit(0)\n',
+    )
+    done = run(root, "new", "r", RC)
+    assert done.returncode != 0
+    assert (
+        done.stderr
+        == f"[error] context list failed\nfix: {shell_line(str(cli_path(root)), 'doctor')}\n"
+    )
+    assert fixes(done) == [f"fix: {shell_line(str(cli_path(root)), 'doctor')}"]
