@@ -129,6 +129,17 @@
       "description": "One git read per fact in the gate and worktree features. Measured 2026-10-28 with strace between a6cddda33 and f8d56a124: test_the_fix_line_clears_the_refusal[dead_denylisted] went from 1574 to 2150 execve and from 4.63 to 6.10 s; git rev-list 93 -> 245, cat-file 17 -> 169, ls-tree 8 -> 65, diff 2 -> 40. The Integration job wall grew to 415-589 s and E2E to 173-333 s; ADR 0284 is the third CI budget re-freeze in a month (ADR 0119, 0262, 0284). Goal: the per-operation git subprocess count falls, and with it the CI wall.",
       "provenance": "Operator ruling on ADR 0284, AskUserQuestion 2026-10-28: 'Re-congelar no m\u00e1x (Recommended)' ('A redu\u00e7\u00e3o de chamadas git vai ao backlog. O 0.5.0 segue.'); ADR 0284 decision: 'Reducing the git subprocesses per gate and worktree operation is backlog work, not part of this record.'",
       "relates": []
+    },
+    {
+      "id": "backlog-lane-carries-references-folder",
+      "title": "A wt-backlog lane also lands a repo's top-level references/ folder (research notes, open-access PDFs), one review, no verify: run",
+      "opened": "2026-10-31",
+      "status": "idea",
+      "description": "Measured (HEAD e0d333ab8): a backlog lane's merge refuses every path outside specs/ and the repo's AGENTS.md (_check_specs_only, dd-gitflow-default/scripts/_worktree_end.py:169-174; law: worktrees-AGENTS.md:23, lane 3); repos/ is merge-only (root AGENTS.md \u00a73); a wt-main opens only in IMPLEMENTATION and a candidate needs scope that changes behaviour, so a docs-only folder of reference material that agents read while refining specs has no lane. Outcome: the lightest lane carries a repo's top-level references/ \u2014 preferably wt-backlog-* itself (_check_specs_only and lane 3 also accept references/), else one named lane \u2014 with one review and no verify: run, so a project versions its reference material. Out of scope: any change to what .dadaia/references/ is. Interim: the material lives in .dadaia/references/connect-ideas/ (outside git) and moves to the repo root once this lands.",
+      "provenance": "operator, connect-ideas research grill 2026-10-30: \"criar uma pasta references na raiz do repositorio\"; ruling P4 \"Agora em .dadaia, repo depois (Recommended)\"; grill handoff .dadaia/handoff/connect-ideas/2026-10-31T010950Z-main-grill-pesquisa-referencias.handoff.json",
+      "relates": [
+        "worktree-layout-per-context"
+      ]
     }
   ]
 }
