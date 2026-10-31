@@ -483,6 +483,11 @@ def act(kind: Literal["agent", "operator"], text: str) -> str:
     return f"{_LABELS[kind]}: {text}"
 
 
+def act_kind(fix: str) -> str | None:
+    """The kind of the act *fix* spells (its label leads), else ``None``: a command."""
+    return next((kind for kind, label in _LABELS.items() if fix.startswith(f"{label}:")), None)
+
+
 def git_line(repo: Path | str, *argv: str, caps: Caps | None = None) -> str:
     """``git -C <repo> argv…`` as a finished command line (:func:`command`)."""
     return command("git", "-C", str(repo), *argv, caps=caps)

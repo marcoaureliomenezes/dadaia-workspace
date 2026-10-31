@@ -61,6 +61,7 @@ def _evaluate_target(
         rel_path = fpath.as_posix()
 
     projected, protected = law_set(effective_workspace)
+    refused = invocation.refusal(effective_workspace, os.environ)
     return gate_policy.evaluate(
         rel_path,
         root=effective_workspace,
@@ -72,7 +73,7 @@ def _evaluate_target(
         context=bind.context_name,
         repos=bind.repos,
         has_id=session_id is not None,
-        bind_fix=invocation.refused_bind_fix(effective_workspace, os.environ),
+        bind_fix=refused[1] if refused else None,
     )
 
 

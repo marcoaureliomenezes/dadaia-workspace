@@ -134,6 +134,7 @@ def make_executable(path: Path) -> None:
 # The kernel's functions that read no capability: the door hands them out unchanged.
 Undecodable = _owner.Undecodable
 act = _owner.act
+act_kind = _owner.act_kind
 can_write = _owner.can_write
 decode = _owner.decode
 effective_uid = _owner.effective_uid

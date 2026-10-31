@@ -13,7 +13,6 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal
 
 from dadaia_workspace.core import platform, workspace_layout
 from dadaia_workspace.core.cli_line import cli_words, fix_line, spell_fix
@@ -26,7 +25,6 @@ from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from dadaia_workspace.infrastructure.ledger_scripts import load_owner
 
 CODE = "ONBOARDING"
-Kind = Literal["command", "agent"]
 _INDEX = "product/index.md"
 _STUBS = ("ARCHITECTURE.md", "QUALITY.md", _INDEX)
 
@@ -36,12 +34,17 @@ class Step:
     """One pending onboarding step: its id, kind, why it is pending and its one fix line."""
 
     id: str
-    kind: Kind
+    kind: str
     reason: str
     command: str
 
     def text(self) -> str:
         return f"Next ({self.kind} step {self.id}): {self.reason}\n{spell_fix(self.command)}"
+
+
+def _step(step_id: str, reason: str, fix: str) -> Step:
+    """The step whose kind is its fix line's: an act's own kind, else a command."""
+    return Step(step_id, platform.act_kind(fix) or "command", reason, fix)
 
 
 @dataclass(frozen=True)
@@ -50,7 +53,7 @@ class _Ctx:
     name: str
     specs: Path
     bound: bool | None
-    bind_fix: str | None = None
+    refusal: tuple[str, str] | None = None
 
 
 def specs_ready(specs_dir: Path) -> bool:
@@ -63,7 +66,8 @@ def _constitution_reason(c: _Ctx) -> str | None:
 
 
 def _unbound(c: _Ctx) -> str | None:
-    return "this session has no context binding" if c.bound is False else None
+    why = c.refusal[0] if c.refusal else "this session has no context binding"
+    return why if c.bound is False else None
 
 
 def _first_pass(c: _Ctx) -> list[str]:
@@ -104,36 +108,31 @@ def _first_pass_fix(c: _Ctx) -> str:
 
 
 _Pending = Callable[[_Ctx], str | None]
-#: (id, kind, pending -> reason | None, fix). The ``context`` step is derived in
+#: (id, pending -> reason | None, fix). The ``context`` step is derived in
 #: :func:`next_step` — it is the one step with no context to judge.
-STEPS: tuple[tuple[str, Kind, _Pending, Callable[[_Ctx], str]], ...] = (
+STEPS: tuple[tuple[str, _Pending, Callable[[_Ctx], str]], ...] = (
     (
         "bind",
-        "command",
         _unbound,
-        lambda c: c.bind_fix or fix_line(c.root, "context", "bind", c.name),
+        lambda c: c.refusal[1] if c.refusal else fix_line(c.root, "context", "bind", c.name),
     ),
     (
         "constitution",
-        "agent",
         _constitution_reason,
         lambda c: str(state(c.specs)[1]),
     ),
     (
         "specs",
-        "command",
         lambda c: None if specs_ready(c.specs) else f"'{c.name}' specs tree is {state(c.specs)[0]}",
         lambda c: str(state(c.specs, root=c.root, context=c.name)[1]),
     ),
     (
         "first-pass",
-        "agent",
         lambda c: f"'{c.name}' memory holds no audited content" if _first_pass(c) else None,
         _first_pass_fix,
     ),
     (
         "publish",
-        "command",
         lambda c: (
             None
             if GitSubprocessClient().published(c.specs.parent)
@@ -150,24 +149,25 @@ def next_step(
     trees: Mapping[str, Path],
     focus: str | None = None,
     bound: bool | None = None,
-    bind_fix: str | None = None,
+    refusal: tuple[str, str] | None = None,
 ) -> Step | None:
     """The judged context's first pending step, or ``None``; *bound* is
     whether the caller's session is bound (``None``: no identity, so no ``bind`` step) and
-    *bind_fix* the fix a pending ``bind`` names instead of ``context bind`` (a refused bind)."""
+    *refusal* the ``(message, fix)`` a pending ``bind`` prints instead of ``context bind`` (a
+    refused bind); a step's kind follows its fix line."""
     if not trees:
         create = act(
             "agent",
             f"run {platform.inline(*cli_words(root, 'context', 'create'))} with a context name "
             "and --main-repo set to the main repo's clone URL",
         )
-        return Step("context", "command", "no ALIVE Spec Context — create one", create)
+        return _step("context", "no ALIVE Spec Context — create one", create)
     if focus is None and len(trees) == 1:
         focus = next(iter(trees))
     if focus is None or focus not in trees:
         return None
-    c = _Ctx(root, focus, trees[focus], bound, bind_fix)
-    for step_id, kind, pending, fix in STEPS:
+    c = _Ctx(root, focus, trees[focus], bound, refusal)
+    for step_id, pending, fix in STEPS:
         if (reason := pending(c)) is not None:
-            return Step(step_id, kind, reason, fix(c))
+            return _step(step_id, reason, fix(c))
     return None

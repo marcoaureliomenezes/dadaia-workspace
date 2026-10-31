@@ -32,7 +32,7 @@ __all__ = [
     "alive_context_trees",
     "RELAUNCH",
     "governed",
-    "refused_bind_fix",
+    "refusal",
     "context_name_for_repo_slug",
     "repo_owner",
     "repo_slug_for_context",
@@ -113,15 +113,18 @@ def governed(root: Path, env: Mapping[str, str]) -> bool:
     return not judged or live_session(root, resolve_session_id(env)) is not None
 
 
-def refused_bind_fix(root: Path, env: Mapping[str, str]) -> str | None:
-    """The fix of a ``context bind`` that :func:`governed` refuses for *env*'s session: ``None``
-    when governed; doctor's ``--fix`` when its record file exists and does not read; else the
-    relaunch."""
+def refusal(root: Path, env: Mapping[str, str]) -> tuple[str, str] | None:
+    """The ``(message, fix)`` every surface prints for a session :func:`governed` refuses:
+    ``None`` when governed; a record file that exists and does not read names doctor's
+    ``--fix``; else the session stands in for no role and the fix is the relaunch."""
     if governed(root, env):
         return None
     session = resolve_session_id(env)
+    if session and is_unreadable(root, session):
+        return "This session's record does not read.", fix_line(root, "doctor", "--fix")
     return (
-        fix_line(root, "doctor", "--fix") if session and is_unreadable(root, session) else RELAUNCH
+        "This session was started outside the workspace root, so it stands in for no role.",
+        RELAUNCH,
     )
 
 

@@ -63,7 +63,7 @@ def run_cli(
 def require_governed(root: Path) -> None:
     """Raises `Refusal` with the CLI's own fix when a workspace hook does not govern this call's session."""
     done = run_cli(root, "context", "session-check", env=scrubbed_env(), stdin=subprocess.DEVNULL)
-    relay(done, "no workspace hook governs this session", reinstall_fix(root))
+    relay(done, said(done.stdout + done.stderr, "the workspace CLI refused this session"), reinstall_fix(root))  # fmt: skip
 
 
 def context_row(root: Path, repo: Path) -> dict[str, Any] | None:

@@ -23,7 +23,7 @@ from dadaia_workspace.core.invocation import (
     HARNESS_SESSION_ID_ENV_VARS as _HARNESS_SESSION_ID_ENV_VARS,
 )
 from dadaia_workspace.core.invocation import alive_context_trees as _alive_context_trees
-from dadaia_workspace.core.invocation import refused_bind_fix as _refused_bind_fix
+from dadaia_workspace.core.invocation import refusal as _refusal
 from dadaia_workspace.core.invocation import repo_owner as _repo_owner
 from dadaia_workspace.core.invocation import resolve as _resolve_invocation
 from dadaia_workspace.core.invocation import (
@@ -41,7 +41,7 @@ HARNESS_SESSION_ID_ENV_VARS = _HARNESS_SESSION_ID_ENV_VARS
 resolve_session_id = _resolve_session_id
 alive_context_trees = _alive_context_trees
 repo_owner = _repo_owner
-refused_bind_fix = _refused_bind_fix
+refusal = _refusal
 scope = _scope
 
 
@@ -77,15 +77,15 @@ def own_bind_for_cli() -> tuple[str | None, str | None]:
 
 
 def own_next_step(workspace_root: Path, focus: str | None = None) -> Step | None:
-    """The onboarding next step for THIS caller: its bound state, and the fix of a bind that
-    :func:`governed` refuses."""
+    """The onboarding next step for THIS caller: its bound state, and the refusal of a bind
+    that :func:`governed` refuses."""
     bind, session = own_bind_for_cli()
     return next_step(
         workspace_root,
         _alive_context_trees(workspace_root),
         focus,
         None if session is None else bool(bind),
-        _refused_bind_fix(workspace_root, os.environ),
+        _refusal(workspace_root, os.environ),
     )
 
 
