@@ -10,6 +10,7 @@ Pins two composition-root guarantees:
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import pytest
@@ -52,7 +53,9 @@ def test_push_gate_check_always_wires_a_real_object_source(monkeypatch, tmp_path
     tip_sha = _git(repo, "rev-parse", "HEAD")
 
     monkeypatch.setattr(ci, "_repo_root", lambda: repo)
-    monkeypatch.setattr(container, "load_denylist_terms", lambda: (("zz-synthetic-term", "t"),))
+    monkeypatch.setattr(
+        container, "load_denylist_terms", lambda _repo=None: (("zz-synthetic-term", "t"),)
+    )
 
     result = _runner.invoke(
         app, ["ci", "push-gate-check"], input=f"refs/tags/v1 {tip_sha} refs/tags/v1 {_ZERO}\n"
@@ -66,25 +69,49 @@ def test_onto_judges_the_content_of_a_range_on_a_branch_no_push_could_carry(
     monkeypatch, tmp_path: Path
 ) -> None:
     """`--onto` refuses the denylisted blob of `<onto>..HEAD` on a task branch (never pushable),
-    and its rewrite fix starts at the range's own oldest commit, never below `<onto>`."""
+    and its one fix is an Agent action naming the listed path, never a history rewrite."""
     repo = tmp_path / "repo"
     base = _init_repo(repo)
     os_run(["git", "switch", "-q", "-c", "wt/0.5.0/rc-1/job-1/wt-task-001"], cwd=repo, check=True)
-    shas = []
     for rel, text in (("leak.md", "zz-synthetic-term\n"), ("more.md", "m\n")):
         write_text(repo / rel, text)
         os_run(["git", "add", "-A"], cwd=repo, check=True)
         os_run(["git", "commit", "-q", "-m", f"add {rel}"], cwd=repo, check=True)
-        shas.append(_git(repo, "rev-parse", "HEAD"))
-    first = shas[0]
     monkeypatch.setattr(ci, "_repo_root", lambda: repo)
-    monkeypatch.setattr(container, "load_denylist_terms", lambda: (("zz-synthetic-term", "t"),))
+    monkeypatch.setattr(
+        container, "load_denylist_terms", lambda _repo=None: (("zz-synthetic-term", "t"),)
+    )
 
     done = _runner.invoke(app, ["ci", "push-gate-check", "--onto", base])
 
     assert done.exit_code == 1, done.output
     assert "leak.md:1" in done.output and "zz-synthetic-term" not in done.output
-    assert f"--rewrite-from {first}" in done.output and base not in done.output.split("fix:")[-1]
+    fixes = [ln for ln in done.output.splitlines() if ln.startswith("fix: ")]
+    assert len(fixes) == 1 and fixes[0].startswith("fix: Agent action: ") and "leak.md" in fixes[0]
+    assert "--rewrite-from" not in done.output and base not in fixes[0]
+
+
+@pytest.mark.parametrize(("name", "code"), [("acme-site", 0), ("other", 1)])
+def test_onto_judges_the_scanned_repo_by_its_own_name_from_outside_it_fenced(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, name: str, code: int
+) -> None:
+    """`--repo R --onto` drops the terms R's name carries whatever the cwd, fenced as the merge scan
+    runs it; a repo whose name carries none is still refused."""
+    repo = tmp_path / name
+    base = _init_repo(repo)
+    write_text(repo / "n.md", "acme\n")
+    os_run(["git", "add", "-A"], cwd=repo, check=True)
+    os_run(["git", "commit", "-q", "-m", "add n"], cwd=repo, check=True)
+    write_text(tmp_path / "terms.json", '{"acme": "r"}')
+    outside = tmp_path / "elsewhere"
+    outside.mkdir()
+    monkeypatch.chdir(outside)
+    monkeypatch.setenv("DADAIA_PRIVACY_DENYLIST", str(tmp_path / "terms.json"))
+    monkeypatch.setenv("DADAIA_FENCED_ROOTS", os.pathsep.join(map(str, outside.resolve().parents)))
+
+    done = _runner.invoke(app, ["ci", "push-gate-check", "--repo", str(repo), "--onto", base])
+
+    assert done.exit_code == code, done.output
 
 
 def _stamped_specs(repo: Path, version: int) -> str:
@@ -143,7 +170,7 @@ def test_mode_line_distinguishes_operator_denylist_from_baseline_only(
 
     monkeypatch.setattr(ci, "_repo_root", lambda: repo)
 
-    monkeypatch.setattr(container, "load_denylist_terms", lambda: ())
+    monkeypatch.setattr(container, "load_denylist_terms", lambda _repo=None: ())
     baseline_only = _runner.invoke(
         app,
         ["ci", "push-gate-check"],
@@ -152,7 +179,9 @@ def test_mode_line_distinguishes_operator_denylist_from_baseline_only(
     assert "baseline only" in baseline_only.output
     assert "operator denylist + baseline" not in baseline_only.output
 
-    monkeypatch.setattr(container, "load_denylist_terms", lambda: (("zz-synthetic-term", "test"),))
+    monkeypatch.setattr(
+        container, "load_denylist_terms", lambda _repo=None: (("zz-synthetic-term", "test"),)
+    )
     with_operator = _runner.invoke(
         app,
         ["ci", "push-gate-check"],
@@ -178,7 +207,7 @@ def test_a_sibling_repo_name_that_is_an_english_word_does_not_block_the_push(
     tip_sha = run(["git", "rev-parse", "HEAD"], cwd=repo, check=True).stdout.strip()
 
     monkeypatch.setattr(ci, "_repo_root", lambda: repo)
-    monkeypatch.setattr(container, "load_denylist_terms", lambda: ())
+    monkeypatch.setattr(container, "load_denylist_terms", lambda _repo=None: ())
 
     result = _runner.invoke(
         app,
@@ -189,7 +218,7 @@ def test_a_sibling_repo_name_that_is_an_english_word_does_not_block_the_push(
     assert result.exit_code == 0, result.output
 
 
-# ── the bootstrap birth through the REAL reader ──────────
+# ── a role-branch push through the REAL reader ──────────
 
 
 def _git(repo: Path, *args: str) -> str:
@@ -208,9 +237,7 @@ def _gate(monkeypatch, tmp_path: Path, repo: Path, line: str) -> int:
     return _runner.invoke(app, ["ci", "push-gate-check"], input=line).exit_code
 
 
-def test_births_publish_nothing_and_a_birth_with_content_is_refused(
-    monkeypatch, tmp_path: Path
-) -> None:
+def test_any_push_of_a_role_branch_passes_the_gate(monkeypatch, tmp_path: Path) -> None:
     remote = tmp_path / "origin.git"
     remote.mkdir()
     _git(remote, "init", "-q", "--bare")
@@ -235,7 +262,7 @@ def test_births_publish_nothing_and_a_birth_with_content_is_refused(
     _git(repo, "push", "-q", "--no-verify", "origin", "develop")
     assert _remote_objects(remote) == before
 
-    # A birth carrying a new commit is refused.
+    # A birth carrying a new commit passes too: a role branch is an ordinary ref.
     _git(repo, "checkout", "-q", "-b", "next", "main")
     write_text(repo / "x.txt", "x\n")
     _git(repo, "add", "x.txt")
@@ -244,7 +271,7 @@ def test_births_publish_nothing_and_a_birth_with_content_is_refused(
     _git(repo, "update-ref", "-d", "refs/heads/develop")
     _git(repo, "branch", "develop", tip)
     line = f"refs/heads/develop {tip} refs/heads/develop {_ZERO}\n"
-    assert _gate(monkeypatch, tmp_path, repo, line) != 0
+    assert _gate(monkeypatch, tmp_path, repo, line) == 0
 
 
 def test_a_malformed_privacy_baseline_fails_the_gate_closed_with_one_fix_line(
@@ -260,7 +287,7 @@ def test_a_malformed_privacy_baseline_fails_the_gate_closed_with_one_fix_line(
         )
 
     monkeypatch.setattr(privacy_check, "load_baseline", unreadable)
-    monkeypatch.setattr(container, "load_denylist_terms", lambda: ())
+    monkeypatch.setattr(container, "load_denylist_terms", lambda _repo=None: ())
     monkeypatch.setattr(ci, "_repo_root", lambda: tmp_path)
     monkeypatch.setattr("sys.argv", ["dadaia", "ci", "push-gate-check"])
 
@@ -276,19 +303,16 @@ def test_a_malformed_privacy_baseline_fails_the_gate_closed_with_one_fix_line(
     ]
 
 
-def test_push_gate_check_help_names_the_rewrite_remedy_and_its_contract() -> None:
-    result = _runner.invoke(app, ["ci", "push-gate-check", "--help"])
+def test_push_gate_check_help_offers_no_history_rewrite() -> None:
+    result = _runner.invoke(app, ["ci", "push-gate-check", "--help"], env={"COLUMNS": "400"})
     assert result.exit_code == 0, result.output
-    assert (
-        "Remedy for a refused push: --rewrite-from re-commits the whole unpublished range "
-        "as one commit, over edits and deletions of the paths the gate lists."
-    ) in " ".join(result.output.split())
+    text = " ".join(result.output.split())
+    assert "--rewrite-from" not in text and "re-commit" not in text
 
 
 def test_a_decision_carries_its_listed_paths_even_when_it_lists_none() -> None:
     decision = Decision(allowed=True)
     assert decision.listed == frozenset()
-    assert decision.message_listed is False
 
 
 def test_several_work_branches_warn_and_keep_the_gate_on_the_kept_branch(
@@ -297,7 +321,7 @@ def test_several_work_branches_warn_and_keep_the_gate_on_the_kept_branch(
     repo = tmp_path / "repo"
     _init_repo(repo)
     flow = Gitflow("main", "dev", "feature/")
-    monkeypatch.setattr(ci, "_gitflow", lambda _r: (flow, None, "repo"))
+    monkeypatch.setattr(ci, "_gitflow", lambda _r: (flow, None, repo))
 
     def several(*_a: object) -> str:
         raise SeveralWorkBranches("2 work branches", "run `x`, then run `y`", "0.2.0")

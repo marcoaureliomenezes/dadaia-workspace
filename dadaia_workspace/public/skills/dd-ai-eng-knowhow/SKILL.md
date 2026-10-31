@@ -1,7 +1,7 @@
 ---
 name: dd-ai-eng-knowhow
 description: >
-  Use before reading or changing any persona, skill, rule, hook, AGENTS.md or MCP config: harness literacy, Claude Code/Codex deltas, the AUTHORING contract.
+  Use before changing or auditing any persona, skill, rule, hook, AGENTS.md or MCP config: harness literacy, Claude Code/Codex deltas, the AUTHORING contract. Not for reading law to do a task.
 compatibility: Standalone Agent Skill; the full lifecycle lives in a dadaia-workspace.
 ---
 
@@ -30,10 +30,10 @@ compatibility: Standalone Agent Skill; the full lifecycle lives in a dadaia-work
 
 1. Trace the harness file to its source: the matching `assets[].path` in `.dadaia/agentic/manifest.json` locates it in the library repo that the repo's own `AGENTS.md` names.
    An AI-entity file is a projection: change its source there, never a `.claude/`, `.agents/`, `.codex/` copy.
-2. Reproject per `.dadaia/AGENTS.md` §4.
+2. Reproject per `.dadaia/AGENTS.md`, "Projections and law files".
 3. Author against [`AUTHORING.md`](AUTHORING.md) — the 15-rule
    writing-for-agents contract — and opens the relevant disclosed sibling instead of
-   re-deriving harness behavior; then `.dadaia/.venv/bin/dadaia public doctor` must print `[ok] public-privacy` (its scan covers hostnames, IPs, home paths, emails and secrets).
+   re-deriving harness behavior; then `.dadaia/.venv/bin/dadaia public doctor` must print `[ok] public-privacy`.
 
 - A claim about a binary, a CLI flag, a model id or sandbox behaviour is checked against the live binary before it is written.
 

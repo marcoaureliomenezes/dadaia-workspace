@@ -76,12 +76,14 @@ class Handoff:
         return _within_root(self.path.parent / candidate, workspace_root)
 
     def artifact_hash_status(self, workspace_root: Path) -> str:
-        """``"match"``/``"mismatch"``/``"missing_artifact"`` for the declared ``content_hash``."""
+        """Return ``match``, ``mismatch``, ``missing_artifact`` or ``missing_hash``."""
         resolved = self.artifact_path(workspace_root)
         if resolved is None or not resolved.is_file():
             return "missing_artifact"
+        if not (declared := self._artifact("content_hash")):
+            return "missing_hash"
         actual = hashlib.sha256(resolved.read_bytes()).hexdigest()
-        return "match" if actual == (self._artifact("content_hash") or "") else "mismatch"
+        return "match" if actual == declared else "mismatch"
 
     def validate(
         self,

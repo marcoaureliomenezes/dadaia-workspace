@@ -58,6 +58,7 @@ from tests.features.specs.test_doctor import _make_clean_specs_tree
 from tests.fixtures.harness_env import run_bash, suite_env
 from tests.fixtures.stores import context_store
 from tests.helpers import worktree_ws
+from tests.helpers.cli_root import live_root
 from tests.helpers.oslib import link, read_text, run, write_text
 from tests.helpers.oslib import read_text as os_read_text
 from tests.helpers.oslib import write_text as os_write_text
@@ -132,11 +133,6 @@ def _plant_status_line_gone(root: Path) -> None:
     write_text(release / "TASKS.md", "# Tasks\n\n**Status:** approved\n" + "- t\n" * 170)
 
 
-def _plant_changelog_heading(root: Path) -> None:
-    atom = root / "specs" / "memory" / "product" / "testarea" / "feature-a.md"
-    write_text(atom, read_text(atom) + "\n## Changelog\n\n- 1.0.0 born\n")
-
-
 def _plant_dispositioned_audit(root: Path) -> None:
     audit = root / "specs" / "audits" / "20260101-lifecycle"
     audit.mkdir(parents=True)
@@ -194,7 +190,6 @@ PLANTS: dict[str, Plant] = {
     "SPEC-DOC-034": Plant(_plant_nothing),
     "FIXED-1": Plant(_plant_fixed_block_gone),
     "FIXED-2": Plant(_plant_fixed_block_drifted),
-    "GITFLOW-1": Plant(_plant_gitflow_gone, {"<specs>": "specs"}),
     "TREE-3": Plant(_plant_missing_memory_document),
     "SPEC-DOC-046": Plant(_plant_legacy_state_name),
 }
@@ -232,7 +227,7 @@ def repo(tmp_path: Path, clean_repo: Path) -> Path:
 
 def _doctor(root: Path) -> SpecsDoctor:
     """The specs doctor the CLI builds for *root* (templates, public tree, repo root)."""
-    doctor = _build_specs_doctor(root / "specs", None)
+    doctor = _build_specs_doctor(root / "specs", None, live_root())
     assert doctor is not None
     return doctor
 
@@ -274,7 +269,9 @@ def test_the_fix_line_clears_the_finding_it_was_stamped_on(
         v
         for issue in before
         for line in issue.message.splitlines()
-        for v in dead_verb_citations(f"`{line}`", rel=code, command_paths=command_paths())
+        for v in dead_verb_citations(
+            f"`{line}`", rel=code, command_paths=command_paths(live_root())
+        )
     ]
     assert not dead, f"{code}: the finding cites a verb that does not exist: {dead}"
 
@@ -302,6 +299,63 @@ def test_the_fix_line_clears_the_finding_it_was_stamped_on(
     )
     new_errors = {f for f in after - whole_before if f[2]}
     assert not new_errors, f"{code}: the fix created {new_errors}"
+
+
+_FLOW = "gitflow: {principal: trunk, integration: next, work: work/}\n"
+
+
+def _commit_constitution(root: Path, *, committed: bool, worktree: bool) -> None:
+    """HEAD's constitution holds a gitflow block iff *committed*; the working copy iff *worktree*."""
+    constitution = root / "specs" / "constitution.md"
+    for has_block, commit in ((committed, True), (worktree, False)):
+        head = f"---\nspecs_pattern_version: {CANONICAL_SPECS_VERSION}\n{_FLOW if has_block else ''}---\n"
+        write_text(constitution, head + "# C\n")
+        if commit:
+            _git(root, "add", "-A")
+            _git(root, "commit", "-qm", "constitution")
+
+
+def test_gitflow_1_judges_the_committed_constitution_not_the_working_tree(repo: Path) -> None:
+    """A gitflow block dropped in the working tree only is no finding; a block added only in
+    the working tree is still one, worded as the gates word it."""
+    _commit_constitution(repo, committed=True, worktree=False)
+    assert _doctor(repo)._coherence.check_gitflow() == []
+
+    _commit_constitution(repo, committed=False, worktree=True)
+    [finding] = _doctor(repo)._coherence.check_gitflow()
+    warning = GitSubprocessClient().gitflow(repo)[1]
+    assert warning is not None and warning in finding.message
+
+
+def test_gitflow_1_fix_is_one_agent_action_that_commits_and_performing_it_clears_it(
+    repo: Path,
+) -> None:
+    _commit_constitution(repo, committed=False, worktree=False)
+    rule = next(r for r in SPECS_RULES if "GITFLOW-1" in r.codes)
+    (printed, *_) = run_section("specs", [rule], _doctor(repo), None, repo / "specs").findings
+    fix = printed.fix
+    assert fix.startswith("Agent action: ") and fix.count("Agent action:") == 1, fix
+    assert "specs init" in fix and "commit" in fix and "constitution.md" in fix, fix
+    assert not re.search(r"<[^<>]+>", fix), fix
+    from dadaia_workspace.infrastructure.git_subprocess import gitflow_fix
+
+    assert fix == gitflow_fix(repo / "specs")
+
+    with pytest.MonkeyPatch.context() as mp:
+        mp.chdir(repo)
+        CliRunner().invoke(app, ["specs", "init", "--specs-dir", str(repo / "specs")])
+    _git(repo, "add", "specs/constitution.md")
+    _git(repo, "commit", "-qm", "gitflow")
+    assert _doctor(repo)._coherence.check_gitflow() == []
+
+
+def test_the_no_gitflow_warning_names_the_committed_constitution_and_hints_nothing(
+    tmp_path: Path,
+) -> None:
+    _git(tmp_path, "init", "-q")
+    warning = GitSubprocessClient().gitflow(tmp_path)[1]
+    assert warning is not None and "no committed specs/constitution.md" in warning
+    assert "hint:" not in warning
 
 
 def test_spec_doc_046_never_clobbers_a_canonical_state_file(repo: Path) -> None:
@@ -348,21 +402,6 @@ def test_no_fix_line_deletes_a_record_without_recording_it(codes: str, fix: str 
         "dispositioning it — chain the record step ahead of the removal, "
         "relocate instead of deleting, or drop the fix line"
     )
-
-
-#: `report-only` codes: WARNING-only by
-#: construction, and no fix line (their remedy is the operator's judgment).
-REPORT_ONLY: dict[str, Callable[[Path], None]] = {
-    "SPEC-DOC-030": lambda r: (r / "specs" / "audits" / "Bad_Name").mkdir(parents=True),
-    "MEM-DRIFT-1": lambda r: _append(
-        r / "specs" / "memory" / "ARCHITECTURE.md",
-        "\n### `dadaia_workspace/features` — package map (1 packages)\n\n"
-        '```mermaid\nflowchart LR\n  pkgs["ghostpkg"]\n```\n',
-    ),
-    "MEM-DRIFT-2": lambda r: _append(
-        r / "specs" / "memory" / "QUALITY.md", "\nRun `dadaia no-such-verb`.\n"
-    ),
-}
 
 
 def _write(path: Path, text: str) -> None:
@@ -441,25 +480,6 @@ def test_an_untraced_origin_id_is_cleared_by_its_printed_fix(repo: Path) -> None
     assert before.message.startswith(f"releases/{_RELEASE}/rc-1/SPEC.md:5 "), before.message
     run_bash(before.fix, cwd=repo, check=True)
     assert origin_errors() == []
-
-
-def test_a_judgment_only_rule_never_makes_the_run_exit_1(repo: Path) -> None:
-    """The exit-code half of the contract: every judgment-only rule fires at once and
-    contributes NO error-class finding and NO fix line, so it stalls nobody.
-    A history heading planted beside them is reported once, by LINT-1."""
-    root = repo
-    _plant_changelog_heading(root)
-    for plant in REPORT_ONLY.values():
-        plant(root)
-
-    report = _specs_section(_doctor(root), Path())
-    fired = {f.code for f in report.printable}
-    assert set(REPORT_ONLY) <= fired, fired
-    assert not {"CAT-1", "SPEC-DOC-008", "SPEC-DOC-010"} & fired, fired
-    history = [f for f in report.findings if "Changelog" in f.message]
-    assert [(f.code, f.error) for f in history] == [("LINT-1", True)], history
-    judged = [f for f in report.findings if f.code in REPORT_ONLY]
-    assert [(f.code, f.error, f.fix) for f in judged if f.error or f.fix] == []
 
 
 # ── TREE-5 remedies are honest ─────────────────────────

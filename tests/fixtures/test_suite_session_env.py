@@ -27,7 +27,7 @@ def test_inner():
     assert Path.home() != Path(os.environ["OUTER_FOREIGN_HOME"])
     child = subprocess.run(
         [sys.executable, "-c", "import os; print(os.environ['HOME'])"],
-        env=suite_env(os.environ, Path.home()), capture_output=True, text=True, check=True,
+        env=suite_env(os.environ, Path.home()), capture_output=True, encoding="utf-8", check=True,
     )
     assert child.stdout == f"{Path.home()}\\n"
 """

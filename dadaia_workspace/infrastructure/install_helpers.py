@@ -12,12 +12,15 @@ from dadaia_workspace.core.model_registry import (
     ResolvedAgentModel,
     codex_effort_for_claude_effort,
 )
+from dadaia_workspace.core.skill_owner import load_owner
 from dadaia_workspace.infrastructure.public_assets_common import (
     _SCHEMA_VERSION,
     _package_version,
     _sha256,
 )
 from dadaia_workspace.infrastructure.runtime_transforms.codex_assets import codex_model
+
+key_spans = load_owner("dd-bug-resolution", "_frontmatter").key_spans
 
 
 def split_persona(text: str) -> tuple[str, str]:
@@ -71,8 +74,8 @@ def render_claude_agent(staged_text: str, resolved: ResolvedAgentModel) -> str:
     ``effort:`` is omitted when unresolved — never empty.
     """
     frontmatter, rest = split_persona(staged_text)
-    derived = ("model:", "effort:", "permissionMode:", "disallowedTools:")
-    kept = [line for line in frontmatter.splitlines() if not line.startswith(derived)]
+    derived = {"model", "effort", "permissionMode", "disallowedTools"}
+    kept = [line for key, lines in key_spans(frontmatter) if key not in derived for line in lines]
     if persona_read_only(persona_fields(staged_text)):
         kept += ["permissionMode: default", "disallowedTools: [Edit, Write, NotebookEdit]"]
     else:

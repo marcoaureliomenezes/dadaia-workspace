@@ -18,7 +18,7 @@ sources:
 
 ## Hooks
 
-- The four hook behaviours ([[agentic-entities]]) arrive as two files in the workspace root's `.github` hooks directory, entry key `bash`, `version: 1`: `pre-tool-use.json` (`preToolUse` -> the `copilot-pre-gate` wrapper) and `session-start.json` (`sessionStart` -> `copilot-ctx-inject`, then `copilot-doctor-expired`, the reaper).
+- The hook behaviours ([[agentic-entities]]) arrive as two files in the workspace root's `.github` hooks directory, entry key `bash`, `version: 1`: `pre-tool-use.json` (`preToolUse` -> the `copilot-pre-gate` wrapper) and `session-start.json` (`sessionStart` -> `copilot-ctx-inject`, then `copilot-doctor-expired`, the reaper).
 - ctx-inject answers in Copilot's `additionalContext` JSON: the bound context's bootstrap, `constitution.md` included ([[context-management]]); there is no prompt-time injection, so a bind shows at the next session start.
 - Copilot exposes no native session id: a session binds by exporting `DADAIA_SESSION_ID` (then `context bind`) or `DADAIA_CONTEXT` into its launching environment.
 - Copilot decides by stdout JSON, so the wrapper answers only a deny, remapped to `{"permissionDecision": "deny", "permissionDecisionReason": <reason>}`; an allow emits nothing ([[sdd-gate-v3]]).

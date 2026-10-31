@@ -10,6 +10,8 @@ from typing import Any
 
 from dadaia_workspace.core import platform
 from dadaia_workspace.core.atomic_write import atomic_write
+from dadaia_workspace.core.cli_line import cli_words
+from dadaia_workspace.core.platform import act
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
 from dadaia_workspace.infrastructure.provider_version import provider_version
 
@@ -22,6 +24,7 @@ class ReconcileResult:
     steps: tuple[str, ...]
     error: str | None = None
     rollback_required: bool = False
+    fix: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -43,16 +46,23 @@ def reconcile_workspace(
     actual = actual_version or version()
 
     def failed(
-        error: str, steps: tuple[str, ...] = (), rollback_required: bool = False
+        error: str, fix: str, steps: tuple[str, ...] = (), rollback_required: bool = False
     ) -> ReconcileResult:
         return ReconcileResult(
-            False, expected_version, actual, tuple(steps), error, rollback_required
+            False, expected_version, actual, tuple(steps), error, rollback_required, fix
         )
 
+    rerun = platform.inline(*cli_words(None, "reconcile", "--expect-version", expected_version))
+    install_first = act(
+        "agent", f"install the exact provider version {expected_version}, then run {rerun}"
+    )
     if actual != expected_version:
-        return failed(f"provider version mismatch: expected {expected_version}, found {actual}")
+        return failed(
+            f"provider version mismatch: expected {expected_version}, found {actual}",
+            install_first,
+        )
     if context_store is None or migration_plan is None or migrate is None:
-        return failed("dependencies not composed")
+        return failed("dependencies not composed", act("agent", f"run {rerun}"))
 
     steps: list[str] = ["provider-version"]
     registry_snapshot = context_store.snapshot()
@@ -65,9 +75,9 @@ def reconcile_workspace(
         # step mid-transaction with a bare "Permission denied". Preflight it: the
         # transaction never starts, and the operator gets the exact path + repair
         # command instead of a rollback-flavored ok:false.
-        ownership_error = _ownership_preflight(workspace_root)
-        if ownership_error is not None:
-            return failed(ownership_error)
+        ownership = _ownership_preflight(workspace_root)
+        if ownership is not None:
+            return failed(*ownership)
 
         plan = migration_plan(context_store)
         if not plan.already_v2:
@@ -103,18 +113,24 @@ def reconcile_workspace(
     except Exception as exc:  # noqa: BLE001 - transaction boundary returns structured failure.
         context_store.restore(registry_snapshot)
         atomic_write(primary, primary_snapshot)
-        return failed(str(exc), tuple(steps), projections_started)
+        if projections_started:
+            install = platform.inline(*cli_words(None, "public", "install"))
+            advice = f"reinstall the previous exact provider version, then run {install}"
+        else:
+            advice = f"resolve the error above, then run {rerun}"
+        fix = act("agent", advice)
+        return failed(str(exc), fix, tuple(steps), projections_started)
 
     return ReconcileResult(True, expected_version, actual, tuple(steps))
 
 
-def _ownership_preflight(workspace_root: Path) -> str | None:
-    """Return an actionable error when the runtime user cannot write under ``.dadaia``.
+def _ownership_preflight(workspace_root: Path) -> tuple[str, str] | None:
+    """Return an (error, fix) pair when the runtime user cannot write under ``.dadaia``.
 
     A previous elevated run may leave
     ``.dadaia/agentic`` (or ``.dadaia`` itself) owned by another user (root), so the
     projection step later dies mid-transaction with a bare PermissionError. This
-    preflight names the offending path, its owner, and the exact repair command —
+    preflight names the offending path, its owner, and the exact repair as the fix —
     the transaction never starts on a guaranteed failure. Returns ``None`` when every
     checked path is writable by the current user, or on a host with no ownership
     semantics such as Windows.
@@ -123,7 +139,7 @@ def _ownership_preflight(workspace_root: Path) -> str | None:
     if uid is None:
         return None
 
-    def _check(path: Path) -> str | None:
+    def _check(path: Path) -> tuple[str, str] | None:
         if not path.exists():
             return None
         if (owner := platform.file_owner(path)) is not None and owner[0] != uid:
@@ -132,13 +148,14 @@ def _ownership_preflight(workspace_root: Path) -> str | None:
             )
             return (
                 f"{path} is owned by '{owner[1]}' (uid {owner[0]}), not by the current user "
-                f"(uid {uid}) — reconcile cannot write projections there. "
-                f"Repair with: {repair} (or fix the elevated process that created it)."
+                f"(uid {uid}) — reconcile cannot write projections there.",
+                act("agent", f"run {repair}"),
             )
         if not platform.can_write(path):
             return (
                 f"{path} is not writable by the current user (mode {stat.filemode(path.stat().st_mode)}) — "
-                "reconcile cannot write projections there."
+                "reconcile cannot write projections there.",
+                act("agent", f"make {path} writable by the current user"),
             )
         return None
 

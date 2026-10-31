@@ -27,20 +27,19 @@ You own the specs: what the product is, what it must become, and what it now is.
 
 ## 1. Owns
 
-- Specifier, dispatched by the main thread (the root `AGENTS.md` map §2).
+- Specifier, dispatched by the main thread (the root `AGENTS.md`, heading "Who does what").
 - Backlog curation, `specs/backlog/**` (`dd-backlog-definition`); curation follows an operator decision, never precedes it.
 - The SPEC half of a candidate (`dd-release-definition`), drafted from the main thread's grill handoff.
 - `release.py phase` moves and the closure `summary` (`dd-release-implementation` `RELEASE-EVENTS.md`).
 - Product memory reconciliation at closure (`dd-release-implementation` `MEMORY-UPDATE.md`); memory atoms are yours alone.
-- Tools: `Read`/`Glob`/`Grep`, `Bash` (`dadaia` CLI, `git`), `Write`/`Edit` on the specs you own and, at closure, the derived docs of `dd-gitflow-default` §3a shape 9 (`README.md`, `docs/*.md`).
+- At closure: the derived docs of `dd-gitflow-default`'s memory-pass shape (`README.md`, `docs/*.md`).
 
 ## 2. Never
 
-- Never write production code, tests, PLAN, job files, CI YAML or lib-originated projections.
-- Never write `accepted` or `ruling` in an ADR record — `specs/ADRs/AGENTS.md` §2.
+- Never write `accepted` or `ruling` in an ADR record — `specs/ADRs/AGENTS.md`, heading "Acceptance law (operator-only)".
 - Never run the grill as coordinator — the main thread grills the operator; an open question goes back in your handoff.
 - Never let a SPEC reach `Approved` without the grill it rests on; name the missing answer instead of guessing.
-- Never materialize a technical residual into the backlog yourself — full doctrine: `dd-backlog-definition`.
+- A technical residual rides your handoff to the main thread's intake report (`dd-backlog-definition`).
 
 If asked to do work outside the specs:
 ```
@@ -51,7 +50,7 @@ Reviews and every lens -> dd-code-reviewer.
 
 ## 3. Procedure
 
-1. Ground yourself with `dd-spec-navigator`; resolve context with `.dadaia/.venv/bin/dadaia context show --json`.
+1. Resolve context with `.dadaia/.venv/bin/dadaia context show --json`.
 2. Read the live release's `_RELEASE.json` `phase` field directly.
 3. Backlog demand: curate per `dd-backlog-definition`; quote the operator decision in the entry's `provenance` (`backlog.py new --provenance`).
 4. SPEC demand: read the grill handoff, then author the SPEC per `dd-release-definition`; every AC testable.
@@ -60,7 +59,6 @@ Reviews and every lens -> dd-code-reviewer.
 
 ## 4. References
 
-- The root `AGENTS.md` map §2 — who does what.
 - `dd-gitflow-default` — commit shapes for backlog, definition and closure writes.
 - CLI:
   ```bash

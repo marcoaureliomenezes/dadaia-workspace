@@ -1,15 +1,16 @@
 """GitSubprocessClient — git operations via stdlib subprocess."""
 
+import os
 import subprocess
 from collections.abc import Sequence
 from pathlib import Path
 
 from dadaia_workspace.core import platform
-from dadaia_workspace.core.cli_line import fix_line, fix_of, git_line, without_fix
+from dadaia_workspace.core.cli_line import cli_words, fix_of, git_line, without_fix
 from dadaia_workspace.core.exceptions import GitCloneError, GitSyncError
 from dadaia_workspace.core.gitflow import DEFAULT, Gitflow, read_gitflow, work_branch
 from dadaia_workspace.core.models.git_scan import GitObjectReadError
-from dadaia_workspace.core.platform import act
+from dadaia_workspace.core.platform import act, inline
 from dadaia_workspace.core.skill_owner import load_owner
 from dadaia_workspace.infrastructure.git_objects import unpublished
 
@@ -25,20 +26,19 @@ _ARCHIVE_PUSH = (
 _PROBE_TIMEOUT_S = 15
 
 
-def _run(
-    args: list[str],
-    cwd: Path | None = None,
+def _git(
+    path: Path,
+    *args: str,
     stdin: str | None = None,
     env: dict[str, str] | None = None,
     timeout: float | None = None,
 ) -> subprocess.CompletedProcess[str]:
-    return platform.run(
-        args,
-        cwd=cwd,
-        input=stdin,
-        timeout=timeout,
-        env={**load_owner("dd-bug-resolution", "_git").scrubbed_env(), **(env or {})},
+    """The kernel's `git_bytes` in *path*, its output decoded as UTF-8 with bad bytes replaced."""
+    done = load_owner("dd-bug-resolution", "_git").git_bytes(
+        path, *args, input=None if stdin is None else stdin.encode(), env=env, timeout=timeout
     )
+    out, err = (b.decode("utf-8", "replace") for b in (done.stdout, done.stderr))
+    return subprocess.CompletedProcess(done.args, done.returncode, out, err)
 
 
 def _refuse_unsafe_url(url: str) -> None:
@@ -62,10 +62,7 @@ def _commit(path: Path, msg: str, pathspec: Sequence[str] | None = None) -> None
     ``commit_paths``. A concurrent writer could change one of those files in between;
     every caller passes paths it has just written, with no yield point in between.
     """
-    commit_cmd = ["git", "commit", "-m", msg]
-    if pathspec:
-        commit_cmd += ["--", *pathspec]
-    result = _run(commit_cmd, cwd=path)
+    result = _git(path, "commit", "-m", msg, *(["--", *pathspec] if pathspec else []))
 
     # An empty stdout and stderr with a non-zero exit is a silent no-op (submodule
     # edge case); both streams go in the error message.
@@ -79,10 +76,17 @@ def _commit(path: Path, msg: str, pathspec: Sequence[str] | None = None) -> None
         raise GitSyncError(f"git commit failed in {path}. stdout: {stdout!r} stderr: {stderr!r}")
 
 
+def gitflow_fix(specs_dir: Path) -> str:
+    """The one remedy of a committed constitution without a usable gitflow: run ``specs init``
+    on *specs_dir*, then commit the constitution it writes."""
+    init = inline(*cli_words(None, "specs", "init", "--specs-dir", str(specs_dir)))
+    return act("agent", f"run {init}, then commit {specs_dir / 'constitution.md'}.")
+
+
 class GitSubprocessClient:
     def clone(self, url: str, dest: Path) -> None:
         _refuse_unsafe_url(url)
-        result = _run(["git", "clone", "-c", "core.longpaths=true", url, str(dest)])
+        result = _git(Path("."), "clone", "-c", "core.longpaths=true", url, str(dest))
         if result.returncode != 0:
             raise GitCloneError(f"git clone failed for {url!r}: {result.stderr.strip()}", url)
 
@@ -91,11 +95,20 @@ class GitSubprocessClient:
         for (no terminal, no ssh password); an unsafe, unreachable or hanging url is `False`."""
         try:
             _refuse_unsafe_url(url)
-            done = _run(
-                ["git", "ls-remote", "--heads", "--", url],
+            ssh = (
+                os.environ.get("GIT_SSH_COMMAND")
+                or _git(Path("."), "config", "core.sshCommand").stdout.strip()
+                or platform.quote(os.environ.get("GIT_SSH", "ssh"))
+            )
+            done = _git(
+                Path("."),
+                "ls-remote",
+                "--heads",
+                "--",
+                url,
                 stdin="",
                 timeout=_PROBE_TIMEOUT_S,
-                env={"GIT_TERMINAL_PROMPT": "0", "GIT_SSH_COMMAND": "ssh -o BatchMode=yes"},
+                env={"GIT_TERMINAL_PROMPT": "0", "GIT_SSH_COMMAND": f"{ssh} -o BatchMode=yes"},
             )
         except (GitCloneError, subprocess.TimeoutExpired, OSError):
             return False
@@ -104,17 +117,17 @@ class GitSubprocessClient:
     def move(self, repo: Path, src: str, dst: str) -> None:
         """Rename ``repo/src`` to ``repo/dst``, staging the rename of its tracked files —
         never committing. A tree git does not track is renamed on disk alone."""
-        if not _run(["git", "ls-files", "--", src], cwd=repo).stdout.strip():
+        if not _git(repo, "ls-files", "--", src).stdout.strip():
             platform.replace(repo / src, repo / dst)
             return
-        result = _run(["git", "mv", "--", src, dst], cwd=repo)
+        result = _git(repo, "mv", "--", src, dst)
         if result.returncode != 0:
             raise GitSyncError(f"git mv {src} {dst} failed in {repo}: {result.stderr.strip()}")
 
     def dirty_paths(self, path: Path) -> list[str]:
         """Repo-relative paths ``git status`` reports — changed, staged or untracked (not
         ignored), each file once; a rename names its new path."""
-        out = _run(["git", "status", "--porcelain", "-z", "--untracked-files=all"], cwd=path)
+        out = _git(path, "status", "--porcelain", "-z", "--untracked-files=all")
         entries, paths = iter(out.stdout.split("\0")), []
         for entry in entries:
             if entry:
@@ -125,7 +138,7 @@ class GitSubprocessClient:
 
     def has_commits(self, path: Path) -> bool:
         """Return whether the repository has a valid HEAD commit."""
-        result = _run(["git", "rev-parse", "--verify", "HEAD"], cwd=path)
+        result = _git(path, "rev-parse", "--verify", "HEAD")
         return result.returncode == 0
 
     def commit_paths(self, path: Path, msg: str, paths: Sequence[str]) -> None:
@@ -142,7 +155,7 @@ class GitSubprocessClient:
         if not paths:
             return
         literal_paths = [f":(literal){p}" for p in paths]
-        add_result = _run(["git", "add", "--", *literal_paths], cwd=path)
+        add_result = _git(path, "add", "--", *literal_paths)
         if add_result.returncode != 0:
             raise GitSyncError(
                 f"git add failed in {path} for paths {list(paths)!r}: {add_result.stderr.strip()}"
@@ -150,7 +163,7 @@ class GitSubprocessClient:
         _commit(path, msg, pathspec=literal_paths)
 
     def has_remote(self, path: Path) -> bool:
-        result = _run(["git", "remote"], cwd=path)
+        result = _git(path, "remote")
         return bool(result.stdout.strip())
 
     def unpushed(self, path: Path, rev: str = "HEAD") -> bool:
@@ -169,20 +182,20 @@ class GitSubprocessClient:
         no remote; a stash entry, which lives only in this checkout."""
         if self.has_commits(path) and not self.has_remote(path):
             return [act("agent", f"add the clone URL of {path} as its origin remote")]
-        listed = _run(["git", "worktree", "list", "--porcelain"], cwd=path).stdout
+        listed = _git(path, "worktree", "list", "--porcelain").stdout
         trees = [
             t["worktree"] for t in load_owner("dd-bug-resolution", "_git").parse_worktrees(listed)
         ]
-        refs = ["git", "for-each-ref", "--format=%(objectname) %(refname:short)", "refs/heads"]
-        heads = [line.split(" ", 1) for line in _run(refs, cwd=path).stdout.split("\n") if line]
-        in_head = ["git", "merge-base", "--is-ancestor"]  # HEAD itself is pushed by dead()
+        refs = ("for-each-ref", "--format=%(objectname) %(refname:short)", "refs/heads")
+        heads = [line.split(" ", 1) for line in _git(path, *refs).stdout.split("\n") if line]
+        in_head = ("merge-base", "--is-ancestor")  # HEAD itself is pushed by dead()
         lost = [
             (s, b)
             for s, b in heads
-            if _run([*in_head, f"refs/heads/{b}", "HEAD"], cwd=path).returncode != 0
+            if _git(path, *in_head, f"refs/heads/{b}", "HEAD").returncode != 0
             and self.unpushed(path, f"refs/heads/{b}")
         ]
-        stashes = _run(["git", "stash", "list"], cwd=path).stdout.count("\n")
+        stashes = _git(path, "stash", "list").stdout.count("\n")
         stash = act("operator", f"pop or drop the {stashes} stash entry(ies) of {path}")
         return (
             [git_line(path, "worktree", "remove", t) for t in trees]
@@ -197,8 +210,8 @@ class GitSubprocessClient:
         """The ONE identity probe — git's own rule (env, config, auto-detection): ``""``
         when git resolves an author and a committer, else the agent action setting one."""
         for ident in ("GIT_AUTHOR_IDENT", "GIT_COMMITTER_IDENT"):
-            if _run(["git", "var", ident], cwd=path).returncode != 0:
-                named = _run(["git", "config", "user.name"], cwd=path).stdout.strip()
+            if _git(path, "var", ident).returncode != 0:
+                named = _git(path, "config", "user.name").stdout.strip()
                 key = "user.email" if named else "user.name"
                 return act("agent", f"set git {key} in the config of {path}")
         return ""
@@ -209,7 +222,7 @@ class GitSubprocessClient:
         upstream), else ``-u origin <branch>``; nothing unpushed, nothing run."""
         if not self.unpushed(path):
             return
-        tracking = _run(["git", "rev-parse", "--abbrev-ref", "@{u}"], cwd=path)
+        tracking = _git(path, "rev-parse", "--abbrev-ref", "@{u}")
         if tracking.returncode != 0:
             self.git(path, "push", "-u", "origin", self.current_branch(path))
         else:
@@ -222,7 +235,7 @@ class GitSubprocessClient:
         """One git command in *path* (*env* over the process environment): its stripped
         stdout, else ``GitSyncError`` carrying git's full output (CONFLICT is on stdout); the
         first ``fix:`` line of that output becomes the error's ``fix``."""
-        result = _run(["git", *args], cwd=path, stdin=stdin, env=env)
+        result = _git(path, *args, stdin=stdin, env=env)
         if result.returncode != 0:
             text = f"{result.stdout}\n{result.stderr}".strip()
             fix, output = fix_of(text), without_fix(text).strip()
@@ -237,9 +250,9 @@ class GitSubprocessClient:
         if text is None and main_repo is not None and main_repo.resolve() != repo.resolve():
             return self.gitflow(main_repo)
         if text is None:
-            return DEFAULT, (
-                f"{repo}: no specs/constitution.md — using the default gitflow\n"
-                f"hint: {fix_line(None, 'specs', 'init', '--specs-dir', str(repo / 'specs'))}"
+            return (
+                DEFAULT,
+                f"{repo}: no committed specs/constitution.md — using the default gitflow",
             )
         return read_gitflow(repo / "specs", text)
 
@@ -247,9 +260,9 @@ class GitSubprocessClient:
         """Whether the project is published: ``origin/<integration>`` of the committed
         gitflow exists and ``specs/constitution.md`` is on origin. Offline; reads refs only."""
         ref = f"refs/remotes/origin/{self.gitflow(path)[0].integration}"
-        born = _run(["git", "rev-parse", "-q", "--verify", ref], cwd=path)
+        born = _git(path, "rev-parse", "-q", "--verify", ref)
         rel = "specs/constitution.md"
-        result = _run(["git", "log", "--remotes=origin", "-n1", "--format=%H", "--", rel], cwd=path)
+        result = _git(path, "log", "--remotes=origin", "-n1", "--format=%H", "--", rel)
         return born.returncode == 0 and bool(result.stdout.strip())
 
     def work_version(self, path: Path) -> str:
@@ -263,12 +276,11 @@ class GitSubprocessClient:
         """*rel* at HEAD, else at the newest commit touching it on a local branch or an
         ``origin`` remote-tracking ref, never another remote's. Offline. ``None`` when
         none carries it (*path* may not exist)."""
-        git = ["git", "-C", str(path)]
-        newest = _run(
-            [*git, "log", "--branches", "--remotes=origin", "-n1", "--format=%H", "--", rel]
+        newest = _git(
+            path, "log", "--branches", "--remotes=origin", "-n1", "--format=%H", "--", rel
         )
         for rev in ("HEAD", newest.stdout.strip()):
-            shown = _run([*git, "show", f"{rev}:{rel}"])
+            shown = _git(path, "show", f"{rev}:{rel}")
             if rev and shown.returncode == 0:
                 return shown.stdout
         return None
@@ -276,23 +288,23 @@ class GitSubprocessClient:
     def principal(self, path: Path) -> str:
         """``origin/HEAD``; unset or the integration branch: ``master`` when origin has it,
         else ``DEFAULT.principal`` (``-C``: *path* may not exist yet)."""
-        ref = _run(["git", "-C", str(path), "symbolic-ref", "--short", "refs/remotes/origin/HEAD"])
+        ref = _git(path, "symbolic-ref", "--short", "refs/remotes/origin/HEAD")
         if (head := ref.stdout.strip().removeprefix("origin/")) not in ("", DEFAULT.integration):
             return head
-        master = _run(["git", "-C", str(path), "rev-parse", "-q", "--verify", "origin/master"])
+        master = _git(path, "rev-parse", "-q", "--verify", "origin/master")
         return "master" if master.returncode == 0 else DEFAULT.principal
 
     def current_branch(self, path: Path) -> str:
-        result = _run(["git", "branch", "--show-current"], cwd=path)
+        result = _git(path, "branch", "--show-current")
         return result.stdout.strip()
 
     def checkout(self, path: Path, branch: str) -> None:
-        result = _run(["git", "checkout", branch], cwd=path)
+        result = _git(path, "checkout", branch)
         if result.returncode != 0:
             raise GitSyncError(f"git checkout {branch!r} failed in {path}: {result.stderr.strip()}")
 
     def is_git_root(self, path: Path) -> bool:
-        result = _run(["git", "rev-parse", "--show-toplevel"], cwd=path)
+        result = _git(path, "rev-parse", "--show-toplevel")
         if result.returncode != 0:
             return False
         return Path(result.stdout.strip()).resolve() == path.resolve()
@@ -306,14 +318,12 @@ class GitSubprocessClient:
         newly committed and pushed, so it must be reviewed/scanned first. ``-z``: the
         real names, never core.quotePath's quoting.
         """
-        result = _run(["git", "ls-files", "--others", "--exclude-standard", "-z"], cwd=path)
+        result = _git(path, "ls-files", "--others", "--exclude-standard", "-z")
         return [rel for rel in result.stdout.split("\0") if rel]
 
     def tracked(self, path: Path) -> frozenset[str]:
         """Tracked plus untracked-unignored paths under *path*, *path*-relative; empty outside a repo."""
-        result = _run(
-            ["git", "ls-files", "-z", "--cached", "--others", "--exclude-standard"], cwd=path
-        )
+        result = _git(path, "ls-files", "-z", "--cached", "--others", "--exclude-standard")
         return frozenset(rel for rel in result.stdout.split("\0") if rel)
 
     def remote_url(self, path: Path) -> str:
@@ -321,7 +331,7 @@ class GitSubprocessClient:
 
         Returns the empty string on any failure (no remote, not a repo) and never raises.
         """
-        result = _run(["git", "remote", "get-url", "origin"], cwd=path)
+        result = _git(path, "remote", "get-url", "origin")
         if result.returncode != 0:
             return ""
         return result.stdout.strip()

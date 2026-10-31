@@ -9,6 +9,7 @@ import json
 import os
 import sys
 from pathlib import Path
+from typing import Any
 
 from dadaia_workspace.core import clock, invocation, platform, session_store, workspace_layout
 from dadaia_workspace.core.cli_line import spell_fix
@@ -17,6 +18,7 @@ from dadaia_workspace.core.exceptions import SchemaVersionError
 from dadaia_workspace.features.spec_context import injection_policy
 from dadaia_workspace.features.workspace import onboarding
 from dadaia_workspace.hooks import _common
+from dadaia_workspace.infrastructure.ledger_scripts import load_owner
 from dadaia_workspace.infrastructure.runtime_transforms.hook_wrappers import envelope
 
 _DIGEST_FIELDS: tuple[str, ...] = ("slug", "title", "tldr", "path")
@@ -33,27 +35,33 @@ def _session_bound_at(workspace: Path, session_id: str) -> float | None:
     return bound.timestamp() if bound else None
 
 
-def _resolve_context() -> str:
-    """The session's bind — never the cwd's repo: an unbound session injects no memory."""
-    return invocation.resolve(env=os.environ, cwd=Path.cwd()).bind.context_name or ""
-
-
 def _emit(payload: str) -> None:
     sys.stdout.write(envelope(os.environ, payload))
 
 
-def _digest_catalog(raw: str) -> str:
-    """The catalog reduced to :data:`_DIGEST_FIELDS`; the raw text when it does not parse."""
-    try:
-        features = json.loads(raw).get("features")
-    except (ValueError, AttributeError):
-        return raw
-    if not isinstance(features, list):
-        return raw
-    digested = [
-        {k: f[k] for k in _DIGEST_FIELDS if k in f} for f in features if isinstance(f, dict)
-    ]
+def _digest(features: list[dict[str, Any]]) -> str:
+    """The atom entries reduced to :data:`_DIGEST_FIELDS`."""
+    digested = [{k: f[k] for k in _DIGEST_FIELDS} for f in features]
     return json.dumps({"features": digested}, ensure_ascii=False, indent=2)
+
+
+def _product_memory(specs_dir: Path) -> str:
+    """The atom digest; the product index when no atom exists; a refused atom read is its finding."""
+    drift = load_owner("dd-bug-resolution", "_memory_drift")
+    try:
+        features = drift.entries(specs_dir)
+    except drift.Refusal as refusal:
+        return render_finding(
+            SectionFinding(drift.CODE, "error", str(refusal), False, True, refusal.fix)
+        )
+    if features:
+        return _digest(features)
+    index = specs_dir / "memory" / "product" / "index.md"
+    if not index.is_file():
+        return ""
+    with contextlib.suppress(OSError):
+        return platform.read_text(index)
+    return ""
 
 
 def _tech_stack_section(raw: str) -> str:
@@ -81,14 +89,8 @@ def _build_memory(specs_dir: Path) -> str:
             section = _tech_stack_section(platform.read_text(architecture))
             if section:
                 parts.append(section)
-    catalog = memory_dir / "product" / "catalog.json"
-    index = memory_dir / "product" / "index.md"
-    if catalog.is_file():
-        with contextlib.suppress(OSError):
-            parts.append(_digest_catalog(platform.read_text(catalog)))
-    elif index.is_file():
-        with contextlib.suppress(OSError):
-            parts.append(platform.read_text(index))
+    if block := _product_memory(specs_dir):
+        parts.append(block)
     parts.append("=== end memory bootstrap ===")
     return "\n".join(parts)
 
@@ -123,7 +125,9 @@ def _read_help_digest(workspace: Path) -> str:
 def _head(workspace: Path, header: str, focus: str | None, bound: bool | None) -> list[str]:
     """The header and the onboarding next step ``doctor`` reports."""
     trees = invocation.alive_context_trees(workspace)
-    step = onboarding.next_step(workspace, trees, focus, bound)
+    step = onboarding.next_step(
+        workspace, trees, focus, bound, invocation.refusal(workspace, os.environ)
+    )
     return [header] if step is None else [header, step.text()]
 
 
@@ -175,13 +179,24 @@ def _emit_bootstrap(workspace: Path, context: str) -> None:
 
 
 def main() -> int:
+    try:
+        return _run()
+    except SchemaVersionError as refused:  # unreadable, never "no context": the doctor's finding
+        finding = SectionFinding("REG-SCHEMA", "error", refused.message, False, True, refused.fix)
+        _emit(render_finding(finding) + "\n")
+        return 0
+
+
+def _run() -> int:
     platform.use_utf8_stdio()
     payload = _common.read_stdin_json()
     workspace = invocation.resolve_root(cwd=Path.cwd(), target_path=None)
     if workspace is None:
         _emit("")
         return 0
-    own = invocation.resolve_session_id(os.environ) or None
+    # the session's bind, never the cwd's repo: an unbound session injects no memory
+    inv = invocation.resolve(env=os.environ, cwd=Path.cwd(), payload_id=payload.get("session_id"))
+    own = inv.session_id
     if own:  # the operator's prompt is activity too: renew the liveness clock
         session_store.touch_last_seen_at(workspace, own, now=clock.now_iso())
     session_id = own or "workspace"
@@ -206,25 +221,20 @@ def main() -> int:
     record = session_store.read_session(workspace, session_id)
     bind_id = str(record.get("bind_id") or "").strip() if isinstance(record, dict) else ""
     compact_mtime = _read_sentinel(compact_marker)[0]
-    try:
-        decision = injection_policy.decide_injection(
-            event=event,
-            context=_resolve_context(),
-            recorded_slug=recorded_slug,
-            sentinel_exists=sentinel_mtime is not None,
-            compacted=sentinel_mtime is not None
-            and compact_mtime is not None
-            and compact_mtime > sentinel_mtime,
-            rebound=bool(bind_id) and bind_id != recorded_bind,
-        )
-        if decision.emit == "bootstrap":
-            _emit_bootstrap(workspace, decision.context)
-        elif decision.emit == "preflight":
-            _emit(_generic_preflight(workspace, own, decision.context))
-    except SchemaVersionError as refused:  # unreadable, never "no context": the doctor's finding
-        finding = SectionFinding("REG-SCHEMA", "error", refused.message, False, True, refused.fix)
-        _emit(render_finding(finding) + "\n")
-        return 0
+    decision = injection_policy.decide_injection(
+        event=event,
+        context=inv.bind.context_name or "",
+        recorded_slug=recorded_slug,
+        sentinel_exists=sentinel_mtime is not None,
+        compacted=sentinel_mtime is not None
+        and compact_mtime is not None
+        and compact_mtime > sentinel_mtime,
+        rebound=bool(bind_id) and bind_id != recorded_bind,
+    )
+    if decision.emit == "bootstrap":
+        _emit_bootstrap(workspace, decision.context)
+    elif decision.emit == "preflight":
+        _emit(_generic_preflight(workspace, own, decision.context))
     if decision.stamp_slug is not None:
         _stamp_sentinel(tmp_dir, sentinel, decision.stamp_slug, bind_id)
     return 0

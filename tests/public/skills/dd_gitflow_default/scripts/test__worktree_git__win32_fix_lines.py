@@ -34,12 +34,7 @@ def test_a_row_names_its_exit_through_command_or_inline(win32: None, tmp_path: P
     assert ready["fix"] == command(*git.LAUNCH, "merge", str(bad), caps=_WIN)
     gone = git._row(Path("r"), str(bad), "orphan")
     assert gone["fix"] == command(*git.LAUNCH, "merge", str(bad), caps=_WIN)
-    bad.mkdir()
-    held = git._row(Path("r"), str(bad), "orphan")
-    assert held["fix"] == (
-        f"Agent action: remove the directory {bad}, then run "
-        f"`{inline(*git.LAUNCH, 'merge', str(bad), caps=_WIN)}`"
-    )
+    assert git.move_aside(bad) == f"Agent action: stop what holds files open in {bad}, then move the folder {bad} out of the lane path (it may hold work)"  # fmt: skip
 
 
 def test_ignored_files_are_kept_by_a_command_line(
@@ -49,8 +44,10 @@ def test_ignored_files_are_kept_by_a_command_line(
     monkeypatch.setattr(end, "git", lambda *a, **k: "!! my%notes.scratch\0")
     with pytest.raises(end.Refusal) as refused:
         end._kept(tree, "merge", [], False)
-    assert refused.value.fix == command(
-        *end.LAUNCH, "merge", str(tree), "--keep", "my%notes.scratch", caps=_WIN
+    keep = inline(*end.LAUNCH, "merge", str(tree), "--keep", "my%notes.scratch", caps=_WIN)
+    drop = inline(*end.LAUNCH, "merge", str(tree), "--drop", caps=_WIN)
+    assert (
+        refused.value.fix == f"Agent action: keep them with `{keep}` or discard them with `{drop}`"
     )
 
 
@@ -60,7 +57,9 @@ def test_a_red_gate_names_its_argv_through_inline(
     end, tree = _mod("_worktree_end"), tmp_path / "worktrees" / "r" / "x"
     monkeypatch.setattr(end, "_declared_argv", lambda *a: ["python", "a%b.py"])
     monkeypatch.setattr(end, "workspace_of", lambda _tree: tmp_path)
-    monkeypatch.setattr(end.subprocess, "run", lambda *a, **k: SimpleNamespace(returncode=1))
+    monkeypatch.setattr(
+        end, "run", lambda *a, **k: SimpleNamespace(returncode=1, stdout="", stderr="")
+    )
     with pytest.raises(end.Refusal) as refused:
         end._gate(tree, "work")
     assert refused.value.fix == (
@@ -74,6 +73,7 @@ def test_a_git_failure_reruns_through_inline(
 ) -> None:
     cli = _mod("worktree")
     monkeypatch.setattr(cli, "workspace_of", lambda *a: tmp_path)
+    monkeypatch.setattr(cli, "require_governed", lambda root: None)  # the CLI is the boundary
 
     def failing(*a: object) -> str:
         raise cli.GitError(("merge",), "boom")
@@ -82,5 +82,6 @@ def test_a_git_failure_reruns_through_inline(
     assert cli.main(["merge", "a%b"]) == 1
     rerun = inline(*cli.LAUNCH, "merge", str(Path("a%b").resolve()), caps=_WIN)
     assert (
-        f"Agent action: clear the git failure above, then rerun {rerun}" in capsys.readouterr().err
+        f"Agent action: clear what `git merge` reports above, then rerun {rerun}"
+        in capsys.readouterr().err
     )

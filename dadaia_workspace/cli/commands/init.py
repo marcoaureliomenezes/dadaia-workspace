@@ -21,7 +21,7 @@ from dadaia_workspace.core.exceptions import (
     WorkspaceVenvBootstrapError,
 )
 from dadaia_workspace.core.model_registry import TEMPLATES
-from dadaia_workspace.core.platform import act, workspace_cli_path
+from dadaia_workspace.core.platform import act, inline, quote, workspace_cli_path
 from dadaia_workspace.features.export.service import Artifact, ExportService
 from dadaia_workspace.features.spec_context.service import slug_from_url
 
@@ -46,7 +46,7 @@ class InitPlan:
     associated: tuple[str, ...] = ()
     from_: str = ""
 
-    def command(self, directory: object = None, runner: tuple[str, ...] = _INIT) -> str:
+    def words(self, directory: object = None, runner: tuple[str, ...] = _INIT) -> tuple[str, ...]:
         """The ``init`` invocation that runs this plan — every flag it carries, so a
         ``fix:`` line built from it never drops a level (*directory* overrides DIR)."""
         target = str(self.directory if directory is None else directory)
@@ -54,7 +54,11 @@ class InitPlan:
         flags += [("--from", self.from_)] if self.from_ else []
         flags += [("--repo", self.repo)] if self.repo else []
         flags += [("--associated-repo", url) for url in self.associated]
-        return shell_line(*runner, *filter(None, [target]), *sum(flags, ()))
+        return (*runner, *filter(None, [target]), *sum(flags, ()))
+
+    def command(self, directory: object = None, runner: tuple[str, ...] = _INIT) -> str:
+        """:meth:`words` as one finished command line."""
+        return shell_line(*self.words(directory, runner))
 
 
 def _interactive() -> bool:
@@ -100,7 +104,7 @@ def _plan(
             if directory
             else act(
                 "agent",
-                f"run `{plan.command()}` with the new workspace's directory as its first argument",
+                f"run `{inline(*plan.words())}` with the new workspace's directory as its first argument",
             ),
         )
     directory = directory or str(Path.cwd() / typer.prompt("Workspace name"))
@@ -153,14 +157,43 @@ def init(
     ),
 ) -> None:
     """Bootstrap a dadaia workspace in DIR: .dadaia/, the law, and the projection of each harness (--harness, else the --from artifact's)."""
-    # Every refusal happens BEFORE any output or filesystem write, so a rejected
-    # invocation leaves nothing behind (no partial workspace, no leaked payload).
+    plan, root, artifact, chosen = _resolve(directory, harness, repo, tuple(associated_repo), from_)
+    _require_fit_root(root, plan)
+    root.mkdir(parents=True, exist_ok=True)
+
+    svc = container.build_workspace_service(root)
+    try:
+        before, after, action = svc.venv_change(root)
+        installed = svc.init(root, skip_assets=skip_assets, harnesses=chosen, template=template)
+    except WorkspaceVenvBootstrapError as exc:
+        cli = workspace_cli_path(root)  # the venv's own init only where the venv exists
+        runner = (str(cli), "init") if cli.is_file() else _INIT
+        fail(exc, plan.command(root, runner))
+
+    _announce(root, chosen, installed, skip_assets)
+    if action in ("upgrade", "repair"):
+        _reconcile_upgrade(root, action, before, after)
+    elif before is not None:
+        console.print(f"already at {before}", markup=False, highlight=False)
+
+    if artifact:
+        _restore(root, artifact, Path(plan.from_).expanduser())
+    else:
+        print_next_step(root, _create_context(root, plan) if plan.repo else None)
+
+
+def _resolve(
+    directory: str, harness: str, repo: str, associated: tuple[str, ...], from_: str
+) -> tuple[InitPlan, Path, Artifact | None, tuple[str, ...]]:
+    """The plan, its root, the artifact and the harnesses to scaffold. Every refusal happens
+    BEFORE any output or filesystem write, so a rejected invocation leaves nothing behind (no
+    partial workspace, no leaked payload)."""
     if from_ and repo:
         fail(
             "--from restores an artifact's contexts; it cannot be combined with --repo.",
             InitPlan(directory, harness, from_=from_).command(),
         )
-    plan = _plan(directory, harness, repo, tuple(associated_repo), from_)
+    plan = _plan(directory, harness, repo, associated, from_)
     try:
         if plan.harness:
             plan = replace(plan, harness=harness_registry.parse_harness_name(plan.harness))
@@ -174,25 +207,31 @@ def init(
             "the artifact names no harness.",
             replace(plan, harness=harness_registry.L1_ENTRY_HARNESSES[0]).command(),
         )
+    return plan, root, artifact, chosen
 
-    sibling_fix = plan.command(root.parent / ((root.name or "dadaia") + "-workspace"))
+
+def _require_fit_root(root: Path, plan: InitPlan) -> None:
+    """Refuse a *root* that is a file, or a non-empty folder that is not a dadaia workspace."""
     if root.exists() and not root.is_dir():
-        fail(f"'{root}' is not a directory.", sibling_fix)
+        fail(
+            f"'{root}' is not a directory.",
+            plan.command(root.parent / (root.name + "-workspace")),
+        )
     # A directory that already holds `.dadaia/` is THIS workspace (a re-run, idempotent);
     # anything else non-empty is a foreign tree and is never scaffolded over.
-    if root.is_dir() and any(root.iterdir()) and not (root / ".dadaia").is_dir():
-        fail(f"'{root}' already holds a foreign tree (not a dadaia workspace).", sibling_fix)
-    root.mkdir(parents=True, exist_ok=True)
+    foreign = sorted(p.name for p in root.iterdir()) if root.is_dir() else []
+    if foreign and not (root / ".dadaia").is_dir():
+        fail(
+            f"'{root}' already holds a foreign tree (not a dadaia workspace): {', '.join(map(quote, foreign))}.",
+            act(
+                "operator",
+                f"empty {quote(str(root))} or name another empty folder for the workspace, "
+                f"then run {inline(*plan.words(root))}",
+            ),
+        )
 
-    svc = container.build_workspace_service(root)
-    try:
-        before, after, action = svc.venv_change(root)
-        installed = svc.init(root, skip_assets=skip_assets, harnesses=chosen, template=template)
-    except WorkspaceVenvBootstrapError as exc:
-        cli = workspace_cli_path(root)  # the venv's own init only where the venv exists
-        runner = (str(cli), "init") if cli.is_file() else _INIT
-        fail(exc, plan.command(root, runner))
 
+def _announce(root: Path, chosen: tuple[str, ...], installed: list[str], skip_assets: bool) -> None:
     console.print(
         f"[green]✓[/green] Workspace {root} ({', '.join(chosen)})", highlight=False, soft_wrap=True
     )
@@ -206,16 +245,6 @@ def init(
         console.print(f"[green]✓[/green] {len(installed)} asset(s) installed", highlight=False)
     console.print(f"CLI: {workspace_cli_path(root)}", markup=False, highlight=False, soft_wrap=True)
     console.print(_LAW_NOTE, markup=False, soft_wrap=True)
-
-    if action in ("upgrade", "repair"):
-        _reconcile_upgrade(root, action, before, after)
-    elif before is not None:
-        console.print(f"already at {before}", markup=False, highlight=False)
-
-    if artifact:
-        _restore(root, artifact, Path(plan.from_).expanduser())
-    else:
-        print_next_step(root, _create_context(root, plan) if plan.repo else None)
 
 
 def _read(source: str, root: Path) -> Artifact:

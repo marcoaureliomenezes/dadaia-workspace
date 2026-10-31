@@ -21,27 +21,35 @@ cd demo
 
 After the 3b first pass (below), publish and file the first entry in a backlog lane,
 the worktree `<v>/wt-backlog-<slug>` — only `context create` (the `--repo` clone) and the first `specs init` write
-`specs/` directly (ADR 0154):
+`specs/` directly (ADR 0154). `V` is the work branch's version, read from the repo:
 
 ```bash
+V=$(git -C "repos/$SLUG" branch --list 'feature/*' --format='%(refname:short)' | sed 's|^feature/||')
 .dadaia/.venv/bin/dadaia context baseline "$SLUG"
-B=$(.dadaia/.venv/bin/dadaia worktree new "$SLUG" 0.1.0/wt-backlog-my-first-idea | sed 's/^\[ok\] //')
+B=$(.dadaia/.venv/bin/dadaia worktree new "$SLUG" "$V/wt-backlog-my-first-idea" | sed 's/^\[ok\] //')
 python3 .agents/skills/dd-backlog-definition/scripts/backlog.py new my-first-idea \
   --specs "$B/specs" --title "What I want" --description "Why I want it"
 git -C "$B" commit -qam "chore(backlog): new my-first-idea"
 ```
 
 After an APPROVED `dd-code-reviewer` verdict, `.dadaia/.venv/bin/dadaia worktree merge "$B"` lands it
-on the work branch; the release is born the same way in its `<M.m.p>/rc-<N>/wt-rc` worktree,
-the rc's integration branch that its jobs' `job-<n>/wt-main` trees merge into:
-`release.py new 0.1.0 --specs "$R/specs" --origin backlog:my-first-idea`.
+on the work branch. The release is born in its `<M.m.p>/rc-<N>/wt-rc` worktree, the rc's
+integration branch that its jobs' `job-<n>/wt-main` trees merge into; the block keeps the
+default origin, because `--origin backlog:my-first-idea` names an entry that is not on the work
+branch until that merge lands:
+
+```bash
+V=$(git -C "repos/$SLUG" branch --list 'feature/*' --format='%(refname:short)' | sed 's|^feature/||')
+R=$(.dadaia/.venv/bin/dadaia worktree new "$SLUG" "$V/rc-1/wt-rc" | sed 's/^\[ok\] //')
+python3 .agents/skills/dd-release-implementation/scripts/release.py new "$V" --specs "$R/specs"
+```
 
 - **Level 1 — workspace.** `uvx dadaia-workspace init` provisions `demo/` with its own
   virtualenv; every later command runs through the workspace's CLI,
   `.dadaia/.venv/bin/dadaia`, which `init` prints by its absolute path.
 - **Level 2 — project.** `--repo` clones the repo into `repos/<slug>/`, installs the
-  pre-push and reference-transaction hooks and makes the context (named after the slug) ALIVE; only `context bind`
-  binds a session (§3).
+  pre-push and reference-transaction hooks and makes the context (named after the slug) ALIVE; `context bind`
+  binds a session (*The bind*, below).
 - **Level 3 — specs.** 3a `specs init` brings the repo's `specs/` to the canon and, on a
   repo with no work branch, cuts the local one and commits only the scaffold on it; a foreign
   `specs/` is refused until `--replace-foreign` moves it to `specs-bkp/` (to
@@ -55,6 +63,9 @@ from the parent directory; it prints `upgraded A -> B`, `repaired -> B` when the
 build could not be read, or `already at A` when current. A venv whose python cannot start
 is refused with a fix that deletes `.dadaia/.venv` and reruns the init line.
 Then `.dadaia/.venv/bin/dadaia specs init --context <ctx>` refreshes the project's specs law.
+To carry a workspace to another machine, `.dadaia/.venv/bin/dadaia export` writes the artifact
+and `uvx dadaia-workspace init --from <artifact> <dir>` restores it (contexts come back DEAD;
+`context alive` clones them).
 
 ## 2. What the init line provisioned
 
@@ -84,8 +95,8 @@ clones every repo, installs the hook and makes the context ALIVE; `context bind`
 ```
 
 `bind` writes one record, `.dadaia/sessions/<session-id>.json` (context, runtime, pid,
-`bound_at`, `bind_id`, `last_seen_at`), and acquires nothing; the gate and the bind read the session id from the
-environment only. The bind names the session's scope — the
+`bound_at`, `bind_id`, `last_seen_at`), and acquires nothing; the CLI verbs read the session id from the environment, and the hooks also take the
+hook payload's id where the harness's registry row names a session variable. The bind names the session's scope — the
 context's main repo plus its associated repos — and the bound context's memory is
 injected once into the session. The bind is read from the session's own record when it has an
 id, else `DADAIA_CONTEXT`, never the cwd: sitting inside a repository is not a binding.
@@ -94,9 +105,8 @@ id, else `DADAIA_CONTEXT`, never the cwd: sitting inside a repository is not a b
 
 `doctor` is the one instance validator; three sections run in fixed order —
 `workspace`, `specs`, `ledgers`. Every finding prints as one `<CODE> <verdict>
-<message>` line, every error-class finding carries one fix line (a command, an
-`Agent action: <one act>`, or an `Operator action: <one act>` for what only the human may do), and any
-error-class finding exits 1. There is no score: the findings and the exit code are the
+<message>` line, every error-class finding carries one fix line (its forms are the root `AGENTS.md` map's
+*What is enforced* section), and any error-class finding exits 1. There is no score: the findings and the exit code are the
 run. `--fix` moves slop to `.dadaia/reaped/`; a TTL expiry acts by zone class, an OUTPUT
 entry held, an EPHEMERAL one deleted.
 
@@ -114,9 +124,9 @@ lane.
 `release.py new` is one birth act, all or nothing: a `SPEC.md` stub in
 `specs/releases/<id>/rc-1/` plus `_RELEASE.json` in `DEFINITION` at the release root, refusing a second live
 release or a non-SemVer id with a `fix:` line; the stub opens with `## Bug window review`. From there, author
-`SPEC.md`, `PLAN.md` and one job file per job, `tasks/<job>.md`, in that `rc-<N>/`, `PLAN.md`
+`SPEC.md`, `PLAN.md` and one job file per job, `tasks/job<n>.md`, in that `rc-<N>/`, `PLAN.md`
 opening with the As-is review table (`unit | today | bugs | verdict | why`) and carrying the
-`## DAG` of jobs with waves and exact write sets; `release.py phase IMPLEMENTATION --sha <sha>` opens
+`## DAG` of jobs with waves and exact write sets; `release.py phase IMPLEMENTATION --specs <specs-dir>` opens
 implementation once SPEC and PLAN carry `**Status:** Approved` and every job file is well formed.
 
 Next: [positioning](positioning.md) for why this shape, [the bug loop](bug-loop.md)

@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import subprocess
 from datetime import UTC, datetime
@@ -27,6 +28,7 @@ from dadaia_workspace.core import session_store
 from dadaia_workspace.core.harness_registry import HARNESS_RECORDS
 from dadaia_workspace.core.workspace_layout import MARKER_DIR
 from dadaia_workspace.infrastructure.runtime_transforms.hook_wrappers import (
+    HOOK_DIALECTS,
     hook_documents,
     hook_wrapper_contents,
 )
@@ -174,3 +176,20 @@ def test_ac1_2_every_ctx_inject_wrapper_answers_on_stdout(ws: Path, harness: str
         for _ in range(2 if vendor else 1):
             out = run([git_bash(), str(ws / ".dadaia" / "hooks" / name)], input="{}", cwd=ws, env=env, timeout=60).stdout  # fmt: skip
             assert "[alpha]" in (json.loads(out)[vendor] if vendor else out), (name, out)
+
+
+def test_only_a_harness_naming_its_subagent_and_matching_the_shell_tool_judges_the_verdict_act() -> (
+    None
+):
+    """Of the harnesses naming a subagent key, Claude's pre-gate matcher carries Bash and Codex's
+    does not: a Codex shell matcher would refuse the reviewer, its payload carrying no agent_type."""
+    seen = {
+        name: any(
+            not matcher or re.search(matcher, "Bash")
+            for _, lane, matcher in HOOK_DIALECTS[rec.hooks].files[0].events
+            if lane == "pre-gate"
+        )
+        for name, rec in HARNESS_RECORDS.items()
+        if rec.subagent_key
+    }
+    assert seen == {"claude": True, "codex": False}

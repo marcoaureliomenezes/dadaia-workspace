@@ -14,6 +14,7 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.core.gitflow import DEFAULT
+from dadaia_workspace.core.skill_owner import load_owner
 from dadaia_workspace.features.chokepoints import push_gate_decision
 from dadaia_workspace.features.chokepoints.branch_policy import Decision, PushRef
 from dadaia_workspace.features.specs.canon import canon_violations
@@ -112,21 +113,20 @@ def test_prior_side_lookup_failure_refuses_naming_the_failure_and_no_verify(
     write_text(repo / "notes.md", "edited content\n")
     tip_sha = _commit(repo, "edit")
 
-    from dadaia_workspace.infrastructure import git_objects as git_objects_module
-
-    real_run = git_objects_module._run
+    kernel = load_owner("dd-bug-resolution", "_git")
+    real_run = kernel.git_bytes
     marker = f"{already_published_sha}:".encode()
 
     def _flaky_run(
-        args: list[str], cwd: Path, *, input_bytes: bytes | None = None
+        repo: Path, *args: str, input: bytes | None = None, **kw: object
     ) -> subprocess.CompletedProcess[bytes]:
-        if input_bytes is not None and marker in input_bytes:
+        if input is not None and marker in input:
             return subprocess.CompletedProcess(
-                args, 1, stdout=b"", stderr=b"simulated prior-lookup failure"
+                ["git", *args], 1, stdout=b"", stderr=b"simulated prior-lookup failure"
             )
-        return real_run(args, cwd, input_bytes=input_bytes)
+        return real_run(repo, *args, input=input, **kw)
 
-    monkeypatch.setattr(git_objects_module, "_run", _flaky_run)
+    monkeypatch.setattr(kernel, "git_bytes", _flaky_run)
 
     decision = _decide([_tag_push_ref(tip_sha, remote_sha=already_published_sha)], repo)
 

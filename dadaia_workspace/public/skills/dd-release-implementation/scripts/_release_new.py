@@ -9,12 +9,13 @@ import shutil
 from pathlib import Path
 
 import _clock
+from _bugs_store import history
 from _grammar import SEMVER_RE, STATE, live_ids
-from _ledger import records, replace
+from _ledger import replace
 from _platform import act, is_link, quote, write_text
 from _refusal import Refusal
-from _release_schema import next_candidate
-from _release_store import SCRIPT, State, at_head, read_state, validated
+from _release_schema import SCRIPT, State, next_candidate, read_state
+from _release_store import validated
 from _release_tree import BUG_WINDOW, tree_findings
 
 SPEC_STUB = """\
@@ -63,7 +64,7 @@ def seeded_scope(specs: Path, origin: str) -> str:
     """One scope clause per bug named by a `bugs:` origin, else the placeholder."""
     if not origin.startswith("bugs:"):
         return "(List the scope clusters / acceptance criteria.)"
-    known = {str(r.get("id")): r for r in records(specs / "bugs" / "BUGS.jsonl")}
+    known = {str(r.get("id")): r for r in history(specs)}
     bugs = [b.strip() for b in origin[5:].split(",") if b.strip()]
     return "\n".join(
         f"### FR{n} — {known.get(bug, {}).get('title', bug)}\n\n- Bug `{bug}`.\n"
@@ -79,8 +80,7 @@ def candidate_state(release_id: str, prior: State | None) -> State:
         "schema": "release-state-v1", "release": release_id, "phase": "DEFINITION",
         "defined": None, "implemented": None, "shipped": None, "log": [],
     }  # fmt: skip
-    closed = ((prior or {}).get("implemented") or {}).get("sha")
-    stacked = f"Candidate born on {release_id} (prior candidate closed at {closed})"
+    stacked = f"Candidate born on {release_id} (stacked on the closed prior candidate)"
     note = stacked if prior else f"Release {release_id} born"
     state["phase"] = "DEFINITION"
     state["log"].append(
@@ -126,7 +126,7 @@ def refuse_unfree(specs: Path, release_id: str) -> State | None:
         raise Refusal(
             f"release {release_id} is live in phase {prior.get('phase')!r} — the next "
             "candidate is stacked only on a closed one",
-            at_head(specs, "phase", "CLOSURE"),
+            SCRIPT("phase", "CLOSURE"),
         )
     return prior
 

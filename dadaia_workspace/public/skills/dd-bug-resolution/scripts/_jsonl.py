@@ -9,7 +9,7 @@ from collections.abc import Iterable, Iterator
 from pathlib import Path
 from typing import Any
 
-from _platform import Caps, act, command, read_text
+from _platform import Caps, act, cli_words, command, read_text
 from _refusal import Refusal
 from _root import workspace_of
 
@@ -32,12 +32,15 @@ REINSTALL_ACT = act(
 )
 
 
-def reinstall_fix(start: Path, caps: Caps | None = None) -> str:
-    """The command that repairs a shipped file under *start*: `init` of the workspace holding
-    it, which answers its harness from its own profile; outside every workspace, the act."""
+def reinstall_fix(start: Path, caps: Caps | None = None, *, projected: bool = False) -> str:
+    """The command that repairs a missing file under *start*: a shipped one, `init` of the
+    workspace holding it (which answers its harness from its own profile); a *projected* one,
+    that workspace's `public install`. Outside every workspace, the act."""
     root = workspace_of(start)
     if root is None:
         return REINSTALL_ACT
+    if projected:
+        return command(*cli_words(root, "public", "install", caps=caps), caps=caps)
     return command("uvx", "dadaia-workspace", "init", str(root), caps=caps)
 
 

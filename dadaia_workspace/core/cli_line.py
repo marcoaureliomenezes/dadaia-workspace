@@ -25,16 +25,12 @@ def spell_fix(fix: str) -> str:
     return str(load_owner("dd-bug-resolution", "_refusal").spell_fix(fix))
 
 
-def reinstall_fix(start: Path) -> str:
-    """The command that repairs a shipped file under *start*: the kernel's one decider."""
-    return str(load_owner("dd-bug-resolution", "_jsonl").reinstall_fix(start))
+reinstall_fix = platform.reinstall_fix
 
 
 def cli_words(root: PurePath | None, *argv: str) -> tuple[str, ...]:
-    """The words that run the workspace CLI of *root* (the venv running now when ``None``) with
-    *argv*: rendered once, by ``command`` for a fix or ``platform.inline`` inside a sentence."""
-    venv = platform.venv_dir(root) if root is not None else Path(sys.prefix)
-    return (*platform.cli_argv(venv), *argv)
+    """The words that run the workspace CLI of *root*: the kernel's."""
+    return platform.cli_words(root, *argv)
 
 
 def fix_line(root: PurePath | None, *argv: str) -> str:
@@ -71,10 +67,8 @@ def shell_line(*parts: str) -> str:
 
 
 def mkdir_line(directory: PurePath) -> str:
-    """Create *directory* and its parents, idempotent — one interpreter line that runs
-    unchanged under sh, bash, cmd and PowerShell (no shell builtin differs per OS)."""
-    code = "import pathlib, sys; pathlib.Path(sys.argv[1]).mkdir(parents=True, exist_ok=True)"
-    return platform.command(sys.executable, "-c", code, str(directory))
+    """Create *directory* and its parents: the kernel's cross-shell act."""
+    return platform.mkdir_line(directory)
 
 
 def materialize_line(link: PurePath, target: PurePath) -> str:

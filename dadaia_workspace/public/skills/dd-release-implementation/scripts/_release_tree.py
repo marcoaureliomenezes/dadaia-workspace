@@ -13,9 +13,10 @@ import re
 from pathlib import Path
 from typing import Any
 
+import _bugs_store as store
 import _findings
 import _memory_drift as drift
-from _grammar import SEMVER_RE, SHA_RE, STATE, sole_live
+from _grammar import SEMVER_RE, STATE, sole_live
 from _ledger import records
 from _platform import act, read_text
 from _refusal import Refusal
@@ -27,13 +28,14 @@ from _release_schema import (
     CODE,
     HISTO,
     MEMORY_WRITE,
+    SCRIPT,
     TRIO_PHASES,
     closure_summary,
     current_candidate,
     origin,
     origin_line,
 )
-from _release_store import SCRIPT, Live, at_head, live_release
+from _release_store import Live, live_release
 from _specs import script
 
 __all__ = ["check", "drift", "memory_errors", "ship_findings", "tree_findings"]
@@ -67,8 +69,7 @@ def _trace(
     document = specs / "backlog" / "BACKLOG.json"
     active = json.loads(read_text(document)) if document.is_file() else {}
     exits = records(specs / "backlog/_archive/backlog_histo.jsonl")
-    bugs = {r.get("id"): r for p in ("BUGS.jsonl", "_archive/bugs_histo.jsonl")
-            for r in records(specs / "bugs" / p)}  # fmt: skip
+    bugs = {r.get("id"): r for r in store.history(specs)}
     closed = {r.get("id"): {"release": r.get("release"), "status": r.get("disposition")}
               for r in records(specs / "audits/_archive/audits_histo.jsonl")}  # fmt: skip
     found = {r.get("id"): r for p in sorted(specs.glob("audits/*/FINDINGS.jsonl"))
@@ -76,13 +77,14 @@ def _trace(
     ledgers = {
         "backlog": {**{e.get("id"): {} for e in active.get("active") or []},
                     **{r.get("id"): r for r in exits}},
-        "bugs": bugs,
         "findings": found,
     }  # fmt: skip
 
     def standing(kind: str, i: str, seen: frozenset[str] = frozenset()) -> str:
         if summary and re.search(rf"(?<![\w-]){re.escape(i)}(?![\w-])", summary):
             return "traced"
+        if kind == "bugs":
+            return store.standing(specs, i, release)
         record = ledgers[kind].get(
             i, closed.get(i.rpartition("-F")[0]) if kind == "findings" else None
         )
@@ -94,7 +96,7 @@ def _trace(
             return "traced"
         if (by := record.get("superseded_by")) and by not in seen:
             return standing(kind, by, seen | {i})
-        back = record.get("resolved_release" if kind == "bugs" else "release")
+        back = record.get("release")
         declined = "rejected" in (record.get("status"), record.get("disposition"))
         return "traced" if back == release or declined else "untraced"
 
@@ -121,7 +123,7 @@ def _window_findings(
     head = next((n for n, h in enumerate(lines, 1) if h.startswith("## ")), 1)
     if lines[head - 1 : head] == [BUG_WINDOW]:
         return []
-    message = f"the live SPEC's first `## ` heading is not `{BUG_WINDOW}` (AC5.6)"
+    message = f"the live SPEC's first `## ` heading is not `{BUG_WINDOW}`"
     if state.get("phase") != "DEFINITION":
         return [_findings.info(CODE, rel, head, message)]
     return [_findings.finding(CODE, rel, head, message,
@@ -176,9 +178,7 @@ def _origin_findings(specs: Path) -> list[dict[str, Any]]:
     return out + [_origin_row(specs, spec, line, live, swept, row) for row in rows]
 
 
-def _definition_findings(
-    state: dict[str, Any], rel: str, candidate: Path, specs: Path
-) -> list[dict[str, Any]]:
+def _definition_findings(state: dict[str, Any], rel: str, specs: Path) -> list[dict[str, Any]]:
     """DEFINITION implements nothing: a closure entry logged after the live candidate's
     birth note means the phase verb was never run."""
     log = state["log"]
@@ -187,12 +187,7 @@ def _definition_findings(
              for e in log[born + 1:] if e["kind"] not in ("note", "milestone", "merge")]  # fmt: skip
     if not found:
         return []
-    try:  # `defined` is the commit that approved the SPEC and PLAN, never HEAD: impl commits follow it
-        docs = [str(candidate / n) for n in ("SPEC.md", "PLAN.md")]
-        sha = drift.git(specs.parent, "log", "-1", "--format=%h", "--", *docs)[0]
-        fix: str = SCRIPT(*NEXT["DEFINITION"].split(), "--sha", sha, specs=specs)
-    except (drift.Refusal, OSError, IndexError):  # no history, no git binary
-        fix = act("agent", f"run `{NEXT['DEFINITION']}` at the commit approving {candidate}")
+    fix = SCRIPT(*NEXT["DEFINITION"].split(), specs=specs)
     return [_findings.finding(CODE, rel, 1, "; ".join(found), fix)]
 
 
@@ -211,7 +206,7 @@ def _directory_findings(release_dir: Path, specs: Path) -> list[dict[str, Any]]:
             for path, message, fix in (candidate_errors(candidate) if candidate else [])
             if not (phase == CLOSURE and MEMORY_WRITE in message)]  # fmt: skip
     if phase not in TRIO_PHASES:
-        return (_definition_findings(state, f"{dir_rel}/{STATE}", candidate, specs)
+        return (_definition_findings(state, f"{dir_rel}/{STATE}", specs)
                 if candidate else []) + jobs  # fmt: skip
     missing = [n for n in CANDIDATE_DOCS if not (candidate and (candidate / n).is_file())]
     if candidate is None or missing:
@@ -222,25 +217,36 @@ def _directory_findings(release_dir: Path, specs: Path) -> list[dict[str, Any]]:
     return jobs
 
 
-def memory_errors(specs: Path, phase: str, entry: dict[str, Any]) -> list[str]:
-    """Why *entry* reconciles nothing over its own [since, until]: what the `memory`
-    verb refuses on."""
+def memory_errors(specs: Path, phase: str, entry: dict[str, Any]) -> list[Refusal]:
+    """Why *entry* reconciles nothing over its own [since, until], each with the act that
+    clears it: what the `memory` verb refuses on. A name is valid when its atom matched the
+    window's worklist or its own file moved in the window."""
     since, until = str(entry.get("since")), str(entry.get("until"))
     worklist = drift.report(specs, since, until)
-    lists = [[str(s) for s in entry.get(name) or []] for name in ("reviewed", "changed")]
-    paths = {str(atom["slug"]): str(atom["path"]) for atom in worklist["atoms"]}
-    # git decides "moved": it normalises line endings a byte compare would not.
-    unmoved = [f"--changed names {slug!r}, whose atom did not move since {since}"
-               for slug in lists[1] if slug in paths and not drift.git(
-                   specs.parent, "diff", "--name-only", since, until, "--", paths[slug])]  # fmt: skip
     if phase != "CLOSURE":
-        return [f"release is in phase {phase!r} — the memory reconciliation is CLOSURE work"]
-    listed = [str(atom["slug"]) for atom in worklist["atoms"]] + worklist["uncovered"]
-    named = set(lists[0]) | set(lists[1])
-    errors = [f"worklist entry {e!r} is in neither --reviewed nor --changed"
-              for e in listed if e not in named]  # fmt: skip
-    errors += [f"{e!r} is not in the window's worklist" for e in sorted(named - set(listed))]
-    return errors or unmoved
+        return [Refusal(f"release is in phase {phase!r} — the memory reconciliation is CLOSURE work",
+                        SCRIPT(*NEXT.get(phase, "check").split(), specs=specs))]  # fmt: skip
+    reviewed, changed = (
+        [str(s) for s in entry.get(name) or []] for name in ("reviewed", "changed")
+    )
+    paths = {str(f["slug"]): str(f["path"]) for f in drift.entries(specs)}
+    moved = set(drift.git(specs.parent, "diff", "--name-only", since, until))
+    listed = [str(atom["slug"]) for atom in worklist["atoms"]]
+    valid = set(listed) | {slug for slug, path in paths.items() if path in moved}
+    run = f"run `{SCRIPT.inline('memory', specs=specs)}`"
+    errors = [Refusal(f"worklist entry {e!r} is in neither --reviewed nor --changed",
+                      act("agent", f"{run} with {e!r} in --reviewed, or in --changed once its atom is rewritten"))
+              for e in listed if e not in {*reviewed, *changed}]  # fmt: skip
+    errors += [Refusal(f"unit {u!r} is covered by no atom",
+                       act("agent", f"write an atom whose `sources` glob covers the unit, commit it, then {run} "
+                           "with that atom in --changed"))
+               for u in worklist["uncovered"]]  # fmt: skip
+    errors += [Refusal(f"{e!r} is not in the window's worklist",
+                       act("agent", f"{run} naming only atoms `drift` lists or atoms created or rewritten in the window"))
+               for e in sorted({*reviewed, *changed} - valid)]  # fmt: skip
+    return errors or [Refusal(f"--changed names {slug!r}, whose atom did not move since {since}",
+                              act("agent", f"{run} with {slug!r} in --reviewed"))
+                      for slug in changed if slug in paths and paths[slug] not in moved]  # fmt: skip
 
 
 def _memory_findings(specs: Path) -> list[dict[str, Any]]:
@@ -292,11 +298,10 @@ def tree_findings(specs: Path) -> list[dict[str, Any]]:
                                     act("agent", f"{rewrite}object, from git history")))  # fmt: skip
             continue
         shipped = state.get("shipped") if isinstance(state, dict) else None
-        if not (isinstance(shipped, dict) and SHA_RE.match(str(shipped.get("sha")))
-                and "pr" in shipped and isinstance(shipped["pr"], int | None)):  # fmt: skip
-            findings.append(_findings.finding(CODE, rel, 1, "archived release carries no shipped {sha, pr}",
+        if not (isinstance(shipped, dict) and "pr" in shipped and isinstance(shipped["pr"], int | None)):  # fmt: skip
+            findings.append(_findings.finding(CODE, rel, 1, "archived release carries no shipped {pr}",
                                     act("agent", f"{rewrite}object whose shipped names the "
-                                    "merged promote PR's sha")))  # fmt: skip
+                                    "promote merge")))  # fmt: skip
     return findings
 
 
@@ -316,7 +321,7 @@ def ship_findings(specs: Path) -> list[dict[str, Any]]:
     if phase != "CLOSURE":
         found.append(_findings.finding(CODE, rel, 1, f"release {live.release_id} is in phase {phase!r} — "
                      "only a CLOSURE release ships",
-                     at_head(specs, *NEXT.get(phase, "check").split())))  # fmt: skip
+                     SCRIPT(*NEXT.get(phase, "check").split())))  # fmt: skip
     if (archive := specs / "releases" / "_archive" / live.release_id).exists():
         found.append(_findings.finding(CODE, rel, 1, f"release {live.release_id} is live and already "
                      f"archived at {archive}", act("agent", f"decide which of "

@@ -160,3 +160,22 @@ def test_a_rule_table_over_a_persona_that_is_not_utf8_is_undecodable(
         AGENT_RULE_BUILDERS[record.agent_transcode](record, plan)
 
     assert refused.value.path == latin
+
+
+@pytest.mark.parametrize("eol", ["\n", "\r\n"])
+@pytest.mark.parametrize("prefix", ["", "﻿"])
+def test_the_copilot_transcode_keeps_a_kept_key_with_its_whole_block_value(
+    tmp_path: Path, prefix: str, eol: str
+) -> None:
+    from dadaia_workspace.infrastructure.agent_transcodes import copilot_agent_md_bytes
+
+    persona = tmp_path / "a.md"
+    text = (
+        "---\nname: a\nmodel: opus\ntools:\n  - Read\n  - Edit\nnote: >\n  folded\n"
+        "description: d\nmodel2:\n  - x\n---\n\nbody\n"
+    )
+    persona.write_bytes((prefix + text.replace("\n", eol)).encode())
+
+    assert copilot_agent_md_bytes(persona) == (
+        b"---\nname: a\ntools:\n  - Read\n  - Edit\ndescription: d\n---\n\nbody\n"
+    )

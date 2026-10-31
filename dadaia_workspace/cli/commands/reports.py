@@ -9,7 +9,7 @@ import typer
 from rich.console import Console
 
 from dadaia_workspace.cli._fail import fail
-from dadaia_workspace.core.cli_line import fix_line
+from dadaia_workspace.core.cli_line import fix_line, reinstall_fix
 from dadaia_workspace.core.exceptions import HandoffSchemaError, WorkspaceNotInitializedError
 from dadaia_workspace.core.handoff_index import Handoff, HandoffIndex, ValidationResult
 from dadaia_workspace.core.workspace_resolver import (
@@ -23,6 +23,52 @@ console = Console()
 # ---------------------------------------------------------------------------
 # validate subcommand
 # ---------------------------------------------------------------------------
+
+
+def _targets(paths: list[Path] | None, all_: bool, workspace_root: Path) -> list[Path]:
+    """The files to validate: every handoff under the workspace root with *all_*, else *paths*."""
+    if all_:
+        results_root = workspace_root / ".dadaia" / "handoff"
+        return sorted(results_root.rglob("*.handoff.json")) if results_root.exists() else []
+    missing = [p for p in paths or [] if not p.exists()]
+    if missing:
+        fail(
+            "File not found: " + ", ".join(str(m) for m in missing),
+            fix_line(workspace_root, "reports", "validate", "--all"),
+        )
+    return list(paths or [])
+
+
+def _emit(results: list[ValidationResult], json_output: bool) -> int:
+    """Print *results* as JSON or text; return how many are invalid."""
+    n_valid = sum(1 for r in results if r.valid)
+    n_invalid = len(results) - n_valid
+
+    if json_output:
+        payload = [
+            {
+                "path": str(r.path),
+                "valid": r.valid,
+                "errors": [{"field_path": e.field_path, "message": e.message} for e in r.errors],
+                "hash_status": r.hash_status,
+            }
+            for r in results
+        ]
+        console.print_json(data=payload)
+    else:
+        for r in results:
+            if r.valid:
+                console.print(f"[green]VALID[/green]   {r.path}")
+            else:
+                console.print(f"[red]INVALID[/red] {r.path}")
+                for err in r.errors:
+                    console.print(f"         [yellow]{err.field_path}[/yellow]: {err.message}")
+
+        console.print(
+            f"\nSummary: [green]{n_valid} valid[/green], [red]{n_invalid} invalid[/red] "
+            f"(of {len(results)} files)"
+        )
+    return n_invalid
 
 
 @app.command(
@@ -99,19 +145,7 @@ def validate(
 
     index = HandoffIndex(workspace_root)
 
-    # Collect paths to validate
-    target_paths: list[Path] = []
-    if all_:
-        results_root = workspace_root / ".dadaia" / "handoff"
-        target_paths = sorted(results_root.rglob("*.handoff.json")) if results_root.exists() else []
-    elif paths:
-        missing = [p for p in paths if not p.exists()]
-        if missing:
-            fail(
-                "File not found: " + ", ".join(str(m) for m in missing),
-                fix_line(workspace_root, "reports", "validate", "--all"),
-            )
-        target_paths = list(paths)
+    target_paths = _targets(paths, all_, workspace_root)
 
     # Name the resolved workspace root (stderr — never pollutes --json's stdout list shape) once the
     # invocation is accepted, so a refusal's first line stays `Error:`.
@@ -125,7 +159,7 @@ def validate(
             index.validate_file(p, reviewed_root=reviewed_root) for p in target_paths
         ]
     except HandoffSchemaError as exc:
-        fail(f"Could not load handoff schema: {exc}", fix_line(workspace_root, "public", "install"))
+        fail(f"Could not load handoff schema: {exc}", reinstall_fix(workspace_root, projected=True))
 
     # Apply release filter if requested
     if release:
@@ -138,34 +172,7 @@ def validate(
                 filtered.append(r)
         results = filtered
 
-    # Output
-    n_valid = sum(1 for r in results if r.valid)
-    n_invalid = len(results) - n_valid
-
-    if json_output:
-        payload = [
-            {
-                "path": str(r.path),
-                "valid": r.valid,
-                "errors": [{"field_path": e.field_path, "message": e.message} for e in r.errors],
-                "hash_status": r.hash_status,
-            }
-            for r in results
-        ]
-        console.print_json(data=payload)
-    else:
-        for r in results:
-            if r.valid:
-                console.print(f"[green]VALID[/green]   {r.path}")
-            else:
-                console.print(f"[red]INVALID[/red] {r.path}")
-                for err in r.errors:
-                    console.print(f"         [yellow]{err.field_path}[/yellow]: {err.message}")
-
-        console.print(
-            f"\nSummary: [green]{n_valid} valid[/green], [red]{n_invalid} invalid[/red] "
-            f"(of {len(results)} files)"
-        )
+    n_invalid = _emit(results, json_output)
 
     # An INVALID file is a hard failure
     # — printing INVALID while exiting 0 masked tampered/malformed handoffs from every

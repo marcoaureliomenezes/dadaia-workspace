@@ -1,11 +1,9 @@
 """T2 grader, on feature/0.1.0 since /opt/eval/base: a BUGS.jsonl record lands before the
 fix commit (the first touching slug.py); HEAD's tests fail on the pre-fix sha and pass on
 the fix; the suite is green at HEAD; every assertion node under tests/ at the base (`assert`,
-`assert*` / `raises` / `warns` calls) is still there at HEAD, unedited, wherever it moved.
-Reads only the record `id` of bug-record-v1, which 0.4.7 and the candidate share."""
+`assert*` / `raises` / `warns` calls) is still there at HEAD, unedited, wherever it moved."""
 
 import ast
-import json
 import subprocess
 import sys
 import tempfile
@@ -14,6 +12,7 @@ from pathlib import Path
 
 REPO = "/workspace/repos/demo"
 BRANCH = "feature/0.1.0"
+BUGS = "/workspace/.agents/skills/dd-bug-resolution/scripts/bugs.py"
 
 
 def git(*args):
@@ -23,11 +22,17 @@ def git(*args):
 
 
 def bug_ids(sha):
+    """Ids in the ledger at `sha`, read by the installed library's ledger reader."""
     try:
-        text = git("show", f"{sha}:specs/bugs/BUGS.jsonl")
+        ledger = git("show", f"{sha}:specs/bugs/BUGS.jsonl")
     except subprocess.CalledProcessError:
         return set()
-    return {json.loads(line)["id"] for line in text.splitlines() if line.strip()}
+    with tempfile.TemporaryDirectory() as d:
+        (Path(d) / "specs/bugs").mkdir(parents=True)
+        (Path(d) / "specs/bugs/BUGS.jsonl").write_text(ledger, encoding="utf-8")
+        cmd = (sys.executable, BUGS, "status", "--all", "--specs", f"{d}/specs")
+        out = subprocess.run(cmd, capture_output=True, text=True, check=True).stdout
+    return {line.split("\t")[0] for line in out.splitlines() if "\t" in line}
 
 
 def assertions(sha):

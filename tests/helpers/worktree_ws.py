@@ -14,13 +14,14 @@ import subprocess
 import sys
 from pathlib import Path
 
+from dadaia_workspace.core import clock, session_store
 from dadaia_workspace.core.cli_line import shell_line
 from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
 from dadaia_workspace.core.platform import PLATFORM
 from dadaia_workspace.core.skill_owner import load_owner
 from dadaia_workspace.features.spec_context.doctor import DoctorService
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
-from tests.fixtures.harness_env import run_bash, suite_env
+from tests.fixtures.harness_env import CLAUDE_SESSION_ENV_VAR, run_bash, suite_env
 from tests.fixtures.stores import context_store, fake_venv
 from tests.helpers.oslib import run as run_text
 from tests.helpers.oslib import write_text
@@ -29,6 +30,9 @@ SCRIPT = (
     Path(__file__).resolve().parents[2]
     / "dadaia_workspace/public/skills/dd-gitflow-default/scripts/worktree.py"
 )
+#: The CLI's message for a session no workspace hook governs, and its fix line.
+NO_ROLE = "This session was started outside the workspace root, so it stands in for no role."
+RELAUNCH = "fix: Operator action: relaunch the session at the workspace root"
 FLOW = {"principal": "trunk", "integration": "dev", "work": "feature/"}
 #: The repo's gate: prints its argv; level L fails iff the tree holds `RED-<L>`.
 CI = 'import pathlib, sys\nprint("ci", *sys.argv[1:])\nsys.exit(pathlib.Path("RED-" + sys.argv[1]).exists())\n'
@@ -39,7 +43,19 @@ _CLI = """#!python
 import json, sys
 args = sys.argv[1:]
 if args[:2] == ["context", "list"]:
+    import os
+    fenced = [os.path.realpath(p) for p in os.environ.get("DADAIA_FENCED_ROOTS", "").split(os.pathsep) if p]
+    if os.path.realpath(os.getcwd()) in fenced:
+        print("[error] the workspace root is fenced", file=sys.stderr)
+        sys.exit(1)
     print({rows!r})
+elif args[:2] == ["context", "session-check"]:
+    import os
+    sid = next((os.environ[v] for v in ("DADAIA_SESSION_ID", "CLAUDE_CODE_SESSION_ID", "CODEX_THREAD_ID") if os.environ.get(v)), "")
+    if sid and not os.path.exists(os.path.join(os.getcwd(), ".dadaia", "sessions", sid + ".json")):
+        print("[error] " + {no_role!r}, file=sys.stderr)
+        print({relaunch!r}, file=sys.stderr)
+        sys.exit(1)
 elif args[:2] == ["reports", "validate"]:
     sys.exit(0 if "schema_version" in json.load(open(args[2])) else 1)
 elif args[:1] == ["doctor"]:
@@ -68,7 +84,7 @@ _STUBS: dict[Path, str] = {}  # each workspace's stub source: on Windows the stu
 
 def _stub_cli(root: Path, *listed: dict[str, object]) -> None:
     """The `dadaia` stub over *listed*, placed at `cli_path` by `fake_venv` (startable per platform)."""
-    _STUBS[root] = _CLI.format(rows=json.dumps(list(listed)))
+    _STUBS[root] = _CLI.format(rows=json.dumps(list(listed)), relaunch=RELAUNCH, no_role=NO_ROLE)
     fake_venv(root, cli=_STUBS[root])
 
 
@@ -154,7 +170,18 @@ def associate(root: Path, spec: str, slugs: tuple[str, ...] = ("a",)) -> None:
     git(root / "repos/r", "branch", "-f", "feature/0.5.0")
 
 
-def run(root: Path, *args: str, input: str | None = None) -> subprocess.CompletedProcess[str]:
+def record_session(root: Path, session_id: str) -> None:
+    """The live record a workspace hook leaves for *session_id*: its id and a fresh heartbeat."""
+    session_store.write_session(
+        root, session_id, {"session_id": session_id, "last_seen_at": clock.now_iso()}
+    )
+
+
+def run(
+    root: Path, *args: str, input: str | None = None, session: str | None = None
+) -> subprocess.CompletedProcess[str]:
+    """`worktree.py *args*` from *root*; *session* is the harness session id the run carries (none
+    by default: an operator terminal)."""
     env = suite_env(
         os.environ,
         Path.home(),
@@ -164,6 +191,7 @@ def run(root: Path, *args: str, input: str | None = None) -> subprocess.Complete
             "GIT_DIR": "/nonexistent",
             "GIT_CONFIG_NOSYSTEM": "1",
             "TZ": "Asia/Tokyo",  # a naive produced_at never orders by the local zone
+            **({CLAUDE_SESSION_ENV_VAR: session} if session else {}),
         },
     )
     return run_text([sys.executable, str(SCRIPT), *args], cwd=root, env=env, input=input)
@@ -201,13 +229,24 @@ def open_tree(root: Path, name: str) -> Path:
     return root / "worktrees/r" / name
 
 
+PLUMBING = ("--no-renames", "--no-ext-diff", "--no-color", "--full-index")
+PINS = ("-c", "core.quotePath=true", "-c", "i18n.logOutputEncoding=UTF-8")
+
+
 def diff_hash(root: Path, sha: str, name: str | None = None, repo: str = "r") -> str:
-    """The oracle: sha256 (UTF-8) of `git diff-tree -r -z --full-index <merge-base> <sha>` in repo *repo*,
-    the merge-base taken against the branch tree *name* is cut from; the work branch with no *name*."""
+    """The oracle: sha256 (UTF-8) of the JSON `[diff, series]` over the merge-base of *sha* and the
+    branch tree *name* is cut from (the work branch with no *name*): `diff` is
+    `git diff-tree -r -z --full-index <base> <sha>`, `series` is each linear commit's
+    [`patch-id --stable` of its `diff-tree -p` with no renames and no config, or "" when empty, full message], oldest first."""
     checkout = root / "repos" / repo
     base = git(checkout, "merge-base", _parent(name) if name else "feature/0.5.0", sha).strip()
     diff = git(checkout, "diff-tree", "-r", "-z", "--full-index", base, sha)
-    return hashlib.sha256(diff.encode("utf-8")).hexdigest()
+    series = []
+    for one in git(checkout, "rev-list", "--reverse", f"{base}..{sha}").split():
+        patch = git(checkout, *PINS, "diff-tree", "-p", "--root", *PLUMBING, one)
+        pid = run_text(["git", "patch-id", "--stable"], input=patch, check=True).stdout.split()
+        series.append([pid[0] if pid else "", git(checkout, *PINS, "log", "-1", "--format=%B%x00", one).split("\0")[0]])  # fmt: skip
+    return hashlib.sha256(json.dumps([diff, series]).encode("utf-8")).hexdigest()
 
 
 def approve(
@@ -223,17 +262,21 @@ def approve(
     """The reviewer's verdict as `verdict.py` writes it: a handoff naming *sha*, its diff bound over
     the base of tree *name* (the work branch with no *name*), emitted *at*."""
     file = f"2026-10-02{at.replace(':', '')}-dd-code-reviewer-{sha[:8]}-{verdict}.handoff.json"
-    handoff = root / ".dadaia/handoff/c" / file
+    handoff = root / ".dadaia/states/verdicts/c" / file
     handoff.parent.mkdir(parents=True, exist_ok=True)
     body = {
         "agent": "dd-code-reviewer",
+        "context": "c",
         "verdict": verdict,
+        "verdict_reason": "r",
         "scope": f"wt/{name or NEW_JOB}@{sha}",
         "reviewed_sha": sha,
         "diff_sha256": diff_hash(root, sha, name, repo),
         "produced_at": f"2026-10-02{at}",
     }
-    write_text(handoff, json.dumps({**body, **({"schema_version": "1.2"} if valid else {})}))
+    write_text(
+        handoff, json.dumps({**body, **({"schema_version": "handoff-v1.2"} if valid else {})})
+    )
     return handoff
 
 

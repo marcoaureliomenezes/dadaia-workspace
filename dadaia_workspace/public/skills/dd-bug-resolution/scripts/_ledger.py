@@ -154,10 +154,11 @@ def replace(path: Path, text: str) -> None:
     _atomic.atomic_write(path, text, ensure_parent=True)
 
 
-def terms(root: Path | None) -> list[tuple[str, str]]:
-    """The operator denylist, ONE loader: `$DADAIA_PRIVACY_DENYLIST`, else
-    ``<root>/.dadaia/states/privacy_denylist.json``. Absent is empty; a present file that is
-    not one ``{"<term>": "<reason>"}`` object refuses — never read as no terms."""
+def denylist_file(root: Path | None) -> Path | None:
+    """The one file the loader reads terms from: `$DADAIA_PRIVACY_DENYLIST`, else
+    ``<root>/.dadaia/states/privacy_denylist.json``, the first holding a term; an empty or absent
+    file falls through, a present file that is not one JSON object refuses — never read as no
+    terms. ``None`` when no file holds a term."""
     env = os.environ.get("DADAIA_PRIVACY_DENYLIST")
     for path in [
         *([Path(env)] if env else []),
@@ -178,8 +179,27 @@ def terms(root: Path | None) -> list[tuple[str, str]]:
             )
             raise SystemExit(1)
         if raw:
-            return [(str(term), str(reason)) for term, reason in raw.items()]
-    return []
+            return path
+    return None
+
+
+def terms(root: Path | None, repo: Path | None = None) -> list[tuple[str, str]]:
+    """The operator denylist from `denylist_file`, minus every term the name of the scanned
+    *repo*'s repository (the folder holding its git common dir) equals or contains: a repo may
+    name itself. Absent is empty."""
+    if not (path := denylist_file(root)):
+        return []
+    try:
+        own = _git.main_checkout(repo).name.lower() if repo else ""
+    except _git.GitError:
+        own = ""
+    return [(str(t), str(r)) for t, r in json.loads(read_text(path)).items() if not (t and t.lower() in own)]  # fmt: skip
+
+
+def scanned_patterns(patterns: Iterable[Any], path: str) -> list[Any]:
+    """The baseline patterns that scan *path*: a pattern whose ``skip_paths`` names the path never
+    scans it, every other pattern scans it with its own ``exclude`` carve-out intact."""
+    return [p for p in patterns if not (p.skip_paths and p.skip_paths.search(path))]
 
 
 def _published_text(path: Path) -> str | None:
@@ -207,7 +227,7 @@ def private_refusal(records: Iterable[dict[str, Any]], path: Path) -> tuple[str,
     match the published text of *path* (the ledger file) does not already carry — else
     ``None``; terms and published text are read once per write, from the workspace holding
     *path*, whatever the cwd."""
-    found, patterns = terms(workspace_of(path)), _privacy.load_baseline()
+    found, patterns = terms(workspace_of(path), path.parent), _privacy.load_baseline()
     published = _privacy.published_matches(_published_text(path), found, patterns)
     for key, value in (item for record in records for item in record.items()):
         text = json.dumps(value, ensure_ascii=False)

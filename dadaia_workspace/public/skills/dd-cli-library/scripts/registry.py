@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Any
 
 sys.dont_write_bytecode = True  # the shared _ledger imports without a __pycache__
-sys.path.append(str(Path(__file__).resolve().parents[2] / "dd-bug-resolution" / "scripts"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "dd-bug-resolution" / "scripts"))
 import _clock
 import _platform
 from _ledger import replace, workspace_of
@@ -234,7 +234,9 @@ def cmd_scan(doc: dict[str, Any], args: argparse.Namespace, path: Path) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(prog="dd-cli-library/scripts/registry.py", description=__doc__)
+    p = argparse.ArgumentParser(
+        prog="dd-cli-library/scripts/registry.py", description=__doc__.split("\n\n")[0]
+    )
     p.add_argument(
         "--registry",
         type=Path,

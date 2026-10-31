@@ -4,6 +4,7 @@ import typer
 from rich.console import Console
 
 from dadaia_workspace import container
+from dadaia_workspace.cli.help_digest import write_digest
 from dadaia_workspace.core.cli_line import fix_line, spell_fix
 from dadaia_workspace.core.exceptions import PublicAssetError
 from dadaia_workspace.core.model_registry import TEMPLATES
@@ -17,6 +18,7 @@ console = Console()
     epilog="Recipe:\n\n" + "\n\n".join(fix_line(None, "public", v) for v in ("install", "doctor"))
 )
 def install(
+    ctx: typer.Context,
     force: bool = typer.Option(False, "--force", help="Overwrite existing files"),
     template: str | None = typer.Option(
         None,
@@ -45,11 +47,8 @@ def install(
     else:
         console.print("[dim]No assets to install.[/dim]")
 
-    # Derived help digest rider (backlog cli-help-architecture): regenerate the
-    # version-stamped digest at install time — never at hook fire. Fail-soft.
-    from dadaia_workspace.cli.help_digest import write_digest
-
-    write_digest(workspace_root)
+    # Derived help digest rider: regenerate at install time, never at hook fire. Fail-soft.
+    write_digest(workspace_root, ctx.find_root().command)
 
 
 @app.command()

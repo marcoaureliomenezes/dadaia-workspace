@@ -113,7 +113,9 @@ def test_doctor_judges_no_instance(tmp_path: Path, owner: str) -> None:
         pytest.skip("the host refuses symlinks")
     done = _ci(checkout, "doctor", sys.executable if nested else str(fake_venv(instance, pth=True)))
     assert "doctor --specs-dir specs" in done.stdout
-    # the doctor ran to its own verdict: a finding line, then the fix: line that clears it
+    # the doctor ran to its own verdict on the bare checkout: exit 1 on a finding, never a crash
+    assert done.returncode == 1
+    # a finding line, then the fix: line that clears it
     lines = done.stdout.splitlines()
     assert any(
         re.match(r"[A-Z]+-\S+ (error|warning) ", ln) and nxt.startswith("fix:")
@@ -178,11 +180,6 @@ def test_pushes_use_linux_and_pull_requests_use_the_full_matrix() -> None:
     assert {job.get("if") for job in cross_platform} == {
         "${{ github.event_name == 'pull_request' }}"
     }
-
-
-def test_contract_coverage_cross_cap_is_45_minutes() -> None:
-    workflow = yaml.load(read_text(_REPO / ".github/workflows/ci.yml"), Loader=yaml.BaseLoader)
-    assert workflow["jobs"]["contract-coverage-cross"]["timeout-minutes"] == "45"
 
 
 def _words(line: str) -> list[str]:

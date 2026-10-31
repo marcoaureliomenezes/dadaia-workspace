@@ -24,3 +24,12 @@ def test_the_origin_rerun_fix_quotes_a_path_with_a_blank(
     with pytest.raises(_EXIT.Refusal) as refused:
         _EXIT._origin_ids(spec)
     assert refused.value.fix == command(sys.executable, str(_EXIT._RELEASE), "origin", str(spec))
+
+
+def test_an_unknown_slug_names_the_archive_grep_as_one_built_absolute_path(tmp_path: Path) -> None:
+    specs = tmp_path / "a b"
+    with pytest.raises(_EXIT.Refusal) as refused:
+        _EXIT.check_exit(specs, [], "slug", {"disposition": "delivered", "release": None})
+    assert refused.value.fix == command(
+        "grep", "slug", str(specs / "backlog" / "_archive" / "backlog_histo.jsonl")
+    )

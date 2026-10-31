@@ -67,13 +67,14 @@ class HookFileSpec:
     events: tuple[tuple[str, str, str | None], ...]
 
 
+_SENTINEL = load_owner("dd-bug-resolution", "_root").SENTINEL
 #: Resolve the workspace from the wrapper's OWN location — never a ``PATH`` lookup.
 _SELF_ROOT = 'ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)\n'
 #: A user-level shim serves every workspace: walk up from the hook cwd to the nearest
 #: sentinel; none -> not a workspace, exit 0.
 _CWD_ROOT = (
     "ROOT=$PWD\n"
-    'while [ ! -f "$ROOT/.dadaia/states/spec_contexts.json" ]; do\n'
+    f'while [ ! -f "$ROOT/{_SENTINEL.as_posix()}" ]; do\n'
     '  [ "$ROOT" = / ] && exit 0\n'
     '  ROOT=$(dirname "$ROOT")\n'
     "done\n"
@@ -116,7 +117,6 @@ _POST = HookLane(
 )
 _CTX = HookLane("ctx-inject", "dadaia_workspace.hooks.ctx_inject", forwards=True)
 _CODEX_OUT = ("DADAIA_HOOK_OUTPUT", "codex-json")
-_KIMI = ("DADAIA_RUNTIME", "kimi-code")
 _START = ("DADAIA_HOOK_EVENT", "SessionStart")
 _REAP = ("SessionStart", "doctor-expired", "startup|resume")
 
@@ -130,7 +130,7 @@ HOOK_DIALECTS: dict[HookFormat, HookDialect] = {
             HookFileSpec(
                 "settings.json",
                 (
-                    ("PreToolUse", "pre-gate", "Edit|Write|MultiEdit|NotebookEdit"),
+                    ("PreToolUse", "pre-gate", "Edit|Write|MultiEdit|NotebookEdit|Bash"),
                     ("PostToolUse", "post-gate", "*"),
                     ("UserPromptSubmit", "ctx-inject", ""),
                     *(
@@ -147,13 +147,13 @@ HOOK_DIALECTS: dict[HookFormat, HookDialect] = {
     ),
     HookFormat.KIMI_HOOKS: HookDialect(
         lanes=(
-            replace(_GATE, env=(_KIMI,)),
-            replace(_POST, env=(_KIMI,)),
-            replace(_CTX, env=(_KIMI,)),
+            _GATE,
+            _POST,
+            _CTX,
             HookLane(
                 "post-compact",
                 _CTX.argv,
-                (("DADAIA_HOOK_EVENT", "PostCompact"), _KIMI),
+                (("DADAIA_HOOK_EVENT", "PostCompact"),),
                 forwards=True,
             ),
             _REAPER,
@@ -342,7 +342,7 @@ def _cmd_script(lane: HookLane, dialect: HookDialect) -> str:
         "setlocal EnableExtensions DisableDelayedExpansion",
         'set "ROOT=%CD%"',
         ":up",
-        'if exist "%ROOT%\\.dadaia\\states\\spec_contexts.json" goto found',
+        f'if exist "%ROOT%\\{PureWindowsPath(_SENTINEL)}" goto found',
         'for %%I in ("%ROOT%\\..") do set "UP=%%~fI"',
         'if "%UP%"=="%ROOT%" exit /b 0',
         'set "ROOT=%UP%"',
@@ -372,6 +372,8 @@ def hook_wrapper_contents(
     answer = dialect.answer
     wrappers: dict[str, str] = {}
     for lane in dialect.lanes:
+        # every lane names its harness record: the gate and the session-id rule read this label
+        lane = replace(lane, env=(*lane.env, ("DADAIA_RUNTIME", record.name)))
         name = wrapper_name(record, lane.name, caps)
         if _runs_cmd(dialect, caps):
             wrappers[name] = _cmd_script(lane, dialect)

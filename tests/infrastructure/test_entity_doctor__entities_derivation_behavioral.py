@@ -37,7 +37,7 @@ _GATE_MODULE = "dadaia_workspace.hooks.pre_gate"
 
 
 def _record(name: str, hooks: HookFormat) -> HarnessRecord:
-    return HarnessRecord(name, None, AgentTranscode.NONE, hooks)
+    return HarnessRecord(name, None, AgentTranscode.NONE, hooks, None, (), name)
 
 
 @pytest.fixture(autouse=True)

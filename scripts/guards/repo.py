@@ -26,9 +26,14 @@ sys.path.insert(0, str(ROOT))
 from run import _CI, tracked  # noqa: E402
 
 from dadaia_workspace.core.fixed_sections import authored_text, extract_fixed_section  # noqa: E402
-from dadaia_workspace.core.gitflow import read_gitflow  # noqa: E402
+from dadaia_workspace.core.gitflow import (  # noqa: E402
+    live_release_id,
+    read_gitflow,
+    resolve_live_candidate,
+)
 from dadaia_workspace.core.specs_version import state as specs_state  # noqa: E402
 from dadaia_workspace.features.specs.canon import CANON  # noqa: E402
+from dadaia_workspace.features.specs.memory_canon import is_forbidden_memory_heading  # noqa: E402
 from dadaia_workspace.infrastructure.ledger_scripts import load_owner  # noqa: E402
 
 if TYPE_CHECKING:
@@ -47,9 +52,11 @@ _EVAL_TRIGGERS = {"workflow_dispatch", "schedule"}
 _HOSTED = {"ubuntu-latest", "ubuntu-24.04", "ubuntu-22.04", "windows-latest", "windows-2025",
            "windows-2022", "macos-latest", "macos-15", "macos-14"}  # fmt: skip
 _SCAN = "python3 evals/scripts/scan.py evals/jobs evals/summary.md"
+_PRUNE_TAIL = "-type d -path '*/agent/sessions' -prune -exec rm -rf {} +"  # the harness config dir
 _SUMMARY = 'cat evals/summary.md >> "$GITHUB_STEP_SUMMARY"'
 _UPLOADED = {"evals/jobs/", "evals/summary.md"}  # what the scan covers
-_ACTIONS = ("actions/checkout@", "actions/upload-artifact@")
+_ACTIONS = ("actions/checkout@", "actions/upload-artifact@", "actions/download-artifact@")
+_WHEEL = "dist/*.whl"  # the candidate build, handed to the eval job; not a publish
 _EXPR = re.compile(r"\$\{\{(.*?)\}\}", re.S)
 _SECRETS = re.compile(r"\bsecrets\b(?!\.GITHUB_TOKEN\b)", re.I)
 _WORD = re.compile(r"\bsecrets\b", re.I)
@@ -59,6 +66,12 @@ _SKILLS_REPO = re.compile(
 # Both dated release headings: hand-written `## [x.y.z] — date`, release-please's `(date)`.
 # the one poetry floor: GHSA-2599-h6xx-hpxp (wheel path traversal), GHSA-73h3-mf4w-8647
 _POETRY_FLOOR = (2, 3, 4)
+# the name under PEP 503 normalisation, pinned (`==`, `@`, a range) or named after
+# install/download/add/--from/--with (flags between allowed); `uvx dadaia-workspace init`,
+# `--from <path>` and the import name stay legal
+_NAME_TOKEN = re.compile(r"[A-Za-z0-9][\w.-]*")
+_SPECIFIER = re.compile(r"==[0-9${]|@|[<>~!]=?")
+_AFTER_VERB = re.compile(r"(?:install|download|add|--from|--with)(?:[ ='\",]+-\S+)*[ ='\",]+$")
 _POETRY_PIN = re.compile(r"poetry==(\d+(?:\.\d+)*)")
 _CHANGELOG_TOP = re.compile(
     r"^## \[(\d+\.\d+\.\d+)\](?:\([^)]*\))? (?:[-—] \d{4}-\d{2}-\d{2}|\(\d{4}-\d{2}-\d{2}\))\s*$",
@@ -209,9 +222,16 @@ def _eval_job(job: dict[str, Any]) -> list[str]:
     return _hits(shapes, _EVAL)
 
 
-def _publishes(step: dict[str, Any]) -> bool:
-    return "GITHUB_STEP_SUMMARY" in str(step.get("run")) or str(step.get("uses")).startswith(
-        _ACTIONS[1]
+def _paths(step: dict[str, Any]) -> set[str]:
+    return set(str((step.get("with") or {}).get("path", "")).split())
+
+
+def _publishes(step: dict[str, Any], secret_free: bool) -> bool:
+    """A step that writes the step summary or uploads anything; the wheel handed to the eval
+    job is no publish only in a secret-free job."""
+    return "GITHUB_STEP_SUMMARY" in str(step.get("run")) or (
+        str(step.get("uses")).startswith(_ACTIONS[1])
+        and not (secret_free and _paths(step) == {_WHEEL})
     )
 
 
@@ -232,8 +252,7 @@ def _publish_step(step: dict[str, Any]) -> str | None:
         return _publish_if(step)
     if "run" in step and step != {"run": _SUMMARY}:
         return "summary-step-extra-key" if step["run"] == _SUMMARY else "summary-other-source"
-    paths = str((step.get("with") or {}).get("path", "")).split()
-    return None if "run" in step or set(paths) <= _UPLOADED else "upload-other-path"
+    return None if "run" in step or _paths(step) <= _UPLOADED else "upload-other-path"
 
 
 def _write_rule(before_first_publish: bool) -> str:
@@ -255,17 +274,22 @@ def _eval_publish(job: dict[str, Any]) -> list[str]:
     """Clause (c): after the canonical scan, only publishing steps up to the last one, each
     unconditional and uploading only what the scan covers."""
     steps = job.get("steps") or []
-    pub = [i for i, s in enumerate(steps) if _publishes(s)]
+    free = not _secret_use(job) and "environment" not in job
+    pub = [i for i, s in enumerate(steps) if _publishes(s, free)]
     scans = [i for i, s in enumerate(steps) if s.get("run") == _SCAN and len(s) == 1]
     scan = scans[0] if scans else len(steps)
     after = steps[scan + 1 : pub[-1] + 1] if pub else []
     rules = [
-        _publish_step(s) if _publishes(s) else _write_rule(i < pub[0])
+        _publish_step(s) if _publishes(s, free) else _write_rule(i < pub[0])
         for i, s in enumerate(after, scan + 1)
     ]
     shapes = {
-        "summary-unscanned": not scans,
+        "summary-unscanned": any(_publishes(s, free) for s in steps) and not scans,
         "upload-before-scan": bool(pub and scans) and pub[0] < scan,
+        "sessions-unpruned": any("harbor run" in str(s.get("run")) for s in steps)
+        and not any(
+            len(s) == 1 and str(s["run"]).endswith(_PRUNE_TAIL) for s in steps[:scan] if "run" in s
+        ),
         **_scan_rules(steps),
     }
     return _hits(shapes, _EVAL) + [f"{r}: {_EVAL}" for r in rules if r]
@@ -282,6 +306,22 @@ def _cli_pin(tree: Tree, doc: dict[Any, Any]) -> list[str]:
     ]
 
 
+def _row_pins(doc: dict[Any, Any]) -> list[str]:
+    """``eval-cli-pin`` on the matrix: every row names a model and a version; a claude-code row's
+    version is the ``CLAUDE_CODE_VERSION`` pin."""
+    pin = str((doc.get("env") or {}).get("CLAUDE_CODE_VERSION"))
+    strategies = [j.get("strategy") for j in _jobs(doc).values()]
+    matrices = [s.get("matrix") for s in strategies if isinstance(s, dict)]
+    rows = [r for m in matrices if isinstance(m, dict) for r in m.get("include") or []]
+    out: list[str] = []
+    for row in rows:
+        if not isinstance(row, dict) or "model" not in row or "version" not in row:
+            out.append(f"eval-cli-pin: {_EVAL} matrix row without a model or a version")
+        elif row.get("harness") == "claude-code" and str(row["version"]) != pin:
+            out.append(f"eval-cli-pin: {_EVAL} claude-code matrix row off the pin")
+    return out
+
+
 def no_model_calls_in_ci(tree: Tree) -> list[str]:
     """A model is called only from ``eval.yml``, which is dispatch or schedule
     only, on an exact hosted runner, reads its secret at job level alone, and publishes
@@ -292,7 +332,7 @@ def no_model_calls_in_ci(tree: Tree) -> list[str]:
             out += _model_markers(tree, p, doc) + _outside_eval(p, doc)
             continue
         jobs = _jobs(doc).values()
-        out += _eval_header(doc) + _cli_pin(tree, doc)
+        out += _eval_header(doc) + _cli_pin(tree, doc) + _row_pins(doc)
         out += [v for job in jobs for v in _eval_job(job) + _eval_publish(job)]
     return out
 
@@ -380,13 +420,39 @@ def workflow_never_rules(tree: Tree) -> list[str]:
         # the action mints the tag, never workflow arithmetic
         "hand-computed-tag": [line for line in release_runs if "git tag " in line],
         "hand-listed-tags": [line for line in release_runs if "git ls-remote --tags" in line],
+        # only the build under test is installed; third-party dependencies still resolve from PyPI
+        "published-dadaia-workspace-install": _published_installs(tree.root),
     }
     return [f"{rule}: {hits}" for rule, hits in never.items() if hits]
 
 
+def _published_installs(root: Path) -> list[str]:
+    """``file:line: text`` of every line that installs the published package or names a previous release."""
+    candidates = subprocess.run(
+        ["git", "grep", "-nIiE", r"dadaia[-_.]+workspace|previous_release", "--",
+         ".github", "tests", "evals", "scripts", ":!scripts/guards/repo.py"],
+        cwd=root, capture_output=True, text=True, encoding="utf-8", errors="replace", check=False,
+    ).stdout.splitlines()  # fmt: skip
+
+    def hit(line: str) -> bool:
+        if "previous_release" in line:
+            return True
+        for m in _NAME_TOKEN.finditer(line):
+            if re.sub(r"[-_.]+", "-", m.group()).lower() != "dadaia-workspace":
+                continue
+            if line[m.end() : m.end() + 1] == "/":
+                continue
+            if _SPECIFIER.match(line, m.end()) or _AFTER_VERB.search(line[: m.start()]):
+                return True
+        return False
+
+    return [c for c in candidates if hit(c.split(":", 2)[2])]
+
+
 def release_workflow_canon(tree: Tree) -> list[str]:
     """The main-only pinned release-please, the one gated publish chain, the manifest
-    floor and patch rule, and the pyproject version equal to the CHANGELOG's top section."""
+    floor and patch rule, the CHANGELOG's top section equal to the manifest, and the pyproject
+    version either the live release's newest ``rc`` label or the number release-please wrote."""
     doc = _yaml(tree, _RELEASE)
     on, jobs = _on(doc), _jobs(doc)
     rp, build = jobs.get("release-please", {}), jobs.get("build", {})
@@ -407,6 +473,10 @@ def release_workflow_canon(tree: Tree) -> list[str]:
     sections = {e["type"]: e for e in config.get("changelog-sections") or []}
     minted = tomllib.loads(tree.read("pyproject.toml"))["tool"]["poetry"]["version"]
     top = _CHANGELOG_TOP.search(tree.read("CHANGELOG.md"))
+    specs = tree.root / "specs"
+    live, cand = live_release_id(specs), resolve_live_candidate(specs)
+    shipped = live in (None, manifest["."])
+    expected = manifest["."] if shipped else f"{live}{cand.name.replace('-', '')}" if cand else None
     tags = subprocess.run(
         ["git", "tag", "-l", "v*", "--sort=version:refname"],
         cwd=tree.root, capture_output=True, text=True, encoding="utf-8", errors="replace", check=False,
@@ -439,7 +509,9 @@ def release_workflow_canon(tree: Tree) -> list[str]:
         "ci-gated-build": jobs.get("ci", {}).get("uses") == "./.github/workflows/ci.yml"
         and "ci" in _needs(build),
         "no-pytest": not any("pytest" in yaml.safe_dump(job) for job in jobs.values()),
-        "manifest-floor": set(manifest) == {"."} and minted == manifest["."],
+        "manifest-floor": set(manifest) == {"."},
+        "version-label": shipped or minted == expected,
+        "version-shipped": not shipped or minted == expected,
         # the floor is the last published tag (a shallow clone has none)
         "published-floor": not tags or tags[-1] == f"v{manifest['.']}",
         "minor-pre-major": config.get("bump-minor-pre-major") is True,
@@ -451,12 +523,34 @@ def release_workflow_canon(tree: Tree) -> list[str]:
         "changelog-sections": {"feat", "fix", "refactor", "docs", "ci", "test", "chore"}
         <= set(sections),
         "changelog-dated": top is not None,
-        "version-equals-changelog": top is None or top.group(1) == minted,
+        "version-equals-changelog": top is None or top.group(1) == manifest["."],
+        "smoke-before-publish": "smoke-test" in _needs(jobs.get("publish", {})),
     }
+    pin = f"pyproject.toml reads {minted}; fix: set pyproject.toml version to {expected}"
+    hint = {"version-label": pin, "version-shipped": pin}
     return [
-        f"{c}: release.yml / release-please / version clause broken"
+        f"{c}: {hint.get(c, 'release.yml / release-please / version clause broken')}"
         for c, ok in clauses.items()
         if not ok
+    ]
+
+
+_PKG_MAP = re.compile(
+    r'package map \(\d+ packages\)\s+```mermaid\n(?:(?!```).)*?pkgs\["([^"]*)"', re.S
+)
+
+
+def features_map_matches_architecture(tree: Tree) -> list[str]:
+    """Judge ARCHITECTURE.md's features package map against the tracked feature packages."""
+    node = _PKG_MAP.search(tree.read("specs/memory/ARCHITECTURE.md"))
+    mapped = {n.strip() for n in node[1].split("·")} if node else set()
+    live = {
+        p.split("/")[2]
+        for p in tree.tracked("dadaia_workspace/features")
+        if p.endswith("/__init__.py") and p.count("/") == 3
+    }
+    return [f"stale-node: {n} is no live package" for n in sorted(mapped - live)] + [
+        f"missing-node: {n} is absent from the map" for n in sorted(live - mapped)
     ]
 
 
@@ -465,7 +559,7 @@ _SECTIONS = {
     "QUALITY.md": (["Principles", "Test architecture", "Gates"], "slop-tests"),
 }
 _TOP = re.compile(r"^## (.+?)\s*$", re.M)
-_HISTORY = re.compile(r"^#{1,6}\s*(Changelog|History|Hist[oó]rico|Versions)\b", re.M | re.I)
+_HEADING = re.compile(r"^#{1,6}\s*(.+?)\s*$", re.M)
 _PRINCIPLE = re.compile(r"^### P-(\d{2}) ·.*$", re.M)
 _BLOCK_END = re.compile(r"^(?:### P-\d{2} ·|## )", re.M)
 _MEASURED = re.compile(r"^Measured by: .+$", re.M)
@@ -491,7 +585,9 @@ def memory_canonical_shape(tree: Tree) -> list[str]:
             out.append(f"section-order: {name} has {heads}")
         if not extract_fixed_section(text, fixed):
             out.append(f"fixed-block: {name} lost `{fixed}`")
-        if m := _HISTORY.search(text):
+        if m := next(
+            (m for m in _HEADING.finditer(text) if is_forbidden_memory_heading(m[1])), None
+        ):
             out.append(f"history-heading: {name} carries {m.group(0)!r}")
         start = text.find("## Principles")
         end = (
@@ -634,7 +730,7 @@ def onboarding_journey_uv(tree: Tree) -> list[str]:
     e2e, smoke = texts("ci.yml", "e2e-python"), texts("release.yml", "smoke-test")
     steps = tree.ci_jobs().get("e2e-python", [])
     needles = (
-        'uvx "dadaia-workspace==$VERSION" init',
+        'uvx --from "$whl" dadaia-workspace init',
         "--repo",
         "specs init --context",
         "doctor --context",
@@ -732,7 +828,9 @@ def tests_mirror_the_package(tree: Tree) -> list[str]:
 
 _COPIED = (".github", ".gitignore", "specs/constitution.md", "specs/memory", "specs/ADRs",
            "pyproject.toml", "CHANGELOG.md", ".release-please-manifest.json",
-           "release-please-config.json", "README.md", "llms.txt", "docs", "evals", "scripts/ci.py")  # fmt: skip
+           "release-please-config.json", "README.md", "llms.txt", "docs", "evals", "scripts/ci.py",
+           "specs/releases/*/_RELEASE.json", "specs/releases/*/rc-*/SPEC.md",
+           "dadaia_workspace/features/*/__init__.py")  # fmt: skip
 _ROGUE = (
     "on: push\njobs:\n  x:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: anthropics/a@v1\n"
 )
@@ -838,6 +936,7 @@ _NON_EVAL = _CLEAN + "    runs-on: ubuntu-latest\n"
 _ON = r"(?ms)^on:.*?(?=^permissions:)"
 _STEPS = "    steps:\n      - run: echo\n"
 _GATED_JOB = f"  rogue:\n    needs: [release-please, ghost]\n    if: {_GATE}\n    runs-on: x\n"
+_ROW = "        include:\n          - harness: claude-code\n"
 _SUPERSEDED = json.dumps({"id": "9999", "status": "superseded", "supersedes": None}) + "\n"
 
 CHECKS: dict[str, Check] = {
@@ -1005,6 +1104,19 @@ CHECKS: dict[str, Check] = {
             "eval-cli-pin": _file(
                 "evals/tasks/x/environment/Dockerfile", "ARG CLAUDE_CODE_VERSION=0.0.1\n"
             ),
+            "eval-cli-pin#row-without-model": _edit(
+                _EVAL, "        include:\n", _ROW + "            version: 2.1.284\n"
+            ),
+            "eval-cli-pin#row-without-version": _edit(
+                _EVAL,
+                "        include:\n",
+                _ROW + "            model: anthropic/claude-sonnet-5\n",
+            ),
+            "eval-cli-pin#row-version-off-pin": _edit(
+                _EVAL,
+                "        include:\n",
+                _ROW + "            model: anthropic/claude-sonnet-5\n            version: 9.9.9\n",
+            ),
         },
     ),
     "workflow-never-rules": (
@@ -1027,8 +1139,8 @@ CHECKS: dict[str, Check] = {
             "tag-push-trigger": _workflow("      - run: echo\n", "{push: {tags: [v*]}}"),
             "publishing-job-without-the-release-gate": _edit(
                 _RELEASE,
-                "    needs: [release-please, build, approve]\n",
-                "    needs: [build, approve]\n",
+                "    needs: [release-please, build, approve, smoke-test]\n",
+                "    needs: [build, approve, smoke-test]\n",
             ),
             "publishing-job-ungated": _edit(_RELEASE, f"    if: {_GATE}\n", "    if: always()\n"),
             "hand-listed-tags": _edit(
@@ -1037,6 +1149,27 @@ CHECKS: dict[str, Check] = {
                 "      - run: git ls-remote --tags o\n      - run: pipx install",
             ),
             "needs-an-undefined-job": _edit(_RELEASE, "", _GATED_JOB),
+            "published-dadaia-workspace-install": _file(
+                "tests/helpers/pin.py", 'REQ = "dadaia-workspace==1.2.3"\n'
+            ),
+            "published-dadaia-workspace-install#unpinned": _file(
+                "tests/helpers/pin.py", 'CMD = "pip install dadaia-workspace"\n'
+            ),
+            "published-dadaia-workspace-install#tag": _file(
+                "tests/helpers/pin.py", 'CMD = "uvx dadaia-workspace@latest init x"\n'
+            ),
+            "published-dadaia-workspace-install#range": _file(
+                "tests/helpers/pin.py", "CMD = \"pip install 'dadaia-workspace>=0.4'\"\n"
+            ),
+            "published-dadaia-workspace-install#from": _file(
+                "tests/helpers/pin.py", 'CMD = "uvx --from dadaia-workspace dadaia init"\n'
+            ),
+            "published-dadaia-workspace-install#fstring": _file(
+                "tests/helpers/pin.py", 'REQ = f"dadaia-workspace=={version}"\n'
+            ),
+            "published-dadaia-workspace-install#argv": _file(
+                "tests/helpers/pin.py", 'CMD = ["pip", "install", "dadaia-workspace"]\n'
+            ),
             "hand-computed-tag": _edit(
                 _RELEASE,
                 "      - run: pipx install",
@@ -1093,8 +1226,16 @@ CHECKS: dict[str, Check] = {
             "ci-gated-build": _edit(
                 _RELEASE, "    needs: [release-please, ci]\n", "    needs: [release-please]\n"
             ),
-            "manifest-floor": _edit(".release-please-manifest.json", '": "', '": "9'),
+            "manifest-floor": _edit(".release-please-manifest.json", '"."', '"x": "1", "."'),
+            "version-label": _re("pyproject.toml", r'(?m)^version = ".*"', 'version = "0.4.7"'),
+            # the release PR moved the manifest to the live id and left pyproject at the rc label
+            "version-shipped": _edit(".release-please-manifest.json", "0.4.7", "0.5.0"),
             "published-floor": _tag,
+            "smoke-before-publish": _edit(
+                _RELEASE,
+                "    needs: [release-please, build, approve, smoke-test]\n",
+                "    needs: [release-please, build, approve]\n",
+            ),
             "patch-below-one": _edit(
                 "release-please-config.json",
                 '"bump-patch-for-minor-pre-major": true',
@@ -1120,6 +1261,10 @@ CHECKS: dict[str, Check] = {
             ),
             "atom-link": _edit(_Q, "\n## Gates", "\nSee [[sdd-gate-v3]].\n\n## Gates"),
         },
+    ),
+    "features-map-matches-architecture": (
+        features_map_matches_architecture,
+        {"stale-node": _edit(_A, 'pkgs["backlog', 'pkgs["ghost · backlog')},
     ),
     "adr-superseded-successor": (
         adr_superseded_successor,

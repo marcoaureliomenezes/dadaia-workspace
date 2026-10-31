@@ -14,9 +14,11 @@ from typing import Any
 import pytest
 
 from dadaia_workspace.core.cli_line import shell_line
+from dadaia_workspace.core.skill_owner import load_owner
 from dadaia_workspace.features.specs.doctor import SpecsDoctor
 from dadaia_workspace.features.specs.doctor_common import resolve_active_release
 from dadaia_workspace.features.specs.doctor_release import ReleaseValidator
+from dadaia_workspace.features.specs.specs_tree import SpecsTree
 from tests.helpers.oslib import run as os_run
 from tests.helpers.oslib import write_text
 from tests.helpers.release_state import PLAN
@@ -134,3 +136,55 @@ def test_a_legacy_next_dir_is_not_live_and_new_refuses(tmp_path: Path) -> None:
     assert fix == f"Agent action: move {move}, or out of specs/"
     assert resolve_active_release(specs) == (None, None)
     assert any("/next/" in i.message for i in SpecsDoctor(specs).check() if i.code == "TREE-8")
+
+
+def test_doctor_names_the_candidate_release_py_names(tmp_path: Path) -> None:
+    """A milestone makes the first candidate the live one; the empty folder after it is not, for doctor or script."""
+    milestone = {"ts": "2026-09-21T10:00:00Z", "agent": "release.py", "kind": "milestone",
+                 "candidate": "rc-1", "milestone": "implemented", "sha": "0000002", "text": "rc-1 implemented."}  # fmt: skip
+    specs = _specs(tmp_path, "IMPLEMENTATION", [milestone])
+    (specs / "releases/0.5.0/rc-2").mkdir()
+    release_py = load_owner("dd-release-implementation", "_release_store").live_release(specs)
+    assert release_py.candidate == specs / "releases/0.5.0/rc-1"
+    assert SpecsTree(specs).active_release.candidate == release_py.candidate
+
+
+_GRAMMAR = load_owner("dd-bug-resolution", "_grammar")
+_STATUS_ROWS = [
+    ("# SPEC\n\n**Status:**   Approved\n", "Approved"),
+    ("# SPEC\n\n**Status:** Approved (pending)\n", "Approved (pending)"),
+    ("# TASKS\n\n**Status:** approved\n" + "- t\n" * 170, "approved"),
+    ("# PLAN\n" + "text\n" * 36 + "**Status:** Approved\n", "Approved"),
+    ("# SPEC\n\n**Status:** Draft\n\n**Status:** Approved\n", "Draft"),
+    ("# SPEC\n\n- **Status:** Approved\n", None),
+    ("# SPEC\n\n> **Status:** Approved\n", None),
+    ("# SPEC\n\nthe line reads **Status:** Approved here\n", None),
+    ("# SPEC\n\nno status here\n", None),
+]
+
+
+def test_the_status_vocabulary_is_the_canonical_triple_in_the_kernel() -> None:
+    assert {"Draft", "In review", "Approved"} == _GRAMMAR.CANONICAL_STATUS
+    assert (_GRAMMAR.DRAFT, _GRAMMAR.IN_REVIEW, _GRAMMAR.APPROVED) == (
+        "Draft",
+        "In review",
+        "Approved",
+    )
+
+
+@pytest.mark.parametrize(("text", "expected"), _STATUS_ROWS)
+def test_both_status_readers_return_the_same_token(text: str, expected: str | None) -> None:
+    """The first anchored line counts anywhere; a bullet, a blockquote and a mid-line quote
+    never count; absent is None; the kernel and the release script agree."""
+    script = load_owner("dd-release-implementation", "_release_schema").extract_status
+    assert _GRAMMAR.extract_status(text) == script(text) == expected
+
+
+def test_a_log_the_schema_refuses_names_no_active_release(tmp_path: Path) -> None:
+    specs = _specs(tmp_path, "IMPLEMENTATION", [1])
+    assert resolve_active_release(specs) == (None, None)
+
+
+def test_the_doctor_reports_a_log_the_schema_refuses_and_never_crashes(tmp_path: Path) -> None:
+    specs = _specs(tmp_path, "IMPLEMENTATION", [1])
+    assert SpecsDoctor(specs).check()

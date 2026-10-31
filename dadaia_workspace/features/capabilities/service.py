@@ -6,7 +6,7 @@ from collections.abc import Collection
 from typing import Any
 
 from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES
-from dadaia_workspace.core.spec_status import CANONICAL_STATUS
+from dadaia_workspace.core.skill_owner import load_owner
 from dadaia_workspace.core.specs_version import CANONICAL_SPECS_VERSION
 from dadaia_workspace.infrastructure.provider_version import provider_version
 
@@ -40,7 +40,7 @@ def build_capabilities(command_paths: Collection[tuple[str, ...]]) -> dict[str, 
         "specs": {
             "pattern_version": CANONICAL_SPECS_VERSION,
             # Derived from the doctor's own canon, never a second copy.
-            "status_tokens": sorted(CANONICAL_STATUS),
+            "status_tokens": sorted(load_owner("dd-bug-resolution", "_grammar").CANONICAL_STATUS),
             "commands": groups.get("specs", []),
         },
         "contexts": {
@@ -55,7 +55,6 @@ def build_capabilities(command_paths: Collection[tuple[str, ...]]) -> dict[str, 
             "reconcile_public_projections_after_upgrade": True,
             "load_scoped_context_after_bind": True,
             "preserve_complete_diagnostics": True,
-            "credentials_location": "workspace-root-.env-only",
         },
         "certification": {"schema_version": "dadaia-certification-v1"},
     }

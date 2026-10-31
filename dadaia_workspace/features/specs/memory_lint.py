@@ -15,8 +15,7 @@ from jsonschema import Draft202012Validator
 from dadaia_workspace.core import platform
 from dadaia_workspace.core.fixed_sections import authored_text
 from dadaia_workspace.core.skill_owner import load_owner
-from dadaia_workspace.features.specs import memory_canon
-from dadaia_workspace.features.specs.schemas import load_schema
+from dadaia_workspace.features.specs import doctor_common, memory_canon
 
 __all__ = [
     "AtomResult",
@@ -29,7 +28,7 @@ __all__ = [
 
 
 def load_frontmatter_schema() -> dict[str, Any]:
-    return load_schema("memory/memory-frontmatter-v1")
+    return dict(load_owner("dd-bug-resolution", "_ledger").load_schema("memory-frontmatter-v1"))
 
 
 _H2_RE = re.compile(r"^##\s+(.+)$", re.MULTILINE)
@@ -75,11 +74,11 @@ def _check_sources(result: AtomResult, fm: dict[str, Any], repo_root: Path) -> N
 _TASK_ID = load_owner("dd-bug-resolution", "_grammar").TASK_ID_RE.pattern
 _NARRATIVE_TOKENS = (
     ("date", re.compile(r"\b\d{4}-\d{2}-\d{2}\b")),
-    ("release id", re.compile(r"(?<![\d.=])\d+\.\d+\.\d+(?!\.?\d)")),
     ("candidate id", re.compile(r"\b(?:c|rc-)\d+\b")),
     ("task id", re.compile(rf"\b{_TASK_ID.removeprefix('^').removesuffix('$')}\b")),
     ("FR id", re.compile(r"\bFR\d+\b")),
 )
+_VERSION_RE = re.compile(r"(?<![\d.])\d+\.\d+\.\d+(?!\.?\d)")
 _HISTORY_PHRASE_RE = re.compile(
     r"\b(?:operator (?:doctrine|decision|ruling)|closed as|died|was deleted|retired"
     r"|no longer|formerly|previously)\b",
@@ -88,9 +87,12 @@ _HISTORY_PHRASE_RE = re.compile(
 _FENCE_RE = re.compile(r"^\s*(?:```|~~~)")
 
 
-def _check_narrative(result: AtomResult, content: str, body: str, product: bool) -> None:
+def _check_narrative(
+    result: AtomResult, content: str, body: str, product: bool, releases: set[str]
+) -> None:
     """One ERROR per body line carrying a history token (any memory file) or a history
-    phrase (product atoms only); fenced code is exempt."""
+    phrase (product atoms only); fenced code is exempt. A version is a release id only
+    when it is one of *releases*, the project's own."""
     offset = len(content.splitlines()) - len(body.splitlines())
     fenced = False
     for number, line in enumerate(body.splitlines(), start=offset + 1):
@@ -100,6 +102,9 @@ def _check_narrative(result: AtomResult, content: str, body: str, product: bool)
         if fenced:
             continue
         hits = [(kind, m.group(0)) for kind, rx in _NARRATIVE_TOKENS for m in rx.finditer(line)]
+        hits += [
+            ("release id", m.group(0)) for m in _VERSION_RE.finditer(line) if m.group(0) in releases
+        ]
         if product:
             hits += [("phrase", m.group(0)) for m in _HISTORY_PHRASE_RE.finditer(line)]
         if hits:
@@ -156,7 +161,8 @@ def lint_atom(md_path: Path, memory_dir: Path, schema: dict[str, Any]) -> AtomRe
     product = _is_product_atom(md_path, memory_dir)
     if product:
         _check_sources(result, fm, memory_dir.parent.parent)
-    _check_narrative(result, content, body, product)
+    releases = {d.name for d, _ in doctor_common.iter_all_release_dirs(memory_dir.parent)}
+    _check_narrative(result, content, body, product, releases)
 
     slug = fm.get("slug")
     if isinstance(slug, str) and slug != md_path.stem:
@@ -187,7 +193,7 @@ def lint_atom(md_path: Path, memory_dir: Path, schema: dict[str, Any]) -> AtomRe
 
 def lint_directory(memory_dir: Path, schema: dict[str, Any]) -> list[AtomResult]:
     """Lint the atoms of *memory_dir* and ``product/**`` — never AGENTS.md (a directory
-    contract) nor ``product/index.md`` (a generated TOC)."""
+    contract) nor ``product/index.md`` (its catalog is generated)."""
     product_dir = memory_dir / "product"
     atom_files = sorted(p for p in memory_dir.glob("*.md") if p.name != "AGENTS.md")
     if product_dir.is_dir():

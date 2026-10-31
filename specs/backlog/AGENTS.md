@@ -2,7 +2,7 @@
 
 Scope: this file governs only `specs/backlog/`.
 
-- `BACKLOG_PY` is `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py`: `new` creates an entry, `exit` removes it and appends its history, and `check` validates both files; live-entry curation is §2.
+- `BACKLOG_PY` is `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py`; its `--help` lists the verbs; live-entry curation is §2.
 - The backlog is the operator's demand queue: only the operator creates demand, `dd-product-engineer` curates `active[]`.
 - An entry materializes only through the main thread's operator-facing intake report; an operator-ratified in-release deferral already counts as intake.
 - The backlog is a single JSON document: `specs/backlog/BACKLOG.json`, `{schema: "backlog-v1", active: [...]}`.
@@ -11,15 +11,14 @@ Scope: this file governs only `specs/backlog/`.
 
 ## 1. The document, plus its histo
 
-- Fields: `{id, ts, disposition, release, reason, summary, entry}`.
-- One record per slug, ever — a duplicate exit is structurally impossible.
+- Fields: the schema. One record per slug, ever — a duplicate exit is structurally impossible.
 
 ## 2. Authoring rules
 
 - `<slug>` matches `$defs.slug` of backlog-v1.
-- `BACKLOG_PY new` writes `status: idea`; a later lowercase live token (`candidate`, …) is a hand edit, which `BACKLOG_PY check` validates (§4).
+- A new entry has `status: idea`; a later lowercase live token (`candidate`, …) is a hand edit, which `BACKLOG_PY check --specs <specs-dir>` validates (§4).
 - `relates` is required while `active[]` holds an entry (`--relates <slugs>|none`); `intents` is optional (§4).
-- An entry leaves only by `BACKLOG_PY exit <slug> --disposition …`, which removes the `active[]` object and appends its one histo record.
+- An entry leaves only by `BACKLOG_PY exit <slug> --disposition … --specs <specs-dir>`, which removes the `active[]` object and appends its one histo record.
 
 ## 3. Terminal disposition tokens
 
@@ -30,7 +29,7 @@ Scope: this file governs only `specs/backlog/`.
 
 - `idea` — an unbound brainstorm; no `intents` array required; doctor-clean with no further edits.
 - `candidate` and beyond — the entry must carry a typed `intents[]` array; every subject must resolve to a canonical anchor.
-- `BACKLOG_PY check` (`LEDGER-BACKLOG-SCHEMA`) refuses a malformed `intents[]`, an invalid `status` or an entry past `idea` with no `intents[]`.
+- `BACKLOG_PY check --specs <specs-dir>` (`LEDGER-BACKLOG-SCHEMA`) refuses a malformed `intents[]`, an invalid `status` or an entry past `idea` with no `intents[]`.
 
 ```json
 {"subject": {"kind": "code", "ref": "src/billing/models.py#Invoice"},

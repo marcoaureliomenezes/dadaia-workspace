@@ -9,14 +9,12 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Protocol
 
-from dadaia_workspace.core.cli_line import fix_line, git_line, spell_fix
+from dadaia_workspace.core.cli_line import git_line, spell_fix
 from dadaia_workspace.core.gitflow import Gitflow
 from dadaia_workspace.core.models.git_scan import (
-    ZERO_SHA,
     GitObjectReadError,
     GitRunError,
     ScannedObject,
-    is_zero_sha,
 )
 from dadaia_workspace.core.platform import act
 from dadaia_workspace.features.chokepoints.branch_policy import (
@@ -39,11 +37,6 @@ __all__ = ["content_decision", "push_gate_decision"]
 _PUSH = "[pre-push]"
 _DENYLIST_LAW = ".dadaia/AGENTS.md §3, worktrees/AGENTS.md §2 — a denylisted secret is refused"
 _MAX_LISTED_HITS = 10
-_REWRITE = (
-    "Uncommit the unpublished range down to its oldest commit and re-commit it as one commit, "
-    "two when RED test commits and others mix (origin's history is never rewritten). Remove what is listed from the files first; when "
-    "the message carries it, append `--message` and the new text to the fix; keep any `fix(bugs): …` line, `refactor(bugs): …` lines included. Then repeat the refused act:"
-)
 
 
 class ObjectSource(Protocol):
@@ -52,10 +45,6 @@ class ObjectSource(Protocol):
     def new_objects(
         self, repo: Path, local_sha: str, remote_sha: str
     ) -> Iterable[ScannedObject]: ...
-
-    def unpublished(self, repo: Path, sha: str, held: str = ZERO_SHA) -> list[str]: ...
-
-    def remote_branch(self, repo: Path, branch: str) -> bool: ...
 
     def netted_specs(self, repo: Path, local_sha: str, remote_sha: str) -> list[str]: ...
 
@@ -101,19 +90,21 @@ def _notes(
     return replace(decision, warn=warn)
 
 
-def _rewrite_fix(ref: PushRef, object_source: ObjectSource, repo: Path, fixes: GateFixes) -> str:
-    """The rewrite-verb remedy for the first refused ref (origin is never rewritten)."""
+def _refusal_fix(ref: PushRef, fixes: GateFixes, names: Sequence[str]) -> str:
+    """The one fix for the first refused ref: a switch to its branch, or an Agent action naming the
+    listed paths and commits. The gate offers no history rewrite (origin is never rewritten)."""
     branch = ref.local_ref.removeprefix(HEADS_PREFIX)
     if ref.local_ref.startswith("refs/tags/") or not fixes.head:
         fix = act("agent", "a tag or a detached HEAD has no branch to amend; push a branch.")
     elif branch != ref.local_ref and branch != fixes.head:
         fix = git_line(fixes.repo, "switch", branch)
     else:
-        oldest = object_source.unpublished(repo, ref.local_sha, ref.remote_sha)[-1]
-        fix = fix_line(
-            None, "ci", "push-gate-check", "--repo", fixes.repo, "--rewrite-from", oldest
+        fix = act(
+            "agent",
+            f"remove the listed term or path from {', '.join(names)} in the unpublished commits, "
+            "reword or split those commits by hand",
         )
-    return f"{_REWRITE}\n{spell_fix(fix)}"
+    return spell_fix(fix)
 
 
 def _run_denylist_scan(
@@ -181,9 +172,7 @@ def push_gate_decision(
     baseline_patterns: Iterable[BaselinePatternLike] = (),
 ) -> Decision:
     """Decide a push, first refusal wins: a malformed stdin line (fail closed); branch
-    policy over every non-deletion, non-tag ref (a principal/integration birth allowed
-    when origin holds no gitflow branch or it publishes nothing); then
-    :func:`content_decision`. Every capability is a required parameter: an unwired call site is a CLI defect, never a
+    policy over every non-deletion, non-tag ref; then :func:`content_decision`. Every capability is a required parameter: an unwired call site is a CLI defect, never a
     bypass."""
     if malformed_lines > 0:
         return Decision(
@@ -193,17 +182,7 @@ def push_gate_decision(
             + spell_fix(git_line(fixes.repo, "push", "origin", fixes.work)),
         )
     branch_refs = [r for r in refs if not r.is_deletion and not r.is_tag]
-    roles = (gitflow.principal, gitflow.integration)
-    unborn = [
-        r
-        for r in branch_refs
-        if is_zero_sha(r.remote_sha) and r.remote_ref.removeprefix(HEADS_PREFIX) in roles
-    ]
-    bootstrap = bool(unborn) and not any(object_source.remote_branch(repo, b) for b in roles)
-    births = frozenset(
-        r.local_sha for r in unborn if bootstrap or not object_source.unpublished(repo, r.local_sha)
-    )
-    if refusal := check_branch_policy(branch_refs, gitflow, fixes, births):
+    if refusal := check_branch_policy(branch_refs, gitflow, fixes):
         return refusal
     return content_decision(
         refs,
@@ -260,8 +239,8 @@ def content_decision(
             "path(s)",
             tag=tag,
         )
-        fix = _rewrite_fix(canon[0][0], object_source, repo, fixes)
         listed = frozenset(f"specs/{p}" for _, p in canon)
+        fix = _refusal_fix(canon[0][0], fixes, sorted(masker.mask_path(p) for p in listed))
     elif hits:
         message = _refusal(
             f"the range carries {len(hits)} object(s) with a denylisted term ({_DENYLIST_LAW}).",
@@ -276,9 +255,15 @@ def content_decision(
             "already-published history never needs a rewrite.",
             tag=tag,
         )
-        fix = _rewrite_fix(hits[0][0], object_source, repo, fixes)
         listed = frozenset(h.path for _, h in hits)
         messages = frozenset(h.sha for _, h in hits if h.path == "(commit message)")
+        names = sorted(
+            {
+                f"commit {h.sha[:12]}" if h.path == "(commit message)" else masker.mask_path(h.path)
+                for _, h in hits
+            }
+        )
+        fix = _refusal_fix(hits[0][0], fixes, names)
     else:
         message = fix = ""
         listed = frozenset()

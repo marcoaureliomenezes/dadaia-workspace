@@ -143,11 +143,20 @@ _PACKAGE = _REPO_ROOT / "dadaia_workspace"
 _LOADER = "core/skill_owner.py"
 _RE_CALLS = {"compile", "search", "match", "fullmatch", "finditer", "findall", "sub", "split"}
 #: A grammar's head, as a package regex would spell it; only its owner and pinned twin hold it.
-_GRAMMAR_HEADS = {r"\*\*Origin:\*\*": set(), r"\*\*Status:\*\*": {"core/spec_status.py"}}
-#: Each owner's pinned file and top-level names (the Status pair: `test_spec_status.py`).
+_GRAMMAR_HEADS = {r"\*\*Origin:\*\*": set(), r"\*\*Status:\*\*": set()}
+#: Each owner's pinned file and top-level names.
 _SCHEMA = "public/skills/dd-release-implementation/scripts/_release_schema.py"
 _OWNERS = {
     _SCHEMA: {"origin", "writes"},
+    "public/skills/dd-bug-resolution/scripts/_grammar.py": {
+        "STATE",
+        "STATUS_RE",
+        "APPROVED",
+        "DRAFT",
+        "IN_REVIEW",
+        "CANONICAL_STATUS",
+        "extract_status",
+    },
     "public/skills/dd-bug-resolution/scripts/_ledger.py": {"records", "validate", "terms"},
     _LOADER: {"load_owner"},
     "core/context_registry.py": {"entries"},

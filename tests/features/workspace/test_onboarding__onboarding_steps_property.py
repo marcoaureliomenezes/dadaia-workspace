@@ -64,19 +64,23 @@ def _remote(parent: Path, branches: tuple[str, ...], tag: bool) -> Path:
 def _fill_memory(root: Path) -> None:
     """The scripted stand-in for the ``agent`` step: an audit that writes real memory."""
     for specs in alive_context_trees(root).values():
-        for stub in ("ARCHITECTURE.md", "QUALITY.md"):
+        for stub in ("ARCHITECTURE.md", "QUALITY.md", "product/index.md"):
             write_text(specs / "memory" / stub, f"# {stub}\n\naudited\n")
         catalog = specs / "memory" / "product" / "catalog.json"
         catalog.parent.mkdir(parents=True, exist_ok=True)
         write_text(catalog, json.dumps({"features": [{"slug": "core"}]}))
+        write_text(
+            specs / "memory" / "product" / "core.md",
+            "---\nslug: core\ntitle: core\ntldr: core\nsummary: core\n---\n\n# core\n",
+        )
 
 
 def _run_fix(step: Step, root: Path, bare: Path) -> None:
-    if step.kind == "agent":
+    if step.id == "context":  # an agent act: a context name and the clone URL
+        argv = ["context", "create", "proj", "--main-repo", bare.as_uri()]
+    elif step.kind == "agent":
         _fill_memory(root)
         return
-    if step.id == "context":  # the operator's act: a context name and the clone URL
-        argv = ["context", "create", "proj", "--main-repo", bare.as_uri()]
     else:
         argv = list(_WORDS[step.id])
         assert step.command == command(str(cli_path(root)), *argv), step.command

@@ -5,29 +5,29 @@ House authoring contract for every AI-entity file: personas, skills, rules, hook
 
 ## The 15-rule checklist
 
-Every library skill must satisfy all fifteen; each rule's detail lives in the section named.
+Every library skill must satisfy all fifteen; each rule's detail lives under the heading named.
 
 | # | Rule | Detail |
 |---|---|---|
-| 1 | One skill, one job — and it knows whether it is steps, reference, or a conscious mix | §3, §7 |
-| 2 | The description is a context pointer carrying trigger branches, nothing else | §1 |
-| 3 | Invocation is a deliberate choice: model-invoked only when the agent or another skill must reach it | §7 |
-| 4 | Progressive disclosure: short SKILL.md, disclosed siblings behind condition-naming pointers | §3 |
-| 5 | Single source of truth; the environment is a source; cache only expensive lookups | §6 |
-| 6 | Every step ends on a checkable, demanding completion criterion | §4 |
-| 7 | Leading words over prose; a vocabulary skill says "use these terms exactly" with an Avoid list | §5 |
-| 8 | Positive by default; a prohibition stays only with a demonstrated failure, paired with the positive | §5 |
-| 9 | Prune no-ops, sediment, duplication; git keeps history; a prohibition carries its short reason | §6 |
-| 10 | Right altitude: intent over mechanics that go stale (paths, snippets), with the prototype exception | §6 |
-| 11 | Steps are actions in execution order, one idea each; the branch decision comes first; templates are fenced blocks | §8 |
-| 12 | The set is curated and composed: overlap resolves by merge or by one skill calling the other | §7 |
-| 13 | Determinism goes to a script/template sibling; the skill authors only the stages | §3 |
-| 14 | Human gates are explicit: facts are the agent's job, decisions are the operator's | §8 |
-| 15 | The ecosystem stays equalized: grants, law citations and projections move with the skill | §9 |
+| 1 | One skill, one job — and it knows whether it is steps, reference, or a conscious mix | Information hierarchy and disclosure; Skill mechanics: invocation, composition, the curated set |
+| 2 | The description is a context pointer carrying trigger branches, nothing else | Context pointers |
+| 3 | Invocation is a deliberate choice: model-invoked only when the agent or another skill must reach it | Skill mechanics: invocation, composition, the curated set |
+| 4 | Progressive disclosure: short SKILL.md, disclosed siblings behind condition-naming pointers | Information hierarchy and disclosure |
+| 5 | Single source of truth; the environment is a source; cache only expensive lookups | Pruning |
+| 6 | Every step ends on a checkable, demanding completion criterion | Completion criteria |
+| 7 | Leading words over prose; a vocabulary skill says "use these terms exactly" with an Avoid list | Positive leading words, not negation |
+| 8 | Positive by default; a prohibition stays only with a demonstrated failure, paired with the positive | Positive leading words, not negation |
+| 9 | Prune no-ops, sediment, duplication; git keeps history; a prohibition carries its short reason | Pruning |
+| 10 | Right altitude: intent over mechanics that go stale (paths, snippets), with the prototype exception | Pruning |
+| 11 | Steps are actions in execution order, one idea each; the branch decision comes first; templates are fenced blocks | Steps, branches, human gates |
+| 12 | The set is curated and composed: overlap resolves by merge or by one skill calling the other | Skill mechanics: invocation, composition, the curated set |
+| 13 | Determinism goes to a script/template sibling; the skill authors only the stages | Information hierarchy and disclosure |
+| 14 | Human gates are explicit: facts are the agent's job, decisions are the operator's | Steps, branches, human gates |
+| 15 | The ecosystem stays equalized: grants, law citations and projections move with the skill | The ecosystem contract |
 
 ---
 
-## 1. Context pointers
+## Context pointers
 
 - Every skill description, every `AGENTS.md` doc reference, every "see X" in a persona is a context pointer.
 - The pointer's wording, not its target, decides whether an agent reaches the material.
@@ -39,7 +39,7 @@ Every library skill must satisfy all fifteen; each rule's detail lives in the se
 
 ---
 
-## 2. The two loads
+## The two loads
 
 - Every document/pointer spends one of two budgets; authoring routes correctly between them.
 
@@ -53,7 +53,7 @@ Every library skill must satisfy all fifteen; each rule's detail lives in the se
 
 ---
 
-## 3. Information hierarchy and disclosure
+## Information hierarchy and disclosure
 
 - Every AI-entity document is built from steps (ordered actions) and reference (facts consulted on demand).
 - Ranked on a ladder: in-file step, in-file reference, disclosed reference.
@@ -68,7 +68,7 @@ Every library skill must satisfy all fifteen; each rule's detail lives in the se
 
 ---
 
-## 4. Completion criteria
+## Completion criteria
 
 - Every step in a skill's ordered arc ends on a completion criterion — the condition telling the agent it is done.
 - A criterion is a lever only when clear: the agent can tell done from not-done without judgment calls.
@@ -80,7 +80,7 @@ Every library skill must satisfy all fifteen; each rule's detail lives in the se
 
 ---
 
-## 5. Positive leading words, not negation
+## Positive leading words, not negation
 
 - A leading word is a compact, already-pretrained concept the agent thinks with (this workspace's own: tight, root cause, green, seam, frontier).
 - Reach for an existing word before coining one — a made-up term recruits no priors and costs definition tokens.
@@ -93,7 +93,7 @@ Every library skill must satisfy all fifteen; each rule's detail lives in the se
 
 ---
 
-## 6. Pruning
+## Pruning
 
 Six checks, applied at authoring time and at review time:
 
@@ -111,43 +111,42 @@ decision-rich part.
 
 ---
 
-## 7. Skill mechanics: invocation, composition, the curated set
+## Skill mechanics: invocation, composition, the curated set
 
 - Model-invoked: the description occupies the discovery surface — pay that only when the agent, or another skill, must reach it autonomously.
 - User/dispatch-invoked (`disable-model-invocation: true`): zero context load; the human or the calling skill is the index.
-- Shared reference lives in exactly ONE skill; consumers name it — a two-line composing skill is a success, not a stub.
-- Overlap between two skills resolves by merge or by one calling the other; the material lives once.
+- Consumers name the one skill that holds shared reference; a two-line composing skill is a success, not a stub.
 - A skill is one job: all steps, all reference, or a conscious mix — the form follows the content.
 - When invocable skills multiply past what the index (human or dispatcher) holds, the cure is a router map — one place naming every skill and when to reach it — not more descriptions.
 
 ---
 
-## 8. Steps, branches, human gates
+## Steps, branches, human gates
 
-- Steps are actions in execution order, one idea per step, each ending on its criterion (§4).
+- Steps are actions in execution order, one idea per step, each ending on its criterion (Completion criteria).
 - When a skill branches, the branch decision is the FIRST step — picking the wrong branch wastes the whole run.
 - Templates and formats are given as fenced blocks where they are used.
-- Human gates are explicit: finding facts is the agent's job (inspect before asking); decisions are the operator's — put each one to them and wait.
+- Human gates are explicit: finding facts is the agent's job (inspect before asking); decisions are the operator's — the main thread puts each one to them and waits; a subagent returns it to the main thread.
 
 ---
 
-## 9. The ecosystem contract
+## The ecosystem contract
 
 A skill moves with its ecosystem: any authoring act (create, merge, rename, delete, restructure) carries in the same change:
 
 1. Persona `skills:` grants.
 2. Law citations — the root map and every scoped `AGENTS.md` SOURCE under `public/` that names the skill.
 3. Cross-citations in sibling skills (the citation contract test checks every path-shaped token in `public/**`).
-4. Reprojection — per `.dadaia/AGENTS.md` §4, `public doctor` `[ok]`; stale projected directories removed from every harness target.
+4. Reprojection — per `.dadaia/AGENTS.md`, Projections and law files; `public doctor` `[ok]`; stale projected directories removed from every harness target.
 
 ---
 
-## 10. Applying this contract
+## Applying this contract
 
 When authoring or reviewing any persona, skill, rule, or hook-facing instruction:
 
 1. Walk the 15-rule checklist first — it is the review's finding taxonomy.
-2. Walk §1-§3 while drafting: is every pointer sharp, is the load routed right, is the ladder respected?
-3. Walk §4-§5 and §8 on every step/rule you write: checkable and exhaustive criterion, phrased positively, branch first?
-4. Walk §6 before calling the draft done, and again on every later review pass — pruning is a standing discipline.
-5. Walk §9 before committing — the skill and its ecosystem move in one change.
+2. Walk Context pointers, The two loads and Information hierarchy and disclosure while drafting: is every pointer sharp, is the load routed right, is the ladder respected?
+3. Walk Completion criteria, Positive leading words, not negation and Steps, branches, human gates on every step/rule you write: checkable and exhaustive criterion, phrased positively, branch first?
+4. Walk Pruning before calling the draft done, and again on every later review pass — pruning is a standing discipline.
+5. Walk The ecosystem contract before committing — the skill and its ecosystem move in one change.

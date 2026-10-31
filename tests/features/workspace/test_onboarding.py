@@ -39,7 +39,7 @@ def _specs(tmp_path: Path, name: str = "app", *, audited: bool = False) -> Path:
     (specs / "memory" / "product").mkdir(parents=True)
     stamp = f"---\nspecs_pattern_version: {CANONICAL_SPECS_VERSION}\n---\n# c\n"
     os_write_text(specs / "constitution.md", stamp)
-    for stub in ("ARCHITECTURE.md", "QUALITY.md"):
+    for stub in ("ARCHITECTURE.md", "QUALITY.md", "product/index.md"):
         shutil.copyfile(_SCAFFOLD / "memory" / stub, specs / "memory" / stub)
     if audited:
         for stub in ("ARCHITECTURE.md", "QUALITY.md"):
@@ -47,6 +47,8 @@ def _specs(tmp_path: Path, name: str = "app", *, audited: bool = False) -> Path:
         os_write_text(
             specs / "memory" / "product" / "catalog.json", json.dumps({"features": [{"slug": "x"}]})
         )
+        os_write_text(specs / "memory" / "product" / "x.md", _ATOM)
+        os_write_text(specs / "memory" / "product" / "index.md", "# Product\n\nReal vision.\n")
     return specs
 
 
@@ -74,11 +76,12 @@ def _v047(tmp: Path) -> dict[str, Path]:
 
 
 _CMD = "command"
+_ATOM = "---\nslug: x\ntitle: x\ntldr: x\nsummary: x\n---\n\n# x\n"
 
 
 # fmt: off
 @pytest.mark.parametrize(("trees", "kwargs", "published", "expected", "command", "in_command"), [
-    pytest.param(lambda t: {}, {}, False, ("context", _CMD), None, ["Agent action: run {} with a context name and --main-repo set to the main repo's clone URL"], id="zero-contexts"),
+    pytest.param(lambda t: {}, {}, False, ("context", "agent"), None, ["Agent action: run {} with a context name and --main-repo set to the main repo's clone URL"], id="zero-contexts"),
     pytest.param(_bare, {}, False, ("specs", _CMD), ("specs", "init", "--context", "app"), [], id="S1-no-identity-no-bind-step"),
     pytest.param(_bare, {"bound": False}, False, ("bind", _CMD), ("context", "bind", "app"), [], id="S1-unbound-session-binds"),
     pytest.param(_bare, {"bound": True}, False, ("specs", _CMD), ("specs", "init", "--context", "app"), [], id="S1-bound-is-past-bind"),
@@ -113,11 +116,79 @@ def test_next_step_is_derived_from_the_workspace_state(
     assert all(part.format(create) in step.command.replace("\\", "/") for part in in_command)
 
 
+def test_a_pending_bind_prints_the_refusal_the_caller_gives_instead_of_the_bind(
+    tmp_path: Path,
+) -> None:
+    """The bind step prints the caller's refusal, message and fix, when its session cannot bind;
+    an Operator-action fix makes it an operator step."""
+    relaunch = "Operator action: relaunch the session at the workspace root"
+    why = "This session was started outside the workspace root, so it stands in for no role."
+
+    step = next_step(tmp_path, _bare(tmp_path), bound=False, refusal=(why, relaunch))
+
+    assert step is not None
+    assert step.text() == f"Next (operator step bind): {why}\nfix: {relaunch}"
+
+
+@pytest.mark.parametrize("catalog", ['{"features": []}', "{not json"], ids=["empty", "unreadable"])
+def test_the_first_pass_counts_the_atom_files_not_the_catalog(tmp_path: Path, catalog: str) -> None:
+    """A catalog that holds no feature, or does not parse, never hides an atom file: the files
+    are the owner's answer, so no atom is pending."""
+    specs = _specs(tmp_path, audited=True)
+    write_text(specs / "memory" / "product" / "catalog.json", catalog)
+
+    step = next_step(tmp_path, {"app": specs})
+
+    assert step is None or step.id != "first-pass", step and step.command
+
+
+def test_the_first_pass_names_no_atom_when_only_the_catalog_claims_one(tmp_path: Path) -> None:
+    """The catalog names feature x, but no atom file exists: the files answer, and the first
+    pass is pending with the no-atom finding."""
+    specs = _specs(tmp_path, audited=True)
+    (specs / "memory" / "product" / "x.md").unlink()
+    write_text(
+        specs / "memory" / "product" / "catalog.json", json.dumps({"features": [{"slug": "x"}]})
+    )
+
+    step = next_step(tmp_path, {"app": specs})
+
+    assert step is not None and (step.id, step.kind) == ("first-pass", "agent")
+    assert "(no atom)" in step.command
+
+
+_SCAFFOLD_INDEX = (_SCAFFOLD / "memory" / "product" / "index.md").read_text(encoding="utf-8")
+
+
+@pytest.mark.parametrize(
+    ("index", "pending"),
+    [
+        (_SCAFFOLD_INDEX, True),
+        (_SCAFFOLD_INDEX.replace("_No features found._", "### product\n\n| `x` | X | x |"), True),
+        (_SCAFFOLD_INDEX.replace("The product vision is not documented yet.", "Real vision."), False),
+    ],
+    ids=["scaffold", "scaffold-with-generated-catalog", "hand-written"],
+)
+def test_the_first_pass_judges_the_product_index_apart_from_its_generated_catalog(
+    tmp_path: Path, index: str, pending: bool
+) -> None:
+    """With an atom and filled stubs, the index is pending exactly while what the catalog
+    section leaves is still the shipped scaffold text."""
+    specs = _specs(tmp_path, audited=True)
+    write_text(specs / "memory" / "product" / "index.md", index)
+
+    step = next_step(tmp_path, {"app": specs})
+
+    assert step is not None
+    assert (step.id == "first-pass") == pending
+    assert (str(specs / "memory" / "product" / "index.md") in step.command) == pending
+
+
 def test_the_first_pass_fix_opens_the_backlog_first_pass_lane(tmp_path: Path) -> None:
     specs = _specs(tmp_path, "proj")  # the repo slug differs from the context name
     step = next_step(tmp_path, {"app": specs})
     memory = specs / "memory"
-    pending = f"{memory / 'ARCHITECTURE.md'}, {memory / 'QUALITY.md'}, {memory / 'product'} (no atom)"
+    pending = f"{memory / 'ARCHITECTURE.md'}, {memory / 'QUALITY.md'}, {memory / 'product' / 'index.md'}, {memory / 'product'} (no atom)"
     lane = fix_line(tmp_path, "worktree", "new", "proj", "0.1.0/wt-backlog-first-pass")
     assert step is not None
     assert step.command == (
@@ -147,32 +218,23 @@ def test_the_text_names_the_kind_and_carries_one_fix_line(tmp_path: Path) -> Non
     step = next_step(tmp_path, {})
     assert step is not None
     head, fix = step.text().split("\n")
-    assert head.startswith("Next (command step context): ") and fix == f"fix: {step.command}"
+    assert head.startswith("Next (agent step context): ") and fix == f"fix: {step.command}"
 
 
-def test_several_work_branches_make_the_first_pass_an_agent_step_with_the_refusals_fix(
+def test_several_work_branches_make_the_first_pass_the_refusals_own_fix(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    first = "run `x`, then run `y`"
+    first = "run `x`, then run `y`, then run `z`"
     several = SeveralWorkBranches("2 work branches", first, "0.2.0")
 
     def refuse(_s: object, _p: object) -> str:
         raise several
 
     monkeypatch.setattr(f"{_CLIENT}.work_version", refuse)
-    specs = _specs(tmp_path, "proj")
-    step = next_step(tmp_path, {"app": specs})
-    memory = specs / "memory"
-    pending = f"{memory / 'ARCHITECTURE.md'}, {memory / 'QUALITY.md'}, {memory / 'product'} (no atom)"
-    lane = fix_line(tmp_path, "worktree", "new", "proj", "0.2.0/wt-backlog-first-pass")
+    step = next_step(tmp_path, {"app": _specs(tmp_path, "proj")})
     assert step is not None and (step.id, step.kind) == ("first-pass", "agent")
-    assert step.command == (
-        f"Agent action: {first}, then open the lane {lane}, then run the dd-audit-project first pass in it — {pending}"
-    )
+    assert step.command == f"Agent action: {first}"
     assert step.text().count("fix:") == 1
-
-
-
 
 
 def test_the_context_create_step_renders_the_cli_words_inline(

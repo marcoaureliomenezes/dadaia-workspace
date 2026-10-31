@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.core import platform
+from dadaia_workspace.core.cli_line import cli_words
 from dadaia_workspace.core.models.doctor_report import (
     DoctorLine,
     DoctorReport,
@@ -87,7 +88,41 @@ def test_version_mismatch_is_read_only(tmp_path: Path) -> None:
     )
     assert result.ok is False
     assert result.rollback_required is False
+    assert result.fix.startswith(
+        "Agent action: install the exact provider version 9.9.9, then run "
+    )
     assert (workspace / ".dadaia" / "states" / "spec_contexts.json").read_bytes() == before
+
+
+def test_the_structured_result_carries_the_fix_line(tmp_path: Path) -> None:
+    result = _reconcile(
+        _v1_workspace(tmp_path),
+        expected_version="9.9.9",
+        actual_version="1.0.0",
+        public_service=_Public(),
+        doctor_service=_Doctor(),
+    )
+    assert result.to_dict()["fix"] == result.fix
+    assert result.fix.startswith(
+        "Agent action: install the exact provider version 9.9.9, then run "
+    )
+
+
+def test_missing_dependencies_are_fixed_by_rerunning_the_cli_not_by_an_install(
+    tmp_path: Path,
+) -> None:
+    result = reconcile_workspace(
+        _v1_workspace(tmp_path),
+        expected_version="1.2.3",
+        actual_version="1.2.3",
+        public_service=_Public(),
+        doctor_service=_Doctor(),
+    )
+    assert result.error == "dependencies not composed"
+    assert result.fix == (
+        "Agent action: run "
+        + platform.inline(*cli_words(None, "reconcile", "--expect-version", "1.2.3"))
+    )
 
 
 def test_failure_restores_migrated_state_and_requires_projection_rollback(tmp_path: Path) -> None:
@@ -104,6 +139,10 @@ def test_failure_restores_migrated_state_and_requires_projection_rollback(tmp_pa
     assert result.ok is False
     assert result.rollback_required is True
     assert "injected install failure" in (result.error or "")
+    assert result.fix == (
+        "Agent action: reinstall the previous exact provider version, then run "
+        + platform.inline(*cli_words(None, "public", "install"))
+    )
     assert state_path.read_bytes() == before
 
 
@@ -167,14 +206,15 @@ def test_the_ownership_repair_quotes_a_path_holding_a_blank(
     (root / ".dadaia" / "agentic").mkdir(parents=True)
     monkeypatch.setattr(platform, "file_owner", lambda _path: (uid + 1, "other"))
 
-    message = _reconcile(
+    result = _reconcile(
         root,
         expected_version="1.2.3",
         actual_version="1.2.3",
         public_service=object(),
         doctor_service=object(),
-    ).error
+    )
 
     repair = platform.inline("sudo", "chown", "-R", str(uid), str(root / ".dadaia"))
-    assert message is not None and f"Repair with: {repair} (or fix" in message
+    assert "Repair with" not in (result.error or "")
+    assert result.fix == f"Agent action: run {repair}"
     assert str(root / ".dadaia") in repair and f"'{root / '.dadaia'}'" in repair

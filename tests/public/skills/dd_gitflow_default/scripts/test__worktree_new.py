@@ -17,7 +17,7 @@ import pytest
 from dadaia_workspace.core.cli_line import git_line, shell_line
 from dadaia_workspace.core.skill_owner import load_owner
 from tests.helpers import worktree_ws
-from tests.helpers.oslib import link, read_text, run, write_text
+from tests.helpers.oslib import command, link, read_text, run, write_text
 from tests.helpers.skill_scripts import stage_skill_scripts
 from tests.helpers.worktree_ws import (
     NEW_JOB,
@@ -66,6 +66,8 @@ def _set_release(root: Path, phase: str, *, plan: str = "Approved") -> None:
     state["implemented"] = (
         {"sha": "abc1234", "ts": "2026-10-09T11:00:00Z"} if phase == "CLOSURE" else None
     )
+    if phase == "CLOSURE":  # closure's check wants its memory pass recorded
+        state["log"] = [{"ts": "2026-10-09T12:00:00Z", "agent": "a", "kind": "memory", "text": "t"}]
     write_text(state_path, json.dumps(state))
     _git(repo, "add", "specs/releases")
     _git(repo, "commit", "-qm", f"release {phase}")
@@ -90,6 +92,26 @@ def test_a_release_job_needs_the_implementation_phase(definition_root: Path) -> 
     assert _fixes(refused) == [phase_fix(definition_root)]
     assert not (definition_root / "worktrees/r" / NEW_JOB).exists()
     assert _git(repo, "branch", "--list", f"wt/{NEW_JOB}").strip() == ""
+
+
+def test_a_job_after_closure_is_refused_with_a_fix_that_can_work(definition_root: Path) -> None:
+    """Phase never goes back: the one fix is not the `phase IMPLEMENTATION` step that refuses."""
+    _set_release(definition_root, "CLOSURE")
+    assert _run(definition_root, "new", "r", RC).returncode == 0
+
+    refused = _run(definition_root, "new", "r", NEW_JOB)
+
+    assert (refused.returncode, refused.stdout) == (1, "")
+    assert [f.removeprefix("fix: ") for f in _fixes(refused)] == [
+        f"{_script()} new r 0.5.0/rc-2/wt-rc"
+    ]
+    assert not (definition_root / "worktrees/r" / NEW_JOB).exists()
+    rc_tree = definition_root / "worktrees/r" / RC
+    run_fix(definition_root, refused)  # the printed act, run as printed, is not refused
+    assert (definition_root / "worktrees/r/0.5.0/rc-2/wt-rc").is_dir()
+    assert _git(rc_tree, "status", "--porcelain") == ""
+    state = json.loads(read_text(rc_tree / "specs/releases/0.5.0/_RELEASE.json"))
+    assert state["phase"] == "CLOSURE"
 
 
 def test_a_main_tree_reads_the_phase_on_its_rcs_tree_not_the_work_branch(
@@ -152,7 +174,6 @@ def test_a_reconcile_name_refuses_even_in_closure(definition_root: Path, name: s
     refused = _run(definition_root, "new", "r", name)
 
     assert (refused.returncode, refused.stdout) == (1, "")
-    assert [f.removeprefix("fix: ") for f in _fixes(refused)] == [f"{_script()} list"]
     assert not (definition_root / "worktrees/r").exists()
 
 
@@ -234,32 +255,27 @@ def test_a_plain_name_refuses_whatever_branch_the_repo_is_on(
     ],
     ids=["remote-only", "detached-no-work-branch"],
 )
-def test_a_plain_name_refuses_without_a_local_work_branch_with_the_list_fix(
+def test_a_plain_name_refuses_without_a_local_work_branch(
     root: Path, steps: tuple[tuple[str, ...], ...]
 ) -> None:
     repo = root / "repos/r"
     for step in steps:
         _git(repo, *step)
 
-    refused = _run(root, "new", "r", "maintenance")
-
-    _assert_plain_refused(root, refused)
-    run_fix(root, refused)
     _assert_plain_refused(root, _run(root, "new", "r", "maintenance"))
 
 
 def _assert_plain_refused(root: Path, refused: subprocess.CompletedProcess[str]) -> None:
-    """A one-segment name is no worktree name: refused with the `list` fix, nothing created, no base recorded."""
+    """A one-segment name is no worktree name: refused, nothing created, no base recorded."""
     repo = root / "repos/r"
     assert refused.returncode == 1
     assert "not a worktree name" in refused.stderr
-    assert [f.removeprefix("fix: ") for f in _fixes(refused)] == [f"{_script()} list"]
     assert not (root / "worktrees/r").exists()
     assert _git(repo, "branch", "--list", "wt/maintenance").strip() == ""
     assert "dadaia-base" not in _git(repo, "config", "--list")
 
 
-def test_two_work_branches_still_refuse_a_plain_name_with_the_list_fix(root: Path) -> None:
+def test_two_work_branches_still_refuse_a_plain_name(root: Path) -> None:
     repo = root / "repos/r"
     _git(repo, "checkout", "-q", "feature/0.5.0")
     _git(repo, "commit", "-q", "--allow-empty", "-m", "lower work")
@@ -289,7 +305,6 @@ def test_two_work_branches_still_refuse_a_plain_name_with_the_list_fix(root: Pat
 def test_an_old_grammar_or_foreign_name_refuses(root: Path, name: str) -> None:
     result = _run(root, "new", "r", name)
     assert result.returncode == 1 and not (root / "worktrees/r").exists()
-    assert [f.removeprefix("fix: ") for f in _fixes(result)] == [f"{_script()} list"]
     assert "0.5.0/rc-<N>/job-<n>/wt-main" in result.stderr  # the refusal teaches the hierarchy
 
 
@@ -511,11 +526,13 @@ def test_a_main_tree_whose_rc_tree_was_removed_by_hand_is_refused_with_a_fix_tha
 
     refused = _run(root, "new", "r", NEW_JOB)
 
-    fix = git_line(root / "repos/r", "worktree", "add", "-f", "-f", str(rc_tree), f"wt/{RC}")
+    fix = git_line(root / "repos/r", "worktree", "add", "-f", "-f", "--lock", "--reason",
+                   f"dadaia:{RC}", str(rc_tree), f"wt/{RC}")  # fmt: skip
     assert (refused.returncode, refused.stdout) == (1, "")
     assert refused.stderr == f"[error] {rc_tree} does not exist\nfix: {fix}\n"
     assert not (root / "worktrees/r" / NEW_JOB).exists()
     run_fix(root, refused)
+    assert f"locked dadaia:{RC}" in _git(root / "repos/r", "worktree", "list", "--porcelain").splitlines()  # fmt: skip
     assert _run(root, "new", "r", NEW_JOB).returncode == 0
 
 
@@ -535,10 +552,11 @@ def test_a_main_tree_is_refused_when_release_check_exits_non_zero_with_no_findin
 
     specs = root / "worktrees/r" / RC / "specs"
     assert (refused.returncode, refused.stdout) == (1, "")
-    assert refused.stderr == (
-        "[error] release.py check exited 1\n"
-        f"fix: Agent action: fix the findings of release.py check on {specs}\n"
-    )
+    lines = refused.stderr.splitlines()
+    assert lines[0] == "[error] release.py check exited 1", refused.stderr
+    release = (tmp_path / "skills/dd-release-implementation/scripts/release.py").resolve()
+    check = command(sys.executable, str(release), "check", "--specs", str(specs))
+    assert lines[1:] == [f"fix: {check}"], refused.stderr
     assert not (root / "worktrees/r" / NEW_JOB).exists()
 
 
@@ -612,3 +630,60 @@ def test_list_shows_no_stray_for_a_level_folder_holding_only_its_file(root: Path
     assert (tree.parent / "AGENTS.md").is_file() and not tree.exists()
     rows = json.loads(_run(root, "list", "--json").stdout)
     assert [r["path"] for r in rows if r["state"] == "unregistered"] == []
+
+
+def _leftover(root: Path) -> Path:
+    """A non-empty folder at the rc's tree path that git does not list."""
+    folder = root / "worktrees/r" / RC
+    folder.mkdir(parents=True)
+    write_text(folder / "stray.txt", "x\n")
+    return folder
+
+
+def test_new_onto_an_unlisted_folder_makes_no_branch_and_names_its_move(root: Path) -> None:
+    folder = _leftover(root)
+
+    refused = _run(root, "new", "r", RC)
+
+    assert (refused.returncode, refused.stdout) == (1, "")
+    assert _git(root / "repos/r", "branch", "--list", f"wt/{RC}").strip() == ""
+    assert _fixes(refused) == [
+        f"fix: Agent action: stop what holds files open in {folder}, then move the folder {folder} out of the lane path (it may hold work)"
+    ]
+    folder.rename(root / "aside")
+    assert _run(root, "new", "r", RC).returncode == 0
+    assert (folder / "specs").is_dir()
+
+
+@pytest.mark.parametrize("leftover", [False, True])
+def test_a_branch_left_without_its_tree_is_cleared_by_the_printed_acts(
+    root: Path, leftover: bool
+) -> None:
+    folder = root / "worktrees/r" / RC
+    _git(root / "repos/r", "branch", f"wt/{RC}", "feature/0.5.0")
+    _git(root / "repos/r", "checkout", "-q", "feature/0.5.0")
+    refused = _run(root, "new", "r", RC)
+    assert refused.returncode == 1 and "exists" in refused.stderr
+    if leftover:
+        _leftover(root)
+        assert "move the folder" in _fixes(_run(root, "clean", str(folder)))[0]
+        folder.rename(root / "aside")
+    run_fix(root, refused)
+
+    assert _run(root, "new", "r", RC).returncode == 0
+    assert (folder / "specs").is_dir()
+
+
+def test_merge_onto_a_leftover_folder_without_a_branch_ends_through_new(root: Path) -> None:
+    folder = _leftover(root)
+
+    merged = _run(root, "merge", str(folder))
+    assert (merged.returncode, _fixes(merged)) == (
+        1,
+        [
+            f"fix: Agent action: stop what holds files open in {folder}, then move the folder {folder} out of the lane path (it may hold work)"
+        ],
+    )
+    folder.rename(root / "aside")
+
+    assert _run(root, "new", "r", RC).returncode == 0

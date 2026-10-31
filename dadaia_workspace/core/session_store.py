@@ -15,6 +15,7 @@ from pathlib import Path
 
 from dadaia_workspace.core import platform
 from dadaia_workspace.core.atomic_write import atomic_write
+from dadaia_workspace.core.clock import instant
 from dadaia_workspace.core.models.spec_context import CONTEXT_NAME_RE as _NAME_RE
 
 __all__ = [
@@ -64,12 +65,23 @@ def write_session(workspace: Path, session_id: str, record: dict[str, object]) -
     atomic_write(path, json.dumps(record, indent=2), ensure_parent=True)
 
 
+def is_unreadable(workspace: Path, session_id: str) -> bool:
+    """True when the session's record file exists and does not read."""
+    return (
+        read_session(workspace, session_id) is None
+        and session_record_path(workspace, session_id).exists()
+    )
+
+
 def touch_last_seen_at(workspace: Path, session_id: str, *, now: str) -> dict[str, object] | None:
-    """The heartbeat: renew ``last_seen_at``; the updated record, or ``None`` when absent or
-    unwritable."""
+    """The heartbeat: renew ``last_seen_at``, creating the minimal ``{session_id, last_seen_at}``
+    record only when the file is absent; the record, or ``None`` when unwritable or unreadable
+    (left untouched for doctor)."""
     data = read_session(workspace, session_id)
     if data is None:
-        return None
+        if session_record_path(workspace, session_id).exists():
+            return None
+        data = {"session_id": session_id}
     data[SESSION_HEARTBEAT_FIELD] = now
     try:
         write_session(workspace, session_id, data)
@@ -107,7 +119,7 @@ def is_live(record: dict[str, object], *, clock: Callable[[], datetime] | None =
     seen = parse_instant(record.get(SESSION_HEARTBEAT_FIELD))
     if seen is None:
         return False
-    now = clock() if clock is not None else datetime.now(tz=UTC)
+    now = clock() if clock is not None else instant()
     age = now - seen
     return age.total_seconds() < SESSION_GC_TTL_SECONDS
 

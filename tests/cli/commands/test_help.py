@@ -19,6 +19,7 @@ from dadaia_workspace.cli.main import app
 from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.harness_registry import L1_ENTRY_HARNESSES
 from dadaia_workspace.features.capabilities import build_capabilities
+from tests.helpers.cli_root import live_root
 from tests.helpers.oslib import read_text
 
 _PUBLIC = Path(__file__).resolve().parents[3] / "dadaia_workspace" / "public"
@@ -135,12 +136,17 @@ def test_capabilities_json_matches_service_and_public_schema() -> None:
     result = CliRunner().invoke(app, ["capabilities", "--json"])
     assert result.exit_code == 0, result.output
     payload = json.loads(result.stdout)
-    assert payload == build_capabilities(command_paths())
+    assert payload == build_capabilities(command_paths(live_root()))
     schema = json.loads(read_text(_PUBLIC / "schemas" / "dadaia-capabilities-v3.schema.json"))
     Draft202012Validator(schema).validate(payload)
     assert "workflows" not in payload
     assert payload["contexts"]["selection_contract"] == "explicit-or-caller-owned-bind"
-    assert payload["consumer_requirements"]["exact_provider_version"] is True
+    assert payload["consumer_requirements"] == {
+        "exact_provider_version": True,
+        "reconcile_public_projections_after_upgrade": True,
+        "load_scoped_context_after_bind": True,
+        "preserve_complete_diagnostics": True,
+    }
     assert payload["certification"] == {"schema_version": "dadaia-certification-v1"}
     assert "dadaia " not in json.dumps(payload)
 
@@ -148,8 +154,8 @@ def test_capabilities_json_matches_service_and_public_schema() -> None:
 def test_every_advertised_verb_and_harness_exists() -> None:
     """Each advertised verb is a
     path of the live tree, and the harness list is the harness registry."""
-    payload = build_capabilities(command_paths())
-    live = command_paths()
+    payload = build_capabilities(command_paths(live_root()))
+    live = command_paths(live_root())
     contexts, surfaces = payload["contexts"], payload["surfaces"]
     assert "modes" not in contexts and "heartbeat" not in contexts["commands"]
     assert {("context", verb) for verb in contexts["commands"]} <= live
@@ -162,7 +168,9 @@ def test_every_advertised_verb_and_harness_exists() -> None:
 def test_every_help_example_renders_the_venv_cli() -> None:
     """The gate blocks a bare `dadaia` first token,
     so a command path in any --help follows only the `fix_line` rendering of the CLI."""
-    leaf = "|".join(r"\s+".join(p) for p in sorted(command_paths(), key=len, reverse=True) if p)
+    leaf = "|".join(
+        r"\s+".join(p) for p in sorted(command_paths(live_root()), key=len, reverse=True) if p
+    )
     bare = re.compile(rf"(?<!Usage: )\bdadaia\s+(?:{leaf})(?=[\s'\"`]|$)")
     hits = [
         f"{' '.join(p) or '<root>'}: {m.group(0)!r}"

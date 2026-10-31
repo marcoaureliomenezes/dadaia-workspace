@@ -17,7 +17,7 @@ sources:
 - `contexts` carries `states` (`alive`, `dead`), `commands` (every `context` subcommand) and `selection_contract` `explicit-or-caller-owned-bind` ([[context-management]]).
 - `harnesses.layer_1` lists the Layer-1 entry harnesses of `dadaia_workspace/core/harness_registry.py`.
 - `surfaces` maps every top-level command group to its subcommand names — `{group: [subcommands]}`, a leaf command mapping to an empty list.
-- `certification` names `dadaia certify --json` and its `dadaia-certification-v1` schema; `consumer_requirements` states the consumer's obligations (exact provider version, reconcile after upgrade, load scoped context after bind, keep diagnostics whole, credentials only in the root `.env`).
+- `certification` names `dadaia certify --json` and its `dadaia-certification-v1` schema; `consumer_requirements` states the consumer's obligations (exact provider version, reconcile after upgrade, load scoped context after bind, keep diagnostics whole).
 
 ## Boundaries
 

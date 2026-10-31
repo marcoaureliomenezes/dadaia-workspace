@@ -4,6 +4,7 @@ Size: MEDIUM.
 
 from __future__ import annotations
 
+import importlib
 import json
 import subprocess
 import sys
@@ -190,3 +191,50 @@ def test_the_finding_and_its_fix_name_the_same_bad_line(tmp_path: Path) -> None:
         finding["fix"]
         == f"Agent action: re-encode line 2 of {target} as UTF-8 in place; every other line stays"
     )
+
+
+def _stage_skills(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Every skill's scripts beside each other, on the path the check verbs import from."""
+    stage_skill_scripts("dd-spec-navigator", tmp_path / "staged" / "scripts")
+    for skill in (
+        "dd-bug-resolution",
+        "dd-spec-navigator",
+        "dd-audit-project",
+        "dd-backlog-definition",
+    ):
+        monkeypatch.syspath_prepend(str(tmp_path / skill / "scripts"))
+
+
+def test_memory_check_builds_each_finding_with_the_one_constructor(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _stage_skills(tmp_path, monkeypatch)
+    import _findings
+    import _memory_check
+
+    built: list[tuple[object, ...]] = []
+    real = _findings.finding
+    monkeypatch.setattr(_findings, "finding", lambda *a: built.append(a) or real(*a))
+    specs = tmp_path / "repo" / "specs"
+    (specs / "memory" / "product").mkdir(parents=True)
+
+    found = _memory_check.check(specs)
+    assert found and len(built) == len(found)
+
+
+@pytest.mark.parametrize("module", ["memory", "audit", "backlog"])
+def test_each_check_verb_runs_the_one_check_body(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, module: str
+) -> None:
+    _stage_skills(tmp_path, monkeypatch)
+    import _findings
+
+    runs: list[tuple[tuple[object, ...], dict[str, object]]] = []
+    monkeypatch.setattr(
+        _findings, "run_check", lambda *a, **k: runs.append((a, k)) or 0, raising=False
+    )
+    specs = tmp_path / "repo" / "specs"
+    specs.mkdir(parents=True)
+
+    importlib.import_module(module).main(["check", "--specs", str(specs)])
+    assert len(runs) == 1

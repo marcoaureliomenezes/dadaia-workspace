@@ -16,7 +16,13 @@ from typing import Any
 import pytest
 
 from dadaia_workspace.core import clock, session_store
-from tests.fixtures.harness_env import claude_hook_env, kimi_hook_env, run_hook_subprocess
+from dadaia_workspace.core.cli_line import fix_line
+from tests.fixtures.harness_env import (
+    claude_hook_env,
+    codex_hook_env,
+    kimi_hook_env,
+    run_hook_subprocess,
+)
 from tests.helpers.oslib import read_text, run, write_text
 from tests.helpers.oslib import run as os_run
 from tests.helpers.oslib import write_text as os_write_text
@@ -24,7 +30,8 @@ from tests.helpers.oslib import write_text as os_write_text
 
 def _ws(root: Path, *contexts: dict[str, Any]) -> Path:
     """Register *contexts* (``name`` plus optional ``slug``/``state``/``stack``/``catalog``/
-    ``index``/``assoc``) and write each main repo's memory."""
+    ``index``/``atoms``/``assoc``) and write each main repo's memory; ``atoms`` maps a path under
+    ``product/`` to an atom file's text."""
     states = root / ".dadaia" / "states"
     states.mkdir(parents=True)
     entries = []
@@ -42,6 +49,9 @@ def _ws(root: Path, *contexts: dict[str, Any]) -> Path:
             write_text(product / "index.md", c["index"])
         else:
             write_text(product / "catalog.json", c.get("catalog", '{"features": []}'))
+        for rel, text in c.get("atoms", {}).items():  # the atom files: the owner's answer
+            (product / rel).parent.mkdir(parents=True, exist_ok=True)
+            write_text(product / rel, text)
         if "assoc" in c:  # an associated repo carrying its OWN memory tree
             entry["associated_repos"] = [{"slug": "assoc", "url": "https://example.invalid/a.git"}]
             assoc = root / "repos" / "assoc" / "specs" / "memory"
@@ -238,7 +248,7 @@ _NO_MEMORY = ("end memory bootstrap", "Python 3.12")
             None,
             [
                 _UNBOUND,
-                "\nNext (command step context): no ALIVE Spec Context",
+                "\nNext (agent step context): no ALIVE Spec Context",
                 "context create with a context name and --main-repo set to the main repo's",
             ],
             _NO_MEMORY,
@@ -297,6 +307,70 @@ def test_first_emission(
     assert not any(a in out for a in absent), out
 
 
+@pytest.mark.parametrize("event", [None, "SessionStart"], ids=["prompt", "session-start"])
+def test_the_first_event_of_an_unrecorded_session_leaves_a_live_record(
+    tmp_path: Path, event: str | None
+) -> None:
+    _ws(tmp_path, {"name": "alpha"})
+
+    _run(tmp_path, "fresh", event=event)
+
+    record = session_store.live_session(tmp_path, "fresh")
+    assert record is not None and record["session_id"] == "fresh"
+    assert "context" not in record and "bind_id" not in record
+
+
+@pytest.mark.parametrize(
+    ("payload_id", "recorded"),
+    [("codex-payload-sess", "codex-payload-sess"), ("../pay/1", "pay1")],
+    ids=["plain", "traversal-sanitized"],
+)
+def test_a_codex_prompt_records_the_payload_session(
+    tmp_path: Path, payload_id: str, recorded: str
+) -> None:
+    _ws(tmp_path, {"name": "alpha"})
+
+    result = run_hook_subprocess("ctx_inject", {"session_id": payload_id}, codex_hook_env(tmp_path))
+
+    assert result.returncode == 0, result.stderr
+    record = session_store.live_session(tmp_path, recorded)
+    assert record is not None and record["session_id"] == recorded
+    assert sorted(p.name for p in (tmp_path / ".dadaia" / "sessions").glob("*.json")) == [
+        f"{recorded}.json"
+    ]
+
+
+@pytest.mark.parametrize("event", [None, "SessionStart"], ids=["prompt", "session-start"])
+def test_a_codex_session_bound_under_its_payload_id_is_injected_and_never_told_to_bind(
+    tmp_path: Path, event: str | None
+) -> None:
+    """The env carries no Codex id: heartbeat, Bind and next step all read the payload's."""
+    _ws(tmp_path, {"name": "alpha"})
+    _bind(tmp_path, "cx-sess", "alpha")
+    env = codex_hook_env(tmp_path, extra={"DADAIA_HOOK_EVENT": event} if event else None)
+
+    result = run_hook_subprocess("ctx_inject", {"session_id": "cx-sess"}, env)
+
+    assert result.returncode == 0, result.stderr
+    assert _A in result.stdout and "Python 3.12" in result.stdout, result.stdout
+    assert "context bind" not in result.stdout
+
+
+def test_a_kimi_prompt_with_only_a_payload_id_leaves_no_record_and_no_bind_step(
+    tmp_path: Path,
+) -> None:
+    """Kimi's shell carries no id, so its payload id binds nothing and `context bind` is no step."""
+    _ws(tmp_path, {"name": "alpha"})
+    env = kimi_hook_env(tmp_path, extra={"DADAIA_RUNTIME": "kimi-code"})
+
+    result = run_hook_subprocess("ctx_inject", {"session_id": "kimi-sess"}, env)
+
+    assert result.returncode == 0, result.stderr
+    assert _UNBOUND in result.stdout
+    assert "context bind" not in result.stdout
+    assert not list((tmp_path / ".dadaia" / "sessions").glob("*.json"))
+
+
 def test_env_override_injects_context_memory(tmp_path: Path) -> None:
     """A session with no id (a Kimi shell, no payload id) is bound by DADAIA_CONTEXT."""
     _ws(tmp_path, {"name": "ctx"})
@@ -347,6 +421,13 @@ def test_emissions_attach_the_derived_help_digest(tmp_path: Path) -> None:
     assert "# dadaia CLI digest (vX)" in _run(tmp_path, "s")
 
 
+def _atom(slug: str, summary: str = "short") -> str:
+    return (
+        f"---\nslug: {slug}\ntitle: {slug}\ntldr: handoffs\nsummary: {summary}\n"
+        f"tags: [handoff]\n---\n\n# {slug}\n"
+    )
+
+
 def test_injected_catalog_is_tldr_digest_and_measurably_smaller(tmp_path: Path) -> None:
     """The injected catalog keeps slug/title/tldr/path only (never the heavy
     ``summary`` nor ``rank``), is under half the raw bytes, and the file on disk is untouched."""
@@ -360,7 +441,18 @@ def test_injected_catalog_is_tldr_digest_and_measurably_smaller(tmp_path: Path) 
         "path": "specs/memory/product/agents/agent-comms.md",
     }
     raw = json.dumps({"context": "ctx", "features": [feature, {**feature, "slug": "b"}]})
-    _ws(tmp_path, {"name": "ctx", "catalog": raw})
+    heavy = "heavy self-pull text " * 60
+    _ws(
+        tmp_path,
+        {
+            "name": "ctx",
+            "catalog": raw,
+            "atoms": {
+                "agents/agent-comms.md": _atom("agent-comms", heavy),
+                "agents/b.md": _atom("b", heavy),
+            },
+        },
+    )
     _bind(tmp_path, "s", "ctx")
     out = _run(tmp_path, "s")
     block = out[out.index("{") : out.rindex("}") + 1]
@@ -374,16 +466,75 @@ def test_injected_catalog_is_tldr_digest_and_measurably_smaller(tmp_path: Path) 
     assert read_text(tmp_path / "repos/ctx/specs/memory/product/catalog.json") == raw
 
 
-# The hook under ``runpy``, with an audit hook counting filesystem and subprocess operations
-# (CPython's own audit events: the seam itself, never a production counter).
+def test_the_digest_is_the_atom_files_when_the_catalog_names_a_ghost(tmp_path: Path) -> None:
+    """Catalog and files disagree: the catalog names a feature with no atom file, and the atom
+    file has no catalog entry. The files are the owner's answer."""
+    ghost = json.dumps(
+        {"features": [{"slug": "ghost", "title": "ghost", "tldr": "x", "path": "p"}]}
+    )
+    _ws(tmp_path, {"name": "ctx", "catalog": ghost, "atoms": {"agents/real.md": _atom("real")}})
+    _bind(tmp_path, "s", "ctx")
+
+    out = _run(tmp_path, "s")
+
+    assert '"slug": "real"' in out
+    assert '"slug": "ghost"' not in out
+
+
+def test_the_digest_is_built_from_files_when_the_catalog_is_unreadable(tmp_path: Path) -> None:
+    """A catalog that does not parse is not injected raw: the atom files still answer."""
+    _ws(
+        tmp_path,
+        {"name": "ctx", "catalog": "{not json", "atoms": {"agents/real.md": _atom("real")}},
+    )
+    _bind(tmp_path, "s", "ctx")
+
+    out = _run(tmp_path, "s")
+
+    assert '"slug": "real"' in out
+    assert "{not json" not in out
+
+
+def test_an_unreadable_atom_is_a_finding_with_the_check_that_names_it(tmp_path: Path) -> None:
+    """An atom whose frontmatter does not parse is printed as a finding that names the file and
+    the `memory.py check` fix line, never silently dropped from the emission."""
+    _ws(
+        tmp_path,
+        {
+            "name": "ctx",
+            "atoms": {"agents/broken.md": "---\nslug: [unclosed\n---\n\n# broken\n"},
+        },
+    )
+    _bind(tmp_path, "s", "ctx")
+
+    out = _run(tmp_path, "s")
+
+    assert "broken.md" in out
+    assert "memory.py check" in out
+
+
+# The hook under ``runpy``, with an audit hook counting subprocess spawns and the filesystem
+# operations under the workspace (cwd): CPython's own audit events, the seam itself. Import
+# opens and the import system's re-listing of a ``sys.path`` dir another process changed lie
+# outside the workspace, so they are never counted; an open by file descriptor names no path.
 _COUNTING_DRIVER = """
-import runpy, sys
+import os, runpy, sys
 _SEAM = ("open", "os.listdir", "os.scandir", "os.mkdir", "os.remove", "os.rename",
          "subprocess.Popen")
 ops = [0]
-sys.addaudithook(lambda event, _: ops.__setitem__(0, ops[0] + (event in _SEAM)))
+ROOT = os.getcwd()
+def _counts(event, args):
+    if event == "subprocess.Popen":
+        return True
+    if event not in _SEAM or isinstance(args[0], int):
+        return False
+    try:
+        return os.path.commonpath([ROOT, os.path.abspath(os.fsdecode("." if args[0] is None else args[0]))]) == ROOT
+    except ValueError:
+        return False
+sys.addaudithook(lambda event, args: ops.__setitem__(0, ops[0] + _counts(event, args)))
 try:
-    runpy.run_module("dadaia_workspace.hooks.{hook}", run_name="__main__")
+    runpy.run_module("{hook}", run_name="__main__")
 except SystemExit:
     pass
 finally:
@@ -391,13 +542,12 @@ finally:
 """
 
 
-def _ops(root: Path, hook: str, bound: bool) -> int:
+def _ops(root: Path, hook: str, bound: bool, path: Path | None = None) -> int:
     if bound:
         _bind(root, "s", "c0")
-    env = {**claude_hook_env(root, session_id="s"), "PYTHONPATH": os.environ.get("PYTHONPATH", "")}
+    pythonpath = str(path) if path else os.environ.get("PYTHONPATH", "")
+    env = {**claude_hook_env(root, session_id="s"), "PYTHONPATH": pythonpath}
     env.pop("DADAIA_CONTEXT", None)
-    # A cold, never-written cache: import opens are then the same on every run and machine.
-    env |= {"PYTHONPYCACHEPREFIX": str(root / "cold-pyc"), "PYTHONDONTWRITEBYTECODE": "1"}
     done = run([sys.executable, "-c", _COUNTING_DRIVER.format(hook=hook)], input=json.dumps({"session_id": "s"}), env=env, cwd=root, check=True, timeout=30)  # fmt: skip
     return int(done.stderr.rsplit("OPS=", 1)[1])
 
@@ -423,10 +573,32 @@ def test_hook_lane_cost_does_not_grow_with_the_registry(
 ) -> None:
     """A hook lane's filesystem and subprocess operations are the same at 2 and at 20 contexts."""
     two, twenty = (
-        _ops(_ws(tmp_path / str(n), *({"name": f"c{i}"} for i in range(n))), hook, bound)
+        _ops(
+            _ws(tmp_path / str(n), *({"name": f"c{i}"} for i in range(n))),
+            f"dadaia_workspace.hooks.{hook}",
+            bound,
+        )
         for n in (2, 20)
     )
-    assert twenty == two
+    assert twenty == two > 0
+
+
+def test_hook_lane_cost_ignores_a_sys_path_dir_another_process_changes_mid_run(
+    tmp_path: Path,
+) -> None:
+    """The import system re-lists a ``sys.path`` dir whose mtime moved (another test worker
+    writing into the checkout does that); the count is of the workspace's own operations."""
+    path = tmp_path / "path"
+    path.mkdir()
+    (tmp_path / "off").mkdir()
+    # Both write one file; only churn's lands in a ``sys.path`` dir, so the delta is the re-list.
+    (path / "quiet.py").write_text(f"open({str(tmp_path / 'off' / 'x')!r}, 'w').close()\nimport colorsys\n")  # fmt: skip
+    (path / "churn.py").write_text("open(__file__ + 'x', 'w').close()\nimport colorsys\n")  # fmt: skip
+    os.utime(path, (0, 0))  # the write below always moves the mtime, whatever the clock tick
+    quiet, churn = (
+        _ops(_ws(tmp_path / hook, {"name": "c0"}), hook, False, path) for hook in ("quiet", "churn")
+    )
+    assert churn == quiet
 
 
 def test_hook_lane_cost_is_the_same_whatever_bytecode_cache_the_parent_holds(
@@ -439,7 +611,9 @@ def test_hook_lane_cost_is_the_same_whatever_bytecode_cache_the_parent_holds(
     counts = []
     for n, prefix in enumerate((tmp_path / "cold", warm)):
         monkeypatch.setenv("PYTHONPYCACHEPREFIX", str(prefix))
-        counts.append(_ops(_ws(tmp_path / str(n), {"name": "c0"}), "ctx_inject", True))
+        counts.append(
+            _ops(_ws(tmp_path / str(n), {"name": "c0"}), "dadaia_workspace.hooks.ctx_inject", True)
+        )
     assert counts[0] == counts[1]
 
 
@@ -478,3 +652,31 @@ def test_naive_bound_at_reads_as_utc_in_any_zone(
     finally:
         monkeypatch.undo()
         time.tzset()
+
+
+@pytest.mark.parametrize(
+    ("record", "fix"),
+    [
+        pytest.param("{not json", ("doctor", "--fix"), id="unreadable-names-doctors-fix"),
+        pytest.param(
+            '{"session_id": "s", "last_seen_at": "2999-01-01T00:00:00+00:00"}',
+            ("context", "bind", "alpha"),
+            id="readable-live-unbound-names-the-bind",
+        ),
+    ],
+)
+def test_the_next_step_names_a_fix_the_session_can_run(
+    tmp_path: Path, record: str, fix: tuple[str, ...]
+) -> None:
+    """A record that does not read leaves the session ungoverned, so `context bind` is refused:
+    SessionStart names the act that clears the record instead."""
+    _ws(tmp_path, {"name": "alpha"})
+    write_text(session_store.session_record_path(tmp_path, "s", create=True), record)
+
+    out = _run(tmp_path, "s", event="SessionStart")
+
+    assert f"fix: {fix_line(tmp_path, *fix)}" in out, out
+    assert (fix_line(tmp_path, "context", "bind", "alpha") in out) is (fix[0] == "context"), out
+    assert ("Next (command step bind): This session's record does not read." in out) is (
+        fix[0] == "doctor"
+    ), out

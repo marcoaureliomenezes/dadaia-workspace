@@ -21,8 +21,7 @@ import typer
 
 from dadaia_workspace import container
 from dadaia_workspace.cli._specs_resolution import (
-    alive_context_trees,
-    own_bind_for_cli,
+    own_next_step,
     resolve_context_for_cli,
     resolve_context_specs_dir_for_cli,
     resolve_specs_dir_for_cli,
@@ -44,7 +43,12 @@ from dadaia_workspace.core.exceptions import (
 from dadaia_workspace.core.specs_version import NO_TREE, state
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.backlog import doctor as backlog_doctor
-from dadaia_workspace.features.spec_context.doctor import DoctorService, workspace_rules
+from dadaia_workspace.features.spec_context.doctor import (
+    EXPIRE_STEPS,
+    REAP_STEPS,
+    DoctorService,
+    workspace_rules,
+)
 from dadaia_workspace.features.specs import SpecsDoctor, doctor_adr
 from dadaia_workspace.features.specs.doctor_types import finding_path
 from dadaia_workspace.features.specs.rules import RULES as SPECS_RULES
@@ -142,7 +146,9 @@ def _ledgers_section(
 # ── composition ─────────────────────────────────────────────────────────────────
 
 
-def _build_specs_doctor(specs_dir: Path | None, public_dir: str | None) -> SpecsDoctor | None:
+def _build_specs_doctor(
+    specs_dir: Path | None, public_dir: str | None, root: object
+) -> SpecsDoctor | None:
     """A workspace with no specs tree has no specs doctor."""
     if specs_dir is None or state(specs_dir)[0] in NO_TREE:
         return None
@@ -155,7 +161,7 @@ def _build_specs_doctor(specs_dir: Path | None, public_dir: str | None) -> Specs
         repo_root=specs_dir.parent,
         # The Typer walk, done here and handed in as plain data;
         # `features` never imports `cli`.
-        command_paths=command_paths(),
+        command_paths=command_paths(root),
     )
 
 
@@ -220,13 +226,9 @@ def _onboarding_section(
     if workspace_root is None or expired_only:
         return _empty_section("workspace")
     try:
-        trees = alive_context_trees(workspace_root)
-        bind, session = own_bind_for_cli()
+        step = own_next_step(workspace_root, scope)
     except SchemaVersionError:  # `check` reports REG-SCHEMA; no next step is guessed
         return _empty_section("workspace")
-    step = onboarding.next_step(
-        workspace_root, trees, scope, None if session is None else bool(bind)
-    )
     if step is None:
         return _empty_section("workspace")
     finding = SectionFinding(
@@ -257,6 +259,7 @@ def _render_for(workspace_root: Path | None, *, redact: bool) -> Callable[[str],
 
 @app.callback(invoke_without_command=True)
 def doctor(
+    ctx: typer.Context,
     specs_dir: str | None = typer.Option(
         None,
         "--specs-dir",
@@ -275,13 +278,18 @@ def doctor(
             "checks. Default: auto-detected from specs_dir/../dadaia_workspace/public/."
         ),
     ),
-    fix: bool = typer.Option(False, "--fix", help=render_fix_help()),
+    fix: bool = typer.Option(
+        False,
+        "--fix",
+        help=f"{render_fix_help()} Workspace repairs: {EXPIRE_STEPS}, then {REAP_STEPS}. "
+        "Afterwards it re-checks and reports residual issues.",
+    ),
     expired_only: bool = typer.Option(
         False,
         "--expired-only",
         help=(
             "Scope the run to the workspace TTL lane: the workspace section reports "
-            "only expired entries and --fix deletes only those and stale session records "
+            f"only expired entries and --fix only {EXPIRE_STEPS} "
             "— no slop move, no repo walk, no specs repairs (the SessionStart lane)."
         ),
     ),
@@ -304,7 +312,7 @@ def doctor(
 ) -> None:
     """Report workspace, specs and ledger compliance; optionally repair."""
     workspace_root, service, scope, target = _resolve_run(specs_dir, context)
-    specs_doctor = _build_specs_doctor(target, public_dir)
+    specs_doctor = _build_specs_doctor(target, public_dir, ctx.find_root().command)
 
     fixed = _apply_fixes(service, specs_doctor, scope, fix=fix, expired_only=expired_only)
     render = _render_for(workspace_root, redact=redact)

@@ -3,14 +3,15 @@
 
 from __future__ import annotations
 
-import json
 import os
 import re
+import subprocess
+from collections import Counter
 from collections.abc import Iterable, Mapping
 from pathlib import Path
 
 from _grammar import SHA_RE
-from _platform import read_text, run
+from _platform import run, run_bytes
 
 #: `git rev-parse --local-env-vars` less the config injectors: what makes git answer for another repo. Identity, config and ssh are the caller's.
 _LOCAL = frozenset({
@@ -28,18 +29,35 @@ def scrubbed_env(parent: Mapping[str, str] | None = None) -> dict[str, str]:
 
 
 class GitError(RuntimeError):
-    """A git command that exited non-zero; *stderr* is git's own text."""
+    """A git command that exited non-zero; *stderr* is git's own text, *argv* the command that failed."""
 
-    def __init__(self, args: tuple[str, ...], stderr: str) -> None:
+    def __init__(self, args: tuple[str, ...], stderr: str, repo: Path | None = None) -> None:
         super().__init__(f"git {' '.join(args)}: {stderr}")
         self.stderr = stderr
+        self.argv = ("git", *(("-C", str(repo)) if repo else ()), *args)
 
 
 def git(repo: Path, *args: str, check: bool = True, input: str | None = None) -> str:
     done = run(["git", "-C", str(repo), *args], env=scrubbed_env(), input=input)
     if check and done.returncode:
-        raise GitError(args, done.stderr.strip())
+        raise GitError(args, done.stderr.strip(), repo)
     return done.stdout
+
+
+def git_bytes(
+    repo: Path,
+    *args: str,
+    input: bytes | None = None,
+    timeout: float | None = None,
+    env: Mapping[str, str] | None = None,
+) -> subprocess.CompletedProcess[bytes]:
+    """`git -C repo args` on the scrubbed env plus *env*: raw bytes, the exit status unchecked; a missing git raises `OSError`, a run past *timeout* `subprocess.TimeoutExpired`."""
+    return run_bytes(
+        ["git", "-C", str(repo), *args],
+        env=scrubbed_env() | dict(env or {}),
+        input=input,
+        timeout=timeout,
+    )
 
 
 def shallow(repo: Path) -> bool:
@@ -48,12 +66,8 @@ def shallow(repo: Path) -> bool:
 
 
 def main_checkout(repo: Path) -> Path:
-    """The parent of the git common dir of *repo* (a linked worktree resolves to its main checkout); `Path(".")` when *repo* is no repository."""
-    try:
-        common = git(repo, "rev-parse", "--git-common-dir")
-    except GitError:
-        return Path(".")
-    return (repo / common.strip()).resolve().parent
+    """The parent of the git common dir of *repo* (a linked worktree resolves to its main checkout). Raises `GitError` when *repo* is no repository."""
+    return (repo / git(repo, "rev-parse", "--git-common-dir").strip()).resolve().parent
 
 
 def reaches(repo: Path, sha: str) -> bool:
@@ -67,21 +81,13 @@ def reaches(repo: Path, sha: str) -> bool:
     return True
 
 
-#: A bug-fix line of a commit message: `fix(bugs): <id>[, <id>…] — …` or the REBUILD `refactor(bugs): …`.
-_FIX_LINE = re.compile(r"^(?:fix|refactor)\(bugs\): (.*?) — ", re.M)
+#: A bug-fix line of a commit message: `fix(bugs): <id>[, <id>…] — …` or `refactor(bugs): <id> — …`, the REBUILD.
+_FIX_LINE = re.compile(r"^(fix|refactor)\(bugs\): (.*?) — ", re.M)
 
 
-def context_repos(repo: Path) -> list[Path]:
-    """*repo* and the checkouts of the repos its bound context associates with it, as the workspace registry names them; never another context's checkout."""
-    main = main_checkout(repo)
-    try:
-        rows = json.loads(read_text(main.parent.parent / ".dadaia/states/spec_contexts.json"))[
-            "contexts"
-        ]
-    except (OSError, ValueError, KeyError, TypeError):
-        rows = []
-    beside = (main.parent / a["slug"] for r in rows if r.get("repo_slug") == main.name for a in r.get("associated_repos", []))  # fmt: skip
-    return [repo, *(p for p in beside if (p / ".git").exists())]
+def is_rebuild(message: str) -> bool:
+    """Whether a line of the commit *message* is a `refactor(bugs):` fix line."""
+    return any(label == "refactor" for label, _ in _FIX_LINE.findall(message))
 
 
 def _canon(subject: str) -> str:
@@ -89,23 +95,25 @@ def _canon(subject: str) -> str:
     return f'Revert "Revert "{subject[9:]}"' if subject.startswith('Reapply "') else subject
 
 
-def fix_commit(repo: Path, ids: Iterable[str]) -> dict[str, tuple[Path, str]]:
-    """For each of *ids*, the repo and sha of the newest commit whose message holds a bug-fix line naming it (a group lists its ids separated by commas or blanks), that the HEAD of *repo*, else of a repo of `context_repos`, reaches; each repo is read in one `git log` and only while an id is missing. A commit the HEAD reverts is skipped: a commit subjected `Revert "<S>"` retires the older commit subjected `<S>`, and a retired revert registers nothing."""
+def fix_commit(repos: Iterable[Path], ids: Iterable[str]) -> dict[str, tuple[Path, str]]:
+    """For each of *ids*, the repo and sha of the newest commit whose message holds a bug-fix line naming it (a group lists its ids separated by commas or blanks), that the HEAD of a repo of *repos* reaches; each repo is pulled and read in one `git log` only while an id is missing. A commit subjected `Revert "<S>"` retires exactly one older commit subjected `<S>`, the nearest, and a retired revert registers nothing."""
     wanted, found = set(ids), dict[str, tuple[Path, str]]()
-    for each in context_repos(repo):
-        if wanted <= found.keys():
-            break
-        retired = set()
+    for each in repos if wanted else ():
+        retired = Counter[str]()
         for entry in git(each, "log", "--format=%x1e%H%x00%B", check=False).split("\x1e")[1:]:
             sha, _, message = entry.partition("\0")
-            if (subject := _canon(message.partition("\n")[0])) in retired:
+            subject = _canon(message.partition("\n")[0])
+            if retired[subject]:
+                retired[subject] -= 1
                 continue
             if subject.startswith('Revert "'):
-                retired.add(_canon(subject[8:-1]))
-            for head in _FIX_LINE.findall(message):
+                retired[_canon(subject[8:-1])] += 1
+            for _, head in _FIX_LINE.findall(message):
                 for bug in re.split(r"[,\s]+", head):
                     if bug in wanted:
                         found.setdefault(bug, (each, sha))
+        if wanted <= found.keys():  # after the body: the next repo is not even pulled
+            break
     return found
 
 

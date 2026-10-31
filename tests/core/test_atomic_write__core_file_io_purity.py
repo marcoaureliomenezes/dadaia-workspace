@@ -52,7 +52,7 @@ def _functions(tree: ast.AST) -> Iterator[ast.FunctionDef | ast.AsyncFunctionDef
 #: enters core/ only by joining this set on purpose.
 _CORE_IO_STEMS = frozenset(
     {"workspace_resolver", "context_registry", "session_store", "handoff_index",
-     "template_history", "gitflow", "workspace_layout"}
+     "template_history", "gitflow", "workspace_layout", "linked_tree"}
 )  # fmt: skip
 _PATH_IO_ATTRS = frozenset(
     {"read_text", "write_text", "mkdir", "exists", "glob", "iterdir", "rglob"}
@@ -72,7 +72,7 @@ def _core_file_io() -> list[str]:
                 continue
             f = n.func
             if (
-                (isinstance(f, ast.Name) and f.id == "open")
+                (isinstance(f, ast.Name) and (f.id == "open" or f.id in _PATH_IO_ATTRS))
                 or (isinstance(f, ast.Attribute) and f.attr in _PATH_IO_ATTRS)
                 or (
                     isinstance(f, ast.Attribute)

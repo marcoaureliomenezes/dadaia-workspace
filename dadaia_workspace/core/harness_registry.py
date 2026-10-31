@@ -1,15 +1,7 @@
 """Typed harness identity registry — ``core/harness_registry.py``.
 
-The **code embodiment** of the agent-runtime roster that ``specs/memory/tech-stack.md``
-("Agent runtimes") documents as the single source of truth. One
-:class:`HarnessRecord` per harness is the whole registry: every other constant here
-(:data:`L1_ENTRY_HARNESSES`, :data:`HARNESS_PROJECTION_DIRS`,
-:data:`PROJECTION_TARGETS`) and every projection rule in
-``infrastructure/projection_rules.py`` derives from it, so a harness fact is stated
-once and a per-harness ``if`` has nowhere to live.
-
-Layering: a pure ``core`` leaf — **stdlib only, no upward import** (import-linter clean).
-Consumed downward by ``infrastructure`` / ``features`` / ``cli``.
+Inputs: none. Output: ``HARNESS_RECORDS``, one :class:`HarnessRecord` per Layer-1 entry
+harness, and the constants derived from it. Side effects: none; stdlib only.
 """
 
 from __future__ import annotations
@@ -60,12 +52,19 @@ class HarnessRecord:
             the user level).
         agent_transcode: how it consumes the authored persona set.
         hooks: the format its hook registration serializes into.
+        subagent_key: the key of its pre-tool payload that names the running subagent, or
+            ``None`` when it gives no identity.
+        session_env: the env vars carrying its session id, in resolution order.
+        binary: the CLI binary it installs (the live probe runs it).
     """
 
     name: str
     directory: str | None
     agent_transcode: AgentTranscode
     hooks: HookFormat
+    subagent_key: str | None
+    session_env: tuple[str, ...]
+    binary: str
 
 
 #: The registry. Insertion order IS the canonical order (``init --harness`` and the
@@ -78,36 +77,54 @@ HARNESS_RECORDS: dict[str, HarnessRecord] = {
             directory=".claude",
             agent_transcode=AgentTranscode.CLAUDE_MD_SYMLINK,
             hooks=HookFormat.CLAUDE_SETTINGS,
+            subagent_key="agent_type",
+            session_env=("CLAUDE_CODE_SESSION_ID",),
+            binary="claude",
         ),
         HarnessRecord(
             name="codex",
             directory=".codex",
             agent_transcode=AgentTranscode.CODEX_TOML,
             hooks=HookFormat.CODEX_HOOKS,
+            subagent_key="agent_type",
+            session_env=("CODEX_SESSION_ID", "CODEX_THREAD_ID"),
+            binary="codex",
         ),
         HarnessRecord(
             name="kimi-code",
             directory=None,
             agent_transcode=AgentTranscode.NONE,
             hooks=HookFormat.KIMI_HOOKS,
+            subagent_key=None,
+            session_env=(),
+            binary="kimi",
         ),
         HarnessRecord(
             name="cursor",
             directory=".cursor",
             agent_transcode=AgentTranscode.CURSOR_MD,
             hooks=HookFormat.CURSOR_HOOKS,
+            subagent_key=None,
+            session_env=(),
+            binary="cursor-agent",
         ),
         HarnessRecord(
             name="devin",
             directory=".devin",
             agent_transcode=AgentTranscode.DEVIN_MD,
             hooks=HookFormat.DEVIN_HOOKS,
+            subagent_key=None,
+            session_env=(),
+            binary="devin",
         ),
         HarnessRecord(
             name="copilot",
             directory=".github",
             agent_transcode=AgentTranscode.COPILOT_AGENT_MD,
             hooks=HookFormat.COPILOT_HOOKS,
+            subagent_key=None,
+            session_env=(),
+            binary="copilot",
         ),
     )
 }

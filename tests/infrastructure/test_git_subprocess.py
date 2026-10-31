@@ -4,8 +4,10 @@ A mismatched upstream pushes by explicit refspec; commit_paths ignores pre-stage
 the identity is the operator's own, never a fallback; a failed step carries git's stdout.
 """
 
+import os
 import re
 import subprocess
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
@@ -16,7 +18,16 @@ from dadaia_workspace.core.gitflow import SeveralWorkBranches
 from dadaia_workspace.core.skill_owner import load_owner
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from tests.conftest import _GIT_QUIET
-from tests.helpers.oslib import run, run_line, write_text
+from tests.helpers.oslib import (
+    head,
+    make_executable,
+    norm_sep,
+    quote,
+    read_text,
+    run,
+    run_line,
+    write_text,
+)
 
 pytestmark = pytest.mark.slow
 
@@ -257,3 +268,58 @@ def test_the_several_work_branches_fix_runs_and_clears_the_refusal(
             break
     assert passes == (1 if merged else 2)
     assert client.work_version(repo) == "0.2.0"
+
+
+def _stub_ssh(directory: Path, remote: Path) -> Path:
+    """An `ssh` that records its argv, then serves *remote* locally."""
+    directory.mkdir(parents=True)
+    stub = directory / "ssh"
+    write_text(
+        stub,
+        f'#!/bin/sh\nprintf "%s\\n" "$@" > "$0.argv"\nexec git-upload-pack {quote(norm_sep(str(remote)))}\n',
+    )
+    make_executable(stub)
+    return stub
+
+
+_MARKER = ["-o", "Marker=1"]
+
+
+@pytest.mark.parametrize(
+    ("setup", "options", "on_path"),
+    [
+        (lambda mp, cfg, users, line: mp.setenv("GIT_SSH_COMMAND", line), _MARKER, False),
+        (
+            lambda mp, cfg, users, line: _git(
+                cfg.parent, "config", "--file", str(cfg), "core.sshCommand", line
+            ),
+            _MARKER,
+            False,
+        ),
+        (lambda mp, cfg, users, line: mp.setenv("GIT_SSH", str(users)), [], False),
+        (lambda mp, cfg, users, line: None, [], True),
+    ],
+    ids=["GIT_SSH_COMMAND", "core.sshCommand", "GIT_SSH", "none"],
+)
+def test_reachable_runs_the_users_ssh_with_batch_mode(
+    setup: Callable[..., object],
+    options: list[str],
+    on_path: bool,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    remote = _repo(tmp_path / "remote")
+    users = _stub_ssh(tmp_path / "users", remote)
+    path_stub = _stub_ssh(tmp_path / "bin", remote)
+    monkeypatch.setenv("PATH", f"{path_stub.parent}{os.pathsep}{os.environ['PATH']}")
+    monkeypatch.delenv("GIT_SSH_COMMAND", raising=False)
+    monkeypatch.delenv("GIT_SSH", raising=False)
+    config = tmp_path / "gitconfig"
+    write_text(config, f'[include]\n\tpath = "{_GIT_QUIET.as_posix()}"\n')
+    monkeypatch.setenv("GIT_CONFIG_GLOBAL", str(config))
+    setup(monkeypatch, config, users, " ".join([head(norm_sep(str(users))), *options]))
+
+    assert GitSubprocessClient().reachable("ssh://host/repo") is True
+
+    argv = read_text(Path(f"{path_stub if on_path else users}.argv")).split("\n")
+    assert argv[: len(options) + 2] == [*options, "-o", "BatchMode=yes"]

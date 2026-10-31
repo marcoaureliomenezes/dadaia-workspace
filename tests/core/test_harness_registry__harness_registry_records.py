@@ -32,6 +32,17 @@ def test_every_record_carries_a_directory_an_agent_transcode_and_a_hook_derivati
         assert record.hooks is not None
 
 
+def test_claude_and_codex_name_the_payload_key_of_a_subagent() -> None:
+    assert {name: record.subagent_key for name, record in HARNESS_RECORDS.items()} == {
+        "claude": "agent_type",
+        "codex": "agent_type",
+        "kimi-code": None,
+        "cursor": None,
+        "devin": None,
+        "copilot": None,
+    }
+
+
 def test_the_legacy_constants_derive_from_the_record_table() -> None:
     assert tuple(HARNESS_RECORDS) == L1_ENTRY_HARNESSES
     assert {
@@ -64,3 +75,24 @@ def test_the_projection_table_carries_no_harness_named_literal(module: ModuleTyp
         f"{Path(module.__file__ or '').name} names harnesses {offenders}; "
         "every harness fact belongs to core/harness_registry.py's record table"
     )
+
+
+def test_session_env_and_binary_are_record_fields() -> None:
+    """The session-id env vars and the probe binary live on the record, in resolution order."""
+    assert {n: (r.session_env, r.binary) for n, r in HARNESS_RECORDS.items()} == {
+        "claude": (("CLAUDE_CODE_SESSION_ID",), "claude"),
+        "codex": (("CODEX_SESSION_ID", "CODEX_THREAD_ID"), "codex"),
+        "kimi-code": ((), "kimi"),
+        "cursor": ((), "cursor-agent"),
+        "devin": ((), "devin"),
+        "copilot": ((), "copilot"),
+    }
+
+
+def test_the_session_id_resolution_reads_the_records() -> None:
+    """Every record's session env var resolves a session id, with no second list."""
+    from dadaia_workspace.core import invocation
+
+    for record in HARNESS_RECORDS.values():
+        for var in record.session_env:
+            assert invocation.resolve_session_id({var: "s-1"}) == "s-1"

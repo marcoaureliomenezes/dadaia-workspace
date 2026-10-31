@@ -15,12 +15,12 @@ from typing import Any
 
 import pytest
 
-from dadaia_workspace.core.cli_line import git_line
-from dadaia_workspace.core.platform import quote
+from dadaia_workspace.core.cli_line import shell_line
+from dadaia_workspace.core.platform import git_inline, quote
 from dadaia_workspace.core.skill_owner import load_owner
 from tests.fixtures.harness_env import run_bash
 from tests.helpers.oslib import link, write_text
-from tests.helpers.worktree_ws import commit, fixes, git, make_workspace, run
+from tests.helpers.worktree_ws import cli_path, commit, fixes, git, make_workspace, patch_cli, run
 
 RC = "0.5.0/rc-1/wt-rc"
 MAIN = "0.5.0/rc-1/job-1/wt-main"
@@ -189,7 +189,11 @@ def test_an_off_grammar_orphan_branch_has_an_exit_only_when_git_branch_d_runs(
             "",
         )
         if ahead
-        else (git_line(repo, "branch", "-d", "wt/stray"),) * 2
+        else (
+            f"Agent action: run `{git_inline(repo, 'switch', tip)}`, "
+            f"then run `{git_inline(repo, 'branch', '-d', 'wt/stray')}`",
+        )
+        * 2
     )
 
 
@@ -219,7 +223,7 @@ def test_an_off_grammar_orphan_branch_with_a_diverged_upstream_is_deleted_by_its
 @pytest.mark.parametrize(
     "stray", ["0.5.0/junk", "0.5.0/rc-1/junk", "0.5.0/rc-1/job-1/junk"], ids=["lane", "rc", "job"]
 )
-def test_a_stray_folder_at_any_depth_is_one_row_whose_fix_removes_it(
+def test_a_stray_folder_at_any_depth_is_one_row_whose_fix_moves_it(
     root: Path, stray: str, filled: bool
 ) -> None:
     _open(root, RC)
@@ -230,7 +234,12 @@ def test_a_stray_folder_at_any_depth_is_one_row_whose_fix_removes_it(
 
     unregistered = [(r["path"], r["fix"]) for r in _rows(root) if r["state"] == "unregistered"]
 
-    assert unregistered == [(str(folder), f"Agent action: remove the directory {folder}")]
+    assert unregistered == [
+        (
+            str(folder),
+            f"Agent action: stop what holds files open in {folder}, then move the folder {folder} out of the lane path (it may hold work)",
+        )
+    ]
 
 
 def test_an_orphans_surviving_directory_is_the_orphans_row_alone(root: Path) -> None:
@@ -242,7 +251,7 @@ def test_an_orphans_surviving_directory_is_the_orphans_row_alone(root: Path) -> 
     [row] = _rows(root)
 
     assert (row["state"], row["path"]) == ("orphan", str(folder))
-    assert row["fix"].startswith(f"Agent action: remove the directory {folder}, then run `")
+    assert row["fix"] == f"Agent action: stop what holds files open in {folder}, then move the folder {folder} out of the lane path (it may hold work)"  # fmt: skip
 
 
 def test_a_git_failure_in_a_row_read_ends_as_one_refusal_with_an_agent_action_fix(
@@ -366,20 +375,28 @@ def test_the_origin_read_lists_the_work_branches_origin_holds_and_keeps_the_high
     assert several.value.keep == "0.8.0"
 
 
+@pytest.mark.parametrize("merged", [True, False], ids=["drop-merged-low", "merge-unmerged-low"])
 def test_the_several_work_decision_yields_the_kept_version_and_the_local_act(
-    tmp_path: Path,
+    tmp_path: Path, merged: bool
 ) -> None:
     owner = load_owner("dd-gitflow-default", "_worktree_git")
     repo = _repo_with_origin(tmp_path, ["0.6.0", "0.8.0"], [])
+    if not merged:
+        git(repo, "switch", "-q", "feature/0.6.0")
+        commit(repo, "low.txt")
     flow = {"work": "feature/"}
 
     keep, text = owner.several_work(repo, flow, ["0.6.0", "0.8.0"])
 
     assert keep == "0.8.0"
-    assert text == (
-        f"run `{owner.git_inline(repo, 'switch', 'feature/0.8.0')}`, "
-        f"then run `{owner.git_inline(repo, 'branch', '-d', 'feature/0.6.0')}`"
-    )
+    switch = f"run `{owner.git_inline(repo, 'switch', 'feature/0.8.0')}`"
+    if merged:
+        assert (
+            text
+            == f"{switch}, then run `{owner.git_inline(repo, 'branch', '-d', 'feature/0.6.0')}`"
+        )
+    else:
+        assert text == f"{switch}, then merge feature/0.6.0 into feature/0.8.0"
 
 
 def test_an_origin_only_lower_work_branch_yields_no_local_step(tmp_path: Path) -> None:
@@ -399,7 +416,58 @@ def test_the_several_work_act_reads_the_merged_state_and_upstream_in_one_git_rea
     real = owner.git
     monkeypatch.setattr(owner, "git", lambda tree, *args, **kw: (reads.append(args), real(tree, *args, **kw))[1])  # fmt: skip
 
-    _, text = owner.several_work(repo, {"work": "feature/"}, ["0.6.0", "0.8.0"])
+    owner.several_work(repo, {"work": "feature/"}, ["0.6.0", "0.8.0"])
 
     assert len(reads) == 1, reads
-    assert text.count("`") == 6 and "--unset-upstream" in text and "branch -d" in text
+
+
+def test_the_child_cli_is_handed_the_denylist_file_the_loader_reads(
+    root: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    owner = load_owner("dd-gitflow-default", "_worktree_git")
+    workspace = root / ".dadaia/states/privacy_denylist.json"
+    write_text(workspace, '{"zorblax": "private"}')
+    write_text(root / "empty.json", "{}")
+    monkeypatch.setenv("DADAIA_PRIVACY_DENYLIST", str(root / "empty.json"))  # exists, holds no term
+    seen: list[dict[str, str]] = []
+
+    def spawn(_root: Path, *_args: str, env: dict[str, str], **_kw: Any) -> subprocess.CompletedProcess[str]:  # fmt: skip
+        seen.append(env)
+        return subprocess.CompletedProcess([], 0, "", "")
+
+    monkeypatch.setattr(owner, "run_cli", spawn)
+
+    owner.cli(root, "doctor", tree=root / "worktrees/r/tree")
+
+    assert [e["DADAIA_PRIVACY_DENYLIST"] for e in seen] == [str(workspace)]
+
+
+def test_a_failing_context_list_refuses_with_the_clis_one_fix_line(root: Path) -> None:
+    patch_cli(
+        root,
+        'if args[:2] == ["context", "list"]:\n',
+        'if args[:2] == ["context", "list"]:\n'
+        '    print("[error] registry unreadable\\nfix: run the registry repair", file=sys.stderr)\n'
+        "    sys.exit(1)\n",
+    )
+    done = run(root, "new", "r", RC)
+    assert done.returncode != 0
+    assert done.stderr.strip().splitlines() == [
+        "[error] context list failed",
+        "fix: run the registry repair",
+    ]
+
+
+def test_a_context_list_that_prints_no_json_list_refuses_with_the_doctor_fix(root: Path) -> None:
+    patch_cli(
+        root,
+        'if args[:2] == ["context", "list"]:\n',
+        'if args[:2] == ["context", "list"]:\n    print("not a list")\n    sys.exit(0)\n',
+    )
+    done = run(root, "new", "r", RC)
+    assert done.returncode != 0
+    assert (
+        done.stderr
+        == f"[error] context list failed\nfix: {shell_line(str(cli_path(root)), 'doctor')}\n"
+    )
+    assert fixes(done) == [f"fix: {shell_line(str(cli_path(root)), 'doctor')}"]

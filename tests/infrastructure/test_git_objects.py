@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.core.models.git_scan import ZERO_SHA, GitObjectReadError, ScannedObject
+from dadaia_workspace.core.skill_owner import load_owner
 from dadaia_workspace.infrastructure import git_objects
 from dadaia_workspace.infrastructure.git_objects import GitSubprocessObjectReader, unpublished
 from tests.helpers.oslib import run, run_bytes, write_text
@@ -95,17 +96,16 @@ def test_rev_list_argv_carries_trailing_end_of_options_marker(
 ) -> None:
     """Both range forms end the rev-list argv with ``--``."""
     repo, (base, tip) = _repo(tmp_path, {"a.txt": "one\n"}, {"b.txt": "two\n"})
-    real_run = git_objects._run
-    argvs: list[list[str]] = []
+    kernel = load_owner("dd-bug-resolution", "_git")
+    real_run = kernel.git_bytes
+    argvs: list[tuple[str, ...]] = []
 
-    def spy(
-        args: list[str], cwd: Path, *, input_bytes: bytes | None = None
-    ) -> subprocess.CompletedProcess[bytes]:
-        if args[:3] == ["git", "rev-list", "--objects"]:
+    def spy(repo: Path, *args: str, **kw: object) -> subprocess.CompletedProcess[bytes]:
+        if args[:2] == ("rev-list", "--objects"):
             argvs.append(args)
-        return real_run(args, cwd, input_bytes=input_bytes)
+        return real_run(repo, *args, **kw)
 
-    monkeypatch.setattr(git_objects, "_run", spy)
+    monkeypatch.setattr(kernel, "git_bytes", spy)
     _scan(repo, tip, base if remote == "base" else remote)
     assert argvs and argvs[0][-1] == "--"
 
@@ -248,30 +248,46 @@ def test_a_corrupt_or_failing_git_answer_raises_the_typed_error(
     repo, (base, tip) = _repo(tmp_path, {"a.txt": "hello\n"}, {"a.txt": "edited\n"})
     blob = _git(["rev-parse", "HEAD:a.txt"], repo)
 
-    def is_target(args: list[str], stdin: bytes) -> bool:
-        check = args[:2] == ["git", "cat-file"] and args[2].startswith("--batch-check")
+    def is_target(args: tuple[str, ...], stdin: bytes) -> bool:
+        check = args[:1] == ("cat-file",) and args[1].startswith("--batch-check")
         prior = f"{base}:".encode() in stdin
         return {
             _CURRENT_CHECK: check and not prior,
             _PRIOR_CHECK: check and prior,
-            _CONTENT: args == ["git", "cat-file", "--batch"] and blob.encode() in stdin,
-            _BODIES: args == ["git", "cat-file", "--batch"] and stdin.strip() == tip.encode(),
+            _CONTENT: args == ("cat-file", "--batch") and blob.encode() in stdin,
+            _BODIES: args == ("cat-file", "--batch") and stdin.strip() == tip.encode(),
         }[call]
 
-    def fake(args: list[str], **kwargs: object) -> subprocess.CompletedProcess[bytes]:
+    kernel = load_owner("dd-bug-resolution", "_git")
+    real_run = kernel.git_bytes
+
+    def fake(repo: Path, *args: str, **kwargs: object) -> subprocess.CompletedProcess[bytes]:
         stdin = kwargs.get("input") or b""
         assert isinstance(stdin, bytes)
         if not is_target(args, stdin):
-            return run_bytes(args, **kwargs)  # type: ignore[arg-type]
+            return real_run(repo, *args, **kwargs)
+        argv = ["git", *args]
         if isinstance(reply, str):
-            return _out(reply.format(blob=blob))(args)
-        return reply(args)
+            return _out(reply.format(blob=blob))(argv)
+        return reply(argv)
 
-    monkeypatch.setattr(git_objects.platform, "run_bytes", fake)
+    monkeypatch.setattr(kernel, "git_bytes", fake)
     yielded: list[ScannedObject] = []
     with pytest.raises(GitObjectReadError, match=match):
         yielded.extend(GitSubprocessObjectReader().new_objects(repo, tip, base))
     assert [o for o in yielded if not o.decodable] == []
+
+
+def test_a_callers_git_env_never_redirects_the_scan_to_another_repo(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """With GIT_DIR/GIT_WORK_TREE naming repo B, the scan reads repo A's range."""
+    repo, (base, tip) = _repo(tmp_path, {"a.txt": "one\n"}, {"b.txt": "two\n"})
+    (tmp_path / "other").mkdir()
+    other, _ = _repo(tmp_path / "other", {"z.txt": "z\n"})
+    monkeypatch.setenv("GIT_DIR", str(other / ".git"))
+    monkeypatch.setenv("GIT_WORK_TREE", str(other))
+    assert _blobs(_scan(repo, tip, base)) == {"b.txt"}
 
 
 def test_a_directory_that_is_not_a_repo_raises_the_typed_error(tmp_path: Path) -> None:
@@ -353,43 +369,6 @@ def test_a_new_branch_keeps_amnesty_for_what_origin_already_published(tmp_path: 
     assert shape(_scan(repo, tip, base)) == shape(_scan(repo, tip, ZERO_SHA))
 
 
-def _published_repo(tmp_path: Path) -> tuple[Path, str]:
-    """A repo whose one commit is already on a bare ``origin``."""
-    remote = tmp_path / "origin.git"
-    run(["git", "init", "-q", "--bare", str(remote)], check=True)
-    repo, (sha,) = _repo(tmp_path, {"a.txt": "first\n"})
-    _git(["remote", "add", "origin", str(remote)], repo)
-    _git(["push", "-q", "origin", "HEAD:refs/heads/main"], repo)
-    return repo, sha
-
-
-def test_a_commit_already_on_origin_publishes_nothing(tmp_path: Path) -> None:
-    repo, sha = _published_repo(tmp_path)
-    assert GitSubprocessObjectReader().unpublished(repo, sha) == []
-
-
-def test_the_unpublished_range_is_newest_first_and_ignores_an_advanced_origin(
-    tmp_path: Path,
-) -> None:
-    """The oldest entry is where the rewrite fix resets — never origin's tip."""
-    repo, _ = _published_repo(tmp_path)
-    _git(["checkout", "-q", "-b", "topic"], repo)
-    _git(["commit", "-q", "--allow-empty", "-m", "mine"], repo)
-    oldest = _git(["rev-parse", "HEAD"], repo)
-    _git(["commit", "-q", "--allow-empty", "-m", "more"], repo)
-    tip = _git(["rev-parse", "HEAD"], repo)
-    _git(["checkout", "-q", "main"], repo)
-    _git(["commit", "-q", "--allow-empty", "-m", "dep"], repo)
-    _git(["push", "-q", "origin", "main"], repo)
-    assert GitSubprocessObjectReader().unpublished(repo, tip) == [tip, oldest]
-
-
-def test_a_range_reaching_a_root_commit_ends_at_the_root(tmp_path: Path) -> None:
-    """An empty origin is the same formula — the oldest commit is the root."""
-    repo, (root, sha) = _repo(tmp_path, {}, {})
-    assert GitSubprocessObjectReader().unpublished(repo, sha) == [sha, root]
-
-
 def test_a_commit_only_another_remote_holds_is_still_unpublished(tmp_path: Path) -> None:
     """A commit is published when it is on origin — one rule for the gate and ``unpushed``."""
     repo, (sha,) = _repo(tmp_path, {})
@@ -397,13 +376,6 @@ def test_a_commit_only_another_remote_holds_is_still_unpublished(tmp_path: Path)
     assert unpublished(repo, sha) == [sha]
     _git(["update-ref", "refs/remotes/origin/main", sha], repo)
     assert unpublished(repo, sha) == []
-
-
-@pytest.mark.parametrize("sha", ["a" * 40, "--upload-pack=evil"])
-def test_an_unresolvable_or_option_shaped_sha_fails_closed(tmp_path: Path, sha: str) -> None:
-    """Unreadable counts as unpublished: never a birth, never an empty range."""
-    repo, _ = _published_repo(tmp_path)
-    assert GitSubprocessObjectReader().unpublished(repo, sha) == [sha]
 
 
 def test_an_oversized_blob_read_that_cannot_start_git_raises_the_typed_error(

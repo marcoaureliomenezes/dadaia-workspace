@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from datetime import datetime
 
 from dadaia_workspace.core.skill_owner import load_owner
 
-__all__ = ["now_iso", "today"]
+__all__ = ["compact_day", "instant", "now_iso", "today"]
 
 _owner = load_owner("dd-bug-resolution", "_clock")
 now_iso: Callable[[], str] = _owner.now_iso
 today: Callable[[], str] = _owner.today
+compact_day: Callable[[], str] = _owner.compact_day
+instant: Callable[[], datetime] = _owner.instant

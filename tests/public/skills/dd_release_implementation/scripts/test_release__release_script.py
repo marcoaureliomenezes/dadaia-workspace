@@ -18,6 +18,7 @@ import pytest
 from dadaia_workspace.core import gitflow
 from tests.helpers.oslib import read_text, run, write_text
 from tests.helpers.skill_scripts import stage_skill_scripts
+from tests.helpers.worktree_ws import git
 
 _REPO_ROOT = Path(__file__).resolve().parents[5]
 _PUBLIC = _REPO_ROOT / "dadaia_workspace" / "public"
@@ -54,7 +55,12 @@ def _specs(tmp_path: Path, plan: str, *, plan_status: str = "Approved") -> Path:
 
 
 def _phase(script: Path, specs: Path) -> subprocess.CompletedProcess[str]:
-    argv = [sys.executable, str(script), "phase", "IMPLEMENTATION", "--sha", "abc1234"]
+    argv = [
+        sys.executable,
+        str(script),
+        "phase",
+        "IMPLEMENTATION",
+    ]
     return run([*argv, "--specs", str(specs)])
 
 
@@ -63,7 +69,7 @@ def _admits(script: Path, tmp_path: Path, plan: str) -> None:
     result = _phase(script, specs)
     assert result.returncode == 0, result.stderr
     state = json.loads(read_text(specs / "releases/0.5.0/_RELEASE.json"))
-    assert (state["phase"], state["defined"]["sha"]) == ("IMPLEMENTATION", "abc1234")
+    assert (state["phase"], set(state["defined"])) == ("IMPLEMENTATION", {"ts"})
     assert len(state["log"]) == 1
 
 
@@ -611,3 +617,123 @@ def test_a_reader_prints_the_schema_finding_for_a_non_object_log_entry(
         True,
     )
     assert len(fixes) == 1
+
+
+# --- milestones and memory windows are found by their commit subject, never a stored sha ---
+
+_ATOM = "---\nslug: {0}\ntitle: {0}\ntldr: {0}\nsummary: {0}\ntags: [{0}]\nsources:\n  - src/{0}.py\n---\n\n# {0}\n"
+_SUBJECTS = {
+    "milestone": "chore(release): rc-1 phase IMPLEMENTATION",
+    "enters": "chore(release): rc-1 enters IMPLEMENTATION at abc1234",
+    "memory-pass": "chore(release): rc-0 memory pass recorded — 1 reviewed, 1 changed",
+}
+
+
+def _drift_after_rewrite(script: Path, tmp_path: Path, bound: str) -> list[str]:
+    """Atoms `drift` lists when the commits before the *bound* subject changed `a` and the commits
+    after it changed `b`, the history was then rewritten, and the state still stores the old shas."""
+    specs, ts = _specs(tmp_path, _GOOD), "2026-01-01T00:00:00Z"
+    git(tmp_path, "init", "-q")
+    write_text(tmp_path / ".gitconfig", "[user]\n\tname = t\n\temail = t@t\n")
+    for slug in "ab":
+        (tmp_path / "src").mkdir(exist_ok=True)
+        write_text(tmp_path / f"src/{slug}.py", "x = 0\n")
+        (specs / "memory/product").mkdir(parents=True, exist_ok=True)
+        write_text(specs / f"memory/product/{slug}.md", _ATOM.format(slug))
+    real = _SUBJECTS["milestone" if bound == "decoy" else bound]
+    decoy = _SUBJECTS["enters"]
+    steps = [
+        ("init", None),
+        ("feat(J1.T1): a", "a"),
+        (real, None),
+        ("feat(J1.T2): b", "b"),
+        *([(decoy, None)] if bound == "decoy" else []),
+    ]
+    if bound == "decoy":  # the same-numbered rc of another release, ending its folder
+        (specs / "releases/0.4.9").mkdir()
+        write_text(specs / "releases/0.4.9/old.md", "old\n")
+    old: dict[str, str] = {}
+    for subject, edited in steps:
+        if edited:
+            write_text(tmp_path / f"src/{edited}.py", f"x = '{subject}'\n")
+        if subject == real:  # a milestone commit touches its release folder
+            write_text(specs / "releases/0.5.0/bound.md", subject)
+        if subject == decoy and bound == "decoy":
+            (specs / "releases/0.4.9/old.md").unlink()
+        git(tmp_path, "add", "-A", "specs", "src")
+        git(tmp_path, "commit", "-q", "--allow-empty", "-m", subject)
+        old[subject] = git(tmp_path, "rev-parse", "HEAD").strip()
+    git(tmp_path, "rebase", "-q", "--root", "--exec", "git commit -q --amend --allow-empty --no-edit --date=2030-01-01T00:00:00Z")  # fmt: skip
+    assert git(tmp_path, "rev-parse", "HEAD").strip() != old["feat(J1.T2): b"]
+    state_path = specs / "releases/0.5.0/_RELEASE.json"
+    state = json.loads(read_text(state_path))
+    state["defined"] = {
+        "sha": old["init"] if bound == "memory-pass" else old[real],
+        "ts": ts,
+    }
+    state["log"] = [] if bound != "memory-pass" else [
+        {"ts": ts, "agent": "release.py memory", "kind": "memory", "text": "m", "since": old["init"],
+         "until": old[real], "reviewed": [], "changed": []}]  # fmt: skip
+    write_text(state_path, json.dumps(state))
+    done = run([sys.executable, str(script), "drift", "--json", "--specs", str(specs)])
+    return [a["slug"] for a in json.loads(done.stdout)["atoms"]]
+
+
+@pytest.mark.parametrize("bound", ["milestone", "enters", "decoy", "memory-pass"])
+def test_a_window_opens_at_its_commit_subject_after_a_history_rewrite(
+    script: Path, tmp_path: Path, bound: str
+) -> None:
+    assert _drift_after_rewrite(script, tmp_path, bound) == ["b"]
+
+
+@pytest.mark.parametrize("verb", ["phase", "ship"])
+def test_phase_and_ship_accept_no_sha(script: Path, tmp_path: Path, verb: str) -> None:
+    argv = [sys.executable, str(script), verb, *(["IMPLEMENTATION"] if verb == "phase" else [])]
+    refused = run([*argv, "--sha", "abc1234", "--specs", str(_specs(tmp_path, _GOOD))])
+    assert (refused.returncode, "unrecognized arguments: --sha" in refused.stderr) == (2, True)
+
+
+def test_phase_writes_no_milestone_sha(script: Path, tmp_path: Path) -> None:
+    specs = _specs(tmp_path, _dag(*_CHAIN[:2]))
+    done = run([sys.executable, str(script), "phase", "IMPLEMENTATION", "--specs", str(specs)])
+    assert done.returncode == 0, done.stderr
+    state = json.loads(read_text(specs / "releases/0.5.0/_RELEASE.json"))
+    assert (state["phase"], set(state["defined"]), "sha" in state["log"][0]) == ("IMPLEMENTATION", {"ts"}, False)  # fmt: skip
+
+
+def test_the_archive_event_lines_are_records_for_the_origin_trace(
+    script: Path, tmp_path: Path
+) -> None:
+    """A bug archived as an `event: archived` line carries its record under `data`."""
+    specs = _specs(tmp_path, _GOOD)
+    write_text(specs / "releases/0.5.0/rc-1/SPEC.md", "**Status:** Approved\n**Origin:** bugs:archived-one\n")  # fmt: skip
+    event = {"ts": "2026-01-01T00:00:00Z", "event": "archived", "agent": "a",
+             "data": {"id": "archived-one", "status": "resolved", "resolved_release": "0.5.0"}}  # fmt: skip
+    (specs / "bugs/_archive").mkdir(parents=True)
+    write_text(specs / "bugs/_archive/bugs_histo.jsonl", json.dumps(event) + "\n")
+    assert [(r["message"], r["verdict"]) for r in _origin_rows(script, specs)] == [
+        ("Origin bugs:archived-one traced", "info")
+    ]
+
+
+def test_a_state_written_with_sha_keys_stays_valid(script: Path, tmp_path: Path) -> None:
+    """Passes by design: an older `release.py` wrote `sha` on milestones and on `shipped`."""
+    specs = _specs(tmp_path, _GOOD)
+    state_path = specs / "releases/0.5.0/_RELEASE.json"
+    stamp = {"sha": "abc1234", "ts": "2026-01-01T00:00:00Z"}
+    state = {**json.loads(read_text(state_path)), "defined": stamp,
+             "log": [{**stamp, "agent": "release.py", "kind": "milestone", "candidate": "rc-1",
+                      "milestone": "defined", "text": "Candidate defined at abc1234; phase IMPLEMENTATION."}]}  # fmt: skip
+    write_text(state_path, json.dumps(state))
+    archived = specs / "releases/_archive/0.4.0/_RELEASE.json"
+    archived.parent.mkdir(parents=True)
+    write_text(archived, json.dumps({**state, "release": "0.4.0", "phase": "CLOSURE", "shipped": {**stamp, "pr": 7}}))  # fmt: skip
+    done = run([sys.executable, str(script), "check", "--json", "--specs", str(specs)])
+    assert [f["message"] for f in json.loads(done.stdout) if f["verdict"] == "error" and "Origin" not in f["message"]] == []  # fmt: skip
+
+
+def test_phase_prints_the_subject_its_commit_carries(script: Path, tmp_path: Path) -> None:
+    specs = _specs(tmp_path, _dag(*_CHAIN[:2]))
+    done = run([sys.executable, str(script), "phase", "IMPLEMENTATION", "--specs", str(specs)])
+    assert done.returncode == 0, done.stderr
+    assert "commit subject: chore(release): rc-1 phase IMPLEMENTATION" in done.stdout.splitlines()

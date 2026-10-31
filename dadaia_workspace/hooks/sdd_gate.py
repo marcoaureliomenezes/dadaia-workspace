@@ -1,6 +1,6 @@
 """PreToolUse SDD gate: resolves ONE Invocation and the target's ``scope()`` per write
-target and delegates the verdict to :mod:`gate_policy`. The gate reads no
-``_RELEASE.json``."""
+target and delegates the verdict to :mod:`gate_policy`; a Bash call is judged only as a verdict
+write. The gate reads no ``_RELEASE.json``."""
 
 from __future__ import annotations
 
@@ -35,7 +35,9 @@ def law_set(root: Path) -> tuple[frozenset[str], tuple[str, ...]]:
     return projected, workspace_layout.operator_globs(root)[1]
 
 
-def _evaluate_target(workspace: Path | None, raw_path: str) -> tuple[gate_policy.Decision, str]:
+def _evaluate_target(
+    workspace: Path | None, raw_path: str, payload_id: object
+) -> tuple[gate_policy.Decision, str]:
     """``(ALLOW, "")`` or ``(BLOCK, reason)`` for one target."""
     fpath = Path(raw_path)
     if not fpath.is_absolute():
@@ -44,7 +46,8 @@ def _evaluate_target(workspace: Path | None, raw_path: str) -> tuple[gate_policy
     effective_workspace = workspace_resolver.owning_root(fpath)
     if effective_workspace is None:
         return gate_policy.Decision.ALLOW, ""  # fail-open: no root owns the target
-    session_id = invocation.resolve_session_id(os.environ) or None
+    sid = payload_id if isinstance(payload_id, str) else None
+    session_id = invocation.resolve_session_id(os.environ, sid) or None
     repo, zone = invocation.scope(effective_workspace, fpath)
     try:
         bind = invocation.resolve_bind(effective_workspace, session_id, os.environ)
@@ -58,6 +61,7 @@ def _evaluate_target(workspace: Path | None, raw_path: str) -> tuple[gate_policy
         rel_path = fpath.as_posix()
 
     projected, protected = law_set(effective_workspace)
+    refused = invocation.refusal(effective_workspace, os.environ)
     return gate_policy.evaluate(
         rel_path,
         root=effective_workspace,
@@ -69,12 +73,25 @@ def _evaluate_target(workspace: Path | None, raw_path: str) -> tuple[gate_policy
         context=bind.context_name,
         repos=bind.repos,
         has_id=session_id is not None,
+        bind_fix=refused[1] if refused else None,
     )
 
 
+def _verdict_block(payload: dict[str, object]) -> str | None:
+    """The block reason for a Bash call that writes a verdict outside the reviewer, else ``None``."""
+    key = _common.subagent_key()
+    tool_input = payload.get("tool_input")
+    command = tool_input.get("command") if isinstance(tool_input, dict) else None
+    who = _common.subagent(payload, key)
+    return gate_policy.verdict_act(str(command or ""), key=key, subagent=who)
+
+
 def evaluate_payload(payload: dict[str, object]) -> str | None:
-    """The first BLOCK reason over EVERY write target, else ``None``; no parseable target allows."""
+    """The first BLOCK reason over EVERY write target (and a Bash verdict write), else ``None``;
+    no parseable target allows."""
     name = str(payload.get("tool_name") or "")
+    if name == "Bash":
+        return _verdict_block(payload)
     if not _common.is_write_tool(name):
         return None
     raw_paths = _common.target_paths(payload)
@@ -83,7 +100,7 @@ def evaluate_payload(payload: dict[str, object]) -> str | None:
     # the cwd root only anchors a relative target
     workspace = invocation.resolve_root(cwd=Path.cwd(), target_path=None)
     for raw_path in raw_paths:
-        decision, reason = _evaluate_target(workspace, raw_path)
+        decision, reason = _evaluate_target(workspace, raw_path, payload.get("session_id"))
         if decision == gate_policy.Decision.BLOCK:
             return reason
     return None

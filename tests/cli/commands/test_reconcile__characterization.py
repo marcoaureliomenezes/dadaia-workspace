@@ -46,6 +46,7 @@ def test_reconcile_reports_every_step_and_persists_the_v2_registry(
         "actual_version": version,
         "error": None,
         "expected_version": version,
+        "fix": "",
         "ok": True,
         "rollback_required": False,
         "steps": [

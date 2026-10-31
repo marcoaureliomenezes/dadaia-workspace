@@ -62,7 +62,9 @@ def test_guard_no_instance_reach(tmp_path, record_property):
     import os, subprocess, sys
     from pathlib import Path
 
-    sentinel = Path(".dadaia") / "states" / "spec_contexts.json"
+    from dadaia_workspace.core.skill_owner import load_owner
+
+    sentinel = load_owner("dd-bug-resolution", "_root").SENTINEL
     ws = tmp_path / "instance"
     (ws / sentinel).parent.mkdir(parents=True)
     (ws / sentinel).write_text("{}", encoding="utf-8")

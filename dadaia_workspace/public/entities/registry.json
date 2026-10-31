@@ -1,6 +1,5 @@
 {
   "schema_version": "agentic-entities-v1",
-  "doc": "The abstract, harness-agnostic entity registry — THE source the scaffolded core surface derives from. dadaia-workspace defines behaviors, personas, rules and skills agnostically; each harness receives an IMPLEMENTATION of them. A scaffolded core sub-agent without a Persona here, a core hook without a Deterministic Behavior here, or a core rule without an Abstract Rule here is forbidden (constitution, Anti-Slop Law, Derivation law). Operator-created entities are out of scope.",
   "personas": [
     {
       "id": "dd-product-engineer",
@@ -31,7 +30,7 @@
     },
     {
       "id": "sdd-gate",
-      "mandate": "Three path classes on every write: ADDITIVE always writable, PROTECTED blocked, MUTATING writable but scope-judged under repos/<slug>/ when the session is bound; no phase, no mode; every block carries one fix: line; races surfaced, never prevented.",
+      "mandate": "Three path classes on every write: ADDITIVE always writable, PROTECTED blocked, MUTATING writable except repos/<slug>/, which receives only merges (a file-tool write there is blocked unless it lands under specs/audits/); no phase, no mode; every block carries one fix: line; races surfaced, never prevented.",
       "modules": ["dadaia_workspace.hooks.pre_gate", "dadaia_workspace.hooks.sdd_post_gate", "dadaia_workspace.hooks.translate"]
     },
     {
@@ -65,7 +64,6 @@
     }
   ],
   "universal": {
-    "doc": "Harness-agnostic by construction — every supported harness reads these natively, so they need no per-harness derivation and no harness toggle.",
     "skills_root": ".agents/skills/",
     "agents_md": [
       "AGENTS.md (workspace root guardrail)",

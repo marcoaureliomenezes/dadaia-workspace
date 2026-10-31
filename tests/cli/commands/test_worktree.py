@@ -15,6 +15,7 @@ import dadaia_workspace
 from dadaia_workspace.cli.main import app
 from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.infrastructure import ledger_scripts
+from tests.fixtures.stores import fake_venv
 from tests.helpers.oslib import make_executable, run, write_text
 
 _STUB = "import json, sys\nprint(json.dumps(sys.argv[1:]))\nsys.exit(3)\n"
@@ -71,9 +72,23 @@ def test_help_lists_the_verbs(
 
 
 def test_no_installed_script_refuses_with_the_install_fix(workspace: Path) -> None:
+    (workspace / ".dadaia" / "states").mkdir(parents=True)
+    write_text(workspace / ".dadaia" / "states" / "spec_contexts.json", "{}")
     result = CliRunner().invoke(app, ["worktree", "list"])
     assert result.exit_code != 0
-    assert f"fix: {fix_line(None, 'public', 'install')}" in result.output
+    assert f"fix: {fix_line(workspace.resolve(), 'public', 'install')}" in result.output
+
+
+def test_outside_any_workspace_the_missing_script_names_the_init_act(
+    workspace: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(ledger_scripts, "own_workspace_root", lambda: None)
+    result = CliRunner().invoke(app, ["worktree", "list"])
+    assert result.exit_code != 0
+    assert (
+        "fix: Agent action: run `uvx dadaia-workspace init` with the workspace's directory as its first argument"
+        in result.output
+    )
 
 
 @pytest.mark.medium
@@ -82,6 +97,7 @@ def test_a_runner_that_lags_the_hook_still_creates_a_wt_branch(
 ) -> None:
     """The BLOCK's fix line is `worktree new`: the forwarder marks the run, whatever the projected runner does."""
     monkeypatch.delenv("DADAIA_WT", raising=False)
+    fake_venv(workspace, pth=True)
     repo = workspace / "repo"
     git = lambda *a: run(["git", "-C", str(repo), *a], check=True)  # noqa: E731
     repo.mkdir()

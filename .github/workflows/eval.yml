@@ -1,14 +1,9 @@
 name: eval
 # The one workflow that calls a model (ADR 0217): dispatch or weekly schedule, GitHub-hosted,
-# the secret at job level in the one job that needs it, the scan before anything is published.
+# the secret at job level in the one leg that needs it, the scan before anything is published.
 # The guard no-model-api-in-ci (scripts/guards/repo.py) judges every line of it.
 on:
   workflow_dispatch:
-    inputs:
-      baseline:
-        description: dadaia-workspace release the baseline run installs from PyPI (default 0.4.7)
-        required: false
-        type: string
   schedule:
     - cron: '0 6 * * 1'
 permissions:
@@ -17,48 +12,172 @@ env:
   # The one owner of the Claude CLI pin; each task Dockerfile's ARG equals it (guard eval-cli-pin).
   CLAUDE_CODE_VERSION: 2.1.284
 jobs:
-  eval:
+  prepare:
     runs-on: ubuntu-24.04
-    environment: evals
-    env:
-      BASELINE: ${{ inputs.baseline || '0.4.7' }}
-      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-      CLAUDE_FORCE_OAUTH: "1"
-      SCAN_SECRET: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+    permissions:
+      contents: read
+      checks: read
+    outputs:
+      wheel_sha256: ${{ steps.build.outputs.sha }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           persist-credentials: false
+      # The wheel is only worth building from a commit whose graders already passed their own tests.
+      - name: Require the E2E check run on this commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ok=$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/check-runs?per_page=100" --jq '[.check_runs[] | select(.name == "E2E Python (pytest)")] | length > 0 and all(.conclusion == "success")')
+          test "$ok" = true
       - run: pipx install poetry==2.5.1
-      - run: pipx install harbor==0.23.0
       # The candidate is this checkout: the dispatched ref, or main on the schedule.
       - name: Build the candidate wheel
+        id: build
         run: |
-          v=$(python3 -c 'import json; print(json.load(open("release-please-config.json"))["packages"]["."].get("release-as", ""))')
-          if [ -n "$v" ]; then poetry version "$v"; fi
           poetry build -f wheel
-      # environment/lib/ is each image's last layer: requirements.txt names a pinned PyPI
-      # release, or the wheel beside it. Written per run, never committed.
-      - name: Run on the baseline release
+          echo "sha=$(sha256sum dist/*.whl | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+      - name: Upload the wheel
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: wheel
+          path: dist/*.whl
+  eval:
+    needs: prepare
+    runs-on: ubuntu-24.04
+    environment: evals
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - harness: claude-code
+            task: t1-cold-onboarding
+            model: anthropic/claude-sonnet-5
+            version: 2.1.284
+            secret_name: CLAUDE_CODE_OAUTH_TOKEN
+          - harness: claude-code
+            task: t2-block-list-bug
+            model: anthropic/claude-sonnet-5
+            version: 2.1.284
+            secret_name: CLAUDE_CODE_OAUTH_TOKEN
+          - harness: claude-code
+            task: t3-discovery
+            model: anthropic/claude-sonnet-5
+            version: 2.1.284
+            secret_name: CLAUDE_CODE_OAUTH_TOKEN
+          - harness: codex
+            task: t1-cold-onboarding
+            model: openai/gpt-6.1-sol
+            version: 0.163.0
+            secret_name: CODEX_AUTH_JSON
+          - harness: codex
+            task: t2-block-list-bug
+            model: openai/gpt-6.1-sol
+            version: 0.163.0
+            secret_name: CODEX_AUTH_JSON
+          - harness: codex
+            task: t3-discovery
+            model: openai/gpt-6.1-sol
+            version: 0.163.0
+            secret_name: CODEX_AUTH_JSON
+    env:
+      SCAN_SECRET: ${{ secrets[matrix.secret_name] }}
+      HARNESS: ${{ matrix.harness }}
+      TASK: ${{ matrix.task }}
+      MODEL: ${{ matrix.model }}
+      VERSION: ${{ matrix.version }}
+      SECRET_NAME: ${{ matrix.secret_name }}
+      WHEEL_SHA256: ${{ needs.prepare.outputs.wheel_sha256 }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
+        with:
+          name: wheel
+          path: dist
+      - name: Check the wheel is the one prepare built
+        run: echo "$WHEEL_SHA256  $(ls dist/*.whl)" | sha256sum --check
+      - run: pipx install harbor==0.24.0
+      - run: python3 evals/scripts/preflight.py "$HARNESS" "$SECRET_NAME"
+      - if: matrix.harness == 'claude-code'
         run: |
-          for t in evals/tasks/*/; do mkdir -p "$t/environment/lib"; echo "dadaia-workspace==$BASELINE" > "$t/environment/lib/requirements.txt"; done
-          harbor run -p evals/tasks -a claude-code -m anthropic/claude-sonnet-5 --ak version=$CLAUDE_CODE_VERSION -k 3 -n 2 -o evals/jobs/base
-      - name: Run on the candidate wheel
+          echo "CLAUDE_CODE_OAUTH_TOKEN=$SCAN_SECRET" >> "$GITHUB_ENV"
+          echo "CLAUDE_FORCE_OAUTH=1" >> "$GITHUB_ENV"
+          echo "TASKS=evals/tasks" >> "$GITHUB_ENV"
+      # The login is a 0600 file in RUNNER_TEMP; only its path reaches the environment. Harbor's
+      # Codex agent reads CODEX_AUTH_JSON_PATH first, so CODEX_FORCE_AUTH_JSON is not set.
+      - if: matrix.harness == 'codex'
+        run: |
+          umask 077
+          printf '%s' "$SCAN_SECRET" > "$RUNNER_TEMP/codex-auth.json"
+          echo "CODEX_AUTH_JSON_PATH=$RUNNER_TEMP/codex-auth.json" >> "$GITHUB_ENV"
+          python3 evals/scripts/render.py evals/tasks "$RUNNER_TEMP/tasks" codex Codex
+          echo "TASKS=$RUNNER_TEMP/tasks" >> "$GITHUB_ENV"
+      # environment/lib/ is each image's last layer: the wheel and the requirements.txt naming it.
+      # Written per run, never committed.
+      - name: Run the task
         run: |
           w=$(ls dist/*.whl)
-          for t in evals/tasks/*/; do rm -rf "$t/environment/lib"; mkdir -p "$t/environment/lib"; cp "$w" "$t/environment/lib/"; echo "/lib/$(basename "$w")" > "$t/environment/lib/requirements.txt"; done
-          harbor run -p evals/tasks -a claude-code -m anthropic/claude-sonnet-5 --ak version=$CLAUDE_CODE_VERSION -k 3 -n 2 -o evals/jobs/cand
+          lib="$TASKS/$TASK/environment/lib"
+          rm -rf "$lib"; mkdir -p "$lib"; cp "$w" "$lib/"; echo "/lib/$(basename "$w")" > "$lib/requirements.txt"
+          extra=(); if [ "$HARNESS" = codex ]; then extra=(--ak dangerously_bypass_hook_trust=true --ak 'config={"projects":{"/workspace":{"trust_level":"trusted"}}}'); fi
+          harbor run -p "$TASKS" -i "$TASK" -a "$HARNESS" -m "$MODEL" --ak version="$VERSION" "${extra[@]}" -k 3 -n 3 -o "evals/jobs/$HARNESS/$TASK" \
+            --max-retries 2 \
+            --retry-include EnvironmentStartTimeoutError \
+            --retry-include SandboxBuildFailedError \
+            --retry-include SandboxLikelyOutOfMemoryError \
+            --retry-include VerifierTimeoutError \
+            --retry-include ApiRateLimitError \
+            --retry-include ApiOverloadedError \
+            --retry-include ApiInternalServerError \
+            --retry-include ApiConnectionError
       - name: Compare
         id: compare
-        run: python3 evals/scripts/compare.py evals/jobs/base evals/jobs/cand > evals/summary.md
+        run: python3 evals/scripts/compare.py "evals/jobs/$HARNESS/$TASK" "$TASK" > evals/summary.md
         continue-on-error: true
+      # The raw rollouts hold account ids and the signed config of either harness; compare.py has already read them.
+      - run: find "evals/jobs/$HARNESS/$TASK" -type d -path '*/agent/sessions' -prune -exec rm -rf {} +
       - run: python3 evals/scripts/scan.py evals/jobs evals/summary.md
       - run: cat evals/summary.md >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
-          name: jobs
+          name: jobs-${{ matrix.harness }}-${{ matrix.task }}
           path: |
             evals/jobs/
             evals/summary.md
       - if: steps.compare.outcome == 'failure'
         run: echo "compare.py blocks" && exit 1
+  aggregate:
+    needs: eval
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      # Each artifact is rooted at evals/ (the common ancestor of its two paths): jobs/… and summary.md.
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
+        with:
+          pattern: jobs-*
+          merge-multiple: true
+          path: evals
+      - name: Compare
+        id: compare
+        run: python3 evals/scripts/compare.py --table evals/jobs > evals/summary.md
+        continue-on-error: true
+      - run: python3 evals/scripts/scan.py evals/jobs evals/summary.md
+      - run: cat evals/summary.md >> "$GITHUB_STEP_SUMMARY"
+      - if: steps.compare.outcome == 'failure'
+        run: echo "compare.py blocks" && exit 1
+  result:
+    needs: [prepare, eval, aggregate]
+    if: ${{ always() }}
+    runs-on: ubuntu-24.04
+    env:
+      PREPARE: ${{ needs.prepare.result }}
+      EVAL: ${{ needs.eval.result }}
+      AGGREGATE: ${{ needs.aggregate.result }}
+    steps:
+      - run: test "$PREPARE $EVAL $AGGREGATE" = "success success success"

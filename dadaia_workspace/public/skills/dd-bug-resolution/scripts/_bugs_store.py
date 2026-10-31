@@ -10,9 +10,9 @@ from typing import Any
 
 import _commit
 import _jsonl
-from _bugs_check import HISTO, LEDGER, archived_records, findings_for, plain_ids
+from _bugs_check import HISTO, LEDGER, OPEN, archive_records, findings_for
 from _ledger import private_refusal, replace
-from _platform import read_text
+from _platform import command, read_text
 from _refusal import Refusal as Refusal
 from _specs import script
 
@@ -28,20 +28,43 @@ def read_records(path: Path) -> Records:
         raise Refusal(
             f"{path.name}:{exc.number} {exc} — refusing to rewrite a ledger this script "
             "cannot read in full",
-            f"sed -n '{exc.number}p' {path}",
+            command("sed", "-n", f"{exc.number}p", str(path)),
         ) from exc
 
 
+def _archive(specs: Path) -> list[tuple[int, dict[str, Any], bool]]:
+    return archive_records(read_text(specs / HISTO)) if (specs / HISTO).is_file() else []
+
+
 def history(specs: Path) -> Records:
-    """The live ledger's records and the archive's."""
-    return read_records(specs / LEDGER) + (
-        archived_records(read_text(specs / HISTO)) if (specs / HISTO).is_file() else []
-    )
+    """The live ledger's records and the archive's, a legacy event line as its `data`."""
+    return read_records(specs / LEDGER) + [record for _, record, _ in _archive(specs)]
 
 
 def archived_plain_ids(specs: Path) -> frozenset[str]:
     """The ids of the archive's plain records."""
-    return plain_ids(read_text(specs / HISTO)) if (specs / HISTO).is_file() else frozenset()
+    return frozenset(str(record["id"]) for _, record, legacy in _archive(specs) if not legacy)
+
+
+def open_ids(specs: Path) -> list[str]:
+    """The ids of the live ledger's open records, sorted."""
+    return sorted(str(r["id"]) for r in read_records(specs / LEDGER) if r.get("status") == OPEN)
+
+
+def standing(specs: Path, bug_id: str, release: str) -> str:
+    """`traced` when the record of *bug_id* was resolved in *release* (a legacy `resolved_release`),
+    is rejected, or is superseded by a bug that stands so; `untraced` while not; else why it is wrong."""
+    records = {str(r["id"]): r for r in history(specs)}
+    seen: set[str] = set()
+    while bug_id not in seen:
+        seen.add(bug_id)
+        if (record := records.get(bug_id)) is None:
+            return f"names no record under bugs/ ({bug_id})"
+        if not (by := record.get("superseded_by")):
+            declined = record.get("status") == "rejected"
+            return "traced" if declined or record.get("resolved_release") == release else "untraced"
+        bug_id = str(by)
+    return "untraced"
 
 
 def _validator(path: Path, rel: str) -> Callable[[Records, Records, str, Records], str]:

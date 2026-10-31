@@ -4,12 +4,14 @@
 
 from __future__ import annotations
 
+import datetime as dt
 import json
 import os
 import re
 import time
 from datetime import UTC, datetime, tzinfo
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from typer.testing import CliRunner
@@ -20,13 +22,13 @@ from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.harness_registry import HARNESS_PROJECTION_DIRS, L1_ENTRY_HARNESSES
 from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
 from dadaia_workspace.core.platform import PLATFORM
+from dadaia_workspace.core.skill_owner import load_owner
 from dadaia_workspace.core.workspace_layout import (
     LEVEL1_SEEDS,
     ZoneClass,
     provisioned_zones,
     zones_with_ttl,
 )
-from dadaia_workspace.features.spec_context import sweep
 from dadaia_workspace.features.spec_context.doctor import DoctorService
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from tests.fixtures.stores import context_store
@@ -229,7 +231,8 @@ def test_two_same_second_reaps_of_one_origin_leave_two_intact_holds(
 ) -> None:
     """Two reaps in
     one frozen second leave the first hold byte-intact and a second distinct hold."""
-    monkeypatch.setattr(sweep, "datetime", _FrozenClock)
+    kernel = load_owner("dd-bug-resolution", "_clock")
+    monkeypatch.setattr(kernel, "_dt", SimpleNamespace(datetime=_FrozenClock, UTC=dt.UTC))
     skill = workspace / "stray"
     skill.mkdir()
     (skill / "SKILL.md").write_bytes(b"v1\n")

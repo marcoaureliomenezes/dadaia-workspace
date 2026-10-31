@@ -61,6 +61,22 @@ def test_canonical_cli_maps_the_windows_spelling_to_the_source_form() -> None:
     assert K.canonical_cli("run .venv/bin/dadaia doctor", POSIX) == "run .venv/bin/dadaia doctor"
 
 
+def test_cli_words_are_the_console_script_of_the_root_venv_then_the_argv() -> None:
+    root = PurePosixPath("/ws")
+    assert K.cli_words(root, "context", "bind", caps=WIN) == (
+        "/ws/.dadaia/.venv/Scripts/dadaia.exe", "context", "bind",
+    )  # fmt: skip
+    assert K.cli_words(root, caps=POSIX) == ("/ws/.dadaia/.venv/bin/dadaia",)
+
+
+def test_cli_words_of_no_root_name_the_venv_running_now(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("sys.prefix", "/cache/venvs/proj")
+    assert K.cli_words(None, "doctor", caps=POSIX) == (
+        str(Path("/cache/venvs/proj") / "bin" / "dadaia"),
+        "doctor",
+    )
+
+
 def test_home_env_sets_the_variable_the_host_reads(tmp_path: Path) -> None:
     assert K.home_env(tmp_path, POSIX) == {"HOME": str(tmp_path)}
     assert K.home_env(tmp_path, WIN) == {"HOME": str(tmp_path), "USERPROFILE": str(tmp_path)}

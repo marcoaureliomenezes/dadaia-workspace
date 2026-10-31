@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import contextlib
 import inspect
+import json
 import os
 import re
 import shutil
@@ -30,11 +31,15 @@ from dadaia_workspace.core.models.spec_context import (
     ContextState,
     SpecContextProject,
 )
+from dadaia_workspace.core.platform import command as cli_command
 from dadaia_workspace.core.platform import workspace_cli_path
 from dadaia_workspace.core.specs_version import CANONICAL_SPECS_VERSION
+from dadaia_workspace.features.spec_context.gate_policy import PathClass, classify_path
 from dadaia_workspace.features.spec_context.service import git_hooks_dir, install_git_hooks
+from dadaia_workspace.hooks import pre_gate, sdd_gate
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
 from tests.conftest import GIT_QUIET_INCLUDE
+from tests.helpers import worktree_ws as wt
 from tests.helpers.oslib import (
     Caps,
     cli_path,
@@ -72,12 +77,74 @@ def _rmtree(path: Path) -> None:
     shutil.rmtree(path, onexc=lambda fn, name, _: (make_writable(Path(name)), fn(name)))
 
 
-def _single_fix(done: subprocess.CompletedProcess[str]) -> str:
-    output = done.stdout + done.stderr
-    lines = [line[len("fix: ") :] for line in output.splitlines() if line.startswith("fix: ")]
-    assert len(lines) == 1, f"exactly one fix line expected, got {len(lines)}:\n{output}"
-    assert "&&" not in lines[0], f"one command per fix line (PowerShell 5.1): {lines[0]}"
-    return lines[0]
+_FIX_LINE_RE = re.compile(r"^fix: (\S.*)$", re.MULTILINE)
+#: Not one act: a `<…>` (bar the `<specs>` a rule fix fills), an `&&` chain, an `a|b` menu;
+#: a command also no ` or ` / ` then `.
+_NOT_ONE_ACT_RE = re.compile(r"<(?!specs>)[^<>\n]+>|&&|\w\|\w")
+_NOT_ONE_COMMAND_RE = re.compile(rf"{_NOT_ONE_ACT_RE.pattern}| or | then ")
+#: The installer a workspace is born from, absent from CI runners.
+_PREREQUISITES = {"uvx"}
+#: The executables a fix line opens with (a list, not `which`: a host may ship a prose-named binary).
+_HEADS = {"chmod", "gh", "git", "grep", "ls", "mkdir", "rm", "sed", *_PREREQUISITES}
+
+#: The two act labels: an act the agent performs, and one the law reserves to the human.
+_ACT_LABELS = ("Agent action: ", "Operator action: ")
+_LABEL_RE = re.compile(r"[A-Z]\w* action: ")
+
+
+def fix_defect(fix: str) -> bool:
+    """True when *fix* is neither `Agent action: <one act>` nor `Operator action: <one act>`
+    nor one command whose head is no prose word, or carries any other `<Word> action:` label;
+    `·` stands for a value a source walk cannot know."""
+    known = fix.split("·", 1)[0]
+    if fix.startswith(_ACT_LABELS) or " " not in known and "·" in fix:
+        return bool(_NOT_ONE_ACT_RE.search(fix))
+    if _LABEL_RE.match(fix):
+        return True
+    head = known.split(" ", 1)[0]
+    prose = re.fullmatch(r"[a-z][a-z0-9-]*", head) and head not in _HEADS
+    return bool(prose or _NOT_ONE_ACT_RE.search(fix) or _NOT_ONE_COMMAND_RE.search(known))
+
+
+def _protected_paths(fix: str, root: Path) -> list[str]:
+    """Each absolute path word of *fix* under *root* that the gate classes PROTECTED, by the
+    gate's own law set (its install ledger and the operator's globs): a path an agent's act
+    cannot write."""
+    projected, protected = sdd_gate.law_set(root)
+    found: list[str] = []
+    for word in re.findall(r"(?:[A-Za-z]:)?[\\/][^\s`'\"]+", fix):
+        try:
+            rel = Path(word).resolve().relative_to(root.resolve()).as_posix()
+        except ValueError:
+            continue
+        if classify_path(rel, projected, protected, root=root)[0] is PathClass.PROTECTED:
+            found.append(rel)
+    return found
+
+
+def the_fix(message: str | subprocess.CompletedProcess[str] | None, root: Path) -> str:
+    """The one ``fix:`` line of *message* (or of a finished process's output); raises AssertionError unless it is one act the
+    gate lets run; an ``Agent action:`` under *root* names no path the gate protects."""
+    if isinstance(message, subprocess.CompletedProcess):
+        message = message.stdout + message.stderr
+    assert message, "a refusal with an empty message is a stall"
+    fixes = _FIX_LINE_RE.findall(message)
+    assert len(fixes) == 1, f"expected exactly one 'fix:' line, got {fixes} in:\n{message}"
+    fix = fixes[0]
+    assert not fix_defect(fix) and "<specs>" not in fix, f"not one act: {fix}"
+    if fix.startswith(_ACT_LABELS):
+        assert not (fix.startswith("Agent action: ") and _protected_paths(fix, root)), fix
+        return fix
+    cli = cli_command(str(workspace_cli_path(root)))
+    if fix == cli or fix.startswith(f"{cli} "):  # the CLI line, whole: its head must exist
+        assert workspace_cli_path(root).is_file(), fix
+    else:
+        argv0 = fix.split()[0]  # an absolute file, or a bare name on PATH, never cwd-relative
+        on_path = "/" not in argv0 and (shutil.which(argv0) or argv0 in _PREREQUISITES)
+        assert on_path or (Path(argv0).is_absolute() and Path(argv0).is_file()), fix
+    block = pre_gate.evaluate_payload({"tool_name": "Bash", "tool_input": {"command": fix}})
+    assert block is None, f"the fix command is itself blocked:\n{fix}\n{block}"
+    return fix
 
 
 def _constitution(
@@ -288,6 +355,17 @@ class Skip:
     reason: str
 
 
+@dataclass(frozen=True)
+class WtCase:
+    """A `worktree.py` refusal in a `worktree_ws` workspace: *build* plants it and returns the argv
+    that hits it; *play* is the act an action fix names; *then* (an argv, or a function of the
+    workspace) replaces the re-run."""
+
+    build: Callable[[Path], list[str]]
+    play: Callable[[Path], None] | None = None
+    then: list[str] | Callable[[Path], list[str]] | None = None
+
+
 def _hit(world: World, command: list[str] | str) -> subprocess.CompletedProcess[str]:
     if isinstance(command, str):
         return world.run(command, world.repo)
@@ -335,56 +413,10 @@ def _seeded(world: World) -> None:
     world.seed(_constitution())
 
 
-def _outside(world: World, published: bool = True) -> str:
-    """The refused ref is not the checked-out one."""
-    if published:
-        _published(world)
-    world.commit("notes.md", "n\n", branch="topic")
-    world.git(world.repo, "checkout", "-q", "main")
-    return "git push -q origin topic"
-
-
-def _outside_with_work(world: World) -> str:
-    """The live work branch has diverged from the refused ref: only switch + merge carries it."""
-    _published(world)
-    world.commit("w.md", "w\n", branch="feature/0.1.0")
-    world.git(world.repo, "checkout", "-q", "main")
-    return _outside(world, published=False)
-
-
-def _outside_detached(world: World) -> str:
-    _published(world)
-    world.commit("notes.md", "n\n", branch="topic")
-    world.git(world.repo, "checkout", "-q", "--detach")
-    world.git(world.repo, "branch", "-q", "-D", "topic")
-    return "git push -q origin HEAD:refs/heads/topic"
-
-
-#: The refusal's documented steps after its switch: merge the refused commit, push the work.
-_MERGE_TOPIC = "git merge -q --no-edit topic && git push -q origin feature/0.1.0"
-
-
-def _work_carries_topic(world: World) -> None:
-    tip = world.remote_heads()["feature/0.1.0"]
-    assert "notes.md" in world.git(world.repo, "ls-tree", "--name-only", tip).splitlines()
-
-
 def _mismatch(world: World) -> str:
     _published(world)
     world.commit("notes.md", "n\n", branch="topic")
     return "git push -q origin topic:feature/1.0.0"
-
-
-def _birth_published(world: World) -> str:
-    world.seed(_constitution(), "main")
-    world.clone()
-    world.commit("notes.md", "n\n", branch="develop")
-    return "git push -q origin develop"
-
-
-def _develop_at_main(world: World) -> None:
-    heads = world.remote_heads()
-    assert heads["develop"] == heads["main"]
 
 
 def _baseline_done(
@@ -419,11 +451,26 @@ def _denylisted(world: World) -> str:
     return "git push -q origin feature/1.0.0"
 
 
-def _drop_term(world: World) -> None:
+def _reword(world: World, repo: Path, base: str, *paths: str) -> None:
+    """The hand reword a refusal's Agent action names, as the fixture models the agent: the
+    unpublished range since *base* becomes one commit holding the edited *paths*."""
+    world.git(repo, "reset", "-q", "--soft", base)
+    if paths:
+        world.git(repo, "add", *paths)
+    world.git(repo, "commit", "-q", "-m", "clean")
+
+
+def _reword_denylisted(world: World) -> None:
     write_text(world.repo / "notes.md", "a b\n")
+    _reword(world, world.repo, "origin/develop", "notes.md")
 
 
-#: The refusal's documented step after its fix, the rewrite verb: push it again.
+def _reword_advanced(world: World) -> None:
+    write_text(world.repo / "notes.md", "a b\n")
+    _reword(world, world.repo, "origin/feature/1.0.0", "notes.md")
+
+
+#: The operator's push after the fix is applied: push it again.
 _COMMIT_PUSH = "git push -q origin feature/1.0.0"
 
 
@@ -445,7 +492,10 @@ def _denylisted_not_checked_out(world: World) -> str:
 
 
 #: The operator's edit happens on the refused branch, after the switch.
-_CLEAN_COMMIT_PUSH = f"printf 'a b\\n' > notes.md && {_COMMIT_PUSH}"
+_CLEAN_COMMIT_PUSH = (
+    "printf 'a b\\n' > notes.md && git add notes.md && git reset -q --soft origin/develop"
+    f" && git commit -q -m clean && {_COMMIT_PUSH}"
+)
 
 
 def _denylisted_advanced_integration(world: World) -> str:
@@ -477,12 +527,13 @@ def _nothing_reverted(world: World) -> None:
 def _non_canon(world: World) -> str:
     _published(world)
     world.commit("specs/junk.md", "j\n", branch="feature/1.0.0")
-    world.commit("notes.md", "n\n")  # real work rides the range: the rewrite keeps it
+    world.commit("notes.md", "n\n")  # real work rides the range
     return "git push -q origin feature/1.0.0"
 
 
 def _rm_junk(world: World) -> None:
     world.git(world.repo, "rm", "-q", "specs/junk.md")
+    _reword(world, world.repo, "origin/develop")
 
 
 def _no_junk(world: World) -> None:
@@ -503,7 +554,9 @@ def _denylisted_in_a_worktree(world: World) -> str:
 
 
 def _drop_worktree_term(world: World) -> None:
-    write_text(world.repo / ".claude" / "worktrees" / "agent-x" / "notes.md", "a b\n")
+    wt = world.repo / ".claude" / "worktrees" / "agent-x"
+    write_text(wt / "notes.md", "a b\n")
+    _reword(world, wt, "origin/develop", "notes.md")
 
 
 def _worktree_clean(world: World) -> None:
@@ -557,10 +610,15 @@ def _baseline_denylisted(world: World) -> list[str]:
 
 
 def _drop_draft_term(world: World) -> None:
+    """Nothing is published yet, so the unpublished range is the whole history: the reword
+    squashes it into one root commit holding the edited tree."""
     write_text(world.repo / "AGENTS.md", "a\n")
+    world.git(world.repo, "add", "AGENTS.md")
+    root = world.git(world.repo, "commit-tree", world.git(world.repo, "write-tree"), "-m", "clean")
+    world.git(world.repo, "update-ref", "HEAD", root)
 
 
-#: The refusal's documented step after its fix, the rewrite verb: the publish again.
+#: The refusal's documented step after its fix: the publish again.
 _BASELINE_AGAIN = _repo_cli("context", "baseline", "proj")
 
 
@@ -692,7 +750,7 @@ def _two_untracked(world: World) -> list[str]:
 
 def _discard_what_the_fix_names(world: World) -> None:
     """The operator discards exactly the paths the printed fix names — no more."""
-    fix = _single_fix(_hit(world, ["context", "dead", "proj"]))
+    fix = the_fix(_hit(world, ["context", "dead", "proj"]), world.ws)
     for name in ("notes.md", "b.md"):
         if name in fix:
             (world.repo / name).unlink()
@@ -829,6 +887,8 @@ def _dead_clean_detached(world: World) -> list[str]:
 
 def _drop_readme_term(world: World) -> None:
     write_text(world.repo / "README.md", "a\n")
+    world.git(world.repo, "add", "README.md")
+    world.git(world.repo, "commit", "-q", "--amend", "--no-edit")
 
 
 def _work_ahead_of_origin(world: World) -> str:
@@ -875,17 +935,323 @@ def _work_pushed_0_1_0(world: World) -> None:
     assert world.remote_heads()["feature/0.1.0"] == world.git(world.repo, "rev-parse", "HEAD")
 
 
+# ── the worktree script's refusals ───────────────────────────────────────────────────
+
+_RC = "0.5.0/rc-1/wt-rc"
+_TASK = f"worktrees/r/{wt.NEW_TASK}"
+
+
+def _wt_task(root: Path, *, commit: str = "") -> Path:
+    """The rc, its job and its task tree opened; *commit* is a file the task has committed."""
+    for name in (_RC, wt.NEW_JOB):
+        wt.open_tree(root, name)
+    tree = wt.open_tree(root, wt.NEW_TASK)
+    if commit:
+        wt.commit(tree, commit)
+    return tree
+
+
+def _wt_no_start(root: Path) -> list[str]:
+    return ["new", "r", wt.NEW_JOB]
+
+
+def _wt_symlink(root: Path) -> list[str]:
+    (root / "elsewhere").mkdir()
+    (root / "worktrees").symlink_to(root / "elsewhere", target_is_directory=True)
+    return ["new", "r", _RC]
+
+
+def _wt_unopened_bug(root: Path) -> list[str]:
+    return ["new", "r", "0.5.0/wt-hotfix-bugx"]
+
+
+def _wt_bug_confirmed(root: Path) -> None:
+    repo = root / "repos" / "r"
+    wt.git(repo, "switch", "-q", "feature/0.5.0")
+    wt.commit(repo, "specs/bugs/BUGS.jsonl", '{"id": "bugx", "status": "open"}\n')
+    wt.git(repo, "switch", "-q", "-")
+
+
+def _wt_rc_gone(root: Path) -> list[str]:
+    _rmtree(wt.open_tree(root, _RC))
+    return ["new", "r", wt.NEW_JOB]
+
+
+def _wt_not_implementation(root: Path) -> list[str]:
+    state = wt.open_tree(root, _RC) / "specs/releases/0.5.0/_RELEASE.json"
+    write_text(state, read_text(state).replace("IMPLEMENTATION", "DEFINITION"))
+    return ["new", "r", wt.NEW_JOB]
+
+
+def _wt_implementation(root: Path) -> None:
+    state = root / "worktrees/r" / _RC / "specs/releases/0.5.0/_RELEASE.json"
+    write_text(state, read_text(state).replace("DEFINITION", "IMPLEMENTATION"))
+
+
+def _wt_pause_ignored(root: Path) -> list[str]:
+    write_text(wt.open_tree(root, _RC) / "x.scratch", "1")
+    return ["pause", f"worktrees/r/{_RC}"]
+
+
+def _wt_drop_ignored(root: Path) -> None:
+    (root / "worktrees/r" / _RC / "x.scratch").unlink()
+
+
+def _wt_task_unopened(root: Path) -> list[str]:
+    for name in (_RC, wt.NEW_JOB):
+        wt.open_tree(root, name)
+    return ["merge", _TASK]
+
+
+def _wt_dirty(root: Path) -> list[str]:
+    tree = _wt_task(root)
+    (tree / "src").mkdir()
+    write_text(tree / "src/a.py", "x = 1\n")
+    wt.git(tree, "add", "src/a.py")
+    return ["merge", _TASK]
+
+
+def _wt_commit_staged(root: Path) -> None:
+    wt.git(root / "worktrees/r" / wt.NEW_TASK, "commit", "-qm", "src/a.py")
+
+
+def _wt_ignored(root: Path) -> list[str]:
+    write_text(_wt_task(root, commit="src/a.py") / "x.scratch", "1")
+    return ["merge", _TASK]
+
+
+def _wt_unmerged(root: Path) -> list[str]:
+    _wt_task(root, commit="src/a.py")
+    return ["clean", _TASK]
+
+
+def _wt_bad_sha(root: Path) -> list[str]:
+    _wt_task(root, commit="src/a.py")
+    return ["hash", _TASK, "--sha", "zz"]
+
+
+def _wt_real_sha(root: Path) -> list[str]:
+    return [
+        "hash",
+        _TASK,
+        "--sha",
+        wt.git(root / "worktrees/r" / wt.NEW_TASK, "rev-parse", "HEAD").strip(),
+    ]
+
+
+def _wt_unreviewed_rc(root: Path) -> list[str]:
+    wt.open_tree(root, _RC)
+    return ["merge", f"worktrees/r/{_RC}"]
+
+
+def _wt_review_rc(root: Path) -> None:
+    tree = root / "worktrees/r" / _RC
+    wt.approve(root, wt.git(tree, "rev-parse", "HEAD").strip(), name=_RC)
+
+
+_LANE = "0.5.0/wt-backlog-d"
+
+
+def _wt_red_doctor(root: Path) -> list[str]:
+    """A backlog lane whose `specs/` the doctor refuses, approved: its merge relays the doctor."""
+    wt.git(root / "repos/r", "checkout", "-q", "feature/0.5.0")
+    tree = wt.open_tree(root, _LANE)
+    wt.approve(root, wt.commit(tree, "specs/RED-doctor", ""))
+    return ["merge", str(tree)]
+
+
+def _wt_fix_doctor(root: Path) -> None:
+    tree = root / "worktrees/r" / _LANE
+    wt.git(tree, "rm", "-q", "specs/RED-doctor")
+    wt.git(tree, "commit", "-qm", "doctor-clean")
+    wt.approve(root, wt.git(tree, "rev-parse", "HEAD").strip(), at="T11:00:00Z")
+
+
+def _wt_rc_path(root: Path) -> str:
+    return f"worktrees/r/{_RC}"
+
+
+def _wt_planted(build: Callable[[Path], list[str]]) -> Callable[[Path], list[str]]:
+    def planted(root: Path) -> list[str]:
+        argv = build(root)
+        write_text(root / "refused.json", json.dumps(argv))
+        return argv
+
+    return planted
+
+
+def _wt_agent_reruns(
+    build: Callable[[Path], list[str]], corrected: Callable[[Path], list[str]]
+) -> WtCase:
+    """An input error whose fix is an Agent action: only playing it chooses the valid argument, so
+    a fix line that is a command (which `play` never sees) reruns the argv that refused."""
+
+    def play(root: Path) -> None:
+        write_text(root / "corrected.json", json.dumps(corrected(root)))
+
+    def then(root: Path) -> list[str]:
+        chosen = root / "corrected.json"
+        return json.loads(read_text(chosen if chosen.exists() else root / "refused.json"))
+
+    return WtCase(_wt_planted(build), play, then)
+
+
+def _wt_bad_name(root: Path) -> list[str]:
+    return ["new", "r", "bad-name"]
+
+
+def _wt_other_version(root: Path) -> list[str]:
+    return ["new", "r", "9.9.9/rc-1/wt-rc"]
+
+
+def _wt_unnamed_tree(root: Path) -> list[str]:
+    wt.open_tree(root, _RC)
+    return ["clean", "worktrees/r/bad-name"]
+
+
+def _wt_state_not_an_object(root: Path) -> list[str]:
+    write_text(wt.open_tree(root, _RC) / "specs/releases/0.5.0/_RELEASE.json", "[]")
+    return ["new", "r", wt.NEW_JOB]
+
+
+def _wt_state_repaired(root: Path) -> None:
+    state = root / "worktrees/r" / _RC / "specs/releases/0.5.0/_RELEASE.json"
+    wt.git(state.parent, "checkout", "--", state.name)
+
+
+def _wt_outside_path(root: Path) -> list[str]:
+    wt.open_tree(root, _RC)
+    return ["clean", str(root / "elsewhere")]
+
+
+def _wt_on_rc(verb: str) -> Callable[[Path], list[str]]:
+    return lambda root: [verb, _wt_rc_path(root)]
+
+
+def _wt_paused(root: Path) -> None:
+    """The rc paused: its bundle sits under `.dadaia/dist/r/`."""
+    wt.open_tree(root, _RC)
+    done = wt.run(root, "pause", _wt_rc_path(root))
+    assert done.returncode == 0, done.stderr
+
+
+def _wt_resume_no_bundle(root: Path) -> list[str]:
+    _wt_paused(root)
+    return ["resume", "worktrees/r/0.5.0/wt-backlog-foo"]
+
+
+def _wt_resume_ref_exists(root: Path) -> list[str]:
+    """The rc paused, then its branch recreated by git beside the bundle: no tree, a branch, a bundle."""
+    _wt_paused(root)
+    wt.git(root / "repos/r", "checkout", "-q", "feature/0.5.0")
+    wt.git(root / "repos/r", "branch", f"wt/{_RC}", "feature/0.5.0")
+    return ["resume", _wt_rc_path(root)]
+
+
+def _wt_branch_exists(root: Path) -> list[str]:
+    """A task tree already open: `new` of its name finds the branch. Its clean frees the name."""
+    _wt_task(root)
+    return ["new", "r", wt.NEW_TASK]
+
+
 # ── the census ───────────────────────────────────────────────────────────────────────
 
-_REFUSALS: dict[str, tuple[Case | tuple[Case, ...] | Skip, ...]] = {
+_SUITE = "tests/public/skills/dd_gitflow_default/scripts runs it"
+
+
+def _skips(count: int, reason: str) -> tuple[Skip, ...]:
+    return (Skip(reason),) * count
+
+
+_WORKTREE: dict[str, tuple[WtCase | Skip, ...]] = {
+    "_worktree_new.new": (
+        _wt_agent_reruns(_wt_bad_name, lambda root: ["new", "r", _RC]),
+        _wt_agent_reruns(_wt_other_version, lambda root: ["new", "r", _RC]),
+        WtCase(_wt_no_start),
+    ),
+    "_worktree_new._refuse_symlink": (WtCase(_wt_symlink),),
+    "_worktree_new._refuse_unopened_bug": (WtCase(_wt_unopened_bug, _wt_bug_confirmed),),
+    "_worktree_new._refuse_unready": (
+        WtCase(_wt_rc_gone),
+        WtCase(_wt_state_not_an_object, _wt_state_repaired),
+        Skip("the fix assigned for the refusal below it; the next case runs it"),
+        WtCase(_wt_not_implementation, _wt_implementation),
+    ),
+    "_worktree_pause.pause": (
+        Skip("its fix lands the tree through the merge chain, whose verdict step is an act"),
+        WtCase(_wt_pause_ignored, _wt_drop_ignored),
+        Skip("a bundle that carries nothing; " + _SUITE),
+    ),
+    "_worktree_pause.write_bundle": _skips(
+        1, "a bundle holding a commit the branch lacks; " + _SUITE
+    ),
+    "_worktree_sync.sync": (
+        Skip("the conflict fix assigned for the refusal below it; the next entry names it"),
+        Skip("needs a rebase conflict; " + _SUITE),
+    ),
+    "_worktree_end.target": (
+        _wt_agent_reruns(_wt_outside_path, _wt_on_rc("clean")),
+        _wt_agent_reruns(_wt_unnamed_tree, _wt_on_rc("clean")),
+    ),
+    "_worktree_end.refuse_dirty": (WtCase(_wt_dirty, _wt_commit_staged),),
+    "_worktree_end._kept": (WtCase(_wt_ignored, then=lambda _: ["merge", _TASK, "--drop"]),),
+    "_worktree_end.merge": (
+        Skip("the fast-forward fix assigned for the refusal below it; the next entry names it"),
+        Skip("a fast-forward race; " + _SUITE),
+    ),
+    "_worktree_end.clean": (WtCase(_wt_unmerged, then=["merge", _TASK]),),
+    "_worktree_end._relay": (WtCase(_wt_red_doctor, _wt_fix_doctor),),
+    "_worktree_end.digest": (WtCase(_wt_bad_sha, then=_wt_real_sha),),
+    "_worktree_end._check_approved": (
+        WtCase(_wt_unreviewed_rc, _wt_review_rc),
+        *_skips(3, "a verdict that is invalid, rejected or stale; " + _SUITE),
+        Skip("the dispatch act assigned for the missing and stale refusals; the case runs it"),
+    ),
+    "_worktree_end.drop_tree": _skips(1, "git failing to remove a tree; " + _SUITE),
+    "_worktree_end._remove": _skips(2, "a branch unmerged or a tree to reattach; " + _SUITE),
+    "_worktree_end._undo": _skips(1, "a backlog lane holding code; " + _SUITE),
+    "_worktree_end._check_specs_only": _skips(1, "a backlog lane holding code; " + _SUITE),
+    "_worktree_end.check_ancestor": _skips(1, "a tree not containing its base; " + _SUITE),
+    "_worktree_end._workspace": _skips(1, "no workspace above the tree; " + _SUITE),
+    "_worktree_end._land_line": _skips(1, "a tree to land through a lane; " + _SUITE),
+    "_worktree_end._declared_argv": _skips(1, "an unclosed quote in verify:; " + _SUITE),
+    "_worktree_end._gate": _skips(3, "the declared gate failing or not starting; " + _SUITE),
+    "_worktree_end._refuse_implementation_tests": _skips(2, "test paths in code; " + _SUITE),
+    "_worktree_end.open_children": _skips(1, "a tree with an open child; " + _SUITE),
+    "_worktree_end._scaffold": _skips(1, "a level folder holding other files; " + _SUITE),
+    "_worktree_end._parent": _skips(1, "a parent tree removed by hand; " + _SUITE),
+    "_worktree_end._on_target": _skips(1, "a parent tree on another branch; " + _SUITE),
+    "_worktree_git.not_a_name": (_wt_agent_reruns(_wt_bad_name, lambda root: ["new", "r", _RC]),),
+    "_worktree_git.gitflows": _skips(1, "a failing `context list`; " + _SUITE),
+    "_worktree_git.flow_for": _skips(1, "a repo no context owns; " + _SUITE),
+    "_worktree_git.SeveralWork.__init__": _skips(1, "several work branches; " + _SUITE),
+    "_worktree_git.work_version": (
+        Skip("several work branches; " + _SUITE),
+        Skip("no work branch; " + _SUITE),
+    ),
+    "_worktree_git._absent": _skips(2, "a `list` finding row, not a refusal; " + _SUITE),
+    "_worktree_git.move_aside": _skips(1, "a folder git does not list; " + _SUITE),
+    "_worktree_git._foreign": _skips(1, "a linked worktree no lane owns; " + _SUITE),
+    "_worktree_git.state": (
+        WtCase(_wt_branch_exists),
+        Skip("a tree detached at its branch; " + _SUITE),
+        Skip("a linked worktree no lane owns; " + _SUITE),
+        Skip("a folder git does not list; " + _SUITE),
+        Skip("a branch held by a tree at another path; " + _SUITE),
+        _wt_agent_reruns(_wt_resume_no_bundle, _wt_on_rc("resume")),
+        WtCase(_wt_resume_ref_exists),
+    ),
+    "_worktree_git.require": (WtCase(_wt_task_unopened),),
+    "worktree.main": _skips(3, "no workspace root or a failing child; " + _SUITE),
+}
+
+
+_REFUSALS: dict[str, tuple[Case | WtCase | tuple[Case, ...] | Skip, ...]] = {
     "branch_policy._refuse_branch": (
-        Case(_birth_published, _develop_at_main, replaces=True),
-        (
-            Case(_outside, _work_carries_topic, then=_MERGE_TOPIC),
-            Case(_outside_with_work, _work_carries_topic, then=_MERGE_TOPIC),
-            Case(_outside_detached, _work_carries_topic, then="git push -q origin feature/0.1.0"),
+        Skip(
+            "an Agent action over worktree verbs: the worktree_ws harness drives it, "
+            "tests/core/test_cli_line__refusal_fix_lines_clear_their_refusal.py::test_an_outside_ref_lands_through_a_tree"
         ),
-        Skip("an Agent action on the git host: the PR is no command to run"),
     ),
     "branch_policy.check_branch_policy": (
         Case(_mismatch, _work_pushed, then="git push -q origin feature/1.0.0"),
@@ -896,21 +1262,23 @@ _REFUSALS: dict[str, tuple[Case | tuple[Case, ...] | Skip, ...]] = {
             Case(_work_forced, _tree_opened, before=_open_a_tree, replaces=True),
         ),
     ),
-    "push_gate._rewrite_fix": (
+    "push_gate._refusal_fix": (
         (
             Case(_denylisted_not_checked_out, _clean_publish, then=_CLEAN_COMMIT_PUSH),
-            Case(_denylisted, _clean_publish, before=_drop_term, then=_COMMIT_PUSH),
+            Case(_denylisted, _clean_publish, before=_reword_denylisted, then=_COMMIT_PUSH),
             Case(
                 _denylisted_in_a_worktree,
                 _worktree_clean,
                 before=_drop_worktree_term,
                 then="git -C .claude/worktrees/agent-x push -q origin feature/1.0.0",
             ),
-            Case(_denylisted_no_context, _clean_publish, before=_drop_term, then=_COMMIT_PUSH),
+            Case(
+                _denylisted_no_context, _clean_publish, before=_reword_denylisted, then=_COMMIT_PUSH
+            ),
             Case(
                 _denylisted_advanced_integration,
                 _nothing_reverted,
-                before=_drop_term,
+                before=_reword_advanced,
                 then="git push -q origin feature/1.0.1",
             ),
             Case(_non_canon, _no_junk, before=_rm_junk, then=_COMMIT_PUSH),
@@ -927,24 +1295,18 @@ _REFUSALS: dict[str, tuple[Case | tuple[Case, ...] | Skip, ...]] = {
     ),
     "ci._repo_root": (Skip("the pre-push hook always runs inside the repo it pushes"),),
     "ci.push_gate_check": (Skip("the gate's refusal: its fix is a branch_policy/push_gate site"),),
-    "ci._fold": (
-        Skip(
-            "a group left with no message: test__worktree_end.py pins its one fix and the unchanged branch"
-        ),
-    ),
-    "ci._rewrite_unpublished": (
-        Skip("refuses a commit origin holds: test_reference_transaction__work_branch.py"),
-    ),
     "service.SpecContextService.show": (Case(_unknown_context, _cloned, before=_create),),
     "service.SpecContextService.alive": (
         Case(_no_url_no_checkout, _cloned, before=_clone),
         Case(_alive_remote_gone, _cloned, before=_remote_back),
         Case(_alive_no_integration, _cloned, before=_origin_gains_develop),
     ),
-    "service.SpecContextService.baseline": (
+    "service.SpecContextService._publishable_repo": (
         Case(_no_checkout, _cloned),
         Case(_no_identity, _baseline_done, before=_identity),
         Case(_never_onboarded, _baseline_done),
+    ),
+    "service.SpecContextService.baseline": (
         Case(_baseline_denylisted, _baseline_done, before=_drop_draft_term, then=_BASELINE_AGAIN),
     ),
     "service.SpecContextService._refuse_principal_absent": (
@@ -953,7 +1315,7 @@ _REFUSALS: dict[str, tuple[Case | tuple[Case, ...] | Skip, ...]] = {
     "service.SpecContextService._require_publishable": (
         Case(_secret_draft, _baseline_done, before=_drop_secret),
     ),
-    "service.SpecContextService._dead_preflight": (
+    "service.SpecContextService._refuse_unsafe_repo": (
         (
             Case(_untracked, _dead_done, before=_discard_notes),
             Case(_two_untracked, _dead_done, before=_discard_what_the_fix_names),
@@ -964,6 +1326,8 @@ _REFUSALS: dict[str, tuple[Case | tuple[Case, ...] | Skip, ...]] = {
             Case(_commits_no_remote, _dead_done, before=_origin),
             Case(_stashed, _dead_done, before=_play_stash_act),
         ),
+    ),
+    "service.SpecContextService._refuse_off_work": (
         (
             Case(_dirty_on_integration, _dead_via_work),
             Case(_associated_on_integration, _associated_dead),
@@ -985,4 +1349,5 @@ _REFUSALS: dict[str, tuple[Case | tuple[Case, ...] | Skip, ...]] = {
         ),
         Skip("a refused hold (`repos/` outside the workspace): test_context_dead_holds.py"),
     ),
+    **_WORKTREE,
 }

@@ -30,6 +30,7 @@ from tests.helpers.oslib import (
     is_executable,
     read_text,
     run,
+    run_line,
     stub_cli,
     write_text,
 )
@@ -92,7 +93,10 @@ def _ledger(root: Path, *records: dict[str, object]) -> Path:
         )
     )
     required = set(schema["required"])
-    shaped = [{**{key: None for key in required - record.keys()}, **record} for record in records]
+    shaped = [
+        {**{key: None for key in required - record.keys()}, **record}
+        for record in _land(root, records)
+    ]
     write_text(
         specs / "bugs" / "BUGS.jsonl", "".join(json.dumps(record) + "\n" for record in shaped)
     )
@@ -199,7 +203,7 @@ def test_check_refuses_a_record_whose_fix_commit_lost_its_id_line(
     assert "\nfix: " in done.stdout
 
 
-def test_the_uncited_fix_fix_line_is_one_act_naming_the_literal_id_line(
+def test_the_uncited_fix_fix_line_is_the_archive_act_naming_the_id(
     script: Path, tmp_path: Path
 ) -> None:
     specs = _ledger(tmp_path)
@@ -208,9 +212,10 @@ def test_the_uncited_fix_fix_line_is_one_act_naming_the_literal_id_line(
                 "cause": "c", "solution": "s", "caused_by": "none", "fix_sha": "a" * 40}  # fmt: skip
     _ledger(tmp_path, resolved)
     run([*git, "commit", "-q", "--allow-empty", "-m", "base"], check=True)
-    fix = _run(script, "check", "--specs", str(specs)).stdout.splitlines()[-1]
-    assert fix.startswith("fix: Agent action: ") and "<" not in fix, fix
-    assert "fix(bugs): a-bug \u2014 \u2026" in fix, fix
+    out = _run(script, "check", "--specs", str(specs)).stdout
+    fix = out.splitlines()[-1]
+    assert fix == f"fix: {_archive_act(script, specs, 'a-bug')}", fix
+    assert "fix(bugs): a-bug \u2014 " in out and "refactor(bugs): a-bug \u2014 " in out, out
 
 
 @pytest.mark.parametrize(("ids", "depth", "code"), [
@@ -269,9 +274,20 @@ def test_an_id_commit_any_repo_of_the_context_reaches_is_clean(
     assert done.returncode == 1 and "'a-bug'" in done.stdout, done.stdout
 
 
-def test_a_fix_line_survives_a_percent_in_the_script_path(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    "record",
+    [
+        {"caused_by": "ghost"},
+        {"status": "resolved", "closed_at": "2026-09-21T10:00:00Z", "cause": "c",
+         "solution": "s", "caused_by": "none", "fix_sha": "a" * 40},  # fmt: skip
+    ],
+    ids=["caused-by-ghost", "fix-sha-unreached"],
+)  # fmt: skip
+def test_a_fix_line_survives_a_percent_in_the_script_path(
+    tmp_path: Path, record: dict[str, object]
+) -> None:
     script = stage_skill_scripts("dd-bug-resolution", tmp_path / "a%sb" / "scripts") / "bugs.py"
-    specs = _ledger(tmp_path, {**_OPEN_RECORD, "caused_by": "ghost"})
+    specs = _ledger(tmp_path, {**_OPEN_RECORD, **record})
     done = _run(script, "check", "--specs", str(specs))
     assert "Traceback" not in done.stderr, done.stderr
     assert done.returncode == 1, done.stdout + done.stderr
@@ -379,7 +395,7 @@ def test_a_write_over_an_unreadable_line_refuses_naming_it(
     done = _run(script, "update", "a-bug", "--set", "caused_by=none", "--specs", str(specs))
     assert done.returncode == 1
     assert "BUGS.jsonl:2" in done.stderr and "cannot read in full" in done.stderr
-    assert f"sed -n '2p' {ledger}" in done.stderr
+    assert command("sed", "-n", "2p", str(ledger)) in done.stderr
 
 
 _APPEND = ["append", "--bug-id", "x", "--title", "t", "--severity", "LOW",
@@ -570,9 +586,30 @@ def test_append_registers_one_open_record(script: Path, tmp_path: Path) -> None:
 def _sibling(bug_id: str, *files: str) -> dict[str, object]:
     record = {**_OPEN_RECORD, "id": bug_id, "status": "resolved", "closed_at": "2026-09-21T10:00:00Z",
               "cause": "c", "solution": "s", "caused_by": "none",
-              "fix_sha": (bug_id.encode().hex() * 40)[:40], "fix_files": list(files)}  # fmt: skip
+              "fix_sha": (bug_id.encode().hex() * 40)[:40], "_files": list(files)}  # fmt: skip
     del record["surface"]
     return record
+
+
+def _land(root: Path, records: tuple[dict[str, object], ...]) -> list[dict[str, object]]:
+    """Commit, for each record carrying `_files`, the id-line fix touching those files; the records without that key."""
+    git = ["git", "-C", str(root), "-c", "user.name=t", "-c", "user.email=t@t.test"]
+    if any(r.get("_files") for r in records):
+        run([*git, "add", "-A"], check=True)
+        run([*git, "commit", "-q", "--allow-empty", "-m", "base"], check=True)
+    for record in records:
+        for path in record.get("_files") or ():
+            (root / str(path)).parent.mkdir(parents=True, exist_ok=True)
+            with (root / str(path)).open("a") as out:
+                out.write("# fix\n")
+        if record.get("_files"):
+            run([*git, "add", "-A"], check=True)
+            run([*git, "commit", "-q", "-m", f"fix(bugs): {record['id']} \u2014 c"], check=True)
+    return [{k: v for k, v in r.items() if k != "_files"} for r in records]
+
+
+def _child(bug_id: str, cause: str, *files: str) -> dict[str, object]:
+    return {**_sibling(bug_id, *files), "caused_by": cause}
 
 
 _LEGACY_EVENT = {"ts": "2026-08-28T12:45:33Z", "event": "archived", "agent": "claude-code",
@@ -585,7 +622,7 @@ def _archived(specs: Path, *records: dict[str, object]) -> None:
     """The archive as the real one is: legacy event lines first, then the plain records."""
     (specs / "bugs" / "_archive").mkdir(parents=True, exist_ok=True)
     write_text(specs / "bugs" / "_archive" / "bugs_histo.jsonl",
-               "".join(json.dumps(r) + "\n" for r in (_LEGACY_EVENT, *records)))  # fmt: skip
+               "".join(json.dumps(r) + "\n" for r in (_LEGACY_EVENT, *_land(specs.parent, records))))  # fmt: skip
 
 
 def _append_argv(specs: Path, component: str = "cli/x.py", bug_id: str = "new-bug") -> list[str]:
@@ -594,15 +631,15 @@ def _append_argv(specs: Path, component: str = "cli/x.py", bug_id: str = "new-bu
             "--symptom", "s", "--repro", "r", "--expected", "e"]  # fmt: skip
 
 
-def test_append_prints_the_earlier_bugs_whose_fix_files_match_and_the_rebuild_due(
+def test_append_prints_the_earlier_bugs_whose_id_commits_touch_the_path_and_the_rebuild_due(
     script: Path, tmp_path: Path
 ) -> None:
-    """Live and archived records whose `fix_files` hold the component's path are listed by id;
-    a legacy record without `fix_files` never matches. Without `--correlates` it refuses."""
+    """Live and archived records whose id commit touches the component's path are listed by id;
+    a record whose id commit holds no such path never matches. Without `--correlates` it refuses."""
     specs = _ledger(
         tmp_path, _sibling("b1", "cli/x.py"), _sibling("b4", "hooks/y.py"), _OPEN_RECORD
     )
-    _archived(specs, _sibling("b3", "cli/x.py", "z"))
+    _archived(specs, _child("b3", "b1", "cli/x.py", "z"))
     argv = _append_argv(specs)
     bare, named = _run(script, *argv), _run(script, *argv, "--correlates", "b1,b3")
     assert bare.returncode == 1
@@ -617,11 +654,15 @@ def test_append_prints_the_earlier_bugs_whose_fix_files_match_and_the_rebuild_du
     ]
 
 
-def test_a_fix_commit_shared_by_three_bugs_counts_once_toward_a_files_rebuild_due(
+def test_bugs_sharing_one_fix_commit_are_no_child_of_one_another(
     script: Path, tmp_path: Path
 ) -> None:
-    shared = [{**_sibling(i, "cli/x.py"), "fix_sha": "c" * 40} for i in ("b1", "b2", "b3")]
-    twice = [_sibling("b4", "tests/t.py"), _sibling("b5", "tests/t.py")]
+    _ledger(tmp_path)
+    _land(tmp_path, ({"id": "b1, b2, b3", "_files": ["cli/x.py"]},))
+    shared = [{**_sibling("b1"), "fix_sha": "c" * 40}] + [
+        {**_child(i, "b1"), "fix_sha": "c" * 40} for i in ("b2", "b3")
+    ]
+    twice = [_sibling("b4", "tests/t.py"), _child("b5", "b4", "tests/t.py")]
     specs = _ledger(tmp_path, *shared, *twice)
     stats = _run(script, "stats", "--specs", str(specs))
     assert [ln for ln in stats.stdout.splitlines() if ln.startswith("rebuild-due:")] == [
@@ -631,15 +672,21 @@ def test_a_fix_commit_shared_by_three_bugs_counts_once_toward_a_files_rebuild_du
     assert done.returncode == 0, done.stderr
     assert done.stdout.splitlines()[:4] == [
         "earlier bug on cli/x.py: b1", "earlier bug on cli/x.py: b2",
-        "earlier bug on cli/x.py: b3", "REBUILD due: 2nd bug on cli/x.py",
+        "earlier bug on cli/x.py: b3", f"[ok] registered new-bug -> {specs}",
     ]  # fmt: skip
 
 
 def test_append_lists_a_bug_once_when_two_of_its_files_match(script: Path, tmp_path: Path) -> None:
-    specs = _ledger(tmp_path, _sibling("b1", "cli/x.py", "cli/y.py"))
-    done = _run(script, *_append_argv(specs, "cli"), "--correlates", "b1")
+    specs = _ledger(
+        tmp_path, _sibling("b1", "cli/x.py", "cli/y.py"), _child("b2", "b1", "cli/x.py")
+    )
+    done = _run(script, *_append_argv(specs, "cli"), "--correlates", "b1,b2")
     assert done.returncode == 0, done.stderr
-    assert done.stdout.splitlines()[:2] == ["earlier bug on cli: b1", "REBUILD due: 2nd bug on cli"]
+    assert done.stdout.splitlines()[:3] == [
+        "earlier bug on cli: b1",
+        "earlier bug on cli: b2",
+        "REBUILD due: 3rd bug on cli",
+    ]
 
 
 def test_append_prints_no_rebuild_due_for_a_first_bug_on_a_file(
@@ -683,11 +730,13 @@ def test_append_refuses_a_correlate_no_ledger_or_archive_holds(
 def test_append_takes_a_component_that_names_a_tracked_path_in_free_text(
     script: Path, tmp_path: Path, component: str
 ) -> None:
-    specs = _ledger(tmp_path, _sibling("b1", "cli/x.py"), _sibling("b4", "hooks/y.py"))
+    specs = _ledger(tmp_path, _sibling("b1", "cli/x.py"), _child("b2", "b1", "cli/x.py"),
+                    _sibling("b4", "hooks/y.py"))  # fmt: skip
     done = _run(script, *_append_argv(specs, component), "--correlates", "b1")
     assert done.returncode == 0, done.stderr
-    assert done.stdout.splitlines()[:2] == [
-        "earlier bug on cli/x.py: b1", "REBUILD due: 2nd bug on cli/x.py",
+    assert done.stdout.splitlines()[:3] == [
+        "earlier bug on cli/x.py: b1", "earlier bug on cli/x.py: b2",
+        "REBUILD due: 3rd bug on cli/x.py",
     ]  # fmt: skip
     assert _records(specs)[-1]["component"] == component
 
@@ -722,7 +771,7 @@ def test_check_reports_a_record_no_commit_cites_and_runs_no_git_on_its_fix_sha(
     script: Path, tmp_path: Path, sha: str
 ) -> None:
     sha = sha.format(planted=tmp_path / "planted")
-    specs = _ledger(tmp_path, {**_OPEN_RECORD, "fix_sha": sha})
+    specs = _ledger(tmp_path, _resolved("a-bug", sha))
     trace, env = _traced(tmp_path)
     done = _run(script, "check", "--specs", str(specs), env=env)
     assert done.returncode == 1 and "'a-bug' fix_sha" in done.stdout + done.stderr
@@ -793,21 +842,18 @@ def test_a_legacy_record_with_a_surface_passes_check(script: Path, tmp_path: Pat
     assert done.returncode == 0, done.stdout + done.stderr
 
 
-def test_resolve_records_the_fix_files_once(script: Path, tmp_path: Path) -> None:
+def test_resolve_stores_no_fix_files(script: Path, tmp_path: Path) -> None:
     specs = _ledger(tmp_path, _OPEN_RECORD)
     _fix_commit(tmp_path, "cli/x.py", _FIXED)
     done = _run(script, *_resolve_argv(), "--specs", str(specs))
     assert done.returncode == 0, done.stderr
-    assert _records(specs)[0]["fix_files"] == ["cli/x.py"]
-    again = _run(script, "update", "a-bug", "--set", "fix_files=other.py", "--specs", str(specs))
-    assert again.returncode == 1 and "write-once" in again.stderr
-    assert _records(specs)[0]["fix_files"] == ["cli/x.py"]
+    assert "fix_files" not in _records(specs)[0]
 
 
 def test_stats_reports_the_files_two_or_more_bugs_fixed(script: Path, tmp_path: Path) -> None:
-    specs = _ledger(tmp_path, _sibling("b1", "cli/x.py"), _sibling("b2", "cli/x.py", "hooks/y.py"),
-                    _sibling("b4", "hooks/y.py"), _sibling("b5", "solo.py"), _OPEN_RECORD)  # fmt: skip
-    _archived(specs, _sibling("b3", "cli/x.py"))
+    specs = _ledger(tmp_path, _sibling("b1", "cli/x.py"), _child("b2", "b1", "cli/x.py", "hooks/y.py"),
+                    _child("b4", "b2", "hooks/y.py"), _sibling("b5", "solo.py"), _OPEN_RECORD)  # fmt: skip
+    _archived(specs, _child("b3", "b1", "cli/x.py"))
     done = _run(script, "stats", "--specs", str(specs))
     assert done.returncode == 0, done.stderr
     assert [ln for ln in done.stdout.splitlines() if ln.startswith("rebuild-due:")] == [
@@ -1305,7 +1351,7 @@ def _closed_on(bug_id: str, closed_at: str, caused_by: str, *files: str) -> dict
 
 
 def test_stats_window_counts_what_closed_between_two_stamps(script: Path, tmp_path: Path) -> None:
-    """b2 and b5 share a fixed file with an out-of-window bug, b3 fixed a file alone, b4 closed
+    """b2 is a child of an out-of-window bug on a file, b5 the cause of an out-of-window child, b3 fixed a file alone, b4 closed
     after the window; the archive counts like the live ledger."""
     specs = _ledger(
         tmp_path,
@@ -1318,7 +1364,7 @@ def test_stats_window_counts_what_closed_between_two_stamps(script: Path, tmp_pa
     _archived(
         specs,
         _closed_on("b5", "2026-09-22T00:00:00Z", "none", "hooks/y.py"),
-        _closed_on("b6", "2026-08-01T00:00:00Z", "none", "hooks/y.py"),
+        _closed_on("b6", "2026-08-01T00:00:00Z", "b5", "hooks/y.py"),
     )
     window = ["--closed-after", "2026-09-15T00:00:00Z", "--closed-until", "2026-10-01T00:00:00Z"]
     done = _run(script, "stats", "--specs", str(specs), *window)
@@ -1392,7 +1438,7 @@ def test_fix_commit_hands_git_no_id(tmp_path: Path, monkeypatch: pytest.MonkeyPa
     _fix_commit(tmp_path, "cli/x.py", _FIXED)
     trace, env = _traced(tmp_path)
     monkeypatch.setenv("GIT_TRACE", env["GIT_TRACE"])
-    assert load_owner("dd-bug-resolution", "_git").fix_commit(tmp_path, ["--output=x"]) == {}
+    assert load_owner("dd-bug-resolution", "_git").fix_commit([tmp_path], ["--output=x"]) == {}
     assert not any("--output=x" in ln for ln in _trace_lines(trace))
 
 
@@ -1440,9 +1486,7 @@ def test_append_finds_the_earlier_bugs_of_records_without_fix_files_in_one_diff_
     _ledger(tmp_path)
     first = _fix_commit(tmp_path, "cli/x.py", "fix(bugs): b1 \u2014 c")
     second = _fix_commit(tmp_path, "cli/x.py", "fix(bugs): b2 \u2014 c")
-    old = [{**_sibling(i, "cli/x.py"), "fix_sha": sha} for i, sha in (("b1", first), ("b2", second))]
-    for record in old:
-        del record["fix_files"]
+    old = [{**_child(i, c), "fix_sha": sha} for i, c, sha in (("b1", "none", first), ("b2", "b1", second))]
     specs = _ledger(tmp_path, *old)
     trace, env = _traced(tmp_path)
     done = _run(script, *_append_argv(specs), "--correlates", "b1,b2", env=env)
@@ -1473,6 +1517,10 @@ def _commit_as(root: Path, message: str, path: str = "cli/x.py") -> str:
     write_text(root / path, read_text(root / path) + "# edit\n")
     run([*git, "commit", "-q", "-a", "-m", message], check=True)
     return run([*git, "rev-parse", "HEAD"], check=True).stdout.strip()
+
+
+def _archive_act(script: Path, specs: Path, *ids: str) -> str:
+    return shell_line(sys.executable, str(script), "archive", *ids, "--specs", str(specs))
 
 
 def _resolved(bug_id: str, sha: str = "a" * 40) -> dict[str, object]:
@@ -1564,17 +1612,37 @@ def test_check_refuses_a_record_no_commit_of_head_cites_with_one_fix_line(
     assert done.returncode == 1, done.stdout
     assert done.stdout.count("LEDGER-BUGS-SCHEMA") == 1 and "bugs/BUGS.jsonl:1" in done.stdout
     [fix] = [ln for ln in done.stdout.splitlines() if ln.startswith("fix: ")]
-    assert fix.startswith("fix: Agent action: ") and "fix(bugs): a-bug \u2014 " in fix, fix
+    assert fix == f"fix: {_archive_act(script, specs, 'a-bug')}", fix
 
 
-def test_resolve_records_the_sha_and_files_of_the_id_commit(script: Path, tmp_path: Path) -> None:
+def test_the_archive_act_check_prints_clears_a_record_a_task_commit_fixed(
+    script: Path, tmp_path: Path
+) -> None:
+    """A task-shaped fix commit cannot be re-worded once pushed: the printed act is the way out."""
+    _ledger(tmp_path)
+    sha = _commit_as(tmp_path, "fix(J1.T1): a-bug \u2014 c")
+    still_open = {**_OPEN_RECORD, "id": "c-bug", "fix_sha": sha}  # archive refuses it: never judged
+    specs = _ledger(tmp_path, _resolved("a-bug", sha), _resolved("b-bug", sha), still_open)
+    done = _run(script, "check", "--specs", str(specs))
+    assert done.returncode == 1, done.stdout
+    fixes = {ln for ln in done.stdout.splitlines() if ln.startswith("fix: ")}
+    assert fixes == {f"fix: {_archive_act(script, specs, 'a-bug', 'b-bug')}"}, done.stdout
+    act = run_line(next(iter(fixes))[5:], check=False)
+    assert act.returncode == 0, act.stdout + act.stderr
+    assert _run(script, "check", "--specs", str(specs)).returncode == 0
+
+
+@pytest.mark.parametrize("message", [_FIXED, "refactor(bugs): a-bug \u2014 REBUILD u: c"])
+def test_resolve_records_the_sha_of_the_id_commit(
+    script: Path, tmp_path: Path, message: str
+) -> None:
     specs = _ledger(tmp_path, _OPEN_RECORD)
-    sha = _fix_commit(tmp_path, "cli/x.py", _FIXED)
+    sha = _fix_commit(tmp_path, "cli/x.py", message)
     done = _run(script, "resolve", "a-bug", "--cause", "c", "--caused-by", "none",
                 "--solution", "s", "--specs", str(specs))  # fmt: skip
     assert done.returncode == 0, done.stdout + done.stderr
     [record] = _records(specs)
-    assert (record["fix_sha"], record["fix_files"]) == (sha, ["cli/x.py"])
+    assert (record["fix_sha"], "fix_files" in record) == (sha, False)
     assert _run(script, "check", "--specs", str(specs)).returncode == 0
 
 
@@ -1588,8 +1656,15 @@ def test_resolve_with_no_id_commit_is_one_refusal_with_one_fix_line(
                 "--solution", "s", "--specs", str(specs))  # fmt: skip
     assert done.returncode == 1 and "Traceback" not in done.stderr, done.stderr
     [fix] = [ln for ln in done.stderr.splitlines() if ln.startswith("fix: ")]
-    assert "fix(bugs): a-bug \u2014 " in fix, fix
+    assert "fix(bugs): a-bug \u2014 " in fix and "refactor(bugs): a-bug \u2014 " in fix, fix
+    assert "caused_by" not in fix and " when " not in fix, fix
     assert (specs / "bugs/BUGS.jsonl").read_bytes() == before
+
+
+def test_help_describes_resolves_fix_as_either_id_line(script: Path) -> None:
+    done = _run(script, "--help")
+    entry = " ".join(done.stdout.split()).split(" resolve ", 1)[1].split(" archive ")[0]
+    assert done.returncode == 0 and "fix(bugs)" in entry and "refactor(bugs)" in entry, entry
 
 
 def test_resolve_takes_no_fix_sha_flag(script: Path, tmp_path: Path) -> None:
@@ -1606,8 +1681,163 @@ def test_stats_reads_the_files_of_the_id_commit_for_a_record_without_fix_files(
     _ledger(tmp_path)
     for bug in ("b1", "b2"):
         _commit_as(tmp_path, f"fix(bugs): {bug} \u2014 c")
-    specs = _ledger(tmp_path, _resolved("b1", "1" * 40), _resolved("b2", "2" * 40))
+    specs = _ledger(tmp_path, _resolved("b1", "1" * 40), {**_resolved("b2", "2" * 40), "caused_by": "b1"})
     done = _run(script, "stats", "--specs", str(specs))
     assert [ln for ln in done.stdout.splitlines() if ln.startswith("rebuild-due:")] == [
         "rebuild-due:cli/x.py\tb1,b2"
     ]
+
+
+def test_check_refuses_a_registry_the_workspace_cli_rejects_with_its_fix_line(
+    script: Path, tmp_path: Path
+) -> None:
+    (tmp_path / "ws").mkdir()
+    root = make_workspace(tmp_path / "ws")
+    write_text(root / ".dadaia/states/spec_contexts.json", json.dumps({"contexts": ["not-a-row"]}))
+    refusing = "#!python\nimport sys\nprint('[error] bad row', file=sys.stderr)\nprint('fix: Agent action: repair the registry row', file=sys.stderr)\nsys.exit(1)\n"  # fmt: skip
+    stub_cli(cli_path(root).parent, "dadaia", refusing)
+    specs = _ledger(root / "repos" / "r", {**_resolved("a-bug"), "fix_sha": "a" * 40})
+    done = _run(script, "check", "--specs", str(specs))
+    out = done.stdout + done.stderr
+    assert "Traceback" not in out and "AttributeError" not in out, out
+    assert done.returncode == 1, out
+    assert "fix: Agent action: repair the registry row" in out, out
+
+
+def _unit_history(
+    tmp_path: Path, steps: list[tuple[str, str, str]]
+) -> Path:
+    """Resolved bugs, oldest first, each fixed by a commit on cli/x.py: `(id, line kind, caused_by)`."""
+    _ledger(tmp_path)
+    records = []
+    for bug, kind, caused_by in steps:
+        line = {
+            "refactor": "refactor(bugs): {} — REBUILD u: c",
+            "body": "test({0}): t\n\nrefactor(bugs): {0} — REBUILD u: c",
+            "plain": "test({0}): t\n\nrefactor(bugs): {0} — a token test, no lexer",
+        }.get(kind, "fix(bugs): {} — c")
+        sha = _commit_as(tmp_path, line.format(bug))
+        records.append({**_resolved(bug, sha), "caused_by": caused_by})
+    return _ledger(tmp_path, *records)
+
+
+@pytest.mark.parametrize(("steps", "due"), [
+    ([("b1", "fix", "none"), ("b2", "fix", "b1")], True),  # a child of b1, and no REBUILD since
+    ([("b1", "fix", "none"), ("b2", "refactor", "b1")], False),  # the REBUILD answered the child
+    ([("b1", "fix", "none"), ("b2", "body", "b1")], False),  # the REBUILD line sits in a test commit's body
+    ([("b1", "fix", "none"), ("b2", "plain", "b1")], False),  # a refactor(bugs) line without the REBUILD token
+    ([("b1", "fix", "none"), ("b2", "refactor", "b1"), ("b3", "fix", "b2")], True),  # a child after the last REBUILD
+    ([("b1", "fix", "none"), ("b2", "fix", "none")], False),  # two bugs, none caused by the other
+])  # fmt: skip
+def test_append_and_stats_say_rebuild_due_alike_on_a_child_after_the_units_last_rebuild(
+    script: Path, tmp_path: Path, steps: list[tuple[str, str, str]], due: bool
+) -> None:
+    specs = _unit_history(tmp_path, steps)
+    stats = _run(script, "stats", "--specs", str(specs))
+    flagged = [ln.split("\t")[0] for ln in stats.stdout.splitlines() if ln.startswith("rebuild-due:")]
+    correlates = ",".join(bug for bug, _, _ in steps)
+    done = _run(script, *_append_argv(specs), "--correlates", correlates)
+    assert done.returncode == 0, done.stderr
+    said = [ln for ln in done.stdout.splitlines() if ln.startswith("REBUILD due")]
+    assert (flagged == ["rebuild-due:cli/x.py"], bool(said)) == (due, due), (stats.stdout, done.stdout)
+
+
+def _both_shapes(specs: Path) -> None:
+    """An archive as the real one is: legacy event lines, then plain records; `shared` is both."""
+    shared = {"ts": "2026-08-28T12:45:33Z", "event": "archived", "agent": "a",
+              "data": {"id": "shared", "status": "Closed"}}  # fmt: skip
+    (specs / "bugs" / "_archive").mkdir(parents=True, exist_ok=True)
+    lines = [_LEGACY_EVENT, shared, _closed("shared"), _closed("plain-one")]
+    write_text(specs / "bugs" / "_archive" / "bugs_histo.jsonl",
+               "".join(json.dumps(r) + "\n" for r in lines))  # fmt: skip
+
+
+def test_an_archive_of_both_shapes_is_read_from_its_lines_for_check_and_the_ids_append_takes(
+    script: Path, tmp_path: Path
+) -> None:
+    specs = _ledger(tmp_path, _OPEN_RECORD)
+    _both_shapes(specs)
+    assert _run(script, "check", "--specs", str(specs)).returncode == 0
+    for bug in ("legacy-one", "plain-one", "shared"):
+        argv = _append_argv(specs, bug_id=f"n-{bug}")
+        done = _run(script, *argv, "--correlates", bug)
+        assert done.returncode == 0, (bug, done.stderr)
+    refused = _run(script, *_append_argv(specs, bug_id="shared"), "--correlates", "none")
+    assert refused.returncode == 1 and "already exists" in refused.stderr
+
+
+def test_a_fix_sha_only_record_whose_id_commit_exists_passes_check(
+    script: Path, tmp_path: Path
+) -> None:
+    _ledger(tmp_path)
+    sha = _commit_as(tmp_path, _FIXED)
+    specs = _ledger(tmp_path, _resolved("a-bug", sha))
+    assert "fix_files" not in _records(specs)[0]
+    done = _run(script, "check", "--specs", str(specs))
+    assert done.returncode == 0, done.stdout + done.stderr
+
+
+def _two_candidates(specs: Path) -> None:
+    """One task id heads a task row in two candidates; another only in the second."""
+    for number, ids in ((9, ["J1.T3"]), (10, ["J1.T3", "J2.T1"])):
+        job = specs / "releases" / "0.5.0" / f"rc-{number}" / "tasks" / "job1.md"
+        job.parent.mkdir(parents=True)
+        write_text(job, "".join(f"| {i} | AC1.1 | `ci.py` |\n" for i in ids))
+
+
+def test_resolve_refuses_a_bare_task_id_two_candidates_carry_and_names_the_qualified_form(
+    script: Path, tmp_path: Path
+) -> None:
+    specs = _ledger(tmp_path, _OPEN_RECORD)
+    _two_candidates(specs)
+    _fix_commit(tmp_path, "cli/x.py", _FIXED)
+    before = (specs / "bugs/BUGS.jsonl").read_bytes()
+    done = _run(script, *_resolve_argv(caused_by="J1.T3"), "--specs", str(specs))
+    assert done.returncode == 1 and "Traceback" not in done.stderr, done.stderr
+    [fix] = [ln for ln in done.stderr.splitlines() if ln.startswith("fix: ")]
+    assert "J1.T3" in fix and "0.5.0-rc9" in fix and "0.5.0-rc10" in fix, fix
+    assert (specs / "bugs/BUGS.jsonl").read_bytes() == before
+
+
+def test_resolve_takes_a_bare_task_id_only_one_candidate_carries(
+    script: Path, tmp_path: Path
+) -> None:
+    specs = _ledger(tmp_path, _OPEN_RECORD)
+    _two_candidates(specs)
+    _fix_commit(tmp_path, "cli/x.py", _FIXED)
+    done = _run(script, *_resolve_argv(caused_by="J2.T1"), "--specs", str(specs))
+    assert done.returncode == 0, done.stderr
+    assert _records(specs)[0]["caused_by"] == "J2.T1"
+
+
+def test_resolve_takes_the_candidate_qualified_form_of_an_ambiguous_task_id(
+    script: Path, tmp_path: Path
+) -> None:
+    specs = _ledger(tmp_path, _OPEN_RECORD)
+    _two_candidates(specs)
+    _fix_commit(tmp_path, "cli/x.py", _FIXED)
+    done = _run(script, *_resolve_argv(caused_by="0.5.0-rc9/J1.T3"), "--specs", str(specs))
+    assert done.returncode == 0, done.stderr
+    assert _records(specs)[0]["caused_by"] == "0.5.0-rc9/J1.T3"
+    assert _run(script, "check", "--specs", str(specs)).returncode == 0
+
+
+def test_a_bare_ambiguous_task_id_already_in_a_ledger_still_passes_check(
+    script: Path, tmp_path: Path
+) -> None:
+    specs = _ledger(tmp_path, {**_OPEN_RECORD, "caused_by": "J1.T3"})
+    _two_candidates(specs)
+    assert _run(script, "check", "--specs", str(specs)).returncode == 0
+
+
+def test_open_ids_and_standing_read_the_live_ledger_and_the_archive(tmp_path: Path) -> None:
+    store = load_owner("dd-bug-resolution", "_bugs_store")
+    rejected = {**_OPEN_RECORD, "id": "r-bug", "status": "rejected", "closed_at": "2026-09-21"}
+    legacy = {**_resolved("old"), "resolved_release": "0.4.0"}
+    specs = _ledger(tmp_path, _OPEN_RECORD, rejected, {**_OPEN_RECORD, "id": "s", "superseded_by": "old"})
+    _archived(specs, legacy)
+    assert store.open_ids(specs) == ["a-bug", "s"]
+    got = [store.standing(specs, i, "0.4.0") for i in ("a-bug", "r-bug", "old", "s", "nope")]
+    assert got[:4] == ["untraced", "traced", "traced", "traced"]
+    assert got[4].startswith("names no record")
+    assert store.standing(specs, "old", "0.5.0") == "untraced"

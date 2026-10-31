@@ -16,5 +16,6 @@
   "Repo hygiene (no tracked projection files)",
   "Compliance (workspace/specs/ledgers sections)",
   "PR source guard (both gitflow edges, one job)",
-  "gitleaks"
+  "gitleaks",
+  "Eval gate"
 ]

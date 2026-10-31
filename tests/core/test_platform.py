@@ -63,6 +63,8 @@ def test_the_door_hands_out_the_kernels_own_function(name: str) -> None:
         ("command", ("C:/a b/x", "c d")),
         ("is_fully_qualified", ("\\tools",)),
         ("canonical_cli", ("x .venv/Scripts/dadaia.exe",)),
+        ("cli_words", (PurePosixPath("/w"), "doctor")),
+        ("mkdir_line", (PurePosixPath("/a b/c"),)),
         ("home_env", (Path("/h"),)),
         ("python_in", (PurePosixPath("/v"),)),
     ],

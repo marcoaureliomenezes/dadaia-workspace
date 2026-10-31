@@ -174,11 +174,14 @@ def test_bind_resolves_one_session_identity(
 ) -> None:
     """Two binds both exit 0 (peer presence is advisory) and persist the record under the one
     resolved identity — no global pointer, no second record, no minted stray."""
-    from dadaia_workspace.core import session_store
+    from dadaia_workspace.core import clock, session_store
 
     for name, value in env.items():
         monkeypatch.setenv(name, value)
     _register_alive_ctx(workspace)
+    session_store.touch_last_seen_at(
+        workspace, session_id, now=clock.now_iso()
+    )  # the hook heartbeat
     outputs = [_runner.invoke(app, ["context", "bind", "myctx"]) for _ in range(2)]
     assert [r.exit_code for r in outputs] == [0, 0], outputs[0].output
     sessions = workspace / ".dadaia" / "sessions"
@@ -320,6 +323,121 @@ def test_context_dead_surfaces_the_refused_push_with_its_fix_line(
     assert "fix: git checkout -b feature/0.1.0" in " ".join(result.output.split())
     assert result.output.count("fix: ") == 1  # the gate's fix is the one fix
     assert repo.is_dir()
+
+
+_RELAUNCH = "fix: Operator action: relaunch the session at the workspace root"
+_NO_ROLE = "This session was started outside the workspace root, so it stands in for no role."
+_UNREAD = "This session's record does not read."
+
+
+@pytest.mark.parametrize(
+    ("session", "recorded", "exit_code"),
+    [
+        pytest.param(None, False, 0, id="no-session"),
+        pytest.param("sess_live", True, 0, id="live-record"),
+        pytest.param("sess_ghost", False, 1, id="no-record"),
+    ],
+)
+def test_session_check_passes_a_governed_session_and_refuses_the_rest(
+    workspace: Path, session: str | None, recorded: bool, exit_code: int
+) -> None:
+    from dadaia_workspace.core import clock, session_store
+
+    if recorded and session:
+        session_store.write_session(
+            workspace, session, {"session_id": session, "last_seen_at": clock.now_iso()}
+        )
+    env = {"CLAUDE_CODE_SESSION_ID": session} if session else {}
+
+    result = _runner.invoke(app, ["context", "session-check"], env=env)
+
+    assert result.exit_code == exit_code, result.output
+    if exit_code:
+        assert " ".join(result.output.split()).count("fix: ") == 1
+        assert _RELAUNCH in " ".join(result.output.split())
+        assert _NO_ROLE in " ".join(result.output.split())
+
+
+@pytest.mark.parametrize(
+    ("env", "session_id", "heartbeat", "exit_code"),
+    [
+        pytest.param({"CLAUDE_CODE_SESSION_ID": "sess_nohook"}, "sess_nohook", False, 1, id="claude-no-record-refused"),
+        pytest.param({"CLAUDE_CODE_SESSION_ID": "sess_hooked"}, "sess_hooked", True, 0, id="claude-after-heartbeat-binds"),
+        pytest.param({"DADAIA_SESSION_ID": "sess_operator"}, "sess_operator", False, 0, id="operator-terminal-binds"),
+        pytest.param({"CODEX_THREAD_ID": "codex-thread"}, "codex-thread", True, 0, id="codex-binds"),
+        pytest.param({"CODEX_SESSION_ID": "codex-nohook"}, "codex-nohook", False, 1, id="codex-no-record-refused"),
+        pytest.param({"CODEX_SESSION_ID": "codex-hooked"}, "codex-hooked", True, 0, id="codex-after-heartbeat-binds"),
+    ],
+)  # fmt: skip
+def test_bind_needs_a_hook_heartbeat_for_a_judged_harness_session(
+    workspace: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    env: dict[str, str],
+    session_id: str,
+    heartbeat: bool,
+    exit_code: int,
+) -> None:
+    """A Claude Code session id binds only after its hook heartbeat created the record; a
+    refused bind writes nothing and prints the one relaunch fix line."""
+    from dadaia_workspace.core import clock, session_store
+
+    for name, value in env.items():
+        monkeypatch.setenv(name, value)
+    _register_alive_ctx(workspace)
+    if heartbeat:
+        session_store.touch_last_seen_at(workspace, session_id, now=clock.now_iso())
+
+    result = _runner.invoke(app, ["context", "bind", "myctx"])
+
+    assert result.exit_code == exit_code, result.output
+    record = session_store.read_session(workspace, session_id)
+    if exit_code:
+        assert " ".join(result.output.split()).count("fix: ") == 1
+        assert _RELAUNCH in " ".join(result.output.split())
+        assert _NO_ROLE in " ".join(result.output.split())
+        assert record is None
+        assert not (workspace / ".dadaia" / "sessions" / f"{session_id}.json").exists()
+    else:
+        assert record is not None and record["context"] == "myctx"
+
+
+def test_a_refused_bind_does_not_make_session_check_pass(
+    workspace: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("CLAUDE_CODE_SESSION_ID", "sess_nohook")
+    _register_alive_ctx(workspace)
+
+    _runner.invoke(app, ["context", "bind", "myctx"])
+    result = _runner.invoke(app, ["context", "session-check"])
+
+    assert result.exit_code == 1, result.output
+    assert _RELAUNCH in " ".join(result.output.split())
+
+
+@pytest.mark.parametrize("argv", [["bind", "myctx"], ["session-check"]])
+def test_a_refused_session_with_an_unreadable_record_names_doctors_fix(
+    workspace: Path, monkeypatch: pytest.MonkeyPatch, argv: list[str]
+) -> None:
+    """The record that does not read is what refuses the session: both verbs name doctor's
+    fix, the one act that clears it, never the relaunch."""
+    from dadaia_workspace.core import session_store
+    from dadaia_workspace.core.cli_line import fix_line
+
+    monkeypatch.setenv("CLAUDE_CODE_SESSION_ID", "sess_corrupt")
+    _register_alive_ctx(workspace)
+    write_text(
+        session_store.session_record_path(workspace, "sess_corrupt", create=True), "{not json"
+    )
+
+    result = _runner.invoke(app, ["context", *argv])
+
+    out = " ".join(result.output.split())
+    assert result.exit_code == 1, result.output
+    assert out.count("fix: ") == 1
+    assert f"fix: {fix_line(workspace, 'doctor', '--fix')}" in out
+    assert _UNREAD in out
+    assert _NO_ROLE not in out
+    assert _RELAUNCH not in out
 
 
 def test_show_unbound_is_calm_in_both_modes(workspace: Path) -> None:

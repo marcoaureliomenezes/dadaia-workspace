@@ -13,10 +13,10 @@ import sys
 from pathlib import Path
 from typing import Any
 
+import _bugs_store
 import _clock
 import _git
-import _jsonl
-from _backlog_schema import DISPOSITIONS
+from _backlog_schema import DISPOSITIONS, HISTO
 from _backlog_store import SCRIPT, Items
 from _platform import act, command, run
 from _refusal import Refusal, fix_of
@@ -84,15 +84,9 @@ def _reason(specs: Path, slug: str, disposition: str, reason: str | None) -> Non
 
 
 def _bug(specs: Path, slug: str, disposition: str, reason: str | None) -> None:
-    """The id of the BUGS.jsonl record the item is handed to, read by the bug skill's reader."""
+    """The id of the BUGS.jsonl record the item is handed to, read by the bug store's reader."""
     bugs = specs / "bugs" / "BUGS.jsonl"
-    try:
-        ids = {record.get("id") for record in _jsonl.read(bugs)}
-    except _jsonl.LineError as exc:
-        raise Refusal(
-            f"{bugs.name}:{exc.number} {exc} — refusing to read a ledger this exit cannot read in full",
-            command("sed", "-n", f"{exc.number}p", str(bugs)),
-        ) from exc
+    ids = {record.get("id") for record in _bugs_store.read_records(bugs)}
     if reason not in ids:
         raise Refusal(
             f"--reason {reason!r} names no record of {bugs}: `to-bug` hands {slug!r} to a registered bug",
@@ -119,7 +113,7 @@ def check_exit(specs: Path, active: Items, slug: str, values: dict[str, Any]) ->
         raise Refusal(
             f"{slug!r} does not name a live active[] entry — an item is retained forever, "
             "so a slug missing from active[] has already exited",
-            f"grep {slug} specs/backlog/_archive/backlog_histo.jsonl",
+            command("grep", slug, str(specs / HISTO)),
         )
     if disposition not in EVIDENCE:
         raise Refusal(

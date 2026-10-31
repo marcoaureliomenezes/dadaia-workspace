@@ -3,12 +3,15 @@ stale selection."""
 
 from __future__ import annotations
 
+import datetime as dt
 from datetime import UTC, datetime
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
 from dadaia_workspace.core import session_store as si
+from dadaia_workspace.core.skill_owner import load_owner
 from tests.helpers.oslib import read_text, write_text
 from tests.helpers.oslib import write_text as os_write_text
 
@@ -39,12 +42,43 @@ def test_record_roundtrip_atomicity_and_fail_soft(tmp_path: Path) -> None:
 
 
 def test_touch_last_seen_at(tmp_path: Path) -> None:
-    """The heartbeat stamps and persists ``last_seen_at``; a missing record is a no-op None."""
+    """The heartbeat stamps and persists ``last_seen_at`` on an existing record."""
     si.write_session(tmp_path, SID, {"id": SID, "last_seen_at": "2020-01-01T00:00:00+00:00"})
     updated = si.touch_last_seen_at(tmp_path, SID, now="2030-06-10T12:00:00+00:00")
     assert updated is not None and updated["last_seen_at"] == "2030-06-10T12:00:00+00:00"
     assert si.read_session(tmp_path, SID) == updated
-    assert si.touch_last_seen_at(tmp_path, "ghost", now="2030-06-10T12:00:00+00:00") is None
+
+
+def test_touch_creates_the_minimal_record_of_a_session_with_none(tmp_path: Path) -> None:
+    """A session the hooks see for the first time gets a record that binds nothing."""
+    created = si.touch_last_seen_at(tmp_path, "ghost", now="2030-06-10T12:00:00+00:00")
+    assert created == {"session_id": "ghost", "last_seen_at": "2030-06-10T12:00:00+00:00"}
+    assert si.read_session(tmp_path, "ghost") == created
+
+
+def test_touch_leaves_an_unreadable_record_for_doctor(tmp_path: Path) -> None:
+    path = si.session_record_path(tmp_path, SID, create=True)
+    os_write_text(path, "{bad")
+    before = path.read_bytes()
+
+    assert si.touch_last_seen_at(tmp_path, SID, now="2030-06-10T12:00:00+00:00") is None
+    assert path.read_bytes() == before
+
+
+def test_touch_renews_a_bound_record_without_changing_its_bind(tmp_path: Path) -> None:
+    bound = si.new_binding_record(
+        session_id=SID,
+        context="alpha",
+        runtime="claude-code",
+        pid=7,
+        now="2020-01-01T00:00:00+00:00",
+    )
+    si.write_session(tmp_path, SID, bound)
+
+    renewed = si.touch_last_seen_at(tmp_path, SID, now="2030-06-10T12:00:00+00:00")
+
+    assert renewed == {**bound, "last_seen_at": "2030-06-10T12:00:00+00:00"}
+    assert si.read_session(tmp_path, SID) == renewed
 
 
 def test_new_binding_record_authors_the_schema_and_retired_keys_still_parse() -> None:
@@ -138,3 +172,22 @@ def test_naive_heartbeat_reads_as_utc_in_any_zone(monkeypatch: pytest.MonkeyPatc
     finally:
         monkeypatch.undo()
         tzset()
+
+
+class _KernelNow(dt.datetime):
+    """The kernel clock frozen at 2026-10-11T03:04:05Z."""
+
+    @classmethod
+    def now(cls, tz: dt.tzinfo | None = None) -> _KernelNow:
+        return cls(2026, 10, 11, 3, 4, 5, tzinfo=tz)
+
+
+def _freeze_kernel_clock(monkeypatch: pytest.MonkeyPatch) -> None:
+    kernel = load_owner("dd-bug-resolution", "_clock")
+    monkeypatch.setattr(kernel, "_dt", SimpleNamespace(datetime=_KernelNow, UTC=dt.UTC))
+
+
+def test_is_live_without_a_clock_reads_the_kernel_clock(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A heartbeat one minute old on the kernel clock is live; the wall clock says it is dead."""
+    _freeze_kernel_clock(monkeypatch)
+    assert si.is_live({si.SESSION_HEARTBEAT_FIELD: "2026-10-11T03:03:00Z"})

@@ -2,6 +2,11 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
+from dadaia_workspace.core.gitflow import DEFAULT, merge_frontmatter
+from dadaia_workspace.core.skill_owner import load_owner
+from dadaia_workspace.features.specs import canon
 from dadaia_workspace.features.specs.canon import (
     canon_violations,
     is_canon_path,
@@ -87,3 +92,36 @@ def test_a_job_file_is_canon_beside_a_closed_rcs_tasks_file() -> None:
             "releases/0.5.0/rc-9/tasks/job2/extra.md",
         ]
     ) == ["releases/0.5.0/rc-9/tasks/notes.txt", "releases/0.5.0/rc-9/tasks/job2/extra.md"]
+
+
+# --- the stubs and the schema loader ask their owners ---------------------------------
+
+_PACKAGE = Path(canon.__file__).resolve().parents[2]
+
+
+def _fresh(tmp_path: Path) -> Path:
+    canon.scaffold(tmp_path, project_name="P")
+    return tmp_path
+
+
+def test_a_fresh_backlog_stub_is_the_stores_empty_render(tmp_path: Path) -> None:
+    store = load_owner("dd-backlog-definition", "_backlog_store")
+    stub = (_fresh(tmp_path) / "backlog" / "BACKLOG.json").read_text(encoding="utf-8")
+    assert stub == store.render([])
+
+
+def test_a_fresh_constitution_is_unchanged_by_merge_frontmatter(tmp_path: Path) -> None:
+    specs = _fresh(tmp_path)
+    scaffolded = (specs / "constitution.md").read_bytes()
+    merge_frontmatter(specs, specs_pattern_version=13, gitflow=DEFAULT)
+    assert (specs / "constitution.md").read_bytes() == scaffolded
+
+
+def test_the_package_outside_the_skills_holds_no_second_schema_loader() -> None:
+    holders = [
+        p.relative_to(_PACKAGE).as_posix()
+        for p in _PACKAGE.rglob("*.py")
+        if "public" not in p.relative_to(_PACKAGE).parts
+        and "def load_schema" in p.read_text(encoding="utf-8")
+    ]
+    assert holders == []

@@ -18,7 +18,7 @@ from _bugs_check import OPEN, TERMINAL, load_schema
 from _bugs_store import Records, Refusal, by_id
 from _clock import now_iso as now_iso
 from _git import fix_commit, fix_files
-from _specs import choice, script
+from _specs import choice, context_repos, script
 
 _MUTABILITY = {k: v["x-mutability"] for k, v in load_schema()["properties"].items()}
 _OBJECTS = frozenset(k for k, v in load_schema()["properties"].items() if v.get("type") == "object")
@@ -33,17 +33,15 @@ _SCRIPT = script(Path(__file__).parent / "bugs.py")
 
 
 def by_file(records: Records, repo: Path) -> dict[str, dict[str, str]]:
-    """Each path some record fixed, with the id -> fix sha of the records that fixed it, by id; a record without
-    `fix_files` is read from its id commit, all of them in one `diff-tree` of *repo*."""
-    commits = fix_commit(repo, [str(r["id"]) for r in records if not r.get("fix_files")])
+    """Each path some record fixed, with the id -> fix sha of the records that fixed it, by id; the fix of a record is the commit of its id line, its paths read from that commit in one `diff-tree` per repo of *repo*'s context."""
+    commits = fix_commit(context_repos(repo), [str(r["id"]) for r in records])
     touched: dict[str, list[str]] = {}
     for each in {at for at, _ in commits.values()}:
         touched |= fix_files(each, [sha for at, sha in commits.values() if at == each])
     found: dict[str, dict[str, str]] = {}
-    for r in records:
-        sha = str(r.get("fix_sha") or r["id"])
-        for path in r.get("fix_files") or touched.get(commits.get(str(r["id"]), (repo, ""))[1], []):
-            found.setdefault(path, {})[str(r["id"])] = sha
+    for bug, (_, sha) in commits.items():
+        for path in touched.get(sha, []):
+            found.setdefault(path, {})[bug] = sha
     return {path: dict(sorted(by_id.items())) for path, by_id in sorted(found.items())}
 
 

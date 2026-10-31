@@ -14,8 +14,10 @@ followed the same way — at most four steps, never a repeated line. A fix that 
 the publish (``git push …``, ``context baseline``) replaces the refused command: its
 success is the clearance.
 
-The census counts every ``fix:`` producer in the four modules per enclosing function: a new
-refusal without a case (or a ``Skip`` reason) fails :func:`test_every_fix_site_has_a_case`.
+The census (``tests/fixtures/fix_census.py``) sweeps two scopes: every ``raise`` reachable from the
+gate and the ``context`` verbs, and every function of the ``dd-gitflow-default`` worktree scripts.
+A site with neither a case nor a named ``Skip`` in ``_REFUSALS`` fails the census test below, and
+so does an entry for a site that is gone.
 
 size: MEDIUM — real git and real CLI child processes, no network.
 """
@@ -24,19 +26,31 @@ from __future__ import annotations
 
 import re
 from collections import Counter
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.core.cli_line import fix_line
+from dadaia_workspace.core.cli_line import cli_words, fix_line
+from dadaia_workspace.core.gitflow import Gitflow
+from dadaia_workspace.core.platform import inline
+from dadaia_workspace.core.skill_owner import load_owner
+from dadaia_workspace.features.chokepoints.branch_policy import (
+    GateFixes,
+    PushRef,
+    check_branch_policy,
+)
+from tests.fakes import land_fix
 from tests.fixtures.fix_census import fix_sites
 from tests.fixtures.fix_world import (
+    _RC,
     _REFUSALS,
     _TERM,
     Case,
     Skip,
     Templates,
     World,
+    WtCase,
     _advance_origin_work,
     _associated_dead,
     _associated_on_integration,
@@ -51,9 +65,10 @@ from tests.fixtures.fix_world import (
     _on_work,
     _push_gate,
     _rmtree,
-    _single_fix,
     _unborn_dirty,
+    the_fix,
 )
+from tests.helpers import worktree_ws as wt
 from tests.helpers.oslib import write_text
 
 pytestmark = [
@@ -81,7 +96,7 @@ def _drive(world: World, case: Case) -> None:
     assert done.returncode != 0, f"the case planted no refusal:\n{done.stdout}{done.stderr}"
     seen: list[str] = []
     for step in range(4):
-        fix = _single_fix(done)
+        fix = the_fix(done, world.ws)
         assert fix not in seen, f"no progress — the same fix line again:\n{fix}"
         seen.append(fix)
         act = fix.startswith(("Agent action: ", "Operator action: "))
@@ -108,9 +123,139 @@ _CASES = [
     pytest.param(case, id=case.build.__name__.strip("_"))
     for refusals in _REFUSALS.values()
     for entry in refusals
-    if not isinstance(entry, Skip)
+    if not isinstance(entry, (Skip, WtCase))
     for case in (entry if isinstance(entry, tuple) else (entry,))
 ]
+
+
+_WT_CASES = [
+    pytest.param(case, id=key.strip("_") + f"-{n}")
+    for key, refusals in _REFUSALS.items()
+    for n, case in enumerate(refusals)
+    if isinstance(case, WtCase)
+]
+
+
+@pytest.mark.parametrize("case", _WT_CASES)
+def test_the_worktree_fix_line_clears_the_refusal(case: WtCase, tmp_path: Path) -> None:
+    root = tmp_path / "ws"
+    root.mkdir()
+    wt.make_workspace(root)
+    argv = case.build(root)
+    done = wt.run(root, *argv)
+    assert done.returncode != 0, f"the case planted no refusal:\n{done.stdout}{done.stderr}"
+    seen: list[str] = []
+    for _ in range(4):
+        fix = the_fix(done, root)
+        assert fix not in seen, f"no progress — the same fix line again:\n{fix}"
+        seen.append(fix)
+        if fix.startswith(("Agent action: ", "Operator action: ")):
+            if case.play is not None:
+                case.play(root)
+        else:
+            wt.run_fix(root, done)
+        argv = case.then(root) if callable(case.then) else case.then or argv
+        done = wt.run(root, *argv)
+        if done.returncode == 0:
+            return
+    pytest.fail("the refusal chain did not clear within four fix lines:\n" + "\n".join(seen))
+
+
+def test_a_refused_task_branch_lands_on_its_wt_main_by_worktree_merge(tmp_path: Path) -> None:
+    """Push of a task branch is refused; the route the Agent action names, `worktree merge` of the
+    tree (path from the branch name), leaves the commit on wt-main, which pre-push admits and
+    origin then holds."""
+    root = tmp_path / "ws"
+    root.mkdir()
+    wt.make_workspace(root)
+    names = load_owner("dd-gitflow-default", "_worktree_names")
+    wt_task = names.branch(wt.NEW_TASK)
+    wt_main = names.branch(wt.NEW_JOB)
+    repo = root / "repos" / "r"
+    flow = Gitflow(principal="trunk", integration="dev", work_prefix="feature/")
+    ref = PushRef(f"refs/heads/{wt_task}", "a" * 40, f"refs/heads/{wt_task}", "0" * 40)
+
+    refused = check_branch_policy([ref], flow, GateFixes(repo=str(repo), work="feature/0.5.0"))
+    assert refused is not None and not refused.allowed
+    assert the_fix(refused.message, root) == land_fix(
+        lambda r, *words: inline(*cli_words(r, *words))
+    )
+
+    for name in (_RC, wt.NEW_JOB):
+        wt.open_tree(root, name)
+    task = wt.open_tree(root, wt.NEW_TASK)
+    sha = wt.commit(task, "src/a.py")
+    merged = wt.run(root, "merge", str(names.tree_path(root, "r", names.name_of(wt_task))))
+    assert merged.returncode == 0, merged.stderr
+
+    main_ref = PushRef(f"refs/heads/{wt_main}", "a" * 40, f"refs/heads/{wt_main}", "0" * 40)
+    assert check_branch_policy([main_ref], flow, GateFixes(repo=str(repo))) is None
+    origin = tmp_path / "origin.git"
+    wt.git(tmp_path, "init", "-q", "--bare", str(origin))
+    wt.git(repo, "push", "-q", str(origin), f"{wt_main}:refs/heads/{wt_main}")
+    assert sha in wt.git(origin, "rev-list", wt_main).split()
+
+
+def _topic(repo: Path) -> tuple[str, str]:
+    """A commit on a branch of its own, still named."""
+    wt.git(repo, "checkout", "-q", "-b", "topic")
+    sha = wt.commit(repo, "src/a.py", "topic = 1\n")
+    wt.git(repo, "checkout", "-q", "main")
+    return "refs/heads/topic", sha
+
+
+def _diverged(repo: Path) -> tuple[str, str]:
+    """The same, with the live work branch holding a commit the topic lacks."""
+    wt.git(repo, "checkout", "-q", "feature/0.5.0")
+    wt.commit(repo, "w.md", "w\n")
+    wt.git(repo, "checkout", "-q", "main")
+    return _topic(repo)
+
+
+def _detached(repo: Path) -> tuple[str, str]:
+    """The commit on a detached HEAD, no branch naming it."""
+    _, sha = _topic(repo)
+    wt.git(repo, "checkout", "-q", "--detach", sha)
+    wt.git(repo, "branch", "-q", "-D", "topic")
+    return "HEAD", sha
+
+
+@pytest.mark.parametrize(
+    "plant", [_topic, _diverged, _detached], ids=lambda f: f.__name__.strip("_")
+)
+def test_an_outside_ref_lands_through_a_tree(
+    plant: Callable[[Path], tuple[str, str]], tmp_path: Path
+) -> None:
+    """The refusal's Agent action, played with the real verbs: the refused commit is carried into a tree
+    opened by `worktree new`, `worktree merge` lands it on wt-main, wt-main is pushed and origin holds it."""
+    root = tmp_path / "ws"
+    root.mkdir()
+    wt.make_workspace(root)
+    repo = root / "repos" / "r"
+    local, sha = plant(repo)
+    flow = Gitflow(principal="trunk", integration="dev", work_prefix="feature/")
+    fixes = GateFixes(repo=str(repo), work="feature/0.5.0")
+    refused = check_branch_policy([PushRef(local, sha, "refs/heads/topic", "0" * 40)], flow, fixes)
+    assert refused is not None and not refused.allowed
+    assert the_fix(refused.message, root) == land_fix(
+        lambda r, *words: inline(*cli_words(r, *words))
+    )
+
+    names = load_owner("dd-gitflow-default", "_worktree_names")
+    for name in (_RC, wt.NEW_JOB):
+        wt.open_tree(root, name)
+    task = wt.open_tree(root, wt.NEW_TASK)
+    wt.git(task, "cherry-pick", sha)
+    merged = wt.run(root, "merge", str(names.tree_path(root, "r", wt.NEW_TASK)))
+    assert merged.returncode == 0, merged.stderr
+
+    main = names.branch(wt.NEW_JOB)
+    landed = PushRef(f"refs/heads/{main}", "a" * 40, f"refs/heads/{main}", "0" * 40)
+    assert check_branch_policy([landed], flow, fixes) is None
+    origin = tmp_path / "origin.git"
+    wt.git(tmp_path, "init", "-q", "--bare", str(origin))
+    wt.git(repo, "push", "-q", str(origin), f"{main}:refs/heads/{main}")
+    assert "topic = 1" in wt.git(origin, "show", f"{main}:src/a.py")
 
 
 def test_dead_leaves_a_clean_published_detached_head(world: World) -> None:
@@ -160,23 +305,20 @@ def test_every_fix_line_prints_on_one_line_without_a_tty(tmp_path: Path) -> None
     through the one ``cli/_fail.fail`` a real child process exercises here."""
     world = World(tmp_path / ("d" * 90))
     _unborn_dirty(world)
-    fix = _single_fix(world.cli("context", "dead", "proj"))
+    fix = the_fix(world.cli("context", "dead", "proj"), world.ws)
     assert fix.startswith("Agent action: move ") and fix.endswith("notes.txt into a worktree"), fix
     assert re.search(re.escape(str(world.ws)), fix)
 
 
-def test_the_gate_is_read_only_and_its_rewrite_fix_uncommits_only_unpublished_work(
+def test_the_gate_is_read_only_and_its_fix_is_one_agent_action_naming_the_listed_path(
     world: World,
 ) -> None:
-    """The denylist refusal's fix uncommits the refused ref's own
-    unpublished range, down to its oldest unpublished commit — never a squash of
-    published history, never a publish verb that rewrites."""
+    """The denylist refusal's one fix is an Agent action naming the listed path; the gate
+    offers no history rewrite and no publish verb that rewrites."""
     command = _denylisted(world)
-    oldest = world.git(world.repo, "rev-parse", "HEAD~1")
-    fix = _single_fix(_hit(world, command))
-    assert fix == fix_line(
-        world.ws, "ci", "push-gate-check", "--repo", str(world.repo), "--rewrite-from", oldest
-    )
+    fix = the_fix(_hit(world, command), world.ws)
+    assert fix.startswith("Agent action: ") and "notes.md" in fix, fix
+    assert "--rewrite-from" not in fix
     assert "--republish" not in world.cli("context", "baseline", "--help").stdout
 
 
@@ -220,11 +362,11 @@ def test_a_refused_baseline_push_names_the_anchor_and_the_publish_as_the_next_st
     world: World,
 ) -> None:
     """The gate refuses baseline's push — the refusal keeps the gate's
-    one fix (reset to the oldest unpublished commit) and names the anchor and the publish
-    as the step after the rewrite (a hand push would drop origin's merge parent)."""
+    one fix (an Agent action naming the listed path) and names the anchor and the publish
+    as the step after that fix (a hand push would drop origin's merge parent)."""
     done = _hit(world, _baseline_denylisted(world))
     output = done.stdout + done.stderr
-    assert done.returncode != 0 and "--rewrite-from" in _single_fix(done)
+    assert done.returncode != 0 and the_fix(done, world.ws).startswith("Agent action: ")
     assert f"onboarding commit {world.git(world.repo, 'rev-parse', 'HEAD')}" in output
     assert fix_line(world.ws, "context", "baseline", "proj") in output.replace("\n", "")
 
@@ -246,7 +388,7 @@ def test_dead_after_the_operator_pulls_into_a_conflict_publishes_no_markers(
     published = world.remote_heads()["feature/1.0.0"]
     done = world.cli("context", "dead", "proj")
     output = done.stdout + done.stderr
-    fix = _single_fix(done)
+    fix = the_fix(done, world.ws)
     assert done.returncode != 0 and "README.md" in fix and "x.md" in fix, output
     assert fix.startswith("Agent action: move ") and fix.endswith("into a worktree"), output
     assert world.repo.is_dir() and world.remote_heads()["feature/1.0.0"] == published

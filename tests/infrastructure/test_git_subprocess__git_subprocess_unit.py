@@ -1,4 +1,4 @@
-"""GitSubprocessClient decisions at the ``git_subprocess._run`` seam; real-git behavior
+"""GitSubprocessClient decisions at the kernel ``_git.git_bytes`` seam; real-git behavior
 lives in ``tests/infrastructure/test_git_subprocess.py``.
 
 Clone transport reject matrix and the ``_stage_files_safe`` hardening.
@@ -13,27 +13,25 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.core.exceptions import GitCloneError, GitSyncError
-from dadaia_workspace.infrastructure import git_subprocess
+from dadaia_workspace.core.skill_owner import load_owner
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 
-Reply = Callable[[list[str]], "subprocess.CompletedProcess[str] | None"]
+Reply = Callable[[list[str]], "subprocess.CompletedProcess[bytes] | None"]
 
 
-def _result(rc: int = 0, stdout: str = "", stderr: str = "") -> subprocess.CompletedProcess[str]:
-    return subprocess.CompletedProcess(["git"], rc, stdout=stdout, stderr=stderr)
+def _result(rc: int = 0, stdout: str = "", stderr: str = "") -> subprocess.CompletedProcess[bytes]:
+    return subprocess.CompletedProcess(["git"], rc, stdout=stdout.encode(), stderr=stderr.encode())
 
 
 def _fake(monkeypatch: pytest.MonkeyPatch, reply: Reply) -> list[list[str]]:
-    """Route ``_run`` to *reply* (None = success) and record every argv."""
+    """Route ``_git.git_bytes`` to *reply* (None = success) and record every argv, `git` first."""
     calls: list[list[str]] = []
 
-    def run(
-        args: list[str], cwd: Path | None = None, **_: object
-    ) -> subprocess.CompletedProcess[str]:
-        calls.append(args)
-        return reply(args) or _result()
+    def run(repo: Path, *args: str, **_: object) -> subprocess.CompletedProcess[bytes]:
+        calls.append(["git", *args])
+        return reply(["git", *args]) or _result()
 
-    monkeypatch.setattr(git_subprocess, "_run", run)
+    monkeypatch.setattr(load_owner("dd-bug-resolution", "_git"), "git_bytes", run)
     return calls
 
 
@@ -98,7 +96,7 @@ def test_a_failed_git_step_raises_and_nothing_after_it_runs(
 ) -> None:
     """A stage that did not happen never silently becomes a commit."""
 
-    def reply(args: list[str]) -> subprocess.CompletedProcess[str] | None:
+    def reply(args: list[str]) -> subprocess.CompletedProcess[bytes] | None:
         if args[: len(failing)] == failing:
             return _result(1, "stdout detail", "stderr detail fatal: pathspec did not match")
         if args[:3] == ["git", "ls-files", "--others"]:
@@ -165,17 +163,20 @@ def test_reachable_probes_with_the_url_after_the_options_end_and_nothing_to_prom
 ) -> None:
     seen: list[dict[str, object]] = []
 
-    def run(args: list[str], **kw: object) -> subprocess.CompletedProcess[str]:
-        seen.append({"args": args, **kw})
+    def run(repo: Path, *args: str, **kw: object) -> subprocess.CompletedProcess[bytes]:
+        seen.append({"args": list(args), **kw})
         return _result()
 
-    monkeypatch.setattr(git_subprocess, "_run", run)
+    monkeypatch.delenv("GIT_SSH_COMMAND", raising=False)
+    monkeypatch.delenv("GIT_SSH", raising=False)
+    monkeypatch.setattr(load_owner("dd-bug-resolution", "_git"), "git_bytes", run)
 
     assert GitSubprocessClient().reachable("https://example.invalid/o/r.git") is True
 
-    [call] = seen
-    assert call["args"] == ["git", "ls-remote", "--heads", "--", "https://example.invalid/o/r.git"]
-    assert call["stdin"] == ""
+    [config, call] = seen
+    assert config["args"] == ["config", "core.sshCommand"]
+    assert call["args"] == ["ls-remote", "--heads", "--", "https://example.invalid/o/r.git"]
+    assert call["input"] == b""
     assert isinstance(call["timeout"], int | float)
     env = call["env"]
     assert isinstance(env, dict)
@@ -189,10 +190,10 @@ def test_reachable_probes_with_the_url_after_the_options_end_and_nothing_to_prom
 def test_reachable_counts_a_timeout_or_a_missing_git_as_unreachable(
     failure: Exception, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    def run(args: list[str], **_: object) -> subprocess.CompletedProcess[str]:
+    def run(repo: Path, *args: str, **_: object) -> subprocess.CompletedProcess[bytes]:
         raise failure
 
-    monkeypatch.setattr(git_subprocess, "_run", run)
+    monkeypatch.setattr(load_owner("dd-bug-resolution", "_git"), "git_bytes", run)
 
     assert GitSubprocessClient().reachable("https://example.invalid/o/r.git") is False
 

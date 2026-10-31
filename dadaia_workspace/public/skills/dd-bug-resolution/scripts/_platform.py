@@ -67,6 +67,13 @@ def cli_argv(venv: PurePath, caps: Caps | None = None) -> list[str]:
     return [str(venv_tool(venv, "dadaia", caps))]
 
 
+def cli_words(root: PurePath | None, *argv: str, caps: Caps | None = None) -> tuple[str, ...]:
+    """The words that run the workspace CLI of *root* (the venv running now when ``None``) with
+    *argv*: rendered once, by :func:`command` for a fix or :func:`inline` inside a sentence."""
+    venv = venv_dir(root) if root is not None else Path(sys.prefix)
+    return (*cli_argv(venv, caps), *argv)
+
+
 def norm_sep(path: str) -> str:
     """*path* spelled with forward slashes, whatever host wrote it."""
     return path.replace("\\", "/")
@@ -112,11 +119,22 @@ class Undecodable(Refusal):
         self.path, self.line = path, line
 
 
+def _retrying[T](act: Callable[[], T]) -> T:
+    """Run *act*, retrying a held-open file (``PermissionError``, Windows) 49 times 0.01 s apart
+    before the final raising call; POSIX never raises it for this cause."""
+    for _ in range(49):
+        with contextlib.suppress(PermissionError):
+            return act()
+        time.sleep(0.01)
+    return act()
+
+
 def read_text(path: Path, fix: str = "") -> str:
-    """The text of *path*, newlines as ``\\n``; bytes that are not UTF-8 raise :class:`Undecodable`
-    naming it, with *fix* in place of the default act."""
+    """The text of *path*, newlines as ``\\n``; a read the swap holds is retried as :func:`replace`
+    is, and a real denial still raises ``PermissionError`` after it; bytes that are not UTF-8 raise
+    :class:`Undecodable` naming it, with *fix* in place of the default act."""
     try:
-        return path.read_text(encoding="utf-8")
+        return _retrying(lambda: path.read_text(encoding="utf-8"))
     except UnicodeDecodeError as exc:
         raise Undecodable(path, fix, exc.object.count(b"\n", 0, exc.start) + 1) from exc
 
@@ -159,16 +177,24 @@ def run(
     )  # fmt: skip
 
 
+def passthrough(
+    argv: Sequence[str], *, cwd: Path | None = None, env: Mapping[str, str] | None = None
+) -> int:
+    """Run *argv* (no shell) with this process's own stdin, stdout and stderr; its exit code."""
+    return subprocess.run(argv, cwd=cwd, env=env, check=False).returncode  # noqa: S603
+
+
 def run_bytes(
     argv: Sequence[str],
     *,
     cwd: Path | None = None,
+    env: Mapping[str, str] | None = None,
     input: bytes | None = None,
     timeout: float | None = None,
 ) -> subprocess.CompletedProcess[bytes]:
     """Run *argv* (no shell) and capture its output as raw bytes."""
     return subprocess.run(  # noqa: S603 — an argv list, no shell
-        list(argv), cwd=cwd, input=input, timeout=timeout, capture_output=True
+        list(argv), cwd=cwd, env=env, input=input, timeout=timeout, capture_output=True
     )
 
 
@@ -224,13 +250,8 @@ def can_write(path: Path) -> bool:
 
 
 def replace(src: Path, dst: Path) -> None:
-    """Move *src* onto *dst* atomically. A held-open destination (``PermissionError``, Windows) is
-    retried 49 times 0.01 s apart before the final raising swap; POSIX never raises it there."""
-    for _ in range(49):
-        with contextlib.suppress(PermissionError):
-            return os.replace(src, dst)
-        time.sleep(0.01)
-    os.replace(src, dst)
+    """Move *src* onto *dst* atomically, retrying a held-open destination as :func:`_retrying` does."""
+    _retrying(lambda: os.replace(src, dst))
 
 
 def is_link(path: Path) -> bool:
@@ -442,14 +463,29 @@ def command(*argv: str, caps: Caps | None = None) -> str:
     return text if safe else act("agent", f"run {text}")
 
 
+def mkdir_line(directory: PurePath, caps: Caps | None = None) -> str:
+    """Create *directory* and its parents, idempotent: one interpreter line that runs unchanged
+    under sh, bash, cmd and PowerShell, the path its own argv word."""
+    code = "import pathlib, sys; pathlib.Path(sys.argv[1]).mkdir(parents=True, exist_ok=True)"
+    return command(sys.executable, "-c", code, str(directory), caps=caps)
+
+
 _LABELS = {"agent": "Agent action", "operator": "Operator action"}
 
 
 def act(kind: Literal["agent", "operator"], text: str) -> str:
-    """*text* behind the label of *kind* (``agent`` or ``operator``); any other *kind* raises ``ValueError``."""
+    """*text* behind the label of *kind* (``agent`` or ``operator``); any other *kind*, or a
+    *text* already holding a label, raises ``ValueError``."""
     if kind not in _LABELS:
         raise ValueError(f"unknown action kind {kind!r}")
+    if any(f"{label}:" in text for label in _LABELS.values()):
+        raise ValueError(f"an act sentence never embeds a second label: {text!r}")
     return f"{_LABELS[kind]}: {text}"
+
+
+def act_kind(fix: str) -> str | None:
+    """The kind of the act *fix* spells (its label leads), else ``None``: a command."""
+    return next((kind for kind, label in _LABELS.items() if fix.startswith(f"{label}:")), None)
 
 
 def git_line(repo: Path | str, *argv: str, caps: Caps | None = None) -> str:

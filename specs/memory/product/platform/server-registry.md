@@ -20,7 +20,7 @@ sources:
 
 ## Runtime state
 
-`.dadaia/states/server_registry.json` — `{"version", "range", "entries": [{port, project, url, status, pid, reserved_at, expires_at, description}]}`, seeded by [[workspace-init]]; the script finds it from the cwd through `_ledger.workspace_of` — the first ancestor holding `.dadaia/states/spec_contexts.json`, never a root `DADAIA_FENCED_ROOTS` fences — and `--registry <path>` overrides.
+`.dadaia/states/server_registry.json` — `{"version", "range", "entries": [{port, project, url, status, pid, reserved_at, expires_at, description}]}`, seeded by [[workspace-init]]; the script, which puts the kernel first on its import path, finds it from the cwd through `_ledger.workspace_of` — the first ancestor holding `.dadaia/states/spec_contexts.json`, never a root `DADAIA_FENCED_ROOTS` fences — and `--registry <path>` overrides.
 
 ## Dependencies
 

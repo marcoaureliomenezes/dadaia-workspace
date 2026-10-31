@@ -33,6 +33,7 @@ from dadaia_workspace.core.redaction import (
     mask,
     published_matches,
 )
+from dadaia_workspace.core.skill_owner import load_owner
 
 __all__ = [
     "BaselinePatternLike",
@@ -165,7 +166,9 @@ def scan_objects(
                     path=obj.path, size_bytes=obj.size_bytes, scanned_bytes=obj.scanned_bytes
                 )
             )
-        content = [p for p in pattern_list if not (p.skip_paths and p.skip_paths.search(obj.path))]
+        content = load_owner("dd-bug-resolution", "_ledger").scanned_patterns(
+            pattern_list, obj.path
+        )
         hit = _first_match(obj, term_list, content)
         if hit is not None:
             hits.append(hit)

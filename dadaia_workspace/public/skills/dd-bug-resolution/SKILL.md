@@ -22,11 +22,10 @@ compatibility: Standalone Agent Skill; the full lifecycle lives in a dadaia-work
 
 ## 2. The method — seven phases, each gated
 
-**Phase 0 — Lineage.** Read the bug ledger for prior fixes to the same
-recorded fix files or `component` in the bounded window ([`LINEAGE.md`](LINEAGE.md)); inspect every prior fix by its `fix(bugs)` or `refactor(bugs)` id line (`git log -E --grep '^(fix|refactor)\(bugs\): .*<id>'`; the recorded sha is a hint) with `git show`; a `caused_by` other than `none` makes this fix a REBUILD (`specs/bugs/AGENTS.md` §2);
+**Phase 0 — Lineage.** Read the unit's prior fixes in the bounded window, found by the id-line query of [`LINEAGE.md`](LINEAGE.md) §The filter; inspect every prior fix as [`LINEAGE.md`](LINEAGE.md) §Read persisted facts says; whether this fix is a REBUILD is `specs/bugs/AGENTS.md` §2's;
 grep every decider of the same fact and name its one owner before any fix;
 carry the link to Phase 6 (`resolve --caused-by`; `update` repairs);
-echo the `caused_by:`/`evidence:`/`prior diffs read:`/`rebuild:` block in the fix commit body; a `caused_by` other than `none` names its REBUILD unit in `rebuild:`, never `rebuild: none`.
+echo the `caused_by:`/`evidence:`/`prior diffs read:`/`rebuild:` block in the fix commit body; a REBUILD names its unit in `rebuild:`, never `rebuild: none`.
 *Done when prior diffs were actually read, the owner is named, and the link and the rebuild decision (`rebuild` or `none`) are decided.*
 
 **Phase 1 — Red loop.** This is the skill; everything after it is mechanical. Build a
@@ -54,7 +53,7 @@ regressions: measure a baseline, then bisect — logs mislead.
 *Done when one hypothesis survives by observation, not by reading code.*
 
 **Phase 5 — Seam test.** The regression test at the correct seam, BEFORE the fix, has a literal
-expected value, covers every caller of the contract, sits at the lowest level that detects it, and is committed first under a `test(` subject; the test rule is the root map §1 line; watch it fail,
+expected value, covers every caller of the contract, sits at the lowest level that detects it, and, unless an existing contract test already goes red on the bug (that test is the RED, with no `test(` commit for it), is committed first under a `test(` subject; the test rule is the root map §1 line; watch it fail,
 fix the cause, watch it pass, re-run the Phase 1 loop on the original scenario. A
 correct seam exercises the real bug pattern at its call site; when none exists, that
 is itself the finding — return the seam gap to the main thread as a finding
@@ -65,7 +64,7 @@ gap was returned first).*
 **Phase 6 — Cleanup + resolve.** Grep the probe prefix to zero:
 
 - Commit the GREEN source fix with shape 3 of `dd-gitflow-default` §3a, then resolve; it derives
-  `fix_sha` from that commit's `fix(bugs): <id>` line:
+  `fix_sha` from that commit's id line (`specs/bugs/AGENTS.md` §2):
 
 ```bash
 python3 .agents/skills/dd-bug-resolution/scripts/bugs.py resolve <bug-id> --specs <specs-dir> \

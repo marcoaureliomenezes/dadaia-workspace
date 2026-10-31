@@ -94,6 +94,23 @@ def is_fully_qualified(candidate: str) -> bool:
     return _owner.is_fully_qualified(candidate, _caps())
 
 
+def cli_words(root: PurePath | None, *argv: str) -> tuple[str, ...]:
+    """The words that run the workspace CLI of *root* with *argv*, on the current ``PLATFORM``."""
+    return _owner.cli_words(root, *argv, caps=_caps())
+
+
+def reinstall_fix(start: Path, *, projected: bool = False) -> str:
+    """The command that repairs a missing file under *start*, on the current ``PLATFORM``."""
+    return str(
+        load_owner("dd-bug-resolution", "_jsonl").reinstall_fix(start, _caps(), projected=projected)
+    )
+
+
+def mkdir_line(directory: PurePath) -> str:
+    """The cross-shell mkdir line for *directory*, on the current ``PLATFORM``."""
+    return _owner.mkdir_line(directory, _caps())
+
+
 def canonical_cli(text: str) -> str:
     """*text* with the current ``PLATFORM``'s venv CLI spelling replaced by the source form."""
     return _owner.canonical_cli(text, _caps())
@@ -117,6 +134,7 @@ def make_executable(path: Path) -> None:
 # The kernel's functions that read no capability: the door hands them out unchanged.
 Undecodable = _owner.Undecodable
 act = _owner.act
+act_kind = _owner.act_kind
 can_write = _owner.can_write
 decode = _owner.decode
 effective_uid = _owner.effective_uid

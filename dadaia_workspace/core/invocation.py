@@ -15,11 +15,12 @@ from pathlib import Path
 from typing import Literal
 
 from dadaia_workspace.core import context_registry, platform, workspace_resolver
-from dadaia_workspace.core.cli_line import fix_line
+from dadaia_workspace.core.cli_line import cli_words, fix_line
 from dadaia_workspace.core.exceptions import SpecsDirUnresolvedError
+from dadaia_workspace.core.harness_registry import HARNESS_RECORDS
 from dadaia_workspace.core.models.spec_context import CONTEXT_NAME_RE
 from dadaia_workspace.core.platform import act
-from dadaia_workspace.core.session_store import live_session
+from dadaia_workspace.core.session_store import is_unreadable, live_session
 
 __all__ = [
     "CONTEXT_NAME_RE",
@@ -29,6 +30,9 @@ __all__ = [
     "Zone",
     "all_repos",
     "alive_context_trees",
+    "RELAUNCH",
+    "governed",
+    "refusal",
     "context_name_for_repo_slug",
     "repo_owner",
     "repo_slug_for_context",
@@ -44,10 +48,8 @@ __all__ = [
 
 #: Harness-native session-id env vars, in resolution order (a modern Codex subprocess
 #: exposes ``CODEX_THREAD_ID`` instead of ``CODEX_SESSION_ID``).
-HARNESS_SESSION_ID_ENV_VARS: tuple[str, ...] = (
-    "CLAUDE_CODE_SESSION_ID",
-    "CODEX_SESSION_ID",
-    "CODEX_THREAD_ID",
+HARNESS_SESSION_ID_ENV_VARS: tuple[str, ...] = tuple(
+    var for record in HARNESS_RECORDS.values() for var in record.session_env
 )
 
 _SESSION_ID_STRIP = re.compile(r"[^A-Za-z0-9_-]")
@@ -82,18 +84,52 @@ def sanitize_session_id(raw: str | None) -> str:
     return _SESSION_ID_STRIP.sub("", raw or "")
 
 
-def resolve_session_id(env: Mapping[str, str]) -> str:
+def resolve_session_id(env: Mapping[str, str], payload_id: str | None = None) -> str:
     """The one session-id rule, sanitized: ``DADAIA_SESSION_ID``, then
-    :data:`HARNESS_SESSION_ID_ENV_VARS`, else ``""``. Env only: ``context bind`` sees no
-    hook payload, so a payload id would be an id no bind can ever record."""
+    :data:`HARNESS_SESSION_ID_ENV_VARS`, then the hook payload's id only when the harness named
+    by ``DADAIA_RUNTIME`` carries a session id in its shell, else ``""``."""
+    row = HARNESS_RECORDS.get(env.get("DADAIA_RUNTIME", ""))
+    payload = payload_id if isinstance(payload_id, str) and row and row.session_env else ""
     candidate = env.get("DADAIA_SESSION_ID") or next(
-        filter(None, map(env.get, HARNESS_SESSION_ID_ENV_VARS)), ""
+        filter(None, map(env.get, HARNESS_SESSION_ID_ENV_VARS)), payload
     )
     return sanitize_session_id(candidate)
 
 
+#: The fix of a refusal for a session no workspace hook governs.
+RELAUNCH = act("operator", "relaunch the session at the workspace root")
+
+
+def governed(root: Path, env: Mapping[str, str]) -> bool:
+    """True unless *env* carries the session id of a harness whose registry row names a subagent
+    and no live record of that session (under :func:`resolve_session_id`) sits under *root*: the
+    one test of "a workspace hook governs this call". Other callers control their own env."""
+    judged = any(
+        env.get(var)
+        for rec in HARNESS_RECORDS.values()
+        if rec.subagent_key
+        for var in rec.session_env
+    )
+    return not judged or live_session(root, resolve_session_id(env)) is not None
+
+
+def refusal(root: Path, env: Mapping[str, str]) -> tuple[str, str] | None:
+    """The ``(message, fix)`` every surface prints for a session :func:`governed` refuses:
+    ``None`` when governed; a record file that exists and does not read names doctor's
+    ``--fix``; else the session stands in for no role and the fix is the relaunch."""
+    if governed(root, env):
+        return None
+    session = resolve_session_id(env)
+    if session and is_unreadable(root, session):
+        return "This session's record does not read.", fix_line(root, "doctor", "--fix")
+    return (
+        "This session was started outside the workspace root, so it stands in for no role.",
+        RELAUNCH,
+    )
+
+
 def _alive(entry: dict[str, object]) -> bool:
-    return str(entry.get("state")).lower() == "alive" and bool(entry.get("name"))
+    return context_registry.is_alive(entry) and bool(entry.get("name"))
 
 
 def _main_slug(entry: dict[str, object]) -> str | None:
@@ -215,11 +251,12 @@ def resolve(
     target_path: Path | None = None,
     env: Mapping[str, str],
     cwd: Path,
+    payload_id: str | None = None,
 ) -> Invocation:
     """Resolve session, context, root and bind once. *explicit*/*target_path* are rung 0 (a
     write under ``repos/x/`` resolves ``x`` even while bound to ``y``)."""
     root = resolve_root(cwd=cwd, target_path=target_path)
-    session_id = resolve_session_id(env) or None
+    session_id = resolve_session_id(env, payload_id) or None
     bind = resolve_bind(root, session_id, env)
 
     def owner(path: Path | None) -> str | None:
@@ -259,7 +296,7 @@ def resolve_specs_dir(specs_dir: str | None) -> Path:
         fix=act(
             "agent",
             "pass --specs-dir with the specs/ directory, or run "
-            f"`{fix_line(None, 'context', 'bind')}` with a context name",
+            f"`{platform.inline(*cli_words(None, 'context', 'bind'))}` with a context name",
         ),
     )
 

@@ -7,20 +7,18 @@ record whose `ts` or `closed_at` falls inside that window.
 
 ## Resolution evidence
 
-- Find a fix by its id line (`git log -E --grep '^(fix|refactor)\(bugs\): .*<id>'`; a group line lists several ids) and inspect it with
-  `git show <sha> --stat --patch`; the recorded sha is only a hint a rewrite may orphan. Report a
-  release-squash trail as coarse evidence instead of inventing attribution.
+- Find and inspect each fix as `dd-bug-resolution/LINEAGE.md` §Read persisted facts says.
 - Derive diff direction from the named commit's production numstat. Direction is an
   audit result.
-- Read the prior candidate's `SPEC.md` `## Bug window review` for the maturity verdict.
-  The release summary owns delivered, carried and backlog-exit scope.
+- The prior `SPEC.md` `## Bug window review` judges each fix KEEP or REBUILD and schedules
+  no work (`dd-release-definition`, Pick the set, step 7); a REBUILD is proposed as a bug, rebuilt in its own lane once confirmed.
 
 ## Recurrence and fix-induced bugs
 
-- Recurrence is a later record sharing a recorded fix file with the earlier record,
-  registered after the earlier record's resolution.
-- A fix-induced bug is a later record whose component names a file touched by the earlier
-  record's `fix_sha`, with `caused_by` naming that earlier bug.
+- History is the id-line query (`dd-bug-resolution/LINEAGE.md` §The filter), never `fix_files`.
+- Recurrence is a later record whose `component` names a path a prior fix commit touches,
+  registered after that record's resolution.
+- A fix-induced bug is such a record with `caused_by` naming that prior bug.
 - A contradicted `caused_by: none` is a finding.
 
 ## The nine forensic metrics
@@ -33,11 +31,11 @@ value against the previous audit's `AUDIT.md`, from git history, where it was co
 | 1 | Registrations per reporter | group records by `reported_by` |
 | 2 | Complete resolutions | resolved records satisfying the canonical resolution facts |
 | 3 | Fix-shape ratio | `net-negative / (net-neutral + net-positive)` from `git show --numstat <sha>` of the fix found by its id line, on production paths |
-| 4 | Same-surface re-bug rate at 3d/14d | group by recorded fix files |
+| 4 | Same-surface re-bug rate at 3d/14d | group by the paths the fix commit (id-line query) touches |
 | 5 | Hand-kept-list touch count | named fix commits touching the hand-kept files (below) |
 | 6 | Test-layer bug share | `component` starts with `tests/` |
 | 7 | Scanner-vs-prose recurrence | scanner-term symptom and a fix touching only docs/tests |
-| 8 | Sweep closures as `resolved` | resolved records whose `fix_sha` touches no production code |
+| 8 | Sweep closures as `resolved` | resolved records whose fix commit (id-line query) touches no production path |
 | 9 | REBUILD share | resolved records with `caused_by != none` whose named fix commit identifies a REBUILD |
 
 Metric 5's hand-kept files are those that list by hand what code could derive: ignore lists, digest or baseline ledgers, golden fixtures, literal name inventories.

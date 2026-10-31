@@ -21,26 +21,27 @@ from dadaia_workspace.core.release_state import (
     RELEASE_STATE_FILENAME,
 )
 from dadaia_workspace.core.skill_owner import load_owner
-from dadaia_workspace.core.spec_status import APPROVED, extract_status
-from dadaia_workspace.core.spec_status import CANONICAL_STATUS as _CANONICAL_STATUS
 from dadaia_workspace.features.specs.doctor_common import iter_all_release_dirs
 from dadaia_workspace.features.specs.doctor_types import Severity, finding_path, specs_finding
 from dadaia_workspace.features.specs.specs_tree import SpecsTree
 
-# Vocabulary + parser live in core.spec_status (single definition); re-exported here
-# because doctor_release has been the documented import site for both.
-CANONICAL_STATUS = _CANONICAL_STATUS
+_grammar = load_owner("dd-bug-resolution", "_grammar")
+APPROVED, CANONICAL_STATUS = _grammar.APPROVED, _grammar.CANONICAL_STATUS
 #: The lifecycle phases in order, from the moved schema; all but the first are implementation-bound.
 _PHASES = load_owner("dd-bug-resolution", "_ledger").load_schema("release-state-v1")["properties"][
     "phase"
 ]["enum"]
+CANDIDATE_DOCS: tuple[str, ...] = load_owner(
+    "dd-release-implementation", "_release_schema"
+).CANDIDATE_DOCS
 
 
 def _extract_status(md_path: Path) -> str | None:
-    """Read a release artifact's declared status. Parsing itself is core.spec_status."""
+    """Read a release artifact's declared status. Parsing is the kernel's."""
     if not md_path.exists():
         return None
-    return extract_status(platform.read_text(md_path))
+    status: str | None = _grammar.extract_status(platform.read_text(md_path))
+    return status
 
 
 class ReleaseValidator:
@@ -57,7 +58,7 @@ class ReleaseValidator:
         active = self.tree.active_release
         if not active.candidate:
             return issues
-        for fname in ("SPEC.md", "PLAN.md"):
+        for fname in CANDIDATE_DOCS:
             fpath = active.candidate / fname
             if not fpath.exists():
                 # Presence is `release.py check`'s rule, in ONE home. This rule judges the `**Status:**`

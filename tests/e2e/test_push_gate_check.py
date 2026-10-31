@@ -1,8 +1,8 @@
 """`ci push-gate-check` driven as the pre-push hook drives it (git's ref lines on stdin,
-harness-free env, no handoff on disk). A work-branch push, a branch deletion and a tag push pass;
-the branch names come from the committed constitution's gitflow (custom, absent -> default + one
-warning, inherited by an associated repo; its main repo absent -> default + one warning). The
-integration-branch refusal and its fix are the refusal harness Case `birth_published`.
+harness-free env, no handoff on disk). A push of a work, principal or integration branch, a branch
+deletion and a tag push pass; the branch names come from the committed constitution's gitflow
+(custom, absent -> default + one warning, inherited by an associated repo; its main repo absent ->
+default + one warning).
 
 Owner: dd-sw-engineer-sr
 """
@@ -17,9 +17,11 @@ from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.core.cli_line import shell_line
+from dadaia_workspace.core.cli_line import cli_words
+from dadaia_workspace.core.platform import inline
 from dadaia_workspace.core.specs_version import CANONICAL_SPECS_VERSION
 from dadaia_workspace.features.spec_context import sweep
+from tests.fakes import land_fix
 from tests.fixtures.harness_env import suite_env
 from tests.helpers.oslib import make_readonly, run, write_text
 
@@ -69,11 +71,13 @@ def _run_push_gate(
     [
         pytest.param("refs/heads/feature/0.0.1 {sha} refs/heads/feature/0.0.1 " + _ZERO, id="work-branch-push"),
         pytest.param("refs/heads/old " + _ZERO + " refs/heads/old {sha}", id="branch-deletion"),
+        pytest.param("refs/heads/main {sha} refs/heads/main {sha}", id="principal-update"),
+        pytest.param("refs/heads/develop {sha} refs/heads/develop {sha}", id="integration-update"),
         pytest.param("refs/tags/v1 {sha} refs/tags/v1 " + _ZERO, id="tag-push"),
     ],
 )  # fmt: skip
 def test_pass_matrix(tmp_path: Path, line: str) -> None:
-    """Never review-gated: the verdict is a PR gate, not on this path."""
+    """Never review-gated: the verdict is the merge gate's, not this path's; no role branch is refused."""
     repo, sha = _init_repo(tmp_path, _SLUG)
     result = _run_push_gate(repo, tmp_path, line.format(sha=sha) + "\n")
     assert result.returncode == 0, result.stdout + result.stderr
@@ -102,7 +106,7 @@ def test_a_custom_gitflow_governs_the_push(tmp_path: Path) -> None:
     assert _run_push_gate(repo, tmp_path, _push("work/0.0.1", sha)).returncode == 0
     refused = _run_push_gate(repo, tmp_path, _push("feature/0.0.1", sha))
     assert refused.returncode != 0
-    fix = shell_line("git", "-C", str(repo), "switch", "-c", "work/0.1.0", sha)
+    fix = land_fix(lambda root, *words: inline(*cli_words(root, *words)))
     assert f"fix: {fix}" in refused.stderr, refused.stderr
 
 

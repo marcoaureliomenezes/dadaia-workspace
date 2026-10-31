@@ -36,4 +36,4 @@ def test_a_symlink_into_protected_sessions_classifies_protected(tmp_path: Path, 
     result = run_hook_subprocess("sdd_gate", payload, claude_hook_env(tmp_path))
 
     envelope = result.block_envelope()
-    assert result.returncode == 0 and envelope is not None and "SEC-01" in envelope["reason"]
+    assert result.returncode == 0 and envelope is not None and "CWE-284" in envelope["reason"]

@@ -23,6 +23,7 @@ from _audit_store import (
     read_findings,
     write_findings,
 )
+from _platform import command
 from _refusal import Refusal
 from _specs import choice
 
@@ -59,7 +60,7 @@ def disposition(specs: Path, audit: str, finding_id: str, values: dict[str, Any]
         raise Refusal(
             f"{finding_id!r} does not name a finding of audit {audit!r}. Known findings: "
             f"{', '.join(known) or '(none)'}",
-            f"grep {finding_id} specs/{AUDITS}/{audit}/{FINDINGS}",
+            command("grep", finding_id, str(directory / FINDINGS)),
         )
     for record in records:
         if record.get("id") == finding_id:

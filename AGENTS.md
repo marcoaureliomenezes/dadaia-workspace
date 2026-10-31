@@ -26,6 +26,8 @@ Contract coverage, integration and e2e run in this repository's CI, not in the j
 
 - Versioning here: release-please owns the version, tag and CHANGELOG; the work branch
   is named for the live release (`_RELEASE.json`).
-- Tests never build a real venv (exhausts disk) and never use `time.sleep`/`threading.Barrier` in unit tests.
+- The rc's define commit `chore(release): rc-<N> is labelled <release>rc<N>` sets `pyproject.toml` to
+  `<release>rc<N>`; `scripts/guards/repo.py`'s version-label guard enforces it.
+- Tests never pip-install into a venv (exhausts disk) and never use `time.sleep`/`threading.Barrier` in unit tests.
 - Dev tools (pytest, ruff, mypy, lint-imports) come from the `dev` group, installed into
   the workspace venv from this repo's root: `VIRTUAL_ENV=../../.dadaia/.venv poetry install --no-root --with dev`.

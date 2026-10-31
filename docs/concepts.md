@@ -1,79 +1,56 @@
 # Concepts
 
-Seven terms, one section each. Their canonical meanings live in
-[`CONTEXT.md`](../CONTEXT.md); workspace law lives in
-`dadaia_workspace/public/data/AGENTS.md`, and the walkthrough is
-[getting started](getting-started.md).
+Seven terms, one section each. Their glossary entries live in
+[`CONTEXT.md`](../CONTEXT.md); each rule a section names is stated once, by its owner.
+The walkthrough is [getting started](getting-started.md).
 
 ## Context
 
 A *context* is one canonical `specs/` tree owned by one main repository: the unit for
 memory, backlog, bugs, releases, reports and handoffs. Associated repositories own
-production source only. The registry holds each context ALIVE or DEAD, and a repository
-slug belongs to one context.
-
-Resolution proceeds from caller-supplied context, to `DADAIA_CONTEXT`, to the session
-record, to the repository containing the current directory. The session's bind names the
-context and all its repository slugs; an unbound session owns nothing. Binding also
-triggers memory injection.
+production source only. Resolution, scope and races: `dadaia_workspace/public/data/dadaia-AGENTS.md`,
+heading *Context, scope and races*.
 
 ## Release and candidate
 
-Exactly one *release* is live under `specs/releases/<M.m.p>/`. It has open scope and grows
-through closed-scope *candidates*. Each `rc-<N>/` holds `SPEC.md`, `PLAN.md` and
-`tasks/<job>.md`; the highest numbered candidate is live. `_RELEASE.json` is the release's
-one mutable state document: `phase`, the three milestones and an append-only `log` whose
-new entries are `milestone`, `note`, `summary` or closure `memory`.
-
-Every SPEC begins with one `**Origin:**` line: `operator-demand`, or the canonical
-backlog/bugs/findings clauses. `release.py check` traces those ids through the closure
-summary. Release ids are bare SemVer and move only at an operator-approved deploy.
+A *release* is one SemVer line under `specs/releases/<M.m.p>/`, and its *candidates*
+(`rc-<N>/`) are closed-scope steps through it; the highest candidate is live. The release
+state is owned by
+`dadaia_workspace/public/skills/dd-release-implementation/RELEASE-EVENTS.md`; the SPEC `Origin` line
+and the release ids by `dadaia_workspace/public/scaffold/releases/AGENTS.md` (Authoring rules).
 
 ## The flow
 
-Every demand takes one of two arms. Arm A moves through backlog or operator demand,
-as-is review, grill, approved SPEC/PLAN/job files, test-first tasks, one review per job,
-reconciliation, the work-to-integration merge and the promote-or-continue choice. Jobs
-and tasks are the only implementation levels.
-
-Arm B proposes and registers a confirmed bug, establishes lineage, lands a lowest-level
-RED case, fixes the owning seam, proves GREEN and resolves the record with `cause`,
-`solution`, `caused_by` and `fix_sha`, plus the fix's `fix_files`. A bug in code the work branch holds uses a hotfix lane; after CLOSURE a
-block-list bug in code only the `wt-rc` holds is fixed on that `wt-rc`; other bugs enter
-approved candidate scope. Documents record the flow; there is no in-repository flow engine.
+Every demand takes one of two arms, Arm A (feature) or Arm B (bug). The steps of each arm
+are the root map's, `dadaia_workspace/public/data/AGENTS.md`, heading *The flow*. Documents
+record the flow; there is no in-repository flow engine. The review gates of a merge are in
+`dadaia_workspace/public/data/worktrees-AGENTS.md`, heading *Merges, gates, review*.
 
 ## The gate
 
-The pre-tool gate evaluates the root whitelist and SDD gate in that order. The root
-`AGENTS.md` defines protected, additive and mutating paths plus every fail-open case. Git
-chokepoints independently enforce branch names, canonical specs and privacy. Every BLOCK
-carries one executable `fix:` line or one operator act.
+The pre-tool gate and the git chokepoints refuse what the root map's heading *What is
+enforced* lists. Every refusal carries one executable `fix:` line or one operator act.
 
 ## Memory
 
-*Memory* is current product truth: `specs/memory/product/**`, `ARCHITECTURE.md` and
-`QUALITY.md`. A bound session receives the constitution, technical bootstrap, catalog
-digest and open worktrees. Candidate closure runs drift, reconciles every affected atom,
-writes a `memory` entry per pass and regenerates the catalog. Memory contains no
-release history.
+*Memory* is current product truth: the product atoms, `ARCHITECTURE.md` and `QUALITY.md`.
+A bound session receives the constitution, technical bootstrap and atom digest. Its
+writing rules are the memory law, `dadaia_workspace/public/scaffold/memory/AGENTS.md`.
 
 ## Bugs and backlog
 
-`specs/bugs/BUGS.jsonl` holds one record per bug, appended once. New records use
-`open | resolved | superseded | rejected`; resolution persists `cause`, `solution`,
-`caused_by`, `fix_sha` and `fix_files`, all derived from the fix commit that carries the bug's
-`fix(bugs)` or `refactor(bugs)` id line (the sha a hint), while git supplies the implementation diff. The next SPEC's
-bug-window review owns maturity, and the closure summary owns delivered and carried scope.
+A bug is one record in `specs/bugs/BUGS.jsonl`; its statuses, fields, lanes and writer are
+the bug law, `dadaia_workspace/public/scaffold/bugs/AGENTS.md`, and `bugs.py --help`. The
+window review judges each resolved fix KEEP or REBUILD and schedules no work: a fix judged
+REBUILD is proposed as a bug and, once confirmed, rebuilt in its own lane. The rule is
+`dadaia_workspace/public/skills/dd-release-definition/SKILL.md`, heading *Pick the set*.
 
-`specs/backlog/BACKLOG.json` is the operator's active demand queue. An entry is created by
-`backlog.py new`, picked through a SPEC Origin clause and removed exactly once by
-`backlog.py exit`, which appends its terminal history record.
+The backlog is the operator's active demand queue; its law is
+`dadaia_workspace/public/scaffold/backlog/AGENTS.md`, and `backlog.py --help` names its verbs.
 
 ## Audits
 
-An *audit* is the full-tree inspection lane. A live audit directory holds `AUDIT.md` and
-`FINDINGS.jsonl`; its three pillars are bug history, spec compliance and memory drift over
-the window since the newest archived audit. The bug pillar reports nine forensic metrics.
-An audit generates at most one remediation release. `audit.py disposition` moves each
-finding to `resolved`, `superseded` or `rejected`; `audit.py close` refuses while any
-finding is open, then appends one audit-history record and removes the live directory.
+An *audit* is the full-tree inspection lane. Its law, its three pillars and its one
+remediation release are in `dadaia_workspace/public/scaffold/audits/AGENTS.md`. The bug
+pillar's forensic metrics are in `dadaia_workspace/public/skills/dd-audit-project/PILLAR-BUGS.md`,
+heading *The nine forensic metrics*.

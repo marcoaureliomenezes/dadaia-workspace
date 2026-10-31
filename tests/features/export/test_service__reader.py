@@ -23,7 +23,7 @@ from dadaia_workspace.features.export.service import ExportService
 from dadaia_workspace.features.spec_context.service import SpecContextService
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from tests.fixtures.stores import context_store
-from tests.helpers.oslib import write_text
+from tests.helpers.oslib import link, write_text
 
 _ALPHA = SpecContextProject(
     name="alpha",
@@ -343,3 +343,28 @@ def test_restore_extracts_the_bundles_and_never_overwrites_a_file_in_dist(tmp_pa
 
     assert str(refused.value).count("fix:") == 1
     assert target.read_bytes() == b"local paused work"
+
+
+@pytest.mark.parametrize("verb", ["read", "restore"])
+def test_a_dangling_link_in_dist_obstructs_read_and_restore_before_any_write(
+    tmp_path: Path, verb: str
+) -> None:
+    reader, _ = _reader(tmp_path)
+    archive = _hard(tmp_path, [("app/0.5.0/lane.bundle", b"from the artifact")])
+    artifact = reader.read(archive)
+    target = tmp_path / ".dadaia/dist/app/0.5.0/lane.bundle"
+    target.parent.mkdir(parents=True)
+    if not link(str(tmp_path / "gone.bundle"), target, is_dir=False):
+        pytest.skip("the host refuses symlinks")
+
+    with pytest.raises(DadaiaError, match="already exists") as refused:
+        if verb == "read":
+            reader.read(archive, into=tmp_path)
+        else:
+            reader.restore(archive, artifact)
+
+    assert str(refused.value).count("fix:") == 1
+    assert f"move {target} out of" in str(refused.value)
+    assert target.is_symlink()
+    assert not (tmp_path / "gone.bundle").exists()
+    assert sorted(p.name for p in target.parent.iterdir()) == ["lane.bundle"]

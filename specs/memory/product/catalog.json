@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-19T20:25:38Z",
+  "generated_at": "2026-10-28T06:59:09Z",
   "features": [
     {
       "rank": 1,
@@ -14,9 +14,10 @@
         "handoff",
         "schema"
       ],
-      "token_estimate": 1073,
+      "token_estimate": 1158,
       "depends_on": [
         "worktrees",
+        "bug-ledger",
         "release-lifecycle",
         "workspace-doctor",
         "public-asset-distribution"
@@ -42,7 +43,7 @@
         "dispatch",
         "sdd"
       ],
-      "token_estimate": 1035,
+      "token_estimate": 1139,
       "depends_on": [
         "bug-ledger",
         "worktrees",
@@ -73,7 +74,7 @@
         "derivation",
         "governance"
       ],
-      "token_estimate": 568,
+      "token_estimate": 636,
       "depends_on": [
         "sdd-gate-v3",
         "cross-platform-portability",
@@ -96,8 +97,8 @@
       "slug": "agent-evals",
       "title": "agent-evals",
       "area": "distribution",
-      "tldr": "The library's own agent evals — two graded tasks run on the candidate wheel and a PyPI baseline by one dispatch-or-schedule workflow.",
-      "summary": "evals/ holds a cold-onboarding task and a block-list-bug task, each graded by a script on the state the agent leaves; .github/workflows/eval.yml runs each three times on a baseline release and on the candidate wheel built from its own checkout, scans every upload for the model secret, and blocks when a gated task falls below its floor on the candidate or drops where the baseline passed.",
+      "tldr": "The library's own agent evals — three graded tasks run on the candidate wheel by Claude Code and Codex; a green run is the deploy gate.",
+      "summary": "evals/ holds a cold-onboarding task, a block-list-bug task and a discovery task, each graded by a script on the state the agent leaves; .github/workflows/eval.yml builds the candidate wheel once, runs each task three times per harness in its own leg, scans every upload for secrets and account ids, and blocks when any (harness, task) falls below its floor; the Eval gate check on a PR into main passes only with a green run on a commit whose diff to the head is release bookkeeping.",
       "path": "specs/memory/product/distribution/agent-evals.md",
       "tags": [
         "evals",
@@ -105,8 +106,9 @@
         "release-gate",
         "distribution"
       ],
-      "token_estimate": 521,
+      "token_estimate": 1488,
       "depends_on": [
+        "harness-codex",
         "pypi-distribution",
         "QUALITY",
         "consumer-agent-support"
@@ -131,16 +133,16 @@
         "projection",
         "privacy"
       ],
-      "token_estimate": 1505,
+      "token_estimate": 1592,
       "depends_on": [
         "agentic-entities",
+        "context-management",
         "bug-ledger",
         "agent-orchestration",
         "sdd-gate-v3",
         "workspace-init",
         "workspace-doctor",
         "specs-migration",
-        "context-management",
         "pypi-distribution",
         "consumer-agent-support",
         "harness-kimi-code"
@@ -169,7 +171,7 @@
       "title": "pypi-distribution",
       "area": "distribution",
       "tldr": "The PyPI package on one version axis, two console-script names, the OIDC pipeline, the wheel contract and the derived docs.",
-      "summary": "dadaia-workspace publishes to PyPI under OIDC trusted publishing from the release-please workflow; release-please owns the version, the CHANGELOG and the tag, and pyproject carries the published floor.",
+      "summary": "dadaia-workspace publishes to PyPI under OIDC trusted publishing from the release-please workflow; release-please owns the version, the CHANGELOG and the tag, the manifest carries the published floor, pyproject the label of the build under development, and every test, eval and smoke run validates only that build.",
       "path": "specs/memory/product/distribution/pypi-distribution.md",
       "tags": [
         "distribution",
@@ -177,7 +179,7 @@
         "release",
         "packaging"
       ],
-      "token_estimate": 1386,
+      "token_estimate": 1733,
       "depends_on": [
         "release-lifecycle",
         "QUALITY",
@@ -210,7 +212,7 @@
         "projection",
         "hooks"
       ],
-      "token_estimate": 444,
+      "token_estimate": 500,
       "depends_on": [
         "agent-orchestration",
         "agentic-entities",
@@ -239,10 +241,12 @@
         "projection",
         "hooks"
       ],
-      "token_estimate": 417,
+      "token_estimate": 662,
       "depends_on": [
         "agentic-entities",
+        "context-management",
         "sdd-gate-v3",
+        "agent-evals",
         "agent-orchestration",
         "public-asset-distribution"
       ],
@@ -269,7 +273,7 @@
         "projection",
         "hooks"
       ],
-      "token_estimate": 284,
+      "token_estimate": 282,
       "depends_on": [
         "agentic-entities",
         "context-management",
@@ -297,7 +301,7 @@
         "projection",
         "hooks"
       ],
-      "token_estimate": 244,
+      "token_estimate": 243,
       "depends_on": [
         "agentic-entities",
         "context-management",
@@ -325,7 +329,7 @@
         "projection",
         "hooks"
       ],
-      "token_estimate": 173,
+      "token_estimate": 171,
       "depends_on": [
         "agentic-entities",
         "sdd-gate-v3",
@@ -352,7 +356,7 @@
         "hooks",
         "binding"
       ],
-      "token_estimate": 471,
+      "token_estimate": 470,
       "depends_on": [
         "agentic-entities",
         "sdd-gate-v3",
@@ -379,7 +383,7 @@
         "paradigm",
         "pillars"
       ],
-      "token_estimate": 779,
+      "token_estimate": 844,
       "depends_on": [
         "context-management",
         "worktrees",
@@ -411,7 +415,7 @@
         "lifecycle",
         "concurrency"
       ],
-      "token_estimate": 626,
+      "token_estimate": 670,
       "depends_on": [
         "context-management",
         "specs-migration",
@@ -439,7 +443,7 @@
         "provider",
         "onboarding"
       ],
-      "token_estimate": 325,
+      "token_estimate": 317,
       "depends_on": [
         "consumer-agent-support",
         "workspace-doctor",
@@ -465,7 +469,7 @@
         "release-gate",
         "sdd"
       ],
-      "token_estimate": 405,
+      "token_estimate": 427,
       "depends_on": [
         "pypi-distribution",
         "workspace-init",
@@ -496,7 +500,7 @@
         "session",
         "privacy"
       ],
-      "token_estimate": 3201,
+      "token_estimate": 3665,
       "depends_on": [
         "specs-migration",
         "workspace-doctor",
@@ -504,6 +508,7 @@
         "sdd-gate-v3",
         "context-portability",
         "worktrees",
+        "bug-ledger",
         "agentic-entities",
         "spec-context-project",
         "QUALITY"
@@ -535,7 +540,7 @@
         "portability",
         "worktrees"
       ],
-      "token_estimate": 1148,
+      "token_estimate": 1273,
       "depends_on": [
         "worktrees",
         "sdd-gate-v3",
@@ -566,7 +571,7 @@
         "macos",
         "linux"
       ],
-      "token_estimate": 933,
+      "token_estimate": 1023,
       "depends_on": [
         "bug-ledger",
         "workspace-doctor",
@@ -595,7 +600,7 @@
         "ports",
         "ttl"
       ],
-      "token_estimate": 437,
+      "token_estimate": 450,
       "depends_on": [
         "workspace-init",
         "agentic-entities"
@@ -619,7 +624,7 @@
         "registry",
         "onboarding"
       ],
-      "token_estimate": 1365,
+      "token_estimate": 1422,
       "depends_on": [
         "public-asset-distribution",
         "sdd-gate-v3",
@@ -654,7 +659,7 @@
         "compliance",
         "privacy"
       ],
-      "token_estimate": 3721,
+      "token_estimate": 3947,
       "depends_on": [
         "public-asset-distribution",
         "sdd-gate-v3",
@@ -697,7 +702,7 @@
         "upgrade",
         "onboarding"
       ],
-      "token_estimate": 2388,
+      "token_estimate": 2483,
       "depends_on": [
         "context-management",
         "specs-migration",
@@ -736,7 +741,7 @@
         "specs",
         "memory"
       ],
-      "token_estimate": 474,
+      "token_estimate": 505,
       "depends_on": [
         "bug-ledger",
         "release-lifecycle",
@@ -764,7 +769,7 @@
         "ledger",
         "governance"
       ],
-      "token_estimate": 1065,
+      "token_estimate": 1077,
       "depends_on": [
         "agent-orchestration",
         "worktrees",
@@ -784,7 +789,7 @@
       "title": "bug-ledger",
       "area": "sdd",
       "tldr": "BUGS.jsonl stores one lean record per confirmed defect; a resolved bug's fix is the commit carrying its fix(bugs) or refactor(bugs) id line.",
-      "summary": "The bug record grammar, confirmation and privacy boundary, terminal transitions, persisted fix lineage and fix files, the earlier-bug and REBUILD-due readout, archival and candidate integration.",
+      "summary": "The bug record grammar, confirmation and privacy boundary, terminal transitions, persisted fix lineage, the earlier-bug and REBUILD-due readout, archival and candidate integration.",
       "path": "specs/memory/product/sdd/bug-ledger.md",
       "tags": [
         "bugs",
@@ -792,7 +797,7 @@
         "lineage",
         "resolution"
       ],
-      "token_estimate": 1790,
+      "token_estimate": 2202,
       "depends_on": [
         "cross-platform-portability",
         "public-asset-distribution",
@@ -822,7 +827,7 @@
         "state",
         "closure"
       ],
-      "token_estimate": 1617,
+      "token_estimate": 2051,
       "depends_on": [
         "agent-orchestration",
         "worktrees",
@@ -844,7 +849,7 @@
       "title": "sdd-gate-v3",
       "area": "sdd",
       "tldr": "No-lock enforcement — root-entry hygiene and SDD write policy before tools; branch, canon and privacy checks at push; a ref gate on raw ref moves.",
-      "summary": "The two-policy pre-tool gate, path classes and bind scope, fail-open boundaries, one-fix refusal shape, range-scoped git publication chokepoint with its remedy verb, and the reference-transaction ref gate.",
+      "summary": "The two-policy pre-tool gate, path classes and bind scope, fail-open boundaries, one-fix refusal shape, range-scoped git publication chokepoint, the verdict-writer act, and the reference-transaction ref gate.",
       "path": "specs/memory/product/sdd/sdd-gate-v3.md",
       "tags": [
         "gate",
@@ -853,12 +858,13 @@
         "privacy",
         "git"
       ],
-      "token_estimate": 1640,
+      "token_estimate": 1728,
       "depends_on": [
+        "context-management",
         "cross-platform-portability",
         "worktrees",
         "bug-ledger",
-        "context-management",
+        "release-lifecycle",
         "workspace-doctor",
         "agentic-entities",
         "public-asset-distribution",
@@ -891,7 +897,7 @@
         "merge",
         "review"
       ],
-      "token_estimate": 2637,
+      "token_estimate": 3448,
       "depends_on": [
         "context-management",
         "sdd-gate-v3",

@@ -11,22 +11,19 @@ The `Surface` column names the path or entity as it appears in an installed work
 
 ## 1. Load triggers, per harness
 
-| Harness | Root `AGENTS.md` | Scoped `AGENTS.md` | `.agents/skills/dd-*` | `.agents/agents/dd-*.md` | Own dir |
-|---|---|---|---|---|---|
-| Claude Code | session start, iff no `CLAUDE.md` on the path | attached when a file in that dir is Read | via per-skill symlink under `.claude/skills/` | via per-file symlink under `.claude/agents/` | `.claude/` (hooks, settings) |
-| Codex CLI | session start | chain root -> cwd only | native (cwd, parents, root) | TOML transcode `.codex/agents/*.toml` | `.codex/` (config, hooks, rules) |
-| Kimi Code | session start | chain root -> cwd only | native | native (Claude-style Markdown) | none (hooks are user-level) |
-| GitHub Copilot CLI | session start | path + touched-file ancestors | native | `.github/agents/*.agent.md` | `.github/` |
-| Cursor | session start | files in subtree (IDE) | native | `.cursor/agents` | `.cursor/` |
-| Devin CLI | session start | lazy on file access + parents | native | native | `.devin/` |
-| OpenCode | session start | upward at start, lazy on read/list | native (walks up) | `.opencode/agents` | `.opencode/` |
-| Gemini CLI | `context.fileName: AGENTS.md` | ancestors at start, JIT on tool touch | alias of `.gemini/skills` | `.gemini/agents` | `.gemini/` |
-| DeepSeek dsh | session start | chain + JIT on read/write/edit | native | not documented | `.dsh/` |
-| Z.AI ZCode | root only | none | `.zcode/skills` | user-level | `.zcode/` |
+One row per registered harness: the `HARNESS_RECORDS` row names it, `.dadaia/.venv/bin/dadaia harness list` lists it, and the row's `directory` is its own dir.
 
-- Universal core = the root `AGENTS.md` map (10/10) + scoped `AGENTS.md` (8/10 automatic;
-  Codex, Kimi Code and dsh by chain only) + `.agents/skills` (8/10 native; Claude Code and
-  ZCode by projected entry).
+| Harness (registry `name`) | Root `AGENTS.md` | Scoped `AGENTS.md` | `.agents/skills/dd-*` | `.agents/agents/dd-*.md` | Own dir (registry `directory`) |
+|---|---|---|---|---|---|
+| Claude Code (`claude`) | session start, iff no `CLAUDE.md` on the path | attached when a file in that dir is Read | via per-skill symlink under `.claude/skills/` | via per-file symlink under `.claude/agents/` | the row's `directory` |
+| Codex CLI (`codex`) | session start | chain root -> cwd only | native (cwd, parents, root) | TOML transcode `.codex/agents/*.toml` | the row's `directory` |
+| Kimi Code (`kimi-code`) | session start | chain root -> cwd only | native | native (Claude-style Markdown) | the row's `directory` (none: hooks are user-level) |
+| GitHub Copilot CLI (`copilot`) | session start | path + touched-file ancestors | native | `.github/agents/*.agent.md` | the row's `directory` |
+| Cursor (`cursor`) | session start | files in subtree (IDE) | native | `.cursor/agents` | the row's `directory` |
+| Devin CLI (`devin`) | session start | lazy on file access + parents | native | native | the row's `directory` |
+
+- Universal core = the root `AGENTS.md` map + scoped `AGENTS.md` + `.agents/skills`. Codex and
+  Kimi Code load scoped files by chain only; Claude Code reaches skills by projected entry.
 - Every dd- skill that touches a governed area opens that area's scoped `AGENTS.md` as step 1,
   so the scoped law reaches every harness by procedure, not by loader luck.
 - Sessions launch at the workspace root: a `CLAUDE.md` inside `repos/<slug>/` hides the map
@@ -64,25 +61,23 @@ One procedure each; a skill that touches a governed area opens its scoped law as
 | `dd-bug-resolution` | the seven-phase diagnosing method and the resolve record | `specs/bugs/AGENTS.md` |
 | `dd-cli-library` | CLI idioms, CLI-owned state, the dev-server registry | `.dadaia/AGENTS.md` |
 | `dd-code-review` | the three review axes and the six lenses | `specs/memory/AGENTS.md` |
-| `dd-gitflow-default` | the branch contract, commit shapes, the PR gate | — |
+| `dd-gitflow-default` | the branch contract, commit shapes, the merge gate | — |
 | `dd-grill-me` | the operator grill that precedes a candidate | — |
 | `dd-handoff-emitter` | handoff-first emission and ack-on-consume | `.dadaia/handoff/AGENTS.md` |
-| `dd-manager-orchestration` | intake, dispatch and the closure pass | — |
+| `dd-manager-orchestration` | dispatch, decision authority, escalation and main-thread discipline | — |
 | `dd-release-definition` | picking the set and authoring the SPEC, PLAN and job files | `specs/releases/AGENTS.md` |
 | `dd-release-implementation` | the candidate arc from the first task to the gate | `specs/releases/AGENTS.md` |
 | `dd-spec-navigator` | the three-phase session grounding protocol | `specs/AGENTS.md` |
 
 ## 4. Personas — `.agents/agents/*.md`
 
-Five roles, no sixth.
+One file per persona. Each file's frontmatter declares its role and tools; the
+root map's Who does what table (`AGENTS.md`, Who does what) indexes them.
 
-| Surface | Purpose | Belongs |
-|---|---|---|
-| `dd-product-engineer` | backlog, SPEC, the product-memory pass at closure | role, read_only, model policy |
-| `dd-sw-engineer-sr` | as-is review, PLAN, job files, new behaviour and its tests | role, read_only, model policy |
-| `dd-sw-engineer-jr` | tasks whose AC and `W:` fully state the outcome | role, read_only, model policy |
-| `dd-researcher` | read-only research, findings as `path:line` or URL | role, read_only, model policy |
-| `dd-code-reviewer` | the three-axis review and its six lenses | role, read_only, model policy |
-
-- A statement belongs to exactly one surface: the map indexes, the scoped file rules, the
-  skill instructs, the persona declares who acts.
+| Surface | Mandate |
+|---|---|
+| `dd-product-engineer` | its persona file |
+| `dd-sw-engineer-sr` | its persona file |
+| `dd-sw-engineer-jr` | its persona file |
+| `dd-researcher` | its persona file |
+| `dd-code-reviewer` | its persona file |

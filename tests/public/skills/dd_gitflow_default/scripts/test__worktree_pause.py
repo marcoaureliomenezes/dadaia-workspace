@@ -17,7 +17,16 @@ import pytest
 
 import dadaia_workspace
 from tests.fixtures.stores import fake_venv
-from tests.helpers.oslib import command, make_executable, read_text, stub_cli, write_text
+from tests.helpers.oslib import (
+    PERMISSIONS_ENFORCED,
+    command,
+    make_executable,
+    make_readonly,
+    make_writable,
+    read_text,
+    stub_cli,
+    write_text,
+)
 from tests.helpers.oslib import run as os_run
 from tests.helpers.worktree_ws import (
     NEW_JOB,
@@ -212,6 +221,15 @@ def test_resume_creates_the_branch_through_the_cli_marker(root: Path) -> None:
     assert git(repo, "rev-parse", _branch(BACKLOG)).strip() == tip
 
 
+def test_a_resumed_tree_is_locked_as_new_locks_it(root: Path) -> None:
+    repo, tree = root / "repos/r", _lane(root)
+    assert run(root, "pause", str(tree)).returncode == 0
+
+    assert run(root, "resume", str(tree)).returncode == 0
+
+    assert f"locked dadaia:{BACKLOG}" in git(repo, "worktree", "list", "--porcelain").splitlines()
+
+
 def test_a_lane_whose_branch_was_pushed_resumes(root: Path) -> None:
     tree = open_tree(root, BACKLOG)
     commit(tree, "specs/a.md")
@@ -286,3 +304,34 @@ def test_list_shows_a_paused_tree_whose_exit_is_the_resume_line(root: Path, name
     assert Path(row["path"]) == tree
     assert row["exit"] == command(sys.executable, str(SCRIPT), "resume", str(tree))
     assert row["fix"] == ""
+
+
+_SKILL = (
+    Path(__file__).resolve().parents[5] / "dadaia_workspace/public/skills/dd-cli-library/SKILL.md"
+)
+
+
+def test_the_dist_writer_sentence_names_worktree_pause_and_resume() -> None:
+    """The skill's sentence listing what writes `.dadaia/dist/` names every verb that does."""
+    (sentence,) = [ln for ln in read_text(_SKILL).splitlines() if ".dadaia/dist/" in ln]
+
+    assert "`worktree pause`" in sentence
+    assert "`worktree resume`" in sentence
+
+
+@pytest.mark.skipif(not PERMISSIONS_ENFORCED, reason="needs a folder this process cannot empty")
+def test_a_folder_git_cannot_delete_is_named_and_the_rerun_ends_the_pause(root: Path) -> None:
+    make_readonly((tree := _lane(root)) / "specs")
+    aside = root.parent / "aside"
+    # the bundle is written, git forgot the tree, the folder stays
+    for _ in range(2):
+        refused = run(root, "pause", str(tree))
+        assert refused.returncode == 1
+        (fix,) = fixes(refused)
+        assert fix == f"fix: Agent action: stop what holds files open in {tree}, then move the folder {tree} out of the lane path (it may hold work)"  # fmt: skip
+    tree.rename(aside)
+    make_writable(aside / "specs")
+    done = run(root, "pause", str(tree))
+    assert done.returncode == 0, done.stderr
+    assert _bundle(root, BACKLOG).is_file()
+    assert git(root / "repos/r", "branch", "--list", _branch(BACKLOG)) == ""

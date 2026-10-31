@@ -3,27 +3,30 @@
 Races between sessions are never prevented; there is no session mode. Protected CLI session records remain fail-closed against
 file-tool writes.
 
-**The gate blocks three things.** A PROTECTED write (CLI-owned session
-records and projected law files); a MUTATING write out of the bind's scope or under
-``repos/<r>/`` outside ``specs/audits/``; and — in
-``hooks/root_whitelist`` — a new workspace-root entry. There is no
-fourth block and no path class beyond ``ADDITIVE``/``MUTATING``/``PROTECTED``.
+**The gate blocks four things.** A PROTECTED write (the class
+``_protection`` decides); a MUTATING write out of the bind's scope or under
+``repos/<r>/`` outside ``specs/audits/``; in ``hooks/root_whitelist`` a new workspace-root
+entry; and a verdict write by anyone but the reviewer (:func:`verdict_act`, the one Bash act
+judged). There is no path class beyond ``ADDITIVE``/``MUTATING``/``PROTECTED``.
 
 The gate reads no SDD artifact; memory authorship is never gated.
 """
 
 from __future__ import annotations
 
+import re
 from collections.abc import Callable
 from enum import Enum
 from itertools import chain
 from pathlib import Path, PurePath
 
 from dadaia_workspace.core import workspace_layout
-from dadaia_workspace.core.cli_line import fix_line, mkdir_line, spell_fix
+from dadaia_workspace.core.cli_line import fix_line, mkdir_line, reinstall_fix, spell_fix
+from dadaia_workspace.core.linked_tree import linked_tree_depths
 from dadaia_workspace.core.platform import act
+from dadaia_workspace.core.skill_owner import load_owner
 
-__all__ = ["Decision", "PathClass", "classify_path", "evaluate"]
+__all__ = ["Decision", "PathClass", "classify_path", "evaluate", "verdict_act"]
 
 # Derived from the zone registry (OUTPUT + EPHEMERAL zones) — never a second literal.
 _ADDITIVE_DADAIA_PREFIXES: tuple[str, ...] = workspace_layout.additive_prefixes()
@@ -32,7 +35,7 @@ _Fix = Callable[[PurePath, str | None], str]
 _DRAFT: _Fix = lambda root, _: mkdir_line(root / ".dadaia" / "tmp")  # noqa: E731
 #: One fix per refusal, total: a new ``FloorRefusal`` member fails here, as ``REFUSALS`` does.
 _FIXES: dict[workspace_layout.FloorRefusal, _Fix] = {
-    _R.LAW: lambda root, _: fix_line(root, "public", "install"),
+    _R.LAW: lambda root, _: reinstall_fix(Path(root), projected=True),
     _R.STATE: lambda root, _: act(
         "agent", "use the verb or skill script that owns that state file instead of editing it"
     ),
@@ -114,16 +117,19 @@ def evaluate(
     context: str | None = None,
     repos: frozenset[str] = frozenset(),
     has_id: bool = True,
+    bind_fix: str | None = None,
 ) -> tuple[Decision, str]:
     """The gate decision and its message for one write target; *root* builds every
     ``fix:`` line. The target arrives as ``core.invocation.scope``'s *zone*/*repo* plus
     the context registering *repo* (*owner*); the session as its bind (*context*,
-    *repos*) and whether it carries an id (*has_id*), never re-resolved here.
+    *repos*) and whether it carries an id (*has_id*), never re-resolved here; *bind_fix* replaces the
+    ``context bind`` fix when the hook's decider refuses that bind.
 
     PROTECTED blocks first (fail-closed). A MUTATING write into an owned repo outside the
     bind's *repos* is refused with ``context bind <owner>`` — an unbound session with an id
     owns nothing; an id-less one bound by env is told to relaunch; an id-less
-    unbound one is the declared gap. Then every write in zone ``repo`` is
+    unbound one is the declared gap, unless the write lands inside a git-linked worktree of
+    this workspace (scope follows the tree, never a rebind). Then every write in zone ``repo`` is
     refused with the ``dadaia worktree list`` fix. Everything else ALLOWS.
     """
     cls, hit = classify_path(rel_path, projected, protected, root=root)
@@ -134,7 +140,15 @@ def evaluate(
         return Decision.BLOCK, message + spell_fix(fix)
     if cls == PathClass.ADDITIVE or repo is None:
         return Decision.ALLOW, ""
-    if owner is not None and repo not in repos and (context is not None or has_id):
+    in_linked_tree = zone == "worktree" and linked_tree_depths(
+        Path(root), rel_path.replace("\\", "/").strip("/").split("/")
+    )
+    if (
+        owner is not None
+        and repo not in repos
+        and (context is not None or has_id)
+        and not in_linked_tree
+    ):
         message = _SCOPE_MESSAGE.format(
             rel_path=rel_path,
             repo=repo,
@@ -143,7 +157,7 @@ def evaluate(
             scope=", ".join(sorted(repos)) or "no registered repo",
         )
         fix = (  # an id-less session's bind is its env: only the operator can change it
-            fix_line(root, "context", "bind", owner)
+            bind_fix or fix_line(root, "context", "bind", owner)
             if has_id
             else act("operator", f"relaunch this session with DADAIA_CONTEXT={owner}")
         )
@@ -152,3 +166,28 @@ def evaluate(
         message = _MERGE_ONLY_MESSAGE.format(rel_path=rel_path, repo=repo)
         return Decision.BLOCK, message + spell_fix(fix_line(root, "worktree", "list"))
     return Decision.ALLOW, ""
+
+
+_WRITER = re.compile(r"verdict\.py|-m\s*verdict")
+
+
+def verdict_act(command: str, *, key: str | None, subagent: str | None) -> str | None:
+    """The block message when the text of *command* holds the writer (``verdict.py`` or
+    ``-m verdict``) and ``--verdict`` once quotes and backslashes are removed (a glob, brace
+    or parameter expansion of the name, e.g. ``verdict.p?``, ``verdict.{py,}``, ``$v.py``, is
+    not caught), and the harness, which names a running subagent under payload *key*
+    (``None``: it gives no identity), reports
+    *subagent* (``None``: the main thread) other than the reviewer; else ``None``."""
+    reviewer = load_owner("dd-bug-resolution", "_handoffs").REVIEWER
+    if (
+        key is None
+        or subagent == reviewer
+        or not (
+            _WRITER.search(text := re.sub(r"['\"\\]", "", command.lower())) and "--verdict" in text
+        )
+    ):
+        return None
+    dispatch = f"dispatch {reviewer} on the tree to judge; its verdict.py run writes the verdict"
+    return f"[GATE] Only the dispatched {reviewer} writes a verdict.\n" + spell_fix(
+        act("agent", dispatch)
+    )

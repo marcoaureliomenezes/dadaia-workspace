@@ -11,9 +11,9 @@ Disclosed sibling of `SKILL.md`, pillar 3. Input: canonical memory (`ARCHITECTUR
 
 ## 2 — Product memory vs code (scored)
 
-1. `python3 .agents/skills/dd-spec-navigator/scripts/memory.py drift --since <from-sha> --json` — every atom it lists that no `kind: memory` entry of the window names in `reviewed` or `changed` is HIGH (a closure that did not reconcile); every uncovered package is HIGH.
+1. `python3 .agents/skills/dd-spec-navigator/scripts/memory.py drift --since <from-sha> --json --specs <specs-dir>` — every atom it lists that no `kind: memory` entry of the window names in `reviewed` or `changed` is HIGH (a closure that did not reconcile); every uncovered package is HIGH.
 2. For each atom in the window, read its `sources` and check every functional claim against the code: a claim with no implementation evidence is HIGH; code behavior no atom describes is LOW.
-3. Run `memory.py check` and the doctor's `LINT-1` (history lines, `MEM-NARRATIVE-1:` prefix), `MEM-DRIFT-1/2` over the tree; any finding is MEDIUM (the closure should have left them clean).
+3. Run `memory.py check` and the doctor's `LINT-1` (history lines, `MEM-NARRATIVE-1:` prefix), `MEM-DRIFT-2` over the tree; any finding is MEDIUM (the closure should have left them clean).
 4. `git log --format=%h <from-sha>..HEAD -- specs/memory/product`: an atom commit whose diff only adds lines to an existing atom is evidence of stacking — LOW, named per commit.
 5. Tech stack: for each line of `ARCHITECTURE.md`'s `## Tech Stack`, confirm the technology and its pin in the repo's manifest and lockfile; an undeclared dependency or a line with no manifest counterpart is MEDIUM.
 
@@ -26,8 +26,8 @@ Supports §2 — a module claimed live in memory but unreachable is drift. Every
 
 ## 4 — `constitution.md` violations
 
-- Check every absolute law in `constitution.md` against the window's commits and current tree state.
-- A violated absolute law is CRITICAL by definition.
+- Check every invariant in `constitution.md` against the window's commits and current tree state.
+- A violated invariant is CRITICAL by definition.
 
 ## Findings
 

@@ -11,21 +11,25 @@ Two failure modes stay closed:
 
 from __future__ import annotations
 
+import json
 import re
 import shutil
 import sys
 import tomllib
-import uuid
 from collections.abc import Collection
 from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.infrastructure.privacy_check import PORTUGUESE_CONTROL_TERMS
+from dadaia_workspace.infrastructure.privacy_check import (
+    PORTUGUESE_CONTROL_TERMS,
+    load_privacy_terms,
+)
 from tests.fixtures.real_git import git
 from tests.helpers.oslib import Undecodable, read_text, run, write_text
 from tests.helpers.privacy_fixtures import internal_host, private_ip
 from tests.helpers.scan_population import assert_populated
+from tests.helpers.suite_files import tracked
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _PUBLIC_ROOT = _REPO_ROOT / "dadaia_workspace" / "public"
@@ -35,8 +39,10 @@ _SCRIPTS_DIR = _PUBLIC_ROOT / "scripts"
 def tracked_bytecode(repo_root: Path) -> list[str]:
     """The bytecode artifacts *git tracks* under ``dadaia_workspace/public/`` in the repo at
     *repo_root* (sorted paths relative to it). An ignored or untracked cache is not shipped."""
-    tracked = git(repo_root, "ls-files", "dadaia_workspace/public").splitlines()
-    return sorted(p for p in tracked if p.endswith(".pyc") or "__pycache__/" in p)
+    tracked_paths = (
+        p.relative_to(repo_root).as_posix() for p in tracked(repo_root, "dadaia_workspace/public")
+    )
+    return sorted(p for p in tracked_paths if p.endswith(".pyc") or "__pycache__/" in p)
 
 
 def test_bytecode_contract_judges_tracked_files_not_the_working_tree(tmp_path: Path) -> None:
@@ -154,6 +160,20 @@ def test_public_law_names_no_adr_number_or_library_path() -> None:
     assert _denied_lines(globs, r"ADR \d{4}|dadaia_workspace/", _BANNER_SPAN[0]) == []
 
 
+_PROVENANCE_ID = (
+    r"v?0\.\d+\.\d+ (?:FR|specs-canon)|retired in 0\.|T-0\d{2}-\d+|AC\d+\.\d+|\bA\d+\.\d+ |FR\d+"
+    r"|ADR 0\d{3}:|\bD1[45]\b|SEC-\d+"
+)
+
+
+def test_shipped_package_names_no_release_or_requirement_id() -> None:
+    """A shipped schema, message or law line states its rule, never the release, requirement, task or finding id."""
+    globs = ("**/*.json", "**/*.py", "public/**/*.md")
+    baseline = "public/skills/dd-bug-resolution/scripts/privacy_baseline.json"
+    hits = _denied_lines(globs, _PROVENANCE_ID, None)
+    assert [h for h in hits if not h.startswith(baseline)] == []
+
+
 _BARE_CLI_RE = re.compile(r"(?<![\w./-])dadaia(?:-workspace)?(?= [a-z-])")
 _UVX_INIT_RE = re.compile(r"uvx dadaia-workspace(?:@\S+)? init\b")
 _VENV_CALL_RE = re.compile(r"\.dadaia/\.venv/bin/dadaia((?: [a-z][\w-]*)+)([^`]*)")
@@ -212,7 +232,7 @@ def test_the_bare_cli_detector_spares_the_venv_path_and_uvx_init() -> None:
     assert _bare_invocations("dadaia doctor --fix") == ["dadaia"]
     assert _bare_invocations("run dadaia-workspace init x") == ["dadaia-workspace"]
     assert _bare_invocations("/w/.dadaia/.venv/bin/dadaia context list") == []
-    assert _bare_invocations("uvx dadaia-workspace@0.4.8 init demo") == []
+    assert _bare_invocations("uvx dadaia-workspace init demo") == []
 
 
 def _cli_tree() -> dict[str, set[str]]:
@@ -261,40 +281,44 @@ def test_every_flag_cited_beside_a_venv_call_exists_in_that_verbs_help() -> None
 _RETIRED_PERSONA = "dd-" + "software-engineer"
 
 
-def test_the_retired_persona_name_stays_out_of_library_and_tests() -> None:
-    """No text file under dadaia_workspace/ or tests/ names the retired persona."""
-    tracked = git(_REPO_ROOT, "ls-files", "dadaia_workspace", "tests").splitlines()
-    paths = sorted(_REPO_ROOT / p for p in tracked if "__pycache__" not in p.split("/"))
-    assert_populated(paths, sentinel=Path(__file__))
+def _persona_hits(root: Path) -> list[str]:
+    paths = tracked(root, "dadaia_workspace", "tests")
+    assert_populated(
+        paths, sentinel=root / "tests/test_a.py" if root != _REPO_ROOT else Path(__file__)
+    )
     hits = []
     for path in paths:
         try:
             lines = read_text(path).splitlines()
         except Undecodable:
             continue
-        rel = path.relative_to(_REPO_ROOT).as_posix()
+        rel = path.relative_to(root).as_posix()
         hits += [f"{rel}:{n}" for n, line in enumerate(lines, 1) if _RETIRED_PERSONA in line]
-    assert hits == [], "\n".join(hits)
+    return hits
+
+
+def test_the_retired_persona_name_stays_out_of_library_and_tests() -> None:
+    """No text file under dadaia_workspace/ or tests/ names the retired persona."""
+    assert _persona_hits(_REPO_ROOT) == []
 
 
 def test_the_persona_scan_survives_an_untracked_scratch_file_deleted_mid_scan(
-    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    scratch = _REPO_ROOT / "tests" / "tmp" / f"persona-race-{uuid.uuid4().hex[:8]}"
-    scratch.mkdir(parents=True)
-    try:
-        write_text(scratch / "test_gone.py", "X = 1\n")
+    git(tmp_path, "init", "-q")
+    (tmp_path / "tests/tmp/persona-race").mkdir(parents=True)
+    write_text(tmp_path / "tests" / "test_a.py", f"X = '{_RETIRED_PERSONA}'\n")
+    git(tmp_path, "add", "tests/test_a.py")
+    scratch = tmp_path / "tests" / "tmp" / "persona-race"
+    write_text(scratch / "test_gone.py", f"X = '{_RETIRED_PERSONA}'\n")
+    listed = assert_populated
 
-        listed = assert_populated
+    def populated_then_deleted(population: Collection[Path], sentinel: Path) -> None:
+        listed(population, sentinel)
+        shutil.rmtree(scratch)
 
-        def populated_then_deleted(population: Collection[Path], sentinel: Path) -> None:
-            listed(population, sentinel)
-            shutil.rmtree(scratch)
-
-        monkeypatch.setattr(sys.modules[__name__], "assert_populated", populated_then_deleted)
-        test_the_retired_persona_name_stays_out_of_library_and_tests()
-    finally:
-        shutil.rmtree(scratch, ignore_errors=True)
+    monkeypatch.setattr(sys.modules[__name__], "assert_populated", populated_then_deleted)
+    assert _persona_hits(tmp_path) == ["tests/test_a.py:1"]
 
 
 def test_a_public_file_that_is_not_utf8_is_skipped_by_the_scan(tmp_path: Path) -> None:
@@ -356,3 +380,30 @@ def test_a_lock_file_skips_only_the_pattern_naming_its_path(tmp_path: Path) -> N
     write_text(public / "notes.json", f'{{"v": "{private_ip()}"}}\n')
     [line] = check_public_privacy(public, lambda d: d.iterdir())
     assert line.status is DoctorStatus.ERROR and "notes.json" in line.text
+
+
+def _workspace_with_terms(root: Path, terms: dict[str, str]) -> Path:
+    states = root / ".dadaia" / "states"
+    states.mkdir(parents=True)
+    write_text(states / "spec_contexts.json", "{}")
+    write_text(states / "privacy_denylist.json", json.dumps(terms))
+    return root
+
+
+def _repo_in(workspace: Path, name: str) -> Path:
+    repo = workspace / "repos" / name
+    repo.mkdir(parents=True)
+    run(["git", "init", "-q", str(repo)])
+    return repo
+
+
+def test_the_denylist_of_a_scanned_path_is_its_own_workspaces_not_the_cwds(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Scanning a repo of workspace B from workspace A's cwd applies B's terms only."""
+    monkeypatch.delenv("DADAIA_PRIVACY_DENYLIST", raising=False)
+    cwd_ws = _workspace_with_terms(tmp_path / "wsa", {"zzcwdterm": "a"})
+    repo = _repo_in(_workspace_with_terms(tmp_path / "wsb", {"zzplantedterm": "b"}), "app")
+    monkeypatch.chdir(cwd_ws)
+
+    assert load_privacy_terms(repo) == (("zzplantedterm", "b"),)

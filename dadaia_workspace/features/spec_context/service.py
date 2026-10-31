@@ -11,7 +11,7 @@ from functools import partial
 from pathlib import Path
 from typing import Any, Protocol
 
-from dadaia_workspace.core import clock, platform, workspace_layout
+from dadaia_workspace.core import clock, linked_tree, platform, workspace_layout
 from dadaia_workspace.core.cli_line import cli_words, fix_line, git_line, shell_line
 from dadaia_workspace.core.exceptions import (
     AssociatedRepoConflictError,
@@ -93,8 +93,7 @@ class DeadUnpushedCommitsError(DadaiaError):
 def _worktree_git_dir(tree: Path) -> Path:
     """The common git dir a move of linked worktree *tree* runs from — Windows refuses to
     rename a process's cwd, so never *tree* itself."""
-    gitdir = platform.read_text(tree / ".git").removeprefix("gitdir:").strip()
-    return (tree / gitdir).parents[1]
+    return (tree / (linked_tree.gitdir(tree / ".git") or "")).parents[1]
 
 
 def _require_allowlisted(label: str, value: str) -> None:
@@ -349,7 +348,9 @@ class SpecContextService:
         ctx = self.show(name)
         if slug == ctx.repo_slug:  # the main repo is already in all_repos()
             return ctx, False
-        add = fix_line(self._workspace_root, "context", "repo", "add", name, slug, "--url")
+        add = platform.inline(
+            *cli_words(self._workspace_root, "context", "repo", "add", name, slug, "--url")
+        )
         self._refuse_slug(
             name, slug, repo_url, act("agent", f"run `{add}` with the repo's clone URL")
         )
@@ -464,9 +465,8 @@ class SpecContextService:
         branch through this ONE method — never a second ad hoc git-subprocess call
         at a CLI or feature boundary.
 
-        A repo that is not cloned, or whose live git query fails, degrades to
-        ``on_disk=False`` / ``current_branch=None`` rather than raising — every
-        caller here is a best-effort display surface.
+        A repo that is not cloned, or whose live git query fails, degrades to an absent repo
+        with no branch rather than raising — every caller here is a best-effort display surface.
         """
         repo_path = self._repo_path(repo.slug)
         on_disk = repo_path.exists() and self._git.is_git_root(repo_path)
@@ -567,25 +567,12 @@ class SpecContextService:
         refusal leaves HEAD on ``<work>`` holding the anchor, and names it. Uncommitted
         work outside the paths is never committed and git refuses a switch or merge that
         would overwrite it (residual: it rides along onto ``<work>``). Never a forced
-        checkout, a reset, a rebase, a force-push or a deletion."""
-        ctx = self.show(name)
-        repo = self._repo_path(ctx.repo_slug)
-        if not repo.is_dir() or not self._git.is_git_root(repo):
-            raise ContextStateError(
-                f"Context '{name}' has no Git repository at '{repo}'.",
-                fix=fix_line(self._workspace_root, "context", "alive", name),
-            )
-        if fix := self._git.identity_fix(repo):
-            raise ContextStateError(f"Context '{name}': git identity unknown.", fix=fix)
+        checkout, a reset, a rebase, a force-push or a deletion; the one forced act is
+        pointing a role branch origin lacks at its tip, which the push is about to publish
+        (residual: it moves such a branch even when another worktree has it checked out)."""
+        repo = self._publishable_repo(name)
         git = partial(self._git.git, repo)
-        rel = "specs/constitution.md"  # on disk and committable ⇒ HEAD holds it after the anchor
-        if not (repo / rel).is_file() or not git("ls-files", "-co", "--exclude-standard", rel):
-            raise ContextStateError(
-                f"Context '{name}': no committable {rel}.",
-                fix=fix_line(self._workspace_root, "specs", "init", "--context", name),
-            )
-        self._require_publishable(name, repo)
-        git("fetch", "--prune", "--tags", "origin")
+        git("fetch", "--prune", "--tags", "origin", "+refs/heads/*:refs/remotes/origin/*")
         refs = git("for-each-ref", "--format=%(refname:lstrip=3)", "refs/remotes/origin")
         heads = [h for h in refs.split() if h != "HEAD"]
         born = self._git.has_commits(repo)
@@ -596,29 +583,7 @@ class SpecContextService:
         flow, _ = self._git.gitflow(repo)
         work = work_branch(repo, flow, repo.name)
         try:
-            if born:
-                old = git("for-each-ref", "--format=%(objectname)", f"refs/heads/{work}")
-                if old:
-                    git("merge", "--no-edit", old)
-                git("fetch", ".", f"HEAD:refs/heads/{work}")
-                git("switch", work)
-            else:
-                git("branch", "-m", work)
-            if heads and flow.principal not in heads:
-                self._refuse_principal_absent(name, flow, heads, anchor, work)
-            roles = (work, flow.integration, flow.principal)
-            if start := next((f"origin/{b}" for b in roles if b in heads), ""):
-                roots = git("rev-list", "--max-parents=0", "HEAD").split()
-                ours = all(
-                    all(map(_onboarded, git("ls-tree", "-r", "--name-only", r).split()))
-                    for r in roots
-                )
-                git("merge", "--no-edit", *["--allow-unrelated-histories"] * ours, start)
-            at = f"refs/remotes/origin/{flow.principal}" if heads else anchor
-            births = [f"{at}:refs/heads/{b}" for b in roles[1:] if b not in heads]
-            if not births and not self._git.unpushed(repo):
-                return ""
-            git("push", "--atomic", "-u", "origin", *births, work)
+            return work if self._publish(name, repo, flow, heads, born, anchor, work) else ""
         except GitSyncError as exc:
             again = fix_line(self._workspace_root, "context", "baseline", name)
             raise GitSyncError(
@@ -626,7 +591,67 @@ class SpecContextService:
                 f"fixed (a refused push: after the amend), publish again: {again}",
                 fix=exc.fix,
             ) from exc
-        return work
+
+    def _publishable_repo(self, name: str) -> Path:
+        """The main repo of context *name*, once every refusal that needs no write is past."""
+        ctx = self.show(name)
+        repo = self._repo_path(ctx.repo_slug)
+        if not repo.is_dir() or not self._git.is_git_root(repo):
+            raise ContextStateError(
+                f"Context '{name}' has no Git repository at '{repo}'.",
+                fix=fix_line(self._workspace_root, "context", "alive", name),
+            )
+        if fix := self._git.identity_fix(repo):
+            raise ContextStateError(f"Context '{name}': git identity unknown.", fix=fix)
+        rel = "specs/constitution.md"  # on disk and committable ⇒ HEAD holds it after the anchor
+        if not (repo / rel).is_file() or not self._git.git(
+            repo, "ls-files", "-co", "--exclude-standard", rel
+        ):
+            raise ContextStateError(
+                f"Context '{name}': no committable {rel}.",
+                fix=fix_line(self._workspace_root, "specs", "init", "--context", name),
+            )
+        self._require_publishable(name, repo)
+        return repo
+
+    def _publish(
+        self,
+        name: str,
+        repo: Path,
+        flow: Gitflow,
+        heads: list[str],
+        born: bool,
+        anchor: str,
+        work: str,
+    ) -> bool:
+        """Put the anchor on *work*, merge origin's start, and push atomically; False when
+        there was nothing to push."""
+        git = partial(self._git.git, repo)
+        if born:
+            old = git("for-each-ref", "--format=%(objectname)", f"refs/heads/{work}")
+            if old:
+                git("merge", "--no-edit", old)
+            git("fetch", ".", f"HEAD:refs/heads/{work}")
+            git("switch", work)
+        else:
+            git("branch", "-m", work)
+        if heads and flow.principal not in heads:
+            self._refuse_principal_absent(name, flow, heads, anchor, work)
+        roles = (work, flow.integration, flow.principal)
+        if start := next((f"origin/{b}" for b in roles if b in heads), ""):
+            roots = git("rev-list", "--max-parents=0", "HEAD").split()
+            ours = all(
+                all(map(_onboarded, git("ls-tree", "-r", "--name-only", r).split())) for r in roots
+            )
+            git("merge", "--no-edit", *["--allow-unrelated-histories"] * ours, start)
+        at = f"refs/remotes/origin/{flow.principal}" if heads else anchor
+        births = [b for b in roles[1:] if b not in heads]
+        for b in births:
+            git("update-ref", f"refs/heads/{b}", at)
+        if not births and not self._git.unpushed(repo):
+            return False
+        git("push", "--atomic", "-u", "origin", work, *births)
+        return True
 
     def _refuse_principal_absent(
         self, name: str, flow: Gitflow, heads: list[str], anchor: str, work: str
@@ -671,61 +696,71 @@ class SpecContextService:
         a linked worktree, unpushed commits on a HEAD off the work branch. Every refusal
         names its repo."""
         main_repo = self._repo_path(ctx.repo_slug)
-        trees, failed, refix = self._worktree_rows(
-            self._workspace_root, {r.slug for r in ctx.all_repos()}
-        )
+        rows = self._worktree_rows(self._workspace_root, {r.slug for r in ctx.all_repos()})
         for repo in ctx.all_repos():
-            slug, path = repo.slug, self._repo_path(repo.slug)
-            lead = f"Context '{name}': repo '{slug}'"
-            if path.exists() and not repo.url:
-                raise RepoUrlMissingError(
-                    f"{lead} has no clone URL (no origin remote) — removing it would leave "
-                    "nothing 'context alive' could clone back. Nothing was touched.",
-                    fix=act("agent", f"add the clone URL of {path} as its origin remote"),
-                )
-            if not (path.exists() and self._git.is_git_root(path)):
-                continue
-            if dirty := self._git.dirty_paths(path):
-                raise DeadReviewRequiredError(
-                    f"{lead} has {len(dirty)} uncommitted change(s); dead never "
-                    "commits. Nothing was touched.",
-                    fix=act(
-                        "agent",
-                        "move " + ", ".join(str(path / rel) for rel in dirty) + " into a worktree",
-                    ),
-                )
-            held = [
-                r for r in trees if r["repo"] == slug and r["exit"] and r.get("state") != "paused"
-            ]  # the owner's exits
-            lost = [refix] if failed else [r["exit"] for r in held]
-            lost += self._git.unrecoverable(path)
-            if tree := sweep.linked_worktree(self._workspace_root, path):
-                move = git_line(_worktree_git_dir(tree), "worktree", "move", str(tree))
-                lost.append(
-                    act("agent", f"choose a directory to keep {tree} in and run `{move}` with it")
-                )
-            if lost:
-                raise DeadUnpushedCommitsError(
-                    f"{lead} holds {len(lost)} worktree(s) or unpushed branch(es) dead() would "
-                    f"lose{f' ({failed})' if failed else ''}. Nothing was "
-                    "touched.",
-                    fix=lost[0],
-                )
-            if not (self._git.has_commits(path) and self._git.unpushed(path)):
-                continue
-            flow, _ = self._git.gitflow(path, main_repo)
-            branch = self._git.current_branch(path)
-            if flow.role_of(branch) != "work":
-                work = work_branch(path, flow, main_repo.name)
-                cut = self._git.git(
-                    path, "for-each-ref", "--format=%(refname)", f"refs/heads/{work}"
-                )
-                raise DeadReviewRequiredError(
-                    f"{lead} is on '{branch or 'a detached HEAD'}', which the gitflow never "
-                    "pushes directly — dead() would push its unpushed commits there. "
-                    "Nothing was touched.",
-                    fix=git_line(path, *(("switch",) if cut else ("checkout", "-b")), work),
-                )
+            self._refuse_unsafe_repo(name, repo, main_repo, rows)
+
+    def _refuse_unsafe_repo(
+        self,
+        name: str,
+        repo: AssociatedRepo,
+        main_repo: Path,
+        rows: tuple[list[dict[str, Any]], str, str],
+    ) -> None:
+        """Refuse what dead() would lose in *repo*; *rows* is `_worktree_rows`' answer."""
+        trees, failed, refix = rows
+        slug, path = repo.slug, self._repo_path(repo.slug)
+        lead = f"Context '{name}': repo '{slug}'"
+        if path.exists() and not repo.url:
+            raise RepoUrlMissingError(
+                f"{lead} has no clone URL (no origin remote) — removing it would leave "
+                "nothing 'context alive' could clone back. Nothing was touched.",
+                fix=act("agent", f"add the clone URL of {path} as its origin remote"),
+            )
+        if not (path.exists() and self._git.is_git_root(path)):
+            return
+        if dirty := self._git.dirty_paths(path):
+            raise DeadReviewRequiredError(
+                f"{lead} has {len(dirty)} uncommitted change(s); dead never "
+                "commits. Nothing was touched.",
+                fix=act(
+                    "agent",
+                    "move " + ", ".join(str(path / rel) for rel in dirty) + " into a worktree",
+                ),
+            )
+        held = [
+            r for r in trees if r["repo"] == slug and r["exit"] and r.get("state") != "paused"
+        ]  # the owner's exits
+        lost = [refix] if failed else [r["exit"] for r in held]
+        lost += self._git.unrecoverable(path)
+        if tree := sweep.linked_worktree(self._workspace_root, path):
+            move = platform.git_inline(_worktree_git_dir(tree), "worktree", "move", str(tree))
+            lost.append(
+                act("agent", f"choose a directory to keep {tree} in and run `{move}` with it")
+            )
+        if lost:
+            raise DeadUnpushedCommitsError(
+                f"{lead} holds {len(lost)} worktree(s) or unpushed branch(es) dead() would "
+                f"lose{f' ({failed})' if failed else ''}. Nothing was "
+                "touched.",
+                fix=lost[0],
+            )
+        if self._git.has_commits(path) and self._git.unpushed(path):
+            self._refuse_off_work(lead, path, main_repo)
+
+    def _refuse_off_work(self, lead: str, path: Path, main_repo: Path) -> None:
+        """Refuse unpushed commits on a HEAD off the work branch."""
+        flow, _ = self._git.gitflow(path, main_repo)
+        branch = self._git.current_branch(path)
+        if flow.role_of(branch) != "work":
+            work = work_branch(path, flow, main_repo.name)
+            cut = self._git.git(path, "for-each-ref", "--format=%(refname)", f"refs/heads/{work}")
+            raise DeadReviewRequiredError(
+                f"{lead} is on '{branch or 'a detached HEAD'}', which the gitflow never "
+                "pushes directly — dead() would push its unpushed commits there. "
+                "Nothing was touched.",
+                fix=git_line(path, *(("switch",) if cut else ("checkout", "-b")), work),
+            )
 
     def dead(self, name: str) -> SpecContextProject:
         """ALIVE -> DEAD over the whole set: back-fill every URL from origin,
@@ -756,7 +791,7 @@ class SpecContextService:
         for slug, repo_path in present:
             done = sweep.hold(self._workspace_root, repo_path, f"repos/{slug}")
             if isinstance(done, sweep.Skipped):  # the refusal, not success: nothing to hold is fine
-                again = fix_line(self._workspace_root, "context", "dead", name)
+                again = platform.inline(*cli_words(self._workspace_root, "context", "dead", name))
                 raise ContextStateError(
                     f"Context '{name}' stays ALIVE: {done}",
                     fix=act("agent", f"free {repo_path} for the move, then run `{again}`"),

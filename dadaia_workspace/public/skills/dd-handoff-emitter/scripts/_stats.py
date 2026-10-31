@@ -10,10 +10,12 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from _git import git, main_checkout, scrubbed_env
+from _git import fix_files, git, scrubbed_env
 from _handoffs import reviewer_records
-from _platform import run
-from _specs import check_release, run_cli
+from _jsonl import parse_object
+from _memory_drift import by_subject
+from _platform import act, read_text, run
+from _specs import check_release, context_row
 
 _FREE = ("docs(memory)", "chore(release)", "chore(backlog)", "chore(bugs)", "docs(adr)", "chore(adrs)")  # fmt: skip
 NA = "n/a"
@@ -38,8 +40,8 @@ def _script(skill: str, script: str, *args: str, ok: tuple[int, ...] = (0,)) -> 
     return str(done.stdout) if done.returncode in ok else None
 
 
-def _window(state: dict[str, Any], rc: str) -> tuple[str, str, str, str | None, bool] | None:
-    """(birth, previous CLOSURE or "", end, `implemented` sha, newest) of a candidate the log names,
+def _window(state: dict[str, Any], rc: str) -> tuple[str, str, str, bool, bool] | None:
+    """(birth, previous CLOSURE or "", end, closed, newest) of a candidate the log names,
     where end is its CLOSURE stamp or now; None when the log never names it."""
     n = int(m) if (m := rc.rpartition("-rc")[2]).isdigit() else 0
     log = [(int(e["candidate"][3:]), e) for e in state.get("log") or [] if e.get("candidate")]
@@ -49,23 +51,16 @@ def _window(state: dict[str, Any], rc: str) -> tuple[str, str, str, str | None, 
     first = min(e["ts"] for e in mine)
     born = [e["ts"] for e in state["log"] if e.get("agent") == "release.py new" and e["ts"] <= first]  # fmt: skip
     now = datetime.now(tz=UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
-    done = next((e for e in mine if e.get("milestone") == "implemented"), {"ts": now})
+    done = next((e for e in mine if e.get("milestone") == "implemented"), None)
     before = [e["ts"] for k, e in log if k < n and e.get("milestone") == "implemented"]
     newest = n >= max(k for k, _ in log)
-    return max(born, default=first), max(before, default=""), done["ts"], done.get("sha"), newest
-
-
-def _context(root: Path, repo: Path) -> tuple[str, str] | None:
-    """(context name, integration branch) of the context that owns *repo*, named by the parent
-    of its git common dir, so a worktree and its main checkout answer alike."""
-    slug = main_checkout(repo).name
-    done = run_cli(root, "context", "list", "--json", env=scrubbed_env())
-    try:
-        rows = json.loads(done.stdout)
-        row = next(r for r in rows if r.get("gitflow") and slug in (r["main_repo"], *(a["slug"] for a in r["associated_repos"])))  # fmt: skip
-        return str(row["name"]), str(row["gitflow"]["integration"])
-    except (ValueError, StopIteration, TypeError, KeyError):
-        return None
+    return (
+        max(born, default=first),
+        max(before, default=""),
+        (done or {"ts": now})["ts"],
+        done is not None,
+        newest,
+    )
 
 
 def _merge(repo: Path, branch: str, sha: str) -> list[str]:
@@ -77,25 +72,30 @@ def _merge(repo: Path, branch: str, sha: str) -> list[str]:
 
 
 def _after_closure(repo: Path, sha: str | None, tip: str) -> str:
-    if not sha:
+    if not sha:  # the candidate is not closed yet
         return NA
-    raw = git(repo, "log", "--no-merges", "--format=%x00%s%n%b", f"{sha}..{tip}", check=False)
-    commits = [c for c in raw.split("\0") if c.strip()]
-    keep = [c for c in commits if not c.startswith(_FREE) and not re.search(r"^block:", c, re.M)]
-    return str(len(keep))
+    raw = git(repo, "log", "--no-merges", "--format=%H%x00%B%x01", f"{sha}..{tip}", check=False)
+    entries = [c.strip().partition("\0") for c in raw.split("\x01") if c.strip()]
+    files = fix_files(repo, [h for h, _, _ in entries])
+    return str(sum(not ((f := files.get(h)) and all(p.startswith("specs/audits/") for p in f) or text.startswith(_FREE) or re.search(r"^block:", text, re.M)) for h, _, text in entries))  # fmt: skip
 
 
 def table(root: Path, specs: Path, rc: str) -> str:
     """The tab-separated metric table of candidate *rc* (`<M.m.p>-rc<N>`); absent data reads `n/a`; a release state `release.py check` refuses raises its Refusal."""
     repo = specs.parent
     check_release(specs)
-    state = json.loads(p.read_text("utf-8")) if (p := specs / "releases" / rc.partition("-rc")[0] / "_RELEASE.json").is_file() else {}  # fmt: skip
+    p = specs / "releases" / rc.partition("-rc")[0] / "_RELEASE.json"
+    state = parse_object(read_text(p), act("agent", f"repair {p} until release.py check passes")) if p.is_file() else {}  # fmt: skip
     window = _window(state, rc)
     seen: list[str] = []
     vals = [NA] * 6
     if window:
-        birth, prior, end, sha, newest = window
-        name, integration = _context(root, repo) or (None, None)
+        birth, prior, end, closed, newest = window
+        version, _, n = rc.partition("-rc")
+        closing = by_subject(repo, version, f"rc-{n}", "(?:phase|enters) CLOSURE")
+        sha = closing[0] if closed and closing else None
+        row = context_row(root, repo) or {}
+        name, integration = row.get("name"), (row.get("gitflow") or {}).get("integration")
         trees: dict[str, list[tuple[str, str]]] = {}
         for _path, data in reviewer_records(root):
             if data.get("context") != name:
@@ -117,7 +117,9 @@ def table(root: Path, specs: Path, rc: str) -> str:
             _ratio(int(got["fix-induced"]), int(got["closed"])) if "closed" in got else NA,
             _ratio(first.count("APPROVED"), len(first)),
             f"{(_parse(merge[1]) - _parse(end)).total_seconds() / 3600:.1f} h" if merge else NA,
-            _after_closure(repo, sha, f"{merge[0]}^2" if merge else "HEAD"),
+            _after_closure(repo, sha, f"{merge[0]}^2" if merge else "HEAD")
+            if sha or not closed
+            else f"{NA} (no closure commit)",  # fmt: skip
             atoms,
             got.get("rebuild-due", NA),
         ]

@@ -18,15 +18,32 @@ CANDIDATE_RE = re.compile(r"^rc-([1-9][0-9]*)$")
 CONTEXT_NAME_RE = re.compile(r"[A-Za-z0-9_-]+")
 TAG_RE = re.compile(r"^v?(\d+)\.(\d+)\.(\d+)$")
 TASK_ID_RE = re.compile(r"^J[1-9][0-9]*(?:\.S[1-9][0-9]*)?\.T[1-9][0-9]*$")
-#: The head of a closed release's task line (a checklist item or a table cell), read by lineage only.
-HISTORICAL_TASK_RE = re.compile(
-    r"^(?:- \[.\]\s*|\|\s*)\**(T-[0-9]+-[0-9]+[A-Z]?|J[A-Z]\.S[1-9][0-9]*\.T[1-9][0-9]*)\b"
+#: A task id as `caused_by` may name it: the current grammar or a closed release's.
+TASK_ID_ANY_RE = re.compile(
+    r"(?:T-[0-9]+-[0-9]+[A-Z]?|J(?:[1-9][0-9]*|[A-Z])(?:\.S[1-9][0-9]*)?\.T[1-9][0-9]*)\b"
 )
+#: Line-anchored, first match anywhere: a bullet, blockquote or quoted mid-line never counts.
 STATUS_RE = re.compile(r"^\*\*Status:\*\*\s*(.+?)\s*$", re.MULTILINE)
+APPROVED = "Approved"
+DRAFT = "Draft"
+IN_REVIEW = "In review"
+CANONICAL_STATUS = {DRAFT, IN_REVIEW, APPROVED}
 #: A git object id as a human pastes it from a merge: short (7) to full (40), or SHA-256 (64).
 SHA_RE = re.compile(r"^(?:[0-9a-f]{7,40}|[0-9a-f]{64})$")
 #: A full git object id, SHA-1 (40) or SHA-256 (64) hex; the all-zero id matches it.
 OBJECT_ID_RE = re.compile(r"^[0-9a-fA-F]{40}$|^[0-9a-fA-F]{64}$")
+
+
+def extract_status(text: str) -> str | None:
+    """The declared token verbatim (so 'not canonical' differs from absent), or ``None``."""
+    match = STATUS_RE.search(text)
+    return match.group(1) if match else None
+
+
+def is_zero_object_id(sha: str | bytes) -> bool:
+    """Whether *sha* is git's absent-object id: exactly 40 or 64 zeros, nothing else."""
+    text = sha.decode("ascii", "replace") if isinstance(sha, bytes) else sha
+    return bool(OBJECT_ID_RE.fullmatch(text)) and not text.strip("0")
 
 
 def candidate_number(names: Iterable[str]) -> int:

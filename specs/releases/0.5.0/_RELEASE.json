@@ -3,12 +3,10 @@
   "release": "0.5.0",
   "phase": "CLOSURE",
   "defined": {
-    "sha": "b216ae8f8118bd7659baa038ea29d81cedb5ce90",
-    "ts": "2026-10-19T12:13:34Z"
+    "ts": "2026-10-28T02:05:42Z"
   },
   "implemented": {
-    "sha": "36295014a43b87da73c645dba87f04c23bef46a2",
-    "ts": "2026-10-19T20:17:04Z"
+    "ts": "2026-10-28T06:43:13Z"
   },
   "shipped": null,
   "log": [
@@ -2356,6 +2354,389 @@
       "agent": "dd-product-engineer",
       "kind": "summary",
       "text": "delivered: rc-19 'export chain' (SPEC FR1-FR7) in 7 jobs, the 57 planned tasks landed (J7.T8 as the shape-4 resolve a3c58f1c6), beyond the PLAN J3.T14 (8 commits of review rework: write_bundle without the scratch dir, an atomic resume, pause drops the level folders it leaves, context delete reads the owner's paused rows) and the in-rc bug work below: (1) verdict.py stats and a job's admission run release.py check first and relay its refusal and fix line (R1); (2) one decider names the ledger scripts that judge a tree's specs (R2); (3) dadaia worktree pause and resume for a lane or a wt-rc, and the .dadaia/dist canon (ADR 0271); (4) the stored current_branch is deleted and context alive checks out the highest origin work branch, else the integration branch, a failed checkout refusing (ADRs 0171 + 0270, R3); (5) dadaia export, read-only, soft and hard (ADRs 0175 + 0272); (6) init --from replicates a soft or a hard artifact, and dadaia import is deleted; (7) ADR 0273 (amends 0267): a resolved bug's fix is the newest commit HEAD reaches whose message holds its fix(bugs) or refactor(bugs) id line, fix_sha a write-once hint, and the push-gate fold keeps every folded message; the 30 earlier resolved records with no id-bearing fix commit archived (bdc51eeae); operator ruling: the approved SPEC amended with FR7 ('Add as rc-19 Job 7 (Recommended)'); bugs: the 9 Origin bugs resolved and archived (afc7a4a24): stats-crashes-on-a-release-state-that-breaks-its-schema, import-turns-a-null-repo-url-into-none, worktree-sync-orphans-the-fix-sha-a-lanes-resolve-cites, push-gate-rewrite-orphans-shas-cited-in-the-range, check-relay-reads-a-pass-from-text-not-exit-status, rc-tree-absent-fix-line-does-not-clear-its-refusal, export-scratch-dir-failure-prints-no-fix-line, scan-refusal-hides-gits-reason, denylist-scan-runs-only-at-pre-push; push-gate-rewrite-orphans-shas-cited-in-the-range was reopened (reverts 27cba9811, 9d1c9bc21) and re-fixed by Job 7 in the group fix bfcbc6c18 with worktree-sync-orphans-the-fix-sha-a-lanes-resolve-cites (REBUILD 09bc7b352; both resolved a3c58f1c6); denylist-scan-runs-only-at-pre-push joined rc-19 from its hotfix lane (Origin 993a3a3c1), that lane paused and its bundle discarded on the operator's ruling 'Discard the bundle (Recommended)' (grill report roadmap-050, 'Old denylist lane (operator)'), then fixed on the wt-rc in three rounds (b6f91fdc7; 0192947e6 and 305b84a09; 5261998e0; resolve 36295014a); the same archive commit took the two hotfix-lane bugs rc-19 took by sync, release-check-crashes-on-a-non-object-log-entry and removal-test-hand-spells-a-posix-path-suffix (11 records); goals (SPEC §2), read at 171630639: (1) met, the measured_by checks: ADR 0270's owner tests 36 passed and its grep prints the RepoLiveStatus live read and its repo_live_status docstring, which describes that live value and not the deleted stored field, as 0270's measured_by was repaired to state in 623e50af5 (a measured_by repair, no code change); ADR 0271's 52 passed; ADR 0272's 9 passed; ADR 0273's 187 passed; (2) met: bugs.py status 0 open, all 9 archived; (3) met: dadaia import is absent from the tree's dadaia --help and from docs/cli.md (0 hits each); (4) REBUILD net lines (git diff --numstat of each REBUILD commit): R1 _stats.py 0 (3148f9b08 +6/-6); R2 _ledgers in _worktree_end.py +1 (36d6d2587 +2, 11affa8de -1), by main-thread ruling (grill report roadmap-050, 'Job 2 net lines (main thread)'); R3 the several-work decision in _worktree_git.py +12 (2f95a0ccc +7, 60c2f7b05 +5), reviewer-accepted as the FR4 ADD; the <= 0 target is missed on R2 and R3; (5) readout (verdict.py stats 0.5.0-rc19) beside rc-18's baseline and the target: metric 1 fix-induced 15/18 (83%) vs 6/6 (100%), target <= 20%, missed; metric 2 first-pass approval 2/15 (13%) vs 2/13 (15%), target >= 70%, missed; metric 4 closure duration n/a until the rc-19 PR merges vs n/a, target <= 4 h; metric 6 non-block commits after closure 0 vs 15, target 0, met; metric 7 memory drift 0 vs 0, target 0, met; metric 9 rebuild-due patches 18 vs 6, target 0, missed; oldest record 2026-10-10T23:48:22Z; net-line overruns, reviewer-accepted under pre-review item 5 (git diff --numstat per commit, tests and specs excluded): Job 5 export +256 (+433/-177; .py alone +218); Job 6 +93 (.py, the J6 task commits with the import-bug REBUILD f7cf18c76); Job 7 ADR 0273 +38 (.py, the J7 task commits with bfcbc6c18 and 09bc7b352); the denylist fix +152 (b6f91fdc7, 0192947e6, 305b84a09, 5261998e0); deviations for the operator: the denylist merge scan runs as --onto on the existing push-gate-check and not as the ruling's new scan-range verb, with the same reach (task, hotfix and backlog merges only) and a lighter shape; a main-thread ruling that refused init --from into an existing workspace (c82d17eb3) was withdrawn because it reversed accepted ADR 0175 (bad2f4ad5); merge-scan cost, one commit, 3 runs, median, process start included: 0.33 s (implementer) and 1.45 s (reviewer), against ci.py job at 85.03 s (reviewer, first denylist review; 65.99 s at its second re-review); operator batch (dd-manager-orchestration §2 step 4): the main thread's intake batch of 25 items, its bug proposals included, awaits the operator's ruling; carried: none (bugs.py status: 0 open); backlog exits: spec-context-branch-field-deleted, context-dead-snapshots-open-worktrees, export-soft-and-hard, init-from-export (delivered 0.5.0)"
+    },
+    {
+      "ts": "2026-10-19T21:18:53Z",
+      "agent": "release.py new",
+      "kind": "note",
+      "text": "Candidate born on 0.5.0 (prior candidate closed at 36295014a43b87da73c645dba87f04c23bef46a2)"
+    },
+    {
+      "ts": "2026-10-20T01:52:58Z",
+      "agent": "release.py",
+      "kind": "milestone",
+      "candidate": "rc-20",
+      "milestone": "defined",
+      "sha": "df408f362",
+      "text": "Candidate defined at df408f362; phase IMPLEMENTATION."
+    },
+    {
+      "ts": "2026-10-20T12:35:37Z",
+      "agent": "release.py",
+      "kind": "milestone",
+      "candidate": "rc-20",
+      "milestone": "implemented",
+      "sha": "53419057f",
+      "text": "Candidate implemented at 53419057f; phase CLOSURE."
+    },
+    {
+      "ts": "2026-10-20T12:47:04Z",
+      "agent": "release.py memory",
+      "kind": "memory",
+      "text": "Memory reconciled over 0998cc5dd16dec782fc808798286cbe5418a5ba4..c888e0505228: 3 reviewed, 13 changed.",
+      "since": "0998cc5dd16dec782fc808798286cbe5418a5ba4",
+      "until": "c888e05052285a4b840525dae9ab798951525dce",
+      "reviewed": [
+        "agentic-entities",
+        "public-asset-distribution",
+        "consumer-agent-support"
+      ],
+      "changed": [
+        "agent-comms",
+        "agent-evals",
+        "pypi-distribution",
+        "spec-context-project",
+        "context-management",
+        "context-portability",
+        "specs-migration",
+        "workspace-doctor",
+        "workspace-init",
+        "bug-ledger",
+        "release-lifecycle",
+        "sdd-gate-v3",
+        "worktrees"
+      ]
+    },
+    {
+      "ts": "2026-10-20T12:48:30Z",
+      "agent": "dd-product-engineer",
+      "kind": "summary",
+      "text": "delivered: rc-20 'adoption' (SPEC FR1-FR7, FR9) in 10 jobs, all merged (48 job-file task rows): (1) FR1 R1, one relay of a child's refusal (_refusal.relay): release.py check's exit status alone decides and its own fix line is relayed through _refusal's one parser, _worktree_end's copy deleted; (2) FR2 R2, the push-gate fold leaves cli/commands/ci.py for features/chokepoints/fold.py, --message the subject of the commit holding a listed message, else of the last; (3) FR3 R3, one context reader for the skill scripts (_specs.context_row over context list --json, the registry read lazily, only on a miss), _git.context_repos's raw registry read and _stats._context deleted (ADR 0276, amends 0088: that read lifts the fence for the repo's own workspace root alone); (4) FR4 R4, scan_bundle leaves container.py for features/export/scan.py; (5) FR5 R5, the repo_live_status docstring reworded and ADR 0270's measured_by restored to its accepted text (36acddcff); (6) FR6 eval T3 discovery built (evals/tasks/t3-discovery: vague goal, wheelhouse-only install, code-only grader); (7) FR7 llms-full.txt and scripts/llms_full.py, the keywords cursor, devin, github-copilot and agent-skills, the README agent fast path, docs/index.md and docs/quickstart.md fixed and naming init --from, the quickstart's three blocks run as printed; (8) ADR 0274 (amends 0021): pyproject reads <release>rc<N> (0.5.0rc20), tests, evals and the release smoke install only the current build, the eval gate is candidate-only; (9) ADR 0275 (amends 0103): scope follows a git-linked worktree of this workspace, nothing rebinds; bugs: the 25 Origin bugs resolved and archived (994b5c53c): bug-skill-registry-reader-crashes-on-a-bad-row, check-failure-fix-line-names-findings-that-do-not-exist, clean-of-an-unmerged-lane-offers-only-merge, cli-library-skill-omits-pause-as-a-dist-writer, closure-check-raises-a-traceback-outside-git, closure-refusal-fix-line-points-at-a-phase-that-cannot-go-back, consumer-recipe-expects-stamp-two, dist-obstruction-check-misses-a-dangling-link, first-pass-fix-line-chains-five-steps, fix-cite-retires-the-older-same-subject-fix, fold-subject-is-the-oldest-folded-subject, gone-tree-merge-judges-the-upstream-not-the-merge, kept-refusal-offers-keep-only, memory-drift-reads-the-installed-feature-list, merge-scan-copies-the-denylist-precedence, migrate-reports-a-stamp-three-registry-as-stamp-two, orphan-row-judges-merge-against-the-checked-out-head, planted-git-file-anchors-the-workspace-root, push-gate-rewrite-help-says-one-commit, reachability-probe-overrides-the-users-ssh-command, red-separation-act-names-an-implementation-commit, red-separation-splits-paths-on-blanks, restored-tree-comes-back-unlocked, subagent-bind-rebinds-the-parent-session-across-contexts, verdict-refusal-fix-cannot-clear-after-a-sync; the same archive took 13 hotfix-lane and in-rc records, 10 resolved (windows-contract-coverage-runs-at-its-timeout, fix-line-tests-hand-spell-the-git-path-on-windows, export-hard-test-cannot-remove-read-only-git-objects-on-windows, damaged-pause-bundle-crashes-the-worker-on-windows, own-repo-name-is-refused-as-a-private-term, bugs-check-refuses-task-fixed-records, pyproject-keeps-the-published-version-after-a-deploy, tests-and-evals-install-a-published-release, context-reader-reads-the-cwd-workspace-for-a-non-repo, rc-merge-reads-the-context-registry-twice) and 3 superseded (check-relay-fix-line-spells-the-path-two-ways-on-windows, cross-context-agent-rebinds-the-whole-session, privacy-scan-refuses-a-context-naming-itself); goals (SPEC §2), read at c888e0505: (1) met: bugs.py status 1 open, mcp-on-main-is-vulnerable-to-session-exhaustion, every other Origin bug resolved and archived; (2) missed on R1, R2 and R4 (git diff --numstat per REBUILD commit, tests and specs excluded): R1 check relay +7 (292fc2f84 +3, 575ff377c +3, 9516135db +1; Job 1 whole +18); R2 +29 (f1f8671d2 +47, 26775e326 -18; fold.py +125, ci.py -96), recorded as measured by main-thread ruling; R3 met as AC3.3 words it, _git.py -11 and _stats.py -12, though its five REBUILD commits net +6 counting _specs.py, where the decider moved (0297a75a1 0, 6e59ecd05 +3, 902c574ed +4, bd8ec5ce2 +1, 53419057f -2); R4 +18 (02770493e; +19 for the job), reviewer-accepted as the module boundary; (3) met: ADR 0270's grep prints one line, features/spec_context/service.py:476, the RepoLiveStatus live read; (4) met by the Job 7 review at 9d3cdbb83: tests/e2e t3+t1+scripts 26 passed in 92.15 s, the image built on the candidate, the grader passing a hand-done workspace and failing an empty one; T3 has no baseline image since ADR 0274; (5) partly met: llms-full.txt committed and fresh (the contract test, 16 passed at c888e0505), the keywords hold the four names; missed: the GitHub topics hold 9 names, not cursor, devin, github-copilot or agent-skills (api.github.com repo read at closure), the main thread's closure act still to run; (6) met: none of SPEC §1's index, quickstart and README defects remain, docs/index.md's bare dadaia export spelled through the venv CLI in the memory commit; the Job 9 review ran tests/e2e/test_onboarding_journey.py with DADAIA_REQUIRE_UVX=1, 2 passed (83.9 s); (7) readout (verdict.py stats 0.5.0-rc20, read after the memory pass) beside rc-19's baseline and the target: metric 1 fix-induced 34/38 (89%) vs 15/18 (83%), target <= 20%, missed; metric 2 first-pass approval 7/22 (32%) vs 2/15 (13%), target >= 70%, missed; metric 4 closure duration n/a until the rc-20 PR merges vs n/a, target <= 4 h; metric 6 non-block commits after closure 0 vs 0, target 0, met; metric 7 memory drift 0 vs 0, target 0, met; metric 9 rebuild-due patches 34 vs 18, target 0, missed; oldest record 2026-10-10T23:48:22Z; rc-21 launch act (AC7.3, backlog launch-operator-acts): repoint Homepage at pyproject.toml:37 with its comment at :34-35, and gh repo edit --homepage, once the portfolio page is live; lesson: twice in rc-20, and once in rc-18, a medium test outside unit-fast went red on wt-rc past an APPROVED review (0297a75a1 -> test_an_rc_merge_reads_the_gitflow_once); reviews must run the touched test dirs, including the owner dirs found through the history of the touched lines; no new gate; operator batch (dd-manager-orchestration §2 step 4): this reconcile's intake items ride the main thread's batch; carried: mcp-on-main-is-vulnerable-to-session-exhaustion (operator ruling 'Register, resolve at promote (Recommended)', Dependabot #21 on main; feature/0.5.0 holds no mcp); backlog exits: adoption-and-discoverability, eval-t3-discovery (delivered 0.5.0)"
+    },
+    {
+      "ts": "2026-10-20T15:14:19Z",
+      "agent": "release.py new",
+      "kind": "note",
+      "text": "Candidate born on 0.5.0 (prior candidate closed at 53419057f)"
+    },
+    {
+      "ts": "2026-10-20T16:02:39Z",
+      "agent": "release.py",
+      "kind": "milestone",
+      "candidate": "rc-21",
+      "milestone": "defined",
+      "sha": "c4e6d7782",
+      "text": "Candidate defined at c4e6d7782; phase IMPLEMENTATION."
+    },
+    {
+      "ts": "2026-10-20T18:43:27Z",
+      "agent": "release.py",
+      "kind": "milestone",
+      "candidate": "rc-21",
+      "milestone": "implemented",
+      "sha": "3da9a1dac",
+      "text": "Candidate implemented at 3da9a1dac; phase CLOSURE."
+    },
+    {
+      "ts": "2026-10-20T18:48:39Z",
+      "agent": "release.py memory",
+      "kind": "memory",
+      "text": "Memory reconciled over 0998cc5dd16dec782fc808798286cbe5418a5ba4..6d10dd9dd3d0: 11 reviewed, 8 changed.",
+      "since": "0998cc5dd16dec782fc808798286cbe5418a5ba4",
+      "until": "6d10dd9dd3d038267544d88d30990fc5d7f3e708",
+      "reviewed": [
+        "agent-comms",
+        "agentic-entities",
+        "public-asset-distribution",
+        "spec-context-project",
+        "consumer-agent-support",
+        "context-management",
+        "context-portability",
+        "specs-migration",
+        "workspace-init",
+        "audits-canon",
+        "sdd-gate-v3"
+      ],
+      "changed": [
+        "agent-evals",
+        "pypi-distribution",
+        "workspace-doctor",
+        "worktrees",
+        "agent-orchestration",
+        "release-lifecycle",
+        "product-vision",
+        "bug-ledger"
+      ]
+    },
+    {
+      "ts": "2026-10-20T18:52:51Z",
+      "agent": "dd-product-engineer",
+      "kind": "summary",
+      "text": "delivered: rc-21 'prove and ship' (SPEC FR1-FR5, FR7 AC7.1, FR10, FR11) in 5 jobs, all merged at 3da9a1dac: (1) FR1 and FR10 law gaps: dd-gitflow-default §3a rows for a test-change fix, a code revert and a format-only commit, the wt-main archive row, the rc version-label commit in the repo AGENTS.md, block-list item (1) also red when a merge would turn the work branch's CI red, canon digests re-pinned, CHANGELOG pending actions trimmed; (2) FR2 the REBUILD pack, net source 0 (git diff --numstat over the J2 commits, tests and specs excluded: +58 -58): locked_add the one locked re-add, drop_argv the one merged-branch drop behind drop_steps and _worktree_end._remove (which holds the one unmerged refusal), _refusal.said the one child-message parser, the rc number read through candidate_number; (3) FR3 the four deletions, net source -24 (+30 -54): the duplicate judgment-only doctor test, the export AST grep, message_listed, SeveralWorkBranches.text and the already-current schema_version_before, and MEM-DRIFT-1 out of the shipped doctor into the repo guard features-map-matches-architecture; (4) FR7 AC7.1 the PyPI Homepage is https://marco-menezes.com/projetos/dadaia-workspace; (5) FR5 the agentic scorecard: 12 + 2 cells fixed, final round 2 every cell >= 9 from both judges; FR4: the 29 Origin audit findings of 20260930-structural-convergence dispositioned; FR11 ADRs 0277 and 0278 proposed at the define; measured_by repairs of ADRs 0103 and 0113 (864203e8e); memory pass 11 reviewed, 8 changed (6d10dd9dd); carried: mcp-on-main-is-vulnerable-to-session-exhaustion (CRITICAL, Dependabot on main; operator ruling 'Keep: resolve at promote, carried'); backlog exits: promote-gate-050, launch-operator-acts (delivered 0.5.0)"
+    },
+    {
+      "ts": "2026-10-21T00:28:07Z",
+      "agent": "release.py new",
+      "kind": "note",
+      "text": "Candidate born on 0.5.0 (prior candidate closed at 3da9a1dac)"
+    },
+    {
+      "ts": "2026-10-22T12:45:46Z",
+      "agent": "release.py",
+      "kind": "milestone",
+      "candidate": "rc-22",
+      "milestone": "defined",
+      "sha": "f700394a2",
+      "text": "Candidate defined at f700394a2; phase IMPLEMENTATION."
+    },
+    {
+      "ts": "2026-10-23T23:13:31Z",
+      "agent": "release.py",
+      "kind": "milestone",
+      "candidate": "rc-22",
+      "milestone": "implemented",
+      "sha": "e02c302ff",
+      "text": "Candidate implemented at e02c302ff; phase CLOSURE."
+    },
+    {
+      "ts": "2026-10-23T23:36:34Z",
+      "agent": "release.py memory",
+      "kind": "memory",
+      "text": "Memory reconciled over 6d10dd9dd3d038267544d88d30990fc5d7f3e708..390591423edf: 3 reviewed, 26 changed.",
+      "since": "6d10dd9dd3d038267544d88d30990fc5d7f3e708",
+      "until": "390591423edf611b760a5464d1766acafe3c7ede",
+      "reviewed": [
+        "capabilities",
+        "consumer-agent-support",
+        "spec-context-project"
+      ],
+      "changed": [
+        "agent-comms",
+        "agent-orchestration",
+        "agentic-entities",
+        "agent-evals",
+        "public-asset-distribution",
+        "pypi-distribution",
+        "harness-claude-code",
+        "harness-codex",
+        "harness-copilot",
+        "harness-cursor",
+        "harness-devin",
+        "harness-kimi-code",
+        "product-vision",
+        "context-management",
+        "context-portability",
+        "cross-platform-portability",
+        "server-registry",
+        "specs-migration",
+        "workspace-doctor",
+        "workspace-init",
+        "audits-canon",
+        "backlog-ledger",
+        "bug-ledger",
+        "release-lifecycle",
+        "sdd-gate-v3",
+        "worktrees"
+      ]
+    },
+    {
+      "ts": "2026-10-23T23:40:20Z",
+      "agent": "dd-product-engineer",
+      "kind": "summary",
+      "text": "delivered: rc-22 'remediation of audit 20261022-bug-history-and-single-source' (SPEC FR1-FR15) in 7 jobs, all merged at e02c302ff; net source per FR is git show --numstat over the job's commits f700394a2..e02c302ff, tests/, specs/, docs/, README.md and llms-full.txt excluded: (1) FR1 and FR2, net +7 (+49 -42): ADR 0280's five clauses each in one law home (the REBUILD of a culprit's unit in its own lane, the first-pass sweep, the reached-test evidence bar, the id-line history, no stored milestone sha), the deferral line deleted, SLOP.md the one slop definition with signals S11-S14; (2) FR3, net -371 (+333 -704): one owner per fact, every other copy a pointer, CONTEXT.md reduced to terms, registry.json prose deleted, the constitution points the roster at core/harness_registry.py (F047); (3) FR4, net -111 (+706 -817): one owner per duplicated code question C01-C35 (zero-id predicate and git runner, registry row parser and harness record fields, workspace sentinel and reinstall act, live-candidate reader, frontmatter key span, status tokens in _grammar with core/spec_status.py deleted, cli words and mkdir act, clock and check-verb body, catalog and backlog readers), the push-gate fold and --rewrite-from deleted, R30 KEEP (repack_installed_wheel has one production consumer); (4) FR5-FR11 one REBUILD per unit, net +99 (+663 -564): FR5 bug ledger +48 (+133 -85: one REBUILD-due decider, history by id line, stored fix_files gone, legacy archive lines read from their shape, ambiguous caused_by refused, no main_checkout sentinel), FR6 worktree merge +7 (+85 -78: landing read from git, a path with no tree and no branch refuses, instance ledger scripts only, the GitError fix names the failed act), FR7 verdict-writer gate -12 (+22 -34: token test after quote removal, lexer deleted), FR8 fix-line production +4 (+38 -34: no nested label, render= deleted), FR9 chokepoints +16 (+79 -63: linked-tree predicates in core/linked_tree.py, ref-gate zero predicate from the kernel), FR10 release state -5 (+170 -175: --sha removed from phase and ship, milestones and memory bounds from commit subjects, metric 6 reads n/a with no closure commit), FR11 the rest +41 (+128 -87: denylist of the scanned path's workspace, export failures classified with one timed runner, backlog exit and reconcile fix lines, R50 template history KEEP after its proof run exited 1, 24 unrecorded published digests appended); (5) FR12, net 0 (+12 -12): fake_venv is venv.create, the census covers the worktree scripts, one home per pinned literal, the Q3 (a)-(d) removals; (6) FR13, net +39 (+57 -18): the T3 grader scores a stub SPEC and a filed-then-rejected demand 0, compare.py zeroes a trial whose verdict was written outside the dispatched reviewer, the T2 grader reads ids through bugs.py; (7) FR14 the agentic scorecard, net +1 (+15 -14): round 1 fixed 8 cells, final round 1 left 4 cells below 9 from judge A, fixed, final round 2 every cell >= 9 from both judges at e02c302ff, then the wt-rc review rework 830088b7c (no placeholder in the resolve fix line), then final round 3 every cell >= 9 from both judges at 830088b7c; SPEC AC10.1 amended with the operator's approval (88fc8aff9: a missing closure commit reads n/a); the Job 6 law line b0a4fb9be: a session outside the workspace root stands in for no role; total net source -336; bugs resolved: init-no-terminal-fix-line-nests-one-act-label-inside-another, verdict-act-gate-lexer-lets-an-ampersand-redirection-or-a-midword-hash-hide-the-writer, verdict-act-gate-lexer-misses-the-module-name-attached-to-dash-m, merge-accepts-a-verdict-written-by-the-merger, t3-grader-requires-an-active-backlog-entry, init-over-a-folder-with-a-venv-fix-line-names-another-folder, merge-of-a-gone-tree-with-its-parent-gone-prints-a-generic-fix-line, reconcile-rollback-advice-is-prose-not-a-fix-line, code-breaks-the-constitution-complexity-and-import-cycle-law, stats-counts-audit-commits-as-non-block-work-after-closure, verdict-act-gate-regex-misses-spellings-and-refuses-reads, stats-reads-closure-files-by-whitespace-split-with-renames, reconcile-service-calls-act-through-an-attribute, init-fix-line-text-breaks-two-fix-line-contract-tests, merge-of-a-path-with-no-tree-and-no-branch-claims-merged, and resolve-names-only-the-fix-bugs-label (registered and resolved inside Job 7 on the operator's confirmation); the 56 findings of audit 20261022-bug-history-and-single-source resolved by 0.5.0 and the audit closed (e4b3a215b); memory pass 3 reviewed, 26 changed (390591423); carried: mcp-on-main-is-vulnerable-to-session-exhaustion (CRITICAL, open; resolves at the promote, PLAN R97 KEEP); backlog exits: none"
+    },
+    {
+      "ts": "2026-10-24T04:00:53Z",
+      "agent": "release.py new",
+      "kind": "note",
+      "text": "Candidate born on 0.5.0 (stacked on the closed prior candidate)"
+    },
+    {
+      "ts": "2026-10-24T04:30:34Z",
+      "agent": "release.py",
+      "kind": "milestone",
+      "candidate": "rc-23",
+      "milestone": "defined",
+      "text": "Candidate defined; phase IMPLEMENTATION."
+    },
+    {
+      "ts": "2026-10-24T17:44:03Z",
+      "agent": "release.py",
+      "kind": "milestone",
+      "candidate": "rc-23",
+      "milestone": "implemented",
+      "text": "Candidate implemented; phase CLOSURE."
+    },
+    {
+      "ts": "2026-10-24T18:36:01Z",
+      "agent": "release.py memory",
+      "kind": "memory",
+      "text": "Memory reconciled over 149571afb27314244db0873a0cc539b608bb6453..1ccd830c6707: 6 reviewed, 8 changed.",
+      "since": "149571afb27314244db0873a0cc539b608bb6453",
+      "until": "1ccd830c67072a01934e1822a036b8251f6552d7",
+      "reviewed": [
+        "harness-claude-code",
+        "harness-copilot",
+        "harness-cursor",
+        "harness-devin",
+        "harness-kimi-code",
+        "spec-context-project"
+      ],
+      "changed": [
+        "agent-evals",
+        "pypi-distribution",
+        "public-asset-distribution",
+        "harness-codex",
+        "sdd-gate-v3",
+        "context-management",
+        "product-vision",
+        "consumer-agent-support"
+      ]
+    },
+    {
+      "ts": "2026-10-24T18:36:41Z",
+      "agent": "dd-product-engineer",
+      "kind": "note",
+      "text": "Operator authorization verbatim: Authorize the carry — mcp-on-main-is-vulnerable-to-session-exhaustion"
+    },
+    {
+      "ts": "2026-10-24T18:36:41Z",
+      "agent": "dd-product-engineer",
+      "kind": "summary",
+      "text": "delivered: rc-23 'the multi-harness eval pipeline and its deploy gate' (SPEC FR1-FR10, Origin operator-demand) in 8 jobs merged into its wt-rc; net source +497 (+599 -102) over 149571afb..562c37889 by git diff --numstat, specs/, tests/, docs/, README.md and llms-full.txt excluded (tests +946 -39): (1) Job 1, the Codex T3 diagnosis, whose T3 adoption readout is: on the rc22 wheel Codex T3 scored 0/3, every trial stopping on the root map's relaunch text; on the rc-23 tip before Job 8 the grader passed 3/3 with no stop (hypothesis H-b survives), but 2 of the 3 trials merged on a verdict a role-less subagent wrote, so under AC4.2 Codex T3 reads 1/3, below its floor of 2; (2) Job 2, ADR 0281 accepted, ADR 0225 rejected, ADRs 0269 and 0277 superseded; (3) Jobs 3-5, evals/scripts compare.py (the per-harness forged check, leg.json, --table with pass^3 and the Wilson 95% interval), scan.py (JSON-leaf, key, JWT and creator-id needles), preflight.py, render.py and evals/RESEED.md; (4) Job 6, eval.yml rebuilt as prepare, a 6-leg Claude Code x Codex matrix, aggregate and result, with no-model-api-in-ci holding one publish decider and eval-cli-pin judging every matrix row; (5) Job 7, the Eval gate (evals/scripts/gate.py, the ci.yml job, .github/required-checks.json; release.yml grants actions: read); (6) Job 8 (FR10, ADR 0282 accepted), Codex judged by its session record: its registry row names agent_type, the hooks take the payload session id under the one session-id rule, one id per hook call, every lane wrapper exports DADAIA_RUNTIME, certify binds as an operator terminal, root map line 50 restated; (7) at closure the REBUILD a46615b31 resolved codex-pre-gate-judges-a-bound-session-as-id-less, and the -s ours merge of origin/main (7438f591f) changed no file; earlier on the work branch in this window, the session-check hotfix (a-session-outside-the-workspace-root-merges-on-its-own-verdict) and the bind hotfix (context-bind-fakes-a-governed-session), both resolved; goals: 1-3 and 5 on the run on E, which follows this reconcile; goal 4's Eval gate is listed in .github/required-checks.json and its branch protection is the operator's act after that run; memory: 8 atoms changed, 6 reviewed, QUALITY P-33 and its gates line; carried: mcp-on-main-is-vulnerable-to-session-exhaustion (open CRITICAL on main only, where the work line has no mcp, clearing at the promote; authorized in the note above); backlog exits: eval-codex-lane-in-library-ci rejected (absorbed by rc-23's Codex legs and Eval gate; delivered and superseded are refused for an operator-demand Origin), release-approve-requires-evals-gate rejected (absorbed by rc-23's Eval gate, ADR 0281 (3)); evals-benchmark-lanes and opencode-harness-support stay active"
+    },
+    {
+      "ts": "2026-10-25T21:25:46Z",
+      "agent": "release.py new",
+      "kind": "note",
+      "text": "Candidate born on 0.5.0 (stacked on the closed prior candidate)"
+    },
+    {
+      "ts": "2026-10-25T21:59:18Z",
+      "agent": "release.py",
+      "kind": "milestone",
+      "candidate": "rc-24",
+      "milestone": "defined",
+      "text": "Candidate defined; phase IMPLEMENTATION."
+    },
+    {
+      "ts": "2026-10-26T06:57:42Z",
+      "agent": "release.py",
+      "kind": "milestone",
+      "candidate": "rc-24",
+      "milestone": "implemented",
+      "text": "Candidate implemented; phase CLOSURE."
+    },
+    {
+      "ts": "2026-10-26T07:04:15Z",
+      "agent": "release.py memory",
+      "kind": "memory",
+      "text": "Memory reconciled over 1ca66fbf61ce26cfd13d5b35e145168cf2addf5c..b53f83d99867: 7 reviewed, 2 changed.",
+      "since": "1ca66fbf61ce26cfd13d5b35e145168cf2addf5c",
+      "until": "b53f83d99867eb3b3252601f0e765cff45a8eef7",
+      "reviewed": [
+        "public-asset-distribution",
+        "pypi-distribution",
+        "harness-claude-code",
+        "harness-copilot",
+        "harness-cursor",
+        "harness-devin",
+        "harness-kimi-code"
+      ],
+      "changed": [
+        "agent-evals",
+        "harness-codex"
+      ]
+    },
+    {
+      "ts": "2026-10-26T08:37:52Z",
+      "agent": "release.py memory",
+      "kind": "memory",
+      "text": "Memory reconciled over 562c37889ff6e42f6ee794f774fbfca17550af84..7931bb2abb8b: 6 reviewed, 13 changed.",
+      "since": "562c37889ff6e42f6ee794f774fbfca17550af84",
+      "until": "7931bb2abb8b5443f738bf18dd729bbbc5b01c75",
+      "reviewed": [
+        "agent-orchestration",
+        "agentic-entities",
+        "public-asset-distribution",
+        "pypi-distribution",
+        "product-vision",
+        "audits-canon"
+      ],
+      "changed": [
+        "agent-comms",
+        "agent-evals",
+        "harness-codex",
+        "context-management",
+        "specs-migration",
+        "workspace-doctor",
+        "workspace-init",
+        "sdd-gate-v3",
+        "release-lifecycle",
+        "worktrees",
+        "cross-platform-portability",
+        "bug-ledger",
+        "spec-context-project"
+      ]
+    },
+    {
+      "ts": "2026-10-28T01:31:19Z",
+      "agent": "release.py new",
+      "kind": "note",
+      "text": "Candidate born on 0.5.0 (stacked on the closed prior candidate)"
+    },
+    {
+      "ts": "2026-10-28T02:05:42Z",
+      "agent": "release.py",
+      "kind": "milestone",
+      "candidate": "rc-25",
+      "milestone": "defined",
+      "text": "Candidate defined; phase IMPLEMENTATION."
+    },
+    {
+      "ts": "2026-10-28T06:43:13Z",
+      "agent": "release.py",
+      "kind": "milestone",
+      "candidate": "rc-25",
+      "milestone": "implemented",
+      "text": "Candidate implemented; phase CLOSURE."
+    },
+    {
+      "ts": "2026-10-28T06:59:25Z",
+      "agent": "release.py memory",
+      "kind": "memory",
+      "text": "Memory reconciled over 516320ff348480d6a27ce2a690d53631a062b31b..5312dcea1f42: 8 reviewed, 11 changed.",
+      "since": "516320ff348480d6a27ce2a690d53631a062b31b",
+      "until": "5312dcea1f4225b7e0dbe589ace02c1af610fe19",
+      "reviewed": [
+        "agent-comms",
+        "pypi-distribution",
+        "product-vision",
+        "spec-context-project",
+        "server-registry",
+        "specs-migration",
+        "audits-canon",
+        "bug-ledger"
+      ],
+      "changed": [
+        "sdd-gate-v3",
+        "context-management",
+        "release-lifecycle",
+        "agent-orchestration",
+        "capabilities",
+        "harness-codex",
+        "backlog-ledger",
+        "worktrees",
+        "workspace-doctor",
+        "agentic-entities",
+        "public-asset-distribution"
+      ]
+    },
+    {
+      "ts": "2026-10-28T07:00:14Z",
+      "agent": "dd-product-engineer",
+      "kind": "summary",
+      "text": "delivered: two candidates, since rc-24's closure wrote no summary. rc-24 'Codex judged by its session record, T3 onboard-then-stop' (SPEC FR1-FR4, Origin backlog:codex-judged-by-session-record-redo,t3-onboard-then-stop) in 3 jobs merged into its wt-rc and onto the work branch (516320ff3): net source -1 (+38 -39) over be942231c..516320ff3 by git diff --numstat, specs/, tests/, docs/, README.md and llms-full.txt excluded (tests +103 -19): (1) Job 2, the Codex registry row names agent_type (ec4ee8eff), so Codex is judged by its session record; (2) Job 3, harbor pinned at 0.24.0 and the two hook-trust facts on the Codex eval rows only (34055f010); (3) Job 1, the T3 grader rewards onboarding and nothing past it, each later act (worktree, backlog entry, SPEC, verdict, code move or merge, session record) scoring 0, test_grade.py net -2; goals 1 and 5 hold (the row names agent_type; dadaia_workspace/ net 0); goals 2-4, the run on E, were never read: no eval.yml run exists after rc-24's birth (gh run list: newest 40229657896, 2026-10-25T20:12:17Z); its backlog exits were written at its closure (c21ac6d12). rc-25 'the gitflow runs on local git, principal and integration advance by their merge' (SPEC FR1-FR6, Origin bugs:gitflow-requires-a-remote-and-a-pr-host; ADR 0283 accepted in d3e99fdd8, amending 0036; operator rulings R1 2026-10-27 'Remover o PR-only (Recomendado)' and R2 2026-10-28 'Confirmar (Recomendado)'; approval 0f54c87e9 'Aprovo SPEC + PLAN (Recomendado)') in 2 jobs merged into its wt-rc: net source -50 (+65 -115) over 653b1340d..435e79dbf by git diff --numstat, same exclusions (tests +90 -131): (1) Job 1, dd-gitflow-default steps 2 and 4 read the local ref on a repo with no remote, section 2a makes integration and principal pushable and advanced by their merge, 3b is the merge gate, the history-rewrite rule covers every branch the gitflow block names, and every other shipped site names the merge (903cca094, 75418a58d, 5a1875eaf; test re-pin 4d956cd7a on the main-thread ruling 2026-10-28); (2) Job 2, the pre-push gate admits principal and integration from their same-named heads and the ADR 0036 birth is deleted (2d9b932c7), and baseline points a role branch origin lacks at its tip and pushes it by name beside work (9a2244cc5; its one forced act pinned by aa289a33e on the operator ruling 2026-10-28; test re-pin 00a5ba2ee on the main-thread ruling 2026-10-28); approval-order deviation: PLAN.md:23 and job2 J2.T4 said KEEP GitSubprocessObjectReader.unpublished, the operator's approval 0f54c87e9 ordered it and its 3 tests deleted, and J2.T4 deleted them; (3) at closure the REBUILD cf2964298 (RED 949fe64d9) resolved baseline-moves-a-role-head-origin-holds-in-a-partial-clone (baseline's one fetch reads every head origin holds), and dabc5cf47 resolved the Origin bug by 2d9b932c7; goals: 2 holds (the J1 probe in 903cca094: fetch and merge-tree exit 0 on a repo with no remote), 3 holds (the AC5.2 rg prints nothing at 435e79dbf), 4 holds (branch_policy.py, push_gate.py, git_objects.py and spec_context/service.py net -51, +31 -82), 1 is the scorecard before the promote; memory: 11 atoms changed, 8 reviewed over 516320ff3..5312dcea1, getting-started steps 6-7 and llms-full.txt; ARCHITECTURE.md's rendered adr-list already lists 0283; carried: mcp-on-main-is-vulnerable-to-session-exhaustion (open CRITICAL on main only, clearing at the promote; authorized in log[256]), certifi-on-main-bundles-compromised-emsign-roots (open CRITICAL on main only, fixed on the work branch, clearing at the promote; its operator authorization is pending and is asked before ship); backlog exits: none for rc-25 (no active entry was absorbed)"
     }
   ]
 }

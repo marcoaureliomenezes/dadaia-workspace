@@ -11,11 +11,12 @@ from collections.abc import Callable, Collection
 from dataclasses import dataclass
 from enum import StrEnum
 from functools import cached_property
-from pathlib import Path, PurePath, PurePosixPath
+from pathlib import Path, PurePosixPath
 from typing import Literal
 
 from dadaia_workspace.core import invocation, platform
 from dadaia_workspace.core.harness_registry import HARNESS_PROJECTION_DIRS
+from dadaia_workspace.core.linked_tree import linked_tree_depths
 from dadaia_workspace.core.release_state import CANDIDATE_RE, RELEASE_ID_RE
 
 __all__ = [
@@ -117,7 +118,7 @@ REFUSALS: dict[FloorRefusal, str] = {
     FloorRefusal.SESSION: (
         "[GATE] .dadaia/sessions/ is protected CLI-owned bind state. Agents must not write "
         "here via file tools. Blocked to preserve caller session identity integrity "
-        "(SEC-01 / CWE-284).\n"
+        "(CWE-284).\n"
     ),
 }
 
@@ -180,6 +181,7 @@ STATES_CANON: frozenset[str] = frozenset(
         "agent_model_policy.json.last-good.json",
         "privacy_denylist.json",
         "harness_profile.json",
+        "verdicts",
         "AGENTS.md",
     }
 )
@@ -273,18 +275,6 @@ def _matches(sub: str, pattern: str) -> bool:
     return len(parts) == len(globs) and all(map(fnmatch.fnmatch, parts, globs))
 
 
-def is_worktree_gitfile(entry: Path) -> bool:
-    """A linked worktree's ``.git`` file: a regular file, not a link, whose gitdir sits in
-    ``<common>/worktrees/``."""
-    if not entry.is_file() or platform.is_link(entry):
-        return False
-    try:
-        gitdir = platform.read_text(entry).removeprefix("gitdir:").strip()
-    except (OSError, platform.Undecodable):
-        return False
-    return PurePath(gitdir).parent.name == "worktrees"
-
-
 def protected_glob(root: Path, rel: str, protected: tuple[str, ...]) -> str | None:
     """The protected glob a prefix of the repo-relative part of *rel* (workspace-relative, under
     *root*) matches, else ``None``. Under ``repos/<r>/`` the root is the repo; under
@@ -298,11 +288,7 @@ def protected_glob(root: Path, rel: str, protected: tuple[str, ...]) -> str | No
     tail = parts[2:]
     anchors = [0]
     if zone == "worktree":
-        anchors = [
-            k - 2
-            for k in range(3, len(parts))
-            if is_worktree_gitfile(root.joinpath(*parts[:k], ".git"))
-        ] or list(range(len(tail)))
+        anchors = [k - 2 for k in linked_tree_depths(root, parts)] or list(range(len(tail)))
     subs = ("/".join(tail[i : j + 1]) for i in anchors for j in range(i, len(tail)))
     return next((g for sub in subs for g in protected if _matches(sub, g)), None)
 
@@ -322,26 +308,36 @@ def verdict(
     slugs: dict[str, Collection[str]] = {"repos": repos, "worktrees": {*worktrees, "AGENTS.md"}}
     parts = rel.strip("/").split("/")
     for depth, name in enumerate(parts):
-        directory = is_dir or depth < len(parts) - 1
-        allowed: Collection[str]
-        if depth == 0:
-            allowed = ROOT_ALLOWED_DIRS if directory else ROOT_ALLOWED_FILES
-        elif depth == 1 and parts[0] == ".dadaia":
-            allowed = zone_names() if directory else DADAIA_ROOT_FILES
-        elif depth == 2 and parts[0] == ".dadaia":
-            zone = next((z for z in DADAIA_ZONES if z.name == parts[1]), None)
-            if zone is None or zone.canon is None:
-                return "canon"
-            allowed = {*zone.canon, *repos} if zone.name == "dist" else zone.canon
-        elif depth == 1 and parts[0] in slugs:
-            allowed = slugs[parts[0]]
-        else:
+        allowed = _allowed(parts, depth, is_dir or depth < len(parts) - 1, slugs, repos)
+        if allowed is None:
             return "canon"
         if any(fnmatch.fnmatch(name, a) for a in allowed):
             continue
         excepted = any(_matches("/".join(parts[: depth + 1]), g) for g in globs)
         return "operator" if excepted else "slop"
     return "canon"
+
+
+def _allowed(
+    parts: list[str],
+    depth: int,
+    directory: bool,
+    slugs: dict[str, Collection[str]],
+    repos: Collection[str],
+) -> Collection[str] | None:
+    """The names *parts*[*depth*] may take at a judged level, or ``None`` below an open one."""
+    if depth == 0:
+        return ROOT_ALLOWED_DIRS if directory else ROOT_ALLOWED_FILES
+    if depth == 1 and parts[0] == ".dadaia":
+        return zone_names() if directory else DADAIA_ROOT_FILES
+    if depth == 2 and parts[0] == ".dadaia":
+        zone = next((z for z in DADAIA_ZONES if z.name == parts[1]), None)
+        if zone is None or zone.canon is None:
+            return None
+        return {*zone.canon, *repos} if zone.name == "dist" else zone.canon
+    if depth == 1 and parts[0] in slugs:
+        return slugs[parts[0]]
+    return None
 
 
 def zone_names() -> frozenset[str]:
@@ -451,12 +447,14 @@ def _shape_regex(shape: str) -> str:
 
 @dataclass(frozen=True)
 class CanonEntry:
-    """One ``specs/`` canon row: a path shape in the law's notation, its root member, and
-    whether a fresh tree must carry it at birth."""
+    """One ``specs/`` canon row: a path shape in the law's notation, its root member, whether a
+    fresh tree must carry it at birth, and how the rendered canon table names it (``None``: by
+    its shape; ``""``: not at all, a legacy name the doctor still admits)."""
 
     shape: str
     area: SpecsArea
     required_at_birth: bool = False
+    display: str | None = None
 
     @property
     def dest(self) -> str | None:
@@ -482,11 +480,15 @@ SPECS_CANON: tuple[CanonEntry, ...] = (
     CanonEntry("releases/_archive/<M.m.p>/**", "releases"),
     CanonEntry("releases/<M.m.p>/_RELEASE.json", "releases"),
     # Legacy state-file name, admitted only as the input of the doctor's rename to _RELEASE.json.
-    CanonEntry("releases/<M.m.p>/RELEASE.json", "releases"),
+    CanonEntry("releases/<M.m.p>/RELEASE.json", "releases", display=""),
     CanonEntry("releases/<M.m.p>/rc-<N>/SPEC.md", "releases"),
     CanonEntry("releases/<M.m.p>/rc-<N>/PLAN.md", "releases"),
-    CanonEntry("releases/<M.m.p>/rc-<N>/TASKS.md", "releases"),  # a closed rc's
-    CanonEntry("releases/<M.m.p>/rc-<N>/tasks/<slug>.md", "releases"),  # one per job
+    CanonEntry("releases/<M.m.p>/rc-<N>/TASKS.md", "releases", display=""),  # a closed rc's
+    CanonEntry(
+        "releases/<M.m.p>/rc-<N>/tasks/<slug>.md",
+        "releases",
+        display="releases/<M.m.p>/rc-<N>/tasks/job<n>.md",
+    ),  # one per job
     CanonEntry("backlog/AGENTS.md", "backlog", True),
     CanonEntry("backlog/BACKLOG.json", "backlog", True),
     CanonEntry("backlog/_archive/backlog_histo.jsonl", "backlog", True),
@@ -544,7 +546,8 @@ def specs_canon_table_rows() -> tuple[tuple[str, str], ...]:
     root); a single-member directory is path-compressed into its parent's cell."""
     children: dict[str, list[str]] = {}
     for entry in SPECS_CANON:
-        segments = entry.shape.split("/")
+        shown = entry.shape if entry.display is None else entry.display
+        segments = shown.split("/") if shown else []
         for depth, segment in enumerate(segments):
             bucket = children.setdefault("/".join(segments[:depth]), [])
             if segment not in bucket:
