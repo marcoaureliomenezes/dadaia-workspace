@@ -76,11 +76,11 @@ def _fill_memory(root: Path) -> None:
 
 
 def _run_fix(step: Step, root: Path, bare: Path) -> None:
-    if step.kind == "agent":
+    if step.id == "context":  # an agent act: a context name and the clone URL
+        argv = ["context", "create", "proj", "--main-repo", bare.as_uri()]
+    elif step.kind == "agent":
         _fill_memory(root)
         return
-    if step.id == "context":  # the operator's act: a context name and the clone URL
-        argv = ["context", "create", "proj", "--main-repo", bare.as_uri()]
     else:
         argv = list(_WORDS[step.id])
         assert step.command == command(str(cli_path(root)), *argv), step.command

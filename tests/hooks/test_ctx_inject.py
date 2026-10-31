@@ -248,7 +248,7 @@ _NO_MEMORY = ("end memory bootstrap", "Python 3.12")
             None,
             [
                 _UNBOUND,
-                "\nNext (command step context): no ALIVE Spec Context",
+                "\nNext (agent step context): no ALIVE Spec Context",
                 "context create with a context name and --main-repo set to the main repo's",
             ],
             _NO_MEMORY,
@@ -677,3 +677,6 @@ def test_the_next_step_names_a_fix_the_session_can_run(
 
     assert f"fix: {fix_line(tmp_path, *fix)}" in out, out
     assert (fix_line(tmp_path, "context", "bind", "alpha") in out) is (fix[0] == "context"), out
+    assert ("Next (command step bind): This session's record does not read." in out) is (
+        fix[0] == "doctor"
+    ), out

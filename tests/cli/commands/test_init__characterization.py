@@ -28,7 +28,7 @@ def test_init_creates_the_literal_level_one_state(tmp_path: Path) -> None:
             "✓ 163 asset(s) installed\n"
             f"CLI: {cli}\n"
             "Sessions launch at the workspace root.\n"
-            "Next (command step context): no ALIVE Spec Context — create one\n"
+            "Next (agent step context): no ALIVE Spec Context — create one\n"
             f"fix: Agent action: run {create} with a context name and "
             "--main-repo set to the main repo's clone URL\n"
         )
@@ -38,7 +38,7 @@ def test_init_creates_the_literal_level_one_state(tmp_path: Path) -> None:
             "✓ 139 asset(s) installed\n"
             f"CLI: {cli}\n"
             "Sessions launch at the workspace root.\n"
-            "Next (command step context): no ALIVE Spec Context — create one\n"
+            "Next (agent step context): no ALIVE Spec Context — create one\n"
             f"fix: Agent action: run {create} with a context name and "
             "--main-repo set to the main repo's clone URL\n"
         )

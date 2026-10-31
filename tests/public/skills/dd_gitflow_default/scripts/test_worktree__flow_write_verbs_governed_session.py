@@ -15,7 +15,7 @@ import pytest
 from tests.fixtures.harness_env import suite_env
 from tests.helpers.oslib import run as run_text
 from tests.helpers.oslib import write_text
-from tests.helpers.worktree_ws import RELAUNCH, fixes, make_workspace, record_session
+from tests.helpers.worktree_ws import NO_ROLE, RELAUNCH, fixes, make_workspace, record_session
 
 _SKILLS = Path(__file__).resolve().parents[5] / "dadaia_workspace/public/skills"
 _SCRIPT = {
@@ -95,6 +95,7 @@ def test_a_judged_session_with_no_record_is_refused_and_nothing_is_written(
     refused = _run(root, script, argv, var)
 
     assert refused.returncode == 1 and fixes(refused) == [RELAUNCH], refused.stderr
+    assert f"[error] {NO_ROLE}\n" in refused.stderr, refused.stderr
     assert _snapshot(root) == before
 
 

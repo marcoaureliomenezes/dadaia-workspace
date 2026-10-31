@@ -78,7 +78,7 @@ def _register_specless_context(root: Path, *names: str) -> None:
 @pytest.mark.parametrize(
     ("contexts", "argv", "text", "code"),
     [
-        pytest.param((), ["doctor"], "ONBOARDING info Next (command step context):", None, id="R2-zero-contexts-is-not-silent"),
+        pytest.param((), ["doctor"], "ONBOARDING info Next (agent step context):", None, id="R2-zero-contexts-is-not-silent"),
         pytest.param(("app",), ["doctor", "--context", "app"], "specs init --context app", 0, id="AC3.1-specless-context-is-level-two"),
         pytest.param(("a", "b"), ["doctor", "--context", "b"], "specs init --context b", None, id="G1-the-doctored-context-names-its-own-step"),
         pytest.param((), ["doctor", "--context", "ghost"], "Error: Context 'ghost' not found.", 1, id="AC6.3-ghost-context-exits-one"),
@@ -135,7 +135,12 @@ def test_doctor_names_the_bind_only_to_a_session_bind_accepts(
 
     result = _runner.invoke(app, ["doctor", "--context", "app"])
 
-    assert "step bind" in result.output, result.output
+    head = {
+        False: "Next (operator step bind): This session was started outside the workspace root, so it stands in for no role.",
+        True: "Next (command step bind): this session has no context binding",
+        None: "Next (command step bind): This session's record does not read.",
+    }[live]
+    assert head in " ".join(result.output.split()), result.output
     assert fix in result.output, result.output
     assert ("context bind app" in result.output) == bool(live), result.output
     assert ("relaunch the session" in result.output) == (live is False), result.output

@@ -81,7 +81,7 @@ _ATOM = "---\nslug: x\ntitle: x\ntldr: x\nsummary: x\n---\n\n# x\n"
 
 # fmt: off
 @pytest.mark.parametrize(("trees", "kwargs", "published", "expected", "command", "in_command"), [
-    pytest.param(lambda t: {}, {}, False, ("context", _CMD), None, ["Agent action: run {} with a context name and --main-repo set to the main repo's clone URL"], id="zero-contexts"),
+    pytest.param(lambda t: {}, {}, False, ("context", "agent"), None, ["Agent action: run {} with a context name and --main-repo set to the main repo's clone URL"], id="zero-contexts"),
     pytest.param(_bare, {}, False, ("specs", _CMD), ("specs", "init", "--context", "app"), [], id="S1-no-identity-no-bind-step"),
     pytest.param(_bare, {"bound": False}, False, ("bind", _CMD), ("context", "bind", "app"), [], id="S1-unbound-session-binds"),
     pytest.param(_bare, {"bound": True}, False, ("specs", _CMD), ("specs", "init", "--context", "app"), [], id="S1-bound-is-past-bind"),
@@ -116,14 +116,18 @@ def test_next_step_is_derived_from_the_workspace_state(
     assert all(part.format(create) in step.command.replace("\\", "/") for part in in_command)
 
 
-def test_a_pending_bind_names_the_fix_the_caller_gives_instead_of_the_bind(tmp_path: Path) -> None:
-    """The bind step prints the caller's *bind_fix* when its session cannot bind."""
+def test_a_pending_bind_prints_the_refusal_the_caller_gives_instead_of_the_bind(
+    tmp_path: Path,
+) -> None:
+    """The bind step prints the caller's refusal, message and fix, when its session cannot bind;
+    an Operator-action fix makes it an operator step."""
     relaunch = "Operator action: relaunch the session at the workspace root"
+    why = "This session was started outside the workspace root, so it stands in for no role."
 
-    step = next_step(tmp_path, _bare(tmp_path), bound=False, bind_fix=relaunch)
+    step = next_step(tmp_path, _bare(tmp_path), bound=False, refusal=(why, relaunch))
 
-    assert step is not None and step.id == "bind"
-    assert step.text().endswith(f"fix: {relaunch}")
+    assert step is not None
+    assert step.text() == f"Next (operator step bind): {why}\nfix: {relaunch}"
 
 
 @pytest.mark.parametrize("catalog", ['{"features": []}', "{not json"], ids=["empty", "unreadable"])
@@ -214,7 +218,7 @@ def test_the_text_names_the_kind_and_carries_one_fix_line(tmp_path: Path) -> Non
     step = next_step(tmp_path, {})
     assert step is not None
     head, fix = step.text().split("\n")
-    assert head.startswith("Next (command step context): ") and fix == f"fix: {step.command}"
+    assert head.startswith("Next (agent step context): ") and fix == f"fix: {step.command}"
 
 
 def test_several_work_branches_make_the_first_pass_the_refusals_own_fix(

@@ -326,6 +326,8 @@ def test_context_dead_surfaces_the_refused_push_with_its_fix_line(
 
 
 _RELAUNCH = "fix: Operator action: relaunch the session at the workspace root"
+_NO_ROLE = "This session was started outside the workspace root, so it stands in for no role."
+_UNREAD = "This session's record does not read."
 
 
 @pytest.mark.parametrize(
@@ -353,6 +355,7 @@ def test_session_check_passes_a_governed_session_and_refuses_the_rest(
     if exit_code:
         assert " ".join(result.output.split()).count("fix: ") == 1
         assert _RELAUNCH in " ".join(result.output.split())
+        assert _NO_ROLE in " ".join(result.output.split())
 
 
 @pytest.mark.parametrize(
@@ -391,6 +394,7 @@ def test_bind_needs_a_hook_heartbeat_for_a_judged_harness_session(
     if exit_code:
         assert " ".join(result.output.split()).count("fix: ") == 1
         assert _RELAUNCH in " ".join(result.output.split())
+        assert _NO_ROLE in " ".join(result.output.split())
         assert record is None
         assert not (workspace / ".dadaia" / "sessions" / f"{session_id}.json").exists()
     else:
@@ -431,6 +435,8 @@ def test_a_refused_session_with_an_unreadable_record_names_doctors_fix(
     assert result.exit_code == 1, result.output
     assert out.count("fix: ") == 1
     assert f"fix: {fix_line(workspace, 'doctor', '--fix')}" in out
+    assert _UNREAD in out
+    assert _NO_ROLE not in out
     assert _RELAUNCH not in out
 
 

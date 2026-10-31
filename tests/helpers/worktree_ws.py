@@ -30,7 +30,8 @@ SCRIPT = (
     Path(__file__).resolve().parents[2]
     / "dadaia_workspace/public/skills/dd-gitflow-default/scripts/worktree.py"
 )
-#: The refusal line of a session no workspace hook governs.
+#: The CLI's message for a session no workspace hook governs, and its fix line.
+NO_ROLE = "This session was started outside the workspace root, so it stands in for no role."
 RELAUNCH = "fix: Operator action: relaunch the session at the workspace root"
 FLOW = {"principal": "trunk", "integration": "dev", "work": "feature/"}
 #: The repo's gate: prints its argv; level L fails iff the tree holds `RED-<L>`.
@@ -52,7 +53,7 @@ elif args[:2] == ["context", "session-check"]:
     import os
     sid = next((os.environ[v] for v in ("DADAIA_SESSION_ID", "CLAUDE_CODE_SESSION_ID", "CODEX_THREAD_ID") if os.environ.get(v)), "")
     if sid and not os.path.exists(os.path.join(os.getcwd(), ".dadaia", "sessions", sid + ".json")):
-        print("[error] no workspace hook governs this session", file=sys.stderr)
+        print("[error] " + {no_role!r}, file=sys.stderr)
         print({relaunch!r}, file=sys.stderr)
         sys.exit(1)
 elif args[:2] == ["reports", "validate"]:
@@ -83,7 +84,7 @@ _STUBS: dict[Path, str] = {}  # each workspace's stub source: on Windows the stu
 
 def _stub_cli(root: Path, *listed: dict[str, object]) -> None:
     """The `dadaia` stub over *listed*, placed at `cli_path` by `fake_venv` (startable per platform)."""
-    _STUBS[root] = _CLI.format(rows=json.dumps(list(listed)), relaunch=RELAUNCH)
+    _STUBS[root] = _CLI.format(rows=json.dumps(list(listed)), relaunch=RELAUNCH, no_role=NO_ROLE)
     fake_venv(root, cli=_STUBS[root])
 
 
