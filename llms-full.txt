@@ -876,7 +876,7 @@ lines the new fix replaces. End with `caused_by: <bug-id> | <task-id> | none`, d
 `dd-bug-resolution` LINEAGE.md, Declare `caused_by`.
 
 A fix whose `caused_by` names a culprit, or that lands on a unit already fixed in the window, is the REBUILD of that unit in the same lane, under `refactor(bugs): <id> — REBUILD <unit>` (`specs/bugs/AGENTS.md`, Resolution); `bugs.py append` prints a REBUILD due on a path, and a REBUILD keeps the regression tests. Then add the lowest-level case that fails for the real cause before production code
-moves. Existing assertions remain contract evidence.
+moves; an existing contract test that already goes red on the bug is that case, with no `test(` commit for it. Existing assertions remain contract evidence.
 
 ## 3. Fix at the owning seam
 
