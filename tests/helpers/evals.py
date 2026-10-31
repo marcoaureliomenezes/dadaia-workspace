@@ -128,9 +128,10 @@ ORG_CALC_ON_ORIGIN_T3 = (
     f"{ORG_WORK_BRANCH_T3} && git clone -q /srv/demo.git /root/demo && cd /root/demo"
     f" && {_EDIT} && git commit -qam sub && git push -q origin main"
 )
+# The lane's tree is invalid and doctor reads only the main tree, so the checker alone judges it.
 ORG_BROKEN_BACKLOG_T3 = (
-    f'{ORG_WORK_BRANCH_T3} && sed -i \'s/"active"/"actve"/\' {_MAIN}/backlog/BACKLOG.json'
-    f" && cd {_REPO} && git commit -qam break"
+    f'{ORG_LANE_T3} && sed -i \'s/"active"/"actve"/\' {_LANE}/specs/backlog/BACKLOG.json'
+    " && git commit -qam break"
 )
 
 

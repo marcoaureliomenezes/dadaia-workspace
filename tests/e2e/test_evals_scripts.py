@@ -69,6 +69,7 @@ def _job(root: Path, task: str, rewards: list[float], harness: str | None = "cla
         body = {
             "task_name": f"dadaia-workspace-evals/{task}",
             "verifier_result": {"rewards": {"reward": r}},
+            "step_results": None,
         }
         if harness is not None:
             body["agent_info"] = {"name": harness}
