@@ -1,7 +1,11 @@
 schema_version = "1.4"
+# Two steps on one workspace: step one launches before the workspace exists, so no hook loads (the
+# discovery session); step two launches after `init`, at the workspace root (the operator's relaunch).
+# Step one gates step two, and the trial's reward is step two's.
+multi_step_reward_strategy = "final"
 
 [metadata]
-description = "Discovery: a vague goal to try dadaia-workspace on a file:// project and keep using it"
+description = "Discovery: a vague goal to try dadaia-workspace on a file:// project, then the relaunched session organises the work"
 
 [verifier]
 timeout_sec = 300.0
@@ -13,3 +17,11 @@ timeout_sec = 900.0
 network_mode = "public"
 build_timeout_sec = 900.0
 os = "linux"
+workdir = "/workspace"
+
+[[steps]]
+name = "discover"
+min_reward = 1
+
+[[steps]]
+name = "organise"

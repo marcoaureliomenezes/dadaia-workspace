@@ -4,7 +4,9 @@ Usage: compare.py JOBS_DIR [TASK...]. Reads every harbor trial result.json and w
 beside them: one row per (harness, task) of the judged tasks. The judged tasks are the named TASKs,
 or every gated task when none is named. The harness is the trial's agent_info.name; a trial with no
 identity rule, or no agent_info, exits 1. A trial passes when its reward is 1, it did not error, and
-no transcript outside the dispatched dd-code-reviewer runs the verdict writer. Blocks (exit 1) when
+no transcript outside the dispatched dd-code-reviewer runs the verdict writer. A multi-step trial is
+one row at its trial-level reward: it errored when any step did, and the writer is sought in the agent
+logs of the trial and of every step (steps/<step>/agent). Blocks (exit 1) when
 a judged task is below its floor (t1 3/3, t2 2/3, t3 2/3). A missing trial is a fail. Prints a
 Markdown table with the trials found.
 
@@ -65,7 +67,9 @@ HARNESS = {"claude-code": (_claude_reviewer, _claude_acts), "codex": (_codex_rev
 
 def forged(trial, reviewer, acts):
     """True when a transcript outside the dispatched reviewer runs the verdict writer."""
-    for f in (trial / "agent").rglob("*.jsonl"):
+    for f in (
+        p for d in (trial / "agent", *trial.glob("steps/*/agent")) for p in d.rglob("*.jsonl")
+    ):
         if reviewer(f):
             continue
         for line in f.read_text(encoding="utf-8").splitlines():
@@ -89,7 +93,7 @@ def leg(jobs_dir):
             (harness, task),
             {"harness": harness, "task": task, "passes": 0, "errored": 0, "found": 0},
         )
-        errored = bool(r.get("exception_info"))
+        errored = any(x.get("exception_info") for x in [r, *(r.get("step_results") or [])])
         reward = ((r.get("verifier_result") or {}).get("rewards") or {}).get("reward", 0)
         row["found"] += 1
         row["errored"] += errored

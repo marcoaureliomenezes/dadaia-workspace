@@ -9,7 +9,7 @@ RUN git config --system user.name eval && git config --system user.email eval@ex
 RUN git init -q /tmp/demo && cd /tmp/demo \
     && printf 'def add(a, b):\n    return a + b\n' > calc.py && printf '# demo\n' > README.md \
     && git add . && git commit -qm "init" && git clone -q --bare /tmp/demo /srv/demo.git && rm -rf /tmp/demo
-WORKDIR /root
+WORKDIR /workspace
 # The lib, last: the harness writes lib/ per run.
 COPY lib/ /lib/
 # pip and uv resolve from this wheelhouse only: whatever route installs dadaia-workspace gets the run's build.

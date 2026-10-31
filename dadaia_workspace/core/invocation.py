@@ -123,7 +123,7 @@ def refusal(root: Path, env: Mapping[str, str]) -> tuple[str, str] | None:
     if session and is_unreadable(root, session):
         return "This session's record does not read.", fix_line(root, "doctor", "--fix")
     return (
-        "This session was started outside the workspace root, so it stands in for no role.",
+        "This session was launched where no workspace hook loaded, so it stands in for no role.",
         RELAUNCH,
     )
 
