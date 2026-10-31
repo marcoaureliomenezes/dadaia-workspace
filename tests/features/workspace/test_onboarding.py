@@ -122,7 +122,7 @@ def test_a_pending_bind_prints_the_refusal_the_caller_gives_instead_of_the_bind(
     """The bind step prints the caller's refusal, message and fix, when its session cannot bind;
     an Operator-action fix makes it an operator step."""
     relaunch = "Operator action: relaunch the session at the workspace root"
-    why = "This session was started outside the workspace root, so it stands in for no role."
+    why = "This session was launched where no workspace hook loaded, so it stands in for no role."
 
     step = next_step(tmp_path, _bare(tmp_path), bound=False, refusal=(why, relaunch))
 

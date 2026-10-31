@@ -97,6 +97,41 @@ CALC_WORKTREE_T3 = (
     f"{_CALC}git worktree add -q -b feat /root/wt && cd /root/wt && {_EDIT} && git commit -qam sub"
 )
 BASELINED_T3 = f"{ONBOARDED_T3} && {_D} context baseline demo"
+# T3 step 2: the relaunched session. Each row is an onboarded workspace holding its own session record
+# (the SessionStart hook writes it), then one way of entering, or not entering, the operator's demand.
+_REPO = "/workspace/repos/demo"
+_LANE = "/workspace/worktrees/demo/0.1.0/wt-backlog-x"
+_RC_TREE_DIR = "/workspace/worktrees/demo/0.1.0/rc-1/wt-rc"
+_COMMIT = "git add specs && git commit -qm demand"
+_ORG = f"{ONBOARDED_T3} && {_RECORD}"
+_LANE_ENTRY = (
+    f"{_D} worktree new demo 0.1.0/wt-backlog-x && {_FILE} {_LANE}/specs && cd {_LANE} && {_COMMIT}"
+)
+_REJECT = f"{_RUN}/dd-backlog-definition/scripts/backlog.py exit try-it --disposition rejected --reason no"
+ORG_NO_ENTRY_T3 = _ORG
+ORG_WORK_BRANCH_T3 = f"{_ORG} && {_FILE} {_MAIN} && cd {_REPO} && {_COMMIT}"
+ORG_LANE_T3 = f"{_ORG} && {_LANE_ENTRY}"
+ORG_RC_SPEC_T3 = (
+    f"{_ORG} && {_D} worktree new demo 0.1.0/rc-1/wt-rc && {_NEW} --origin operator-demand"
+    f" && sed -i 's/(Describe the problem this release solves.)/Add a subtract function"
+    f" with tests to calc.py./' {_RC}/releases/0.1.0/rc-1/SPEC.md && cd {_RC_TREE_DIR} && {_COMMIT}"
+)
+ORG_TRACED_T3 = f"{TRACED_T3} && {_RECORD} && cd {_RC_TREE_DIR} && {_COMMIT}"
+ORG_UNCOMMITTED_T3 = f"{_ORG} && {_FILE} {_MAIN}"
+ORG_NO_SESSION_T3 = f"{ONBOARDED_T3} && {_FILE} {_MAIN} && cd {_REPO} && {_COMMIT}"
+ORG_REJECTED_T3 = (
+    f"{_ORG} && {_FILE} {_MAIN} && {_REJECT} --specs {_MAIN} && cd {_REPO} && {_COMMIT}"
+)
+ORG_DOCTOR_ERROR_T3 = f"{ORG_WORK_BRANCH_T3} && rm -rf /workspace/.agents/skills/dd-handoff-emitter"
+ORG_CALC_THEN_LANE_T3 = f"{_ORG} && cd {_REPO} && {_EDIT} && git commit -qam sub && {_LANE_ENTRY}"
+ORG_CALC_ON_ORIGIN_T3 = (
+    f"{ORG_WORK_BRANCH_T3} && git clone -q /srv/demo.git /root/demo && cd /root/demo"
+    f" && {_EDIT} && git commit -qam sub && git push -q origin main"
+)
+ORG_BROKEN_BACKLOG_T3 = (
+    f'{ORG_WORK_BRANCH_T3} && sed -i \'s/"active"/"actve"/\' {_MAIN}/backlog/BACKLOG.json'
+    f" && cd {_REPO} && git commit -qam break"
+)
 
 
 def sh(*cmd: str) -> str:
@@ -134,12 +169,18 @@ def image(task: str, version: str) -> str:
     return tag
 
 
-def reward(task: str, version: str, script: str) -> str:
-    """Run ``script`` in a fresh container, then the task's grader as Harbor does; the reward written."""
+def reward(task: str, version: str, script: str, step: str | None = None) -> str:
+    """Run ``script`` in a fresh container, then the task's grader as Harbor does; the reward written.
+
+    A multi-step task's ``/tests`` is ``tests/`` overlaid with ``steps/<step>/tests/``, as Harbor uploads it."""
     tests = task_dir(task) / "tests"
-    out = sh(
-        "docker", "run", "--rm", "--mount", f"type=bind,src={tests},dst=/tests,readonly",
-        image(task, version), "bash", "-c",
-        f"({script}) >&2; mkdir -p /logs/verifier; bash /tests/test.sh >&2; cat /logs/verifier/reward.txt",
-    )  # fmt: skip
+    with tempfile.TemporaryDirectory() as d:
+        if step:
+            tests = Path(shutil.copytree(tests, Path(d) / "tests"))
+            shutil.copytree(task_dir(task) / "steps" / step / "tests", tests, dirs_exist_ok=True)
+        out = sh(
+            "docker", "run", "--rm", "--mount", f"type=bind,src={tests},dst=/tests,readonly",
+            image(task, version), "bash", "-c",
+            f"({script}) >&2; mkdir -p /logs/verifier; bash /tests/test.sh >&2; cat /logs/verifier/reward.txt",
+        )  # fmt: skip
     return out.strip()

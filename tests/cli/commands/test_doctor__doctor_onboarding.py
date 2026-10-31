@@ -136,7 +136,7 @@ def test_doctor_names_the_bind_only_to_a_session_bind_accepts(
     result = _runner.invoke(app, ["doctor", "--context", "app"])
 
     head = {
-        False: "Next (operator step bind): This session was started outside the workspace root, so it stands in for no role.",
+        False: "Next (operator step bind): This session was launched where no workspace hook loaded, so it stands in for no role.",
         True: "Next (command step bind): this session has no context binding",
         None: "Next (command step bind): This session's record does not read.",
     }[live]

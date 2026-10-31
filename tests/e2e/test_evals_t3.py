@@ -1,11 +1,14 @@
 """T3 discovery: the image builds on this checkout's wheel, holds no dadaia
-on PATH, installs only the run's build, and the grader rewards onboarding and nothing past it.
+on PATH, installs only the run's build, and the task is two steps on one workspace: the first grader rewards onboarding and
+nothing past it, the second the demand the relaunched session entered through a path the law admits.
 
 Docker is required: a missing tool fails the row, never skips it. 600 s: T1's four image builds
 took 95 s on ubuntu-24.04 (run 37554712931). Candidate only: no published build is installed.
 
 Owner: dd-sw-engineer-sr
 """
+
+import tomllib
 
 import pytest
 
@@ -23,9 +26,22 @@ from tests.helpers.evals import (
     MAIN_SPEC_T3,
     ONBOARDED_NO_SPECS_T3,
     ONBOARDED_T3,
+    ORG_BROKEN_BACKLOG_T3,
+    ORG_CALC_ON_ORIGIN_T3,
+    ORG_CALC_THEN_LANE_T3,
+    ORG_DOCTOR_ERROR_T3,
+    ORG_LANE_T3,
+    ORG_NO_ENTRY_T3,
+    ORG_NO_SESSION_T3,
+    ORG_RC_SPEC_T3,
+    ORG_REJECTED_T3,
+    ORG_TRACED_T3,
+    ORG_UNCOMMITTED_T3,
+    ORG_WORK_BRANCH_T3,
     REAPED_T3,
     REJECTED_T3,
     RENAMED_T3,
+    ROOT,
     SESSION_T3,
     SPEC_T3,
     STUB_T3,
@@ -131,8 +147,66 @@ def test_a_plain_install_resolves_the_lib_build_offline(version: str, route: str
         "empty",
     ],
 )
-def test_the_grader_rewards_onboarding_and_nothing_past_it(
+def test_the_first_grader_rewards_onboarding_and_nothing_past_it(
     version: str, script: str, want: str
 ) -> None:
-    """The grader rewards onboarding and nothing past it."""
-    assert reward(T3, version, script) == want
+    """The first step's grader rewards onboarding and nothing past it."""
+    assert reward(T3, version, script, step="discover") == want
+
+
+@pytest.mark.parametrize("version", VERSIONS)
+@pytest.mark.parametrize(
+    ("script", "want"),
+    [
+        (ORG_WORK_BRANCH_T3, "1"),
+        (ORG_LANE_T3, "1"),
+        (ORG_RC_SPEC_T3, "1"),
+        (ORG_TRACED_T3, "1"),
+        (ORG_NO_ENTRY_T3, "0"),
+        (ORG_UNCOMMITTED_T3, "0"),
+        (ORG_REJECTED_T3, "0"),
+        (ORG_NO_SESSION_T3, "0"),
+        (ORG_DOCTOR_ERROR_T3, "0"),
+        (ORG_BROKEN_BACKLOG_T3, "0"),
+        (ORG_CALC_THEN_LANE_T3, "0"),
+        (ORG_CALC_ON_ORIGIN_T3, "0"),
+        ("true", "0"),
+    ],
+    ids=[
+        "entry-on-the-work-branch",
+        "entry-on-an-unmerged-lane",
+        "spec-origin-on-an-unmerged-wt-rc",
+        "backlog-origin-traced-on-a-wt-rc",
+        "no-entry",
+        "entry-written-and-never-committed",
+        "filed-then-rejected",
+        "no-session-record",
+        "doctor-error",
+        "backlog-checker-red",
+        "calc-committed-then-a-reviewed-lane",
+        "calc-pushed-to-origin-beside-an-entry",
+        "empty",
+    ],
+)
+def test_the_second_grader_rewards_the_demand_the_relaunched_session_entered(
+    version: str, script: str, want: str
+) -> None:
+    """The second step's grader rewards a session record, a clean doctor, the demand on a head
+    that its checkers accept, and no move of the project's code."""
+    assert reward(T3, version, script, step="organise") == want
+
+
+@pytest.mark.parametrize("version", VERSIONS)
+def test_the_session_launches_at_the_workspace_folder(version: str) -> None:
+    assert _in_image(version, "pwd").stdout.strip() == "/workspace"
+
+
+def test_a_trial_passes_only_when_both_steps_pass() -> None:
+    """Step one gates step two, and the trial's reward is the last step's."""
+    task = tomllib.loads((ROOT / "evals/tasks/t3-discovery/task.toml").read_text(encoding="utf-8"))
+    steps = task["steps"]
+    assert [s["name"] for s in steps] == ["discover", "organise"]
+    assert steps[0]["min_reward"] == 1
+    assert task["multi_step_reward_strategy"] == "final"
+    assert task["environment"]["workdir"] == "/workspace"
+    assert task["agent"]["timeout_sec"] == 900.0

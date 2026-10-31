@@ -475,3 +475,60 @@ def test_compare_judges_only_the_tasks_it_names(
 def test_compare_without_a_task_judges_every_gated_task(tmp_path: Path) -> None:
     _job(tmp_path, _T3, [1, 1, 1], harness="codex")
     assert _compare_named(tmp_path) == 1
+
+
+def _step_trial(
+    root: Path, task: str, name: str, *, forged_in: str | None, errored_in: str | None
+) -> Path:
+    """A multi-step trial as harbor 0.24 lays it: one trial-level result.json holding the final step's
+    reward and every step's result, each step's agent logs under steps/<step>/agent, none under agent/."""
+    trial = root / name
+    steps = ["discover", "organise"]
+    for step in steps:
+        (trial / "steps" / step).mkdir(parents=True)
+    results = [
+        {"step_name": s, "verifier_result": {"rewards": {"reward": 1}}}
+        | ({"exception_info": {"type": "Timeout"}} if s == errored_in else {})
+        for s in steps
+    ]
+    body = {
+        "task_name": f"dadaia-workspace-evals/{task}",
+        "agent_info": {"name": "claude-code"},
+        "verifier_result": {"rewards": {"reward": 1}},
+        "step_results": results,
+    }
+    write_text(trial / "result.json", json.dumps(body))
+    for s, step in zip(steps, results, strict=True):
+        write_text(trial / "steps" / s / "result.json", json.dumps(step))
+        if s == forged_in:
+            _transcript(trial / "steps" / s, agent_type=None)
+    return trial
+
+
+@pytest.mark.parametrize(
+    ("forged_in", "errored_in", "passes", "errored"),
+    [
+        (None, None, 3, 0),
+        ("discover", None, 2, 0),
+        ("organise", None, 2, 0),
+        (None, "organise", 2, 1),
+    ],
+    ids=["clean", "verdict-forged-in-step-1", "verdict-forged-in-step-2", "step-2-agent-errored"],
+)
+def test_compare_reads_a_multi_step_trial_as_one_row(
+    tmp_path: Path, forged_in: str | None, errored_in: str | None, passes: int, errored: int
+) -> None:
+    """One row per trial at the trial-level reward; a step-level result.json is not a second trial; a
+    verdict forged, or an agent errored, in any step fails the trial."""
+    write_text(tmp_path / "result.json", json.dumps({"stats": {}}))
+    for i in range(3):
+        bad = i == 0
+        _step_trial(
+            tmp_path, _T3, f"{_T3}__{i}", forged_in=forged_in if bad else None,
+            errored_in=errored_in if bad else None,
+        )  # fmt: skip
+    _compare(tmp_path)
+    leg = json.loads((tmp_path / "leg.json").read_text(encoding="utf-8"))
+    assert leg == [
+        {"harness": "claude-code", "task": _T3, "passes": passes, "errored": errored, "found": 3}
+    ]

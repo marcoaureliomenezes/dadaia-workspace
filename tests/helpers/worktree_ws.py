@@ -31,7 +31,7 @@ SCRIPT = (
     / "dadaia_workspace/public/skills/dd-gitflow-default/scripts/worktree.py"
 )
 #: The CLI's message for a session no workspace hook governs, and its fix line.
-NO_ROLE = "This session was started outside the workspace root, so it stands in for no role."
+NO_ROLE = "This session was launched where no workspace hook loaded, so it stands in for no role."
 RELAUNCH = "fix: Operator action: relaunch the session at the workspace root"
 FLOW = {"principal": "trunk", "integration": "dev", "work": "feature/"}
 #: The repo's gate: prints its argv; level L fails iff the tree holds `RED-<L>`.

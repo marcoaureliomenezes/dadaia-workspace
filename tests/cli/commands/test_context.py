@@ -326,7 +326,7 @@ def test_context_dead_surfaces_the_refused_push_with_its_fix_line(
 
 
 _RELAUNCH = "fix: Operator action: relaunch the session at the workspace root"
-_NO_ROLE = "This session was started outside the workspace root, so it stands in for no role."
+_NO_ROLE = "This session was launched where no workspace hook loaded, so it stands in for no role."
 _UNREAD = "This session's record does not read."
 
 
