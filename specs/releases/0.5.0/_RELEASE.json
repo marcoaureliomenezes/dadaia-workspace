@@ -2806,6 +2806,41 @@
         "workspace-doctor",
         "bug-ledger"
       ]
+    },
+    {
+      "ts": "2026-11-01T17:00:44Z",
+      "agent": "release.py memory",
+      "kind": "memory",
+      "text": "Memory reconciled over 516320ff348480d6a27ce2a690d53631a062b31b..b3cbf4ea251f: 15 reviewed, 8 changed.",
+      "since": "516320ff348480d6a27ce2a690d53631a062b31b",
+      "until": "b3cbf4ea251f5769fdf6243b634a68888a31f0ff",
+      "reviewed": [
+        "agent-comms",
+        "agent-orchestration",
+        "agentic-entities",
+        "public-asset-distribution",
+        "pypi-distribution",
+        "product-vision",
+        "capabilities",
+        "consumer-agent-support",
+        "server-registry",
+        "specs-migration",
+        "audits-canon",
+        "backlog-ledger",
+        "release-lifecycle",
+        "worktrees",
+        "bug-ledger"
+      ],
+      "changed": [
+        "agent-evals",
+        "spec-context-project",
+        "context-management",
+        "workspace-init",
+        "sdd-gate-v3",
+        "context-portability",
+        "cross-platform-portability",
+        "workspace-doctor"
+      ]
     }
   ]
 }
