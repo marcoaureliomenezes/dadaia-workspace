@@ -8,7 +8,13 @@ from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.core.models.git_scan import ZERO_SHA, GitObjectReadError, ScannedObject
+from dadaia_workspace.core.exceptions import DadaiaError
+from dadaia_workspace.core.models.git_scan import (
+    ZERO_SHA,
+    GitObjectReadError,
+    GitRunError,
+    ScannedObject,
+)
 from dadaia_workspace.core.skill_owner import load_owner
 from dadaia_workspace.infrastructure import git_objects
 from dadaia_workspace.infrastructure.git_objects import GitSubprocessObjectReader, unpublished
@@ -387,3 +393,26 @@ def test_an_oversized_blob_read_that_cannot_start_git_raises_the_typed_error(
     monkeypatch.setattr(git_objects.platform, "popen_bytes", refuse)
     with pytest.raises(GitObjectReadError, match="git could not run"):
         git_objects._read_oversized_blob_prefix(tmp_path, "a" * 40)
+
+
+_NO_GIT_FIX = "Operator action: make git runnable here"
+
+
+@pytest.mark.parametrize("read", ["git_run", "blob_prefix"])
+def test_a_git_read_with_no_git_on_path_is_the_one_git_run_error_with_its_fix(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, read: str
+) -> None:
+    """The kernel's runner and the blob-prefix read meet a missing git as one DadaiaError that
+    stays a GitObjectReadError: git that cannot run is not corruption, so no fsck."""
+    nogit = tmp_path / "nogit"
+    nogit.mkdir()
+    monkeypatch.setenv("PATH", str(nogit))
+    with pytest.raises(GitRunError) as refused:
+        if read == "git_run":
+            git_objects.git_run(tmp_path, "status")
+        else:
+            git_objects._read_oversized_blob_prefix(tmp_path, "a" * 40)
+    assert isinstance(refused.value, DadaiaError)
+    assert isinstance(refused.value, GitObjectReadError)
+    assert refused.value.message.startswith(f"git could not run in {tmp_path}: ")
+    assert refused.value.fix == _NO_GIT_FIX

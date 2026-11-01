@@ -168,4 +168,4 @@ def test_a_git_call_that_hangs_refuses_instead_of_raising_the_timeout(
     with pytest.raises(DadaiaError) as refused:
         _scan(ws, bundle)
 
-    assert refused.value.fix == _READ_FIX
+    assert refused.value.fix == "Operator action: make git runnable here"

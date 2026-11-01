@@ -296,3 +296,31 @@ def test_certify_bare_remote_writes_long_paths(tmp_path: Path) -> None:
     certify(tmp_path, seen)
 
     assert "longpaths = true" in seen.bare_config
+
+
+class _EveryChildFails(SubprocessCertificationProcess):
+    def __init__(self) -> None:
+        pass
+
+    def run(
+        self,
+        argv: Sequence[str],
+        *,
+        cwd: Path,
+        env: Mapping[str, str] | None = None,
+        timeout: float,
+    ) -> CertificationProcessResult:
+        return CertificationProcessResult(1, "", "")
+
+
+@pytest.mark.medium
+def test_certify_with_no_git_on_path_fails_the_bare_remote_check_with_the_owners_line(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, tmp_path_factory: pytest.TempPathFactory
+) -> None:
+    monkeypatch.setenv("PATH", str(tmp_path_factory.mktemp("nogit")))
+    result = certify(tmp_path, _EveryChildFails())
+
+    (check,) = [c for c in result.checks if c.name == "context-empty-remote-baseline"]
+    assert check.status == "FAIL"
+    assert check.detail.startswith("git could not run in ")
+    assert check.detail.endswith("\nfix: Operator action: make git runnable here")

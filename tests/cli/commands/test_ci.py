@@ -21,6 +21,7 @@ from dadaia_workspace.cli.commands import ci
 from dadaia_workspace.cli.main import app
 from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.gitflow import Gitflow, SeveralWorkBranches
+from dadaia_workspace.core.models.git_scan import GitRunError
 from dadaia_workspace.core.specs_version import CANONICAL_SPECS_VERSION
 from dadaia_workspace.features.chokepoints.branch_policy import Decision
 from tests.helpers.oslib import run, write_text
@@ -332,3 +333,15 @@ def test_several_work_branches_warn_and_keep_the_gate_on_the_kept_branch(
     assert capsys.readouterr().err == (
         "[pre-push] WARNING: 2 work branches\nhint: Agent action: run `x`, then run `y`\n"
     )
+
+
+def test_the_repo_root_with_no_git_on_path_is_the_git_run_error_not_a_missing_repository(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    nogit = tmp_path / "nogit"
+    nogit.mkdir()
+    monkeypatch.setenv("PATH", str(nogit))
+    monkeypatch.chdir(tmp_path)
+    with pytest.raises(GitRunError) as refused:
+        ci._repo_root()
+    assert refused.value.fix == "Operator action: make git runnable here"

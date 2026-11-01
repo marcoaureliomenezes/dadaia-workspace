@@ -19,6 +19,7 @@ from dadaia_workspace.core.gitflow import (
     resolve_live_candidate,
     work_branch,
 )
+from dadaia_workspace.core.models.git_scan import GitRunError
 from dadaia_workspace.core.skill_owner import load_owner
 from tests.helpers.oslib import (
     PERMISSIONS_ENFORCED,
@@ -324,6 +325,49 @@ def test_work_branch_with_an_unreadable_releases_dir_raises_a_dadaia_error_with_
     assert refused.value.fix == (
         f"Agent action: repair {releases} so that this user can use it (Permission denied)"
     )
+
+
+@pytest.mark.medium
+def test_work_branch_with_no_git_on_path_raises_the_git_run_error_not_a_repair_act(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo = _repo(tmp_path, [], None)
+    nogit = tmp_path / "nogit"
+    nogit.mkdir()
+    monkeypatch.setenv("PATH", str(nogit))
+    with pytest.raises(GitRunError) as refused:
+        work_branch(repo, Gitflow("main", "dev", "feature/"), "r")
+    assert refused.value.message.startswith(f"git could not run in {repo}: ")
+    assert refused.value.fix == "Operator action: make git runnable here"
+
+
+@pytest.mark.parametrize("git_on_path", [False, True], ids=["git-missing", "path-unreadable"])
+def test_work_branch_tells_a_missing_git_from_an_unreadable_path_by_the_path_not_the_filename(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, git_on_path: bool
+) -> None:
+    """Windows names no file on a failed spawn: the OSError carries none, so PATH decides."""
+    nogit = tmp_path / "nogit"
+    nogit.mkdir()
+    if not git_on_path:
+        monkeypatch.setenv("PATH", str(nogit))
+
+    repo = tmp_path / "r"
+    unreadable = str(repo / "specs") if git_on_path else None
+
+    def refuse(*_a: object) -> None:
+        raise OSError(13, "Permission denied", unreadable)
+
+    monkeypatch.setattr(load_owner("dd-gitflow-default", "_worktree_git"), "work_versions", refuse)
+    with pytest.raises(DadaiaError) as refused:
+        work_branch(repo, Gitflow("main", "dev", "feature/"), "r")
+    if git_on_path:
+        assert refused.value.fix == (
+            f"Agent action: repair {unreadable} so that this user can use it (Permission denied)"
+        )
+    else:
+        assert type(refused.value) is GitRunError
+        assert refused.value.message.startswith(f"git could not run in {repo}: ")
+        assert refused.value.fix == "Operator action: make git runnable here"
 
 
 def _constitution(tmp_path: Path, text: str) -> Path:

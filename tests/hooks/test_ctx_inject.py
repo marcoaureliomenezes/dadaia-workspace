@@ -710,3 +710,33 @@ def test_a_main_repo_that_is_not_a_git_repository_never_crashes_the_session_star
     assert "Traceback" not in result.stderr, result.stderr
     fix = f"fix: Agent action: run {platform.git_inline(repo, 'status')} and repair what it reports until it exits 0"
     assert fix in result.stdout, result.stdout
+
+
+@pytest.mark.parametrize("step", ["first-pass", "publish"])
+def test_a_missing_git_never_crashes_the_session_start(tmp_path: Path, step: str) -> None:
+    """git off PATH leaves SessionStart exit 0, no traceback, the state line and its one fix,
+    whether the step's act or its pending check is what reads git."""
+    _ws(tmp_path, {"name": "alpha", "canonical": True})
+    if step == "publish":  # the first pass is done: real text in every stub, and one atom
+        memory = tmp_path / "repos" / "alpha" / "specs" / "memory"
+        for name in ("QUALITY.md", "product/index.md", "product/x.md"):
+            write_text(memory / name, "# Real\n\nreal content\n")
+        write_text(memory / "product" / "catalog.json", '{"features": [{"slug": "x"}]}')
+    _bind(tmp_path, "s", "alpha")
+    nogit = tmp_path / "nogit"
+    nogit.mkdir()
+    env = claude_hook_env(tmp_path, session_id="s", extra={"DADAIA_HOOK_EVENT": "SessionStart"})
+    for var in ("DADAIA_CONTEXT", "DADAIA_SESSION_ID", "CLAUDE_CODE_SESSION_ID"):
+        env.pop(var, None)
+    env["DADAIA_SESSION_ID"] = "s"
+    env["PATH"] = str(nogit)
+
+    result = run_hook_subprocess("ctx_inject", {"session_id": "s"}, env)
+
+    assert result.returncode == 0, result.stderr
+    assert "Traceback" not in result.stderr, result.stderr
+    fix = "fix: Operator action: make git runnable here"
+    line = f"Next (operator step {step}): git could not run in {tmp_path / 'repos' / 'alpha'}: "
+    (state,) = [ln for ln in result.stdout.splitlines() if ln.startswith(line)]
+    assert result.stdout.count(f"{state}\n{fix}\n") == 1, result.stdout
+    assert result.stdout.count(fix) == 1, result.stdout

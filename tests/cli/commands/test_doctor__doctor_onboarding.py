@@ -12,6 +12,7 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
+from dadaia_workspace.cli import main as cli_main
 from dadaia_workspace.cli.main import app
 from dadaia_workspace.core import clock, platform, workspace_layout
 from dadaia_workspace.core.cli_line import fix_line
@@ -193,3 +194,27 @@ def test_doctor_reports_a_main_repo_that_is_not_a_git_repository_as_one_finding(
     fix = f"fix: Agent action: run {platform.git_inline(repo, 'status')} and repair what it reports until it exits 0"
     assert result.output.count(fix) == 1, result.output
     assert result.exit_code == 0, result.output
+
+
+@pytest.mark.slow(reason="git init subprocess")
+def test_doctor_with_no_git_on_path_is_one_refusal_with_the_operator_fix(
+    workspace: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path_factory: pytest.TempPathFactory,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """git off PATH is the console entry's one DadaiaError line plus its fix, never a defect."""
+    _register_specless_context(workspace, "app")
+    _stamp_specs(workspace, "app")
+    _runner.invoke(app, ["doctor", "--context", "app", "--fix"])
+    monkeypatch.setenv("PATH", str(tmp_path_factory.mktemp("nogit")))
+    monkeypatch.setattr("sys.argv", ["dadaia", "doctor", "--context", "app"])
+
+    with pytest.raises(SystemExit) as exited:
+        cli_main._safe_app()
+
+    err = capsys.readouterr().err
+    assert exited.value.code == 1, err
+    assert "unexpected" not in err, err
+    assert err.startswith("Error: git could not run in "), err
+    assert err.count("fix: Operator action: make git runnable here") == 1, err

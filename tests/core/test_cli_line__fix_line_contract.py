@@ -204,7 +204,7 @@ _OPERATOR_ACTIONS = {
     ("cli/commands/context.py", "export DADAIA_SESSION_ID set to a stable id of your choice before opening the session"): "reach",
     ("features/export/scan.py", "rule whether {bundle} is restored from a copy or discarded"): "ruling",
     ("core/context_registry.py", "rewrite {path} as one {shape} object"): "protected",
-    ("features/chokepoints/push_gate.py", "make git runnable here"): "reach",
+    ("core/models/git_scan.py", "make git runnable here"): "reach",
     ("features/spec_context/doctor.py", "split {skill}/SKILL.md at its library source; this workspace holds none and never edits the projection"): "reach",
     ("features/spec_context/doctor.py", "move {entry.name} out of the workspace"): "protected",
     ("features/spec_context/gate_policy.py", "relaunch this session with DADAIA_CONTEXT={owner}"): "reach",

@@ -247,6 +247,7 @@ def test_several_work_branches_make_the_first_pass_the_refusals_own_fix(
     step = next_step(tmp_path, {"app": _specs(tmp_path, "proj")})
     assert step is not None and (step.id, step.kind) == ("first-pass", "agent")
     assert step.command == f"Agent action: {first}"
+    assert step.reason == "2 work branches"
     assert step.text().count("fix:") == 1
 
 
@@ -263,7 +264,22 @@ def test_a_main_repo_git_cannot_read_makes_the_first_pass_the_refusals_own_fix(
     step = next_step(tmp_path, {"app": specs})
     assert step is not None and (step.id, step.kind) == ("first-pass", "agent")
     assert step.command == refusal.fix
+    assert step.reason == "git cannot read it"
     assert step.text().count("fix:") == 1
+
+
+def test_a_pending_check_that_git_refuses_is_the_step_with_the_refusals_message_and_fix(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    refusal = DadaiaError("git could not run in x", "Operator action: make git runnable here")
+
+    def refuse(_s: object, _p: object) -> bool:
+        raise refusal
+
+    monkeypatch.setattr(f"{_CLIENT}.published", refuse)
+    step = next_step(tmp_path, {"app": _specs(tmp_path, "proj", audited=True)})
+    assert step is not None and (step.id, step.kind) == ("publish", "operator")
+    assert (step.reason, step.command) == ("git could not run in x", refusal.fix)
 
 
 def test_the_context_create_step_renders_the_cli_words_inline(

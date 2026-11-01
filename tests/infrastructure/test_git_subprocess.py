@@ -15,6 +15,7 @@ import pytest
 from dadaia_workspace.core.cli_line import git_line
 from dadaia_workspace.core.exceptions import GitCloneError, GitSyncError
 from dadaia_workspace.core.gitflow import SeveralWorkBranches
+from dadaia_workspace.core.models.git_scan import GitRunError
 from dadaia_workspace.core.skill_owner import load_owner
 from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from tests.conftest import _GIT_QUIET
@@ -323,3 +324,15 @@ def test_reachable_runs_the_users_ssh_with_batch_mode(
 
     argv = read_text(Path(f"{path_stub if on_path else users}.argv")).split("\n")
     assert argv[: len(options) + 2] == [*options, "-o", "BatchMode=yes"]
+
+
+def test_a_client_git_read_with_no_git_on_path_is_the_one_git_run_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    nogit = tmp_path / "nogit"
+    nogit.mkdir()
+    monkeypatch.setenv("PATH", str(nogit))
+    with pytest.raises(GitRunError) as refused:
+        GitSubprocessClient().git(tmp_path, "status")
+    assert refused.value.message.startswith(f"git could not run in {tmp_path}: ")
+    assert refused.value.fix == "Operator action: make git runnable here"
