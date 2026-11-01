@@ -3,7 +3,8 @@
 Every resolver-driven ``dadaia`` command resolves through this module — its specs
 directory via :func:`resolve_specs_dir_for_cli`, or the bound context name itself via
 :func:`resolve_context_for_cli`. A thin call onto :mod:`dadaia_workspace.core.invocation`,
-which owns resolution; this module adds only the CLI-specific allowlist validation.
+which owns resolution; this module adds the CLI-specific allowlist validation, the onboarding
+next step of the caller (:func:`own_next_step`).
 
 An *explicit* context name is gated by :data:`~dadaia_workspace.core.invocation.CONTEXT_NAME_RE`
 before any ``repos/<name>/specs`` join; an ambient ``DADAIA_CONTEXT`` is judged by the
@@ -22,6 +23,7 @@ from dadaia_workspace.core.invocation import (
     HARNESS_SESSION_ID_ENV_VARS as _HARNESS_SESSION_ID_ENV_VARS,
 )
 from dadaia_workspace.core.invocation import alive_context_trees as _alive_context_trees
+from dadaia_workspace.core.invocation import refusal as _refusal
 from dadaia_workspace.core.invocation import repo_owner as _repo_owner
 from dadaia_workspace.core.invocation import resolve as _resolve_invocation
 from dadaia_workspace.core.invocation import (
@@ -30,6 +32,7 @@ from dadaia_workspace.core.invocation import (
 from dadaia_workspace.core.invocation import resolve_session_id as _resolve_session_id
 from dadaia_workspace.core.invocation import resolve_specs_dir as _core_resolve_specs_dir
 from dadaia_workspace.core.invocation import scope as _scope
+from dadaia_workspace.features.workspace.onboarding import Step, next_step
 
 #: Re-exports so a verb never reaches ``core.invocation`` directly: every consumer of the
 #: harness-session-id env-var list, the session-id rule, or the name->repo-slug mapping
@@ -38,6 +41,7 @@ HARNESS_SESSION_ID_ENV_VARS = _HARNESS_SESSION_ID_ENV_VARS
 resolve_session_id = _resolve_session_id
 alive_context_trees = _alive_context_trees
 repo_owner = _repo_owner
+refusal = _refusal
 scope = _scope
 
 
@@ -70,6 +74,19 @@ def own_bind_for_cli() -> tuple[str | None, str | None]:
     """THIS caller's ``(bound context, session id)`` — the one Bind every reader shares."""
     inv = _resolve_invocation(env=os.environ, cwd=Path.cwd())
     return inv.bind.context_name, inv.session_id
+
+
+def own_next_step(workspace_root: Path, focus: str | None = None) -> Step | None:
+    """The onboarding next step for THIS caller: its bound state, and the refusal of a bind
+    that :func:`governed` refuses."""
+    bind, session = own_bind_for_cli()
+    return next_step(
+        workspace_root,
+        _alive_context_trees(workspace_root),
+        focus,
+        None if session is None else bool(bind),
+        _refusal(workspace_root, os.environ),
+    )
 
 
 def resolve_context_specs_dir_for_cli(workspace_root: Path, context: str) -> Path | None:

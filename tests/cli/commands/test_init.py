@@ -68,7 +68,7 @@ def test_init_converts_a_list_form_denylist_once_and_holds_the_original(
     assert json.loads(read_text(denylist)) == {"zz-term-a": "", "zz-term-b": "why"}
     held = list((ws / ".dadaia" / "reaped").rglob("privacy_denylist.json"))
     assert [read_text(h) for h in held] == [original]
-    assert load_denylist_terms() == (("zz-term-a", ""), ("zz-term-b", "why"))
+    assert load_denylist_terms(ws) == (("zz-term-a", ""), ("zz-term-b", "why"))
 
 
 def test_a_failed_denylist_conversion_leaves_the_operator_terms_in_place(

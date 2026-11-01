@@ -17,7 +17,7 @@ sources:
 
 ## Hooks
 
-- The four hook behaviours ([[agentic-entities]]) arrive through three wrappers under `.dadaia/hooks/cursor-*`: `preToolUse` -> the merged pre-gate, and `sessionStart` -> ctx-inject, then the reaper.
+- The hook behaviours ([[agentic-entities]]) arrive through three wrappers under `.dadaia/hooks/cursor-*`: `preToolUse` -> the merged pre-gate, and `sessionStart` -> ctx-inject, then the reaper.
 - ctx-inject answers in Cursor's `additional_context` JSON: the bound context's bootstrap, `constitution.md` included ([[context-management]]); there is no prompt-time injection, so a bind shows at the next session start.
 - Cursor exposes no native session id: a session binds by exporting `DADAIA_SESSION_ID` (then `context bind`) or `DADAIA_CONTEXT` into its launching environment.
 - Cursor decides by stdout JSON, so the wrapper answers only a deny, remapped to `{"permission": "deny", "agent_message": <reason>}`; an allow emits nothing and Cursor's own approval stays in force ([[sdd-gate-v3]]).

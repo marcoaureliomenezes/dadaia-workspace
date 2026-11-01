@@ -14,25 +14,25 @@ the fix commit, found by its `fix(bugs)` or `refactor(bugs)` id line, to see wha
 The ledger verbs report current counts without copying them into prose:
 
 ```bash
-python3 .agents/skills/dd-bug-resolution/scripts/bugs.py stats
-python3 .agents/skills/dd-bug-resolution/scripts/bugs.py status --all
+python3 .agents/skills/dd-bug-resolution/scripts/bugs.py stats --specs <specs-dir>
+python3 .agents/skills/dd-bug-resolution/scripts/bugs.py status --all --specs <specs-dir>
 ```
 
 Current bug status is `open | resolved | superseded | rejected`. A terminal status is
-written only by its transition. `resolve` requires the diagnosed cause, implemented
-solution, lineage link and 40-hex fix sha; `supersede` names the replacement; `reject`
-records the reason. A reopen is a new record.
+written only by its transition; each transition's flags are `bugs.py <verb> --help`. A
+reopen is a new record.
 
 Candidate maturity is not stored on the bug. The next candidate's `SPEC.md`
-`## Bug window review` records KEEP or REBUILD: one KEEP leaves the first-level window;
-a REBUILD leaves after its tested replacement and a following candidate with no child
-bug. The release summary owns delivered, carried and backlog-exit scope.
+`## Bug window review` judges each fix and never schedules work; the window rule is in
+`dd-bug-resolution/LINEAGE.md`, and the review step is in `dd-release-definition/SKILL.md`,
+Pick the set, step 7. The release summary's scope is in
+`dd-release-implementation/RELEASE-EVENTS.md`.
 
 ## Lesson 1 — a per-caller fix breeds the next caller's bug
 
 When a guard lives at only the caller that was caught, the next unguarded caller becomes
 the next bug. The structure that ends the family is one deep module every writer uses.
-The context registry is the example: `create`, `repo add` and import share one ownership
+The context registry is the example: `create`, `repo add` and `init --from` share one ownership
 check, and `INV-6` reports a slug owned by more than one context.
 
 ## Lesson 2 — a per-measurement exclusion breeds another measurement bug
@@ -45,15 +45,16 @@ scratch output is outside the measurement by construction.
 
 A ledger field that caches a fact available from git becomes wrong wherever history has a
 different shape, especially in a shallow checkout. Find the fix by its id line, with the
-write-once `fix_sha` only a hint a rewrite may orphan; derive numstat, direction and maturity
-from that commit and the bug-window review when needed.
+write-once `fix_sha` only a hint a rewrite may orphan; derive numstat and direction from that
+commit.
 
 ## Standing order
 
-- Read the matching ledger history before proposing a fix. Inspect at most the 20 most
-  recent records and their named fix commits.
-- Use `caused_by: <bug-id> | <task-id> | none`; choose `none` only when blame offers no
-  candidate. Two prior fixes on the touched module require a REBUILD.
+- Read each touched file's history, the id-line query of `dd-bug-resolution/LINEAGE.md`,
+  before proposing a fix, within the cap it sets.
+- Declare `caused_by: <bug-id> | <task-id> | none` per `dd-bug-resolution` LINEAGE.md,
+  Declare `caused_by`. A fix whose `caused_by` names a culprit, or that lands on a unit already fixed
+  in the window, is the REBUILD of that unit in the same lane (`specs/bugs/AGENTS.md`, Resolution).
 - Prefer a deletion-shaped fix. If the production diff grows, route it through the
   architecture lens.
 - Derive the bug-surface delta from `git show` of the fix commit, found by its `fix(bugs)` or `refactor(bugs)` id line, and report it in review evidence.

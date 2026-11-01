@@ -13,7 +13,7 @@ A line `verify: <one argv command>` (required by every job merge) and `tests: <g
 
 ## 2. SDD entry check
 
-Before editing production source: `specs/AGENTS.md` §3.
+Before editing production source: `specs/AGENTS.md`, Before implementing.
 
 ## 3. Repo commands
 

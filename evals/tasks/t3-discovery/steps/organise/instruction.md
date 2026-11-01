@@ -1,0 +1,1 @@
+The operator relaunched you at the workspace root, `/workspace`, where `dadaia-workspace` is set up on their Git project `file:///srv/demo.git`. Keep using the tool to organise the work on the project. The operator's demand is a `subtract` function with tests for `calc.py`: record it the way the tool takes demands. Write no code before the operator reviews it.

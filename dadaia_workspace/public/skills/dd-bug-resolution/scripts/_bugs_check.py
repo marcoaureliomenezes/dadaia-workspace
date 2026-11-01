@@ -8,6 +8,7 @@ commit, so a writer/validator disagreement is unrepresentable. The schema is
 
 from __future__ import annotations
 
+import re
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
@@ -16,9 +17,9 @@ import _findings
 import _git
 import _jsonl
 import _ledger
-from _grammar import HISTORICAL_TASK_RE, TASK_ID_RE
+from _grammar import CANDIDATE_RE, TASK_ID_ANY_RE
 from _platform import act, git_line, read_text
-from _specs import script
+from _specs import context_repos, script
 
 CODE = "LEDGER-BUGS-SCHEMA"
 LEDGER = "bugs/BUGS.jsonl"
@@ -68,41 +69,57 @@ def invariant_errors(record: dict[str, Any]) -> Iterator[str]:
         yield f"record {record['id']!r} closed_at={closed_at!r} precedes its filing date ts={ts!r}"
 
 
-def tasks(root: Path) -> set[str]:
-    """The ids under *root*`/releases/` (`_archive/` included) in every `TASKS.md` and
-    `tasks/*.md`: the id at the head of each checklist item or table cell, in either grammar,
-    plus every table cell that is a current-grammar id."""
-    files = [*root.glob("releases/**/TASKS.md"), *root.glob("releases/**/tasks/*.md")]
-    lines = [ln for file in files for ln in read_text(file).splitlines()]
-    found = {m[1] for ln in lines if (m := HISTORICAL_TASK_RE.match(ln))}
-    return found | {
-        c for ln in lines for p in ln.split("|") if TASK_ID_RE.fullmatch(c := p.strip())
-    }
+def tasks(root: Path) -> dict[str, list[str]]:
+    """Each task id under *root*`/releases/` (`_archive/` included) that heads a checklist item
+    or fills a table cell of a `TASKS.md` or `tasks/*.md`, with the `<M.m.p>-rc<N>/<id>` form of
+    every candidate that carries it."""
+    found: dict[str, set[str]] = {}
+    for file in [*root.glob("releases/**/TASKS.md"), *root.glob("releases/**/tasks/*.md")]:
+        parts = file.relative_to(root / "releases").parts
+        rc = next((i for i, p in enumerate(parts) if CANDIDATE_RE.match(p)), 0)
+        where = f"{parts[rc - 1]}-{parts[rc].replace('-', '')}/" if rc else ""
+        for line in read_text(file).splitlines():
+            item = re.match(r"- \[.\]\s*", line)
+            cells = (
+                line.split("|") if line.startswith("|") else [line[item.end() :]] if item else []
+            )
+            for cell in cells:
+                if m := TASK_ID_ANY_RE.match(cell.strip().lstrip("*")):
+                    found.setdefault(m[0], set()).update([f"{where}{m[0]}"] if where else [])
+    return {task: sorted(forms) for task, forms in found.items()}
 
 
-def findings_for(
-    text: str, rel: str = LEDGER, archived: str = "", root: Path = _ledger.SPECS
-) -> list[dict[str, Any]]:
-    """Every finding the ledger *text* carries — the ONE validation path, run both by
-    ``check`` over the committed file and by every write over its own candidate bytes.
-    Lineage: a `caused_by` names a record of *text* or of the archive text *archived*, or a task
-    a `TASKS.md` under *root*`/releases/` carries, and never loops. An id holds at most one plain
-    record across *text* and *archived*; a pre-v6 event line is not a record."""
-    schema = load_schema()
-    lines: dict[int, list[str]] = {}
-    fixes: dict[int, str] = {}  # a line a governance verb clears
-    seen: dict[str, int] = {}
-    links: dict[str, object] = {}
-    legacy_ids: set[str] = set()
+def ambiguous(root: Path, target: str) -> list[str]:
+    """The candidate-qualified forms of the bare task id *target* when several candidates carry it, else none."""
+    forms = tasks(root).get(target, [])
+    return forms if len(forms) > 1 else []
+
+
+def _archive_twice(archived: str, root: Path) -> tuple[dict[str, int], list[dict[str, Any]]]:
+    """The first line of each plain archive id, and a finding for every later repeat."""
     plain: dict[str, int] = {}
     twice: list[dict[str, Any]] = []
-    for number, record in _archive_lines(archived, events=False):
+    for number, record, legacy in archive_records(archived):
+        if legacy:
+            continue
         if (first := plain.setdefault(str(record["id"]), number)) != number:
             twice.append(_findings.finding(
                 CODE, HISTO, number,
                 f"duplicate record id {record['id']!r} (first archived at line {first})",
                 _ledger.unwritten(root / HISTO, number, "`bugs.py archive`", _LAW),
             ))  # fmt: skip
+    return plain, twice
+
+
+def _record_lines(
+    text: str, plain: dict[str, int], lines: dict[int, list[str]]
+) -> tuple[dict[str, int], dict[str, object], set[str]]:
+    """Walk the ledger *text* once: add each line's schema, invariant and duplicate messages to
+    *lines*; return the first line of each id, each id's `caused_by`, and the legacy ids."""
+    schema = load_schema()
+    seen: dict[str, int] = {}
+    links: dict[str, object] = {}
+    legacy_ids: set[str] = set()
 
     def add(line: int, message: str) -> None:
         lines.setdefault(line, []).append(message)
@@ -125,12 +142,26 @@ def findings_for(
         links.setdefault(record["id"], record["caused_by"])
         if record.keys() >= _LEGACY_MARKERS:
             legacy_ids.add(record["id"])
+    return seen, links, legacy_ids
+
+
+def _lineage(
+    seen: dict[str, int],
+    links: dict[str, object],
+    legacy_ids: set[str],
+    archived: str,
+    root: Path,
+    lines: dict[int, list[str]],
+    fixes: dict[int, str],
+) -> None:
+    """Add to *lines* and *fixes* a finding for each `caused_by` that names no record or task
+    or closes a loop."""
     known = {
         None,
         "none",
         *links,
-        *(str(r["id"]) for r in archived_records(archived)),
-        *tasks(root),
+        *(str(r["id"]) for _, r, _ in archive_records(archived)),
+        *(t for task, forms in tasks(root).items() for t in (task, *forms)),
     }
     for bug_id, target in links.items():
         if bug_id in legacy_ids:
@@ -141,13 +172,28 @@ def findings_for(
             at = links[str(at)]
         if target not in known or at == bug_id:
             why = f"forms a cycle: {' -> '.join(chain)}" if at == bug_id else "names no record"
-            add(seen[bug_id], f"{bug_id!r} caused_by {why}")
+            lines.setdefault(seen[bug_id], []).append(f"{bug_id!r} caused_by {why}")
             bugs = script(Path(__file__).with_name("bugs.py"))
             fixes[seen[bug_id]] = (  # a cycle's wrong link is a judgement; a dangling one is not
                 act("agent", f"decide which of {', '.join(chain)} names the wrong cause and "
                     f"set its caused_by to the real cause's id, or none, through `{bugs.inline('update', specs=root)}` ({_LAW})") if at == bug_id
                 else bugs("update", bug_id, "--set", "caused_by=none", specs=root)
             )  # fmt: skip
+
+
+def findings_for(
+    text: str, rel: str = LEDGER, archived: str = "", root: Path = _ledger.SPECS
+) -> list[dict[str, Any]]:
+    """Every finding the ledger *text* carries — the ONE validation path, run both by
+    ``check`` over the committed file and by every write over its own candidate bytes.
+    Lineage: a `caused_by` names a record of *text* or of the archive text *archived*, or a release
+    task `tasks` finds under *root*, and never loops. An id holds at most one plain
+    record across *text* and *archived*; a pre-v6 event line is not a record."""
+    lines: dict[int, list[str]] = {}
+    fixes: dict[int, str] = {}  # a line a governance verb clears
+    plain, twice = _archive_twice(archived, root)
+    seen, links, legacy_ids = _record_lines(text, plain, lines)
+    _lineage(seen, links, legacy_ids, archived, root, lines, fixes)
     return [
         _findings.finding(CODE, rel, n, "; ".join(m),
                         fixes.get(n) or _ledger.unwritten(root / rel, n, _VERBS, _LAW))
@@ -170,41 +216,32 @@ def histo_findings(text: str, root: Path = _ledger.SPECS) -> list[dict[str, Any]
     )  # fmt: skip
 
 
-def _archive_lines(text: str, events: bool = True) -> Iterator[tuple[int, dict[str, Any]]]:
-    """The `(line, record)` pairs of the archive *text*: a plain line is a record, an event line
-    contributes its `data` when *events*; a line with no `id` or an unreadable one is
-    `histo_findings`' to name."""
+def archive_records(text: str) -> list[tuple[int, dict[str, Any], bool]]:
+    """The `(line, record, legacy)` of each archive line of *text* that names an id: a line
+    holding `event` and a `data` object is a legacy event line and yields its `data`; any other
+    line is a record. A line with no `id` or an unreadable one is `histo_findings`' to name."""
+    found = []
     for number, record, why in _jsonl.walk(text):
         if why or not isinstance(record, dict):
             continue
-        if events and "event" in record and isinstance(record.get("data"), dict):
-            record = record["data"]
-        if "id" in record:
-            yield number, record
-
-
-def archived_records(text: str) -> list[dict[str, Any]]:
-    """The records of the archive *text*, event lines' `data` included."""
-    return [record for _, record in _archive_lines(text)]
-
-
-def plain_ids(text: str) -> frozenset[str]:
-    """The ids of the archive *text*'s plain records: the ids no new record may take."""
-    return frozenset(str(record["id"]) for _, record in _archive_lines(text, events=False))
+        legacy = "event" in record and isinstance(record.get("data"), dict)
+        if "id" in (kept := record["data"] if legacy else record):
+            found.append((number, kept, legacy))
+    return found
 
 
 def _uncited(specs: Path, text: str) -> list[dict[str, Any]]:
-    """The live records that carry a `fix_sha` and whose id line no commit of the main repo or a repo beside it reaches from its HEAD, one finding each; where a repo is a shallow clone a miss cannot be judged, so the misses are one finding for the cut. The sha is a hint, never judged."""
-    held = {str(r["id"]): (n, r["fix_sha"]) for n, r, why in _jsonl.walk(text) if not why and isinstance(r, dict) and r.get("fix_sha")}  # fmt: skip
-    found = _git.fix_commit(specs.parent, held)
-    repos = _git.context_repos(specs.parent)
+    """The live resolved records that carry a `fix_sha` and whose id line no commit of the main repo or a repo beside it reaches from its HEAD, one finding each, every one fixed by the one archive of all the misses; where a repo is a shallow clone a miss cannot be judged, so the misses are one finding for the cut. The sha is a hint, never judged."""
+    held = {str(r["id"]): (n, r["fix_sha"]) for n, r, why in _jsonl.walk(text) if not why and isinstance(r, dict) and r.get("status") == "resolved" and r.get("fix_sha")}  # fmt: skip
+    found = _git.fix_commit(context_repos(specs.parent), held)
     missed = [i for i in held if i not in found]
+    repos = list(context_repos(specs.parent)) if missed else []
     if missed and (cut := next((p for p in repos if _git.shallow(p)), None)):
         return [_findings.finding(CODE, LEDGER, held[missed[0]][0], "the clone is shallow: its misses cannot be judged", git_line(cut, "fetch", "--unshallow"))]  # fmt: skip
     return [
         _findings.finding(
-            CODE, LEDGER, held[i][0], f"{i!r} fix_sha {held[i][1]} has no commit in HEAD of {', '.join(p.name for p in repos)} holding the line `fix(bugs): {i} — …`",
-            act("agent", f"commit the fix with the line `fix(bugs): {i} — …` in its message"),
+            CODE, LEDGER, held[i][0], f"{i!r} fix_sha {held[i][1]} has no commit in HEAD of {', '.join(p.name for p in repos)} holding the line `fix(bugs): {i} — …` or `refactor(bugs): {i} — …`",
+            script(Path(__file__).with_name("bugs.py"))("archive", *missed, specs=specs),
         )
         for i in missed
     ]  # fmt: skip

@@ -7,6 +7,7 @@ tracked blob.
 from __future__ import annotations
 
 import json
+import os
 import re
 from pathlib import Path
 
@@ -19,7 +20,7 @@ from dadaia_workspace.infrastructure.privacy_check import (
     load_privacy_terms,
 )
 from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetManager
-from tests.helpers.oslib import read_text, write_text
+from tests.helpers.oslib import read_text, run, write_text
 
 
 def _host(*labels: str) -> str:
@@ -150,7 +151,7 @@ def test_shipped_baseline_header_and_single_line_documented_carve_outs() -> None
     )
     assert raw["_header"]["version"] == 17
     excludes = " ".join(raw["_header"]["excludes"])
-    assert all(word in excludes for word in ("/root", "Users", "FR12/A12.3", "FR12/A12.4"))
+    assert all(word in excludes for word in ("/root", "Users", "Public", ".home"))
     for pattern in raw["patterns"]:
         assert "\n" not in pattern["regex"] + (pattern.get("exclude_regex") or "")
         if pattern.get("exclude_regex"):
@@ -240,4 +241,53 @@ def test_load_denylist_env_precedence_and_workspace_fallback(
     monkeypatch.chdir(tmp_path / "ws")
     assert load_privacy_terms() == (("from-env", "env"),)
     monkeypatch.delenv("DADAIA_PRIVACY_DENYLIST")
-    assert load_privacy_terms() == (("from-file", "file"),)
+    assert load_privacy_terms(tmp_path / "ws") == (("from-file", "file"),)
+
+
+@pytest.mark.parametrize(
+    ("repo", "fenced", "terms"),
+    [
+        ("acme", False, ()),
+        ("acme-site", False, ()),
+        ("acme", True, ()),
+        ("acme-site", True, ()),
+        ("other", False, (("acme", "r"),)),
+        ("other", True, (("acme", "r"),)),
+    ],
+)
+def test_the_scanned_repos_own_name_drops_the_terms_it_carries(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    repo: str,
+    fenced: bool,
+    terms: tuple[tuple[str, str], ...],
+) -> None:
+    """The name is the checkout's repository, never its folder: a worktree of `repo` placed under
+    a folder named for another repo still scans as `repo`, fenced as the merge scan runs it."""
+    write_text(tmp_path / "terms.json", '{"acme": "r"}')
+    monkeypatch.setenv("DADAIA_PRIVACY_DENYLIST", str(tmp_path / "terms.json"))
+    home = tmp_path / "ws" / "repos" / repo
+    home.mkdir(parents=True)
+    run(["git", "init", "-q", str(home)])
+    run(
+        [
+            "git",
+            "-C",
+            str(home),
+            "-c",
+            "user.name=t",
+            "-c",
+            "user.email=t@t",
+            "commit",
+            "-q",
+            "--allow-empty",
+            "-m",
+            "x",
+        ]
+    )
+    tree = tmp_path / "ws" / "worktrees" / "acme" / "wt"
+    run(["git", "-C", str(home), "worktree", "add", "-q", str(tree)])
+    if fenced:
+        monkeypatch.setenv("DADAIA_FENCED_ROOTS", os.pathsep.join(map(str, tree.resolve().parents)))
+    monkeypatch.chdir(tree)
+    assert load_privacy_terms(tree) == terms

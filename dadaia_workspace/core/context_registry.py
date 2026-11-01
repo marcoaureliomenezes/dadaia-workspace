@@ -39,6 +39,16 @@ def entries(workspace_root: Path) -> list[dict[str, object]]:
     return [e for e in cast("list[object]", found) if isinstance(e, dict)]
 
 
+def state(entry: dict[str, object]) -> str:
+    """A row's state, the one spelling rule: stripped and lower-cased; ``""`` when absent."""
+    return str(entry.get("state") or "").strip().lower()
+
+
+def is_alive(entry: dict[str, object]) -> bool:
+    """Whether the row is ALIVE, whatever the case of its stored state."""
+    return state(entry) == "alive"
+
+
 def entry_slugs(entry: dict[str, object]) -> tuple[object, ...]:
     """A registry entry's repo slugs, unvalidated: the main one (falsy when absent) first."""
     associated = entry.get("associated_repos")
@@ -56,7 +66,7 @@ def registered_slugs(workspace_root: Path) -> tuple[frozenset[str], frozenset[st
         found = entries(workspace_root)
     except SchemaVersionError:
         return frozenset("*"), frozenset("*")
-    alive = [e for e in found if str(e.get("state", "")).lower() == "alive"]
+    alive = [e for e in found if is_alive(e)]
     every, live = (
         frozenset(s for e in group for s in entry_slugs(e) if isinstance(s, str) and s)
         for group in (found, alive)

@@ -1,9 +1,5 @@
 # Memory Catalog — dadaia-workspace
 
-> Generated automatically from `specs/memory/product/<area>/*.md` frontmatter.
-> The catalog section below is refreshed by `.agents/skills/dd-spec-navigator/scripts/memory.py catalog generate`; other
-> sections of this file are preserved verbatim.
-
 ## Feature catalog
 
 ### agents
@@ -18,7 +14,7 @@
 
 | slug | title | tldr |
 |------|-------|------|
-| `agent-evals` | agent-evals | The library's own agent evals — two graded tasks run on the candidate wheel and a PyPI baseline by one dispatch-or-schedule workflow. |
+| `agent-evals` | agent-evals | The library's own agent evals — three graded tasks run on the candidate wheel by Claude Code and Codex; a green run is the deploy gate. |
 | `public-asset-distribution` | public-asset-distribution | Public install stages packaged assets and projects shared law, agents, skills and every registered harness; public doctor reports projection drift. |
 | `pypi-distribution` | pypi-distribution | The PyPI package on one version axis, two console-script names, the OIDC pipeline, the wheel contract and the derived docs. |
 

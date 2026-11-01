@@ -12,12 +12,13 @@ import os
 import shutil
 import subprocess
 import tomllib
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 
 import pytest
 
 from dadaia_workspace.core.harness_registry import HARNESS_RECORDS
 from dadaia_workspace.core.platform import Capabilities
+from dadaia_workspace.core.skill_owner import load_owner
 from dadaia_workspace.infrastructure.runtime_config import claude_hooks, kimi_hooks_block
 from dadaia_workspace.infrastructure.runtime_transforms.hook_wrappers import (
     envelope,
@@ -230,6 +231,25 @@ def test_kimi_on_windows_gets_a_cmd_wrapper_whose_literal_is_pinned() -> None:
     assert "echo dadaia: no workspace venv at %ROOT%\\.dadaia\\.venv - the gate is off.\r\n" in told
 
 
+_LANE_WRAPPERS = [
+    pytest.param(harness, name, id=name)
+    for harness, record in sorted(HARNESS_RECORDS.items())
+    for name in sorted(hook_wrapper_contents(record, Capabilities.detect("linux")))
+]
+
+
+@pytest.mark.parametrize(("harness", "name"), _LANE_WRAPPERS)
+def test_every_lane_wrapper_names_its_harness_to_the_hook(harness: str, name: str) -> None:
+    """A hook finds its harness record by the label its own wrapper exports, on every lane."""
+    body = hook_wrapper_contents(HARNESS_RECORDS[harness], Capabilities.detect("linux"))[name]
+    assert f'DADAIA_RUNTIME="{harness}"\nexport DADAIA_RUNTIME\n' in body
+
+
+def test_claude_hands_the_gate_a_bash_call_too() -> None:
+    (pre,) = claude_hooks()["hooks"]["PreToolUse"]
+    assert pre["matcher"] == "Edit|Write|MultiEdit|NotebookEdit|Bash"
+
+
 @pytest.mark.parametrize(
     ("home", "command"),
     [
@@ -244,3 +264,18 @@ def test_kimi_windows_command_is_what_cmd_runs_whole(
     monkeypatch.setattr("dadaia_workspace.core.platform.PLATFORM", _WIN)
     hooks = tomllib.loads(kimi_hooks_block(Path(home)))["hooks"]
     assert hooks[0]["command"] == command
+
+
+def test_every_shim_walks_to_the_kernels_sentinel() -> None:
+    """The sh and cmd shims render the sentinel the kernel's `_root` owns, never their own spelling."""
+    sentinel = load_owner("dd-bug-resolution", "_root").SENTINEL
+    spellings = {"linux": sentinel.as_posix(), "win32": str(PureWindowsPath(sentinel))}
+    walked = 0
+    for platform_name, spelling in spellings.items():
+        caps = Capabilities.detect(platform_name)
+        for record in HARNESS_RECORDS.values():
+            for name, body in hook_wrapper_contents(record, caps).items():
+                if "spec_contexts.json" in body:
+                    walked += 1
+                    assert spelling in body, name
+    assert walked > 0

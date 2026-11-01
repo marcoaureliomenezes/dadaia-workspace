@@ -9,11 +9,9 @@ the section runs that script beside these rules and holds no second vocabulary.
 
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass
 from pathlib import Path
 
-from dadaia_workspace.core import platform
 from dadaia_workspace.core.doctor_rules import Rule, SectionFinding
 from dadaia_workspace.core.models.backlog import INTENTS_EXEMPT_STATUS, Intent
 from dadaia_workspace.core.platform import act
@@ -25,9 +23,10 @@ __all__ = ["RULES", "DoctorContext", "build_context"]
 
 @dataclass(frozen=True)
 class DoctorContext:
-    """Each live entry past ``idea``: slug -> (anchor -> change, unresolved messages)."""
+    """Each live entry past ``idea``: slug -> (anchor -> change, unresolved messages); ``None``
+    when the backlog store refuses the document, so the ledger finding is the one voice."""
 
-    bound: dict[str, tuple[dict[str, str], list[str]]]
+    bound: dict[str, tuple[dict[str, str], list[str]]] | None
 
 
 def _finding(code: str, message: str, slug: str) -> SectionFinding:
@@ -38,13 +37,17 @@ def _finding(code: str, message: str, slug: str) -> SectionFinding:
 def _check_schema(ctx: DoctorContext) -> list[SectionFinding]:
     return [
         _finding("BL-SCHEMA", message, slug)
-        for slug, (_, unresolved) in ctx.bound.items()
+        for slug, (_, unresolved) in (ctx.bound or {}).items()
         for message in unresolved
     ]
 
 
 def _check_conflict(ctx: DoctorContext) -> list[SectionFinding]:
-    items = [(slug, changes) for slug, (changes, unresolved) in ctx.bound.items() if not unresolved]
+    items = [
+        (slug, changes)
+        for slug, (changes, unresolved) in (ctx.bound or {}).items()
+        if not unresolved
+    ]
     findings: list[SectionFinding] = []
     for i, (slug, changes) in enumerate(items):
         for other, theirs in items[:i]:
@@ -84,30 +87,33 @@ RULES: tuple[LedgerRule, ...] = (
 _ITEM = {"$ref": "#/$defs/activeItem"}
 
 
-def _live_intents(specs_dir: Path) -> dict[str, list[Intent]]:
+def _live_intents(specs_dir: Path) -> dict[str, list[Intent]] | None:
     """Each live entry past ``idea`` the backlog-v1 schema accepts, and its intents; every
-    other entry is `backlog.py check`'s finding and binds nothing here."""
+    other entry is `backlog.py check`'s finding and binds nothing here. ``None`` when the
+    store refuses the document."""
+    store = load_owner("dd-backlog-definition", "_backlog_store")
+    try:
+        active = store.read_active(specs_dir / "backlog" / "BACKLOG.json")
+    except store.Refusal:
+        return None
     owner = load_owner("dd-bug-resolution", "_ledger")
     schema = owner.load_schema("backlog-v1")
-    try:
-        active = json.loads(platform.read_text(specs_dir / "backlog" / "BACKLOG.json"))["active"]  # fmt: skip
-        return {
-            e["id"]: [Intent.of(i) for i in e.get("intents", [])]
-            for e in active
-            if not any(owner.validate(e, _ITEM, schema, "entry"))
-            and e["status"] != INTENTS_EXEMPT_STATUS
-        }
-    except (OSError, ValueError, KeyError, TypeError, platform.Undecodable):
-        return {}
+    return {
+        e["id"]: [Intent.of(i) for i in e.get("intents", [])]
+        for e in active
+        if not any(owner.validate(e, _ITEM, schema, "entry"))
+        and e["status"] != INTENTS_EXEMPT_STATUS
+    }
 
 
 def build_context(specs_dir: Path, tracked: frozenset[str]) -> DoctorContext:
     """Bind every live entry's intents against the registry over the repo's ``tracked``
     paths, recomputed from live truth."""
+    intents = _live_intents(specs_dir)
+    if intents is None:
+        return DoctorContext(None)
     registry = build_registry(specs_dir=specs_dir, tracked=tracked)
-    return DoctorContext(
-        {slug: _bind(intents, registry) for slug, intents in _live_intents(specs_dir).items()}
-    )
+    return DoctorContext({slug: _bind(i, registry) for slug, i in intents.items()})
 
 
 def _bind(intents: list[Intent], registry: Registry) -> tuple[dict[str, str], list[str]]:

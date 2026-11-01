@@ -7,17 +7,16 @@ from __future__ import annotations
 from collections import deque
 from pathlib import Path
 
-from _platform import act, command, git_inline, inline
-from _worktree_end import _check_ancestor, _refuse_dirty, _target
-from _worktree_git import cli_words, flow_for, git, ours
-from _worktree_names import LAUNCH, Refusal, base_of, branch
+from _platform import act, git_inline, inline
+from _worktree_end import check_ancestor, refuse_dirty, target
+from _worktree_git import cli_words, flow_for, git, ours, require
+from _worktree_names import Refusal, base_of, branch
 
 
 def _cascade(root: Path, path: str) -> list[tuple[Path, str]]:
     """(tree, base) of the tree at *path* then of each open tree whose base chain leads to it."""
-    repo, tree, name, onto = _target(root, path)
-    if not tree.exists():
-        raise Refusal(f"{tree} does not exist", command(*LAUNCH, "list"))
+    repo, tree, name, onto = target(root, path)
+    require(repo, tree, name, "normal")
     work = flow_for(root, repo)["work"]
     below = [(row["name"], Path(row["path"])) for row in ours(repo)]
     order: list[tuple[Path, str]] = []
@@ -35,7 +34,7 @@ def _cascade(root: Path, path: str) -> list[tuple[Path, str]]:
 
 def _holds(root: Path, tree: Path, base: str) -> bool:
     try:
-        _check_ancestor(root, tree, base)
+        check_ancestor(root, tree, base)
     except Refusal:
         return False
     return True
@@ -56,7 +55,7 @@ def _fork(tree: Path, key: str, base: str) -> str:
 def sync(root: Path, path: str) -> str:
     order = _cascade(root, path)
     for tree, _ in order:  # a dirty tree stops the cascade before any tree moves
-        _refuse_dirty(tree)
+        refuse_dirty(tree)
     keys = {
         tree: "branch." + git(tree, "symbolic-ref", "--short", "HEAD").strip() for tree, _ in order
     }
@@ -75,7 +74,7 @@ def sync(root: Path, path: str) -> str:
             git(tree, "rebase", "--abort", check=False)
             fix = act(
                 "agent",
-                f"resolve the conflict by hand (`{git_inline(tree, 'rebase', '--onto', base, forks[tree])}`), "
+                f"resolve the conflict (`{git_inline(tree, 'rebase', '--onto', base, forks[tree])}`; a ledger conflict is redone by the ledger's own writer, never hand-merged), "
                 f"then rerun `{inline(*cli_words(root, 'worktree', 'sync', path))}`",
             )
             raise Refusal(f"{tree} conflicts rebasing onto {base}", fix) from error

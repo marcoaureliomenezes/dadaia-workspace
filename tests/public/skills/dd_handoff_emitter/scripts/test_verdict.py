@@ -17,11 +17,21 @@ import pytest
 
 from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.skill_owner import load_owner
-from tests.fixtures.harness_env import suite_env
-from tests.helpers.oslib import read_text, write_text
+from tests.fixtures.harness_env import CLAUDE_SESSION_ENV_VAR, suite_env
+from tests.helpers.oslib import command, read_text, write_text
 from tests.helpers.oslib import run as os_run
 from tests.helpers.skill_scripts import stage_skill_scripts
-from tests.helpers.worktree_ws import commit, fixes, git, make_workspace, patch_cli, run
+from tests.helpers.worktree_ws import (
+    RELAUNCH,
+    approve,
+    commit,
+    fixes,
+    git,
+    make_workspace,
+    patch_cli,
+    record_session,
+    run,
+)
 
 PKG = Path(__file__).resolve().parents[5] / "dadaia_workspace"
 SKILL = "dd-handoff-emitter"
@@ -42,6 +52,7 @@ RESERVED = (
     "schema_version",
 )
 RED = "reviewer-emits-own-verdict (ADR 0218)"
+VERDICTS = ".dadaia/states/verdicts"
 
 
 def _workspace(tmp_path: Path) -> tuple[Path, Path, str]:
@@ -65,6 +76,7 @@ def _verdict(
     stdin: str | None = None,
     slug: str = "s",
     cwd: Path | None = None,
+    session: str | None = None,
     **over: str,
 ) -> subprocess.CompletedProcess[str]:
     script = root / ".agents/skills" / SKILL / "scripts/verdict.py"
@@ -80,13 +92,18 @@ def _verdict(
     env = suite_env(
         os.environ,
         Path.home(),
-        overrides={"PATH": os.environ["PATH"], "HOME": str(root), "GIT_CONFIG_NOSYSTEM": "1"},
+        overrides={
+            "PATH": os.environ["PATH"],
+            "HOME": str(root),
+            "GIT_CONFIG_NOSYSTEM": "1",
+            **({CLAUDE_SESSION_ENV_VAR: session} if session else {}),
+        },
     )
     return os_run(cmd, cwd=cwd or root, env=env, input=json.dumps(BODY) if stdin is None else stdin)
 
 
 def _written(root: Path) -> list[Path]:
-    return sorted((root / ".dadaia/handoff").glob("**/*.handoff.json"))
+    return sorted((root / VERDICTS).glob("**/*.handoff.json"))
 
 
 def test_a_verdict_binds_the_head_it_judged_and_the_merge_lands_on_it(tmp_path: Path) -> None:
@@ -94,7 +111,7 @@ def test_a_verdict_binds_the_head_it_judged_and_the_merge_lands_on_it(tmp_path: 
     done = _verdict(root, tree, sha=head)
     assert done.returncode == 0, done.stderr
     (path,) = _written(root)
-    assert path.parent == root / ".dadaia/handoff/c" and path.name.endswith(
+    assert path.parent == root / VERDICTS / "c" and path.name.endswith(
         "-dd-code-reviewer-s.handoff.json"
     )
     body = json.loads(read_text(path))
@@ -110,14 +127,40 @@ def test_a_verdict_binds_the_head_it_judged_and_the_merge_lands_on_it(tmp_path: 
     assert landed.returncode == 0, landed.stderr
 
 
+@pytest.mark.parametrize(
+    ("session", "recorded", "written"),
+    [
+        pytest.param(None, False, True, id="operator-terminal-no-session"),
+        pytest.param("recorded-sess", True, True, id="session-a-hook-governs"),
+        pytest.param("unrecorded-sess", False, False, id="session-no-hook-governs"),
+    ],
+)
+def test_a_verdict_is_written_only_by_a_session_the_workspace_governs(
+    tmp_path: Path, session: str | None, recorded: bool, written: bool
+) -> None:
+    """A reviewer subagent carries its parent's id, so it writes exactly when the parent does."""
+    root, tree, head = _workspace(tmp_path)
+    if recorded and session:
+        record_session(root, session)
+
+    done = _verdict(root, tree, sha=head, session=session)
+
+    assert (done.returncode == 0, len(_written(root))) == (written, int(written)), done.stderr
+    if not written:
+        assert fixes(done) == [RELAUNCH] and done.stdout == ""
+
+
 def test_a_verdict_for_a_sha_a_later_commit_left_behind_is_refused_by_the_merge(
     tmp_path: Path,
 ) -> None:
     root, tree, old = _workspace(tmp_path)
     assert _verdict(root, tree, sha=old).returncode == 0
-    commit(tree, "specs/later", "x\n")
+    head = commit(tree, "specs/later", "x\n")
     refused = run(root, "merge", str(tree))
-    assert refused.returncode != 0 and "reports validate" in refused.stderr
+    assert refused.returncode != 0
+    assert (
+        f"fix: Agent action: dispatch dd-code-reviewer on {tree} at HEAD {head}; " in refused.stderr
+    )
 
 
 _OWNED = "stdin sets keys verdict.py owns: "
@@ -177,7 +220,7 @@ def test_a_slug_that_climbs_out_is_refused_and_writes_nothing(tmp_path: Path) ->
     root, tree, head = _workspace(tmp_path)
     refused = _verdict(root, tree, sha=head, slug="../x")
     assert refused.returncode != 0 and refused.stderr
-    assert _written(root) == [] and not (root / ".dadaia/handoff/x").exists()
+    assert _written(root) == [] and not (root / VERDICTS / "x").exists()
 
 
 def _tree_files(top: Path) -> set[Path]:
@@ -212,7 +255,7 @@ def test_a_context_the_core_grammar_accepts_receives_its_verdict(tmp_path: Path,
     done = _verdict(root, tree, sha=head, **{"--context": ctx})
     assert done.returncode == 0, done.stderr
     (path,) = _written(root)
-    assert path.parent == root / ".dadaia/handoff" / ctx
+    assert path.parent == root / VERDICTS / ctx
 
 
 @pytest.mark.parametrize("stdin", ["[1]", "3", "null", '"s"'])
@@ -231,7 +274,7 @@ def test_a_non_object_json_is_refused_with_text_and_no_traceback(
 
 def test_a_verdict_in_a_second_already_taken_never_overwrites_the_first(tmp_path: Path) -> None:
     root, tree, head = _workspace(tmp_path)
-    out = root / ".dadaia/handoff/c"
+    out = root / VERDICTS / "c"
     out.mkdir(parents=True)
     now = datetime.now(UTC)
     taken = [
@@ -281,8 +324,6 @@ def _record(
     verdict: str,
     at: str,
     *,
-    hold: bool = False,
-    agent: str = "dd-code-reviewer",
     minute: str = "2026-10-12T10:00",
     context: str = "c",
 ) -> None:
@@ -290,7 +331,7 @@ def _record(
     produced = f"{minute}:{at}Z"
     body = {
         "schema_version": "handoff-v1.2",
-        "agent": agent,
+        "agent": "dd-code-reviewer",
         "context": context,
         "produced_at": produced,
         "verdict": verdict,
@@ -302,11 +343,9 @@ def _record(
     }
     schema = json.loads(read_text(PKG / "public/schemas/handoff-v1.schema.json"))
     jsonschema.validate(body, schema)
-    base = root / (
-        f".dadaia/reaped/x/.dadaia/handoff/{context}" if hold else f".dadaia/handoff/{context}"
-    )
+    base = root / VERDICTS / context
     base.mkdir(parents=True, exist_ok=True)
-    name = f"{produced.replace(':', '')}-{agent}-{verdict}-{scope.replace('/', '_')}.handoff.json"
+    name = f"{produced.replace(':', '')}-dd-code-reviewer-{verdict}-{scope.replace('/', '_')}.handoff.json"
     write_text(base / name, json.dumps(body, indent=2) + "\n")
 
 
@@ -318,6 +357,16 @@ def _stats_workspace(tmp_path: Path) -> Path:
         stage_skill_scripts(skill, root / ".agents/skills" / skill / "scripts")
     patch_cli(root, '"main_repo": "r"', '"name": "c", "main_repo": "r"')
     return root
+
+
+def _close(repo: Path, n: int) -> str:
+    """Commits candidate *n*'s CLOSURE phase under its subject and returns its sha."""
+    write_text(
+        repo / f"specs/releases/0.5.0/closure-{n}.md", "closed\n"
+    )  # a milestone commit touches its release folder
+    git(repo, "add", "specs")
+    git(repo, "commit", "-q", "-m", f"chore(release): rc-{n} phase CLOSURE")
+    return git(repo, "rev-parse", "HEAD").strip()
 
 
 def _log(root: Path, log: list[dict[str, str]]) -> None:
@@ -369,7 +418,7 @@ def test_stats_prints_the_local_metric_table_over_the_candidate_window(tmp_path:
     held by the reaper is read, and the oldest record read is printed whatever its window."""
     root = _stats_workspace(tmp_path)
     repo = root / "repos/r"
-    closure = git(repo, "rev-parse", "HEAD").strip()
+    closure = _close(repo, 99)
     _log(
         root,
         [
@@ -434,10 +483,9 @@ def test_stats_prints_the_local_metric_table_over_the_candidate_window(tmp_path:
     _record(root, f"wt/0.5.0/rc-99/job-3/wt-main{sha}", "APPROVED", "03")
     _record(root, f"wt/0.5.0/rc-99/job-3/wt-main{sha}", "REJECTED", "01")
     _record(root, f"wt/0.5.0/rc-99/job-1/wt-main{sha}", "APPROVED", "01")
-    _record(root, f"wt/0.5.0/wt-backlog-notes{sha}", "APPROVED", "01", hold=True)
+    _record(root, f"wt/0.5.0/wt-backlog-notes{sha}", "APPROVED", "01")
     _record(root, f"wt/0.5.0/free-tree{sha}", "REJECTED", "01")
     _record(root, f"wt/0.5.0/wt-hotfix-old{sha}", "REJECTED", "01", minute="2026-10-09T10:00")
-    _record(root, f"wt/0.5.0/rc-99/job-4/wt-main{sha}", "REJECTED", "01", agent="dd-sw-engineer-sr")
     _record(root, f"wt/0.5.0/rc-99/job-9/wt-main{sha}", "APPROVED", "01", context="other")
     _stub(root, "dd-bug-resolution", "bugs.py",
           'assert sys.argv[1] == "stats"\nprint("total\\t9")\nprint("closed\\t4\\nfix-induced\\t1\\nrebuild-due\\t1")\nprint("rebuild-due:a.py\\ta,z")\nprint("rebuild-due:b.py\\te,w")')  # fmt: skip
@@ -461,7 +509,7 @@ def test_stats_of_a_worktree_reads_the_same_table_as_the_repo_checkout(tmp_path:
     root = _stats_workspace(tmp_path)
     repo = root / "repos/r"
     _log(root, [_born("2026-10-12T09:00:00Z"),
-                _milestone("2026-10-12T11:00:00Z", "rc-99", "implemented", git(repo, "rev-parse", "HEAD").strip())])  # fmt: skip
+                _milestone("2026-10-12T11:00:00Z", "rc-99", "implemented", _close(repo, 99))])  # fmt: skip
     git(repo, "add", "-A")
     git(repo, "commit", "-qm", "state")
     tree = root / "worktrees/r/wt-rc"
@@ -476,7 +524,7 @@ def test_stats_of_a_worktree_reads_the_same_table_as_the_repo_checkout(tmp_path:
 def test_stats_reads_closure_duration_as_n_a_before_the_integration_merge(tmp_path: Path) -> None:
     root = _stats_workspace(tmp_path)
     repo = root / "repos/r"
-    closure = git(repo, "rev-parse", "HEAD").strip()
+    closure = _close(repo, 99)
     git(repo, "branch", "dev")
     _log(
         root,
@@ -511,6 +559,7 @@ def test_stats_reads_memory_drift_only_for_the_newest_candidate(tmp_path: Path) 
 
 def test_stats_window_of_a_first_candidate_opens_at_its_release_born_note(tmp_path: Path) -> None:
     root = _stats_workspace(tmp_path)
+    _close(root / "repos/r", 1)
     _log(
         root,
         [
@@ -597,6 +646,8 @@ def test_stats_counts_a_bug_closed_between_two_candidates_in_exactly_one_window(
     tmp_path: Path,
 ) -> None:
     root = _stats_workspace(tmp_path)
+    _close(root / "repos/r", 98)
+    _close(root / "repos/r", 99)
     _log(
         root,
         [
@@ -619,6 +670,7 @@ def test_stats_counts_a_bug_closed_between_two_candidates_in_exactly_one_window(
 
 def test_stats_window_of_the_first_candidate_has_no_lower_bound(tmp_path: Path) -> None:
     root = _stats_workspace(tmp_path)
+    _close(root / "repos/r", 1)
     _log(
         root,
         [
@@ -634,8 +686,9 @@ def test_stats_reads_the_closed_counts_by_running_the_bug_script_without_its_int
     tmp_path: Path,
 ) -> None:
     root = _stats_workspace(tmp_path)
+    _close(root / "repos/r", 99)
     scripts = root / ".agents/skills/dd-bug-resolution/scripts"
-    (scripts / "_bugs_store.py").unlink()
+    (scripts / "_bugs_write.py").unlink()
     _log(
         root,
         [
@@ -699,7 +752,7 @@ def test_stats_counts_the_integration_line_merge_not_a_back_merge_into_the_work_
     work = git(repo, "rev-parse", "--abbrev-ref", "HEAD").strip()
     _dev_side_merge(repo, "2026-10-12T08:00:00Z")
     git(repo, "commit", "-q", "--allow-empty", "-m", "feat(J1.T0): the closure")
-    closure = git(repo, "rev-parse", "HEAD").strip()
+    closure = _close(repo, 99)
     _log(
         root,
         [
@@ -718,6 +771,21 @@ def test_stats_counts_the_integration_line_merge_not_a_back_merge_into_the_work_
     assert "6 non-block commits after closure\t2\t0" in lines
 
 
+def test_stats_names_the_context_that_owns_the_repo_among_several(tmp_path: Path) -> None:
+    root = _stats_workspace(tmp_path)
+    decoy = '{"name": "x", "main_repo": "z", "associated_repos": [], "gitflow": {"integration": "main"}}, '  # fmt: skip
+    patch_cli(root, '[{"name": "c"', f"[{decoy}" + '{"name": "c"')
+    repo = root / "repos/r"
+    work = _dev_side_merge(repo, "2026-10-12T08:00:00Z")
+    git(repo, "commit", "-q", "--allow-empty", "-m", "feat(J1.T0): the closure")
+    closure = _close(repo, 99)
+    _log(root, [_born("2026-10-12T09:00:00Z"), _milestone("2026-10-12T11:00:00Z", "rc-99", "implemented", closure)])  # fmt: skip
+    _merge_at(repo, "dev", work, "2026-10-12T14:30:00Z")
+    done = _stats(root)
+    assert done.returncode == 0, done.stderr
+    assert "4 closure duration\t3.5 h\t<= 4 h" in done.stdout.splitlines()
+
+
 def test_stats_reads_closure_duration_as_n_a_when_no_integration_merge_holds_the_closure(
     tmp_path: Path,
 ) -> None:
@@ -725,7 +793,7 @@ def test_stats_reads_closure_duration_as_n_a_when_no_integration_merge_holds_the
     repo = root / "repos/r"
     _dev_side_merge(repo, "2026-10-12T08:00:00Z")
     git(repo, "commit", "-q", "--allow-empty", "-m", "feat(J1.T0): the closure")
-    closure = git(repo, "rev-parse", "HEAD").strip()
+    closure = _close(repo, 99)
     _log(
         root,
         [
@@ -763,6 +831,7 @@ def test_stats_with_the_root_found_and_the_cli_missing_refuses_with_the_install_
     tmp_path: Path,
 ) -> None:
     root = _stats_workspace(tmp_path)
+    _close(root / "repos/r", 99)
     _log(root, [_born("2026-10-12T09:00:00Z"), _milestone("2026-10-12T11:00:00Z", "rc-99", "implemented", "2" * 40)])  # fmt: skip
     shutil.rmtree(root / ".dadaia/.venv")
     refused = _stats(root)
@@ -879,10 +948,12 @@ def test_stats_refuses_a_release_check_that_exits_non_zero_with_no_finding(tmp_p
           'print("Traceback (most recent call last):", file=sys.stderr)\nsys.exit(1)')  # fmt: skip
     done = _stats(root, "0.5.0-rc18")
     assert (done.returncode, done.stdout) == (1, ""), done.stderr
-    assert done.stderr == (
-        "[error] release.py check exited 1\n"
-        f"fix: Agent action: fix the findings of release.py check on {(root / 'repos/r/specs').resolve()}\n"
-    )
+    specs = (root / "repos/r/specs").resolve()
+    lines = done.stderr.splitlines()
+    assert lines[0] == "[error] release.py check exited 1", done.stderr
+    release = (root / ".agents/skills/dd-release-implementation/scripts/release.py").resolve()
+    check = command(sys.executable, str(release), "check", "--specs", str(specs))
+    assert lines[1:] == [f"fix: {check}"], done.stderr
 
 
 def test_stats_of_a_milestone_without_sha_reads_n_a(tmp_path: Path) -> None:
@@ -1015,6 +1086,38 @@ def test_a_cli_crash_without_json_or_fix_line_is_refused_with_one_agent_action(
     assert _written(root) == []
 
 
+def test_a_cli_crash_with_its_own_fix_line_is_refused_with_that_one_fix_line(
+    tmp_path: Path,
+) -> None:
+    root, tree, head = _workspace(tmp_path)
+    patch_cli(
+        root,
+        _STUB_VALIDATE,
+        '    sys.stderr.write("[error] registry unreadable\\nfix: run the registry repair\\n")\n'
+        "    sys.exit(1)",
+    )
+    refused = _verdict(root, tree, sha=head)
+    assert refused.returncode == 1
+    assert refused.stderr == "[error] registry unreadable\nfix: run the registry repair\n"
+    assert _written(root) == []
+
+
+def test_a_cli_refusal_printed_as_error_colon_is_relayed_as_one_error_line(
+    tmp_path: Path,
+) -> None:
+    root, tree, head = _workspace(tmp_path)
+    patch_cli(
+        root,
+        _STUB_VALIDATE,
+        '    sys.stderr.write("Error: registry unreadable\\nfix: run the registry repair\\n")\n'
+        "    sys.exit(1)",
+    )
+    refused = _verdict(root, tree, sha=head)
+    assert refused.returncode == 1
+    assert refused.stderr == "[error] registry unreadable\nfix: run the registry repair\n"
+    assert _written(root) == []
+
+
 def test_stats_outside_a_workspace_is_refused_with_one_fix_line(tmp_path: Path) -> None:
     root, _tree, _head = _workspace(tmp_path)
     (away := tmp_path / "away").mkdir()
@@ -1034,3 +1137,32 @@ def test_a_workspace_without_its_cli_is_refused_with_the_install_fix_line(tmp_pa
     assert refused.returncode == 1
     assert refused.stderr.startswith("[error] no workspace CLI\nfix: uvx dadaia-workspace init ")
     assert refused.stderr.count("fix:") == 1 and _written(root) == []
+
+
+def test_the_approve_helper_writes_what_verdict_py_writes(tmp_path: Path) -> None:
+    root, tree, head = _workspace(tmp_path)
+    done = _verdict(root, tree, sha=head)
+    assert done.returncode == 0, done.stderr
+    real = Path(done.stdout.strip())
+    made = approve(root, head, name="0.5.0/wt-backlog-notes")
+    got, want = json.loads(read_text(made)), json.loads(read_text(real))
+    assert set(got) == set(want) - set(BODY)
+    assert {
+        k: got[k] for k in ("schema_version", "agent", "scope", "reviewed_sha", "diff_sha256")
+    } == {k: want[k] for k in ("schema_version", "agent", "scope", "reviewed_sha", "diff_sha256")}
+    assert re.fullmatch(r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ", got["produced_at"])
+    assert made.parent == real.parent
+    assert re.fullmatch(r"\d{4}-\d\d-\d\dT\d{6}Z-dd-code-reviewer-.+\.handoff\.json", made.name)
+
+
+@pytest.mark.parametrize("flag", [["--verd", "APPROVED"], ["--verdi=APPROVED"]])
+def test_a_prefix_of_the_verdict_flag_is_refused_and_writes_nothing(
+    tmp_path: Path, flag: list[str]
+) -> None:
+    root, tree, head = _workspace(tmp_path)
+    script = root / ".agents/skills" / SKILL / "scripts/verdict.py"
+    argv = [sys.executable, str(script), str(tree), "--sha", head, "--context", "c", "--slug", "s"]
+    refused = os_run([*argv, *flag, "--reason", "r"], cwd=root, input=json.dumps(BODY))
+    assert refused.returncode == 2
+    assert "the following arguments are required: --verdict" in refused.stderr
+    assert _written(root) == []

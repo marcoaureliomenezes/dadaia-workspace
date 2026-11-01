@@ -1,6 +1,6 @@
 """In-memory fakes for the container-built collaborators — unit tests without I/O."""
 
-from collections.abc import Collection
+from collections.abc import Callable, Collection
 from pathlib import Path
 from typing import Any
 
@@ -122,3 +122,9 @@ class NoWorktreeContainer:
 
     def build_git_client(self) -> Any:
         return container.build_git_client()
+
+
+def land_fix(render: Callable[..., str]) -> str:
+    """The Agent action an outside-the-gitflow push refusal prints, its CLI words rendered by *render*."""
+    merge, listing, new = (render(None, "worktree", verb) for verb in ("merge", "list", "new"))
+    return f"Agent action: land the work with {merge} on its tree (see {listing}), or open one with {new}"

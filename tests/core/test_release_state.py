@@ -21,6 +21,15 @@ def test_core_exposes_the_name_and_the_grammars_only() -> None:
     ]
 
 
+def test_the_status_module_is_gone_and_no_module_names_it() -> None:
+    importers = [
+        p.relative_to(_PACKAGE).as_posix()
+        for p in _PACKAGE.rglob("*.py")
+        if "core.spec_status" in read_text(p)
+    ]
+    assert (importers, (_PACKAGE / "core/spec_status.py").exists()) == ([], False)
+
+
 def test_no_release_validity_decision_lives_outside_the_script() -> None:
     offenders = [
         p.relative_to(_PACKAGE).as_posix()

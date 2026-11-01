@@ -3,7 +3,7 @@
 from collections.abc import Callable
 from pathlib import Path
 
-from dadaia_workspace.core.cli_line import fix_line
+from dadaia_workspace.core.cli_line import reinstall_fix
 from dadaia_workspace.core.model_registry import (
     AgentModelPolicyOverlay,
     AgentModelPolicyStoreError,
@@ -65,4 +65,4 @@ class PublicAssetService:
         if not blocking:
             return lines, ""
         remedy = next((line.fix for line in blocking if line.fix), "")
-        return lines, remedy or fix_line(workspace_root, "public", "install")
+        return lines, remedy or reinstall_fix(workspace_root, projected=True)

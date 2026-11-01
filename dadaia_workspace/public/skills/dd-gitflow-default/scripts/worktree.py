@@ -20,8 +20,10 @@ sys.path[:0] = [
 ]
 
 from _git import GitError
+from _jsonl import reinstall_fix
 from _platform import act, inline, use_utf8_stdio
 from _refusal import report, spell_fix
+from _specs import require_governed
 from _worktree_end import clean, digest, merge
 from _worktree_git import rows, workspace_of
 from _worktree_names import LAUNCH, Refusal
@@ -31,10 +33,12 @@ from _worktree_sync import sync
 
 __all__ = ["main"]
 
+_WRITES = {"new", "merge", "clean", "sync", "pause", "resume"}
+
 
 def main(argv: list[str] | None = None) -> int:
     use_utf8_stdio()
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     verbs = parser.add_subparsers(dest="verb", required=True)
     make = verbs.add_parser("new", help="open an rc, main, task, backlog or hotfix worktree")
     make.add_argument("repo")
@@ -69,8 +73,10 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if (root := workspace_of(Path.cwd(), Path(__file__))) is None:  # projected inside one
             raise Refusal(
-                "no workspace root above the cwd or this script", "uvx dadaia-workspace init"
+                "no workspace root above the cwd or this script", reinstall_fix(Path.cwd())
             )
+        if args.verb in _WRITES:
+            require_governed(root)
         if args.verb == "new":
             print(f"[ok] {new(root, args.repo, args.name)}")
             return 0
@@ -98,7 +104,10 @@ def main(argv: list[str] | None = None) -> int:
         words = sys.argv[1:] if argv is None else argv
         path = getattr(args, "path", None)
         again = inline(*LAUNCH, *(str(Path(w).resolve()) if w == path else w for w in words))
-        report(failure, act("agent", f"clear the git failure above, then rerun {again}"))
+        report(
+            failure,
+            act("agent", f"clear what `{inline(*failure.argv)}` reports above, then rerun {again}"),
+        )
         return 1
     if args.json:
         print(json.dumps(found, indent=2))

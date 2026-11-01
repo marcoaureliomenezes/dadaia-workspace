@@ -5,11 +5,8 @@ Scope: this file governs only `specs/ADRs/`.
 ## 1. Shape
 
 - JSONL, one record per line, `decisions.jsonl`, `decision-record-v1`.
-- Fields: `id` (NNNN, zero-padded, monotonic, gap-free, never reused), `ts`, `title`, `status`.
-- Fields (continued): `context`, `decision`, `options`, `consequences`, `measured_by`, `supersedes`, `amends`.
-- `options`: at least two, each `{name, tradeoff, rejected_because}`.
+- Fields, `options` and `status` values: the schema; `id` is zero-padded, monotonic, gap-free and never reused.
 - Threshold: a decision is an ADR only when all three legs hold: it is a one-way door, it is architecturally significant, and at least two genuine options exist; a decision failing a leg lives in its scoped law line or the SPEC.
-- `status` values: `proposed` | `accepted` | `rejected` | `superseded`.
 - `accepted` requires a non-empty `measured_by` naming the check; `.dadaia/.venv/bin/dadaia doctor` (`LEDGER-ADR-SCHEMA`) validates every record and the numbering.
 - Schema: `.dadaia/agentic/schemas/ADRs/decision-record-v1.schema.json`.
 

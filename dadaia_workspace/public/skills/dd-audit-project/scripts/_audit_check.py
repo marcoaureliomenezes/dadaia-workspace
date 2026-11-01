@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """What a valid audit tree is: every FINDINGS.jsonl record against `finding-record-v1`,
-every archived line against `histo-record-v1` under this ledger's four-word subset.
+every archived line against `histo-record-v1` under this ledger's three-word subset.
 
 This is what `audit.py check` reports and what every write validates its own result
 against — one definition of valid, so the writer and the validator cannot disagree.

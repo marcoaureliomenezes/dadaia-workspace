@@ -6,6 +6,7 @@ import ast
 import os
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 import pytest
@@ -15,6 +16,41 @@ from dadaia_workspace.core.skill_owner import load_owner
 K = load_owner("dd-bug-resolution", "_platform")
 _KERNEL_DIR = Path(K.__file__).parent
 _ENTRY_POINTS = sorted(_KERNEL_DIR.parents[1].glob("*/scripts/[!_]*.py"))
+
+
+def test_read_text_retries_a_read_the_swap_holds_then_returns_the_text(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    path = tmp_path / "a.md"
+    path.write_text("ok\n", encoding="utf-8")
+    calls: list[int] = []
+    real = Path.read_text
+
+    def held(self: Path, *args: object, **kwargs: object) -> str:
+        calls.append(1)
+        if len(calls) <= 3:
+            raise PermissionError("held open")
+        return real(self, *args, **kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(time, "sleep", lambda _s: None)
+    monkeypatch.setattr(Path, "read_text", held)
+    assert (K.read_text(path), len(calls)) == ("ok\n", 4)
+
+
+def test_read_text_raises_permissionerror_after_fifty_attempts_on_a_file_that_stays_held(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls: list[int] = []
+
+    def held(self: Path, *args: object, **kwargs: object) -> str:
+        calls.append(1)
+        raise PermissionError("denied")
+
+    monkeypatch.setattr(time, "sleep", lambda _s: None)
+    monkeypatch.setattr(Path, "read_text", held)
+    with pytest.raises(PermissionError):
+        K.read_text(tmp_path / "a.md")
+    assert len(calls) == 50
 
 
 def test_read_text_decodes_utf8_and_translates_crlf(tmp_path: Path) -> None:

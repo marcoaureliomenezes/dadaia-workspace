@@ -3,19 +3,27 @@
 
 from __future__ import annotations
 
-import json
 import shutil
 from pathlib import Path
 
 from _bugs_check import OPEN
-from _grammar import STATE
-from _platform import act, command, git_line, is_link
+from _git import git
+from _grammar import STATE, candidate_number
+from _jsonl import parse_object
+from _platform import act, command, is_link, read_text
 from _specs import check_release, parse
-from _worktree_git import flow_for, git, not_a_name, work_version, work_versions
+from _worktree_git import (
+    flow_for,
+    locked_add,
+    not_a_name,
+    reattach,
+    require,
+    work_version,
+    work_versions,
+)
 from _worktree_names import (
     LAUNCH,
     LEVEL_FILE,
-    LOCK,
     NAME_RE,
     Refusal,
     base_of,
@@ -53,14 +61,18 @@ def _refuse_unready(root: Path, main: Path, version: str, rc: str) -> None:
     rc_tree = tree_path(root, main.name, rc_name)
     state = rc_tree / "specs/releases" / version / STATE
     if not rc_tree.exists():  # removed by hand while its branch lives
-        raise Refusal(f"{rc_tree} does not exist", git_line(main, "worktree", "add", "-f", "-f", str(rc_tree), branch(rc_name)))  # fmt: skip
+        raise Refusal(f"{rc_tree} does not exist", reattach(main, rc_tree, rc_name))  # fmt: skip
     phase = None
     if state.is_file():
         check_release(rc_tree / "specs")
-        phase = json.loads(state.read_text("utf-8")).get("phase")
+        phase = parse_object(read_text(state), act("agent", f"repair {state} into a JSON object")).get("phase")  # fmt: skip
     if phase != "IMPLEMENTATION":
-        raise Refusal(f"a job needs release {version} in phase IMPLEMENTATION on {branch(rc_name)}",
-                      act("agent", f"reach phase IMPLEMENTATION in {STATE} on {branch(rc_name)} at {rc_tree} (release.py phase), then open its job again"))  # fmt: skip
+        nxt = f"{version}/rc-{candidate_number([rc]) + 1}/wt-rc"  # a phase never goes back: past IMPLEMENTATION the way on is the next candidate's own tree
+        fix = (command(*LAUNCH, "new", main.name, nxt) if phase == "CLOSURE"
+               else act("agent", f"reach phase IMPLEMENTATION in {STATE} on {branch(rc_name)} at {rc_tree} (release.py phase), then open its job again"))  # fmt: skip
+        raise Refusal(
+            f"a job needs release {version} in phase IMPLEMENTATION on {branch(rc_name)}", fix
+        )
 
 
 def absent_levels(root: Path, repo_name: str, name: str) -> list[tuple[Path, str]]:
@@ -93,10 +105,8 @@ def new(root: Path, repo_name: str, name: str) -> Path:
     if match["bug"]:
         _refuse_unopened_bug(root / "repos" / flow["main"], start, match["bug"])
     tree = tree_path(root, repo_name, name)
-    if git(repo, "branch", "--list", branch(name)).strip():
-        raise Refusal(f"{branch(name)} exists", command(*LAUNCH, "list"))
+    require(repo, tree, name, "absent")  # a branch, a folder or a paused bundle holds the name
     made = absent_levels(root, repo_name, name)
-    git(repo, "worktree", "add", "-q", "--lock", "--reason", f"{LOCK}{name}", "-b", branch(name),
-        str(tree), start)  # fmt: skip
+    git(repo, *locked_add(name, "-q", "-b", branch(name)), str(tree), start)
     write_level_files(made)
     return tree

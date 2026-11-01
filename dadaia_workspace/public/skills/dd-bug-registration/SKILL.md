@@ -7,7 +7,7 @@ description: >
 
 # dd-bug-registration
 
-> `dd-product-engineer` and `dd-sw-engineer-sr` register; every other agent, the reviewer included (in its verdict's `findings`), returns the proposal to the main thread; the propose/confirm rule lives in `specs/bugs/AGENTS.md` §1. Fixing a registered bug is dd-bug-resolution's.
+> Who writes `bugs/**`: `specs/AGENTS.md`, Artifact authority; the propose/confirm rule: `specs/bugs/AGENTS.md`, What a bug is. Fixing a registered bug is dd-bug-resolution's.
 
 ## 1. When
 
@@ -24,7 +24,7 @@ description: >
 5. Severity: CRITICAL a stall or data loss; HIGH a contract broken on the default
    path; MEDIUM off the default path or with a documented workaround; LOW a message
    or cosmetic defect.
-6. A subagent returns the proposal as a `bug-proposal:` finding (the reviewer: in its verdict's `findings`); the main thread puts it to the operator (after launch: the closure summary, `dd-manager-orchestration` §2 step 4).
+6. A subagent returns the proposal as a `bug-proposal:` finding (the reviewer: in its verdict's `findings`); the main thread puts it to the operator (after launch: the closure report, `dd-manager-orchestration` §2 step 4).
 
 ## 3. Register — after the operator confirms
 
@@ -35,13 +35,12 @@ description: >
      --bug-id <slug> --reported-by <agent> --title "…" --severity LOW\|MEDIUM\|HIGH\|CRITICAL \
      --component … --context … --symptom … --repro … --expected … --correlates <ids>\|none
    ```
-2. `--component` is the path of the failing component; siblings come from the fix files the ledger records, so no surface is typed.
-3. Propose `caused_by`: `git blame` the lines the fix will replace and name the bug or task of the commit that introduced them; `none` only when blame gives no candidate.
-4. `--correlates`: search `specs/bugs/BUGS.jsonl` and `specs/bugs/_archive/bugs_histo.jsonl` for the component path and the symptom, and list every hit; `none` only when both searches are empty.
-5. In a `wt-main` or `wt-backlog-<slug>` tree (`worktrees/AGENTS.md` §1), stage `BUGS.jsonl`; commit `chore(bugs): report <id>` — shape 1 of `dd-gitflow-default` §3a.
-6. A bug belongs to the context whose tooling broke: its own `specs/bugs/`, plus an
+2. `--component` is the path of the failing component; siblings come from the files each recorded bug's fix commit touched, so no surface is typed.
+3. `--correlates`: search `specs/bugs/BUGS.jsonl` and `specs/bugs/_archive/bugs_histo.jsonl` for the component path and the symptom, and list every hit; `none` only when both searches are empty.
+4. Stage `BUGS.jsonl` and commit it in the tree and message of shape 1 of `dd-gitflow-default` §3a.
+5. A bug belongs to the context whose tooling broke: its own `specs/bugs/`, plus an
    upstream report when the broken tool is someone else's.
-7. Hand the fix to `dd-bug-resolution` once the record exists.
+6. Hand the fix to `dd-bug-resolution` once the record exists.
 
 ## 4. Done when
 

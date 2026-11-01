@@ -10,8 +10,8 @@ Scope: this file governs only `specs/audits/`.
 
 - Each audit session produces a directory named `<YYYYMMDD>-<slug>/` holding its committed findings and summary.
 - That directory holds `AUDIT.md` and `FINDINGS.jsonl` (one record per finding, appended once).
-- A finding's disposition moves only by `python3 .agents/skills/dd-audit-project/scripts/audit.py disposition <dir> <finding-id> ...` (`--help` lists the dispositions); every other field stays byte-identical.
-- Once none is `open`: `python3 .agents/skills/dd-audit-project/scripts/audit.py close <dir> --sha <window-end>` appends the one `histo-record-v1` and deletes the directory.
+- A finding's disposition moves only by `python3 .agents/skills/dd-audit-project/scripts/audit.py disposition <dir> <finding-id> --disposition <disposition> --specs <specs-dir>` (`--help` lists the dispositions); every other field stays byte-identical.
+- Once none is `open`: `python3 .agents/skills/dd-audit-project/scripts/audit.py close <dir> --sha <window-end> --specs <specs-dir>` appends the one `histo-record-v1` and deletes the directory.
 
 ## 2. Relationship to releases
 

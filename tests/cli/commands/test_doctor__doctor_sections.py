@@ -23,6 +23,7 @@ from dadaia_workspace.cli.help_digest import command_paths
 from dadaia_workspace.cli.main import app
 from dadaia_workspace.core.cli_line import git_line
 from dadaia_workspace.core.specs_version import state
+from tests.helpers.cli_root import live_root
 from tests.helpers.oslib import read_text, run, write_text
 from tests.helpers.oslib import write_text as os_write_text
 
@@ -126,7 +127,7 @@ def test_doctor_release_findings_are_the_scripts(tmp_path: Path, over: dict[str,
 def test_specs_doctor_and_backlog_doctor_commands_are_gone() -> None:
     """(c) the two replaced commands are DELETED, not aliased — no hidden survivor in
     the Typer tree, and therefore none in the backlog subject registry's CLI anchors."""
-    anchors = {" ".join(p) for p in command_paths()}
+    anchors = {" ".join(p) for p in command_paths(live_root())}
     assert "specs doctor" not in anchors
     assert "backlog doctor" not in anchors
     assert "doctor" in anchors

@@ -36,9 +36,9 @@ def _spawn(ws: Path, payload: dict[str, Any]) -> Any:
         ("Write", {"file_path": "repos/a/src/thing.py"}, "@wt"),
         ("NotebookEdit", {"notebook_path": "junk.ipynb"}, None),
         ("Read", {"file_path": "x"}, None),
-        ("Write", {"file_path": ".dadaia/sessions/a.json"}, "SEC-01"),
+        ("Write", {"file_path": ".dadaia/sessions/a.json"}, "CWE-284"),
         ("Write", {"file_path": "junk.txt"}, "ROOT WHITELIST GATE"),
-        ("apply_patch", {"command": _PATCH.format(".dadaia/sessions/a.json")}, "SEC-01"),
+        ("apply_patch", {"command": _PATCH.format(".dadaia/sessions/a.json")}, "CWE-284"),
         *[("Write", {"file_path": p}, "[GATE]") for p in ("AGENTS.md", ".dadaiaignore", ".claude/settings.json", ".dadaia/hooks/w.sh", ".dadaia/states/spec_contexts.json")],
         ("Edit", {"file_path": "repos/a/secrets/k"}, "protected glob 'secrets'"),
         ("apply_patch", {"command": _PATCH.format("worktrees/a/0.5.0-rc1/j1/secrets/k")}, "protected glob 'secrets'"),
@@ -82,7 +82,10 @@ def test_non_write_and_protected_matrix(
     write_text(tmp_path / ".dadaiaignore", "[protected]\nsecrets\n")
     for tree in ("0.5.0-rc1/j1", "scratch", "scratch/any", "x/y/z"):  # a linked worktree's root holds a .git file
         (tmp_path / "worktrees" / "a" / tree).mkdir(parents=True)
-        write_text(tmp_path / "worktrees" / "a" / tree / ".git", "gitdir: ../../main/.git/worktrees/j1\n")
+        admin = tmp_path / "repos/a/.git/worktrees" / tree.replace("/", "-")
+        admin.mkdir(parents=True)
+        write_text(admin / "gitdir", f"{(tmp_path / 'worktrees' / 'a' / tree / '.git').as_posix()}\n")
+        write_text(tmp_path / "worktrees" / "a" / tree / ".git", f"gitdir: {admin.as_posix()}\n")
     rooted = {k: v if k == "command" else str(tmp_path / v) for k, v in tool_input.items()}
     block = _spawn(tmp_path, {"tool_name": tool, "tool_input": rooted}).block_envelope()
     if want is None:

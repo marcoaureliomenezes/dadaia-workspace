@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import io
 import json
+import shutil
 import subprocess
 import sys
 from collections.abc import Callable
@@ -13,7 +14,7 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.core.skill_owner import load_owner
-from tests.helpers.oslib import cli_path, command, write_text
+from tests.helpers.oslib import cli_path, command, stub_cli, write_text
 
 
 def _bound_fix(ws: Path, _capsys: pytest.CaptureFixture[str], _mp: pytest.MonkeyPatch) -> str:
@@ -71,3 +72,140 @@ def test_run_cli_with_the_root_found_and_the_cli_missing_refuses_with_the_instal
     with pytest.raises(specs.Refusal) as refused:
         specs.run_cli(tmp_path, "context", "list")
     assert refused.value.fix == command("uvx", "dadaia-workspace", "init", str(tmp_path))
+
+
+_ROWS = [
+    {"name": "c", "main_repo": "r", "associated_repos": [{"slug": "a"}, {"slug": "gone"}]},
+    {"name": "d", "main_repo": "z", "associated_repos": [{"slug": "y"}]},
+]
+
+
+def _init(repo: Path) -> None:
+    repo.mkdir(parents=True)
+    subprocess.run(["git", "init", "-q", str(repo)], check=True)
+
+
+def _workspace(root: Path, cli: str) -> Path:
+    """A workspace whose CLI runs *cli*, holding checkouts r, a (of context c), q (of none) and y (of d)."""
+    (cli_dir := cli_path(root).parent).mkdir(parents=True)
+    stub_cli(cli_dir, "dadaia", cli)
+    (root / ".dadaia/states").mkdir(parents=True)
+    write_text(root / ".dadaia/states/spec_contexts.json", "{}")
+    for slug in ("r", "a", "q", "y"):
+        _init(root / "repos" / slug)
+    return root
+
+
+def _answering(root: Path) -> Path:
+    return _workspace(root, f"#!python\nimport json\nprint(json.dumps({_ROWS!r}))\n")
+
+
+def test_context_row_answers_the_context_that_owns_a_main_or_associated_repo(
+    tmp_path: Path,
+) -> None:
+    specs = load_owner("dd-bug-resolution", "_specs")
+    root = _answering(tmp_path)
+    assert [(specs.context_row(root, root / "repos" / s) or {}).get("name") for s in ("r", "a", "q", "y")] == ["c", "c", None, "d"]  # fmt: skip
+
+
+def test_context_repos_is_the_repo_and_the_existing_checkouts_its_context_associates(
+    tmp_path: Path,
+) -> None:
+    specs = load_owner("dd-bug-resolution", "_specs")
+    root = _answering(tmp_path)
+    assert list(specs.context_repos(root / "repos/r")) == [root / "repos/r", root / "repos/a"]
+    assert list(specs.context_repos(root / "repos/q")) == [root / "repos/q"]
+
+
+def test_context_repos_of_a_repo_with_no_workspace_or_no_cli_is_the_repo_alone(
+    tmp_path: Path,
+) -> None:
+    specs = load_owner("dd-bug-resolution", "_specs")
+    (repo := tmp_path / "bare/repos/r").mkdir(parents=True)
+    assert list(specs.context_repos(repo)) == [repo]
+    (root := tmp_path / "ws").mkdir()
+    (root / ".dadaia/states").mkdir(parents=True)
+    write_text(root / ".dadaia/states/spec_contexts.json", "{}")
+    (repo := root / "repos/r").mkdir(parents=True)
+    assert list(specs.context_repos(repo)) == [repo]
+
+
+def test_a_cli_that_runs_and_fails_refuses_with_its_own_fix_line(tmp_path: Path) -> None:
+    specs = load_owner("dd-bug-resolution", "_specs")
+    root = _workspace(
+        tmp_path,
+        "#!python\nimport sys\nprint('[error] bad row', file=sys.stderr)\n"
+        "print('fix: Agent action: repair the registry row', file=sys.stderr)\nsys.exit(1)\n",
+    )
+    for ask in (lambda: specs.context_row(root, root / "repos/r"), lambda: list(specs.context_repos(root / "repos/r"))):  # fmt: skip
+        with pytest.raises(specs.Refusal) as refused:
+            ask()
+        assert refused.value.fix == "Agent action: repair the registry row"
+
+
+def test_context_row_names_a_linked_worktree_by_its_checkout_wherever_it_sits(
+    tmp_path: Path,
+) -> None:
+    specs = load_owner("dd-bug-resolution", "_specs")
+    root = _answering(tmp_path)
+    git = ["git", "-C", str(root / "repos/r"), "-c", "user.name=t", "-c", "user.email=t@t"]
+    subprocess.run([*git, "commit", "-q", "--allow-empty", "-m", "c"], check=True)
+    subprocess.run([*git, "worktree", "add", "-q", str(tree := root / ".dadaia/tmp/scratch")], check=True)  # fmt: skip
+    assert (specs.context_row(root, tree) or {}).get("name") == "c"
+
+
+def test_a_repo_nested_under_a_fenced_workspace_starts_no_cli_of_it(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    specs = load_owner("dd-bug-resolution", "_specs")
+    log = tmp_path / "spawns"
+    root = _workspace(tmp_path, f"#!python\nopen({str(log)!r}, 'a').write('x')\nprint('[]')\n")
+    _init(probe := root / ".dadaia/tmp/probe/repos/r")
+    monkeypatch.setenv("DADAIA_FENCED_ROOTS", str(root))
+    assert list(specs.context_repos(probe)) == [probe]
+    assert not log.exists()
+
+
+def test_a_path_that_is_no_repository_starts_no_cli_of_the_workspace_it_is_run_from(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    specs = load_owner("dd-bug-resolution", "_specs")
+    log = tmp_path / "spawns"
+    root = _workspace(
+        tmp_path / "ws", f"#!python\nopen({str(log)!r}, 'a').write('x')\nprint('[]')\n"
+    )
+    (loose := tmp_path / "loose").mkdir()
+    monkeypatch.chdir(root)
+    monkeypatch.setenv("DADAIA_FENCED_ROOTS", str(root))
+    assert list(specs.context_repos(loose)) == [loose]
+    assert not log.exists()
+
+
+def test_context_row_finds_a_checkout_by_the_path_the_workspace_keeps_it_at(
+    tmp_path: Path,
+) -> None:
+    """The repo registered as `r` lives at `repos/r`, whatever its real folder is called."""
+    specs = load_owner("dd-bug-resolution", "_specs")
+    root = _answering(tmp_path / "ws")
+    (real := tmp_path / "elsewhere/odd-name").parent.mkdir()
+    shutil.rmtree(root / "repos/r")
+    _init(real)
+    try:
+        (root / "repos/r").symlink_to(real, target_is_directory=True)
+    except OSError:
+        pytest.skip("symlinks unavailable")
+    assert (specs.context_row(root, real) or {}).get("name") == "c"
+
+
+def test_context_row_does_not_take_a_foreign_repo_named_like_a_slug(tmp_path: Path) -> None:
+    specs = load_owner("dd-bug-resolution", "_specs")
+    root = _answering(tmp_path / "ws")
+    _init(foreign := tmp_path / "foreign/r")
+    assert specs.context_row(root, foreign) is None
+
+
+def test_context_row_of_a_path_that_is_no_repository_names_no_owner(tmp_path: Path) -> None:
+    specs = load_owner("dd-bug-resolution", "_specs")
+    root = _answering(tmp_path / "ws")
+    (loose := tmp_path / "loose").mkdir()
+    assert specs.context_row(root, loose) is None

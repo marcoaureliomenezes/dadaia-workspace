@@ -117,3 +117,16 @@ def test_tree8_stray_root_folder_errors_and_fix_keeps_it(tmp_path: Path) -> None
     codes = [f["code"] for f in _specs_findings(fix_result.output)]
     assert "TREE-8" in codes, f"TREE-8 must still be reported after --fix; got {codes}"
     assert fix_result.exit_code != 0, fix_result.output
+
+
+def test_the_fix_help_composes_the_workspace_steps_from_their_owner() -> None:
+    from dadaia_workspace.features.spec_context import doctor as owner
+
+    out = _runner.invoke(app, ["doctor", "--help"], terminal_width=400).output
+
+    text = " ".join(out.replace("│", " ").split())
+    assert text.count(owner.EXPIRE_STEPS) == 2  # --fix and --expired-only
+    assert text.count(owner.REAP_STEPS) == 1
+    assert text.index(owner.REAP_STEPS) < text.index("re-checks")
+    assert "never auto-fixed" not in text
+    assert "deletes only those" not in text

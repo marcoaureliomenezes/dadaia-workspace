@@ -1,8 +1,8 @@
 # CLAUDE-CODE.md — Claude Code Harness Mastery
+Sections: 1. Agentic loop model and the compaction boundary · 2. Context hierarchy decision protocol (ADR-style) · 3. Rules enforcement model — always-on vs path-scoped · 4. Skills mechanics — and the listing-budget tax · 5. Hooks lifecycle — the determinism primitive · 6. Subagents and dispatch authority · 7. Tools and permission model · 8. MCP and tool-search · Composition decision tree · 9. Official reference index (on-demand links — no content copied)
 
-Sections: 1. Agentic loop model and the compaction boundary; 2. Context hierarchy decision protocol (ADR-style); 3. Rules enforcement model — always-on vs path-scoped; 4. Skills mechanics — and the listing-budget tax; 5. Hooks lifecycle — the determinism primitive; 6. Subagents and dispatch authority; 7. Tools and permission model; 8. MCP and tool-search; Composition decision tree; 9. Official reference index (on-demand links — no content copied).
 Sibling of [`SKILL.md`](SKILL.md) (`dd-ai-eng-knowhow`, authoring depth).
-A decision surface, not a doc mirror — official docs are an on-demand index at §9; consult, never transcribe.
+A decision surface, not a doc mirror — official docs are an on-demand index at "Official reference index"; consult, never transcribe.
 
 - Governing law: the model decides, the harness enforces.
 - CLAUDE.md, memory, rules, skill bodies shape behavior — context, not guarantee.
@@ -42,8 +42,7 @@ A decision surface, not a doc mirror — official docs are an on-demand index at
 | Topic instructions, maybe directory-specific | Rule (`.claude/rules/*.md`) | Every session (unscoped) or on match (`paths:`) | Harness-only modular instructions; law lives in `AGENTS.md` |
 | Sometimes-needed reference | Skill (`SKILL.md`) | Description every session; body on invoke | Multi-step protocol, deep reference |
 
-- CLAUDE.md past ~200 lines: move reference material to skills, split law into scoped `AGENTS.md` files.
-- A long CLAUDE.md lowers adherence.
+- CLAUDE.md past ~200 lines lowers adherence: move reference material to skills, split law into scoped `AGENTS.md` files.
 - A "see X" prose pointer loads nothing in Claude Code — only an `@import` or a symlink pulls a file in.
 - Personal machine-local content goes to `~/.claude/` and `CLAUDE.local.md` (gitignored).
 
@@ -60,10 +59,6 @@ A decision surface, not a doc mirror — official docs are an on-demand index at
 
 - A rule fires by presence in context — advisory, the model is expected to comply.
 - A skill is invoked — its body enters context on demand and the model acts on it.
-- Rule of separation: standing law coloring all reasoning -> the root map or a scoped `AGENTS.md`.
-- A procedure run on a specific task -> skill.
-- A guarantee that must hold regardless of model choice -> hook.
-- Gotcha: an unscoped rule loads every session even when irrelevant.
 - Add `paths:` for subtree-only instructions; reserve always-on for genuinely global instructions.
 
 ---
@@ -85,7 +80,6 @@ A decision surface, not a doc mirror — official docs are an on-demand index at
 - Overflow drops least-used descriptions first, causing mis-triggering.
 - Split-vs-merge: split a skill only on genuinely distinct triggers; otherwise merge to one description.
 - Prefer `user-invocable: false` for agent-internal protocols nobody types as a command.
-- Gotcha: `applyTo` is silently ignored by Claude Code — the native path-scoping field is `paths:`.
 
 ---
 
@@ -112,10 +106,8 @@ A decision surface, not a doc mirror — official docs are an on-demand index at
 | `Edit\|Write` (letters/`_`/`\|`) | Exact tool name or `\|`-list |
 | anything else | JavaScript regex (e.g. `^Notebook`, `mcp__.*`) |
 
-- Gotcha: an empty matcher fires on every tool (`Read`, `Grep`, `Glob`, `WebFetch`, `TaskCreate` too).
-- Scope write-gates to `Edit|Write|MultiEdit|NotebookEdit`.
-- Inject full static context once (session-keyed sentinel), never every prompt.
-- `UserPromptSubmit` may fire every prompt but must stay a silent no-op after the first injection, until the session's bind changes or it compacts.
+- A gate's matcher is its harness's entry in `hook_wrappers.HOOK_DIALECTS`: scope it to the tools the gate judges.
+- Context injection: the rule is `decide_injection` in `injection_policy.py`, not restated here.
 - PreToolUse is a guardrail, not a hard boundary — a script that writes files itself can slip past it.
 - Keep a server-side backstop (a `doctor` check) for true enforcement.
 - Hooks run unsandboxed on the operator's machine, only after project-trust is accepted.
@@ -157,10 +149,7 @@ A decision surface, not a doc mirror — official docs are an on-demand index at
 - Narrow a subagent's surface with `tools:`/`disallowedTools:` rather than broad global allows.
 - Background subagents auto-deny anything that would prompt.
 - A blanket-allow layer is acceptable only when real enforcement lives in correctly-scoped hooks.
-- Prune dead/stale permission entries.
-- Gotcha: nothing enforces the per-persona write-allowlist.
 - Native frontmatter (`name`, `description`, `model`, `tools`, `skills`, `maxTurns`) is honored.
-- dadaia's PreToolUse gate is persona-blind: path-class x scope only.
 
 ---
 
@@ -187,9 +176,8 @@ Must it hold EVERY time, regardless of what the model decides?
       |- yes -> Does it govern only one subtree?
       |         |- yes -> a scoped `AGENTS.md` (never always-on for subtree law).
       |         `- no  -> the root `AGENTS.md` map.
-      |                   (A "see X" prose pointer loads nothing — @import it).
       `- no -> Is it a procedure / reference needed only sometimes?
-         |- yes -> SKILL. Path-scope with paths:, not applyTo:.
+         |- yes -> SKILL. Path-scope with paths:.
          |         Mind the listing tax: tight description, split only on distinct
          |         triggers, user-invocable:false for internal protocols.
          `- no -> Does a side task flood the main window with output?

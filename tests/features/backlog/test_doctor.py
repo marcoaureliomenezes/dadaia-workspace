@@ -101,3 +101,23 @@ def test_the_doctor_judges_a_live_entry_as_backlog_py_check_does(row: str, tmp_p
     found = [f for f in section.findings if f.code.startswith(("BL-", _LEDGER))]
     assert [f.code for f in found] == expected, [f.message for f in found]
     assert all(f.error and not f.fix.startswith("sed") for f in found)
+
+
+def test_a_corrupt_backlog_document_is_one_finding_naming_the_file_with_a_fix_line(
+    tmp_path: Path,
+) -> None:
+    """A BACKLOG.json that does not parse yields exactly one finding, the ledger's, naming that
+    file with its fix line; the doctor's own anchor rules add no second voice on the same fact."""
+    specs = tmp_path / "specs"
+    (specs / "backlog").mkdir(parents=True)
+    (tmp_path / "pkg").mkdir()
+    write_text(tmp_path / "pkg" / "m.py", _SOURCE)
+    run(["git", "init", "-q"], cwd=tmp_path, check=True)
+    write_text(specs / "backlog" / "BACKLOG.json", '{"schema": "backlog-v1", "active": [')
+
+    section = _ledgers_section(None, specs)
+
+    found = [f for f in section.findings if f.code.startswith(("BL-", _LEDGER))]
+    assert [f.code for f in found] == [_LEDGER]
+    assert "BACKLOG.json" in found[0].message
+    assert found[0].error and found[0].fix

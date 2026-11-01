@@ -2,7 +2,7 @@
 """Validate and write a release's `_RELEASE.json` and SPEC stub, stdlib only.
 
 Also validates the candidate's SPEC/PLAN/job files and the ship ledger. Every write is validated by `check`
-before an atomic replace; `ship` records the merged promote PR and moves the release to `_archive/<v>/`.
+before an atomic replace; `ship` records the promote merge and moves the release to `_archive/<v>/`.
 """
 
 from __future__ import annotations
@@ -22,10 +22,11 @@ sys.path[:0] = [
     str(Path(__file__).resolve().parents[2] / "dd-bug-resolution" / "scripts"),
 ]
 
+import _bugs_store as store
 import _findings
 import _ledger
 from _clock import now_iso as utc_now
-from _grammar import SHA_RE, STATE
+from _grammar import STATE
 from _platform import Undecodable, act, read_text, use_utf8_stdio
 from _platform import replace as move
 from _refusal import Refusal, report
@@ -36,27 +37,25 @@ from _release_schema import (
     _ORIGIN_GRAMMAR,
     HISTO,
     ORIGIN_KINDS,
+    SCRIPT,
     closure_summary,
     origin,
 )
 from _release_store import (
-    SCRIPT,
     Live,
-    at_head,
     commit,
     live_release,
-    open_bug_ids,
     window_start,
 )
 from _release_tree import check, drift, memory_errors, ship_findings
-from _specs import choice, find_specs, refuse
+from _specs import choice, find_specs, refuse, require_governed, workspace_of
 
 _HELP = {
     "new": "open the next candidate: its rc-<N+1>/SPEC.md stub and _RELEASE.json, in one act",
     "phase": "move the live release to IMPLEMENTATION or CLOSURE, stamping its milestone",
     "drift": "the closure worklist over the live release's memory window (memory.py drift)",
     "memory": "append a structured `kind: memory` entry to the live log",
-    "ship": "record the merged promote PR: shipped, a delivered histo line, the dir archived",
+    "ship": "record the promote merge: shipped, a delivered histo line, the dir archived",
     "origin": "print the ids a SPEC's **Origin:** line carries, one `<kind> <id>` per line",
     "check": "validate every _RELEASE.json under releases/ and the ship ledger",
 }
@@ -68,7 +67,7 @@ def _mentions(text: str, bug_id: str) -> bool:
 
 
 def _parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     sub = parser.add_subparsers(dest="verb", required=True)
     for verb, help_text in _HELP.items():
         command = sub.add_parser(verb, help=help_text)
@@ -81,8 +80,6 @@ def _parser() -> argparse.ArgumentParser:
             command.add_argument("--origin", default="operator-demand", help=_ORIGIN_GRAMMAR)
         if verb == "phase":
             command.add_argument("phase", help="IMPLEMENTATION or CLOSURE")
-        if verb in ("phase", "ship"):
-            command.add_argument("--sha", required=True, help="the commit the milestone names")
         if verb == "ship":
             command.add_argument("--pr", help="the merged promote PR number, when the host has one")
             command.add_argument(
@@ -94,7 +91,7 @@ def _parser() -> argparse.ArgumentParser:
             )
         if verb == "memory":
             for name in ("--reviewed", "--changed"):
-                command.add_argument(name, default="", help="comma-separated worklist entries")
+                command.add_argument(name, default="", help="comma-separated atom slugs")
         if verb in ("check", "drift"):
             command.add_argument("--json", action="store_true", help="emit findings as JSON")
     return parser
@@ -128,23 +125,32 @@ def _origin(spec: Path) -> int:
     return 0
 
 
+def _subject(live: Live, tail: str) -> None:
+    """Print the subject the milestone commit carries (the one reader of it is `_memory_drift.by_subject`)."""
+    if live.candidate:
+        print(f"commit subject: chore(release): {live.candidate.name} {tail}")
+
+
 def _phase(args: argparse.Namespace, specs: Path) -> int:
-    release_id, ts = set_phase(specs, args.phase.upper(), args.sha)
+    release_id, ts = set_phase(specs, args.phase.upper())
     print(f"[ok] release {release_id} -> phase {args.phase.upper()} ({ts})")
+    _subject(live_release(specs), f"phase {args.phase.upper()}")
     return 0
 
 
 def _drift(args: argparse.Namespace, specs: Path) -> int:
-    """The worklist over the window `memory` records: from the newest recorded bound HEAD reaches, else the root commit."""
-    report = drift.report(specs, drift.reach(specs.parent, window_start(live_release(specs).state)))
+    """The worklist over the window `memory` records: from the newest earlier candidate's memory pass HEAD reaches, else the live IMPLEMENTATION commit, else the root commit."""
+    report = drift.report(
+        specs, drift.reach(specs.parent, window_start(specs.parent, live_release(specs)))
+    )
     print(json.dumps(report, indent=2) if args.json else drift.render(report))
     return 1 if report["atoms"] or report["uncovered"] else 0
 
 
 def _memory(args: argparse.Namespace, specs: Path) -> int:
-    """Append the record over the ledger-derived window, refused unless its worklist was worked."""
+    """Append the record over the window `drift` reports, refused unless its worklist was worked."""
     live, ts = live_release(specs), utc_now()
-    since = drift.reach(specs.parent, window_start(live.state))
+    since = drift.reach(specs.parent, window_start(specs.parent, live))
     lists = [[s for s in getattr(args, n).split(",") if s] for n in ("reviewed", "changed")]
     try:
         until = drift.git(specs.parent, "rev-parse", "HEAD")[0]
@@ -160,16 +166,17 @@ def _memory(args: argparse.Namespace, specs: Path) -> int:
     except drift.Refusal as refusal:
         raise Refusal(str(refusal), refusal.fix) from refusal
     if errors:
-        raise Refusal(errors[0], SCRIPT("memory", "--help"))
+        raise errors[0]
     commit(live.release_dir / STATE, f"releases/{live.release_id}/{STATE}",
            lambda state: {**state, "log": [*(state.get("log") or []), entry]})  # fmt: skip
     print(f"[ok] release {live.release_id} log <- kind memory {since}..{until[:12]} ({ts})")
+    _subject(live, "memory pass recorded")
     return 0
 
 
 def _allowed_open_bugs(args: argparse.Namespace, specs: Path) -> list[str]:
     """The `--allow-open` ids, once each, matching the open bugs exactly; refuses otherwise."""
-    open_ids = open_bug_ids(specs)
+    open_ids = store.open_ids(specs)
     allowed = sorted(set(args.allow_open))
     if len(allowed) != len(args.allow_open):
         raise Refusal(
@@ -201,7 +208,7 @@ def _refuse_unauthorized(allowed: list[str], state: dict[str, Any]) -> None:
     for bug_id in allowed:
         authorized = any(
             entry.get("kind") == "note"
-            and "Operator authorization verbatim:" in str(entry.get("text", ""))
+            and str(entry.get("text", "")).startswith("Operator authorization verbatim:")
             and _mentions(str(entry.get("text", "")), bug_id)
             for entry in log
         )
@@ -229,26 +236,22 @@ def _record_ship(args: argparse.Namespace, specs: Path, live: Live, ts: str) -> 
         raise Refusal(f"the ship ledger would not pass check: {errors[-1]['message']}",
                       SCRIPT("check"))  # fmt: skip
     commit(live.release_dir / STATE, f"releases/{live.release_id}/{STATE}",
-           lambda s: {**s, "shipped": {"sha": args.sha, "pr": int(args.pr) if args.pr else None, "ts": ts}})  # fmt: skip
+           lambda s: {**s, "shipped": {"pr": int(args.pr) if args.pr else None, "ts": ts}})  # fmt: skip
     _ledger.replace(histo, kept + line)
     move(live.release_dir, specs / "releases" / "_archive" / live.release_id)
 
 
 def _ship(args: argparse.Namespace, specs: Path) -> int:
-    """CLOSURE -> shipped {sha, pr, ts}, one `delivered` histo line, the whole directory
+    """CLOSURE -> shipped {pr, ts}, one `delivered` histo line, the whole directory
     moved to `_archive/<v>/`, never deleted; refused on any `ship_findings`."""
     live, ts = live_release(specs), utc_now()
-    if not (SHA_RE.match(args.sha) and (args.pr is None or args.pr.isdigit() and int(args.pr) > 0)):
-        raise choice(Refusal(f"--sha {args.sha!r} / --pr {args.pr!r}: a hex sha and, if given, a PR number",
-                             SCRIPT("ship", "--sha", args.sha) if SHA_RE.match(args.sha) else at_head(specs, "ship")), SHIP_PR)  # fmt: skip
+    if not (args.pr is None or args.pr.isdigit() and int(args.pr) > 0):
+        raise choice(Refusal(f"--pr {args.pr!r}: a PR number, when the host has one", SCRIPT("ship")), SHIP_PR)  # fmt: skip
     if found := ship_findings(specs):
         raise Refusal(found[0]["message"], found[0]["fix"])
     _refuse_unauthorized(_allowed_open_bugs(args, specs), live.state)
     _record_ship(args, specs, live, ts)
-    print(
-        f"[ok] release {live.release_id} shipped at {args.sha}"
-        + (f" (PR #{args.pr})" if args.pr else "")
-    )
+    print(f"[ok] release {live.release_id} shipped" + (f" (PR #{args.pr})" if args.pr else ""))
     return 0
 
 
@@ -264,20 +267,25 @@ def main(argv: list[str] | None = None) -> int:
     specs = find_specs(args.specs, ledger=None if reads else f"specs/releases/{STATE}")
     if args.verb == "check":
         findings = check(specs)
-        errors = [f for f in findings if f["verdict"] == "error"]
         origin_rows = [f for f in findings if f["message"].startswith("Origin ")]
         publish_origin = bool(origin_rows) and all(
             f["verdict"] == "info" and f["message"].endswith(" traced") for f in origin_rows
         )
-        json_findings = [
-            f
-            for f in findings
-            if f["verdict"] == "error" or (publish_origin and f["message"].startswith("Origin "))
-        ]
         # JSON adds Origin trace information; only errors control the exit status.
-        print(json.dumps(json_findings, indent=2)) if args.json else _findings.print_text(findings)
-        return 1 if errors else 0
+        _findings.run_check(
+            [
+                f
+                for f in findings
+                if f["verdict"] == "error" or (publish_origin and f in origin_rows)
+            ]
+            if args.json
+            else findings,
+            as_json=args.json,
+        )
+        return int(any(f["verdict"] == "error" for f in findings))
     try:
+        if not reads and (root := workspace_of(specs)):
+            require_governed(root)
         return _VERBS[args.verb](args, specs)
     except (Refusal, drift.Refusal) as refusal:
         return refuse(refusal, specs)

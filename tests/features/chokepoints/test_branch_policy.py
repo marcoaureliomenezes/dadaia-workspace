@@ -1,5 +1,5 @@
 """The branch contract, read from the project gitflow: work branches ``<prefix><M.m.p>`` are
-pushable; the principal and integration branches are PR-only; every refusal and its fix line
+pushable, and so are the principal and integration branches (ordinary refs); every refusal and its fix line
 name the CONFIGURED branches.
 Every row runs under the default gitflow or a custom one (``trunk``/``next``/``work/``).
 """
@@ -23,6 +23,7 @@ from dadaia_workspace.features.chokepoints.branch_policy import (
 from dadaia_workspace.features.specs.canon import canon_violations
 from dadaia_workspace.infrastructure.git_objects import GitSubprocessObjectReader
 from tests.fakes import gate_fixes
+from tests.fakes import land_fix as _land_fix
 from tests.fixtures.real_git import PushRepo
 from tests.helpers.oslib import command
 
@@ -54,35 +55,26 @@ def _fix(decision: Decision) -> str:
     return decision.message.rsplit("fix: ", 1)[1]
 
 
-def _birth(role: str) -> Scenario:
+def _update_of(branch: str) -> Scenario:
+    """A fast-forward of *branch* over a tip origin already holds: the refspec matches."""
+
     def run(repo: PushRepo, flow: Gitflow) -> str:
         repo.commit({"a.md": "a\n"})
-        sha = repo.publish(flow.integration if role == "principal" else flow.principal)
-        return _line(getattr(flow, role), sha=sha)
+        old = repo.publish(getattr(flow, branch))
+        return _line(getattr(flow, branch), remote_sha=old, sha=repo.commit({"b.md": "b\n"}))
 
     return run
 
 
-def _birth_with_commit(role: str, other: str) -> Scenario:
+def _create_of(branch: str) -> Scenario:
+    """A role branch created at a new commit, the other role already on origin."""
+
     def run(repo: PushRepo, flow: Gitflow) -> str:
         repo.commit({"a.md": "a\n"})
-        repo.publish(getattr(flow, other))
-        return _line(getattr(flow, role), sha=repo.commit({"b.md": "b\n"}))
+        repo.publish(flow.integration if branch == "principal" else flow.principal)
+        return _line(getattr(flow, branch), sha=repo.commit({"b.md": "b\n"}))
 
     return run
-
-
-def _existing_principal(repo: PushRepo, flow: Gitflow) -> str:
-    repo.commit({"a.md": "a\n"})
-    sha = repo.publish(flow.principal)
-    return _line(flow.principal, remote_sha=sha, sha=sha)
-
-
-def _birth_from_any_source(repo: PushRepo, flow: Gitflow) -> str:
-    """Judged by the remote branch it creates and what it publishes, never the local name."""
-    repo.commit({"a.md": "a\n"})
-    sha = repo.publish()
-    return f"{_line('main', 'develop', sha=sha)}\n{sha} {sha} refs/heads/develop {_ZERO}"
 
 
 def _feature_to_published_integration(repo: PushRepo, flow: Gitflow) -> str:
@@ -104,11 +96,14 @@ _D, _C = DEFAULT, _CUSTOM
     pytest.param(_C, _commit_then(lambda s, f: _line(f"{f.work_prefix}0.0.0", sha=s)), id="custom-work-branch"),
     pytest.param(_D, _commit_then(lambda s, f: _line(f.principal, sha=s)), id="default-R13-empty-origin-admits-principal"),
     pytest.param(_C, _commit_then(lambda s, f: _line(f.principal, sha=s)), id="custom-R13-empty-origin-admits-principal"),
-    pytest.param(_D, _birth("principal"), id="default-ADR0036-contentless-principal-birth"),
-    pytest.param(_C, _birth("principal"), id="custom-ADR0036-contentless-principal-birth"),
-    pytest.param(_D, _birth("integration"), id="default-ADR0036-contentless-integration-birth"),
-    pytest.param(_C, _birth("integration"), id="custom-ADR0036-contentless-integration-birth"),
-    pytest.param(_D, _birth_from_any_source, id="H4-contentless-birth-from-any-source"),
+    pytest.param(_D, _update_of("integration"), id="default-integration-update-matching-refspec"),
+    pytest.param(_D, _create_of("integration"), id="default-integration-create-carrying-a-commit"),
+    pytest.param(_D, _update_of("principal"), id="default-principal-update-matching-refspec"),
+    pytest.param(_D, _create_of("principal"), id="default-principal-create-carrying-a-commit"),
+    pytest.param(_C, _update_of("integration"), id="custom-integration-update-matching-refspec"),
+    pytest.param(_C, _create_of("integration"), id="custom-integration-create-carrying-a-commit"),
+    pytest.param(_C, _update_of("principal"), id="custom-principal-update-matching-refspec"),
+    pytest.param(_C, _create_of("principal"), id="custom-principal-create-carrying-a-commit"),
     pytest.param(_D, _commit_then(lambda s, f: f"refs/heads/wt/x {s} refs/tags/archive/wt/x {_ZERO}"), id="tag-carve-out-keys-on-the-remote-ref"),
     pytest.param(_D, lambda repo, flow: "", id="finding-1-empty-stdin-has-nothing-to-gate"),
 ])
@@ -118,43 +113,31 @@ def test_the_gate_allows(repo: PushRepo, flow: Gitflow, scenario: Scenario) -> N
     assert decision.allowed, decision.message
 
 
-_PR_TO_INTEGRATION = "Agent action: open a PR/MR from '{prefix}0.6.0' into '{integration}' on your git host"
-_PR_TO_PRINCIPAL = "Agent action: open a PR/MR from '{integration}' into '{principal}' on your git host"
-
-
-def _birth_fix(tip: str, role: str) -> list[str]:
-    return ["git", "-C", "/repo", "push", "origin", f"refs/remotes/origin/{{{tip}}}:refs/heads/{{{role}}}"]
-
 
 # fmt: off
 @pytest.mark.parametrize(("flow", "scenario", "named", "fix"), [
-    pytest.param(_D, lambda r, f: _line(f.integration, remote_sha=_B), "'{integration}'", _PR_TO_INTEGRATION, id="default-integration-is-PR-only"),
-    pytest.param(_C, lambda r, f: _line(f.integration, remote_sha=_B), "'{integration}'", _PR_TO_INTEGRATION, id="custom-integration-is-PR-only"),
-    pytest.param(_D, lambda r, f: _line(f.principal, remote_sha=_B), "'{principal}'", _PR_TO_PRINCIPAL, id="default-principal-is-PR-only"),
-    pytest.param(_C, lambda r, f: _line(f.principal, remote_sha=_B), "'{principal}'", _PR_TO_PRINCIPAL, id="custom-principal-is-PR-only"),
-    pytest.param(_D, lambda r, f: f"refs/tags/v1 {_A} refs/heads/{f.principal} {_B}", "'{principal}'", _PR_TO_PRINCIPAL, id="a-local-tag-onto-the-principal-is-PR-only"),
-    pytest.param(_D, _birth_with_commit("principal", "integration"), "", _birth_fix("integration", "principal"), id="default-M2-principal-birth-carrying-a-commit"),
-    pytest.param(_C, _birth_with_commit("principal", "integration"), "", _birth_fix("integration", "principal"), id="custom-M2-principal-birth-carrying-a-commit"),
-    pytest.param(_D, _birth_with_commit("integration", "principal"), "", _birth_fix("principal", "integration"), id="default-M2-integration-birth-carrying-a-commit"),
-    pytest.param(_C, _birth_with_commit("integration", "principal"), "", _birth_fix("principal", "integration"), id="custom-M2-integration-birth-carrying-a-commit"),
-    pytest.param(_D, _existing_principal, "", None, id="an-existing-principal-is-never-a-birth"),
+    pytest.param(_D, lambda r, f: f"refs/tags/v1 {_A} refs/heads/{f.principal} {_B}", "is outside the gitflow", _land_fix, id="a-local-tag-aimed-at-the-principal-is-outside-the-gitflow"),
+    pytest.param(_D, _commit_then(lambda s, f: _line("topic", f.principal, remote_sha=_B, sha=s)), "refspec aims 'refs/heads/topic' at remote 'refs/heads/{principal}'", ["git", "-C", "/repo", "branch", "-m", "topic", "{principal}"], id="default-mismatched-refspec-at-the-principal"),
+    pytest.param(_C, _commit_then(lambda s, f: _line("topic", f.integration, remote_sha=_B, sha=s)), "refspec aims 'refs/heads/topic' at remote 'refs/heads/{integration}'", ["git", "-C", "/repo", "branch", "-m", "topic", "{integration}"], id="custom-mismatched-refspec-at-the-integration"),
     pytest.param(_C, lambda r, f: _line("work/0.0.1", "work/0.0.2"), "refs/heads/work/0.0.2",
                  ["git", "-C", "/repo", "branch", "-m", "work/0.0.1", "work/0.0.2"], id="finding-2-work-branch-to-a-foreign-remote-ref"),
     pytest.param(_C, _feature_to_published_integration, "", None, id="finding-2-work-branch-to-the-integration-ref"),
-    pytest.param(_C, lambda r, f: f"HEAD {_A} refs/heads/work/0.0.1 {_ZERO}", "",
-                 ["git", "-C", "/repo", "switch", "-c", "work/0.6.0", _A], id="finding-6-detached-head-cuts-the-work-branch"),
+    pytest.param(_C, lambda r, f: f"HEAD {_A} refs/heads/work/0.0.1 {_ZERO}", "", _land_fix, id="finding-6-detached-head-is-landed-through-a-tree"),
     pytest.param(_D, lambda r, f: "this line has three fields", "", None, id="finding-1-malformed-stdin-fails-closed"),
 ])
 # fmt: on
 def test_the_gate_refuses_with_the_configured_fix(
-    repo: PushRepo, flow: Gitflow, scenario: Scenario, named: str, fix: list[str] | str | None
+    repo: PushRepo, flow: Gitflow, scenario: Scenario, named: str, fix: list[str] | str | Callable[..., str] | None,
+    sentence: Callable[..., str],
 ) -> None:
-    """Each refusal names the configured branches; its fix is one command, no `&&` (PowerShell 5.1 has none)."""
+    """Each refusal names the configured branches; its fix is one command (no `&&`: PowerShell 5.1 has none) or one Agent action."""
     names = {"principal": flow.principal, "integration": flow.integration, "prefix": flow.work_prefix}
     decision = _decide(scenario(repo, flow), repo, flow)
     assert not decision.allowed
     assert named.format(**names) in decision.message
-    if isinstance(fix, str):
+    if callable(fix):
+        assert _fix(decision) == fix(sentence)
+    elif isinstance(fix, str):
         assert _fix(decision) == fix.format(**names)
     else:
         assert fix is None or _fix(decision) == command(*[part.format(**names) for part in fix])
@@ -170,27 +153,40 @@ def test_the_gate_refuses_with_the_configured_fix(
 ])
 # fmt: on
 def test_a_branch_outside_the_gitflow_is_refused_naming_the_work_branch(
-    repo: PushRepo, flow: Gitflow, branch: str
+    repo: PushRepo, flow: Gitflow, branch: str, sentence: Callable[..., str]
 ) -> None:
     """A name that is not exactly the principal, the integration or prefix + M.m.p has no role.
 
-    The fix is one command from any cwd carrying the refused commit.
+    The fix is the Agent action that lands the work through a tree.
     """
     decision = _decide(_line(branch), repo, flow)
     assert not decision.allowed
     assert "outside the gitflow" in decision.message
     assert all(word in decision.message for word in (branch, flow.principal, flow.integration, flow.work_prefix))
-    assert _fix(decision) == command("git", "-C", "/repo", "switch", "-c", f"{flow.work_prefix}0.6.0", _A)
+    assert "dd-gitflow-default" in decision.message and "only a work branch" not in decision.message
+    assert "worktree merge" in decision.message and f"merge {_A}" not in decision.message
+    assert _fix(decision) == _land_fix(sentence)
 
 
-def test_an_outside_ref_is_carried_onto_the_live_work_branch() -> None:
-    """The live work branch may have diverged — switch to it and merge (append-only, never a
-    rebase)."""
+def test_an_outside_ref_is_routed_through_a_tree_whatever_the_live_work_branch(sentence: Callable[..., str]) -> None:
+    """With a live work branch the route stays `worktree merge`: the pushable set is the §2a
+    contract, never a raw merge of the refused commit into the work branch."""
     refs = parse_push_stdin(_line("topic"))[0]
-    decision = check_branch_policy(refs, _CUSTOM, replace(gate_fixes(), work="work/1.2.3", cut=True))
+    decision = check_branch_policy(refs, _CUSTOM, replace(gate_fixes(), work="work/1.2.3"))
     assert decision is not None and "'work/1.2.3'" in decision.message
-    assert f"merge {_A}" in decision.message
-    assert _fix(decision) == command("git", "-C", "/repo", "switch", "work/1.2.3")
+    assert "dd-gitflow-default" in decision.message and "worktree merge" in decision.message
+    assert f"merge {_A}" not in decision.message
+    assert _fix(decision) == _land_fix(sentence)
+
+
+def test_a_task_branch_is_routed_to_its_parent_by_worktree_merge(sentence: Callable[..., str]) -> None:
+    """A `wt/` task branch is not pushable: its route is `worktree merge` into its parent, never a raw merge."""
+    ref = "wt/0.5.0/rc-1/job-1/wt-task-001"
+    decision = check_branch_policy(parse_push_stdin(_line(ref))[0], _CUSTOM, replace(gate_fixes(), work="work/1.2.3"))
+    assert decision is not None and not decision.allowed
+    assert "worktree merge" in decision.message and "dd-gitflow-default" in decision.message
+    assert "only a work branch" not in decision.message and f"merge {_A}" not in decision.message
+    assert _fix(decision) == _land_fix(sentence)
 
 
 @pytest.mark.parametrize(
@@ -349,3 +345,11 @@ def test_the_facts_are_not_read_for_a_move_onto_origins_sha() -> None:
         raise AssertionError("read")
 
     assert _ref_policy([_LINE], DEFAULT, {_WORK_REF: _B}, unreadable).allowed
+
+
+def test_a_fault_that_is_not_git_s_propagates_out_of_the_policy() -> None:
+    def broken(old: str, new: str) -> tuple[bool, list[str]]:
+        raise OSError("disk gone")
+
+    with pytest.raises(OSError, match="disk gone"):
+        _ref_policy([_LINE], DEFAULT, {_WORK_REF: _C1}, broken)

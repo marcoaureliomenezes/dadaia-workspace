@@ -1,5 +1,5 @@
 """Memory validator: required atoms (SPEC-DOC-002), placeholders, fixed law sections,
-LINT-1 atom lint, MEM-DRIFT-1 package map vs live tree, MEM-DRIFT-2 citations.
+LINT-1 atom lint, MEM-DRIFT-2 citations.
 Leaf-only: imports the shared leaves + core, never a sibling validator."""
 
 from __future__ import annotations
@@ -24,12 +24,6 @@ PRODUCT_INDEX_REL = "product/index.md"
 _ADR_LIST = "adr-list"  # the ledger-rendered block of memory/ARCHITECTURE.md
 _PLACEHOLDER_TOKENS = ("SLUG_PLACEHOLDER", "TITLE_PLACEHOLDER", "RELEASE_PLACEHOLDER")
 _MD_HEADING_RE = re.compile(r"^#{1,6}\s+\S", re.MULTILINE)
-# Matched by shape, never by the package count: the count changes only at closure.
-_FEATURES_PKG_MAP_HEADING_RE = re.compile(
-    r"^### `dadaia_workspace/features` — package map \(\d+ packages\)\s*$", re.MULTILINE
-)
-_MERMAID_BLOCK_RE = re.compile(r"```mermaid\n(.*?)\n```", re.DOTALL)
-_PKGS_NODE_RE = re.compile(r'pkgs\["([^"]*)"\]')
 
 
 def _read_or_empty(path: Path) -> str:
@@ -59,23 +53,6 @@ def _has_heading(path: Path) -> bool:
     content = platform.read_text(path)
     fm, body, _problem = memory_canon.parse_atom(content)
     return bool(_MD_HEADING_RE.search(body if fm is not None else content))
-
-
-def _mermaid_block_after_heading(text: str, heading_end: int) -> str | None:
-    """The first ```mermaid block before the next H2/H3 heading."""
-    next_heading = re.search(r"\n#{2,3}\s", text[heading_end:])
-    section = text[heading_end : heading_end + next_heading.start() if next_heading else None]
-    block_match = _MERMAID_BLOCK_RE.search(section)
-    return block_match.group(1) if block_match else None
-
-
-def _live_feature_package_names() -> set[str]:
-    # The namespace package's empty __init__ loads no sibling: no cross-feature edge.
-    import importlib
-    import pkgutil
-
-    pkg = importlib.import_module("dadaia_workspace.features")
-    return {name for _finder, name, ispkg in pkgutil.iter_modules(pkg.__path__) if ispkg}
 
 
 class MemoryValidator:
@@ -264,28 +241,4 @@ class MemoryValidator:
             for path, violation in citations.memory_citation_violations(
                 self.specs_dir / "memory", repo_root=repo_root, command_paths=command_paths
             )
-        ]
-
-    def check_mem_drift1_features_package_map(self) -> list[SectionFinding]:
-        """MEM-DRIFT-1: one WARNING per stale or missing node of ARCHITECTURE.md's features
-        package map vs the live tree; silent when the map is absent."""
-        architecture_md = self.specs_dir / "memory" / "ARCHITECTURE.md"
-        if not architecture_md.is_file():
-            return []
-        text = platform.read_text(architecture_md)
-        heading = _FEATURES_PKG_MAP_HEADING_RE.search(text)
-        mermaid = _mermaid_block_after_heading(text, heading.end()) if heading else None
-        pkgs_match = _PKGS_NODE_RE.search(mermaid) if mermaid is not None else None
-        if pkgs_match is None:
-            return []
-        declared = {tok.strip() for tok in pkgs_match.group(1).split("·") if tok.strip()}
-        live = _live_feature_package_names()
-        stale = "ARCHITECTURE.md features package map names '{}' but dadaia_workspace/features"
-        stale += " has no such live package — update the diagram (memory drift)."
-        missing = "dadaia_workspace/features/{} is a live package not named in ARCHITECTURE.md's"
-        missing += " features package map — update the diagram (memory drift)."
-        return [
-            specs_finding("MEM-DRIFT-1", Severity.WARNING, tpl.format(name), str(architecture_md))
-            for names, tpl in ((declared - live, stale), (live - declared, missing))
-            for name in sorted(names)
         ]

@@ -34,7 +34,7 @@ def test_unbound_session_emits_preflight_once_and_stamps_exact_sentinel(tmp_path
     assert result.returncode == 0
     assert result.stdout == (
         "[no bound context]\n"
-        "Next (command step context): no ALIVE Spec Context — create one\n"
+        "Next (agent step context): no ALIVE Spec Context — create one\n"
         "fix: Agent action: run "
         f"{create} with a context name and --main-repo set to the main repo's clone URL\n"
     )

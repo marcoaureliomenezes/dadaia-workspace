@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any, cast
 
+from dadaia_workspace.core import context_registry
 from dadaia_workspace.core.workspace_resolver import not_initialized
 from dadaia_workspace.infrastructure.json_context_store import (
     LEGACY_STATES,
@@ -17,11 +19,11 @@ from dadaia_workspace.infrastructure.json_context_store import (
 class MigrationPlan:
     """Describes what the migration will do — produced in dry-run mode."""
 
-    schema_version_before: str
     contexts_to_migrate: list[dict]  # type: ignore[type-arg]
     primary_context_exists: bool
     dirs_to_create: list[str] = field(default_factory=list)
     already_v2: bool = False
+    schema_version_before: str = ""
 
 
 def plan_migration(store: JsonContextStore) -> MigrationPlan:
@@ -32,10 +34,10 @@ def plan_migration(store: JsonContextStore) -> MigrationPlan:
     if not store.exists():
         raise ValueError(str(not_initialized(states_dir.parent.parent)))
 
-    raw = store.read_raw()
-    if parse_schema_version(raw, states_dir / "spec_contexts.json") >= 2:
+    registry = states_dir / "spec_contexts.json"
+    raw = context_registry.read(registry)
+    if (version := parse_schema_version(raw, registry)) >= 2:
         return MigrationPlan(
-            schema_version_before="2",
             contexts_to_migrate=[],
             primary_context_exists=primary_file.exists(),
             already_v2=True,
@@ -49,12 +51,12 @@ def plan_migration(store: JsonContextStore) -> MigrationPlan:
             "had_is_primary": "is_primary" in ctx,
             "had_activated_at": "activated_at" in ctx,
         }
-        for ctx in raw.get("contexts", [])
+        for ctx in cast("list[dict[str, Any]]", raw["contexts"])
         if (state := ctx.get("state", "")) in LEGACY_STATES
     ]
 
     return MigrationPlan(
-        schema_version_before="1",
+        schema_version_before=str(version),
         contexts_to_migrate=contexts_to_migrate,
         primary_context_exists=primary_file.exists(),
         dirs_to_create=[".dadaia/sessions"],
@@ -66,8 +68,9 @@ def execute_migration(store: JsonContextStore, workspace_root: Path) -> None:
     """Migrate the registry and its retired primary marker to the current schema."""
     states_dir = store.states_dir
     primary_file = states_dir / "primary_context.json"
-    raw = store.read_raw() if store.exists() else None
-    if raw is not None and parse_schema_version(raw, states_dir / "spec_contexts.json") < 2:
+    registry = states_dir / "spec_contexts.json"
+    raw = context_registry.read(registry) if store.exists() else None
+    if raw is not None and parse_schema_version(raw, registry) < 2:
         store.replace_raw(
             {
                 "contexts": [
@@ -82,7 +85,7 @@ def execute_migration(store: JsonContextStore, workspace_root: Path) -> None:
                         "alive_since": ctx.get("activated_at"),
                         "dead_since": None,
                     }
-                    for ctx in raw.get("contexts", [])
+                    for ctx in cast("list[dict[str, Any]]", raw["contexts"])
                 ],
             },
         )

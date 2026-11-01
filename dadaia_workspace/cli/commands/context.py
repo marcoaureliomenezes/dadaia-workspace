@@ -13,13 +13,14 @@ from rich.table import Table
 from dadaia_workspace import container
 from dadaia_workspace.cli._fail import fail
 from dadaia_workspace.cli._specs_resolution import (
-    alive_context_trees,
     own_bind_for_cli,
+    own_next_step,
+    refusal,
     resolve_session_id,
 )
 from dadaia_workspace.cli.redact import build_context_redactor
 from dadaia_workspace.core import clock, session_store
-from dadaia_workspace.core.cli_line import fix_line
+from dadaia_workspace.core.cli_line import cli_words, fix_line, shell_line
 from dadaia_workspace.core.exceptions import (
     AssociatedRepoConflictError,
     AssociatedRepoNotFoundError,
@@ -37,12 +38,11 @@ from dadaia_workspace.core.models.spec_context import (
     ContextState,
     SpecContextProject,
 )
-from dadaia_workspace.core.platform import act
+from dadaia_workspace.core.platform import act, inline
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from dadaia_workspace.features.spec_context.service import (
     SpecContextService,
 )
-from dadaia_workspace.features.workspace import onboarding
 
 app = typer.Typer(help="Manage Spec Context Projects.")
 # Associated-repo registry verbs, nested under `context repo`
@@ -111,11 +111,7 @@ def _live_session(workspace_root: Path, session_id: str) -> dict[str, Any] | Non
 
 def print_next_step(workspace_root: Path, focus: str | None = None) -> None:
     """Print the derived onboarding next step, the text ``doctor`` also reports."""
-    trees = alive_context_trees(workspace_root)
-    bind, session = own_bind_for_cli()
-    step = onboarding.next_step(
-        workspace_root, trees, focus, None if session is None else bool(bind)
-    )
+    step = own_next_step(workspace_root, focus)
     if step is not None:
         console.print(step.text(), markup=False, highlight=False, soft_wrap=True)
 
@@ -127,14 +123,15 @@ def create_fix(root: Path, error: Exception, name: str | None, urls: list[str]) 
     if isinstance(error, ContextAlreadyExistsError):
         name = None
     flags = [arg for u in urls[1:] for arg in ("--associated-repo", u)]
-    fix = fix_line(
+    words = cli_words(
         root, "context", "create", *([name] if name else []), "--main-repo", urls[0], *flags
     )
+    fix = inline(*words)
     if isinstance(error, ContextAlreadyExistsError):
         return act("agent", f"choose a context name no context holds and run `{fix}` with it")
     if isinstance(error, GitCloneError):
         return act("agent", f"run `{fix}` with a reachable clone URL in place of {error.url}")
-    return fix
+    return shell_line(*words)
 
 
 @app.command()
@@ -222,6 +219,23 @@ def list_all(
     console.print(table)
 
 
+def _print_details(data: dict[str, Any]) -> None:
+    for label, key in (
+        *(("Name", "name"), ("State", "state"), ("Main repo", "main_repo")),
+        *(("Repo URL", "repo_url"), ("Branch", "current_branch"), ("Created", "created_at")),
+        *(("Alive since", "alive_since"), ("Dead since", "dead_since")),
+    ):
+        console.print(f"[bold]{label + ':':<13}[/bold] {data[key] or '—'}", highlight=False)
+    if data["associated_repos"]:
+        table = Table(title="Associated repos")
+        for column in ("Slug", "URL", "On disk", "Branch"):
+            table.add_column(column)
+        for r in data["associated_repos"]:
+            on_disk = "yes" if r["on_disk"] else "no"
+            table.add_row(r["slug"], r["url"] or "—", on_disk, r["current_branch"] or "—")
+        console.print(table)
+
+
 @app.command()
 def show(
     name: str | None = typer.Argument(None, help="Context name"),
@@ -260,20 +274,7 @@ def show(
         msg = f"Context '{name}' not found." if name else "No active context."
         console.print(f"[dim]{msg}[/dim]")
         return
-    for label, key in (
-        *(("Name", "name"), ("State", "state"), ("Main repo", "main_repo")),
-        *(("Repo URL", "repo_url"), ("Branch", "current_branch"), ("Created", "created_at")),
-        *(("Alive since", "alive_since"), ("Dead since", "dead_since")),
-    ):
-        console.print(f"[bold]{label + ':':<13}[/bold] {data[key] or '—'}", highlight=False)
-    if data["associated_repos"]:
-        table = Table(title="Associated repos")
-        for column in ("Slug", "URL", "On disk", "Branch"):
-            table.add_column(column)
-        for r in data["associated_repos"]:
-            on_disk = "yes" if r["on_disk"] else "no"
-            table.add_row(r["slug"], r["url"] or "—", on_disk, r["current_branch"] or "—")
-        console.print(table)
+    _print_details(data)
 
 
 @app.command()
@@ -344,6 +345,7 @@ def bind(name: str = typer.Argument(..., help="Context name to bind to")) -> Non
                 "before opening the session",
             ),
         )
+    _require_governed(workspace_root)
     _sessions_dir(workspace_root).mkdir(parents=True, exist_ok=True)
     session_store.write_session(
         workspace_root,
@@ -357,6 +359,17 @@ def bind(name: str = typer.Argument(..., help="Context name to bind to")) -> Non
         ),
     )
     console.print(f"[green]✓[/green] Bound to '[bold]{name}[/bold]' (session id: {session_id})")
+
+
+def _require_governed(workspace_root: Path) -> None:
+    if refused := refusal(workspace_root, os.environ):
+        fail(*refused)
+
+
+@app.command(name="session-check")
+def session_check() -> None:
+    """Exit 0 when no workspace hook is bypassed: an operator terminal or a session with a live record."""
+    _require_governed(resolve_workspace_root())
 
 
 # ------------------------------------------------------------------ context repo

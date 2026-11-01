@@ -178,3 +178,21 @@ def test_the_hook_and_main_checkout_name_the_same_repo(
     assert slug is not None
     assert slug.group(1) == load_owner("dd-bug-resolution", "_git").main_checkout(cwd).name
     assert slug.group(1) == "primary-checkout"
+
+
+def test_a_short_run_of_zeros_is_not_the_zero_id(
+    repo: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """One decider of the sentinel: git's zero id is a whole object id, as the kernel reads it."""
+    line = f"0000000 {_SHA} refs/heads/wt/x\n".encode()
+    assert ref_transaction.main(line) == 0
+    assert capsys.readouterr().err == ""
+
+
+def test_the_module_entry_exits_three_on_a_refusal(repo: Path, tmp_path: Path) -> None:
+    """Installed shims run `python -m dadaia_workspace.hooks.ref_transaction` and turn exit 3 into a refusal."""
+    env = suite_env(os.environ, tmp_path)
+    argv = [sys.executable, "-B", "-m", "dadaia_workspace.hooks.ref_transaction"]
+    done = run(argv, input=_CREATE.decode(), cwd=repo, env=env, timeout=60)
+    assert done.returncode == 3, done.stderr
+    assert _BLOCKED in done.stderr

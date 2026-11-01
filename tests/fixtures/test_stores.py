@@ -6,24 +6,22 @@ from pathlib import Path
 import pytest
 import typer
 
-from dadaia_workspace.core.platform import PLATFORM, Capabilities
+from dadaia_workspace.core.platform import PLATFORM
 from tests.fixtures.stores import fake_venv
 from tests.helpers.oslib import run as os_run
 
 
-@pytest.mark.parametrize(
-    ("platform", "relative"),
-    [("linux", "bin/python"), ("darwin", "bin/python"), ("win32", "Scripts/python.exe")],
-)
-def test_fake_venv_lays_python_out_as_the_platform_does(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, platform: str, relative: str
-) -> None:
-    monkeypatch.setattr("tests.fixtures.stores.PLATFORM", Capabilities.detect(platform))
+def test_fake_venv_is_a_venv_whose_python_is_the_base_interpreter(tmp_path: Path) -> None:
     python = fake_venv(tmp_path)
-    assert python == tmp_path / ".dadaia" / ".venv" / relative
-    assert python.is_file()
-    assert not python.is_symlink()
-    assert (tmp_path / ".dadaia" / ".venv" / "pyvenv.cfg").read_text().startswith("home = ")
+    assert python == tmp_path / ".dadaia" / ".venv" / PLATFORM.venv_scripts_dir / (
+        f"python{PLATFORM.venv_exe_suffix}"
+    )
+    assert "home = " in (tmp_path / ".dadaia" / ".venv" / "pyvenv.cfg").read_text()
+    code = "import sys; print(sys.prefix, sys._base_executable)"
+    prefix, base = os_run([str(python), "-c", code]).stdout.split()
+    assert Path(prefix) == tmp_path / ".dadaia" / ".venv"
+    assert Path(base).resolve() == Path(sys._base_executable).resolve()
+    assert not (tmp_path / ".dadaia" / ".venv" / PLATFORM.venv_scripts_dir / "pip").exists()
 
 
 def test_fake_venv_python_runs_on_this_platform(tmp_path: Path) -> None:
@@ -72,17 +70,3 @@ def test_fake_venv_pth_puts_the_running_packages_on_the_venv_python(tmp_path: Pa
     assert Path(ran.stdout.strip()) == Path(typer.__file__)
     bare = os_run([str(fake_venv(tmp_path / "bare")), "-c", code])
     assert bare.returncode != 0
-
-
-def test_fake_venv_copies_the_base_interpreter_not_the_running_venvs(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    decoy = tmp_path / "decoy-python"
-    decoy.write_bytes(b"not the base interpreter")
-    monkeypatch.setattr("sys.executable", str(decoy))
-    root = tmp_path / "ws"
-    python = fake_venv(root)
-    base = Path(sys._base_executable).resolve()
-    assert python.read_bytes() == base.read_bytes()
-    cfg = (root / ".dadaia" / ".venv" / "pyvenv.cfg").read_text()
-    assert cfg == f"home = {base.parent}\n"

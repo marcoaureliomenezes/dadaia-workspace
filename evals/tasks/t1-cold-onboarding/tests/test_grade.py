@@ -1,5 +1,5 @@
 """T1 grader: /workspace onboards file:///srv/demo.git — one ALIVE context, its specs
-initialized, `dadaia doctor` with no error. Reads only fields 0.4.7 and the candidate share."""
+initialized, `dadaia doctor` with no error."""
 
 import json
 import subprocess

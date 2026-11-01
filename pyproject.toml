@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "dadaia-workspace"
-version = "0.4.7"
+version = "0.5.0rc25"
 description = "A local-first, spec-driven workspace that gives AI agents current context, a document-governed lifecycle, visible concurrency and anti-slop boundaries."
 authors = ["Marco Menezes <marcoaureliomenezes@users.noreply.github.com>"]
 readme = "README.md"
@@ -14,7 +14,7 @@ exclude = ["**/__pycache__", "**/*.pyc", "**/*.pyo"]
 keywords = [
     "ai-agents", "claude-code", "codex", "kimi-code",
     "workspace", "multi-agent", "sdd", "spec-driven-development",
-    "cli"
+    "cli", "cursor", "devin", "github-copilot", "agent-skills"
 ]
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -31,10 +31,10 @@ classifiers = [
     "Operating System :: Microsoft :: Windows",
 ]
 
-# What PyPI renders beside the long description. Homepage is the PyPI project page;
+# What PyPI renders beside the long description. Homepage is the author's project page;
 # Documentation is the repository's docs/ folder (no separate site is published).
 [tool.poetry.urls]
-Homepage = "https://pypi.org/project/dadaia-workspace/"
+Homepage = "https://marco-menezes.com/projetos/dadaia-workspace"
 Repository = "https://github.com/marcoaureliomenezes/dadaia-workspace"
 Documentation = "https://github.com/marcoaureliomenezes/dadaia-workspace/tree/main/docs"
 Changelog = "https://github.com/marcoaureliomenezes/dadaia-workspace/blob/main/CHANGELOG.md"

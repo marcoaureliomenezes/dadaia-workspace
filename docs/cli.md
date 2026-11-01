@@ -18,6 +18,7 @@
 - context delete — Delete a context. Context must be dead.
 - context list — List all Spec Context Projects.
 - context repo <add, remove> — Manage a context's associated repos (main repo excluded).
+- context session-check — Exit 0 when no workspace hook is bypassed: an operator terminal or a session with a live record.
 - context show — Show details of a context.
 
 ## dadaia doctor — Diagnose and repair workspace, specs and ledger compliance.

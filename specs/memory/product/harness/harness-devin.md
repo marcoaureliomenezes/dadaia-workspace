@@ -17,7 +17,7 @@ sources:
 
 ## Hooks
 
-- The four hook behaviours ([[agentic-entities]]) arrive as `PreToolUse` -> the `.dadaia/hooks/devin-pre-gate` wrapper (the merged pre-gate), `UserPromptSubmit` and `SessionStart` -> `devin-ctx-inject`, and `SessionStart` -> `devin-doctor-expired` (the reaper); each event maps to `{matcher, hooks: [{type: command, …}]}` groups with no top-level `hooks` key.
+- The hook behaviours ([[agentic-entities]]) arrive as `PreToolUse` -> the `.dadaia/hooks/devin-pre-gate` wrapper (the merged pre-gate), `UserPromptSubmit` and `SessionStart` -> `devin-ctx-inject`, and `SessionStart` -> `devin-doctor-expired` (the reaper); each event maps to `{matcher, hooks: [{type: command, …}]}` groups with no top-level `hooks` key.
 - Devin reads the gate's Claude-compatible envelope and exit code, so the wrapper translates nothing ([[sdd-gate-v3]]).
 - `dadaia certify`'s `devin-live-probe` checks that the `devin` binary answers `--version`, reporting SKIP `UNVERIFIED` when it is absent; no version floor.
 

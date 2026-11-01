@@ -5,12 +5,14 @@ one intents grammar — its kind enum is the model's, and a code ref is repo-rel
 
 from __future__ import annotations
 
+import ast
 import json
 from pathlib import Path
 
 import pytest
 from jsonschema import Draft202012Validator
 
+from dadaia_workspace.core.models import backlog
 from dadaia_workspace.core.models.backlog import SubjectKind
 from tests.helpers.oslib import read_text
 
@@ -26,6 +28,15 @@ _INTENT = Draft202012Validator({"$defs": _SCHEMA["$defs"], "$ref": "#/$defs/inte
 def test_the_model_kinds_are_the_schema_kinds() -> None:
     kinds = _SCHEMA["$defs"]["intent"]["properties"]["subject"]["properties"]["kind"]["enum"]
     assert sorted(kinds) == sorted(k.value for k in SubjectKind)
+
+
+def test_the_exempt_status_is_the_schema_owners_word_not_a_second_literal() -> None:
+    literals = [
+        n.value
+        for n in ast.walk(ast.parse(read_text(Path(backlog.__file__))))
+        if isinstance(n, ast.Constant) and n.value == "idea"
+    ]
+    assert (backlog.INTENTS_EXEMPT_STATUS, literals) == ("idea", [])
 
 
 @pytest.mark.parametrize(

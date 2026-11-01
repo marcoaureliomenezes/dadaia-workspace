@@ -7,6 +7,12 @@ import os
 from pathlib import Path
 
 STATES = Path(".dadaia") / "states"
+SENTINEL = STATES / "spec_contexts.json"
+
+
+def is_workspace(root: Path) -> bool:
+    """Whether *root* holds the sentinel file: the one test of what a workspace is."""
+    return (root / SENTINEL).is_file()
 
 
 def fenced_roots() -> frozenset[Path]:
@@ -17,8 +23,8 @@ def fenced_roots() -> frozenset[Path]:
 
 
 def workspace_of(*starts: Path, fenced: frozenset[Path] | None = None) -> Path | None:
-    """The first ancestor of any of *starts* holding `.dadaia/states/spec_contexts.json`,
+    """The first ancestor of any of *starts* holding the sentinel,
     never a root in *fenced* (default: `fenced_roots()`)."""
     fenced = fenced_roots() if fenced is None else fenced
     return next((d for s in starts for d in (s.resolve(), *s.resolve().parents)
-                 if d not in fenced and (d / STATES / "spec_contexts.json").is_file()), None)  # fmt: skip
+                 if d not in fenced and is_workspace(d)), None)  # fmt: skip

@@ -7,12 +7,15 @@ pins one refusal or deletion outcome.
 
 from __future__ import annotations
 
+import datetime as dt
 import os
 from collections.abc import Callable
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
+from dadaia_workspace.core.skill_owner import load_owner
 from dadaia_workspace.features.spec_context import sweep
 from tests.helpers.oslib import (
     PERMISSIONS_ENFORCED,
@@ -356,3 +359,24 @@ def test_the_owner_named_is_the_kernels_answer(
     """The owner text comes from the kernel's ``file_owner`` alone (posix answers and win32's None)."""
     monkeypatch.setattr(sweep.platform, "file_owner", lambda _path: kernel_answer)
     assert sweep._owner(tmp_path) == named
+
+class _KernelNow(dt.datetime):
+    """The kernel clock frozen at 2026-10-11T03:04:05Z."""
+
+    @classmethod
+    def now(cls, tz: dt.tzinfo | None = None) -> _KernelNow:
+        return cls(2026, 10, 11, 3, 4, 5, tzinfo=tz)
+
+
+def _freeze_kernel_clock(monkeypatch: pytest.MonkeyPatch) -> None:
+    kernel = load_owner("dd-bug-resolution", "_clock")
+    monkeypatch.setattr(kernel, "_dt", SimpleNamespace(datetime=_KernelNow, UTC=dt.UTC))
+
+
+def test_a_hold_is_stamped_with_the_kernel_clocks_day(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _freeze_kernel_clock(monkeypatch)
+    (tmp_path / "slop.txt").write_text("x", encoding="utf-8")
+    sweep.hold(tmp_path, tmp_path / "slop.txt", "slop.txt")
+    assert (tmp_path / ".dadaia" / "reaped" / "20261011" / "slop.txt").is_file()

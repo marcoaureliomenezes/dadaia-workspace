@@ -24,9 +24,7 @@ from dadaia_workspace.core.skill_owner import load_owner
 _root = load_owner("dd-bug-resolution", "_root")
 _workspace_of: Callable[..., Path | None] = _root.workspace_of
 _fenced: Callable[[], frozenset[Path]] = _root.fenced_roots
-
-#: The sentinel file whose presence marks a properly initialized workspace.
-_SENTINEL = Path(".dadaia") / "states" / "spec_contexts.json"
+is_workspace: Callable[[Path], bool] = _root.is_workspace
 
 #: ``os.pathsep``-separated roots never resolved — by the walk, the CLI's own venv or an
 #: explicit ``--workspace`` — so no dadaia process nor child inheriting it acts on one
@@ -78,7 +76,7 @@ def own_workspace_root() -> Path | None:
     another one. A fenced root (:data:`FENCE_ENV`) is never its own."""
     venv = Path(sys.prefix).resolve()
     root = venv.parent.parent
-    owned = venv.parent.name == ".dadaia" and (root / _SENTINEL).is_file()
+    owned = venv.parent.name == ".dadaia" and is_workspace(root)
     return root if owned and root not in _fenced() else None
 
 
@@ -93,9 +91,14 @@ def not_initialized(
         if skipped
         else ""
     )
+    holder = _workspace_of(searched)
+    fix = (
+        act("agent", f"run the verb again with `--workspace {holder}`")
+        if holder
+        else load_owner("dd-bug-resolution", "_jsonl").reinstall_fix(searched)
+    )
     return WorkspaceNotInitializedError(
-        f"No initialized workspace found from '{searched}'.{partial}",
-        fix=act("agent", "run `uvx dadaia-workspace init` with the new workspace's directory"),
+        f"No initialized workspace found from '{searched}'.{partial}", fix=fix
     )
 
 
@@ -119,6 +122,6 @@ def resolve_cli_workspace_root(workspace: Path | None, cwd: Path | None = None) 
     if workspace is None:
         return resolve_workspace_root(cwd)
     root = workspace.resolve()
-    if not (root / _SENTINEL).is_file() or root in _fenced():
+    if not is_workspace(root) or root in _fenced():
         raise not_initialized(root)
     return root

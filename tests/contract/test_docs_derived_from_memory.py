@@ -9,6 +9,7 @@ from pathlib import Path
 from dadaia_workspace.cli.help_digest import command_paths, render_digest
 from dadaia_workspace.core.fixed_sections import authored_text
 from dadaia_workspace.features.specs.citations import dead_citations
+from tests.helpers.cli_root import live_root
 from tests.helpers.oslib import read_text
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -85,17 +86,63 @@ def test_the_cli_reference_is_the_committed_output_of_the_generator() -> None:
     line included; regenerate with `dadaia help tree > docs/cli.md`."""
     committed = read_text(_DOCS_DIR / "cli.md")
 
-    assert committed == render_digest(), (
+    assert committed == render_digest(live_root()), (
         "docs/cli.md drifted from the live command tree — "
         "regenerate: dadaia help tree > docs/cli.md"
     )
+
+
+def test_the_full_text_index_is_the_committed_output_of_the_generator() -> None:
+    """`llms-full.txt` IS `llms_full.render()`'s output; regenerate with
+    `python scripts/llms_full.py > llms-full.txt`."""
+    from scripts import llms_full
+
+    committed = read_text(_REPO_ROOT / "llms-full.txt")
+
+    assert committed == llms_full.render(), (
+        "llms-full.txt drifted from llms.txt's pages — "
+        "regenerate: python scripts/llms_full.py > llms-full.txt"
+    )
+
+
+def test_the_agent_index_links_the_full_text_index() -> None:
+    assert "(llms-full.txt)" in read_text(_REPO_ROOT / "llms.txt")
+
+
+_DISCOVERY_KEYWORDS = {"cursor", "devin", "github-copilot", "agent-skills"}
+
+
+def test_the_keywords_hold_the_harness_names_and_the_readme_says_each() -> None:
+    """A keyword PyPI lists is a claim: the README names every one, hyphen read as a space."""
+    keywords = set(_pyproject_poetry()["keywords"])  # type: ignore[arg-type]
+    readme = read_text(_REPO_ROOT / "README.md").lower().replace("-", " ")
+
+    assert keywords >= _DISCOVERY_KEYWORDS
+    assert [k for k in sorted(keywords) if k.replace("-", " ") not in readme] == []
+
+
+def test_the_readme_agent_section_opens_with_a_fast_path_of_at_most_five_lines() -> None:
+    readme = read_text(_REPO_ROOT / "README.md")
+    section = readme.split("## An agent reads AGENTS.md and uses it\n", 1)[1]
+    opening = section.lstrip("\n").split("\n\n", 1)[0].splitlines()
+
+    assert len(opening) <= 5, f"the agent section opens with {len(opening)} lines"
+
+
+def test_the_entry_pages_name_init_from_and_do_not_promise_pip_install() -> None:
+    index = read_text(_DOCS_DIR / "index.md")
+    quickstart = read_text(_DOCS_DIR / "quickstart.md")
+
+    assert "init --from" in index
+    assert "init --from" in quickstart
+    assert "pip install" not in index
 
 
 def test_no_derived_document_cites_a_dead_verb_or_path() -> None:
     """The same finders that keep `public/**` and `specs/memory/**` honest: a backticked
     `dadaia <verb>` absent from the live command tree, or a `specs/`/`dadaia_workspace/`/
     `.github/` path absent from the checkout, is dead the day it is written."""
-    paths = command_paths()
+    paths = command_paths(live_root())
     violations = [
         v
         for doc in [*_derived_docs(), _DOCS_DIR / "cli.md"]

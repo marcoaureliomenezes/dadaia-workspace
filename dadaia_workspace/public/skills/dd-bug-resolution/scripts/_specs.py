@@ -5,16 +5,19 @@ script prints through."""
 from __future__ import annotations
 
 import json
-import re
+import os
 import subprocess
 import sys
+from collections.abc import Iterator
 from pathlib import Path
+from typing import Any
 
-from _git import scrubbed_env
+from _git import GitError, main_checkout, scrubbed_env
 from _jsonl import reinstall_fix
 from _ledger import parse as parse
-from _platform import act, cli_argv, cli_path, command, inline, run, venv_dir
-from _refusal import Refusal, fix_of, report
+from _platform import act, cli_path, cli_words, command, inline, run
+from _refusal import Refusal, relay, report, said
+from _root import STATES, fenced_roots
 from _root import workspace_of as workspace_of
 
 CATALOG = "memory/product/catalog.json"
@@ -57,14 +60,42 @@ def run_cli(
         raise Refusal(f"the workspace CLI cannot start: {error}", reinstall_fix(root)) from error
 
 
+def require_governed(root: Path) -> None:
+    """Raises `Refusal` with the CLI's own fix when a workspace hook does not govern this call's session."""
+    done = run_cli(root, "context", "session-check", env=scrubbed_env(), stdin=subprocess.DEVNULL)
+    relay(done, said(done.stdout + done.stderr, "the workspace CLI refused this session"), reinstall_fix(root))  # fmt: skip
+
+
+def context_row(root: Path, repo: Path) -> dict[str, Any] | None:
+    """The `context list --json` row owning *repo* (main or associated; a checkout or a worktree of it), or None when no context owns it or *repo* is no repository.
+    Raises `Refusal` with the CLI's own fix when the CLI fails; rows it cannot read name no owner. A registry read: the fence is lifted for *root* only."""
+    done = run_cli(root, "context", "list", "--json", env=scrubbed_env() | {"DADAIA_FENCED_ROOTS": os.pathsep.join(map(str, fenced_roots() - {root.resolve()}))})  # fmt: skip
+    relay(done, "context list failed", reinstall_fix(root))
+    try:
+        checkout = main_checkout(repo)
+        return next((r for r in json.loads(done.stdout) if any((root / "repos" / s).resolve() == checkout for s in (r["main_repo"], *(a["slug"] for a in r["associated_repos"])))), None)  # fmt: skip
+    except (GitError, ValueError, TypeError, KeyError):
+        return None
+
+
+def context_repos(repo: Path) -> Iterator[Path]:
+    """*repo*, then the existing checkouts of the repos its context associates; the workspace beside its checkout is read only when the second is pulled, and *repo* stays alone when it is no repository or that workspace holds no registry or no CLI."""
+    yield repo
+    try:
+        main = main_checkout(repo)
+    except GitError:
+        return
+    root = main.parent.parent
+    row = context_row(root, repo) if (root / STATES / "spec_contexts.json").is_file() and cli_path(root).exists() else None  # fmt: skip
+    beside = (main.parent / a["slug"] for a in (row or {}).get("associated_repos", []))
+    yield from (p for p in beside if (p / ".git").exists())
+
+
 def check_release(specs: Path) -> None:
-    """Runs `release.py check` on *specs*; raises `Refusal` (first finding or exit status, one fix) on a non-zero exit."""
-    script = Path(__file__).resolve().parents[2] / "dd-release-implementation/scripts/release.py"
-    done = run([sys.executable, str(script), "check", "--specs", str(specs)], env=scrubbed_env())
-    out = done.stdout + done.stderr
-    if done.returncode:
-        bad = re.search(r"^(?:\S+ error |\[error\] )(.*)$", out, re.M)
-        raise Refusal(bad[1] if bad else f"release.py check exited {done.returncode}", fix_of(out, act("agent", f"fix the findings of release.py check on {specs}")))  # fmt: skip
+    """Runs `release.py check` once and relays it: a non-zero exit raises `Refusal`."""
+    check = script(Path(__file__).resolve().parents[2] / "dd-release-implementation/scripts/release.py")  # fmt: skip
+    done = run([*check, "check", "--specs", str(specs)], env=scrubbed_env())
+    relay(done, said(done.stdout + done.stderr, f"release.py check exited {done.returncode}"), check("check", specs=specs))  # fmt: skip
 
 
 def _bound_fix(here: Path, rerun: Script, ledger: str | None) -> tuple[str, str]:
@@ -75,10 +106,10 @@ def _bound_fix(here: Path, rerun: Script, ledger: str | None) -> tuple[str, str]
     except Refusal as refusal:
         return refusal.fix, ""
     except (ValueError, LookupError, TypeError):
-        return command(*cli_argv(venv_dir(root)), "context", "list"), ""
+        return command(*cli_words(root, "context", "list")), ""
     if ledger is None or ledger.startswith("specs/audits/"):
         return rerun(specs=root / "repos" / repo / "specs"), ""
-    return command(*cli_argv(venv_dir(root)), "worktree", "list"), ""
+    return command(*cli_words(root, "worktree", "list")), ""
 
 
 class Fix(str):

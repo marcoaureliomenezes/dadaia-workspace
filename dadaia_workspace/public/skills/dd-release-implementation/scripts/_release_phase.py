@@ -14,20 +14,20 @@ from typing import Any
 
 import _clock
 import _git
-from _grammar import SHA_RE, STATE
+from _grammar import APPROVED, STATE, extract_status
 from _platform import act, command, read_text, run
 from _refusal import Refusal, fix_of
 from _release_check import candidate_errors
 from _release_schema import (
-    APPROVED,
     CANDIDATE_DOCS,
     CLOSURE,
     DEFINITION,
     IMPLEMENTATION,
     PHASES,
-    extract_status,
+    SCRIPT,
+    State,
 )
-from _release_store import SCRIPT, Live, State, at_head, commit, live_release
+from _release_store import Live, commit, live_release
 from _specs import choice
 
 #: DEFINITION is `new`'s; each later phase has one predecessor (out-of-order = re-run).
@@ -46,7 +46,7 @@ def _refuse_unapproved_docs(live: Live) -> Path:
                 f"release {live.release_id} has no {document.relative_to(live.release_dir).as_posix()}",
                 act(
                     "agent",
-                    f"write {document.resolve()} (its writer per specs/AGENTS.md §4) and put it to the operator for approval",
+                    f"write {document.resolve()} (its writer per specs/AGENTS.md §4)",
                 ),
             )
         status = extract_status(read_text(document))
@@ -92,8 +92,11 @@ def _refuse_open_worktrees(specs: Path) -> None:
     root = workspace_of(specs)
     if root is None:  # no workspace holds this tree: there is no worktree to wait for
         return
-    main = _git.main_checkout(specs)
-    own = Path(_git.git(specs, "rev-parse", "--show-toplevel").strip()).resolve()
+    try:
+        main = _git.main_checkout(specs)
+    except _git.GitError:
+        raise Refusal(f"{specs} is in no git checkout", act("agent", "close from the specs of a repo's git checkout")) from None  # fmt: skip
+    own = specs.parent.resolve()
     held = [
         r for r in _worktree_rows(root)
         if r["repo"] == main.name and r["kind"] != "rc" and Path(str(r["path"])).resolve() != own
@@ -115,20 +118,15 @@ SHIP_PR = "with --pr set to the promote PR's number, when the host has one"
 SUPPLY = {CLOSURE: SHIP_PR}
 
 
-def set_phase(specs: Path, phase: str, sha: str) -> tuple[str, str]:
+def set_phase(specs: Path, phase: str) -> tuple[str, str]:
     """Move the live release to *phase* and stamp its milestone."""
-    if not SHA_RE.match(sha):
-        raise Refusal(
-            f"--sha {sha!r} is not a commit sha",
-            at_head(specs, "phase", phase),
-        )
     live = live_release(specs)
     current = str(live.state.get("phase"))
     if PREDECESSOR.get(phase) != current:
         refusal = Refusal(
             f"release {live.release_id} is in phase {current!r} — `phase` writes "
             f"{IMPLEMENTATION} after {DEFINITION} and {CLOSURE} after {IMPLEMENTATION}, once each",
-            SCRIPT(*NEXT.get(current, "check").split(), "--sha", sha),
+            SCRIPT(*NEXT.get(current, "check").split()),
         )
         raise choice(refusal, SUPPLY.get(current, ""))
     ts, candidate = _clock.now_iso(), live.candidate
@@ -144,11 +142,10 @@ def set_phase(specs: Path, phase: str, sha: str) -> tuple[str, str]:
 
     def apply(state: State) -> State:
         # The slot is the live candidate's stamp; the `milestone` entry is its history .
-        state[milestone] = {"sha": sha, "ts": ts}
+        state[milestone] = {"ts": ts}
         state.setdefault("log", []).append({
             "ts": ts, "agent": "release.py", "kind": "milestone", **rc,
-            "milestone": milestone, "sha": sha,
-            "text": f"Candidate {milestone} at {sha}; phase {phase}."})  # fmt: skip
+            "milestone": milestone, "text": f"Candidate {milestone}; phase {phase}."})  # fmt: skip
         state["phase"] = phase
         return state
 

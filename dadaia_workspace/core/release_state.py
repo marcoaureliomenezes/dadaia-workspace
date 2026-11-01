@@ -18,9 +18,8 @@ __all__ = [
 ]
 
 #: The release-state filename. The legacy name is never read as live; the doctor renames it.
-RELEASE_STATE_FILENAME = "_RELEASE.json"
-LEGACY_RELEASE_STATE_FILENAME = "RELEASE.json"
-
 _grammar = load_owner("dd-bug-resolution", "_grammar")
+RELEASE_STATE_FILENAME: str = _grammar.STATE
+LEGACY_RELEASE_STATE_FILENAME = RELEASE_STATE_FILENAME.removeprefix("_")
 RELEASE_ID_RE: re.Pattern[str] = _grammar.SEMVER_RE
 CANDIDATE_RE: re.Pattern[str] = _grammar.CANDIDATE_RE

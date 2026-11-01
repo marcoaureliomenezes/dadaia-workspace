@@ -30,7 +30,10 @@ def test_in_place_ledger_change_refuses_at_rebase(tmp_path: Path, name: str) -> 
     printed = command(*cli_argv(venv_dir(root)), "worktree", "sync", str(tree))
     assert fix == f"fix: {printed}"
     assert run_bash(printed, cwd=root).returncode == 0  # the printed line starts the launcher
-    assert run(root, "sync", str(tree)).returncode == 1  # sync stops on the conflicted ledger
+    stopped = run(root, "sync", str(tree))
+    assert stopped.returncode == 1  # sync stops on the conflicted ledger
+    (line,) = fixes(stopped)
+    assert "by hand" not in line and "ledger's own writer" in line
     env = {"HOME": str(root), "PATH": "/usr/bin:/bin", "GIT_CONFIG_NOSYSTEM": "1"}
     rebase = os_run(["git", "-C", str(tree), "rebase", "feature/0.5.0"], env=env)
     assert rebase.returncode == 1

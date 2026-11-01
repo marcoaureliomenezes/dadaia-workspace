@@ -233,3 +233,44 @@ def test_a_runner_planted_in_the_repo_is_never_run_ahead_of_the_workspace_venv(r
     assert done.returncode != 0
     assert f"fix: {oslib.command(str(repo.stub), 'worktree', 'new', 'repo', 'x')}" in done.stderr
     assert not marker.exists()
+
+
+def test_a_raw_commit_on_the_work_branch_is_refused_by_the_shipped_script(tmp_path: Path) -> None:
+    """The shipped script, module importable and runner working, refuses a raw work-branch commit."""
+    ws = tmp_path / "ws"
+    source = Path(dadaia_workspace.__file__).parent.parent
+    runner = (
+        "#!python\nimport runpy, sys\nsys.dont_write_bytecode = True\n"
+        f"sys.path.insert(0, {str(source)!r})\n"
+        'runpy.run_module("dadaia_workspace", run_name="__main__", alter_sys=True)\n'
+    )
+    fake_venv(ws, cli=runner, pth=True)
+    origin, root = tmp_path / "origin.git", ws / "repo"
+    root.mkdir()
+    env = {k: v for k, v in os.environ.items() if k != "DADAIA_WT"}
+    for args in (
+        ["init", "-q", "--bare", str(origin)],
+        ["init", "-q", "-b", "main", str(root)],
+    ):
+        assert run(["git", *args], env=env, timeout=60).returncode == 0
+    for args in (
+        ["config", "user.email", _EMAIL],
+        ["config", "user.name", "Test"],
+        ["commit", "-q", "--allow-empty", "-m", "init"],
+        ["remote", "add", "origin", str(origin)],
+        ["checkout", "-q", "-b", "feature/0.5.0"],
+        ["push", "-q", "-u", "origin", "feature/0.5.0"],
+    ):
+        assert run(["git", "-C", str(root), *args], env=env, timeout=60).returncode == 0
+    hook = root / ".git" / "hooks" / "reference-transaction"
+    shutil.copy(_SCRIPT, hook)
+    make_executable(hook)
+    before = run(["git", "-C", str(root), "rev-parse", "HEAD"]).stdout.strip()
+    done = run(
+        ["git", "-C", str(root), "commit", "-q", "--allow-empty", "-m", "raw"], env=env, timeout=60
+    )
+    after = run(["git", "-C", str(root), "rev-parse", "HEAD"]).stdout.strip()
+    assert done.returncode != 0
+    assert "[ref-gate] BLOCKED" in done.stderr, done.stderr
+    assert "update allowed" not in done.stderr
+    assert after == before

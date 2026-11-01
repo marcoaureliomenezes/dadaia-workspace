@@ -10,30 +10,24 @@ enumerated at collection and parsed inside the test; the mutation corpus is comm
 from __future__ import annotations
 
 import ast
-import importlib.util
 import json
 import re
-import shutil
-import uuid
 from pathlib import Path
 
 import pytest
 import yaml
 
 from dadaia_workspace.core.skill_owner import load_owner
-from tests.helpers.oslib import read_text, run, write_text
+from tests.fixtures.real_git import git
+from tests.helpers.oslib import read_text, write_text
+from tests.helpers.suite_files import tracked
 
 _ROOT = Path(__file__).resolve().parents[5]
 _BLOCK = re.compile(r"\A---[ \t]*\n(.*?)\n---[ \t]*\n?", re.DOTALL)
 
 
-def _tracked(*spec: str) -> list[Path]:
-    out = run(["git", "-C", str(_ROOT), "ls-files", "-z", "--", *spec], check=True).stdout
-    return sorted(_ROOT / p for p in out.split("\0") if p)
-
-
-_SHIPPED = _tracked("dadaia_workspace/public/*.md", "specs/*.md")
-_TESTS = _tracked("tests/*.py")
+_SHIPPED = tracked(_ROOT, "dadaia_workspace/public/*.md", "specs/*.md")
+_TESTS = tracked(_ROOT, "tests/*.py")
 _CORPUS = _ROOT / "tests/fixtures/frontmatter_mutations.json"
 
 
@@ -78,18 +72,13 @@ def test_every_inline_frontmatter_literal_of_the_suite_equals_safe_load_or_is_re
     assert seen > 20
 
 
-def test_the_suite_walk_holds_no_untracked_file() -> None:
-    scratch = _ROOT / "tests/tmp" / f"race-probe-{uuid.uuid4().hex[:8]}"
-    scratch.mkdir(parents=True, exist_ok=True)
-    try:
-        write_text(scratch / "test_gone.py", "X = 1\n")
-        spec = importlib.util.spec_from_file_location("_differential_probe", Path(__file__))
-        assert spec and spec.loader
-        module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
-    finally:
-        shutil.rmtree(scratch, ignore_errors=True)
-    assert scratch / "test_gone.py" not in module._TESTS
+def test_the_suite_walk_holds_no_untracked_file(tmp_path: Path) -> None:
+    git(tmp_path, "init", "-q")
+    (tmp_path / "tests/tmp").mkdir(parents=True)
+    write_text(tmp_path / "tests" / "test_kept.py", "X = 1\n")
+    git(tmp_path, "add", "tests/test_kept.py")
+    write_text(tmp_path / "tests" / "test_gone.py", "X = 1\n")
+    assert tracked(tmp_path, "tests/*.py") == [tmp_path / "tests/test_kept.py"]
 
 
 def test_the_pinned_mutation_corpus_equals_safe_load_or_is_refused() -> None:

@@ -75,6 +75,18 @@ def test_cli_line_renders_every_argv_as_the_kernel_does(
     )
 
 
+@pytest.mark.parametrize("platform", ["linux", "win32"])
+def test_cli_line_words_and_mkdir_are_the_kernels_own(
+    platform: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The door adds nothing: the words and the mkdir act are the kernel's, the host's caps included."""
+    monkeypatch.setattr("dadaia_workspace.core.platform.PLATFORM", Capabilities.detect(platform))
+    kernel, caps = load_owner("dd-bug-resolution", "_platform"), oslib.detect(platform)
+    root = PurePosixPath("/ws")
+    assert cli_line.cli_words(root, "doctor") == kernel.cli_words(root, "doctor", caps=caps)
+    assert cli_line.mkdir_line(root / "t") == kernel.mkdir_line(root / "t", caps=caps)
+
+
 _SHELL = ["powershell", "-NoProfile", "-Command"] if oslib.detect().windows else ["sh", "-c"]
 
 

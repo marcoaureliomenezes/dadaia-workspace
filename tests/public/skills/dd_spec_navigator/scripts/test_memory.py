@@ -1,6 +1,6 @@
 """dd-spec-navigator/scripts/memory.py owns specs/memory/product/
 {index.md,catalog.json} and NOTHING else: its grammar is the atoms' one grammar, the
-schema is the library lint's (LINT-1), so `check` compares the generated pair against
+schema is the library lint's (LINT-1), so `check` compares the catalog against
 the atoms and there is no atom generator. Size: SMALL.
 
 The byte-reproduction case is the anti-drift one: the script regenerates THIS repo's
@@ -21,7 +21,7 @@ import pytest
 
 from dadaia_workspace.features.specs.memory_lint import lint_atom, load_frontmatter_schema
 from tests.fixtures.harness_env import git_bash
-from tests.helpers.oslib import read_text, run, write_text
+from tests.helpers.oslib import read_text, run, spell, write_text
 from tests.helpers.skill_scripts import stage_skill_scripts
 
 _REPO = Path(__file__).resolve().parents[5]
@@ -74,13 +74,13 @@ def test_catalog_generate_byte_reproduces_the_committed_catalog_and_index(
 def test_catalog_generate_rebuilds_the_committed_content_from_the_atoms_alone(
     script: Path, specs: Path
 ) -> None:
-    """The stamp is the only field carried over: with both generated files deleted, the
+    """The stamp is the only field carried over: with the catalog deleted and the section stale, the
     atoms alone reproduce every committed entry and every rendered row."""
     product = specs / "memory" / "product"
     committed = json.loads(read_text(_REPO / "specs" / "memory" / "product" / "catalog.json"))
     committed_index = read_text(_REPO / "specs" / "memory" / "product" / "index.md")
     (product / "catalog.json").unlink()
-    (product / "index.md").unlink()
+    write_text(product / "index.md", "## Feature catalog\n\nstale\n")
 
     assert _run(script, "catalog", "generate", "--specs", str(specs)).returncode == 0
 
@@ -101,6 +101,73 @@ def test_catalog_generate_preserves_non_catalog_sections_verbatim(
     assert read_text(index).endswith("## Operator notes\n\nkept verbatim.\n")
 
 
+@pytest.mark.parametrize(
+    ("authored", "kept_before", "kept_after"),
+    [
+        ("# Mine\n\n## Authored\n\nkeep me.\n", "# Mine\n\n## Authored\n\nkeep me.\n\n", ""),
+        (
+            "# Mine\n\n## Feature catalog (generated)\n\nhand text.\n",
+            "# Mine\n\n## Feature catalog (generated)\n\nhand text.\n\n",
+            "",
+        ),
+        (
+            "# Mine\n\n### Feature catalog\n\nsub.\n",
+            "# Mine\n\n### Feature catalog\n\nsub.\n\n",
+            "",
+        ),
+        (
+            "# Mine\n\n## Feature catalog\n\nSTALE row\n\n## Notes\n\nafter.\n",
+            "# Mine\n\n## Feature catalog\n\n",
+            "\n\n## Notes\n\nafter.\n",
+        ),
+        (
+            "# Mine\n\n\n## Feature catalog\n\nSTALE row\n\n## Notes\n\nafter.\n",
+            "# Mine\n\n\n## Feature catalog\n\n",
+            "\n\n## Notes\n\nafter.\n",
+        ),
+        ("\n# Mine\n\n## Feature catalog\n\nSTALE row\n", "\n# Mine\n\n## Feature catalog\n\n", ""),
+        (
+            "# Mine\n\n## Authored\n\nkeep.\n\n\n",
+            "# Mine\n\n## Authored\n\nkeep.\n\n## Feature catalog\n\n### ",
+            "",
+        ),
+    ],
+    ids=[
+        "no-heading",
+        "longer-heading-line",
+        "deeper-heading",
+        "exact-heading",
+        "two-blank-lines-before-exact",
+        "leading-blank-line",
+        "append-after-trailing-blanks",
+    ],
+)
+def test_catalog_generate_keeps_every_authored_line_and_owns_one_exact_section(
+    script: Path, specs: Path, authored: str, kept_before: str, kept_after: str
+) -> None:
+    index = specs / "memory" / "product" / "index.md"
+    write_text(index, authored)
+
+    assert _run(script, "catalog", "generate", "--specs", str(specs)).returncode == 0
+    text = read_text(index)
+    assert text.startswith(kept_before) and text.endswith(kept_after or "|\n")
+    assert text.count("\n## Feature catalog\n\n### ") == 1
+    assert "STALE" not in text
+    assert _run(script, "check", "--specs", str(specs)).returncode == 0
+
+
+def test_catalog_generate_never_creates_the_index(script: Path, specs: Path) -> None:
+    """The index has one creator, the scaffold copy (`specs upgrade`); generate refreshes
+    the catalog beside a missing one and leaves the doctor's TREE-3 to create it."""
+    product = specs / "memory" / "product"
+    (product / "index.md").unlink()
+
+    assert _run(script, "catalog", "generate", "--specs", str(specs)).returncode == 0
+    assert (product / "catalog.json").is_file()
+    assert not (product / "index.md").exists()
+    assert _run(script, "check", "--specs", str(specs)).returncode == 0
+
+
 def test_check_passes_in_a_checkout_folder_not_named_after_the_repo(
     script: Path, specs: Path
 ) -> None:
@@ -114,7 +181,7 @@ def test_check_passes_in_a_checkout_folder_not_named_after_the_repo(
 
 def test_check_ignores_frontmatter_the_library_lint_owns(script: Path, specs: Path) -> None:
     """A tldr over the schema ceiling is LINT-1's
-    finding over the one grammar's dict; `check` reports only the generated pair."""
+    finding over the one grammar's dict; `check` reports only the catalog."""
     assert _run(script, "check", "--specs", str(specs)).returncode == 0
 
     atom = next((specs / "memory" / "product").glob("*/*.md"))
@@ -141,19 +208,18 @@ def test_check_flags_a_catalog_that_drifted_from_the_atoms(script: Path, specs: 
     result = _run(script, "check", "--specs", str(specs))
 
     assert result.returncode == 1
-    assert "catalog.json" in result.stdout
+    assert "the catalog in catalog.json does not match the atoms" in result.stdout
 
 
 def test_check_flags_an_index_that_drifted_from_the_atoms(script: Path, specs: Path) -> None:
-    """Both halves of the generated pair are checked — index.md is not the catalog's
-    shadow, it is the second file `catalog generate` writes in the same act."""
+    """The index's `## Feature catalog` is checked beside catalog.json."""
     index = specs / "memory" / "product" / "index.md"
     write_text(index, read_text(index).replace("| `agent-comms` |", "| `agent-coms` |", 1))
 
     result = _run(script, "check", "--specs", str(specs))
 
     assert result.returncode == 1
-    assert "index.md" in result.stdout
+    assert "the catalog in index.md does not match the atoms" in result.stdout
 
 
 def test_a_drifted_pair_names_the_generator_as_its_fix(
@@ -169,6 +235,27 @@ def test_a_drifted_pair_names_the_generator_as_its_fix(
 
     assert run([git_bash(), "-c", finding["fix"]], cwd=tmp_path).returncode == 0
     assert _run(script, "check", "--specs", str(specs)).returncode == 0
+
+
+def test_a_specs_tree_without_product_names_the_cross_shell_mkdir_by_absolute_path(
+    script: Path, tmp_path: Path
+) -> None:
+    """Both the generator's refusal and `check`'s finding carry the interpreter mkdir act with the
+    absolute product folder, and running that line creates it."""
+    bare = tmp_path / "bare" / "specs"
+    (bare / "memory").mkdir(parents=True)
+    product = bare / "memory" / "product"
+
+    refusal = _run(script, "catalog", "generate", "--specs", str(bare))
+    (finding,) = json.loads(_run(script, "check", "--specs", str(bare), "--json").stdout)
+
+    assert refusal.returncode == 1
+    for fix in (finding["fix"], refusal.stderr.split("fix: ", 1)[1].strip()):
+        assert fix.endswith(f" {spell(str(product))}")
+        assert not fix.startswith(("mkdir", "Agent action"))
+        assert run([git_bash(), "-c", fix], cwd=tmp_path).returncode == 0
+        assert product.is_dir()
+        product.rmdir()
 
 
 @pytest.mark.parametrize(

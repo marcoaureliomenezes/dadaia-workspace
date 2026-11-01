@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Write the reviewer's verdict handoff, bound to the sha and diff it judged."""
+"""Write the reviewer's verdict handoff, bound to the sha and diff it judged; `verdict.py stats <rc>` prints the readout."""
 
 from __future__ import annotations
 
@@ -24,8 +24,8 @@ from _git import scrubbed_env
 from _grammar import CONTEXT_NAME_RE
 from _handoffs import REVIEWER
 from _platform import act, run, use_utf8_stdio, write_text
-from _refusal import Refusal, fix_of, report
-from _specs import find_specs, run_cli
+from _refusal import Refusal, fix_of, report, said, without_fix
+from _specs import find_specs, require_governed, run_cli
 from _stats import table as _stats_table
 
 _WORKTREE = Path(__file__).resolve().parents[2] / "dd-gitflow-default" / "scripts" / "worktree.py"
@@ -56,11 +56,10 @@ def _reason(stdout: str, stderr: str) -> Refusal:
     try:
         err = json.loads(stdout)[0]["errors"][0]
     except (ValueError, LookupError, TypeError):  # no JSON: the CLI refused before validating
-        said = stderr.splitlines()
+        why = said(stderr, without_fix(stderr).strip() or "no output")
         fix = fix_of(
             stderr, act("agent", "resolve the workspace CLI error above, then rerun verdict.py")
         )
-        why = next((x[7:] for x in said if x.startswith("Error: ")), stderr.strip() or "no output")
         return Refusal(why, fix)
     where, why = err["field_path"], err["message"]
     return Refusal(
@@ -97,7 +96,7 @@ def main(argv: list[str] | None = None) -> int:
 def _run(argv: list[str]) -> int:
     if argv[:1] == ["stats"]:
         return _stats(argv[1:])
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0], allow_abbrev=False)
     parser.add_argument("path")
     parser.add_argument("--sha", required=True)
     parser.add_argument("--context", required=True)
@@ -119,6 +118,7 @@ def _run(argv: list[str]) -> int:
         sys.stderr.write(done.stderr)
         return done.returncode
     bound = json.loads(done.stdout)
+    require_governed(Path(bound["root"]))
     now = _clock.now_iso()
     handoff = {
         "schema_version": "handoff-v1.2",
@@ -133,7 +133,7 @@ def _run(argv: list[str]) -> int:
         **body,
     }
     root = Path(bound["root"])
-    out = root / ".dadaia/handoff" / args.context
+    out = root / ".dadaia/states/verdicts" / args.context
     out.mkdir(parents=True, exist_ok=True)
     target = out / f"{now.replace(':', '')}-{REVIEWER}-{args.slug}.handoff.json"
     try:

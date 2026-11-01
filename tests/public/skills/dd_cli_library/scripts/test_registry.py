@@ -169,19 +169,29 @@ def test_entry_with_a_dead_pid_is_stale_before_its_ttl(tmp_path: Path) -> None:
 
 
 def test_a_concurrent_load_never_reads_a_half_written_registry(tmp_path: Path) -> None:
-    """Interleaved save and load never raise JSONDecodeError (a load raising it fails the reader
-    thread)."""
+    """Interleaved save and load never raise in the reader thread (JSONDecodeError, or the
+    PermissionError a read overlapping the swap gets on Windows)."""
     import threading
 
     module = _load_module()
     registry = tmp_path / "server_registry.json"
     doc = json.dumps({"entries": [{"port": p} for p in range(2000)]}) + "\n"
     module.replace(registry, doc)
-    reader = threading.Thread(target=lambda: [module.load(registry) for _ in range(300)])
+    raised: list[BaseException] = []
+
+    def read() -> None:
+        try:
+            for _ in range(300):
+                module.load(registry)
+        except BaseException as exc:
+            raised.append(exc)
+
+    reader = threading.Thread(target=read)
     reader.start()
     for _ in range(300):
         module.replace(registry, doc)
     reader.join()
+    assert raised == []
 
 
 def test_staleness_asks_the_kernel_whether_the_pid_lives(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -275,3 +285,16 @@ def test_every_registry_refusal_prints_one_error_line_and_one_fix_line(tmp_path:
         f"{reg} is not valid UTF-8",
         f"Operator action: delete {quote(str(reg))} — the next registry.py run starts an empty registry",
     )
+
+
+def test_a_planted_kernel_module_on_the_path_never_loads(tmp_path: Path) -> None:
+    """The kernel's `_clock` wins over any same-named module an earlier path entry holds."""
+    planted = tmp_path / "planted"
+    planted.mkdir()
+    marker = tmp_path / "loaded"
+    write_text(planted / "_clock.py", f"open({str(marker)!r}, 'w').close()\nraise SystemExit(97)\n")
+    reg = tmp_path / ".dadaia" / "states" / "server_registry.json"
+    env = {**os.environ, "PYTHONPATH": str(planted)}
+    done = run([sys.executable, str(_SCRIPT), "--registry", str(reg), "list"], check=False, env=env)
+
+    assert (done.returncode, marker.exists()) == (0, False), done.stderr

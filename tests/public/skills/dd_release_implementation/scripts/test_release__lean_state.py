@@ -233,15 +233,13 @@ def test_ship_requires_each_open_bug_flag_and_its_verbatim_authorization_note(
         + "\n",
     )
 
-    refused = _run(script, "ship", "--sha", "3333333", "--specs", str(specs))
+    refused = _run(script, "ship", "--specs", str(specs))
     assert refused.returncode == 1
     assert "a-bug" in refused.stderr
 
     shipped = _run(
         script,
         "ship",
-        "--sha",
-        "3333333",
         "--allow-open",
         "a-bug",
         "--specs",
@@ -266,6 +264,14 @@ def test_ship_requires_each_open_bug_flag_and_its_verbatim_authorization_note(
             "Agent action: add a-bug to the carried field of the kind: summary entry",
             id="no-carry-is-the-agents",
         ),
+        pytest.param(
+            [
+                _entry("note", 'He said: Operator authorization verbatim: "carry a-bug open"'),
+                _entry("summary", "delivered: x; carried: a-bug; backlog exits: none"),
+            ],
+            "Operator action: authorize carrying a-bug",
+            id="a-phrase-mid-note-is-no-authorization",
+        ),
     ],
 )
 def test_ship_names_who_clears_a_missing_authorization_or_carry(
@@ -276,9 +282,7 @@ def test_ship_names_who_clears_a_missing_authorization_or_carry(
     _write_release(specs, phase="CLOSURE", log=[*log, memory])
     (specs / "bugs").mkdir()
     write_text(specs / "bugs" / "BUGS.jsonl", json.dumps({"id": "a-bug", "status": "open"}) + "\n")
-    refused = _run(
-        script, "ship", "--sha", "3333333", "--allow-open", "a-bug", "--specs", str(specs)
-    )
+    refused = _run(script, "ship", "--allow-open", "a-bug", "--specs", str(specs))
     assert refused.returncode == 1
     assert refused.stderr.splitlines()[-1] == f"fix: {fix}"
 
@@ -345,7 +349,7 @@ def test_ship_refuses_every_open_bug_then_carries_each_authorized_id(
     histo = specs / "releases/_archive/releases_histo.jsonl"
     before = (state.read_bytes(), histo.read_bytes())
 
-    refused = _run(script, "ship", "--sha", "3333333", "--specs", str(specs))
+    refused = _run(script, "ship", "--specs", str(specs))
 
     assert refused.returncode == 1
     assert "a-bug" in refused.stderr
@@ -356,8 +360,6 @@ def test_ship_refuses_every_open_bug_then_carries_each_authorized_id(
     shipped = _run(
         script,
         "ship",
-        "--sha",
-        "3333333",
         "--allow-open",
         "a-bug",
         "--specs",
@@ -515,9 +517,7 @@ def test_a_previous_candidates_carry_does_not_satisfy_allow_open(
         _MEMORY,
     ]
     specs = _stacked(tmp_path, "operator-demand", log, ("a-bug",))
-    refused = _run(
-        script, "ship", "--sha", "3333333", "--allow-open", "a-bug", "--specs", str(specs)
-    )
+    refused = _run(script, "ship", "--allow-open", "a-bug", "--specs", str(specs))
     assert refused.returncode == 1
     assert refused.stderr.splitlines()[-1] == (
         "fix: Agent action: add a-bug to the carried field of the kind: summary entry"

@@ -40,7 +40,7 @@ Rationale: every context bug came from a second resolution path answering differ
 Measured by: `poetry run python scripts/guards/run.py` prints `PASS ignore-cap` — `scripts/guards/slop.py`'s `IGNORE_EDGES` is the cap's one numeric home.
 Rationale: a pinned exception list turns every new suppression into a reviewable diff.
 
-### P-11 · We keep `core` file-I/O pure outside an authorized set of eight modules; new file I/O enters `core` only by joining that set on purpose.
+### P-11 · We keep `core` file-I/O pure outside an authorized set of modules (`_CORE_IO_STEMS` of the purity test); new file I/O enters `core` only by joining that set on purpose.
 Measured by: `pytest 'tests/core/test_atomic_write__core_file_io_purity.py::test_each_question_has_one_owner[core-file-io-purity]'` (AST walk; every authorized stem must exist).
 Rationale: joining the set is legal; arriving there unnoticed is not.
 
@@ -48,8 +48,8 @@ Rationale: joining the set is legal; arriving there unnoticed is not.
 Measured by: `pytest tests/core/test_atomic_write__core_file_io_purity.py -k never_imports_the_container` (`test_importing_a_hook_never_imports_the_container` over five hook modules, and `test_gate_resolution_path_never_imports_the_container` over the executed gate path, each with `container` absent from `sys.modules`).
 Rationale: the composition graph costs seconds of import time per gated tool call.
 
-### P-13 · We keep the architecture diagrams derived from live code: every diagrammed class, view module and feature package is introspected against the live tree.
-Measured by: `dadaia doctor` — `specs`-section rule `MEM-DRIFT-1` (`features/specs/doctor_memory.py`), one WARNING per package the map and the live tree disagree on.
+### P-13 · We keep the architecture diagrams derived from live code: the features package map names exactly the live feature packages.
+Measured by: `poetry run python scripts/guards/run.py` prints `PASS features-map-matches-architecture` — `scripts/guards/repo.py`'s `features_map_matches_architecture`, one violation per package the map and the tracked tree disagree on.
 Rationale: a diagram nobody checks is the first artifact to lie.
 
 ### P-14 · We keep the release-state reader pure: `core/release_state.py` parses and serializes already-read text and performs no file I/O.
@@ -109,9 +109,9 @@ flowchart TB
 
 - `container.py` is composition wiring only: every definition keeps a production consumer, and a single-consumer adapter is imported directly by its feature.
 - No `core/protocols/` package exists: no seam carries two production adapters, so every adapter is imported by its one consumer; a `typing.Protocol` lives only as a structural type inside the module that consumes it.
-- `setup.cfg` carries seven import-linter contracts; `features-no-subprocess` and `features-no-cross-feature` have no suppressed edge (P-10).
+- The import-linter contracts are the `[importlinter:contract:*]` sections of `setup.cfg`; `features-no-subprocess` and `features-no-cross-feature` have no suppressed edge (P-10).
 - Hooks import `core.invocation` directly and build the `Invocation` once per process (P-12); `sdd_post_gate` touches `last_seen_at` and writes nothing else.
-- The package/skill seam (ADR 0246): every shared fact has one owner, a skill script; the cross-cutting ones (refusal, git runner, JSONL, atomic writer, frontmatter parser, clock, the OS boundary `_platform.py`, workspace-root walk, privacy matcher) live in `public/skills/dd-bug-resolution/scripts/`, the kernel, and each ledger schema in its writer skill's `scripts/schemas/`. `core/skill_owner.load_owner` loads an owner by absolute path as one module object, and no copy is staged or projected.
+- The package/skill seam (ADR 0246): every shared fact has one owner, a skill script; the cross-cutting ones (refusal, git runner, zero-object-id predicate, JSONL and the reinstall act per shipped-file class, atomic writer, frontmatter parser and key span, clock, finding constructor and check-verb body, the OS boundary `_platform.py` with the CLI words, workspace test and root walk, privacy matcher) live in `public/skills/dd-bug-resolution/scripts/`, the kernel, and each ledger schema in its writer skill's `scripts/schemas/`. `core/skill_owner.load_owner` loads an owner by absolute path as one module object, and no copy is staged or projected.
 - `core/atomic_write.py`, `core/clock.py`, `core/frontmatter.py`, `core/platform.py` and `core/redaction.py` are typed doors over their kernel owners and import only `core.skill_owner` among the package's modules (ADR 0246).
 - `features/migrate` stamps `specs_pattern_version: 13` (`core/specs_version.CANONICAL_SPECS_VERSION`) or refuses; a tree below v6 is foreign, and `specs init --replace-foreign` moves it to `specs-bkp/` before the canon is scaffolded.
 
@@ -265,18 +265,26 @@ flowchart TB
 - 0259 — ADR 0152 (2) as amended by ADR 0193: SPEC and job-file size stay a recommendation, the TASKS size reads per job file
 - 0260 — ADR 0193 is superseded: no fixed job cap per rc; the DAG, Job 1 and the Reconciliation live in dd-release-definition
 - 0261 — ADR 0142 stays: no hard line-count limit gates any change; line counts are a readout; its measured_by is repaired
-- 0262 — The per-job CI wall-clock budget of ADR 0119 is re-frozen at measured durations, judged by dd-code-reviewer from the CI job durations
 - 0263 — A fix line has three forms: a runnable command, 'Agent action: <one act>' for an act an agent performs, and 'Operator action: <one act>' only for an act the law reserves to the human
 - 0264 — Worktrees are a hierarchy under worktrees/<repo>/<v>/: an rc integration branch wt-rc, a base derived from the path, the plain kind deleted, and the CLI enforced by a git hook
 - 0265 — The OS boundary is one module of the skill kernel, _platform.py; no other file decides a host fact
 - 0266 — A fix line's label is spelled by one producer, act(kind, text), beside command() in the skill kernel's _platform.py; call sites pass only the act text
 - 0267 — A bug record's surface is derived from the files its fix commit touched, never typed; append lists the earlier bugs whose fixes touched the same files
 - 0268 — The OS boundary admits one lint rule: ruff PLW1514 (a text open names its encoding), in the existing ruff step; still no guard and no gate
-- 0269 — The 0.5.0 eval gate runs in this repo's eval.yml on sha E; the promote PR head differs from E only by the _RELEASE.json record; T1 3/3, T2 and T3 at least 2/3 on the candidate
 - 0270 — Amend ADR 0171: context alive takes the highest work branch on its clone's origin through the one work-branch reader, every other caller staying local; no registry migration ships
 - 0271 — dadaia worktree pause bundles one clean lane or wt-rc tree and removes it; job and task trees are never paused; context dead is unchanged and keeps refusing every wt/*
 - 0272 — Amend ADR 0175: export always bundles and never probes visibility; hard carries the open lane and wt-rc trees with no snapshots zone; the artifact carries the export-v1 format; a context with no remote is listed unreplicable; init --from excludes --repo and installs every harness
 - 0273 — A resolved bug's fix is the commit HEAD reaches whose message carries its fix(bugs) or refactor(bugs) line; fix_sha is a write-once hint, never judged
+- 0274 — The code under development carries <release>rc<N>; tests, evals and release validate only the current build, never a published dadaia-workspace
+- 0275 — Amend ADR 0103: scope follows the linked tree a write lands in; a write inside a back-pointer-verified linked worktree of a registered repo is in scope for any session
+- 0276 — Amend ADR 0088: a skill's registry read of the repo's own workspace, found by position, lifts the fence for that one root
+- 0278 — Amend ADR 0273: an uncited resolved record's fix line is the one bugs.py archive act naming every missed id
+- 0279 — Only the dispatched dd-code-reviewer writes a verdict: verdicts live in the PROTECTED states zone, and the pre-gate judges the one Bash act that writes one where the harness names the subagent
+- 0280 — A fix with a culprit is the REBUILD of its unit in its own lane; review sweeps the fixed pattern on the first pass and refuses a verdict without the reached-test run; history is the id-line query; no stored sha a rewrite can orphan
+- 0281 — The deploy gate is the multi-harness eval pipeline: Claude Code and Codex legs at k=3 on sha E, read by a required Eval gate check on the promote PR
+- 0282 — Codex is judged by its session record: its hooks leave the record under the id its commands resolve, and its registry row names a subagent key
+- 0283 — The principal and integration branches are ordinary pushable refs: the pre-push gate stops refusing their direct push, and the bootstrap birth is deleted
+- 0284 — The per-job CI wall-clock budget of ADR 0262 is re-frozen at the per-job maximum of the green feature/0.5.0 runs read on 2026-10-28; the Integration and Contract coverage timeouts are about 1.5x their budget
 <!-- /dadaia:fixed adr-list -->
 
 <!-- dadaia:fixed slop-code -->

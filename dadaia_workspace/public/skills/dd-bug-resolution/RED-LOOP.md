@@ -14,7 +14,7 @@ Disclosed reference of [`SKILL.md`](SKILL.md) Phase 1.
 5. **Replay a captured trace** — save a real request/payload/event log to disk;
    replay it through the code path in isolation.
 6. **Throwaway harness** — a minimal subset of the system (one service, mocked deps)
-   exercising the bug path with a single call; one any runner collects is a test, promoted to its contract's home; only one no runner collects may go in Phase 6.
+   exercising the bug path with one call; a collected one lives in `tests/tmp/<job>/`; the merge refuses until each moves to its contract's home or the operator orders a delete.
 7. **Property / fuzz loop** — for "sometimes wrong output", run many random inputs
    and look for the failure mode.
 8. **Bisection harness** — bug appeared between two known states: automate "boot at

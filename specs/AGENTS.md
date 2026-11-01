@@ -16,8 +16,8 @@ Scope: this file governs only the `specs/` tree of one Spec Context Project.
 | `memory/product/` | `index.md catalog.json <area>/<slug>.md` |
 | `releases/` | `AGENTS.md _archive/ <M.m.p>/` |
 | `releases/_archive/` | `releases_histo.jsonl <M.m.p>/**` |
-| `releases/<M.m.p>/` | `_RELEASE.json RELEASE.json rc-<N>/` |
-| `releases/<M.m.p>/rc-<N>/` | `SPEC.md PLAN.md TASKS.md tasks/<slug>.md` |
+| `releases/<M.m.p>/` | `_RELEASE.json rc-<N>/` |
+| `releases/<M.m.p>/rc-<N>/` | `SPEC.md PLAN.md tasks/job<n>.md` |
 | `backlog/` | `AGENTS.md BACKLOG.json _archive/backlog_histo.jsonl` |
 | `bugs/` | `AGENTS.md BUGS.jsonl _archive/bugs_histo.jsonl` |
 | `audits/` | `AGENTS.md _archive/audits_histo.jsonl <YYYYMMDD-slug>/` |
@@ -33,17 +33,17 @@ Scope: this file governs only the `specs/` tree of one Spec Context Project.
 
 - The live release's `_RELEASE.json` `phase` reads `IMPLEMENTATION`: `release.py phase` enters it only when the candidate's SPEC and PLAN both carry `**Status:** Approved`.
 - The task is a row of its job file (`rc-<N>/tasks/job<n>.md`), and its declared write set names every file touched.
-- Any item missing: stop and emit the §7 `[SDD BLOCKED]` block naming it. A bug fix needs only its open bug (`specs/bugs/AGENTS.md` §2).
+- Any item missing: stop and emit the §7 `[SDD BLOCKED]` block naming it. A `wt-hotfix` lane, or a block-list fix on a closed `wt-rc`, needs only its open bug (`specs/bugs/AGENTS.md`, Resolution).
 
 ## 4. Artifact authority
 
 | Path | Writer |
 |---|---|
 | `constitution.md` | operator, or `dd-product-engineer` under approved governance work |
-| `releases/<id>/_RELEASE.json` | `python3 .agents/skills/dd-release-implementation/scripts/release.py new\|phase\|memory\|ship`; `log` entries per `dd-release-implementation`'s `RELEASE-EVENTS.md` table |
+| `releases/<id>/_RELEASE.json` | `python3 .agents/skills/dd-release-implementation/scripts/release.py`; `log` entries per `dd-release-implementation`'s `RELEASE-EVENTS.md` table |
 | `releases/<id>/rc-<N>/{SPEC,PLAN}.md`, `rc-<N>/tasks/job<n>.md` (read-only after its closure; archived whole at promote) | `dd-product-engineer` (SPEC), `dd-sw-engineer-sr` (PLAN, job files) |
 | `memory/**` | `dd-product-engineer`; phases and tiers: `memory/AGENTS.md` §1 |
-| `backlog/**` | `dd-product-engineer`; entries exit by `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py exit` |
+| `backlog/**` | `dd-product-engineer`; entries exit by `backlog.py exit` (`dd-backlog-definition`) |
 | `bugs/**` | `dd-product-engineer`, `dd-sw-engineer-sr`, by verbs only, after the operator confirms; propose and confirm: `bugs/AGENTS.md` |
 | `audits/**` | the main thread, from the reviewer's audit-lens report; how a finding moves: `audits/AGENTS.md` |
 

@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "decision-record-v1",
   "title": "ADR Decision Record v1",
-  "description": "One record per architecture decision, appended once to specs/ADRs/decisions.jsonl (v0.5.0 specs-canon closure, operator ruling 2026-08-28). A superseded decision stays in decisions.jsonl with `status: superseded`, named by its successor's `supersedes`; its id is never reused. `id` is monotonic and gap-free over the one file. Who accepts: specs/ADRs/AGENTS.md §2.",
+  "description": "One record per architecture decision, appended once to specs/ADRs/decisions.jsonl. A superseded decision stays in decisions.jsonl with `status: superseded`, named by its successor's `supersedes`; its id is never reused. `id` is monotonic and gap-free over the one file. Who accepts: specs/ADRs/AGENTS.md §2.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -135,7 +135,7 @@
       }
     },
     {
-      "description": "The operator-only acceptance law, expressed MECHANICALLY (0.4.7 FR6): an 'accepted' record must carry a non-empty 'measured_by' — a decision nobody can measure is not a principle, it is prose. Stated in this schema rather than in a test's hand-rolled copy, so the one validator the ledgers doctor runs and the one the contract test runs are the same validator.",
+      "description": "The operator-only acceptance law, expressed MECHANICALLY: an 'accepted' record must carry a non-empty 'measured_by' — a decision nobody can measure is not a principle, it is prose. Stated in this schema rather than in a test's hand-rolled copy, so the one validator the ledgers doctor runs and the one the contract test runs are the same validator.",
       "if": {
         "properties": {
           "status": {

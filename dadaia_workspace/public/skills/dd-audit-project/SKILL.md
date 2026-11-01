@@ -18,8 +18,7 @@ description: >
 
 ## 2. The three pillars — all three in one run
 
-- **Pillar 1 — bugs** ([`PILLAR-BUGS.md`](PILLAR-BUGS.md)): compute all nine
-  forensic metrics it lists on each `BUGS.jsonl` record in the window; the audit record and git history establish coverage.
+- **Pillar 1 — bugs** ([`PILLAR-BUGS.md`](PILLAR-BUGS.md)): compute every forensic metric it lists over the `BUGS.jsonl` records in the window; the audit record and git history establish coverage.
 - **Pillar 2 — specs** ([`PILLAR-SPECS.md`](PILLAR-SPECS.md)): commit shapes, canon compliance, `_RELEASE.json` milestones over the window.
 - **Pillar 3 — memory** ([`PILLAR-MEMORY.md`](PILLAR-MEMORY.md)): principles through their `Measured by:` checks, product atoms against code.
 
@@ -30,14 +29,14 @@ The main thread refuses to write `AUDIT.md` until all three pillar sections are 
 
 - Applies while `.dadaia/.venv/bin/dadaia doctor`'s ONBOARDING next step is `first-pass`; its fix line lists the pending memory files.
 - Worklist: `python3 .agents/skills/dd-spec-navigator/scripts/memory.py drift --since <root commit> --specs repos/<slug>/specs` (root commit: `git -C repos/<slug> rev-list --max-parents=0 HEAD`) — every uncovered unit.
-- `dd-product-engineer` fills `ARCHITECTURE.md`, `QUALITY.md` and the product atoms from the code, and from `specs-bkp/` when present.
-- Done = every worklist line covered and `.dadaia/.venv/bin/dadaia doctor --context <ctx>` exit 0 (LINT-1 owns the atoms, `memory.py check` only the generated pair) — the next step moves to `publish`; the first pass opens no audit window.
+- `dd-product-engineer` fills `ARCHITECTURE.md`, `QUALITY.md`, the product atoms and `index.md`'s non-catalog sections (`specs/memory/AGENTS.md` §Tree, format, validation) from the code, and from `specs-bkp/` when present.
+- Done = every worklist line covered and `.dadaia/.venv/bin/dadaia doctor --context <ctx>` exit 0 (LINT-1 owns the atoms, `memory.py check` only the catalog) — the next step moves to `publish`; the first pass opens no audit window.
 
 ## 4. Done when
 
-- Window recorded; nine bug metrics, each against its previous-audit baseline (metrics 7 and 8 against target 0); every PILLAR-MEMORY §1 check ran; `AUDIT.md` has all three pillars, each claim a `FINDINGS.jsonl` record; `python3 .agents/skills/dd-audit-project/scripts/audit.py check --specs <specs-dir>` exits 0.
+- Window recorded; every PILLAR-BUGS metric computed against its previous-audit baseline and target; every PILLAR-MEMORY §1 check ran; `AUDIT.md` has all three pillars, each claim a `FINDINGS.jsonl` record; `python3 .agents/skills/dd-audit-project/scripts/audit.py check --specs <specs-dir>` exits 0.
 
 ## 5. References
 
-- Script: `python3 .agents/skills/dd-audit-project/scripts/audit.py` — the only verbs that change a committed finding or close the audit (`disposition`, `close`); `check` validates; a finding is appended by hand (`FINDINGS-FORMAT.md`).
+- Script: `python3 .agents/skills/dd-audit-project/scripts/audit.py` — `--help` names the verbs that change a committed finding or close the audit; a finding is appended by hand (`FINDINGS-FORMAT.md`).
 - Lifecycle, pillars and verbs: `specs/audits/AGENTS.md`.

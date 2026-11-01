@@ -6,6 +6,7 @@ from pathlib import Path
 
 from dadaia_workspace.core.doctor_rules import SectionFinding
 from dadaia_workspace.features.specs.doctor_types import Severity, specs_finding
+from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient, gitflow_fix
 
 
 class CoherenceValidator:
@@ -33,13 +34,14 @@ class CoherenceValidator:
         return []
 
     def check_gitflow(self) -> list[SectionFinding]:
-        """WARN when the constitution's ``gitflow:`` block is absent or malformed: the
-        pre-push gate then falls back to the default."""
-        from dadaia_workspace.core.gitflow import read_gitflow
-
+        """WARN, in a git repo, when the committed constitution's ``gitflow:`` block is absent or malformed:
+        the gates read the same text and fall back to the default."""
         constitution = self.specs_dir / "constitution.md"
-        _, warning = read_gitflow(self.specs_dir)
-        if warning is None or not constitution.is_file():
+        repo = self.specs_dir.parent
+        if not constitution.is_file() or not (repo / ".git").exists():
+            return []
+        _, warning = GitSubprocessClient().gitflow(repo)
+        if warning is None:
             return []
         return [
             specs_finding(
@@ -47,5 +49,6 @@ class CoherenceValidator:
                 severity=Severity.WARNING,
                 description=warning,
                 path=str(constitution),
+                fix=gitflow_fix(self.specs_dir),
             )
         ]

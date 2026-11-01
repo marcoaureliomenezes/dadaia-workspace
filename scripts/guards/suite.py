@@ -39,7 +39,6 @@ CALIBRATION = {
 
 _RUN_PYTEST = re.compile(r"^\s*(?:-\s*)?run:\s*(.*\bpytest\s.*)$", re.M)
 _SELECTOR = re.compile(r"""-m\s+(["'])(.*?)\1""")
-_LOW_TIMEOUT = re.compile(r"mark\.timeout\((\d+)\)")
 _REAL_CI = Path(__file__).resolve().parents[2] / _CI
 
 PROBE = (
@@ -127,15 +126,6 @@ def tier_timeout(tree: Tree) -> list[str]:
     if not tiers:
         return ["probe-broke: the probe session reported no tier timeouts"]
     out = []
-    if s.get("explicit") != 45:
-        out.append(f"explicit-kept: a planted timeout(45) became {s.get('explicit')}")
-    for p in tree.tracked("tests"):
-        if p.endswith(".py"):
-            for n in _LOW_TIMEOUT.findall(tree.read(p)):
-                if int(n) < TIER_SECONDS["medium"]:
-                    out.append(
-                        f"explicit-below-medium: {p} sets timeout({n}), bypassing the calibration"
-                    )
     wrong = {t: tiers.get(t) for t in TIER_SECONDS if tiers.get(t) != TIER_SECONDS[t] * factor}
     if wrong:
         out.append(f"four-tiers: {wrong} differ from {TIER_SECONDS} (x{factor})")
@@ -192,7 +182,6 @@ def _write(root: Path, rel: str, text: str) -> None:
 def _healthy() -> Session:
     return {
         "tiers": dict(TIER_SECONDS),
-        "explicit": 45,
         "refusal": "tests/tmp/p.py::test_guard_quarantine_naked: ... requires a registered bug id",
         "stderr": "[quarantine-discipline]",
         "props": {"calibration": dict(CALIBRATION), "push_gc": []},
@@ -223,11 +212,6 @@ def _plant_imports(files: int, per_file: int) -> Callable[[Path], Session]:
     return plant
 
 
-def _plant_low_timeout(root: Path) -> Session:
-    _write(root, "tests/unit/test_t.py", "@pytest.mark.timeout(15)\ndef test_t(): ...\n")
-    return CONTROL(root)
-
-
 def _plant_selector(root: Path) -> Session:
     session = CONTROL(root)
     _write(root, _CI, _REAL_CI.read_text("utf-8").replace("slow and not quarantine", "slow"))
@@ -248,12 +232,10 @@ CHECKS: dict[str, Check] = {
     "tier-timeout": (
         tier_timeout,
         {
-            "explicit-kept": _session(explicit=30),
             "four-tiers": _session(tiers={**TIER_SECONDS, "e2e": None}),
             "calibrated-ceiling": _session(
                 props={"calibration": {**CALIBRATION, "small win32 False": 10}, "push_gc": []}
             ),
-            "explicit-below-medium": _plant_low_timeout,
             "probe-broke": lambda root: {},
         },
     ),

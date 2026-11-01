@@ -16,6 +16,7 @@ from dadaia_workspace.core import platform
 from dadaia_workspace.core.harness_registry import AgentTranscode, HarnessRecord
 from dadaia_workspace.core.model_registry import ResolvedAgentModel
 from dadaia_workspace.infrastructure.install_helpers import (
+    key_spans,
     persona_fields,
     persona_read_only,
     resolve_codex_agent_model,
@@ -115,16 +116,13 @@ def copilot_agent_md_bytes(md_path: Path) -> bytes:
     """The authored persona rendered as a Copilot custom agent: its three known
     frontmatter keys (with their block values) plus the body, verbatim."""
     frontmatter, body = split_persona(platform.read_text(md_path))
-    kept: list[str] = []
-    keeping = False
-    for line in frontmatter.splitlines():
-        if line[:1].isspace() or line.startswith("-"):
-            if keeping:
-                kept.append(line)
-            continue
-        keeping = line.split(":", 1)[0] in _COPILOT_FRONTMATTER_KEYS
-        if keeping:
-            kept.append(line)
+    kept = [
+        line
+        for key, lines in key_spans(frontmatter)
+        if key in _COPILOT_FRONTMATTER_KEYS
+        for line in lines
+        if line
+    ]
     return ("---\n" + "\n".join(kept) + "\n---\n" + body).encode("utf-8")
 
 

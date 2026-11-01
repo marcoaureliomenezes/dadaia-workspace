@@ -386,13 +386,12 @@ def test_narrative_exempts_code_fences(tmp_path: Path) -> None:
     "line",
     [
         "Shipped on 2026-09-22.",
-        "Since 0.4.7 the gate reads nothing.",
         "Candidate c11 rewrote it.",
         "Built in rc-4.",
         "Delivered by J3.T2.",
         "Covers FR4.",
     ],
-    ids=["iso-date", "release-id", "candidate", "rc", "task-id", "fr-id"],
+    ids=["iso-date", "candidate", "rc", "task-id", "fr-id"],
 )
 def test_narrative_token_in_any_memory_file_names_its_line(tmp_path: Path, line: str) -> None:
     """Each token class is history in every memory file."""
@@ -407,6 +406,36 @@ def test_narrative_token_in_any_memory_file_names_its_line(tmp_path: Path, line:
 def test_narrative_ignores_versions_that_are_not_release_ids(tmp_path: Path) -> None:
     """A loopback address or a two-part version is no release."""
     assert _canonical(tmp_path, "## Purpose\n\nBinds 127.0.0.1 on Python 3.12.\n") == []
+
+
+def _prose_lint(tmp_path: Path, line: str, *, releases: tuple[str, ...]) -> list[str]:
+    """MEM-NARRATIVE-1 errors of one prose line in specs/memory/ARCHITECTURE.md, beside
+    `specs/releases/<id>/` for each of *releases*."""
+    memory = tmp_path / "specs" / "memory"
+    memory.mkdir(parents=True)
+    for release in releases:
+        (tmp_path / "specs" / "releases" / release).mkdir(parents=True)
+        write_text(tmp_path / "specs" / "releases" / release / "SPEC.md", "")
+    path = _make_atom(
+        memory, slug="ARCHITECTURE", filename="ARCHITECTURE.md", body=f"## Purpose\n\n{line}\n"
+    )
+    return _narrative(lint_atom(path, memory, load_frontmatter_schema()).errors)
+
+
+def test_narrative_flags_only_the_projects_own_release_ids(tmp_path: Path) -> None:
+    """A version is a release id only when `specs/releases/` names it: a dependency pinned in
+    prose passes, the project's own release id (live or archived) is flagged, and a project
+    with no `specs/releases/` lints."""
+    pin = "The parser is pinned to PyPI 0.8.0 for its grammar."
+    assert _prose_lint(tmp_path / "a", pin, releases=("0.4.7",)) == []
+    assert _prose_lint(tmp_path / "b", pin, releases=()) == []
+    own = _prose_lint(tmp_path / "c", "Since 0.4.7 the gate reads nothing.", releases=("0.4.7",))
+    assert len(own) == 1 and "release id '0.4.7'" in own[0], own
+    shipped = tmp_path / "d"
+    (shipped / "specs" / "releases" / "_archive" / "0.3.0").mkdir(parents=True)
+    write_text(shipped / "specs" / "releases" / "_archive" / "0.3.0" / "SPEC.md", "")
+    old = _prose_lint(shipped, "Built in 0.3.0.", releases=())
+    assert len(old) == 1 and "release id '0.3.0'" in old[0], old
 
 
 def test_narrative_ignores_a_pinned_dependency_version(tmp_path: Path) -> None:

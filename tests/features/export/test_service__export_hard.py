@@ -5,22 +5,24 @@ bare origin, the real worktree scripts over a tmp workspace. Size: MEDIUM.
 
 from __future__ import annotations
 
+import json
 import os
 import shutil
+import subprocess
 import tarfile
 from pathlib import Path
+from typing import Any
 
 import pytest
 
 from dadaia_workspace import container
 from dadaia_workspace.core.cli_line import fix_line, git_line
-from dadaia_workspace.core.exceptions import DadaiaError, GitSyncError
+from dadaia_workspace.core.exceptions import DadaiaError
 from dadaia_workspace.core.models.git_scan import GitObjectReadError
 from dadaia_workspace.core.models.spec_context import ContextState, SpecContextProject
 from dadaia_workspace.core.platform import act
 from dadaia_workspace.features.spec_context import sweep
 from dadaia_workspace.infrastructure.git_objects import GitSubprocessObjectReader
-from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 from tests.fixtures.harness_env import run_bash, suite_env
 from tests.fixtures.stores import context_store
 from tests.helpers.oslib import PERMISSIONS_ENFORCED, make_readonly, make_writable, write_text
@@ -145,6 +147,23 @@ def test_a_secret_in_a_bundle_refuses_and_leaves_no_archive_and_no_ref(
     assert aws_key_shape() not in str(refused.value)
     assert not (root / ".dadaia/dist" / ARCHIVE).exists()
     assert _refs(root) == refs
+
+
+@pytest.mark.parametrize("text", ["r\n", "zebra\n"], ids=["own-repo-name", "other-term"])
+def test_a_repo_may_name_itself_in_a_bundle_but_no_other_term(
+    root: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, text: str
+) -> None:
+    write_text(tmp_path / "terms.json", json.dumps({"r": "own name", "zebra": "private"}))
+    monkeypatch.setenv("DADAIA_PRIVACY_DENYLIST", str(tmp_path / "terms.json"))
+    commit(open_tree(root, LANE), "specs/notes.md", text)
+
+    if text == "r\n":
+        assert f"r/{LANE}.bundle" in _members(_export(root))
+    else:
+        with pytest.raises(DadaiaError) as refused:
+            _export(root)
+        assert "specs/notes.md" in str(refused.value)
+        assert not (root / ".dadaia/dist" / ARCHIVE).exists()
 
 
 def test_a_worktree_outside_worktrees_is_not_carried_and_does_not_crash(root: Path) -> None:
@@ -277,10 +296,14 @@ def test_git_that_cannot_run_refuses_with_the_push_gates_fix(
 ) -> None:
     commit(open_tree(root, LANE), "specs/notes.md")
 
-    def missing(*_args: object, **_kwargs: object) -> str:
-        raise FileNotFoundError("git")
+    real = subprocess.run
 
-    monkeypatch.setattr(GitSubprocessClient, "git", missing)
+    def missing(argv: list[str], **kw: Any) -> subprocess.CompletedProcess[bytes]:
+        if "list-heads" in argv:
+            raise FileNotFoundError("git")
+        return real(argv, **kw)  # type: ignore[no-any-return]
+
+    monkeypatch.setattr(subprocess, "run", missing)
 
     assert _refused_scan(root).fix == act("operator", "make git runnable here")
 
@@ -347,14 +370,14 @@ def _space_act(root: Path) -> str:
 
 def _stubbed(monkeypatch: pytest.MonkeyPatch, verb: tuple[str, ...], text: str) -> None:
     """Make the git call that starts with *verb* fail with git's *text*; every other call is real."""
-    real = GitSubprocessClient.git
+    real = subprocess.run
 
-    def failing(self: GitSubprocessClient, path: Path, *args: str, **kw: object) -> str:
-        if args[: len(verb)] == verb:
-            raise GitSyncError(f"git {args[0]} failed in {path}:\n{text}")
-        return real(self, path, *args, **kw)  # type: ignore[arg-type]
+    def failing(argv: list[str], **kw: Any) -> subprocess.CompletedProcess[bytes]:
+        if tuple(argv[3 : 3 + len(verb)]) == verb:
+            return subprocess.CompletedProcess(argv, 128, b"", text.encode())
+        return real(argv, **kw)  # type: ignore[no-any-return]
 
-    monkeypatch.setattr(GitSubprocessClient, "git", failing)
+    monkeypatch.setattr(subprocess, "run", failing)
 
 
 def test_an_open_lanes_failed_unbundle_relays_gits_reason_and_names_the_scratch_act(

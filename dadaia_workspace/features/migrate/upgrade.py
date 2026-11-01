@@ -22,8 +22,11 @@ from dadaia_workspace.core.frontmatter import split
 from dadaia_workspace.core.gitflow import candidate_dir, merge_frontmatter, next_candidate
 from dadaia_workspace.core.platform import act
 from dadaia_workspace.core.release_state import RELEASE_ID_RE
-from dadaia_workspace.core.spec_status import APPROVED, DRAFT, IN_REVIEW, STATUS_LINE
+from dadaia_workspace.core.skill_owner import load_owner
 from dadaia_workspace.core.workspace_layout import CANDIDATE_DOCUMENTS
+
+_grammar = load_owner("dd-bug-resolution", "_grammar")
+APPROVED, DRAFT, IN_REVIEW = _grammar.APPROVED, _grammar.DRAFT, _grammar.IN_REVIEW
 
 
 class UpgradeRefused(DadaiaError):
@@ -191,7 +194,7 @@ def remove_empty_ideas_dir(specs_dir: Path, remove: Callable[[Path], object]) ->
 
 
 #: The retired Portuguese status tokens mapped onto the one English vocabulary
-#: (``core.spec_status``). A tree is migrated ONCE, here — nothing downstream
+#: (the kernel's ``_grammar``). A tree is migrated ONCE, here — nothing downstream
 #: keeps a compatibility spelling, so the doctor keeps exactly one rule.
 _RETIRED_STATUS_TOKENS = {
     "Aprovado": APPROVED,
@@ -230,7 +233,8 @@ def rewrite_status_tokens(specs_dir: Path) -> list[Path]:
 
 
 def _rewrite_status_line(text: str) -> str:
-    """Translate the owner's one ``**Status:**`` declaration (``STATUS_LINE``), and nothing else."""
-    return STATUS_LINE.sub(
+    """Translate the owner's one ``**Status:**`` declaration (``STATUS_RE``), and nothing else."""
+    rewritten: str = _grammar.STATUS_RE.sub(
         lambda m: m[0].replace(m[1], _RETIRED_STATUS_TOKENS.get(m[1], m[1])), text, count=1
     )
+    return rewritten

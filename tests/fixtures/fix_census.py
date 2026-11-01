@@ -1,5 +1,8 @@
-"""The census of the chokepoints' refusals and the verbs' raises: one entry per site, keyed
-by its enclosing function. Shared by the two tests that give every site a case."""
+"""The census of refusal sites: one entry per site, keyed by its enclosing function. Two scopes, no
+more: every ``raise`` reachable from the pre-push gate and the ``context`` verbs (plus the
+chokepoints' refusals), and every function of the ``dd-gitflow-default`` worktree scripts that raises
+or spells a ``fix:`` line. One consumer, ``tests/core/test_cli_line__refusal_fix_lines_clear_their_refusal.py``,
+gives every site a case or a named ``Skip``."""
 
 from __future__ import annotations
 
@@ -9,6 +12,10 @@ from pathlib import Path
 from tests.helpers.oslib import read_text
 
 _PKG = Path(__file__).resolve().parents[2] / "dadaia_workspace"
+
+_SCRIPTS = _PKG / "public" / "skills" / "dd-gitflow-default" / "scripts"
+#: A call that spells a fix line: the act and refusal constructors, the printers, or any ``fix=``.
+_SPELLERS = {"act", "Refusal", "fail", "spell_fix", "_blocked"}
 
 _CHOKEPOINTS = {
     "branch_policy": _PKG / "features" / "chokepoints" / "branch_policy.py",
@@ -59,10 +66,42 @@ def _reachable(scopes: dict[str, ast.FunctionDef], roots: tuple[str, ...]) -> li
     return sorted(seen)
 
 
+def _is_site(node: ast.AST) -> bool:
+    return isinstance(node, ast.Call) and (
+        getattr(node.func, "id", "") in _SPELLERS or any(k.arg == "fix" for k in node.keywords)
+    )
+
+
+def _functions(node: ast.AST, prefix: tuple[str, ...] = ()) -> dict[str, ast.AST]:
+    found: dict[str, ast.AST] = {}
+    for child in ast.iter_child_nodes(node):
+        if isinstance(child, ast.ClassDef):
+            found |= _functions(child, (*prefix, child.name))
+        elif isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            found[".".join((*prefix, child.name))] = child
+    return found
+
+
+def _ends(node: ast.AST) -> bool:
+    """A statement that refuses: a ``raise`` of an exception, or any simple statement that spells
+    a fix line."""
+    if isinstance(node, ast.Raise):
+        return node.exc is not None
+    simple = (ast.Return, ast.Expr, ast.Assign, ast.AnnAssign, ast.AugAssign)
+    return isinstance(node, simple) and any(map(_is_site, ast.walk(node)))
+
+
+def _refusals(fn: ast.AST) -> int:
+    """How many statements of *fn* refuse (see :func:`_ends`); a function that only spells a fix
+    line inside a compound header counts once."""
+    return sum(map(_ends, ast.walk(fn))) or 1
+
+
 def fix_sites() -> list[str]:
-    """The chokepoints' refusals (a call to ``spell_fix`` or to
-    branch_policy's ``_blocked``, whose own body is the renderer) and every ``raise``
-    the verbs reach — one entry per refusal, keyed by its enclosing function."""
+    """The chokepoints' refusals (a call to ``spell_fix`` or to branch_policy's ``_blocked``, whose
+    own body is the renderer), every ``raise`` the verbs reach, and each worktree-script function
+    that spells a fix line once per statement that ends in one (a spelling function's own body is
+    the renderer, not a site) — keyed by the enclosing function."""
     sites: list[str] = []
     for stem, path in _CHOKEPOINTS.items():
         for name, fn in _scopes(ast.parse(read_text(path))).items():
@@ -86,4 +125,8 @@ def fix_sites() -> list[str]:
                 or (isinstance(n, ast.Call) and getattr(n.func, "id", "") == "fail")
             ]
             sites += [f"{stem}.{name}"] * len(raises)
+    for path in sorted(_SCRIPTS.glob("*.py")):
+        for qual, fn in _functions(ast.parse(read_text(path))).items():
+            if qual.rsplit(".", 1)[-1] not in _SPELLERS and any(map(_ends, ast.walk(fn))):
+                sites += [f"{path.stem}.{qual}"] * _refusals(fn)
     return sites

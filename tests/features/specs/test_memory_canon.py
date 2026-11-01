@@ -29,7 +29,15 @@ def test_memory_canon_facts_are_one_object_everywhere() -> None:
 
 
 def test_forbidden_heading_vocabulary_is_one_matcher() -> None:
-    for heading in ("Changelog", "History", "Histórico", "Historico", "Version", "Versions"):
+    for heading in (
+        "Changelog",
+        "History",
+        "Histórico",
+        "Historico",
+        "Version",
+        "Versions",
+        "Version notes",
+    ):
         assert memory_canon.is_forbidden_memory_heading(heading), heading
     assert not memory_canon.is_forbidden_memory_heading("Design")
 

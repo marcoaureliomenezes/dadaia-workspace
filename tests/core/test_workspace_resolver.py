@@ -20,6 +20,7 @@ from pathlib import Path
 import pytest
 
 from dadaia_workspace.core.exceptions import WorkspaceNotInitializedError
+from dadaia_workspace.core.skill_owner import load_owner
 from dadaia_workspace.core.workspace_resolver import (
     resolve_cli_workspace_root,
     resolve_workspace_root,
@@ -144,3 +145,11 @@ def test_explicit_workspace_is_authoritative_and_must_be_initialized(tmp_path: P
     deep = sub_repo / "src"
     deep.mkdir(parents=True)
     assert resolve_cli_workspace_root(None, deep) == existing_ws
+
+
+def test_a_missing_workspace_is_repaired_by_the_one_reinstall_act(tmp_path: Path) -> None:
+    """The refusal's fix is the kernel's repair act for a location outside every workspace."""
+    with pytest.raises(WorkspaceNotInitializedError) as exc:
+        resolve_workspace_root(tmp_path)
+
+    assert exc.value.fix == load_owner("dd-bug-resolution", "_jsonl").reinstall_fix(tmp_path)

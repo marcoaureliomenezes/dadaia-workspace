@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import ast
 import json
 import re
 import sys
@@ -84,3 +85,15 @@ def test_the_slug_places_are_one_defs_slug() -> None:
     refs = {"id": item["id"], "relates": item["relates"]["items"]}
     assert "slug" in schema["$defs"]
     assert {k: v.get("$ref") for k, v in refs.items()} == dict.fromkeys(refs, "#/$defs/slug")
+
+
+def test_the_write_path_holds_neither_the_intent_kinds_nor_the_idea_word() -> None:
+    """The kinds are the schema's enum and the exempt stage is `_backlog_schema.IDEA`; the
+    entry birth reads both, it spells neither."""
+    source = _PUBLIC / "skills/dd-backlog-definition/scripts/_backlog_write.py"
+    spelled = {
+        n.value
+        for n in ast.walk(ast.parse(read_text(source)))
+        if isinstance(n, ast.Constant) and n.value in {"idea", "invariant", "catalog"}
+    }
+    assert spelled == set()

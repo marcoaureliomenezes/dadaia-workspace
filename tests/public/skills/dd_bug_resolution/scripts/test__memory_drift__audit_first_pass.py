@@ -41,3 +41,17 @@ def test_drift_from_root_lists_units_of_a_consumer_layout(tmp_path: Path) -> Non
     assert result.returncode == 1, result.stderr
     listed = [line.split()[1] for line in result.stdout.splitlines() if "uncovered" in line]
     assert listed == ["app", "src/svc/api"]
+
+
+def test_drift_demands_no_atom_for_the_specs_backup_specs_init_writes(tmp_path: Path) -> None:
+    """`specs-bkp/` and `specs-bkp/<UTC>/` hold the foreign specs `specs init` moved aside,
+    like `specs/`: no unit, so no atom is demanded for them."""
+    for path in ("app/core.py", "specs-bkp/old/notes.py", "specs-bkp/2026-10-25T170000Z/x/y.py"):
+        (tmp_path / path).parent.mkdir(parents=True, exist_ok=True)
+        write_text(tmp_path / path, "x\n")
+    _git(tmp_path, "init", "-q")
+    _git(tmp_path, "add", ".")
+    _git(tmp_path, "commit", "-qm", "root")
+    result = _drift(tmp_path, {"features": []})
+    listed = [line.split()[1] for line in result.stdout.splitlines() if "uncovered" in line]
+    assert listed == ["app"]

@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import re
 import shutil
-import uuid
 from pathlib import Path
 from unittest.mock import patch
 
@@ -21,6 +20,7 @@ from dadaia_workspace.infrastructure.public_assets import FileSystemPublicAssetM
 from tests.fixtures.real_git import git
 from tests.helpers.harness_profile import register_all
 from tests.helpers.oslib import decode, read_text, write_text
+from tests.helpers.suite_files import tracked
 
 pytestmark = pytest.mark.slow(reason="real public stage + install into tmp_path")
 
@@ -112,37 +112,36 @@ _RETIRED_ROLES = frozenset(
 _FIXTURE_AGENT = re.compile(r"""\bagent"?\s*[:=]\s*["']([a-z-]+)["']""")
 
 
-def test_no_retired_fixture_role() -> None:
-    """No retired role is a fixture agent under
-    tests/ or in production."""
-    root = _PKG.parent
-    retired = [
+def _retired_roles(root: Path) -> list[str]:
+    return [
         f"{path}:{name}"
-        for path in sorted(
-            root / p for p in git(root, "ls-files", "tests", "dadaia_workspace").splitlines()
-        )
+        for path in tracked(root, "tests", "dadaia_workspace")
         if path.suffix in {".py", ".json"} and path.name != Path(__file__).name
         for name in _FIXTURE_AGENT.findall(decode(path.read_bytes()))
         if name in _RETIRED_ROLES
     ]
-    assert retired == []
+
+
+def test_no_retired_fixture_role() -> None:
+    """No retired role is a fixture agent under
+    tests/ or in production."""
+    assert _retired_roles(_PKG.parent) == []
 
 
 def test_the_retired_role_scan_survives_an_untracked_scratch_file_deleted_mid_scan(
-    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    scratch = _PKG.parent / "tests" / "tmp" / f"role-race-{uuid.uuid4().hex[:8]}"
-    scratch.mkdir(parents=True)
+    git(tmp_path, "init", "-q")
+    (tmp_path / "tests/tmp/role-race").mkdir(parents=True)
+    write_text(tmp_path / "tests" / "test_a.py", 'agent = "qa-engineer"\n')
+    git(tmp_path, "add", "tests/test_a.py")
+    scratch = tmp_path / "tests" / "tmp" / "role-race"
+    write_text(scratch / "test_gone.py", 'agent = "qa-engineer"\n')
     read = Path.read_bytes
 
     def read_after_delete(self: Path) -> bytes:
         shutil.rmtree(scratch, ignore_errors=True)
         return read(self)
 
-    try:
-        write_text(scratch / "test_gone.py", "X = 1\n")
-        monkeypatch.setattr(Path, "read_bytes", read_after_delete)
-        test_no_retired_fixture_role()
-    finally:
-        monkeypatch.undo()
-        shutil.rmtree(scratch, ignore_errors=True)
+    monkeypatch.setattr(Path, "read_bytes", read_after_delete)
+    assert _retired_roles(tmp_path) == [f"{tmp_path / 'tests/test_a.py'}:qa-engineer"]

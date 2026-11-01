@@ -7,7 +7,7 @@ Four anchor kinds, each backed by a real registry of truth in the live tree:
 
 1. ``code`` — a tracked repo path, any language, ``#word`` optional: the word must occur in
    that file (a word grep, no parser);
-2. ``catalog`` — ``catalog.json`` slugs (and product-atom ids);
+2. ``catalog`` — the atom files' feature slugs (and product-atom ids);
 3. ``doc`` — spec-doc ids (``SPEC-DOC-NNN``) + memory heading anchors (``file.md#heading``);
 4. ``invariant`` — named invariants (``INV-*``).
 
@@ -19,7 +19,6 @@ actionable.
 
 from __future__ import annotations
 
-import json
 import re
 from dataclasses import dataclass
 from enum import StrEnum
@@ -27,6 +26,7 @@ from pathlib import Path
 
 from dadaia_workspace.core import platform
 from dadaia_workspace.core.models.backlog import SubjectKind
+from dadaia_workspace.infrastructure.ledger_scripts import load_owner
 
 __all__ = [
     "Anchor",
@@ -74,23 +74,14 @@ class BindResult:
 # ── catalog anchors ──────────────────────────────────────────────────────────────
 
 
-def _derive_catalog_anchors(catalog_path: Path) -> set[str]:
-    """Derive feature slugs (and product-atom ids) from ``catalog.json``."""
-    anchors: set[str] = set()
+def _derive_catalog_anchors(specs_dir: Path) -> tuple[set[str], str]:
+    """The feature slugs the atom files declare, and the refusal naming the atom whose read
+    failed ("" when every atom reads)."""
+    drift = load_owner("dd-bug-resolution", "_memory_drift")
     try:
-        data = json.loads(platform.read_text(catalog_path))
-    except (OSError, ValueError, platform.Undecodable):
-        return anchors
-    if not isinstance(data, dict):
-        return anchors
-    features = data.get("features")
-    if isinstance(features, list):
-        for feature in features:
-            if isinstance(feature, dict):
-                slug = feature.get("slug")
-                if isinstance(slug, str) and slug:
-                    anchors.add(slug)
-    return anchors
+        return {str(entry["slug"]) for entry in drift.entries(specs_dir)}, ""
+    except drift.Refusal as refusal:
+        return set(), str(refusal)
 
 
 # ── doc anchors (SPEC-DOC ids + memory heading anchors) ─────────────────────────
@@ -165,9 +156,12 @@ class Registry:
     classifier and doctor consume :meth:`bind` and :meth:`list_anchors`.
     """
 
-    def __init__(self, anchors: dict[SubjectKind, set[str]], repo: Path) -> None:
+    def __init__(
+        self, anchors: dict[SubjectKind, set[str]], repo: Path, catalog_error: str = ""
+    ) -> None:
         self._anchors = anchors
         self._repo = repo
+        self._catalog_error = catalog_error
 
     def _resolve_in_kind(self, raw_ref: str, kind: SubjectKind) -> BindResult:
         """Resolve ``raw_ref`` as a direct anchor of ``kind``.
@@ -209,6 +203,8 @@ class Registry:
         the message naming the ref). A ``code`` ref is ``path[#word]``: the path binds
         against the tracked paths, then the word must occur in that file."""
         ref = raw_ref.strip()
+        if kind is SubjectKind.CATALOG and self._catalog_error:
+            return BindResult(status=BindStatus.UNRESOLVED, message=self._catalog_error)
         if kind is not SubjectKind.CODE or not ref:
             return self._resolve_in_kind(ref, kind)
         path, _, word = ref.partition("#")
@@ -230,12 +226,11 @@ class Registry:
 def build_registry(*, specs_dir: Path, tracked: frozenset[str]) -> Registry:
     """Build the canonical-subject registry from live truth: ``tracked`` is
     the repo's tracked paths (``specs_dir.parent``-relative), handed in by the caller."""
+    slugs, catalog_error = _derive_catalog_anchors(specs_dir)
     anchors: dict[SubjectKind, set[str]] = {
         SubjectKind.CODE: set(tracked),
-        SubjectKind.CATALOG: _derive_catalog_anchors(
-            specs_dir / "memory" / "product" / "catalog.json"
-        ),
+        SubjectKind.CATALOG: slugs,
         SubjectKind.DOC: _derive_doc_anchors(specs_dir),
         SubjectKind.INVARIANT: _derive_invariant_anchors(specs_dir),
     }
-    return Registry(anchors, specs_dir.parent)
+    return Registry(anchors, specs_dir.parent, catalog_error)

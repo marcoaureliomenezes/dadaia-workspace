@@ -17,17 +17,17 @@ line here and `--help` disagree, `--help` wins.
 2. Invoke the CLI by its venv path (`.dadaia/.venv/bin/dadaia`; Windows `.dadaia/.venv/Scripts/dadaia.exe`), never a bare `dadaia`: `.dadaia/.venv/bin/dadaia --help` lists the groups, `<group> --help` the subcommands; add `--json` to read commands for machine-readable output.
 3. `.dadaia/.venv/bin/dadaia harness list` names this workspace's projected runtimes; `.dadaia/.venv/bin/dadaia harness add <name>` registers one more.
 4. Run `.dadaia/.venv/bin/dadaia capabilities --json` first in any new or upgraded session.
-5. Bind: `.dadaia/AGENTS.md` §2.
-6. Workspace compliance: `.dadaia/.venv/bin/dadaia doctor --context <ctx> [--json]` — clean before any implementation write; `--fix` semantics: `.dadaia/AGENTS.md` §5.
+5. Bind: `.dadaia/AGENTS.md`, heading "Context, scope and races".
+6. Workspace compliance: `.dadaia/.venv/bin/dadaia doctor --context <ctx> [--json]`; `--fix` semantics: `.dadaia/AGENTS.md`, heading "Doctor — the one scan and reaper".
 7. Pass an explicit `--context` on every command that takes it.
 8. Converge a runtime: `v=$(.dadaia/.venv/bin/dadaia capabilities --json | <the venv's python> -c 'import json,sys;print(json.load(sys.stdin)["provider"]["distribution_version"])')`, then `.dadaia/.venv/bin/dadaia reconcile --expect-version "$v" --json`, then `.dadaia/.venv/bin/dadaia certify --json` — a failed certify check is a release blocker.
-9. On a failing command: preserve the evidence trail (command, exit code, output); propose a genuine bug (`dd-bug-registration` §2) before any workaround.
+9. On a failing command: preserve the evidence trail (command, exit code, output); propose a genuine bug (`dd-bug-registration`, heading "Propose") before any workaround.
 
 ## Workspace state is CLI-owned
 
-- Each `.dadaia/states/` file changes through its owning verb (`.dadaia/states/AGENTS.md`); `repos/` clones and `.dadaia/dist/` only through `context create`, `alive`, `dead`, `init --from` and `export`.
-- Onboarding levels: the root `AGENTS.md` map §7; retire with `context dead` → `context delete`.
-- Verb index (flags: `--help`): `.dadaia/.venv/bin/dadaia init`, `.dadaia/.venv/bin/dadaia export`, `.dadaia/.venv/bin/dadaia context list`, `.dadaia/.venv/bin/dadaia context alive`, `.dadaia/.venv/bin/dadaia context delete`, `.dadaia/.venv/bin/dadaia context repo add`, `.dadaia/.venv/bin/dadaia context repo remove`, `.dadaia/.venv/bin/dadaia ci push-gate-check`, `.dadaia/.venv/bin/dadaia ci ref-gate-check`, `.dadaia/.venv/bin/dadaia specs upgrade`, `.dadaia/.venv/bin/dadaia migrate`, `.dadaia/.venv/bin/dadaia help tree`, `.dadaia/.venv/bin/dadaia worktree`.
+- Each `.dadaia/states/` file changes through its owning verb (`.dadaia/states/AGENTS.md`); `repos/` clones and `.dadaia/dist/` change only through the `dadaia` verbs that own them, `worktree pause` and `worktree resume` among them; their index is `.dadaia/.venv/bin/dadaia help tree`.
+- Onboarding levels: the root `AGENTS.md`, heading "Onboarding — three levels"; retire with `context dead` → `context delete`.
+- Verb index (flags: `--help`): `.dadaia/.venv/bin/dadaia init`, `.dadaia/.venv/bin/dadaia export`, `.dadaia/.venv/bin/dadaia context list`, `.dadaia/.venv/bin/dadaia context alive`, `.dadaia/.venv/bin/dadaia context dead`, `.dadaia/.venv/bin/dadaia context session-check`, `.dadaia/.venv/bin/dadaia context delete`, `.dadaia/.venv/bin/dadaia context repo add`, `.dadaia/.venv/bin/dadaia context repo remove`, `.dadaia/.venv/bin/dadaia ci push-gate-check`, `.dadaia/.venv/bin/dadaia ci ref-gate-check`, `.dadaia/.venv/bin/dadaia specs upgrade`, `.dadaia/.venv/bin/dadaia migrate`, `.dadaia/.venv/bin/dadaia help tree`, `.dadaia/.venv/bin/dadaia worktree`.
 
 ## Dev servers
 
@@ -47,9 +47,9 @@ line here and `--help` disagree, `--help` wins.
 ## Done when
 
 - Each command run was checked against its live `--help` this session.
-- `.dadaia/.venv/bin/dadaia doctor` clean before any implementation write; `certify --json` green before promoting a runtime; every dev server started is registered.
+- `certify --json` green before promoting a runtime; every dev server started is registered.
 
 ## References
 
-- `dd-bug-registration` — the ask-first proposal a genuine bug takes before `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py append`.
+- `dd-bug-registration` — the ask-first proposal a genuine bug takes before `python3 .agents/skills/dd-bug-resolution/scripts/bugs.py append --specs <specs-dir>`.
 - `dd-handoff-emitter` — emit/validate the final handoff.

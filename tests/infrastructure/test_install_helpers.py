@@ -328,3 +328,46 @@ def test_the_real_personas_parse_to_a_typed_read_only() -> None:
         parsed = parse(read_text(persona))
         assert isinstance(parsed, Frontmatter), persona.name
         assert type(parsed.data["read_only"]) is bool, persona.name
+
+
+_BLOCK_LIST_BODY = (
+    "---\n"
+    "name: a\n"
+    "description: d\n"
+    "read_only: false\n"
+    "dispatch_band: 3\n"
+    "tools:\n"
+    "  - Read\n"
+    "  - Edit\n"
+    "disallowedTools:\n"
+    "  - Write\n"
+    "effort:\n"
+    "  - high\n"
+    "model: opus\n"
+    "---\n"
+    "\n"
+    "# Body\n"
+)
+
+
+@pytest.mark.parametrize("eol", ["\n", "\r\n"])
+@pytest.mark.parametrize("prefix", ["", "﻿"])
+def test_a_derived_key_with_a_block_list_is_dropped_whole_and_the_agent_stays_parseable(
+    prefix: str, eol: str
+) -> None:
+    from dadaia_workspace.core.frontmatter import Frontmatter, parse
+    from dadaia_workspace.infrastructure.install_helpers import render_claude_agent
+
+    resolved = ResolvedAgentModel(model="sonnet", effort="high", source="default")
+
+    rendered = render_claude_agent(prefix + _BLOCK_LIST_BODY.replace("\n", eol), resolved)
+
+    assert rendered == (
+        "---\nname: a\ndescription: d\nread_only: false\ndispatch_band: 3\n"
+        "tools:\n  - Read\n  - Edit\n"
+        "permissionMode: acceptEdits\nmodel: sonnet\neffort: high\n---\n\n# Body\n"
+    )
+    parsed = parse(rendered)
+    assert isinstance(parsed, Frontmatter)
+    assert parsed.data["tools"] == ["Read", "Edit"]
+    assert parsed.data["model"] == "sonnet"

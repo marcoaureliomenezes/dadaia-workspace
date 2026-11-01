@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import json
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -49,6 +50,15 @@ def print_text(findings: list[dict[str, Any]]) -> None:
         )
         if found.get("fix"):
             print(spell_fix(found["fix"]))
+
+
+def run_check(findings: list[dict[str, Any]], *, as_json: bool) -> int:
+    """A check verb's one body: its findings as JSON or as text, and the exit code they set."""
+    if as_json:
+        print(json.dumps(findings, indent=2))
+    else:
+        print_text(findings)
+    return 1 if findings else 0
 
 
 def histo_findings(

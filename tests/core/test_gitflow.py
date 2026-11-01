@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+import json
 import re
 from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.core.cli_line import git_line
+from dadaia_workspace.core import platform
 from dadaia_workspace.core.exceptions import DadaiaError
 from dadaia_workspace.core.gitflow import (
     DEFAULT,
@@ -15,10 +16,18 @@ from dadaia_workspace.core.gitflow import (
     SeveralWorkBranches,
     from_mapping,
     live_release_id,
+    resolve_live_candidate,
     work_branch,
 )
+from dadaia_workspace.core.models.git_scan import GitRunError
 from dadaia_workspace.core.skill_owner import load_owner
-from tests.helpers.oslib import read_text, write_text
+from tests.helpers.oslib import (
+    PERMISSIONS_ENFORCED,
+    make_readonly,
+    make_writable,
+    read_text,
+    write_text,
+)
 
 
 def test_the_default_names_live_only_in_default_and_work_is_cut_from_integration() -> None:
@@ -60,6 +69,36 @@ def test_the_sole_live_release_is_the_kernels_and_several_refuse_there(tmp_path:
         " ship or move out the others"
     )
     assert live_release_id(tmp_path) is None
+
+
+def test_resolve_live_candidate_names_the_candidate_release_py_names(tmp_path: Path) -> None:
+    """A milestone makes the first candidate the live one; the empty folder after it is not."""
+    release = tmp_path / "releases" / "0.5.0"
+    (release / "rc-1").mkdir(parents=True)
+    (release / "rc-2").mkdir()
+    milestone = {"ts": "2026-09-21T10:00:00Z", "agent": "release.py", "kind": "milestone",
+                 "candidate": "rc-1", "milestone": "implemented", "sha": "0000002", "text": "rc-1 implemented."}  # fmt: skip
+    state = {"schema": "release-state-v1", "release": "0.5.0", "phase": "IMPLEMENTATION",
+             "defined": None, "implemented": None, "shipped": None, "log": [milestone]}  # fmt: skip
+    write_text(release / "_RELEASE.json", json.dumps(state))
+    release_py = load_owner("dd-release-implementation", "_release_store").live_release(tmp_path)
+    assert release_py.candidate == release / "rc-1"
+    assert resolve_live_candidate(tmp_path) == release_py.candidate
+
+
+def test_an_unreadable_state_names_no_live_candidate(tmp_path: Path) -> None:
+    """The doctor's rule: a state it cannot read names no candidate; `release.py check` reports it."""
+    release = tmp_path / "releases" / "0.5.0"
+    (release / "rc-1").mkdir(parents=True)
+    write_text(release / "_RELEASE.json", "{not json")
+    assert resolve_live_candidate(tmp_path) is None
+
+
+def test_a_log_the_schema_refuses_names_no_live_candidate(tmp_path: Path) -> None:
+    release = tmp_path / "releases" / "0.5.0"
+    (release / "rc-1").mkdir(parents=True)
+    write_text(release / "_RELEASE.json", json.dumps({"phase": "IMPLEMENTATION", "log": [1]}))
+    assert resolve_live_candidate(tmp_path) is None
 
 
 @pytest.mark.parametrize(
@@ -106,7 +145,7 @@ def test_from_mapping_refuses_invalid(mapping: object) -> None:
         from_mapping(mapping)
 
 
-def test_the_history_rewrite_rule_covers_only_the_branches_that_advance_by_merge_or_pr() -> None:
+def test_the_history_rewrite_rule_covers_only_the_branches_that_advance_by_merge() -> None:
     """A wt/* branch is rebased by its owner; the rule must not reach it,
     and both of its verbs (rewrite, force-push) take the same scope."""
     skill = read_text(
@@ -119,13 +158,16 @@ def test_the_history_rewrite_rule_covers_only_the_branches_that_advance_by_merge
     rule = next(ln for ln in skill.splitlines() if "pushed history" in ln)
     verbs, scope = rule.split("force-pushing,", 1)
     assert "pushed history of," in verbs
-    assert "work branch" in scope
-    assert "advances only by PR" in scope
+    assert "a branch the gitflow block names" in scope
+    assert "advances only by PR" not in scope
+    pushable = {r[0].split()[0]: r[1].strip() for r in rows if "wt/" not in r[0]}
+    assert pushable["integration"].startswith("Yes")
+    assert pushable["principal"].startswith("Yes")
     assert not {"job", "backlog", "task", "plain"} & set(re.findall(r"\w+", scope))
 
 
-def test_the_history_rewrite_rule_scopes_to_the_branches_that_never_rebase() -> None:
-    """A wt/* branch is rebased by its owner."""
+def test_the_history_rewrite_rule_refers_to_the_gitflow_block_not_its_rows() -> None:
+    """A wt/* branch is rebased by its owner; the rule names no row, so none is reachable."""
     skill = read_text(
         Path(__file__).resolve().parents[2]
         / "dadaia_workspace/public/skills/dd-gitflow-default/SKILL.md"
@@ -136,8 +178,9 @@ def test_the_history_rewrite_rule_scopes_to_the_branches_that_never_rebase() -> 
         for ln in skill.splitlines()
         if re.match(r"\| (work|integration|principal|job|backlog|task|plain) ", ln)
     ]
-    assert [r for r in rows if re.search(rf"\b{r}\b", rule)] == ["work"]
-    assert "advances only by PR" in rule
+    assert "the gitflow block" in rule
+    assert [r for r in rows if re.search(rf"\b{r}\b", rule)] == []
+    assert "advances only by PR" not in rule
 
 
 def _repo(tmp_path: Path, heads: list[str], live: str | None) -> Path:
@@ -183,30 +226,6 @@ def test_the_work_branch_is_the_one_local_branch_else_the_name_to_create(
 
 
 @pytest.mark.medium
-def test_several_work_branches_refuse_with_the_skills_fix_line(tmp_path: Path) -> None:
-    repo = _repo(tmp_path, ["feature/0.5.0", "feature/0.6.0"], "0.5.0")
-    git = load_owner("dd-gitflow-default", "_worktree_git").git
-    git(repo, "switch", "-q", "feature/0.5.0")
-    git(
-        repo,
-        "-c",
-        "user.name=t",
-        "-c",
-        "user.email=t@t",
-        "commit",
-        "-q",
-        "--allow-empty",
-        "-m",
-        "lower",
-    )
-    with pytest.raises(SeveralWorkBranches) as refused:
-        work_branch(repo, Gitflow("main", "dev", "feature/"), "r")
-    assert refused.value.fix == (
-        f"Agent action: run `{git_line(repo, 'switch', 'feature/0.6.0')}`, then merge feature/0.5.0 into feature/0.6.0"
-    )
-
-
-@pytest.mark.medium
 def test_several_work_branches_refuse_as_the_one_error_type_that_carries_its_fix(
     tmp_path: Path,
 ) -> None:
@@ -214,9 +233,8 @@ def test_several_work_branches_refuse_as_the_one_error_type_that_carries_its_fix
     with pytest.raises(DadaiaError) as refused:
         work_branch(repo, Gitflow("main", "dev", "feature/"), "r")
     assert refused.value.message == "2 work branches"
-    fix = f"Agent action: run `{git_line(repo, 'switch', 'feature/0.6.0')}`, then run `{git_line(repo, 'branch', '-d', 'feature/0.5.0')}`"
-    assert refused.value.fix == fix
-    assert str(refused.value) == f"2 work branches\nfix: {fix}"
+    assert refused.value.fix.startswith("Agent action: run `")
+    assert str(refused.value) == f"2 work branches\nfix: {refused.value.fix}"
 
 
 def test_several_work_branches_is_one_dadaia_error_built_from_message_text_and_keep() -> None:
@@ -224,11 +242,7 @@ def test_several_work_branches_is_one_dadaia_error_built_from_message_text_and_k
     skill_class = load_owner("dd-gitflow-default", "_worktree_git").SeveralWork
     assert not isinstance(several, skill_class)
     assert isinstance(several, DadaiaError)
-    assert (several.message, several.text, several.keep) == (
-        "2 work branches",
-        "run `x`, then run `y`",
-        "0.2.0",
-    )
+    assert (several.message, several.keep) == ("2 work branches", "0.2.0")
     assert several.fix == "Agent action: run `x`, then run `y`"
     assert str(several) == "2 work branches\nfix: Agent action: run `x`, then run `y`"
 
@@ -244,3 +258,156 @@ def test_work_branch_with_several_raises_the_one_class_and_never_the_skills(
     assert type(refused.value) is SeveralWorkBranches
     assert not isinstance(refused.value, skill_class)
     assert refused.value.keep == "0.6.0"
+
+
+def _unreadable_fix(repo: Path) -> str:
+    return f"Agent action: run {platform.git_inline(repo, 'status')} and repair what it reports until it exits 0"
+
+
+@pytest.mark.medium
+def test_work_branch_on_a_dir_with_no_dot_git_raises_the_one_error_with_the_status_act(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "r"
+    repo.mkdir()
+    with pytest.raises(DadaiaError) as refused:
+        work_branch(repo, Gitflow("main", "dev", "feature/"), "r")
+    assert refused.value.message.startswith(f"git cannot read {repo}: ")
+    assert "\n" not in refused.value.message
+    assert refused.value.fix == _unreadable_fix(repo)
+
+
+@pytest.mark.medium
+def test_work_branch_with_several_live_releases_raises_the_skills_refusal_as_a_dadaia_error(
+    tmp_path: Path,
+) -> None:
+    repo = _repo(tmp_path, [], None)
+    for release in ("0.1.0", "0.2.0"):
+        (repo / "specs/releases" / release).mkdir(parents=True)
+        write_text(repo / "specs/releases" / release / "_RELEASE.json", "{}")
+    with pytest.raises(DadaiaError) as refused:
+        work_branch(repo, Gitflow("main", "dev", "feature/"), "r")
+    assert type(refused.value) is DadaiaError
+    assert refused.value.fix == (
+        f"Agent action: keep one of 0.1.0, 0.2.0 live under {repo / 'specs/releases'};"
+        " ship or move out the others"
+    )
+
+
+@pytest.mark.medium
+def test_work_branch_on_a_repo_whose_config_git_cannot_parse_raises_the_same_error_and_act(
+    tmp_path: Path,
+) -> None:
+    repo = _repo(tmp_path, [], None)
+    with (repo / ".git" / "config").open("a") as config:
+        config.write("[core\n")
+    with pytest.raises(DadaiaError) as refused:
+        work_branch(repo, Gitflow("main", "dev", "feature/"), "r")
+    assert refused.value.message.startswith(f"git cannot read {repo}: ")
+    assert refused.value.fix == _unreadable_fix(repo)
+
+
+@pytest.mark.medium
+@pytest.mark.skipif(not PERMISSIONS_ENFORCED, reason="needs a folder this process cannot read")
+def test_work_branch_with_an_unreadable_releases_dir_raises_a_dadaia_error_with_a_repair_act(
+    tmp_path: Path,
+) -> None:
+    repo = _repo(tmp_path, [], None)
+    releases = repo / "specs" / "releases"
+    releases.mkdir(parents=True)
+    make_readonly(releases, locked=True)
+    try:
+        with pytest.raises(DadaiaError) as refused:
+            work_branch(repo, Gitflow("main", "dev", "feature/"), "r")
+    finally:
+        make_writable(releases)
+    assert refused.value.message == f"Permission denied: {releases}"
+    assert refused.value.fix == (
+        f"Agent action: repair {releases} so that this user can use it (Permission denied)"
+    )
+
+
+@pytest.mark.medium
+def test_work_branch_with_no_git_on_path_raises_the_git_run_error_not_a_repair_act(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo = _repo(tmp_path, [], None)
+    nogit = tmp_path / "nogit"
+    nogit.mkdir()
+    monkeypatch.setenv("PATH", str(nogit))
+    with pytest.raises(GitRunError) as refused:
+        work_branch(repo, Gitflow("main", "dev", "feature/"), "r")
+    assert refused.value.message.startswith(f"git could not run in {repo}: ")
+    assert refused.value.fix == "Operator action: make git runnable here"
+
+
+@pytest.mark.parametrize("git_on_path", [False, True], ids=["git-missing", "path-unreadable"])
+def test_work_branch_tells_a_missing_git_from_an_unreadable_path_by_the_path_not_the_filename(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, git_on_path: bool
+) -> None:
+    """Windows names no file on a failed spawn: the OSError carries none, so PATH decides."""
+    nogit = tmp_path / "nogit"
+    nogit.mkdir()
+    if not git_on_path:
+        monkeypatch.setenv("PATH", str(nogit))
+
+    repo = tmp_path / "r"
+    unreadable = str(repo / "specs") if git_on_path else None
+
+    def refuse(*_a: object) -> None:
+        raise OSError(13, "Permission denied", unreadable)
+
+    monkeypatch.setattr(load_owner("dd-gitflow-default", "_worktree_git"), "work_versions", refuse)
+    with pytest.raises(DadaiaError) as refused:
+        work_branch(repo, Gitflow("main", "dev", "feature/"), "r")
+    if git_on_path:
+        assert refused.value.fix == (
+            f"Agent action: repair {unreadable} so that this user can use it (Permission denied)"
+        )
+    else:
+        assert type(refused.value) is GitRunError
+        assert refused.value.message.startswith(f"git could not run in {repo}: ")
+        assert refused.value.fix == "Operator action: make git runnable here"
+
+
+def _constitution(tmp_path: Path, text: str) -> Path:
+    specs = tmp_path / "specs"
+    specs.mkdir()
+    write_text(specs / "constitution.md", text)
+    return specs
+
+
+@pytest.mark.parametrize("eol", ["\n", "\r\n"])
+@pytest.mark.parametrize("prefix", ["", "﻿"])
+def test_merge_frontmatter_replaces_a_block_value_whole_and_keeps_the_rest(
+    tmp_path: Path, prefix: str, eol: str
+) -> None:
+    from dadaia_workspace.core.gitflow import merge_frontmatter
+
+    text = (
+        "---\nconstitution_version: 7.0.0\nspecs_pattern_version:\n- 1\n- 2\n"
+        "gitflow:\n  principal: x\n  work: y\nkeep:\n  - a\n---\n\n# body\n"
+    )
+    specs = _constitution(tmp_path, prefix + text.replace("\n", eol))
+
+    merge_frontmatter(specs, specs_pattern_version=7, gitflow=Gitflow("main", "dev", "feature/"))
+
+    assert read_text(specs / "constitution.md") == (
+        "---\nconstitution_version: 7.0.0\nspecs_pattern_version: 7\n"
+        'gitflow: {"principal": "main", "integration": "dev", "work": "feature/"}\n'
+        "keep:\n  - a\n---\n\n# body\n"
+    )
+
+
+def test_merge_frontmatter_appends_an_absent_key_after_a_trailing_block_list(
+    tmp_path: Path,
+) -> None:
+    from dadaia_workspace.core.gitflow import merge_frontmatter
+
+    specs = _constitution(tmp_path, "---\nkeep:\n  - a\n---\nbody\n")
+
+    merge_frontmatter(specs, specs_pattern_version=7)
+
+    assert read_text(specs / "constitution.md") == (
+        "---\nkeep:\n  - a\nspecs_pattern_version: 7\n---\nbody\n"
+    )

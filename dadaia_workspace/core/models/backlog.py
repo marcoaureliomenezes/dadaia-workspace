@@ -11,6 +11,8 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any
 
+from dadaia_workspace.core.skill_owner import load_owner
+
 __all__ = [
     "INTENTS_EXEMPT_STATUS",
     "Intent",
@@ -19,7 +21,7 @@ __all__ = [
 ]
 
 #: The one backlog stage exempt from the resolvable-typed-intents requirement.
-INTENTS_EXEMPT_STATUS = "idea"
+INTENTS_EXEMPT_STATUS: str = load_owner("dd-backlog-definition", "_backlog_schema").IDEA
 
 
 class SubjectKind(StrEnum):

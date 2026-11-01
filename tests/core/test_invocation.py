@@ -14,7 +14,7 @@ from typing import Any
 
 import pytest
 
-from dadaia_workspace.core import invocation
+from dadaia_workspace.core import invocation, session_store
 from dadaia_workspace.core.exceptions import SchemaVersionError
 from dadaia_workspace.core.workspace_resolver import resolve_workspace_root
 from tests.helpers.oslib import link, read_text, write_text
@@ -38,6 +38,9 @@ def _mk_ws(tmp_path: Path, *contexts: tuple[str, str, tuple[str, ...]]) -> Path:
         json.dumps({"schema_version": "2", "contexts": entries}),
     )
     return ws
+
+
+_CLAUDE = "CLAUDE_CODE_SESSION_ID"
 
 
 def _ctx(slug: str, name: str | None = None, *associated: str) -> tuple[str, str, tuple[str, ...]]:
@@ -112,6 +115,50 @@ def test_resolve_scenarios(tmp_path: Path, given: dict[str, Any], then: dict[str
 def test_resolve_session_id_precedence(env: dict[str, str], expected: str) -> None:
     """DADAIA_SESSION_ID > harness env > ""; env only — bind sees no payload."""
     assert invocation.resolve_session_id(env) == expected
+
+
+_CODEX = {"DADAIA_RUNTIME": "codex"}
+
+
+@pytest.mark.parametrize(
+    ("env", "payload_id", "expected"),
+    [
+        pytest.param(_CODEX, "pay-1", "pay-1", id="payload_counts_where_the_harness_shell_carries_it"),
+        pytest.param({"DADAIA_RUNTIME": "kimi-code"}, "pay-1", "", id="payload_dropped_when_the_row_has_no_session_env"),
+        pytest.param({}, "pay-1", "", id="payload_dropped_without_a_runtime"),
+        pytest.param({"DADAIA_RUNTIME": "no-such-harness"}, "pay-1", "", id="payload_dropped_for_an_unknown_runtime"),
+        pytest.param({**_CODEX, _CLAUDE: "env-1"}, "pay-1", "env-1", id="env_wins_over_payload"),
+        pytest.param({**_CODEX, "CODEX_THREAD_ID": "t-1"}, "pay-1", "t-1", id="codex_env_wins_over_payload"),
+        pytest.param({**_CODEX, "DADAIA_SESSION_ID": "own-1"}, "pay-1", "own-1", id="override_wins_over_payload"),
+        pytest.param(_CODEX, "../pay/1", "pay1", id="payload_is_sanitized"),
+        pytest.param(_CODEX, "", "", id="empty_payload_resolves_nothing"),
+        pytest.param(_CODEX, 42, "", id="non_string_payload_resolves_nothing"),
+        pytest.param({}, 42, "", id="non_string_payload_without_runtime_resolves_nothing"),
+    ],
+)  # fmt: skip
+def test_resolve_session_id_takes_the_payload_id_last(
+    env: dict[str, str], payload_id: object, expected: str
+) -> None:
+    assert invocation.resolve_session_id(env, payload_id) == expected  # type: ignore[arg-type]
+
+
+def test_resolve_carries_the_payload_id_to_the_session_and_its_bind(tmp_path: Path) -> None:
+    """One call, one id: the payload id of a Codex hook names the session and finds its record."""
+    ws = _mk_ws(tmp_path, _ctx("proj"))
+    record = session_store.new_binding_record(
+        session_id="pay-1",
+        context="proj",
+        runtime="codex",
+        pid=1,
+        now=datetime.now(UTC).isoformat(),
+    )
+    session_store.write_session(ws, "pay-1", record)
+
+    inv = invocation.resolve(env=_CODEX, cwd=ws, payload_id="pay-1")
+
+    assert inv.session_id == "pay-1"
+    assert inv.bind.context_name == "proj"
+    assert invocation.resolve(env={}, cwd=ws, payload_id="pay-1").session_id is None
 
 
 def test_context_name_for_repo_slug_maps_main_associated_and_legacy_repo_field(
@@ -208,3 +255,79 @@ def test_a_row_without_a_main_slug_has_no_specs_tree(tmp_path: Path) -> None:
     assert invocation.alive_context_trees(ws) == {"proj": ws / "repos" / "proj" / "specs"}
     assert invocation.repo_slug_for_context(ws, "blank") is None
     assert invocation.alive_context_names(ws) == ["proj", "blank", "bare"]
+
+
+@pytest.mark.parametrize("spelling", ["ALIVE", "Alive", "alive"])
+def test_a_registry_state_spelling_is_alive_for_bind_and_for_the_layout_gate(
+    tmp_path: Path, spelling: str
+) -> None:
+    """One row parser: ``alive_context_names``, ``alive_context_trees`` and the ALIVE slug
+    set agree on every spelling the store itself accepts."""
+    from dadaia_workspace.core import context_registry
+
+    ws = _mk_ws(tmp_path)
+    path = ws / ".dadaia" / "states" / "spec_contexts.json"
+    row = {"name": "proj", "state": spelling, "repo_slug": "proj"}
+    write_text(path, json.dumps({"schema_version": "3", "contexts": [row]}))
+
+    assert invocation.alive_context_names(ws) == ["proj"]
+    assert list(invocation.alive_context_trees(ws)) == ["proj"]
+    assert context_registry.registered_slugs(ws)[1] == frozenset({"proj"})
+
+
+_LIVE, _STALE = timedelta(minutes=5), timedelta(days=2)
+
+
+@pytest.mark.parametrize(
+    ("env", "record_id", "record_age", "governed"),
+    [
+        pytest.param({}, None, None, True, id="no-session-is-an-operator-terminal"),
+        pytest.param({_CLAUDE: "sess-1"}, "sess-1", _LIVE, True, id="live-record"),
+        pytest.param({_CLAUDE: "sess-1"}, None, None, False, id="no-record"),
+        pytest.param({_CLAUDE: "sess-1"}, "sess-1", _STALE, False, id="stale-record"),
+        pytest.param({"CODEX_THREAD_ID": "sess-1"}, "sess-1", _LIVE, True, id="codex-thread-live"),
+        pytest.param({"CODEX_THREAD_ID": "sess-1"}, None, None, False, id="codex-thread-no-record"),
+        pytest.param(
+            {"CODEX_SESSION_ID": "sess-1"}, None, None, False, id="codex-session-no-record"
+        ),
+        pytest.param(
+            {"CODEX_SESSION_ID": "sess-1"}, "sess-1", _LIVE, True, id="codex-session-live"
+        ),
+        pytest.param(
+            {"CODEX_SESSION_ID": "root-1", "CODEX_THREAD_ID": "sub-1"},
+            "root-1",
+            _LIVE,
+            True,
+            id="codex-subagent-under-the-live-root-session",
+        ),
+        pytest.param({"DADAIA_SESSION_ID": "sess-1"}, "sess-1", _LIVE, True, id="override-live"),
+        pytest.param({"DADAIA_SESSION_ID": "sess-1"}, None, None, True, id="override-no-record"),
+        pytest.param(
+            {_CLAUDE: "claude-1", "DADAIA_SESSION_ID": "over-1"},
+            "over-1",
+            _LIVE,
+            True,
+            id="claude-with-override-live-under-the-override",
+        ),
+        pytest.param(
+            {_CLAUDE: "claude-1", "DADAIA_SESSION_ID": "over-1"},
+            None,
+            None,
+            False,
+            id="claude-with-override-no-record",
+        ),
+    ],
+)
+def test_governed_judges_a_harness_that_names_a_subagent(
+    tmp_path: Path,
+    env: dict[str, str],
+    record_id: str | None,
+    record_age: timedelta | None,
+    governed: bool,
+) -> None:
+    ws = _mk_ws(tmp_path)
+    if record_id and record_age is not None:
+        seen = (datetime.now(UTC) - record_age).isoformat()
+        session_store.write_session(ws, record_id, {"session_id": record_id, "last_seen_at": seen})
+
+    assert invocation.governed(ws, env) is governed

@@ -4,7 +4,7 @@ A local-first, spec-driven workspace that gives AI agents current context, a doc
 
 Start here:
 
-- [Quickstart](quickstart.md) — from `pip install` to a bound project, a backlog entry and a live release.
+- [Quickstart](quickstart.md) — from `uvx` to a bound project, a backlog entry and a live release.
 - [Positioning](positioning.md) — why your product repos never carry agent config, and how one law governs many projects.
 - [The bug loop](bug-loop.md) — register, RED test, fix, resolve with evidence and lineage.
 
@@ -14,52 +14,12 @@ Repository: <https://github.com/marcoaureliomenezes/dadaia-workspace>
 
 ## What it is
 
-dadaia-workspace is the operating environment around repositories developed with AI
-agents, and its unit is the context.
+The pillars are listed once, in the [README](../README.md#what-it-is-and-principles).
+The unit is the context: one main repo where `specs/` lives, plus its associated repos.
 
-A workspace is one folder. The agent session launches at its root, always. Projects
-live in repos inside it (`repos/<slug>/`), which take agent work only as merges from
-their worktree hierarchy under `worktrees/<repo>/<M.m.p>/`, and the governance — the root `AGENTS.md`
-map, the scoped `AGENTS.md` files, `.agents/skills`, `.agents/agents`, `.dadaia/` —
-lives outside every repo. A project is a context: one main repo, where `specs/` lives,
-plus its associated repos. A workspace holds many contexts and a context many repos; it
-is never a monorepo, and a single-repo context is the minimal case.
+A human reaches a bound project with `uvx dadaia-workspace init <dir> --harness <name> --repo <url>`
+and the [quickstart](quickstart.md); `uvx dadaia-workspace init --from <artifact> <dir>`
+restores a workspace that `.dadaia/.venv/bin/dadaia export` wrote.
 
-What it rests on:
-
-- Current context — agents bind explicitly and receive only the relevant project,
-  memory, release and task state.
-- Documents are the lifecycle — backlog, SPEC, PLAN, the job files, `_RELEASE.json` and
-  `BUGS.jsonl` carry ordered work; no runtime drives agents through steps.
-- Deterministic boundaries — path class, bind scope, root hygiene and
-  the push gate are mechanical, each refusal carrying one fix line; what
-  cannot be mechanical is written as law.
-- Visible concurrency — sessions may race, git exposes the overlap, and nothing waits
-  on a lock.
-- Features and fixes spend future options when they add coupling, so delivery alternates
-  with deletion, simplification or decoupling. Mechanisms without a current demand are
-  removed, and runtime state, reports, handoffs, caches, projections and temporary files
-  have canonical homes.
-- Success is evidenced by reviews, task commits, commands and artifacts, never
-  inferred from prose.
-
-## Two ways in
-
-A human drives it from a shell in three levels:
-`uvx dadaia-workspace init <dir> --harness <name> --repo <url>` provisions the
-workspace and its first project ALIVE (`context bind` binds),
-`.dadaia/.venv/bin/dadaia specs init --context <slug>` brings the project's `specs/`
-to the canon (cutting the work branch when the repo has none), the first pass fills memory in a backlog lane, `context baseline` publishes it, and
-`.dadaia/.venv/bin/dadaia doctor` prints the next step and every finding with one
-fix line; `.dadaia/.venv/bin/dadaia context create --main-repo <url>` adds the next
-project, and re-running the `uvx` init line upgrades the workspace.
-
-An agent reads the root `AGENTS.md` map — flow, roles, gate invariants, where things
-live, the index of every scoped law and skill — opens the scoped `AGENTS.md` of its
-area, and works inside the gate, the ledger scripts and the handoff contract;
-`llms.txt` at the repository root is its index.
-
-Claude Code, Codex, Kimi Code, Cursor, Devin and GitHub Copilot are the entry
-harnesses, one registry record each. The same canonical rules reach every harness
-through one authored set, read natively or through per-entry symlinks. Both paths read
-one truth: every page here is reconciled from named product memory.
+An agent starts at the root map, `dadaia_workspace/public/data/AGENTS.md`, then opens the
+scoped law of its area. `llms.txt` at the repository root is its index.

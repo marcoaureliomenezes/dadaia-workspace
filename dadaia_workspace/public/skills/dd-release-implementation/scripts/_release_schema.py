@@ -5,16 +5,28 @@ from __future__ import annotations
 
 import datetime as _dt
 import functools
-import json
 import re
 from pathlib import Path
 from typing import Any
 
 import _git
-from _grammar import STATE, STATUS_RE, TASK_ID_RE, candidate_dir, candidate_number, sole_live
+from _grammar import (
+    APPROVED,
+    STATE,
+    TASK_ID_RE,
+    candidate_dir,
+    candidate_number,
+    extract_status,
+    sole_live,
+)
+from _jsonl import parse_object
 from _ledger import load_schema
 from _platform import act, read_text
+from _refusal import Refusal
+from _specs import script
 
+State = dict[str, Any]
+SCRIPT = script(Path(__file__).parent / "release.py")
 CODE = "LEDGER-RELEASE-SCHEMA"
 HISTO = "releases/_archive/releases_histo.jsonl"
 #: One candidate's documents, born in its own `rc-<N>/` and never rewritten after closure; its
@@ -29,7 +41,6 @@ TRIO_PHASES = frozenset(PHASES[1:])
 MEMORY_WRITE = "writes specs/memory"
 #: A release ships `delivered` — the one histo disposition this ledger writes.
 DELIVERED = "delivered"
-APPROVED = "Approved"
 #: The Origin clause kinds, each at most once on the line.
 ORIGIN_KINDS = ("backlog", "bugs", "findings")
 _ORIGIN_RE = re.compile(r"^\*\*Origin:\*\*[ \t]*(.*?)[ \t]*$", re.MULTILINE)
@@ -55,12 +66,6 @@ def closure_summary(state: dict[str, Any]) -> dict[str, str]:
             fields = found.groupdict() if found else {}
             return {name: "" if text == "none" else text for name, text in fields.items()}
     return {}
-
-
-def extract_status(text: str) -> str | None:
-    """The ``**Status:**`` token a SPEC, PLAN or job document carries, or ``None``."""
-    match = STATUS_RE.search(text)
-    return match.group(1) if match else None
 
 
 class ShallowClone(ValueError):
@@ -89,19 +94,29 @@ def utc(ts: str) -> _dt.datetime:
     return at.replace(tzinfo=_dt.UTC) if at.tzinfo is None else at.astimezone(_dt.UTC)
 
 
+def read_state(path: Path) -> State:
+    """The one reader of a state document, refusing anything this script cannot read in full."""
+    fix = act("agent", f"repair {path} until `{SCRIPT.inline('check')}` passes")
+    try:
+        text = read_text(path)
+    except OSError as exc:
+        raise Refusal(f"{path.name} cannot be read ({exc})", fix) from exc
+    return parse_object(text, fix)
+
+
 @functools.cache
 def releases(specs: Path) -> dict[str, tuple[_dt.datetime, _dt.datetime | None]]:
     """Each release id, live or archived -> its span: first `log` ts, `shipped.ts` or None."""
     spans: dict[str, tuple[_dt.datetime, _dt.datetime | None]] = {}
     for path in [*(specs / "releases").glob(f"*/{STATE}"), *(specs / "releases/_archive").glob(f"*/{STATE}")]:  # fmt: skip
         try:
-            state = json.loads(read_text(path))
+            state = read_state(path)
             shipped = (state.get("shipped") or {}).get("ts")
             spans[path.parent.name] = (
                 utc(state["log"][0]["ts"]),
                 utc(shipped) if shipped else None,
             )
-        except (OSError, ValueError, LookupError, TypeError, AttributeError) as exc:
+        except (Refusal, ValueError, LookupError, TypeError, AttributeError) as exc:
             raise UnreadableRelease(f"{path} has no readable first log ts and shipped ts ({exc})",
                              act("agent", f"repair {path} until `release.py check` passes")) from None  # fmt: skip
     return spans

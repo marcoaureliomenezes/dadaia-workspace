@@ -4,14 +4,14 @@ a bundle of each open lane and `wt-rc` tree and each pause bundle)."""
 
 import io
 import json
+import os
 import re
 import tarfile
-import tempfile
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
-from dadaia_workspace.core import clock, harness_registry, platform
+from dadaia_workspace.core import clock, context_registry, harness_registry, platform
 from dadaia_workspace.core.atomic_write import atomic_write
 from dadaia_workspace.core.cli_line import cli_words, fix_line
 from dadaia_workspace.core.exceptions import DadaiaError, SchemaVersionError
@@ -23,6 +23,7 @@ from dadaia_workspace.core.models.spec_context import (
 )
 from dadaia_workspace.core.platform import act
 from dadaia_workspace.core.skill_owner import load_owner
+from dadaia_workspace.features.export.scan import new_scratch
 from dadaia_workspace.infrastructure.json_context_store import JsonContextStore
 from dadaia_workspace.infrastructure.json_harness_profile_store import JsonHarnessProfileStore
 from dadaia_workspace.infrastructure.ledger_scripts import worktree_rows
@@ -33,23 +34,6 @@ _REFUSED = (
     load_owner("dd-bug-resolution", "_refusal").Refusal,
     load_owner("dd-bug-resolution", "_git").GitError,
 )
-
-
-def scratch_fix(tmp: Path) -> str:
-    """The act that clears a scratch directory or file that cannot be written under *tmp*."""
-    return act("agent", f"free space and write permission under {tmp}, then rerun the export")
-
-
-def new_scratch(tmp: Path, prefix: str) -> "tempfile.TemporaryDirectory[str]":
-    """A scratch directory under *tmp*; a failure to make it refuses with the act that clears it."""
-    try:
-        tmp.mkdir(parents=True, exist_ok=True)
-        return tempfile.TemporaryDirectory(dir=tmp, prefix=prefix)
-    except OSError as exc:
-        raise DadaiaError(
-            f"cannot create a scratch directory ({type(exc).__name__})",
-            fix=scratch_fix(tmp),
-        ) from exc
 
 
 @dataclass(frozen=True)
@@ -125,7 +109,7 @@ def _members(
 
 def _free(dist: Path, bundles: list[tarfile.TarInfo]) -> None:
     """Refuses the first bundle that already sits in *dist*: a file there can be the only copy."""
-    if taken := next((dist / m.name for m in bundles if (dist / m.name).exists()), None):
+    if taken := next((dist / m.name for m in bundles if os.path.lexists(dist / m.name)), None):
         raise _refuse(
             f"{taken} already exists.", act("agent", f"move {taken} out of {dist}, then run again")
         )
@@ -198,7 +182,7 @@ class ExportService:
             )
             for r in payload["contexts"]
         )
-        alive = tuple(r["name"] for r in payload["contexts"] if r["state"] == "alive")
+        alive = tuple(r["name"] for r in payload["contexts"] if context_registry.is_alive(r))
         artifact = Artifact(harnesses, contexts, alive)
         if tarfile.is_tarfile(path):
             with tarfile.open(path) as tar:
@@ -269,7 +253,7 @@ class ExportService:
         hits = []
         for arc, file in sorted(bundles.items()):
             repo = self._workspace_root / "repos" / arc.split("/")[0]
-            if file.is_symlink():
+            if load_owner("dd-bug-resolution", "_platform").is_link(file):
                 raise DadaiaError(
                     f"{arc} is a symlink; an archive carries bundle files only",
                     fix=act("agent", f"replace {file} with the bundle file itself, then export"),

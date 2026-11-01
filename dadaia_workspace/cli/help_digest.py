@@ -9,7 +9,6 @@ attached to every ctx-inject emission bind-independent.
 
 from __future__ import annotations
 
-import functools
 from pathlib import Path
 
 from dadaia_workspace.core import platform
@@ -28,24 +27,9 @@ def _first_line(text: str | None) -> str:
     return (text or "").strip().splitlines()[0].strip() if (text or "").strip() else ""
 
 
-def _root_command() -> object:
-    """The live Typer app as a click-compatible root command.
-
-    Imported, never a subprocess ``--help`` parse: hermetic, fast and always in sync
-    with the tree this process ships.
-    """
-    from typer.main import get_command
-
-    from dadaia_workspace.cli.main import app  # lazy: avoid an import cycle
-
-    return get_command(app)
-
-
-@functools.lru_cache(maxsize=1)
-def command_paths() -> frozenset[tuple[str, ...]]:
-    """Every command path of the live tree, root ``()`` included — walked ONCE per
-    process (the digest, the citation contract tests and the doctor's
-    ``MEM-DRIFT-2`` share this one walk).
+def command_paths(root: object) -> frozenset[tuple[str, ...]]:
+    """Every command path of the tree under *root* (the click-compatible root command
+    the running command received), root ``()`` included.
 
     Walked by duck-typing (``hasattr(cmd, "commands")``), never ``isinstance(cmd,
     click.Group)``: the installed ``typer`` (``>=0.27.1``) vendors its own
@@ -64,13 +48,12 @@ def command_paths() -> frozenset[tuple[str, ...]]:
             paths.add(child)
             _walk(sub, child)
 
-    _walk(_root_command(), ())
+    _walk(root, ())
     return frozenset(paths)
 
 
-def render_digest() -> str:
-    """Introspect the live command tree into a compact, stamped digest."""
-    root = _root_command()
+def render_digest(root: object) -> str:
+    """Introspect the command tree under *root* into a compact digest."""
     # Duck-typed group detection: this typer version ships its own click shim
     # (typer._click), so isinstance against the click package is unreliable.
     root_commands: dict[str, object] = dict(getattr(root, "commands", {}) or {})
@@ -108,7 +91,7 @@ def digest_path(workspace_root: Path) -> Path:
     return workspace_root / DIGEST_REL
 
 
-def write_digest(workspace_root: Path) -> Path | None:
+def write_digest(workspace_root: Path, root: object) -> Path | None:
     """Write the digest, skipping when the file already holds exactly this digest.
 
     Fail-soft: any error returns ``None`` — regeneration is a convenience rider on
@@ -116,7 +99,7 @@ def write_digest(workspace_root: Path) -> Path | None:
     """
     try:
         path = digest_path(workspace_root)
-        text = render_digest()
+        text = render_digest(root)
         if path.is_file() and platform.read_text(path) == text:
             return path
         path.parent.mkdir(parents=True, exist_ok=True)

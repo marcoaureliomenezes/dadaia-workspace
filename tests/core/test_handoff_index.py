@@ -262,6 +262,8 @@ def test_artifact_path_rejects_escape(tmp_path: Path, bad_ref: str) -> None:
         pytest.param(True, "match", "match", id="match"),
         pytest.param(True, "wrong", "mismatch", id="mismatch"),
         pytest.param(False, "match", "missing_artifact", id="missing_artifact"),
+        pytest.param(True, "absent", "missing_hash", id="missing_hash_absent"),
+        pytest.param(True, "empty", "missing_hash", id="missing_hash_empty"),
     ],
 )
 def test_artifact_hash_status_matrix(
@@ -274,25 +276,31 @@ def test_artifact_hash_status_matrix(
         artifact.parent.mkdir(parents=True)
         artifact.write_bytes(content)
 
-    declared = real_hash if declared_hash == "match" else "b" * 64
+    artifact_ref: dict[str, object] = {
+        "type": "report",
+        "path": ".dadaia/reports/ctx/agent/report.html",
+    }
+    declared = {"match": real_hash, "wrong": "b" * 64, "empty": ""}.get(declared_hash)
+    if declared is not None:
+        artifact_ref["content_hash"] = declared
     handoff_path = _write(
         tmp_path / ".dadaia" / "handoff" / "ctx" / "h.handoff.json",
-        _base_doc(
-            artifact={
-                "type": "report",
-                "path": ".dadaia/reports/ctx/agent/report.html",
-                "content_hash": declared,
-            }
-        ),
+        _base_doc(artifact=artifact_ref),
     )
     handoff = Handoff.load(handoff_path)
 
     assert handoff.artifact_hash_status(tmp_path) == expected_status
 
+    if declared_hash == "empty":
+        # The schema pattern ^[a-f0-9]{64}$ rejects "" before the hash check runs.
+        return
     result = handoff.validate(workspace_root=_atom(tmp_path), schema=_SCHEMA)
     assert result.valid is (expected_status == "match")
     if expected_status != "match":
         assert result.hash_status == expected_status
+        assert [(e.field_path, e.message) for e in result.errors] == [
+            ("artifact.content_hash", f"artifact hash check failed: {expected_status}")
+        ]
 
 
 # ---------------------------------------------------------------------------

@@ -32,6 +32,7 @@ if TYPE_CHECKING:
 
 SELF, PKG, SWEEP = "scripts/guards/slop.py", "dadaia_workspace", "features/spec_context/sweep.py"
 _LEDGER = load_owner("dd-bug-resolution", "_ledger")
+_STORE = load_owner("dd-bug-resolution", "_bugs_store")
 _BACKLOG = load_owner("dd-backlog-definition", "_backlog_store")
 
 IGNORE_EDGES = 0
@@ -47,7 +48,7 @@ v38* infrastructure/projection.py:_clear parity:tests/infrastructure/test_public
 v38* infrastructure/public_assets.py:_prune_empty_dirs parity:tests/infrastructure/test_public_assets__install_ledger_reconciliation.py
 v38* infrastructure/public_assets.py:_reconcile_install_ledger parity:tests/infrastructure/test_public_assets__install_ledger_reconciliation.py
 v38* infrastructure/public_assets.py:stage parity:tests/infrastructure/test_public_assets__staged_assets_have_consumers.py
-v38 public/skills/dd-gitflow-default/scripts/_worktree_end.py:_rmdir parity:tests/public/skills/dd_gitflow_default/scripts/test__worktree_end__removal.py
+v38 public/skills/dd-gitflow-default/scripts/_worktree_end.py:rmdir parity:tests/public/skills/dd_gitflow_default/scripts/test__worktree_end__removal.py
 v38 public/skills/dd-gitflow-default/scripts/_worktree_pause.py:write_bundle parity:tests/public/skills/dd_gitflow_default/scripts/test__worktree_pause.py
 v38 public/skills/dd-gitflow-default/scripts/_worktree_pause.py:resume parity:tests/public/skills/dd_gitflow_default/scripts/test__worktree_pause.py
 v38* public/skills/dd-release-implementation/scripts/_release_new.py:new_release parity:tests/public/skills/dd_release_implementation/scripts/test_release.py
@@ -113,8 +114,7 @@ def _allowance(tree: Tree, hits: dict[str, str], check: str, also: str = "") -> 
     """*hits* (key -> its sub-rule) against the tree's allowance rows of *check*."""
     rows = [r for r in _table(tree.read(SELF)) if r[0].rstrip("*") == check]
     allow = {key: value for _, key, value in rows if value != "-"}
-    ledger = _LEDGER.records(tree.root / "specs/bugs/BUGS.jsonl")
-    valid = {r["id"] for r in ledger if r.get("status") == "open"} | {also}
+    valid = {*_STORE.open_ids(tree.root / "specs"), also}
     out = [f"{r}: {k} has no allowance key" for k, r in sorted(hits.items()) if k not in allow]
     out += [f"stale-key: {k} matches nothing" for k in sorted(allow.keys() - hits.keys())]
     for key, value in sorted(allow.items()):
@@ -686,13 +686,13 @@ _PLANTS: dict[str, dict[str, Plant]] = {
         "absent-at-birth": _plant(_born_package_row),
         "skill-row-no-test": _edit(
             SELF,
-            "_worktree_end.py:_rmdir parity:tests/public/skills/dd_gitflow_default/scripts/test__worktree_end__removal.py",
-            "_worktree_end.py:_rmdir zz-open-bug",
+            "_worktree_end.py:rmdir parity:tests/public/skills/dd_gitflow_default/scripts/test__worktree_end__removal.py",
+            "_worktree_end.py:rmdir zz-open-bug",
         ),
         "no-test-file": _edit(
             SELF,
-            "_worktree_end.py:_rmdir parity:tests/public",
-            "_worktree_end.py:_rmdir parity:tests/zz/public",
+            "_worktree_end.py:rmdir parity:tests/public",
+            "_worktree_end.py:rmdir parity:tests/zz/public",
         ),
     },
     "v39": {

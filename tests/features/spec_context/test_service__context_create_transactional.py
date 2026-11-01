@@ -180,5 +180,5 @@ def test_the_created_line_is_one_line_and_the_next_step_is_the_new_contexts(
     code, out = _create("--main-repo", _remote(tmp_path, "a-rather-long-repo-name.git").as_uri())
     assert code == 0, out
     assert any(ln.endswith("(main repo: repos/a-rather-long-repo-name)") for ln in out.splitlines())
-    assert "context bind a-rather-long-repo-name" in out  # a session, unbound
+    assert "specs init --context a-rather-long-repo-name" in out  # a session, unbound
     assert "'second'" not in out

@@ -80,10 +80,6 @@ RULES: tuple[SpecsRule, ...] = (
         lambda d: d._memory.check_lint1_memory_atoms(),
     ),
     _rule(
-        ("MEM-DRIFT-1",),
-        lambda d: d._memory.check_mem_drift1_features_package_map(),
-    ),
-    _rule(
         ("ADR-SUPERSEDED-CITATION",),
         lambda d: doctor_adr.superseded_adr_citations(d.specs_dir, d.public_dir),
         fix_help=act(
@@ -106,8 +102,6 @@ RULES: tuple[SpecsRule, ...] = (
     _rule(
         ("GITFLOW-1",),
         lambda d: d._coherence.check_gitflow(),
-        # No flag: `specs init` keeps a valid block, else writes the detected gitflow.
-        fix_help=("specs", "init", "--specs-dir", "<specs>"),
     ),
     _rule(
         ("SPEC-DOC-026",),
@@ -146,8 +140,4 @@ def render_fix_help() -> str:
     The CODES only: ``fix_help`` is the one executable remediation command, not a
     description; every auto-fixable rule's command is this very flag."""
     parts = ", ".join("/".join(r.codes) for r in RULES if r.fix is not None)
-    return (
-        f"Apply auto-fixes for fixable issues ({parts}). "
-        "Every other invariant is warn/report-only and never auto-fixed. "
-        "After fixing, re-checks and reports residual issues."
-    )
+    return f"Apply auto-fixes for fixable issues ({parts})."

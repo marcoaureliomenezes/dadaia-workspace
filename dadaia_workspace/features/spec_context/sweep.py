@@ -28,12 +28,12 @@ import os
 import shutil
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import UTC, datetime
 from pathlib import Path
 
-from dadaia_workspace.core import platform
+from dadaia_workspace.core import clock, platform
+from dadaia_workspace.core.linked_tree import is_worktree_gitfile
 from dadaia_workspace.core.platform import act
-from dadaia_workspace.core.workspace_layout import is_worktree_gitfile, occupied
+from dadaia_workspace.core.workspace_layout import occupied
 
 __all__ = [
     "Skipped",
@@ -192,7 +192,7 @@ def hold(workspace_root: Path, target: Path, label: str, *, note: str = "") -> s
     """:func:`move` *target* to ``.dadaia/reaped/<YYYYMMDD>/<workspace-relative path>``,
     the one hold: the origin path is the record of where the entry came from. The hold's
     clock is its top entry ``reaped/<YYYYMMDD>/<first segment>``, stamped once here."""
-    day = workspace_root / ".dadaia" / REAPED_ZONE / datetime.now(tz=UTC).strftime("%Y%m%d")
+    day = workspace_root / ".dadaia" / REAPED_ZONE / clock.compact_day()
     rel = target.relative_to(workspace_root)
     done = move(workspace_root, target, day / rel, label, note=note)
     if len(rel.parts) > 1 and done:

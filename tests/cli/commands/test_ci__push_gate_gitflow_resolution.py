@@ -12,9 +12,9 @@ import pytest
 import typer
 
 from dadaia_workspace.cli.commands import ci
-from dadaia_workspace.core.cli_line import fix_line
+from dadaia_workspace.core import platform
 from dadaia_workspace.core.gitflow import Gitflow
-from tests.helpers.oslib import run, write_text
+from tests.helpers.oslib import run, spell, write_text
 
 _CUSTOM = "---\nspecs_pattern_version: 7\ngitflow: {principal: trunk, integration: next, work: work/}\n---\n"
 
@@ -86,6 +86,25 @@ def test_several_live_releases_block_the_gate_with_the_refusals_own_fix(
     )
 
 
+def test_a_repo_whose_config_git_cannot_parse_blocks_the_gate_with_the_status_act(
+    repo: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    with (repo / ".git" / "config").open("a") as config:
+        config.write("[core\n")
+
+    with pytest.raises(typer.Exit):
+        ci._gate_inputs(repo, "")
+
+    err = capsys.readouterr().err.splitlines()
+    assert any(
+        line.startswith(f"Error: [pre-push] BLOCKED: git cannot read {repo}: ") for line in err
+    )
+    assert err[-1] == (
+        f"fix: Agent action: run {platform.git_inline(repo, 'status')}"
+        " and repair what it reports until it exits 0"
+    )
+
+
 def test_heads_constitution_wins_over_the_working_tree(repo: Path) -> None:
     _git(repo, "checkout", "-q", "trunk")
     write_text(repo / "specs" / "constitution.md", "# an uncommitted edit\n")
@@ -101,9 +120,12 @@ def test_an_absent_specs_tree_is_reported_as_absent_with_the_specs_init_fix(
     _git(app, "commit", "-q", "--allow-empty", "-m", "birth")
     ci._gate_inputs(app, "")
     err = capsys.readouterr().err
-    assert "no specs/constitution.md" in err
-    fixes = [line for line in err.splitlines() if line.startswith("hint: ")]
-    assert fixes == [f"hint: {fix_line(None, 'specs', 'init', '--specs-dir', str(app / 'specs'))}"]
+    from dadaia_workspace.infrastructure.git_subprocess import gitflow_fix
+
+    assert "no committed specs/constitution.md" in err
+    fixes = [line for line in err.splitlines() if line.startswith(("fix: ", "hint: "))]
+    assert fixes == [f"fix: {gitflow_fix(app / 'specs')}"]
+    assert fixes[0].startswith("fix: Agent action: ")
 
 
 def test_a_committed_constitution_without_a_block_keeps_the_no_block_warning(
@@ -119,4 +141,4 @@ def test_a_committed_constitution_without_a_block_keeps_the_no_block_warning(
     ci._gate_inputs(app, "")
     err = capsys.readouterr().err
     assert f"{app / 'specs' / 'constitution.md'}: no gitflow block" in err
-    assert "specs init" not in err
+    assert f"specs init --specs-dir {spell(str(app / 'specs'))}" in err

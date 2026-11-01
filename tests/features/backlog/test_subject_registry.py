@@ -54,8 +54,14 @@ def repo(tmp_path: Path) -> Path:
     product = tmp_path / "specs" / "memory" / "product"
     product.mkdir(parents=True)
     write_text(product / "catalog.json", json.dumps(MINIMAL_CATALOG))
+    for slug in ("alpha-feature", "beta-feature"):
+        write_text(product / f"{slug}.md", _atom(slug))
     os_write_text(tmp_path / "specs" / "memory" / "architecture.md", MINIMAL_ARCH_DOC)
     return tmp_path
+
+
+def _atom(slug: str) -> str:
+    return f"---\nslug: {slug}\ntitle: {slug}\ntldr: {slug}\nsummary: {slug}\n---\n\n# {slug}\n"
 
 
 def _build(repo: Path, tracked: frozenset[str] = TRACKED) -> Registry:
@@ -103,6 +109,29 @@ def test_a_gitignored_path_does_not_bind_an_untracked_one_does(repo: Path) -> No
     reg = _build(repo, GitSubprocessClient().tracked(repo))
     assert reg.bind("build/out.go", SubjectKind.CODE).status is BindStatus.UNRESOLVED
     assert reg.bind("pkg/widget.go", SubjectKind.CODE).status is BindStatus.RESOLVED
+
+
+def test_a_catalog_slug_without_an_atom_file_does_not_resolve(repo: Path) -> None:
+    """The catalog names a ghost, the atom file is the real feature: the files answer."""
+    product = repo / "specs" / "memory" / "product"
+    write_text(product / "catalog.json", json.dumps({"features": [{"slug": "ghost-feature"}]}))
+    write_text(product / "real-feature.md", _atom("real-feature"))
+
+    reg = _build(repo)
+
+    assert reg.bind("ghost-feature", SubjectKind.CATALOG).status is BindStatus.UNRESOLVED
+    assert reg.bind("real-feature", SubjectKind.CATALOG).status is BindStatus.RESOLVED
+
+
+def test_an_unreadable_atom_is_named_by_a_catalog_refusal(repo: Path) -> None:
+    """An atom whose frontmatter does not parse is never an empty anchor set: the catalog
+    refusal names the file that broke."""
+    write_text(repo / "specs" / "memory" / "product" / "broken.md", "---\nslug: [unclosed\n---\n")
+
+    result = _build(repo).bind("alpha-feature", SubjectKind.CATALOG)
+
+    assert result.status is BindStatus.UNRESOLVED
+    assert "broken.md" in result.message
 
 
 def test_catalog_doc_and_invariant_resolve_and_unknown_halts(repo: Path) -> None:

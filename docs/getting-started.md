@@ -1,7 +1,7 @@
 # Getting started
 
 From a bare machine to a first candidate. Every step names what it creates on disk;
-the terms are defined in [concepts](concepts.md) and in [`CONTEXT.md`](../CONTEXT.md).
+the terms are defined in [concepts](concepts.md) and in the glossary [`CONTEXT.md`](../CONTEXT.md), which defines terms only.
 
 ## Install
 
@@ -75,12 +75,13 @@ die with it. Specs, bind, memory, releases and backlog resolve only from the mai
 the context ALIVE — it never binds; on failure nothing is left behind. The name
 defaults to the main repo's slug. `bind` writes exactly one record,
 `.dadaia/sessions/<session-id>.json` (context, runtime, pid, `bound_at`, `bind_id`, `last_seen_at`), and acquires
-nothing; the session id comes from the environment only, and a session without a
+nothing; the CLI verbs read the session id from the environment, and the hooks also take the hook payload's id where the harness's registry row names a session variable, and a session without a
 harness-native id exports `DADAIA_SESSION_ID` before it binds. The bind's scope
 is the context's main repo plus its associated repos; a MUTATING file-tool write into a
-repo outside it is refused with the bind that would allow it, and agents write a repo
-only inside its worktrees. After a bind, the ctx-inject hook injects the context header,
-`constitution.md`, `ARCHITECTURE.md`'s `## Tech Stack` section, the memory catalog digest
+repo outside it is refused with the bind that would allow it, unless the write lands in a
+worktree git linked from a repo of this workspace, and agents write a repo only inside its
+worktrees. After a bind, the ctx-inject hook injects the context header,
+`constitution.md`, `ARCHITECTURE.md`'s `## Tech Stack` section, the memory atom digest
 and the open worktrees once.
 
 ## Level 3 — the specs
@@ -116,8 +117,8 @@ runs the two tree sections; any other run outside a workspace exits 1 with the o
 workspace-not-found error.
 
 Every printed finding is one `<CODE> <verdict> <message>` line, every error-class
-finding carries one fix line (a command, an
-`Agent action: <one act>`, or an `Operator action: <one act>` for what only the human may do), and any error-class finding exits 1. There
+finding carries one fix line (its forms are the root `AGENTS.md` map's *What is enforced*
+section), and any error-class finding exits 1. There
 is no score: the findings and the exit code are the run. `--json` mirrors it,
 `--redact` masks every foreign context name and repo slug, and `--fix` is the reaper —
 it moves slop to `.dadaia/reaped/<YYYYMMDD>/` under a 7-day hold; a TTL expiry acts by
@@ -136,10 +137,10 @@ the candidate's `rc-<N>/wt-rc`, its integration branch, for steps 2, 3, 4 and 6;
 runs every worktree verb: `new`, `merge`, `sync`, `clean`, `hash`, `list`, `pause`, `resume`.
 
 1. **Demand enters the backlog.** Only the operator creates demand;
-   `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py new <slug> --relates <slugs>|none`
+   `python3 .agents/skills/dd-backlog-definition/scripts/backlog.py new <slug> --relates <slugs>|none --specs <specs-dir>`
    appends one `active[]` entry born `idea`, and every later status binds `intents[]` that resolve to a code, catalog, doc or invariant anchor.
 2. **Birth the release.**
-   `python3 .agents/skills/dd-release-implementation/scripts/release.py new <M.m.p>`
+   `python3 .agents/skills/dd-release-implementation/scripts/release.py new <M.m.p> --specs <specs-dir>`
    writes a `SPEC.md` stub in `specs/releases/<M.m.p>/rc-<N>/` and `_RELEASE.json` in
    `DEFINITION` at the release root, all or nothing, refusing a second live release.
 3. **Define the candidate.** The picked set; the as-is review — one row per unit the
@@ -147,10 +148,10 @@ runs every worktree verb: `new`, `merge`, `sync`, `clean`, `hash`, `list`, `paus
    REBUILD, UPDATE or KEEP, then ADD only for what no unit can carry; the mandatory
    grill; then `SPEC.md` (its `Replaces` naming what DELETE/REBUILD rows remove),
    `PLAN.md` (opening with that table as §1, then the job DAG with waves and exact `W:` sets) and
-   one job file per job, `tasks/<job>.md`, in that `rc-<N>/`, as the first commits of
+   one job file per job, `tasks/job<n>.md`, in that `rc-<N>/`, as the first commits of
    the `wt-rc`, cut from the work branch (`<work>M.m.p`; the names are the
    `gitflow:` block of `specs/constitution.md`).
-4. **Open implementation.** `release.py phase IMPLEMENTATION --sha <sha>` requires
+4. **Open implementation.** `release.py phase IMPLEMENTATION --specs <specs-dir>` requires
    `SPEC.md` and `PLAN.md` `**Status:** Approved`, PLAN's `## DAG` with wave and exact
    `W:` sets, and lean job files containing task id, AC and exact `W:`, then stamps `defined`.
 5. **Run the jobs.** Each job opens its `wt-main` by `.dadaia/.venv/bin/dadaia worktree new`
@@ -162,21 +163,22 @@ runs every worktree verb: `new`, `merge`, `sync`, `clean`, `hash`, `list`, `paus
    `.dadaia/.venv/bin/dadaia worktree sync <wt-rc path>` rebases the rc and its trees,
    parents first.
 6. **Close the candidate.** The Reconciliation, as the last commits of the `wt-rc`:
-   `release.py phase CLOSURE --sha <sha>` (no `wt/*` tree or branch open but the `wt-rc`), the
+   `release.py phase CLOSURE --specs <specs-dir>` (no `wt/*` tree or branch open but the `wt-rc`), the
    closure `log` entries, the disposition sweep (`backlog.py exit`, `audit.py
    disposition`/`close`, `bugs.py archive`), artifact GC, and last the memory
    reconciliation with its derived docs; after CLOSURE a hotfix lane still reaches it by
    `worktree sync`, in code only the `wt-rc` holds only a block-list bug lands, on the `wt-rc` itself, and any other work opens the next candidate. Then the `wt-rc` merges into the work branch through the job gate plus
-   the ledger checks, and the work -> integration PR merges green.
+   the ledger checks; the work → integration merge is `dd-gitflow-default` step 8's, on the operator's order.
 7. **Continue or promote.** Continue: `release.py new` with the same id stacks the next
    candidate, reopening `DEFINITION`. Promote: merge the integration branch into the
-   principal by PR — that merge is the deploy. The old work tip is tagged
+   principal, through a PR when the host has one; when the project's own release pipeline then opens a PR into the
+   principal, that PR's merge is the deploy, else this merge is. The old work tip is tagged
    `archive/<work-branch>` and the work branch is renamed to the next release id
-   (`git branch -m`, then `git push -u`), never cut anew; `release.py ship --sha <sha>`,
+   (`git branch -m`, then `git push -u`), never cut anew; `release.py ship`,
    in a backlog lane on that branch, then records the promote and moves the release
    folder to `_archive/`.
 
 A bug is registered once the operator confirms it; a bug in code the work branch holds is fixed in
-a `wt-hotfix-<bug-id>` lane — lineage, a RED new case, root-cause fix, GREEN, then `resolve` with the
-implementation sha. Any other bug becomes explicit candidate scope; ship refuses it while
+a `wt-hotfix-<bug-id>` lane — lineage, a RED new case, root-cause fix, GREEN, then `resolve`, which reads the
+fix from its id line. Any other bug becomes explicit candidate scope; ship refuses it while
 open unless the operator authorizes that exact id and the authorization is recorded.

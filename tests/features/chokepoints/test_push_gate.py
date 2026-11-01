@@ -15,7 +15,7 @@ from typing import Any
 import pytest
 
 from dadaia_workspace.container import load_denylist_terms
-from dadaia_workspace.core.cli_line import fix_line, git_line
+from dadaia_workspace.core.cli_line import git_line
 from dadaia_workspace.core.gitflow import DEFAULT
 from dadaia_workspace.core.models.git_scan import GitObjectReadError, GitRunError, ScannedObject
 from dadaia_workspace.features.chokepoints import push_gate_decision
@@ -71,7 +71,7 @@ def _gen() -> Iterable[tuple[str, str]]:
     pytest.param({"leak.md": f"{_TERM}\n"}, None, _branch, _TERMS, [], id="A1.1-blob-in-branch-range"),
     pytest.param({"tag-blob.md": f"{_TERM}\n"}, None, _tag, _TERMS, [], id="A2.1-tainted-tag"),
     pytest.param({"c.md": "clean\n"}, f"mentions {_TERM}", _branch, _TERMS,
-                 ["Uncommit the unpublished range"], id="A11.1-term-only-in-commit-message"),
+                 [], id="A11.1-term-only-in-commit-message"),
     pytest.param({"leak.md": f"{_TERM}\n"}, None, _tag, "gen", ["denylisted term"], id="one-shot-generator-terms"),
     pytest.param({"t.py": f"{_TERM}\n"}, None, _branch, _TERMS, [
         "A test fixture that needs a secret shape composes it at runtime (string concatenation), never as a tracked literal."
@@ -111,9 +111,9 @@ def test_shared_blob_across_two_refs_is_deduped(repo: PushRepo) -> None:
 def test_branch_policy_refusal_precedes_the_scan(repo: PushRepo) -> None:
     """A branch-policy refusal is decided before the denylist scan."""
     sha = repo.commit({"leak.md": f"{_TERM}\n"})
-    decision = _decide(repo, f"refs/heads/main {sha} refs/heads/main {'b' * 40}", denylist_terms=_TERMS)
+    decision = _decide(repo, f"refs/heads/topic {sha} refs/heads/topic {'b' * 40}", denylist_terms=_TERMS)
     assert not decision.allowed
-    assert "main" in decision.message
+    assert "topic" in decision.message
     assert "denylisted term" not in decision.message
 
 
@@ -204,9 +204,6 @@ class _Raising:
     def __init__(self, exc: GitObjectReadError) -> None:
         self._exc = exc
 
-    def remote_branch(self, repo: Path, branch: str) -> bool:
-        return True
-
     def new_objects(self, repo: Path, local_sha: str, remote_sha: str) -> Iterable[ScannedObject]:
         raise self._exc
 
@@ -235,27 +232,37 @@ def test_a_git_read_failure_refuses_with_its_own_fix(
     assert decision.message.splitlines()[-1] == last_line.format(fsck=git_line(repo.path, "fsck"))
 
 
+def test_a_refused_branch_gets_one_agent_action_naming_its_listed_path(repo: PushRepo) -> None:
+    """The refusal's one fix is an Agent action that names the listed path; no history rewrite
+    is offered."""
+    repo.commit({"a.md": "clean\n"})
+    tip = repo.commit({"n.md": f"{_TERM}\n"})
+    decision = _decide(
+        repo, _branch(tip), fixes=replace(gate_fixes(), head="feature/0.0.1"), denylist_terms=_TERMS
+    )
+    fixes = [ln for ln in decision.message.splitlines() if ln.startswith("fix: ")]
+    assert not decision.allowed and "update-ref" not in decision.message
+    assert len(fixes) == 1 and fixes[0].startswith("fix: Agent action: ") and "n.md" in fixes[0]
+    assert "--rewrite-from" not in decision.message and "re-commit" not in decision.message
+
+
 # fmt: off
 @pytest.mark.parametrize(("ref", "head", "end"), [
-    pytest.param(_branch, "feature/0.0.1", "fix: {verb}", id="N3-rewrite-verb-from-oldest-unpublished"),
     pytest.param(_branch, "main", "fix: git -C /repo switch feature/0.0.1", id="H1-not-checked-out-switch-first"),
-    pytest.param(lambda sha: _tag(sha, "v0.0.1"), "feature/0.0.1", None, id="N3-tag-operator-action-no-command"),
+    pytest.param(lambda sha: _tag(sha, "v0.0.1"), "feature/0.0.1", "fix: Agent action: ", id="N3-tag-operator-action-no-command"),
 ])
 # fmt: on
-def test_the_rewrite_fix_runs_the_verb_from_the_oldest_unpublished_commit(
-    repo: PushRepo, ref: Any, head: str, end: str | None
+def test_the_refusal_fix_is_the_switch_or_the_operator_act_and_never_a_rewrite(
+    repo: PushRepo, ref: Any, head: str, end: str
 ) -> None:
-    """One fix line from the refused ref's own unpublished range, never HEAD or a ref deletion."""
-    oldest = repo.commit({"a.md": "clean\n"})
+    """One fix line from the refused ref's own range; a refused ref never offers a rewrite."""
+    repo.commit({"a.md": "clean\n"})
     tip = repo.commit({"n.md": f"{_TERM}\n"})
     decision = _decide(repo, ref(tip), fixes=replace(gate_fixes(), head=head), denylist_terms=_TERMS)
-    message = decision.message
-    assert not decision.allowed and "update-ref" not in message
-    if end is None:
-        assert "\nfix: Agent action: " in message and message.count("\nfix: ") == 1
-    else:
-        verb = fix_line(None, "ci", "push-gate-check", "--repo", "/repo", "--rewrite-from", oldest)
-        assert message.endswith(end.format(verb=verb)) and message.count("\nfix: ") == 1
+    fixes = [ln for ln in decision.message.splitlines() if ln.startswith("fix: ")]
+    assert not decision.allowed and "update-ref" not in decision.message
+    assert len(fixes) == 1 and fixes[0].startswith(end), decision.message
+    assert "--rewrite-from" not in decision.message
 
 
 def test_a_ledger_verb_outside_the_workspace_loads_the_pre_push_terms(
@@ -271,7 +278,7 @@ def test_a_ledger_verb_outside_the_workspace_loads_the_pre_push_terms(
     specs.mkdir(parents=True)
     monkeypatch.delenv("DADAIA_PRIVACY_DENYLIST", raising=False)
     monkeypatch.chdir(specs)
-    assert load_denylist_terms() == _TERMS
+    assert load_denylist_terms(specs) == _TERMS
     monkeypatch.chdir(tmp_path)
     ledger = load_owner("dd-bug-resolution", "_ledger")
     assert ledger.private_refusal([{"title": f"a {_TERM} leak"}], specs) is not None

@@ -63,3 +63,56 @@ def test_a_script_path_with_a_blank_is_one_word_of_every_line(tmp_path: Path) ->
     assert this("check", specs=tmp_path / "s p") == command(
         sys.executable, str(path.resolve()), "check", "--specs", str(tmp_path / "s p")
     )
+
+
+def _check_release(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, body: str
+) -> tuple[Exception | None, int]:
+    """Runs `check_release` against a stub `release.py`; returns its refusal (or None) and the spawn count."""
+    skills = tmp_path / "skills"
+    release = skills / "dd-release-implementation/scripts/release.py"
+    release.parent.mkdir(parents=True)
+    release.write_text(f"import sys\nopen({str(tmp_path / 'spawns')!r}, 'a').write('x')\n{body}\n")
+    monkeypatch.setattr(_S, "__file__", str(skills / "dd-bug-resolution/scripts/_specs.py"))
+    try:
+        _S.check_release(tmp_path / "specs")
+    except _S.Refusal as refusal:
+        return refusal, len((tmp_path / "spawns").read_text())
+    return None, len((tmp_path / "spawns").read_text())
+
+
+@pytest.mark.medium
+def test_a_check_that_exits_one_with_no_fix_is_refused_with_the_check_command(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    refusal, spawns = _check_release(tmp_path, monkeypatch, "sys.exit(1)")
+    assert isinstance(refusal, _S.Refusal) and spawns == 1
+    release = tmp_path / "skills/dd-release-implementation/scripts/release.py"
+    check = command(sys.executable, str(release.resolve()), "check", "--specs", str(tmp_path / "specs"))  # fmt: skip
+    assert refusal.fix == check
+
+
+@pytest.mark.medium
+def test_a_check_that_prints_error_and_exits_zero_passes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    refusal, spawns = _check_release(tmp_path, monkeypatch, "print('[error] x y')")
+    assert (refusal, spawns) == (None, 1)
+
+
+@pytest.mark.medium
+def test_a_check_with_findings_relays_its_own_first_fix(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    body = "print('[error] bad')\nprint('fix: Agent action: do A')\nprint('fix: Agent action: do B')\nsys.exit(1)"  # fmt: skip
+    refusal, spawns = _check_release(tmp_path, monkeypatch, body)
+    assert isinstance(refusal, _S.Refusal) and spawns == 1
+    assert refusal.fix == "Agent action: do A"
+
+
+@pytest.mark.medium
+def test_a_check_that_prints_an_error_line_and_exits_one_relays_its_message(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    refusal, _ = _check_release(tmp_path, monkeypatch, "print('[error] m')\nsys.exit(1)")
+    assert isinstance(refusal, _S.Refusal) and str(refusal) == "m"

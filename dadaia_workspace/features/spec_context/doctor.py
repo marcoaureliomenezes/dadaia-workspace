@@ -73,6 +73,13 @@ _CANONICAL = frozenset({FindingVerdict.CANON, FindingVerdict.OPERATOR, FindingVe
 #: no-operator bug proposal), so it is held; an EPHEMERAL one is deleted.
 _EXPIRY_ACT = {ZoneClass.OUTPUT: sweep.hold, ZoneClass.EPHEMERAL: sweep.remove}
 
+#: What `expire()` and `fix()` do, one phrase each: the CLI help composes them, never restates.
+EXPIRE_STEPS = (
+    "seeds missing workspace files and zones, deletes stale session records, and takes "
+    "TTL-expired zone entries (output entries are held in reaped/, ephemeral ones deleted)"
+)
+REAP_STEPS = "moves workspace slop to reaped/ and reaps dead contexts' repos"
+
 #: Directory names that end the repo-tree walk: a nested VCS/venv/dependency tree is
 #: never ours to classify and is where the walk's cost would otherwise live.
 _REPO_WALK_PRUNED: frozenset[str] = frozenset({".git", ".venv", "node_modules"})
@@ -549,10 +556,8 @@ class DoctorService:
     # ------------------------------------------------------------------
 
     def expire(self) -> list[str]:
-        """The SessionStart lane (``--expired-only``): missing level-1 core seeded,
-        stale session records deleted, then each TTL-expired zone entry taken by its zone
-        class — an OUTPUT entry held in ``reaped/``, an EPHEMERAL one deleted. It
-        costs one lstat per zone entry and walks no repo."""
+        """The SessionStart lane (``--expired-only``): ``EXPIRE_STEPS``. It costs one lstat per
+        zone entry and walks no repo."""
         actions = [
             line
             for finding in self._missing_core()
@@ -572,8 +577,8 @@ class DoctorService:
         return actions
 
     def fix(self, context: str | None = None) -> list[str]:
-        """The full reaper: :meth:`expire` (seed first, so the scan judges after it) -> MOVE
-        slop to ``reaped/`` -> reap dead contexts' repos (INV-5).
+        """The full reaper: :meth:`expire` (seed first, so the scan judges after it), then
+        ``REAP_STEPS`` (INV-5).
 
         Nothing here deletes a live entry. Slop is MOVED and holds its 7 days in
         ``.dadaia/reaped/<YYYYMMDD>/<workspace-relative-path>``, the clock starting at the

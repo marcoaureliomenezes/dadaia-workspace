@@ -7,14 +7,16 @@ import re
 from typing import Any
 
 import _clock
+from _backlog_schema import IDEA
 from _backlog_store import SCRIPT, Items
 from _ledger import load_schema
 from _refusal import Refusal
 from _specs import choice
 
-_SLUG = load_schema("backlog-v1")["$defs"]["slug"]["pattern"]
+_SCHEMA = load_schema("backlog-v1")
+_SLUG = _SCHEMA["$defs"]["slug"]["pattern"]
 _INTENT_RE = re.compile(r"^(?P<kind>[a-z]+):(?P<ref>[^=]+)=(?P<change>.+)$", re.DOTALL)
-KINDS = ("code", "doc", "invariant", "catalog")
+KINDS = tuple(_SCHEMA["$defs"]["intent"]["properties"]["subject"]["properties"]["kind"]["enum"])
 
 
 def parse_intents(raw: list[str] | None) -> list[dict[str, Any]]:
@@ -37,7 +39,7 @@ def parse_intents(raw: list[str] | None) -> list[dict[str, Any]]:
 
 
 def new_entry(active: Items, slug: str, values: dict[str, Any]) -> Items:
-    """One brand-new entry, born at ``status: 'idea'`` — an unbound brainstorm, which is
+    """One brand-new entry, born at the ``IDEA`` status — an unbound brainstorm, which is
     the one status exempt from the typed-intents requirement, so it is doctor-clean with
     no further edits."""
     if not re.fullmatch(_SLUG, slug):
@@ -61,7 +63,7 @@ def new_entry(active: Items, slug: str, values: dict[str, Any]) -> Items:
         "id": slug,
         "title": values.get("title") or slug,
         "opened": _clock.today(),
-        "status": "idea",
+        "status": IDEA,
         "description": values.get("description") or "(one-line description of the need)",
         "provenance": values.get("provenance") or "operator request",
     }

@@ -10,16 +10,14 @@ from __future__ import annotations
 
 import json
 import subprocess
-import sys
 from pathlib import Path
 
 import pytest
 
-from dadaia_workspace.core.cli_line import shell_line
-from tests.helpers.oslib import cli_argv, command, venv_dir, write_text
+from tests.helpers.oslib import write_text
 from tests.helpers.worktree_ws import (
     NEW_JOB,
-    SCRIPT,
+    RELAUNCH,
     approve,
     commit,
     diff_hash,
@@ -28,13 +26,13 @@ from tests.helpers.worktree_ws import (
     land,
     make_workspace,
     open_tree,
+    record_session,
     run,
 )
 
 RC = "0.5.0/rc-1/wt-rc"
+RC_TREE = f"worktrees/r/{RC}"
 TREE = f"worktrees/r/{NEW_JOB}"
-VALIDATE_ALL = "validate-all"
-DISPATCH = "dispatch"
 
 
 @pytest.fixture
@@ -49,7 +47,9 @@ def root(tmp_path: Path) -> Path:
 
 def _hand(root: Path, scope_sha: str, **fields: str) -> None:
     """A valid APPROVED a hand wrote: `scope` names *scope_sha*, *fields* ride beside it."""
-    handoff = root / ".dadaia/handoff/c/2026-10-02T100000Z-dd-code-reviewer-hand.handoff.json"
+    handoff = (
+        root / ".dadaia/states/verdicts/c/2026-10-02T100000Z-dd-code-reviewer-hand.handoff.json"
+    )
     handoff.parent.mkdir(parents=True, exist_ok=True)
     write_text(
         handoff,
@@ -66,29 +66,24 @@ def _hand(root: Path, scope_sha: str, **fields: str) -> None:
     )
 
 
-def _refusal(root: Path, result: subprocess.CompletedProcess[str], kind: str, head: str) -> None:
-    """The merge refused with exactly the one `fix:` line of *kind*, and nothing landed."""
+def _refusal(root: Path, result: subprocess.CompletedProcess[str], head: str) -> None:
+    """The merge refused with exactly the one dispatch `fix:` line naming *head*, and nothing landed."""
     dispatch = (f"fix: Agent action: dispatch dd-code-reviewer on {root / TREE} at HEAD {head};"
                 " its verdict.py run writes the verdict")  # fmt: skip
-    validate = f"fix: {command(*cli_argv(venv_dir(root)), 'reports', 'validate', '--all')}"
-    got = fixes(result)
-    want = [validate] if kind == VALIDATE_ALL else [dispatch]
-    assert result.returncode == 1 and got == want, result.stderr
+    assert result.returncode == 1 and fixes(result) == [dispatch], result.stderr
     assert git(root / "repos/r", "rev-parse", f"wt/{RC}").strip() != head
 
 
-@pytest.mark.parametrize(
-    ("kind", "fields"),
-    [
-        pytest.param(VALIDATE_ALL, "hand", id="hand-form"),
-        pytest.param(DISPATCH, "no-hash", id="no-diff-sha256"),
-        pytest.param(DISPATCH, "other-range", id="other-range-hash"),
-        pytest.param(VALIDATE_ALL, "outside", id="reviewed-sha-outside"),
-    ],
-)  # fmt: skip
-def test_a_verdict_that_does_not_bind_the_diff_it_lands_refuses(
-    root: Path, kind: str, fields: str
-) -> None:
+def test_a_valid_verdict_placed_by_hand_in_the_handoff_zone_is_no_verdict(root: Path) -> None:
+    head = land(root, "src/a.py")
+    made = approve(root, head)
+    (zone := root / ".dadaia/handoff/c").mkdir(parents=True, exist_ok=True)
+    made.rename(zone / made.name)
+    _refusal(root, run(root, "merge", TREE), head)
+
+
+@pytest.mark.parametrize("fields", ["hand", "no-hash", "other-range", "outside"])
+def test_a_verdict_that_does_not_bind_the_diff_it_lands_refuses(root: Path, fields: str) -> None:
     first = land(root, "src/a.py")
     head = land(root, "src/b.py")
     body = {
@@ -101,7 +96,7 @@ def test_a_verdict_that_does_not_bind_the_diff_it_lands_refuses(
         },
     }[fields]
     _hand(root, head, **body)
-    _refusal(root, run(root, "merge", TREE), kind, head)
+    _refusal(root, run(root, "merge", TREE), head)
 
 
 def test_hash_prints_the_binding_a_verdict_carries(root: Path) -> None:
@@ -128,7 +123,7 @@ def test_a_stale_sha_named_by_a_verdict_refuses_for_review(root: Path) -> None:
     old = land(root, "src/a.py")
     head = land(root, "src/b.py")
     approve(root, old, name=NEW_JOB)  # bound, but to the sha a later commit left behind
-    _refusal(root, run(root, "merge", TREE), VALIDATE_ALL, head)
+    _refusal(root, run(root, "merge", TREE), head)
 
 
 def test_a_same_patch_rebase_over_other_blobs_refuses_with_the_dispatch_line(root: Path) -> None:
@@ -140,13 +135,43 @@ def test_a_same_patch_rebase_over_other_blobs_refuses_with_the_dispatch_line(roo
     commit(rc, "src/a.py", text.replace("l29\n", "bottom\n", 1))  # the rc branch moved, same file
     git(tree, "rebase", "-q", f"wt/{RC}")  # the same patch, other blobs
     head = git(tree, "rev-parse", "HEAD").strip()  # read before the merge removes the tree
-    _refusal(root, run(root, "merge", TREE), DISPATCH, head)
+    _refusal(root, run(root, "merge", TREE), head)
+
+
+def test_a_sync_that_changes_the_patch_context_refuses_with_a_dispatch_the_approval_clears(
+    root: Path,
+) -> None:
+    rc, tree = root / "worktrees/r" / RC, root / TREE
+    text = "".join(f"l{i}\n" for i in range(30))
+    commit(rc, "src/a.py", text)
+    assert run(root, "sync", TREE).returncode == 0
+    approve(root, commit(tree, "src/a.py", text.replace("l0\n", "top\n", 1)), name=NEW_JOB)
+    commit(rc, "src/a.py", text.replace("l3\n", "moved\n", 1))  # inside the tree hunk's context
+    assert run(root, "sync", TREE).returncode == 0
+    head = git(tree, "rev-parse", "HEAD").strip()  # read before the merge removes the tree
+    _refusal(root, run(root, "merge", TREE), head)
+    approve(root, head, name=NEW_JOB, at="T11:00:00Z")
+    landed = run(root, "merge", TREE)
+    assert landed.returncode == 0, landed.stderr
+    assert git(root / "repos/r", "rev-parse", f"wt/{RC}").strip() == head
+
+
+def test_a_head_that_holds_a_merge_commit_lands_on_its_own_verdict(root: Path) -> None:
+    land(root, "src/a.py")
+    commit(root / RC_TREE, "src/z.py")
+    git(root / TREE, "merge", "-q", "--no-edit", f"wt/{RC}")
+    head = git(root / TREE, "rev-parse", "HEAD").strip()
+    bound = json.loads(run(root, "hash", TREE, "--sha", head).stdout)["diff_sha256"]
+    _hand(root, head, reviewed_sha=head, diff_sha256=bound)
+    landed = run(root, "merge", TREE)
+    assert landed.returncode == 0, landed.stderr
+    assert git(root / "repos/r", "rev-parse", f"wt/{RC}").strip() == head
 
 
 def test_a_commit_that_changes_the_diff_after_the_review_refuses(root: Path) -> None:
     approve(root, land(root, "src/a.py"), name=NEW_JOB)
     head = commit(root / TREE, "src/b.py")
-    _refusal(root, run(root, "merge", TREE), VALIDATE_ALL, head)
+    _refusal(root, run(root, "merge", TREE), head)
 
 
 def test_a_matching_verdict_tied_with_a_forged_one_refuses(root: Path) -> None:
@@ -154,15 +179,39 @@ def test_a_matching_verdict_tied_with_a_forged_one_refuses(root: Path) -> None:
     head = land(root, "src/b.py")
     approve(root, head, name=NEW_JOB)
     _hand(root, head, reviewed_sha=head, diff_sha256=diff_hash(root, first, NEW_JOB))  # same moment
-    _refusal(root, run(root, "merge", TREE), DISPATCH, head)
+    _refusal(root, run(root, "merge", TREE), head)
 
 
-def test_a_bound_approval_of_head_lands(root: Path) -> None:
+@pytest.mark.parametrize("session", [None, "recorded-sess"], ids=["no-session", "recorded-session"])
+def test_a_bound_approval_of_head_lands(root: Path, session: str | None) -> None:
     head = land(root, "src/a.py")
     approve(root, head, name=NEW_JOB)
-    landed = run(root, "merge", TREE)
+    if session:
+        record_session(root, session)
+    landed = run(root, "merge", TREE, session=session)
     assert landed.returncode == 0, landed.stderr
     assert git(root / "repos/r", "rev-parse", f"wt/{RC}").strip() == head
+
+
+def test_a_session_no_workspace_hook_governs_cannot_merge_on_a_valid_verdict(root: Path) -> None:
+    head = land(root, "src/a.py")
+    approve(root, head, name=NEW_JOB)
+
+    refused = run(root, "merge", TREE, session="unrecorded-sess")
+
+    assert refused.returncode == 1 and fixes(refused) == [RELAUNCH], refused.stderr
+    assert git(root / "repos/r", "rev-parse", f"wt/{RC}").strip() != head
+
+
+def test_a_session_no_workspace_hook_governs_is_refused_before_the_verdict_check(
+    root: Path,
+) -> None:
+    head = land(root, "src/a.py")  # no verdict exists: the dispatch line must not be the answer
+
+    refused = run(root, "merge", TREE, session="unrecorded-sess")
+
+    assert refused.returncode == 1 and fixes(refused) == [RELAUNCH], refused.stderr
+    assert git(root / "repos/r", "rev-parse", f"wt/{RC}").strip() != head
 
 
 def test_a_bound_approval_does_not_land_a_tree_with_uncommitted_changes(root: Path) -> None:
@@ -186,6 +235,48 @@ def test_a_plain_name_is_refused_as_not_a_worktree_name(root: Path) -> None:
 
     assert refused.returncode == 1
     assert "[error] not a worktree name" in refused.stderr
-    assert fixes(refused) == [f"fix: {shell_line(sys.executable, str(SCRIPT))} list"]
     assert not (root / "worktrees/r/maintenance").exists()
     assert git(repo, "rev-parse", "feature/0.5.0").strip() == base
+
+
+def _printed(root: Path, head: str) -> str:
+    printed = run(root, "hash", TREE, "--sha", head)
+    assert printed.returncode == 0, printed.stderr
+    return json.loads(printed.stdout)["diff_sha256"]
+
+
+def test_a_rename_commit_binds_as_the_oracle_binds_it(root: Path) -> None:
+    tree = root / TREE
+    commit(tree, "src/a.py", "".join(f"l{i}\n" for i in range(30)))
+    git(tree, "mv", "src/a.py", "src/b.py")
+    git(tree, "commit", "-q", "-m", "rename")
+    head = git(tree, "rev-parse", "HEAD").strip()
+
+    assert _printed(root, head) == diff_hash(root, head, NEW_JOB)
+
+
+@pytest.mark.parametrize(
+    "key, value",
+    [
+        ("diff.noprefix", "true"),
+        ("diff.renames", "false"),
+        ("diff.context", "1"),
+        ("core.quotePath", "false"),
+        ("i18n.logOutputEncoding", "ISO-8859-1"),
+    ],
+)
+def test_the_binding_does_not_read_the_diff_config(root: Path, key: str, value: str) -> None:
+    tree = root / TREE
+    commit(tree, "src/a.py", "".join(f"l{i}\n" for i in range(30)))
+    git(tree, "mv", "src/a.py", "src/b.py")
+    write_text(tree / "src/b.py", "".join(f"l{i}\n" for i in range(30)).replace("l15", "m15"))
+    git(tree, "commit", "-qam", "rename and edit")
+    write_text(tree / "src/é.py", "x = 1\n")
+    git(tree, "add", "src/é.py")
+    git(tree, "commit", "-qm", "é: non-ASCII path and message")
+    head = git(tree, "rev-parse", "HEAD").strip()
+    before = _printed(root, head)
+
+    git(tree, "config", key, value)
+
+    assert _printed(root, head) == before == diff_hash(root, head, NEW_JOB)

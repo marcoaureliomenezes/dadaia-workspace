@@ -12,33 +12,17 @@ import json
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
 import _commit
-import _git
-from _grammar import SHA_RE, STATE
-from _jsonl import parse_object
-from _ledger import records, replace
-from _platform import act, read_text
+from _grammar import STATE
+from _ledger import replace
+from _memory_drift import by_subject
 from _refusal import Refusal
 from _release_check import state_findings
-from _release_schema import UnreadableRelease, current_candidate, live_id
-from _specs import script
+from _release_schema import SCRIPT, State, UnreadableRelease, current_candidate, live_id, read_state
 
-State = dict[str, Any]
-SCRIPT = script(Path(__file__).parent / "release.py")
-
-
-def at_head(specs: Path, *words: str) -> str:
-    """The fix line of SCRIPT *words* at the short sha of the repo's HEAD; the act that supplies
-    the sha when git cannot answer."""
-    try:
-        sha = _git.git(specs.parent, "rev-parse", "--short", "HEAD", check=False).strip()
-    except OSError:
-        sha = ""
-    if SHA_RE.match(sha):
-        return SCRIPT(*words, "--sha", sha)
-    return act("agent", f"run `{SCRIPT.inline(*words)}` with --sha set to the short sha of HEAD")
+PASS = "memory pass recorded"
+IMPLEMENTATION = "(?:phase|enters) IMPLEMENTATION"
 
 
 @dataclass(frozen=True)
@@ -49,16 +33,6 @@ class Live:
     release_dir: Path
     state: State
     candidate: Path | None
-
-
-def read_state(path: Path) -> State:
-    """One state document, refusing anything this script cannot read in full."""
-    fix = act("agent", f"repair {path} until `{SCRIPT.inline('check')}` passes")
-    try:
-        text = read_text(path)
-    except OSError as exc:
-        raise Refusal(f"{path.name} cannot be read ({exc})", fix) from exc
-    return parse_object(text, fix)
 
 
 def live_release(specs: Path) -> Live:
@@ -75,21 +49,16 @@ def live_release(specs: Path) -> Live:
     return Live(live, release_dir, state, current_candidate(release_dir, state))
 
 
-def window_start(state: State) -> list[str]:
-    """The memory window's start candidates, newest first: each memory entry's `until`,
-    newest entry first, then `defined.sha`."""
-    bounds = [str(e["until"]) for e in reversed(state.get("log") or [])
-              if e.get("kind") == "memory" and e.get("until")]  # fmt: skip
-    return bounds + [str(d) for d in [(state.get("defined") or {}).get("sha")] if d]
-
-
-def open_bug_ids(specs: Path) -> list[str]:
-    """Every persisted open bug id, sorted for deterministic refusals."""
-    return sorted(
-        str(record["id"])
-        for record in records(specs / "bugs" / "BUGS.jsonl")
-        if record.get("status") == "open" and record.get("id")
-    )
+def window_start(repo: Path, live: Live) -> list[str]:
+    """The memory window's start candidates, newest first: the newest memory pass of any
+    candidate in any release except the live candidate's own passes in the live release
+    (product memory is one per repo; sync rebases what landed after an own pass under it),
+    then the live candidate's IMPLEMENTATION commit."""
+    if not live.candidate:
+        return []
+    name, own = live.candidate.name, by_subject(repo, live.release_id, live.candidate.name, PASS)
+    other = [sha for sha in by_subject(repo, "", r"rc-\d+", PASS) if sha not in own]
+    return [*other[:1], *by_subject(repo, live.release_id, name, IMPLEMENTATION)[:1]]
 
 
 def validated(state: State, rel: str) -> str:

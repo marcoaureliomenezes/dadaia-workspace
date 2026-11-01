@@ -275,6 +275,41 @@ def test_every_publish_passes_the_shipped_pre_push_gate(env, tmp_path: Path, see
     assert {"main", "develop", "feature/0.1.0"} <= set(_heads(bare))
 
 
+@pytest.mark.parametrize("seeded", [(), ("main",)], ids=["empty", "principal-only"])
+def test_baseline_leaves_the_role_heads_local_at_their_origin_tips(
+    env, tmp_path: Path, seeded
+) -> None:
+    """After baseline the integration and principal exist as local heads, each at
+    the tip origin holds."""
+    svc, repo, bare = env
+    if seeded:
+        _seed(bare, tmp_path / "seed", *seeded)
+    _clone_onboarded(bare, repo)
+    svc.baseline("proj")
+    for role in ("main", "develop"):
+        assert _git(repo, "rev-parse", f"refs/heads/{role}") == _heads(bare)[role]
+
+
+def test_a_single_branch_clone_keeps_the_unpushed_commits_of_a_role_head_origin_holds(
+    env, tmp_path: Path
+) -> None:
+    """A local integration branch origin holds is never moved, though the clone tracks
+    only the principal."""
+    svc, repo, bare = env
+    _seed(bare, tmp_path / "seed", "main", "develop")
+    _git(repo.parent, "clone", "-q", "--single-branch", "-b", "main", bare.as_uri(), str(repo))
+    _identity(repo)
+    _git(repo, "switch", "-q", "-c", "develop", "origin/main")
+    _commit_file(repo, "mine.py")
+    mine = _git(repo, "rev-parse", "develop")
+    _git(repo, "switch", "-q", "main")
+    (repo / "specs").mkdir()
+    write_text(repo / "specs" / "constitution.md", _CONSTITUTION)
+    write_text(repo / "AGENTS.md", "# law\n")
+    svc.baseline("proj")
+    assert _git(repo, "rev-parse", "refs/heads/develop") == mine
+
+
 @pytest.mark.parametrize("seeded", [(), ("main", "develop")], ids=["empty", "adopted"])
 def test_second_run_is_a_no_op(env, tmp_path: Path, seeded) -> None:
     svc, repo, bare = env
@@ -542,7 +577,8 @@ def test_a_second_foreign_backup_is_published_inside_specs_bkp(env, tmp_path: Pa
 
 def test_the_publish_code_never_rewrites_forces_or_deletes() -> None:
     """No forced checkout, reset, rebase, force-push, remote delete or squash
-    in the publish, the gate or the sync-failure fixes."""
+    in the publish, the gate or the sync-failure fixes; the one forced act is
+    pointing a role branch origin lacks at its tip."""
     pkg = Path(__file__).resolve().parents[3] / "dadaia_workspace"
     for rel in (
         "features/spec_context/service.py",
@@ -551,3 +587,8 @@ def test_the_publish_code_never_rewrites_forces_or_deletes() -> None:
         text = read_text(pkg / rel)
         for verb in ('"-f"', '"reset"', '"rebase"', '"--force"', '"--delete"', "--republish"):
             assert verb not in text, f"{rel} carries {verb}"
+    service = read_text(pkg / "features/spec_context/service.py")
+    pin = 'git("update-ref", f"refs/heads/{b}", at)'
+    assert service.count('"update-ref"') == 1
+    assert service.count(pin) == 1
+    assert '"update-ref"' not in read_text(pkg / "features/chokepoints/branch_policy.py")

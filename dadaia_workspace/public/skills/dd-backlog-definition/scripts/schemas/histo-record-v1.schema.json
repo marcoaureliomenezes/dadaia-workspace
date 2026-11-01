@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "histo-record-v1",
   "title": "History Record v1",
-  "description": "One terminal record of one exit, in ANY of the three append-only history ledgers (specs/backlog/_archive/backlog_histo.jsonl, specs/audits/_archive/audits_histo.jsonl, specs/releases/_archive/releases_histo.jsonl) — release 0.4.7 FR7. Before this schema the three files had three hand-written shapes, no schema and no reader: two were event streams wrapping a free-form 'data' object, so a history record could not be validated at all. ONE shape for all three: 'id'/'ts'/'disposition' are the immutable core (identity and terminal verdict), 'release'/'reason'/'summary' are nullable free text, 'entry' is the removed object itself (the backlog entry, the audit's per-pillar counts) or null when the exit had nothing to snapshot. The per-ledger terminal vocabulary is a PARAMETER of the validator (which of the enum's words this ledger may use — backlog: delivered/superseded/rejected/to-bug; audits: resolved/superseded/deferred/rejected; releases: delivered), never a second or third schema file.",
+  "description": "One terminal record of one exit, in any of the three append-only history ledgers: 'id'/'ts'/'disposition' are the immutable core, 'release'/'reason'/'summary' nullable free text, 'entry' the removed object or null. Each ledger's validator (_backlog_schema.py, _audit_check.py, _release_check.py) holds its own subset of the disposition enum.",
   "type": "object",
   "additionalProperties": false,
   "required": ["id", "ts", "disposition", "release", "reason", "summary", "entry"],
@@ -15,12 +15,12 @@
     "ts": {
       "type": "string",
       "minLength": 1,
-      "description": "When the exit happened: an ISO-8601 date or UTC timestamp. Date-only values are accepted because migrated pre-0.4.7 records carry them."
+      "description": "When the exit happened: an ISO-8601 date or UTC timestamp. Date-only values are accepted."
     },
     "disposition": {
       "type": "string",
-      "enum": ["delivered", "resolved", "superseded", "deferred", "rejected", "to-bug"],
-      "description": "The terminal verdict; this enum is the one lowercase vocabulary, and each ledger script validates its own subset."
+      "enum": ["delivered", "resolved", "superseded", "rejected", "to-bug"],
+      "description": "The terminal verdict; each ledger's validator holds its subset."
     },
     "release": {
       "type": ["string", "null"],
@@ -32,7 +32,7 @@
     },
     "summary": {
       "type": ["string", "null"],
-      "description": "One-paragraph narrative of the exit: what shipped, what the audit measured, what a note said before the event wrapper was removed."
+      "description": "One-paragraph narrative of the exit."
     },
     "entry": {
       "type": ["object", "null"],

@@ -6,9 +6,9 @@ one — v3 only adds ``associated_repos``, which ``_from_dict`` defaults to empt
 
 import json
 from pathlib import Path
-from typing import Any, cast
+from typing import cast
 
-from dadaia_workspace.core import context_registry, platform
+from dadaia_workspace.core import context_registry
 from dadaia_workspace.core.atomic_write import atomic_write
 from dadaia_workspace.core.cli_line import fix_line
 from dadaia_workspace.core.exceptions import SchemaVersionError
@@ -79,7 +79,7 @@ def _to_dict(ctx: SpecContextProject) -> dict:  # type: ignore[type-arg]
 def _from_dict(d: dict) -> SpecContextProject:  # type: ignore[type-arg]
     return SpecContextProject(
         name=d["name"],
-        state=ContextState(d["state"]),
+        state=ContextState(context_registry.state(d)),
         repo_slug=d["repo_slug"],
         repo_url=d["repo_url"],
         created_at=d["created_at"],
@@ -98,9 +98,6 @@ class JsonContextStore:
 
     def exists(self) -> bool:
         return self._path.exists()
-
-    def read_raw(self) -> dict[str, Any]:
-        return cast("dict[str, Any]", json.loads(platform.read_text(self._path)))
 
     def replace_raw(self, data: dict) -> None:  # type: ignore[type-arg]
         body = {"schema_version": str(SCHEMA_VERSION)} | {

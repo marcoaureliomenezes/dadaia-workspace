@@ -87,6 +87,7 @@ def test_the_readers_agree_on_the_bind(
     if sid_var:
         monkeypatch.setenv(sid_var, sid)
     if record:
+        session_store.touch_last_seen_at(ws, sid, now=_NOW)  # the hook heartbeat
         assert CliRunner().invoke(app, ["context", "bind", record]).exit_code == 0
         assert (ws / ".dadaia" / "sessions" / f"{sid}.json").is_file()
     monkeypatch.setenv("DADAIA_CONTEXT", env_ctx)
@@ -102,6 +103,11 @@ def test_the_readers_agree_on_the_bind(
     assert (f"[{expected}]" if expected else "[no bound context]") in out
 
     bound = None if not sid else inv.bind.context_name is not None
+    monkeypatch.setattr(  # the walk of a bound session reaches the first pass: git is the boundary
+        "dadaia_workspace.infrastructure.git_subprocess.GitSubprocessClient.work_version",
+        lambda _self, _repo: "0.1.0",
+    )
+    write_text(ws / "repos/alpha/specs/constitution.md", "---\nspecs_pattern_version: 99\n---\n")
     step = next_step(ws, {"alpha": ws / "repos/alpha/specs"}, "alpha", bound)
     assert (step is not None and step.id == "bind") == (sid is not None and expected is None)
 
@@ -114,6 +120,17 @@ def test_the_readers_agree_on_the_bind(
         assert shown["name"] == expected
         assert (shown["session"] or {}).get("context") == record
         assert resolve_specs_dir_for_cli(None) == (ws / "repos" / expected / "specs").resolve()
+
+
+def test_a_record_that_binds_nothing_reads_as_an_empty_bind(tmp_path: Path) -> None:
+    """The heartbeat's minimal record carries no context: the session stays unbound and a
+    registered DADAIA_CONTEXT never fills in for it."""
+    ws = _workspace(tmp_path, "alpha")
+    session_store.write_session(ws, "s1", {"session_id": "s1", "last_seen_at": _NOW})
+
+    inv = resolve(env={_CLAUDE: "s1", "DADAIA_CONTEXT": "alpha"}, cwd=ws)
+
+    assert inv.bind.context_name is None and not inv.bind.repos
 
 
 def test_a_ghost_env_never_denies_and_is_surfaced(tmp_path: Path) -> None:

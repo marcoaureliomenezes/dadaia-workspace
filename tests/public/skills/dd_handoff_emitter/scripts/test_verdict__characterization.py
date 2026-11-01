@@ -77,10 +77,10 @@ def test_verdict_writes_the_exact_bound_handoff(tmp_path: Path) -> None:
     assert (result.returncode, result.stderr) == (0, "")
     target = (
         root
-        / ".dadaia/handoff/catalog/2026-10-09T123456Z-dd-code-reviewer-characterization.handoff.json"
+        / ".dadaia/states/verdicts/catalog/2026-10-09T123456Z-dd-code-reviewer-characterization.handoff.json"
     )
     assert result.stdout == f"{target}\n"
-    assert target.parent == root / ".dadaia/handoff/catalog"
+    assert target.parent == root / ".dadaia/states/verdicts/catalog"
     assert target.name == "2026-10-09T123456Z-dd-code-reviewer-characterization.handoff.json"
     document = json.loads(read_text(target))
     assert document == {
@@ -95,4 +95,4 @@ def test_verdict_writes_the_exact_bound_handoff(tmp_path: Path) -> None:
         "diff_sha256": diff_hash(root, head),
         **_BODY,
     }
-    assert sorted((root / ".dadaia/handoff").glob("**/*.handoff.json")) == [target]
+    assert sorted((root / ".dadaia/states/verdicts").glob("**/*.handoff.json")) == [target]
