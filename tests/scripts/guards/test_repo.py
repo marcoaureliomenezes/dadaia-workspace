@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import importlib
+import re
+import subprocess
+from collections.abc import Callable
 from pathlib import Path
 from types import ModuleType
 
@@ -272,3 +275,58 @@ def test_each_mutation_of_the_multi_job_eval_workflow_trips_its_own_rule(
 ) -> None:
     assert old in _EVAL_YML
     assert _eval_rules(monkeypatch, _EVAL_YML.replace(old, new, 1)) == {rule}
+
+
+def _release_pr_control(repo: ModuleType, mp: pytest.MonkeyPatch) -> Callable[[Path], None]:
+    """CONTROL as release-please's PR leaves it: manifest, pyproject and CHANGELOG top at the
+    live id, the last tag the newest published one below it (the merge mints the new tag)."""
+    control, root = repo.CONTROL, Path(__file__).resolve().parents[3]
+    live = repo.live_release_id(root / "specs")
+    below = subprocess.run(
+        ["git", "tag", "-l", "v*", "--sort=version:refname"], cwd=root, capture_output=True,
+        text=True, check=True,
+    ).stdout.split()  # fmt: skip
+    below = [
+        t
+        for t in below
+        if tuple(map(int, re.findall(r"\d+", t))) < tuple(map(int, live.split(".")))
+    ]
+
+    def pr_control(tree: Path) -> None:
+        with mp.context() as m:
+            m.setattr(repo, "CONTROL", control)
+            repo._versions("{live}", "{live}")(tree)
+        changelog = tree / "CHANGELOG.md"
+        changelog.write_text(
+            re.sub(r"## \[\d+\.\d+\.\d+\]", f"## [{live}]", changelog.read_text("utf-8"), count=1),
+            encoding="utf-8",
+        )
+        git = ["git", "-c", "user.name=g", "-c", "user.email=g@example.invalid"]
+        subprocess.run([*git, "commit", "-q", "--allow-empty", "-m", "g"], cwd=tree, check=True)
+        for tag in below[-1:]:
+            subprocess.run(["git", "tag", tag], cwd=tree, check=True)
+
+    return pr_control
+
+
+@pytest.mark.medium
+def test_the_release_pr_tree_passes_the_release_workflow_canon(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    run, repo = _guards(monkeypatch)
+    fn = repo.CHECKS["release-workflow-canon"][0]
+    assert run._judge([], fn, _release_pr_control(repo, monkeypatch)) == []
+
+
+@pytest.mark.medium
+@pytest.mark.parametrize("on_release_pr", [False, True], ids=["work-branch", "release-pr"])
+@pytest.mark.parametrize("clause", ["version-label", "version-shipped", "published-floor"])
+def test_each_version_plant_trips_its_own_clause_on_either_tree(
+    monkeypatch: pytest.MonkeyPatch, clause: str, on_release_pr: bool
+) -> None:
+    run, repo = _guards(monkeypatch)
+    fn, plants = repo.CHECKS["release-workflow-canon"]
+    if on_release_pr:
+        monkeypatch.setattr(repo, "CONTROL", _release_pr_control(repo, monkeypatch))
+    found = run._judge([], fn, plants[clause])
+    assert [v for v in found if v.startswith(f"{clause}:")]
