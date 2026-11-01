@@ -3,6 +3,11 @@
 from __future__ import annotations
 
 import importlib
+import json
+import re
+import shutil
+import subprocess
+from collections.abc import Callable
 from pathlib import Path
 from types import ModuleType
 
@@ -272,3 +277,65 @@ def test_each_mutation_of_the_multi_job_eval_workflow_trips_its_own_rule(
 ) -> None:
     assert old in _EVAL_YML
     assert _eval_rules(monkeypatch, _EVAL_YML.replace(old, new, 1)) == {rule}
+
+
+def _lifecycle_control(repo: ModuleType, post_ship: bool) -> Callable[[Path], None]:
+    """CONTROL as release-please's PR leaves it (manifest, pyproject and CHANGELOG top at the
+    release id, the last tag the newest published one below it), or, *post_ship*, as the ship
+    leaves it (the live release archived, the release id itself the last tag)."""
+    control, root = repo.CONTROL, Path(__file__).resolve().parents[3]
+    manifest = json.loads((root / ".release-please-manifest.json").read_text("utf-8"))["."]
+    live = repo.live_release_id(root / "specs") or manifest
+    below = subprocess.run(
+        ["git", "tag", "-l", "v*", "--sort=version:refname"], cwd=root, capture_output=True,
+        text=True, check=True,
+    ).stdout.split()  # fmt: skip
+    below = [
+        t
+        for t in below
+        if tuple(map(int, re.findall(r"\d+", t))) < tuple(map(int, live.split(".")))
+    ]
+
+    def lifecycle_control(tree: Path) -> None:
+        control(tree)
+        for rel, pattern, value in (
+            (".release-please-manifest.json", r'"\.": ".*"', f'".": "{live}"'),
+            ("pyproject.toml", r'(?m)^version = ".*"', f'version = "{live}"'),
+            ("CHANGELOG.md", r"## \[\d+\.\d+\.\d+\]", f"## [{live}]"),
+        ):
+            text = (tree / rel).read_text("utf-8")
+            (tree / rel).write_text(re.sub(pattern, value, text, count=1), encoding="utf-8")
+        if post_ship:
+            for release in (tree / "specs/releases").glob(live):
+                shutil.rmtree(release)
+        git = ["git", "-c", "user.name=g", "-c", "user.email=g@example.invalid"]
+        subprocess.run([*git, "commit", "-q", "--allow-empty", "-m", "g"], cwd=tree, check=True)
+        for tag in [f"v{live}"] if post_ship else below[-1:]:
+            subprocess.run(["git", "tag", tag], cwd=tree, check=True)
+
+    return lifecycle_control
+
+
+@pytest.mark.medium
+@pytest.mark.parametrize("post_ship", [False, True], ids=["release-pr", "post-ship"])
+def test_the_lifecycle_trees_pass_the_release_workflow_canon(
+    monkeypatch: pytest.MonkeyPatch, post_ship: bool
+) -> None:
+    run, repo = _guards(monkeypatch)
+    fn = repo.CHECKS["release-workflow-canon"][0]
+    assert run._judge([], fn, _lifecycle_control(repo, post_ship)) == []
+
+
+@pytest.mark.medium
+@pytest.mark.parametrize("tree", ["work-branch", "release-pr", "post-ship"])
+@pytest.mark.parametrize("clause", ["version-label", "version-shipped", "published-floor"])
+def test_each_version_plant_trips_its_own_clause_on_every_tree(
+    monkeypatch: pytest.MonkeyPatch, clause: str, tree: str
+) -> None:
+    run, repo = _guards(monkeypatch)
+    fn, plants = repo.CHECKS["release-workflow-canon"]
+    if tree != "work-branch":
+        control = _lifecycle_control(repo, tree == "post-ship")
+        monkeypatch.setattr(repo, "CONTROL", control)
+    found = run._judge([], fn, plants[clause])
+    assert [v for v in found if v.startswith(f"{clause}:")]
