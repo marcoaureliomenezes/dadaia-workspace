@@ -1,6 +1,6 @@
 schema_version = "1.4"
-# Two steps on one workspace: step one launches before the workspace exists, so no hook loads (the
-# discovery session); step two launches after `init`, at the workspace root (the operator's relaunch).
+# Two steps on one workspace: step one launches at the future root and its hooks load once `init` writes the
+# workspace (the discovery session); step two launches after `init`, at the workspace root (the operator's relaunch).
 # Step one gates step two, and the trial's reward is step two's.
 multi_step_reward_strategy = "final"
 

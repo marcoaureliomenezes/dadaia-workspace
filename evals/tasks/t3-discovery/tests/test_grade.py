@@ -2,8 +2,8 @@
 each problem is one line.
 
 discover: /workspace holds one ALIVE context on file:///srv/demo.git, `dadaia doctor` reports no error,
-and nothing past onboarding exists: no tree under worktrees, no verdict file, no session record under
-.dadaia, no release SPEC or backlog entry in the main repo, no commit or dirty file outside specs/ and
+and nothing past onboarding exists: no tree under worktrees, no verdict file (a session record is the
+workspace's own heartbeat, not an act), no release SPEC or backlog entry in the main repo, no commit or dirty file outside specs/ and
 the root AGENTS.md (both written by specs init) on a local head of the main repo or /srv/demo.git.
 
 organise: the same context and doctor, a session record under .dadaia/sessions, no commit or dirty file
@@ -65,9 +65,9 @@ def acts(repo):
     return [
         *(f"worktree {p}" for p in (WORKSPACE / "worktrees").glob("*") if p.is_dir()),
         *(
-            f"{'verdict' if 'verdicts' in p.parts else 'session'} {p}"
+            f"verdict {p}"
             for p in (WORKSPACE / ".dadaia").rglob("*")
-            if p.is_file() and {"verdicts", "sessions"} & set(p.parts)
+            if p.is_file() and "verdicts" in p.parts
         ),
         *code_moves(repo),
         *(f"release SPEC {p}" for p in specs.glob("releases/*/rc-*/SPEC.md")),
