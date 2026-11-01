@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pytest
 
+from dadaia_workspace.core import platform
 from dadaia_workspace.core.exceptions import DadaiaError
 from dadaia_workspace.core.gitflow import (
     DEFAULT,
@@ -19,7 +20,13 @@ from dadaia_workspace.core.gitflow import (
     work_branch,
 )
 from dadaia_workspace.core.skill_owner import load_owner
-from tests.helpers.oslib import read_text, write_text
+from tests.helpers.oslib import (
+    PERMISSIONS_ENFORCED,
+    make_readonly,
+    make_writable,
+    read_text,
+    write_text,
+)
 
 
 def test_the_default_names_live_only_in_default_and_work_is_cut_from_integration() -> None:
@@ -250,6 +257,72 @@ def test_work_branch_with_several_raises_the_one_class_and_never_the_skills(
     assert type(refused.value) is SeveralWorkBranches
     assert not isinstance(refused.value, skill_class)
     assert refused.value.keep == "0.6.0"
+
+
+def _unreadable_fix(repo: Path) -> str:
+    return f"Agent action: run {platform.git_inline(repo, 'status')} and repair what it reports until it exits 0"
+
+
+@pytest.mark.medium
+def test_work_branch_on_a_dir_with_no_dot_git_raises_the_one_error_with_the_status_act(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "r"
+    repo.mkdir()
+    with pytest.raises(DadaiaError) as refused:
+        work_branch(repo, Gitflow("main", "dev", "feature/"), "r")
+    assert refused.value.message.startswith(f"git cannot read {repo}: ")
+    assert "\n" not in refused.value.message
+    assert refused.value.fix == _unreadable_fix(repo)
+
+
+@pytest.mark.medium
+def test_work_branch_with_several_live_releases_raises_the_skills_refusal_as_a_dadaia_error(
+    tmp_path: Path,
+) -> None:
+    repo = _repo(tmp_path, [], None)
+    for release in ("0.1.0", "0.2.0"):
+        (repo / "specs/releases" / release).mkdir(parents=True)
+        write_text(repo / "specs/releases" / release / "_RELEASE.json", "{}")
+    with pytest.raises(DadaiaError) as refused:
+        work_branch(repo, Gitflow("main", "dev", "feature/"), "r")
+    assert type(refused.value) is DadaiaError
+    assert refused.value.fix == (
+        f"Agent action: keep one of 0.1.0, 0.2.0 live under {repo / 'specs/releases'};"
+        " ship or move out the others"
+    )
+
+
+@pytest.mark.medium
+def test_work_branch_on_an_intact_repo_git_refuses_raises_the_same_error_and_act(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo = _repo(tmp_path, [], None)
+    monkeypatch.setenv("GIT_TEST_ASSUME_DIFFERENT_OWNER", "1")
+    with pytest.raises(DadaiaError) as refused:
+        work_branch(repo, Gitflow("main", "dev", "feature/"), "r")
+    assert refused.value.message.startswith(f"git cannot read {repo}: ")
+    assert refused.value.fix == _unreadable_fix(repo)
+
+
+@pytest.mark.medium
+@pytest.mark.skipif(not PERMISSIONS_ENFORCED, reason="needs a folder this process cannot read")
+def test_work_branch_with_an_unreadable_releases_dir_raises_a_dadaia_error_with_a_repair_act(
+    tmp_path: Path,
+) -> None:
+    repo = _repo(tmp_path, [], None)
+    releases = repo / "specs" / "releases"
+    releases.mkdir(parents=True)
+    make_readonly(releases, locked=True)
+    try:
+        with pytest.raises(DadaiaError) as refused:
+            work_branch(repo, Gitflow("main", "dev", "feature/"), "r")
+    finally:
+        make_writable(releases)
+    assert refused.value.message == f"Permission denied: {releases}"
+    assert refused.value.fix == (
+        f"Agent action: repair {releases} so that this user can use it (Permission denied)"
+    )
 
 
 def _constitution(tmp_path: Path, text: str) -> Path:

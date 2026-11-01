@@ -12,6 +12,7 @@ import pytest
 import typer
 
 from dadaia_workspace.cli.commands import ci
+from dadaia_workspace.core import platform
 from dadaia_workspace.core.gitflow import Gitflow
 from tests.helpers.oslib import run, spell, write_text
 
@@ -82,6 +83,24 @@ def test_several_live_releases_block_the_gate_with_the_refusals_own_fix(
     assert capsys.readouterr().err.splitlines()[-1] == (
         f"fix: Agent action: keep one of 0.5.0, 0.6.0 live under {repo / 'specs/releases'};"
         " ship or move out the others"
+    )
+
+
+def test_a_repo_git_refuses_blocks_the_gate_with_the_status_act(
+    repo: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("GIT_TEST_ASSUME_DIFFERENT_OWNER", "1")
+
+    with pytest.raises(typer.Exit):
+        ci._gate_inputs(repo, "")
+
+    err = capsys.readouterr().err.splitlines()
+    assert any(
+        line.startswith(f"Error: [pre-push] BLOCKED: git cannot read {repo}: ") for line in err
+    )
+    assert err[-1] == (
+        f"fix: Agent action: run {platform.git_inline(repo, 'status')}"
+        " and repair what it reports until it exits 0"
     )
 
 
