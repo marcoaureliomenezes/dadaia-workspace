@@ -5,7 +5,6 @@ it: ``monkeypatch.setattr("dadaia_workspace.core.platform.PLATFORM", Capabilitie
 
 from __future__ import annotations
 
-import shutil
 from pathlib import Path, PurePath
 from typing import TYPE_CHECKING, NamedTuple
 
@@ -127,11 +126,6 @@ def is_executable(path: Path) -> bool:
     return _owner.is_executable(path, _caps())
 
 
-def git_missing() -> bool:
-    """Whether no ``git`` program is found on this process's ``PATH``."""
-    return shutil.which("git") is None
-
-
 def make_executable(path: Path) -> None:
     """Add the exec bits to *path* on the current ``PLATFORM``."""
     _owner.make_executable(path, _caps())
@@ -145,6 +139,7 @@ can_write = _owner.can_write
 decode = _owner.decode
 effective_uid = _owner.effective_uid
 file_owner = _owner.file_owner
+git_missing = _owner.git_missing
 is_link = _owner.is_link
 link = _owner.link
 make_writable = _owner.make_writable

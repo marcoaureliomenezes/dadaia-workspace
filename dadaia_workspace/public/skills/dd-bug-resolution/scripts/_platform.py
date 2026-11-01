@@ -11,6 +11,7 @@ import os
 import posixpath
 import re
 import shlex
+import shutil
 import stat
 import subprocess
 import sys
@@ -231,6 +232,11 @@ def is_executable(path: Path, caps: Caps | None = None) -> bool:
     """Whether *path* is a file the host can run: the exec bit on POSIX, existence on Windows
     (the extension decides there)."""
     return path.is_file() and ((caps or detect()).windows or os.access(path, os.X_OK))
+
+
+def git_missing() -> bool:
+    """Whether no ``git`` program is found on this process's ``PATH``."""
+    return shutil.which("git") is None
 
 
 def make_executable(path: Path, caps: Caps | None = None) -> None:
