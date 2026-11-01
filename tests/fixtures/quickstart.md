@@ -48,12 +48,12 @@ python3 .agents/skills/dd-release-implementation/scripts/release.py new "$V" --s
   virtualenv; every later command runs through the workspace's CLI,
   `.dadaia/.venv/bin/dadaia`, which `init` prints by its absolute path.
 - **Level 2 — project.** `--repo` clones the repo into `repos/<slug>/`, installs the
-  pre-push and reference-transaction hooks and makes the context (named after the slug) ALIVE; `context bind`
-  binds a session (*The bind*, below).
+  pre-push and reference-transaction hooks and makes the context (named after the slug) ALIVE.
 - **Level 3 — specs.** 3a `specs init` brings the repo's `specs/` to the canon and, on a
   repo with no work branch, cuts the local one and commits only the scaffold on it; a foreign
   `specs/` is refused until `--replace-foreign` moves it to `specs-bkp/` (to
-  `specs-bkp/<UTC>/` when a backup already exists).
+  `specs-bkp/<UTC>/` when a backup already exists); then `context bind` binds a session
+  (*The bind*, below).
   3b the `dd-audit-project` first pass fills memory in the `wt-backlog-first-pass` lane — done when it holds real content,
   never by a stamp. 3c `context baseline <slug>` publishes the specs. `doctor` prints the
   next pending step with its `fix:` line at every point.

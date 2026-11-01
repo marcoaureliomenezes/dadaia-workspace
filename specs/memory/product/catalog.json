@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-01T17:00:37Z",
+  "generated_at": "2026-11-01T17:09:25Z",
   "features": [
     {
       "rank": 1,
@@ -860,7 +860,7 @@
         "privacy",
         "git"
       ],
-      "token_estimate": 1785,
+      "token_estimate": 1821,
       "depends_on": [
         "context-management",
         "cross-platform-portability",
