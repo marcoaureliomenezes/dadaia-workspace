@@ -41,11 +41,6 @@ def _ws(root: Path, *contexts: dict[str, Any]) -> Path:
                  "repo_url": "", "created_at": "2026-09-30T00:00:00+00:00"}  # fmt: skip
         product = root / "repos" / slug / "specs" / "memory" / "product"
         product.mkdir(parents=True)
-        if c.get("canonical"):  # the specs the bind step waits behind, in the git repo they live in
-            run(["git", "init", "-q", str(root / "repos" / slug)], check=True)
-            write_text(
-                product.parents[1] / "constitution.md", "---\nspecs_pattern_version: 99\n---\n"
-            )
         write_text(
             product.parent / "ARCHITECTURE.md",
             f"# Architecture\n\n## Tech Stack\n\n{c.get('stack', 'Python 3.12')}\n",
@@ -213,7 +208,7 @@ def test_injection_sequence(tmp_path: Path, steps: list[tuple[str, str]]) -> Non
     """Each prompt/event emits the header it names, or nothing (``""``): injection fires once
     per bind; PostCompact stamps the marker and leaves the sentinel for the next prompt;
     SessionStart(compact|clear) re-injects and restamps at once."""
-    _ws(tmp_path, {"name": "alpha", "canonical": True}, {"name": "beta", "stack": "Node 20"})
+    _ws(tmp_path, {"name": "alpha"}, {"name": "beta", "stack": "Node 20"})
     marker = tmp_path / ".dadaia" / "tmp" / "hooks" / "ctx-compact-s"
     for kind, want in steps:
         if kind == "bind":
@@ -675,7 +670,7 @@ def test_the_next_step_names_a_fix_the_session_can_run(
 ) -> None:
     """A record that does not read leaves the session ungoverned, so `context bind` is refused:
     SessionStart names the act that clears the record instead."""
-    _ws(tmp_path, {"name": "alpha", "canonical": True})
+    _ws(tmp_path, {"name": "alpha"})
     write_text(session_store.session_record_path(tmp_path, "s", create=True), record)
 
     out = _run(tmp_path, "s", event="SessionStart")
