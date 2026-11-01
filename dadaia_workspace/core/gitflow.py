@@ -13,6 +13,7 @@ from typing import Literal
 from dadaia_workspace.core import platform
 from dadaia_workspace.core.exceptions import DadaiaError
 from dadaia_workspace.core.frontmatter import FrontmatterError, parse, split
+from dadaia_workspace.core.models.git_scan import GitRunError
 from dadaia_workspace.core.platform import act
 from dadaia_workspace.core.skill_owner import load_owner
 
@@ -134,6 +135,8 @@ def work_branch(repo: Path, flow: Gitflow, main: str) -> str:
             ),
         ) from failed
     except OSError as failed:
+        if platform.git_missing():
+            raise GitRunError.missing(repo, failed) from failed
         raise DadaiaError(
             f"{failed.strerror}: {failed.filename}",
             act(

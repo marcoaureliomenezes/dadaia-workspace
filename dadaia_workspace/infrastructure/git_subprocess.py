@@ -9,7 +9,7 @@ from dadaia_workspace.core import platform
 from dadaia_workspace.core.cli_line import cli_words, fix_of, git_line, without_fix
 from dadaia_workspace.core.exceptions import GitCloneError, GitSyncError
 from dadaia_workspace.core.gitflow import DEFAULT, Gitflow, read_gitflow, work_branch
-from dadaia_workspace.core.models.git_scan import GitObjectReadError
+from dadaia_workspace.core.models.git_scan import GitObjectReadError, GitRunError
 from dadaia_workspace.core.platform import act, inline
 from dadaia_workspace.core.skill_owner import load_owner
 from dadaia_workspace.infrastructure.git_objects import unpublished
@@ -34,9 +34,12 @@ def _git(
     timeout: float | None = None,
 ) -> subprocess.CompletedProcess[str]:
     """The kernel's `git_bytes` in *path*, its output decoded as UTF-8 with bad bytes replaced."""
-    done = load_owner("dd-bug-resolution", "_git").git_bytes(
-        path, *args, input=None if stdin is None else stdin.encode(), env=env, timeout=timeout
-    )
+    try:
+        done = load_owner("dd-bug-resolution", "_git").git_bytes(
+            path, *args, input=None if stdin is None else stdin.encode(), env=env, timeout=timeout
+        )
+    except OSError as exc:  # no git on PATH
+        raise GitRunError.missing(path, exc) from exc
     out, err = (b.decode("utf-8", "replace") for b in (done.stdout, done.stderr))
     return subprocess.CompletedProcess(done.args, done.returncode, out, err)
 
@@ -110,7 +113,7 @@ class GitSubprocessClient:
                 timeout=_PROBE_TIMEOUT_S,
                 env={"GIT_TERMINAL_PROMPT": "0", "GIT_SSH_COMMAND": f"{ssh} -o BatchMode=yes"},
             )
-        except (GitCloneError, subprocess.TimeoutExpired, OSError):
+        except (GitCloneError, GitRunError, subprocess.TimeoutExpired):
             return False
         return done.returncode == 0
 

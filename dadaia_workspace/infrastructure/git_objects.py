@@ -62,7 +62,7 @@ def git_run(
         ).git_bytes(repo, *args, input=input, timeout=_TIMEOUT_S)
         return done
     except OSError as exc:  # no git on PATH, or a cwd that is not a directory (WinError 267)
-        raise GitRunError(f"git could not run in {repo}: {exc}") from exc
+        raise GitRunError.missing(repo, exc) from exc
     except subprocess.TimeoutExpired as exc:
         raise GitRunError(f"git command timed out: {' '.join(args)}") from exc
 
@@ -588,8 +588,8 @@ def _read_oversized_blob_prefix(repo: Path, sha: str) -> bytes:
     git (unknown oid, a tree) raises :class:`GitObjectReadError`."""
     try:
         proc = platform.popen_bytes(["git", "cat-file", "blob", sha], cwd=repo)
-    except OSError as exc:  # same conversion as ``_git``
-        raise GitObjectReadError(f"git could not run in {repo}: {exc}") from exc
+    except OSError as exc:
+        raise GitRunError.missing(repo, exc) from exc
     with proc:
         prefix = proc.stdout.read(_MAX_BLOB_BYTES) if proc.stdout else b""
     if len(prefix) < _MAX_BLOB_BYTES and proc.returncode != 0:

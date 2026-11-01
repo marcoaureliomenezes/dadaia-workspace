@@ -20,6 +20,7 @@ from dadaia_workspace.core.redaction import Redactor
 from dadaia_workspace.core.skill_owner import load_owner
 from dadaia_workspace.core.workspace_resolver import fenced_env
 from dadaia_workspace.infrastructure.certification_process import SubprocessCertificationProcess
+from dadaia_workspace.infrastructure.git_subprocess import GitSubprocessClient
 
 
 @dataclass(frozen=True)
@@ -318,7 +319,7 @@ def certify(
     bare = run_root / "certified-consumer.git"  # slug == context name
 
     def empty_remote() -> str:
-        git = load_owner("dd-bug-resolution", "_git").git
+        git = GitSubprocessClient().git
         git(run_root, "init", "--bare", str(bare))
         git(bare, "config", "core.longpaths", "true")
         cli("context", "create", "certified-consumer", "--main-repo", str(bare))

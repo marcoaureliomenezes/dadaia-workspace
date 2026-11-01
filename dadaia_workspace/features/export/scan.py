@@ -57,8 +57,8 @@ def scan_bundle(
     def git(cwd: Path, *args: str, why: str, fix: str) -> str:
         try:
             done = git_run(cwd, *args)
-        except GitRunError:
-            refuse("git could not run", read_fix(GitRunError("git"), repo))
+        except GitRunError as exc:
+            refuse(exc.message, exc.fix)
         if done.returncode:
             reason = (done.stdout + done.stderr).decode("utf-8", "replace").strip()
             if any(marker in reason for marker in _ENVIRONMENT):
@@ -118,4 +118,4 @@ def scan_bundle(
             found = GitSubprocessObjectReader().new_objects(scratch, heads.split()[0], "")
             return match(found)
         except GitObjectReadError as exc:
-            refuse(str(exc), read_fix(exc, repo))
+            refuse(exc.message, read_fix(exc, repo))

@@ -5,6 +5,7 @@ it: ``monkeypatch.setattr("dadaia_workspace.core.platform.PLATFORM", Capabilitie
 
 from __future__ import annotations
 
+import shutil
 from pathlib import Path, PurePath
 from typing import TYPE_CHECKING, NamedTuple
 
@@ -124,6 +125,11 @@ def home_env(home: Path) -> dict[str, str]:
 def is_executable(path: Path) -> bool:
     """Whether *path* is runnable on the current ``PLATFORM``."""
     return _owner.is_executable(path, _caps())
+
+
+def git_missing() -> bool:
+    """Whether no ``git`` program is found on this process's ``PATH``."""
+    return shutil.which("git") is None
 
 
 def make_executable(path: Path) -> None:

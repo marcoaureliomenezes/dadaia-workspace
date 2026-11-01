@@ -16,10 +16,9 @@ from dadaia_workspace.cli._specs_resolution import (
     scope,
 )
 from dadaia_workspace.core.cli_line import fix_line, spell_fix
-from dadaia_workspace.core.exceptions import DadaiaError
+from dadaia_workspace.core.exceptions import DadaiaError, GitSyncError
 from dadaia_workspace.core.gitflow import Gitflow, SeveralWorkBranches, work_branch
 from dadaia_workspace.core.platform import act
-from dadaia_workspace.core.skill_owner import load_owner
 from dadaia_workspace.features.chokepoints.branch_policy import (
     HEADS_PREFIX,
     Decision,
@@ -37,10 +36,11 @@ app = typer.Typer(help="Git-hook chokepoints: the pre-push and ref gates and the
 
 def _repo_root() -> Path:
     """Resolve the enclosing git repo root, or fail with a clear message."""
-    git = load_owner("dd-bug-resolution", "_git")
+    from dadaia_workspace.container import build_git_client
+
     try:
-        return Path(git.git(Path.cwd(), "rev-parse", "--show-toplevel").strip())
-    except (git.GitError, OSError):
+        return Path(build_git_client().git(Path.cwd(), "rev-parse", "--show-toplevel"))
+    except GitSyncError:
         fail("not inside a git repository", act("agent", "run it inside a git repository"))
 
 

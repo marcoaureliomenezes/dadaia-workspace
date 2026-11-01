@@ -12,7 +12,10 @@ importing ``subprocess`` (``infrastructure/git_objects.py`` does).
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 
+from dadaia_workspace.core.exceptions import DadaiaError
+from dadaia_workspace.core.platform import act
 from dadaia_workspace.core.skill_owner import load_owner
 
 #: A zero sha marks a branch deletion — never scanned, always an empty
@@ -72,11 +75,21 @@ class GitObjectReadError(Exception):
 
     def __init__(self, message: str, *, path: str | None = None) -> None:
         super().__init__(message)
-        self.path = path
+        self.message, self.path = message, path
 
 
-class GitRunError(GitObjectReadError):
-    """git itself could not run (missing, timed out): the object store is not at fault."""
+class GitRunError(GitObjectReadError, DadaiaError):
+    """git itself could not run (missing, timed out): the object store is not at fault. The one
+    owner of that state's message and its operator fix, whichever package read met it."""
+
+    def __init__(self, message: str) -> None:
+        DadaiaError.__init__(self, message, act("operator", "make git runnable here"))
+        self.path = None
+
+    @classmethod
+    def missing(cls, repo: Path, exc: OSError) -> GitRunError:
+        """The error for *exc*, the ``OSError`` of spawning git in *repo*."""
+        return cls(f"git could not run in {repo}: {exc}")
 
 
 __all__ = ["ZERO_SHA", "is_zero_sha", "GitObjectReadError", "GitRunError", "ScannedObject"]

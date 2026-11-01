@@ -144,7 +144,7 @@ def read_failure_fix(exc: GitObjectReadError, repo: Path) -> str:
     """The one fix for a git-object read failure: git that could not run is not corruption, so no
     fsck; any other read failure points git's own check at *repo*."""
     if isinstance(exc, GitRunError):
-        return act("operator", "make git runnable here")
+        return exc.fix
     return git_line(repo, "fsck")
 
 
@@ -153,7 +153,9 @@ def _read_failure(exc: GitObjectReadError, masker: PathMasker, repo: Path, tag: 
     masked = f" (path: {masker.mask_path(exc.path)})" if exc.path is not None else ""
     return Decision(
         allowed=False,
-        message=_fail_closed(f"reading the pushed-range git objects failed ({exc}{masked})", tag)
+        message=_fail_closed(
+            f"reading the pushed-range git objects failed ({exc.message}{masked})", tag
+        )
         + "\n"
         + spell_fix(read_failure_fix(exc, repo)),
     )

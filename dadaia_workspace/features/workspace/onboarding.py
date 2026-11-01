@@ -93,12 +93,9 @@ def _first_pass(c: _Ctx) -> list[str]:
 
 
 def _first_pass_fix(c: _Ctx) -> str:
-    """The first-pass act; when the work version cannot be read, that refusal's own fix."""
+    """The first-pass act; raises the refusal when the work version cannot be read."""
     repo = c.specs.parent
-    try:
-        version = GitSubprocessClient().work_version(repo)
-    except DadaiaError as unreadable:
-        return unreadable.fix
+    version = GitSubprocessClient().work_version(repo)
     lane = platform.inline(
         *cli_words(c.root, "worktree", "new", repo.name, f"{version}/wt-backlog-first-pass")
     )
@@ -169,6 +166,9 @@ def next_step(
         return None
     c = _Ctx(root, focus, trees[focus], bound, refusal)
     for step_id, pending, fix in STEPS:
-        if (reason := pending(c)) is not None:
-            return _step(step_id, reason, fix(c))
+        try:
+            if (reason := pending(c)) is not None:
+                return _step(step_id, reason, fix(c))
+        except DadaiaError as refused:  # a step that cannot judge or name its act
+            return _step(step_id, refused.message, refused.fix)
     return None
