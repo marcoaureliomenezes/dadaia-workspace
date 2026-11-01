@@ -1,9 +1,9 @@
 """The onboarding step list — the one next-step derivation.
 
-``STEPS`` is ordered: ``context`` (no ALIVE context), ``constitution`` (frontmatter
-unparseable), ``specs`` (3a), ``bind`` (a resolvable session is unbound; the steps before it
-need no binding), ``first-pass`` (3b), ``publish`` (3c). Every predicate reads real state —
-files, git, the session registry — never a stamp, and no network. One context is judged: the focus,
+``STEPS`` is ordered: ``context`` (no ALIVE context), ``bind`` (a resolvable session is
+unbound), ``constitution`` (frontmatter unparseable), ``specs`` (3a),
+``first-pass`` (3b), ``publish`` (3c). Every predicate reads real state — files, git,
+the session registry — never a stamp, and no network. One context is judged: the focus,
 else the only one in *trees* (every ALIVE name -> its ``specs/`` dir; the caller's read).
 ``doctor``, ``init``, ``context create`` and SessionStart all print :meth:`Step.text`.
 """
@@ -112,6 +112,11 @@ _Pending = Callable[[_Ctx], str | None]
 #: :func:`next_step` — it is the one step with no context to judge.
 STEPS: tuple[tuple[str, _Pending, Callable[[_Ctx], str]], ...] = (
     (
+        "bind",
+        _unbound,
+        lambda c: c.refusal[1] if c.refusal else fix_line(c.root, "context", "bind", c.name),
+    ),
+    (
         "constitution",
         _constitution_reason,
         lambda c: str(state(c.specs)[1]),
@@ -120,11 +125,6 @@ STEPS: tuple[tuple[str, _Pending, Callable[[_Ctx], str]], ...] = (
         "specs",
         lambda c: None if specs_ready(c.specs) else f"'{c.name}' specs tree is {state(c.specs)[0]}",
         lambda c: str(state(c.specs, root=c.root, context=c.name)[1]),
-    ),
-    (
-        "bind",
-        _unbound,
-        lambda c: c.refusal[1] if c.refusal else fix_line(c.root, "context", "bind", c.name),
     ),
     (
         "first-pass",
