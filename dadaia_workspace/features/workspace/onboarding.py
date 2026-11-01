@@ -16,8 +16,9 @@ from pathlib import Path
 
 from dadaia_workspace.core import platform, workspace_layout
 from dadaia_workspace.core.cli_line import cli_words, fix_line, spell_fix
+from dadaia_workspace.core.exceptions import DadaiaError
 from dadaia_workspace.core.fixed_sections import strip_fixed_sections
-from dadaia_workspace.core.gitflow import SeveralWorkBranches, constitution_problem
+from dadaia_workspace.core.gitflow import constitution_problem
 from dadaia_workspace.core.platform import act
 from dadaia_workspace.core.specs_version import state
 from dadaia_workspace.core.template_history import was_shipped
@@ -92,12 +93,12 @@ def _first_pass(c: _Ctx) -> list[str]:
 
 
 def _first_pass_fix(c: _Ctx) -> str:
-    """The first-pass act; with several work branches, that refusal's own fix."""
+    """The first-pass act; when the work version cannot be read, that refusal's own fix."""
     repo = c.specs.parent
     try:
         version = GitSubprocessClient().work_version(repo)
-    except SeveralWorkBranches as several:
-        return several.fix
+    except DadaiaError as unreadable:
+        return unreadable.fix
     lane = platform.inline(
         *cli_words(c.root, "worktree", "new", repo.name, f"{version}/wt-backlog-first-pass")
     )
