@@ -2771,6 +2771,41 @@
         "worktrees",
         "harness-codex"
       ]
+    },
+    {
+      "ts": "2026-11-01T16:29:44Z",
+      "agent": "release.py memory",
+      "kind": "memory",
+      "text": "Memory reconciled over 516320ff348480d6a27ce2a690d53631a062b31b..200e69a425f2: 14 reviewed, 9 changed.",
+      "since": "516320ff348480d6a27ce2a690d53631a062b31b",
+      "until": "200e69a425f2cea4f74e5b5da13f56e6f0d1e2b8",
+      "reviewed": [
+        "agent-comms",
+        "agent-orchestration",
+        "agentic-entities",
+        "public-asset-distribution",
+        "pypi-distribution",
+        "product-vision",
+        "capabilities",
+        "consumer-agent-support",
+        "server-registry",
+        "specs-migration",
+        "audits-canon",
+        "backlog-ledger",
+        "release-lifecycle",
+        "worktrees"
+      ],
+      "changed": [
+        "agent-evals",
+        "spec-context-project",
+        "context-management",
+        "workspace-init",
+        "sdd-gate-v3",
+        "context-portability",
+        "cross-platform-portability",
+        "workspace-doctor",
+        "bug-ledger"
+      ]
     }
   ]
 }
